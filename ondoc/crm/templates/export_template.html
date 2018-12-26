@@ -1,0 +1,6 @@
+{% extends "admin/import_export/change_list.html" %}
+
+{% block object-tools-items %}
+  {% include "export_template_item.html" %}
+  {{ block.super }}
+{% endblock %}

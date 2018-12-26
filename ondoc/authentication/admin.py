@@ -1,23 +1,23 @@
 from django.contrib import admin
 from django.contrib.contenttypes.admin import GenericTabularInline
 import nested_admin
-from ondoc.authentication.models import BillingAccount, SPOCDetails, DoctorNumber
-from .forms import BillingAccountFormSet, BillingAccountForm, SPOCDetailsForm
+from ondoc.authentication.models import SPOCDetails, DoctorNumber
+from .forms import SPOCDetailsForm
 from reversion.admin import VersionAdmin
 from django import forms
 from ondoc.doctor import models as doc_models
 from dal import autocomplete
 
 
-class BillingAccountInline(GenericTabularInline, nested_admin.NestedTabularInline):
-    form = BillingAccountForm
-    formset = BillingAccountFormSet
-    can_delete = False
-    extra = 0
-    model = BillingAccount
-    show_change_link = False
-    readonly_fields = ['merchant_id']
-    fields = ['merchant_id', 'type', 'account_number', 'ifsc_code', 'pan_number', 'pan_copy', 'account_copy', 'enabled']
+# class BillingAccountInline(GenericTabularInline, nested_admin.NestedTabularInline):
+#     form = BillingAccountForm
+#     formset = BillingAccountFormSet
+#     can_delete = False
+#     extra = 0
+#     model = BillingAccount
+#     show_change_link = False
+#     readonly_fields = ['merchant_id']
+#     fields = ['merchant_id', 'type', 'account_number', 'ifsc_code', 'pan_number', 'pan_copy', 'account_copy', 'enabled']
 
 
 class SPOCDetailsInline(GenericTabularInline):

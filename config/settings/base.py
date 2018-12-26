@@ -106,7 +106,8 @@ THIRD_PARTY_APPS = (
     'anymail',
     'nested_admin',
     'ipware',
-    'django_user_agents'
+    'django_user_agents',
+    'ddtrace.contrib.django',
 )
 
 LOCAL_APPS = (
@@ -321,8 +322,10 @@ MAXMIND_ACCOUNT_ID = env('MAXMIND_ACCOUNT_ID')
 MAXMIND_LICENSE_KEY = env('MAXMIND_LICENSE_KEY')
 MAXMIND_CITY_API_URL = env('MAXMIND_CITY_API_URL')
 OTP_BYPASS_NUMBERS = env.list('OTP_BYPASS_NUMBERS')
+TIME_BEFORE_APPOINTMENT_TO_SEND_OTP = 60  # in minutes
 # MONGO_URL = env.list('MONGO_URL')
 #GOOGLE_MAP_API_KEY = env('GOOGLE_MAP_API_KEY')
+MATRIX_NUMBER_MASKING = env('MATRIX_NUMBER_MASKING')
 
 ANYMAIL = {
     "MAILGUN_API_KEY": env('MAILGUN_API_KEY', default=None),
@@ -354,3 +357,7 @@ SEND_THROUGH_NODEJS_ENABLED = env.bool('SEND_THROUGH_NODEJS_ENABLED', default=Fa
 #DJANGO_TABLES2_TEMPLATE = 'django_tables2/bootstrap.html'
 DATA_UPLOAD_MAX_NUMBER_FIELDS=10000
 CONN_MAX_AGE=600
+
+AWS_ACCESS_KEY_ID = env('AWS_ACCESS_KEY_ID', default='')
+AWS_SECRET_ACCESS_KEY = env('AWS_SECRET_ACCESS_KEY', default='')
+PROVIDER_EMAIL = env('PROVIDER_EMAIL', default='')

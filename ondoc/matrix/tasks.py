@@ -14,6 +14,8 @@ logger = logging.getLogger(__name__)
 
 
 def prepare_and_hit(self, data):
+    from ondoc.doctor.models import OpdAppointment
+    from ondoc.diagnostic.models import LabAppointment
 
     appointment = data.get('appointment')
     task_data = data.get('task_data')
@@ -105,12 +107,23 @@ def prepare_and_hit(self, data):
 
     resp_data = response.json()
 
-    # save the appointment with the matrix lead id.
-    appointment.matrix_lead_id = resp_data.get('Id', None)
-    appointment.matrix_lead_id = int(appointment.matrix_lead_id)
+    if not resp_data.get('Id', None):
+        raise Exception("[ERROR] Id not recieved from the matrix while pushing appointment lead.")
 
-    data = {'push_again_to_matrix':False}
-    appointment.save(**data)
+    # save the appointment with the matrix lead id.
+    qs = None
+    if task_data.get('type') == 'OPD_APPOINTMENT':
+        qs = OpdAppointment.objects.filter(id=appointment.id)
+    elif task_data.get('type') == 'LAB_APPOINTMENT':
+        qs = LabAppointment.objects.filter(id=appointment.id)
+
+    if qs:
+        qs.update(matrix_lead_id=int(resp_data.get('Id')))
+
+    # appointment.matrix_lead_id = resp_data.get('Id', None)
+    # appointment.matrix_lead_id = int(appointment.matrix_lead_id)
+    # data = {'push_again_to_matrix':False}
+    # appointment.save(**data)
 
     print(str(resp_data))
     if isinstance(resp_data, dict) and resp_data.get('IsSaved', False):
@@ -172,7 +185,6 @@ def push_appointment_to_matrix(self, data):
 
 @task(bind=True, max_retries=2)
 def push_signup_lead_to_matrix(self, data):
-    # TODO: SHASHANK_SINGH Not sure what to do.
     try:
         from ondoc.web.models import OnlineLead
         lead_id = data.get('lead_id', None)
@@ -264,7 +276,6 @@ def push_order_to_matrix(self, data):
             raise Exception("Order could not found against id - " + str(order_id))
 
         appointment_details = order_obj.appointment_details()
-        # TODO: SHASHANK_SINGH not sure if any changes?
         request_data = {
             'LeadSource': 'DocPrime',
             'HospitalName': appointment_details.get('hospital_name'),

@@ -14,7 +14,7 @@ from .common import *
 from ondoc.authentication.models import GenericAdmin, User, GenericLabAdmin, AssociatedMerchant
 from django.contrib.contenttypes.admin import GenericTabularInline
 
-from ondoc.authentication.admin import BillingAccountInline, SPOCDetailsInline
+from ondoc.authentication.admin import SPOCDetailsInline
 import nested_admin
 from .common import AssociatedMerchantInline
 
@@ -223,7 +223,6 @@ class LabNetworkAdmin(VersionAdmin, ActionAdmin, QCPemAdmin):
                HomePickupChargesInline,
                LabNetworkDocumentInline,
                GenericLabNetworkAdminInline,
-               BillingAccountInline,
                SPOCDetailsInline,
                AssociatedMerchantInline]
 

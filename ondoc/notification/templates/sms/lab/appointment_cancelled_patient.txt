@@ -1,7 +1,21 @@
 {% spaceless %}
 {% if instance.cancellation_type == 3 %}
-    Your appointment for  {{patient_name|capfirst}} at {{instance.time_slot_start|date:"h:i a"}} {{instance.time_slot_start|date:"d/m/y"}} with Lab - {{lab_name|capfirst}} has been cancelled due to unavailability of lab manager.
+    Your appointment for {{patient_name|capfirst}} on {{instance.time_slot_start|date:"d/m/y"}} at {{instance.time_slot_start|date:"h:i a"}} with {{lab_name|capfirst}} has been cancelled due to unavailability of the lab manager.
 {% else %}
-    Your appointment for {{patient_name|capfirst}} at {{instance.time_slot_start|date:"h:i a"}} {{instance.time_slot_start|date:"d/m/y"}} with Lab - {{lab_name|capfirst}} has been cancelled as requested by you.
+    Your appointment for {{patient_name|capfirst}} on {{instance.time_slot_start|date:"d/m/y"}} at {{instance.time_slot_start|date:"h:i a"}} with {{lab_name|capfirst}} has been cancelled as requested by you.
 {% endif %}
+
+Booking ID : {{instance.id}}
+Patient Name : {{patient_name|capfirst}}
+Lab Name : {{lab_name|capfirst}}
+Date and Time : {{instance.time_slot_start|date:"D jS F Y"}} || {{instance.time_slot_start|date:"h:i A"}}
+{% if instance.effective_price > 0 %}
+Refund Amount : {{instance.effective_price}}
+
+Refund if applicable will be credited within 5-7 working days.
+{% endif %}
+
+In case of any queries please contact us at our toll free number 1800-123-9419.
+
+Thanks for choosing docprime.com
 {% endspaceless %}

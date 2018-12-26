@@ -784,7 +784,7 @@ class DoctorProfileUserViewSerializer(DoctorProfileSerializer):
         return False
 
     def get_is_gold(self, obj):
-        return obj.is_gold and obj.enabled_for_online_booking
+        return False #obj.is_gold and obj.enabled_for_online_booking
 
     def get_rating(self, obj):
         app = OpdAppointment.objects.select_related('profile').all()

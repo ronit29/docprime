@@ -37,7 +37,7 @@
 										<tbody>
 											<tr>
 												<td style="color: #0b0a0a; font-size: 16px; font-weight: 600;">
-													New Appoinment
+													New Appointment
 												</td>
 											</tr>
 											<tr>
@@ -59,59 +59,49 @@
 						<tbody>
 							<tr>
 								<td style="color: #000000; font-size: 16px; font-weight: 500; padding-top: 16px;">
-									Appointment with <span style="font-weight: 600;" > {{patient_name|capfirst}}</span>
+									Hi<br/>We have received an appointment for {{patient_name|capfirst}} at
+									{{lab_name|capfirst}} on {{instance.time_slot_start|date:"D jS F Y"}} at
+									{{instance.time_slot_start|date:"h:i A"}}
+								</td>
+							</tr>
+							<tr>
+								<td style="color: #000000; font-size: 16px; font-weight: 500; padding-top: 16px;">
+									Please confirm the booking at the earliest by accepting the booking using docprime
+									provider app or by replying to this email.<br/>The booking details are mentioned below.
 								</td>
 							</tr>
 							<tr>
 								<td style="color: #f78631; font-size: 14px; font-weight: 500; padding-top: 8px;">
-									Date and Time
+									Booking ID
 								</td>
 							</tr>
 							<tr>
 								<td style="color: #3f3f3f; font-size: 16px; font-weight: 500; padding-top: 8px; padding-left: 8px;">
-									{{instance.time_slot_start|date:"D jS F Y"}}
+									{{instance.id}}
 								</td>
 							</tr>
 							<tr>
-								<td style="color: #3f3f3f; font-size: 16px; font-weight: 500; padding-top: 4px; padding-left: 8px;">
-									{{instance.time_slot_start|date:"h:i a"}}
+								<td style="color: #f78631; font-size: 14px; font-weight: 500; padding-top: 8px;">
+									Patient Name
+								</td>
+							</tr>
+							<tr>
+								<td style="color: #3f3f3f; font-size: 16px; font-weight: 500; padding-top: 8px; padding-left: 8px;">
+									{{patient_name|capfirst}}
 								</td>
 							</tr>
 							<tr>
 								<td>
 									<table cellpadding="0" cellspacing="0" style="width: 100%; padding: 20px 0;">
 										<tbody>
-											{% if instance.lab.name %}
 												<tr>
-													<td style="color: #000000; font-weight: 600; font-size: 16px;">
+													<td style="color: #f78631; font-size: 14px; font-weight: 500; padding-top: 8px;">
 														Lab Name
 													</td>
 												</tr>
 												<tr>
-													<td style="font-size: 14px; color: #070707; font-weight: 500; padding-top: 4px;">
-														{{instance.lab.name|capfirst}}
-													</td>
-												</tr>
-											{% endif %}
-										</tbody>
-									</table>
-								</td>
-            				</tr>
-
-            				<tr>
-								<td>
-									<table cellpadding="0" cellspacing="0" style="width: 100%; padding: 20px 0;">
-										<tbody>
-												<tr>
-													<td style="color: #000000; font-weight: 600; font-size: 16px;">
-														Test Booked
-													</td>
-												</tr>
-												<tr>
-													<td style="font-size: 14px; color: #070707; font-weight: 500; padding-top: 4px;">
-														{% for test in instance.lab_test.all %}
-															{{test.test.name}}{% if not forloop.last %},{% endif %}
-														{% endfor %}
+													<td style="color: #3f3f3f; font-size: 16px; font-weight: 500; padding-top: 8px; padding-left: 8px;">
+														{{lab_name|capfirst}}
 													</td>
 												</tr>
 										</tbody>
@@ -130,17 +120,15 @@
 												</tr>
 
 												<tr>
-													<td style="color: #000000; font-weight: 600; font-size: 16px;">
-													Home Visit Address
+													<td style="color: #f78631; font-size: 14px; font-weight: 500; padding-top: 8px;">
+													Home Pick up Address
 													</td>
 												</tr>
-												{% if instance.address.address %}
 													<tr>
-														<td style="font-size: 14px; color: #070707; font-weight: 500; padding-top: 4px;">
-														{{instance.address.address}}
+														<td style="color: #3f3f3f; font-size: 16px; font-weight: 500; padding-top: 8px; padding-left: 8px;">
+														{{instance.get_pickup_address}}
 														</td>
 													</tr>
-												{% endif %}
 												<tr>
 													<td style="font-size: 14px; color: #070707; font-weight: 500; padding-top: 2px;">
 													</td>
@@ -154,34 +142,74 @@
 									<td>
 										<table cellpadding="0" cellspacing="0" style="width: 100%; padding: 20px 0;">
 											<tbody>
-												{% if instance.lab.name %}
 												<tr>
-													<td style="color: #000000; font-weight: 600; font-size: 16px;">
-														{{instance.lab.name|capfirst}}
+													<td style="color: #f78631; font-size: 14px; font-weight: 500; padding-top: 8px;">
+														Lab Address
 													</td>
 												</tr>
-												{% endif %}
 												<tr>
-													<td style="font-size: 14px; color: #070707; font-weight: 500; padding-top: 4px;">
+													<td style="color: #3f3f3f; font-size: 16px; font-weight: 500; padding-top: 8px; padding-left: 8px;">
 														{{instance.lab.get_lab_address}}
 													</td>
 												</tr>
-												<!--<tr>-->
-													<!--<td style="font-size: 14px; color: #070707; font-weight: 500; padding-top: 2px;">-->
-														<!--{% if instance.hospital.city %}{{instance.lab.city}} {% endif %}{% if instance.lab.state%}{{instance.lab.state}}{% endif %}-->
-													<!--</td>-->
-												<!--</tr>-->
-												<!--<tr>-->
-													<!--<td style="font-size: 14px; color: #070707; font-weight: 500; padding-top: 2px;">-->
-													<!--{% if instance.lab.city %} {{instance.lab.pin_code}}{% endif %}-->
-													<!--</td>-->
-												<!--</tr>-->
 											</tbody>
 										</table>
 									</td>
 								</tr>
 							{% endif %}
-
+							<tr>
+								<td style="color: #f78631; font-size: 14px; font-weight: 500; padding-top: 8px;">
+									Date and Time
+								</td>
+							</tr>
+							<tr>
+								<td style="color: #3f3f3f; font-size: 16px; font-weight: 500; padding-top: 8px; padding-left: 8px;">
+									{{instance.time_slot_start|date:"D jS F Y"}} || {{instance.time_slot_start|date:"h:i a"}}
+								</td>
+							</tr>
+            				<tr>
+								<td>
+									<table cellpadding="0" cellspacing="0" style="width: 100%; padding: 20px 0;">
+										<tbody>
+												<tr>
+													<td style="color: #f78631; font-size: 14px; font-weight: 500; padding-top: 8px;">
+														Test Booked
+													</td>
+												</tr>
+												<tr>
+													<td style="color: #3f3f3f; font-size: 16px; font-weight: 500; padding-top: 8px; padding-left: 8px;">
+														{% for test in instance.lab_test.all %}
+															{{test.test.name}}{% if not forloop.last %},{% endif %}
+														{% endfor %}
+													</td>
+												</tr>
+										</tbody>
+									</table>
+								</td>
+							</tr>
+							<tr>
+								<td style="color: #000000; font-size: 16px; font-weight: 500; padding-top: 16px;">
+									Process to complete the appointment & billing:<br/>
+									1. In case you have the Docprime provider App installed:
+									<ul>
+										<li> Once the customer comes to avail services at your premises, obtain the 4
+											digit Unique Confirmation Code (OTP) from the customer
+										</li>
+										<li>Open the appointment of the customer on the Docprime provider application
+											and enter the Unique Confirmation Code (OTP) on the "Complete Appointment" page.
+										</li>
+									</ul>
+									2. In case you don't have the Docprime provider App installed:
+									<ul>
+										<li>Please obtain the 4-digit Unique Confirmation Code and Booking ID from the
+											customer & enter it in the below mentioned link:<br>
+											Confirmation page - https://provider.docprime.com/lab/otp
+										</li>
+									</ul>
+									Thanks<br/>
+									Team docprime
+								</td>
+							</tr>
 						</tbody>
 					</table>
 				</td>
@@ -192,7 +220,8 @@
 						<tbody>
 							<tr>
 								<td style="font-size: 14px; font-weight: 500; color: #757575; text-align: center;">
-									This is a system-generated e-mail. Please do not reply to this e-mail. For any support please write to networkhelp@docprime.com
+									This is a system-generated e-mail. Please do not reply to this e-mail. For any
+									support please write to customercare@docprime.com.
 								</td>
 							</tr>
 						</tbody>
