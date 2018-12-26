@@ -1111,6 +1111,7 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin):
                                         through_fields=('opd_appointment', 'procedure'), null=True, blank=True)
 
     merchant_payout = models.ForeignKey(MerchantPayout, related_name="opd_appointment", on_delete=models.SET_NULL, null=True)
+    price_data = JSONField(blank=True, null=True)
 
     def __str__(self):
         return self.profile.name + " (" + self.doctor.name + ")"

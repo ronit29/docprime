@@ -886,6 +886,7 @@ class LabAppointment(TimeStampedModel, CouponsMixin):
     cancellation_reason = models.ForeignKey(CancellationReason, on_delete=models.SET_NULL, null=True, blank=True)
     cancellation_comments = models.CharField(max_length=5000, null=True, blank=True)
     merchant_payout = models.ForeignKey(MerchantPayout, related_name="lab_appointment", on_delete=models.SET_NULL, null=True)
+    price_data = JSONField(blank=True, null=True)
 
     def get_tests_and_prices(self):
         test_price = []

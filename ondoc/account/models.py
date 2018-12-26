@@ -167,7 +167,10 @@ class Order(TimeStampedModel):
             self.update_order(order_dict)
         # If payment is required and appointment is created successfully, debit consumer's account
         if appointment_obj and not payment_not_required:
-            consumer_account.debit_schedule(appointment_obj, self.product_id, amount)
+            # debit consumer account and update appointment with price breakup
+            wallet_amount, cashback_amount = consumer_account.debit_schedule(appointment_obj, self.product_id, amount)
+            appointment_obj.price_data = {"wallet_amount": int(wallet_amount), "cashback_amount": int(cashback_amount)}
+            appointment_obj.save()
         return appointment_obj
 
     def update_order(self, data):
@@ -472,11 +475,31 @@ class ConsumerAccount(TimeStampedModel):
         self.save()
 
     def credit_cancellation(self, appointment_obj, product_id, amount):
-        self.balance += amount
+        wallet_refund_amount = amount
+        cashback_refund_amount = 0
+
+        price_data = appointment_obj.price_data
+        if price_data:
+            wallet_refund_amount = price_data["wallet_amount"]
+            cashback_refund_amount = price_data["cashback_amount"]
+
+        if wallet_refund_amount + cashback_refund_amount != int(amount):
+            raise Exception("Amount sanity check failed " + str(appointment_obj))
+
+        self.balance += wallet_refund_amount
+        self.cashback += cashback_refund_amount
+
         action = ConsumerTransaction.CANCELLATION
         tx_type = PgTransaction.CREDIT
-        consumer_tx_data = self.consumer_tx_appointment_data(appointment_obj, product_id, amount, action, tx_type)
-        ConsumerTransaction.objects.create(**consumer_tx_data)
+
+        if wallet_refund_amount:
+            consumer_tx_data = self.consumer_tx_appointment_data(appointment_obj, product_id, wallet_refund_amount, action, tx_type, ConsumerTransaction.WALLET_SOURCE)
+            ConsumerTransaction.objects.create(**consumer_tx_data)
+
+        if cashback_refund_amount:
+            consumer_tx_data = self.consumer_tx_appointment_data(appointment_obj, product_id, cashback_refund_amount, action, tx_type, ConsumerTransaction.CASHBACK_SOURCE)
+            ConsumerTransaction.objects.create(**consumer_tx_data)
+
         self.save()
 
     def debit_refund(self):
@@ -499,10 +522,17 @@ class ConsumerAccount(TimeStampedModel):
 
         action = ConsumerTransaction.SALE
         tx_type = PgTransaction.DEBIT
+        
+        if balance_deducted:
+            consumer_tx_data = self.consumer_tx_appointment_data(appointment_obj, product_id, balance_deducted, action, tx_type, ConsumerTransaction.WALLET_SOURCE)
+            ConsumerTransaction.objects.create(**consumer_tx_data)
 
-        consumer_tx_data = self.consumer_tx_appointment_data(appointment_obj, product_id, amount, action, tx_type)
-        ConsumerTransaction.objects.create(**consumer_tx_data)
+        if cashback_deducted:
+            consumer_tx_data = self.consumer_tx_appointment_data(appointment_obj, product_id, cashback_deducted, action, tx_type, ConsumerTransaction.CASHBACK_SOURCE)
+            ConsumerTransaction.objects.create(**consumer_tx_data)
+
         self.save()
+        return balance_deducted, cashback_deducted
 
     def credit_schedule(self, appointment_obj, product_id, amount):
         self.balance += amount
@@ -538,7 +568,10 @@ class ConsumerAccount(TimeStampedModel):
         consumer_tx_data['amount'] = amount
         return consumer_tx_data
 
-    def consumer_tx_appointment_data(self, app_obj, product_id, amount, action, tx_type):
+    def consumer_tx_appointment_data(self, app_obj, product_id, amount, action, tx_type, source=None):
+        if source is None:
+            source = ConsumerTransaction.WALLET_SOURCE
+
         consumer_tx_data = dict()
         consumer_tx_data['user'] = app_obj.user
         consumer_tx_data['product_id'] = product_id
@@ -548,6 +581,7 @@ class ConsumerAccount(TimeStampedModel):
         consumer_tx_data['type'] = tx_type
         consumer_tx_data['action'] = action
         consumer_tx_data['amount'] = amount
+        consumer_tx_data['source'] = source
         return consumer_tx_data
 
     class Meta:
@@ -562,6 +596,10 @@ class ConsumerTransaction(TimeStampedModel):
     RESCHEDULE_PAYMENT = 4
     CASHBACK_CREDIT = 5
 
+    WALLET_SOURCE = 1
+    CASHBACK_SOURCE = 2
+
+    SOURCE_TYPE = [(WALLET_SOURCE, "Wallet"), (CASHBACK_SOURCE, "Cashback")]
     action_list = ["Cancellation", "Payment", "Refund", "Sale", "CashbackCredit"]
     ACTION_CHOICES = list(enumerate(action_list, 0))
     user = models.ForeignKey(User, on_delete=models.DO_NOTHING)
@@ -573,6 +611,7 @@ class ConsumerTransaction(TimeStampedModel):
     type = models.SmallIntegerField(choices=PgTransaction.TYPE_CHOICES)
     action = models.SmallIntegerField(choices=ACTION_CHOICES)
     amount = models.DecimalField(max_digits=10, decimal_places=2, default=0)
+    source = models.SmallIntegerField(choices=SOURCE_TYPE, blank=True, null=True)
 
     @classmethod
     def valid_appointment_for_cancellation(cls, app_id, product_id):
