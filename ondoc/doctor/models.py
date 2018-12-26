@@ -1891,7 +1891,10 @@ class OfflinePatients(auth_model.TimeStampedModel):
     def after_commit_sms(sms_list):
         if sms_list:
             for number in sms_list:
-                notification_tasks.send_offline_welcome_message.apply_async(kwargs={'number': number}, countdown=1)
+                try:
+                    notification_tasks.send_offline_welcome_message.apply_async(kwargs={'number': number}, countdown=1)
+                except Exception as e:
+                    logger.error("Failed to Push Offline Welcome Message SMS Task "+ str(e))
 
     class Meta:
         db_table = 'offline_patients'
