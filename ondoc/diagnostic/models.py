@@ -313,12 +313,12 @@ class Lab(TimeStampedModel, CreatedByModel, QCModel, SearchKey):
                     filter(lab=id, test__test_type=LabTest.RADIOLOGY).\
                     update(computed_deal_price=DealPriceCalculate(F('mrp'), F('computed_agreed_price'), rad_deal_price_prcnt))
 
-        transaction.on_commit(lambda: self.app_commit_tasks(push_to_matrix))
-
-    def app_commit_tasks(self, push_to_matrix):
-        if push_to_matrix:
-            push_onboarding_qcstatus_to_matrix.apply_async(({'obj_type': self.__class__.__name__, 'obj_id': self.id}
-                                                            ,), countdown=5)
+        # transaction.on_commit(lambda: self.app_commit_tasks(push_to_matrix))
+    #
+    # def app_commit_tasks(self, push_to_matrix):
+    #     if push_to_matrix:
+    #         push_onboarding_qcstatus_to_matrix.apply_async(({'obj_type': self.__class__.__name__, 'obj_id': self.id}
+    #                                                         ,), countdown=5)
 
 
 class LabCertification(TimeStampedModel):
