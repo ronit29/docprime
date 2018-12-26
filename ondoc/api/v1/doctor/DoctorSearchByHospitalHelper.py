@@ -16,12 +16,12 @@ import re
 import json
 from django.contrib.staticfiles.templatetags.staticfiles import static
 
-from ondoc.location.models import EntityAddress
+from ondoc.location.models import EntityAddress, EntityUrls
 from collections import OrderedDict
 from collections import defaultdict
 
 
-class DoctorSearchHelper:
+class DoctorSearchByHospitalHelper:
     MAX_DISTANCE = "15000"
 
     def __init__(self, query_params):
@@ -207,7 +207,7 @@ class DoctorSearchHelper:
                     order_by_field = " distance ASC, deal_price ASC, priority desc "
                     rank_by = " rnk=1 "
             else:
-                order_by_field = ' floor(distance/{bucket_size}) ASC, is_license_verified DESC, distance, priority desc '.format(bucket_size=str(bucket_size))
+                order_by_field = ' floor(distance/{bucket_size}) ASC, is_gold desc, is_license_verified DESC, distance, priority desc '.format(bucket_size=str(bucket_size))
                 rank_by = "rnk=1"
 
             order_by_field = "{}, {} ".format(' enabled_for_online_booking DESC ', order_by_field)
@@ -220,14 +220,13 @@ class DoctorSearchHelper:
         max_distance = str(
             self.query_params.get('max_distance') * 1000 if self.query_params.get(
                 'max_distance') and self.query_params.get(
-                'max_distance') * 1000 < int(DoctorSearchHelper.MAX_DISTANCE) else DoctorSearchHelper.MAX_DISTANCE)
+                'max_distance') * 1000 < int(DoctorSearchByHospitalHelper.MAX_DISTANCE) else DoctorSearchByHospitalHelper.MAX_DISTANCE)
         min_distance = self.query_params.get('min_distance')*1000 if self.query_params.get('min_distance') else 0
         # max_distance = 10000000000000000000000
         data = dict()
 
         specialization_ids = self.query_params.get("specialization_ids", [])
         condition_ids = self.query_params.get("condition_ids", [])
-
 
         if self.count_of_procedure:
             rank_part = "Row_number() OVER( PARTITION BY doctor_id ORDER BY " \
@@ -236,14 +235,15 @@ class DoctorSearchHelper:
                 rank_part = " Row_number() OVER( partition BY doctor_id " \
                             "ORDER BY total_price ASC, distance) rnk " \
 
-            query_string = "SELECT doctor_id, hospital_id, doctor_clinic_id, doctor_clinic_timing_id " \
+            query_string = "SELECT doctor_id, hospital_id, doctor_clinic_id, doctor_clinic_timing_id, " \
+                           "ROW_NUMBER () OVER (ORDER BY {order_by_field}) order_rank " \
                            "FROM (SELECT total_price, " \
                            " {rank_part} ," \
-                           " distance, enabled_for_online_booking, is_license_verified, priority " \
+                           " distance, enabled_for_online_booking, is_gold, is_license_verified, priority " \
                            "procedure_deal_price, doctor_id, practicing_since, doctor_clinic_id, doctor_clinic_timing_id, " \
                            "procedure_id, doctor_clinic_deal_price, hospital_id " \
                            "FROM (SELECT distance, procedure_deal_price, doctor_id, practicing_since, doctor_clinic_id, doctor_clinic_timing_id, procedure_id," \
-                           "enabled_for_online_booking, is_license_verified, priority, " \
+                           "enabled_for_online_booking, is_gold, is_license_verified, priority, " \
                            "doctor_clinic_deal_price, hospital_id , count_per_clinic, sum_per_clinic, sum_per_clinic+doctor_clinic_deal_price as total_price FROM " \
                            "(SELECT " \
                            "COUNT(procedure_id) OVER (PARTITION BY dct.id) AS count_per_clinic, " \
@@ -251,7 +251,7 @@ class DoctorSearchHelper:
                            "St_distance(St_setsrid(St_point((%(longitude)s), (%(latitude)s)), 4326), h.location) AS distance, " \
                            "dcp.deal_price AS procedure_deal_price, " \
                            "d.id AS doctor_id, practicing_since, " \
-                           "d.enabled_for_online_booking and dc.enabled_for_online_booking and h.enabled_for_online_booking as enabled_for_online_booking, d.is_license_verified, dc.priority, " \
+                           "d.enabled_for_online_booking, d.is_gold, d.is_license_verified, dc.priority, " \
                            "dc.id AS doctor_clinic_id,  dct.id AS doctor_clinic_timing_id, dcp.id AS doctor_clinic_procedure_id, " \
                            "dcp.procedure_id, dct.deal_price AS doctor_clinic_deal_price, " \
                            "dc.hospital_id AS hospital_id FROM doctor d " \
@@ -270,11 +270,20 @@ class DoctorSearchHelper:
                 count_of_procedure=filtering_params.get('count_of_procedure'),
                 rank_by=rank_by, order_by_field=order_by_field)
 
+            query = ''' select doctor_id, hospital_id, doctor_clinic_id, doctor_clinic_timing_id from ( 
+                select *, dense_rank() over(order by rank) as hosp_rank from ( 
+                    select  doctor_id, hospital_id,  ROW_NUMBER() OVER 
+                    (PARTITION BY hospital_id order by order_rank) AS row_num,
+                    min (order_rank) OVER (PARTITION BY coalesce(hospital_id,random())) rank,
+                    doctor_clinic_id, doctor_clinic_timing_id from ({query_string})y )z where row_num<=5)a where hosp_rank<=20
+                    '''.format(query_string=query_string)
+
         else:
             sp_cond = ''
             min_dist_cond = ''
             rank_part = " Row_number() OVER( partition BY d.id  ORDER BY " \
                 "St_distance(St_setsrid(St_point((%(longitude)s), (%(latitude)s)), 4326 ), h.location),dct.deal_price ASC) rnk " \
+
 
             if len(specialization_ids)>0 or len(condition_ids)>0:
                 sp_cond = " LEFT JOIN doctor_practice_specialization ds on ds.doctor_id = d.id " \
@@ -286,27 +295,38 @@ class DoctorSearchHelper:
                 rank_part = " Row_number() OVER( partition BY d.id  ORDER BY " \
                             "dct.deal_price, St_distance(St_setsrid(St_point((%(longitude)s), (%(latitude)s)), 4326 ), h.location) ASC) rnk " \
 
-            query_string = "SELECT x.doctor_id, x.hospital_id, doctor_clinic_id, doctor_clinic_timing_id " \
-            "FROM (select {rank_part}, " \
-            "St_distance(St_setsrid(St_point((%(longitude)s), (%(latitude)s)), 4326), h.location) distance, " \
-            "d.id as doctor_id, " \
-            "dc.id as doctor_clinic_id,  " \
-            "dct.id as doctor_clinic_timing_id,practicing_since, " \
-            "d.enabled_for_online_booking, is_license_verified, priority,deal_price, " \
-            "dc.hospital_id as hospital_id FROM doctor d " \
-            "INNER JOIN doctor_clinic dc ON d.id = dc.doctor_id and dc.enabled=true and d.is_live=true " \
-            "and d.is_test_doctor is False and d.is_internal is False " \
-            "INNER JOIN hospital h ON h.id = dc.hospital_id and h.is_live=true " \
-            "INNER JOIN doctor_clinic_timing dct ON dc.id = dct.doctor_clinic_id " \
-            "{sp_cond}" \
-            "WHERE {filtering_params} " \
-            "and St_dwithin(St_setsrid(St_point((%(longitude)s), (%(latitude)s)), 4326 ), h.location, (%(max_distance)s)) " \
-            "{min_dist_cond}" \
-            " )x " \
-            "where {rank_by} ORDER BY {order_by_field}".format(rank_part=rank_part, sp_cond=sp_cond, \
-                filtering_params=filtering_params.get('string'), \
-                min_dist_cond=min_dist_cond, order_by_field=order_by_field, \
-                rank_by = rank_by)
+            query_string = "SELECT x.doctor_id, x.hospital_id, doctor_clinic_id, doctor_clinic_timing_id ," \
+                           " ROW_NUMBER () OVER (ORDER BY {order_by_field}) order_rank " \
+                           "FROM (select {rank_part}, " \
+                           "St_distance(St_setsrid(St_point((%(longitude)s), (%(latitude)s)), 4326), h.location) distance, " \
+                           "d.id as doctor_id, " \
+                           "dc.id as doctor_clinic_id,  " \
+                           "dct.id as doctor_clinic_timing_id,practicing_since, " \
+                           "d.enabled_for_online_booking, is_gold,is_license_verified, priority,deal_price, " \
+                           "dc.hospital_id as hospital_id FROM doctor d " \
+                           "INNER JOIN doctor_clinic dc ON d.id = dc.doctor_id and dc.enabled=true and d.is_live=true " \
+                           "and d.is_test_doctor is False and d.is_internal is False " \
+                           "INNER JOIN hospital h ON h.id = dc.hospital_id and h.is_live=true " \
+                           "INNER JOIN doctor_clinic_timing dct ON dc.id = dct.doctor_clinic_id " \
+                           "{sp_cond}" \
+                           "WHERE {filtering_params} " \
+                           "and St_dwithin(St_setsrid(St_point((%(longitude)s), (%(latitude)s)), 4326 ), h.location, (%(max_distance)s)) " \
+                           "{min_dist_cond}" \
+                           " )x " \
+                           "where {rank_by} ORDER BY {order_by_field}".format(rank_part=rank_part, sp_cond=sp_cond, \
+                                                                              filtering_params=filtering_params.get(
+                                                                                  'string'), \
+                                                                              min_dist_cond=min_dist_cond,
+                                                                              order_by_field=order_by_field, \
+                                                                              rank_by=rank_by)
+
+            query = ''' select doctor_id, hospital_id, doctor_clinic_id, doctor_clinic_timing_id from ( 
+                select *, dense_rank() over(order by rank) as hosp_rank from ( 
+                    select  doctor_id, hospital_id,  ROW_NUMBER() OVER 
+                    (PARTITION BY hospital_id order by order_rank) AS row_num,
+                    min (order_rank) OVER (PARTITION BY coalesce(hospital_id,random())) rank,
+                    doctor_clinic_id, doctor_clinic_timing_id from ({query_string})y )z where row_num<=5)a where hosp_rank<=20
+                    '''.format(query_string=query_string)
 
         if filtering_params.get('params'):
             filtering_params.get('params')['longitude'] = longitude
@@ -319,7 +339,7 @@ class DoctorSearchHelper:
              filtering_params['params']['min_distance'] = min_distance
              filtering_params['params']['max_distance'] = max_distance
 
-        return {'params':filtering_params.get('params'), 'query': query_string}
+        return {'params':filtering_params.get('params'), 'query': query}
 
     def count_hospitals(self, doctor):
         return len([h for h in doctor.hospitals.all() if h.is_live == True])
@@ -341,7 +361,15 @@ class DoctorSearchHelper:
                 # return doctor_hospital.deal_price
         return None
 
-    def prepare_search_response(self, doctor_data, doctor_search_result, request):
+    def prepare_search_response(self, doctor_data, doctor_search_result, doctor_ids, request):
+        entity_ids = doctor_ids
+
+        id_url_dict = dict()
+        entity = EntityUrls.objects.filter(entity_id__in=entity_ids, url_type='PAGEURL', is_valid='t',
+                                           entity_type__iexact='Doctor').values('entity_id', 'url')
+        for data in entity:
+            id_url_dict[data['entity_id']] = data['url']
+
         doctor_clinic_mapping = {data.get("doctor_id"): data.get("hospital_id") for data in doctor_search_result}
         doctor_availability_mapping = {data.get("doctor_id"): data.get("doctor_clinic_timing_id") for data in
                                        doctor_search_result}
@@ -349,11 +377,12 @@ class DoctorSearchHelper:
         procedure_ids = self.query_params.get("procedure_ids", [])
         category_ids = [int(x) for x in category_ids]
         procedure_ids = [int(x) for x in procedure_ids]
-        response = []
+
+        hospital_card = dict()
         selected_procedure_ids, other_procedure_ids = get_selected_and_other_procedures(category_ids, procedure_ids)
         for doctor in doctor_data:
 
-            is_gold = False #doctor.enabled_for_online_booking and doctor.is_gold
+            is_gold = doctor.enabled_for_online_booking and doctor.is_gold
             doctor_clinics = [doctor_clinic for doctor_clinic in doctor.doctor_clinics.all() if
                               doctor_clinic.hospital_id == doctor_clinic_mapping[doctor_clinic.doctor_id]]
             doctor_clinic = doctor_clinics[0]
@@ -391,28 +420,27 @@ class DoctorSearchHelper:
                                                                         other_procedures_list)
                 # fees = self.get_doctor_fees(doctor, doctor_availability_mapping)
 
-                enable_online_booking = False
-                if doctor_clinic and doctor and doctor_clinic.hospital:
-                    if doctor.enabled_for_online_booking and doctor_clinic.hospital.enabled_for_online_booking and doctor_clinic.enabled_for_online_booking:
-                        enable_online_booking = True
+                # enable_online_booking = False
+                # if doctor_clinic and doctor and doctor_clinic.hospital:
+                #     if doctor.enabled_for_online_booking and doctor_clinic.hospital.enabled_for_online_booking and doctor_clinic.enabled_for_online_booking:
+                #         enable_online_booking = True
 
                 hospitals = [{
-                    "enabled_for_online_booking": enable_online_booking,
+                    # "enabled_for_online_booking": enable_online_booking,
                     "hospital_name": doctor_clinic.hospital.name,
                     "address": ", ".join(
                         [value for value in [doctor_clinic.hospital.sublocality, doctor_clinic.hospital.locality] if
                          value]),
                     "short_address": doctor_clinic.hospital.get_short_address(),
-                    "doctor": doctor.name,
-                    "display_name": doctor.get_display_name(),
                     "hospital_id": doctor_clinic.hospital.id,
-                    "mrp": min_price["mrp"],
-                    "discounted_fees": min_price["deal_price"],
-                    "timings": clinic_convert_timings(doctor_clinic.availability.all(), is_day_human_readable=False),
+                    # "discounted_fees": min_price["deal_price"],
                     "procedure_categories": final_result
                 }]
 
             thumbnail = doctor.get_thumbnail()
+
+            if doctor.pk in id_url_dict.keys():
+                url = id_url_dict[doctor.pk]
 
             opening_hours = None
             if doctor_clinic.availability.exists():
@@ -429,13 +457,9 @@ class DoctorSearchHelper:
                 "mrp": filtered_mrp,
                 "is_live": doctor.is_live,
                 "is_gold": is_gold,
-                # "fees": filtered_fees,*********show mrp here
                 "discounted_fees": filtered_deal_price,
-                # "discounted_fees": filtered_fees, **********deal_price
                 "practicing_since": doctor.practicing_since,
                 "experience_years": doctor.experience_years(),
-                #"experiences": serializers.DoctorExperienceSerializer(doctor.experiences.all(), many=True).data,
-                #"qualifications": serializers.DoctorQualificationSerializer(doctor.qualifications.all(), many=True).data,
                 "general_specialization": serializers.DoctorPracticeSpecializationSerializer(
                     doctor.doctorpracticespecializations.all(),
                     many=True).data,
@@ -443,8 +467,6 @@ class DoctorSearchHelper:
                 "name": doctor.name,
                 "display_name": doctor.get_display_name(),
                 "gender": doctor.gender,
-                #"images": serializers.DoctorImageSerializer(doctor.images.all(), many=True, context={"request": request}).data,
-                "hospitals": hospitals,
                 "thumbnail": (
                     request.build_absolute_uri(thumbnail) if thumbnail else None),
 
@@ -477,7 +499,20 @@ class DoctorSearchHelper:
                         }
                     }
 
-                }
+                },
+                "url":url
+
+
             }
-            response.append(temp)
-        return response
+
+            hospital_id = doctor_clinic.hospital.pk
+            if hospital_id:
+                if not hospital_card.get('hospital' + str(hospital_id)):
+                    hospital_card['hospital' + str(hospital_id)] = hospitals
+                    if not hospital_card.get('hospital' + str(hospital_id))[0].get('doctors'):
+                        hospital_card.get('hospital' + str(hospital_id))[0]['doctors'] = list()
+                    hospital_card['hospital' + str(hospital_id)][0]['doctors'].append(temp)
+                else:
+                    hospital_card['hospital' + str(hospital_id)][0]['doctors'].append(temp)
+
+        return hospital_card
