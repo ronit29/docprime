@@ -988,7 +988,7 @@ class LabPackageListSerializer(serializers.Serializer):
     def validate_category_ids(self, attrs):
         try:
             temp_attrs = [int(attr) for attr in attrs]
-            if LabTestCategory.objects.filter(is_live=True, is_package_category=True).count() == len(temp_attrs):
+            if LabTestCategory.objects.filter(is_live=True, is_package_category=True, id__in=temp_attrs).count() == len(temp_attrs):
                 return attrs
         except:
             raise serializers.ValidationError('Invalid Category IDs')
