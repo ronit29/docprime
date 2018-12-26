@@ -511,6 +511,10 @@ class ConsumerAccount(TimeStampedModel):
 
     @classmethod
     def credit_cashback(cls, user, cashback_amount, appointment_obj, product_id):
+        # check if cashback already credited
+        if ConsumerTransaction.objects.filter(product_id=product_id, type=ConsumerTransaction.CASHBACK_CREDIT, reference_id=appointment_obj.id).exists():
+            return
+
         consumer_account = cls.objects.select_for_update().get(user=user)
         consumer_account.cashback += cashback_amount
         action = ConsumerTransaction.CASHBACK_CREDIT
