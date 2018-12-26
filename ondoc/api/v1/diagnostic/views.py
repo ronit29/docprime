@@ -976,7 +976,6 @@ class LabList(viewsets.ReadOnlyModelViewSet):
         resp_queryset = list()
         temp_var = dict()
         tests = dict()
-        lab = dict()
 
         for obj in labs:
             temp_var[obj.id] = obj
@@ -988,7 +987,6 @@ class LabList(viewsets.ReadOnlyModelViewSet):
                     else:
                         deal_price=test.computed_deal_price
                     tests[obj.id].append({"id": test.test_id, "name": test.test.name, "deal_price": deal_price, "mrp": test.mrp})
-
         day_now = timezone.now().weekday()
         days_array = [i for i in range(7)]
         rotated_days_array = days_array[day_now:] + days_array[:day_now]
