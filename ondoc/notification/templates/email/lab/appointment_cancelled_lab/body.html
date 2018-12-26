@@ -122,7 +122,8 @@
                             </tr>
                             <tr>
                                 <td style="font-size: 14px; color: #070707; font-weight: 500; padding-top: 4px;">
-                                    {% for test in instance.lab_test.all %}
+                                    {% for test in instance.test_mappings.all %}
+                                    <!-- DONE SHASHANK_SINGH CHANGE 8-->
                                     {{test.test.name}}{% if not forloop.last %},{% endif %}
                                     {% endfor %}
                                 </td>

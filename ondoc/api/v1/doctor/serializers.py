@@ -173,7 +173,6 @@ class CreateAppointmentSerializer(serializers.Serializer):
     # time_slot_end = serializers.DateTimeField()
 
     def validate(self, data):
-        # TODO: SHASHANK_SINGH - timeslot in .5 multiples, no need for below code
         # procedures = data.get('procedure_ids', [])
         # procedure_categories = data.get('procedure_ids', [])
         # procedure_category_ids = [procedure.id for procedure in procedures]

@@ -37,7 +37,7 @@ def prepare_and_hit(self, data):
         patient_address = resolve_address(appointment.address)
     service_name = ""
     if task_data.get('type') == 'LAB_APPOINTMENT':
-        service_name = ','.join([test_obj.test.name for test_obj in appointment.lab_test.all()])
+        service_name = ','.join([test_obj.test.name for test_obj in appointment.test_mappings.all()])  # DONE SHASHANK_SINGH CHANGE 13
 
     order = data.get('order')
 

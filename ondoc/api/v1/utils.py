@@ -261,7 +261,7 @@ def opdappointment_transform(app_data):
     return app_data
 
 
-def labappointment_transform(app_data):
+def labappointment_transform(app_data):  # NO NEED SHASHANK_SINGH CHANGE 3 convert extra_details price to str
     app_data["price"] = str(app_data["price"])
     app_data["agreed_price"] = str(app_data["agreed_price"])
     app_data["deal_price"] = str(app_data["deal_price"])

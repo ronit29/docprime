@@ -405,7 +405,7 @@ class LabAppointmentModelSerializer(serializers.ModelSerializer):
     class Meta:
         model = LabAppointment
         fields = ('id', 'lab', 'lab_test', 'profile', 'type', 'lab_name', 'status', 'deal_price', 'effective_price', 'time_slot_start', 'time_slot_end',
-                   'is_home_pickup', 'lab_thumbnail', 'lab_image', 'patient_thumbnail', 'patient_name', 'allowed_action', 'address')
+                   'is_home_pickup', 'lab_thumbnail', 'lab_image', 'patient_thumbnail', 'patient_name', 'allowed_action', 'address')  # SHASHANK_SINGH CHANGE 18
 
 
 class LabAppointmentBillingSerializer(serializers.ModelSerializer):
@@ -455,6 +455,7 @@ class LabAppTransactionModelSerializer(serializers.Serializer):
     address = serializers.JSONField(required=False)
     coupon = serializers.ListField(child=serializers.IntegerField(), required=False, default = [])
     discount = serializers.DecimalField(max_digits=10, decimal_places=2)
+    extra_details = serializers.JSONField(required=False)
 
 
 class LabAppRescheduleModelSerializer(serializers.ModelSerializer):
@@ -772,7 +773,7 @@ class UpdateStatusSerializer(serializers.Serializer):
 class LabAppointmentRetrieveSerializer(LabAppointmentModelSerializer):
     profile = UserProfileSerializer()
     lab = LabModelSerializer()
-    lab_test = AvailableLabTestSerializer(many=True)
+    lab_test = AvailableLabTestSerializer(many=True)  # SHASHANK_SINGH CHANGE 17
     address = serializers.SerializerMethodField()
     type = serializers.ReadOnlyField(default='lab')
     reports = serializers.SerializerMethodField()
