@@ -2293,7 +2293,7 @@ class OfflineCustomerViewSet(viewsets.GenericViewSet):
             .select_related('user', 'profile', 'doctor') \
             .prefetch_related('doctor__qualifications', 'doctor__doctorpracticespecializations')\
             .distinct()
-        offline_queryset = get_opd_pemnotification_tasks_queryset(request.user, models.OfflineOPDAppointments)\
+        offline_queryset = get_opd_pem_queryset(request.user, models.OfflineOPDAppointments)\
             .select_related('user')\
             .prefetch_related('user__patient_mobiles').distinct()
         start_date = valid_data.get('start_date')
