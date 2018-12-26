@@ -14,6 +14,7 @@ from ondoc.doctor.models import (
         Doctor, Specialization, MedicalService, DoctorImage, Symptoms,
         DoctorQualification, DoctorImage, DoctorHospital, DoctorExperience, DoctorLanguage, OpdAppointment, Hospital, DoctorEmail, DoctorMobile, DoctorMedicalService, DoctorAssociation, DoctorAward, DoctorLeave
     )
+from ondoc.location.models import EntityUrls
 
 
 class DoctorExperienceSerializer(serializers.ModelSerializer):
@@ -116,10 +117,11 @@ class ArticleAuthorSerializer(serializers.ModelSerializer):
     profile_img = serializers.SerializerMethodField()
     speciality = serializers.SerializerMethodField()
     rating = serializers.SerializerMethodField()
+    url = serializers.SerializerMethodField()
 
     class Meta:
         model = Doctor
-        fields = ('id', 'name', 'experience', 'profile_img', 'speciality', 'rating')
+        fields = ('id', 'name', 'experience', 'profile_img', 'speciality', 'rating', 'url')
 
     def get_name(self, obj):
         return obj.name
@@ -135,6 +137,13 @@ class ArticleAuthorSerializer(serializers.ModelSerializer):
 
     def get_rating(self, obj):
         return obj.get_avg_rating()
+
+    def get_url(self, obj):
+        entity = EntityUrls.objects.filter(entity_id=obj.id, sitemap_identifier=EntityUrls.SitemapIdentifier.DOCTOR_PAGE, is_valid=True).first()
+        if entity:            
+            return entity.url
+        return ""
+
 
 
 class DoctorApiReformData(DoctorSerializer):

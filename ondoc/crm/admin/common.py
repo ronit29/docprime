@@ -261,8 +261,10 @@ class MerchantAdmin(ImportExportMixin, VersionAdmin):
 
     list_display = ('beneficiary_name', 'account_number', 'ifsc_code', 'enabled', 'verified_by_finance')
 
-    change_list_template = 'superuser_import_export.html'
-    search_fields = ['beneficiary_name']
+    change_list_template = 'export_template.html'
+    search_fields = ['beneficiary_name', 'account_number']
+    list_filter = ('enabled', 'verified_by_finance')
+
 
 
     def get_readonly_fields(self, request, obj=None):
@@ -324,7 +326,7 @@ class MerchantPayoutAdmin(VersionAdmin):
     model = MerchantPayout
     fields = ['id','charged_amount','updated_at','created_at','payable_amount','status','payout_time','paid_to',
     'appointment_id', 'get_billed_to', 'get_merchant', 'process_payout']
-    list_display = ('id', 'status', 'payable_amount')
+    list_display = ('id', 'status', 'payable_amount','appointment_id')
 
     def get_readonly_fields(self, request, obj=None):
         base = ['appointment_id', 'get_billed_to', 'get_merchant']

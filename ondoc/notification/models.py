@@ -44,6 +44,9 @@ class NotificationAction:
     DOCTOR_INVOICE = 10
     LAB_INVOICE = 11
 
+    OPD_OTP_BEFORE_APPOINTMENT = 30
+    LAB_OTP_BEFORE_APPOINTMENT = 31
+
     NOTIFICATION_TYPE_CHOICES = (
         (APPOINTMENT_ACCEPTED, "Appointment Accepted"),
         (APPOINTMENT_CANCELLED, "Appointment Cancelled"),

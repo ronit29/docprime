@@ -999,6 +999,17 @@ class LabAppointment(TimeStampedModel, CouponsMixin):
             except Exception as e:
                 logger.error(str(e))
 
+        if old_instance and old_instance.status != self.ACCEPTED and self.status == self.ACCEPTED:
+            try:
+                notification_tasks.lab_send_otp_before_appointment.apply_async(
+                    (self.id, str(math.floor(self.time_slot_start.timestamp()))),
+                    eta=self.time_slot_start - datetime.timedelta(
+                        minutes=settings.TIME_BEFORE_APPOINTMENT_TO_SEND_OTP), )
+                # notification_tasks.lab_send_otp_before_appointment(self.id, self.time_slot_start)
+            except Exception as e:
+                logger.error(str(e))
+
+
         # Do not delete below commented code
         # try:
         #     prev_app_dict = {'id': self.id,
