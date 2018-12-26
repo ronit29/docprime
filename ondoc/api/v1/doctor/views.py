@@ -981,13 +981,17 @@ class DoctorListViewSet(viewsets.GenericViewSet):
                     return Response(status=status.HTTP_400_BAD_REQUEST)
 
             if entity.sitemap_identifier =='DOCTORS_LOCALITY_CITY':
-                rating = round(random.uniform(3.5, 4.9),1)
-                reviews = random.randint(100, 125)
-                DefaultRating.objects.create(ratings=rating, reviews=reviews, url=url)
+                default_rating_obj = DefaultRating.objects.filter(url=url).first()
+                if not default_rating_obj:
+                    rating = round(random.uniform(3.5, 4.9),1)
+                    reviews = random.randint(100, 125)
+                    DefaultRating.objects.create(ratings=rating, reviews=reviews, url=url)
             elif entity.sitemap_identifier == 'SPECIALIZATION_LOCALITY_CITY':
-                rating = round(random.uniform(3.5, 4.9), 1)
-                reviews = random.randint(10, 25)
-                DefaultRating.objects.create(ratings=rating, reviews=reviews, url=url)
+                default_rating_obj = DefaultRating.objects.filter(url=url).first()
+                if not default_rating_obj:
+                    rating = round(random.uniform(3.5, 4.9), 1)
+                    reviews = random.randint(10, 25)
+                    DefaultRating.objects.create(ratings=rating, reviews=reviews, url=url)
 
             extras = entity.additional_info
             if extras:
