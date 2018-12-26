@@ -497,7 +497,6 @@ class CouponsMixin(object):
 
         user = kwargs.get("user")
         coupon_obj = kwargs.get("coupon_obj")
-        profile = kwargs.get("profile")
 
         if coupon_obj:
             if coupon_obj.is_user_specific and not user.is_authenticated:
@@ -520,35 +519,9 @@ class CouponsMixin(object):
                     return {"is_valid": False, "used_count": None}
 
             # check if a user is new i.e user has done any appointments
-            if user.is_authenticated:
-                if profile:
-                    user_profile = user.profiles.filter(id=profile.id).first()
-                else:
-                    user_profile = user.profiles.filter(is_default_user=True).first()
-                user_age = user_profile.get_age()
-            # else:
-            #     user_profile = None
-            #     user_age = None
-
-                if coupon_obj.new_user_constraint and not self.is_user_first_time(user):
+            if user and coupon_obj.new_user_constraint:
+                if not self.is_user_first_time(user):
                     return {"is_valid": False, "used_count": 0}
-
-                # TODO
-                if coupon_obj.step_count != 1:
-                    user_opd_completed = OpdAppointment.objects.filter(user=user,
-                                                                       status__in=[OpdAppointment.COMPLETED]).count()
-                    user_lab_completed = LabAppointment.objects.filter(user=user,
-                                                                       status__in=[LabAppointment.COMPLETED]).count()
-                    if ((user_opd_completed + user_lab_completed + 1) % coupon_obj.step_count != 0):
-                        return {"is_valid": False, "used_count": None}
-
-                if coupon_obj.gender and coupon_obj.gender != user_profile.gender:
-                    return {"is_valid": False, "used_count": None}
-
-                # TODO
-                if ((coupon_obj.age_start and coupon_obj.age_start >= user_age)
-                        or (coupon_obj.age_end and coupon_obj.age_end <= user_age)):
-                    return {"is_valid": False, "used_count": None}
 
             count = coupon_obj.used_coupon_count(user)
             total_used_count = coupon_obj.total_used_coupon_count()
