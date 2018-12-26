@@ -492,14 +492,14 @@ class ConsumerAccount(TimeStampedModel):
         action = ConsumerTransaction.CANCELLATION
         tx_type = PgTransaction.CREDIT
 
-        if wallet_refund_amount:
-            consumer_tx_data = self.consumer_tx_appointment_data(appointment_obj, product_id, wallet_refund_amount, action, tx_type, ConsumerTransaction.WALLET_SOURCE)
-            ConsumerTransaction.objects.create(**consumer_tx_data)
-
         if cashback_refund_amount:
             consumer_tx_data = self.consumer_tx_appointment_data(appointment_obj, product_id, cashback_refund_amount, action, tx_type, ConsumerTransaction.CASHBACK_SOURCE)
             ConsumerTransaction.objects.create(**consumer_tx_data)
 
+        if wallet_refund_amount:
+            consumer_tx_data = self.consumer_tx_appointment_data(appointment_obj, product_id, wallet_refund_amount, action, tx_type, ConsumerTransaction.WALLET_SOURCE)
+            ConsumerTransaction.objects.create(**consumer_tx_data)
+            
         self.save()
 
     def debit_refund(self):
@@ -522,13 +522,13 @@ class ConsumerAccount(TimeStampedModel):
 
         action = ConsumerTransaction.SALE
         tx_type = PgTransaction.DEBIT
-        
-        if balance_deducted:
-            consumer_tx_data = self.consumer_tx_appointment_data(appointment_obj, product_id, balance_deducted, action, tx_type, ConsumerTransaction.WALLET_SOURCE)
-            ConsumerTransaction.objects.create(**consumer_tx_data)
 
         if cashback_deducted:
             consumer_tx_data = self.consumer_tx_appointment_data(appointment_obj, product_id, cashback_deducted, action, tx_type, ConsumerTransaction.CASHBACK_SOURCE)
+            ConsumerTransaction.objects.create(**consumer_tx_data)
+
+        if balance_deducted:
+            consumer_tx_data = self.consumer_tx_appointment_data(appointment_obj, product_id, balance_deducted, action, tx_type, ConsumerTransaction.WALLET_SOURCE)
             ConsumerTransaction.objects.create(**consumer_tx_data)
 
         self.save()
