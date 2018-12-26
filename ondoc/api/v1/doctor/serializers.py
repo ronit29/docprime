@@ -1320,12 +1320,13 @@ class OfflineAppointmentBodySerializer(serializers.Serializer):
     hospital = serializers.PrimaryKeyRelatedField(queryset=Hospital.objects.all())
     start_date = serializers.DateTimeField()
     start_time = serializers.FloatField()
-    id = serializers.UUIDField()
+    # id = serializers.UUIDField()
+    id = serializers.CharField()
 
 
 class OfflineAppointmentUpdateBodySerializer(OfflineAppointmentBodySerializer):
     status = serializers.IntegerField()
-
+    is_docprime = serializers.BooleanField()
 
 class OfflineAppointmentCreateSerializer(serializers.Serializer):
     data = OfflineAppointmentBodySerializer(many=True)
