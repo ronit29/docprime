@@ -2,7 +2,7 @@ from rest_framework import serializers
 from rest_framework.fields import CharField
 from ondoc.diagnostic.models import (LabTest, AvailableLabTest, Lab, LabAppointment, LabTiming, PromotedLab,
                                      CommonTest, CommonDiagnosticCondition, LabImage, LabReportFile, CommonPackage,
-                                     LabTestCategory)
+                                     LabTestCategory, LabAppointmentTestMapping)
 from django.contrib.staticfiles.templatetags.staticfiles import static
 from ondoc.authentication.models import UserProfile, Address
 from ondoc.api.v1.doctor.serializers import CreateAppointmentSerializer, CommaSepratedToListField
@@ -295,6 +295,36 @@ class AvailableLabTestSerializer(serializers.ModelSerializer):
         fields = ('test_id', 'mrp', 'test', 'agreed_price', 'deal_price', 'enabled', 'is_home_collection_enabled')
 
 
+class LabAppointmentTestMappingSerializer(serializers.ModelSerializer):
+    test = LabTestSerializer()
+    test_id = serializers.ReadOnlyField(source='test.id')
+    agreed_price = serializers.SerializerMethodField()
+    deal_price = serializers.SerializerMethodField()
+    is_home_collection_enabled = serializers.SerializerMethodField()
+
+    def get_is_home_collection_enabled(self, obj):
+        if self.context.get("lab") is not None:
+            if self.context["lab"].is_home_collection_enabled and obj.test.home_collection_possible:
+                return True
+            return False
+        return obj.test.home_collection_possible
+        # return None
+
+    def get_agreed_price(self, obj):
+        agreed_price = obj.computed_agreed_price if obj.custom_agreed_price is None else obj.custom_agreed_price
+        return agreed_price
+
+    def get_deal_price(self, obj):
+        deal_price = obj.computed_deal_price if obj.custom_deal_price is None else obj.custom_deal_price
+        return deal_price
+
+    class Meta:
+        model = LabAppointmentTestMapping
+        fields = ('test_id', 'mrp', 'test', 'agreed_price', 'deal_price',
+                  # 'enabled',  # SHASHANK_SINGH Ask Arun Sir
+                  'is_home_collection_enabled')
+
+
 class LabCustomSerializer(serializers.Serializer):
     # lab = serializers.SerializerMethodField()
     lab = LabModelSerializer()
@@ -381,6 +411,10 @@ class LabAppointmentModelSerializer(serializers.ModelSerializer):
     patient_thumbnail = serializers.SerializerMethodField()
     patient_name = serializers.SerializerMethodField()
     allowed_action = serializers.SerializerMethodField()
+    lab_test = serializers.SerializerMethodField()
+
+    def get_lab_test(self, obj):
+        return list(obj.test_mappings.values_list('test_id', flat=True))
 
     def get_lab_thumbnail(self, obj):
         request = self.context.get("request")
@@ -405,7 +439,7 @@ class LabAppointmentModelSerializer(serializers.ModelSerializer):
     class Meta:
         model = LabAppointment
         fields = ('id', 'lab', 'lab_test', 'profile', 'type', 'lab_name', 'status', 'deal_price', 'effective_price', 'time_slot_start', 'time_slot_end',
-                   'is_home_pickup', 'lab_thumbnail', 'lab_image', 'patient_thumbnail', 'patient_name', 'allowed_action', 'address')  # SHASHANK_SINGH CHANGE 18
+                   'is_home_pickup', 'lab_thumbnail', 'lab_image', 'patient_thumbnail', 'patient_name', 'allowed_action', 'address')  # DONE SHASHANK_SINGH CHANGE 18
 
 
 class LabAppointmentBillingSerializer(serializers.ModelSerializer):
@@ -773,10 +807,14 @@ class UpdateStatusSerializer(serializers.Serializer):
 class LabAppointmentRetrieveSerializer(LabAppointmentModelSerializer):
     profile = UserProfileSerializer()
     lab = LabModelSerializer()
-    lab_test = AvailableLabTestSerializer(many=True)  # SHASHANK_SINGH CHANGE 17
+    # lab_test = AvailableLabTestSerializer(many=True)  # SHASHANK_SINGH CHANGE 17
+    lab_test = serializers.SerializerMethodField()
     address = serializers.SerializerMethodField()
     type = serializers.ReadOnlyField(default='lab')
     reports = serializers.SerializerMethodField()
+
+    def get_lab_test(self, obj):
+        return LabAppointmentTestMappingSerializer(obj.test_mappings.all(), many=True).data
 
     def get_reports(self, obj):
         reports = []
@@ -809,7 +847,7 @@ class LabAppointmentRetrieveSerializer(LabAppointmentModelSerializer):
                    'is_home_pickup', 'lab_thumbnail', 'lab_image', 'profile', 'allowed_action', 'lab_test', 'lab', 'otp', 'address', 'type', 'reports')
 
 
-class DoctorLabAppointmentRetrieveSerializer(LabAppointmentModelSerializer):
+class DoctorLabAppointmentRetrieveSerializer(LabAppointmentModelSerializer):  # Not Used any more, untested
     profile = UserProfileSerializer()
     lab = LabModelSerializer()
     lab_test = AvailableLabTestSerializer(many=True)
