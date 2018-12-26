@@ -1875,7 +1875,10 @@ class OfflineCustomerViewSet(viewsets.GenericViewSet):
                                                             )
         if valid_data.get('updated_at'):
             queryset = queryset.filter(updated_at__gte=valid_data.get('updated_at'))
-        queryset = queryset.values('name', 'id', 'gender', 'doctor', 'hospital', 'age', 'dob', 'calculated_dob', 'updated_at').distinct()
+        queryset = queryset.values('name', 'id', 'gender', 'doctor', 'hospital', 'age', 'dob', 'calculated_dob', 'updated_at',
+                                   'share_with_hospital', 'sms_notification', 'medical_history',
+                                   'referred_by', 'display_welcome_message',
+                                   ).distinct()
         return Response(queryset)
 
     @transaction.atomic
