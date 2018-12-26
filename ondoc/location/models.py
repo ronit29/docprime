@@ -1971,3 +1971,15 @@ class DoctorPageURL(object):
         data['url'] = new_url
         EntityUrls.objects.create(**data)
         return ("success: " + str(doctor.id))
+
+
+class DefaultRating(TimeStampedModel):
+    ratings = models.PositiveIntegerField(null=True)
+    reviews = models.PositiveIntegerField(null=True)
+    url = models.TextField()
+
+    class Meta:
+        db_table = 'default_rating'
+        indexes = [
+            models.Index(fields=['url']),
+        ]

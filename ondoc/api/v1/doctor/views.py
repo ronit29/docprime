@@ -10,7 +10,7 @@ from django.utils.safestring import mark_safe
 from ondoc.coupon.models import Coupon
 from ondoc.api.v1.diagnostic import serializers as diagnostic_serializer
 from ondoc.account import models as account_models
-from ondoc.location.models import EntityUrls, EntityAddress
+from ondoc.location.models import EntityUrls, EntityAddress, DefaultRating
 from ondoc.procedure.models import Procedure, ProcedureCategory, CommonProcedureCategory, ProcedureToCategoryMapping, \
     get_selected_and_other_procedures, CommonProcedure
 from . import serializers
@@ -56,6 +56,7 @@ from dal import autocomplete
 from django.contrib.staticfiles.templatetags.staticfiles import static
 from django.db.models import Avg
 from django.db.models import Count
+import random
 
 
 class CreateAppointmentPermission(permissions.BasePermission):
@@ -978,6 +979,15 @@ class DoctorListViewSet(viewsets.GenericViewSet):
                     return Response(status=status.HTTP_301_MOVED_PERMANENTLY, data={'url': corrected_url})
                 else:
                     return Response(status=status.HTTP_400_BAD_REQUEST)
+
+            if entity.sitemap_identifier =='DOCTORS_LOCALITY_CITY':
+                rating = round(random.uniform(3.5, 4.9),1)
+                reviews = random.randint(100, 125)
+                DefaultRating.objects.create(ratings=rating, reviews=reviews, url=url)
+            elif entity.sitemap_identifier == 'SPECIALIZATION_LOCALITY_CITY':
+                rating = round(random.uniform(3.5, 4.9), 1)
+                reviews = random.randint(10, 25)
+                DefaultRating.objects.create(ratings=rating, reviews=reviews, url=url)
 
             extras = entity.additional_info
             if extras:
