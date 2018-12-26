@@ -1100,7 +1100,7 @@ class UserTransactionViewSet(viewsets.GenericViewSet):
     @transaction.non_atomic_requests
     def list(self, request):
         user = request.user
-        tx_queryset = ConsumerTransaction.objects.filter(user=user)
+        tx_queryset = ConsumerTransaction.objects.filter(user=user).order_by('-id')
         consumer_account = ConsumerAccount.objects.filter(user=user).first()
 
         tx_serializable_data = list()
