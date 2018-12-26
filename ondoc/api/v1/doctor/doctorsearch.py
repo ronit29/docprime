@@ -207,7 +207,7 @@ class DoctorSearchHelper:
                     order_by_field = " distance ASC, deal_price ASC, priority desc "
                     rank_by = " rnk=1 "
             else:
-                order_by_field = ' floor(distance/{bucket_size}) ASC, is_gold desc, is_license_verified DESC, distance, priority desc '.format(bucket_size=str(bucket_size))
+                order_by_field = ' floor(distance/{bucket_size}) ASC, is_license_verified DESC, distance, priority desc '.format(bucket_size=str(bucket_size))
                 rank_by = "rnk=1"
 
             order_by_field = "{}, {} ".format(' enabled_for_online_booking DESC ', order_by_field)
@@ -239,11 +239,11 @@ class DoctorSearchHelper:
             query_string = "SELECT doctor_id, hospital_id, doctor_clinic_id, doctor_clinic_timing_id " \
                            "FROM (SELECT total_price, " \
                            " {rank_part} ," \
-                           " distance, enabled_for_online_booking, is_gold, is_license_verified, priority " \
+                           " distance, enabled_for_online_booking, is_license_verified, priority " \
                            "procedure_deal_price, doctor_id, practicing_since, doctor_clinic_id, doctor_clinic_timing_id, " \
                            "procedure_id, doctor_clinic_deal_price, hospital_id " \
                            "FROM (SELECT distance, procedure_deal_price, doctor_id, practicing_since, doctor_clinic_id, doctor_clinic_timing_id, procedure_id," \
-                           "enabled_for_online_booking, is_gold, is_license_verified, priority, " \
+                           "enabled_for_online_booking, is_license_verified, priority, " \
                            "doctor_clinic_deal_price, hospital_id , count_per_clinic, sum_per_clinic, sum_per_clinic+doctor_clinic_deal_price as total_price FROM " \
                            "(SELECT " \
                            "COUNT(procedure_id) OVER (PARTITION BY dct.id) AS count_per_clinic, " \
@@ -251,7 +251,7 @@ class DoctorSearchHelper:
                            "St_distance(St_setsrid(St_point((%(longitude)s), (%(latitude)s)), 4326), h.location) AS distance, " \
                            "dcp.deal_price AS procedure_deal_price, " \
                            "d.id AS doctor_id, practicing_since, " \
-                           "d.enabled_for_online_booking, d.is_gold, d.is_license_verified, dc.priority, " \
+                           "d.enabled_for_online_booking and dc.enabled_for_online_booking and h.enabled_for_online_booking as enabled_for_online_booking, d.is_license_verified, dc.priority, " \
                            "dc.id AS doctor_clinic_id,  dct.id AS doctor_clinic_timing_id, dcp.id AS doctor_clinic_procedure_id, " \
                            "dcp.procedure_id, dct.deal_price AS doctor_clinic_deal_price, " \
                            "dc.hospital_id AS hospital_id FROM doctor d " \
@@ -292,7 +292,7 @@ class DoctorSearchHelper:
             "d.id as doctor_id, " \
             "dc.id as doctor_clinic_id,  " \
             "dct.id as doctor_clinic_timing_id,practicing_since, " \
-            "d.enabled_for_online_booking, is_gold,is_license_verified, priority,deal_price, " \
+            "d.enabled_for_online_booking, is_license_verified, priority,deal_price, " \
             "dc.hospital_id as hospital_id FROM doctor d " \
             "INNER JOIN doctor_clinic dc ON d.id = dc.doctor_id and dc.enabled=true and d.is_live=true " \
             "and d.is_test_doctor is False and d.is_internal is False " \
