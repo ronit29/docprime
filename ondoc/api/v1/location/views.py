@@ -669,7 +669,8 @@ class SearchUrlsViewSet(viewsets.GenericViewSet):
                 location_dict = dict()
                 location_address = location_models.EntityAddress.objects.get(id=location_id)
                 if location_address.type == 'SUBLOCALITY':
-                    city_location_address = location_models.EntityAddress.objects.get(id=location_address.parent)
+                    #city_location_address = location_models.EntityAddress.objects.get(id=location_address.parent)
+                    city_location_address = location_address.parent
                     location_dict['city'] = city_location_address.value
                     location_dict['locality'] = location_address.value
                 else:
