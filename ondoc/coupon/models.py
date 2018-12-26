@@ -25,7 +25,7 @@ class Coupon(auth_model.TimeStampedModel):
     city = models.CharField(max_length=50, default=None, null=True, blank=True)
     count = models.PositiveIntegerField()
     total_count = models.PositiveIntegerField(null=True, blank=True)
-    step_count = models.PositiveIntegerField(verbose_name="Valid only at multiples of this appointment number", default=1, validators=[MinValueValidator(1)], blank=True)
+    step_count = models.PositiveIntegerField(verbose_name="Valid only at multiples of this appointment number", default=1, validators=[MinValueValidator(1)], blank=True, null=True)
     description = models.CharField(max_length=500, default="")
     heading = models.CharField(max_length=500, default="")
     tnc = models.CharField(max_length=2000, default="")
