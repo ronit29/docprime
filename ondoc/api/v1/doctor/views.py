@@ -1731,7 +1731,7 @@ class CreateAdminViewSet(viewsets.GenericViewSet):
                         temp[x['phone_number']]['permission_type'] = auth_models.GenericAdmin.ALL
                 else:
                     for doc in assoc_docs:
-                        if (doc.get('phone_number') and doc.get('phone_number') == x['phone_number']) and not x['super_user_permission']:
+                        if (doc.get('phone_number') and doc.get('phone_number') == x['phone_number']):
                             x['is_doctor'] = True
                             x['name'] = doc.get('name')
                             x['id'] = doc.get('id')
@@ -1739,6 +1739,8 @@ class CreateAdminViewSet(viewsets.GenericViewSet):
                             break
                     if not x.get('is_doctor'):
                         x['is_doctor'] = False
+                    elif x.get('super_user_permission') and x.get('is_doctor'):
+                        x['super_user_permission'] = False
                     x['doctor_ids'] = [x['doctor_ids']] if x['doctor_ids'] else []
                     if len(x['doctor_ids']) > 0:
                         x['doctor_ids_count'] = len(x['doctor_ids'])
