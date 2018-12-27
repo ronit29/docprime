@@ -1939,7 +1939,7 @@ class OfflineCustomerViewSet(viewsets.GenericViewSet):
                 obj = {'id': data.get('id'),
                        'error': True,
                        'error_message': "Appointment With Same UUid exists!"}
-                obj.update(self.get_offline_response_obj(appnt, request))
+                # obj.update(self.get_offline_response_obj(appnt, request))
 
                 resp.append(obj)
                 logger.error("PROVIDER_REQUEST - Offline Appointment With Same UUid exists! " + str(data))
@@ -1948,7 +1948,7 @@ class OfflineCustomerViewSet(viewsets.GenericViewSet):
                 obj = {'id': data.get('id'),
                        'error': True,
                        'error_message': "Patient not Recieved for Offline Appointment!"}
-                obj.update(self.get_offline_response_obj(appnt, request))
+                # obj.update(self.get_offline_response_obj(appnt, request))
                 resp.append(obj)
                 logger.error("PROVIDER_REQUEST - Patient not Recieved for Offline Appointment! " + str(data))
                 continue
