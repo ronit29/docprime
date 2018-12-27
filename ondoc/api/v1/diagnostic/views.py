@@ -163,11 +163,14 @@ class LabList(viewsets.ReadOnlyModelViewSet):
         max_distance = 50000
         category_ids = validated_data.get('category_ids', None)
         lab_tests = None
-        if category_ids:
-            lab_tests = LabTestCategoryMapping.objects.filter(parent_category_id__in=category_ids).values_list(
-                'lab_test',
-                flat=True)
-        all_packages_in_network_labs = LabTest.objects.prefetch_related('test').filter(is_package=True,
+        if not category_ids:
+            category_ids = LabTestCategory.objects.filter(is_live=True, is_package_category=True).values_list('id', flat=True)
+
+        lab_tests = LabTestCategoryMapping.objects.filter(parent_category_id__in=category_ids).values_list(
+            'lab_test',
+            flat=True)
+
+        all_packages_in_network_labs = LabTest.objects.prefetch_related('test').filter(searchable=True, is_package=True,
                                                                                        availablelabs__lab_pricing_group__labs__network__isnull=False,
                                                                                        availablelabs__lab_pricing_group__labs__location__dwithin=(
                                                                                            Point(float(long),
@@ -184,7 +187,7 @@ class LabList(viewsets.ReadOnlyModelViewSet):
                         partition_by=[F(
                             'availablelabs__lab_pricing_group__labs__network'), F('id')]))
 
-        all_packages_in_non_network_labs = LabTest.objects.prefetch_related('test').filter(is_package=True,
+        all_packages_in_non_network_labs = LabTest.objects.prefetch_related('test').filter(searchable=True, is_package=True,
                                                                                            availablelabs__lab_pricing_group__labs__network__isnull=True,
                                                                                            availablelabs__lab_pricing_group__labs__location__dwithin=(
                                                                                                Point(float(long),
@@ -199,9 +202,8 @@ class LabList(viewsets.ReadOnlyModelViewSet):
                 When(availablelabs__custom_deal_price__isnull=False,
                      then=F('availablelabs__custom_deal_price'))),
         )
-        if lab_tests:
-            all_packages_in_non_network_labs = all_packages_in_non_network_labs.filter(id__in=lab_tests)
-            all_packages_in_network_labs = all_packages_in_network_labs.filter(id__in=lab_tests)
+        all_packages_in_non_network_labs = all_packages_in_non_network_labs.filter(id__in=lab_tests)
+        all_packages_in_network_labs = all_packages_in_network_labs.filter(id__in=lab_tests)
 
         all_packages = [package for package in all_packages_in_network_labs if package.rank == 1]
         all_packages.extend([package for package in all_packages_in_non_network_labs])
@@ -221,7 +223,8 @@ class LabList(viewsets.ReadOnlyModelViewSet):
                 is_selected = True
             category_result.append({'name': name, 'id': category_id, 'is_selected': is_selected})
 
-        return Response({'result': serializer.data, 'categories': category_result, 'count': len(all_packages)})
+        return Response({'result': serializer.data, 'categories': category_result, 'count': len(all_packages),
+                         'categories_count': len(category_result)})
 
 
 
