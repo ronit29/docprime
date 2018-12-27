@@ -1,1 +1,1 @@
-Invoice has been generated.
+Payment Receipt has been generated.
