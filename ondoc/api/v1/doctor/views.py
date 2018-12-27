@@ -1935,12 +1935,22 @@ class OfflineCustomerViewSet(viewsets.GenericViewSet):
         doc_pem_list, hosp_pem_list = map(list, zip(*pem_queryset))
 
         for data in valid_data.get('data'):
-            if data['id'] in appntment_ids or (data.get('patient') and data.get('patient')['id'] in patient_ids):
+            try:
+                id = UUID(data.get('id'), version=4)
+            except ValueError:
+                obj = self.get_error_obj(data)
+                obj['doctor_id'] = data.get('doctor').id
+                obj['hospital_id'] = data.get('hospital').id
+                obj['error_message'] = 'Invalid UUid - Offline Appointment Create!'
+                resp.append(obj)
+                logger.error("PROVIDER_REQUEST - Invalid UUid - Offline Appointment Create! " + str(data))
+                continue
+            if id in appntment_ids or (not data.get('patient_id') and (data.get('patient') and data.get('patient')['id'] in patient_ids)):
                 obj = {'id': data.get('id'),
                        'error': True,
                        'error_message': "Appointment With Same UUid exists!"}
-                # obj.update(self.get_offline_response_obj(appnt, request))
-
+                obj['doctor_id'] = data.get('doctor').id
+                obj['hospital_id'] = data.get('hospital').id
                 resp.append(obj)
                 logger.error("PROVIDER_REQUEST - Offline Appointment With Same UUid exists! " + str(data))
                 continue
@@ -1948,7 +1958,8 @@ class OfflineCustomerViewSet(viewsets.GenericViewSet):
                 obj = {'id': data.get('id'),
                        'error': True,
                        'error_message': "Patient not Recieved for Offline Appointment!"}
-                # obj.update(self.get_offline_response_obj(appnt, request))
+                obj['doctor_id'] = data.get('doctor').id
+                obj['hospital_id'] = data.get('hospital').id
                 resp.append(obj)
                 logger.error("PROVIDER_REQUEST - Patient not Recieved for Offline Appointment! " + str(data))
                 continue
