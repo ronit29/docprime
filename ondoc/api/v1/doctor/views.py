@@ -1916,7 +1916,7 @@ class OfflineCustomerViewSet(viewsets.GenericViewSet):
         ret_obj['updated_at'] = appnt.updated_at
         ret_obj['doctor_name'] = appnt.doctor.name
         ret_obj['doctor_id'] = appnt.doctor.id
-        ret_obj['doctor_thumbnail'] = request.build_absolute_uri(appnt.doctor.get_thumbnail())
+        ret_obj['doctor_thumbnail'] = request.build_absolute_uri(appnt.doctor.get_thumbnail()) if appnt.doctor.get_thumbnail() else None
         ret_obj['hospital_id'] = appnt.hospital.id
         ret_obj['hospital_name'] = appnt.hospital.name
         ret_obj['time_slot_start'] = appnt.time_slot_start
@@ -2456,7 +2456,7 @@ class OfflineCustomerViewSet(viewsets.GenericViewSet):
             ret_obj['updated_at'] = app.updated_at
             ret_obj['doctor_name'] = app.doctor.name
             ret_obj['doctor_id'] = app.doctor.id
-            ret_obj['doctor_thumbnail'] = request.build_absolute_uri(app.doctor.get_thumbnail())
+            ret_obj['doctor_thumbnail'] = request.build_absolute_uri(app.doctor.get_thumbnail()) if app.doctor.get_thumbnail() else None
             ret_obj['hospital_id'] = app.hospital.id
             ret_obj['hospital_name'] = app.hospital.name
             ret_obj['time_slot_start'] = app.time_slot_start
