@@ -1117,7 +1117,7 @@ class DoctorListViewSet(viewsets.GenericViewSet):
                         description += ': Book best ' + 'Doctor' + ' appointment online ' + 'in '+ locality
             if specializations:
                 if not sublocality:
-                    title += '- Book Best ' + specializations +' Online'
+                    title += ' - Book Best ' + specializations +' Online'
                 else:
                     title += ' | Book & Get Best Deal'
 
