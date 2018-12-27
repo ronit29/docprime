@@ -56,6 +56,9 @@ from dal import autocomplete
 from django.contrib.staticfiles.templatetags.staticfiles import static
 from django.db.models import Avg
 from django.db.models import Count
+import logging
+
+logger = logging.getLogger(__name__)
 
 
 class CreateAppointmentPermission(permissions.BasePermission):
@@ -1119,7 +1122,7 @@ class DoctorListViewSet(viewsets.GenericViewSet):
                         description += ': Book best ' + 'Doctor' + ' appointment online ' + 'in '+ locality
             if specializations:
                 if not sublocality:
-                    title += '- Book Best ' + specializations +' Online'
+                    title += ' - Book Best ' + specializations +' Online'
                 else:
                     title += ' | Book & Get Best Deal'
 
@@ -1505,7 +1508,7 @@ class CreateAdminViewSet(viewsets.GenericViewSet):
             user = user_queryset
 
         if valid_data.get('entity_type') == GenericAdminEntity.DOCTOR:
-            doct = Doctor.objects.get(id=valid_data['id'])
+            doct = models.Doctor.objects.get(id=valid_data['id'])
             if valid_data.get('assoc_hosp'):
                 create_admins = []
                 for hos in valid_data['assoc_hosp']:
@@ -1617,7 +1620,7 @@ class CreateAdminViewSet(viewsets.GenericViewSet):
         return Response(resp)
 
     def assoc_hosp(self, request, pk=None):
-        doctor = get_object_or_404(Doctor.objects.prefetch_related('hospitals'), pk=pk)
+        doctor = get_object_or_404(models.Doctor.objects.prefetch_related('hospitals'), pk=pk)
         queryset = doctor.hospitals.filter(is_appointment_manager=False)
         return Response(queryset.values('name', 'id'))
 
@@ -1728,7 +1731,7 @@ class CreateAdminViewSet(viewsets.GenericViewSet):
                         temp[x['phone_number']]['permission_type'] = auth_models.GenericAdmin.ALL
                 else:
                     for doc in assoc_docs:
-                        if doc.get('phone_number') and doc.get('phone_number') == x['phone_number']:
+                        if (doc.get('phone_number') and doc.get('phone_number') == x['phone_number']):
                             x['is_doctor'] = True
                             x['name'] = doc.get('name')
                             x['id'] = doc.get('id')
@@ -1736,6 +1739,8 @@ class CreateAdminViewSet(viewsets.GenericViewSet):
                             break
                     if not x.get('is_doctor'):
                         x['is_doctor'] = False
+                    elif x.get('super_user_permission') and x.get('is_doctor'):
+                        x['super_user_permission'] = False
                     x['doctor_ids'] = [x['doctor_ids']] if x['doctor_ids'] else []
                     if len(x['doctor_ids']) > 0:
                         x['doctor_ids_count'] = len(x['doctor_ids'])
@@ -1777,6 +1782,7 @@ class CreateAdminViewSet(viewsets.GenericViewSet):
         try:
             queryset.delete()
         except Exception as e:
+            logger.error("Error Deleting Entity " + str(e))
             return Response({'error': 'something went wrong!'})
         return Response({'success': 'Deleted Successfully'})
 
@@ -1805,7 +1811,7 @@ class CreateAdminViewSet(viewsets.GenericViewSet):
                 delete_queryset = delete_queryset.filter(hospital_id=None)
             if len(delete_queryset) > 0:
                 delete_queryset.delete()
-            doct = Doctor.objects.get(id=valid_data['id'])
+            doct = models.Doctor.objects.get(id=valid_data['id'])
             if valid_data.get('assoc_hosp'):
                 create_admins = []
                 for hos in valid_data['assoc_hosp']:
@@ -1819,6 +1825,7 @@ class CreateAdminViewSet(viewsets.GenericViewSet):
                 try:
                     auth_models.GenericAdmin.objects.bulk_create(create_admins)
                 except Exception as e:
+                    logger.error("Error Updating Entity Doctor " + str(e))
                     return Response({'error': 'something went wrong!'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
             else:
                 create_admins = []
@@ -1833,6 +1840,7 @@ class CreateAdminViewSet(viewsets.GenericViewSet):
                 try:
                     auth_models.GenericAdmin.objects.bulk_create(create_admins)
                 except Exception as e:
+                    logger.error("Error Updating Entity Doctor " + str(e))
                     return Response({'error': 'something went wrong!'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
         elif valid_data.get('entity_type') == GenericAdminEntity.HOSPITAL:
             hosp = models.Hospital.objects.get(id=valid_data['id'])
@@ -1844,6 +1852,7 @@ class CreateAdminViewSet(viewsets.GenericViewSet):
                     try:
                         dn.update(phone_number=valid_data.get('phone_number'))
                     except Exception as e:
+                        logger.error("Error Updating Entity Hospital " + str(e))
                         return Response({'error': 'something went wrong!'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
                 else:
                     try:
@@ -1851,11 +1860,13 @@ class CreateAdminViewSet(viewsets.GenericViewSet):
                                                                 doctor=valid_data.get('doc_profile'),
                                                                 hospital=hosp)
                     except Exception as e:
+                        logger.error("Error Updating Entity Hospital " + str(e))
                         return Response({'error': 'something went wrong!'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
             delete_queryset = auth_models.GenericAdmin.objects.filter(phone_number=phone_number,
-                                                                      entity_type=GenericAdminEntity.HOSPITAL)
+                                                                      entity_type=GenericAdminEntity.HOSPITAL,
+                                                                      super_user_permission=False)
             if valid_data.get('remove_list'):
                 delete_queryset = delete_queryset.filter(doctor_id__in=valid_data.get('remove_list'))
             else:
@@ -1877,6 +1888,7 @@ class CreateAdminViewSet(viewsets.GenericViewSet):
                 try:
                     auth_models.GenericAdmin.objects.bulk_create(create_admins)
                 except Exception as e:
+                    logger.error("Error Updating Entity Hospital " + str(e))
                     return Response({'error': 'something went wrong!'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
             else:
                 create_admins = []
@@ -1891,6 +1903,7 @@ class CreateAdminViewSet(viewsets.GenericViewSet):
                 try:
                     auth_models.GenericAdmin.objects.bulk_create(create_admins)
                 except Exception as e:
+                    logger.error("Error Updating Entity Hospital " + str(e))
                     return Response({'error': 'something went wrong!'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
         elif valid_data.get('entity_type') == GenericAdminEntity.LAB:
             admin = auth_models.GenericLabAdmin.objects.filter(phone_number=phone_number, lab_id=valid_data.get('id'))
