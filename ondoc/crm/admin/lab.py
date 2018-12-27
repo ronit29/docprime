@@ -810,7 +810,7 @@ class LabAppointmentAdmin(nested_admin.NestedModelAdmin):
                     'used_profile_name', 'used_profile_number',
                     'default_profile_name', 'default_profile_number', 'user_id', 'user_number', 'price', 'agreed_price',
                     'deal_price', 'effective_price', 'payment_status', 'payment_type', 'insurance', 'is_home_pickup',
-                    'get_pickup_address', 'get_lab_address', 'outstanding', 'status', 'cancel_type',
+                    'get_pickup_address', 'get_lab_address', 'outstanding', 'otp', 'status', 'cancel_type',
                     'cancellation_reason', 'cancellation_comments', 'start_date', 'start_time')
         else:
             return ()
@@ -822,7 +822,7 @@ class LabAppointmentAdmin(nested_admin.NestedModelAdmin):
             return ('booking_id', 'order_id', 'lab_name', 'lab_id', 'get_lab_test',
                     'lab_contact_details', 'used_profile_name', 'used_profile_number',
                     'default_profile_name', 'default_profile_number', 'user_number', 'user_id', 'price', 'agreed_price',
-                    'deal_price', 'effective_price', 'payment_status',
+                    'deal_price', 'effective_price', 'payment_status', 'otp',
                     'payment_type', 'insurance', 'is_home_pickup', 'get_pickup_address', 'get_lab_address', 'outstanding')
         else:
             return ()
