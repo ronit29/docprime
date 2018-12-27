@@ -30,7 +30,7 @@ def push_doctors():
                 mobile = str(doctor_mobiles_list[0].std_code)+str(mobile)
 
         if not mobile and doctor_hospitals.exists():
-            spoc = doctor_hospitals.first().spoc_details.objects.all().first()
+            spoc = doctor_hospitals.first().spoc_details.first()
             if spoc:
                 if spoc.std_code:
                     mobile = str(spoc.std_code)+str(spoc.number)

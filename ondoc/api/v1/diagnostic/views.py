@@ -372,10 +372,48 @@ class LabList(viewsets.ReadOnlyModelViewSet):
                          "seo": seo, "breadcrumb": breadcrumb})
 
     @transaction.non_atomic_requests
-    def search(self, request):
+    def search_by_url(self, request, *args, **kwargs):
+        url = request.GET.get('url', None)
+        if not url:
+            return Response(status=status.HTTP_404_NOT_FOUND)
+
+        entity_url_qs = EntityUrls.objects.filter(url=url, url_type=EntityUrls.UrlType.SEARCHURL,
+                                                  entity_type__iexact='Lab').order_by('-sequence')
+        if entity_url_qs.exists():
+            entity = entity_url_qs.first()
+            if not entity.is_valid:
+                valid_qs = EntityUrls.objects.filter(url_type=EntityUrls.UrlType.SEARCHURL, is_valid=True,
+                                                     entity_type__iexact='Lab', locality_id=entity.locality_id,
+                                                     sublocality_id=entity.sublocality_id,
+                                                     sitemap_identifier=entity.sitemap_identifier).order_by('-sequence')
+
+                if valid_qs.exists():
+                    corrected_url = valid_qs.first().url
+                    return Response(status=status.HTTP_301_MOVED_PERMANENTLY, data={'url': corrected_url})
+                else:
+                    return Response(status=status.HTTP_404_NOT_FOUND)
+
+            extras = entity.additional_info
+            if extras.get('location_json'):
+                kwargs['location_json'] = extras.get('location_json')
+                kwargs['url'] = url
+                kwargs['parameters'] = get_lab_search_details(extras, request.query_params)
+                response = self.search(request, **kwargs)
+                return response
+        else:
+            return Response(status=status.HTTP_404_NOT_FOUND)
+
+    @transaction.non_atomic_requests
+    def search(self, request, **kwargs):
         parameters = request.query_params
+        if kwargs.get('parameters'):
+            parameters = kwargs.get('parameters')
         serializer = diagnostic_serializer.SearchLabListSerializer(data=parameters)
         serializer.is_valid(raise_exception=True)
+        if kwargs.get('location_json'):
+            serializer.validated_data['location_json'] = kwargs['location_json']
+        if kwargs.get('url'):
+            serializer.validated_data['url'] = kwargs['url']
         parameters = serializer.validated_data
         queryset_result = self.get_lab_search_list(parameters)
         count = len(queryset_result)
@@ -435,10 +473,19 @@ class LabList(viewsets.ReadOnlyModelViewSet):
                 location = sublocality
             description += " and book test online, check fees, packages prices and more at DocPrime."
             seo = {'title': title, "description": description, "location": location}
+            if sublocality:
+                breadcrumb = [{
+                    'name': locality,
+                    'url': breadcrumb_locality_url
+                },
+                    {
+                        'name': sublocality,
+                        'url': parameters.get('url')
+                    }]
 
         return Response({"result": result,
                          "count": count, 'tests': tests,
-                         "seo": seo})
+                         "seo": seo, 'breadcrumb':breadcrumb})
 
     def get_lab_search_list(self, parameters):
         # distance in meters
@@ -1169,18 +1216,7 @@ class LabAppointmentView(mixins.CreateModelMixin,
                 home_pickup_charges = data["lab"].home_pickup_charges
             # TODO PM - call coupon function to calculate effective price
 
-        coupon_list = []
-        coupon_discount = 0
-        if data.get("coupon_code"):
-            coupon_obj = Coupon.objects.filter(code__in=set(data.get("coupon_code")))
-            obj = models.LabAppointment()
-            for coupon in coupon_obj:
-                if coupon.is_user_specific and coupon.test.exists():
-                    total_price = obj.get_applicable_tests_with_total_price(coupon_obj=coupon, test_ids=data['test_ids'], lab=data["lab"]).get("total_price")
-                    coupon_discount += obj.get_discount(coupon, total_price)
-                else:
-                    coupon_discount += obj.get_discount(coupon, effective_price)
-                coupon_list.append(coupon.id)
+        coupon_discount, coupon_cashback, coupon_list = Coupon.get_total_deduction(data, effective_price)
 
         if data.get("payment_type") in [doctor_model.OpdAppointment.COD, doctor_model.OpdAppointment.PREPAID]:
             if coupon_discount >= effective_price:
@@ -1228,7 +1264,8 @@ class LabAppointmentView(mixins.CreateModelMixin,
             # "lab_test": [x["id"] for x in lab_test_queryset.values("id")],
             "extra_details": extra_details,
             "coupon": coupon_list,
-            "discount": coupon_discount
+            "discount": int(coupon_discount),
+            "cashback": int(coupon_cashback)
         }
         if data.get("is_home_pickup") is True:
             address = Address.objects.filter(pk=data.get("address").id).first()
@@ -1275,6 +1312,8 @@ class LabAppointmentView(mixins.CreateModelMixin,
         consumer_account = account_models.ConsumerAccount.objects.get_or_create(user=user)
         consumer_account = account_models.ConsumerAccount.objects.select_for_update().get(user=user)
         balance = consumer_account.balance
+        cashback_balance = consumer_account.cashback
+        total_balance = balance + cashback_balance
         resp = {}
 
         resp['is_agent'] = False
@@ -1300,16 +1339,22 @@ class LabAppointmentView(mixins.CreateModelMixin,
 
 
         if ( (appointment_details['payment_type'] == doctor_model.OpdAppointment.PREPAID and
-                balance < appointment_details.get("effective_price")) or resp['is_agent'] ):
+              total_balance < appointment_details.get("effective_price")) or resp['is_agent'] ):
 
-            payable_amount = appointment_details.get("effective_price") - balance
+            payable_amount = max(0, appointment_details.get("effective_price") - total_balance)
+            required_amount = appointment_details.get("effective_price")
+            cashback_amount = min(required_amount, cashback_balance)
+            wallet_amount = 0
+            if cashback_amount < required_amount:
+                wallet_amount = min(balance, required_amount - cashback_amount)
 
             order = account_models.Order.objects.create(
                 product_id=product_id,
                 action=account_models.Order.LAB_APPOINTMENT_CREATE,
                 action_data=appointment_action_data,
                 amount=payable_amount,
-                wallet_amount=balance,
+                wallet_amount=wallet_amount,
+                cashback_amount=cashback_amount,
                 payment_status=account_models.Order.PAYMENT_PENDING
             )
 
@@ -1330,8 +1375,11 @@ class LabAppointmentView(mixins.CreateModelMixin,
                 pass
         else:
             wallet_amount = 0
+            cashback_amount = 0
+
             if appointment_details['payment_type'] == models.OpdAppointment.PREPAID:
-                wallet_amount = appointment_details.get("effective_price")
+                cashback_amount = min(cashback_balance, appointment_details.get("effective_price"))
+                wallet_amount = max(0, appointment_details.get("effective_price") - cashback_amount)
 
             order = account_models.Order.objects.create(
                 product_id=product_id,
@@ -1339,6 +1387,7 @@ class LabAppointmentView(mixins.CreateModelMixin,
                 action_data=appointment_action_data,
                 amount=0,
                 wallet_amount=wallet_amount,
+                cashback_amount=cashback_amount,
                 payment_status=account_models.Order.PAYMENT_PENDING
             )
 

@@ -292,7 +292,8 @@ class DoctorSearchHelper:
             "d.id as doctor_id, " \
             "dc.id as doctor_clinic_id,  " \
             "dct.id as doctor_clinic_timing_id,practicing_since, " \
-            "d.enabled_for_online_booking, is_license_verified, priority,deal_price, " \
+            "d.enabled_for_online_booking and dc.enabled_for_online_booking and h.enabled_for_online_booking as enabled_for_online_booking, " \
+            "is_license_verified, priority,deal_price, " \
             "dc.hospital_id as hospital_id FROM doctor d " \
             "INNER JOIN doctor_clinic dc ON d.id = dc.doctor_id and dc.enabled=true and d.is_live=true " \
             "and d.is_test_doctor is False and d.is_internal is False " \
