@@ -359,10 +359,48 @@ class LabList(viewsets.ReadOnlyModelViewSet):
                          "seo": seo, "breadcrumb": breadcrumb})
 
     @transaction.non_atomic_requests
-    def search(self, request):
+    def search_by_url(self, request, *args, **kwargs):
+        url = request.GET.get('url', None)
+        if not url:
+            return Response(status=status.HTTP_404_NOT_FOUND)
+
+        entity_url_qs = EntityUrls.objects.filter(url=url, url_type=EntityUrls.UrlType.SEARCHURL,
+                                                  entity_type__iexact='Lab').order_by('-sequence')
+        if entity_url_qs.exists():
+            entity = entity_url_qs.first()
+            if not entity.is_valid:
+                valid_qs = EntityUrls.objects.filter(url_type=EntityUrls.UrlType.SEARCHURL, is_valid=True,
+                                                     entity_type__iexact='Lab', locality_id=entity.locality_id,
+                                                     sublocality_id=entity.sublocality_id,
+                                                     sitemap_identifier=entity.sitemap_identifier).order_by('-sequence')
+
+                if valid_qs.exists():
+                    corrected_url = valid_qs.first().url
+                    return Response(status=status.HTTP_301_MOVED_PERMANENTLY, data={'url': corrected_url})
+                else:
+                    return Response(status=status.HTTP_404_NOT_FOUND)
+
+            extras = entity.additional_info
+            if extras.get('location_json'):
+                kwargs['location_json'] = extras.get('location_json')
+                kwargs['url'] = url
+                kwargs['parameters'] = get_lab_search_details(extras, request.query_params)
+                response = self.search(request, **kwargs)
+                return response
+        else:
+            return Response(status=status.HTTP_404_NOT_FOUND)
+
+    @transaction.non_atomic_requests
+    def search(self, request, **kwargs):
         parameters = request.query_params
+        if kwargs.get('parameters'):
+            parameters = kwargs.get('parameters')
         serializer = diagnostic_serializer.SearchLabListSerializer(data=parameters)
         serializer.is_valid(raise_exception=True)
+        if kwargs.get('location_json'):
+            serializer.validated_data['location_json'] = kwargs['location_json']
+        if kwargs.get('url'):
+            serializer.validated_data['url'] = kwargs['url']
         parameters = serializer.validated_data
         queryset_result = self.get_lab_search_list(parameters)
         count = len(queryset_result)
@@ -422,10 +460,19 @@ class LabList(viewsets.ReadOnlyModelViewSet):
                 location = sublocality
             description += " and book test online, check fees, packages prices and more at DocPrime."
             seo = {'title': title, "description": description, "location": location}
+            if sublocality:
+                breadcrumb = [{
+                    'name': locality,
+                    'url': breadcrumb_locality_url
+                },
+                    {
+                        'name': sublocality,
+                        'url': parameters.get('url')
+                    }]
 
         return Response({"result": result,
                          "count": count, 'tests': tests,
-                         "seo": seo})
+                         "seo": seo, 'breadcrumb':breadcrumb})
 
     def get_lab_search_list(self, parameters):
         # distance in meters
