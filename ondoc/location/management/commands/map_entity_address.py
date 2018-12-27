@@ -4,11 +4,12 @@ import json
 
 
 def map_entity_address():
-    geocoding_data = GeocodingResults.objects.all()
+    geocoding_data = GeocodingResults.objects.all().prefetch_related('entity_addresses')
     for data in geocoding_data:
-        value = None
-        value = json.loads(data.value)
-        print(EntityAddress.create(data, value))
+        if not data.entity_addresses.exists():
+            value = None
+            value = json.loads(data.value)
+            print(EntityAddress.create(data, value))
 
 
 class Command(BaseCommand):
