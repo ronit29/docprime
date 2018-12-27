@@ -505,6 +505,7 @@ class LabAppTransactionModelSerializer(serializers.Serializer):
     address = serializers.JSONField(required=False)
     coupon = serializers.ListField(child=serializers.IntegerField(), required=False, default = [])
     discount = serializers.DecimalField(max_digits=10, decimal_places=2)
+    cashback = serializers.DecimalField(max_digits=10, decimal_places=2)
     extra_details = serializers.JSONField(required=False)
 
 

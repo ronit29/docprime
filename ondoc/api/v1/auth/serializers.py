@@ -276,7 +276,7 @@ class UserTransactionModelSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = ConsumerTransaction
-        fields = ('type', 'action', 'amount', 'product_id', 'reference_id', 'order_id')
+        fields = ('type', 'action', 'amount', 'product_id', 'reference_id', 'order_id', 'created_at', 'source')
         # fields = '__all__'
 
 

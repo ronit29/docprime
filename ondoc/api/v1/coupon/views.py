@@ -142,6 +142,7 @@ class ApplicableCouponsViewSet(viewsets.GenericViewSet):
                             "is_corporate" : coupon.is_corporate,
                             "tests": [ test.id for test in coupon.test.all() ],
                             "network_id": coupon.lab_network.id if coupon.lab_network else None,
+                            "is_cashback": coupon.coupon_type == Coupon.CASHBACK,
                             "tnc": coupon.tnc})
 
 

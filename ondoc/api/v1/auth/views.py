@@ -20,7 +20,7 @@ from rest_framework.authtoken.models import Token
 from django.db.models import F, Sum, Max, Q, Prefetch, Case, When, Count
 from django.forms.models import model_to_dict
 
-from ondoc.coupon.models import UserSpecificCoupon
+from ondoc.coupon.models import UserSpecificCoupon, Coupon
 from ondoc.lead.models import UserLead
 from ondoc.sms.api import send_otp
 from ondoc.doctor.models import DoctorMobile, Doctor, HospitalNetwork, Hospital, DoctorHospital, DoctorClinic, DoctorClinicTiming
@@ -1101,11 +1101,12 @@ class UserTransactionViewSet(viewsets.GenericViewSet):
     @transaction.non_atomic_requests
     def list(self, request):
         user = request.user
-        tx_queryset = ConsumerTransaction.objects.filter(user=user)
+        tx_queryset = ConsumerTransaction.objects.filter(user=user).order_by('-id')
         consumer_account = ConsumerAccount.objects.filter(user=user).first()
 
         tx_serializable_data = list()
         consumer_balance = 0
+        consumer_cashback = 0
         if tx_queryset.exists():
             tx_queryset = paginate_queryset(tx_queryset, request)
             tx_serializer = serializers.UserTransactionModelSerializer(tx_queryset, many=True)
@@ -1113,10 +1114,12 @@ class UserTransactionViewSet(viewsets.GenericViewSet):
 
         if consumer_account:
             consumer_balance = consumer_account.balance
+            consumer_cashback = consumer_account.cashback
 
         resp = dict()
         resp["user_transactions"] = tx_serializable_data
         resp["user_wallet_balance"] = consumer_balance
+        resp["consumer_cashback"] = consumer_cashback
         return Response(data=resp)
 
 
