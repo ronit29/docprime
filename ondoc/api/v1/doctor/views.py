@@ -1982,7 +1982,8 @@ class OfflineCustomerViewSet(viewsets.GenericViewSet):
                     def_number = patient.patient_mobiles.filter(is_default=True).first()
                     if def_number:
                         sms_list.append(def_number.phone_number)
-            time_slot_start = form_time_slot(data.get("start_date"), data.get("start_time"))
+            # time_slot_start = form_time_slot(data.get("start_date"), data.get("start_time"))
+            time_slot_start = data.get('time_slot_start')
             try:
                 appnt = models.OfflineOPDAppointments.objects.create(doctor=data.get('doctor'),
                                                                      id=data.get('id'),

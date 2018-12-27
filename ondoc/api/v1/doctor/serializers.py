@@ -1318,8 +1318,8 @@ class OfflineAppointmentBodySerializer(serializers.Serializer):
     # patient_id = serializers.PrimaryKeyRelatedField(queryset=OfflinePatients.objects.all(), required=False, allow_empty=True)
     doctor = serializers.PrimaryKeyRelatedField(queryset=Doctor.objects.all())
     hospital = serializers.PrimaryKeyRelatedField(queryset=Hospital.objects.all())
-    start_date = serializers.DateTimeField()
-    start_time = serializers.FloatField()
+    time_slot_start = serializers.DateTimeField()
+    # start_time = serializers.FloatField()
     # id = serializers.UUIDField()
     id = serializers.CharField()
 
