@@ -542,7 +542,7 @@ class UserAppointmentsViewSet(OndocViewSet):
                         "profile_detail": lab_appointment.profile_detail,
                         "status": lab_appointment.status,
                         "payment_type": lab_appointment.payment_type,
-                        "lab_test": lab_appointment.lab_test,  # SHASHANK_SINGH CHANGE 17
+                        "lab_test": lab_appointment.test_mappings.values_list('test__id', flat=True),  # SHASHANK_SINGH CHANGE 17
                         "discount": coupon_discount
                     }
 
