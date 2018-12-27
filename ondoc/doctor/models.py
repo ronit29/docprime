@@ -46,7 +46,7 @@ import hashlib
 from django.contrib.contenttypes.fields import GenericRelation
 from django.contrib.contenttypes.fields import GenericForeignKey
 from django.contrib.contenttypes.models import ContentType
-from ondoc.matrix.tasks import push_appointment_to_matrix
+from ondoc.matrix.tasks import push_appointment_to_matrix, push_onboarding_qcstatus_to_matrix
 # from ondoc.procedure.models import Procedure
 from ondoc.ratings_review import models as ratings_models
 from django.utils import timezone
@@ -441,7 +441,24 @@ class Doctor(auth_model.TimeStampedModel, auth_model.QCModel, SearchKey):
 
     def save(self, *args, **kwargs):
         self.update_live_status()
+
+        # On every update of onboarding status or Qcstatus push to matrix
+        push_to_matrix = False
+        if self.id:
+            doctor_obj = Doctor.objects.filter(pk=self.id).first()
+            if doctor_obj and (self.onboarding_status!=doctor_obj.onboarding_status or
+                  self.data_status !=doctor_obj.data_status):
+                # Push to matrix
+                push_to_matrix = True
+
         super(Doctor, self).save(*args, **kwargs)
+
+        transaction.on_commit(lambda: self.app_commit_tasks(push_to_matrix))
+
+    def app_commit_tasks(self, push_to_matrix):
+        if push_to_matrix:
+            push_onboarding_qcstatus_to_matrix.apply_async(({'obj_type': self.__class__.__name__, 'obj_id': self.id}
+                                                            ,), countdown=5)
 
     class Meta:
         db_table = "doctor"

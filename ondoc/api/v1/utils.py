@@ -519,7 +519,7 @@ class CouponsMixin(object):
                     return {"is_valid": False, "used_count": None}
 
             # check if a user is new i.e user has done any appointments
-            if user and coupon_obj.new_user_constraint:
+            if user.is_authenticated and coupon_obj.new_user_constraint:
                 if not self.is_user_first_time(user):
                     return {"is_valid": False, "used_count": 0}
 

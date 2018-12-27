@@ -663,6 +663,9 @@ class UploadHospital(Doc):
             if not hospital:
                 hospital_name = self.clean_data(sheet.cell(row=row, column=headers.get('hospital_name')).value)
                 building = self.clean_data(sheet.cell(row=row, column=headers.get('building')).value)
+                if not building:
+                    building=''
+
                 city = self.clean_data(sheet.cell(row=row, column=headers.get('city')).value)
                 location = self.parse_gaddress(self.clean_data(sheet.cell(row=row, column=headers.get('gaddress')).value))
                 hospital = Hospital.objects.create(name=hospital_name, building=building, city=city, country='India', location=location, source=source, batch=batch, enabled_for_online_booking=False)
@@ -678,7 +681,7 @@ class UploadHospital(Doc):
         # if doc_clinic_obj_dict.get((doctor_obj, hospital_obj)):
         #     doc_clinic_obj = doc_clinic_obj_dict.get((doctor_obj, hospital_obj))
         # else:
-        doc_clinic_obj, is_field_created = DoctorClinic.objects.get_or_create(doctor=doctor_obj, hospital=hospital_obj, defaults={'followup_charges':0, 'followup_duration':7,enabled_for_online_booking:False})
+        doc_clinic_obj, is_field_created = DoctorClinic.objects.get_or_create(doctor=doctor_obj, hospital=hospital_obj, defaults={'followup_charges':0, 'followup_duration':7,'enabled_for_online_booking':False})
         # doc_clinic_obj_dict[(doctor_obj, hospital_obj)] = doc_clinic_obj
 
         return doc_clinic_obj
