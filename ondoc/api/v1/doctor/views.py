@@ -2119,15 +2119,16 @@ class OfflineCustomerViewSet(viewsets.GenericViewSet):
                                                         )
         default_num = None
         sms_number = None
-        for num in data.get('phone_number'):
-            models.PatientMobile.objects.create(patient=patient,
-                                                phone_number=num.get('phone_number'),
-                                                is_default=num.get('is_default', False))
+        if data.get('phone_number'):
+            for num in data.get('phone_number'):
+                models.PatientMobile.objects.create(patient=patient,
+                                                    phone_number=num.get('phone_number'),
+                                                    is_default=num.get('is_default', False))
 
-            if 'is_default' in num and num['is_default']:
-                default_num = num['phone_number']
-        if default_num and ('sms_notification' in data and data['sms_notification']):
-            sms_number = default_num
+                if 'is_default' in num and num['is_default']:
+                    default_num = num['phone_number']
+            if default_num and ('sms_notification' in data and data['sms_notification']):
+                sms_number = default_num
         return {"sms_list": sms_number, "patient": patient}
 
     def update_offline_appointments(self, request):
