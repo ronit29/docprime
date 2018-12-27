@@ -8,11 +8,11 @@ from django.db.models import Prefetch
 
 
 def doctor_page_urls():
-    query = '''select nextval('entity_url_version_seq') as inc'''
-    seq = RawSql(query,[]).fetch_all()
+    # query = '''select nextval('entity_url_version_seq') as inc'''
+    # seq = RawSql(query,[]).fetch_all()
 
-    #if seq:
-    sequence = seq[0]['inc']
+    # #if seq:
+    # sequence = seq[0]['inc']
 
     # if seq:
     #     sequence = seq[0]['inc'] if seq[0]['inc'] else 0
@@ -25,16 +25,17 @@ def doctor_page_urls():
     #         (Prefetch('hospitals', queryset=Hospital.objects.filter(is_live=True).order_by('hospital_type', 'id')))
     #          ).filter(is_live=True, is_test_doctor=False)
 
-    doc_obj =Doctor.objects.prefetch_related('doctorpracticespecializations', 'doctorpracticespecializations__specialization',
-                                        (Prefetch('hospitals', queryset=Hospital.objects.filter(is_live=True).order_by('hospital_type', 'id')))
-                                         ).filter(is_live=True, is_test_doctor=False).order_by('id')
+    # doc_obj =Doctor.objects.prefetch_related('doctorpracticespecializations', 'doctorpracticespecializations__specialization',
+    #                                     (Prefetch('hospitals', queryset=Hospital.objects.filter(is_live=True).order_by('hospital_type', 'id')))
+    #                                      ).filter(is_live=True, is_test_doctor=False).order_by('id')
 
 
     #     try:
-    for doctor in doc_obj:
-        status = DoctorPageURL.create_doctor_page_urls(doctor,sequence)
+    DoctorPageURL.create_doctor_page_urls()
+    # for doctor in doc_obj:
+    #     status = DoctorPageURL.create_doctor_page_urls(doctor,sequence)
         
-    EntityUrls.objects.filter(sitemap_identifier='DOCTOR_PAGE', sequence__lt=sequence).update(is_valid=False)
+    # EntityUrls.objects.filter(sitemap_identifier='DOCTOR_PAGE', sequence__lt=sequence).update(is_valid=False)
 
         # except Exception as e:
         #     print("failure: " + str(doctor.id) + ", error: " + str(e))
