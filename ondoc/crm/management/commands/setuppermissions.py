@@ -41,7 +41,7 @@ from ondoc.web.models import Career, OnlineLead
 from ondoc.ratings_review import models as rating_models
 from ondoc.articles.models import Article, ArticleLinkedUrl, LinkedArticle
 
-from ondoc.authentication.models import BillingAccount, SPOCDetails, GenericAdmin, User, Merchant, AssociatedMerchant
+from ondoc.authentication.models import BillingAccount, SPOCDetails, GenericAdmin, User, Merchant, AssociatedMerchant, DoctorNumber
 from ondoc.account.models import MerchantPayout
 from ondoc.seo.models import Sitemap
 from ondoc.elastic.models import DemoElastic
@@ -173,7 +173,7 @@ class Command(BaseCommand):
             DoctorClinic, DoctorClinicTiming, GenericAdmin, GenericLabAdmin,
             DoctorQualification, DoctorLanguage, DoctorAward, DoctorAssociation,
             DoctorExperience, DoctorMedicalService, DoctorImage, DoctorDocument,
-            DoctorMobile, DoctorEmail, HospitalSpeciality,
+            DoctorMobile, DoctorEmail, HospitalSpeciality, DoctorNumber,
             HospitalAward, HospitalAccreditation, HospitalImage, HospitalDocument,
             HospitalCertification, HospitalNetworkManager, HospitalNetworkHelpline,
             HospitalNetworkEmail, HospitalNetworkAccreditation, HospitalNetworkAward,
@@ -248,7 +248,7 @@ class Command(BaseCommand):
             DoctorClinic, DoctorClinicTiming,
             DoctorQualification, DoctorLanguage, DoctorAward, DoctorAssociation,
             DoctorExperience, DoctorMedicalService, DoctorImage, DoctorDocument,
-            DoctorMobile, DoctorEmail, HospitalSpeciality,
+            DoctorMobile, DoctorEmail, HospitalSpeciality, DoctorNumber,
             HospitalAward, HospitalAccreditation, HospitalImage, HospitalDocument,
             HospitalCertification, HospitalNetworkManager, HospitalNetworkHelpline,
             HospitalNetworkEmail, HospitalNetworkAccreditation, HospitalNetworkAward,
