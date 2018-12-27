@@ -183,7 +183,7 @@ class LabList(viewsets.ReadOnlyModelViewSet):
                      then=F('availablelabs__computed_deal_price')),
                 When(availablelabs__custom_deal_price__isnull=False,
                      then=F('availablelabs__custom_deal_price'))),
-            rank=Window(expression=RowNumber(), order_by=F('distance').desc(),
+            rank=Window(expression=RowNumber(), order_by=F('distance'),
                         partition_by=[F(
                             'availablelabs__lab_pricing_group__labs__network'), F('id')]))
 
