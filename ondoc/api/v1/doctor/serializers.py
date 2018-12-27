@@ -1304,7 +1304,7 @@ class OfflinePatientBodySerializer(serializers.Serializer):
     medical_history = serializers.CharField(required=False, max_length=256)
     welcome_message = serializers.CharField(required=False, max_length=256)
     display_welcome_message = serializers.BooleanField(required=False)
-    phone_number = serializers.ListField()
+    phone_number = serializers.ListField(required=False)
     id = serializers.UUIDField()
     age = serializers.IntegerField(required=False)
 
