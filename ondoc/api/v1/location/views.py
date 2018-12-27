@@ -443,7 +443,7 @@ class DoctorProfileFooter(Footer):
                      'url_list': top_specialities_in_locality})
 
         if self.locality_id and self.locality:            
-            print(str(self.locality_id))
+            #print(str(self.locality_id))
             top_specialities_in_city = self.specialist_in_city()
             if top_specialities_in_city:
                 response['menu'].append({'sub_heading': 'Popular Doctors in %s' % (self.locality), 'url_list': top_specialities_in_city})
@@ -481,7 +481,7 @@ class DoctorProfileFooter(Footer):
 class DoctorCityFooter(Footer):
 
     def __init__(self, entity):
-        self.locality_id = int(entity.locality_id)
+        self.locality_id = int(entity.locality_id) if entity.locality_id else None
         self.locality = entity.locality_value
         self.centroid = entity.locality_location
 
@@ -489,13 +489,15 @@ class DoctorCityFooter(Footer):
         response = {}
         response['menu'] = []
 
-        doctors_in_top_localities = self.doctor_in_top_localities()
-        if doctors_in_top_localities:
-            response['menu'].append({'sub_heading': 'Doctors in Top Localities', 'url_list': doctors_in_top_localities})
+        if self.locality and self.centroid:
+            doctors_in_top_localities = self.doctor_in_top_localities()
+            if doctors_in_top_localities:
+                response['menu'].append({'sub_heading': 'Doctors in Top Localities', 'url_list': doctors_in_top_localities})
 
-        top_specialities_in_city = self.specialist_in_city()
-        if top_specialities_in_city:
-            response['menu'].append({'sub_heading': 'Top specialities in %s' % self.locality, 'url_list': top_specialities_in_city})
+        if self.locality:        
+            top_specialities_in_city = self.specialist_in_city()
+            if top_specialities_in_city:
+                response['menu'].append({'sub_heading': 'Top specialities in %s' % self.locality, 'url_list': top_specialities_in_city})
 
         if response['menu']:
             response['heading'] = 'Dynamic footer on doctors in %s' % self.locality
