@@ -1877,7 +1877,7 @@ class OfflineCustomerViewSet(viewsets.GenericViewSet):
             queryset = queryset.filter(updated_at__gte=valid_data.get('updated_at'))
         queryset = queryset.values('name', 'id', 'gender', 'doctor', 'hospital', 'age', 'dob', 'calculated_dob', 'updated_at',
                                    'share_with_hospital', 'sms_notification', 'medical_history',
-                                   'referred_by', 'display_welcome_message',
+                                   'referred_by', 'display_welcome_message', 'error'
                                    ).distinct()
         return Response(queryset)
 
@@ -1945,7 +1945,7 @@ class OfflineCustomerViewSet(viewsets.GenericViewSet):
                 resp.append(obj)
                 logger.error("PROVIDER_REQUEST - Invalid UUid - Offline Appointment Create! " + str(data))
                 continue
-            if id in appntment_ids or (not data.get('patient_id') and (data.get('patient') and data.get('patient')['id'] in patient_ids)):
+            if id in appntment_ids:
                 obj = {'id': data.get('id'),
                        'error': True,
                        'error_message': "Appointment With Same UUid exists!"}
@@ -1954,7 +1954,7 @@ class OfflineCustomerViewSet(viewsets.GenericViewSet):
                 resp.append(obj)
                 logger.error("PROVIDER_REQUEST - Offline Appointment With Same UUid exists! " + str(data))
                 continue
-            if not data.get('patient') and not data.get('patient_id'):
+            if not data.get('patient'):
                 obj = {'id': data.get('id'),
                        'error': True,
                        'error_message': "Patient not Recieved for Offline Appointment!"}
@@ -1971,28 +1971,38 @@ class OfflineCustomerViewSet(viewsets.GenericViewSet):
                 data['error'] = True
                 data['error_message'] = 'Doctor is not associated with given hospital!'
 
-            if not data.get('patient_id') and data.get('patient'):
+            if not data.get('patient')['id'] in patient_ids:
                 patient_data = self.create_patient(request, data['patient'], data['hospital'], data['doctor'])
                 patient = patient_data['patient']
                 if patient_data['sms_list'] is not None:
                     sms_list.append(patient_data['sms_list'])
             else:
-                patient = data.get('patient_id')
-                if patient.sms_notification:
+                patient = models.OfflinePatients.objects.filter(id=data.get('patient')['id']).first()
+                if patient and patient.sms_notification:
                     def_number = patient.patient_mobiles.filter(is_default=True).first()
                     if def_number:
                         sms_list.append(def_number.phone_number)
             time_slot_start = form_time_slot(data.get("start_date"), data.get("start_time"))
-            appnt = models.OfflineOPDAppointments.objects.create(doctor=data.get('doctor'),
-                                                                 id=data.get('id'),
-                                                                 hospital=data.get('hospital'),
-                                                                 time_slot_start=time_slot_start,
-                                                                 booked_by=request.user,
-                                                                 user=patient,
-                                                                 status=models.OfflineOPDAppointments.ACCEPTED,
-                                                                 error=data.get('error') if data.get('error') else False,
-                                                                 error_message=data.get('error_message') if data.get('error_message') else None
-                                                                 )
+            try:
+                appnt = models.OfflineOPDAppointments.objects.create(doctor=data.get('doctor'),
+                                                                     id=data.get('id'),
+                                                                     hospital=data.get('hospital'),
+                                                                     time_slot_start=time_slot_start,
+                                                                     booked_by=request.user,
+                                                                     user=patient,
+                                                                     status=models.OfflineOPDAppointments.ACCEPTED,
+                                                                     error=data.get('error') if data.get('error') else False,
+                                                                     error_message=data.get('error_message') if data.get('error_message') else None
+                                                                     )
+            except Exception as e:
+                obj = {'id': data.get('id'),
+                       'error': True,
+                       'error_message': "Something Went Wrong!"}
+                obj['doctor_id'] = data.get('doctor').id
+                obj['hospital_id'] = data.get('hospital').id
+                resp.append(obj)
+                logger.error("Fialed Creating Appointment "+ str(e))
+                continue
             ret_obj = {}
             ret_obj['id'] = appnt.id
             ret_obj['patient_id'] = appnt.user.id

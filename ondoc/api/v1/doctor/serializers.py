@@ -1315,7 +1315,7 @@ class OfflinePatientExplicitSerializer(OfflinePatientBodySerializer):
 
 class OfflineAppointmentBodySerializer(serializers.Serializer):
     patient = OfflinePatientBodySerializer(many=False, allow_null=True, required=False)
-    patient_id = serializers.PrimaryKeyRelatedField(queryset=OfflinePatients.objects.all(), required=False, allow_empty=True)
+    # patient_id = serializers.PrimaryKeyRelatedField(queryset=OfflinePatients.objects.all(), required=False, allow_empty=True)
     doctor = serializers.PrimaryKeyRelatedField(queryset=Doctor.objects.all())
     hospital = serializers.PrimaryKeyRelatedField(queryset=Hospital.objects.all())
     start_date = serializers.DateTimeField()
@@ -1327,6 +1327,7 @@ class OfflineAppointmentBodySerializer(serializers.Serializer):
 class OfflineAppointmentUpdateBodySerializer(OfflineAppointmentBodySerializer):
     status = serializers.IntegerField()
     is_docprime = serializers.BooleanField()
+
 
 class OfflineAppointmentCreateSerializer(serializers.Serializer):
     data = OfflineAppointmentBodySerializer(many=True)
