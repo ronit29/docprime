@@ -10,7 +10,7 @@ from django.contrib.gis import admin
 from django.contrib.admin import SimpleListFilter, TabularInline
 from reversion.admin import VersionAdmin
 from import_export.admin import ImportExportMixin
-from django.db.models import Q
+from django.db.models import Q, Count
 from django.db import models, transaction
 from django.utils.dateparse import parse_datetime
 from dateutil import tz
@@ -671,6 +671,7 @@ class LabAppointmentForm(forms.ModelForm):
     start_time = forms.CharField(widget=TimePickerWidget())
     cancel_type = forms.ChoiceField(label='Cancel Type', choices=((0, 'Cancel and Rebook'),
                                                                   (1, 'Cancel and Refund'),), initial=0, widget=forms.RadioSelect)
+    send_email_sms_report = forms.BooleanField(label='Send reports via message and email', initial=False, required=False)
 
     def clean(self):
         super().clean()
@@ -696,6 +697,10 @@ class LabAppointmentForm(forms.ModelForm):
             lab = self.instance.lab
         else:
             raise forms.ValidationError("Lab and lab test details not entered.")
+        if cleaned_data.get('send_email_sms_report', False) and self.instance and self.instance.id and not sum(
+                self.instance.reports.annotate(no_of_files=Count('files')).values_list('no_of_files', flat=True)):
+                raise forms.ValidationError("Can't send reports as none are available. Please upload.")
+        # SHASHANK_SINGH if no report error.
 
 
         # if self.instance.status in [LabAppointment.CANCELLED, LabAppointment.COMPLETED] and len(cleaned_data):
@@ -804,14 +809,14 @@ class LabAppointmentAdmin(nested_admin.NestedModelAdmin):
                     'profile_detail', 'status', 'cancel_type', 'cancellation_reason', 'cancellation_comments',
                     'price', 'agreed_price',
                     'deal_price', 'effective_price', 'start_date', 'start_time', 'otp', 'payment_status',
-                    'payment_type', 'insurance', 'is_home_pickup', 'address', 'outstanding')
+                    'payment_type', 'insurance', 'is_home_pickup', 'address', 'outstanding', 'send_email_sms_report')
         elif request.user.groups.filter(name=constants['LAB_APPOINTMENT_MANAGEMENT_TEAM']).exists():
             return ('booking_id', 'order_id',  'lab_id', 'lab_name', 'get_lab_test', 'lab_contact_details',
                     'used_profile_name', 'used_profile_number',
                     'default_profile_name', 'default_profile_number', 'user_id', 'user_number', 'price', 'agreed_price',
                     'deal_price', 'effective_price', 'payment_status', 'payment_type', 'insurance', 'is_home_pickup',
                     'get_pickup_address', 'get_lab_address', 'outstanding', 'otp', 'status', 'cancel_type',
-                    'cancellation_reason', 'cancellation_comments', 'start_date', 'start_time')
+                    'cancellation_reason', 'cancellation_comments', 'start_date', 'start_time', 'send_email_sms_report')
         else:
             return ()
 
@@ -935,6 +940,7 @@ class LabAppointmentAdmin(nested_admin.NestedModelAdmin):
             # time = datetime.datetime.strptime(request.POST['start_time'], '%H:%M').time()
             #
             # date_time = datetime.datetime.combine(date, time)
+            send_email_sms_report = form.cleaned_data.get('send_email_sms_report', False)
             if request.POST['start_date'] and request.POST['start_time']:
                 date_time_field = request.POST['start_date'] + " " + request.POST['start_time']
                 to_zone = tz.gettz(settings.TIME_ZONE)
@@ -952,6 +958,15 @@ class LabAppointmentAdmin(nested_admin.NestedModelAdmin):
                     logger.warning("Lab Admin Cancel completed - " + str(obj.id) + " timezone - " + str(timezone.now()))
             else:
                 super().save_model(request, obj, form, change)
+            if send_email_sms_report and sum(
+                    obj.reports.annotate(no_of_files=Count('files')).values_list('no_of_files', flat=True)):
+                transaction.on_commit(lambda: self.on_commit_tasks(obj.id))
+
+    def on_commit_tasks(self, obj_id):
+        from ondoc.notification.tasks import send_lab_reports
+        send_lab_reports(obj_id)
+
+
 
     class Media:
         js = (

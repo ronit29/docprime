@@ -1,29 +1,23 @@
 import copy
 import json
 import random
-from collections import defaultdict
 from itertools import groupby
-
 import pytz
+from django.db.models import F
 from hardcopy import bytestring_to_pdf
-
 from ondoc.doctor.models import OpdAppointment
 from ondoc.diagnostic.models import LabAppointment
-from django.core.files.uploadedfile import SimpleUploadedFile, TemporaryUploadedFile, InMemoryUploadedFile
+from django.core.files.uploadedfile import TemporaryUploadedFile, InMemoryUploadedFile
 from django.forms import model_to_dict
 from django.template.loader import render_to_string
 from django.contrib.auth import get_user_model
 import logging
 from django.conf import settings
 from django.utils import timezone
-from weasyprint import HTML
-
 from ondoc.account.models import Invoice, Order
 from ondoc.authentication.models import UserProfile, GenericAdmin, NotificationEndpoint
-
 from ondoc.notification.models import NotificationAction, SmsNotification, EmailNotification, AppNotification, \
     PushNotification
-# from ondoc.notification.sqs_client import publish_message
 from ondoc.notification.rabbitmq_client import publish_message
 
 User = get_user_model()
@@ -227,7 +221,8 @@ class SMSNotification:
             body_template = "sms/lab/appointment_cancelled_lab.txt"
         elif notification_type == NotificationAction.LAB_REPORT_UPLOADED:
             body_template = "sms/lab/lab_report_uploaded.txt"
-
+        elif notification_type == NotificationAction.LAB_REPORT_SEND_VIA_CRM:
+            body_template = "sms/lab/lab_report_send_crm.txt"
         return body_template
 
     def trigger(self, receiver, template, context):
@@ -401,6 +396,10 @@ class EMAILNotification:
             context.update({"invoice_url": invoice.file.url})
             body_template = "email/lab_invoice/body.html"
             subject_template = "email/lab_invoice/subject.txt"
+
+        elif notification_type == NotificationAction.LAB_REPORT_SEND_VIA_CRM:
+            body_template = "email/lab/lab_report_send_crm/body.html"
+            subject_template = "email/lab/lab_report_send_crm/subject.txt"
 
         return subject_template, body_template
 
@@ -651,6 +650,11 @@ class LabNotification(Notification):
         est = pytz.timezone(settings.TIME_ZONE)
         time_slot_start = self.appointment.time_slot_start.astimezone(est)
         tests = self.appointment.get_tests_and_prices()
+        reports = instance.reports.all()
+        report_file_links = set()
+        for report in reports:
+            report_file_links = report_file_links.union(
+                set([report_file.name.url for report_file in report.files.all()]))
         for test in tests:
             test['mrp'] = str(test['mrp'])
             test['deal_price'] = str(test['deal_price'])
@@ -682,6 +686,11 @@ class LabNotification(Notification):
         elif notification_type == NotificationAction.LAB_OTP_BEFORE_APPOINTMENT:
             sms_notification = SMSNotification(notification_type, context)
             sms_notification.send(all_receivers.get('sms_receivers', []))
+        elif notification_type == NotificationAction.LAB_REPORT_SEND_VIA_CRM:
+            email_notification = EMAILNotification(notification_type, context)
+            sms_notification = SMSNotification(notification_type, context)
+            email_notification.send(all_receivers.get('email_receivers', []))
+            sms_notification.send(all_receivers.get('sms_receivers', []))
         else:
             email_notification = EMAILNotification(notification_type, context)
             sms_notification = SMSNotification(notification_type, context)
@@ -704,7 +713,8 @@ class LabNotification(Notification):
                                  NotificationAction.LAB_APPOINTMENT_RESCHEDULED_BY_LAB,
                                  NotificationAction.LAB_REPORT_UPLOADED,
                                  NotificationAction.LAB_INVOICE,
-                                 NotificationAction.LAB_OTP_BEFORE_APPOINTMENT]:
+                                 NotificationAction.LAB_OTP_BEFORE_APPOINTMENT,
+                                 NotificationAction.LAB_REPORT_SEND_VIA_CRM]:
             receivers.append(instance.user)
         elif notification_type in [NotificationAction.LAB_APPOINTMENT_RESCHEDULED_BY_PATIENT,
                                    NotificationAction.LAB_APPOINTMENT_BOOKED,

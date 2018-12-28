@@ -415,3 +415,16 @@ def lab_send_otp_before_appointment(appointment_id, previous_appointment_date_ti
         opd_notification.send()
     except Exception as e:
         logger.error(str(e))
+
+@task()
+def send_lab_reports(appointment_id):
+    from ondoc.diagnostic.models import LabAppointment
+    from ondoc.communications.models import LabNotification
+    try:
+        instance = LabAppointment.objects.filter(id=appointment_id).first()
+        if not instance:
+            return
+        opd_notification = LabNotification(instance, NotificationAction.LAB_REPORT_SEND_VIA_CRM)
+        opd_notification.send()
+    except Exception as e:
+        logger.error(str(e))
