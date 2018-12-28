@@ -2049,3 +2049,14 @@ class PageUrlCache():
                 if ent.entity_id == entity_id:
                     deletions.append(ent.id)
         return deletions
+
+class DefaultRating(TimeStampedModel):
+    ratings = models.PositiveIntegerField(null=True)
+    reviews = models.PositiveIntegerField(null=True)
+    url = models.TextField()
+
+    class Meta:
+        db_table = 'default_rating'
+        indexes = [
+            models.Index(fields=['url']),
+        ]
