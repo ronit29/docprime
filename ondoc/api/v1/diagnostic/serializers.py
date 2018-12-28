@@ -221,6 +221,7 @@ class AvailableLabTestPackageSerializer(serializers.ModelSerializer):
 
     def get_insurance(self, obj):
         request = self.context.get("request")
+        lab_obj = self.context.get("lab")
         insurance_threshold = InsuranceThreshold.objects.all().order_by('-lab_amount_limit').first()
         resp = {
             'is_insurance_covered': False,
@@ -238,7 +239,7 @@ class AvailableLabTestPackageSerializer(serializers.ModelSerializer):
                             insurance_threshold.lab_amount_limit
                         resp['is_user_insured'] = True
 
-            if obj.mrp is not None and obj.mrp <= resp['insurance_threshold_amount']:
+            if lab_obj.is_insurance_enabled and obj.mrp is not None and obj.mrp <= resp['insurance_threshold_amount']:
                 resp['is_insurance_covered'] = True
 
         return resp
@@ -320,6 +321,7 @@ class AvailableLabTestSerializer(serializers.ModelSerializer):
 
     def get_insurance(self, obj):
         request = self.context.get("request")
+        lab_obj = self.context.get("lab")
         insurance_threshold = InsuranceThreshold.objects.all().order_by('-lab_amount_limit').first()
         resp = {
             'is_insurance_covered': False,
@@ -337,7 +339,7 @@ class AvailableLabTestSerializer(serializers.ModelSerializer):
                             insurance_threshold.lab_amount_limit
                         resp['is_user_insured'] = True
 
-            if obj.mrp is not None and obj.mrp <= resp['insurance_threshold_amount']:
+            if lab_obj.is_insurance_enabled and obj.mrp is not None and obj.mrp <= resp['insurance_threshold_amount']:
                 resp['is_insurance_covered'] = True
 
         return resp
