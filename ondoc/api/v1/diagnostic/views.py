@@ -797,14 +797,14 @@ class LabList(viewsets.ReadOnlyModelViewSet):
                 existing = lab_network.get(network_id)
 
             if not existing:
-                res['others'] = []
+                res['other_labs'] = []
                 #existing = res
                 key = network_id
                 if not key:
                     key = random.randint(10, 1000000000)
                 lab_network[key] = res
             else:
-                existing['others'].append(res)
+                existing['other_labs'].append(res)
 
         return lab_network.values()
 
