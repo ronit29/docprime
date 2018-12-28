@@ -486,8 +486,7 @@ class UserInsurance(auth_model.TimeStampedModel):
         if not 'doctor' in appointment_data:
             # if not user_insurance.is_lab_appointment_count_valid(appointment_data):
             #     return False, user_insurance.id, 'Not Covered under Insurance'
-            lab_id = appointment_data['lab']
-            lab = Lab.objects.get(id=lab_id)
+            lab = appointment_data['lab']
             if not lab.is_insurance_enabled:
                 return False, user_insurance.id, 'Not Covered under Insurance'
             if appointment_data['extra_details']:
@@ -509,8 +508,7 @@ class UserInsurance(auth_model.TimeStampedModel):
                 for detail in appointment_data:
                     if detail['procedure_id']:
                         return False, user_insurance.id, 'Procedure Not covered under insurance'
-            doctor_id = appointment_data['doctor']
-            doctor = Doctor.objects.get(id=doctor_id)
+            doctor = appointment_data['doctor']
             if not doctor.is_insurance_enabled:
                 return False, user_insurance.id, "Not Covered Under Insurance"
             if not int(appointment_data['mrp']) <= threshold_opd:
@@ -518,44 +516,8 @@ class UserInsurance(auth_model.TimeStampedModel):
             # if not user_insurance.is_opd_appointment_count_valid(appointment_data):
             #     return False, user_insurance.id, "Not Covered Under Insurance"
 
-        is_insured, insurance_id, insurance_message = user_insurance.doctor_specialization_validation(appointment_data)
-        return is_insured, insurance_id, insurance_message
-        # doctor = DoctorPracticeSpecialization.objects.filter(doctor_id=appointment_data['doctor']).values('specialization_id')
-        # specilization_ids = doctor
-        # specilization_ids_set = set(map(lambda specialization: specialization['specialization_id'], specilization_ids))
-        # gynecologist_list = json.loads(settings.GYNECOLOGIST_SPECIALIZATION_IDS)
-        # gynecologist_set = set(gynecologist_list)
-        # oncologist_list = json.loads(settings.ONCOLOGIST_SPECIALIZATION_IDS)
-        # oncologist_set = set(oncologist_list)
-        # if not (specilization_ids_set & oncologist_set) and not (specilization_ids_set & gynecologist_set):
-        #     return True, user_insurance.id, 'Covered Under Insurance'
-        # members = user_insurance.members.all().get(profile=profile)
-        # if specilization_ids_set & gynecologist_set:
-        #     doctor_with_same_specialization = DoctorPracticeSpecialization.objects.filter(
-        #         specialization_id__in=gynecologist_list).values_list(
-        #         'doctor_id', flat=True)
-        #     opd_appointment_count = OpdAppointment.objects.filter(~Q(status=6),
-        #                                                           doctor_id__in=doctor_with_same_specialization,
-        #                                                           payment_type=3,
-        #                                                           insurance_id=user_insurance.id,
-        #                                                           profile_id=members.profile.id).count()
-        #     if opd_appointment_count >= 5:
-        #         return False, user_insurance.id, 'Gynecologist Limit of 5 exceeded'
-        #     else:
-        #         return True, user_insurance.id, 'Covered Under Insurance'
-        # elif specilization_ids_set & oncologist_set:
-        #     doctor_with_same_specialization = DoctorPracticeSpecialization.objects.filter(
-        #         specialization_id__in=oncologist_list).values_list(
-        #         'doctor_id', flat=True)
-        #     opd_appointment_count = OpdAppointment.objects.filter(~Q(status=6),
-        #                                                           doctor_id__in=doctor_with_same_specialization,
-        #                                                           payment_type=3,
-        #                                                           insurance_id=user_insurance.id,
-        #                                                           profile_id=members.profile.id).count()
-        #     if opd_appointment_count >= 5:
-        #         return False, user_insurance.id, 'Oncologist Limit of 5 exceeded'
-        #     else:
-        #         return True, user_insurance.id, 'Covered Under Insurance'
+            is_insured, insurance_id, insurance_message = user_insurance.doctor_specialization_validation(appointment_data)
+            return is_insured, insurance_id, insurance_message
 
 
 class InsuranceTransaction(auth_model.TimeStampedModel):
