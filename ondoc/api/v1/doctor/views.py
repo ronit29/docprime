@@ -1259,32 +1259,36 @@ class DoctorListViewSet(viewsets.GenericViewSet):
         validated_data = serializer.validated_data
         specialization_dynamic_content = ''
         doctor_search_helper = DoctorSearchByHospitalHelper(validated_data)
-        if not validated_data.get("search_id"):
-            filtering_params = doctor_search_helper.get_filtering_params()
-            order_by_field, rank_by = doctor_search_helper.get_ordering_params()
-            query_string = doctor_search_helper.prepare_raw_query(filtering_params,
-                                                                  order_by_field, rank_by)
-            doctor_search_result = RawSql(query_string.get('query'),
-                                          query_string.get('params')).fetch_all()
+        # if not validated_data.get("search_id"):
+        filtering_params = doctor_search_helper.get_filtering_params()
+        order_by_field, rank_by = doctor_search_helper.get_ordering_params()
+        page = int(request.query_params.get('page', 1))
 
-            result_count = len(doctor_search_result)
+        query_string = doctor_search_helper.prepare_raw_query(filtering_params,
+                                                              order_by_field, rank_by, page)
+        doctor_search_result = RawSql(query_string.get('query'),
+                                      query_string.get('params')).fetch_all()
+
+        result_count = 0
+        if len(doctor_search_result)>0:
+            result_count = doctor_search_result[0]['result_count']
             # sa
             # saved_search_result = models.DoctorSearchResult.objects.create(results=doctor_search_result,
             #                                                                result_count=result_count)
-        else:
-            saved_search_result = get_object_or_404(models.DoctorSearchResult, pk=validated_data.get("search_id"))
-        doctor_ids = paginate_queryset([data.get("doctor_id") for data in doctor_search_result], request)
-        preserved = Case(*[When(pk=pk, then=pos) for pos, pk in enumerate(doctor_ids)])
+        # else:
+        #     saved_search_result = get_object_or_404(models.DoctorSearchResult, pk=validated_data.get("search_id"))
+
+        doctor_ids = [data.get("doctor_id") for data in doctor_search_result]
+        #preserved = Case(*[When(pk=pk, then=pos) for pos, pk in enumerate(doctor_ids)])
         doctor_data = models.Doctor.objects.filter(
             id__in=doctor_ids).prefetch_related("hospitals", "doctor_clinics", "doctor_clinics__availability",
                                                 "doctor_clinics__hospital",
                                                 "doctorpracticespecializations",
                                                 "doctorpracticespecializations__specialization",
                                                 "images",
-                                                "doctor_clinics__doctorclinicprocedure_set__procedure__parent_categories_mapping").order_by(
-            preserved)
+                                                "doctor_clinics__doctorclinicprocedure_set__procedure__parent_categories_mapping")
 
-        response = doctor_search_helper.prepare_search_response(doctor_data, doctor_search_result, doctor_ids, request)
+        result = doctor_search_helper.prepare_search_response(doctor_data, doctor_search_result, doctor_ids, request)
 
         # from collections import Counter
         # for hosp in response.items():
@@ -1302,9 +1306,9 @@ class DoctorListViewSet(viewsets.GenericViewSet):
         #         if hosp[1][0].get('specialization'):
         #             break
 
-        result = list()
-        for data in response.values():
-            result.append(data[0])
+        # result = list()
+        # for data in response.values():
+        #     result.append(data[0])
 
         validated_data.get('procedure_categories', [])
         procedures = list(Procedure.objects.filter(pk__in=validated_data.get('procedure_ids', [])).values('id', 'name'))
