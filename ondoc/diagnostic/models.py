@@ -1570,7 +1570,8 @@ class LabReportFile(auth_model.TimeStampedModel, auth_model.Document):
         FileExtensionValidator(allowed_extensions=['pdf', 'jfif', 'jpg', 'jpeg', 'png'])])
 
     def __str__(self):
-        return "{}-{}".format(self.id, self.report.id)
+
+        return "{}-{}".format(self.id, self.report.id if self.report and self.report.id else None)
 
     def send_notification(self, database_instance):
         appointment = self.report.appointment

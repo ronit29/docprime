@@ -16,6 +16,7 @@ from weasyprint import HTML
 from django.conf import settings
 import pytz
 import logging
+from django.contrib.postgres.fields import ArrayField
 
 import copy
 
@@ -437,6 +438,9 @@ class EmailNotification(TimeStampedModel, EmailNotificationOpdMixin, EmailNotifi
     viewed_at = models.DateTimeField(blank=True, null=True)
     read_at = models.DateTimeField(blank=True, null=True)
     notification_type = models.PositiveIntegerField(choices=NotificationAction.NOTIFICATION_TYPE_CHOICES)
+    cc = ArrayField(models.EmailField(), default=[], blank=[])
+    bcc = ArrayField(models.EmailField(), default=[], blank=[])
+    attachments = ArrayField(JSONField(), default=[], blank=[])
 
     class Meta:
         db_table = "email_notification"
