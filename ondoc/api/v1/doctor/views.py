@@ -1080,7 +1080,7 @@ class DoctorListViewSet(viewsets.GenericViewSet):
         description = ''
         seo = None
         breadcrumb = None
-
+        ratings_title = ''
         # if False and (validated_data.get('extras') or validated_data.get('specialization_ids')):
         if validated_data.get('extras'):
             location = None
@@ -1091,7 +1091,7 @@ class DoctorListViewSet(viewsets.GenericViewSet):
             locality = ''
             sublocality = ''
             specializations = ''
-            ratings_title = ''
+
             if validated_data.get('extras') and validated_data.get('extras').get('location_json'):
                 if validated_data.get('extras').get('location_json').get('locality_value'):
                     locality = validated_data.get('extras').get('location_json').get('locality_value')
