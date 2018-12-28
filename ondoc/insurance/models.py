@@ -460,8 +460,8 @@ class UserInsurance(auth_model.TimeStampedModel):
 
     @classmethod
     def validate_insurance(self, appointment_data):
-        from ondoc.doctor.models import DoctorPracticeSpecialization, OpdAppointment
-        from ondoc.diagnostic.models import LabAppointment
+        from ondoc.doctor.models import Doctor
+        from ondoc.diagnostic.models import Lab
         profile = appointment_data['profile']
         user = appointment_data['user']
         is_lab_insured = False
@@ -486,6 +486,10 @@ class UserInsurance(auth_model.TimeStampedModel):
         if not 'doctor' in appointment_data:
             # if not user_insurance.is_lab_appointment_count_valid(appointment_data):
             #     return False, user_insurance.id, 'Not Covered under Insurance'
+            lab_id = appointment_data['lab']
+            lab = Lab.objects.get(id=lab_id)
+            if not lab.is_insurance_enabled:
+                return False, user_insurance.id, 'Not Covered under Insurance'
             if appointment_data['extra_details']:
                 for detail in appointment_data['extra_details']:
                     if int(float(detail['mrp'])) <= threshold_lab:
@@ -505,6 +509,10 @@ class UserInsurance(auth_model.TimeStampedModel):
                 for detail in appointment_data:
                     if detail['procedure_id']:
                         return False, user_insurance.id, 'Procedure Not covered under insurance'
+            doctor_id = appointment_data['doctor']
+            doctor = Doctor.objects.get(id=doctor_id)
+            if not doctor.is_insurance_enabled:
+                return False, user_insurance.id, "Not Covered Under Insurance"
             if not int(appointment_data['mrp']) <= threshold_opd:
                 return False, user_insurance.id, "Not Covered Under Insurance"
             # if not user_insurance.is_opd_appointment_count_valid(appointment_data):

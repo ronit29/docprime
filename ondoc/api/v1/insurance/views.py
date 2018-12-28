@@ -25,8 +25,8 @@ logger = logging.getLogger(__name__)
 
 
 class ListInsuranceViewSet(viewsets.GenericViewSet):
-    authentication_classes = (JWTAuthentication,)
-    permission_classes = (IsAuthenticated,)
+    # authentication_classes = (JWTAuthentication,)
+    # permission_classes = (IsAuthenticated,)
 
     def get_queryset(self):
         return Insurer.objects.filter(is_live=True)
