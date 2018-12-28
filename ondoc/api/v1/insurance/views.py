@@ -96,8 +96,8 @@ class InsuranceOrderViewSet(viewsets.GenericViewSet):
         user = request.user
 
         user_insurance = UserInsurance.objects.filter(user=user).last()
-        # if user_insurance and user_insurance.is_valid():
-        #     return Response(data={'certificate': True}, status=status.HTTP_200_OK)
+        if user_insurance and user_insurance.is_valid():
+            return Response(data={'certificate': True}, status=status.HTTP_200_OK)
 
         serializer = serializers.InsuredMemberSerializer(data=request.data, context={'request': request})
         if not serializer.is_valid() and serializer.errors:
