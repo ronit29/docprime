@@ -438,6 +438,7 @@ class DoctorSearchByHospitalHelper:
                 }]
 
             thumbnail = doctor.get_thumbnail()
+            url = None
 
             if doctor.pk in id_url_dict.keys():
                 url = id_url_dict[doctor.pk]

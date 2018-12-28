@@ -42,6 +42,7 @@ from ondoc.matrix.tasks import push_appointment_to_matrix, push_onboarding_qcsta
 from ondoc.location import models as location_models
 from ondoc.ratings_review import models as ratings_models
 from decimal import Decimal
+from ondoc.common.models import AppointmentHistory
 import reversion
 
 logger = logging.getLogger(__name__)
@@ -1083,7 +1084,17 @@ class LabAppointment(TimeStampedModel, CouponsMixin):
         if 'push_again_to_matrix' in kwargs.keys():
             kwargs.pop('push_again_to_matrix')
 
+        # Pushing every status to the Appointment history
+        push_to_history = False
+        if self.id and self.status != LabAppointment.objects.get(pk=self.id).status:
+            push_to_history = True
+        elif self.id is None:
+            push_to_history = True
+
         super().save(*args, **kwargs)
+
+        if push_to_history:
+            AppointmentHistory.create(content_object=self)
 
         transaction.on_commit(lambda: self.app_commit_tasks(database_instance, push_to_matrix))
 

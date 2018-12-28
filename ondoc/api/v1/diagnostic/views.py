@@ -719,7 +719,9 @@ class LabList(viewsets.ReadOnlyModelViewSet):
             if lab_obj.sublocality and lab_obj.city:
                 row['address'] = lab_obj.sublocality + ' ' + lab_obj.city
             elif lab_obj.city:
-                row['address'] =  lab_obj.city
+                row['address'] = lab_obj.city
+
+            row['lab_thumbnail'] = self.request.build_absolute_uri(lab_obj.get_thumbnail()) if lab_obj.get_thumbnail() else None
 
             row['home_pickup_charges'] = lab_obj.home_pickup_charges
             row['is_home_collection_enabled'] = lab_obj.is_home_collection_enabled
