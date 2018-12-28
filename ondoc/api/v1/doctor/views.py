@@ -1086,6 +1086,7 @@ class DoctorListViewSet(viewsets.GenericViewSet):
             locality = ''
             sublocality = ''
             specializations = ''
+            ratings_title = ''
             if validated_data.get('extras') and validated_data.get('extras').get('location_json'):
                 if validated_data.get('extras').get('location_json').get('locality_value'):
                     locality = validated_data.get('extras').get('location_json').get('locality_value')
@@ -1146,8 +1147,10 @@ class DoctorListViewSet(viewsets.GenericViewSet):
                     else:
 
                         description += ': Book best ' + 'Doctor' + ' appointment online ' + 'in '+ locality
+            ratings_title = title
             if specializations:
                 if not sublocality:
+
                     title += '- Book Best ' + specializations +' Online'
                 else:
                     title += ' | Book & Get Best Deal'
@@ -1250,7 +1253,7 @@ class DoctorListViewSet(viewsets.GenericViewSet):
                          'specializations': specializations, 'conditions': conditions, "seo": seo,
                          "breadcrumb": breadcrumb, 'search_content': specialization_dynamic_content,
                          'procedures': procedures, 'procedure_categories': procedure_categories,
-                         'ratings':ratings, 'reviews': reviews})
+                         'ratings':ratings, 'reviews': reviews, 'ratings_title': ratings_title})
 
     @transaction.non_atomic_requests
     def search_by_hospital(self, request):
