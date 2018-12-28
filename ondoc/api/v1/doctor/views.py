@@ -988,6 +988,9 @@ class DoctorListViewSet(viewsets.GenericViewSet):
                     rating = round(random.uniform(3.5, 4.9),1)
                     reviews = random.randint(100, 125)
                     DefaultRating.objects.create(ratings=rating, reviews=reviews, url=url)
+                else:
+                    rating = default_rating_obj.ratings
+                    reviews = default_rating_obj.reviews
 
             elif entity.sitemap_identifier == 'SPECIALIZATION_LOCALITY_CITY':
                 default_rating_obj = DefaultRating.objects.filter(url=url).first()
@@ -995,6 +998,9 @@ class DoctorListViewSet(viewsets.GenericViewSet):
                     rating = round(random.uniform(3.5, 4.9), 1)
                     reviews = random.randint(10, 25)
                     DefaultRating.objects.create(ratings=rating, reviews=reviews, url=url)
+                else:
+                    rating = default_rating_obj.ratings
+                    reviews = default_rating_obj.reviews
 
             extras = entity.additional_info
             if extras:
