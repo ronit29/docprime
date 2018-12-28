@@ -508,7 +508,6 @@ class LabList(viewsets.ReadOnlyModelViewSet):
 
             filtering_params_query1.append("network_id=(%(network_id)s)")
 
-
         if lat is not None and long is not None:
             params['latitude'] = lat
             params['longitude'] = long

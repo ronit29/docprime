@@ -9,11 +9,14 @@ from rest_framework import mixins, viewsets, status
 from django.shortcuts import get_object_or_404
 from rest_framework.response import Response
 
-from ondoc.location.models import CityInventory, EntityUrls, EntityAddress
+from ondoc.location.models import CityInventory, EntityUrls, EntityAddress, GoogleSearchEntry, GoogleSearches, \
+    GoogleResult
 from . import serializers
 from ondoc.api.v1.doctor.serializers import DoctorListSerializer
 from ondoc.api.v1.doctor.serializers import DoctorProfileUserViewSerializer
 from ondoc.api.v1.utils import RawSql
+import requests
+from django.conf import settings
 
 import logging
 
@@ -920,3 +923,100 @@ class SearchUrlsViewSet(viewsets.GenericViewSet):
             resp[data.get('city')]['urls'].append({'url': data.get('url'),'title': data.get('title')})
 
         return Response(resp.values())
+
+
+class SearchedDoctorDataViewSet(viewsets.GenericViewSet):
+
+    def get_queryset(self):
+        return None
+
+    def get_custom_queryset(self, search_keywords):
+        return GoogleSearches.objects.filter(search_keywords=search_keywords).first()
+
+    def searched_google_data(self, request, search_keywords):
+        google_data = self.get_custom_queryset(search_keywords)
+        google_result = []
+        count = 0
+        searched_result = []
+
+        if not google_data:
+            response = requests.get(
+                    'https://maps.googleapis.com/maps/api/place/textsearch/json',
+                    params={'query':search_keywords,'key': settings.REVERSE_GEOCODING_API_KEY})
+            if response.status_code != status.HTTP_200_OK or not response.ok:
+                print ('failure  status_code: ' + str(response.status_code) + ', reason: ' + str(response.reason))
+            else:
+                searched_data = response.json()
+                if searched_data.get('results'):
+                    for data in searched_data.get('results'):
+                        google_result.append(data)
+                        count += 1
+                    page = 1
+                if searched_data.get('next_page_token'):
+                    next_page_token = searched_data.get('next_page_token')
+
+                    while page>0:
+                            next_page_response = requests.get(
+                                'https://maps.googleapis.com/maps/api/place/textsearch/json',
+                                params={'query': search_keywords,'pagetoken':next_page_token,
+                                        'key': settings.REVERSE_GEOCODING_API_KEY})
+
+                            if next_page_response.status_code != status.HTTP_200_OK or not response.ok:
+                                print('failure  status_code: ' + str(response.status_code) + ', reason: ' + str(
+                                    response.reason))
+                            else:
+                                next_page_searched_data = next_page_response.json()
+                                if next_page_searched_data.get('results'):
+                                    for data in next_page_searched_data.get('results'):
+                                        google_result.append(data)
+                                        count += 1
+                                page += 1
+                                if next_page_searched_data.get('next_page_token'):
+                                    next_page_token = next_page_searched_data.get('next_page_token')
+                                else:
+                                    break
+                create_google_search_record = GoogleSearches.objects.create(search_keywords=search_keywords, results=google_result, count=count)
+                if create_google_search_record:
+                    id = create_google_search_record.id
+                    results = create_google_search_record.results
+                    for data in results:
+                        place_id = data.get('place_id')
+                        if place_id:
+                            google_result_obj = GoogleResult.objects.filter(place_entry_id__place_id=place_id).first()
+                            if google_result_obj:
+                                GoogleResult.objects.create(place_entry_id=google_result_obj.place_entry_id,
+                                                            search_results_id=id)
+                            else:
+
+                                place_response = requests.get('https://maps.googleapis.com/maps/api/place/details/json',
+                                                  params={'place_id': place_id, 'key': settings.REVERSE_GEOCODING_API_KEY})
+                                if place_response.status_code != status.HTTP_200_OK or not response.ok:
+                                    print('failure  status_code: ' + str(response.status_code) + ', reason: ' + str(
+                                        response.reason))
+                                else:
+                                    place_searched_data = place_response.json()
+
+                                    doctor_details = dict()
+                                    doctor_details['name'] = data.get('name')
+                                    if place_searched_data.get('result'):
+                                        place_searched_data = place_searched_data.get('result')
+                                        doctor_details['address'] = place_searched_data.get('formatted_address')
+                                        doctor_details['phone_number'] = place_searched_data.get('formatted_phone_number')
+                                        doctor_details['website'] = place_searched_data.get('website')
+                                        if place_searched_data.get('address_components'):
+                                            address_components = place_searched_data.get('address_components')
+                                            for address in address_components:
+                                                types = [key.upper() for key in address.get('types', [])]
+                                                if 'LOCALITY' in types:
+                                                    doctor_details['city'] = address.get('long_name')
+                                                if 'POSTAL_CODE' in types:
+                                                    doctor_details['pin_code'] = address.get('long_name')
+                                    searched_result.append(doctor_details)
+                                    create_google_search_entry = GoogleSearchEntry.objects.create(place_id=place_id, place_result=place_searched_data,
+                                                                                              doctor_details=doctor_details)
+        else:
+            searched_details = GoogleSearchEntry.objects.filter(google_search_details=google_data.id)
+            for data in searched_details:
+                searched_result.append(data.get('doctor_details'))
+
+        return Response(searched_result)
