@@ -460,11 +460,11 @@ class DoctorSearchByHospitalHelper:
             d_data = {}    
             d_data["id"] = result["doctor_id"]
             d_data["doctor_id"] = result["doctor_id"]
-            d_data["deal_price"] = str(result["deal_price"])
-            d_data["discounted_fees"] = str(result["deal_price"])
+            d_data["deal_price"] = result["deal_price"]
+            d_data["discounted_fees"] = result["deal_price"]
             d_data["is_license_verified"] = result["is_license_verified"]
             d_data["distance"] = result["distance"]/1000
-            d_data["mrp"] = str(result["mrp"])
+            d_data["mrp"] = result["mrp"]
             d_data["is_live"] = result["is_live"]
             d_data["enabled_for_online_booking"] = result["enabled_for_online_booking"]
             d_data["is_gold"] = False
