@@ -24,7 +24,7 @@ class Migration(migrations.Migration):
                 ('sent_at', models.DateTimeField(blank=True, default=None, null=True)),
                 ('coupon', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='random_generated_coupon', to='coupon.Coupon')),
                 ('user', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, to=settings.AUTH_USER_MODEL)),
-                ('validity', models.PositiveIntegerField(default=None))
+                ('validity', models.PositiveIntegerField(default=None)),
             ],
             options={
                 'db_table': 'random_generated_coupon',

@@ -1,8 +1,9 @@
 from rest_framework import serializers
 from ondoc.account.models import Order
-from ondoc.diagnostic.models import Lab, LabTest, AvailableLabTest, LabAppointment
+from ondoc.diagnostic.models import Lab, LabTest, AvailableLabTest, LabAppointment, LabTestCategory
 from ondoc.coupon.models import Coupon, RandomGeneratedCoupon
-from ondoc.doctor.models import Doctor
+from ondoc.doctor.models import Doctor, Hospital, PracticeSpecialization, OpdAppointment
+from ondoc.procedure.models import Procedure, ProcedureCategory
 from ondoc.authentication.models import UserProfile
 from django.contrib.auth import get_user_model
 from ondoc.api.v1.doctor.serializers import CommaSepratedToListField
@@ -15,16 +16,40 @@ class ProductIDSerializer(serializers.Serializer):
     product_id = serializers.ChoiceField(required=False, choices=Order.PRODUCT_IDS)
     lab_id = serializers.PrimaryKeyRelatedField(required=False, queryset=Lab.objects.filter(is_live=True))
     test_ids = CommaSepratedToListField(required=False)
+    # test_categories_ids = CommaSepratedToListField(required=False)
+    procedures_ids = CommaSepratedToListField(required=False)
+    # procedure_categories_ids = CommaSepratedToListField(required=False)
+    doctor_id = serializers.PrimaryKeyRelatedField(required=False,
+                                                   queryset=Doctor.objects.filter(is_live=True, enabled=True))
+    hospital_id = serializers.PrimaryKeyRelatedField(required=False,
+                                                   queryset=Hospital.objects.filter(is_live=True, enabled=True))
+    # specialization_ids = serializers.PrimaryKeyRelatedField(required=False,
+    #                                                queryset=PracticeSpecialization.objects.all())
     deal_price = serializers.DecimalField(max_digits=10, decimal_places=2, required=False)
     coupon_code = serializers.CharField(required=False)
-    gender = serializers.ChoiceField(required=False, choices=UserProfile.GENDER_CHOICES)
     profile_id = serializers.PrimaryKeyRelatedField(required=False, queryset=UserProfile.objects.all())
-    age_range = CommaSepratedToListField(required=False, max_length=2, min_length=2)
+    # gender = serializers.ChoiceField(required=False, choices=UserProfile.GENDER_CHOICES)
+    # age_range = CommaSepratedToListField(required=False, max_length=2, min_length=2)
+    # cities = serializers.CharField(required=False)
 
     def validate(self, attrs):
-        age_range = attrs.get("age_range")
-        if age_range and age_range[0] > age_range[1]:
-            raise serializers.ValidationError("Invalid Age Range")
+        # age_range = attrs.get("age_range")
+        product_id = attrs.get("product_id")
+        lab = attrs.get("lab_id")
+        doctor = attrs.get("doctor_id")
+        test_ids = attrs.get("test_ids")
+        procedures_ids = attrs.get("procedures_ids")
+        # if age_range and age_range[0] > age_range[1]:
+        #     raise serializers.ValidationError("Invalid Age Range")
+        if product_id:
+            if product_id == Order.DOCTOR_PRODUCT_ID and lab:
+                raise serializers.ValidationError("Invalid product id for lab")
+            if product_id == Order.LAB_PRODUCT_ID and doctor:
+                raise serializers.ValidationError("Invalid product id for doctor")
+        if test_ids:
+            attrs["tests"] = LabTest.objects.filter(id__in=test_ids)
+        if procedures_ids:
+            attrs["procedures"] = Procedure.objects.filter(id__in=procedures_ids)
         return attrs
 
 
@@ -58,6 +83,12 @@ class UserSpecificCouponSerializer(CouponListSerializer):
 
     lab = serializers.PrimaryKeyRelatedField(required=False,queryset=Lab.objects.filter(is_live=True))
     tests = serializers.ListField(child=serializers.PrimaryKeyRelatedField(required=False, queryset=LabTest.objects.all()),  required=False)
+    # test_categories = serializers.ListField(
+    #     child=serializers.PrimaryKeyRelatedField(required=False, queryset=LabTestCategory.objects.all()), required=False)
+    procedures = serializers.ListField(
+        child=serializers.PrimaryKeyRelatedField(required=False, queryset=Procedure.objects.all()), required=False)
+    # procedure_categories = serializers.ListField(
+    #     child=serializers.PrimaryKeyRelatedField(required=False, queryset=ProcedureCategory.objects.all()), required=False)
     doctor = serializers.PrimaryKeyRelatedField(required=False, queryset=Doctor.objects.filter(is_live=True))
     profile = serializers.PrimaryKeyRelatedField(required=False, queryset=UserProfile.objects.all())
 
@@ -65,8 +96,9 @@ class UserSpecificCouponSerializer(CouponListSerializer):
 
         lab = attrs.get("lab")
         tests = attrs.get("tests")
-        doctor = attrs.get("doctors")
+        doctor = attrs.get("doctor")
         codes = attrs.get("coupon_code")
+        procedures = attrs.get("procedures")
 
         random_coupons = RandomGeneratedCoupon.objects.filter(random_coupon__in=codes,
                                                               sent_at__isnull=False,
@@ -109,6 +141,11 @@ class UserSpecificCouponSerializer(CouponListSerializer):
                         raise serializers.ValidationError('Invalid coupon code - ' + str(coupon))
 
         if doctor:
-            pass
+            for coupon in coupons_data:
+                obj = OpdAppointment()
+                if not obj.validate_product_coupon(coupon_obj=coupon,
+                                                   doctor=doctor, procedures=procedures,
+                                                   product_id=Order.DOCTOR_PRODUCT_ID):
+                    raise serializers.ValidationError('Invalid coupon code - ' + str(coupon))
 
         return attrs

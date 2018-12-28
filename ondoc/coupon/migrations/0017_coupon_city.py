@@ -12,7 +12,7 @@ class Migration(migrations.Migration):
     operations = [
         migrations.AddField(
             model_name='coupon',
-            name='city',
-            field=models.CharField(blank=True, default=None, max_length=50, null=True),
+            name='cities',
+            field=models.CharField(blank=True, default=None, max_length=100, null=True),
         ),
     ]

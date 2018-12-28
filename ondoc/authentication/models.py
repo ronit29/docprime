@@ -373,7 +373,9 @@ class UserProfile(TimeStampedModel):
         return not getattr(self, 'profile_image').name == old_value
 
     def get_age(self):
-        user_age = (date.today() - self.dob) // timedelta(days=365.2425)
+        user_age = None
+        if self.dob:
+            user_age = (date.today() - self.dob) // timedelta(days=365.2425)
         return user_age
 
     def save(self, *args, **kwargs):

@@ -1,7 +1,7 @@
 from ondoc.coupon.models import Coupon, RandomGeneratedCoupon
 from ondoc.account.models import Order
 from ondoc.doctor.models import OpdAppointment
-from ondoc.diagnostic.models import LabAppointment, AvailableLabTest
+from ondoc.diagnostic.models import LabAppointment, AvailableLabTest, LabTest
 from ondoc.authentication import models as auth_models
 from ondoc.api.v1.utils import CouponsMixin
 from ondoc.api.v1.coupon import serializers as coupon_serializers
@@ -37,18 +37,26 @@ class ApplicableCouponsViewSet(viewsets.GenericViewSet):
 
         product_id = input_data.get("product_id")
         lab = input_data.get("lab_id", None)
-        test_ids = input_data.get("test_ids", [])
+        tests = input_data.get("tests", [])
+        test_categories_ids = input_data.get("test_categories_ids", [])
+        procedures = input_data.get("procedures", [])
+        procedure_categories_ids = input_data.get("procedure_categories_ids", [])
+        doctor = input_data.get("doctor_id", None)
+        hospital = input_data.get("hospital_id", None)
+        # specializations = input_data.get("specialization_ids", None)
         deal_price = input_data.get("deal_price")
         coupon_code = input_data.get("coupon_code")
-        gender = input_data.get("gender")
-        age_range = input_data.get("age_range")
+        profile = input_data.get("profile_id", None)
+        # gender = input_data.get("gender")
+        # age_range = input_data.get("age_range")
+        # cities = input_data.get("cities")
         types = []
         if deal_price==0:
             deal_price=None
 
-        if product_id and product_id == Order.DOCTOR_PRODUCT_ID:
+        if (product_id and product_id == Order.DOCTOR_PRODUCT_ID) or doctor:
             types = [Coupon.ALL, Coupon.DOCTOR]
-        elif product_id and product_id == Order.LAB_PRODUCT_ID:
+        elif (product_id and product_id == Order.LAB_PRODUCT_ID) or lab:
             types = [Coupon.ALL, Coupon.LAB]
         else:
             types = [Coupon.ALL, Coupon.DOCTOR, Coupon.LAB]
@@ -69,9 +77,6 @@ class ApplicableCouponsViewSet(viewsets.GenericViewSet):
         else:
             coupons = coupons.filter(is_visible=True)
 
-        if test_ids:
-            coupons = coupons.filter(Q(test__in=test_ids) | Q(test__isnull=True))
-
         if user and user.is_authenticated:
             coupons = coupons.filter(Q(is_user_specific=False) \
                 | (Q(is_user_specific=True) & Q(user_specific_coupon__user=user)))
@@ -85,16 +90,65 @@ class ApplicableCouponsViewSet(viewsets.GenericViewSet):
                                               sent_at__isnull=False,
                                               consumed_at__isnull=True,
                                               last_date__gte=datetime.datetime.now())))
+
+            if profile:
+                if profile.gender:
+                    coupons = coupons.filter(Q(gender=profile.gender) | Q(gender__isnull=True))
+                else:
+                    coupons = coupons.filter(gender__isnull=True)
+
+                user_age = profile.get_age()
+                if user_age:
+                    coupons = coupons.filter(Q(age_start__isnull=True, age_end__isnull=True) | Q(age_start_lte=user_age) | Q(age_end_gte=user_age))
+                else:
+                    coupons = coupons.filter(age_start__isnull=True, age_end__isnull=True)
+            else:
+                coupons = coupons.filter(gender__isnull=True)
+                coupons = coupons.filter(age_start__isnull=True, age_end__isnull=True)
         else:
             coupons = coupons.filter(is_user_specific=False)
 
-        if gender:
-            coupons = coupons.filter(Q(gender=gender) | Q(gender__isnull=True))
+        if tests:
+            test_categories = list()
+            for test in tests:
+                test_cat = test.categories.all()
+                test_categories.extend(test_cat)
+            test_categories = set(test_categories)
+            coupons = coupons.filter(Q(test__in=tests) | Q(test__isnull=True) | Q(tests_categories__in=test_categories) | Q(test_categories__isnull=True))
 
-        # TODO
-        if age_range:
-            age_start, age_end = age_range[0], age_range[1]
-            coupons = coupons.filter(age_start_lte=age_start, age_end_gte=age_end)
+        if lab:
+            coupons = coupons.filter(Q(cities__icontains=lab.city) | Q(cities__isnull=True))
+
+        if hospital:
+            coupons = coupons.filter(Q(cities__icontains=hospital.city) | Q(cities__isnull=True))
+
+        if doctor:
+            coupons = coupons.filter(Q(specializations__in=
+                                       [spec.specialization for spec in doctor.doctorpracticespecializations.all()])
+                                     | Q(specializations__isnull=True))
+
+        # if cities:
+        #     cities_list = [city.strip() for city in cities.split(',')]
+        #     q = Q()
+        #     for city_in_list in cities_list:
+        #         q |= Q(cities__icontains=city_in_list)
+        #     coupons = coupons.filter(q)
+
+
+        # if test_categories_ids:
+        #     coupons = coupons.filter(Q(test_categories__in=test_categories_ids) | Q(test_categories__isnull=True))
+
+        if procedures:
+            procedure_categories = list()
+            for procedure in procedures:
+                proc_cat = procedure.categories.all()
+                procedure_categories.extend(proc_cat)
+            procedure_categories = set(procedure_categories)
+            coupons = coupons.filter(Q(procedures__in=procedures) | Q(procedures__isnull=True)
+                                     | Q(procedure_categories__in=procedure_categories) | Q(procedure_categories__isnull=True))
+
+        # if procedure_categories_ids:
+        #     coupons = coupons.filter(Q(procedure_categories__in=procedure_categories_ids) | Q(procedure_categories__isnull=True))
 
         if product_id:
             coupons = coupons.filter(is_corporate=False)
@@ -120,9 +174,9 @@ class ApplicableCouponsViewSet(viewsets.GenericViewSet):
                                   to_attr='user_lab_booked')
 
         # TODO
-        user_opd_completed = OpdAppointment.objects.filter(user=user, status__in=[OpdAppointment.COMPLETED]).count()
-
-        user_lab_completed = LabAppointment.objects.filter(user=user, status__in=[LabAppointment.COMPLETED]).count()
+        # user_opd_completed = OpdAppointment.objects.filter(user=user, status__in=[OpdAppointment.COMPLETED]).count()
+        #
+        # user_lab_completed = LabAppointment.objects.filter(user=user, status__in=[LabAppointment.COMPLETED]).count()
 
         coupons = coupons.prefetch_related('test', total_opd_booked, user_opd_booked, total_lab_booked, user_lab_booked)
         coupons = coupons.distinct()
@@ -140,8 +194,8 @@ class ApplicableCouponsViewSet(viewsets.GenericViewSet):
                 allowed = False
 
             # TODO
-            if ((user_opd_completed + user_lab_completed + 1) % coupon.step_count != 0 ):
-                allowed = False
+            # if ((user_opd_completed + user_lab_completed + 1) % coupon.step_count != 0 ):
+            #     allowed = False
 
             if coupon.start_date and coupon.start_date>timezone.now() \
                 or (coupon.start_date + datetime.timedelta(days=coupon.validity))<timezone.now():
@@ -172,22 +226,23 @@ class ApplicableCouponsViewSet(viewsets.GenericViewSet):
                             "tests": [ test.id for test in coupon.test.all() ],
                             "network_id": coupon.lab_network.id if coupon.lab_network else None,
                             "tnc": coupon.tnc})
-                for random_coupon in coupon.random_generated_coupon.all():
-                    applicable_coupons.append({"is_random_generated": True,
-                            "coupon_type": coupon.type,
-                            "random_coupon_id": random_coupon.id,
-                            "coupon_id": coupon.id,
-                            "random_code": random_coupon.random_coupon,
-                            "code": coupon.code,
-                            "desc": coupon.description,
-                            "coupon_count": 1,
-                            "used_count": 0,
-                            "coupon": coupon,
-                            "heading": coupon.heading,
-                            "is_corporate": coupon.is_corporate,
-                            "tests": [test.id for test in coupon.test.all()],
-                            "network_id": coupon.lab_network.id if coupon.lab_network else None,
-                            "tnc": coupon.tnc})
+                if user:
+                    for random_coupon in coupon.random_generated_coupon.all():
+                        applicable_coupons.append({"is_random_generated": True,
+                                "coupon_type": coupon.type,
+                                "random_coupon_id": random_coupon.id,
+                                "coupon_id": coupon.id,
+                                "random_code": random_coupon.random_coupon,
+                                "code": coupon.code,
+                                "desc": coupon.description,
+                                "coupon_count": 1,
+                                "used_count": 0,
+                                "coupon": coupon,
+                                "heading": coupon.heading,
+                                "is_corporate": coupon.is_corporate,
+                                "tests": [test.id for test in coupon.test.all()],
+                                "network_id": coupon.lab_network.id if coupon.lab_network else None,
+                                "tnc": coupon.tnc})
 
 
         if applicable_coupons:
@@ -356,6 +411,9 @@ class CouponDiscountViewSet(viewsets.GenericViewSet):
         product_id = input_data.get("product_id")
         lab = input_data.get("lab")
         tests = input_data.get("tests", [])
+        # test_categories = input_data.get("test_categories", [])
+        procedures = input_data.get("procedures", [])
+        procedure_categories = input_data.get("procedure_categories", [])
         doctor = input_data.get("doctor")
         profile = input_data.get("profile")
 
