@@ -963,6 +963,8 @@ class DoctorListViewSet(viewsets.GenericViewSet):
             return Response(status=status.HTTP_404_NOT_FOUND)
 
         url = url.lower()
+        rating = None
+        reviews = None
 
         entity_url_qs = EntityUrls.objects.filter(url=url, url_type=EntityUrls.UrlType.SEARCHURL,
                                            entity_type__iexact='Doctor').order_by('-sequence')
@@ -986,6 +988,7 @@ class DoctorListViewSet(viewsets.GenericViewSet):
                     rating = round(random.uniform(3.5, 4.9),1)
                     reviews = random.randint(100, 125)
                     DefaultRating.objects.create(ratings=rating, reviews=reviews, url=url)
+
             elif entity.sitemap_identifier == 'SPECIALIZATION_LOCALITY_CITY':
                 default_rating_obj = DefaultRating.objects.filter(url=url).first()
                 if not default_rating_obj:
@@ -999,6 +1002,8 @@ class DoctorListViewSet(viewsets.GenericViewSet):
                 kwargs['specialization_id'] = entity.specialization_id
                 kwargs['url'] = url
                 kwargs['parameters'] = doctor_query_parameters(extras, request.query_params)
+                kwargs['ratings'] = rating
+                kwargs['reviews'] = reviews
                 response = self.list(request, **kwargs)
                 return response
         else:
@@ -1016,9 +1021,15 @@ class DoctorListViewSet(viewsets.GenericViewSet):
             validated_data['extras'] = kwargs['extras']
         if kwargs.get('url'):
             validated_data['url'] = kwargs['url']
+        if kwargs.get('ratings'):
+            validated_data['ratings'] = kwargs['ratings']
+        if kwargs.get('reviews'):
+            validated_data['reviews'] = kwargs['reviews']
 
         specialization_id = kwargs.get('specialization_id', None)
         specialization_dynamic_content = ''
+        ratings = None
+        reviews = None
 
         doctor_search_helper = DoctorSearchHelper(validated_data)
         if not validated_data.get("search_id"):
@@ -1225,10 +1236,15 @@ class DoctorListViewSet(viewsets.GenericViewSet):
         procedure_categories = list(ProcedureCategory.objects.filter(pk__in=validated_data.get('procedure_category_ids', [])).values('id', 'name'))
         specializations = list(models.PracticeSpecialization.objects.filter(id__in=validated_data.get('specialization_ids',[])).values('id','name'));
         conditions = list(models.MedicalCondition.objects.filter(id__in=validated_data.get('condition_ids',[])).values('id','name'));
+        if validated_data.get('ratings'):
+            ratings = validated_data.get('ratings')
+        if validated_data.get('reviews'):
+            reviews = validated_data.get('reviews')
         return Response({"result": response, "count": result_count,
                          'specializations': specializations, 'conditions': conditions, "seo": seo,
                          "breadcrumb": breadcrumb, 'search_content': specialization_dynamic_content,
-                         'procedures': procedures, 'procedure_categories': procedure_categories})
+                         'procedures': procedures, 'procedure_categories': procedure_categories,
+                         'ratings':ratings, 'reviews': reviews})
 
     @transaction.non_atomic_requests
     def search_by_hospital(self, request):
