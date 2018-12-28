@@ -13,7 +13,7 @@ from ondoc.doctor.models import (HospitalNetworkManager, Hospital,
     HospitalNetworkAward, HospitalNetworkCertification, HospitalNetworkDocument)
 import datetime
 from .common import *
-from ondoc.authentication.admin import BillingAccountInline, SPOCDetailsInline
+from ondoc.authentication.admin import SPOCDetailsInline
 import nested_admin
 from .common import AssociatedMerchantInline
 
@@ -170,7 +170,6 @@ class HospitalNetworkAdmin(VersionAdmin, ActionAdmin, QCPemAdmin):
         HospitalNetworkCertificationInline,
         HospitalNetworkDocumentInline,
         GenericAdminInline,
-        BillingAccountInline,
         SPOCDetailsInline,
         AssociatedMerchantInline,
     ]

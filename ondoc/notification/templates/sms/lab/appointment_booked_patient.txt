@@ -1,1 +1,11 @@
-We have received your appointment for {{patient_name|capfirst}} with Lab - {{lab_name|capfirst}} at {{instance.time_slot_start|date:"h:i a"}} {{instance.time_slot_start|date:"d/m/y"}}. You will receive a confirmation as soon as it is accepted by the lab.
+We have received an appointment request for {{patient_name|capfirst}} with {{lab_name|capfirst}} on {{instance.time_slot_start|date:"D jS F Y"}} at {{instance.time_slot_start|date:"h:i A"}}
+
+The booking details are as below :
+Booking ID : {{instance.id}}
+Patient Name : {{patient_name|capfirst}}
+Lab Name : {{lab_name|capfirst}}
+Appointment Date and Time : {{instance.time_slot_start|date:"D jS F Y"}} || {{instance.time_slot_start|date:"h:i A"}}
+Helpline Toll Free Number : 1800-123-9419
+You will receive a confirmation email and sms once the booking is confirmed by the lab.
+
+Thanks for choosing docprime.com

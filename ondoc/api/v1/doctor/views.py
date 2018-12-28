@@ -1,4 +1,4 @@
-from collections import defaultdict, OrderedDict
+from ondoc.api.v1.doctor.DoctorSearchByHospitalHelper import DoctorSearchByHospitalHelper
 from ondoc.api.v1.procedure.serializers import CommonProcedureCategorySerializer, ProcedureInSerializer, \
     ProcedureSerializer, DoctorClinicProcedureSerializer, CommonProcedureSerializer
 from ondoc.doctor import models
@@ -10,7 +10,7 @@ from django.utils.safestring import mark_safe
 from ondoc.coupon.models import Coupon
 from ondoc.api.v1.diagnostic import serializers as diagnostic_serializer
 from ondoc.account import models as account_models
-from ondoc.location.models import EntityUrls, EntityAddress
+from ondoc.location.models import EntityUrls, EntityAddress, DefaultRating
 from ondoc.procedure.models import Procedure, ProcedureCategory, CommonProcedureCategory, ProcedureToCategoryMapping, \
     get_selected_and_other_procedures, CommonProcedure
 from . import serializers
@@ -56,6 +56,10 @@ from dal import autocomplete
 from django.contrib.staticfiles.templatetags.staticfiles import static
 from django.db.models import Avg
 from django.db.models import Count
+import logging
+
+logger = logging.getLogger(__name__)
+import random
 
 
 class CreateAppointmentPermission(permissions.BasePermission):
@@ -264,7 +268,7 @@ class DoctorAppointmentsViewSet(OndocViewSet):
             if data.get("payment_type") == models.OpdAppointment.INSURANCE:
                 effective_price = doctor_clinic_timing.deal_price
             elif data.get("payment_type") in [models.OpdAppointment.COD, models.OpdAppointment.PREPAID]:
-                coupon_discount, coupon_list = self.getCouponDiscout(data, doctor_clinic_timing.deal_price)
+                coupon_discount, coupon_cashback, coupon_list = Coupon.get_total_deduction(data, doctor_clinic_timing.deal_price)
                 if coupon_discount >= doctor_clinic_timing.deal_price:
                     effective_price = 0
                 else:
@@ -279,7 +283,7 @@ class DoctorAppointmentsViewSet(OndocViewSet):
             if data.get("payment_type") == models.OpdAppointment.INSURANCE:
                 effective_price = total_deal_price
             elif data.get("payment_type") in [models.OpdAppointment.COD, models.OpdAppointment.PREPAID]:
-                coupon_discount, coupon_list = self.getCouponDiscout(data, total_deal_price)
+                coupon_discount, coupon_cashback, coupon_list = Coupon.get_total_deduction(data, total_deal_price)
                 if coupon_discount >= total_deal_price:
                     effective_price = 0
                 else:
@@ -313,7 +317,8 @@ class DoctorAppointmentsViewSet(OndocViewSet):
             "time_slot_start": time_slot_start,
             "payment_type": data.get("payment_type"),
             "coupon": coupon_list,
-            "discount": coupon_discount
+            "discount": int(coupon_discount),
+            "cashback": int(coupon_cashback)
         }
         resp = self.create_order(request, opd_data, account_models.Order.DOCTOR_PRODUCT_ID)
 
@@ -348,17 +353,6 @@ class DoctorAppointmentsViewSet(OndocViewSet):
         }
         return Response(response)
 
-    def getCouponDiscout(self, data, deal_price):
-        coupon_list = []
-        coupon_discount = 0
-        if data.get("coupon_code"):
-            coupon_obj = Coupon.objects.filter(code__in=set(data.get("coupon_code")))
-            obj = models.OpdAppointment()
-            for coupon in coupon_obj:
-                coupon_discount += obj.get_discount(coupon, deal_price)
-                coupon_list.append(coupon.id)
-        return coupon_discount, coupon_list
-
     @transaction.atomic
     def create_order(self, request, appointment_details, product_id):
 
@@ -367,6 +361,8 @@ class DoctorAppointmentsViewSet(OndocViewSet):
         consumer_account = account_models.ConsumerAccount.objects.get_or_create(user=user)
         consumer_account = account_models.ConsumerAccount.objects.select_for_update().get(user=user)
         balance = consumer_account.balance
+        cashback_balance = consumer_account.cashback
+        total_balance = balance + cashback_balance
         resp = {}
 
         resp['is_agent'] = False
@@ -391,10 +387,15 @@ class DoctorAppointmentsViewSet(OndocViewSet):
                                                     account_models.Order.OPD_APPOINTMENT_CREATE)
 
         if ((appointment_details['payment_type'] == models.OpdAppointment.PREPAID and
-             balance < appointment_details.get("effective_price")) or resp['is_agent']):
+             total_balance < appointment_details.get("effective_price")) or resp['is_agent']):
 
-            payable_amount = max(0, appointment_details.get("effective_price") - balance)
-            wallet_amount = min(balance, appointment_details.get("effective_price"))
+            payable_amount = max(0, appointment_details.get("effective_price") - total_balance)
+            required_amount = appointment_details.get("effective_price")
+            cashback_amount = min(required_amount, cashback_balance)
+            wallet_amount = 0
+            if cashback_amount < required_amount:
+                wallet_amount = min(balance, required_amount - cashback_amount)
+
 
             order = account_models.Order.objects.create(
                 product_id=product_id,
@@ -402,6 +403,7 @@ class DoctorAppointmentsViewSet(OndocViewSet):
                 action_data=appointment_action_data,
                 amount=payable_amount,
                 wallet_amount=wallet_amount,
+                cashback_amount=cashback_amount,
                 payment_status=account_models.Order.PAYMENT_PENDING
             )
             appointment_details["payable_amount"] = payable_amount
@@ -421,8 +423,11 @@ class DoctorAppointmentsViewSet(OndocViewSet):
                 pass
         else:
             wallet_amount = 0
+            cashback_amount = 0
+
             if appointment_details['payment_type'] == models.OpdAppointment.PREPAID:
-                wallet_amount = appointment_details.get("effective_price")
+                cashback_amount = min(cashback_balance, appointment_details.get("effective_price"))
+                wallet_amount = max(0, appointment_details.get("effective_price") - cashback_amount)
 
             order = account_models.Order.objects.create(
                 product_id=product_id,
@@ -430,6 +435,7 @@ class DoctorAppointmentsViewSet(OndocViewSet):
                 action_data=appointment_action_data,
                 amount=0,
                 wallet_amount=wallet_amount,
+                cashback_amount=cashback_amount,
                 payment_status=account_models.Order.PAYMENT_PENDING
             )
 
@@ -962,6 +968,8 @@ class DoctorListViewSet(viewsets.GenericViewSet):
             return Response(status=status.HTTP_404_NOT_FOUND)
 
         url = url.lower()
+        rating = None
+        reviews = None
 
         entity_url_qs = EntityUrls.objects.filter(url=url, url_type=EntityUrls.UrlType.SEARCHURL,
                                            entity_type__iexact='Doctor').order_by('-sequence')
@@ -979,12 +987,28 @@ class DoctorListViewSet(viewsets.GenericViewSet):
                 else:
                     return Response(status=status.HTTP_400_BAD_REQUEST)
 
+            if entity.sitemap_identifier =='DOCTORS_LOCALITY_CITY':
+                default_rating_obj = DefaultRating.objects.filter(url=url).first()
+                if not default_rating_obj:
+                    rating = round(random.uniform(3.5, 4.9),1)
+                    reviews = random.randint(100, 125)
+                    DefaultRating.objects.create(ratings=rating, reviews=reviews, url=url)
+
+            elif entity.sitemap_identifier == 'SPECIALIZATION_LOCALITY_CITY':
+                default_rating_obj = DefaultRating.objects.filter(url=url).first()
+                if not default_rating_obj:
+                    rating = round(random.uniform(3.5, 4.9), 1)
+                    reviews = random.randint(10, 25)
+                    DefaultRating.objects.create(ratings=rating, reviews=reviews, url=url)
+
             extras = entity.additional_info
             if extras:
                 kwargs['extras'] = extras
                 kwargs['specialization_id'] = entity.specialization_id
                 kwargs['url'] = url
                 kwargs['parameters'] = doctor_query_parameters(extras, request.query_params)
+                kwargs['ratings'] = rating
+                kwargs['reviews'] = reviews
                 response = self.list(request, **kwargs)
                 return response
         else:
@@ -1002,9 +1026,15 @@ class DoctorListViewSet(viewsets.GenericViewSet):
             validated_data['extras'] = kwargs['extras']
         if kwargs.get('url'):
             validated_data['url'] = kwargs['url']
+        if kwargs.get('ratings'):
+            validated_data['ratings'] = kwargs['ratings']
+        if kwargs.get('reviews'):
+            validated_data['reviews'] = kwargs['reviews']
 
         specialization_id = kwargs.get('specialization_id', None)
         specialization_dynamic_content = ''
+        ratings = None
+        reviews = None
 
         doctor_search_helper = DoctorSearchHelper(validated_data)
         if not validated_data.get("search_id"):
@@ -1117,7 +1147,7 @@ class DoctorListViewSet(viewsets.GenericViewSet):
                         description += ': Book best ' + 'Doctor' + ' appointment online ' + 'in '+ locality
             if specializations:
                 if not sublocality:
-                    title += '- Book Best ' + specializations +' Online'
+                    title += ' - Book Best ' + specializations +' Online'
                 else:
                     title += ' | Book & Get Best Deal'
 
@@ -1211,9 +1241,85 @@ class DoctorListViewSet(viewsets.GenericViewSet):
         procedure_categories = list(ProcedureCategory.objects.filter(pk__in=validated_data.get('procedure_category_ids', [])).values('id', 'name'))
         specializations = list(models.PracticeSpecialization.objects.filter(id__in=validated_data.get('specialization_ids',[])).values('id','name'));
         conditions = list(models.MedicalCondition.objects.filter(id__in=validated_data.get('condition_ids',[])).values('id','name'));
+        if validated_data.get('ratings'):
+            ratings = validated_data.get('ratings')
+        if validated_data.get('reviews'):
+            reviews = validated_data.get('reviews')
         return Response({"result": response, "count": result_count,
                          'specializations': specializations, 'conditions': conditions, "seo": seo,
                          "breadcrumb": breadcrumb, 'search_content': specialization_dynamic_content,
+                         'procedures': procedures, 'procedure_categories': procedure_categories,
+                         'ratings':ratings, 'reviews': reviews})
+
+    @transaction.non_atomic_requests
+    def search_by_hospital(self, request):
+        parameters = request.query_params
+        serializer = serializers.DoctorListSerializer(data=parameters, context={"request": request})
+        serializer.is_valid(raise_exception=True)
+        validated_data = serializer.validated_data
+        specialization_dynamic_content = ''
+        doctor_search_helper = DoctorSearchByHospitalHelper(validated_data)
+        if not validated_data.get("search_id"):
+            filtering_params = doctor_search_helper.get_filtering_params()
+            order_by_field, rank_by = doctor_search_helper.get_ordering_params()
+            query_string = doctor_search_helper.prepare_raw_query(filtering_params,
+                                                                  order_by_field, rank_by)
+            doctor_search_result = RawSql(query_string.get('query'),
+                                          query_string.get('params')).fetch_all()
+
+            result_count = len(doctor_search_result)
+            # sa
+            # saved_search_result = models.DoctorSearchResult.objects.create(results=doctor_search_result,
+            #                                                                result_count=result_count)
+        else:
+            saved_search_result = get_object_or_404(models.DoctorSearchResult, pk=validated_data.get("search_id"))
+        doctor_ids = paginate_queryset([data.get("doctor_id") for data in doctor_search_result], request)
+        preserved = Case(*[When(pk=pk, then=pos) for pos, pk in enumerate(doctor_ids)])
+        doctor_data = models.Doctor.objects.filter(
+            id__in=doctor_ids).prefetch_related("hospitals", "doctor_clinics", "doctor_clinics__availability",
+                                                "doctor_clinics__hospital",
+                                                "doctorpracticespecializations",
+                                                "doctorpracticespecializations__specialization",
+                                                "images",
+                                                "doctor_clinics__doctorclinicprocedure_set__procedure__parent_categories_mapping").order_by(
+            preserved)
+
+        response = doctor_search_helper.prepare_search_response(doctor_data, doctor_search_result, doctor_ids, request)
+
+        # from collections import Counter
+        # for hosp in response.items():
+        #     hosp_specialization = list()
+        #     doctors_in_hosp = hosp[1][0].get('doctors')
+        #     for doctor in doctors_in_hosp:
+        #         specialization = doctor.get('general_specialization')
+        #         for spec in specialization:
+        #             hosp_specialization.append(spec.get('name'))
+        #     spec_dict = Counter(hosp_specialization)
+        #     max_value = max(spec_dict.values())
+        #     for spec_key in spec_dict.items():
+        #         if spec_key[1] == max_value:
+        #             hosp[1][0]['specialization'] = spec_key[0]
+        #         if hosp[1][0].get('specialization'):
+        #             break
+
+        result = list()
+        for data in response.values():
+            result.append(data[0])
+
+        validated_data.get('procedure_categories', [])
+        procedures = list(Procedure.objects.filter(pk__in=validated_data.get('procedure_ids', [])).values('id', 'name'))
+        procedure_categories = list(
+            ProcedureCategory.objects.filter(pk__in=validated_data.get('procedure_category_ids', [])).values('id',
+                                                                                                             'name'))
+        conditions = list(
+            models.MedicalCondition.objects.filter(id__in=validated_data.get('condition_ids', [])).values('id',
+                                                                                                          'name'))
+        specializations = list(
+            models.PracticeSpecialization.objects.filter(id__in=validated_data.get('specialization_ids', [])).values(
+                'id', 'name'))
+
+        return Response(data={"result": result, "count": result_count,
+                         'specializations': specializations, 'conditions': conditions,
                          'procedures': procedures, 'procedure_categories': procedure_categories})
 
 
@@ -1379,7 +1485,8 @@ class DoctorFeedbackViewSet(viewsets.GenericViewSet):
         if manages_string:
             message = message + "<br><br> User Manages <br>"+ manages_string
         try:
-            emails = ["rajivk@policybazaar.com", "sanat@docprime.com", "arunchaudhary@docprime.com", "rajendra@docprime.com", "harpreet@docprime.com"]
+            emails = ["rajivk@policybazaar.com", "sanat@docprime.com", "arunchaudhary@docprime.com",
+                      "rajendra@docprime.com", "harpreet@docprime.com", "jaspreetkaur@docprime.com"]
             for x in emails:
                 notif_models.EmailNotification.publish_ops_email(str(x), mark_safe(message), subject_string)
             resp['status'] = "success"
@@ -1431,7 +1538,7 @@ class CreateAdminViewSet(viewsets.GenericViewSet):
             user = user_queryset
 
         if valid_data.get('entity_type') == GenericAdminEntity.DOCTOR:
-            doct = Doctor.objects.get(id=valid_data['id'])
+            doct = models.Doctor.objects.get(id=valid_data['id'])
             if valid_data.get('assoc_hosp'):
                 create_admins = []
                 for hos in valid_data['assoc_hosp']:
@@ -1543,7 +1650,7 @@ class CreateAdminViewSet(viewsets.GenericViewSet):
         return Response(resp)
 
     def assoc_hosp(self, request, pk=None):
-        doctor = get_object_or_404(Doctor.objects.prefetch_related('hospitals'), pk=pk)
+        doctor = get_object_or_404(models.Doctor.objects.prefetch_related('hospitals'), pk=pk)
         queryset = doctor.hospitals.filter(is_appointment_manager=False)
         return Response(queryset.values('name', 'id'))
 
@@ -1654,7 +1761,7 @@ class CreateAdminViewSet(viewsets.GenericViewSet):
                         temp[x['phone_number']]['permission_type'] = auth_models.GenericAdmin.ALL
                 else:
                     for doc in assoc_docs:
-                        if doc.get('phone_number') and doc.get('phone_number') == x['phone_number']:
+                        if (doc.get('phone_number') and doc.get('phone_number') == x['phone_number']):
                             x['is_doctor'] = True
                             x['name'] = doc.get('name')
                             x['id'] = doc.get('id')
@@ -1662,6 +1769,8 @@ class CreateAdminViewSet(viewsets.GenericViewSet):
                             break
                     if not x.get('is_doctor'):
                         x['is_doctor'] = False
+                    elif x.get('super_user_permission') and x.get('is_doctor'):
+                        x['super_user_permission'] = False
                     x['doctor_ids'] = [x['doctor_ids']] if x['doctor_ids'] else []
                     if len(x['doctor_ids']) > 0:
                         x['doctor_ids_count'] = len(x['doctor_ids'])
@@ -1703,6 +1812,7 @@ class CreateAdminViewSet(viewsets.GenericViewSet):
         try:
             queryset.delete()
         except Exception as e:
+            logger.error("Error Deleting Entity " + str(e))
             return Response({'error': 'something went wrong!'})
         return Response({'success': 'Deleted Successfully'})
 
@@ -1731,7 +1841,7 @@ class CreateAdminViewSet(viewsets.GenericViewSet):
                 delete_queryset = delete_queryset.filter(hospital_id=None)
             if len(delete_queryset) > 0:
                 delete_queryset.delete()
-            doct = Doctor.objects.get(id=valid_data['id'])
+            doct = models.Doctor.objects.get(id=valid_data['id'])
             if valid_data.get('assoc_hosp'):
                 create_admins = []
                 for hos in valid_data['assoc_hosp']:
@@ -1745,6 +1855,7 @@ class CreateAdminViewSet(viewsets.GenericViewSet):
                 try:
                     auth_models.GenericAdmin.objects.bulk_create(create_admins)
                 except Exception as e:
+                    logger.error("Error Updating Entity Doctor " + str(e))
                     return Response({'error': 'something went wrong!'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
             else:
                 create_admins = []
@@ -1759,6 +1870,7 @@ class CreateAdminViewSet(viewsets.GenericViewSet):
                 try:
                     auth_models.GenericAdmin.objects.bulk_create(create_admins)
                 except Exception as e:
+                    logger.error("Error Updating Entity Doctor " + str(e))
                     return Response({'error': 'something went wrong!'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
         elif valid_data.get('entity_type') == GenericAdminEntity.HOSPITAL:
             hosp = models.Hospital.objects.get(id=valid_data['id'])
@@ -1770,6 +1882,7 @@ class CreateAdminViewSet(viewsets.GenericViewSet):
                     try:
                         dn.update(phone_number=valid_data.get('phone_number'))
                     except Exception as e:
+                        logger.error("Error Updating Entity Hospital " + str(e))
                         return Response({'error': 'something went wrong!'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
                 else:
                     try:
@@ -1777,11 +1890,13 @@ class CreateAdminViewSet(viewsets.GenericViewSet):
                                                                 doctor=valid_data.get('doc_profile'),
                                                                 hospital=hosp)
                     except Exception as e:
+                        logger.error("Error Updating Entity Hospital " + str(e))
                         return Response({'error': 'something went wrong!'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
             delete_queryset = auth_models.GenericAdmin.objects.filter(phone_number=phone_number,
-                                                                      entity_type=GenericAdminEntity.HOSPITAL)
+                                                                      entity_type=GenericAdminEntity.HOSPITAL,
+                                                                      super_user_permission=False)
             if valid_data.get('remove_list'):
                 delete_queryset = delete_queryset.filter(doctor_id__in=valid_data.get('remove_list'))
             else:
@@ -1803,6 +1918,7 @@ class CreateAdminViewSet(viewsets.GenericViewSet):
                 try:
                     auth_models.GenericAdmin.objects.bulk_create(create_admins)
                 except Exception as e:
+                    logger.error("Error Updating Entity Hospital " + str(e))
                     return Response({'error': 'something went wrong!'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
             else:
                 create_admins = []
@@ -1817,6 +1933,7 @@ class CreateAdminViewSet(viewsets.GenericViewSet):
                 try:
                     auth_models.GenericAdmin.objects.bulk_create(create_admins)
                 except Exception as e:
+                    logger.error("Error Updating Entity Hospital " + str(e))
                     return Response({'error': 'something went wrong!'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
         elif valid_data.get('entity_type') == GenericAdminEntity.LAB:
             admin = auth_models.GenericLabAdmin.objects.filter(phone_number=phone_number, lab_id=valid_data.get('id'))

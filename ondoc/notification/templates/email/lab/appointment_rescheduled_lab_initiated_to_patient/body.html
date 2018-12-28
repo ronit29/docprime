@@ -84,13 +84,11 @@
 									Home Visit Address
 									</td>
 								</tr>
-								{% if instance.address.address %}
 									<tr>
 										<td style="font-size: 14px; color: #070707; font-weight: 500; padding-top: 4px;">
-										{{instance.address.address}}
+										{{instance.get_pickup_address}}
 										</td>
 									</tr>
-								{% endif %}
 								<tr>
 									<td style="font-size: 14px; color: #070707; font-weight: 500; padding-top: 2px;">
 									</td>
@@ -151,7 +149,8 @@
 						<tbody>
 							<tr>
 								<td style="font-size: 14px; font-weight: 500; color: #757575; text-align: center;">
-									This is a system-generated e-mail. Please do not reply to this e-mail. For any support please write to customerhelp@docprime.com
+									This is a system-generated e-mail. Please do not reply to this e-mail. For any
+									support please write to customercare@docprime.com.
 								</td>
 							</tr>
 						</tbody>

@@ -11,7 +11,7 @@ from ondoc.crm.constants import constants
 from django.utils.safestring import mark_safe
 from django.contrib.admin import SimpleListFilter
 from ondoc.authentication.models import GenericAdmin, User, QCModel, DoctorNumber, AssociatedMerchant
-from ondoc.authentication.admin import BillingAccountInline, SPOCDetailsInline
+from ondoc.authentication.admin import SPOCDetailsInline
 from django import forms
 import nested_admin
 from .common import AssociatedMerchantInline
@@ -92,11 +92,12 @@ class GenericAdminFormSet(forms.BaseInlineFormSet):
                     phone_number = True
                     # break
                 if not data.get('DELETE'):
-                    row = (data.get('phone_number'), data.get('doctor'), data.get('permission_type'))
-                    if row in validate_unique:
-                        raise forms.ValidationError("Duplicate Permission with this %s exists." % (data.get('phone_number')))
-                    else:
-                        validate_unique.append(row)
+                    if not data.get('super_user_permission'):
+                        row = (data.get('phone_number'), data.get('doctor'), data.get('permission_type'))
+                        if row in validate_unique:
+                            raise forms.ValidationError("Duplicate Permission with this %s exists." % (data.get('phone_number')))
+                        else:
+                            validate_unique.append(row)
             if phone_number:
                 if not appnt_manager_flag:
                     if not(len(self.deleted_forms) == len(self.cleaned_data)):
@@ -113,12 +114,12 @@ class GenericAdminFormSet(forms.BaseInlineFormSet):
             if appnt_manager_flag:
                 raise forms.ValidationError(
                     "An Admin phone number is required if 'Enabled for Managing Appointment' Field is Set.")
-        if validate_unique:
-            numbers = list(zip(*validate_unique))[0]
-            for row in validate_unique:
-                if row[1] is None and numbers.count(row[0]) > 2:
-                    raise forms.ValidationError(
-                        "Permissions for all doctors already allocated for %s." % (row[0]))
+        # if validate_unique:
+        #     numbers = list(zip(*validate_unique))[0]
+        #     for row in validate_unique:
+        #         if row[1] is None and numbers.count(row[0]) > 2:
+        #             raise forms.ValidationError(
+        #                 "Permissions for all doctors already allocated for %s." % (row[0]))
         doc_num_list = []
         if self.instance:
             doc_num = DoctorNumber.objects.filter(hospital_id=self.instance.id)
@@ -307,7 +308,6 @@ class HospitalAdmin(admin.GeoModelAdmin, VersionAdmin, ActionAdmin, QCPemAdmin):
         HospitalDocumentInline,
         HospitalCertificationInline,
         GenericAdminInline,
-        BillingAccountInline,
         SPOCDetailsInline,
         AssociatedMerchantInline
     ]

@@ -27,6 +27,9 @@ from collections import OrderedDict
 import datetime
 from django.utils.dateparse import parse_datetime
 import hashlib
+import logging
+logger = logging.getLogger(__name__)
+
 User = get_user_model()
 
 
@@ -158,6 +161,9 @@ class RawSql:
             ]
         return result
 
+    def execute(self):
+        with connection.cursor() as cursor:
+            cursor.execute(self.query, self.parameters)
 
 class AgreedPriceCalculate(Func):
     function = 'labtest_agreed_price_calculate'
@@ -513,7 +519,7 @@ class CouponsMixin(object):
                     return {"is_valid": False, "used_count": None}
 
             # check if a user is new i.e user has done any appointments
-            if user and coupon_obj.new_user_constraint:
+            if user.is_authenticated and coupon_obj.new_user_constraint:
                 if not self.is_user_first_time(user):
                     return {"is_valid": False, "used_count": 0}
 
@@ -533,31 +539,64 @@ class CouponsMixin(object):
 
         coupon_obj = kwargs.get("coupon_obj")
 
-        is_valid = False
+        is_valid = True
 
-        if coupon_obj:
+        if not coupon_obj:
+            return False
 
-            if kwargs.get("product_id") == Order.LAB_PRODUCT_ID:
-                if kwargs.get("lab"):
-                    lab = Lab.objects.filter(pk=kwargs.get("lab").id)
-                    if lab:
-                        # if kwargs.get("test"):
-                        test = kwargs.get("test", [])
-                        lab = lab.filter(lab_pricing_group__available_lab_tests__test__in=test)
-                        if lab.count() == len(test):
-                            lab = lab.first()
-                            if (coupon_obj.lab_network is not None and coupon_obj.lab_network==lab.network and not coupon_obj.test.exists()) or \
-                                (coupon_obj.lab_network is not None and coupon_obj.lab_network==lab.network and coupon_obj.test.exists() and set(test) & set(coupon_obj.test.all())) or \
-                                (coupon_obj.lab is not None and not coupon_obj.test.exists() and coupon_obj.lab==lab) or \
-                                (coupon_obj.lab is not None and coupon_obj.test.exists() and coupon_obj.lab==lab and set(test) & set(coupon_obj.test.all())):
-                                # (coupon_obj.lab is not None and coupon_obj.test.all() and coupon_obj.lab == lab and set(test)<=set(coupon_obj.test.all())):
-                                is_valid = True
+        # product_id = kwargs.get("product_id")
 
-            elif kwargs.get("product_id") == Order.DOCTOR_PRODUCT_ID:
-                if kwargs.get("doctor"):
-                    pass
+        # if product_id == Order.LAB_PRODUCT_ID:
+        lab = kwargs.get("lab")
+        tests = kwargs.get("test", [])
 
-        return is_valid
+        if coupon_obj.lab and coupon_obj.lab != lab:
+            return False
+
+        if coupon_obj.lab_network and (not lab or lab.network!=coupon_obj.lab_network):
+            return False
+
+        if tests and coupon_obj.test.exists():
+            count = coupon_obj.test.filter(id__in=[t.id for t in tests]).count()
+            #count = lab.lab_pricing_group.available_lab_tests.filter(enabled=True, test__id__in=tests).count()
+            if count == 0:
+                return False
+
+        return is_valid    
+                    
+        # elif kwargs.get("product_id") == Order.DOCTOR_PRODUCT_ID:
+        #     return True
+            # if kwargs.get("doctor"):
+            #     pass
+
+        # return is_valid    
+
+
+        #     coupon_obj.lab_network and coupon_obj.lab_network == lab.network
+
+        # if coupon_obj:
+
+        #     if kwargs.get("product_id") == Order.LAB_PRODUCT_ID:
+        #         lab = kwargs.get("lab")
+        #         if lab:
+        #             tests = kwargs.get("test", [])
+
+        #             available_lab_tests = lab.lab_pricing_group.available_lab_tests.filter(enabled=True, test__id__in=tests).prefetch_related('test')
+        #             available_lab_tests = lab.lab_pricing_group.available_lab_tests.all().prefetch_related('test')
+        #             lab_tests = list()
+        #             for lab_test in available_lab_tests:
+        #                 lab_tests.append(lab_test.test)
+        #             if set(tests) <= set(lab_tests):
+        #                 if (coupon_obj.lab_network and coupon_obj.lab_network == lab.network) or (not coupon_obj.lab_network):
+        #                     if (coupon_obj.lab and coupon_obj.lab==lab) or (not coupon_obj.lab):
+        #                         if (coupon_obj.test.exists() and set(tests) & set(coupon_obj.test.all())) or not coupon_obj.test.exists():
+        #                             is_valid = True
+
+        #     elif kwargs.get("product_id") == Order.DOCTOR_PRODUCT_ID:
+        #         if kwargs.get("doctor"):
+        #             pass
+
+        # return is_valid
 
     def get_discount(self, coupon_obj, price):
 
@@ -802,6 +841,8 @@ def create_payout_checksum(all_txn, product_id):
         checksum += curr
 
     checksum = secret_key + "|[" + checksum + "]|" + client_key
-    checksum = hashlib.sha256(str(checksum).encode())
-    checksum = checksum.hexdigest()
-    return checksum
+    checksum_hash = hashlib.sha256(str(checksum).encode())
+    checksum_hash = checksum_hash.hexdigest()
+    print("checksum string - " + str(checksum) + "checksum hash - " + str(checksum_hash))
+    logger.error("checksum string - " + str(checksum) + "checksum hash - " + str(checksum_hash))
+    return checksum_hash

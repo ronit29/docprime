@@ -2,7 +2,7 @@ from django.contrib.gis.db import models
 from django.contrib.staticfiles.templatetags.staticfiles import static
 from django.core.validators import MaxValueValidator, MinValueValidator, FileExtensionValidator
 
-from ondoc.account.models import MerchantPayout
+from ondoc.account.models import MerchantPayout, ConsumerAccount, Order
 from ondoc.authentication.models import (TimeStampedModel, CreatedByModel, Image, Document, QCModel, UserProfile, User,
                                          UserPermission, GenericAdmin, LabUserPermission, GenericLabAdmin, BillingAccount)
 from ondoc.doctor.models import Hospital, SearchKey, CancellationReason
@@ -38,10 +38,11 @@ from ondoc.insurance import models as insurance_model
 from django.contrib.contenttypes.fields import GenericRelation
 from django.contrib.contenttypes.fields import GenericForeignKey
 from django.contrib.contenttypes.models import ContentType
-from ondoc.matrix.tasks import push_appointment_to_matrix
+from ondoc.matrix.tasks import push_appointment_to_matrix, push_onboarding_qcstatus_to_matrix
 from ondoc.location import models as location_models
 from ondoc.ratings_review import models as ratings_models
 from decimal import Decimal
+from ondoc.common.models import AppointmentHistory
 import reversion
 
 logger = logging.getLogger(__name__)
@@ -269,6 +270,16 @@ class Lab(TimeStampedModel, CreatedByModel, QCModel, SearchKey):
             original = Lab.objects.get(pk=self.id)
 
         self.update_live_status()
+
+        # On every update of onboarding status or Qcstatus push to matrix
+        push_to_matrix = False
+        if self.id:
+            lab_obj = Lab.objects.filter(pk=self.id).first()
+            if lab_obj and (self.onboarding_status != lab_obj.onboarding_status or
+                            self.data_status != lab_obj.data_status):
+                # Push to matrix
+                push_to_matrix = True
+
         super(Lab, self).save(*args, **kwargs)
 
         if edit_instance is not None:
@@ -302,6 +313,13 @@ class Lab(TimeStampedModel, CreatedByModel, QCModel, SearchKey):
                 AvailableLabTest.objects.\
                     filter(lab=id, test__test_type=LabTest.RADIOLOGY).\
                     update(computed_deal_price=DealPriceCalculate(F('mrp'), F('computed_agreed_price'), rad_deal_price_prcnt))
+
+        # transaction.on_commit(lambda: self.app_commit_tasks(push_to_matrix))
+    #
+    # def app_commit_tasks(self, push_to_matrix):
+    #     if push_to_matrix:
+    #         push_onboarding_qcstatus_to_matrix.apply_async(({'obj_type': self.__class__.__name__, 'obj_id': self.id}
+    #                                                         ,), countdown=5)
 
 
 class LabCertification(TimeStampedModel):
@@ -699,6 +717,7 @@ class LabTest(TimeStampedModel, SearchKey):
     enable_for_ppc = models.BooleanField(default=False)
     enable_for_retail = models.BooleanField(default=False)
     about_test = models.TextField(blank=True, verbose_name='About the test')
+    show_details = models.BooleanField(default=False)
     preparations = models.TextField(blank=True, verbose_name='Preparations for the test')
     priority = models.PositiveIntegerField(default=0, null=True)
     hide_price = models.BooleanField(default=False)
@@ -881,9 +900,28 @@ class LabAppointment(TimeStampedModel, CouponsMixin):
     rating_declined = models.BooleanField(default=False)
     coupon = models.ManyToManyField(Coupon, blank=True, null=True, related_name="lab_appointment_coupon")
     discount = models.DecimalField(max_digits=10, decimal_places=2, blank=True, null=True)
+    cashback = models.DecimalField(max_digits=10, decimal_places=2, blank=True, null=True)
     cancellation_reason = models.ForeignKey(CancellationReason, on_delete=models.SET_NULL, null=True, blank=True)
     cancellation_comments = models.CharField(max_length=5000, null=True, blank=True)
     merchant_payout = models.ForeignKey(MerchantPayout, related_name="lab_appointment", on_delete=models.SET_NULL, null=True)
+    price_data = JSONField(blank=True, null=True)
+
+    def get_tests_and_prices(self):
+        test_price = []
+        for test in self.lab_test.all():
+            test_price.append({'name': test.test.name, 'mrp': test.mrp, 'deal_price': (
+                test.custom_deal_price if test.custom_deal_price else test.computed_deal_price),
+                               'discount': test.mrp - (
+                                   test.custom_deal_price if test.custom_deal_price else test.computed_deal_price)})
+
+        if self.is_home_pickup:
+            test_price.append(
+                {'name': 'Home Pick Up Charges', 'mrp': self.home_pickup_charges, 'deal_price': self.home_pickup_charges,
+                 'discount': '0.00'})
+
+        return test_price
+
+
 
     def get_reports(self):
         return self.reports.all()
@@ -933,18 +971,48 @@ class LabAppointment(TimeStampedModel, CouponsMixin):
     def app_commit_tasks(self, old_instance, push_to_matrix):
         if push_to_matrix:
             # Push the appointment data to the matrix
-            push_appointment_to_matrix.apply_async(({'type': 'LAB_APPOINTMENT', 'appointment_id': self.id, 'product_id':5,
-                                                     'sub_product_id': 2}, ), countdown=5)
+            try:
+                push_appointment_to_matrix.apply_async(
+                    ({'type': 'LAB_APPOINTMENT', 'appointment_id': self.id, 'product_id': 5,
+                      'sub_product_id': 2},), countdown=5)
+            except Exception as e:
+                logger.error(str(e))
 
         if self.is_to_send_notification(old_instance):
-            notification_tasks.send_lab_notifications.apply_async(kwargs={'appointment_id': self.id}, countdown=1)
+            try:
+                notification_tasks.send_lab_notifications_refactored.apply_async(kwargs={'appointment_id': self.id},
+                                                                                 countdown=1)
+                # notification_tasks.send_lab_notifications_refactored(self.id)
+                # notification_tasks.send_lab_notifications.apply_async(kwargs={'appointment_id': self.id}, countdown=1)
+            except Exception as e:
+                logger.error(str(e))
 
         if not old_instance or old_instance.status != self.status:
-            notification_models.EmailNotification.ops_notification_alert(self, email_list=settings.OPS_EMAIL_ID,
-                                                                         product=account_model.Order.LAB_PRODUCT_ID,
-                                                                         alert_type=notification_models.EmailNotification.OPS_APPOINTMENT_NOTIFICATION)
+            try:
+                notification_models.EmailNotification.ops_notification_alert(self, email_list=settings.OPS_EMAIL_ID,
+                                                                             product=account_model.Order.LAB_PRODUCT_ID,
+                                                                             alert_type=notification_models.EmailNotification.OPS_APPOINTMENT_NOTIFICATION)
+            except Exception as e:
+                logger.error(str(e))
+
         if self.status == self.COMPLETED and not self.is_rated:
-            notification_tasks.send_opd_rating_message.apply_async(kwargs={'appointment_id': self.id, 'type': 'lab'}, countdown=int(settings.RATING_SMS_NOTIF))
+            try:
+                notification_tasks.send_opd_rating_message.apply_async(
+                    kwargs={'appointment_id': self.id, 'type': 'lab'}, countdown=int(settings.RATING_SMS_NOTIF))
+            except Exception as e:
+                logger.error(str(e))
+
+        if old_instance and old_instance.status != self.ACCEPTED and self.status == self.ACCEPTED:
+            try:
+                notification_tasks.lab_send_otp_before_appointment.apply_async(
+                    (self.id, str(math.floor(self.time_slot_start.timestamp()))),
+                    eta=self.time_slot_start - datetime.timedelta(
+                        minutes=settings.TIME_BEFORE_APPOINTMENT_TO_SEND_OTP), )
+                # notification_tasks.lab_send_otp_before_appointment(self.id, self.time_slot_start)
+            except Exception as e:
+                logger.error(str(e))
+
+
         # Do not delete below commented code
         # try:
         #     prev_app_dict = {'id': self.id,
@@ -987,7 +1055,8 @@ class LabAppointment(TimeStampedModel, CouponsMixin):
 
     def save(self, *args, **kwargs):
         database_instance = LabAppointment.objects.filter(pk=self.id).first()
-        if database_instance and (database_instance.status == self.COMPLETED or database_instance.status == self.CANCELLED):
+        if database_instance and (database_instance.status == self.COMPLETED or database_instance.status == self.CANCELLED) \
+                and (self.status != database_instance.status):
             raise Exception('Cancelled or Completed appointment cannot be saved')
 
         try:
@@ -995,22 +1064,37 @@ class LabAppointment(TimeStampedModel, CouponsMixin):
                     (not database_instance or database_instance.status != self.status) and not self.outstanding):
                 out_obj = self.outstanding_create()
                 self.outstanding = out_obj
-        except:
-            pass
+        except Exception as e:
+            logger.error("Error while creating outstanding for lab- " + str(e))
 
         try:
-            # while completing appointment, add a merchant_payout entry
-            if database_instance.status != self.status and self.status == self.COMPLETED:
+            # while completing appointment
+            if database_instance and database_instance.status != self.status and self.status == self.COMPLETED:
+                # add a merchant_payout entry
                 if self.merchant_payout is None:
                     self.save_merchant_payout()
+                # credit cashback if any
+                if self.cashback is not None and self.cashback > 0:
+                    ConsumerAccount.credit_cashback(self.user, self.cashback, database_instance,
+                                                        Order.LAB_PRODUCT_ID)
         except Exception as e:
-            pass
+            logger.error("Error while saving payout mercahnt for lab- " + str(e))
 
         push_to_matrix = kwargs.get('push_again_to_matrix', True)
         if 'push_again_to_matrix' in kwargs.keys():
             kwargs.pop('push_again_to_matrix')
 
+        # Pushing every status to the Appointment history
+        push_to_history = False
+        if self.id and self.status != LabAppointment.objects.get(pk=self.id).status:
+            push_to_history = True
+        elif self.id is None:
+            push_to_history = True
+
         super().save(*args, **kwargs)
+
+        if push_to_history:
+            AppointmentHistory.create(content_object=self)
 
         transaction.on_commit(lambda: self.app_commit_tasks(database_instance, push_to_matrix))
 
@@ -1535,3 +1619,23 @@ class LabTestGroup(auth_model.TimeStampedModel):
     class Meta:
         db_table = 'lab_test_group'
 
+
+def get_lab_timings_today(self, day_now=timezone.now().weekday()):
+    lab_timing = list()
+    lab_timing_data = list()
+    if self.always_open:
+        lab_timing.append("12:00 AM - 11:45 PM")
+        lab_timing_data.append({
+            "start": str(0.0),
+            "end": str(23.75)
+        })
+    else:
+        timing_queryset = self.lab_timings.all()
+        for data in timing_queryset:
+            if data.day == day_now:
+                lab_timing.append('{} - {}'.format(LabTiming.TIME_CHOICES[data.start], LabTiming.TIME_CHOICES[data.end]))
+                lab_timing_data.append({"start": str(data.start), "end": str(data.end)})
+    return ' | '.join(lab_timing), lab_timing_data
+
+
+Lab.lab_timings_today = get_lab_timings_today

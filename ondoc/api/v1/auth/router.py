@@ -5,7 +5,7 @@ from .views import (LoginOTP, UserViewset, NotificationEndpointViewSet,
                     HospitalDoctorAppointmentPermissionViewSet, HospitalDoctorBillingPermissionViewSet,
                     OrderViewSet, ConsumerAccountRefundViewSet, RefreshJSONWebToken, OnlineLeadViewSet, UserLabViewSet,
                     OrderDetailViewSet, UserTokenViewSet, SendBookingUrlViewSet, ContactUsViewSet, CareerViewSet,
-                    DoctorNumberAutocomplete)
+                    DoctorNumberAutocomplete, UserLeadViewSet)
 
 urlpatterns = [
     path('api-token-refresh', RefreshJSONWebToken.as_view({'post':'refresh'}), name='token-refresh'),
@@ -47,6 +47,7 @@ urlpatterns = [
     path('pgdata/<int:pk>', OrderViewSet.as_view({"get": "retrieve"}), name="pg-order-detail"),
     path('refund', ConsumerAccountRefundViewSet.as_view({"post": "refund"}), name="consumer-refund"),
     path('onlinelead/create', OnlineLeadViewSet.as_view({"post": "create"}), name='doctor-signup'),
+    path('userlead/create', UserLeadViewSet.as_view({"post": "create"}), name='user-signup'),
     path('manageablelabs', UserLabViewSet.as_view({"get": "list"}), name='user-manageable-labs'),
     path('order/<int:order_id>/send', SendBookingUrlViewSet.as_view({"post": "send_booking_url"}), name='send-booking-url'),
     path('order/<int:order_id>', OrderDetailViewSet.as_view({"get": "details"}), name='extract-order-detail'),

@@ -14,9 +14,11 @@ from datetime import timedelta
 from dateutil import tz
 from django.utils import timezone
 from ondoc.authentication import models as auth_model
+
 from ondoc.location import models as location_models
 from ondoc.account.models import Order, ConsumerAccount, ConsumerTransaction, PgTransaction, ConsumerRefund, \
     MerchantPayout
+from ondoc.notification.models import NotificationAction
 from ondoc.payout.models import Outstanding
 from ondoc.coupon.models import Coupon
 from ondoc.doctor.tasks import doc_app_auto_cancel
@@ -26,7 +28,8 @@ from ondoc.payout import models as payout_model
 from ondoc.notification import models as notification_models
 from ondoc.notification import tasks as notification_tasks
 from django.contrib.contenttypes.fields import GenericRelation
-from ondoc.api.v1.utils import get_start_end_datetime, custom_form_datetime, CouponsMixin
+from ondoc.api.v1.utils import get_start_end_datetime, custom_form_datetime, CouponsMixin, aware_time_zone
+from ondoc.common.models import AppointmentHistory
 from functools import reduce
 from operator import or_
 import logging
@@ -44,7 +47,7 @@ import hashlib
 from django.contrib.contenttypes.fields import GenericRelation
 from django.contrib.contenttypes.fields import GenericForeignKey
 from django.contrib.contenttypes.models import ContentType
-from ondoc.matrix.tasks import push_appointment_to_matrix
+from ondoc.matrix.tasks import push_appointment_to_matrix, push_onboarding_qcstatus_to_matrix
 # from ondoc.procedure.models import Procedure
 from ondoc.ratings_review import models as ratings_models
 from django.utils import timezone
@@ -198,7 +201,7 @@ class Hospital(auth_model.TimeStampedModel, auth_model.CreatedByModel, auth_mode
 
     def get_short_address(self):
         address_items = [value for value in
-                         [self.sublocality, self.locality] if value]
+                         [self.locality, self.city] if value]
         return ", ".join(address_items)
 
     def update_live_status(self):
@@ -214,10 +217,10 @@ class Hospital(auth_model.TimeStampedModel, auth_model.CreatedByModel, auth_mode
 
     def save(self, *args, **kwargs):
         self.update_live_status()
-        build_url = True
-        if self.is_live and self.id and self.location:
-            if Hospital.objects.filter(location__distance_lte=(self.location, 0), id=self.id).exists():
-                build_url = False
+        # build_url = True
+        # if self.is_live and self.id and self.location:
+        #     if Hospital.objects.filter(location__distance_lte=(self.location, 0), id=self.id).exists():
+        #         build_url = False
 
         super(Hospital, self).save(*args, **kwargs)
 
@@ -228,8 +231,8 @@ class Hospital(auth_model.TimeStampedModel, auth_model.CreatedByModel, auth_mode
             auth_model.GenericAdmin.objects.filter(hospital=self, entity_type=auth_model.GenericAdmin.DOCTOR, permission_type=auth_model.GenericAdmin.APPOINTMENT)\
                 .update(is_disabled=False)
 
-        if build_url and self.location and self.is_live:
-            ea = location_models.EntityLocationRelationship.create(latitude=self.location.y, longitude=self.location.x, content_object=self)
+        # if build_url and self.location and self.is_live:
+        #     ea = location_models.EntityLocationRelationship.create(latitude=self.location.y, longitude=self.location.x, content_object=self)
 
 
 class HospitalAward(auth_model.TimeStampedModel):
@@ -371,7 +374,7 @@ class Doctor(auth_model.TimeStampedModel, auth_model.QCModel, SearchKey):
     merchant_payout = GenericRelation(MerchantPayout)
 
     def __str__(self):
-        return self.name
+        return '{} ({})'.format(self.name, self.id)
 
     def get_display_name(self):
         return "Dr. {}".format(self.name.title()) if self.name else None
@@ -444,7 +447,24 @@ class Doctor(auth_model.TimeStampedModel, auth_model.QCModel, SearchKey):
 
     def save(self, *args, **kwargs):
         self.update_live_status()
+
+        # On every update of onboarding status or Qcstatus push to matrix
+        push_to_matrix = False
+        if self.id:
+            doctor_obj = Doctor.objects.filter(pk=self.id).first()
+            if doctor_obj and (self.onboarding_status!=doctor_obj.onboarding_status or
+                  self.data_status !=doctor_obj.data_status):
+                # Push to matrix
+                push_to_matrix = True
+
         super(Doctor, self).save(*args, **kwargs)
+
+        transaction.on_commit(lambda: self.app_commit_tasks(push_to_matrix))
+
+    def app_commit_tasks(self, push_to_matrix):
+        if push_to_matrix:
+            push_onboarding_qcstatus_to_matrix.apply_async(({'obj_type': self.__class__.__name__, 'obj_id': self.id}
+                                                            ,), countdown=5)
 
     class Meta:
         db_table = "doctor"
@@ -1147,6 +1167,7 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin):
     rating_declined = models.BooleanField(default=False)
     coupon = models.ManyToManyField(Coupon, blank=True, null=True, related_name="opd_appointment_coupon")
     discount = models.DecimalField(max_digits=10, decimal_places=2, blank=True, null=True)
+    cashback = models.DecimalField(max_digits=10, decimal_places=2, blank=True, null=True)
     cancellation_reason = models.ForeignKey('CancellationReason', on_delete=models.SET_NULL, null=True, blank=True)
     cancellation_comments = models.CharField(max_length=5000, null=True, blank=True)
     rating = GenericRelation(ratings_models.RatingsReview)
@@ -1154,6 +1175,7 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin):
                                         through_fields=('opd_appointment', 'procedure'), null=True, blank=True)
 
     merchant_payout = models.ForeignKey(MerchantPayout, related_name="opd_appointment", on_delete=models.SET_NULL, null=True)
+    price_data = JSONField(blank=True, null=True)
 
     def __str__(self):
         return self.profile.name + " (" + self.doctor.name + ")"
@@ -1294,17 +1316,41 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin):
     def after_commit_tasks(self, old_instance, push_to_matrix):
         if push_to_matrix:
         # Push the appointment data to the matrix .
-            push_appointment_to_matrix.apply_async(({'type': 'OPD_APPOINTMENT', 'appointment_id': self.id,
-                                                     'product_id': 5, 'sub_product_id': 2}, ), countdown=5)
+            try:
+                push_appointment_to_matrix.apply_async(({'type': 'OPD_APPOINTMENT', 'appointment_id': self.id,
+                                                         'product_id': 5, 'sub_product_id': 2},), countdown=5)
+            except Exception as e:
+                logger.error(str(e))
 
         if self.is_to_send_notification(old_instance):
-            notification_tasks.send_opd_notifications.apply_async(kwargs={'appointment_id': self.id}, countdown=1)
+            try:
+                notification_tasks.send_opd_notifications_refactored.apply_async((self.id,), countdown=1)
+            except Exception as e:
+                logger.error(str(e))
+            # notification_tasks.send_opd_notifications_refactored(self.id)
+            # notification_tasks.send_opd_notifications.apply_async(kwargs={'appointment_id': self.id},
+            #                                                                  countdown=1)
         if not old_instance or old_instance.status != self.status:
             notification_models.EmailNotification.ops_notification_alert(self, email_list=settings.OPS_EMAIL_ID,
                                                                          product=Order.DOCTOR_PRODUCT_ID,
                                                                          alert_type=notification_models.EmailNotification.OPS_APPOINTMENT_NOTIFICATION)
         if self.status == self.COMPLETED and not self.is_rated:
-            notification_tasks.send_opd_rating_message.apply_async(kwargs={'appointment_id': self.id, 'type': 'opd'}, countdown=int(settings.RATING_SMS_NOTIF))
+            try:
+                notification_tasks.send_opd_rating_message.apply_async(
+                    kwargs={'appointment_id': self.id, 'type': 'opd'}, countdown=int(settings.RATING_SMS_NOTIF))
+            except Exception as e:
+                logger.error(str(e))
+
+        if old_instance and old_instance.status != self.ACCEPTED and self.status == self.ACCEPTED:
+            try:
+                notification_tasks.opd_send_otp_before_appointment.apply_async(
+                    (self.id, str(math.floor(self.time_slot_start.timestamp()))),
+                    eta=self.time_slot_start - datetime.timedelta(
+                        minutes=settings.TIME_BEFORE_APPOINTMENT_TO_SEND_OTP), )
+                # notification_tasks.opd_send_otp_before_appointment(self.id, self.time_slot_start)
+            except Exception as e:
+                logger.error(str(e))
+
         # try:
         #     if self.status not in [OpdAppointment.COMPLETED, OpdAppointment.CANCELLED, OpdAppointment.ACCEPTED]:
         #         countdown = self.get_auto_cancel_delay(self)
@@ -1329,14 +1375,30 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin):
             kwargs.pop('push_again_to_matrix')
 
         try:
-            # while completing appointment, add a merchant_payout entry
-            if database_instance.status != self.status and self.status == self.COMPLETED:
+            # while completing appointment
+            if database_instance and database_instance.status != self.status and self.status == self.COMPLETED:
+                # add a merchant_payout entry
                 if self.merchant_payout is None:
                     self.save_merchant_payout()
+
+                # credit cashback if any
+                if self.cashback is not None and self.cashback > 0:
+                    ConsumerAccount.credit_cashback(self.user, self.cashback, database_instance, Order.DOCTOR_PRODUCT_ID)
+
         except Exception as e:
             pass
 
+        # Pushing every status to the Appointment history
+        push_to_history = False
+        if self.id and self.status != OpdAppointment.objects.get(pk=self.id).status:
+            push_to_history = True
+        elif self.id is None:
+            push_to_history = True
+
         super().save(*args, **kwargs)
+
+        if push_to_history:
+            AppointmentHistory.create(content_object=self)
 
         transaction.on_commit(lambda: self.after_commit_tasks(database_instance, push_to_matrix))
 
@@ -1574,10 +1636,20 @@ class PrescriptionFile(auth_model.TimeStampedModel, auth_model.Document):
                 notification_type=notification_models.NotificationAction.PRESCRIPTION_UPLOADED,
             )
 
+    def send_notification_refactored(self, database_instance):
+        from ondoc.communications.models import OpdNotification
+        appointment = self.prescription.appointment
+        if not appointment.user:
+            return
+        if not database_instance:
+            opd_notification = OpdNotification(appointment, NotificationAction.PRESCRIPTION_UPLOADED)
+            opd_notification.send()
+
     def save(self, *args, **kwargs):
         database_instance = PrescriptionFile.objects.filter(pk=self.id).first()
         super().save(*args, **kwargs)
-        self.send_notification(database_instance)
+        transaction.on_commit(lambda: self.send_notification_refactored(database_instance))
+        # self.send_notification(database_instance)
 
     class Meta:
         db_table = "prescription_file"
