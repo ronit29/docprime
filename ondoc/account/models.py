@@ -834,10 +834,10 @@ class MerchantPayout(TimeStampedModel):
         super().save(*args, **kwargs)
 
     def get_appointment(self):
-        if self.lab_appointment.first():
-            return self.lab_appointment.first()
-        elif self.opd_appointment.first():
-            return self.opd_appointment.first()
+        if self.lab_appointment.all():
+            return self.lab_appointment.all()[0]
+        elif self.opd_appointment.all():
+            return self.opd_appointment.all()[0]
         return None
 
     def get_billed_to(self):
