@@ -422,19 +422,9 @@ class LabList(viewsets.ReadOnlyModelViewSet):
         # serializer = diagnostic_serializer.LabNetworkSerializer(response_queryset, many=True,
         #                                                        context={"request": request})
 
-        entity_ids = [lab_data.get('id')for lab_data in result]
-
-        id_url_dict = dict()
-        entity = EntityUrls.objects.filter(entity_id__in=entity_ids, url_type='PAGEURL', is_valid='t',
-                                           entity_type__iexact='Lab').values('entity_id', 'url')
-        for data in entity:
-            id_url_dict[data['entity_id']] = data['url']
-
-        for resp in result:
-            if id_url_dict.get(resp.get('id')):
-                resp['url'] = id_url_dict[resp.get('id')]
-            else:
-                resp['url'] = None
+        # entity_ids = [lab_data.get('id')for lab_data in result]
+        #
+        # id_url_dict = dict()
 
         test_ids = parameters.get('ids', [])
 
@@ -689,6 +679,12 @@ class LabList(viewsets.ReadOnlyModelViewSet):
         # ids, id_details = self.extract_lab_ids(queryset)
         labs = Lab.objects.select_related('network').prefetch_related('lab_documents', 'lab_image', 'lab_timings','home_collection_charges')
 
+        entity = EntityUrls.objects.filter(entity_id__in=ids, url_type='PAGEURL', is_valid='t',
+                                           entity_type__iexact='Lab').values('entity_id', 'url')
+        id_url_dict = dict()
+        for data in entity:
+            id_url_dict[data['entity_id']] = data['url']
+
         if test_ids:
             group_queryset = LabPricingGroup.objects.prefetch_related(Prefetch(
                     "available_lab_tests",
@@ -786,6 +782,12 @@ class LabList(viewsets.ReadOnlyModelViewSet):
             row["next_lab_timing"] = next_lab_timing_dict
             row["next_lab_timing_data"] = next_lab_timing_data_dict
             row["tests"] = tests.get(row["id"])
+
+            if lab_obj.id in id_url_dict.keys():
+                row['url'] = id_url_dict[lab_obj.id]
+            else:
+                row['url'] = ''
+
 
         lab_network = OrderedDict()
         for res in queryset:
