@@ -378,20 +378,21 @@ def process_payout(payout_id):
 # @task
 def send_insurance_notifications(user_id):
     from ondoc.authentication import models as auth_model
+    from ondoc.communications.models import InsuranceNotification
+    try:
+        user = auth_model.User.objects.filter(id=user_id).last()
+        if not user:
+            logger.error("Invalid user id passed for insurance email notification")
 
-    user = auth_model.User.objects.filter(id=user_id).first()
-    if not user:
-        logger.error("Invalid user id passed for insurance email notification")
+        user_insurance = user.purchased_insurance.filter().last()
+        if not user_insurance or not user_insurance.is_valid():
+            logger.error("Invalid or None user insurance found for email notification")
 
-    user_insurance = user.purchased_insurance.filter().last()
-    if not user_insurance or not user_insurance.is_valid():
-        logger.error("Invalid or None user insurance found for email notification")
+        insurance_notification = InsuranceNotification(user_insurance, NotificationAction.INSURANCE_CONFIRMED)
+        insurance_notification.send()
+    except Exception as e:
+        logger.error(str(e))
 
-    notification_models.NotificationAction.trigger(
-        instance=user_insurance,
-        user=user,
-        notification_type=notification_models.NotificationAction.INSURANCE_CONFIRMED,
-    )
 
 @task()
 def opd_send_otp_before_appointment(appointment_id, previous_appointment_date_time):

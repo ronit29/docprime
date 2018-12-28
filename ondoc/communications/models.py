@@ -25,7 +25,7 @@ from ondoc.notification.models import NotificationAction, SmsNotification, Email
     PushNotification
 # from ondoc.notification.sqs_client import publish_message
 from ondoc.notification.rabbitmq_client import publish_message
-
+import datetime
 User = get_user_model()
 logger = logging.getLogger(__name__)
 
@@ -227,6 +227,8 @@ class SMSNotification:
             body_template = "sms/lab/appointment_cancelled_lab.txt"
         elif notification_type == NotificationAction.LAB_REPORT_UPLOADED:
             body_template = "sms/lab/lab_report_uploaded.txt"
+        elif notification_type == NotificationAction.INSURANCE_CONFIRMED:
+            body_template = "sms/insurance/insurance_confirmed.txt"
 
         return body_template
 
@@ -401,6 +403,9 @@ class EMAILNotification:
             context.update({"invoice_url": invoice.file.url})
             body_template = "email/lab_invoice/body.html"
             subject_template = "email/lab_invoice/subject.txt"
+        elif notification_type == NotificationAction.INSURANCE_CONFIRMED:
+            body_template = "email/insurance_confirmed/body.html"
+            subject_template = "email/insurance_confirmed/subject.txt"
 
         return subject_template, body_template
 
@@ -580,7 +585,7 @@ class OpdNotification(Notification):
         receivers = []
         notification_type = self.notification_type
         if not instance or not instance.user:
-            return receivers
+            return {}
         doctor_admins = GenericAdmin.get_appointment_admins(instance)
         if notification_type in [NotificationAction.APPOINTMENT_ACCEPTED,
                                  NotificationAction.APPOINTMENT_RESCHEDULED_BY_DOCTOR,
@@ -752,3 +757,93 @@ class LabNotification(Notification):
         all_receivers['push_receivers'] = user_and_tokens
 
         return all_receivers
+
+
+class InsuranceNotification(Notification):
+
+    def __init__(self, insurance, notification_type=None):
+        self.insurance = insurance
+        self.notification_type = notification_type
+
+    def get_context(self):
+        instance = self.insurance
+        insured_members = instance.members.all()
+        proposer = list(filter(lambda member: member.relation.lower() == 'self', insured_members))
+        proposer = proposer[0]
+
+        proposer_fname = proposer.first_name if proposer.first_name else ""
+        proposer_mname = proposer.middle_name if proposer.middle_name else ""
+        proposer_lname = proposer.last_name if proposer.last_name else ""
+
+        proposer_name = '%s %s %s %s' % (proposer.title, proposer_fname, proposer_mname, proposer_lname)
+
+        member_list = list()
+        count = 1
+        for member in insured_members:
+            fname = member.first_name if member.first_name else ""
+            mname = member.middle_name if member.middle_name else ""
+            lname = member.last_name if member.last_name else ""
+
+            name = '%s %s %s' % (fname, mname, lname)
+            data = {
+                'name': name.title(),
+                'member_number': count,
+                'dob': member.dob.strftime('%d-%m-%Y'),
+                'relation': member.relation,
+                'id': member.id,
+                'gender': member.gender.title(),
+                'age': int((datetime.datetime.now().date() - member.dob).days/365),
+            }
+            member_list.append(data)
+            count = count + 1
+
+        context = {
+            'purchase_data': str(instance.purchase_date.date().strftime('%d-%m-%Y')),
+            'expiry_date': str(instance.expiry_date.date().strftime('%d-%m-%Y')),
+            'premium': instance.premium_amount,
+            'proposer_name': proposer_name.title(),
+            'current_date': datetime.datetime.now().date().strftime('%d-%m-%Y'),
+            'policy_number': instance.policy_number,
+            'total_member_covered': len(member_list),
+            'plan': instance.insurance_plan.name,
+            'insured_members': member_list,
+            'insurer_logo': instance.insurance_plan.insurer.logo.url,
+            'coi_url': instance.coi.url,
+            'insurer_name': instance.insurance_plan.insurer.name
+        }
+
+        return context
+
+    def get_receivers(self):
+
+        all_receivers = {}
+        instance = self.insurance
+        if not instance:
+            return {}
+
+        user_and_phone_number = []
+        user_and_email = []
+
+        insured_members = instance.members.all()
+        proposer = list(filter(lambda member: member.relation.lower() == 'self', insured_members))
+        proposer = proposer[0]
+
+        user_and_email.append({'user': instance.user, 'email': proposer.email})
+        user_and_phone_number.append({'user': instance.user, 'phone_number': proposer.phone_number})
+
+        all_receivers['sms_receivers'] = user_and_phone_number
+        all_receivers['email_receivers'] = user_and_email
+
+        return all_receivers
+
+    def send(self):
+        context = self.get_context()
+        notification_type = self.notification_type
+        all_receivers = self.get_receivers()
+
+        if notification_type == NotificationAction.INSURANCE_CONFIRMED:
+            email_notification = EMAILNotification(notification_type, context)
+            email_notification.send(all_receivers.get('email_receivers', []))
+
+            sms_notification = SMSNotification(notification_type, context)
+            sms_notification.send(all_receivers.get('sms_receivers', []))

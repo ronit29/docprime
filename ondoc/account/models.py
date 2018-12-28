@@ -8,7 +8,7 @@ from django.db import transaction
 from django.db.models import Sum, Q, F, Max
 from datetime import datetime, timedelta
 from django.utils import timezone
-from ondoc.api.v1.utils import refund_curl_request, form_pg_refund_data
+from ondoc.api.v1.utils import refund_curl_request, form_pg_refund_data, insurance_reverse_transform
 from django.conf import settings
 from rest_framework import status
 from copy import deepcopy
@@ -95,6 +95,7 @@ class Order(TimeStampedModel):
         from ondoc.diagnostic.models import LabAppointment
         from ondoc.api.v1.doctor.serializers import OpdAppTransactionModelSerializer
         from ondoc.api.v1.diagnostic.serializers import LabAppTransactionModelSerializer
+        from ondoc.api.v1.insurance.serializers import UserInsuranceSerializer
 
         # Initial validations for appointment data
         appointment_data = self.action_data
@@ -162,7 +163,16 @@ class Order(TimeStampedModel):
                     "payment_status": Order.PAYMENT_ACCEPTED
                 }
         elif self.action == Order.INSURANCE_CREATE:
-            appointment_obj = self.process_insurance_order(consumer_account)
+            insurance_data = deepcopy(self.action_data)
+            insurance_data = insurance_reverse_transform(insurance_data)
+            insurance_data['user_insurance']['order'] = self.id
+            user = User.objects.get(id=self.action_data.get('user'))
+            insurance_data['user_insurance']['premium_amount'] = self.amount + self.wallet_amount
+            serializer = UserInsuranceSerializer(data=insurance_data.get('user_insurance'))
+            serializer.is_valid(raise_exception=True)
+            user_insurance_data = serializer.validated_data
+            appointment_data = user_insurance_data
+            appointment_obj = self.process_insurance_order(consumer_account,user_insurance_data)
             amount = appointment_obj.premium_amount
             order_dict = {
                 "reference_id": appointment_obj.id,
@@ -187,20 +197,20 @@ class Order(TimeStampedModel):
         return appointment_obj
 
     @transaction.atomic
-    def process_insurance_order(self, consumer_account):
-        from ondoc.api.v1.utils import insurance_reverse_transform
+    def process_insurance_order(self, consumer_account,user_insurance_data):
+
         from ondoc.api.v1.insurance.serializers import UserInsuranceSerializer
         from ondoc.insurance.models import UserInsurance, InsuranceTransaction
         from ondoc.authentication.models import User
-        insurance_data = deepcopy(self.action_data)
-        insurance_data = insurance_reverse_transform(insurance_data)
-
-        insurance_data['user_insurance']['order'] = self.id
+        # insurance_data = deepcopy(self.action_data)
+        # insurance_data = insurance_reverse_transform(insurance_data)
+        #
+        # insurance_data['user_insurance']['order'] = self.id
         user = User.objects.get(id=self.action_data.get('user'))
-        insurance_data['user_insurance']['premium_amount'] = self.amount + self.wallet_amount
-        serializer = UserInsuranceSerializer(data=insurance_data.get('user_insurance'))
-        serializer.is_valid(raise_exception=True)
-        user_insurance_data = serializer.validated_data
+        # insurance_data['user_insurance']['premium_amount'] = self.amount + self.wallet_amount
+        # serializer = UserInsuranceSerializer(data=insurance_data.get('user_insurance'))
+        # serializer.is_valid(raise_exception=True)
+        # user_insurance_data = serializer.validated_data
 
         if consumer_account.balance >= user_insurance_data['premium_amount']:
             user_insurance_obj = UserInsurance.create_user_insurance(user_insurance_data, user)
