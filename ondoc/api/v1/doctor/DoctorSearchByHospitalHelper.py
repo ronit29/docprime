@@ -7,7 +7,7 @@ from ondoc.doctor import models
 from ondoc.api.v1.utils import clinic_convert_timings
 from ondoc.api.v1.doctor import serializers
 from ondoc.authentication.models import QCModel
-from ondoc.doctor.models import Doctor
+from ondoc.doctor.models import Doctor, DoctorClinic
 from ondoc.procedure.models import DoctorClinicProcedure, ProcedureCategory, ProcedureToCategoryMapping, \
     get_selected_and_other_procedures, get_included_doctor_clinic_procedure, \
     get_procedure_categories_with_procedures
@@ -234,20 +234,19 @@ class DoctorSearchByHospitalHelper:
         condition_ids = self.query_params.get("condition_ids", [])
 
         if self.count_of_procedure:
-            rank_part = "Row_number() OVER( PARTITION BY doctor_id ORDER BY " \
+            rank_part = "Row_number() OVER( PARTITION BY doctor_id, hospital_id ORDER BY " \
                            "distance, total_price ASC) rnk "
             if self.query_params.get('sort_on') == 'fees':
-                rank_part = " Row_number() OVER( partition BY doctor_id " \
+                rank_part = " Row_number() OVER( partition BY doctor_id, hospital_id " \
                             "ORDER BY total_price ASC, distance) rnk " \
 
-            query_string = "SELECT doctor_id, hospital_id, doctor_clinic_id, doctor_clinic_timing_id, " \
+            query_string = "SELECT *, " \
                            "ROW_NUMBER () OVER (ORDER BY {order_by_field}) order_rank " \
-                           "FROM (SELECT total_price, " \
-                           " {rank_part} ," \
-                           " distance, enabled_for_online_booking, is_license_verified, priority " \
-                           "procedure_deal_price, doctor_id, practicing_since, doctor_clinic_id, doctor_clinic_timing_id, " \
-                           "procedure_id, doctor_clinic_deal_price, hospital_id " \
-                           "FROM (SELECT distance, procedure_deal_price, doctor_id, practicing_since, doctor_clinic_id, doctor_clinic_timing_id, procedure_id," \
+                           "FROM (SELECT " \
+                           " *, {rank_part} " \
+                           "FROM (SELECT city, locality, hospital_name, name, deal_price, mrp, distance, procedure_deal_price," \
+                           "is_live, is_license_verified, " \
+                           "doctor_id, practicing_since, doctor_clinic_id, doctor_clinic_timing_id, procedure_id," \
                            "enabled_for_online_booking, is_license_verified, priority, " \
                            "doctor_clinic_deal_price, hospital_id , count_per_clinic, sum_per_clinic, sum_per_clinic+doctor_clinic_deal_price as total_price FROM " \
                            "(SELECT " \
@@ -255,8 +254,10 @@ class DoctorSearchByHospitalHelper:
                            "SUM(dcp.deal_price) OVER (PARTITION BY dct.id) AS sum_per_clinic, " \
                            "St_distance(St_setsrid(St_point((%(longitude)s), (%(latitude)s)), 4326), h.location) AS distance, " \
                            "dcp.deal_price AS procedure_deal_price, " \
+                           "dct.deal_price, dct.mrp, d.is_live, " \
+                           "h.locality, h.city, h.name hospital_name, d.name, " \
                            "d.id AS doctor_id, practicing_since, " \
-                           "d.enabled_for_online_booking, d.is_license_verified, dc.priority, " \
+                           "d.enabled_for_online_booking and dc.enabled_for_online_booking and h.enabled_for_online_booking as enabled_for_online_booking, d.is_license_verified, dc.priority, " \
                            "dc.id AS doctor_clinic_id,  dct.id AS doctor_clinic_timing_id, dcp.id AS doctor_clinic_procedure_id, " \
                            "dcp.procedure_id, dct.deal_price AS doctor_clinic_deal_price, " \
                            "dc.hospital_id AS hospital_id FROM doctor d " \
@@ -270,18 +271,24 @@ class DoctorSearchByHospitalHelper:
                            "St_dwithin(St_setsrid(St_point((%(longitude)s), (%(latitude)s)), 4326 ), h.location, (%(min_distance)s)) = false " \
                            " ) " \
                            "AS tempTable WHERE count_per_clinic={count_of_procedure}) AS tempTable2) " \
-                           "x WHERE {rank_by} ORDER BY {order_by_field}".format(
+                           "x WHERE {rank_by} ".format(
                 rank_part = rank_part, filtering_params=filtering_params.get('string'),
                 count_of_procedure=filtering_params.get('count_of_procedure'),
                 rank_by=rank_by, order_by_field=order_by_field)
 
-            query = ''' select doctor_id, hospital_id, doctor_clinic_id, doctor_clinic_timing_id from ( 
-                select *, dense_rank() over(order by rank) as hosp_rank from ( 
-                    select  doctor_id, hospital_id,  ROW_NUMBER() OVER 
-                    (PARTITION BY hospital_id order by order_rank) AS row_num,
-                    min (order_rank) OVER (PARTITION BY coalesce(hospital_id,random())) rank,
-                    doctor_clinic_id, doctor_clinic_timing_id from ({query_string})y )z where row_num<=5)a where hosp_rank<=20
+
+            query = ''' select * from (
+                    select *, max(hosp_rank) over(partition by 1) result_count from (
+                    select *, dense_rank() over(order by rank) as hosp_rank from ( 
+                    select  *, 
+                    ROW_NUMBER() OVER (PARTITION BY hospital_id order by order_rank) AS row_num,
+                    min (order_rank) OVER (PARTITION BY hospital_id) rank 
+                     from ({query_string})y )z where row_num<=10
+                    )g
+                    )a 
+                    where hosp_rank<=(%(page_end)s) and hosp_rank>(%(page_start)s) order by hosp_rank, row_num
                     '''.format(query_string=query_string)
+
 
         else:
             sp_cond = ''
@@ -310,7 +317,7 @@ class DoctorSearchByHospitalHelper:
                            "dc.id as doctor_clinic_id,  " \
                            "dct.id as doctor_clinic_timing_id,practicing_since, " \
                            "d.enabled_for_online_booking and dc.enabled_for_online_booking and h.enabled_for_online_booking as enabled_for_online_booking, " \
-                           "priority,deal_price, d.is_live, " \
+                           "priority, d.is_live, " \
                            "dc.hospital_id as hospital_id FROM doctor d " \
                            "INNER JOIN doctor_clinic dc ON d.id = dc.doctor_id and dc.enabled=true and d.is_live=true " \
                            "and d.is_test_doctor is False and d.is_internal is False " \
@@ -385,12 +392,18 @@ class DoctorSearchByHospitalHelper:
         entity_ids = doctor_ids
 
         id_url_dict = dict()
-        entity = EntityUrls.objects.filter(entity_id__in=entity_ids, url_type='PAGEURL', is_valid='t',
-                                           entity_type__iexact='Doctor').values('entity_id', 'url')
-        for data in entity:
+        entities = EntityUrls.objects.filter(entity_id__in=entity_ids, is_valid='t',
+                                           sitemap_identifier='DOCTOR_PAGE').values('entity_id', 'url')
+
+        # for entity in entities:
+        #     id_url_dict[entity['id']]=entity['url']
+
+        # print(entity)
+        for data in entities:
             id_url_dict[data['entity_id']] = data['url']
 
-        doctor_clinic_mapping = {data.get("doctor_id"): data.get("hospital_id") for data in doctor_search_result}
+
+        #doctor_clinic_mapping = {data.get("doctor_id"): data.get("hospital_id") for data in doctor_clinics}
         # doctor_availability_mapping = {data.get("doctor_id"): data.get("doctor_clinic_timing_id") for data in
         #                                doctor_search_result}
         category_ids = self.query_params.get("procedure_category_ids", [])
@@ -398,19 +411,50 @@ class DoctorSearchByHospitalHelper:
         category_ids = [int(x) for x in category_ids]
         procedure_ids = [int(x) for x in procedure_ids]
 
+        if len(category_ids)>0 or len(procedure_ids)>0:
+            doctor_clinic_ids = [data.get("doctor_clinic_id") for data in doctor_search_result]
+            doctor_clinics = DoctorClinic.objects.filter(id__in=doctor_clinic_ids).prefetch_related('hospital','doctorclinicprocedure_set__procedure__parent_categories_mapping')
+            doctor_clinic_mapping = dict()
+            for dc in doctor_clinics:
+                doctor_clinic_mapping[dc.id] = dc
+
+
         selected_procedure_ids, other_procedure_ids = get_selected_and_other_procedures(category_ids, procedure_ids)
 
         hospital_card = OrderedDict()
         for result in doctor_search_result:
+            
             existing = hospital_card.get(result['hospital_id'])
             if not existing:
                 h_data = {}
-                h_data['address'] = ",".join([result["locality"], result["city"]])
+                h_data['address'] = ", ".join([result["locality"], result["city"]])
                 h_data['hospital_id'] = result["hospital_id"]
                 h_data['doctors'] = []
                 h_data['hospital_name'] = result["hospital_name"]
                 h_data['procedure_categories'] = []
                 hospital_card[h_data['hospital_id']] = h_data
+
+                if len(category_ids)>0 or len(procedure_ids)>0:
+
+                    all_doctor_clinic_procedures = list(doctor_clinic_mapping[result["doctor_clinic_id"]].doctorclinicprocedure_set.all())
+                    selected_procedures_data = get_included_doctor_clinic_procedure(all_doctor_clinic_procedures,
+                                                                                    selected_procedure_ids)
+                    other_procedures_data = get_included_doctor_clinic_procedure(all_doctor_clinic_procedures,
+                                                                                 other_procedure_ids)
+                    selected_procedures_serializer = DoctorClinicProcedureSerializer(selected_procedures_data,
+                                                                                     context={'is_selected': True,
+                                                                                              'category_ids': category_ids},
+                                                                                     many=True)
+                    other_procedures_serializer = DoctorClinicProcedureSerializer(other_procedures_data,
+                                                                                  context={'is_selected': False,
+                                                                                           'category_ids': category_ids},
+                                                                                  many=True)
+                    selected_procedures_list = list(selected_procedures_serializer.data)
+                    other_procedures_list = list(other_procedures_serializer.data)
+                    final_result = get_procedure_categories_with_procedures(selected_procedures_list,
+                                                                                other_procedures_list)
+
+                    h_data['procedure_categories'] = final_result
                 existing = h_data
             
             d_data = {}    
@@ -419,13 +463,17 @@ class DoctorSearchByHospitalHelper:
             d_data["deal_price"] = str(result["deal_price"])
             d_data["discounted_fees"] = str(result["deal_price"])
             d_data["is_license_verified"] = result["is_license_verified"]
-            d_data["distance"] = result["distance"]
+            d_data["distance"] = result["distance"]/1000
             d_data["mrp"] = str(result["mrp"])
             d_data["is_live"] = result["is_live"]
             d_data["enabled_for_online_booking"] = result["enabled_for_online_booking"]
             d_data["is_gold"] = False
             d_data["name"] = result["name"]
             d_data["display_name"] = "Dr. "+result["name"]
+            d_data["url"] = id_url_dict.get(result["doctor_id"],"")
+
+
+
             existing["doctors"].append(d_data)
 
         return hospital_card.values()
