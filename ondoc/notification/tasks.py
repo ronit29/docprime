@@ -311,7 +311,7 @@ def send_appointment_location_message(number, hospital_lat, hospital_long):
     data = {}
     data['phone_number'] = number
 
-    link = '''http://maps.google.com/maps?q=loc:%s,-%s''' % (hospital_lat, hospital_long)
+    link = '''http://maps.google.com/maps?q=loc:%s,%s''' % (hospital_lat, hospital_long)
     text = '''Location for your Upcoming Appointment %s ''' % (link)
     data['text'] = mark_safe(text)
     try:

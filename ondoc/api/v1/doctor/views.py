@@ -2077,7 +2077,7 @@ class OfflineCustomerViewSet(viewsets.GenericViewSet):
                 obj['doctor_id'] = data.get('doctor').id
                 obj['hospital_id'] = data.get('hospital').id
                 resp.append(obj)
-                logger.error("Fialed Creating Appointment "+ str(e))
+                logger.error("Fialed Creating Appointment " + str(e))
                 continue
             appntment_ids.append(appnt.id)
             patient_ids.append(patient.id)
@@ -2416,8 +2416,8 @@ class OfflineCustomerViewSet(viewsets.GenericViewSet):
             online_queryset = online_queryset.filter(updated_at__gte=updated_at)
             offline_queryset = offline_queryset.filter(updated_at__gte=updated_at)
         final_data = sorted(chain(online_queryset, offline_queryset), key=lambda car: car.time_slot_start, reverse=False)
-        resp = []
-        group = OrderedDict()
+        # resp = []
+        # group = OrderedDict()
         final_result = []
         for app in final_data:
             instance = ONLINE if isinstance(app, models.OpdAppointment) else OFFLINE
