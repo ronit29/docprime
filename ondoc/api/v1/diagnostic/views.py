@@ -14,7 +14,8 @@ from ondoc.notification.models import EmailNotification
 from ondoc.coupon.models import Coupon
 from ondoc.doctor import models as doctor_model
 from ondoc.api.v1 import insurance as insurance_utility
-from ondoc.api.v1.utils import form_time_slot, IsConsumer, labappointment_transform, IsDoctor, payment_details, aware_time_zone, get_lab_search_details, TimeSlotExtraction
+from ondoc.api.v1.utils import form_time_slot, IsConsumer, labappointment_transform, IsDoctor, payment_details, \
+    aware_time_zone, get_lab_search_details, TimeSlotExtraction, RawSql
 from ondoc.api.pagination import paginate_queryset
 
 from rest_framework import viewsets, mixins
@@ -386,6 +387,421 @@ class LabList(viewsets.ReadOnlyModelViewSet):
         return Response({"result": serializer.data,
                          "count": count,'tests':tests,
                          "seo": seo, "breadcrumb": breadcrumb})
+
+    @transaction.non_atomic_requests
+    def search_by_url(self, request, *args, **kwargs):
+        url = request.GET.get('url', None)
+        if not url:
+            return Response(status=status.HTTP_404_NOT_FOUND)
+
+        entity_url_qs = EntityUrls.objects.filter(url=url, url_type=EntityUrls.UrlType.SEARCHURL,
+                                                  entity_type__iexact='Lab').order_by('-sequence')
+        if entity_url_qs.exists():
+            entity = entity_url_qs.first()
+            if not entity.is_valid:
+                valid_qs = EntityUrls.objects.filter(url_type=EntityUrls.UrlType.SEARCHURL, is_valid=True,
+                                                     entity_type__iexact='Lab', locality_id=entity.locality_id,
+                                                     sublocality_id=entity.sublocality_id,
+                                                     sitemap_identifier=entity.sitemap_identifier).order_by('-sequence')
+
+                if valid_qs.exists():
+                    corrected_url = valid_qs.first().url
+                    return Response(status=status.HTTP_301_MOVED_PERMANENTLY, data={'url': corrected_url})
+                else:
+                    return Response(status=status.HTTP_404_NOT_FOUND)
+
+            extras = entity.additional_info
+            if extras.get('location_json'):
+                kwargs['location_json'] = extras.get('location_json')
+                kwargs['url'] = url
+                kwargs['parameters'] = get_lab_search_details(extras, request.query_params)
+                response = self.search(request, **kwargs)
+                return response
+        else:
+            return Response(status=status.HTTP_404_NOT_FOUND)
+
+    @transaction.non_atomic_requests
+    def search(self, request, **kwargs):
+        parameters = request.query_params
+        if kwargs.get('parameters'):
+            parameters = kwargs.get('parameters')
+        serializer = diagnostic_serializer.SearchLabListSerializer(data=parameters)
+        serializer.is_valid(raise_exception=True)
+        if kwargs.get('location_json'):
+            serializer.validated_data['location_json'] = kwargs['location_json']
+        if kwargs.get('url'):
+            serializer.validated_data['url'] = kwargs['url']
+        parameters = serializer.validated_data
+        queryset_result = self.get_lab_search_list(parameters)
+        count = len(queryset_result)
+        paginated_queryset = paginate_queryset(queryset_result, request)
+        response_queryset = self.form_lab_search_whole_data(paginated_queryset, parameters.get("ids"))
+        result = list()
+        for data in response_queryset.items():
+            result.append(data[1])
+
+        # serializer = diagnostic_serializer.LabNetworkSerializer(response_queryset, many=True,
+        #                                                        context={"request": request})
+
+        entity_ids = [lab_data[1].get('id')for lab_data in response_queryset.items()]
+
+        id_url_dict = dict()
+        entity = EntityUrls.objects.filter(entity_id__in=entity_ids, url_type='PAGEURL', is_valid='t',
+                                           entity_type__iexact='Lab').values('entity_id', 'url')
+        for data in entity:
+            id_url_dict[data['entity_id']] = data['url']
+
+        for resp in response_queryset.items():
+            if id_url_dict.get(resp[1].get('id')):
+                resp[1]['url'] = id_url_dict[resp[1].get('id')]
+            else:
+                resp[1]['url'] = None
+
+        test_ids = parameters.get('ids', [])
+
+        tests = list(LabTest.objects.filter(id__in=test_ids).values('id', 'name', 'hide_price', 'show_details'))
+        seo = None
+        breadcrumb = None
+        location = None
+        if parameters.get('location_json'):
+            locality = ''
+            sublocality = ''
+
+            if parameters.get('location_json') and parameters.get('location_json').get('locality_value'):
+                locality = parameters.get('location_json').get('locality_value')
+
+            if parameters.get('location_json') and parameters.get('location_json').get('sublocality_value'):
+                sublocality = parameters.get('location_json').get('sublocality_value')
+                if sublocality:
+                    sublocality += ' '
+
+            if parameters.get('location_json') and parameters.get('location_json').get('breadcrum_url'):
+                breadcrumb_locality_url = parameters.get('location_json').get('breadcrum_url')
+
+            title = "Diagnostic Centres & Labs "
+            if locality:
+                title += "in " + sublocality + locality
+            title += " | Books Tests"
+            description = "Find best Diagnostic Centres and Labs"
+            if locality:
+                description += " in " + sublocality + locality
+                location = sublocality + locality
+            elif sublocality:
+                location = sublocality
+            description += " and book test online, check fees, packages prices and more at DocPrime."
+            seo = {'title': title, "description": description, "location": location}
+            if sublocality:
+                breadcrumb = [{
+                    'name': locality,
+                    'url': breadcrumb_locality_url
+                },
+                    {
+                        'name': sublocality,
+                        'url': parameters.get('url')
+                    }]
+
+        return Response({"result": result,
+                         "count": count, 'tests': tests,
+                         "seo": seo, 'breadcrumb':breadcrumb})
+
+    def get_lab_search_list(self, parameters):
+        # distance in meters
+
+        DEFAULT_DISTANCE = 20000
+        MAX_SEARCHABLE_DISTANCE = 50000
+
+        default_long = 77.071848
+        default_lat = 28.450367
+        min_distance = parameters.get('min_distance')
+        max_distance = parameters.get('max_distance')*1000 if parameters.get('max_distance') else DEFAULT_DISTANCE
+        max_distance = min(max_distance, MAX_SEARCHABLE_DISTANCE)
+        long = parameters.get('long', default_long)
+        lat = parameters.get('lat', default_lat)
+        ids = parameters.get('ids', [])
+        min_price = parameters.get('min_price',0)
+        max_price = parameters.get('max_price')
+        name = parameters.get('name')
+        network_id = parameters.get("network_id")
+
+        filtering_params = []
+        filtering_params_query1 = []
+        params = {}
+        if not min_distance:
+            min_distance=0
+
+        params['min_distance'] = min_distance
+        params['max_distance'] = max_distance
+
+        if network_id:
+            filtering_params.append("lb.network_id=(%(network_id)s)")
+            params['network_id'] = str(network_id)
+
+            filtering_params_query1.append("network_id=(%(network_id)s)")
+
+
+        if lat is not None and long is not None:
+            params['latitude'] = lat
+            params['longitude'] = long
+
+        if name:
+            search_key = re.findall(r'[a-z0-9A-Z.]+',name)
+            search_key = " ".join(search_key).lower()
+            search_key = "".join(search_key.split("."))
+            filtering_params.append(
+                "lb.name ilike %(name)s")
+            params['name'] = search_key + '%'
+            filtering_params_query1.append(
+                "name ilike %(name)s")
+
+        test_params = []
+
+        if ids:
+            counter = 1
+            if len(ids) > 0:
+                test_str = 'avlt.test_id IN('
+                for id in ids:
+                    if not counter == 1:
+                        test_str += ','
+                    test_str = test_str + '%(' + 'test' + str(counter) + ')s'
+                    params['test' + str(counter)] = id
+                    counter += 1
+                filtering_params.append(
+                    test_str + ')'
+                )
+
+            params['length'] = len(ids)
+        else:
+            params['length']=0
+
+        price=[]
+
+        if min_price:
+            price.append("where price>=(%(min_price)s)")
+            params['min_price'] = min_price
+        if max_price:
+            if not min_price:
+                price.append("where price<=(%(max_price)s)")
+            else:
+                price.append("price<=(%(max_price)s)")
+            params['max_price'] = max_price
+        filtering_result = {}
+        if filtering_params:
+            filtering_result['string'] = " and ".join(filtering_params)
+        if filtering_result.get('string'):
+            filtering_result = 'and ' + filtering_result.get('string')
+        else:
+            filtering_result = ' '
+        filtering_params_query1_result = {}
+        if filtering_params_query1:
+            filtering_params_query1_result['string'] = " and ".join(filtering_params_query1)
+        if filtering_params_query1_result.get('string'):
+            filtering_params_query1_result = 'and ' + filtering_params_query1_result.get('string')
+        else:
+            filtering_params_query1_result = ' '
+
+        test_result={}
+
+        if test_params:
+            test_result['string'] = " and ".join(test_params)
+
+        price_result={}
+        if price:
+            price_result['string'] = " and ".join(price)
+        else:
+            price_result['string'] = 'where price>=0'
+
+        order_by = self.apply_search_sort(parameters)
+
+        if ids:
+            query = ''' select id,network_id, name ,price, count, mrp, pickup_charges, distance, order_priority
+            from ( 
+            select id,network_id, name ,price, count, mrp, pickup_charges, distance, order_priority, 
+                        dense_rank() over(order by network_rank) as new_network_rank from
+                        (
+                        select id,network_id, rank() over(partition by coalesce(network_id,random()) order by order_rank) as rank,
+                         min (order_rank) OVER (PARTITION BY coalesce(network_id,random())) network_rank,
+                         name ,price, count, mrp, pickup_charges, distance, order_priority from
+                        (select id,network_id,  
+                        name ,price, test_count as count, total_mrp as mrp,pickup_charges, distance, 
+                        ROW_NUMBER () OVER (ORDER BY {order} ) order_rank,
+                        max_order_priority as order_priority
+                        from (
+                        select lb.*, sum(mrp) total_mrp, count(*) as test_count,
+                        case when bool_and(home_collection_possible)=True and is_home_collection_enabled=True 
+                        then max(home_pickup_charges) else 0
+                        end as pickup_charges,
+                        sum(case when custom_deal_price is null then computed_deal_price else custom_deal_price end)as price,
+                        max(ST_Distance(location,St_setsrid(St_point((%(longitude)s), (%(latitude)s)), 4326))) as distance,
+                        max(order_priority) as max_order_priority from lab lb inner join available_lab_test avlt on
+                        lb.lab_pricing_group_id = avlt.lab_pricing_group_id 
+                        and lb.is_test_lab = False and lb.is_live = True and lb.lab_pricing_group_id is not null 
+                        and St_dwithin( St_setsrid(St_point((%(longitude)s), (%(latitude)s)), 4326),lb.location, (%(max_distance)s)) 
+                        and St_dwithin(St_setsrid(St_point((%(longitude)s), (%(latitude)s)), 4326), lb.location,  (%(min_distance)s)) = false 
+                        and avlt.enabled = True 
+                        {filtering_params}
+                        inner join lab_test lt on lt.id = avlt.test_id
+                        group by lb.id having count(*)=(%(length)s))a
+                        {price})y )x where rank<=5 )z where new_network_rank<=20
+                         '''.format(filtering_params=filtering_result, price=price_result.get('string'), order=order_by)
+
+            doctor_search_result = RawSql(query, params).fetch_all()
+        else:
+            query1 = '''select id,network_id, name , distance, order_priority from (select id,network_id, name , distance, order_priority, 
+                    dense_rank() over(order by network_rank) as new_network_rank from
+                    (
+                    select id,network_id,rank() over(partition by coalesce(network_id,random()) order by order_rank) as rank,
+                     min (order_rank) OVER (PARTITION BY coalesce(network_id,random())) network_rank,
+                     name , distance, order_priority from
+                    (select id,network_id,  
+                    name , distance, 
+                    ROW_NUMBER () OVER (ORDER BY {order} ) order_rank,
+                    max_order_priority as order_priority
+                    from (
+                    select *,
+                    max(ST_Distance(location,St_setsrid(St_point(77.0333, 28.4667), 4326))) as distance,
+                    max(order_priority) as max_order_priority
+                    from lab where is_test_lab = False and is_live = True and lab_pricing_group_id is not null 
+                    and St_dwithin( St_setsrid(St_point(77.0333, 28.4667), 4326),location, 200000) 
+                    and St_dwithin(St_setsrid(St_point(77.0333, 28.4667), 4326), location, 0) = false
+                    {filtering_params}
+                     group by id)a)y )x where rank<=5)z where new_network_rank<=20'''.format(filtering_params=filtering_params_query1_result, order=order_by)
+            doctor_search_result = RawSql(query1, params).fetch_all()
+
+
+        return doctor_search_result
+
+    def apply_search_sort(self, parameters):
+        order_by = parameters.get("sort_on")
+        if order_by is not None:
+            if order_by == "fees" and parameters.get('ids'):
+                queryset_order_by = ' order_priority desc, price asc , pickup_charges asc, distance asc'
+            elif order_by == 'distance':
+                queryset_order_by = ' order_priority desc, distance asc'
+            elif order_by == 'name':
+                queryset_order_by = ' order_priority desc, name asc'
+            else:
+                queryset_order_by = ' order_priority desc, distance asc'
+        else:
+            queryset_order_by =' order_priority desc, distance asc'
+        return queryset_order_by
+
+    def form_lab_search_whole_data(self, queryset, test_ids=None):
+        ids = [value.get('id') for value in queryset]
+        # ids, id_details = self.extract_lab_ids(queryset)
+        labs = Lab.objects.select_related('network').prefetch_related('lab_documents', 'lab_image', 'lab_timings','home_collection_charges')
+
+        if test_ids:
+            group_queryset = LabPricingGroup.objects.prefetch_related(Prefetch(
+                    "available_lab_tests",
+                    queryset=AvailableLabTest.objects.filter(test_id__in=test_ids).prefetch_related('test'),
+                    to_attr="selected_tests"
+                )).all()
+
+            labs = labs.prefetch_related(
+                Prefetch(
+                    "lab_pricing_group",
+                    queryset=group_queryset,
+                    to_attr="selected_group"
+                )
+            )
+        labs = labs.filter(id__in=ids)
+        # resp_queryset = list()
+        temp_var = dict()
+        tests = dict()
+        lab = dict()
+
+        for obj in labs:
+            temp_var[obj.id] = obj
+            tests[obj.id] = list()
+            if test_ids and obj.selected_group and obj.selected_group.selected_tests:
+                for test in obj.selected_group.selected_tests:
+                    if test.custom_deal_price:
+                        deal_price=test.custom_deal_price
+                    else:
+                        deal_price=test.computed_deal_price
+                    tests[obj.id].append({"id": test.test_id, "name": test.test.name, "deal_price": deal_price, "mrp": test.mrp})
+
+        day_now = timezone.now().weekday()
+        days_array = [i for i in range(7)]
+        rotated_days_array = days_array[day_now:] + days_array[:day_now]
+        lab_network = dict()
+        for row in queryset:
+
+            lab_timing = list()
+            lab_timing_data = list()
+            next_lab_timing_dict = {}
+            next_lab_timing_data_dict = {}
+            data_array = [list() for i in range(7)]
+            lab_obj = temp_var[row["id"]]
+            if lab_obj.sublocality and lab_obj.city:
+                row['address'] = lab_obj.sublocality + ' ' + lab_obj.city
+            elif lab_obj.city:
+                row['address'] =  lab_obj.city
+
+            row['home_pickup_charges'] = lab_obj.home_pickup_charges
+            row['is_home_collection_enabled'] = lab_obj.is_home_collection_enabled
+
+            if lab_obj.always_open:
+                lab_timing = "12:00 AM - 11:45 PM"
+                next_lab_timing_dict = {rotated_days_array[1]: "12:00 AM - 11:45 PM"}
+                lab_timing_data = [{
+                    "start": 0.0,
+                    "end": 23.75
+                }]
+                next_lab_timing_data_dict = {rotated_days_array[1]: {
+                    "start": 0.0,
+                    "end": 23.75
+                }}
+            else:
+                timing_queryset =lab_obj.lab_timings.all()
+
+                for data in timing_queryset:
+                    data_array[data.day].append(data)
+
+                rotated_data_array = data_array[day_now:] + data_array[:day_now]
+
+                for count, timing_data in enumerate(rotated_data_array):
+                    day = rotated_days_array[count]
+                    if count == 0:
+                        if timing_data:
+                            lab_timing, lab_timing_data = self.get_lab_timing(timing_data)
+                            lab_timing_data = sorted(lab_timing_data, key=lambda k: k["start"])
+                    elif timing_data:
+                        next_lab_timing, next_lab_timing_data = self.get_lab_timing(timing_data)
+                        next_lab_timing_data = sorted(next_lab_timing_data, key=lambda k: k["start"])
+                        next_lab_timing_dict[day] = next_lab_timing
+                        next_lab_timing_data_dict[day] = next_lab_timing_data
+                        break
+
+            if lab_obj.home_collection_charges.exists():
+                row["distance_related_charges"] = 1
+            else:
+                row["distance_related_charges"] = 0
+
+            row["lab_timing"] = lab_timing
+            row["lab_timing_data"] = lab_timing_data
+            row["next_lab_timing"] = next_lab_timing_dict
+            row["next_lab_timing_data"] = next_lab_timing_data_dict
+            row["tests"] = tests.get(row["id"])
+
+            if row.get('network_id'):
+                if lab_network.get('network_id' + str(row.get('network_id'))):
+
+                    lab_network['network_id' + str(row.get('network_id'))]['other_labs'].append(row)
+
+                else:
+                    lab_network['network_id' + str(row.get('network_id'))] = row
+                    if not lab_network.get('network_id' + str(row.get('network_id'))).get('other_labs'):
+                        lab_network.get('network_id' + str(row.get('network_id')))['other_labs'] = list()
+
+            else:
+                lab_network['lab_id: '+str(row.get('id'))] = row
+                if not lab_network.get('lab_id: '+str(row.get('id'))).get('other_labs'):
+                    lab_network.get('lab_id: '+str(row.get('id')))['other_labs'] = list()
+            # resp_queryset.append(row)
+
+        return lab_network
+
 
     @transaction.non_atomic_requests
     def retrieve(self, request, lab_id, entity=None):
@@ -822,18 +1238,7 @@ class LabAppointmentView(mixins.CreateModelMixin,
                 home_pickup_charges = data["lab"].home_pickup_charges
             # TODO PM - call coupon function to calculate effective price
 
-        coupon_list = []
-        coupon_discount = 0
-        if data.get("coupon_code"):
-            coupon_obj = Coupon.objects.filter(code__in=set(data.get("coupon_code")))
-            obj = models.LabAppointment()
-            for coupon in coupon_obj:
-                if coupon.is_user_specific and coupon.test.exists():
-                    total_price = obj.get_applicable_tests_with_total_price(coupon_obj=coupon, test_ids=data['test_ids'], lab=data["lab"]).get("total_price")
-                    coupon_discount += obj.get_discount(coupon, total_price)
-                else:
-                    coupon_discount += obj.get_discount(coupon, effective_price)
-                coupon_list.append(coupon.id)
+        coupon_discount, coupon_cashback, coupon_list = Coupon.get_total_deduction(data, effective_price)
 
         if data.get("payment_type") in [doctor_model.OpdAppointment.COD, doctor_model.OpdAppointment.PREPAID]:
             if coupon_discount >= effective_price:
@@ -881,7 +1286,8 @@ class LabAppointmentView(mixins.CreateModelMixin,
             # "lab_test": [x["id"] for x in lab_test_queryset.values("id")],
             "extra_details": extra_details,
             "coupon": coupon_list,
-            "discount": coupon_discount
+            "discount": int(coupon_discount),
+            "cashback": int(coupon_cashback)
         }
         if data.get("is_home_pickup") is True:
             address = Address.objects.filter(pk=data.get("address").id).first()
@@ -928,6 +1334,8 @@ class LabAppointmentView(mixins.CreateModelMixin,
         consumer_account = account_models.ConsumerAccount.objects.get_or_create(user=user)
         consumer_account = account_models.ConsumerAccount.objects.select_for_update().get(user=user)
         balance = consumer_account.balance
+        cashback_balance = consumer_account.cashback
+        total_balance = balance + cashback_balance
         resp = {}
 
         resp['is_agent'] = False
@@ -957,16 +1365,22 @@ class LabAppointmentView(mixins.CreateModelMixin,
 
 
         if ( (appointment_details['payment_type'] == doctor_model.OpdAppointment.PREPAID and
-                balance < appointment_details.get("effective_price")) or resp['is_agent'] ):
+              total_balance < appointment_details.get("effective_price")) or resp['is_agent'] ):
 
-            payable_amount = appointment_details.get("effective_price") - balance
+            payable_amount = max(0, appointment_details.get("effective_price") - total_balance)
+            required_amount = appointment_details.get("effective_price")
+            cashback_amount = min(required_amount, cashback_balance)
+            wallet_amount = 0
+            if cashback_amount < required_amount:
+                wallet_amount = min(balance, required_amount - cashback_amount)
 
             order = account_models.Order.objects.create(
                 product_id=product_id,
                 action=account_models.Order.LAB_APPOINTMENT_CREATE,
                 action_data=appointment_action_data,
                 amount=payable_amount,
-                wallet_amount=balance,
+                wallet_amount=wallet_amount,
+                cashback_amount=cashback_amount,
                 payment_status=account_models.Order.PAYMENT_PENDING
             )
 
@@ -987,8 +1401,11 @@ class LabAppointmentView(mixins.CreateModelMixin,
                 pass
         else:
             wallet_amount = 0
+            cashback_amount = 0
+
             if appointment_details['payment_type'] == models.OpdAppointment.PREPAID:
-                wallet_amount = appointment_details.get("effective_price")
+                cashback_amount = min(cashback_balance, appointment_details.get("effective_price"))
+                wallet_amount = max(0, appointment_details.get("effective_price") - cashback_amount)
 
             order = account_models.Order.objects.create(
                 product_id=product_id,
@@ -996,6 +1413,7 @@ class LabAppointmentView(mixins.CreateModelMixin,
                 action_data=appointment_action_data,
                 amount=0,
                 wallet_amount=wallet_amount,
+                cashback_amount=cashback_amount,
                 payment_status=account_models.Order.PAYMENT_PENDING
             )
 

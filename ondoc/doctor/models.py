@@ -28,7 +28,8 @@ from ondoc.payout import models as payout_model
 from ondoc.notification import models as notification_models
 from ondoc.notification import tasks as notification_tasks
 from django.contrib.contenttypes.fields import GenericRelation
-from ondoc.api.v1.utils import get_start_end_datetime, custom_form_datetime, CouponsMixin
+from ondoc.api.v1.utils import get_start_end_datetime, custom_form_datetime, CouponsMixin, aware_time_zone
+from ondoc.common.models import AppointmentHistory
 from functools import reduce
 from operator import or_
 import logging
@@ -46,7 +47,7 @@ import hashlib
 from django.contrib.contenttypes.fields import GenericRelation
 from django.contrib.contenttypes.fields import GenericForeignKey
 from django.contrib.contenttypes.models import ContentType
-from ondoc.matrix.tasks import push_appointment_to_matrix
+from ondoc.matrix.tasks import push_appointment_to_matrix, push_onboarding_qcstatus_to_matrix
 # from ondoc.procedure.models import Procedure
 from ondoc.ratings_review import models as ratings_models
 from django.utils import timezone
@@ -441,7 +442,24 @@ class Doctor(auth_model.TimeStampedModel, auth_model.QCModel, SearchKey):
 
     def save(self, *args, **kwargs):
         self.update_live_status()
+
+        # On every update of onboarding status or Qcstatus push to matrix
+        push_to_matrix = False
+        if self.id:
+            doctor_obj = Doctor.objects.filter(pk=self.id).first()
+            if doctor_obj and (self.onboarding_status!=doctor_obj.onboarding_status or
+                  self.data_status !=doctor_obj.data_status):
+                # Push to matrix
+                push_to_matrix = True
+
         super(Doctor, self).save(*args, **kwargs)
+
+        transaction.on_commit(lambda: self.app_commit_tasks(push_to_matrix))
+
+    def app_commit_tasks(self, push_to_matrix):
+        if push_to_matrix:
+            push_onboarding_qcstatus_to_matrix.apply_async(({'obj_type': self.__class__.__name__, 'obj_id': self.id}
+                                                            ,), countdown=5)
 
     class Meta:
         db_table = "doctor"
@@ -1103,6 +1121,7 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin):
     rating_declined = models.BooleanField(default=False)
     coupon = models.ManyToManyField(Coupon, blank=True, null=True, related_name="opd_appointment_coupon")
     discount = models.DecimalField(max_digits=10, decimal_places=2, blank=True, null=True)
+    cashback = models.DecimalField(max_digits=10, decimal_places=2, blank=True, null=True)
     cancellation_reason = models.ForeignKey('CancellationReason', on_delete=models.SET_NULL, null=True, blank=True)
     cancellation_comments = models.CharField(max_length=5000, null=True, blank=True)
     rating = GenericRelation(ratings_models.RatingsReview)
@@ -1110,6 +1129,7 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin):
                                         through_fields=('opd_appointment', 'procedure'), null=True, blank=True)
 
     merchant_payout = models.ForeignKey(MerchantPayout, related_name="opd_appointment", on_delete=models.SET_NULL, null=True)
+    price_data = JSONField(blank=True, null=True)
 
     def __str__(self):
         return self.profile.name + " (" + self.doctor.name + ")"
@@ -1250,7 +1270,6 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin):
         return False
 
     def after_commit_tasks(self, old_instance, push_to_matrix):
-        from ondoc.notification.tasks import send_opd_notifications_refactored
         if push_to_matrix:
         # Push the appointment data to the matrix .
             try:
@@ -1261,7 +1280,7 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin):
 
         if self.is_to_send_notification(old_instance):
             try:
-                send_opd_notifications_refactored.apply_async((self.id,), countdown=1)
+                notification_tasks.send_opd_notifications_refactored.apply_async((self.id,), countdown=1)
             except Exception as e:
                 logger.error(str(e))
             # notification_tasks.send_opd_notifications_refactored(self.id)
@@ -1275,6 +1294,16 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin):
             try:
                 notification_tasks.send_opd_rating_message.apply_async(
                     kwargs={'appointment_id': self.id, 'type': 'opd'}, countdown=int(settings.RATING_SMS_NOTIF))
+            except Exception as e:
+                logger.error(str(e))
+
+        if old_instance and old_instance.status != self.ACCEPTED and self.status == self.ACCEPTED:
+            try:
+                notification_tasks.opd_send_otp_before_appointment.apply_async(
+                    (self.id, str(math.floor(self.time_slot_start.timestamp()))),
+                    eta=self.time_slot_start - datetime.timedelta(
+                        minutes=settings.TIME_BEFORE_APPOINTMENT_TO_SEND_OTP), )
+                # notification_tasks.opd_send_otp_before_appointment(self.id, self.time_slot_start)
             except Exception as e:
                 logger.error(str(e))
 
@@ -1302,14 +1331,30 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin):
             kwargs.pop('push_again_to_matrix')
 
         try:
-            # while completing appointment, add a merchant_payout entry
+            # while completing appointment
             if database_instance and database_instance.status != self.status and self.status == self.COMPLETED:
+                # add a merchant_payout entry
                 if self.merchant_payout is None:
                     self.save_merchant_payout()
+
+                # credit cashback if any
+                if self.cashback is not None and self.cashback > 0:
+                    ConsumerAccount.credit_cashback(self.user, self.cashback, database_instance, Order.DOCTOR_PRODUCT_ID)
+
         except Exception as e:
             pass
 
+        # Pushing every status to the Appointment history
+        push_to_history = False
+        if self.id and self.status != OpdAppointment.objects.get(pk=self.id).status:
+            push_to_history = True
+        elif self.id is None:
+            push_to_history = True
+
         super().save(*args, **kwargs)
+
+        if push_to_history:
+            AppointmentHistory.create(content_object=self)
 
         transaction.on_commit(lambda: self.after_commit_tasks(database_instance, push_to_matrix))
 

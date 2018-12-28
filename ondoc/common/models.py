@@ -12,6 +12,12 @@ from django.core.files.storage import FileSystemStorage
 from django.core.files.base import ContentFile
 from django.core.files import File
 from io import BytesIO
+from django.contrib.contenttypes.fields import GenericForeignKey
+from django.contrib.contenttypes.models import ContentType
+from ondoc.authentication.models import TimeStampedModel
+# from ondoc.doctor.models import OpdAppointment
+# from ondoc.diagnostic.models import LabAppointment
+
 
 class Cities(models.Model):
     name = models.CharField(max_length=48, db_index=True)
@@ -67,3 +73,23 @@ class PDFTester(models.Model):
 
     class Meta:
         db_table = 'pdftest'
+
+
+class AppointmentHistory(TimeStampedModel):
+    content_type = models.ForeignKey(ContentType, on_delete=models.DO_NOTHING)
+    object_id = models.PositiveIntegerField()
+    content_object = GenericForeignKey()
+    status = models.PositiveSmallIntegerField(null=False)
+
+    @classmethod
+    def create(cls, *args, **kwargs):
+        obj = kwargs.get('content_object')
+        if not obj:
+            raise Exception('Function accept content_object in **kwargs')
+
+        content_type = ContentType.objects.get_for_model(obj)
+        cls(content_type=content_type, object_id=obj.id, status=obj.status).save()
+
+
+    class Meta:
+        db_table = 'appointment_history'

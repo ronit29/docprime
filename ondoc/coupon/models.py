@@ -7,7 +7,13 @@ class Coupon(auth_model.TimeStampedModel):
     DOCTOR = 1
     LAB = 2
     ALL = 3
+
+    DISCOUNT = 1
+    CASHBACK = 2
+
     TYPE_CHOICES = (("", "Select"), (DOCTOR, "Doctor"), (LAB, "Lab"), (ALL, "All"),)
+    COUPON_TYPE_CHOICES = ((DISCOUNT, "Discount"), (CASHBACK, "Cashback"),)
+
     code = models.CharField(max_length=50)
     min_order_amount = models.DecimalField(max_digits=10, decimal_places=2, blank=True, null=True)
     percentage_discount = models.DecimalField(max_digits=10, decimal_places=2, blank=True, null=True, validators=[MaxValueValidator(100), MinValueValidator(0)])
@@ -29,6 +35,7 @@ class Coupon(auth_model.TimeStampedModel):
     is_corporate = models.BooleanField(default=False)
     is_visible = models.BooleanField(default=True)
     new_user_constraint = models.BooleanField(default=False)
+    coupon_type = models.IntegerField(choices=COUPON_TYPE_CHOICES, default=DISCOUNT)
 
     def save(self, *args, **kwargs):
         if not self.id:
@@ -82,6 +89,49 @@ class Coupon(auth_model.TimeStampedModel):
                                                                LabAppointment.COMPLETED],
                                                    coupon=self).count()
         return count
+
+    @classmethod
+    def get_total_deduction(cls, data, deal_price):
+        from ondoc.doctor.models import OpdAppointment
+        coupon_list = []
+        discount_coupon_list = []
+        cashback_coupon_list = []
+
+        coupon_discount = 0
+        coupon_cashback = 0
+
+        if data.get("coupon_code"):
+            coupon_obj = cls.objects.filter(code__in=set(data.get("coupon_code")))
+            obj = OpdAppointment()
+
+            remaining_deal_price = deal_price
+            for coupon in coupon_obj:
+                if coupon.coupon_type == coupon.CASHBACK:
+                    cashback_coupon_list.append(coupon)
+                elif coupon.coupon_type == coupon.DISCOUNT:
+                    discount_coupon_list.append(coupon)
+
+            for coupon in discount_coupon_list:
+                if remaining_deal_price > 0:
+                    if coupon.is_user_specific and coupon.test.exists() and coupon.type == Coupon.LAB:
+                        curr_discount = obj.get_applicable_tests_with_total_price(coupon_obj=coupon, test_ids=data['test_ids'], lab=data["lab"]).get("total_price")
+                    else:
+                        curr_discount = obj.get_discount(coupon, remaining_deal_price)
+                    coupon_discount += curr_discount
+                    remaining_deal_price -= curr_discount
+                    coupon_list.append(coupon.id)
+
+            for coupon in cashback_coupon_list:
+                if remaining_deal_price > 0:
+                    if coupon.is_user_specific and coupon.test.exists() and coupon.type == Coupon.LAB:
+                        curr_cashback = obj.get_applicable_tests_with_total_price(coupon_obj=coupon, test_ids=data['test_ids'], lab=data["lab"]).get("total_price")
+                    else:
+                        curr_cashback = obj.get_discount(coupon, remaining_deal_price)
+                    coupon_cashback += curr_cashback
+                    remaining_deal_price -= curr_cashback
+                    coupon_list.append(coupon.id)
+
+        return coupon_discount, coupon_cashback, coupon_list
 
     def __str__(self):
         return self.code

@@ -5,6 +5,8 @@ import datetime
 from dateutil.parser import parse
 from dateutil.relativedelta import relativedelta
 from django.http import HttpResponseRedirect
+from django.utils.safestring import mark_safe
+
 from ondoc.account import models as account_models
 from rest_framework.viewsets import GenericViewSet
 from rest_framework.permissions import IsAuthenticated
@@ -18,7 +20,8 @@ from rest_framework.authtoken.models import Token
 from django.db.models import F, Sum, Max, Q, Prefetch, Case, When, Count
 from django.forms.models import model_to_dict
 
-from ondoc.coupon.models import UserSpecificCoupon
+from ondoc.coupon.models import UserSpecificCoupon, Coupon
+from ondoc.lead.models import UserLead
 from ondoc.sms.api import send_otp
 from ondoc.doctor.models import DoctorMobile, Doctor, HospitalNetwork, Hospital, DoctorHospital, DoctorClinic, DoctorClinicTiming
 from ondoc.authentication.models import (OtpVerifications, NotificationEndpoint, Notification, UserProfile,
@@ -1187,11 +1190,12 @@ class UserTransactionViewSet(viewsets.GenericViewSet):
     @transaction.non_atomic_requests
     def list(self, request):
         user = request.user
-        tx_queryset = ConsumerTransaction.objects.filter(user=user)
+        tx_queryset = ConsumerTransaction.objects.filter(user=user).order_by('-id')
         consumer_account = ConsumerAccount.objects.filter(user=user).first()
 
         tx_serializable_data = list()
         consumer_balance = 0
+        consumer_cashback = 0
         if tx_queryset.exists():
             tx_queryset = paginate_queryset(tx_queryset, request)
             tx_serializer = serializers.UserTransactionModelSerializer(tx_queryset, many=True)
@@ -1199,10 +1203,12 @@ class UserTransactionViewSet(viewsets.GenericViewSet):
 
         if consumer_account:
             consumer_balance = consumer_account.balance
+            consumer_cashback = consumer_account.cashback
 
         resp = dict()
         resp["user_transactions"] = tx_serializable_data
         resp["user_wallet_balance"] = consumer_balance
+        resp["consumer_cashback"] = consumer_cashback
         return Response(data=resp)
 
 
@@ -1571,7 +1577,9 @@ class RefreshJSONWebToken(GenericViewSet):
     def refresh(self, request):
         data = {}
         serializer = serializers.RefreshJSONWebTokenSerializer(data=request.data)
-        serializer.is_valid(raise_exception=True)
+        # serializer.is_valid(raise_exception=True)
+        if not serializer.is_valid():
+            return Response({"error": "Cannot Refresh Token"}, status=status.HTTP_401_UNAUTHORIZED)
         data['token'] = serializer.validated_data['token']
         data['payload'] = serializer.validated_data['payload']
         return Response(data)
@@ -1709,3 +1717,24 @@ class DoctorNumberAutocomplete(autocomplete.Select2QuerySetView):
         if self.q:
             qs = qs.filter(name__icontains=self.q).order_by('name')
         return qs
+
+class UserLeadViewSet(GenericViewSet):
+
+    def create(self,request):
+        resp = {}
+        serializer = serializers.UserLeadSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        validated_data = serializer.validated_data
+
+        if validated_data:
+            resp['name'] = validated_data.get('name')
+            resp['message'] = validated_data.get('message')
+            resp['phone_number'] = validated_data.get('phone_number')
+            resp['gender'] = validated_data.get('gender')
+
+            ul_obj = UserLead.objects.create(**resp)
+            resp['status'] = "success"
+
+
+        return Response(resp)
+

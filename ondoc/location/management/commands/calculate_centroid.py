@@ -1,6 +1,7 @@
 from django.core.management.base import BaseCommand
 from django.contrib.gis.geos import GEOSGeometry, LineString, Polygon
 from ondoc.location.models import EntityAddress
+from ondoc.api.v1.utils import RawSql
 
 def new_calculate_centroid(ea):
 
@@ -71,16 +72,44 @@ def new_calculate_centroid(ea):
 #         print(str(e))
 
 
+# class Command(BaseCommand):
+#     def handle(self, **options):
+#         EntityAddress.objects.all().update(centroid=None)
+#         ea_objs = EntityAddress.objects.all().order_by('-order')
+#         if ea_objs:
+#             for ea_obj in ea_objs:
+#                 try:
+#                     new_calculate_centroid(ea_obj)
+#                     print('success: ' + str(ea_obj.value) + '(' + str(ea_obj.id) + ')')
+#                 except Exception as e:
+#                     print(str(e))
+#         else:
+#             print('error: objects not found')
+
 class Command(BaseCommand):
+
     def handle(self, **options):
-        EntityAddress.objects.all().update(centroid=None)
-        ea_objs = EntityAddress.objects.all()
-        if ea_objs:
-            for ea_obj in ea_objs:
-                try:
-                    new_calculate_centroid(ea_obj)
-                    print('success: ' + str(ea_obj.value) + '(' + str(ea_obj.id) + ')')
-                except Exception as e:
-                    print(str(e))
+
+        RawSql("update entity_address set centroid=null", []).execute()
+
+        max_order = RawSql('select max("order") from entity_address', []).fetch_all()
+        if max_order:
+           max_order = max_order[0]['max']
+           print(max_order)
         else:
-            print('error: objects not found')
+            print("error")
+            return 
+
+        #for all addresses with no child
+        RawSql("update entity_address set centroid=abs_centroid where id not in (select parent_id from \
+            entity_address where parent_id is not null)", []).execute()
+
+        current_order = max_order
+        while current_order >=1:
+            print("running for "+str(current_order))
+
+            RawSql("update entity_address ea set centroid = (select ST_Centroid(ST_Union(centroid::geometry)) from entity_address\
+                where parent_id=ea.id and centroid is not null) \
+                where ea.order=%s and (select count(*) from entity_address where parent_id=ea.id and centroid is not null)>0",[current_order]).execute()
+
+            current_order -=1
