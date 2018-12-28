@@ -1,3 +1,4 @@
+from urllib.parse import urlparse
 from rest_framework.views import exception_handler
 from rest_framework import permissions
 from collections import defaultdict
@@ -846,3 +847,10 @@ def create_payout_checksum(all_txn, product_id):
     print("checksum string - " + str(checksum) + "checksum hash - " + str(checksum_hash))
     logger.error("checksum string - " + str(checksum) + "checksum hash - " + str(checksum_hash))
     return checksum_hash
+
+
+def util_absolute_url(url):
+    if bool(urlparse(url).netloc):
+        return url
+    else:
+        return settings.BASE_URL + url

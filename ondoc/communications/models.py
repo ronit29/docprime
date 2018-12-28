@@ -7,6 +7,7 @@ from itertools import groupby
 import pytz
 from hardcopy import bytestring_to_pdf
 
+from ondoc.api.v1.utils import util_absolute_url
 from ondoc.doctor.models import OpdAppointment
 from ondoc.diagnostic.models import LabAppointment
 from django.core.files.uploadedfile import SimpleUploadedFile, TemporaryUploadedFile, InMemoryUploadedFile
@@ -340,6 +341,8 @@ class EMAILNotification:
             except Exception as e:
                 logger.error("Got error while creating pdf for opd invoice {}".format(e))
             context.update({"invoice_url": invoice.file.url})
+            context.update(
+                {"attachments": [{"filename": invoice.file.url, "path": util_absolute_url(invoice.file.url)}]})
             body_template = "email/doctor_invoice/body.html"
             subject_template = "email/doctor_invoice/subject.txt"
 
@@ -399,6 +402,8 @@ class EMAILNotification:
             # except Exception as e:
             #     logger.error("Got error while creating pdf for lab invoice {}".format(e))
             context.update({"invoice_url": invoice.file.url})
+            context.update(
+                {"attachments": [{"filename": invoice.file.url, "path": util_absolute_url(invoice.file.url)}]})
             body_template = "email/lab_invoice/body.html"
             subject_template = "email/lab_invoice/subject.txt"
 
@@ -408,6 +413,8 @@ class EMAILNotification:
         cc = []
         bcc = settings.PROVIDER_EMAIL
         attachments = []
+        if context.get('attachments', None):
+            attachments = context.get('attachments')
         user = receiver.get('user')
         email = receiver.get('email')
         notification_type = self.notification_type
