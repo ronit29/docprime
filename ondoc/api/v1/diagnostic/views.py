@@ -162,7 +162,7 @@ class LabList(viewsets.ReadOnlyModelViewSet):
         lat = validated_data.get('lat')
         point_string = 'POINT(' + str(long) + ' ' + str(lat) + ')'
         pnt = GEOSGeometry(point_string, srid=4326)
-        max_distance = 50000
+        max_distance = 10000
         category_ids = validated_data.get('category_ids', None)
         lab_tests = None
         if not category_ids:
