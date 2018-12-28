@@ -993,6 +993,9 @@ class DoctorListViewSet(viewsets.GenericViewSet):
                     rating = round(random.uniform(3.5, 4.9),1)
                     reviews = random.randint(100, 125)
                     DefaultRating.objects.create(ratings=rating, reviews=reviews, url=url)
+                else:
+                    rating = default_rating_obj.ratings
+                    reviews = default_rating_obj.reviews
 
             elif entity.sitemap_identifier == 'SPECIALIZATION_LOCALITY_CITY':
                 default_rating_obj = DefaultRating.objects.filter(url=url).first()
@@ -1000,6 +1003,9 @@ class DoctorListViewSet(viewsets.GenericViewSet):
                     rating = round(random.uniform(3.5, 4.9), 1)
                     reviews = random.randint(10, 25)
                     DefaultRating.objects.create(ratings=rating, reviews=reviews, url=url)
+                else:
+                    rating = default_rating_obj.ratings
+                    reviews = default_rating_obj.reviews
 
             extras = entity.additional_info
             if extras:
@@ -1085,6 +1091,7 @@ class DoctorListViewSet(viewsets.GenericViewSet):
             locality = ''
             sublocality = ''
             specializations = ''
+            ratings_title = ''
             if validated_data.get('extras') and validated_data.get('extras').get('location_json'):
                 if validated_data.get('extras').get('location_json').get('locality_value'):
                     locality = validated_data.get('extras').get('location_json').get('locality_value')
@@ -1145,6 +1152,7 @@ class DoctorListViewSet(viewsets.GenericViewSet):
                     else:
 
                         description += ': Book best ' + 'Doctor' + ' appointment online ' + 'in '+ locality
+            ratings_title = title
             if specializations:
                 if not sublocality:
                     title += ' - Book Best ' + specializations +' Online'
@@ -1249,7 +1257,7 @@ class DoctorListViewSet(viewsets.GenericViewSet):
                          'specializations': specializations, 'conditions': conditions, "seo": seo,
                          "breadcrumb": breadcrumb, 'search_content': specialization_dynamic_content,
                          'procedures': procedures, 'procedure_categories': procedure_categories,
-                         'ratings':ratings, 'reviews': reviews})
+                         'ratings':ratings, 'reviews': reviews, 'ratings_title': ratings_title})
 
     @transaction.non_atomic_requests
     def search_by_hospital(self, request):
