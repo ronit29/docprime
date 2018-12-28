@@ -2001,8 +2001,8 @@ class OfflineCustomerViewSet(viewsets.GenericViewSet):
         patient = None
         sms_list = []
         resp = []
-        appntment_ids = models.OfflineOPDAppointments.objects.values_list('id', flat=True)
-        patient_ids = models.OfflinePatients.objects.values_list('id', flat=True)
+        appntment_ids = list(models.OfflineOPDAppointments.objects.values_list('id', flat=True))
+        patient_ids = list(models.OfflinePatients.objects.values_list('id', flat=True))
         req_hosp_ids = [data.get('hospital').id if data.get('hospital') else None for data in valid_data.get('data')]
         clinic_queryset = [(dc.doctor.id, dc.hospital.id) for dc in
                            models.DoctorClinic.objects.filter(hospital__id__in=req_hosp_ids)]
@@ -2061,7 +2061,7 @@ class OfflineCustomerViewSet(viewsets.GenericViewSet):
             time_slot_start = data.get('time_slot_start')
             try:
                 appnt = models.OfflineOPDAppointments.objects.create(doctor=data.get('doctor'),
-                                                                     id=data.get('id'),
+                                                                     id=id,
                                                                      hospital=data.get('hospital'),
                                                                      time_slot_start=time_slot_start,
                                                                      booked_by=request.user,
@@ -2079,6 +2079,8 @@ class OfflineCustomerViewSet(viewsets.GenericViewSet):
                 resp.append(obj)
                 logger.error("Fialed Creating Appointment "+ str(e))
                 continue
+            appntment_ids.append(appnt.id)
+            patient_ids.append(patient.id)
             ret_obj = {}
             ret_obj['id'] = appnt.id
             ret_obj['patient_id'] = appnt.user.id
@@ -2448,7 +2450,6 @@ class OfflineCustomerViewSet(viewsets.GenericViewSet):
                 patient_name = app.profile.name if hasattr(app, 'profile') else None
             ret_obj = {}
             ret_obj['id'] = app.id
-            # ret_obj['patient_number'] = phone_number
             ret_obj['deal_price'] = deal_price
             ret_obj['effective_price'] = effective_price
             ret_obj['allowed_action'] = allowed_actions
