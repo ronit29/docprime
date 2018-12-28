@@ -33,9 +33,10 @@ class ListInsuranceViewSet(viewsets.GenericViewSet):
 
     def list(self, request):
         user = request.user
-        user_insurance = UserInsurance.objects.filter(user_id=request.user).last()
-        if user_insurance and user_insurance.is_valid():
-            return Response(data={'certificate': True}, status=status.HTTP_200_OK)
+        if not user.is_anonymous:
+            user_insurance = UserInsurance.objects.filter(user_id=request.user).last()
+            if user_insurance and user_insurance.is_valid():
+                return Response(data={'certificate': True}, status=status.HTTP_200_OK)
 
         insurer_data = self.get_queryset()
         body_serializer = serializers.InsurerSerializer(insurer_data,context={'request': request}, many=True)
