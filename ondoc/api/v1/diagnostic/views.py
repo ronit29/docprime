@@ -566,7 +566,7 @@ class LabList(viewsets.ReadOnlyModelViewSet):
 
         filter_query_string = ""    
         if len(filtering_query)>0:
-            filter_query_string = " where "+" and ".join(filtering_query)
+            filter_query_string = " and "+" and ".join(filtering_query)
         
         group_filter_query_string = ""
 
@@ -632,7 +632,7 @@ class LabList(viewsets.ReadOnlyModelViewSet):
                         and St_dwithin( St_setsrid(St_point((%(longitude)s), (%(latitude)s)), 4326),lb.location, (%(max_distance)s)) 
                         and St_dwithin(St_setsrid(St_point((%(longitude)s), (%(latitude)s)), 4326), lb.location,  (%(min_distance)s)) = false 
                         and avlt.enabled = True 
-                        inner join lab_test lt on lt.id = avlt.test_id {filter_query_string}
+                        inner join lab_test lt on lt.id = avlt.test_id where 1=1 {filter_query_string}
 
                         group by lb.id having count(*)=(%(length)s))a
                         {group_filter_query_string})y )x where rank<=5 )z 

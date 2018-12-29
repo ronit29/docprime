@@ -850,6 +850,10 @@ class AvailableLabTest(TimeStampedModel):
     class Meta:
         unique_together = (("test", "lab_pricing_group"))
         db_table = "available_lab_test"
+        indexes = [
+            models.Index(fields=['test_id', 'lab_pricing_group_id']),
+        ]
+
 
 @reversion.register()
 class LabAppointment(TimeStampedModel, CouponsMixin):
