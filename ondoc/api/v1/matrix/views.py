@@ -14,6 +14,7 @@ from django.conf import settings
 
 
 class MaskNumberViewSet(viewsets.GenericViewSet):
+    serializer_class = NumberMaskSerializer
 
     def mask_number(self, request):
         serializer = NumberMaskSerializer(data=request.data)
