@@ -96,7 +96,6 @@ class DoctorAppointmentsViewSet(OndocViewSet):
     serializer_class = serializers.OpdAppointmentSerializer
 
     def get_queryset(self):
-
         return None
 
     def get_pem_queryset(self, user):
@@ -324,7 +323,6 @@ class DoctorAppointmentsViewSet(OndocViewSet):
 
     @transaction.atomic
     def create_order(self, request, appointment_details, product_id):
-
         remaining_amount = 0
         user = request.user
         consumer_account = account_models.ConsumerAccount.objects.get_or_create(user=user)
@@ -2503,6 +2501,9 @@ class HospitalNetworkListViewset(viewsets.GenericViewSet):
 
 
 class AppointmentMessageViewset(viewsets.GenericViewSet):
+
+    authentication_classes = (JWTAuthentication,)
+    permission_classes = (IsAuthenticated, IsDoctor)
 
     def send_message(self, request):
         serializer = serializers.AppointmentMessageSerializer(data=request.data)
