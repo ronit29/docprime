@@ -46,7 +46,7 @@ class GoogleSearchEntry(TimeStampedModel):
     place_id = models.TextField()
     place_result = JSONField()
     doctor_details = JSONField()
-    place_search = models.ManyToManyField('GoogleSearches', through='GoogleResult',
+    place_search = models.ManyToManyField(GoogleSearches, through='GoogleResult',
                                           through_fields=('place_entry','search_results'),
                                           related_name='assoc_search_results',
                                           )

@@ -933,6 +933,7 @@ class SearchedDoctorDataViewSet(viewsets.GenericViewSet):
     def get_custom_queryset(self, search_keywords):
         return GoogleSearches.objects.filter(search_keywords=search_keywords).first()
 
+
     def searched_google_data(self, request, search_keywords):
         google_data = self.get_custom_queryset(search_keywords)
         google_result = []
@@ -944,9 +945,12 @@ class SearchedDoctorDataViewSet(viewsets.GenericViewSet):
                     'https://maps.googleapis.com/maps/api/place/textsearch/json',
                     params={'query':search_keywords,'key': settings.REVERSE_GEOCODING_API_KEY})
             if response.status_code != status.HTTP_200_OK or not response.ok:
-                print ('failure  status_code: ' + str(response.status_code) + ', reason: ' + str(response.reason))
+                return Response('failure  status_code: ' + str(response.status_code) + ', reason: ' + str(response.reason))
             else:
                 searched_data = response.json()
+                if isinstance(searched_data.get('results'), list) and \
+                        len(searched_data.get('results')) == 0:
+                    return Response('OVER_QUERY_LIMIT')
                 if searched_data.get('results'):
                     for data in searched_data.get('results'):
                         google_result.append(data)
@@ -962,10 +966,13 @@ class SearchedDoctorDataViewSet(viewsets.GenericViewSet):
                                         'key': settings.REVERSE_GEOCODING_API_KEY})
 
                             if next_page_response.status_code != status.HTTP_200_OK or not response.ok:
-                                print('failure  status_code: ' + str(response.status_code) + ', reason: ' + str(
+                                return Response('failure  status_code: ' + str(response.status_code) + ', reason: ' + str(
                                     response.reason))
                             else:
                                 next_page_searched_data = next_page_response.json()
+                                if isinstance(next_page_searched_data.get('results'), list) and \
+                                        len(next_page_searched_data.get('results')) == 0:
+                                    return Response('OVER_QUERY_LIMIT')
                                 if next_page_searched_data.get('results'):
                                     for data in next_page_searched_data.get('results'):
                                         google_result.append(data)
@@ -979,6 +986,7 @@ class SearchedDoctorDataViewSet(viewsets.GenericViewSet):
                 if create_google_search_record:
                     id = create_google_search_record.id
                     results = create_google_search_record.results
+                    place_entry_list = list()
                     for data in results:
                         place_id = data.get('place_id')
                         if place_id:
@@ -991,10 +999,13 @@ class SearchedDoctorDataViewSet(viewsets.GenericViewSet):
                                 place_response = requests.get('https://maps.googleapis.com/maps/api/place/details/json',
                                                   params={'place_id': place_id, 'key': settings.REVERSE_GEOCODING_API_KEY})
                                 if place_response.status_code != status.HTTP_200_OK or not response.ok:
-                                    print('failure  status_code: ' + str(response.status_code) + ', reason: ' + str(
+                                    return Response('failure  status_code: ' + str(response.status_code) + ', reason: ' + str(
                                         response.reason))
                                 else:
                                     place_searched_data = place_response.json()
+                                    if place_searched_data.get('status') == 'OVER_QUERY_LIMIT':
+                                        create_google_search_record.delete()
+                                        return Response('OVER_QUERY_LIMIT')
 
                                     doctor_details = dict()
                                     doctor_details['name'] = data.get('name')
@@ -1012,11 +1023,18 @@ class SearchedDoctorDataViewSet(viewsets.GenericViewSet):
                                                 if 'POSTAL_CODE' in types:
                                                     doctor_details['pin_code'] = address.get('long_name')
                                     searched_result.append(doctor_details)
-                                    create_google_search_entry = GoogleSearchEntry.objects.create(place_id=place_id, place_result=place_searched_data,
-                                                                                              doctor_details=doctor_details)
+                                    place_entry_list.append({'place_id':place_id,
+                                                            'place_result':place_searched_data,
+                                                            'doctor_details':doctor_details})
+                    with transaction.atomic():
+                        for place in place_entry_list:
+                            create_google_search_entry = GoogleSearchEntry.objects.create(place_id=place.get('place_id'),
+                                                         place_result=place.get('place_result'), doctor_details=place.get('doctor_details'))
+                            create_google_result = GoogleResult.objects.create(place_entry=create_google_search_entry,
+                                                                                           search_results=create_google_search_record)
         else:
-            searched_details = GoogleSearchEntry.objects.filter(google_search_details=google_data.id)
+            searched_details = GoogleResult.objects.filter(search_results=google_data)
             for data in searched_details:
-                searched_result.append(data.get('doctor_details'))
+                searched_result.append(data.place_entry.doctor_details)
 
         return Response(searched_result)
