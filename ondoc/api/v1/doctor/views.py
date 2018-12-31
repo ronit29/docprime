@@ -1288,15 +1288,15 @@ class DoctorListViewSet(viewsets.GenericViewSet):
 
         doctor_ids = [data.get("doctor_id") for data in doctor_search_result]
         #preserved = Case(*[When(pk=pk, then=pos) for pos, pk in enumerate(doctor_ids)])
-        doctor_data = models.Doctor.objects.filter(
-            id__in=doctor_ids).prefetch_related("hospitals", "doctor_clinics", "doctor_clinics__availability",
-                                                "doctor_clinics__hospital",
-                                                "doctorpracticespecializations",
-                                                "doctorpracticespecializations__specialization",
-                                                "images",
-                                                "doctor_clinics__doctorclinicprocedure_set__procedure__parent_categories_mapping")
+        # doctor_data = models.Doctor.objects.filter(
+        #     id__in=doctor_ids).prefetch_related("hospitals", "doctor_clinics", "doctor_clinics__availability",
+        #                                         "doctor_clinics__hospital",
+        #                                         "doctorpracticespecializations",
+        #                                         "doctorpracticespecializations__specialization",
+        #                                         "images",
+        #                                         "doctor_clinics__doctorclinicprocedure_set__procedure__parent_categories_mapping")
 
-        result = doctor_search_helper.prepare_search_response(doctor_data, doctor_search_result, doctor_ids, request)
+        result = doctor_search_helper.prepare_search_response(doctor_search_result, doctor_ids, request)
 
         # from collections import Counter
         # for hosp in response.items():
