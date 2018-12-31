@@ -296,7 +296,7 @@ def send_offline_welcome_message(number):
         logger.error("Error sending welcome message - "+ str(e))
 
 @task
-def send_offline_appointment_reminder_message(number, doctor, date):
+def send_appointment_reminder_message(number, doctor, date):
     data = {}
     data['phone_number'] = number
     text = '''You have an upcomming Appointment with Dr. %s scheduled on %s''' % (doctor, date)
