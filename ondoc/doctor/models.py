@@ -29,6 +29,7 @@ from ondoc.notification import models as notification_models
 from ondoc.notification import tasks as notification_tasks
 from django.contrib.contenttypes.fields import GenericRelation
 from ondoc.api.v1.utils import get_start_end_datetime, custom_form_datetime, CouponsMixin, aware_time_zone
+from ondoc.common.models import AppointmentHistory
 from functools import reduce
 from operator import or_
 import logging
@@ -1338,7 +1339,17 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin):
         except Exception as e:
             pass
 
+        # Pushing every status to the Appointment history
+        push_to_history = False
+        if self.id and self.status != OpdAppointment.objects.get(pk=self.id).status:
+            push_to_history = True
+        elif self.id is None:
+            push_to_history = True
+
         super().save(*args, **kwargs)
+
+        if push_to_history:
+            AppointmentHistory.create(content_object=self)
 
         transaction.on_commit(lambda: self.after_commit_tasks(database_instance, push_to_matrix))
 
