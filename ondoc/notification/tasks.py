@@ -303,7 +303,6 @@ def send_appointment_reminder_message(number, doctor, date):
     data['text'] = mark_safe(text)
     try:
         notification_models.SmsNotification.send_rating_link(data)
-        logger.error("Successfully Sent Reminder message")
     except Exception as e:
         logger.error("Error sending Reminder message - " + str(e))
 
@@ -317,7 +316,6 @@ def send_appointment_location_message(number, hospital_lat, hospital_long):
     data['text'] = mark_safe(text)
     try:
         notification_models.SmsNotification.send_rating_link(data)
-        logger.error("Successfully Sent Reminder message")
     except Exception as e:
         logger.error("Error sending Location message - " + str(e))
 
