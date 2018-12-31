@@ -2522,7 +2522,7 @@ class AppointmentMessageViewset(viewsets.GenericViewSet):
         if data.get('type') == serializers.AppointmentMessageSerializer.REMINDER:
             if phone_number:
                 try:
-                    notification_tasks.send_offline_appointment_reminder_message.apply_async(
+                    notification_tasks.send_appointment_reminder_message.apply_async(
                         kwargs={'number': phone_number,
                                 'doctor': appnt.doctor.name,
                                 'date': appnt.time_slot_start.strftime("%B %d, %Y")},
