@@ -2187,9 +2187,7 @@ class OfflineCustomerViewSet(viewsets.GenericViewSet):
                         if data.get('status') and data.get('status') not in [models.OfflineOPDAppointments.NO_SHOW,
                                                                              models.OfflineOPDAppointments.RESCHEDULED_DOCTOR,
                                                                              models.OfflineOPDAppointments.CANCELLED,
-                                                                             models.OfflineOPDAppointments.ACCEPTED,
-                                                                             models.OfflineOPDAppointments.REMINDER,
-                                                                             models.OfflineOPDAppointments.SEND_MAP_LINK]:
+                                                                             models.OfflineOPDAppointments.ACCEPTED]:
                             obj = self.get_error_obj(data)
                             obj['error_message'] = 'Invalid Appointment Status Recieved!'
                             obj.update(self.get_offline_response_obj(appnt, request))
@@ -2202,50 +2200,6 @@ class OfflineCustomerViewSet(viewsets.GenericViewSet):
                             def_number = patient.patient_mobiles.filter(is_default=True).first()
                             if def_number:
                                 sms_list.append(def_number.phone_number)
-                        if data.get('status') == models.OfflineOPDAppointments.REMINDER:
-                            obj = {'id': appnt.id,
-                                   'patient_id': appnt.user.id, 'error_message': '',
-                                   'error': False}
-                            if def_number:
-                                try:
-                                    notification_tasks.send_offline_appointment_reminder_message.apply_async(kwargs={'number': def_number.phone_number,
-                                                                                                                     'doctor': appnt.doctor.name,
-                                                                                                                     'date': appnt.time_slot_start.strftime("%B %d, %Y")},
-                                                                                                             countdown=1)
-
-                                except Exception as e:
-                                    obj['error'] = True
-                                    obj['error_message'] = 'Error Sending Appointment Reminder Message!'
-                                    logger.error("Error Sending Appointment Reminder Message " + str(e))
-                            else:
-                                obj['error'] = True
-                                obj['error_message'] = 'No Default Number'
-                            obj.update(self.get_offline_response_obj(appnt, request))
-                            resp.append(obj)
-                            break
-                        if data.get('status') == models.OfflineOPDAppointments.SEND_MAP_LINK:
-                            obj = {'id': appnt.id,
-                                   'patient_id': appnt.user.id, 'error_message': '',
-                                   'error': False}
-                            if def_number:
-                                try:
-                                    notification_tasks.send_appointment_location_message.apply_async(
-                                        kwargs={'number': def_number.phone_number,
-                                                'hospital_lat': appnt.hospital.location.y,
-                                                'hospital_long': appnt.hospital.location.x,
-                                                },
-                                        countdown=1)
-
-                                except Exception as e:
-                                    obj['error'] = True
-                                    obj['error_message'] = 'Error Sending Appointment Reminder Message!'
-                                    logger.error("Error Sending Appointment Reminder Message " + str(e))
-                            else:
-                                obj['error'] = True
-                                obj['error_message'] = 'No Default Number'
-                            obj.update(self.get_offline_response_obj(appnt, request))
-                            resp.append(obj)
-                            break
 
                         appnt.doctor = data.get('doctor')
                         appnt.hospital = data.get('hospital')
@@ -2546,3 +2500,60 @@ class HospitalNetworkListViewset(viewsets.GenericViewSet):
                     resp1 = {"network_name": network_name, "hospitals": info}
 
         return Response(resp1)
+
+
+class AppointmentMessageViewset(viewsets.GenericViewSet):
+
+    def send_message(self, request):
+        serializer = serializers.AppointmentMessageSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        data = serializer.validated_data
+        appnt = data.get('appointment')
+        patient = appnt.user
+        obj = {"error": False}
+        phone_number = None
+        if not data.get('is_docprime'):
+            if patient.sms_notification:
+                def_number = patient.patient_mobiles.filter(is_default=True).first()
+                if def_number:
+                    phone_number = def_number.phone_number
+        else:
+            phone_number = patient.phone_number
+        if data.get('type') == serializers.AppointmentMessageSerializer.REMINDER:
+            if phone_number:
+                try:
+                    notification_tasks.send_offline_appointment_reminder_message.apply_async(
+                        kwargs={'number': phone_number,
+                                'doctor': appnt.doctor.name,
+                                'date': appnt.time_slot_start.strftime("%B %d, %Y")},
+                        countdown=1)
+
+                except Exception as e:
+                    obj['error'] = True
+                    obj['message'] = 'Error Sending Appointment Reminder Message!'
+                    logger.error("Error Sending Appointment Reminder Message " + str(e))
+            else:
+                obj['error'] = True
+                obj['message'] = 'No Default Number'
+                return Response(obj, status=status.HTTP_400_BAD_REQUEST)
+        if data.get('type') == models.OfflineOPDAppointments.SEND_MAP_LINK:
+            if phone_number:
+                try:
+                    notification_tasks.send_appointment_location_message.apply_async(
+                        kwargs={'number': phone_number,
+                                'hospital_lat': appnt.hospital.location.y,
+                                'hospital_long': appnt.hospital.location.x,
+                                },
+                        countdown=1)
+
+                except Exception as e:
+                    obj['error'] = True
+                    obj['message'] = 'Error Sending Appointment Reminder Message!'
+                    logger.error("Error Sending Appointment Reminder Message " + str(e))
+            else:
+                obj['error'] = True
+                obj['message'] = 'No Default Number'
+                return Response(obj, status=status.HTTP_400_BAD_REQUEST)
+        if not 'message' in obj:
+            obj['message'] = "Message Sent Successfully"
+        return Response(obj)
