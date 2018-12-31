@@ -302,7 +302,7 @@ def send_appointment_reminder_message(number, doctor, date):
     text = '''You have an upcomming Appointment with Dr. %s scheduled on %s''' % (doctor, date)
     data['text'] = mark_safe(text)
     try:
-        notification_models.SmsNotification.send_rating_link(data)
+            notification_models.SmsNotification.send_rating_link(data)
     except Exception as e:
         logger.error("Error sending welcome message - " + str(e))
 

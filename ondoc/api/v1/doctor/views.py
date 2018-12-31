@@ -2536,8 +2536,8 @@ class AppointmentMessageViewset(viewsets.GenericViewSet):
                 obj['error'] = True
                 obj['message'] = 'No Default Number'
                 return Response(obj, status=status.HTTP_400_BAD_REQUEST)
-        if data.get('type') == models.OfflineOPDAppointments.SEND_MAP_LINK:
-            if phone_number:
+        if data.get('type') == serializers.AppointmentMessageSerializer.DIRECTIONS:
+            if phone_number and appnt.hospital.location:
                 try:
                     notification_tasks.send_appointment_location_message.apply_async(
                         kwargs={'number': phone_number,
@@ -2552,7 +2552,7 @@ class AppointmentMessageViewset(viewsets.GenericViewSet):
                     logger.error("Error Sending Appointment Reminder Message " + str(e))
             else:
                 obj['error'] = True
-                obj['message'] = 'No Default Number'
+                obj['message'] = 'No PhoneNumber/HospitaLocation Found'
                 return Response(obj, status=status.HTTP_400_BAD_REQUEST)
         if not 'message' in obj:
             obj['message'] = "Message Sent Successfully"
