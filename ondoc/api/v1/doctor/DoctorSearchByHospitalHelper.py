@@ -388,7 +388,7 @@ class DoctorSearchByHospitalHelper:
                 # return doctor_hospital.deal_price
         return None
 
-    def prepare_search_response(self, doctor_data, doctor_search_result, doctor_ids, request):
+    def prepare_search_response(self, doctor_search_result, doctor_ids, request):
         entity_ids = doctor_ids
 
         id_url_dict = dict()
