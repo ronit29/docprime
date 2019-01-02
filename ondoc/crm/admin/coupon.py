@@ -17,9 +17,9 @@ class LabNetworkAutocomplete(autocomplete.Select2QuerySetView):
         if not self.request.user.is_authenticated:
             return LabNetwork.objects.none()
         queryset = LabNetwork.objects.all()
-        lab = self.forwarded.get('lab', default=None)
-        test = self.forwarded.get('test', default=[])
-        test_categories = self.forwarded.get('test_categories', default=[])
+        lab = self.forwarded.get('lab', None)
+        test = self.forwarded.get('test', [])
+        test_categories = self.forwarded.get('test_categories',[])
 
         if self.q:
             queryset = queryset.filter(name__istartswith=self.q)
@@ -40,8 +40,8 @@ class LabAutocomplete(autocomplete.Select2QuerySetView):
             return Lab.objects.none()
         queryset = Lab.objects.all()
         lab_network = self.forwarded.get('lab_network', None)
-        test = self.forwarded.get('test', default=[])
-        test_categories = self.forwarded.get('test_categories', default=[])
+        test = self.forwarded.get('test', [])
+        test_categories = self.forwarded.get('test_categories', [])
         if lab_network:
             queryset = queryset.filter(network=lab_network)
         if test:
@@ -60,7 +60,7 @@ class TestAutocomplete(autocomplete.Select2QuerySetView):
             return LabTest.objects.none()
         lab_network = self.forwarded.get('lab_network', None)
         lab = self.forwarded.get('lab', None)
-        test_categories = self.forwarded.get('test_categories', default=[])
+        test_categories = self.forwarded.get('test_categories', [])
         queryset = LabTest.objects.all()
 
         if self.q:
@@ -81,9 +81,9 @@ class TestCategoriesAutocomplete(autocomplete.Select2QuerySetView):
     def get_queryset(self):
         if not self.request.user.is_authenticated:
             return LabTestCategory.objects.none()
-        lab_network = self.forwarded.get('lab_network', default=None)
-        lab = self.forwarded.get('lab', default=None)
-        test = self.forwarded.get('test', default=[])
+        lab_network = self.forwarded.get('lab_network', None)
+        lab = self.forwarded.get('lab', None)
+        test = self.forwarded.get('test', [])
         queryset = LabTestCategory.objects.all()
 
         if self.q:
