@@ -4,7 +4,6 @@ from django.contrib.contenttypes.models import ContentType
 import logging
 from .service import get_meta_by_latlong
 import logging
-logger = logging.getLogger(__name__)
 import json
 from decimal import Decimal
 from ondoc.doctor import models as doc_models
@@ -23,7 +22,11 @@ from django.db import transaction
 from collections import OrderedDict
 import re
 from django.contrib.postgres.fields import ArrayField
+from django.db.models import Prefetch
+from django.db import transaction
 
+
+logger = logging.getLogger(__name__)
 
 def split_and_append(initial_str, spliter, appender):
     value_chunks = initial_str.split(spliter)
@@ -144,7 +147,8 @@ class EntityAddress(TimeStampedModel):
 
     type_blueprint = models.CharField(max_length=128, blank=False, null=True)
     postal_code = models.PositiveIntegerField(null=True)
-    parent = models.IntegerField(null=True)
+    #parent = models.IntegerField(null=True)
+    parent = models.ForeignKey('self', on_delete=models.CASCADE, null=True, db_constraint=False)
     centroid = models.PointField(geography=True, srid=4326, blank=True, null=True)
     abs_centroid = models.PointField(geography=True, srid=4326, blank=True, null=True)
     #geocoding = models.ForeignKey(GeocodingResults, null=True, on_delete=models.DO_NOTHING)
@@ -327,7 +331,7 @@ class EntityAddress(TimeStampedModel):
                 #print(use_in_url)
 
                 entity_address = EntityAddress(type=selected_type, abs_centroid=point, postal_code=postal_code,
-                                                   type_blueprint=type_blueprint, value=long_name, parent=parent_id,
+                                                   type_blueprint=type_blueprint, value=long_name, parent=parent_entity,
                                                    alternative_value=alternative_name,
                                                    order=order, use_in_url=use_in_url,
                                                    address=address, components = components,
@@ -704,7 +708,7 @@ class EntityUrls(TimeStampedModel):
                     from hospital h inner join entity_address ea on ST_DWithin(ea.centroid,h.location,500) and h.is_live=true
                     and ea.type IN ('SUBLOCALITY' , 'LOCALITY') and ea.use_in_url=true inner join doctor_clinic dc on dc.hospital_id = h.id
                     inner join doctor d on dc.doctor_id= d.id
-                    and d.is_live=true left join entity_address eaparent on ea.parent=eaparent.id and eaparent.use_in_url=true
+                    and d.is_live=true left join entity_address eaparent on ea.parent_id=eaparent.id and eaparent.use_in_url=true
                     group by ea.id, eaparent.id having count(*) >= 3''' % sequence
         create_temp_table = RawSql(create_temp_table_query, []).execute()
 
@@ -782,7 +786,7 @@ class EntityUrls(TimeStampedModel):
                     inner join doctor d on dc.doctor_id= d.id
                     inner join doctor_practice_specialization dps on dps.doctor_id = d.id and d.is_live=true
                     inner join practice_specialization ps on ps.id = dps.specialization_id 
-                    left join entity_address eaparent on ea.parent=eaparent.id and eaparent.use_in_url=true
+                    left join entity_address eaparent on ea.parent_id=eaparent.id and eaparent.use_in_url=true
                     group by ps.id, ea.id, eaparent.id having count(*) >= 3 
                 ''' % sequence
 
@@ -931,7 +935,7 @@ class EntityUrls(TimeStampedModel):
             end as url
             from
             (select * from 
-            (select ea.id location_id,ea.alternative_value location_name, ea.type,ea.parent,ps.id specialization_id,ps.name specialization_name,
+            (select ea.id location_id,ea.alternative_value location_name, ea.type,ea.parent_id,ps.id specialization_id,ps.name specialization_name,
             st_x(centroid::geometry) as longitude, st_y(centroid::geometry) as latitude
             ,count(*) count from entity_address ea
             inner join hospital h on h.is_live=true
@@ -945,7 +949,7 @@ class EntityUrls(TimeStampedModel):
             inner join practice_specialization ps on ps.id = dps.specialization_id
             where type_blueprint in ('LOCALITY','SUBLOCALITY')
             group by ea.id,ps.id)x where count>=3)y
-            left join entity_address ea on y.parent=ea.id 
+            left join entity_address ea on y.parent_id=ea.id 
             ) as data												 
             )x where rnum=1 and x.url ~* 'y*?(^[A-Za-z0-9-]+$)' ''' % (sequence)
 
@@ -1041,7 +1045,7 @@ class EntityUrls(TimeStampedModel):
             end as url
             from
             (select * from
-            (select ea.id location_id,ea.alternative_value location_name, ea.type,ea.parent,
+            (select ea.id location_id,ea.alternative_value location_name, ea.type,ea.parent_id,
             st_x(centroid::geometry) as longitude, st_y(centroid::geometry) as latitude
             ,count(*) count from entity_address ea
             inner join hospital h on h.is_live=true
@@ -1053,7 +1057,7 @@ class EntityUrls(TimeStampedModel):
             inner join doctor d on dc.doctor_id = d.id and d.is_live=true
             where type_blueprint in ('LOCALITY','SUBLOCALITY')
             group by ea.id)x where count>=3)y
-            left join entity_address ea on y.parent=ea.id
+            left join entity_address ea on y.parent_id=ea.id
             ) as data
             )x where rnum=1 and x.url ~* 'y*?(^[A-Za-z0-9-]+$)' ''' % (sequence)
 
@@ -1163,7 +1167,7 @@ class EntityUrls(TimeStampedModel):
                        end as url
                        from
                        (select * from 
-                       (select ea.id location_id,ea.alternative_value location_name, ea.type,ea.parent,
+                       (select ea.id location_id,ea.alternative_value location_name, ea.type,ea.parent_id,
                        st_x(centroid::geometry) as longitude, st_y(centroid::geometry) as latitude
                        ,count(*) count from entity_address ea
                        inner join lab l on l.is_live=true 
@@ -1173,7 +1177,7 @@ class EntityUrls(TimeStampedModel):
                        )
                        where type_blueprint in ('LOCALITY','SUBLOCALITY')
                        group by ea.id)x where count>=3)y
-                       left join entity_address ea on y.parent=ea.id 
+                       left join entity_address ea on y.parent_id=ea.id 
                        ) as data 
                        ) x where rnum=1 and x.url ~* 'y*?(^[A-Za-z0-9-]+$)' 
                        ''' % (sequence)
@@ -1397,8 +1401,8 @@ class EntityUrlsHelper(object):
             sublocality_id = location.location_id
             sublocality_latitude = ea_sublocality.centroid.y
             sublocality_longitude = ea_sublocality.centroid.x
-            ea_locality = EntityAddress.objects.get(id=ea_sublocality.parent, type='LOCALITY')
-            locality_id = ea_sublocality.parent
+            ea_locality = EntityAddress.objects.get(id=ea_sublocality.parent_id, type='LOCALITY')
+            locality_id = ea_sublocality.parent_id
             locality_latitude = ea_locality.centroid.y
             locality_longitude = ea_locality.centroid.x
             locality_value = ea_locality.alternative_value
@@ -1621,7 +1625,7 @@ class LabPageUrl(object):
                     if sublocality.centroid:
                         sublocality_longitude = sublocality.centroid.x
                         sublocality_latitude = sublocality.centroid.y
-                    locality = EntityAddress.objects.filter(id=sublocality.parent).first()
+                    locality = EntityAddress.objects.filter(id=sublocality.parent_id).first()
                     if locality:
                         locality_value = locality.alternative_value
                         locality_id = locality.id
@@ -1802,172 +1806,260 @@ class DoctorPageURL(object):
             EntityUrls.objects.filter(entity_id=self.doctor.id, sitemap_identifier=EntityUrls.SitemapIdentifier.DOCTOR_PAGE, url=url).delete()
             EntityUrls.objects.create(**data)
 
-    def create_doctor_page_urls(doctor, sequence):
-        locality_value = None
-        locality_id = None
-        locality_latitude = None
-        locality_longitude = None
-        sublocality_value = None
-        sublocality_id = None
-        sublocality_longitude = None
-        sublocality_latitude = None
-        sequence = sequence
-        doc_sublocality = None
-        doc_locality = None
-        hospital = None
 
-        practice_specializations = doctor.doctorpracticespecializations.all()
-        sp_dict = dict()
-        for sp in practice_specializations:
-            sp_dict[sp.specialization_id] = sp.specialization.name
-        sp_dict = OrderedDict(sorted(sp_dict.items()))
-        specializations = list(sp_dict.values())
-        specialization_ids = list(sp_dict.keys())
+    def create_doctor_page_urls():
 
-        all_hospitals = doctor.hospitals.all()
-        for hosp in all_hospitals:
-            if hosp.is_live:
-                hospital = hosp
-            break
+        from ondoc.doctor.models import Doctor, DoctorPracticeSpecialization, Hospital, PracticeSpecialization
+
+        query = '''select nextval('entity_url_version_seq') as inc'''
+        seq = RawSql(query,[]).fetch_all()
+
+        sequence = seq[0]['inc']
+
+        cache = PageUrlCache(EntityUrls.SitemapIdentifier.DOCTOR_PAGE)
+        #to_disable = []
+        to_delete = []
+        to_create = []
+
+        doc_obj =Doctor.objects.prefetch_related('doctorpracticespecializations', 'doctorpracticespecializations__specialization',
+                                    (Prefetch('hospitals', queryset=Hospital.objects.filter(is_live=True).order_by('hospital_type', 'id')))
+                                    ).prefetch_related('hospitals__entity','hospitals__entity__location','hospitals__entity__location__parent').filter(is_live=True, is_test_doctor=False).order_by('id')
 
 
-        #print('attempting for doctor '+str(doctor.id))
-        # if doctor.hospitals.all():
-        #     hospital = doctor.hospitals.all()[0]
-        #     if hospital.is_live:
-                # doc_sublocality = hospital.entity.filter(type="SUBLOCALITY").first()
-        if not hospital:
-            print('hospital not found')
+        for doctor in doc_obj:
+            #status = DoctorPageURL.create_doctor_page_urls(doctor,sequence)
 
-        if hospital:
-            entity_location_relation = hospital.entity.all()
-            print('mapped entities for hospital'+str(hospital.id)+'='+str(len(entity_location_relation)))
-            for obj in entity_location_relation:
-                #print('location mapped')
+            locality_value = None
+            locality_id = None
+            locality_latitude = None
+            locality_longitude = None
+            sublocality_value = None
+            sublocality_id = None
+            sublocality_longitude = None
+            sublocality_latitude = None
+            sequence = sequence
+            doc_sublocality = None
+            doc_locality = None
+            hospital = None
 
-                if not doc_sublocality and obj.location.use_in_url:
-                    if obj.location.type =='SUBLOCALITY':
-                        doc_sublocality = obj.location
-                        #print('sublocality found')
+            practice_specializations = doctor.doctorpracticespecializations.all()
+            sp_dict = dict()
+            for sp in practice_specializations:
+                sp_dict[sp.specialization_id] = sp.specialization.name
+            sp_dict = OrderedDict(sorted(sp_dict.items()))
+            specializations = list(sp_dict.values())
+            specialization_ids = list(sp_dict.keys())
 
-                # if not doc_locality and obj.location.use_in_url:
-                #     if obj.location.type =='LOCALITY':
-                #         doc_locality = obj.location
+            all_hospitals = doctor.hospitals.all()
+            for hosp in all_hospitals:
+                if hosp.is_live:
+                    hospital = hosp
+                break
 
-                # if obj.location.type =='SUBLOCALITY':
-                #
-                #     doc_sublocality = EntityAddress.objects.filter(id=obj.location.id)
-                #     if doc_sublocality:
-                #         doc_sublocality = doc_sublocality[0]
-            if doc_sublocality:
-                sublocality_value = doc_sublocality.alternative_value
-                sublocality_id = doc_sublocality.id
-                if doc_sublocality.centroid:
-                    sublocality_longitude = doc_sublocality.centroid.x
-                    sublocality_latitude = doc_sublocality.centroid.y
-                # doc_sublocality = hospital.entity.filter(type="LOCALITY", valid=True).first()
 
-                doc_locality = EntityAddress.objects.filter(id=doc_sublocality.parent).first()
-                if doc_locality:
-                    #doc_locality = doc_locality[0]
-                    locality_value = doc_locality.alternative_value
-                    locality_id = doc_locality.id
-                    if doc_locality.centroid:
-                        locality_longitude = doc_locality.centroid.x
-                        locality_latitude = doc_locality.centroid.y
-                #doc_locality = EntityAddress.objects.filter(id=doc_sublocality.location.parent).first()
-                # locality_value = doc_locality.alternative_value
-                # locality_id = doc_locality.id
-                # if doc_locality.centroid:
-                #     locality_longitude = doc_locality.centroid.x
-                #     locality_latitude = doc_locality.centroid.y
+            #print('attempting for doctor '+str(doctor.id))
+            # if doctor.hospitals.all():
+            #     hospital = doctor.hospitals.all()[0]
+            #     if hospital.is_live:
+                    # doc_sublocality = hospital.entity.filter(type="SUBLOCALITY").first()
+            if not hospital:
+                print('hospital not found')
 
-                # doc_locality = hospital.entity.filter(type="LOCALITY", valid=True).first()
-                #doc_locality = hospital.entity.filter(type="LOCALITY", valid=True, location__centroid__isnull=False).first()
+            if hospital:
+                entity_location_relation = hospital.entity.all()
+                print('mapped entities for hospital'+str(hospital.id)+'='+str(len(entity_location_relation)))
+                for obj in entity_location_relation:
+                    #print('location mapped')
 
-        if not doc_locality or not doc_sublocality:
-            print('failed')
+                    if not doc_sublocality and obj.location.use_in_url:
+                        if obj.location.type =='SUBLOCALITY':
+                            doc_sublocality = obj.location
+                            #print('sublocality found')
 
-        if specializations:
-            url = "dr-%s-%s" % (doctor.name, "-".join(specializations))
-        else:
-            url = "dr-%s" % (doctor.name)
+                    # if not doc_locality and obj.location.use_in_url:
+                    #     if obj.location.type =='LOCALITY':
+                    #         doc_locality = obj.location
 
-        if doc_locality and doc_sublocality:
-            url = url + "-in-%s-%s" % (sublocality_value, locality_value)
-        # elif doc_locality:
-        #     url = url + "-in-%s" % (locality_value)
-        else:
-            url = url
+                    # if obj.location.type =='SUBLOCALITY':
+                    #
+                    #     doc_sublocality = EntityAddress.objects.filter(id=obj.location.id)
+                    #     if doc_sublocality:
+                    #         doc_sublocality = doc_sublocality[0]
+                if doc_sublocality:
+                    sublocality_value = doc_sublocality.alternative_value
+                    sublocality_id = doc_sublocality.id
+                    if doc_sublocality.centroid:
+                        sublocality_longitude = doc_sublocality.centroid.x
+                        sublocality_latitude = doc_sublocality.centroid.y
+                    # doc_sublocality = hospital.entity.filter(type="LOCALITY", valid=True).first()
 
-        url = slugify(url)
-        data = {}
-        data['is_valid'] = True
-        data['url_type'] = EntityUrls.UrlType.PAGEURL
-        data['entity_type'] = 'Doctor'
-        data['entity_id'] = doctor.id
-        data['sitemap_identifier'] = EntityUrls.SitemapIdentifier.DOCTOR_PAGE
-        #if doc_locality
-        data['locality_id'] = locality_id
-        data['locality_value'] = locality_value
-        data['locality_latitude'] = locality_latitude
-        data['locality_longitude'] = locality_longitude
+                    #doc_locality = EntityAddress.objects.filter(id=doc_sublocality.parent).first()
+                    doc_locality = doc_sublocality.parent
+                    if doc_locality:
+                        #doc_locality = doc_locality[0]
+                        locality_value = doc_locality.alternative_value
+                        locality_id = doc_locality.id
+                        if doc_locality.centroid:
+                            locality_longitude = doc_locality.centroid.x
+                            locality_latitude = doc_locality.centroid.y
+                    #doc_locality = EntityAddress.objects.filter(id=doc_sublocality.location.parent).first()
+                    # locality_value = doc_locality.alternative_value
+                    # locality_id = doc_locality.id
+                    # if doc_locality.centroid:
+                    #     locality_longitude = doc_locality.centroid.x
+                    #     locality_latitude = doc_locality.centroid.y
 
-        if locality_latitude and locality_longitude:
-            data['locality_location'] = Point(locality_longitude, locality_latitude)
+                    # doc_locality = hospital.entity.filter(type="LOCALITY", valid=True).first()
+                    #doc_locality = hospital.entity.filter(type="LOCALITY", valid=True, location__centroid__isnull=False).first()
 
-        if sublocality_latitude and sublocality_longitude:
-            data['sublocality_location'] = Point(sublocality_longitude, sublocality_latitude)
+            if not doc_locality or not doc_sublocality:
+                print('failed')
 
-        #if doc_sublocality:
-        data['sublocality_id'] = sublocality_id
-        data['sublocality_value'] = sublocality_value
-        data['sublocality_latitude'] = sublocality_latitude
-        data['sublocality_longitude'] = sublocality_longitude
+            if specializations:
+                url = "dr-%s-%s" % (doctor.name, "-".join(specializations))
+            else:
+                url = "dr-%s" % (doctor.name)
 
-        if hospital:
-            data['location'] = hospital.location
+            if doc_locality and doc_sublocality:
+                url = url + "-in-%s-%s" % (sublocality_value, locality_value)
+            # elif doc_locality:
+            #     url = url + "-in-%s" % (locality_value)
+            else:
+                url = url
 
-        # if specializations and specialization_ids:
-        #     data['specialization'] = specializations[0]
-        #     data['specialization_id'] = specialization_ids[0]
+            url = slugify(url)
+            data = {}
+            data['is_valid'] = True
+            data['url_type'] = EntityUrls.UrlType.PAGEURL
+            data['entity_type'] = 'Doctor'
+            data['entity_id'] = doctor.id
+            data['sitemap_identifier'] = EntityUrls.SitemapIdentifier.DOCTOR_PAGE
+            #if doc_locality
+            data['locality_id'] = locality_id
+            data['locality_value'] = locality_value
+            data['locality_latitude'] = locality_latitude
+            data['locality_longitude'] = locality_longitude
 
-        extras = {}
-        extras['related_entity_id'] = doctor.id
-        #if sublocality_id or locality_id:
-        extras['location_id'] = sublocality_id if sublocality_id else locality_id
-        extras['locality_value'] = locality_value if doc_locality else ''
-        extras['sublocality_value'] = sublocality_value if doc_sublocality else ''
-        extras['breadcrums'] = []
-        data['extras'] = extras
-        data['sequence'] = sequence
+            if locality_latitude and locality_longitude:
+                data['locality_location'] = Point(locality_longitude, locality_latitude)
 
-        new_url = url
-        # counter = 0
-        #
-        # while True:
-        #     if counter>0:
-        #         # new_url = url+'-'+'-'+''.join([random.choice(string.digits) for n in range(10)])
-        #         new_url = url + '-' + str(counter)
-        #     dup_url = EntityUrls.objects.filter(url=new_url, sitemap_identifier=EntityUrls.SitemapIdentifier.DOCTOR_PAGE).filter(~Q(entity_id=doctor.id)).first()
-        #     if not dup_url:
-        #         break
-        #     counter = counter + 1
-        dup_url = EntityUrls.objects.filter(url=new_url + '-dpp',
-                                            sitemap_identifier=EntityUrls.SitemapIdentifier.DOCTOR_PAGE
-                                            ).filter(~Q(entity_id=doctor.id)).first()
-        if dup_url:
-            new_url = new_url + '-' + str(doctor.id)
+            if sublocality_latitude and sublocality_longitude:
+                data['sublocality_location'] = Point(sublocality_longitude, sublocality_latitude)
 
-        new_url = new_url + '-dpp'
+            #if doc_sublocality:
+            data['sublocality_id'] = sublocality_id
+            data['sublocality_value'] = sublocality_value
+            data['sublocality_latitude'] = sublocality_latitude
+            data['sublocality_longitude'] = sublocality_longitude
 
-        EntityUrls.objects.filter(entity_id=doctor.id,
-                                  sitemap_identifier=EntityUrls.SitemapIdentifier.DOCTOR_PAGE).filter(
-            ~Q(url=new_url)).update(is_valid=False)
+            if hospital:
+                data['location'] = hospital.location
 
-        EntityUrls.objects.filter(entity_id=doctor.id, sitemap_identifier=EntityUrls.SitemapIdentifier.DOCTOR_PAGE,
-                                  url=new_url).delete()
+            # if specializations and specialization_ids:
+            #     data['specialization'] = specializations[0]
+            #     data['specialization_id'] = specialization_ids[0]
 
-        data['url'] = new_url
-        EntityUrls.objects.create(**data)
-        return ("success: " + str(doctor.id))
+            extras = {}
+            extras['related_entity_id'] = doctor.id
+            #if sublocality_id or locality_id:
+            extras['location_id'] = sublocality_id if sublocality_id else locality_id
+            extras['locality_value'] = locality_value if doc_locality else ''
+            extras['sublocality_value'] = sublocality_value if doc_sublocality else ''
+            extras['breadcrums'] = []
+            data['extras'] = extras
+            data['sequence'] = sequence
+
+            new_url = url
+            # counter = 0
+            #
+            # while True:
+            #     if counter>0:
+            #         # new_url = url+'-'+'-'+''.join([random.choice(string.digits) for n in range(10)])
+            #         new_url = url + '-' + str(counter)
+            #     dup_url = EntityUrls.objects.filter(url=new_url, sitemap_identifier=EntityUrls.SitemapIdentifier.DOCTOR_PAGE).filter(~Q(entity_id=doctor.id)).first()
+            #     if not dup_url:
+            #         break
+            #     counter = counter + 1
+
+            is_duplicate = cache.is_duplicate(new_url + '-dpp', doctor.id)
+            # dup_url = EntityUrls.objects.filter(url=new_url + '-dpp',
+            #                                     sitemap_identifier=EntityUrls.SitemapIdentifier.DOCTOR_PAGE
+            #                                     ).filter(~Q(entity_id=doctor.id)).first()
+            if is_duplicate:
+                new_url = new_url + '-' + str(doctor.id)
+
+            new_url = new_url + '-dpp'
+
+            # EntityUrls.objects.filter(entity_id=doctor.id,
+            #                           sitemap_identifier=EntityUrls.SitemapIdentifier.DOCTOR_PAGE).filter(
+            #     ~Q(url=new_url)).update(is_valid=False)
+
+            to_delete.extend(cache.get_deletions(new_url, doctor.id))
+            # EntityUrls.objects.filter(entity_id=doctor.id, sitemap_identifier=EntityUrls.SitemapIdentifier.DOCTOR_PAGE,
+            #                           url=new_url).delete()
+
+            data['url'] = new_url
+            to_create.append(EntityUrls(**data))
+            #EntityUrls.objects.create(**data)
+
+        with transaction.atomic():
+
+            EntityUrls.objects.filter(id__in=to_delete).delete()
+            #EntityUrls.filter(id__in=to_delete).delete()
+            EntityUrls.objects.bulk_create(to_create)
+            EntityUrls.objects.filter(sitemap_identifier='DOCTOR_PAGE', sequence__lt=sequence).update(is_valid=False)    
+            return ("success: " + str(doctor.id))
+
+        
+class PageUrlCache():
+
+    def __init__(self, sitemap_identifier):
+        self.url_cache = dict()
+        self.entity_cache = dict()
+
+        existing = EntityUrls.objects.filter(sitemap_identifier=sitemap_identifier)
+
+        for ex in existing:
+            if not self.url_cache.get(ex.url):
+                self.url_cache[ex.url] = []
+
+            if not self.entity_cache.get(ex.id):
+                self.entity_cache[ex.id] = []
+
+            self.url_cache[ex.url].append(ex)
+            self.entity_cache[ex.id].append(ex)
+
+    # def get(url):
+    #     return self.cache.get(url)
+
+    # def set():
+    #     pass
+
+    def is_duplicate(self, url, entity_id):
+        entities = self.url_cache.get(url)
+        if entities:
+            for ent in entities:
+                if ent.entity_id != entity_id:
+                    return True
+
+        return False
+
+    def get_deletions(self, url, entity_id):
+        deletions = []
+        entities = self.url_cache.get(url)
+        if entities:
+            for ent in entities:
+                if ent.entity_id == entity_id:
+                    deletions.append(ent.id)
+        return deletions
+
+class DefaultRating(TimeStampedModel):
+    ratings = models.PositiveIntegerField(null=True)
+    reviews = models.PositiveIntegerField(null=True)
+    url = models.TextField()
+
+    class Meta:
+        db_table = 'default_rating'
+        indexes = [
+            models.Index(fields=['url']),
+        ]
