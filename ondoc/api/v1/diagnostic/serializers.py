@@ -239,7 +239,7 @@ class AvailableLabTestPackageSerializer(serializers.ModelSerializer):
                             insurance_threshold.lab_amount_limit
                         resp['is_user_insured'] = True
 
-            if obj.lab.is_insurance_enabled and obj.mrp is not None and obj.mrp <= resp['insurance_threshold_amount']:
+            if lab_obj.is_insurance_enabled and obj.mrp is not None and obj.mrp <= resp['insurance_threshold_amount']:
                 resp['is_insurance_covered'] = True
 
         return resp
@@ -339,7 +339,7 @@ class AvailableLabTestSerializer(serializers.ModelSerializer):
                             insurance_threshold.lab_amount_limit
                         resp['is_user_insured'] = True
 
-            if obj.lab.is_insurance_enabled and obj.mrp is not None and obj.mrp <= resp['insurance_threshold_amount']:
+            if lab_obj.is_insurance_enabled and obj.mrp is not None and obj.mrp <= resp['insurance_threshold_amount']:
                 resp['is_insurance_covered'] = True
 
         return resp

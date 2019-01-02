@@ -39,7 +39,7 @@ class ListInsuranceViewSet(viewsets.GenericViewSet):
                 return Response(data={'certificate': True}, status=status.HTTP_200_OK)
 
         insurer_data = self.get_queryset()
-        body_serializer = serializers.InsurerSerializer(insurer_data,context={'request': request}, many=True)
+        body_serializer = serializers.InsurerSerializer(insurer_data, context={'request': request}, many=True)
         return Response(body_serializer.data)
 
 
