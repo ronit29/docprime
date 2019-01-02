@@ -37,8 +37,8 @@ class ApplicableCouponsViewSet(viewsets.GenericViewSet):
 
         product_id = input_data.get("product_id")
         lab = input_data.get("lab_id", None)
-        tests = input_data.get("tests", default=[])
-        procedures = input_data.get("procedures", default=[])
+        tests = input_data.get("tests", [])
+        procedures = input_data.get("procedures", [])
         doctor = input_data.get("doctor_id", None)
         hospital = input_data.get("hospital_id", None)
         deal_price = input_data.get("deal_price")

@@ -575,10 +575,10 @@ class CouponsMixin(object):
 
         # if product_id == Order.LAB_PRODUCT_ID:
         lab = kwargs.get("lab")
-        tests = kwargs.get("test", default=[])
+        tests = kwargs.get("test", [])
         doctor = kwargs.get("doctor")
         # hospital = kwargs.get("hospital")
-        procedures = kwargs.get("procedures", default=[])
+        procedures = kwargs.get("procedures", [])
 
         if coupon_obj.lab and coupon_obj.lab != lab:
             return False
