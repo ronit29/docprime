@@ -47,9 +47,9 @@ class DoctorNumberAdmin(VersionAdmin):
     date_hierarchy = 'created_at'
     # form = DoctorNumberForm
     autocomplete_fields = ['doctor']
-    list_display_links = None
+    # list_display_links = None
 
-    def has_add_permission(self, request, obj=None):
-        return False
+    # def has_add_permission(self, request, obj=None):
+    #     return False
 
 admin.site.register(DoctorNumber, DoctorNumberAdmin)

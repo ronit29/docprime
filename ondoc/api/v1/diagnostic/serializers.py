@@ -310,6 +310,22 @@ class LabCustomSerializer(serializers.Serializer):
     distance_related_charges = serializers.IntegerField()
     tests = serializers.ListField(child=serializers.DictField())
 
+# class LabNetworkSerializer(serializers.Serializer):
+#     # lab = serializers.SerializerMethodField()
+#     lab = LabModelSerializer()
+#     network_id = serializers.IntegerField(default=None)
+#     price = serializers.IntegerField(default=None)
+#     mrp = serializers.IntegerField(default=None)
+#     distance = serializers.IntegerField()
+#     pickup_available = serializers.IntegerField(default=0)
+#     lab_timing = serializers.CharField(max_length=1000)
+#     lab_timing_data = serializers.ListField()
+#     next_lab_timing = serializers.DictField()
+#     next_lab_timing_data = serializers.DictField()
+#     pickup_charges = serializers.IntegerField(default=None)
+#     distance_related_charges = serializers.IntegerField()
+#     tests = serializers.ListField(child=serializers.DictField())
+
     # def get_lab(self, obj):
     #     queryset = Lab.objects.get(pk=obj['lab'])
     #     serializer = LabModelSerializer(queryset)
@@ -455,7 +471,7 @@ class LabAppTransactionModelSerializer(serializers.Serializer):
     address = serializers.JSONField(required=False)
     coupon = serializers.ListField(child=serializers.IntegerField(), required=False, default = [])
     discount = serializers.DecimalField(max_digits=10, decimal_places=2)
-
+    cashback = serializers.DecimalField(max_digits=10, decimal_places=2)
 
 class LabAppRescheduleModelSerializer(serializers.ModelSerializer):
     class Meta:
@@ -915,7 +931,7 @@ class LabEntitySerializer(serializers.ModelSerializer):
 
 
 class CustomPackageLabSerializer(LabModelSerializer):
-    avg_rating = serializers.SerializerMethodField()
+    avg_rating = serializers.ReadOnlyField()
 
     class Meta:
         model = Lab
@@ -923,23 +939,26 @@ class CustomPackageLabSerializer(LabModelSerializer):
                   'sublocality', 'city', 'state', 'country', 'always_open', 'about', 'home_pickup_charges',
                   'is_home_collection_enabled', 'seo', 'breadcrumb', 'center_visit_enabled', 'avg_rating')
 
-    def get_avg_rating(self, obj):
-        return obj.avg_rating
+    # def get_avg_rating(self, obj):
+    #     return obj.avg_rating
 
 
 class CustomLabTestPackageSerializer(serializers.ModelSerializer):
     lab = serializers.SerializerMethodField()
     distance = serializers.SerializerMethodField()
     mrp = serializers.SerializerMethodField()
-    deal_price = serializers.SerializerMethodField()
+    price = serializers.SerializerMethodField()
     lab_timings = serializers.SerializerMethodField()
     lab_timings_data = serializers.SerializerMethodField()
+    pickup_charges = serializers.SerializerMethodField()
+    pickup_available = serializers.SerializerMethodField()
+    distance_related_charges = serializers.SerializerMethodField()
 
     class Meta:
         model = LabTest
-        fields = ('id', 'name', 'lab', 'mrp', 'distance', 'deal_price', 'lab_timings', 'lab_timings_data',
-                  'test_type', 'is_package', 'number_of_tests', 'why', 'pre_test_info')
-        # fields = ('__all__')
+        fields = ('id', 'name', 'lab', 'mrp', 'distance', 'price', 'lab_timings', 'lab_timings_data',
+                  'test_type', 'is_package', 'number_of_tests', 'why', 'pre_test_info', 'is_package',
+                  'pickup_charges', 'pickup_available', 'distance_related_charges')
 
     def get_lab(self, obj):
         lab_data = self.context.get('lab_data')
@@ -954,8 +973,8 @@ class CustomLabTestPackageSerializer(serializers.ModelSerializer):
     def get_mrp(self, obj):
         return str(obj.mrp)
 
-    def get_deal_price(self, obj):
-        return str(obj.deal_price)
+    def get_price(self, obj):
+        return str(obj.price)
 
     def get_lab_timings(self, obj):
         lab_data = self.context.get('lab_data', [])
@@ -973,11 +992,43 @@ class CustomLabTestPackageSerializer(serializers.ModelSerializer):
         lab_data = self.context.get('lab_data', [])
         for data in lab_data:
             if data.id == obj.lab:
-                return data
+                return data.avg_rating
+
+    def get_pickup_charges(self, obj):
+        lab_data = self.context.get('lab_data', [])
+        for data in lab_data:
+            if data.id == obj.lab and data.is_home_collection_enabled:
+                return data.home_pickup_charges
+            else:
+                return 0
+
+    def get_pickup_available(self, obj):
+        for temp_test in obj.test.all():
+            if not temp_test.home_collection_possible:
+                return 0
+        lab_data = self.context.get('lab_data', [])
+        for data in lab_data:
+            if data.id == obj.lab:
+                return 1 if data.is_home_collection_enabled else 0
+        return 0
+
+    def get_distance_related_charges(self, obj):
+        lab_data = self.context.get('lab_data', [])
+        for data in lab_data:
+            if data.id == obj.lab:
+                return 1 if bool(data.home_collection_charges.all()) else 0
 
 
 class LabPackageListSerializer(serializers.Serializer):
-    long = serializers.FloatField(required=False)
-    lat = serializers.FloatField(required=False)
-    categories = serializers.ListField(child=serializers.PrimaryKeyRelatedField(
-        queryset=LabTestCategory.objects.filter(is_live=True, is_package_category=True)), required=False)
+    long = serializers.FloatField(default=77.071848)
+    lat = serializers.FloatField(default=28.450367)
+    category_ids = CommaSepratedToListField(required=False, max_length=500, typecast_to=int)
+
+    def validate_category_ids(self, attrs):
+        try:
+            temp_attrs = [int(attr) for attr in attrs]
+            if LabTestCategory.objects.filter(is_live=True, is_package_category=True, id__in=temp_attrs).count() == len(temp_attrs):
+                return attrs
+        except:
+            raise serializers.ValidationError('Invalid Category IDs')
+        raise serializers.ValidationError('Invalid Category IDs')
