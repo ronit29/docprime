@@ -415,7 +415,6 @@ class EMAILNotification:
         attachments = []
         if context.get('attachments', None):
             attachments = context.get('attachments')
-            attachments = json.dumps(attachments)
         user = receiver.get('user')
         email = receiver.get('email')
         notification_type = self.notification_type
