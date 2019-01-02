@@ -28,7 +28,8 @@ from ondoc.authentication.models import (OtpVerifications, NotificationEndpoint,
                                          Address, AppointmentTransaction, GenericAdmin, UserSecretKey, GenericLabAdmin,
                                          AgentToken, DoctorNumber)
 from ondoc.notification.models import SmsNotification, EmailNotification
-from ondoc.account.models import PgTransaction, ConsumerAccount, ConsumerTransaction, Order, ConsumerRefund, OrderLog
+from ondoc.account.models import PgTransaction, ConsumerAccount, ConsumerTransaction, Order, ConsumerRefund, OrderLog, \
+    UserReferrals, UserReferred
 from django.contrib.auth import get_user_model
 from django.shortcuts import get_object_or_404
 from ondoc.api.pagination import paginate_queryset
@@ -136,6 +137,11 @@ class UserViewset(GenericViewSet):
             user = User.objects.create(phone_number=data['phone_number'],
                                        is_phone_number_verified=True,
                                        user_type=User.CONSUMER)
+
+            # for new user, create a referral coupon entry
+            self.set_referral(user)
+
+
         self.set_coupons(user)
 
         token_object = JWTAuthentication.generate_token(user)
@@ -153,6 +159,12 @@ class UserViewset(GenericViewSet):
 
     def set_coupons(self, user):
         UserSpecificCoupon.objects.filter(phone_number=user.phone_number, user__isnull=True).update(user=user)
+
+    def set_referral(self, user):
+        try:
+            UserReferrals.objects.create(user=user)
+        except Exception as e:
+            logger.error(str(e))
 
     @transaction.atomic
     def logout(self, request):
@@ -307,11 +319,13 @@ class UserProfileViewSet(mixins.CreateModelMixin, mixins.ListModelMixin,
         data['email'] = request.data.get('email')
         data['phone_number'] = request.data.get('phone_number')
         data['user'] = request.user.id
+        first_profile = False
 
         if not queryset.exists():
             data.update({
                 "is_default_user": True
             })
+            first_profile = True
 
         if request.data.get('age'):
             try:
@@ -338,6 +352,12 @@ class UserProfileViewSet(mixins.CreateModelMixin, mixins.ListModelMixin,
             # }, status=status.HTTP_400_BAD_REQUEST)
             return Response(serializer.data)
         serializer.save()
+        # for new profile credit referral amount if any refrral code is used
+        if first_profile and request.data.get('referral_code'):
+            try:
+                self.credit_referral(request.data.get('referral_code'), request.user)
+            except Exception as e:
+                logger.error(str(e))
         return Response(serializer.data)
 
     def update(self, request, *args, **kwargs):
@@ -370,6 +390,12 @@ class UserProfileViewSet(mixins.CreateModelMixin, mixins.ListModelMixin,
         serializer.save()
         return Response(serializer.data)
 
+    @transaction.atomic()
+    def credit_referral(self, referral_code, user):
+        referral = UserReferrals.objects.filter(Q(code__iexact=referral_code), ~Q(user=user)).first()
+        if referral and not UserReferred.objects.filter(user=user).exists():
+            UserReferred.objects.create(user=user, referral_code=referral, used=False)
+            ConsumerAccount.credit_referral(user, referral.signup_cashback)
 
 class OndocViewSet(mixins.CreateModelMixin,
                    mixins.RetrieveModelMixin,
