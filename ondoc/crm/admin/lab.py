@@ -689,11 +689,8 @@ class LabAppointmentForm(forms.ModelForm):
         else:
             raise forms.ValidationError("Invalid start date and time.")
 
-        if cleaned_data.get('lab') and cleaned_data.get('lab_test'):
-            lab_test = cleaned_data.get('lab_test').all()
-            lab = cleaned_data.get('lab')
-        elif self.instance.id:
-            lab_test = self.instance.lab_test.all()
+        if self.instance.id:  # DONE SHASHANK_SINGH
+            lab_test = self.instance.test_mappings.all()
             lab = self.instance.lab
         else:
             raise forms.ValidationError("Lab and lab test details not entered.")
@@ -702,10 +699,8 @@ class LabAppointmentForm(forms.ModelForm):
                 raise forms.ValidationError("Can't send reports as none are available. Please upload.")
         # SHASHANK_SINGH if no report error.
 
-
         # if self.instance.status in [LabAppointment.CANCELLED, LabAppointment.COMPLETED] and len(cleaned_data):
         #     raise forms.ValidationError("Cancelled/Completed appointment cannot be modified.")
-
 
         if not cleaned_data.get('status') is LabAppointment.CANCELLED and (cleaned_data.get(
                 'cancellation_reason') or cleaned_data.get('cancellation_comments')):
@@ -721,26 +716,26 @@ class LabAppointmentForm(forms.ModelForm):
             raise forms.ValidationError(
                 "If Reason for Cancelled appointment is others it should be mentioned in cancellation comment.")
 
-
         if not lab.lab_pricing_group:
             raise forms.ValidationError("Lab is not in any lab pricing group.")
 
-        selected_test_ids = lab_test.values_list('test', flat=True)
-        is_lab_timing_available = LabTiming.objects.filter(
-            lab=lab,
-            lab__lab_pricing_group__available_lab_tests__test__in=selected_test_ids,
-            day=time_slot_start.weekday(),
-            start__lte=hour, end__gt=hour).exists()
-        # if not is_lab_timing_available:
-        #     raise forms.ValidationError("This lab test is not available on selected day and time.")
-        if self.instance.is_home_pickup or cleaned_data.get('is_home_pickup'):
-            if not lab.is_home_collection_enabled:
-                raise forms.ValidationError("Home Pickup is disabled for the lab")
-            if hour < 7.0 or hour > 19.0:
-                raise forms.ValidationError("No time slot available")
-        else:
-            if not lab.always_open and not is_lab_timing_available:
-                raise forms.ValidationError("No time slot available")
+        if self.instance.id:
+            selected_test_ids = lab_test.values_list('test', flat=True)
+            is_lab_timing_available = LabTiming.objects.filter(
+                lab=lab,
+                lab__lab_pricing_group__available_lab_tests__test__in=selected_test_ids,
+                day=time_slot_start.weekday(),
+                start__lte=hour, end__gt=hour).exists()
+            # if not is_lab_timing_available:
+            #     raise forms.ValidationError("This lab test is not available on selected day and time.")
+            if self.instance.is_home_pickup or cleaned_data.get('is_home_pickup'):
+                if not lab.is_home_collection_enabled:
+                    raise forms.ValidationError("Home Pickup is disabled for the lab")
+                if hour < 7.0 or hour > 19.0:
+                    raise forms.ValidationError("No time slot available")
+            else:
+                if not lab.always_open and not is_lab_timing_available:
+                    raise forms.ValidationError("No time slot available")
 
         return cleaned_data
 
@@ -769,6 +764,13 @@ class LabAppointmentAdmin(nested_admin.NestedModelAdmin):
     inlines = [
         LabReportInline
     ]
+
+    def get_autocomplete_fields(self, request):
+        if request.user.is_superuser:
+            temp_autocomplete_fields = ('lab', 'profile', 'user', 'cancellation_reason')
+        else:
+            temp_autocomplete_fields = super().get_autocomplete_fields(request)
+        return temp_autocomplete_fields
 
     def get_profile(self, obj):
         if not obj.profile:
@@ -805,9 +807,9 @@ class LabAppointmentAdmin(nested_admin.NestedModelAdmin):
 
     def get_fields(self, request, obj=None):
         if request.user.is_superuser:
-            return ('booking_id', 'order_id', 'lab', 'lab_id', 'lab_test', 'lab_contact_details', 'profile', 'user',
+            return ('booking_id', 'order_id', 'lab', 'lab_id', 'lab_contact_details', 'profile', 'user',  # DONE SHASHANK_SINGH CHANGE 15 remove and add a read only
                     'profile_detail', 'status', 'cancel_type', 'cancellation_reason', 'cancellation_comments',
-                    'price', 'agreed_price',
+                    'get_lab_test', 'price', 'agreed_price',
                     'deal_price', 'effective_price', 'start_date', 'start_time', 'otp', 'payment_status',
                     'payment_type', 'insurance', 'is_home_pickup', 'address', 'outstanding', 'send_email_sms_report')
         elif request.user.groups.filter(name=constants['LAB_APPOINTMENT_MANAGEMENT_TEAM']).exists():
@@ -822,7 +824,7 @@ class LabAppointmentAdmin(nested_admin.NestedModelAdmin):
 
     def get_readonly_fields(self, request, obj=None):
         if request.user.is_superuser:
-            return ('booking_id', 'order_id', 'lab_id', 'lab_contact_details')
+            return 'booking_id', 'order_id', 'lab_id', 'lab_contact_details', 'get_lab_test'
         elif request.user.groups.filter(name=constants['LAB_APPOINTMENT_MANAGEMENT_TEAM']).exists():
             return ('booking_id', 'order_id', 'lab_name', 'lab_id', 'get_lab_test',
                     'lab_contact_details', 'used_profile_name', 'used_profile_number',
@@ -831,6 +833,15 @@ class LabAppointmentAdmin(nested_admin.NestedModelAdmin):
                     'payment_type', 'insurance', 'is_home_pickup', 'get_pickup_address', 'get_lab_address', 'outstanding')
         else:
             return ()
+
+    # def get_inline_instances(self, request, obj=None):  # ALMOST DONE (Inline To be created) SHASHANK_SINGH CHANGE 16
+    #     inline_instance = super().get_inline_instances(request=request, obj=obj)
+    #     if request.user.is_superuser:
+    #         inline_instance.append(LabTestInline(self.model, self.admin_site))
+    #         inline_instance.append(LabReportInline(self.model, self.admin_site))
+    #     else:
+    #         inline_instance.append(LabReportInline(self.model, self.admin_site))
+    #     return inline_instance
 
     def order_id(self, obj):
         if obj and obj.id:
@@ -869,8 +880,9 @@ class LabAppointmentAdmin(nested_admin.NestedModelAdmin):
 
     def get_lab_test(self, obj):
         format_string = ""
-        for data in obj.lab_test.all():
-            format_string += "<div><span>{}</span></div>".format(data.test.name)
+        for data in obj.test_mappings.all():  # DONE SHASHANK_SINGH CHANGE 11
+            format_string += "<div><span>{}, MRP : {}, Deal Price : {} </span></div>".format(data.test.name, data.mrp,
+                                                                                         data.custom_deal_price if data.custom_deal_price else data.computed_deal_price)
         return format_html_join(
             mark_safe('<br/>'),
             format_string,
