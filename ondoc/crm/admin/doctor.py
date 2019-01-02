@@ -507,28 +507,40 @@ class DoctorMobileFormSet(forms.BaseInlineFormSet):
 
             count += 1
 
+
             if value.get('is_primary'):
-                if not value.get('id'):
-                    raise forms.ValidationError('Primary number can be marked only by checking mark_primary, '
-                                                'obtaining otp and entering otp again.')
-                id = value.get('id').id
-                if id and not DoctorMobile.objects.filter(id=id, is_primary=True).exists():
-                    raise forms.ValidationError('Primary number can be marked only by checking mark_primary, '
-                                                'obtaining otp and entering otp again.')
+                if self.forms[0].instance.doctor.onboarding_status == 3:
+                    if value.get('DELETE'):
+                        raise forms.ValidationError('Primary number cannot be deleted.')
 
-                if id and not DoctorMobile.objects.filter(id=id, number=value.get('number')).exists():
-                    raise forms.ValidationError('Primary number cannot be changed.')
+                    if not value.get('id'):
+                        raise forms.ValidationError('Primary number can be marked only by checking mark_primary, '
+                                                    'obtaining otp and entering otp again.')
+                    id = value.get('id').id
+                    if id and not DoctorMobile.objects.filter(id=id, is_primary=True).exists():
+                        raise forms.ValidationError('Primary number can be marked only by checking mark_primary, '
+                                                    'obtaining otp and entering otp again.')
 
-                if value.get('mark_primary'):
-                    raise forms.ValidationError('Number is already primary number.')
+                    if id and not DoctorMobile.objects.filter(id=id, number=value.get('number')).exists():
+                        raise forms.ValidationError('Primary number cannot be changed. Add another number , mark it as primary'
+                                                    ' and validate it with otp')
+
+                    if value.get('mark_primary'):
+                        raise forms.ValidationError('Number is already primary number.')
 
                 primary += 1
+
             if value.get('mark_primary'):
                 mark_primary += 1
 
         if count > 0:
-            if DoctorMobile.objects.filter(doctor=self.forms[0].instance.doctor).exists():
-                if primary > 1:
+
+            if primary > 1:
+                raise forms.ValidationError("Doctor can have only one primary number.")
+
+            if DoctorMobile.objects.filter(doctor=self.forms[0].instance.doctor).exists() \
+                    and self.forms[0].instance.doctor.onboarding_status == 3:
+                if primary != 1 :
                     raise forms.ValidationError("Doctor must have one primary mobile number.")
             if mark_primary > 1:
                 raise forms.ValidationError("Doctor can change only one primary mobile number.")
