@@ -23,6 +23,7 @@ from collections import OrderedDict
 import re
 from django.contrib.postgres.fields import ArrayField
 from django.db.models import Prefetch
+from django.db import transaction
 
 
 logger = logging.getLogger(__name__)
@@ -2001,11 +2002,13 @@ class DoctorPageURL(object):
             to_create.append(EntityUrls(**data))
             #EntityUrls.objects.create(**data)
 
-        EntityUrls.objects.filter(id__in=to_delete).delete()
-        #EntityUrls.filter(id__in=to_delete).delete()
-        EntityUrls.objects.bulk_create(to_create)
-        EntityUrls.objects.filter(sitemap_identifier='DOCTOR_PAGE', sequence__lt=sequence).update(is_valid=False)    
-        return ("success: " + str(doctor.id))
+        with transaction.atomic():
+
+            EntityUrls.objects.filter(id__in=to_delete).delete()
+            #EntityUrls.filter(id__in=to_delete).delete()
+            EntityUrls.objects.bulk_create(to_create)
+            EntityUrls.objects.filter(sitemap_identifier='DOCTOR_PAGE', sequence__lt=sequence).update(is_valid=False)    
+            return ("success: " + str(doctor.id))
 
         
 class PageUrlCache():
@@ -2049,3 +2052,14 @@ class PageUrlCache():
                 if ent.entity_id == entity_id:
                     deletions.append(ent.id)
         return deletions
+
+class DefaultRating(TimeStampedModel):
+    ratings = models.PositiveIntegerField(null=True)
+    reviews = models.PositiveIntegerField(null=True)
+    url = models.TextField()
+
+    class Meta:
+        db_table = 'default_rating'
+        indexes = [
+            models.Index(fields=['url']),
+        ]

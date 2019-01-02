@@ -42,6 +42,7 @@ from ondoc.matrix.tasks import push_appointment_to_matrix, push_onboarding_qcsta
 from ondoc.location import models as location_models
 from ondoc.ratings_review import models as ratings_models
 from decimal import Decimal
+from ondoc.common.models import AppointmentHistory
 import reversion
 
 logger = logging.getLogger(__name__)
@@ -849,6 +850,10 @@ class AvailableLabTest(TimeStampedModel):
     class Meta:
         unique_together = (("test", "lab_pricing_group"))
         db_table = "available_lab_test"
+        indexes = [
+            models.Index(fields=['test_id', 'lab_pricing_group_id']),
+        ]
+
 
 @reversion.register()
 class LabAppointment(TimeStampedModel, CouponsMixin):
@@ -1083,7 +1088,17 @@ class LabAppointment(TimeStampedModel, CouponsMixin):
         if 'push_again_to_matrix' in kwargs.keys():
             kwargs.pop('push_again_to_matrix')
 
+        # Pushing every status to the Appointment history
+        push_to_history = False
+        if self.id and self.status != LabAppointment.objects.get(pk=self.id).status:
+            push_to_history = True
+        elif self.id is None:
+            push_to_history = True
+
         super().save(*args, **kwargs)
+
+        if push_to_history:
+            AppointmentHistory.create(content_object=self)
 
         transaction.on_commit(lambda: self.app_commit_tasks(database_instance, push_to_matrix))
 
@@ -1612,6 +1627,7 @@ class LabTestGroup(auth_model.TimeStampedModel):
 def get_lab_timings_today(self, day_now=timezone.now().weekday()):
     lab_timing = list()
     lab_timing_data = list()
+    time_choices = {item[0]: item[1] for item in LabTiming.TIME_CHOICES}
     if self.always_open:
         lab_timing.append("12:00 AM - 11:45 PM")
         lab_timing_data.append({
@@ -1622,7 +1638,7 @@ def get_lab_timings_today(self, day_now=timezone.now().weekday()):
         timing_queryset = self.lab_timings.all()
         for data in timing_queryset:
             if data.day == day_now:
-                lab_timing.append('{} - {}'.format(LabTiming.TIME_CHOICES[data.start], LabTiming.TIME_CHOICES[data.end]))
+                lab_timing.append('{} - {}'.format(time_choices[data.start], time_choices[data.end]))
                 lab_timing_data.append({"start": str(data.start), "end": str(data.end)})
     return ' | '.join(lab_timing), lab_timing_data
 
