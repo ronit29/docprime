@@ -83,12 +83,8 @@ class UserSpecificCouponSerializer(CouponListSerializer):
 
     lab = serializers.PrimaryKeyRelatedField(required=False,queryset=Lab.objects.filter(is_live=True))
     tests = serializers.ListField(child=serializers.PrimaryKeyRelatedField(required=False, queryset=LabTest.objects.all()),  required=False)
-    # test_categories = serializers.ListField(
-    #     child=serializers.PrimaryKeyRelatedField(required=False, queryset=LabTestCategory.objects.all()), required=False)
     procedures = serializers.ListField(
         child=serializers.PrimaryKeyRelatedField(required=False, queryset=Procedure.objects.all()), required=False)
-    # procedure_categories = serializers.ListField(
-    #     child=serializers.PrimaryKeyRelatedField(required=False, queryset=ProcedureCategory.objects.all()), required=False)
     doctor = serializers.PrimaryKeyRelatedField(required=False, queryset=Doctor.objects.filter(is_live=True))
     profile = serializers.PrimaryKeyRelatedField(required=False, queryset=UserProfile.objects.all())
 

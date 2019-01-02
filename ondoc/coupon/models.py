@@ -45,6 +45,10 @@ class Coupon(auth_model.TimeStampedModel):
     def save(self, *args, **kwargs):
         if not self.id:
             self.start_date = datetime.datetime.now()
+        if self.age_start and not self.age_end:
+            self.age_end = 100
+        if self.age_end and not self.age_start:
+            self.age_start = 0
         return super().save(*args, **kwargs)
 
     def used_coupon_count(self, user):

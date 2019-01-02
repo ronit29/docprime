@@ -529,9 +529,6 @@ class CouponsMixin(object):
                     user_age = user_profile.get_age()
                 else:
                     user_age = None
-            # else:
-            #     user_profile = None
-            #     user_age = None
 
                 if coupon_obj.new_user_constraint and not self.is_user_first_time(user):
                     return {"is_valid": False, "used_count": 0}
@@ -548,7 +545,6 @@ class CouponsMixin(object):
                 if coupon_obj.gender and (not user_profile or coupon_obj.gender != user_profile.gender):
                     return {"is_valid": False, "used_count": None}
 
-                # TODO
                 if ( (coupon_obj.age_start and (not user_age or coupon_obj.age_start >= user_age))
                         or (coupon_obj.age_end and (not user_age or coupon_obj.age_end <= user_age)) ):
                     return {"is_valid": False, "used_count": None}
@@ -579,10 +575,10 @@ class CouponsMixin(object):
 
         # if product_id == Order.LAB_PRODUCT_ID:
         lab = kwargs.get("lab")
-        tests = kwargs.get("test", [])
+        tests = kwargs.get("test", default=[])
         doctor = kwargs.get("doctor")
         # hospital = kwargs.get("hospital")
-        procedures = kwargs.get("procedures")
+        procedures = kwargs.get("procedures", default=[])
 
         if coupon_obj.lab and coupon_obj.lab != lab:
             return False
@@ -592,89 +588,52 @@ class CouponsMixin(object):
 
         if tests and coupon_obj.test.exists():
             count = coupon_obj.test.filter(id__in=[t.id for t in tests]).count()
-            #count = lab.lab_pricing_group.available_lab_tests.filter(enabled=True, test__id__in=tests).count()
             if count == 0:
                 return False
 
-        if tests and coupon_obj.test_categories.exists():
-            test_categories = list()
-            for test in tests:
-                test_cat_ids = test.categories.values_list('id')
-                test_categories.extend(test_cat_ids)
-            test_categories = set(test_categories)
-            test_cat_count = coupon_obj.test_categories.filter(id__in=test_categories).count()
-            if test_cat_count == 0:
+        if coupon_obj.test_categories.exists():
+            if tests:
+                test_categories = set(tests.values_list('categories', flat=True))
+                test_cat_count = coupon_obj.test_categories.filter(id__in=test_categories).count()
+                if test_cat_count == 0:
+                    return False
+            else:
                 return False
-            # coupons = coupons.filter(
-            #     Q(test__in=tests) | Q(test__isnull=True) | Q(tests_categories__in=test_categories) | Q(
-            #         test_categories__isnull=True))
 
         if coupon_obj.cities:
-            if lab and re.search(lab.city, coupon_obj.cities, re.IGNORECASE):
+            if (lab and re.search(lab.city, coupon_obj.cities, re.IGNORECASE)) or not lab:
                 return False
-            # if hospital and re.search(hospital.city, coupon_obj.cities, re.IGNORECASE):
+            # if (hospital and re.search(hospital.city, coupon_obj.cities, re.IGNORECASE)) or not hospital:
             #     return False
 
-        if procedures and coupon_obj.procedures.exists():
-            procedure_count = coupon_obj.procedures.filter(id__in=[proc.id for proc in procedures]).count()
-            # count = lab.lab_pricing_group.available_lab_tests.filter(enabled=True, test__id__in=tests).count()
-            if procedure_count == 0:
+        if coupon_obj.procedures.exists():
+            if procedures:
+                procedure_count = coupon_obj.procedures.filter(id__in=[proc.id for proc in procedures]).count()
+                if procedure_count == 0:
+                    return False
+            else:
                 return False
 
-        if procedures and coupon_obj.procedure_categories.exists():
-            procedure_categories = list()
-            for procedure in procedures:
-                proc_cat = procedure.categories.all()
-                procedure_categories.extend(proc_cat)
-            procedure_categories = set(procedure_categories)
-            procedure_cat_count = coupon_obj.procedure_categories.filter(id__in=procedure_categories).count()
-            if procedure_cat_count == 0:
+        if coupon_obj.procedure_categories.exists():
+            if procedures:
+                procedure_categories = set(procedures.values_list('categories', flat=True))
+                procedure_cat_count = coupon_obj.procedure_categories.filter(id__in=procedure_categories).count()
+                if procedure_cat_count == 0:
+                    return False
+            else:
                 return False
 
         if coupon_obj.specializations.exists():
             if doctor:
                 spec_count = coupon_obj.specializations.filter(
-                    id__in=[spec.specialization.id for spec in doctor.doctorpracticespecializations.all()]).count()
+                    id__in=doctor.doctorpracticespecializations.values_list('specialization', flat=True)).count()
                 if spec_count == 0:
                     return False
             else:
                 return False
 
         return is_valid    
-                    
-        # elif kwargs.get("product_id") == Order.DOCTOR_PRODUCT_ID:
-        #     return True
-            # if kwargs.get("doctor"):
-            #     pass
 
-        # return is_valid    
-
-
-        #     coupon_obj.lab_network and coupon_obj.lab_network == lab.network
-
-        # if coupon_obj:
-
-        #     if kwargs.get("product_id") == Order.LAB_PRODUCT_ID:
-        #         lab = kwargs.get("lab")
-        #         if lab:
-        #             tests = kwargs.get("test", [])
-
-        #             available_lab_tests = lab.lab_pricing_group.available_lab_tests.filter(enabled=True, test__id__in=tests).prefetch_related('test')
-        #             available_lab_tests = lab.lab_pricing_group.available_lab_tests.all().prefetch_related('test')
-        #             lab_tests = list()
-        #             for lab_test in available_lab_tests:
-        #                 lab_tests.append(lab_test.test)
-        #             if set(tests) <= set(lab_tests):
-        #                 if (coupon_obj.lab_network and coupon_obj.lab_network == lab.network) or (not coupon_obj.lab_network):
-        #                     if (coupon_obj.lab and coupon_obj.lab==lab) or (not coupon_obj.lab):
-        #                         if (coupon_obj.test.exists() and set(tests) & set(coupon_obj.test.all())) or not coupon_obj.test.exists():
-        #                             is_valid = True
-
-        #     elif kwargs.get("product_id") == Order.DOCTOR_PRODUCT_ID:
-        #         if kwargs.get("doctor"):
-        #             pass
-
-        # return is_valid
 
     def get_discount(self, coupon_obj, price):
 

@@ -37,19 +37,13 @@ class ApplicableCouponsViewSet(viewsets.GenericViewSet):
 
         product_id = input_data.get("product_id")
         lab = input_data.get("lab_id", None)
-        tests = input_data.get("tests", [])
-        test_categories_ids = input_data.get("test_categories_ids", [])
-        procedures = input_data.get("procedures", [])
-        procedure_categories_ids = input_data.get("procedure_categories_ids", [])
+        tests = input_data.get("tests", default=[])
+        procedures = input_data.get("procedures", default=[])
         doctor = input_data.get("doctor_id", None)
         hospital = input_data.get("hospital_id", None)
-        # specializations = input_data.get("specialization_ids", None)
         deal_price = input_data.get("deal_price")
         coupon_code = input_data.get("coupon_code")
         profile = input_data.get("profile_id", None)
-        # gender = input_data.get("gender")
-        # age_range = input_data.get("age_range")
-        # cities = input_data.get("cities")
         types = []
         if deal_price==0:
             deal_price=None
@@ -93,13 +87,15 @@ class ApplicableCouponsViewSet(viewsets.GenericViewSet):
 
             if profile:
                 if profile.gender:
-                    coupons = coupons.filter(Q(gender=profile.gender) | Q(gender__isnull=True))
+                    coupons = coupons.filter(Q(gender__isnull=True) | Q(gender=profile.gender))
                 else:
                     coupons = coupons.filter(gender__isnull=True)
 
+                #TODO age defaults
                 user_age = profile.get_age()
                 if user_age:
-                    coupons = coupons.filter(Q(age_start__isnull=True, age_end__isnull=True) | Q(age_start_lte=user_age) | Q(age_end_gte=user_age))
+                    coupons = coupons.filter(Q(age_start__isnull=True, age_end__isnull=True)
+                                             | Q(age_start__lte=user_age, age_end__gte=user_age))
                 else:
                     coupons = coupons.filter(age_start__isnull=True, age_end__isnull=True)
             else:
@@ -109,46 +105,26 @@ class ApplicableCouponsViewSet(viewsets.GenericViewSet):
             coupons = coupons.filter(is_user_specific=False)
 
         if tests:
-            test_categories = list()
-            for test in tests:
-                test_cat = test.categories.all()
-                test_categories.extend(test_cat)
-            test_categories = set(test_categories)
-            coupons = coupons.filter(Q(test__in=tests) | Q(test__isnull=True) | Q(tests_categories__in=test_categories) | Q(test_categories__isnull=True))
+            coupons = coupons.filter(Q(test__isnull=True) | Q(test__in=tests))
+            test_categories = set(tests.values_list('categories', flat=True))
+            coupons = coupons.filter(Q(test_categories__isnull=True) | Q(test_categories__in=test_categories))
 
         if lab:
-            coupons = coupons.filter(Q(cities__icontains=lab.city) | Q(cities__isnull=True))
+            coupons = coupons.filter(Q(cities__isnull=True) | Q(cities__icontains=lab.city))
 
         if hospital:
-            coupons = coupons.filter(Q(cities__icontains=hospital.city) | Q(cities__isnull=True))
+            coupons = coupons.filter(Q(cities__isnull=True) | Q(cities__icontains=hospital.city))
 
         if doctor:
-            coupons = coupons.filter(Q(specializations__in=
-                                       [spec.specialization for spec in doctor.doctorpracticespecializations.all()])
-                                     | Q(specializations__isnull=True))
-
-        # if cities:
-        #     cities_list = [city.strip() for city in cities.split(',')]
-        #     q = Q()
-        #     for city_in_list in cities_list:
-        #         q |= Q(cities__icontains=city_in_list)
-        #     coupons = coupons.filter(q)
-
-
-        # if test_categories_ids:
-        #     coupons = coupons.filter(Q(test_categories__in=test_categories_ids) | Q(test_categories__isnull=True))
+            coupons = coupons.filter(Q(specializations__isnull=True)
+                                     | Q(specializations__in=
+                                       doctor.doctorpracticespecializations.values_list('specialization', flat=True))
+                                     )
 
         if procedures:
-            procedure_categories = list()
-            for procedure in procedures:
-                proc_cat = procedure.categories.all()
-                procedure_categories.extend(proc_cat)
-            procedure_categories = set(procedure_categories)
-            coupons = coupons.filter(Q(procedures__in=procedures) | Q(procedures__isnull=True)
-                                     | Q(procedure_categories__in=procedure_categories) | Q(procedure_categories__isnull=True))
-
-        # if procedure_categories_ids:
-        #     coupons = coupons.filter(Q(procedure_categories__in=procedure_categories_ids) | Q(procedure_categories__isnull=True))
+            coupons = coupons.filter(Q(procedures__isnull=True) | Q(procedures__in=procedures))
+            procedure_categories = set(procedures.values_list('categories', flat=True))
+            coupons = coupons.filter(Q(procedure_categories__isnull=True) | Q(procedure_categories__in=procedure_categories))
 
         if product_id:
             coupons = coupons.filter(is_corporate=False)
@@ -411,9 +387,6 @@ class CouponDiscountViewSet(viewsets.GenericViewSet):
         product_id = input_data.get("product_id")
         lab = input_data.get("lab")
         tests = input_data.get("tests", [])
-        # test_categories = input_data.get("test_categories", [])
-        procedures = input_data.get("procedures", [])
-        procedure_categories = input_data.get("procedure_categories", [])
         doctor = input_data.get("doctor")
         profile = input_data.get("profile")
 

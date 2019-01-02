@@ -1737,7 +1737,7 @@ class PracticeSpecializationContent(auth_model.TimeStampedModel):
 
 class DoctorPracticeSpecialization(auth_model.TimeStampedModel):
     doctor = models.ForeignKey(Doctor, related_name="doctorpracticespecializations", on_delete=models.CASCADE)
-    specialization = models.ForeignKey(PracticeSpecialization, on_delete=models.CASCADE, blank=False, null=False)
+    specialization = models.ForeignKey(PracticeSpecialization, on_delete=models.CASCADE, blank=False, null=False, related_name='specialization')
 
     # def __str__(self):
     #     return "{}-{}".format(self.doctor.name, self.specialization.name)

@@ -158,7 +158,7 @@ class Lab(TimeStampedModel, CreatedByModel, QCModel, SearchKey):
     network_type = models.PositiveSmallIntegerField(blank=True, null=True,
                                                     choices=[("", "Select"), (1, "Non Network Lab"),
                                                              (2, "Network Lab")])
-    network = models.ForeignKey('LabNetwork', null=True, blank=True, on_delete=models.SET_NULL)
+    network = models.ForeignKey('LabNetwork', null=True, blank=True, on_delete=models.SET_NULL, related_name='lab')
     location = models.PointField(geography=True, srid=4326, blank=True, null=True)
     location_error = models.PositiveIntegerField(blank=True, null=True)
     building = models.CharField(max_length=100, blank=True)
