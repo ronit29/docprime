@@ -411,10 +411,11 @@ class EMAILNotification:
 
     def trigger(self, receiver, template, context):
         cc = []
-        bcc = settings.PROVIDER_EMAIL
+        bcc = [settings.PROVIDER_EMAIL]
         attachments = []
         if context.get('attachments', None):
             attachments = context.get('attachments')
+            attachments = json.dumps(attachments)
         user = receiver.get('user')
         email = receiver.get('email')
         notification_type = self.notification_type
@@ -446,7 +447,10 @@ class EMAILNotification:
                 email=email,
                 notification_type=notification_type,
                 content=html_body,
-                email_subject=email_subject
+                email_subject=email_subject,
+                cc=cc,
+                bcc=bcc,
+                attachments=attachments
             )
             message = {
                 "data": model_to_dict(email_noti),

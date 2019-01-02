@@ -440,7 +440,7 @@ class EmailNotification(TimeStampedModel, EmailNotificationOpdMixin, EmailNotifi
     notification_type = models.PositiveIntegerField(choices=NotificationAction.NOTIFICATION_TYPE_CHOICES)
     cc = ArrayField(models.EmailField(), default=[], blank=[])
     bcc = ArrayField(models.EmailField(), default=[], blank=[])
-    attachments = ArrayField(JSONField(), default=[], blank=[])
+    attachments = JSONField(default=[], blank=[])
 
     class Meta:
         db_table = "email_notification"
