@@ -173,6 +173,7 @@ class LabList(viewsets.ReadOnlyModelViewSet):
             flat=True)
 
         all_packages_in_network_labs = LabTest.objects.prefetch_related('test').filter(searchable=True, is_package=True,
+                                                                                       availablelabs__enabled=True,
                                                                                        availablelabs__lab_pricing_group__labs__network__isnull=False,
                                                                                        availablelabs__lab_pricing_group__labs__location__dwithin=(
                                                                                            Point(float(long),
@@ -190,6 +191,7 @@ class LabList(viewsets.ReadOnlyModelViewSet):
                             'availablelabs__lab_pricing_group__labs__network'), F('id')]))
 
         all_packages_in_non_network_labs = LabTest.objects.prefetch_related('test').filter(searchable=True, is_package=True,
+                                                                                           availablelabs__enabled=True,
                                                                                            availablelabs__lab_pricing_group__labs__network__isnull=True,
                                                                                            availablelabs__lab_pricing_group__labs__location__dwithin=(
                                                                                                Point(float(long),
