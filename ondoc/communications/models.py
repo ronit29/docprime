@@ -1,23 +1,31 @@
 import copy
 import json
 import random
+from collections import defaultdict
 from itertools import groupby
+
 import pytz
 from django.db.models import F
 from hardcopy import bytestring_to_pdf
+
+from ondoc.api.v1.utils import util_absolute_url
 from ondoc.doctor.models import OpdAppointment
 from ondoc.diagnostic.models import LabAppointment
-from django.core.files.uploadedfile import TemporaryUploadedFile, InMemoryUploadedFile
+from django.core.files.uploadedfile import SimpleUploadedFile, TemporaryUploadedFile, InMemoryUploadedFile
 from django.forms import model_to_dict
 from django.template.loader import render_to_string
 from django.contrib.auth import get_user_model
 import logging
 from django.conf import settings
 from django.utils import timezone
+from weasyprint import HTML
+
 from ondoc.account.models import Invoice, Order
 from ondoc.authentication.models import UserProfile, GenericAdmin, NotificationEndpoint
+
 from ondoc.notification.models import NotificationAction, SmsNotification, EmailNotification, AppNotification, \
     PushNotification
+# from ondoc.notification.sqs_client import publish_message
 from ondoc.notification.rabbitmq_client import publish_message
 
 User = get_user_model()
@@ -335,6 +343,8 @@ class EMAILNotification:
             except Exception as e:
                 logger.error("Got error while creating pdf for opd invoice {}".format(e))
             context.update({"invoice_url": invoice.file.url})
+            context.update(
+                {"attachments": [{"filename": invoice.file.url, "path": util_absolute_url(invoice.file.url)}]})
             body_template = "email/doctor_invoice/body.html"
             subject_template = "email/doctor_invoice/subject.txt"
 
@@ -394,6 +404,8 @@ class EMAILNotification:
             # except Exception as e:
             #     logger.error("Got error while creating pdf for lab invoice {}".format(e))
             context.update({"invoice_url": invoice.file.url})
+            context.update(
+                {"attachments": [{"filename": invoice.file.url, "path": util_absolute_url(invoice.file.url)}]})
             body_template = "email/lab_invoice/body.html"
             subject_template = "email/lab_invoice/subject.txt"
 
@@ -404,6 +416,11 @@ class EMAILNotification:
         return subject_template, body_template
 
     def trigger(self, receiver, template, context):
+        cc = []
+        bcc = [settings.PROVIDER_EMAIL]
+        attachments = []
+        if context.get('attachments', None):
+            attachments = context.get('attachments')
         user = receiver.get('user')
         email = receiver.get('email')
         notification_type = self.notification_type
@@ -418,7 +435,10 @@ class EMAILNotification:
                 email=email,
                 notification_type=notification_type,
                 content=html_body,
-                email_subject=email_subject
+                email_subject=email_subject,
+                cc=cc,
+                bcc=bcc,
+                attachments=attachments
             )
             message = {
                 "data": model_to_dict(email_noti),
@@ -432,7 +452,10 @@ class EMAILNotification:
                 email=email,
                 notification_type=notification_type,
                 content=html_body,
-                email_subject=email_subject
+                email_subject=email_subject,
+                cc=cc,
+                bcc=bcc,
+                attachments=attachments
             )
             message = {
                 "data": model_to_dict(email_noti),
