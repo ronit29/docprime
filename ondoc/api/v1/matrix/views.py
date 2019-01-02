@@ -31,7 +31,6 @@ class MaskNumberViewSet(viewsets.GenericViewSet):
             "FromNumber": data.get('mobile') if str(data.get('mobile')).startswith('0') else "0%d" % data.get('mobile')
         }
 
-
         if hospital and hospital.is_live and len(spoc_details)>0:
             for type in [auth_models.SPOCDetails.SPOC, auth_models.SPOCDetails.MANAGER, auth_models.SPOCDetails.OTHER, auth_models.SPOCDetails.OWNER]:
                 for spoc in spoc_details:

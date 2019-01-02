@@ -5,6 +5,7 @@ from ondoc.doctor import models
 from ondoc.authentication import models as auth_models
 from ondoc.diagnostic import models as lab_models
 #from ondoc.doctor.models import Hospital, DoctorClinic,Doctor,  OpdAppointment
+from ondoc.doctor.models import DoctorClinic
 from ondoc.notification.models import EmailNotification
 from django.utils.safestring import mark_safe
 from ondoc.coupon.models import Coupon
@@ -576,10 +577,21 @@ class DoctorProfileView(viewsets.GenericViewSet):
 class DoctorProfileUserViewSet(viewsets.GenericViewSet):
 
     def prepare_response(self, response_data, selected_hospital):
-        hospitals = sorted(response_data.get('hospitals'), key=itemgetter("hospital_id"))
+        import operator
+        # hospitals = sorted(response_data.get('hospitals'), key=itemgetter("hospital_id"))
+        # [d['value'] for d in l if 'value' in d]
+        hospital_ids = set(data['hospital_id'] for data in response_data.get('hospitals') if 'hospital_id' in data)
+        doctor_clinic = DoctorClinic.objects.filter(hospital_id__in=hospital_ids).values('hospital_id').annotate(count=Count('doctor_id'))
+        for hospital in response_data.get('hospitals'):
+            for doctor_count in doctor_clinic:
+                if doctor_count.get('hospital_id') == hospital.get('hospital_id'):
+                    hospital['count'] = doctor_count.get('count')
+
+        sorted_by_enable_booking = sorted(response_data.get('hospitals'), key=itemgetter('enabled_for_online_booking', 'count'),reverse=True)
+
         procedures = response_data.pop('procedures')
         availability = []
-        for key, group in groupby(hospitals, lambda x: x['hospital_id']):
+        for key, group in groupby(sorted_by_enable_booking, lambda x: x['hospital_id']):
             hospital_groups = list(group)
             hospital_groups = sorted(hospital_groups, key=itemgetter("discounted_fees"))
             hospital = hospital_groups[0]
@@ -590,6 +602,7 @@ class DoctorProfileUserViewSet(viewsets.GenericViewSet):
             hospital.pop("start", None)
             hospital.pop("end", None)
             hospital.pop("day",  None)
+            hospital.pop("count", None)
             hospital.pop("discounted_fees", None)
             hospital['procedure_categories'] = procedures.get(key) if procedures else []
             if key == selected_hospital:
