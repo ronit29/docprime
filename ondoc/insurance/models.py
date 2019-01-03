@@ -39,6 +39,18 @@ def generate_insurance_policy_number():
     else:
         raise ValueError('Sequence Produced is not valid.')
 
+def generate_insurance_reciept_number():
+    query = '''select nextval('userinsurance_policy_reciept_seq') as inc'''
+    seq = RawSql(query, []).fetch_all()
+    sequence = None
+    if seq:
+        sequence = seq[0]['inc'] if seq[0]['inc'] else None
+
+    if sequence:
+        return int('.8d' % sequence)
+    else:
+        raise ValueError('Sequence Produced is not valid.')
+
 
 class LiveMixin(models.Model):
     def save(self, *args, **kwargs):
@@ -195,6 +207,7 @@ class UserInsurance(auth_model.TimeStampedModel):
     insured_members = JSONField(blank=False, null=False)
     premium_amount = models.PositiveIntegerField(default=0)
     order = models.ForeignKey(account_model.Order, on_delete=models.DO_NOTHING)
+    receipt_number = models.BigIntegerField(null=False, unique=True, default=generate_insurance_reciept_number)
     coi = models.FileField(default=None, null=True, upload_to='insurance/coi', validators=[FileExtensionValidator(allowed_extensions=['pdf'])])
 
     def __str__(self):
@@ -589,6 +602,7 @@ class InsuredMembers(auth_model.TimeStampedModel):
     town = models.CharField(max_length=100, null=False)
     district = models.CharField(max_length=100, null=False)
     state = models.CharField(max_length=100, null=False)
+    state_code = models.CharField(max_length=10, null=True)
     user_insurance = models.ForeignKey(UserInsurance, related_name="members", on_delete=models.DO_NOTHING, null=False)
 
     class Meta:
@@ -615,6 +629,7 @@ class InsuredMembers(auth_model.TimeStampedModel):
                                                                         town=member.get('town'),
                                                                         district=member.get('district'),
                                                                         state=member.get('state'),
+                                                                        state_code = member.get('state_code'),
                                                                         user_insurance=user_insurance
                                                                         )
 
