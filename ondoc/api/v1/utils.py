@@ -822,13 +822,17 @@ class GenericAdminEntity():
 def create_payout_checksum(all_txn, product_id):
     from ondoc.account.models import Order
 
-    secret_key = client_key = ""
-    if product_id == Order.DOCTOR_PRODUCT_ID:
-        secret_key = settings.PG_SECRET_KEY_P1
-        client_key = settings.PG_CLIENT_KEY_P1
-    elif product_id == Order.LAB_PRODUCT_ID:
-        secret_key = settings.PG_SECRET_KEY_P2
-        client_key = settings.PG_CLIENT_KEY_P2
+    # secret_key = client_key = ""
+    # if product_id == Order.DOCTOR_PRODUCT_ID:
+    #     secret_key = settings.PG_SECRET_KEY_P1
+    #     client_key = settings.PG_CLIENT_KEY_P1
+    # elif product_id == Order.LAB_PRODUCT_ID:
+    #     secret_key = settings.PG_SECRET_KEY_P2
+    #     client_key = settings.PG_CLIENT_KEY_P2
+
+    secret_key = settings.PG_SECRET_KEY_P2
+    client_key = settings.PG_CLIENT_KEY_P2
+
 
     all_txn = sorted(all_txn, key=lambda x : x["idx"])
     checksum = ""
