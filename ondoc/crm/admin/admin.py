@@ -7,7 +7,7 @@ from ondoc.doctor.models import (Doctor, Language, MedicalService, Specializatio
                                  MedicalCondition, AboutDoctor, HealthTip, CommonMedicalCondition, CommonSpecialization,
                                  DoctorClinic, DoctorMapping, DoctorImage, OpdAppointment, CompetitorInfo,
                                  SpecializationDepartment, SpecializationField, PracticeSpecialization,
-                                 VisitReason, CancellationReason, PracticeSpecializationContent, OfflinePatients)
+                                 VisitReason, CancellationReason, PracticeSpecializationContent, OfflinePatients, OfflineOPDAppointments)
 from ondoc.diagnostic.models import (Lab, LabNetwork, LabTest, LabTestType,LabService,
                                       AvailableLabTest, LabAppointment, CommonTest, CommonDiagnosticCondition, LabPricingGroup,
                                      TestParameter, CommonPackage, LabTestCategory)
@@ -87,6 +87,7 @@ admin.site.register(Specialization, SpecializationAdmin)
 admin.site.register(MedicalCondition, MedicalConditionAdmin)
 admin.site.register(HealthTip, HealthTipAdmin)
 admin.site.register(OfflinePatients, OfflinePatientAdmin)
+admin.site.register(OfflineOPDAppointments)
 
 admin.site.register(College, CollegeAdmin)
 admin.site.register(HospitalNetwork, HospitalNetworkAdmin)
