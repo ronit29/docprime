@@ -175,8 +175,8 @@ class CouponForm(forms.ModelForm):
             age_start = 0
         if age_start and not age_end:
             age_end = 100
-        if age_start > age_end:
-            raise forms.ValidationError('Age End is smaller than Age Start.')
+        if age_start and age_end and age_start > age_end:
+            raise forms.ValidationError('Age End cannot be smaller than Age Start.')
 
 
 class CouponAdmin(admin.ModelAdmin):

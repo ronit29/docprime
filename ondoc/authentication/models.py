@@ -375,7 +375,8 @@ class UserProfile(TimeStampedModel):
     def get_age(self):
         user_age = None
         if self.dob:
-            user_age = (date.today() - self.dob) // timedelta(days=365.2425)
+            today = date.today()
+            user_age = today.year - self.dob.year - ((today.month, today.day) < (self.dob.month, self.dob.day))
         return user_age
 
     def save(self, *args, **kwargs):
