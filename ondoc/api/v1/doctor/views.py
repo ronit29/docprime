@@ -413,11 +413,12 @@ class DoctorAppointmentsViewSet(OndocViewSet):
                 ops_email_data = dict()
                 ops_email_data.update(order.appointment_details())
                 ops_email_data["transaction_time"] = aware_time_zone(timezone.now())
-                EmailNotification.ops_notification_alert(ops_email_data, settings.OPS_EMAIL_ID,
-                                                         order.product_id,
-                                                         EmailNotification.OPS_PAYMENT_NOTIFICATION)
-                push_order_to_matrix.apply_async(({'order_id': order.id, 'created_at':int(order.created_at.timestamp()),
-                                                   'timeslot':int(appointment_details['time_slot_start'].timestamp())}, ), countdown=5)
+                # EmailNotification.ops_notification_alert(ops_email_data, settings.OPS_EMAIL_ID,
+                #                                          order.product_id,
+                #                                          EmailNotification.OPS_PAYMENT_NOTIFICATION)
+                push_order_to_matrix.apply_async(
+                    ({'order_id': order.id, 'created_at': int(order.created_at.timestamp()),
+                      'timeslot': int(appointment_details['time_slot_start'].timestamp())},), countdown=5)
 
             except:
                 pass

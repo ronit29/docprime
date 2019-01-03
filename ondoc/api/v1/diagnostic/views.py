@@ -166,13 +166,14 @@ class LabList(viewsets.ReadOnlyModelViewSet):
         category_ids = validated_data.get('category_ids', None)
         lab_tests = None
         if not category_ids:
-            category_ids = LabTestCategory.objects.filter(is_live=True, is_package_category=True).values_list('id', flat=True)
+            category_ids = LabTestCategory.objects.filter(is_live=True, is_package_category=True).values_list('id',
+                                                                                                              flat=True)
 
         lab_tests = LabTestCategoryMapping.objects.filter(parent_category_id__in=category_ids).values_list(
-            'lab_test',
-            flat=True)
+            'lab_test', flat=True)
 
-        all_packages_in_network_labs = LabTest.objects.prefetch_related('test').filter(searchable=True, is_package=True,
+        all_packages_in_network_labs = LabTest.objects.prefetch_related('test').filter(enable_for_retail=True,
+                                                                                       searchable=True, is_package=True,
                                                                                        availablelabs__enabled=True,
                                                                                        availablelabs__lab_pricing_group__labs__network__isnull=False,
                                                                                        availablelabs__lab_pricing_group__labs__location__dwithin=(
@@ -190,7 +191,9 @@ class LabList(viewsets.ReadOnlyModelViewSet):
                         partition_by=[F(
                             'availablelabs__lab_pricing_group__labs__network'), F('id')])).order_by('-priority')
 
-        all_packages_in_non_network_labs = LabTest.objects.prefetch_related('test').filter(searchable=True, is_package=True,
+        all_packages_in_non_network_labs = LabTest.objects.prefetch_related('test').filter(enable_for_retail=True,
+                                                                                           searchable=True,
+                                                                                           is_package=True,
                                                                                            availablelabs__enabled=True,
                                                                                            availablelabs__lab_pricing_group__labs__network__isnull=True,
                                                                                            availablelabs__lab_pricing_group__labs__location__dwithin=(
@@ -1007,7 +1010,7 @@ class LabList(viewsets.ReadOnlyModelViewSet):
                                        lab_pricing_group__available_lab_tests__enabled=True)
 
         if ids:
-            if LabTest.objects.filter(id__in=ids, home_collection_possible=True).count() == len(ids):
+            if LabTest.objects.filter(id__in=ids, home_collection_possible=True, enable_for_retail=True).count() == len(ids):
                 home_pickup_calculation = Case(
                     When(is_home_collection_enabled=True,
                          then=F('home_pickup_charges')),
@@ -1081,7 +1084,7 @@ class LabList(viewsets.ReadOnlyModelViewSet):
         if test_ids:
             group_queryset = LabPricingGroup.objects.prefetch_related(Prefetch(
                     "available_lab_tests",
-                    queryset=AvailableLabTest.objects.filter(test_id__in=test_ids).prefetch_related('test'),
+                    queryset=AvailableLabTest.objects.filter(test__enable_for_retail=True, test_id__in=test_ids).prefetch_related('test'),
                     to_attr="selected_tests"
                 )).all()
 
@@ -1425,12 +1428,13 @@ class LabAppointmentView(mixins.CreateModelMixin,
                 ops_email_data = dict()
                 ops_email_data.update(order.appointment_details())
                 ops_email_data["transaction_time"] = aware_time_zone(timezone.now())
-                EmailNotification.ops_notification_alert(ops_email_data, settings.OPS_EMAIL_ID,
-                                                         order.product_id,
-                                                         EmailNotification.OPS_PAYMENT_NOTIFICATION)
+                # EmailNotification.ops_notification_alert(ops_email_data, settings.OPS_EMAIL_ID,
+                #                                          order.product_id,
+                #                                          EmailNotification.OPS_PAYMENT_NOTIFICATION)
 
-                push_order_to_matrix.apply_async(({'order_id': order.id, 'created_at':int(order.created_at.timestamp()),
-                                                   'timeslot':int(appointment_details['time_slot_start'].timestamp())}, ), countdown=5)
+                push_order_to_matrix.apply_async(
+                    ({'order_id': order.id, 'created_at': int(order.created_at.timestamp()),
+                      'timeslot': int(appointment_details['time_slot_start'].timestamp())},), countdown=5)
             except:
                 pass
         else:
@@ -1534,7 +1538,10 @@ class AvailableTestViewSet(mixins.RetrieveModelMixin,
     @transaction.non_atomic_requests
     def retrieve(self, request, lab_id):
         params = request.query_params
-        queryset = AvailableLabTest.objects.select_related().filter(test__searchable=True, lab_pricing_group__labs=lab_id, lab_pricing_group__labs__is_live=True, enabled=True)
+        queryset = AvailableLabTest.objects.select_related().filter(test__searchable=True,
+                                                                    test__enable_for_retail=True,
+                                                                    lab_pricing_group__labs=lab_id,
+                                                                    lab_pricing_group__labs__is_live=True, enabled=True)
         if not queryset:
             return Response([])
         lab_obj = Lab.objects.filter(pk=lab_id).first()
