@@ -8,6 +8,7 @@ import nested_admin
 from import_export import fields, resources
 from datetime import datetime
 from ondoc.insurance.models import InsuranceDisease
+from django.conf import settings
 
 
 class InsurerAdmin(admin.ModelAdmin):
@@ -160,7 +161,10 @@ class InsuredMemberResource(resources.ModelResource):
         return ""
 
     def dehydrate_coi(self, insured_members):
-        return insured_members.user_insurance.coi
+        # return insured_members.user_insurance.coi.url
+
+        return settings.BASE_URL + insured_members.user_insurance.coi.url if insured_members.user_insurance.coi is not None and \
+                                                                          insured_members.user_insurance.coi.name else ''
 
 
 
