@@ -854,3 +854,10 @@ def util_absolute_url(url):
         return url
     else:
         return settings.BASE_URL + url
+
+
+def util_file_name(filename):
+    import os
+    if filename:
+        filename = os.path.basename(filename)
+    return filename

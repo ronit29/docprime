@@ -8,7 +8,7 @@ import pytz
 from django.db.models import F
 from hardcopy import bytestring_to_pdf
 
-from ondoc.api.v1.utils import util_absolute_url
+from ondoc.api.v1.utils import util_absolute_url, util_file_name
 from ondoc.doctor.models import OpdAppointment
 from ondoc.diagnostic.models import LabAppointment
 from django.core.files.uploadedfile import SimpleUploadedFile, TemporaryUploadedFile, InMemoryUploadedFile
@@ -344,7 +344,8 @@ class EMAILNotification:
                 logger.error("Got error while creating pdf for opd invoice {}".format(e))
             context.update({"invoice_url": invoice.file.url})
             context.update(
-                {"attachments": [{"filename": invoice.file.url, "path": util_absolute_url(invoice.file.url)}]})
+                {"attachments": [
+                    {"filename": util_file_name(invoice.file.url), "path": util_absolute_url(invoice.file.url)}]})
             body_template = "email/doctor_invoice/body.html"
             subject_template = "email/doctor_invoice/subject.txt"
 
@@ -397,19 +398,17 @@ class EMAILNotification:
                 invoice.save()
             except Exception as e:
                 logger.error("Got error while creating pdf for opd invoice {}".format(e))
-            # try:
-            #     file = HTML(string=html_body).write_pdf()
-            #     invoice.file = SimpleUploadedFile(filename, file, content_type='application/pdf')
-            #     invoice.save()
-            # except Exception as e:
-            #     logger.error("Got error while creating pdf for lab invoice {}".format(e))
             context.update({"invoice_url": invoice.file.url})
             context.update(
-                {"attachments": [{"filename": invoice.file.url, "path": util_absolute_url(invoice.file.url)}]})
+                {"attachments": [{"filename": util_file_name(invoice.file.url), "path": util_absolute_url(invoice.file.url)}]})
             body_template = "email/lab_invoice/body.html"
             subject_template = "email/lab_invoice/subject.txt"
 
         elif notification_type == NotificationAction.LAB_REPORT_SEND_VIA_CRM:
+            attachments = []
+            for report_link in context.get('reports', []):
+                attachments.append({"filename": util_file_name(report_link), "path": util_absolute_url(report_link)})
+            context.update({'attachments': attachments})
             body_template = "email/lab/lab_report_send_crm/body.html"
             subject_template = "email/lab/lab_report_send_crm/subject.txt"
 
@@ -418,9 +417,7 @@ class EMAILNotification:
     def trigger(self, receiver, template, context):
         cc = []
         bcc = [settings.PROVIDER_EMAIL]
-        attachments = []
-        if context.get('attachments', None):
-            attachments = context.get('attachments')
+        attachments = context.get('attachments', [])
         user = receiver.get('user')
         email = receiver.get('email')
         notification_type = self.notification_type
@@ -571,7 +568,8 @@ class OpdNotification(Notification):
             "action_id": self.appointment.id,
             "payment_type": dict(OpdAppointment.PAY_CHOICES)[self.appointment.payment_type],
             "image_url": "",
-            "time_slot_start": time_slot_start
+            "time_slot_start": time_slot_start,
+            "attachments": {}  # Updated later
         }
         return context
 
@@ -678,6 +676,7 @@ class LabNotification(Notification):
         for report in reports:
             report_file_links = report_file_links.union(
                 set([report_file.name.url for report_file in report.files.all()]))
+        report_file_links = [util_absolute_url(report_file_link) for report_file_link in report_file_links]
         for test in tests:
             test['mrp'] = str(test['mrp'])
             test['deal_price'] = str(test['deal_price'])
@@ -694,7 +693,9 @@ class LabNotification(Notification):
             "pickup_address": self.appointment.get_pickup_address(),
             "coupon_discount": str(self.appointment.discount) if self.appointment.discount else None,
             "time_slot_start": time_slot_start,
-            "tests": tests
+            "tests": tests,
+            "reports": report_file_links,
+            "attachments": {}  # Updated later
         }
         return context
 
