@@ -188,7 +188,7 @@ class LabList(viewsets.ReadOnlyModelViewSet):
                      then=F('availablelabs__custom_deal_price'))),
             rank=Window(expression=RowNumber(), order_by=F('distance').asc(),
                         partition_by=[F(
-                            'availablelabs__lab_pricing_group__labs__network'), F('id')]))
+                            'availablelabs__lab_pricing_group__labs__network'), F('id')])).order_by('-priority')
 
         all_packages_in_non_network_labs = LabTest.objects.prefetch_related('test').filter(searchable=True, is_package=True,
                                                                                            availablelabs__enabled=True,
@@ -205,7 +205,7 @@ class LabList(viewsets.ReadOnlyModelViewSet):
                      then=F('availablelabs__computed_deal_price')),
                 When(availablelabs__custom_deal_price__isnull=False,
                      then=F('availablelabs__custom_deal_price'))),
-        )
+        ).order_by('-priority')
         all_packages_in_non_network_labs = all_packages_in_non_network_labs.filter(id__in=lab_tests)
         all_packages_in_network_labs = all_packages_in_network_labs.filter(id__in=lab_tests)
 
