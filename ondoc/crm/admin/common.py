@@ -264,7 +264,7 @@ class MerchantResource(resources.ModelResource):
         model = Merchant
         fields = ('id', 'beneficiary_name', 'merchant_add_1', 'merchant_add_2', 'merchant_add_3', 'merchant_add_4',
                   'city', 'pin', 'state', 'country', 'email', 'mobile', 'ifsc_code', 'account_number', 'enabled',
-                  'verified_by_finance',)
+                  'verified_by_finance','type')
 
 
 class MerchantAdmin(ImportExportMixin, VersionAdmin):
