@@ -221,6 +221,7 @@ class UserInsurance(auth_model.TimeStampedModel):
         proposer_fname = proposer.first_name if proposer.first_name else ""
         proposer_mname = proposer.middle_name if proposer.middle_name else ""
         proposer_lname = proposer.last_name if proposer.last_name else ""
+        gst_state_code = proposer.state_code
 
         proposer_name = '%s %s %s %s' % (proposer.title, proposer_fname, proposer_mname, proposer_lname)
 
@@ -311,8 +312,8 @@ class UserInsurance(auth_model.TimeStampedModel):
             'insurer_signature': self.insurance_plan.insurer.signature.url,
             'company_name': self.insurance_plan.insurer.company_name,
             'insurer_name': self.insurance_plan.insurer.name,
-            'gst_state_code': '',
-            'reciept_number': ''
+            'gst_state_code': gst_state_code,
+            'reciept_number': self.receipt_number
         }
         html_body = render_to_string("pdfbody.html", context=context)
         policy_number = self.policy_number
