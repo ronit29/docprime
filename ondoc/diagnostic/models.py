@@ -719,7 +719,7 @@ class LabTest(TimeStampedModel, SearchKey):
     about_test = models.TextField(blank=True, verbose_name='About the test')
     show_details = models.BooleanField(default=False)
     preparations = models.TextField(blank=True, verbose_name='Preparations for the test')
-    priority = models.PositiveIntegerField(default=0, null=True)
+    priority = models.IntegerField(default=0, null=True)
     hide_price = models.BooleanField(default=False)
     searchable = models.BooleanField(default=True)
     categories = models.ManyToManyField(LabTestCategory,
