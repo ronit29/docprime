@@ -2078,16 +2078,12 @@ class OfflineCustomerViewSet(viewsets.GenericViewSet):
 
             if not data.get('patient')['id'] in patient_ids:
                 patient_data = self.create_patient(request, data['patient'], data['hospital'], data['doctor'])
-                patient = patient_data['patient']
-                if patient_data['sms_list'] is not None:
-                    sms_list.append(patient_data['sms_list'])
             else:
-                patient = models.OfflinePatients.objects.filter(id=data.get('patient')['id']).first()
-                if patient and patient.sms_notification:
-                    def_number = patient.patient_mobiles.filter(is_default=True).first()
-                    if def_number:
-                        sms_list.append(def_number.phone_number)
-            # time_slot_start = form_time_slot(data.get("start_date"), data.get("start_time"))
+                patient_data = self.update_patient(request, data['patient'], data['hospital'], data['doctor'])
+
+            patient = patient_data['patient']
+            if patient_data['sms_list'] is not None:
+                sms_list.append(patient_data['sms_list'])
             time_slot_start = data.get('time_slot_start')
             try:
                 appnt = models.OfflineOPDAppointments.objects.create(doctor=data.get('doctor'),
@@ -2135,7 +2131,7 @@ class OfflineCustomerViewSet(viewsets.GenericViewSet):
                                                         sms_notification=data.get('sms_notification', False),
                                                         gender=data.get('gender'),
                                                         dob=data.get("dob"),
-                                                        calculated_dob=data.get("dob"),
+                                                        calculated_dob=data.get("calculated_dob"),
                                                         age=data.get('age'),
                                                         referred_by=data.get('referred_by'),
                                                         medical_history=data.get('medical_history'),
@@ -2161,7 +2157,50 @@ class OfflineCustomerViewSet(viewsets.GenericViewSet):
                     default_num = num['phone_number']
             if default_num and ('sms_notification' in data and data['sms_notification']):
                 sms_number = default_num
-        return {"sms_list": sms_number, "patient": patient}
+        return {"sms_list": sms_number, 'display_welcome_message': patient.display_welcome_message, 'welcome_message': patient.welcome_message , "patient": patient}
+
+    def update_patient(self, request, data, hospital, doctor):
+        if data.get('share_with_hospital') and not hospital:
+            logger.error('PROVIDER_REQUEST - Hospital Not Given when Shared with Hospital Set'+ str(data))
+        hosp = hospital if data.get('share_with_hospital') and hospital else None
+        patient = models.OfflinePatients.objects.filter(id=data.get('id')).first()
+        if patient:
+            if data.get('gender'):
+                patient.gender = data.get('gender')
+            if data.get('dob'):
+                patient.dob = data.get('dob')
+            if data.get('calculated_dob'):
+                patient.calculated_dob = data.get('calculated_dob')
+            if data.get('referred_by'):
+                patient.referred_by = data.get('referred_by')
+            if data.get('medical_history'):
+                patient.medical_history = data.get('medical_history')
+            if data.get('sms_notification'):
+                patient.sms_notification = data.get('sms_notification')
+            if data.get('display_welcome_message'):
+                patient.display_welcome_message = data.get('display_welcome_message')
+            if data.get('share_with_hospital'):
+                patient.share_with_hospital = data.get('share_with_hospital')
+            if hosp:
+                patient.hospital = hosp
+            patient.save()
+            default_num = None
+            sms_number = None
+
+            if data.get('phone_number'):
+                del_queryset = models.PatientMobile.objects.filter(patient=patient)
+                if del_queryset.exists():
+                    del_queryset.delete()
+                for num in data.get('phone_number'):
+                    models.PatientMobile.objects.create(patient=patient,
+                                                        phone_number=num.get('phone_number'),
+                                                        is_default=num.get('is_default', False))
+
+                    if 'is_default' in num and num['is_default']:
+                        default_num = num['phone_number']
+                if default_num and ('sms_notification' in data and data['sms_notification']):
+                    sms_number = default_num
+            return {"sms_list": sms_number, 'display_welcome_message': patient.display_welcome_message, 'welcome_message': patient.welcome_message , "patient": patient}
 
     def update_offline_appointments(self, request):
         serializer = serializers.OfflineAppointmentUpdateSerializer(data=request.data)
@@ -2170,7 +2209,7 @@ class OfflineCustomerViewSet(viewsets.GenericViewSet):
         sms_list = []
         resp = []
         appntment_ids = models.OfflineOPDAppointments.objects.all()
-        # patient_ids = models.OfflinePatients.objects.values_list('id', flat=True)
+        patient_ids = list(models.OfflinePatients.objects.values_list('id', flat=True))
         req_hosp_ids = [data.get('hospital').id if data.get('hospital') else None for data in valid_data.get('data')]
         clinic_queryset = [(dc.doctor.id, dc.hospital.id) for dc in models.DoctorClinic.objects.filter(hospital__id__in=req_hosp_ids)]
         pem_queryset = [(ga.doctor.id if ga.doctor else None, ga.hospital.id if ga.hospital else None) for ga in
@@ -2224,22 +2263,35 @@ class OfflineCustomerViewSet(viewsets.GenericViewSet):
                             resp.append(obj)
                             logger.error("PROVIDER_REQUEST - Invalid Appointment Status Recieved! " + str(data))
                             break
+                        if data.get('patient'):
+                            if not data.get('patient')['id'] in patient_ids:
+                                patient_data = self.create_patient(request, data['patient'], data['hospital'],
+                                                                   data['doctor'])
+                                patient_ids.append(patient_data['patient'].id)
 
-                        patient = appnt.user
-                        if patient.sms_notification:
-                            def_number = patient.patient_mobiles.filter(is_default=True).first()
-                            if def_number:
-                                sms_list.append(def_number.phone_number)
+                            else:
+                                patient_data = self.update_patient(request, data['patient'], data['hospital'],
+                                                                   data['doctor'])
 
+                            patient = patient_data['patient']
+                            if patient_data['sms_list'] is not None:
+                                sms_list.append(patient_data['sms_list'])
+                            appnt.user = patient
+
+                        else:
+                            patient = appnt.user
+                            if patient.sms_notification:
+                                def_number = patient.patient_mobiles.filter(is_default=True).first()
+                                if def_number:
+                                    sms_list.append(def_number.phone_number)
                         appnt.doctor = data.get('doctor')
                         appnt.hospital = data.get('hospital')
                         appnt.error = data.get('error')
                         appnt.error_message = data.get('error_message')
 
-                        if data.get("start_date") and data.get("start_time") and \
-                                data.get('status') == models.OfflineOPDAppointments.RESCHEDULED_DOCTOR:
-                            time_slot_start = form_time_slot(data.get("start_date"), data.get("start_time"))
-                            appnt.time_slot_start = time_slot_start
+                        if data.get("time_slot_start") and data.get('status') == models.OfflineOPDAppointments.RESCHEDULED_DOCTOR:
+                            # time_slot_start = form_time_slot(data.get("start_date"), data.get("start_time"))
+                            appnt.time_slot_start = data.get("time_slot_start")
                         if data.get('status'):
                             appnt.status = data.get('status')
                         try:
@@ -2550,6 +2602,10 @@ class AppointmentMessageViewset(viewsets.GenericViewSet):
                 def_number = patient.patient_mobiles.filter(is_default=True).first()
                 if def_number:
                     phone_number = def_number.phone_number
+            else:
+                obj['error'] = True
+                obj['message'] = 'Sms Notifications Not Enabled!'
+                return Response(obj, status=status.HTTP_400_BAD_REQUEST)
         else:
             phone_number = patient.phone_number
         if data.get('type') == serializers.AppointmentMessageSerializer.REMINDER:
