@@ -19,15 +19,17 @@ class Banner(auth_model.TimeStampedModel):
     LAB_RESULT = 3
     PACKAGE = 4
     PROCEDURE = 5
+    OFFERS_PAGE = 6
 
-    slider_location = [(HOME_PAGE, 'home_page'), (DOCTOR_RESULT, 'doctor_search_page'), (LAB_RESULT, 'lab_search_page'), (PROCEDURE, 'procedure_search_page'), (PACKAGE, 'package_search_page')]
+    slider_location = [(HOME_PAGE, 'home_page'), (DOCTOR_RESULT, 'doctor_search_page'), (LAB_RESULT, 'lab_search_page'), (PROCEDURE, 'procedure_search_page'), (PACKAGE, 'package_search_page'),
+                       (OFFERS_PAGE, 'offers_page')]
     title = models.CharField(max_length=500)
     image = models.ImageField('Banner image', upload_to='banner/images')
     url = models.URLField(max_length=1000)
     priority = models.PositiveIntegerField(blank=True, null=True, default=0)
     slider_locate = models.SmallIntegerField(choices=slider_location)
-    slider_action = models.SmallIntegerField(choices=slider_choice)
-    object_id = models.PositiveIntegerField()
+    slider_action = models.SmallIntegerField(choices=slider_choice, null=True, blank=True)
+    object_id = models.PositiveIntegerField(null=True, blank=True)
     start_date = models.DateTimeField(null=True, blank=True)
     end_date = models.DateTimeField(null=True, blank=True)
     enable = models.BooleanField(verbose_name='is enabled', default=True)

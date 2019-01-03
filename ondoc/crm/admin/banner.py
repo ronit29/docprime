@@ -30,8 +30,9 @@ class BannerForm(forms.ModelForm):
         #     if not MedicalCondition.objects.filter(id=cleaned_data.get('object_id')):
         #         raise forms.ValidationError('Condition does not exist')
 
-        if not cleaned_data.get('start_date') < cleaned_data.get('end_date'):
-            raise forms.ValidationError('End date is invalid')
+        if cleaned_data.get('start_date'):
+            if not cleaned_data.get('start_date') < cleaned_data.get('end_date'):
+                raise forms.ValidationError('End date is invalid')
 
 
 class BannerAdmin(admin.ModelAdmin):
