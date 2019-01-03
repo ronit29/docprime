@@ -284,7 +284,7 @@ class UserInsurance(auth_model.TimeStampedModel):
             'group_policy_email': 'customercare@docprime.com',
             'nominee_name': 'legal heir',
             'nominee_relation': 'legal heir',
-            'nominee_address': '',
+            'nominee_address': 'Same as proposer',
             'policy_related_email': '%s and customercare@docprime.com' % self.insurance_plan.insurer.email,
             'policy_related_tollno': '%d and 18001239419' % self.insurance_plan.insurer.intermediary_contact_number,
             'policy_related_website': '%s and https://docprime.com' % self.insurance_plan.insurer.website,
