@@ -6,7 +6,8 @@ from rest_framework.renderers import JSONRenderer
 from ondoc.diagnostic.models import Lab
 from ondoc.doctor.models import Doctor
 from ondoc.insurance.models import (Insurer, InsurancePlans, InsuranceThreshold, InsurerAccount, InsuredMembers,
-                                    InsuranceTransaction, UserInsurance, InsuranceDisease, InsurancePlanContent)
+                                    InsuranceTransaction, UserInsurance, InsuranceDisease, InsurancePlanContent,
+                                    StateGSTCode)
 from ondoc.authentication.models import (User, UserProfile)
 from ondoc.account import models as account_models
 from ondoc.account.models import (Order)
@@ -154,3 +155,12 @@ class InsuranceValidationSerializer(serializers.Serializer):
     doctor = serializers.PrimaryKeyRelatedField(queryset=Doctor.objects.all(), allow_null=True)
     time_slot_start = serializers.DateTimeField()
     profile = serializers.PrimaryKeyRelatedField(queryset=UserProfile.objects.all())
+
+
+class StateGSTCodeSerializer(serializers.ModelSerializer):
+
+    class Meta:
+        model = StateGSTCode
+        fields = ('id', 'gst_code', 'state_name')
+
+

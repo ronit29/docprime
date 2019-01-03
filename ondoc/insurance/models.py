@@ -641,9 +641,19 @@ class InsuranceDisease(auth_model.TimeStampedModel):
 
 
 class InsuranceDiseaseResponse(auth_model.TimeStampedModel):
-    disease = models.ForeignKey(InsuranceDisease,related_name="affected_members", on_delete=models.SET_NULL, null=True)
+    disease = models.ForeignKey(InsuranceDisease, related_name="affected_members", on_delete=models.SET_NULL, null=True)
     member = models.ForeignKey(InsuredMembers, related_name="diseases", on_delete=models.SET_NULL, null=True)
     response = models.BooleanField(default=False)
 
     class Meta:
         db_table = "insurance_disease_response"
+
+
+class StateGSTCode(auth_model.TimeStampedModel):
+    gst_code = models.CharField(max_length=10)
+    state_name = models.CharField(max_length=100)
+    is_enabled = models.BooleanField(default=True)
+    is_live = models.BooleanField(default=True)
+
+    class Meta:
+        db_table = "state_gst_code"
