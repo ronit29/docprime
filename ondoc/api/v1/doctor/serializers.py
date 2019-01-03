@@ -272,22 +272,16 @@ class CreateAppointmentSerializer(serializers.Serializer):
         coupon_obj = Coupon.objects.filter(code__in=coupon_codes) | coupon_obj
         if coupon_obj:
         # if len(coupon_code) == len(coupon_obj):
-            ##### DO NOT DELETE ######
-            # for coupon in coupon_obj:
-            #     obj = OpdAppointment()
-            #     if obj.validate_user_coupon(user=request.user, coupon_obj=coupon).get("is_valid"):
-            #         if coupon.is_user_specific:
-            #             if not obj.validate_product_coupon(coupon_obj=coupon,
-            #                                                      lab=data.get("lab"), test=data.get("test_ids"),
-            #                                                      product_id=Order.LAB_PRODUCT_ID):
-            #                 raise serializers.ValidationError('Invalid coupon code - ' + str(coupon))
-            #     else:
-            #         raise serializers.ValidationError('Invalid coupon code - ' + str(coupon))
-            ##########################
             for coupon in coupon_obj:
                 profile = data.get("profile")
                 obj = OpdAppointment()
-                if not obj.validate_user_coupon(user=request.user, coupon_obj=coupon, profile=profile).get("is_valid"):
+                if obj.validate_user_coupon(user=request.user, coupon_obj=coupon, profile=profile).get("is_valid"):
+                    if not obj.validate_product_coupon(coupon_obj=coupon,
+                                                       doctor=data.get("doctor"), hospital=data.get("hospitals"),
+                                                       procedures=data.get("procedure_ids"),
+                                                       product_id=Order.DOCTOR_PRODUCT_ID):
+                        raise serializers.ValidationError('Invalid coupon code - ' + str(coupon))
+                else:
                     raise serializers.ValidationError('Invalid coupon code - ' + str(coupon))
             data["coupon_obj"] = list(coupon_obj)
 

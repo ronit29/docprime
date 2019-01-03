@@ -108,23 +108,35 @@ class ApplicableCouponsViewSet(viewsets.GenericViewSet):
             coupons = coupons.filter(Q(test__isnull=True) | Q(test__in=tests))
             test_categories = set(tests.values_list('categories', flat=True))
             coupons = coupons.filter(Q(test_categories__isnull=True) | Q(test_categories__in=test_categories))
+        else:
+            coupons = coupons.filter(test__isnull=True)
+            coupons = coupons.filter(test_categories__isnull=True)
 
         if lab:
             coupons = coupons.filter(Q(cities__isnull=True) | Q(cities__icontains=lab.city))
+        else:
+            coupons = coupons.filter(cities__isnull=True)
 
         if hospital:
             coupons = coupons.filter(Q(cities__isnull=True) | Q(cities__icontains=hospital.city))
+        else:
+            coupons = coupons.filter(cities__isnull=True)
 
         if doctor:
             coupons = coupons.filter(Q(specializations__isnull=True)
                                      | Q(specializations__in=
                                        doctor.doctorpracticespecializations.values_list('specialization', flat=True))
                                      )
+        else:
+            coupons = coupons.filter(specializations__isnull=True)
 
         if procedures:
             coupons = coupons.filter(Q(procedures__isnull=True) | Q(procedures__in=procedures))
             procedure_categories = set(procedures.values_list('categories', flat=True))
             coupons = coupons.filter(Q(procedure_categories__isnull=True) | Q(procedure_categories__in=procedure_categories))
+        else:
+            coupons = coupons.filter(procedures__isnull=True)
+            coupons = coupons.filter(procedure_categories__isnull=True)
 
         if product_id:
             coupons = coupons.filter(is_corporate=False)

@@ -592,11 +592,10 @@ class LabAppointmentCreateSerializer(serializers.Serializer):
                 for coupon in coupon_obj:
                     obj = LabAppointment()
                     if obj.validate_user_coupon(user=request.user, coupon_obj=coupon, profile=profile).get("is_valid"):
-                        if coupon.is_user_specific:
-                            if not obj.validate_product_coupon(coupon_obj=coupon,
-                                                                     lab=data.get("lab"), test=data.get("test_ids"),
-                                                                     product_id=Order.LAB_PRODUCT_ID):
-                                raise serializers.ValidationError('Invalid coupon code - ' + str(coupon))
+                        if not obj.validate_product_coupon(coupon_obj=coupon,
+                                                           lab=data.get("lab"), test=data.get("test_ids"),
+                                                           product_id=Order.LAB_PRODUCT_ID):
+                            raise serializers.ValidationError('Invalid coupon code - ' + str(coupon))
                     else:
                         raise serializers.ValidationError('Invalid coupon code - ' + str(coupon))
                 data["coupon_obj"] = list(coupon_obj)
