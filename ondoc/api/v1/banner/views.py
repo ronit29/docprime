@@ -1,4 +1,6 @@
 import re
+from urllib.parse import urlparse
+
 from django.http import QueryDict
 from django.utils import timezone
 from rest_framework import viewsets, status, serializers
@@ -13,7 +15,7 @@ class BannerListViewSet(viewsets.GenericViewSet):
 
         now = timezone.now()
 
-        queryset = Banner.objects.filter(enable=True, start_date__lte=now, end_date__gte=now).order_by('-priority')[:10]
+        queryset = Banner.objects.filter(enable=True).order_by('-priority')[:10]
         slider_locate = dict(Banner.slider_location)
         final_result = []
 
@@ -26,6 +28,10 @@ class BannerListViewSet(viewsets.GenericViewSet):
             resp['end_date'] = data.end_date
             resp['priority'] = data.priority
             resp['event_name'] = data.event_name
+            if data.url:
+                import re
+                data.url = re.sub(r'(https?://.+?/)', '', data.url)
+
             resp['url'] = data.url
             if data.url:
                 data.url = re.sub('.*?\?', '', data.url)

@@ -25,7 +25,7 @@ class Banner(auth_model.TimeStampedModel):
                        (OFFERS_PAGE, 'offers_page')]
     title = models.CharField(max_length=500)
     image = models.ImageField('Banner image', upload_to='banner/images')
-    url = models.URLField(max_length=1000)
+    url = models.URLField(max_length=1000, null=True, blank=True)
     priority = models.PositiveIntegerField(blank=True, null=True, default=0)
     slider_locate = models.SmallIntegerField(choices=slider_location)
     slider_action = models.SmallIntegerField(choices=slider_choice, null=True, blank=True)
