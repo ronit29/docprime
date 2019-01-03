@@ -86,7 +86,7 @@
                 <tbody>
                 <tr>
                     <td style="color: #000000; font-weight: 600; font-size: 16px;">
-                        Booking ID : <span style="font-size: 14px; color: #070707; font-weight: 500; padding-top: 4px;">{{instance.id}}</span>
+                        Booking ID : <span style="font-size: 14px; color: #070707; font-weight: 650; padding-top: 4px;">{{instance.id}}</span>
                     </td>
                 </tr>
                 </tbody>
@@ -100,7 +100,7 @@
                 <tbody>
                 <tr>
                     <td style="color: #000000; font-weight: 600; font-size: 16px;">
-                        Patient Name
+                        Patient
                     </td>
                 </tr>
                 <tr>
@@ -119,7 +119,7 @@
                 <tbody>
                 <tr>
                     <td style="color: #000000; font-weight: 600; font-size: 16px;">
-                        Appointment Date &amp; Time :
+                        Appointment Date &amp; Time
                     </td>
                 </tr>
                 <tr>
@@ -138,7 +138,7 @@
                 <tbody>
                 <tr>
                     <td style="color: #000000; font-weight: 600; font-size: 16px;">
-                        Lab Name
+                        Lab
                     </td>
                 </tr>
                 <tr>
@@ -155,12 +155,6 @@
         <td>
             <table cellpadding="0" cellspacing="0" style="width: 100%; padding: 20px 15px 0;">
                 <tbody>
-                <tr>
-                    <td style="color: #000000; font-weight: 600; font-size: 16px;">
-
-                    </td>
-                </tr>
-
                 <tr>
                     <td style="color: #000000; font-weight: 600; font-size: 16px;">
                         Home Pick up Address
@@ -201,19 +195,77 @@
     {% endif %}
     <tr>
         <td>
-            <table cellpadding="0" cellspacing="0" style="width: 100%; padding: 20px 15px 0;">
+            <table cellpadding="0" cellspacing="0"
+                   style="width: 100%; padding: 20px 15px 20px;">
                 <tbody>
                 <tr>
                     <td style="color: #000000; font-weight: 600; font-size: 16px;">
-                        Test Booked
+                        Service(s) Included
                     </td>
                 </tr>
+                </tbody>
+            </table>
+        </td>
+    </tr>
+    <tr>
+        <td style="padding-top: 5px;">
+            <table align="center" cellpadding="0" cellspacing="0"
+                   style="width: 100%;border-collapse: collapse;border: 1px solid black;">
+                <thead>
                 <tr>
-                    <td style="font-size: 14px; color: #070707; font-weight: 500; padding-top: 4px;">
-                        {% for test in instance.test_mappings.all %}
-                        <!--DONE SHASHANK_SINGH CHANGE 14-->
-                        {{test.test.name}}{% if not forloop.last %},{% endif %}
-                        {% endfor %}
+                    <th style="border: 1px solid black;">
+                        S.No.
+                    </th>
+                    <th style="border: 1px solid black;">
+                        Particulars
+                    </th>
+                    <th style="border: 1px solid black;">
+                        MRP
+                    </th>
+                    <th style="border: 1px solid black;">
+                        Discount
+                    </th>
+                    <th style="border: 1px solid black;">
+                        Grand Total
+                    </th>
+                </tr>
+                </thead>
+                <tbody>
+                {% for test in tests %}
+                <tr>
+                    <td style="border: 1px solid black;text-align: center;">
+                        {{forloop.counter}}
+                    </td>
+                    <td style="border: 1px solid black;text-align: center;">
+                        {{test.name|capfirst}}
+                    </td>
+                    <td style="border: 1px solid black;text-align: center;">
+                        {{test.mrp}}
+                    </td>
+                    <td style="border: 1px solid black;text-align: center;">
+                        {{test.discount}}
+                    </td>
+                    <td style="border: 1px solid black;text-align: center;">
+                        {{test.deal_price}}
+                    </td>
+                </tr>
+                {% endfor %}
+                {% if coupon_discount %}
+                <tr>
+                    <td colspan="4" style="border: 1px solid black;text-align: center;">
+                        Coupon Discount
+                    </td>
+                    <td style="border: 1px solid black;text-align: center;">
+                        {{coupon_discount}}
+                    </td>
+                </tr>
+                {% endif %}
+                <tr>
+                    <td colspan="4" style="border: 1px solid black;text-align: center;">
+                        Amount Paid
+                    </td>
+                    <td style="border: 1px solid black;text-align: center;">
+                        {{instance.effective_price}}
                     </td>
                 </tr>
                 </tbody>
