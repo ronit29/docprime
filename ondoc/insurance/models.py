@@ -47,7 +47,7 @@ def generate_insurance_reciept_number():
         sequence = seq[0]['inc'] if seq[0]['inc'] else None
 
     if sequence:
-        return int('.8d' % sequence)
+        return int("1%.8d" % sequence)
     else:
         raise ValueError('Sequence Produced is not valid.')
 
