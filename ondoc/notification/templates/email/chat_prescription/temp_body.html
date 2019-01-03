@@ -1,0 +1,217 @@
+{% load static %}
+{% load invoice_tags %}
+<table style="width: 100%;">
+    <tr>
+        <td align="right">
+            <input id="download_prescription"
+                   style="font-size:14px !important; border-radius: 5px; background: #f1863b !important ;border: 0px;color: white;border-radius: 2px;padding: 5px 10px;"
+                   type="submit" value="&#x21E9; Download" onclick="msg()">
+        </td>
+    </tr>
+</table>
+<table border="0" align="center" cellpadding="0" cellspacing="0"
+       style="font-family: verdana; background:#ffffff; border: 2px solid #d7d7d7; width:100%; padding: 0px 15px 40px 15px;">
+    <tr style="text-align: center">
+        <td align="center" valign="top" style="padding:10px 0; text-align: center">
+
+            <div style="font-weight: 700; margin:4px 0px 5px 0px !important; text-align: left; padding-left:20px">Dr.
+                {{doctorProfile.name}}
+                <br>
+                <span style="font-size:12px; padding-top:10px; display:inline-block;">
+{% for value in doctorProfile.qualifications %}
+{{value.qualification}}{% if not forloop.last %},&nbsp;{% endif %}
+{% endfor %}</span>
+                <br>
+                <span style="font-size: 12px; font-weight:400">Registration No.</span>
+                <br>
+                <span style="font-size: 12px">{{doctorProfile.license}}</span>
+                <br>
+                <br>
+                <span style="display: none; font-size: 12px; padding:0px 10px 0px 0px; color: #806c6c">Online
+consultation</span>
+                <br>
+                <br>
+                <span style="display: inline-block; font-size: 12px; padding:0px 10px 0px 0px; color: #806c6c">Online
+consultation</span>
+                <span style="color:#191616; float:right; font-weight: bold; font-size: 12px; padding:0px 15px 0px 0px;">{{updated_at|date:'l, F jS Y'}}</span>
+            </div>
+            <hr style="display:block; background:#000000; height:1px; clear:both; margin:0px -15px;">
+        </td>
+    </tr>
+    <tr>
+        <td align="center" valign="top" style="text-align: center;">
+            <div style="float: left; text-align:left; width:45%; padding:0px 0px 15px 20px;">
+                <span style="font-size: 14px; font-weight: bold; padding-bottom:12px; display: inline-block">Patient Detail</span>
+                <br>
+                <span style="font-size: 13px;">
+<span style="font-weight: bold">Name</span> -
+<span>{{profile.name}}</span>
+</span>
+                <br>
+                <span style="font-size: 13px;">
+<span style="font-weight: bold">Age</span> -
+<span>{{profile.age}}</span>
+</span>
+                <br>
+                <span style="font-size: 13px;">
+<span style="font-weight: bold">Gender</span> -
+<span>{{profile.gender}}</span>
+</span>
+                <br>
+                <br>
+                <br>
+                {% if symptoms %}
+                <span style="font-size: 13px; font-weight: bold; padding-bottom: 10px; display: inline-block">Symptoms</span>
+                <ul style="font-size: 13px;">
+                    {% for value in symptoms %}
+                    <li style="padding: 2px 0px">{{value}}</li>
+                    {% endfor %}
+                </ul>
+                {% endif %}
+
+                {% if findings %}
+                {% for value in findings %}
+                <li style="font-size: 13px; font-weight: bold; padding-bottom: 10px; list-style:none;">{{value}}</li>
+                {% endfor %}
+                {% endif %}
+                <br>
+                {% if prodiagnosis and prodiagnosisType %}
+                <span style="font-size: 13px; font-weight: bold; padding-bottom: 10px; display: inline-block">Provisional
+Diagnosis</span>
+                <br>
+                <ul style="font-size: 13px;">
+                    {% for value in prodiagnosis %}
+                    <li style="padding: 2px 0px">{{value}}</li>
+                    {% endfor %}
+                </ul>
+                {% else %}
+                {% if diagnosis %}
+                <span style="font-size: 13px;font-weight: bold;padding-bottom: 10px;display: inline-block">Diagnosis</span>
+                <br>
+                <ul style="font-size: 13px;">
+                    {% for value in diagnosis %}
+                    <li style="padding: 2px 0px">{{value}}</li>
+                    {% endfor %}
+                </ul>
+                {% endif %}
+                {% endif %}
+            </div>
+            <div style="float: right; text-align: left; width:45%">
+                {% if medicines %}
+                <span style="font-size: 14px; font-weight: bold; padding-bottom:20px; display: inline-block">Medicines</span>
+                <br>
+                <ul style="font-size: 13px;">
+                    {% for value in medicines %}
+                    <li style="padding: 2px 0px; font-weight: 600;">{{value.MedicineName}}
+                        <p style="    margin-top: 0px;color: #7f7979; font-weight: 500;">{{value.qunatity}},
+                            {{value.selectedNoOfTimes}}{% if value.times %}, {{value.times|join:"| "}}{% endif %} {% if
+                            value.mealtimes %}({{value.mealtimes}}){% endif %} {{value.selectedmedDays}}{% if
+                            value.medicineInstructions %} {{ value.medicineInstructions }}{% endif %}</p>
+                    </li>
+                    {% endfor %}
+                </ul>
+                {% endif %}
+                <span style="font-size: 13px;">
+{% if investigations %}
+<span style="font-weight: bold">Investigation</span>
+<ul style="font-size: 13px;">
+{% for value in investigations %}
+<li style="padding: 2px 0px">{{value}}</li>
+{% endfor %}
+</ul>
+{% endif %}
+</span>
+            </div>
+        </td>
+    </tr>
+    <tr>
+        <td align="center" valign="top" style="text-align: center;">
+            <div style="float: left;text-align:left;margin-top:20px;padding-left:20px;">
+                {% if instructions %}
+                <span style="font-size: 14px;font-weight: bold;padding-bottom: 10px;display: inline-block">Instructions</span>
+                <br>
+                <ul style="font-size: 13px;">
+                    {% for value in instructions %}
+                    <li style="padding: 2px 0px">{{value}}</li>
+                    {% endfor %}
+                </ul>
+                {% endif %}
+            </div>
+        </td>
+
+    </tr>
+    <tr>
+        <td align="center" valign="top" style="text-align: center;">
+
+            {% if physicalexamination and specialization %}
+            <div style="float: left;text-align: center;font-size: 13px;padding:0 10px;margin-top:20px;margin-bottom: 10px;">
+                <b>Recommendation:</b> Basis your symptoms, we recommend you to visit
+                <b style="padding: 2px 0px; font-weight: 600;">{{specialization|join:", "}}</b> for a physical
+                examination.
+                <br>
+
+            </div>
+            {% endif %}
+        </td>
+
+    </tr>
+    <tr>
+        <td align="center" valign="top" style="text-align: center;">
+            <div style="float: right; width:100px; height:50px; text-align: center; font-size: 9px; font-style: italic; margin-bottom: 10px; padding:0px 10px;">
+                {% if signatureurl %}<img src="{{signatureurl}}" style="width:100px; height:50px;">{% endif %}
+            </div>
+        </td>
+    </tr>
+    <tr>
+        <td align="center" valign="top" style="text-align: center;">
+            <div style="float: left; text-align: center; font-size: 9px; font-style: italic; margin-bottom: 15px; padding:0px 10px;">
+                This medical advice is based on the responses provided by you over online or telephonic medium.
+                Depending on the symptoms
+                you presented, your case may further require a physical examination by a doctor. Please visit a doctor
+                or a hospital near you if your symptoms do not improve.
+                <br> powered by docprime
+            </div>
+            <hr style="display:block; background:#000000; height:1px; clear:both; margin:0px -15px;">
+        </td>
+    </tr>
+    <tr>
+        <td>
+            <table border="0" align="center" cellpadding="0" cellspacing="0" style="width: 100%">
+                <tr>
+                    <td style="width: 33%" valign="top">
+                        <table style="width: 100%">
+                            <tr>
+                                <td valign="top"><span style="padding-top: 5px; display: inline-block;">
+<img style="width:20px;" src="{{'notification/images/consultation.png'|get_absolute_url}}"/>
+</span></td>
+                                <td><label style="font-size: 11px;">Talk to our in-house doctors for free
+                                    consultation</label></td>
+                            </tr>
+                        </table>
+                    </td>
+                    <td style="width: 33%" valign="top">
+                        <table style="width: 100%">
+                            <tr>
+                                <td valign="top"><span style="padding-top: 5px; display: inline-block;">
+<img style="width:20px;" src="{{'notification/images/doctor.png'|get_absolute_url}}"/>
+</span></td>
+                                <td><label style="font-size: 11px;">Book appointment with doctors near you</label></td>
+                            </tr>
+                        </table>
+                    </td>
+                    <td style="width: 33%" valign="top">
+                        <table style="width: 100%">
+                            <tr>
+                                <td valign="top"><span style="padding-top: 5px; display: inline-block;">
+<img style="width:20px;" src="{{'notification/images/lab.png'|get_absolute_url}}"/>
+</span></td>
+                                <td><label style="font-size: 11px;">Book
+                                    test with labs</label></td>
+                            </tr>
+                        </table>
+                    </td>
+                </tr>
+            </table>
+        </td>
+    </tr>
+</table>
