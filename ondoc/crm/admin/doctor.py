@@ -568,6 +568,9 @@ class DoctorMobileFormSet(forms.BaseInlineFormSet):
                     todo_make_primary = form.instance.id
                     form.instance.otp = None
                     form.instance.mark_primary = False
+                else:
+                    raise forms.ValidationError("OTP is incorrect")
+
 
             elif not form.instance.mark_primary and form.instance.otp:
                 form.instance.otp = None
