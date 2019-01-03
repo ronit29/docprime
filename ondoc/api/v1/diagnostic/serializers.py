@@ -586,7 +586,11 @@ class LabAppointmentCreateSerializer(serializers.Serializer):
                 else:
                     raise serializers.ValidationError('Invalid coupon code - ' + str(random_coupon))
 
-            coupon_obj = Coupon.objects.filter(code__in=coupon_codes) | coupon_obj
+            if coupon_obj:
+                coupon_obj = Coupon.objects.filter(code__in=coupon_codes) | coupon_obj
+            else:
+                coupon_obj = Coupon.objects.filter(code__in=coupon_codes)
+
             # if len(coupon_code) == len(coupon_obj):
             if coupon_obj:
                 for coupon in coupon_obj:
