@@ -6,15 +6,15 @@ The booking details are as below :
 Patient : {{patient_name|capfirst}}
 Lab : {{lab_name|capfirst}}
 Appointment Date and Time : {{instance.time_slot_start|date:"D jS F Y"}} || {{instance.time_slot_start|date:"h:i A"}}
-{% if tests %}
+{% if instance.test_mappings.all %}
 Test(s) Booked :
-{% for test in tests %}
-{{test.name|capfirst}}{% if not forloop.last %},{% endif %}
+{% for test in instance.test_mappings.all %}
+{{test.test.name|capfirst}}{% if not forloop.last %},{% endif %}
 {% endfor %}
 {% endif %}
 
 {% if reports %}
-Links(s):
+Link(s):
 {% for report in reports %}
 {{report}}{% if not forloop.last %}, {% endif %}
 {% endfor %}

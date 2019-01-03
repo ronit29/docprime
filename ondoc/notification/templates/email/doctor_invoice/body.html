@@ -73,19 +73,6 @@
 			<!--</tr>-->
 			<tr>
 				<td>
-					<table cellpadding="0" cellspacing="0" style="width: 100%; padding: 20px 15px 0;">
-						<tbody>
-							<tr>
-								<td style="color: #757575; font-size: 16px; font-weight: 500;">
-									Booking ID : <span style="color: #000000; font-weight: 600;">{{instance.id}}</span>
-								</td>
-							</tr>
-						</tbody>
-					</table>
-				</td>
-			</tr>
-			<tr>
-				<td>
 					<table cellpadding="0" cellspacing="0" style="width: 100%; padding: 40px 15px 0;">
 						<tbody>
 							<!--<tr>-->
@@ -95,7 +82,7 @@
 							<!--</tr>-->
 							<tr>
 								<td style="font-size: 14px; color: #070707; font-weight: 500; padding-top: 4px;">
-									Payment Receipt has been generated. Please <a href="{{invoice_url|get_media_absolute_url}}">Click here </a> to download.
+									Please find attached the payment receipt for booking ID : {{instance.id}} booked on {{instance.created_by|date:"D jS F Y"}}.
 								</td>
 							</tr>
 							<!--<tr>-->
