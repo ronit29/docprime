@@ -9,7 +9,7 @@ from rest_framework.response import Response
 from ondoc.account import models as account_models
 from ondoc.doctor import models as doctor_models
 from ondoc.insurance.models import (Insurer, InsuredMembers, InsuranceThreshold, InsurancePlans, UserInsurance,
-                                    InsuranceTransaction, InsuranceDisease, InsuranceDiseaseResponse)
+                                    InsuranceTransaction, InsuranceDisease, InsuranceDiseaseResponse, StateGSTCode)
 from ondoc.authentication.models import UserProfile
 from ondoc.authentication.backends import JWTAuthentication
 from rest_framework.permissions import IsAuthenticated
@@ -32,6 +32,7 @@ class ListInsuranceViewSet(viewsets.GenericViewSet):
         return Insurer.objects.filter(is_live=True)
 
     def list(self, request):
+        resp = {}
         user = request.user
         if not user.is_anonymous:
             user_insurance = UserInsurance.objects.filter(user_id=request.user).last()
@@ -40,7 +41,12 @@ class ListInsuranceViewSet(viewsets.GenericViewSet):
 
         insurer_data = self.get_queryset()
         body_serializer = serializers.InsurerSerializer(insurer_data, context={'request': request}, many=True)
-        return Response(body_serializer.data)
+        state_code = StateGSTCode.objects.filter(is_live=True)
+        state_code_serializer = serializers.StateGSTCodeSerializer(state_code, context={'request': request}, many=True)
+        resp['insurance'] = body_serializer.data
+        resp['state'] = state_code_serializer.data
+        # return Response(body_serializer.data)
+        return Response(resp)
 
 
 class InsuredMemberViewSet(viewsets.GenericViewSet):
