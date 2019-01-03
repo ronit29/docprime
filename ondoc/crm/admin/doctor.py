@@ -549,15 +549,15 @@ class DoctorMobileFormSet(forms.BaseInlineFormSet):
         todo_make_primary = None
         for form in self.forms:
             if form.instance.mark_primary and not form.instance.otp:
-                if not DoctorMobileOtp.objects.filter(doctor_mobile=form.instance).exists():
-                    form.instance.save()
-                    dmo = DoctorMobileOtp.create_otp(form.instance)
-                    message = "The OTP for onboard process is %d" % dmo.otp
+                # if not DoctorMobileOtp.objects.filter(doctor_mobile=form.instance).exists():
+                form.instance.save()
+                dmo = DoctorMobileOtp.create_otp(form.instance)
+                message = "The OTP for onboard process is %d" % dmo.otp
 
-                    try:
-                        api.send_sms(message, str(form.instance.number))
-                    except Exception as e:
-                        logger.error(str(e))
+                try:
+                    api.send_sms(message, str(form.instance.number))
+                except Exception as e:
+                    logger.error(str(e))
 
             elif form.instance.mark_primary and form.instance.otp:
                 doctor_mobile_otp = form.instance.mobiles_otp.all().last()

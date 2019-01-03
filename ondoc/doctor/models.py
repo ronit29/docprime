@@ -935,9 +935,13 @@ class DoctorMobileOtp(auth_model.TimeStampedModel):
 
     def consume(self):
         if self.is_valid():
-            self.usable_counter = 0
-            self.save()
-            return True
+            if self.doctor_mobile.otp == self.otp:
+                self.usable_counter = 0
+                self.save()
+                return True
+            else:
+                print('OTP not matched')
+                return False
         else:
             print('[ERROR] Otp is expired.')
             return False
