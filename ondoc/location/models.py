@@ -799,15 +799,17 @@ class EntityUrls(TimeStampedModel):
         update_urls = RawSql(update_urls_query, []).execute()
 
         update_extras_query = '''update  seo_doctor_specialization_search 
-                    set extras = case when type='LOCALITY' then
-                    json_build_object('location_json',json_build_object('locality_id',locality_id,'locality_value',locality_value, 
-                    'locality_latitude',locality_latitude,'locality_longitude',locality_longitude))
+                          set extras = case when type='LOCALITY' then
+                           json_build_object('specialization_id', specialization_id, 'location_json',
+                           json_build_object('locality_id', locality_id, 'locality_value', locality_value, 'locality_latitude', 
+                           locality_latitude,'locality_longitude', locality_longitude), 'specialization', specialization)
 
-                    else  json_build_object('location_json',
-                    json_build_object('sublocality_id',sublocality_id,'sublocality_value',sublocality_value,
-                    'locality_id', locality_id, 'locality_value', locality_value,'breadcrum_url',getslug(specialization||'-in-' || locality_value ||'-sptcit'),
-                    'sublocality_latitude',sublocality_latitude, 'sublocality_longitude',sublocality_longitude, 'locality_latitude',locality_latitude,
-                    'locality_longitude',locality_longitude)) end'''
+                          else  json_build_object('specialization_id', specialization_id,'location_json',
+                          json_build_object('sublocality_id',sublocality_id,'sublocality_value',sublocality_value,
+                           'locality_id', locality_id, 'locality_value', locality_value,
+                           'breadcrum_url',getslug(specialization || '-in-' || locality_value ||'-sptcit'),
+                          'sublocality_latitude',sublocality_latitude, 'sublocality_longitude',sublocality_longitude, 
+                          'locality_latitude',locality_latitude,'locality_longitude',locality_longitude),'specialization', specialization) end'''
         update_extras = RawSql(update_extras_query, []).execute()
 
         update_locality_loc_query = '''update seo_doctor_specialization_search set locality_location = st_setsrid(st_point(locality_longitude, locality_latitude),4326)::geography where 
