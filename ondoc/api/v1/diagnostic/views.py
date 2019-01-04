@@ -870,12 +870,13 @@ class LabList(viewsets.ReadOnlyModelViewSet):
                                                                     lab_pricing_group__labs__is_test_lab=False,
                                                                     lab_pricing_group__labs__is_live=True,
                                                                     enabled=True,
+                                                                    test__enable_for_retail=True,
                                                                     test__in=test_ids)
 
         test_serializer = diagnostic_serializer.AvailableLabTestPackageSerializer(queryset, many=True,
                                                                            context={"lab": lab_obj})
         # for Demo
-        demo_lab_test = AvailableLabTest.objects.filter(lab_pricing_group=lab_obj.lab_pricing_group, enabled=True).order_by("-test__priority").prefetch_related('test')[:2]
+        demo_lab_test = AvailableLabTest.objects.filter(test__enable_for_retail=True, lab_pricing_group=lab_obj.lab_pricing_group, enabled=True).order_by("-test__priority").prefetch_related('test')[:2]
         lab_test_serializer = diagnostic_serializer.AvailableLabTestSerializer(demo_lab_test, many=True, context={"lab": lab_obj})
         day_now = timezone.now().weekday()
         timing_queryset = list()
