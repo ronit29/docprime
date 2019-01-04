@@ -502,8 +502,7 @@ class UserAppointmentsViewSet(OndocViewSet):
                         }
                         return resp
 
-                    # test_ids = lab_appointment.lab_test.values_list('test__id', flat=True)
-                    test_ids = lab_appointment.test_mappings.values_list('test_id', flat=True)
+                    test_ids = lab_appointment.lab_test.values_list('test__id', flat=True)
                     lab_test_queryset = AvailableLabTest.objects.select_related('lab_pricing_group__labs').filter(
                         lab_pricing_group__labs=lab_appointment.lab,
                         test__in=test_ids)
@@ -542,7 +541,7 @@ class UserAppointmentsViewSet(OndocViewSet):
                         "profile_detail": lab_appointment.profile_detail,
                         "status": lab_appointment.status,
                         "payment_type": lab_appointment.payment_type,
-                        "lab_test": lab_appointment.test_mappings.values_list('test__id', flat=True),  # SHASHANK_SINGH CHANGE 17
+                        "lab_test": lab_appointment.lab_test,
                         "discount": coupon_discount
                     }
 
@@ -665,7 +664,7 @@ class UserAppointmentsViewSet(OndocViewSet):
                 if product_id == account_models.Order.DOCTOR_PRODUCT_ID:
                     appointment_details.action_rescheduled_patient(new_appointment_details)
                     appointment_serializer = AppointmentRetrieveSerializer(appointment_details, context={"request": request})
-                if product_id == account_models.Order.LAB_PRODUCT_ID:  # SHASHANK_SINGH Ask Arun Sir Code not reachable.
+                if product_id == account_models.Order.LAB_PRODUCT_ID:
                     appointment_details.action_rescheduled_patient(new_appointment_details)
                     appointment_serializer = LabAppointmentRetrieveSerializer(appointment_details, context={"request": request})
                 resp['status'] = 1
@@ -683,7 +682,7 @@ class UserAppointmentsViewSet(OndocViewSet):
                     opdappointment_transform(temp_app_details)
                 elif product_id == account_models.Order.LAB_PRODUCT_ID:
                     action = Order.LAB_APPOINTMENT_RESCHEDULE
-                    labappointment_transform(temp_app_details)  # SHASHANK_SINGH When will this case occur.
+                    labappointment_transform(temp_app_details)
 
                 order = account_models.Order.objects.create(
                     product_id=product_id,

@@ -455,7 +455,7 @@ class LabAppointmentModelSerializer(serializers.ModelSerializer):
     class Meta:
         model = LabAppointment
         fields = ('id', 'lab', 'lab_test', 'profile', 'type', 'lab_name', 'status', 'deal_price', 'effective_price', 'time_slot_start', 'time_slot_end',
-                   'is_home_pickup', 'lab_thumbnail', 'lab_image', 'patient_thumbnail', 'patient_name', 'allowed_action', 'address')  # DONE SHASHANK_SINGH CHANGE 18
+                   'is_home_pickup', 'lab_thumbnail', 'lab_image', 'patient_thumbnail', 'patient_name', 'allowed_action', 'address')
 
 
 class LabAppointmentBillingSerializer(serializers.ModelSerializer):
@@ -864,7 +864,7 @@ class LabAppointmentRetrieveSerializer(LabAppointmentModelSerializer):
                    'is_home_pickup', 'lab_thumbnail', 'lab_image', 'profile', 'allowed_action', 'lab_test', 'lab', 'otp', 'address', 'type', 'reports')
 
 
-class DoctorLabAppointmentRetrieveSerializer(LabAppointmentModelSerializer):  # Not Used any more, untested
+class DoctorLabAppointmentRetrieveSerializer(LabAppointmentModelSerializer):
     profile = UserProfileSerializer()
     lab = LabModelSerializer()
     lab_test = AvailableLabTestSerializer(many=True)
