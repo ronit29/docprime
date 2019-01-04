@@ -1011,7 +1011,7 @@ class LabList(viewsets.ReadOnlyModelViewSet):
                                        lab_pricing_group__available_lab_tests__enabled=True)
 
         if ids:
-            if LabTest.objects.filter(id__in=ids, home_collection_possible=True, enable_for_retail=True).count() == len(ids):
+            if LabTest.objects.filter(id__in=ids, home_collection_possible=True).count() == len(ids):
                 home_pickup_calculation = Case(
                     When(is_home_collection_enabled=True,
                          then=F('home_pickup_charges')),
@@ -1085,7 +1085,7 @@ class LabList(viewsets.ReadOnlyModelViewSet):
         if test_ids:
             group_queryset = LabPricingGroup.objects.prefetch_related(Prefetch(
                     "available_lab_tests",
-                    queryset=AvailableLabTest.objects.filter(test__enable_for_retail=True, test_id__in=test_ids).prefetch_related('test'),
+                    queryset=AvailableLabTest.objects.filter(test_id__in=test_ids).prefetch_related('test'),
                     to_attr="selected_tests"
                 )).all()
 
