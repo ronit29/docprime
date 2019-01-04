@@ -7,7 +7,8 @@ from ondoc.procedure.models import Procedure, ProcedureCategory
 from ondoc.authentication.models import UserProfile
 from django.contrib.auth import get_user_model
 from ondoc.api.v1.doctor.serializers import CommaSepratedToListField
-from django.db.models import Q
+from django.db.models import F, Q, ExpressionWrapper, DateTimeField
+import datetime
 
 User = get_user_model()
 
@@ -61,15 +62,18 @@ class CouponListSerializer(serializers.Serializer):
 
     def validate(self, attrs):
         codes = attrs.get("coupon_code")
-        random_coupons = RandomGeneratedCoupon.objects.filter(random_coupon__in=codes,
-                                                              sent_at__isnull=False,
-                                                              consumed_at__isnull=True).all()
-        coupons_data = None
-        if random_coupons:
-            coupon_codes = list()
-            for coupon in random_coupons:
-                coupon_codes.append(coupon.coupon)
-            coupons_data = Coupon.objects.filter(code__in=coupon_codes)
+        coupons_data, random_coupons = None, None
+        if RandomGeneratedCoupon.objects.filter(random_coupon__in=codes).exists():
+            expression = F('sent_at') + datetime.timedelta(days=1) * F('validity')
+            annotate_expression = ExpressionWrapper(expression, DateTimeField())
+            random_coupons = RandomGeneratedCoupon.objects.annotate(last_date=annotate_expression
+                                                                    ).filter(random_coupon__in=codes,
+                                                                             sent_at__isnull=False,
+                                                                             consumed_at__isnull=True,
+                                                                             last_date__gte=datetime.datetime.now()
+                                                                             ).all()
+            if random_coupons:
+                coupons_data = Coupon.objects.filter(id__in=random_coupons.values_list('coupon', flat=True))
         if coupons_data:
             coupons_data = Coupon.objects.filter(code__in=codes) | coupons_data
         else:
@@ -96,15 +100,18 @@ class UserSpecificCouponSerializer(CouponListSerializer):
         codes = attrs.get("coupon_code")
         procedures = attrs.get("procedures")
 
-        random_coupons = RandomGeneratedCoupon.objects.filter(random_coupon__in=codes,
-                                                              sent_at__isnull=False,
-                                                              consumed_at__isnull=True).all()
-        coupons_data = None
-        if random_coupons:
-            coupon_codes = list()
-            for coupon in random_coupons:
-                coupon_codes.append(coupon.coupon)
-            coupons_data = Coupon.objects.filter(code__in=coupon_codes)
+        coupons_data, random_coupons = None, None
+        if RandomGeneratedCoupon.objects.filter(random_coupon__in=codes).exists():
+            expression = F('sent_at') + datetime.timedelta(days=1) * F('validity')
+            annotate_expression = ExpressionWrapper(expression, DateTimeField())
+            random_coupons = RandomGeneratedCoupon.objects.annotate(last_date=annotate_expression
+                                                   ).filter(random_coupon__in=codes,
+                                                            sent_at__isnull=False,
+                                                            consumed_at__isnull=True,
+                                                            last_date__gte=datetime.datetime.now()
+                                                            ).all()
+            if random_coupons:
+                coupons_data = Coupon.objects.filter(id__in=random_coupons.values_list('coupon', flat=True))
         if coupons_data:
             coupons_data = Coupon.objects.filter(code__in=codes) | coupons_data
         else:

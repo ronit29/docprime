@@ -166,7 +166,10 @@ class ApplicableCouponsViewSet(viewsets.GenericViewSet):
         #
         # user_lab_completed = LabAppointment.objects.filter(user=user, status__in=[LabAppointment.COMPLETED]).count()
 
-        coupons = coupons.prefetch_related('test', total_opd_booked, user_opd_booked, total_lab_booked, user_lab_booked)
+        coupons = coupons.prefetch_related('lab', 'test', total_opd_booked, user_opd_booked, total_lab_booked, user_lab_booked)
+        # coupons = coupons.prefetch_related('lab_network', 'lab', 'test', 'test_categories',
+        #                                    'specializations', 'procedures', 'procedure_categories',
+        #                                    total_opd_booked, user_opd_booked, total_lab_booked, user_lab_booked)
         coupons = coupons.distinct()
 
         applicable_coupons = []

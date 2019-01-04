@@ -171,12 +171,21 @@ class CouponForm(forms.ModelForm):
         cleaned_data = self.cleaned_data
         age_start = cleaned_data.get('age_start')
         age_end = cleaned_data.get('age_end')
+        lab_network = cleaned_data.get('lab_network')
+        lab = cleaned_data.get('lab')
+        test = cleaned_data.get('test')
+        test_categories = cleaned_data.get('test_categories')
+        specializations = cleaned_data.get('specializations')
+        procedures = cleaned_data.get('procedures')
+        procedure_categories = cleaned_data.get('procedure_categories')
         if age_end and not age_start:
             age_start = 0
         if age_start and not age_end:
             age_end = 100
         if age_start and age_end and age_start > age_end:
             raise forms.ValidationError('Age End cannot be smaller than Age Start.')
+        if (lab_network or lab or test or test_categories) and (specializations or procedures or procedure_categories):
+            raise forms.ValidationError('Please enter either lab specific data or doctor specific data')
 
 
 class CouponAdmin(admin.ModelAdmin):

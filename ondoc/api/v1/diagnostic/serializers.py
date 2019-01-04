@@ -568,23 +568,19 @@ class LabAppointmentCreateSerializer(serializers.Serializer):
             # coupon_code = data.get("coupon_code")
             coupon_codes = data.get("coupon_code", [])
             coupon_obj = None
-            if RandomGeneratedCoupon.objects.filter(random_coupon__in=coupon_codes).first():
+            if RandomGeneratedCoupon.objects.filter(random_coupon__in=coupon_codes).exists():
                 expression = F('sent_at') + datetime.timedelta(days=1) * F('validity')
                 annotate_expression = ExpressionWrapper(expression, DateTimeField())
-                random_coupon = RandomGeneratedCoupon.objects.annotate(last_date=annotate_expression
+                random_coupons = RandomGeneratedCoupon.objects.annotate(last_date=annotate_expression
                                                                        ).filter(random_coupon__in=coupon_codes,
                                                                                 sent_at__isnull=False,
                                                                                 consumed_at__isnull=True,
                                                                                 last_date__gte=datetime.datetime.now()
-                                                                                ).first()
-                if random_coupon:
-                    # coupon_codes = list()
-                    # for coupon in random_coupons:
-                    #     coupon_codes.append(coupon.coupon)
-                    # coupon_obj = Coupon.objects.filter(code__in=coupon_codes)
-                    coupon_obj = Coupon.objects.filter(code=random_coupon.coupon)
+                                                                                ).all()
+                if random_coupons:
+                    coupon_obj = Coupon.objects.filter(id__in=random_coupons.values_list('coupon', flat=True))
                 else:
-                    raise serializers.ValidationError('Invalid coupon code - ' + str(random_coupon))
+                    raise serializers.ValidationError('Invalid coupon codes')
 
             if coupon_obj:
                 coupon_obj = Coupon.objects.filter(code__in=coupon_codes) | coupon_obj

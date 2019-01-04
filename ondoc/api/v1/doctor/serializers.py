@@ -248,46 +248,42 @@ class CreateAppointmentSerializer(serializers.Serializer):
                     request.data))
             raise serializers.ValidationError('Max'+str(MAX_APPOINTMENTS_ALLOWED)+' active appointments are allowed')
 
-        coupon_codes = data.get("coupon_code", [])
-        coupon_obj = None
-
-        if RandomGeneratedCoupon.objects.filter(random_coupon__in=coupon_codes).first():
-            expression = F('sent_at') + datetime.timedelta(days=1) * F('validity')
-            annotate_expression = ExpressionWrapper(expression, DateTimeField())
-            random_coupon = RandomGeneratedCoupon.objects.annotate(last_date=annotate_expression
-                                                                   ).filter(random_coupon__in=coupon_codes,
-                                                                            sent_at__isnull=False,
-                                                                            consumed_at__isnull=True,
-                                                                            last_date__gte=datetime.datetime.now()
-                                                                            ).first()
-            if random_coupon:
-                # coupon_codes = list()
-                # for coupon in random_coupons:
-                #     coupon_codes.append(coupon.coupon)
-                # coupon_obj = Coupon.objects.filter(code__in=coupon_codes)
-                coupon_obj = Coupon.objects.filter(code=random_coupon.coupon)
-            else:
-                raise serializers.ValidationError('Invalid coupon code - ' + str(random_coupon))
-
-        if coupon_obj:
-            coupon_obj = Coupon.objects.filter(code__in=coupon_codes) | coupon_obj
-        else:
-            coupon_obj = Coupon.objects.filter(code__in=coupon_codes)
-
-        if coupon_obj:
-        # if len(coupon_code) == len(coupon_obj):
-            for coupon in coupon_obj:
-                profile = data.get("profile")
-                obj = OpdAppointment()
-                if obj.validate_user_coupon(user=request.user, coupon_obj=coupon, profile=profile).get("is_valid"):
-                    if not obj.validate_product_coupon(coupon_obj=coupon,
-                                                       doctor=data.get("doctor"), hospital=data.get("hospitals"),
-                                                       procedures=data.get("procedure_ids"),
-                                                       product_id=Order.DOCTOR_PRODUCT_ID):
-                        raise serializers.ValidationError('Invalid coupon code - ' + str(coupon))
+        if data.get("coupon_code"):
+            coupon_codes = data.get("coupon_code", [])
+            coupon_obj = None
+            if RandomGeneratedCoupon.objects.filter(random_coupon__in=coupon_codes).exists():
+                expression = F('sent_at') + datetime.timedelta(days=1) * F('validity')
+                annotate_expression = ExpressionWrapper(expression, DateTimeField())
+                random_coupons = RandomGeneratedCoupon.objects.annotate(last_date=annotate_expression
+                                                                       ).filter(random_coupon__in=coupon_codes,
+                                                                                sent_at__isnull=False,
+                                                                                consumed_at__isnull=True,
+                                                                                last_date__gte=datetime.datetime.now()
+                                                                                ).all()
+                if random_coupons:
+                    coupon_obj = Coupon.objects.filter(id__in=random_coupons.values_list('coupon', flat=True))
                 else:
-                    raise serializers.ValidationError('Invalid coupon code - ' + str(coupon))
-            data["coupon_obj"] = list(coupon_obj)
+                    raise serializers.ValidationError('Invalid coupon codes')
+
+            if coupon_obj:
+                coupon_obj = Coupon.objects.filter(code__in=coupon_codes) | coupon_obj
+            else:
+                coupon_obj = Coupon.objects.filter(code__in=coupon_codes)
+
+            if coupon_obj:
+            # if len(coupon_code) == len(coupon_obj):
+                for coupon in coupon_obj:
+                    profile = data.get("profile")
+                    obj = OpdAppointment()
+                    if obj.validate_user_coupon(user=request.user, coupon_obj=coupon, profile=profile).get("is_valid"):
+                        if not obj.validate_product_coupon(coupon_obj=coupon,
+                                                           doctor=data.get("doctor"), hospital=data.get("hospital"),
+                                                           procedures=data.get("procedure_ids"),
+                                                           product_id=Order.DOCTOR_PRODUCT_ID):
+                            raise serializers.ValidationError('Invalid coupon code - ' + str(coupon))
+                    else:
+                        raise serializers.ValidationError('Invalid coupon code - ' + str(coupon))
+                data["coupon_obj"] = list(coupon_obj)
 
         return data
 
