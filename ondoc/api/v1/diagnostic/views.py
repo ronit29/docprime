@@ -68,10 +68,10 @@ class SearchPageViewSet(viewsets.ReadOnlyModelViewSet):
         count = int(count)
         if count <= 0:
             count = 10
-        test_queryset = CommonTest.objects.all()[:count]
+        test_queryset = CommonTest.objects.filter(test__enable_for_retail=True)[:count]
         conditions_queryset = CommonDiagnosticCondition.objects.prefetch_related('lab_test').all()
         lab_queryset = PromotedLab.objects.select_related('lab').filter(lab__is_live=True, lab__is_test_lab=False)
-        package_queryset = CommonPackage.objects.prefetch_related('package').all()[:count]
+        package_queryset = CommonPackage.objects.prefetch_related('package').filter(package__enable_for_retail=True)[:count]
         test_serializer = diagnostic_serializer.CommonTestSerializer(test_queryset, many=True, context={'request': request})
         package_serializer = diagnostic_serializer.CommonPackageSerializer(package_queryset, many=True, context={'request': request})
         lab_serializer = diagnostic_serializer.PromotedLabsSerializer(lab_queryset, many=True)
@@ -166,13 +166,14 @@ class LabList(viewsets.ReadOnlyModelViewSet):
         category_ids = validated_data.get('category_ids', None)
         lab_tests = None
         if not category_ids:
-            category_ids = LabTestCategory.objects.filter(is_live=True, is_package_category=True).values_list('id', flat=True)
+            category_ids = LabTestCategory.objects.filter(is_live=True, is_package_category=True).values_list('id',
+                                                                                                              flat=True)
 
         lab_tests = LabTestCategoryMapping.objects.filter(parent_category_id__in=category_ids).values_list(
-            'lab_test',
-            flat=True)
+            'lab_test', flat=True)
 
-        all_packages_in_network_labs = LabTest.objects.prefetch_related('test').filter(searchable=True, is_package=True,
+        all_packages_in_network_labs = LabTest.objects.prefetch_related('test').filter(enable_for_retail=True,
+                                                                                       searchable=True, is_package=True,
                                                                                        availablelabs__enabled=True,
                                                                                        availablelabs__lab_pricing_group__labs__network__isnull=False,
                                                                                        availablelabs__lab_pricing_group__labs__location__dwithin=(
@@ -190,7 +191,9 @@ class LabList(viewsets.ReadOnlyModelViewSet):
                         partition_by=[F(
                             'availablelabs__lab_pricing_group__labs__network'), F('id')])).order_by('-priority')
 
-        all_packages_in_non_network_labs = LabTest.objects.prefetch_related('test').filter(searchable=True, is_package=True,
+        all_packages_in_non_network_labs = LabTest.objects.prefetch_related('test').filter(enable_for_retail=True,
+                                                                                           searchable=True,
+                                                                                           is_package=True,
                                                                                            availablelabs__enabled=True,
                                                                                            availablelabs__lab_pricing_group__labs__network__isnull=True,
                                                                                            availablelabs__lab_pricing_group__labs__location__dwithin=(
@@ -330,7 +333,7 @@ class LabList(viewsets.ReadOnlyModelViewSet):
 
         test_ids = parameters.get('ids',[])
 
-        tests = list(LabTest.objects.filter(id__in=test_ids).values('id', 'name', 'hide_price', 'show_details'))
+        tests = list(LabTest.objects.filter(id__in=test_ids, enable_for_retail=True).values('id', 'name', 'hide_price', 'show_details'))
         seo = None
         breadcrumb = None
         location = None
@@ -867,12 +870,13 @@ class LabList(viewsets.ReadOnlyModelViewSet):
                                                                     lab_pricing_group__labs__is_test_lab=False,
                                                                     lab_pricing_group__labs__is_live=True,
                                                                     enabled=True,
+                                                                    test__enable_for_retail=True,
                                                                     test__in=test_ids)
 
         test_serializer = diagnostic_serializer.AvailableLabTestPackageSerializer(queryset, many=True,
                                                                            context={"lab": lab_obj})
         # for Demo
-        demo_lab_test = AvailableLabTest.objects.filter(lab_pricing_group=lab_obj.lab_pricing_group, enabled=True).order_by("-test__priority").prefetch_related('test')[:2]
+        demo_lab_test = AvailableLabTest.objects.filter(test__enable_for_retail=True, lab_pricing_group=lab_obj.lab_pricing_group, enabled=True).order_by("-test__priority").prefetch_related('test')[:2]
         lab_test_serializer = diagnostic_serializer.AvailableLabTestSerializer(demo_lab_test, many=True, context={"lab": lab_obj})
         day_now = timezone.now().weekday()
         timing_queryset = list()
@@ -1007,7 +1011,7 @@ class LabList(viewsets.ReadOnlyModelViewSet):
                                        lab_pricing_group__available_lab_tests__enabled=True)
 
         if ids:
-            if LabTest.objects.filter(id__in=ids, home_collection_possible=True).count() == len(ids):
+            if LabTest.objects.filter(id__in=ids, home_collection_possible=True, enable_for_retail=True).count() == len(ids):
                 home_pickup_calculation = Case(
                     When(is_home_collection_enabled=True,
                          then=F('home_pickup_charges')),
@@ -1081,7 +1085,7 @@ class LabList(viewsets.ReadOnlyModelViewSet):
         if test_ids:
             group_queryset = LabPricingGroup.objects.prefetch_related(Prefetch(
                     "available_lab_tests",
-                    queryset=AvailableLabTest.objects.filter(test_id__in=test_ids).prefetch_related('test'),
+                    queryset=AvailableLabTest.objects.filter(test__enable_for_retail=True, test_id__in=test_ids).prefetch_related('test'),
                     to_attr="selected_tests"
                 )).all()
 
@@ -1425,12 +1429,13 @@ class LabAppointmentView(mixins.CreateModelMixin,
                 ops_email_data = dict()
                 ops_email_data.update(order.appointment_details())
                 ops_email_data["transaction_time"] = aware_time_zone(timezone.now())
-                EmailNotification.ops_notification_alert(ops_email_data, settings.OPS_EMAIL_ID,
-                                                         order.product_id,
-                                                         EmailNotification.OPS_PAYMENT_NOTIFICATION)
+                # EmailNotification.ops_notification_alert(ops_email_data, settings.OPS_EMAIL_ID,
+                #                                          order.product_id,
+                #                                          EmailNotification.OPS_PAYMENT_NOTIFICATION)
 
-                push_order_to_matrix.apply_async(({'order_id': order.id, 'created_at':int(order.created_at.timestamp()),
-                                                   'timeslot':int(appointment_details['time_slot_start'].timestamp())}, ), countdown=5)
+                push_order_to_matrix.apply_async(
+                    ({'order_id': order.id, 'created_at': int(order.created_at.timestamp()),
+                      'timeslot': int(appointment_details['time_slot_start'].timestamp())},), countdown=5)
             except:
                 pass
         else:
@@ -1534,7 +1539,10 @@ class AvailableTestViewSet(mixins.RetrieveModelMixin,
     @transaction.non_atomic_requests
     def retrieve(self, request, lab_id):
         params = request.query_params
-        queryset = AvailableLabTest.objects.select_related().filter(test__searchable=True, lab_pricing_group__labs=lab_id, lab_pricing_group__labs__is_live=True, enabled=True)
+        queryset = AvailableLabTest.objects.select_related().filter(test__searchable=True,
+                                                                    test__enable_for_retail=True,
+                                                                    lab_pricing_group__labs=lab_id,
+                                                                    lab_pricing_group__labs__is_live=True, enabled=True)
         if not queryset:
             return Response([])
         lab_obj = Lab.objects.filter(pk=lab_id).first()
