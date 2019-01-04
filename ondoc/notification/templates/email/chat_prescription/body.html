@@ -1,14 +1,37 @@
 {% load static %}
 {% load invoice_tags %}
-<table style="width: 100%;">
-    <tr>
-        <td align="right">
-            <input id="download_prescription"
-                   style="font-size:14px !important; border-radius: 5px; background: #f1863b !important ;border: 0px;color: white;border-radius: 2px;padding: 5px 10px;"
-                   type="submit" value="&#x21E9; Download" onclick="msg()">
-        </td>
-    </tr>
-</table>
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Chat Prescription</title>
+
+    <meta http-equiv="Content-Type" content="text/html; charset=UTF-8"/>
+
+    <link href="https://fonts.googleapis.com/css?family=Quicksand:300,400,500,700" rel="stylesheet">
+
+    <style>
+        @page{
+           margin:20px;
+        }
+
+        @media print{
+           footer {
+           left:0;
+           position:fixed;
+           }
+
+           header {
+           left:0;
+           position:fixed;
+           }
+        }
+
+
+
+    </style>
+
+</head>
+<body>
 <table align="center" border="0" cellpadding="0" cellspacing="0"
        style=" font-family: Arial, sans-serif;border-collapse: collapse; width: 100%; font-size: 14px; border: 1px solid #ff6d00;">
     <tr>
@@ -61,14 +84,7 @@
                     </th>
                     <th style="width: 25%;padding: 10px 10px;; text-align: center;">Gender: <span
                             style="font-weight: 500">{{profile.gender}}</span></th>
-                    <!-- <th style="width: 25%;padding: 10px 10px;; text-align: center;">Mobile</th> -->
                 </tr>
-                <!-- <tr>
-                                                    <td style="padding: 10px 10px;">Lorem ipsum</td>
-                                                    <td style="text-align: center;padding: 10px 10px;">32</td>
-                                                    <td style="text-align: center;padding: 10px 10px;">Male</td>
-
-                                        </tr> -->
             </table>
         </td>
     </tr>
@@ -130,11 +146,6 @@
     <tr>
         <td style="padding: 10px 0px"></td>
     </tr>
-    <!-- <tr>
-            <td style="font-weight: 600; padding-left: 8px;">
-                Medicine:
-            </td>
-        </tr> -->
     <tr>
         <td>
             {% if medicines %}
@@ -233,9 +244,6 @@
                     <td style="width: 33%; vertical-align: top;" valign="top">
                         <table style="width: 100%">
                             <tr>
-                                <!-- <td valign="top" style="vertical-align: top;"><span style=" padding-top: 5px; display: inline-block; margin-right:4px;">
-                                        </span></td>
-                                    -->
                                 <td style="display: flex;justify-content: center;">
                                     <img src="http://telemed.docprime.com/images/healthservices/online_consultation.svg"
                                          width="22px" height="22px">
@@ -248,9 +256,6 @@
                     <td style="width: 33%; vertical-align: top;" valign="top">
                         <table style="width: 100%">
                             <tr>
-                                <!-- <td valign="top" style="vertical-align: top;"><span style=" padding-top: 5px; display: inline-block; margin-right:4px;">
-
-                                    </span></td>-->
                                 <td style="display: flex;justify-content: center;">
                                     <img src="http://telemed.docprime.com/images/healthservices/find_doctor_near_u.svg"
                                          width="22px" height="22px">
@@ -261,9 +266,6 @@
                     <td style="width: 33%; vertical-align: top;" valign="top">
                         <table style="width: 100%">
                             <tr>
-                                <!-- <td valign="top" style="vertical-align: top;"><span style=" padding-top: 5px; display: inline-block;">
-
-                                    </span></td> -->
                                 <td style="display: flex; justify-content: center;">
                                     <img src="http://telemed.docprime.com/images/healthservices/forma-1%20(3).svg"
                                          width="22px" height="22px">
@@ -278,3 +280,5 @@
 
 </table>
 
+</body>
+</html>
