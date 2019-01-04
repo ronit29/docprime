@@ -31,6 +31,7 @@ class BannerListViewSet(viewsets.GenericViewSet):
             if data.url:
                 import re
                 data.url = re.sub(r'(https?://.+?/)', '', data.url)
+                data.url = '/' + data.url
 
             resp['url'] = data.url
             if data.url:
