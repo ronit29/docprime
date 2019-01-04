@@ -25,13 +25,15 @@
            position:fixed;
            }
         }
+
+
+
     </style>
 
 </head>
 <body>
-
 <table align="center" border="0" cellpadding="0" cellspacing="0"
-       style=" font-family: Arial, sans-serif;border-collapse: collapse; width: 100%; font-size: 14px;    border: 1px solid #ff6d00;">
+       style=" font-family: Arial, sans-serif;border-collapse: collapse; width: 100%; font-size: 14px; border: 1px solid #ff6d00;">
     <tr>
         <td>
             <table style="width: 100%;padding: 8px; border-bottom: 3px solid #ff6d00;">
@@ -44,7 +46,8 @@
                             <tr>
                                 <td>{% for value in doctorProfile.qualifications %}
                                     {{value.qualification}}{% if not forloop.last %},&nbsp;{% endif %}
-                                    {% endfor %}</td>
+                                    {% endfor %}
+                                </td>
                             </tr>
                             <tr>
                                 <td>Registration No.: {{doctorProfile.license}}</td>
@@ -73,40 +76,39 @@
     </tr>
     <tr>
         <td>
-            <table style="width: 100%;font-size: 14px;    background: #f3f3f3;    border-bottom:3px solid #ff6d00">
+            <table style="width: 100%;font-size: 14px; background: #f3f3f3; border-bottom:3px solid #ff6d00">
                 <tr align="left">
                     <th style="width: 50%;padding: 10px 10px;">Patient Name: <span
-                            style="font-weight: 500;     text-transform: capitalize;">{{profile.name}}</span></th>
+                            style="font-weight: 500; text-transform: capitalize;">{{profile.name}}</span></th>
                     <th style="width: 25%;padding: 10px 10px;; text-align: center;">Age: <span style="font-weight: 500">{{profile.age}}</span>
                     </th>
                     <th style="width: 25%;padding: 10px 10px;; text-align: center;">Gender: <span
-                            style="font-weight: 500">{% if profile.gender.lower ==  "m" %}Male{% elif profile.gender.lower ==  "f" %}Female{% else %}profile.gender{% endif %}</span></th>
+                            style="font-weight: 500">{{profile.gender}}</span></th>
                 </tr>
             </table>
         </td>
     </tr>
     <tr>
-        <td style="padding: 2px 0px"></td>
+        <td style="padding: 5px 0px"></td>
     </tr>
     <tr>
         <td>
             <table style="width: 100%; padding: 8px;">
                 <tr valign="top">
-                    {% if symptoms %}
                     <td style="width: 50%">
-
                         <p style="margin: 0px; padding: 5px 0px; font-size:14px; font-weight: 600;">Symptoms</p>
+                        {% if symptoms %}
                         <ul style="font-size: 13px;padding-left: 20px;list-style: disc;color: #656565;">
                             {% for value in symptoms %}
                             <li style="padding: 2px 0px">{{value}}</li>
                             {% endfor %}
                         </ul>
-
+                        {% endif %}
                     </td>
-                    {% endif %}
                     {% if prodiagnosis and prodiagnosisType %}
                     <td style="width: 50%">
-                        <p style="margin: 0px; padding: 5px 0px; font-size:14px; font-weight: 600;">Provisional Diagnosis</p>
+                        <p style="margin: 0px; padding: 5px 0px; font-size:14px; font-weight: 600;">Provisional
+                            Diagnosis</p>
                         <ul style="font-size: 13px;padding-left: 20px;list-style: disc;color: #656565;">
                             {% for value in prodiagnosis %}
                             <li style="padding: 2px 0px">{{value}}</li>
@@ -124,10 +126,10 @@
                     </td>
                     {% endif %}
                 </tr>
-                {% if findings %}
                 <tr>
                     <td style="padding: 10px 0px"></td>
                 </tr>
+                {% if findings %}
                 <tr>
                     <td colspan="2">
                         <p style="font-size: 13px;background: #e0dede;padding: 10px; border:1px solid #c7c7c7;">
@@ -142,12 +144,11 @@
         </td>
     </tr>
     <tr>
-        <td style="padding: 2px 0px"></td>
+        <td style="padding: 10px 0px"></td>
     </tr>
     <tr>
-        {% if medicines %}
         <td>
-
+            {% if medicines %}
             <table style="width: 97%;padding: 8px 0px;margin: auto; font-size: 13px; border-bottom: 2px solid #ff6d00"
                    cellpadding="0" cellspacing="0">
                 <tr>
@@ -170,40 +171,36 @@
                     <td style="padding: 5px;text-align: center;">{{value.MedicineName}}</td>
                     <td style="padding: 5px;text-align: center;">{{value.qunatity}}, {{value.selectedNoOfTimes}}{% if value.times %}, {{value.times|join:"| "}}{% endif %} {% if value.mealtimes %}({{value.mealtimes}}){% endif %} {{value.selectedmedDays}}
                     </td>
-                    <td style="padding: 5px; text-align: center;">{% if value.medicineInstructions %}{{value.medicineInstructions }}{% endif %}</td>
-
+                    <td style="padding: 5px; text-align: center;">{% if value.medicineInstructions %}{{value.medicineInstructions }}{% endif %}
+                    </td>
                 </tr>
                 {% endfor %}
             </table>
-
+            {% endif %}
         </td>
-        {% endif %}
     </tr>
     <tr>
         <td style="padding: 5px 0px"></td>
     </tr>
-    {% if investigations %}
     <tr>
-
         <td style="font-weight: 600;padding-bottom: 10px;padding-left: 8px;">
             Lab Tests:
         </td>
     </tr>
     <tr>
+        {% if investigations %}
         <td>
-            <ul style="font-size:13px;  margin:0px;padding-left: 30px;list-style: disc;color: #656565;">
+            <ul style="font-size:13px; margin:0px;padding-left: 30px;list-style: disc;color: #656565;">
                 {% for value in investigations %}
                 <li>{{value}}</li>
                 {% endfor %}
             </ul>
         </td>
-
+        {% endif %}
     </tr>
-    {% endif %}
     <tr>
         <td style="padding: 10px 0px"></td>
     </tr>
-
     <tr>
         <td style="padding-bottom: 10px;padding-left: 8px;font-size: 13px;">
             {% if physicalexamination and specialization %}
@@ -212,22 +209,6 @@
             {% endif %}
         </td>
     </tr>
-    {% if instructions %}
-    <tr>
-        <td style="font-weight: 600;padding-bottom: 10px;padding-left: 8px;">
-            Instructions:
-        </td>
-    </tr>
-    <tr>
-        <td>
-            <ul style="font-size:13px;  margin:0px;padding-left: 30px;list-style: disc;color: #656565;">
-                {% for value in instructions %}
-                <li>{{value}}</li>
-                {% endfor %}
-            </ul>
-        </td>
-    </tr>
-    {% endif %}
     <tr>
         <td align="center" valign="top" style="text-align: center;">
             <div style="float: right; width:100px; height:50px; text-align: center; font-size: 9px; font-style: italic; margin-bottom: 10px; padding:0px 10px;margin-right: 40px;">
@@ -239,7 +220,8 @@
         <td align="center" valign="top" style="text-align: center;">
             <div style="float: left; text-align: center; font-size: 9px; font-style: italic; margin-bottom: 15px; padding:0px 10px;">
                 This medical advice is based on the responses provided by you over online or telephonic medium.
-                Depending on the symptoms you presented, your case may further require a physical examination by a doctor. Please visit a doctor
+                Depending on the symptoms
+                you presented, your case may further require a physical examination by a doctor. Please visit a doctor
                 or a hospital near you if your symptoms do not improve.
             </div>
 
@@ -285,8 +267,8 @@
                             <tr>
                                 <td style="display: flex; justify-content: center;">
                                     <img src="http://telemed.docprime.com/images/healthservices/forma-1%20(3).svg"
-                                         width="16px" height="16px"><label
-                                        style="font-size: 11px;">Book medical tests</label></td>
+                                         width="22px" height="22px">
+                                    <label style="font-size: 11px;">Book medical tests</label></td>
                             </tr>
                         </table>
                     </td>
@@ -294,6 +276,8 @@
             </table>
         </td>
     </tr>
+
 </table>
+
 </body>
 </html>
