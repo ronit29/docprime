@@ -29,11 +29,13 @@ class BannerListViewSet(viewsets.GenericViewSet):
             resp['priority'] = data.priority
             resp['event_name'] = data.event_name
             if data.url:
-                import re
-                data.url = re.sub(r'(https?://.+?/)', '', data.url)
-                data.url = '/' + data.url
-
-            resp['url'] = data.url
+                path = urlparse(data.url).path
+                params = urlparse(data.url).params
+                query = urlparse(data.url).query
+                if path:
+                    resp['url'] = path + params + query
+                else:
+                    resp['url'] = '/'
             if data.url:
                 data.url = re.sub('.*?\?', '', data.url)
                 qd = QueryDict(data.url)
