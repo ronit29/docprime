@@ -1062,9 +1062,9 @@ class LabAppointment(TimeStampedModel, CouponsMixin):
 
     def save(self, *args, **kwargs):
         database_instance = LabAppointment.objects.filter(pk=self.id).first()
-        # if database_instance and (database_instance.status == self.COMPLETED or database_instance.status == self.CANCELLED) \
-        #         and (self.status != database_instance.status):
-        #     raise Exception('Cancelled or Completed appointment cannot be saved')
+        if database_instance and (database_instance.status == self.COMPLETED or database_instance.status == self.CANCELLED) \
+                and (self.status != database_instance.status):
+            raise Exception('Cancelled or Completed appointment cannot be saved')
 
         try:
             if (self.payment_type != OpdAppointment.INSURANCE and self.status == self.COMPLETED and
