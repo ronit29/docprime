@@ -445,20 +445,30 @@ def get_lab_search_details(entity, req_params):
     return params_dict
 
 
-def doctor_query_parameters(entity_params, req_params):
+def doctor_query_parameters(entity, req_params):
     params_dict = copy.deepcopy(req_params)
-    if entity_params.get("location_json"):
-        if entity_params["location_json"].get("sublocality_latitude"):
-            params_dict["latitude"] = entity_params["location_json"]["sublocality_latitude"]
-        elif entity_params["location_json"].get("locality_latitude"):
-            params_dict["latitude"] = entity_params["location_json"]["locality_latitude"]
+    if entity.sublocality_latitude:
+        params_dict["latitude"] = entity.sublocality_latitude
+    elif entity.locality_latitude:
+        params_dict["latitude"] = entity.locality_latitude
+    if entity.sublocality_longitude:
+        params_dict["longitude"] = entity.sublocality_longitude
+    elif entity.locality_longitude:
+        params_dict["longitude"] = entity.locality_longitude
 
-        if entity_params["location_json"].get("sublocality_longitude"):
-            params_dict["longitude"] = entity_params["location_json"]["sublocality_longitude"]
-        elif entity_params["location_json"].get("locality_longitude"):
-            params_dict["longitude"] = entity_params["location_json"]["locality_longitude"]
-    if entity_params.get("specialization_id"):
-        params_dict["specialization_ids"] = str(entity_params["specialization_id"])
+
+    # if entity_params.get("location_json"):
+    #     if entity_params["location_json"].get("sublocality_latitude"):
+    #         params_dict["latitude"] = entity_params["location_json"]["sublocality_latitude"]
+    #     elif entity_params["location_json"].get("locality_latitude"):
+    #         params_dict["latitude"] = entity_params["location_json"]["locality_latitude"]
+    #
+    #     if entity_params["location_json"].get("sublocality_longitude"):
+    #         params_dict["longitude"] = entity_params["location_json"]["sublocality_longitude"]
+    #     elif entity_params["location_json"].get("locality_longitude"):
+    #         params_dict["longitude"] = entity_params["location_json"]["locality_longitude"]
+    if entity.specialization_id:
+        params_dict["specialization_ids"] = str(entity.specialization_id)
     else:
         params_dict["specialization_ids"] = ''
 
