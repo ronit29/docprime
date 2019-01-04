@@ -152,7 +152,7 @@ class EntityAddress(TimeStampedModel):
     centroid = models.PointField(geography=True, srid=4326, blank=True, null=True)
     abs_centroid = models.PointField(geography=True, srid=4326, blank=True, null=True)
     #geocoding = models.ForeignKey(GeocodingResults, null=True, on_delete=models.DO_NOTHING)
-    no_of_childs = models.PositiveIntegerField(default=None, null=True)
+    no_of_childs = models.PositiveIntegerField(default=0, null=True)
     child_count = models.PositiveIntegerField(default=None, null=True)
     use_in_url = models.BooleanField(verbose_name='Use in URL', default=False)
     order = models.PositiveIntegerField(default=None, null=True)
@@ -673,6 +673,133 @@ class EntityUrls(TimeStampedModel):
 
         return True
 
+    def doctor_search_urls():
+
+        RawSql('DROP TABLE IF EXISTS temp_search_urls', []).execute()
+
+        create_temp_table_query = '''create table temp_search_urls as
+                    select  max(ST_Distance(ea.centroid,h.location)) as distance, 
+                    ps.id as specialization_id, ps.name as specialization, ea.alternative_value,
+                    ea.search_slug, null as url, null::json as extras, null::geography as locality_location, 
+                    null::geography as sublocality_location, null::geography as location,
+                    ea.type, count(distinct d.id) as count,
+                    case when ea.type = 'SUBLOCALITY' then 
+                    ea.id 
+                    end as sublocality_id,
+                    case when ea.type = 'LOCALITY' then ea.id 
+                    when ea.type = 'SUBLOCALITY' then max(eaparent.id)
+                    end as locality_id,
+                    case when ea.type = 'SUBLOCALITY' then 
+                    st_x(ea.centroid::geometry) end as sublocality_longitude,
+                    case when ea.type = 'SUBLOCALITY' then 
+                    st_y(ea.centroid::geometry) end as sublocality_latitude,
+                    case when ea.type = 'LOCALITY' then st_x(ea.centroid::geometry)
+                    when ea.type = 'SUBLOCALITY' then max(st_x(eaparent.centroid::geometry))
+                    end as locality_longitude,
+                    case when ea.type = 'LOCALITY' then st_y(ea.centroid::geometry)
+                    when ea.type = 'SUBLOCALITY' then max(st_y(eaparent.centroid::geometry))
+                    end as locality_latitude,
+                    case when ea.type = 'SUBLOCALITY' then ea.alternative_value end as sublocality_value,
+                    case when ea.type = 'LOCALITY' then ea.alternative_value 
+                     when  ea.type = 'SUBLOCALITY' then max(eaparent.alternative_value) end as locality_value,
+                    case when ea.type = 'LOCALITY' then 'SPECIALIZATION_CITY'
+                    else 'SPECIALIZATION_LOCALITY_CITY' end as sitemap_identifier,
+                    'Doctor' as entity_type,
+                    'SEARCHURL' url_type,
+                    True as is_valid
+                    from hospital h inner join entity_address ea on ((ea.type = 'LOCALITY' and 
+                    ST_DWithin(ea.centroid,h.location,15000)) OR 
+                    (ea.type = 'SUBLOCALITY' and ST_DWithin(ea.centroid,h.location,5000))) and h.is_live=true
+                    and ea.type IN ('SUBLOCALITY' , 'LOCALITY') and ea.use_in_url=true inner join doctor_clinic dc on dc.hospital_id = h.id
+                    and dc.enabled=true
+                    inner join doctor d on dc.doctor_id= d.id
+                    inner join doctor_practice_specialization dps on dps.doctor_id = d.id and d.is_live=true
+                    inner join practice_specialization ps on ps.id = dps.specialization_id 
+                    left join entity_address eaparent on ea.parent_id=eaparent.id and eaparent.use_in_url=true
+                    group by ps.id, ea.id having count(distinct d.id) >= 3 
+                ''' 
+        create_temp_table = RawSql(create_temp_table_query, []).execute()
+
+        create_temp_table_query = '''insert into temp_search_urls(distance, alternative_value, search_slug, count,
+                    sublocality_id, locality_id, sublocality_longitude, sublocality_latitude, locality_longitude, 
+                    locality_latitude, sublocality_value, locality_value, sitemap_identifier, entity_type, url_type,
+                    is_valid )
+                    select max(ST_Distance(ea.centroid,h.location)) as distance,
+                    ea.alternative_value, ea.search_slug, 
+                    case when ea.type = 'SUBLOCALITY' then 
+                    getslug(concat('doctors-in-', ea.search_slug, '-sptlitcit'))
+                    else getslug(concat('doctors-in-', ea.search_slug, '-sptcit'))
+                    end as url, ea.type, count(distinct d.id) as count,
+                    case when ea.type = 'SUBLOCALITY' then 
+                    ea.id 
+                    end as sublocality_id,
+                    case when ea.type = 'LOCALITY' then ea.id 
+                    when ea.type = 'SUBLOCALITY' then max(eaparent.id)
+                    end as locality_id,
+                    case when ea.type = 'SUBLOCALITY' then 
+                    st_x(ea.centroid::geometry) end as sublocality_longitude,
+                    case when ea.type = 'SUBLOCALITY' then 
+                    st_y(ea.centroid::geometry) end as sublocality_latitude,
+                    case when ea.type = 'LOCALITY' then st_x(ea.centroid::geometry)
+                    when ea.type = 'SUBLOCALITY' then max(st_x(eaparent.centroid::geometry))
+                    end as locality_longitude,
+                    case when ea.type = 'LOCALITY' then st_y(ea.centroid::geometry)
+                    when ea.type = 'SUBLOCALITY' then max(st_y(eaparent.centroid::geometry)) 
+                    end as locality_latitude,
+                    case when ea.type = 'SUBLOCALITY' then ea.alternative_value end as sublocality_value,
+                    case when ea.type = 'LOCALITY' then ea.alternative_value 
+                    when  ea.type = 'SUBLOCALITY' then max(eaparent.alternative_value) end as locality_value,
+                    case when ea.type = 'LOCALITY' then 'DOCTORS_CITY'
+                    else 'DOCTORS_LOCALITY_CITY' end as sitemap_identifier,                    
+                    'Doctor' as entity_type,
+                    'SEARCHURL' url_type,
+                    True as is_valid
+                    from hospital h inner join entity_address ea on ((ea.type = 'LOCALITY' and ST_DWithin(ea.centroid,h.location,15000)) OR 
+                    (ea.type = 'SUBLOCALITY' and ST_DWithin(ea.centroid,h.location,5000))) and h.is_live=true
+                    and ea.type IN ('SUBLOCALITY' , 'LOCALITY') and ea.use_in_url=true inner join doctor_clinic dc on dc.hospital_id = h.id
+                    and dc.enabled=true 
+                    inner join doctor d on dc.doctor_id= d.id
+                    and d.is_live=true left join entity_address eaparent on ea.parent_id=eaparent.id and eaparent.use_in_url=true
+                    group by ea.id having count(distinct d.id) >= 3'''
+
+
+        update_urls_query = '''update temp_search_urls set url = case when type = 'SUBLOCALITY' then 
+                    getslug(concat(specialization,'-in-', search_slug, '-sptlitcit'))
+                    else getslug(concat(specialization,'-in-', search_slug, '-sptcit'))
+                    end where sitemap_identifier in ('SPECIALIZATION_LOCALITY_CITY','SPECIALIZATION_CITY')'''
+        update_urls = RawSql(update_urls_query, []).execute()
+
+        update_extras_query = '''update  temp_search_urls 
+                          set extras = case when type='LOCALITY' then
+                           json_build_object('specialization_id', specialization_id, 'location_json',
+                           json_build_object('locality_id', locality_id, 'locality_value', locality_value, 'locality_latitude', 
+                           locality_latitude,'locality_longitude', locality_longitude), 'specialization', specialization)
+
+                          else  json_build_object('specialization_id', specialization_id,'location_json',
+                          json_build_object('sublocality_id',sublocality_id,'sublocality_value',sublocality_value,
+                           'locality_id', locality_id, 'locality_value', locality_value,
+                           'breadcrum_url',getslug(specialization || '-in-' || locality_value ||'-sptcit'),
+                          'sublocality_latitude',sublocality_latitude, 'sublocality_longitude',sublocality_longitude, 
+                          'locality_latitude',locality_latitude,'locality_longitude',locality_longitude),'specialization', specialization) end'''
+        update_extras = RawSql(update_extras_query, []).execute()
+
+        update_locality_loc_query = '''update temp_search_urls set locality_location = st_setsrid(st_point(locality_longitude, locality_latitude),4326)::geography where 
+                locality_latitude is not null and locality_longitude is not null'''
+
+        update_locality_loc = RawSql(update_locality_loc_query, []).execute()
+
+        update_sublocality_loc_query = '''update temp_search_urls set sublocality_location = st_setsrid(st_point(sublocality_longitude, sublocality_latitude),4326)::geography where 
+                 sublocality_latitude is not null and sublocality_longitude is not null'''
+
+        update_sublocality_loc = RawSql(update_sublocality_loc_query, []).execute()
+
+        update_location_query = '''update temp_search_urls set location = case when 
+                           sublocality_location is not null then sublocality_location  else locality_location end'''
+        update_location = RawSql(update_location_query, []).execute()
+
+        return 'success'
+
+
     def create_doctor_search_urls_temp_table():
         from ondoc.api.v1.utils import RawSql
         query = '''select nextval('entity_url_version_seq') as inc;'''
@@ -688,9 +815,9 @@ class EntityUrls(TimeStampedModel):
                     ea.alternative_value, ea.search_slug, null::json as extras , null::geography as sublocality_location,  
                     null::geography as locality_location, null::geography as location,
                     case when ea.type = 'SUBLOCALITY' then 
-                    concat('doctors-in-', ea.search_slug, '-sptlitcit')
-                    else concat('doctors-in-', ea.search_slug, '-sptcit')
-                    end as url, ea.type, count(*) as count,
+                    getslug(concat('doctors-in-', ea.search_slug, '-sptlitcit'))
+                    else getslug(concat('doctors-in-', ea.search_slug, '-sptcit'))
+                    end as url, ea.type, count(distinct d.id) as count,
                     case when ea.type = 'SUBLOCALITY' then 
                     ea.id 
                     end as sublocality_id,
@@ -716,9 +843,10 @@ class EntityUrls(TimeStampedModel):
                     'Doctor' as entity_type,
                     'SEARCHURL' url_type,
                     True as is_valid
-                    from hospital h inner join entity_address ea on ((ea.type ilike 'LOCALITY' and ST_DWithin(ea.centroid,h.location,15000)) OR 
-                    (ea.type ilike 'SUBLOCALITY' and ST_DWithin(ea.centroid,h.location,5000))) and h.is_live=true
+                    from hospital h inner join entity_address ea on ((ea.type = 'LOCALITY' and ST_DWithin(ea.centroid,h.location,15000)) OR 
+                    (ea.type = 'SUBLOCALITY' and ST_DWithin(ea.centroid,h.location,5000))) and h.is_live=true
                     and ea.type IN ('SUBLOCALITY' , 'LOCALITY') and ea.use_in_url=true inner join doctor_clinic dc on dc.hospital_id = h.id
+                    and dc.enabled=true 
                     inner join doctor d on dc.doctor_id= d.id
                     and d.is_live=true left join entity_address eaparent on ea.parent_id=eaparent.id and eaparent.use_in_url=true
                     group by ea.id having count(distinct d.id) >= 3''' % sequence
@@ -767,7 +895,7 @@ class EntityUrls(TimeStampedModel):
                     ps.id as specialization_id, ps.name as specialization, ea.alternative_value,
                     ea.search_slug, null as url, null::json as extras, null::geography as locality_location, 
                     null::geography as sublocality_location, null::geography as location,
-                    ea.type, count(*) as count,
+                    ea.type, count(distinct d.id) as count,
                     case when ea.type = 'SUBLOCALITY' then 
                     ea.id 
                     end as sublocality_id,
@@ -793,10 +921,11 @@ class EntityUrls(TimeStampedModel):
                     'Doctor' as entity_type,
                     'SEARCHURL' url_type,
                     True as is_valid
-                    from hospital h inner join entity_address ea on ((ea.type ilike 'LOCALITY' and 
+                    from hospital h inner join entity_address ea on ((ea.type = 'LOCALITY' and 
                     ST_DWithin(ea.centroid,h.location,15000)) OR 
-                    (ea.type ilike 'SUBLOCALITY' and ST_DWithin(ea.centroid,h.location,5000))) and h.is_live=true
+                    (ea.type = 'SUBLOCALITY' and ST_DWithin(ea.centroid,h.location,5000))) and h.is_live=true
                     and ea.type IN ('SUBLOCALITY' , 'LOCALITY') and ea.use_in_url=true inner join doctor_clinic dc on dc.hospital_id = h.id
+                    and dc.enabled=true
                     inner join doctor d on dc.doctor_id= d.id
                     inner join doctor_practice_specialization dps on dps.doctor_id = d.id and d.is_live=true
                     inner join practice_specialization ps on ps.id = dps.specialization_id 
@@ -807,8 +936,8 @@ class EntityUrls(TimeStampedModel):
         create_temp_table = RawSql(create_temp_table_query, []).execute()
 
         update_urls_query = '''update seo_doctor_specialization_search set url = case when type = 'SUBLOCALITY' then 
-                    concat(specialization,'-in-', search_slug, '-sptlitcit')
-                    else concat(specialization,'-in-', search_slug, '-sptcit')
+                    getslug(concat(specialization,'-in-', search_slug, '-sptlitcit'))
+                    else getslug(concat(specialization,'-in-', search_slug, '-sptcit'))
                     end'''
         update_urls = RawSql(update_urls_query, []).execute()
 
