@@ -22,6 +22,7 @@ from import_export.admin import ImportExportMixin
 
 from ondoc.diagnostic.models import Lab, LabAppointment
 from ondoc.doctor.models import Hospital, Doctor, OpdAppointment
+from django.db.models import Q
 
 
 def practicing_since_choices():
@@ -264,12 +265,12 @@ class MerchantResource(resources.ModelResource):
         model = Merchant
         fields = ('id', 'beneficiary_name', 'merchant_add_1', 'merchant_add_2', 'merchant_add_3', 'merchant_add_4',
                   'city', 'pin', 'state', 'country', 'email', 'mobile', 'ifsc_code', 'account_number', 'enabled',
-                  'verified_by_finance',)
+                  'verified_by_finance','type')
 
 
 class MerchantAdmin(ImportExportMixin, VersionAdmin):
     resource_class = MerchantResource
-    change_list_template = 'superuser_import_export.html'
+    change_list_template = 'export_template.html'
     list_display = ('beneficiary_name', 'account_number', 'ifsc_code', 'enabled', 'verified_by_finance')
     search_fields = ['beneficiary_name', 'account_number']
     list_filter = ('enabled', 'verified_by_finance')
@@ -345,19 +346,17 @@ class MerchantPayoutAdmin(VersionAdmin):
               'appointment_id', 'get_billed_to', 'get_merchant', 'process_payout']
     list_display = ('id', 'status', 'payable_amount', 'appointment_id', 'doc_lab_name')
     search_fields = ['name']
+    list_filter = ['status']
 
     def get_queryset(self, request):
-        return super().get_queryset(request).order_by('id').prefetch_related('lab_appointment__lab',
+        return super().get_queryset(request).order_by('-id').prefetch_related('lab_appointment__lab',
                                                                              'opd_appointment__doctor')
-
     def get_search_results(self, request, queryset, search_term):
-        queryset, use_distinct = self.get_queryset(request), True
-        if search_term:
-            final_result = []
-            for instance in queryset:
-                if search_term.lower() in self.doc_lab_name(instance).lower():
-                    final_result.append(instance.id)
-            queryset = self.get_queryset(request).filter(id__in=final_result)
+
+        queryset, use_distinct = super().get_search_results(request, queryset, None)
+
+        queryset = queryset.filter(Q(opd_appointment__doctor__name__icontains=search_term) |
+         Q(lab_appointment__lab__name__icontains=search_term))
 
         return queryset, use_distinct
 
