@@ -56,23 +56,23 @@
     <tr>
         <td>
             <table cellpadding="0" cellspacing="0"
-                   style="width: 100%; padding: 20px 15px 70px; border-bottom: 1px solid #d3d3d3;">
+                   style="width: 100%; padding: 20px 15px 30px; border-bottom: 1px solid #d3d3d3;">
                 <tbody>
                 <tr>
                     <td style="color: #757575; font-size: 16px; font-weight: 500;">
-                        <span style="color: #000000; font-weight: 600;"> Hi {{patient_name|capfirst}}, </span>
+                        <span style="color:#3f3f3f;font-size:16px;font-weight:500;"> Hi, </span>
                     </td>
                 </tr>
                 <tr>
                     {% if instance.cancellation_type == 3 %}
-                    <td style="color: #000000; font-size: 14px; font-weight: 500; padding-top: 16px;">
-                        Your appointment for {{patient_name|capfirst}} on {{instance.time_slot_start|date:"d/m/y"}} at
+                    <td style="color:#3f3f3f;font-size:16px;font-weight:500;padding-top: 16px;">
+                        Appointment for {{patient_name|capfirst}} on {{instance.time_slot_start|date:"d/m/y"}} at
                         {{instance.time_slot_start|date:"h:i a"}} with {{lab_name|capfirst}} has been cancelled due to
                         unavailability of the lab manager.
                     </td>
                     {% else %}
-                    <td style="color: #000000; font-size: 14px; font-weight: 500; padding-top: 16px;">
-                        Your appointment for {{patient_name|capfirst}} on {{instance.time_slot_start|date:"d/m/y"}} at
+                    <td style="color:#3f3f3f;font-size:16px;font-weight:500;padding-top: 16px;">
+                        Appointment for {{patient_name|capfirst}} on {{instance.time_slot_start|date:"d/m/y"}} at
                         {{instance.time_slot_start|date:"h:i a"}} with {{lab_name|capfirst}} has been cancelled as
                         requested by you.
                     </td>
@@ -83,7 +83,7 @@
                         <table>
                             <tbody>
                             <tr>
-                                <td style="color:#000000;font-size:14px;font-weight:700;padding-top:16px;width:40%">
+                                <td style="color:#000000;font-size:16px;font-weight:700;padding-top:16px;width:40%">
                                     Booking ID
                                 </td>
                                 <td style="color:#3f3f3f;font-size:16px;font-weight:500;padding-top:16px">
@@ -91,7 +91,7 @@
                                 </td>
                             </tr>
                             <tr>
-                                <td style="color:#000000;font-size:14px;font-weight:700;padding-top:16px;width:40%">
+                                <td style="color:#000000;font-size:16px;font-weight:700;padding-top:16px;width:40%">
                                     Patient Name
                                 </td>
                                 <td style="color:#3f3f3f;font-size:16px;font-weight:500;padding-top:16px">
@@ -99,7 +99,7 @@
                                 </td>
                             </tr>
                             <tr>
-                                <td style="color:#000000;font-size:14px;font-weight:700;padding-top:16px;width:40%">
+                                <td style="color:#000000;font-size:16px;font-weight:700;padding-top:16px;width:40%">
                                     Date and Time
                                 </td>
                                 <td style="color:#3f3f3f;font-size:16px;font-weight:500;padding-top:16px">
@@ -109,7 +109,7 @@
                             </tr>
                             {% if instance.effective_price > 0 %}
                             <tr>
-                                <td style="color:#000000;font-size:14px;font-weight:700;padding-top:16px">
+                                <td style="color:#000000;font-size:16px;font-weight:700;padding-top:16px">
                                     Refund Amount
                                 </td>
                                 <td style="color:#3f3f3f;font-size:16px;font-weight:500;padding-top:8px;">
@@ -123,7 +123,7 @@
                 </tr>
                 {% if instance.effective_price > 0 %}
                 <tr>
-                    <td style="color: #000000; font-size: 14px; font-weight: 500; padding-top: 16px;">
+                    <td style="color:#3f3f3f;font-size:16px;font-weight:500;padding-top: 16px;">
                         Refund if applicable will be credited within 5-7 working days.
                     </td>
                 </tr>
