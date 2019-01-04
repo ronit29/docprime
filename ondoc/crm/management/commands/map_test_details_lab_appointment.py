@@ -10,13 +10,13 @@ class Command(BaseCommand):
     help = 'Map test details from order in lab appointments'
 
     def handle(self, *args, **options):
-        order_queryset = Order.objects.filter(product_id=Order.LAB_PRODUCT_ID)
+        order_queryset = Order.objects.filter(product_id=Order.LAB_PRODUCT_ID, reference_id__isnull=False)
         appointment_test_mappings = []
         for order in order_queryset:
             temp_action_data = order.action_data
             if temp_action_data:
                 temp_action_data = dict(copy.deepcopy(temp_action_data))
-                temp_extra_details = temp_action_data.get('extra_details')
+                temp_extra_details = temp_action_data.get('extra_details', [])
                 for test_details in temp_extra_details:
                     test_details.pop('name', None)
                     test_details['appointment_id'] = order.reference_id
