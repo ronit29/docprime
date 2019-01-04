@@ -863,6 +863,28 @@ def create_payout_checksum(all_txn, product_id):
     return checksum_hash
 
 
+def html_to_pdf(html_body, filename):
+    file = None
+    try:
+        extra_args = {
+            'virtual-time-budget': 6000
+        }
+        from django.core.files.uploadedfile import TemporaryUploadedFile
+        temp_pdf_file = TemporaryUploadedFile(filename, 'byte', 1000, 'utf-8')
+        file = open(temp_pdf_file.temporary_file_path())
+        from hardcopy import bytestring_to_pdf
+        bytestring_to_pdf(html_body.encode(), file, **extra_args)
+        file.seek(0)
+        file.flush()
+        file.content_type = 'application/pdf'
+        from django.core.files.uploadedfile import InMemoryUploadedFile
+        file = InMemoryUploadedFile(temp_pdf_file, None, filename, 'application/pdf',
+                                    temp_pdf_file.tell(), None)
+
+    except Exception as e:
+        logger.error("Got error while creating PDF file :: {}.".format(e))
+    return file
+
 def util_absolute_url(url):
     if bool(urlparse(url).netloc):
         return url
