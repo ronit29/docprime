@@ -1010,12 +1010,12 @@ class DoctorListViewSet(viewsets.GenericViewSet):
 
             extras = entity.additional_info
             if extras:
-                kwargs['extras'] = extras
-                kwargs['specialization_id'] = entity.specialization_id
-                kwargs['url'] = url
-                kwargs['parameters'] = doctor_query_parameters(extras, request.query_params)
+                # kwargs['specialization_id'] = entity.specialization_id
+                # kwargs['url'] = url
+                kwargs['parameters'] = doctor_query_parameters(entity, request.query_params)
                 kwargs['ratings'] = rating
                 kwargs['reviews'] = reviews
+                kwargs['entity'] = entity
                 response = self.list(request, **kwargs)
                 return response
         else:
@@ -1029,16 +1029,27 @@ class DoctorListViewSet(viewsets.GenericViewSet):
         serializer = serializers.DoctorListSerializer(data=parameters, context={"request": request})
         serializer.is_valid(raise_exception=True)
         validated_data = serializer.validated_data
-        if kwargs.get('extras'):
-            validated_data['extras'] = kwargs['extras']
-        if kwargs.get('url'):
-            validated_data['url'] = kwargs['url']
+        specialization_id = None
+        # if kwargs.get('extras'):
+        #     validated_data['extras'] = kwargs['extras']
+        if kwargs.get('entity'):
+            entity = kwargs.get('entity')
+            validated_data['url'] = entity.url
+            validated_data['locality_value'] = entity.locality_value if entity.locality_value else None
+            validated_data['sublocality_value'] = entity.sublocality_value if entity.sublocality_value else None
+            validated_data['specialization'] = entity.specialization if entity.specialization else None
+            validated_data['sublocality_latitude'] = entity.sublocality_latitude if entity.sublocality_latitude else None
+            validated_data['sublocality_longitude'] = entity.sublocality_longitude if entity.sublocality_longitude else None
+            validated_data['locality_latitude'] = entity.locality_latitude if entity.locality_latitude else None
+            validated_data['locality_longitude'] = entity.locality_longitude if entity.locality_longitude else None
+            specialization_id = entity.specialization_id if entity.specialization_id else None
+
         if kwargs.get('ratings'):
             validated_data['ratings'] = kwargs['ratings']
         if kwargs.get('reviews'):
             validated_data['reviews'] = kwargs['reviews']
 
-        specialization_id = kwargs.get('specialization_id', None)
+
         specialization_dynamic_content = ''
         ratings = None
         reviews = None
@@ -1083,28 +1094,38 @@ class DoctorListViewSet(viewsets.GenericViewSet):
         breadcrumb = None
         ratings_title = ''
         # if False and (validated_data.get('extras') or validated_data.get('specialization_ids')):
-        if validated_data.get('extras'):
+        if validated_data.get('locality_value') or validated_data.get('sublocality_value'):
             location = None
-            breadcrumb_sublocality = None
-            breadcrumb_locality = None
+            # breadcrumb_sublocality = None
+            # breadcrumb_locality = None
             city = None
             breadcrumb = None
             locality = ''
             sublocality = ''
             specializations = ''
+            breadcrumb_locality_url = None
 
-            if validated_data.get('extras') and validated_data.get('extras').get('location_json'):
-                if validated_data.get('extras').get('location_json').get('locality_value'):
-                    locality = validated_data.get('extras').get('location_json').get('locality_value')
-                    breadcrumb_locality = locality
-                    city = locality
-                if validated_data.get('extras').get('location_json').get('sublocality_value'):
-                    sublocality = validated_data.get('extras').get('location_json').get('sublocality_value')
-                    if sublocality:
-                        breadcrumb_sublocality = sublocality
-                        locality = sublocality + ' ' + locality
-                if validated_data.get('extras').get('location_json').get('breadcrum_url'):
-                    breadcrumb_locality_url = validated_data.get('extras').get('location_json').get('breadcrum_url')
+            if validated_data.get('locality_value'):
+                locality = validated_data.get('locality_value')
+                city = locality
+            if validated_data.get('sublocality_value'):
+                sublocality = validated_data.get('sublocality_value')
+                if sublocality:
+                    locality = sublocality + ' ' + locality
+
+
+            # if validated_data.get('extras') and validated_data.get('extras').get('location_json'):
+            #     if validated_data.get('extras').get('location_json').get('locality_value'):
+            #         locality = validated_data.get('extras').get('location_json').get('locality_value')
+            #         breadcrumb_locality = locality
+            #         city = locality
+            #     if validated_data.get('extras').get('location_json').get('sublocality_value'):
+            #         sublocality = validated_data.get('extras').get('location_json').get('sublocality_value')
+            #         if sublocality:
+            #             breadcrumb_sublocality = sublocality
+            #             locality = sublocality + ' ' + locality
+            #     if validated_data.get('extras').get('location_json').get('breadcrum_url'):
+            #         breadcrumb_locality_url = validated_data.get('extras').get('location_json').get('breadcrum_url')
             #
             # if validated_data.get('specialization_ids'):
             #     specialization_name_obj = models.PracticeSpecialization.objects.filter(
@@ -1122,8 +1143,11 @@ class DoctorListViewSet(viewsets.GenericViewSet):
             #     else:
             #         specializations = ''
             specializations = None
-            if validated_data.get('extras') and validated_data.get('extras').get('specialization'):
-                specializations = validated_data.get('extras').get('specialization')
+            if validated_data.get('specialization'):
+                specializations = validated_data.get('specialization')
+
+            # if validated_data.get('extras') and validated_data.get('extras').get('specialization'):
+            #     specializations = validated_data.get('extras').get('specialization')
 
             if specializations:
                 title = specializations
@@ -1168,16 +1192,16 @@ class DoctorListViewSet(viewsets.GenericViewSet):
                 description += 'in '+ city
             description += '.'
 
-            if breadcrumb_sublocality:
-                breadcrumb =[ {
-                'name': breadcrumb_locality,
-                'url': breadcrumb_locality_url
-                },
-                 {
-                        'name': breadcrumb_sublocality,
-                        'url': validated_data.get('url')
-                    }
-                ]
+            # if breadcrumb_sublocality:
+            #     breadcrumb =[ {
+            #     'name': breadcrumb_locality,
+            #     'url': breadcrumb_locality_url
+            #     },
+            #      {
+            #             'name': breadcrumb_sublocality,
+            #             'url': validated_data.get('url')
+            #         }
+            #     ]
 
             if title or description:
                 if locality:
@@ -1185,13 +1209,21 @@ class DoctorListViewSet(viewsets.GenericViewSet):
                         location = city
                     else:
                         location = locality
-
-            if validated_data.get('extras', {}).get('location_json', {}).get('sublocality_latitude', None):
-                latitude = validated_data.get('extras').get('location_json').get('sublocality_latitude')
-                longitude = validated_data.get('extras').get('location_json').get('sublocality_longitude')
+            if validated_data.get('sublocality_latitude', None):
+                latitude = validated_data.get('sublocality_latitude')
+                longitude = validated_data.get('sublocality_longitude')
             else:
-                latitude = validated_data.get('extras', {}).get('location_json', {}).get('locality_latitude', None)
-                longitude = validated_data.get('extras', {}).get('location_json', {}).get('locality_longitude', None)
+
+                latitude = validated_data.get('locality_latitude', None)
+                longitude = validated_data.get('locality_longitude', None)
+
+
+            # if validated_data.get('extras', {}).get('location_json', {}).get('sublocality_latitude', None):
+            #     latitude = validated_data.get('extras').get('location_json').get('sublocality_latitude')
+            #     longitude = validated_data.get('extras').get('location_json').get('sublocality_longitude')
+            # else:
+            #     latitude = validated_data.get('extras', {}).get('location_json', {}).get('locality_latitude', None)
+            #     longitude = validated_data.get('extras', {}).get('location_json', {}).get('locality_longitude', None)
 
             # seo = {
             #     "title": title,

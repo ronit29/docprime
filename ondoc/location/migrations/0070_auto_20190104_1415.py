@@ -15,4 +15,17 @@ class Migration(migrations.Migration):
             name='no_of_childs',
             field=models.PositiveIntegerField(default=0, null=True),
         ),
+        migrations.RunSQL(
+            '''CREATE OR REPLACE FUNCTION slugify_url(url varchar) RETURNS VARCHAR AS
+            $$
+            DECLARE
+                result varchar;
+            BEGIN
+                result := regexp_replace(regexp_replace(regexp_replace(lower(url), '[^a-zA-Z0-9_, -]','','g'),'[_,-]',' ','g'),'[ -]+','-','g');
+                result := trim(both '-' from result);
+                RETURN result;
+            END;
+            $$
+            LANGUAGE PLPGSQL;'''
+        ),
     ]

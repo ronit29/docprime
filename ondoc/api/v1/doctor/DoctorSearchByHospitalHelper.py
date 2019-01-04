@@ -267,6 +267,7 @@ class DoctorSearchByHospitalHelper:
                            "INNER JOIN doctor_clinic_timing dct ON dc.id = dct.doctor_clinic_id " \
                            "INNER JOIN doctor_clinic_procedure dcp ON dc.id = dcp.doctor_clinic_id " \
                            "WHERE {filtering_params} AND " \
+                           "d.enabled_for_online_booking and dc.enabled_for_online_booking and h.enabled_for_online_booking AND " \
                            "St_dwithin(St_setsrid(St_point((%(longitude)s), (%(latitude)s)), 4326 ), h.location, (%(max_distance)s)) AND " \
                            "St_dwithin(St_setsrid(St_point((%(longitude)s), (%(latitude)s)), 4326 ), h.location, (%(min_distance)s)) = false " \
                            " ) " \
@@ -324,7 +325,8 @@ class DoctorSearchByHospitalHelper:
                            "INNER JOIN hospital h ON h.id = dc.hospital_id and h.is_live=true " \
                            "INNER JOIN doctor_clinic_timing dct ON dc.id = dct.doctor_clinic_id " \
                            "{sp_cond}" \
-                           "WHERE {filtering_params} " \
+                           "WHERE {filtering_params}" \
+                           " and d.enabled_for_online_booking and dc.enabled_for_online_booking and h.enabled_for_online_booking   " \
                            "and St_dwithin(St_setsrid(St_point((%(longitude)s), (%(latitude)s)), 4326 ), h.location, (%(max_distance)s)) " \
                            "{min_dist_cond}" \
                            " )x " \
