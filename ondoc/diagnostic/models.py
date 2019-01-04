@@ -1160,7 +1160,7 @@ class LabAppointment(TimeStampedModel, CouponsMixin):
             test['computed_agreed_price'] = Decimal(test['computed_agreed_price']) if test['computed_agreed_price'] != 'None' else None
             test_mappings.append(LabAppointmentTestMapping(**test))
         LabAppointmentTestMapping.objects.bulk_create(test_mappings)
-        # app_obj.lab_test.add(*lab_ids)  # DONE SHASHANK_SINGH CHANGE 4 add new mappings
+        app_obj.lab_test.add(*lab_ids)
         if coupon_list:
             app_obj.coupon.add(*coupon_list)
         return app_obj
