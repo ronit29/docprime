@@ -1,3 +1,4 @@
+from urllib.parse import urlparse
 from rest_framework.views import exception_handler
 from rest_framework import permissions
 from collections import defaultdict
@@ -264,7 +265,7 @@ def opdappointment_transform(app_data):
     return app_data
 
 
-def labappointment_transform(app_data):
+def labappointment_transform(app_data):  # NO NEED SHASHANK_SINGH CHANGE 3 convert extra_details price to str
     app_data["price"] = str(app_data["price"])
     app_data["agreed_price"] = str(app_data["agreed_price"])
     app_data["deal_price"] = str(app_data["deal_price"])
@@ -850,3 +851,17 @@ def create_payout_checksum(all_txn, product_id):
     print("checksum string - " + str(checksum) + "checksum hash - " + str(checksum_hash))
     logger.error("checksum string - " + str(checksum) + "checksum hash - " + str(checksum_hash))
     return checksum_hash
+
+
+def util_absolute_url(url):
+    if bool(urlparse(url).netloc):
+        return url
+    else:
+        return settings.BASE_URL + url
+
+
+def util_file_name(filename):
+    import os
+    if filename:
+        filename = os.path.basename(filename)
+    return filename

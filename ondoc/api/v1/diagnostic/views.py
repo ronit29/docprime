@@ -1293,8 +1293,8 @@ class LabAppointmentView(mixins.CreateModelMixin,
         test_ids_list = list()
         extra_details = list()
         for obj in lab_test_queryset:
-            test_ids_list.append(obj.id)
-            extra_details.append({
+            test_ids_list.append(obj.test.id)  # DONE SHASHANK_SINGH CHANGE 1 SAVE TEST IDS NO ALTs IDS
+            extra_details.append({  # No NEED SHASHANK_SINGH CHANGE 2 save without str(s)
                 "id": str(obj.test.id),
                 "name": str(obj.test.name),
                 "custom_deal_price": str(obj.custom_deal_price),

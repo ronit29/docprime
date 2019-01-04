@@ -91,7 +91,7 @@ class Order(TimeStampedModel):
         from ondoc.api.v1.diagnostic.serializers import LabAppTransactionModelSerializer
 
         # Initial validations for appointment data
-        appointment_data = self.action_data
+        appointment_data = copy.deepcopy(self.action_data)
         # Check if payment is required at all, only when payment is required we debit consumer's account
         payment_not_required = False
         if self.product_id == self.DOCTOR_PRODUCT_ID:

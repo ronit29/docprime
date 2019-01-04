@@ -1,5 +1,5 @@
 
-from django.contrib.gis import admin
+from django.contrib import admin
 
 from ondoc.crm.admin.procedure import ProcedureCategoryAdmin, ProcedureAdmin
 from ondoc.doctor.models import (Doctor, Language, MedicalService, Specialization, College, Qualification, Hospital,
