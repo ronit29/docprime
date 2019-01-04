@@ -1,5 +1,6 @@
 The appointment for {{patient_name|capfirst}} with {{lab_name|capfirst}} on {{instance.time_slot_start|date:"D jS F Y"}} at {{instance.time_slot_start|date:"h:i A"}} has been confirmed.
 
+The booking details are as below :
 Unique Confirmation Code : {{instance.otp}}
 Share this code with the lab at the time of your appointment.
 Booking ID : {{instance.id}}
