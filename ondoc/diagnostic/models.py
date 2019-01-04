@@ -1,3 +1,5 @@
+from copy import deepcopy
+
 from django.contrib.gis.db import models
 from django.contrib.staticfiles.templatetags.staticfiles import static
 from django.core.validators import MaxValueValidator, MinValueValidator, FileExtensionValidator
@@ -1144,7 +1146,7 @@ class LabAppointment(TimeStampedModel, CouponsMixin):
         appointment_data["otp"] = otp
         lab_ids = appointment_data.pop("lab_test")
         coupon_list = appointment_data.pop("coupon", None)
-        extra_details = appointment_data.pop("extra_details", None)
+        extra_details = deepcopy(appointment_data.pop("extra_details", None))
         app_obj = cls.objects.create(**appointment_data)
         test_mappings = []
         for test in extra_details:
