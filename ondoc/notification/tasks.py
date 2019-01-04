@@ -254,6 +254,7 @@ def set_order_dummy_transaction(self, order_id, user_id):
             response = requests.post(url, data=json.dumps(req_data), headers=headers)
             if response.status_code == status.HTTP_200_OK:
                 resp_data = response.json()
+                logger.error(resp_data)
                 if resp_data.get("ok") is not None and resp_data.get("ok") == 1:
                     tx_data = {}
                     tx_data['user'] = user
