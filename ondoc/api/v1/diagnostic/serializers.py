@@ -537,6 +537,7 @@ class LabAppointmentCreateSerializer(serializers.Serializer):
     # address = serializers.IntegerField(required=False, allow_null=True)
     payment_type = serializers.IntegerField(default=OpdAppointment.PREPAID)
     coupon_code = serializers.ListField(child=serializers.CharField(), required=False, default=[])
+    use_wallet = serializers.BooleanField(required=False, default=True)
 
     def validate(self, data):
         MAX_APPOINTMENTS_ALLOWED = 10

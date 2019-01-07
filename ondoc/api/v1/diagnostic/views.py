@@ -1248,7 +1248,7 @@ class LabAppointmentView(mixins.CreateModelMixin,
         serializer.is_valid(raise_exception=True)
         appointment_data = self.form_lab_app_data(request, serializer.validated_data)
 
-        resp = self.create_order(request, appointment_data, account_models.Order.LAB_PRODUCT_ID)
+        resp = self.create_order(request, appointment_data, account_models.Order.LAB_PRODUCT_ID, data.get("use_wallet"))
 
         return Response(data=resp)
 
@@ -1364,13 +1364,18 @@ class LabAppointmentView(mixins.CreateModelMixin,
         }
         return Response(response)
 
-    def create_order(self, request, appointment_details, product_id):
-        remaining_amount = 0
+    def create_order(self, request, appointment_details, product_id, use_wallet=True):
+
         user = request.user
-        consumer_account = account_models.ConsumerAccount.objects.get_or_create(user=user)
-        consumer_account = account_models.ConsumerAccount.objects.select_for_update().get(user=user)
-        balance = consumer_account.balance
-        cashback_balance = consumer_account.cashback
+        balance = 0
+        cashback_balance = 0
+
+        if use_wallet:
+            consumer_account = account_models.ConsumerAccount.objects.get_or_create(user=user)
+            consumer_account = account_models.ConsumerAccount.objects.select_for_update().get(user=user)
+            balance = consumer_account.balance
+            cashback_balance = consumer_account.cashback
+
         total_balance = balance + cashback_balance
         resp = {}
 

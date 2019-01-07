@@ -170,6 +170,7 @@ class CreateAppointmentSerializer(serializers.Serializer):
     payment_type = serializers.ChoiceField(choices=OpdAppointment.PAY_CHOICES)
     coupon_code = serializers.ListField(child=serializers.CharField(), required=False, default=[])
     procedure_ids = serializers.ListField(child=serializers.PrimaryKeyRelatedField(queryset=Procedure.objects.filter()), required=False)
+    use_wallet = serializers.BooleanField(required=False, default=True)
     # procedure_category_ids = serializers.ListField(child=serializers.PrimaryKeyRelatedField(queryset=ProcedureCategory.objects.filter(is_live=True)), required=False, default=[])
     # time_slot_end = serializers.DateTimeField()
 
