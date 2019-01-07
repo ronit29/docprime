@@ -12,13 +12,17 @@ from ondoc.authentication.models import Merchant, AssociatedMerchant
 from ondoc.account.models import MerchantPayout
 from ondoc.common.models import Cities, MatrixCityMapping
 from import_export import resources, fields
-from import_export.admin import ImportMixin, base_formats, ImportExportMixin
+from import_export.admin import ImportMixin, base_formats, ImportExportMixin, ImportExportModelAdmin
 from reversion.admin import VersionAdmin
 import nested_admin
 from django.urls import reverse
 from django.utils.safestring import mark_safe
 from django.contrib.contenttypes.models import ContentType
 from import_export.admin import ImportExportMixin
+
+from ondoc.diagnostic.models import Lab, LabAppointment
+from ondoc.doctor.models import Hospital, Doctor, OpdAppointment
+from django.db.models import Q
 
 
 def practicing_since_choices():
@@ -256,37 +260,51 @@ class GenericAdminForm(forms.ModelForm):
                    'phone_number': forms.NumberInput(attrs={'size': 8})}
 
 
+class MerchantResource(resources.ModelResource):
+    class Meta:
+        model = Merchant
+        fields = ('id', 'beneficiary_name', 'merchant_add_1', 'merchant_add_2', 'merchant_add_3', 'merchant_add_4',
+                  'city', 'pin', 'state', 'country', 'email', 'mobile', 'ifsc_code', 'account_number', 'enabled',
+                  'verified_by_finance','type')
+
+
 class MerchantAdmin(ImportExportMixin, VersionAdmin):
-    model = Merchant
-
-    list_display = ('beneficiary_name', 'account_number', 'ifsc_code', 'enabled', 'verified_by_finance')
-
+    resource_class = MerchantResource
     change_list_template = 'export_template.html'
+    list_display = ('beneficiary_name', 'account_number', 'ifsc_code', 'enabled', 'verified_by_finance')
     search_fields = ['beneficiary_name', 'account_number']
     list_filter = ('enabled', 'verified_by_finance')
 
-
+    def associated_to(self, instance):
+        if instance and instance.id:
+            asso_qs = AssociatedMerchant.objects.select_related('content_type').filter(merchant=instance)
+            all_links = []
+            for asso in asso_qs:
+                content_type = asso.content_type
+                change_url = reverse('admin:%s_%s_change' % (content_type.app_label, content_type.model),
+                                     args=[asso.object_id])
+                html = '''<a href='%s' target=_blank>%s</a><br>''' % (
+                    change_url, asso.content_object.name if asso.content_object.name else change_url)
+                all_links.append(html)
+            return mark_safe(''.join(all_links))
+        return None
 
     def get_readonly_fields(self, request, obj=None):
-
         if request.user.is_member_of(constants['MERCHANT_TEAM']):
             if obj and obj.verified_by:
-                return [f.name for f in self.model._meta.fields if f.name not in ['enabled','verified_by_finance']]
+                return [f.name for f in self.model._meta.fields if
+                        f.name not in ['enabled', 'verified_by_finance', 'associated_to']]
             return []
 
         if obj and obj.verified_by:
-            return [f.name for f in self.model._meta.fields]
+            return [f.name for f in self.model._meta.fields] + ['associated_to']
 
-        return ['enabled','verified_by_finance']        
-
-
+        return ['verified_by_finance', 'associated_to']
 
     def save_model(self, request, obj, form, change):
-
         if form.cleaned_data.get('verified_by_finance') and not obj.verified_by:
             obj.verified_by = request.user
             obj.verified_at = timezone.now()
-
         super().save_model(request, obj, form, change)
 
 
@@ -324,9 +342,23 @@ class MerchantPayoutForm(forms.ModelForm):
 class MerchantPayoutAdmin(VersionAdmin):
     form = MerchantPayoutForm
     model = MerchantPayout
-    fields = ['id','charged_amount','updated_at','created_at','payable_amount','status','payout_time','paid_to',
-    'appointment_id', 'get_billed_to', 'get_merchant', 'process_payout']
-    list_display = ('id', 'status', 'payable_amount','appointment_id')
+    fields = ['id', 'charged_amount', 'updated_at', 'created_at', 'payable_amount', 'status', 'payout_time', 'paid_to',
+              'appointment_id', 'get_billed_to', 'get_merchant', 'process_payout']
+    list_display = ('id', 'status', 'payable_amount', 'appointment_id', 'doc_lab_name')
+    search_fields = ['name']
+    list_filter = ['status']
+
+    def get_queryset(self, request):
+        return super().get_queryset(request).order_by('-id').prefetch_related('lab_appointment__lab',
+                                                                             'opd_appointment__doctor')
+    def get_search_results(self, request, queryset, search_term):
+
+        queryset, use_distinct = super().get_search_results(request, queryset, None)
+
+        queryset = queryset.filter(Q(opd_appointment__doctor__name__icontains=search_term) |
+         Q(lab_appointment__lab__name__icontains=search_term))
+
+        return queryset, use_distinct
 
     def get_readonly_fields(self, request, obj=None):
         base = ['appointment_id', 'get_billed_to', 'get_merchant']
@@ -336,6 +368,16 @@ class MerchantPayoutAdmin(VersionAdmin):
     def save_model(self, request, obj, form, change):
         obj.process_payout=form.cleaned_data.get('process_payout')
         super().save_model(request, obj, form, change)
+
+    def doc_lab_name(self, instance):
+        appt = instance.get_appointment()
+        if isinstance(appt, OpdAppointment):
+            if appt.doctor:
+                return appt.doctor.name
+        elif isinstance(appt, LabAppointment):
+            if appt.lab:
+                return appt.lab.name
+        return ''
 
     def appointment_id(self, instance):
         appt = instance.get_appointment()

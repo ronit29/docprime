@@ -101,15 +101,19 @@ class Command(BaseCommand):
             return 
 
         #for all addresses with no child
-        RawSql("update entity_address set centroid=abs_centroid where id not in (select parent_id from \
+        RawSql("update entity_address set centroid=abs_centroid, child_count=1 where id not in (select parent_id from \
             entity_address where parent_id is not null)", []).execute()
 
         current_order = max_order
         while current_order >=1:
             print("running for "+str(current_order))
 
-            RawSql("update entity_address ea set centroid = (select ST_Centroid(ST_Union(centroid::geometry)) from entity_address\
-                where parent_id=ea.id and centroid is not null) \
-                where ea.order=%s and (select count(*) from entity_address where parent_id=ea.id and centroid is not null)>0",[current_order]).execute()
+            RawSql("update entity_address ea set centroid = (select ST_Centroid(ST_Union(centroid::geometry)) "
+                   "from entity_address where parent_id=ea.id and centroid is not null), "
+                   "child_count = (select sum(child_count)+1 from entity_address where parent_id=ea.id) " \
+                    "where ea.order=%s and (select count(*) from entity_address where parent_id=ea.id and " \
+                    "centroid is not null)>0",[current_order]).execute()
 
             current_order -=1
+
+

@@ -54,7 +54,7 @@ def prepare_and_hit(self, data):
         patient_address = resolve_address(appointment.address)
     service_name = ""
     if task_data.get('type') == 'LAB_APPOINTMENT':
-        service_name = ','.join([test_obj.test.name for test_obj in appointment.lab_test.all()])
+        service_name = ','.join([test_obj.test.name for test_obj in appointment.test_mappings.all()])  # DONE SHASHANK_SINGH CHANGE 13
 
     order = data.get('order')
 
@@ -381,13 +381,15 @@ def push_onboarding_qcstatus_to_matrix(self, data):
 
         product_id = 0
         gender = 0
-
         if obj_type == 'Lab':
             obj = Lab.objects.get(id=obj_id)
             mobile = obj.primary_mobile
             product_id = 4
+            exit_point_url = '%s/admin/diagnostic/lab/%s/change' % (settings.ADMIN_BASE_URL, obj_id)
+
         elif obj_type == 'Doctor':
 
+            exit_point_url = '%s/admin/doctor/doctor/%s/change' % (settings.ADMIN_BASE_URL, obj_id)
             obj = Doctor.objects.get(id=obj_id)
             if obj.gender and obj.gender == 'm':
                 gender = 1
@@ -411,7 +413,8 @@ def push_onboarding_qcstatus_to_matrix(self, data):
             'OnBoarding': obj.onboarding_status,
             'Gender': gender,
             'SubProductId': 0,
-            'Name': obj.name
+            'Name': obj.name,
+            'ExitPointUrl': exit_point_url,
         }
 
         #logger.error(json.dumps(request_data))

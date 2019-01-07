@@ -2,6 +2,7 @@ from django.urls import path
 from .views import (LabTestList, LabList, LabAppointmentView, SearchPageViewSet, LabTimingListView,
                     AvailableTestViewSet, LabReportFileViewset, DoctorLabAppointmentsViewSet,
                     DoctorLabAppointmentsNoAuthViewSet, TestDetailsViewset, LabTestCategoryListViewSet)
+
 # from rest_framework.routers import DefaultRouter
 #
 # router = DefaultRouter()
@@ -11,7 +12,7 @@ from .views import (LabTestList, LabList, LabAppointmentView, SearchPageViewSet,
 #
 # urlpatterns = router.urls
 urlpatterns = [
-    #path('block-calender', LabBlockCalendarViewSet.as_view({'get': 'list'}), name='get-lab-block-calender'),
+    # path('block-calender', LabBlockCalendarViewSet.as_view({'get': 'list'}), name='get-lab-block-calender'),
     path('labsearch', SearchPageViewSet.as_view({'get': 'list'}), name='search-lab'),
     path('test', LabTestList.as_view({'get': 'list'}), name='test-list'),
     path('package', LabTestList.as_view({'get': 'autocomplete_packages'}), name='package-autocomplete'),
@@ -23,7 +24,7 @@ urlpatterns = [
     path('lablist_by_url', LabList.as_view({'get': 'list_by_url'}), name='search_by_city'),
     path('lablist/<int:lab_id>', LabList.as_view({'get': 'retrieve'}), name='lab-list-detail'),
     path('lablistbyurl', LabList.as_view({'get': 'retrieve_by_url'}), name='lab-list-by-url'),
-    path('testbyurl', LabList.as_view({'get':'retrieve_test_by_url'}), name='retrieve-test-by-url'),
+    path('testbyurl', LabList.as_view({'get': 'retrieve_test_by_url'}), name='retrieve-test-by-url'),
     # path('lab/appointment', LabAppointmentsViewSet.as_view({'get': 'list'}), name='lab-appointment-list'),
     path('labappointment/create', LabAppointmentView.as_view({'post': 'create'}),
          name='lab-create-appointment'),
@@ -46,7 +47,6 @@ urlpatterns = [
          name='lab-appointment-complete'),
     path('appointment/complete', DoctorLabAppointmentsNoAuthViewSet.as_view({'post': 'complete'}),
          name='appointment-complete'),
-    path('test/details', TestDetailsViewset.as_view({'get':'retrieve'}), name='test-details'),
-    path('test/category',LabTestCategoryListViewSet.as_view({'get': 'list'}), name='test-category'),
-    path('package/category', LabTestCategoryListViewSet.as_view({'get': 'list_category'}), name='package_category'),
+    path('test/details', TestDetailsViewset.as_view({'get': 'retrieve'}), name='test-details'),
+    path('test/category', LabTestCategoryListViewSet.as_view({'get': 'list'}), name='test-category'),
 ]

@@ -189,7 +189,8 @@ class InsuranceThreshold(auth_model.TimeStampedModel, LiveMixin):
             if child_min_age <= days_diff and math.floor(days_diff/365) < child_max_age:
                 is_dob_valid = True
             else:
-                message = {"message": "Child Age should be more than " + str(child_min_age) + " days or less than 18 years"}
+                message = {"message": "Child Age should be more than " + str(child_min_age) + " days or less than" +
+                                      str(child_max_age) + " years"}
 
         return is_dob_valid, message
 

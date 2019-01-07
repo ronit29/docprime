@@ -25,7 +25,7 @@ from django.core.files.base import ContentFile
 from django.core.files.uploadedfile import SimpleUploadedFile, InMemoryUploadedFile
 from django.core.files import File
 from hardcopy import bytestring_to_pdf
-
+from django.contrib.postgres.fields import ArrayField
 
 import copy
 
@@ -46,6 +46,7 @@ class NotificationAction:
     LAB_APPOINTMENT_RESCHEDULED_BY_LAB = 23
     LAB_APPOINTMENT_BOOKED = 24
     LAB_REPORT_UPLOADED = 25
+    LAB_REPORT_SEND_VIA_CRM = 26
 
     PRESCRIPTION_UPLOADED = 6
     PAYMENT_PENDING = 7
@@ -72,6 +73,7 @@ class NotificationAction:
         (LAB_APPOINTMENT_RESCHEDULED_BY_LAB, "Lab Appointment Rescheduled by Lab"),
         (LAB_APPOINTMENT_BOOKED, "Lab Appointment Booked"),
         (LAB_REPORT_UPLOADED, "Lab Report Uploaded"),
+        (LAB_REPORT_SEND_VIA_CRM, "Send Lab Reports via CRM"),
 
         (PRESCRIPTION_UPLOADED, "Prescription Uploaded"),
         (PAYMENT_PENDING, "Payment Pending"),
@@ -522,6 +524,9 @@ class EmailNotification(TimeStampedModel, EmailNotificationOpdMixin, EmailNotifi
     viewed_at = models.DateTimeField(blank=True, null=True)
     read_at = models.DateTimeField(blank=True, null=True)
     notification_type = models.PositiveIntegerField(choices=NotificationAction.NOTIFICATION_TYPE_CHOICES)
+    cc = ArrayField(models.EmailField(), default=[], blank=[])
+    bcc = ArrayField(models.EmailField(), default=[], blank=[])
+    attachments = JSONField(default=[], blank=[])
 
     class Meta:
         db_table = "email_notification"
