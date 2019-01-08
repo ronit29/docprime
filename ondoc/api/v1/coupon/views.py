@@ -63,7 +63,7 @@ class ApplicableCouponsViewSet(viewsets.GenericViewSet):
         coupons = Coupon.objects.filter(type__in=types)
 
         if deal_price:
-            coupons = coupons.filter(min_order_amount__lte = deal_price)
+            coupons = coupons.filter(Q(min_order_amount__isnull=True) | Q(min_order_amount__lte = deal_price))
 
         # check if request is made to fetch a specific coupon, if not only return visible coupons
         if coupon_code:
