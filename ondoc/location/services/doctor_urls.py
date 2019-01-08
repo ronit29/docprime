@@ -51,14 +51,25 @@ class DoctorURL():
                            in ('DOCTORS_LOCALITY_CITY', 'DOCTORS_CITY', 'SPECIALIZATION_CITY', 
                            'SPECIALIZATION_LOCALITY_CITY','DOCTOR_PAGE') and sequence< %d''' % seq
 
-        from django.db import connection
-        with connection.cursor() as cursor:
-            try:
-                cursor.execute(query)
-                cursor.execute(update_query)
-            except Exception as e:
-                print(str(e))
-                return False
+        
+        cleanup = '''delete from entity_urls where id in (select id from 
+        (select eu.*, row_number() over(partition by url order by is_valid desc, sequence desc) rownum from entity_urls eu  
+        )x where rownum>1
+        )y'''                           
+
+        RawSql(query, []).execute()
+        RawSql(update_query, []).execute()
+        RawSql(cleanup, []).execute()
+
+
+        # from django.db import connection
+        # with connection.cursor() as cursor:
+        #     try:
+        #         cursor.execute(query)
+        #         cursor.execute(update_query)
+        #     except Exception as e:
+        #         print(str(e))
+        #         return False
 
         return True
 
@@ -307,7 +318,7 @@ class DoctorURL():
 
         #update for speciality city
         RawSql('''update temp_url tu set breadcrumb=(select json_build_array(json_build_object('title', locality_value, 'url', url)) 
-            from temp_url where sitemap_identifier ='DOCTORS_CITY' and locality_value=tu.locality_value
+            from temp_url where sitemap_identifier ='DOCTORS_CITY' and lower(locality_value)=lower(tu.locality_value)
             and st_dwithin(location::geography, tu.location::geography, 20000) order by st_distance(location, tu.location) asc limit 1)
             where sitemap_identifier ='SPECIALIZATION_CITY' ''', []).execute()
 
@@ -315,7 +326,7 @@ class DoctorURL():
         RawSql('''update temp_url tu set breadcrumb = (select  breadcrumb || jsonb_build_array(jsonb_build_object('title', specialization, 'url', url))
             from temp_url  where sitemap_identifier ='SPECIALIZATION_CITY' and lower(locality_value)=lower(tu.locality_value)
             and specialization_id = tu.specialization_id
-            and st_dwithin(location::geography, tu.location::geography, 30000) order by st_distance(location, tu.location) asc limit 1) 
+            and st_dwithin(location::geography, tu.location::geography, 20000) order by st_distance(location, tu.location) asc limit 1) 
             where sitemap_identifier ='SPECIALIZATION_LOCALITY_CITY' 
             ''', []).execute()
 
