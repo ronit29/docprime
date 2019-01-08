@@ -80,12 +80,13 @@ class LabModelSerializer(serializers.ModelSerializer):
         if self.parent:
             return None
         rate_count = obj.rating.count()
-        avg = None
+        avg = 0
         if rate_count:
             all_rating = []
             for rate in obj.rating.all():
                 all_rating.append(rate.ratings)
-            avg = sum(all_rating) / len(all_rating)
+            if all_rating:
+                avg = sum(all_rating) / len(all_rating)
         if rate_count > 5 or (rate_count <= 5 and avg > 4):
             return True
         return False
