@@ -15,6 +15,8 @@ from ondoc.diagnostic.models import (Lab, LabNetwork, LabTest, LabTestType,LabSe
 from ondoc.coupon.models import Coupon, UserSpecificCoupon
 from ondoc.lead.models import HospitalLead, DoctorLead, SearchLead
 from ondoc.account.models import ConsumerAccount, MerchantPayout
+from ondoc.location.admin import EntityUrlsAdmin
+from ondoc.location.models import EntityUrls
 from ondoc.notification import models as notifcation_model
 from ondoc.procedure.models import Procedure, ProcedureCategory, CommonProcedureCategory, CommonProcedure
 from .common import Cities, CitiesAdmin, MatrixCityMapping, MatrixCityAdmin, MerchantAdmin, MerchantPayoutAdmin
@@ -50,8 +52,8 @@ from ondoc.ratings_review.models import RatingsReview, ReviewCompliments
 from ondoc.crm.admin.ratings import RatingsReviewAdmin, ReviewComplimentsAdmin
 from ondoc.doctor.models import GoogleDetailing
 from .doctor import GoogleDetailingAdmin
-from .seo import SitemapManagerAdmin, SeoSpecializationAdmin, SeoLabNetworkAdmin
-from ondoc.seo.models import SitemapManger
+from .seo import SitemapManagerAdmin, SeoSpecializationAdmin, SeoLabNetworkAdmin, NewDynamicAdmin
+from ondoc.seo.models import SitemapManger, NewDynamic
 from ondoc.seo.models import SeoSpecialization
 from ondoc.seo.models import SeoLabNetwork
 from ondoc.elastic.models import DemoElastic
@@ -146,3 +148,5 @@ admin.site.register(DemoElastic, DemoElasticAdmin)
 admin.site.register(Merchant, MerchantAdmin)
 admin.site.register(MerchantPayout, MerchantPayoutAdmin)
 #admin.site.register(AssociatedMerchant)
+admin.site.register(NewDynamic, NewDynamicAdmin)
+admin.site.register(EntityUrls, EntityUrlsAdmin)
