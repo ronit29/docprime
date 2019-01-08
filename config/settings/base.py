@@ -134,7 +134,8 @@ LOCAL_APPS = (
     'ondoc.ratings_review',
     'ondoc.geoip',
     'ondoc.procedure',
-    'ondoc.elastic'
+    'ondoc.elastic',
+    'ondoc.banner'
 )
 
 INSTALLED_APPS = DJANGO_APPS + THIRD_PARTY_APPS + LOCAL_APPS
@@ -284,7 +285,7 @@ RABBITMQ_CONNECTION_SETTINGS = {
     'NOTIFICATION_QUEUE': env('RABBITMQ_NOTIFICATION_QUEUE')
 }
 CELERY_BROKER_URL = env('RABBITMQ_CONNECTION_URL')
-CELERY_QUEUE = env('CELERY_QUEUE')
+CELERY_QUEUE = env('CELERY_QUEUE',default='celery')
 
 BASE_URL = env('BASE_URL')
 ADMIN_BASE_URL = env('ADMIN_BASE_URL')

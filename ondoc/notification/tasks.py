@@ -252,6 +252,7 @@ def set_order_dummy_transaction(self, order_id, user_id):
             response = requests.post(url, data=json.dumps(req_data), headers=headers)
             if response.status_code == status.HTTP_200_OK:
                 resp_data = response.json()
+                logger.error(resp_data)
                 if resp_data.get("ok") is not None and resp_data.get("ok") == 1:
                     tx_data = {}
                     tx_data['user'] = user
@@ -444,7 +445,20 @@ def lab_send_otp_before_appointment(appointment_id, previous_appointment_date_ti
                                                            previous_appointment_date_time,
                                                            str(math.floor(instance.time_slot_start.timestamp()))))
             return
-        opd_notification = LabNotification(instance, NotificationAction.LAB_OTP_BEFORE_APPOINTMENT)
-        opd_notification.send()
+        lab_notification = LabNotification(instance, NotificationAction.LAB_OTP_BEFORE_APPOINTMENT)
+        lab_notification.send()
+    except Exception as e:
+        logger.error(str(e))
+
+@task()
+def send_lab_reports(appointment_id):
+    from ondoc.diagnostic.models import LabAppointment
+    from ondoc.communications.models import LabNotification
+    try:
+        instance = LabAppointment.objects.filter(id=appointment_id).first()
+        if not instance:
+            return
+        lab_notification = LabNotification(instance, NotificationAction.LAB_REPORT_SEND_VIA_CRM)
+        lab_notification.send()
     except Exception as e:
         logger.error(str(e))

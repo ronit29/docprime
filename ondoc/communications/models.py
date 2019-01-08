@@ -5,8 +5,10 @@ from collections import defaultdict
 from itertools import groupby
 
 import pytz
+from django.db.models import F
 from hardcopy import bytestring_to_pdf
 
+from ondoc.api.v1.utils import util_absolute_url, util_file_name
 from ondoc.doctor.models import OpdAppointment
 from ondoc.diagnostic.models import LabAppointment
 from django.core.files.uploadedfile import SimpleUploadedFile, TemporaryUploadedFile, InMemoryUploadedFile
@@ -227,7 +229,8 @@ class SMSNotification:
             body_template = "sms/lab/appointment_cancelled_lab.txt"
         elif notification_type == NotificationAction.LAB_REPORT_UPLOADED:
             body_template = "sms/lab/lab_report_uploaded.txt"
-
+        elif notification_type == NotificationAction.LAB_REPORT_SEND_VIA_CRM:
+            body_template = "sms/lab/lab_report_send_crm.txt"
         return body_template
 
     def trigger(self, receiver, template, context):
@@ -340,6 +343,9 @@ class EMAILNotification:
             except Exception as e:
                 logger.error("Got error while creating pdf for opd invoice {}".format(e))
             context.update({"invoice_url": invoice.file.url})
+            context.update(
+                {"attachments": [
+                    {"filename": util_file_name(invoice.file.url), "path": util_absolute_url(invoice.file.url)}]})
             body_template = "email/doctor_invoice/body.html"
             subject_template = "email/doctor_invoice/subject.txt"
 
@@ -392,19 +398,26 @@ class EMAILNotification:
                 invoice.save()
             except Exception as e:
                 logger.error("Got error while creating pdf for opd invoice {}".format(e))
-            # try:
-            #     file = HTML(string=html_body).write_pdf()
-            #     invoice.file = SimpleUploadedFile(filename, file, content_type='application/pdf')
-            #     invoice.save()
-            # except Exception as e:
-            #     logger.error("Got error while creating pdf for lab invoice {}".format(e))
             context.update({"invoice_url": invoice.file.url})
+            context.update(
+                {"attachments": [{"filename": util_file_name(invoice.file.url), "path": util_absolute_url(invoice.file.url)}]})
             body_template = "email/lab_invoice/body.html"
             subject_template = "email/lab_invoice/subject.txt"
+
+        elif notification_type == NotificationAction.LAB_REPORT_SEND_VIA_CRM:
+            attachments = []
+            for report_link in context.get('reports', []):
+                attachments.append({"filename": util_file_name(report_link), "path": util_absolute_url(report_link)})
+            context.update({'attachments': attachments})
+            body_template = "email/lab/lab_report_send_crm/body.html"
+            subject_template = "email/lab/lab_report_send_crm/subject.txt"
 
         return subject_template, body_template
 
     def trigger(self, receiver, template, context):
+        cc = []
+        bcc = [settings.PROVIDER_EMAIL]
+        attachments = context.get('attachments', [])
         user = receiver.get('user')
         email = receiver.get('email')
         notification_type = self.notification_type
@@ -419,7 +432,10 @@ class EMAILNotification:
                 email=email,
                 notification_type=notification_type,
                 content=html_body,
-                email_subject=email_subject
+                email_subject=email_subject,
+                cc=cc,
+                bcc=bcc,
+                attachments=attachments
             )
             message = {
                 "data": model_to_dict(email_noti),
@@ -433,7 +449,10 @@ class EMAILNotification:
                 email=email,
                 notification_type=notification_type,
                 content=html_body,
-                email_subject=email_subject
+                email_subject=email_subject,
+                cc=cc,
+                bcc=bcc,
+                attachments=attachments
             )
             message = {
                 "data": model_to_dict(email_noti),
@@ -549,7 +568,8 @@ class OpdNotification(Notification):
             "action_id": self.appointment.id,
             "payment_type": dict(OpdAppointment.PAY_CHOICES)[self.appointment.payment_type],
             "image_url": "",
-            "time_slot_start": time_slot_start
+            "time_slot_start": time_slot_start,
+            "attachments": {}  # Updated later
         }
         return context
 
@@ -651,6 +671,12 @@ class LabNotification(Notification):
         est = pytz.timezone(settings.TIME_ZONE)
         time_slot_start = self.appointment.time_slot_start.astimezone(est)
         tests = self.appointment.get_tests_and_prices()
+        reports = instance.reports.all()
+        report_file_links = set()
+        for report in reports:
+            report_file_links = report_file_links.union(
+                set([report_file.name.url for report_file in report.files.all()]))
+        report_file_links = [util_absolute_url(report_file_link) for report_file_link in report_file_links]
         for test in tests:
             test['mrp'] = str(test['mrp'])
             test['deal_price'] = str(test['deal_price'])
@@ -667,7 +693,9 @@ class LabNotification(Notification):
             "pickup_address": self.appointment.get_pickup_address(),
             "coupon_discount": str(self.appointment.discount) if self.appointment.discount else None,
             "time_slot_start": time_slot_start,
-            "tests": tests
+            "tests": tests,
+            "reports": report_file_links,
+            "attachments": {}  # Updated later
         }
         return context
 
@@ -681,6 +709,11 @@ class LabNotification(Notification):
             email_notification.send(all_receivers.get('email_receivers', []))
         elif notification_type == NotificationAction.LAB_OTP_BEFORE_APPOINTMENT:
             sms_notification = SMSNotification(notification_type, context)
+            sms_notification.send(all_receivers.get('sms_receivers', []))
+        elif notification_type == NotificationAction.LAB_REPORT_SEND_VIA_CRM:
+            email_notification = EMAILNotification(notification_type, context)
+            sms_notification = SMSNotification(notification_type, context)
+            email_notification.send(all_receivers.get('email_receivers', []))
             sms_notification.send(all_receivers.get('sms_receivers', []))
         else:
             email_notification = EMAILNotification(notification_type, context)
@@ -704,7 +737,8 @@ class LabNotification(Notification):
                                  NotificationAction.LAB_APPOINTMENT_RESCHEDULED_BY_LAB,
                                  NotificationAction.LAB_REPORT_UPLOADED,
                                  NotificationAction.LAB_INVOICE,
-                                 NotificationAction.LAB_OTP_BEFORE_APPOINTMENT]:
+                                 NotificationAction.LAB_OTP_BEFORE_APPOINTMENT,
+                                 NotificationAction.LAB_REPORT_SEND_VIA_CRM]:
             receivers.append(instance.user)
         elif notification_type in [NotificationAction.LAB_APPOINTMENT_RESCHEDULED_BY_PATIENT,
                                    NotificationAction.LAB_APPOINTMENT_BOOKED,

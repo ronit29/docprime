@@ -54,7 +54,7 @@
         </td>
     </tr>
     <tr>
-        <td style="color:#3f3f3f;font-size:16px;font-weight:500;padding-top:30px">
+        <td style="color:#3f3f3f;font-size:16px;font-weight:500;padding: 20px 15px 0;">
             Hi<br/>The appointment for {{patient_name|capfirst}} with {{lab_name|capfirst}} on
             {{instance.time_slot_start|date:"D jS F Y"}} at {{instance.time_slot_start|date:"h:i A"}} has
             been confirmed.
@@ -63,30 +63,22 @@
     <tr>
         <td>
             <table cellpadding="0" cellspacing="0"
-                   style="width: 100%; padding: 20px 15px;">
+                   style="width: 100%; padding: 20px 15px;border-bottom: 1px solid #d3d3d3;">
                 <tbody>
                 <tr>
-                    <td style="color: #757575; font-size: 16px; font-weight: 500;">
+                    <td style="color: #000000; font-weight: 600;">
                         Unique Confirmation Code : <span
-                            style="color: #000000; font-weight: 600;">{{instance.otp}}</span>
+                            style="color: #3f3f3f; font-size: 16px; font-weight: 500;">{{instance.otp}}</span>
                     </td>
                 </tr>
                 <tr>
-                    <td style="color: #000000; font-size: 16px; font-weight: 500; padding-top: 4px;; border-bottom: 1px solid #d3d3d3">
+                    <td style="color:#3f3f3f;font-size:16px;font-weight:500; padding-top: 4px;">
                         Share this code with the lab at the time of your appointment.
                     </td>
                 </tr>
-                </tbody>
-            </table>
-        </td>
-    </tr>
-    <tr>
-        <td>
-            <table cellpadding="0" cellspacing="0" style="width: 100%; padding: 20px 15px 0;">
-                <tbody>
                 <tr>
-                    <td style="color: #000000; font-weight: 600; font-size: 16px;">
-                        Booking ID : <span style="font-size: 14px; color: #070707; font-weight: 500; padding-top: 4px;">{{instance.id}}</span>
+                    <td style="color:#3f3f3f;font-size:16px;font-weight:500; padding-top: 14px;">
+                        Your booking details are as below :
                     </td>
                 </tr>
                 </tbody>
@@ -94,55 +86,41 @@
         </td>
     </tr>
 
+
     <tr>
         <td>
-            <table cellpadding="0" cellspacing="0" style="width: 100%; padding: 40px 15px 0;">
+            <table style="padding: 0 15px 0;">
                 <tbody>
                 <tr>
-                    <td style="color: #000000; font-weight: 600; font-size: 16px;">
-                        Patient Name
+                    <td style="color:#000000;font-size:16px;font-weight:700;padding-top:16px;width:40%">
+                        Booking ID
+                    </td>
+                    <td style="color:#3f3f3f;font-size:16px;font-weight:500;padding-top:16px">
+                        {{instance.id}}
                     </td>
                 </tr>
                 <tr>
-                    <td style="font-size: 14px; color: #070707; font-weight: 500; padding-top: 4px;">
+                    <td style="color:#000000;font-size:16px;font-weight:700;padding-top:16px;width:40%">
+                        Patient
+                    </td>
+                    <td style="color:#3f3f3f;font-size:16px;font-weight:500;padding-top:16px">
                         {{patient_name|capfirst}}
                     </td>
                 </tr>
-                </tbody>
-            </table>
-        </td>
-    </tr>
-    <tr>
-        <td>
-            <table cellpadding="0" cellspacing="0"
-                   style="width: 100%; padding: 20px 15px 20px;">
-                <tbody>
                 <tr>
-                    <td style="color: #000000; font-weight: 600; font-size: 16px;">
-                        Appointment Date &amp; Time :
+                    <td style="color:#000000;font-size:16px;font-weight:700;padding-top:16px;width:40%">
+                        Appointment Date &amp; Time
+                    </td>
+                    <td style="color:#3f3f3f;font-size:16px;font-weight:500;padding-top:16px">
+                        {{instance.time_slot_start|date:"D jS F Y"}} ||
+                        {{instance.time_slot_start|date:"h:i A"}}
                     </td>
                 </tr>
                 <tr>
-                    <td style="font-size: 14px; color: #070707; font-weight: 500; padding-top: 4px;">
-                        {{instance.time_slot_start|date:"M d"}} &nbsp;&nbsp; | &nbsp;&nbsp;
-                        {{instance.time_slot_start|date:"h:i a"}}
+                    <td style="color:#000000;font-size:16px;font-weight:700;padding-top:16px;width:40%">
+                        Lab
                     </td>
-                </tr>
-                </tbody>
-            </table>
-        </td>
-    </tr>
-    <tr>
-        <td>
-            <table cellpadding="0" cellspacing="0" style="width: 100%; padding: 20px 15px 0;">
-                <tbody>
-                <tr>
-                    <td style="color: #000000; font-weight: 600; font-size: 16px;">
-                        Lab Name
-                    </td>
-                </tr>
-                <tr>
-                    <td style="font-size: 14px; color: #070707; font-weight: 500; padding-top: 4px;">
+                    <td style="color:#3f3f3f;font-size:16px;font-weight:500;padding-top:16px">
                         {{lab_name|capfirst}}
                     </td>
                 </tr>
@@ -150,17 +128,12 @@
             </table>
         </td>
     </tr>
+
     {% if instance.is_home_pickup %}
     <tr>
         <td>
             <table cellpadding="0" cellspacing="0" style="width: 100%; padding: 20px 15px 0;">
                 <tbody>
-                <tr>
-                    <td style="color: #000000; font-weight: 600; font-size: 16px;">
-
-                    </td>
-                </tr>
-
                 <tr>
                     <td style="color: #000000; font-weight: 600; font-size: 16px;">
                         Home Pick up Address
@@ -201,18 +174,12 @@
     {% endif %}
     <tr>
         <td>
-            <table cellpadding="0" cellspacing="0" style="width: 100%; padding: 20px 15px 0;">
+            <table cellpadding="0" cellspacing="0"
+                   style="width: 100%; padding: 20px 15px 20px;">
                 <tbody>
                 <tr>
                     <td style="color: #000000; font-weight: 600; font-size: 16px;">
-                        Test Booked
-                    </td>
-                </tr>
-                <tr>
-                    <td style="font-size: 14px; color: #070707; font-weight: 500; padding-top: 4px;">
-                        {% for test in instance.lab_test.all %}
-                        {{test.test.name}}{% if not forloop.last %},{% endif %}
-                        {% endfor %}
+                        Service(s) Included
                     </td>
                 </tr>
                 </tbody>
@@ -220,12 +187,77 @@
         </td>
     </tr>
     <tr>
-        <td style="color:#3f3f3f;font-size:16px;font-weight:500;padding-top:30px">
+        <td style="padding: 5px 15px 0;">
+            <table align="center" cellpadding="0" cellspacing="0"
+                   style="width: 100%;border-collapse: collapse;border: 1px solid black;">
+                <thead>
+                <tr>
+                    <th style="border: 1px solid black;">
+                        S.No.
+                    </th>
+                    <th style="border: 1px solid black;">
+                        Particulars
+                    </th>
+                    <th style="border: 1px solid black;">
+                        MRP
+                    </th>
+                    <th style="border: 1px solid black;">
+                        Discount
+                    </th>
+                    <th style="border: 1px solid black;">
+                        Grand Total
+                    </th>
+                </tr>
+                </thead>
+                <tbody>
+                {% for test in tests %}
+                <tr>
+                    <td style="border: 1px solid black;text-align: center;color:#3f3f3f;font-size:16px;font-weight:500;">
+                        {{forloop.counter}}
+                    </td>
+                    <td style="border: 1px solid black;text-align: center;color:#3f3f3f;font-size:16px;font-weight:500;">
+                        {{test.name|capfirst}}
+                    </td>
+                    <td style="border: 1px solid black;text-align: center;color:#3f3f3f;font-size:16px;font-weight:500;">
+                        {{test.mrp}}
+                    </td>
+                    <td style="border: 1px solid black;text-align: center;color:#3f3f3f;font-size:16px;font-weight:500;">
+                        {{test.discount}}
+                    </td>
+                    <td style="border: 1px solid black;text-align: center;color:#3f3f3f;font-size:16px;font-weight:500;">
+                        {{test.deal_price}}
+                    </td>
+                </tr>
+                {% endfor %}
+                {% if coupon_discount %}
+                <tr>
+                    <td colspan="4" style="border: 1px solid black;text-align: center;color:#000000;font-size:16px;font-weight:700;">
+                        Coupon Discount
+                    </td>
+                    <td style="border: 1px solid black;text-align: center;color:#3f3f3f;font-size:16px;font-weight:500;">
+                        {{coupon_discount}}
+                    </td>
+                </tr>
+                {% endif %}
+                <tr>
+                    <td colspan="4" style="border: 1px solid black;text-align: center;color:#000000;font-size:16px;font-weight:700;">
+                        Amount Paid
+                    </td>
+                    <td style="border: 1px solid black;text-align: center;color:#3f3f3f;font-size:16px;font-weight:500;">
+                        {{instance.effective_price}}
+                    </td>
+                </tr>
+                </tbody>
+            </table>
+        </td>
+    </tr>
+    <tr>
+        <td style="color:#3f3f3f;font-size:16px;font-weight:500;padding:30px 15px 0">
             In case of any queries please contact us at our toll free number 1800-123-9419.
         </td>
     </tr>
     <tr>
-        <td style="color:#3f3f3f;font-size:16px;font-weight:500;padding-top:10px">
+        <td style="color:#3f3f3f;font-size:16px;font-weight:500;padding:10px 15px 0">
             Thanks for choosing docprime.com
         </td>
     </tr>

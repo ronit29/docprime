@@ -1,3 +1,4 @@
+from urllib.parse import urlparse
 from rest_framework.views import exception_handler
 from rest_framework import permissions
 from collections import defaultdict
@@ -446,20 +447,30 @@ def get_lab_search_details(entity, req_params):
     return params_dict
 
 
-def doctor_query_parameters(entity_params, req_params):
+def doctor_query_parameters(entity, req_params):
     params_dict = copy.deepcopy(req_params)
-    if entity_params.get("location_json"):
-        if entity_params["location_json"].get("sublocality_latitude"):
-            params_dict["latitude"] = entity_params["location_json"]["sublocality_latitude"]
-        elif entity_params["location_json"].get("locality_latitude"):
-            params_dict["latitude"] = entity_params["location_json"]["locality_latitude"]
+    if entity.sublocality_latitude:
+        params_dict["latitude"] = entity.sublocality_latitude
+    elif entity.locality_latitude:
+        params_dict["latitude"] = entity.locality_latitude
+    if entity.sublocality_longitude:
+        params_dict["longitude"] = entity.sublocality_longitude
+    elif entity.locality_longitude:
+        params_dict["longitude"] = entity.locality_longitude
 
-        if entity_params["location_json"].get("sublocality_longitude"):
-            params_dict["longitude"] = entity_params["location_json"]["sublocality_longitude"]
-        elif entity_params["location_json"].get("locality_longitude"):
-            params_dict["longitude"] = entity_params["location_json"]["locality_longitude"]
-    if entity_params.get("specialization_id"):
-        params_dict["specialization_ids"] = str(entity_params["specialization_id"])
+
+    # if entity_params.get("location_json"):
+    #     if entity_params["location_json"].get("sublocality_latitude"):
+    #         params_dict["latitude"] = entity_params["location_json"]["sublocality_latitude"]
+    #     elif entity_params["location_json"].get("locality_latitude"):
+    #         params_dict["latitude"] = entity_params["location_json"]["locality_latitude"]
+    #
+    #     if entity_params["location_json"].get("sublocality_longitude"):
+    #         params_dict["longitude"] = entity_params["location_json"]["sublocality_longitude"]
+    #     elif entity_params["location_json"].get("locality_longitude"):
+    #         params_dict["longitude"] = entity_params["location_json"]["locality_longitude"]
+    if entity.specialization_id:
+        params_dict["specialization_ids"] = str(entity.specialization_id)
     else:
         params_dict["specialization_ids"] = ''
 
@@ -925,13 +936,17 @@ def offline_form_time_slots(data, timing, is_available=True, is_doctor=True):
 def create_payout_checksum(all_txn, product_id):
     from ondoc.account.models import Order
 
-    secret_key = client_key = ""
-    if product_id == Order.DOCTOR_PRODUCT_ID:
-        secret_key = settings.PG_SECRET_KEY_P1
-        client_key = settings.PG_CLIENT_KEY_P1
-    elif product_id == Order.LAB_PRODUCT_ID:
-        secret_key = settings.PG_SECRET_KEY_P2
-        client_key = settings.PG_CLIENT_KEY_P2
+    # secret_key = client_key = ""
+    # if product_id == Order.DOCTOR_PRODUCT_ID:
+    #     secret_key = settings.PG_SECRET_KEY_P1
+    #     client_key = settings.PG_CLIENT_KEY_P1
+    # elif product_id == Order.LAB_PRODUCT_ID:
+    #     secret_key = settings.PG_SECRET_KEY_P2
+    #     client_key = settings.PG_CLIENT_KEY_P2
+
+    secret_key = settings.PG_SECRET_KEY_P2
+    client_key = settings.PG_CLIENT_KEY_P2
+
 
     all_txn = sorted(all_txn, key=lambda x : x["idx"])
     checksum = ""
@@ -949,3 +964,39 @@ def create_payout_checksum(all_txn, product_id):
     print("checksum string - " + str(checksum) + "checksum hash - " + str(checksum_hash))
     logger.error("checksum string - " + str(checksum) + "checksum hash - " + str(checksum_hash))
     return checksum_hash
+
+def html_to_pdf(html_body, filename):
+    file = None
+    try:
+        extra_args = {
+            'virtual-time-budget': 6000
+        }
+        from django.core.files.uploadedfile import TemporaryUploadedFile
+        temp_pdf_file = TemporaryUploadedFile(filename, 'byte', 1000, 'utf-8')
+        file = open(temp_pdf_file.temporary_file_path())
+        from hardcopy import bytestring_to_pdf
+        bytestring_to_pdf(html_body.encode(), file, **extra_args)
+        file.seek(0)
+        file.flush()
+        file.content_type = 'application/pdf'
+        from django.core.files.uploadedfile import InMemoryUploadedFile
+        file = InMemoryUploadedFile(temp_pdf_file, None, filename, 'application/pdf',
+                                    temp_pdf_file.tell(), None)
+
+    except Exception as e:
+        logger.error("Got error while creating PDF file :: {}.".format(e))
+    return file
+
+def util_absolute_url(url):
+    if bool(urlparse(url).netloc):
+        return url
+    else:
+        return settings.BASE_URL + url
+
+
+def util_file_name(filename):
+    import os
+    if filename:
+        filename = os.path.basename(filename)
+    return filename
+

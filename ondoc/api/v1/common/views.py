@@ -1,3 +1,4 @@
+from hardcopy import bytestring_to_pdf
 from rest_framework import mixins, viewsets, status
 from rest_framework.response import Response
 from django.contrib.gis.geos import Point, GEOSGeometry
@@ -7,6 +8,7 @@ from ondoc.api.v1.common.serializers import SearchLeadSerializer
 from django.utils.dateparse import parse_datetime
 from weasyprint import HTML
 from django.http import HttpResponse
+from ondoc.api.v1.utils import html_to_pdf
 from ondoc.diagnostic.models import Lab
 from ondoc.doctor.models import (Doctor, DoctorPracticeSpecialization, PracticeSpecialization, DoctorMobile, Qualification,
                                  Specialization, College, DoctorQualification, DoctorExperience, DoctorAward,
@@ -23,7 +25,7 @@ from . import serializers
 from ondoc.common.models import Cities
 from ondoc.common.utils import send_email, send_sms
 from ondoc.authentication.backends import JWTAuthentication
-from django.core.files.uploadedfile import SimpleUploadedFile
+from django.core.files.uploadedfile import SimpleUploadedFile, TemporaryUploadedFile, InMemoryUploadedFile
 from openpyxl import load_workbook
 from openpyxl.writer.excel import save_virtual_workbook
 import random
@@ -88,16 +90,15 @@ class ServicesViewSet(viewsets.GenericViewSet):
         if context.get('_updatedAt'):
             context['updated_at'] = parse_datetime(context.get('_updatedAt'))
         content = render_to_string("email/chat_prescription/body.html", context=context)
-        pdf_file = HTML(string=content).write_pdf()
-        random_string = ''.join([random.choice(string.ascii_letters + string.digits) for n in range(12)])
+        random_string = ''.join([random.choice(string.ascii_letters + string.digits) for _ in range(12)])
         patient_profile = context.get('profile')
         patient_name = ''
         if patient_profile:
             patient_name = patient_profile.get('name', '')
-        name = 'dp_{}_{}_{}.pdf'.format('_'.join(patient_name.lower().split()), datetime.datetime.now().date(), random_string)
-        # name = random_string + '.pdf'
-        file = SimpleUploadedFile(name, pdf_file, content_type='application/pdf')
-        chat = ChatPrescription.objects.create(name=name, file=file)
+        filename = 'dp_{}_{}_{}.pdf'.format('_'.join(patient_name.lower().split()), datetime.datetime.now().date(),
+                                            random_string)
+        file = html_to_pdf(content, filename)
+        chat = ChatPrescription.objects.create(name=filename, file=file)
         prescription_url = "{}{}{}".format(settings.BASE_URL,
                                            "/api/v1/common/chat_prescription/",
                                            chat.name)

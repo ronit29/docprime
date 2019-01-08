@@ -35,6 +35,7 @@ else:
 
 
 class Config():
+
     broker_url = settings.CELERY_BROKER_URL
     task_default_queue = settings.CELERY_QUEUE
     default_queue = task_default_queue
@@ -42,9 +43,9 @@ class Config():
     default_exchange_type = task_default_queue
     default_routing_key = task_default_queue
 
+#app.config_from_object('django.conf:settings', namespace='CELERY')
 app.config_from_object(Config)
 
-# app.config_from_object('django.conf:settings', namespace='CELERY')
 app.autodiscover_tasks()
 
 

@@ -823,11 +823,15 @@ class MerchantPayout(TimeStampedModel):
                 self.content_object = self.get_billed_to()
             if not self.paid_to:
                 self.paid_to = self.get_merchant()
-            if self.status == self.PENDING:
-                self.status = self.ATTEMPTED
 
             try:
-                transaction.on_commit(lambda: process_payout.apply_async((self.id,), countdown=3))
+                has_txn, order_data, appointment = self.has_transaction()
+                if has_txn:
+                    if self.status == self.PENDING:
+                        self.status = self.ATTEMPTED
+                    transaction.on_commit(lambda: process_payout.apply_async((self.id,), countdown=3))
+                else:
+                    transaction.on_commit(lambda: set_order_dummy_transaction.apply_async((order_data.id, appointment.user_id,), countdown=5))
             except Exception as e:
                 logger.error(str(e))
 
@@ -857,6 +861,18 @@ class MerchantPayout(TimeStampedModel):
             return appt.get_merchant
         return ''
 
+    def has_transaction(self):
+        appointment = self.get_appointment()
+        if not appointment:
+            raise Exception("Insufficient Data " + str(self))
+
+        order_data = Order.objects.filter(reference_id=appointment.id).order_by('-id').first()
+        if not order_data:
+            raise Exception("Order not found for given payout")
+
+        all_txn = order_data.getTransactions()
+
+        return bool(all_txn and all_txn.count() > 0), order_data, appointment
 
     class Meta:
         db_table = "merchant_payout"

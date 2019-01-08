@@ -2,7 +2,7 @@ from rest_framework import serializers
 from rest_framework.fields import CharField
 from ondoc.diagnostic.models import (LabTest, AvailableLabTest, Lab, LabAppointment, LabTiming, PromotedLab,
                                      CommonTest, CommonDiagnosticCondition, LabImage, LabReportFile, CommonPackage,
-                                     LabTestCategory)
+                                     LabTestCategory, LabAppointmentTestMapping)
 from django.contrib.staticfiles.templatetags.staticfiles import static
 from ondoc.authentication.models import UserProfile, Address
 from ondoc.api.v1.doctor.serializers import CreateAppointmentSerializer, CommaSepratedToListField
@@ -79,8 +79,15 @@ class LabModelSerializer(serializers.ModelSerializer):
     def get_display_rating_widget(self, obj):
         if self.parent:
             return None
-
-        if obj.rating.count() > 10:
+        rate_count = obj.rating.count()
+        avg = 0
+        if rate_count:
+            all_rating = []
+            for rate in obj.rating.all():
+                all_rating.append(rate.ratings)
+            if all_rating:
+                avg = sum(all_rating) / len(all_rating)
+        if rate_count > 5 or (rate_count <= 5 and avg > 4):
             return True
         return False
 
@@ -295,6 +302,36 @@ class AvailableLabTestSerializer(serializers.ModelSerializer):
         fields = ('test_id', 'mrp', 'test', 'agreed_price', 'deal_price', 'enabled', 'is_home_collection_enabled')
 
 
+class LabAppointmentTestMappingSerializer(serializers.ModelSerializer):
+    test = LabTestSerializer()
+    test_id = serializers.ReadOnlyField(source='test.id')
+    agreed_price = serializers.SerializerMethodField()
+    deal_price = serializers.SerializerMethodField()
+    is_home_collection_enabled = serializers.SerializerMethodField()
+
+    def get_is_home_collection_enabled(self, obj):
+        if self.context.get("lab") is not None:
+            if self.context["lab"].is_home_collection_enabled and obj.test.home_collection_possible:
+                return True
+            return False
+        return obj.test.home_collection_possible
+        # return None
+
+    def get_agreed_price(self, obj):
+        agreed_price = obj.computed_agreed_price if obj.custom_agreed_price is None else obj.custom_agreed_price
+        return agreed_price
+
+    def get_deal_price(self, obj):
+        deal_price = obj.computed_deal_price if obj.custom_deal_price is None else obj.custom_deal_price
+        return deal_price
+
+    class Meta:
+        model = LabAppointmentTestMapping
+        fields = ('test_id', 'mrp', 'test', 'agreed_price', 'deal_price',
+                  # 'enabled',  # SHASHANK_SINGH Ask Arun Sir
+                  'is_home_collection_enabled')
+
+
 class LabCustomSerializer(serializers.Serializer):
     # lab = serializers.SerializerMethodField()
     lab = LabModelSerializer()
@@ -397,6 +434,10 @@ class LabAppointmentModelSerializer(serializers.ModelSerializer):
     patient_thumbnail = serializers.SerializerMethodField()
     patient_name = serializers.SerializerMethodField()
     allowed_action = serializers.SerializerMethodField()
+    lab_test = serializers.SerializerMethodField()
+
+    def get_lab_test(self, obj):
+        return list(obj.test_mappings.values_list('test_id', flat=True))
 
     def get_lab_thumbnail(self, obj):
         request = self.context.get("request")
@@ -472,6 +513,8 @@ class LabAppTransactionModelSerializer(serializers.Serializer):
     coupon = serializers.ListField(child=serializers.IntegerField(), required=False, default = [])
     discount = serializers.DecimalField(max_digits=10, decimal_places=2)
     cashback = serializers.DecimalField(max_digits=10, decimal_places=2)
+    extra_details = serializers.JSONField(required=False)
+
 
 class LabAppRescheduleModelSerializer(serializers.ModelSerializer):
     class Meta:
@@ -788,10 +831,14 @@ class UpdateStatusSerializer(serializers.Serializer):
 class LabAppointmentRetrieveSerializer(LabAppointmentModelSerializer):
     profile = UserProfileSerializer()
     lab = LabModelSerializer()
-    lab_test = AvailableLabTestSerializer(many=True)
+    # lab_test = AvailableLabTestSerializer(many=True)  # SHASHANK_SINGH CHANGE 17
+    lab_test = serializers.SerializerMethodField()
     address = serializers.SerializerMethodField()
     type = serializers.ReadOnlyField(default='lab')
     reports = serializers.SerializerMethodField()
+
+    def get_lab_test(self, obj):
+        return LabAppointmentTestMappingSerializer(obj.test_mappings.all(), many=True).data
 
     def get_reports(self, obj):
         reports = []
@@ -908,7 +955,7 @@ class LabEntitySerializer(serializers.ModelSerializer):
 
 
 class CustomPackageLabSerializer(LabModelSerializer):
-    avg_rating = serializers.SerializerMethodField()
+    avg_rating = serializers.ReadOnlyField()
 
     class Meta:
         model = Lab
@@ -916,23 +963,26 @@ class CustomPackageLabSerializer(LabModelSerializer):
                   'sublocality', 'city', 'state', 'country', 'always_open', 'about', 'home_pickup_charges',
                   'is_home_collection_enabled', 'seo', 'breadcrumb', 'center_visit_enabled', 'avg_rating')
 
-    def get_avg_rating(self, obj):
-        return obj.avg_rating
+    # def get_avg_rating(self, obj):
+    #     return obj.avg_rating
 
 
 class CustomLabTestPackageSerializer(serializers.ModelSerializer):
     lab = serializers.SerializerMethodField()
     distance = serializers.SerializerMethodField()
     mrp = serializers.SerializerMethodField()
-    deal_price = serializers.SerializerMethodField()
+    price = serializers.SerializerMethodField()
     lab_timings = serializers.SerializerMethodField()
     lab_timings_data = serializers.SerializerMethodField()
+    pickup_charges = serializers.SerializerMethodField()
+    pickup_available = serializers.SerializerMethodField()
+    distance_related_charges = serializers.SerializerMethodField()
 
     class Meta:
         model = LabTest
-        fields = ('id', 'name', 'lab', 'mrp', 'distance', 'deal_price', 'lab_timings', 'lab_timings_data',
-                  'test_type', 'is_package', 'number_of_tests', 'why', 'pre_test_info')
-        # fields = ('__all__')
+        fields = ('id', 'name', 'lab', 'mrp', 'distance', 'price', 'lab_timings', 'lab_timings_data',
+                  'test_type', 'is_package', 'number_of_tests', 'why', 'pre_test_info', 'is_package',
+                  'pickup_charges', 'pickup_available', 'distance_related_charges')
 
     def get_lab(self, obj):
         lab_data = self.context.get('lab_data')
@@ -947,8 +997,8 @@ class CustomLabTestPackageSerializer(serializers.ModelSerializer):
     def get_mrp(self, obj):
         return str(obj.mrp)
 
-    def get_deal_price(self, obj):
-        return str(obj.deal_price)
+    def get_price(self, obj):
+        return str(obj.price)
 
     def get_lab_timings(self, obj):
         lab_data = self.context.get('lab_data', [])
@@ -966,11 +1016,43 @@ class CustomLabTestPackageSerializer(serializers.ModelSerializer):
         lab_data = self.context.get('lab_data', [])
         for data in lab_data:
             if data.id == obj.lab:
-                return data
+                return data.avg_rating
+
+    def get_pickup_charges(self, obj):
+        lab_data = self.context.get('lab_data', [])
+        for data in lab_data:
+            if data.id == obj.lab and data.is_home_collection_enabled:
+                return data.home_pickup_charges
+            else:
+                return 0
+
+    def get_pickup_available(self, obj):
+        for temp_test in obj.test.all():
+            if not temp_test.home_collection_possible:
+                return 0
+        lab_data = self.context.get('lab_data', [])
+        for data in lab_data:
+            if data.id == obj.lab:
+                return 1 if data.is_home_collection_enabled else 0
+        return 0
+
+    def get_distance_related_charges(self, obj):
+        lab_data = self.context.get('lab_data', [])
+        for data in lab_data:
+            if data.id == obj.lab:
+                return 1 if bool(data.home_collection_charges.all()) else 0
 
 
 class LabPackageListSerializer(serializers.Serializer):
-    long = serializers.FloatField(required=False)
-    lat = serializers.FloatField(required=False)
-    categories = serializers.ListField(child=serializers.PrimaryKeyRelatedField(
-        queryset=LabTestCategory.objects.filter(is_live=True, is_package_category=True)), required=False)
+    long = serializers.FloatField(default=77.071848)
+    lat = serializers.FloatField(default=28.450367)
+    category_ids = CommaSepratedToListField(required=False, max_length=500, typecast_to=int)
+
+    def validate_category_ids(self, attrs):
+        try:
+            temp_attrs = [int(attr) for attr in attrs]
+            if LabTestCategory.objects.filter(is_live=True, is_package_category=True, id__in=temp_attrs).count() == len(temp_attrs):
+                return attrs
+        except:
+            raise serializers.ValidationError('Invalid Category IDs')
+        raise serializers.ValidationError('Invalid Category IDs')

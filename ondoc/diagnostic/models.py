@@ -1,3 +1,5 @@
+from copy import deepcopy
+
 from django.contrib.gis.db import models
 from django.contrib.staticfiles.templatetags.staticfiles import static
 from django.core.validators import MaxValueValidator, MinValueValidator, FileExtensionValidator
@@ -44,6 +46,7 @@ from ondoc.ratings_review import models as ratings_models
 from decimal import Decimal
 from ondoc.common.models import AppointmentHistory
 import reversion
+from decimal import Decimal
 
 logger = logging.getLogger(__name__)
 
@@ -719,7 +722,7 @@ class LabTest(TimeStampedModel, SearchKey):
     about_test = models.TextField(blank=True, verbose_name='About the test')
     show_details = models.BooleanField(default=False)
     preparations = models.TextField(blank=True, verbose_name='Preparations for the test')
-    priority = models.PositiveIntegerField(default=0, null=True)
+    priority = models.IntegerField(default=0, null=True)
     hide_price = models.BooleanField(default=False)
     searchable = models.BooleanField(default=True)
     categories = models.ManyToManyField(LabTestCategory,
@@ -850,6 +853,10 @@ class AvailableLabTest(TimeStampedModel):
     class Meta:
         unique_together = (("test", "lab_pricing_group"))
         db_table = "available_lab_test"
+        indexes = [
+            models.Index(fields=['test_id', 'lab_pricing_group_id']),
+        ]
+
 
 @reversion.register()
 class LabAppointment(TimeStampedModel, CouponsMixin):
@@ -873,7 +880,7 @@ class LabAppointment(TimeStampedModel, CouponsMixin):
                                  (AUTO_CANCELLED, 'Auto Cancelled')]
 
     lab = models.ForeignKey(Lab, on_delete=models.SET_NULL, related_name='labappointment', null=True)
-    lab_test = models.ManyToManyField(AvailableLabTest)
+    lab_test = models.ManyToManyField(AvailableLabTest)  # Not to be used
     profile = models.ForeignKey(UserProfile, related_name="labappointments", on_delete=models.SET_NULL, null=True)
     user = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='lab_appointments')
     profile_detail = JSONField(blank=True, null=True)
@@ -905,10 +912,12 @@ class LabAppointment(TimeStampedModel, CouponsMixin):
     cancellation_comments = models.CharField(max_length=5000, null=True, blank=True)
     merchant_payout = models.ForeignKey(MerchantPayout, related_name="lab_appointment", on_delete=models.SET_NULL, null=True)
     price_data = JSONField(blank=True, null=True)
+    tests = models.ManyToManyField(LabTest, through='LabAppointmentTestMapping', through_fields=('appointment', 'test'))
 
     def get_tests_and_prices(self):
+        # DONE SHASHANK_SINGH CHANGE 10
         test_price = []
-        for test in self.lab_test.all():
+        for test in self.test_mappings.all():
             test_price.append({'name': test.test.name, 'mrp': test.mrp, 'deal_price': (
                 test.custom_deal_price if test.custom_deal_price else test.computed_deal_price),
                                'discount': test.mrp - (
@@ -1137,8 +1146,20 @@ class LabAppointment(TimeStampedModel, CouponsMixin):
         appointment_data["otp"] = otp
         lab_ids = appointment_data.pop("lab_test")
         coupon_list = appointment_data.pop("coupon", None)
-        appointment_data.pop("extra_details", None)
+        extra_details = deepcopy(appointment_data.pop("extra_details", None))
         app_obj = cls.objects.create(**appointment_data)
+        test_mappings = []
+        for test in extra_details:
+            test.pop('name', None)
+            test['test_id'] = test.pop('id')
+            test['appointment_id'] = app_obj.id
+            test['mrp'] = Decimal(test['mrp']) if test['mrp'] != 'None' else None
+            test['custom_deal_price'] = Decimal(test['custom_deal_price']) if test['custom_deal_price'] != 'None' else None
+            test['computed_deal_price'] = Decimal(test['computed_deal_price']) if test['computed_deal_price'] != 'None' else None
+            test['custom_agreed_price'] = Decimal(test['custom_agreed_price']) if test['custom_agreed_price'] != 'None' else None
+            test['computed_agreed_price'] = Decimal(test['computed_agreed_price']) if test['computed_agreed_price'] != 'None' else None
+            test_mappings.append(LabAppointmentTestMapping(**test))
+        LabAppointmentTestMapping.objects.bulk_create(test_mappings)
         app_obj.lab_test.add(*lab_ids)
         if coupon_list:
             app_obj.coupon.add(*coupon_list)
@@ -1588,7 +1609,8 @@ class LabReportFile(auth_model.TimeStampedModel, auth_model.Document):
         FileExtensionValidator(allowed_extensions=['pdf', 'jfif', 'jpg', 'jpeg', 'png'])])
 
     def __str__(self):
-        return "{}-{}".format(self.id, self.report.id)
+
+        return "{}-{}".format(self.id, self.report.id if self.report and self.report.id else None)
 
     def send_notification(self, database_instance):
         appointment = self.report.appointment
@@ -1620,9 +1642,26 @@ class LabTestGroup(auth_model.TimeStampedModel):
         db_table = 'lab_test_group'
 
 
+class LabAppointmentTestMapping(models.Model):
+    appointment = models.ForeignKey(LabAppointment, on_delete=models.CASCADE, related_name='test_mappings')
+    test = models.ForeignKey(LabTest, on_delete=models.CASCADE, related_name='lab_appointment_mappings')
+    mrp = models.DecimalField(max_digits=10, decimal_places=2, default=None, null=True, blank=True)
+    computed_agreed_price = models.DecimalField(max_digits=10, decimal_places=2, default=None, null=True, blank=True)
+    custom_agreed_price = models.DecimalField(max_digits=10, decimal_places=2, default=None, null=True, blank=True)
+    computed_deal_price = models.DecimalField(max_digits=10, decimal_places=2, default=None, null=True, blank=True)
+    custom_deal_price = models.DecimalField(max_digits=10, decimal_places=2, default=None, null=True, blank=True)
+
+    def __str__(self):
+        return '{}>{}'.format(self.appointment, self.test)
+
+    class Meta:
+        db_table = 'lab_appointment_test_mapping'
+
+
 def get_lab_timings_today(self, day_now=timezone.now().weekday()):
     lab_timing = list()
     lab_timing_data = list()
+    time_choices = {item[0]: item[1] for item in LabTiming.TIME_CHOICES}
     if self.always_open:
         lab_timing.append("12:00 AM - 11:45 PM")
         lab_timing_data.append({
@@ -1633,7 +1672,7 @@ def get_lab_timings_today(self, day_now=timezone.now().weekday()):
         timing_queryset = self.lab_timings.all()
         for data in timing_queryset:
             if data.day == day_now:
-                lab_timing.append('{} - {}'.format(LabTiming.TIME_CHOICES[data.start], LabTiming.TIME_CHOICES[data.end]))
+                lab_timing.append('{} - {}'.format(time_choices[data.start], time_choices[data.end]))
                 lab_timing_data.append({"start": str(data.start), "end": str(data.end)})
     return ' | '.join(lab_timing), lab_timing_data
 

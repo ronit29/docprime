@@ -69,7 +69,7 @@
                     </tr>
                     <tr>
                         <td>
-                            <table>
+                            <table cellpadding="0" cellspacing="0" style="width:100%;">
                                 <tbody>
                                 <tr>
                                     <td style="color:#000000;font-size:14px;font-weight:700;padding-top:16px;width:40%">
@@ -116,82 +116,91 @@
                             </table>
                         </td>
                     </tr>
-                    {% if procedures %}
+
+
                     <tr>
-                        <td style="color:#000000;font-size:14px;font-weight:700;padding-top:16px;padding-bottom:2px">
-                            Treatment(s) Booked
+                        <td>
+                            <table cellpadding="0" cellspacing="0"
+                                   style="width: 100%;">
+                                <tbody>
+                                <tr>
+                                    <td style="color:#000000;font-size:16px;font-weight:700;padding-top:16px;width:40%">
+                                        Service(s) Included
+                                    </td>
+                                </tr>
+                                </tbody>
+                            </table>
                         </td>
                     </tr>
                     <tr>
-                        <td>
-                            <table cellpadding="0" cellspacing="0" style="width:100%">
-                                <tbody>
+                        <td style="padding-top: 5px;">
+                            <table align="center" cellpadding="0" cellspacing="0"
+                                   style="width: 100%;border-collapse: collapse;border: 1px solid black;">
+                                <thead>
                                 <tr>
-                                    <th style="color:#3f3f3f;font-size:16px;font-weight:500;padding-top:8px;padding-left:8px;border:1px solid #d3d3d3">
-                                        Name
+                                    <th style="border: 1px solid black;">
+                                        S.No.
                                     </th>
-                                    <th style="color:#3f3f3f;font-size:16px;font-weight:500;padding-top:8px;padding-left:8px;border:1px solid #d3d3d3">
+                                    <th style="border: 1px solid black;">
+                                        Particulars
+                                    </th>
+                                    <th style="border: 1px solid black;">
                                         MRP
                                     </th>
-                                    <th style="color:#3f3f3f;font-size:16px;font-weight:500;padding-top:8px;padding-left:8px;border:1px solid #d3d3d3">
+                                    <th style="border: 1px solid black;">
                                         Discount
                                     </th>
-                                    <th style="color:#3f3f3f;font-size:16px;font-weight:500;padding-top:8px;padding-left:8px;border:1px solid #d3d3d3">
-                                        Sub Total
+                                    <th style="border: 1px solid black;">
+                                        Grand Total
                                     </th>
                                 </tr>
+                                </thead>
+                                <tbody>
                                 {% for procedure in procedures %}
-
                                 <tr>
-                                    <td style="color:#3f3f3f;font-size:16px;font-weight:500;padding-top:8px;padding-left:8px;border:1px solid #d3d3d3;text-align:center;">
+                                    <td style="border: 1px solid black;text-align: center;color:#3f3f3f;font-size:16px;font-weight:500;">
+                                        {{forloop.counter}}
+                                    </td>
+                                    <td style="border: 1px solid black;text-align: center;color:#3f3f3f;font-size:16px;font-weight:500;">
                                         {{procedure.name|capfirst}}
                                     </td>
-                                    <td style="color:#3f3f3f;font-size:16px;font-weight:500;padding-top:8px;padding-left:8px;border:1px solid #d3d3d3;text-align:center;">
+                                    <td style="border: 1px solid black;text-align: center;color:#3f3f3f;font-size:16px;font-weight:500;">
                                         {{procedure.mrp}}
                                     </td>
-                                    <td style="color:#3f3f3f;font-size:16px;font-weight:500;padding-top:8px;padding-left:8px;border:1px solid #d3d3d3;text-align:center;">
+                                    <td style="border: 1px solid black;text-align: center;color:#3f3f3f;font-size:16px;font-weight:500;">
                                         {{procedure.discount}}
                                     </td>
-                                    <td style="color:#3f3f3f;font-size:16px;font-weight:500;padding-top:8px;padding-left:8px;border:1px solid #d3d3d3;text-align:center;">
+                                    <td style="border: 1px solid black;text-align: center;color:#3f3f3f;font-size:16px;font-weight:500;">
                                         {{procedure.deal_price}}
                                     </td>
                                 </tr>
                                 {% endfor %}
-                                {% endif %}
-                                <tr>
-                                    <td colspan="3"
-                                        style="color:#000000;font-size:14px;font-weight:700;padding-top:16px">
-                                        Total Amount
-                                    </td>
-                                    <td style="color:#3f3f3f;font-size:16px;font-weight:500;padding-top:8px;padding-left:8px">
-                                        {{instance.deal_price}}
-                                    </td>
-                                </tr>
                                 {% if coupon_discount %}
                                 <tr>
-                                    <td colspan="3"
-                                        style="color:#000000;font-size:14px;font-weight:700;padding-top:16px">
+                                    <td colspan="4"
+                                        style="border: 1px solid black;text-align: center;color:#000000;font-size:16px;font-weight:700;">
                                         Coupon Discount
                                     </td>
-                                    <td style="color:#3f3f3f;font-size:16px;font-weight:500;padding-top:8px;padding-left:8px">
+                                    <td style="border: 1px solid black;text-align: center;color:#3f3f3f;font-size:16px;font-weight:500;">
                                         {{coupon_discount}}
                                     </td>
                                 </tr>
                                 {% endif %}
                                 <tr>
-                                    <td colspan="3"
-                                        style="color:#000000;font-size:14px;font-weight:700;padding-top:16px">
+                                    <td colspan="4"
+                                        style="border: 1px solid black;text-align: center;color:#000000;font-size:16px;font-weight:700;">
                                         Amount Paid
                                     </td>
-                                    <td style="color:#3f3f3f;font-size:16px;font-weight:500;padding-top:8px;padding-left:8px">
+                                    <td style="border: 1px solid black;text-align: center;color:#3f3f3f;font-size:16px;font-weight:500;">
                                         {{instance.effective_price}}
                                     </td>
                                 </tr>
-
                                 </tbody>
                             </table>
                         </td>
                     </tr>
+
+
                     <tr>
                         <td style="color:#3f3f3f;font-size:16px;font-weight:500;padding-top:30px">
                             You will receive a confirmation email and sms once the booking is confirmed by the doctor.
@@ -230,27 +239,27 @@
                         </td>
                         <td style="width:9%;text-align:right">
                             <a href="https://www.youtube.com/channel/UCL_6Tstix2ACaBk0jwf_1ug" target="_blank"><img
-                                src="{{'notification/images/youtube-email.png'|get_absolute_url}}">
+                                    src="{{'notification/images/youtube-email.png'|get_absolute_url}}">
                             </a>
                         </td>
                         <td style="width:9%;text-align:right">
                             <a href="https://www.instagram.com/docprimeIndia/" target="_blank"><img
-                                src="{{'notification/images/instagram-email.png'|get_absolute_url}}">
+                                    src="{{'notification/images/instagram-email.png'|get_absolute_url}}">
                             </a>
                         </td>
                         <td style="width:9%;text-align:right">
                             <a href="https://www.facebook.com/DocPrimeIndia" target="_blank"><img
-                                src="{{'notification/images/facebook-email.png'|get_absolute_url}}">
+                                    src="{{'notification/images/facebook-email.png'|get_absolute_url}}">
                             </a>
                         </td>
                         <td style="width:9%;text-align:right">
                             <a href="https://twitter.com/DocPrimeindia" target="_blank"><img
-                                src="{{'notification/images/twitter-email.png'|get_absolute_url}}">
+                                    src="{{'notification/images/twitter-email.png'|get_absolute_url}}">
                             </a>
                         </td>
                         <td style="width:9%;text-align:right">
                             <a href="https://www.linkedin.com/company/docprime/" target="_blank"><img
-                                src="{{'notification/images/linkedin-email.png'|get_absolute_url}}">
+                                    src="{{'notification/images/linkedin-email.png'|get_absolute_url}}">
                             </a>
                         </td>
                     </tr>
