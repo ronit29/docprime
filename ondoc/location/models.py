@@ -2221,7 +2221,7 @@ class PageUrlCache():
         return deletions
 
 class DefaultRating(TimeStampedModel):
-    ratings = models.PositiveIntegerField(null=True)
+    ratings = models.FloatField(null=True)
     reviews = models.PositiveIntegerField(null=True)
     url = models.TextField()
 
