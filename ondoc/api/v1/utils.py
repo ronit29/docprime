@@ -607,8 +607,12 @@ class CouponsMixin(object):
 
         if coupon_obj.test_categories.exists():
             if tests:
-                test_categories = set(tests.values_list('categories', flat=True))
-                test_cat_count = coupon_obj.test_categories.filter(id__in=test_categories).count()
+                category_ids = []
+                for test in tests:
+                    categories = test.categories.values_list("id", flat=True)
+                    category_ids.extend(categories)
+                category_ids = list(set(category_ids))
+                test_cat_count = coupon_obj.test_categories.filter(id__in=category_ids).count()
                 if test_cat_count == 0:
                     return False
             else:
@@ -630,8 +634,12 @@ class CouponsMixin(object):
 
         if coupon_obj.procedure_categories.exists():
             if procedures:
-                procedure_categories = set(procedures.values_list('categories', flat=True))
-                procedure_cat_count = coupon_obj.procedure_categories.filter(id__in=procedure_categories).count()
+                category_ids = []
+                for procedure in procedures:
+                    categories = procedure.categories.values_list("id", flat=True)
+                    category_ids.extend(categories)
+                category_ids = list(set(category_ids))
+                procedure_cat_count = coupon_obj.procedure_categories.filter(id__in=category_ids).count()
                 if procedure_cat_count == 0:
                     return False
             else:

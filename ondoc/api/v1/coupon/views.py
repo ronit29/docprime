@@ -425,7 +425,7 @@ class CouponDiscountViewSet(viewsets.GenericViewSet):
                     continue
                 if doctor and hospital and procedures:
                     total_price = obj.get_applicable_procedures_with_total_price(coupon_obj=coupon, doctor=doctor,
-                                                                                 hospital=hospital, procedures_ids=procedures).get("total_price")
+                                                                                 hospital=hospital, procedures=procedures).get("total_price")
                     discount += obj.get_discount(coupon, total_price)
                 discount += obj.get_discount(coupon, deal_price)
             else:
