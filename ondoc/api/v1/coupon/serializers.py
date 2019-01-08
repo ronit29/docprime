@@ -96,6 +96,7 @@ class UserSpecificCouponSerializer(CouponListSerializer):
     def validate(self, attrs):
 
         codes = attrs.get("coupon_code")
+        deal_price=attrs.get("deal_price")
         lab = attrs.get("lab")
         tests = attrs.get("tests")
         doctor = attrs.get("doctor")
