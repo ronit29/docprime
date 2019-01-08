@@ -79,13 +79,8 @@
                     </td>
                 </tr>
                 <tr>
-                    <td style="width: 60%;padding-top: 10px;">
-                        {% if instance.hospital.building %}{{instance.hospital.building}}, {% endif %}
-                        {% if instance.hospital.sublocality %}{{instance.hospital.sublocality}}, {% endif %}
-                        {% if instance.hospital.locality %}{{instance.hospital.locality}}, {% endif %}
-                        {% if instance.hospital.city %}{{instance.hospital.city}}, {% endif %}
-                        {% if instance.hospital.state %}{{instance.hospital.state}}, {% endif %}
-                        {% if instance.hospital.pin_code %}{{instance.hospital.pin_code}}{% endif %}
+                    <td style="width: 60%;padding-top: 10px;padding-right:50px">
+                        {{instance.hospital.get_hos_address}}
                     </td>
                     <td style="width: 60%;padding-top: 10px;padding-left: 12px;">
                         {% if instance.profile.phone_number %}+91-{{instance.profile.phone_number}}{% endif %}
@@ -98,6 +93,11 @@
     <tr>
         <td style="width: 60%;padding-top: 25px;font-weight: 500;">
             Appointment Date &amp; Time : <span style="font-weight: 400;">{{instance.time_slot_start|date:"D jS F Y"}} at {{instance.time_slot_start|date:"h:i A"}}</span>
+        </td>
+    </tr>
+    <tr>
+        <td style="width: 60%;padding-top: 25px;font-weight: 500;">
+            Service(s) Included
         </td>
     </tr>
     <tr>
@@ -173,12 +173,6 @@
     <tr>
         <td style="padding-top: 25px;">
             Thanks for choosing docprime.com
-        </td>
-    </tr>
-    <tr>
-        <td style="padding: 40px 50px 0;color: #757575;text-align: center;">
-            This is a system generated e-mail. Please do not reply to this e-mail. For any support, please write to us
-            at customercare@docprime.com
         </td>
     </tr>
     <tr>
