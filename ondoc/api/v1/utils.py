@@ -697,7 +697,7 @@ class CouponsMixin(object):
 
         coupon_obj = kwargs.get("coupon_obj")
         doctor = kwargs.get("doctor")
-        hospital = kwargs.gete("hospital")
+        hospital = kwargs.get("hospital")
         procedures = kwargs.get("procedures")
 
         queryset = DoctorClinicProcedure.objects.filter(doctor_clinic__doctor=doctor, doctor_clinic__hospital=hospital, procedure__in=procedures)
