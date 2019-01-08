@@ -54,6 +54,7 @@ from django.utils import timezone
 import reversion
 from ondoc.doctor import models as doctor_models
 from django.db.models import Count
+from ondoc.api.v1.utils import RawSql
 
 logger = logging.getLogger(__name__)
 
@@ -1906,7 +1907,6 @@ class PopularityScore(auth_model.TimeStampedModel):
     weightage = models.PositiveIntegerField(default=None, null=True)
     dp_popularity_score = models.PositiveIntegerField(default=None, null=True)
 
-
     class Meta:
         db_table = 'popularity_score'
 
@@ -1933,20 +1933,28 @@ def calculate_popularity_score():
                                                       {"min":60,"max":80,"score":8},
                                                       {"min":80, "max":100, "score":9}]}]
 
-    doc_popularity = doctor_models.DoctorPopularity.objects.all().order_by('id').values('id', 'popularity_score')
+
+    query = '''select reference_id as id , popularity_score  from source_identifier si inner join doctor_popularity dp on 
+                si.unique_identifier = dp.unique_identifier and si.type=1'''
+    doc_popularity = RawSql(query,[]).fetch_all()
+
+
+    final_result = dict()
 
     for popularity in doc_popularity:
         popularity_list = popularity_score_dict[0].get('Practo Popularity score')
         if popularity.get('popularity_score'):
             for score in popularity_list:
                 if popularity.get('popularity_score') == 10:
-                    popularity['practo_popularity_score'] = 10
+                    final_result[popularity.get('id')] = {'practo_popularity_score':10}
+                    # popularity['practo_popularity_score'] = 10
 
                 elif popularity.get('popularity_score')>=score.get('min') and popularity.get('popularity_score')<score.get('max'):
-                    popularity['practo_popularity_score'] = score.get('score')
+                    final_result[popularity.get('id')] = {'practo_popularity_score': score.get('score')}
+                    # popularity['practo_popularity_score'] = score.get('score')
                     break
         else:
-            popularity['practo_popularity_score'] = 0
+            final_result[popularity.get('id')] = {'practo_popularity_score': 0}
 
 
     doctor_practicing_since = doctor_models.Doctor.objects.all().order_by('id').values('id', 'practicing_since')
@@ -1955,7 +1963,7 @@ def calculate_popularity_score():
             doctor['years_of_experience'] = datetime.datetime.now().year - doctor.get('practicing_since')
             exp_years = popularity_score_dict[1].get('Years of experience')
             for score in exp_years:
-                if doctor.get('years_of_experience')>25:
+                if doctor.get('years_of_experience')>=25:
                     doctor['experience_score'] = 10
                 elif doctor.get('years_of_experience')>=score.get('min') and doctor.get('years_of_experience') <score.get('max'):
                     doctor['experience_score'] = score.get('score')
@@ -1982,23 +1990,32 @@ def calculate_popularity_score():
     for doctor in doc_with_max_clinics.values():
         doctors_score_list = popularity_score_dict[2].get('Doctors in clinic')
         for score in doctors_score_list:
-            if doctor.get('doctors_count') >100:
+            if doctor.get('doctors_count') >=100:
                 doctor['doctors_in_clinic_score'] = 10
 
             elif doctor.get('doctors_count') >= score.get('min') and doctor.get('doctors_count') < score.get('max'):
                 doctor['doctors_in_clinic_score'] = score.get('score')
                 break
 
-    for pop_score in doc_popularity:
-        for exp_score in doctor_practicing_since:
-            if pop_score.get('id') == exp_score.get('id'):
-                pop_score['experience_score'] = exp_score.get('experience_score')
-                del pop_score['popularity_score']
 
-    for pop_score in doc_popularity:
-        for doctor_score in doc_with_max_clinics.values():
-            if pop_score.get('id') == doctor_score.get('doctor_id'):
-                pop_score['doctors_in_clinic_score'] = doctor_score.get('doctors_in_clinic_score')
+    for doctor_score in doc_with_max_clinics.values():
+        if doctor_score.get('doctor_id') in final_result.keys():
+            result = final_result[doctor_score.get('doctor_id')]
+            final_result[doctor_score.get('doctor_id')] = [{'doctor_id':doctor_score.get('doctor_id')},result.get('practo_popularity_score'),
+                                                            {'doctors_in_clinic_score':doctor_score['doctors_in_clinic_score'] }]
+        else:
+            final_result[doctor_score.get('doctor_id')] = [{'doctor_id':doctor_score.get('doctor_id')},{'practo_popularity_score':0},
+                                                            {'doctors_in_clinic_score': doctor_score[
+                                                                'doctors_in_clinic_score']}]
+
+    for exp_score in doctor_practicing_since:
+        if exp_score.get('id') in final_result.keys():
+            final_result[exp_score.get('id')].append({'experience_score':exp_score['experience_score']})
+        else:
+            final_result[exp_score.get('id')] = [{'doctor_id':exp_score.get('id')},{'practo_popularity_score':0},
+                                                            {'doctors_in_clinic_score': 0},
+                                                             {'experience_score':0}]
+        print(final_result[exp_score.get('id')])
 
     return True
 
