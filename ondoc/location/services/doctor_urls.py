@@ -27,7 +27,7 @@ class DoctorURL():
         self.create_search_urls()
         self.create_doctor_page_urls()        
         self.update_breadcrumbs()
-        #self.insert_search_urls()
+        self.insert_search_urls()
 
     def insert_search_urls(self):
 
