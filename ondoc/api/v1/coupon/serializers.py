@@ -102,6 +102,13 @@ class UserSpecificCouponSerializer(CouponListSerializer):
         doctor = attrs.get("doctor")
         hospital = attrs.get("hospital")
         procedures = attrs.get("procedures")
+        product_id = attrs.get("product_id")
+
+        if product_id:
+            if product_id == Order.DOCTOR_PRODUCT_ID and lab:
+                raise serializers.ValidationError("Invalid product id for lab")
+            if product_id == Order.LAB_PRODUCT_ID and doctor:
+                raise serializers.ValidationError("Invalid product id for doctor")
 
         coupons_data, random_coupons = None, None
         if RandomGeneratedCoupon.objects.filter(random_coupon__in=codes).exists():
@@ -123,6 +130,8 @@ class UserSpecificCouponSerializer(CouponListSerializer):
 
         if deal_price:
             coupons_data = coupons_data.filter(Q(min_order_amount__isnull=True) | Q(min_order_amount__lte = deal_price))
+            if len(coupons_data) == 0:
+                raise serializers.ValidationError("Coupon invalid, minimum order amount criteria not met")
 
         # if not coupons_data.exists() or len(coupons_data) != len(set(attrs.get("coupon_code"))):
         if not random_coupons and not (coupons_data.exists() and len(coupons_data) == len(set(attrs.get("coupon_code")))):
