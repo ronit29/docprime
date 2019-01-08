@@ -305,7 +305,7 @@ class DoctorURL():
                 elif spec and spec.get('doctor_count')> top_specialization.get('doctor_count'):
                     top_specialization = spec
 
-            print(top_specialization)
+            #print(top_specialization)
 
 
 
