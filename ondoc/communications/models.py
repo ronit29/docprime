@@ -8,7 +8,7 @@ import pytz
 from django.db.models import F
 from hardcopy import bytestring_to_pdf
 
-from ondoc.api.v1.utils import util_absolute_url, util_file_name
+from ondoc.api.v1.utils import util_absolute_url, util_file_name, generate_short_url
 from ondoc.doctor.models import OpdAppointment
 from ondoc.diagnostic.models import LabAppointment
 from django.core.files.uploadedfile import SimpleUploadedFile, TemporaryUploadedFile, InMemoryUploadedFile
@@ -231,6 +231,11 @@ class SMSNotification:
             body_template = "sms/lab/lab_report_uploaded.txt"
         elif notification_type == NotificationAction.LAB_REPORT_SEND_VIA_CRM:
             body_template = "sms/lab/lab_report_send_crm.txt"
+            lab_reports = []
+            for report in self.context.get('reports', []):
+                temp_short_url = generate_short_url(report)
+                lab_reports.append(temp_short_url)
+            self.context['lab_reports'] = lab_reports
         return body_template
 
     def trigger(self, receiver, template, context):

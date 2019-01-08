@@ -12,7 +12,7 @@ Test(s) Booked :
 
 {% if reports %}
 Link(s):
-{% for report in reports %}
+{% for report in lab_reports %}
 {{report}}
 {% endfor %}
 {% endif %}
