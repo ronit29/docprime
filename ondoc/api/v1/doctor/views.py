@@ -2464,7 +2464,7 @@ class OfflineCustomerViewSet(viewsets.GenericViewSet):
             error_message = ''
             phone_number = []
             allowed_actions = []
-            pem_type = billing_status = None
+            payout_amount = billing_status = None
             if instance == OFFLINE:
                 patient_profile = OfflinePatientSerializer(app.user).data
                 is_docprime = False
@@ -2498,6 +2498,7 @@ class OfflineCustomerViewSet(viewsets.GenericViewSet):
                 elif app.status == models.OpdAppointment.COMPLETED and (
                         app.merchant_payout and app.merchant_payout.status == account_models.MerchantPayout.PAID):
                     billing_status = PROCESSED
+                payout_amount = app.doc_payout_amount()
             # if app.super_user:
             #     pem_type = 3
             # elif not app.super_user and not app.appointment_pem and app.billing_pem:
@@ -2509,6 +2510,7 @@ class OfflineCustomerViewSet(viewsets.GenericViewSet):
             ret_obj = {}
             ret_obj['id'] = app.id
             ret_obj['deal_price'] = deal_price
+            ret_obj['payout_amount'] = payout_amount
             ret_obj['effective_price'] = effective_price
             ret_obj['allowed_action'] = allowed_actions
             ret_obj['patient_name'] = patient_name
