@@ -427,6 +427,7 @@ class CouponDiscountViewSet(viewsets.GenericViewSet):
                     total_price = obj.get_applicable_procedures_with_total_price(coupon_obj=coupon, doctor=doctor,
                                                                                  hospital=hospital, procedures=procedures).get("total_price")
                     discount += obj.get_discount(coupon, total_price)
+                    continue
                 discount += obj.get_discount(coupon, deal_price)
             else:
                 return Response({"status": 0, "message": "Invalid coupon code for the user"},
