@@ -90,14 +90,16 @@ class UserSpecificCouponSerializer(CouponListSerializer):
     procedures = serializers.ListField(
         child=serializers.PrimaryKeyRelatedField(required=False, queryset=Procedure.objects.all()), required=False)
     doctor = serializers.PrimaryKeyRelatedField(required=False, queryset=Doctor.objects.filter(is_live=True))
+    hospital = serializers.PrimaryKeyRelatedField(required=False, queryset=Hospital.objects.filter(is_live=True))
     profile = serializers.PrimaryKeyRelatedField(required=False, queryset=UserProfile.objects.all())
 
     def validate(self, attrs):
 
+        codes = attrs.get("coupon_code")
         lab = attrs.get("lab")
         tests = attrs.get("tests")
         doctor = attrs.get("doctor")
-        codes = attrs.get("coupon_code")
+        hospital = attrs.get("hospital")
         procedures = attrs.get("procedures")
 
         coupons_data, random_coupons = None, None
@@ -147,7 +149,7 @@ class UserSpecificCouponSerializer(CouponListSerializer):
             for coupon in coupons_data:
                 obj = OpdAppointment()
                 if not obj.validate_product_coupon(coupon_obj=coupon,
-                                                   doctor=doctor, procedures=procedures,
+                                                   doctor=doctor, hospital=hospital, procedures=procedures,
                                                    product_id=Order.DOCTOR_PRODUCT_ID):
                     raise serializers.ValidationError('Invalid coupon code - ' + str(coupon))
 

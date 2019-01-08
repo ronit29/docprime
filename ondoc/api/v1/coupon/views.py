@@ -404,6 +404,8 @@ class CouponDiscountViewSet(viewsets.GenericViewSet):
         lab = input_data.get("lab")
         tests = input_data.get("tests", [])
         doctor = input_data.get("doctor")
+        hospital = input_data.get("hospital")
+        procedures = input_data.get("procedures", [])
         profile = input_data.get("profile")
 
         if str(product_id) == str(Order.DOCTOR_PRODUCT_ID):
@@ -421,8 +423,10 @@ class CouponDiscountViewSet(viewsets.GenericViewSet):
                                                                             test_ids=tests, lab=lab).get("total_price")
                     discount += obj.get_discount(coupon, total_price)
                     continue
-                if doctor:
-                    pass
+                if doctor and hospital and procedures:
+                    total_price = obj.get_applicable_procedures_with_total_price(coupon_obj=coupon, doctor=doctor,
+                                                                                 hospital=hospital, procedures_ids=procedures).get("total_price")
+                    discount += obj.get_discount(coupon, total_price)
                 discount += obj.get_discount(coupon, deal_price)
             else:
                 return Response({"status": 0, "message": "Invalid coupon code for the user"},

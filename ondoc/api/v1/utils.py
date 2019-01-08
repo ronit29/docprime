@@ -662,7 +662,6 @@ class CouponsMixin(object):
             return 0
 
     def get_applicable_tests_with_total_price(self, **kwargs):
-        from django.db.models import Sum
         from ondoc.diagnostic.models import AvailableLabTest
 
         coupon_obj = kwargs.get("coupon_obj")
@@ -679,6 +678,24 @@ class CouponsMixin(object):
                 total_price += test.custom_deal_price
             else:
                 total_price += test.computed_deal_price
+
+        return {"total_price": total_price}
+
+    def get_applicable_procedures_with_total_price(self, **kwargs):
+        from ondoc.procedure.models import DoctorClinicProcedure
+
+        coupon_obj = kwargs.get("coupon_obj")
+        doctor = kwargs.get("doctor")
+        hospital = kwargs.gete("hospital")
+        procedures = kwargs.get("procedures")
+
+        queryset = DoctorClinicProcedure.objects.filter(doctor_clinic__doctor=doctor, doctor_clinic__hospital=hospital, procedure__in=procedures)
+        if coupon_obj.procedures.exists():
+            queryset = queryset.filter(procedure__in=coupon_obj.procedures.all())
+
+        total_price = 0
+        for procedure in queryset:
+            total_price += procedure.deal_price
 
         return {"total_price": total_price}
 
