@@ -4,7 +4,7 @@ from collections import defaultdict
 from operator import itemgetter
 from itertools import groupby
 from django.db import connection, transaction
-from django.db.models import F, Func, Q, Count, Sum
+from django.db.models import F, Func, Q, Count, Sum, Case, When, Value, IntegerField
 from django.utils import timezone
 import math
 import datetime
@@ -27,6 +27,7 @@ from collections import OrderedDict
 import datetime
 from django.utils.dateparse import parse_datetime
 import hashlib
+from ondoc.authentication import models as auth_models
 import logging
 logger = logging.getLogger(__name__)
 
@@ -804,30 +805,32 @@ class GenericAdminEntity():
 
 
 def get_opd_pem_queryset(user, model):
-    from ondoc.authentication.models import GenericAdmin
+
+    # super_user_query = '''CASE WHEN ((SELECT COUNT(id) FROM generic_admin WHERE user_id=%s AND hospital_id=hospital.id AND
+    #                                   super_user_permission=true AND is_disabled=false) > 0) THEN 1  ELSE 0 END'''
+    # appoint_query = '''CASE WHEN ((SELECT COUNT(id) FROM generic_admin WHERE user_id=%s AND hospital_id=hospital.id AND
+    #                              super_user_permission=false AND is_disabled=false AND permission_type=1) > 0) THEN 1  ELSE 0 END'''
+    # billing_query = '''CASE WHEN ((SELECT COUNT(id) FROM generic_admin WHERE user_id=%s AND hospital_id=hospital.id AND
+    #                                super_user_permission=false AND is_disabled=false AND permission_type=2) > 0) THEN 1  ELSE 0 END'''
     queryset = model.objects \
         .select_related('doctor', 'hospital', 'user') \
-        .prefetch_related('doctor__manageable_doctors', 'hospital__manageable_hospitals', 'doctor__images',
-                          'doctor__qualifications', 'doctor__doctorpracticespecializations') \
+        .prefetch_related('doctor__manageable_doctors', 'hospital__manageable_hospitals', 'doctor__images','doctor__qualifications', 'doctor__qualifications__qualification',
+                          'doctor__qualifications__specialization', 'doctor__qualifications__college', 'doctor__doctorpracticespecializations') \
         .filter(hospital__is_live=True, doctor__is_live=True) \
         .filter(
         Q(
             Q(doctor__manageable_doctors__user=user,
               doctor__manageable_doctors__hospital=F('hospital'),
-              doctor__manageable_doctors__is_disabled=False,
-              doctor__manageable_doctors__permission_type__in=[GenericAdmin.APPOINTMENT,
-                                                               GenericAdmin.ALL]) |
+              doctor__manageable_doctors__is_disabled=False,) |
             Q(doctor__manageable_doctors__user=user,
                 doctor__manageable_doctors__hospital__isnull=True,
                 doctor__manageable_doctors__is_disabled=False,
-                doctor__manageable_doctors__permission_type__in=[GenericAdmin.APPOINTMENT,
-                                                               GenericAdmin.ALL])
+                )
              |
             Q(hospital__manageable_hospitals__doctor__isnull=True,
               hospital__manageable_hospitals__user=user,
               hospital__manageable_hospitals__is_disabled=False,
-              hospital__manageable_hospitals__permission_type__in=[GenericAdmin.APPOINTMENT,
-                                                                   GenericAdmin.ALL])
+              )
         ) |
         Q(
             Q(doctor__manageable_doctors__user=user,
@@ -838,7 +841,25 @@ def get_opd_pem_queryset(user, model):
               hospital__manageable_hospitals__super_user_permission=True,
               hospital__manageable_hospitals__is_disabled=False,
               hospital__manageable_hospitals__entity_type=GenericAdminEntity.HOSPITAL)
-        ))
+        ))\
+    .annotate(pem_type=Case(When(Q(hospital__manageable_hospitals__user=user) &
+                                   Q(hospital__manageable_hospitals__super_user_permission=True) &
+                                   Q(hospital__manageable_hospitals__is_disabled=False), then=Value(3)),
+                              When(Q(hospital__manageable_hospitals__user=user) &
+                                   Q(hospital__manageable_hospitals__super_user_permission=False) &
+                                   Q(hospital__manageable_hospitals__permission_type=auth_models.GenericAdmin.BILLINNG) &
+                                   ~Q(hospital__manageable_hospitals__permission_type=auth_models.GenericAdmin.APPOINTMENT) &
+                                   Q(hospital__manageable_hospitals__is_disabled=False), then=Value(2)),
+                              When(Q(hospital__manageable_hospitals__user=user) &
+                                   Q(hospital__manageable_hospitals__super_user_permission=False) &
+                                   Q(hospital__manageable_hospitals__permission_type=auth_models.GenericAdmin.BILLINNG) &
+                                   Q(hospital__manageable_hospitals__permission_type=auth_models.GenericAdmin.APPOINTMENT) &
+                                   Q(hospital__manageable_hospitals__is_disabled=False), then=Value(3)),
+                              default=Value(1),
+                              output_field=IntegerField()
+                              )
+              )
+    # .extra(select={'super_user': super_user_query, 'appointment_pem': appoint_query, 'billing_pem': billing_query}, params=(user_id, user_id, user_id))
     return queryset
 
 

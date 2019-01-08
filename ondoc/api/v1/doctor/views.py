@@ -2429,13 +2429,16 @@ class OfflineCustomerViewSet(viewsets.GenericViewSet):
     def list_appointments(self, request):
         ONLINE = 1
         OFFLINE = 2
+        INCOMPLETE = 1
+        ELIGIBLE = 2
+        INITIATED = 3
+        PROCESSED = 4
         serializer = serializers.OfflineAppointmentFilterSerializer(data=request.query_params)
         serializer.is_valid(raise_exception=True)
         valid_data = serializer.validated_data
         online_queryset = get_opd_pem_queryset(request.user, models.OpdAppointment)\
-            .select_related('user', 'profile', 'doctor') \
-            .prefetch_related('doctor__qualifications', 'doctor__doctorpracticespecializations')\
-            .distinct()
+            .select_related('profile', 'merchant_payout').distinct()
+
         offline_queryset = get_opd_pem_queryset(request.user, models.OfflineOPDAppointments)\
             .select_related('user')\
             .prefetch_related('user__patient_mobiles').distinct()
@@ -2452,8 +2455,7 @@ class OfflineCustomerViewSet(viewsets.GenericViewSet):
             online_queryset = online_queryset.filter(updated_at__gte=updated_at)
             offline_queryset = offline_queryset.filter(updated_at__gte=updated_at)
         final_data = sorted(chain(online_queryset, offline_queryset), key=lambda car: car.time_slot_start, reverse=False)
-        # resp = []
-        # group = OrderedDict()
+
         final_result = []
         for app in final_data:
             instance = ONLINE if isinstance(app, models.OpdAppointment) else OFFLINE
@@ -2462,6 +2464,7 @@ class OfflineCustomerViewSet(viewsets.GenericViewSet):
             error_message = ''
             phone_number = []
             allowed_actions = []
+            pem_type = billing_status = None
             if instance == OFFLINE:
                 patient_profile = OfflinePatientSerializer(app.user).data
                 is_docprime = False
@@ -2484,6 +2487,25 @@ class OfflineCustomerViewSet(viewsets.GenericViewSet):
                 patient_profile['profile_id'] = app.profile.id if hasattr(app, 'profile') else None
                 patient_profile['phone_numbers'] = phone_number
                 patient_name = app.profile.name if hasattr(app, 'profile') else None
+                if app.time_slot_start <= timezone.now() and \
+                        app.status not in [models.OpdAppointment.COMPLETED, models.OpdAppointment.CANCELLED, models.OpdAppointment.BOOKED]:
+                    billing_status = INCOMPLETE
+                elif app.status == models.OpdAppointment.COMPLETED and (not app.merchant_payout or app.merchant_payout.status not in \
+                        [account_models.MerchantPayout.ATTEMPTED, account_models.MerchantPayout.PAID]):
+                    billing_status = ELIGIBLE
+                elif app.status == models.OpdAppointment.COMPLETED and (app.merchant_payout and app.merchant_payout.status == account_models.MerchantPayout.ATTEMPTED):
+                    billing_status = INITIATED
+                elif app.status == models.OpdAppointment.COMPLETED and (
+                        app.merchant_payout and app.merchant_payout.status == account_models.MerchantPayout.PAID):
+                    billing_status = PROCESSED
+            # if app.super_user:
+            #     pem_type = 3
+            # elif not app.super_user and not app.appointment_pem and app.billing_pem:
+            #     pem_type = 2
+            # elif not app.super_user and app.appointment_pem and not app.billing_pem:
+            #     pem_type = 1
+            # elif not app.super_user and app.appointment_pem and app.billing_pem:
+            #     pem_type = 3
             ret_obj = {}
             ret_obj['id'] = app.id
             ret_obj['deal_price'] = deal_price
@@ -2498,7 +2520,9 @@ class OfflineCustomerViewSet(viewsets.GenericViewSet):
             ret_obj['hospital_name'] = app.hospital.name
             ret_obj['time_slot_start'] = app.time_slot_start
             ret_obj['status'] = app.status
+            ret_obj['billing_status'] = billing_status
             ret_obj['profile'] = patient_profile
+            ret_obj['permission_type'] = app.pem_type
             ret_obj['hospital'] = HospitalModelSerializer(app.hospital).data
             ret_obj['doctor'] = AppointmentRetrieveDoctorSerializer(app.doctor).data
             ret_obj['is_docprime'] = is_docprime
