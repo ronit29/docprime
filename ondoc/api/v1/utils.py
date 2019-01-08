@@ -556,8 +556,8 @@ class CouponsMixin(object):
                 if coupon_obj.gender and (not user_profile or coupon_obj.gender != user_profile.gender):
                     return {"is_valid": False, "used_count": None}
 
-                if ( (coupon_obj.age_start and (not user_age or coupon_obj.age_start >= user_age))
-                        or (coupon_obj.age_end and (not user_age or coupon_obj.age_end <= user_age)) ):
+                if ( (coupon_obj.age_start and (not user_age or coupon_obj.age_start > user_age))
+                        or (coupon_obj.age_end and (not user_age or coupon_obj.age_end < user_age)) ):
                     return {"is_valid": False, "used_count": None}
 
             count = coupon_obj.used_coupon_count(user)

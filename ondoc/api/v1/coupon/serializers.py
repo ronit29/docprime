@@ -120,6 +120,9 @@ class UserSpecificCouponSerializer(CouponListSerializer):
             coupons_data = Coupon.objects.filter(code__in=codes)
         attrs["coupons_data"] = coupons_data
 
+        if deal_price:
+            coupons_data = coupons_data.filter(Q(min_order_amount__isnull=True) | Q(min_order_amount__lte = deal_price))
+
         # if not coupons_data.exists() or len(coupons_data) != len(set(attrs.get("coupon_code"))):
         if not random_coupons and not (coupons_data.exists() and len(coupons_data) == len(set(attrs.get("coupon_code")))):
             raise serializers.ValidationError("Invalid Coupon Codes")
