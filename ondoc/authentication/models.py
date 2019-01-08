@@ -968,7 +968,14 @@ class GenericAdmin(TimeStampedModel, CreatedByModel):
             return []
         admins = GenericAdmin.objects.filter(
             Q(is_disabled=False, hospital=appoinment.hospital),
-            (Q(doctor__isnull=True) | Q(doctor__isnull=False, doctor=appoinment.doctor)))
+            (Q(
+                Q(doctor__isnull=True)
+                |
+                Q(doctor__isnull=False, doctor=appoinment.doctor)
+              )
+             |
+             Q(super_user_permission=True)
+            ))
         admin_users= []
         for admin in admins:
             if admin.user:

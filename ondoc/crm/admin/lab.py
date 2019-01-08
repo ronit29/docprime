@@ -671,7 +671,7 @@ class LabAppointmentForm(forms.ModelForm):
     start_time = forms.CharField(widget=TimePickerWidget())
     cancel_type = forms.ChoiceField(label='Cancel Type', choices=((0, 'Cancel and Rebook'),
                                                                   (1, 'Cancel and Refund'),), initial=0, widget=forms.RadioSelect)
-    # send_email_sms_report = forms.BooleanField(label='Send reports via message and email', initial=False, required=False)
+    send_email_sms_report = forms.BooleanField(label='Send reports via message and email', initial=False, required=False)
 
     def clean(self):
         super().clean()
@@ -694,9 +694,9 @@ class LabAppointmentForm(forms.ModelForm):
             lab = self.instance.lab
         else:
             raise forms.ValidationError("Lab and lab test details not entered.")
-        # if cleaned_data.get('send_email_sms_report', False) and self.instance and self.instance.id and not sum(
-        #         self.instance.reports.annotate(no_of_files=Count('files')).values_list('no_of_files', flat=True)):
-        #         raise forms.ValidationError("Can't send reports as none are available. Please upload.")
+        if cleaned_data.get('send_email_sms_report', False) and self.instance and self.instance.id and not sum(
+                self.instance.reports.annotate(no_of_files=Count('files')).values_list('no_of_files', flat=True)):
+                raise forms.ValidationError("Can't send reports as none are available. Please upload.")
         # SHASHANK_SINGH if no report error.
 
         # if self.instance.status in [LabAppointment.CANCELLED, LabAppointment.COMPLETED] and len(cleaned_data):
@@ -812,7 +812,7 @@ class LabAppointmentAdmin(nested_admin.NestedModelAdmin):
                     'get_lab_test', 'price', 'agreed_price',
                     'deal_price', 'effective_price', 'start_date', 'start_time', 'otp', 'payment_status',
                     'payment_type', 'insurance', 'is_home_pickup', 'address', 'outstanding',
-                    # 'send_email_sms_report'
+                    'send_email_sms_report'
                     )
         elif request.user.groups.filter(name=constants['LAB_APPOINTMENT_MANAGEMENT_TEAM']).exists():
             return ('booking_id', 'order_id',  'lab_id', 'lab_name', 'get_lab_test', 'lab_contact_details',
@@ -821,22 +821,26 @@ class LabAppointmentAdmin(nested_admin.NestedModelAdmin):
                     'deal_price', 'effective_price', 'payment_status', 'payment_type', 'insurance', 'is_home_pickup',
                     'get_pickup_address', 'get_lab_address', 'outstanding', 'otp', 'status', 'cancel_type',
                     'cancellation_reason', 'cancellation_comments', 'start_date', 'start_time',
-                    # 'send_email_sms_report'
+                    'send_email_sms_report'
                     )
         else:
             return ()
 
     def get_readonly_fields(self, request, obj=None):
         if request.user.is_superuser:
-            return 'booking_id', 'order_id', 'lab_id', 'lab_contact_details', 'get_lab_test'
+            read_only =  ['booking_id', 'order_id', 'lab_id', 'lab_contact_details', 'get_lab_test']
         elif request.user.groups.filter(name=constants['LAB_APPOINTMENT_MANAGEMENT_TEAM']).exists():
-            return ('booking_id', 'order_id', 'lab_name', 'lab_id', 'get_lab_test',
+            read_only = ['booking_id', 'order_id', 'lab_name', 'lab_id', 'get_lab_test',
                     'lab_contact_details', 'used_profile_name', 'used_profile_number',
                     'default_profile_name', 'default_profile_number', 'user_number', 'user_id', 'price', 'agreed_price',
                     'deal_price', 'effective_price', 'payment_status', 'otp',
-                    'payment_type', 'insurance', 'is_home_pickup', 'get_pickup_address', 'get_lab_address', 'outstanding')
+                    'payment_type', 'insurance', 'is_home_pickup', 'get_pickup_address', 'get_lab_address', 'outstanding']
         else:
-            return ()
+            read_only = []
+
+        if obj.status == LabAppointment.COMPLETED or obj.status == LabAppointment.CANCELLED:
+            read_only.extend(['status'])
+        return read_only
 
     # def get_inline_instances(self, request, obj=None):  # ALMOST DONE (Inline To be created) SHASHANK_SINGH CHANGE 16
     #     inline_instance = super().get_inline_instances(request=request, obj=obj)
@@ -957,7 +961,7 @@ class LabAppointmentAdmin(nested_admin.NestedModelAdmin):
             # time = datetime.datetime.strptime(request.POST['start_time'], '%H:%M').time()
             #
             # date_time = datetime.datetime.combine(date, time)
-            # send_email_sms_report = form.cleaned_data.get('send_email_sms_report', False)
+            send_email_sms_report = form.cleaned_data.get('send_email_sms_report', False)
             if request.POST['start_date'] and request.POST['start_time']:
                 date_time_field = request.POST['start_date'] + " " + request.POST['start_time']
                 to_zone = tz.gettz(settings.TIME_ZONE)
@@ -973,13 +977,13 @@ class LabAppointmentAdmin(nested_admin.NestedModelAdmin):
                     logger.warning("Lab Admin Cancel started - " + str(obj.id) + " timezone - " + str(timezone.now()))
                     obj.action_cancelled(cancel_type)
                     logger.warning("Lab Admin Cancel completed - " + str(obj.id) + " timezone - " + str(timezone.now()))
-            # elif lab_app_obj and (lab_app_obj.status == LabAppointment.COMPLETED):
-            #     pass
+            elif lab_app_obj and (lab_app_obj.status == LabAppointment.COMPLETED):
+                pass
             else:
                 super().save_model(request, obj, form, change)
-            # if send_email_sms_report and sum(
-            #         obj.reports.annotate(no_of_files=Count('files')).values_list('no_of_files', flat=True)):
-            #     transaction.on_commit(lambda: self.on_commit_tasks(obj.id))
+            if send_email_sms_report and sum(
+                    obj.reports.annotate(no_of_files=Count('files')).values_list('no_of_files', flat=True)):
+                transaction.on_commit(lambda: self.on_commit_tasks(obj.id))
 
     def on_commit_tasks(self, obj_id):
         from ondoc.notification.tasks import send_lab_reports
