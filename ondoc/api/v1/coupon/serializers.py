@@ -85,13 +85,13 @@ class CouponListSerializer(serializers.Serializer):
 
 class UserSpecificCouponSerializer(CouponListSerializer):
 
-    lab = serializers.PrimaryKeyRelatedField(required=False,queryset=Lab.objects.filter(is_live=True))
+    lab = serializers.PrimaryKeyRelatedField(required=False,queryset=Lab.objects.filter(is_live=True), allow_null=True)
     tests = serializers.ListField(child=serializers.PrimaryKeyRelatedField(required=False, queryset=LabTest.objects.all()),  required=False)
     procedures = serializers.ListField(
         child=serializers.PrimaryKeyRelatedField(required=False, queryset=Procedure.objects.all()), required=False)
-    doctor = serializers.PrimaryKeyRelatedField(required=False, queryset=Doctor.objects.filter(is_live=True))
-    hospital = serializers.PrimaryKeyRelatedField(required=False, queryset=Hospital.objects.filter(is_live=True))
-    profile = serializers.PrimaryKeyRelatedField(required=False, queryset=UserProfile.objects.all())
+    doctor = serializers.PrimaryKeyRelatedField(required=False, queryset=Doctor.objects.filter(is_live=True), allow_null=True)
+    hospital = serializers.PrimaryKeyRelatedField(required=False, queryset=Hospital.objects.filter(is_live=True), allow_null=True)
+    profile = serializers.PrimaryKeyRelatedField(required=False, queryset=UserProfile.objects.all(), allow_null=True)
 
     def validate(self, attrs):
 
