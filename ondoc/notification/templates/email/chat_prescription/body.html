@@ -1,202 +1,299 @@
 {% load static %}
 {% load invoice_tags %}
-    <table  border="0" align="center" cellpadding="0" cellspacing="0" style="font-family: verdana; background:#ffffff; border: 2px solid #d7d7d7; width:100%; padding: 0px 15px 40px 15px;">
-            <tr style="text-align: center">
-                <td align="center" valign="top" style="padding:10px 0; text-align: center">
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Chat Prescription</title>
 
-                    <div  style="font-weight: 700; margin:4px 0px 5px 0px !important; text-align: left; padding-left:20px">Dr.
-                        {{doctorProfile.name}}
-                        <br>
-                        <span style="font-size:12px; padding-top:10px; display:inline-block;">
-                            {% for value in doctorProfile.qualifications %}
-                                {{value.qualification}}{% if not forloop.last %},&nbsp;{% endif %}
-                            {% endfor %}</span>
-                        <br>
-                        <span style="font-size: 12px; font-weight:400">Registration No.</span>
-                        <br>
-                        <span style="font-size: 12px">{{doctorProfile.license}}</span>
-                        <br>
-                        <br>
-                        <span  style="display: none; font-size: 12px; padding:0px 10px 0px 0px; color: #806c6c">Online
-                        consultation</span>
-                        <br>
-                        <br>
-                        <span  style="display: inline-block; font-size: 12px; padding:0px 10px 0px 0px; color: #806c6c">Online
-                        consultation</span>
-                        <span style="color:#191616; float:right; font-weight: bold; font-size: 12px; padding:0px 15px 0px 0px;">{{updated_at|date:'l, F jS Y'}}</span>
-                    </div>
-                    <hr style="display:block; background:#000000; height:1px; clear:both; margin:0px -15px;">
-                </td>
-            </tr>
-            <tr>
-                <td align="center" valign="top" style="text-align: center;">
-                    <div  style="float: left; text-align:left; width:45%; padding:0px 0px 15px 20px;">
-                        <span style="font-size: 14px; font-weight: bold; padding-bottom:12px; display: inline-block">Patient Detail</span>
-                        <br>
-                        <span style="font-size: 13px;">
-                            <span style="font-weight: bold">Name</span> -
-                            <span >{{profile.name}}</span>
-                        </span>
-                        <br>
-                        <span style="font-size: 13px;">
-                            <span style="font-weight: bold">Age</span> -
-                            <span>{{profile.age}}</span>
-                        </span>
-                        <br>
-                        <span style="font-size: 13px;">
-                            <span style="font-weight: bold">Gender</span> -
-                            <span>{{profile.gender}}</span>
-                        </span>
-                        <br>
-                        <br>
-                        <br>
-                        {% if symptoms %}
-                        <span style="font-size: 13px; font-weight: bold; padding-bottom: 10px; display: inline-block">Symptoms</span>
-                        <ul style="font-size: 13px;">
+    <meta http-equiv="Content-Type" content="text/html; charset=UTF-8"/>
+
+    <link href="https://fonts.googleapis.com/css?family=Quicksand:300,400,500,700" rel="stylesheet">
+
+    <style>
+        @page{
+           margin:20px;
+        }
+
+        @media print{
+           footer {
+           left:0;
+           position:fixed;
+           }
+
+           header {
+           left:0;
+           position:fixed;
+           }
+        }
+    </style>
+
+</head>
+<body>
+
+<table align="center" border="0" cellpadding="0" cellspacing="0"
+       style=" font-family: Arial, sans-serif;border-collapse: collapse; width: 100%; font-size: 14px;    border: 1px solid #ff6d00;">
+    <tr>
+        <td>
+            <table style="width: 100%;padding: 8px; border-bottom: 3px solid #ff6d00;">
+                <tr>
+                    <td valign='top' style="vertical-align: top;">
+                        <table style="font-size: 15px;">
+                            <tr>
+                                <td style="font-weight:600;">Dr. {{doctorProfile.name}}</td>
+                            </tr>
+                            <tr>
+                                <td>{% for value in doctorProfile.qualifications %}
+                                    {{value.qualification}}{% if not forloop.last %},&nbsp;{% endif %}
+                                    {% endfor %}</td>
+                            </tr>
+                            <tr>
+                                <td>Registration No.: {{doctorProfile.license}}</td>
+                            </tr>
+
+                        </table>
+                    </td>
+                    <td align="right" style="font-size: 15px;">
+                        <img src="https://cdn.docprime.com/images/vector-smart-object.png">
+
+                    </td>
+                </tr>
+                <tr>
+                    <td style="padding: 5px;">
+
+                    </td>
+                </tr>
+                <tr>
+                    <td style="font-size: 14px; color: #757575;">Online Consultation</td>
+                    <td style="font-size: 14px; color: #757575;text-align: right;">
+                        {{updated_at|date:'l, F jS Y'}}
+                    </td>
+                </tr>
+            </table>
+        </td>
+    </tr>
+    <tr>
+        <td>
+            <table style="width: 100%;font-size: 14px;    background: #f3f3f3;    border-bottom:3px solid #ff6d00">
+                <tr align="left">
+                    <th style="width: 50%;padding: 10px 10px;">Patient Name: <span
+                            style="font-weight: 500;     text-transform: capitalize;">{{profile.name}}</span></th>
+                    <th style="width: 25%;padding: 10px 10px;; text-align: center;">Age: <span style="font-weight: 500">{{profile.age}}</span>
+                    </th>
+                    <th style="width: 25%;padding: 10px 10px;; text-align: center;">Gender: <span
+                            style="font-weight: 500">{% if profile.gender.lower ==  "m" %}Male{% elif profile.gender.lower ==  "f" %}Female{% else %}profile.gender{% endif %}</span></th>
+                </tr>
+            </table>
+        </td>
+    </tr>
+    <tr>
+        <td style="padding: 2px 0px"></td>
+    </tr>
+    <tr>
+        <td>
+            <table style="width: 100%; padding: 8px;">
+                <tr valign="top">
+                    {% if symptoms %}
+                    <td style="width: 50%">
+
+                        <p style="margin: 0px; padding: 5px 0px; font-size:14px; font-weight: 600;">Symptoms</p>
+                        <ul style="font-size: 13px;padding-left: 20px;list-style: disc;color: #656565;">
                             {% for value in symptoms %}
                             <li style="padding: 2px 0px">{{value}}</li>
                             {% endfor %}
                         </ul>
-                        {% endif %}
 
-                        {% if findings %}
-                            {% for value in findings %}
-                                <li style="font-size: 13px; font-weight: bold; padding-bottom: 10px; list-style:none;">{{value}}</li>
-                            {% endfor %}
-                        {% endif %}
-                        <br>
-                            {% if prodiagnosis and prodiagnosisType %}
-                                <span style="font-size: 13px; font-weight: bold; padding-bottom: 10px; display: inline-block">Provisional
-                                Diagnosis</span>
-                                <br>
-                                <ul style="font-size: 13px;">
-                                {% for value in prodiagnosis %}
-                                    <li style="padding: 2px 0px">{{value}}</li>
-                                {% endfor %}
-                                </ul>
-                            {% else %}
-                                {% if diagnosis %}
-                                    <span style="font-size: 13px;font-weight: bold;padding-bottom: 10px;display: inline-block">Diagnosis</span>
-                                    <br>
-                                    <ul style="font-size: 13px;">
-                                        {% for value in diagnosis %}
-                                            <li style="padding: 2px 0px">{{value}}</li>
-                                        {% endfor %}
-                                    </ul>
-                                {% endif %}
-                            {% endif %}
-                    </div>
-                    <div style="float: right; text-align: left; width:45%">
-                        {% if medicines %}
-                            <span style="font-size: 14px; font-weight: bold; padding-bottom:20px; display: inline-block">Medicines</span>
-                            <br>
-                            <ul style="font-size: 13px;">
-                                {% for value in medicines %}
-                                    <li style="padding: 2px 0px; font-weight: 600;">{{value.MedicineName}}
-                                        <p style="    margin-top: 0px;color: #7f7979; font-weight: 500;">{{value.qunatity}}, {{value.selectedNoOfTimes}}{% if value.times %}, {{value.times|join:"| "}}{% endif %} {% if value.mealtimes %}({{value.mealtimes}}){% endif %} {{value.selectedmedDays}}{% if value.medicineInstructions %} {{ value.medicineInstructions }}{% endif %}</p>
-                                    </li>
-                                {% endfor %}
-                            </ul>
-                        {% endif %}
-                        <span style="font-size: 13px;">
-                            {% if investigations %}
-                                <span style="font-weight: bold">Investigation</span>
-                                <ul style="font-size: 13px;">
-                                    {% for value in investigations %}
-                                    <li style="padding: 2px 0px">{{value}}</li>
-                                    {% endfor %}
-                                </ul>
-                            {% endif %}
-                        </span>
-                    </div>
-                </td>
-            </tr>
-            <tr>
-            <td align="center" valign="top" style="text-align: center;">
-                <div style="float: left;text-align:left;margin-top:20px;padding-left:20px;">
-                    {% if instructions %}
-                        <span style="font-size: 14px;font-weight: bold;padding-bottom: 10px;display: inline-block">Instructions</span>
-                        <br>
-                        <ul style="font-size: 13px;">
-                            {% for value in instructions %}
-                                <li style="padding: 2px 0px">{{value}}</li>
+                    </td>
+                    {% endif %}
+                    {% if prodiagnosis and prodiagnosisType %}
+                    <td style="width: 50%">
+                        <p style="margin: 0px; padding: 5px 0px; font-size:14px; font-weight: 600;">Provisional Diagnosis</p>
+                        <ul style="font-size: 13px;padding-left: 20px;list-style: disc;color: #656565;">
+                            {% for value in prodiagnosis %}
+                            <li style="padding: 2px 0px">{{value}}</li>
                             {% endfor %}
                         </ul>
+                    </td>
+                    {% elif diagnosis %}
+                    <td style="width: 50%">
+                        <p style="margin: 0px; padding: 5px 0px; font-size:14px; font-weight: 600;">Diagnosis</p>
+                        <ul style="font-size: 13px;padding-left: 20px;list-style: disc;color: #656565;">
+                            {% for value in diagnosis %}
+                            <li style="padding: 2px 0px">{{value}}</li>
+                            {% endfor %}
+                        </ul>
+                    </td>
                     {% endif %}
-                </div>
-            </td>
-
-        </tr>
-        <tr>
-            <td align="center" valign="top" style="text-align: center;">
-
-                {% if physicalexamination and specialization %}
-                    <div style="float: left;text-align: center;font-size: 13px;padding:0 10px;margin-top:20px;margin-bottom: 10px;">
-                        <b>Recommendation:</b> Basis your symptoms, we recommend you to visit
-
-                       <b style="padding: 2px 0px; font-weight: 600;">{{specialization|join:", "}}</b> for a physical examination.
-                       <br>
-
-                    </div>
+                </tr>
+                {% if findings %}
+                <tr>
+                    <td style="padding: 10px 0px"></td>
+                </tr>
+                <tr>
+                    <td colspan="2">
+                        <p style="font-size: 13px;background: #e0dede;padding: 10px; border:1px solid #c7c7c7;">
+                            {% for value in findings %}
+                            {{value}}{% if not forloop.last %},&nbsp;{% endif %}
+                            {% endfor %}
+                        </p>
+                    </td>
+                </tr>
                 {% endif %}
-            </td>
+            </table>
+        </td>
+    </tr>
+    <tr>
+        <td style="padding: 2px 0px"></td>
+    </tr>
+    <tr>
+        {% if medicines %}
+        <td>
 
-        </tr>
-            <tr>
-                <td align="center" valign="top" style="text-align: center;">
-                    <div style="float: right; width:100px; height:50px; text-align: center; font-size: 9px; font-style: italic; margin-bottom: 10px; padding:0px 10px;">
-                        {% if signatureurl %}<img src="{{signatureurl}}" style="width:100px; height:50px;">{% endif %}
-                    </div>
-                </td>
-            </tr>
-            <tr>
-                <td align="center" valign="top" style="text-align: center;">
-                    <div style="float: left; text-align: center; font-size: 9px; font-style: italic; margin-bottom: 15px; padding:0px 10px;">
-                        This medical advice is based on the responses provided by you over online or telephonic medium. Depending on the symptoms
-                        you presented, your case may further require a physical examination by a doctor. Please visit a doctor
-                        or a hospital near you if your symptoms do not improve.
-                        <br> powered by docprime
-                    </div>
-                    <hr style="display:block; background:#000000; height:1px; clear:both; margin:0px -15px;">
-                </td>
-            </tr>
-            <tr>
-                <td>
-                    <table border="0" align="center" cellpadding="0" cellspacing="0" style="width: 100%">
-                        <tr>
-                            <td style="width: 33%" valign="top">
-                                <table style="width: 100%">
-                                    <tr>
-                                        <td valign="top" ><span style="padding-top: 5px; display: inline-block;">
-                                            <img style="width:20px;" src="{{'notification/images/consultation.png'|get_absolute_url}}"/>
-                                        </span></td>
-                                        <td><label style="font-size: 11px;">Talk to our in-house doctors for free consultation</label></td>
-                                    </tr>
-                                </table>
-                            </td>
-                            <td style="width: 33%" valign="top">
-                                <table style="width: 100%">
-                                    <tr>
-                                        <td valign="top" ><span style="padding-top: 5px; display: inline-block;">
-                                            <img style="width:20px;" src="{{'notification/images/doctor.png'|get_absolute_url}}" />
-                                        </span></td>
-                                        <td><label style="font-size: 11px;">Book appointment with doctors near you</label></td>
-                                    </tr>
-                                </table>
-                            </td>
-                            <td style="width: 33%" valign="top">
-                                <table style="width: 100%">
-                                    <tr>
-                                        <td valign="top" ><span style="padding-top: 5px; display: inline-block;">
-                                            <img style="width:20px;" src="{{'notification/images/lab.png'|get_absolute_url}}" />
-                                        </span></td>
-                                        <td><label style="font-size: 11px;">Book
-                                        test with labs</label></td>
-                                    </tr>
-                                </table>
-                            </td>
-                        </tr>
-                    </table>
-                </td>
-            </tr>
-        </table>
+            <table style="width: 97%;padding: 8px 0px;margin: auto; font-size: 13px; border-bottom: 2px solid #ff6d00"
+                   cellpadding="0" cellspacing="0">
+                <tr>
+                    <th style="background: #ff6d00; color: white; padding: 5px 0px; width: 10%;text-align: left; text-align: center;">
+                        S.No.
+                    </th>
+                    <th style="background: #ff6d00; color: white; padding: 5px 0px; width: 30%;text-align: center;">
+                        Prescribed Medicines
+                    </th>
+                    <th style="background: #ff6d00; color: white; padding: 5px 0px; width: 30%;text-align: center;">
+                        Dosage
+                    </th>
+                    <th style="background: #ff6d00; color: white; padding: 5px 0px; width: 30%;text-align: center;">
+                        Instructions
+                    </th>
+                </tr>
+                {% for value in medicines %}
+                <tr>
+                    <td style="padding: 5px;text-align:center;">{{forloop.counter}}</td>
+                    <td style="padding: 5px;text-align: center;">{{value.MedicineName}}</td>
+                    <td style="padding: 5px;text-align: center;">{{value.qunatity}}, {{value.selectedNoOfTimes}}{% if value.times %}, {{value.times|join:"| "}}{% endif %} {% if value.mealtimes %}({{value.mealtimes}}){% endif %} {{value.selectedmedDays}}
+                    </td>
+                    <td style="padding: 5px; text-align: center;">{% if value.medicineInstructions %}{{value.medicineInstructions }}{% endif %}</td>
+
+                </tr>
+                {% endfor %}
+            </table>
+
+        </td>
+        {% endif %}
+    </tr>
+    <tr>
+        <td style="padding: 5px 0px"></td>
+    </tr>
+    {% if investigations %}
+    <tr>
+
+        <td style="font-weight: 600;padding-bottom: 10px;padding-left: 8px;">
+            Lab Tests:
+        </td>
+    </tr>
+    <tr>
+        <td>
+            <ul style="font-size:13px;  margin:0px;padding-left: 30px;list-style: disc;color: #656565;">
+                {% for value in investigations %}
+                <li>{{value}}</li>
+                {% endfor %}
+            </ul>
+        </td>
+
+    </tr>
+    {% endif %}
+    <tr>
+        <td style="padding: 10px 0px"></td>
+    </tr>
+
+    <tr>
+        <td style="padding-bottom: 10px;padding-left: 8px;font-size: 13px;">
+            {% if physicalexamination and specialization %}
+            <span style="font-weight:600;font-size: 14px;">Recommendation: </span> Basis your symptoms, we recommend you
+            to visit {{specialization|join:", "}} for a physical examination.
+            {% endif %}
+        </td>
+    </tr>
+    {% if instructions %}
+    <tr>
+        <td style="font-weight: 600;padding-bottom: 10px;padding-left: 8px;">
+            Instructions:
+        </td>
+    </tr>
+    <tr>
+        <td>
+            <ul style="font-size:13px;  margin:0px;padding-left: 30px;list-style: disc;color: #656565;">
+                {% for value in instructions %}
+                <li>{{value}}</li>
+                {% endfor %}
+            </ul>
+        </td>
+    </tr>
+    {% endif %}
+    <tr>
+        <td align="center" valign="top" style="text-align: center;">
+            <div style="float: right; width:100px; height:50px; text-align: center; font-size: 9px; font-style: italic; margin-bottom: 10px; padding:0px 10px;margin-right: 40px;">
+                {% if signatureurl %}<img src="{{signatureurl}}" style="width:100px; height:50px;">{% endif %}
+            </div>
+        </td>
+    </tr>
+    <tr>
+        <td align="center" valign="top" style="text-align: center;">
+            <div style="float: left; text-align: center; font-size: 9px; font-style: italic; margin-bottom: 15px; padding:0px 10px;">
+                This medical advice is based on the responses provided by you over online or telephonic medium.
+                Depending on the symptoms you presented, your case may further require a physical examination by a doctor. Please visit a doctor
+                or a hospital near you if your symptoms do not improve.
+            </div>
+
+        </td>
+    </tr>
+    <tr>
+        <td style="font-size:9px; text-align:center">
+            powered by docprime
+        </td>
+    </tr>
+    <tr>
+        <td style="padding: 10px 0px"></td>
+    </tr>
+    <tr>
+        <td>
+            <table border="0" align="center" cellpadding="0" cellspacing="0"
+                   style="width: 100%;border-top: 3px solid #ff6d00">
+                <tr>
+                    <td style="width: 33%; vertical-align: top;" valign="top">
+                        <table style="width: 100%">
+                            <tr>
+                                <td style="display: flex;justify-content: center;">
+                                    <img src="http://telemed.docprime.com/images/healthservices/online_consultation.svg"
+                                         width="22px" height="22px">
+
+                                    <label style="font-size: 11px;">Chat online with our in-house doctors for free
+                                        consultation</label></td>
+                            </tr>
+                        </table>
+                    </td>
+                    <td style="width: 33%; vertical-align: top;" valign="top">
+                        <table style="width: 100%">
+                            <tr>
+                                <td style="display: flex;justify-content: center;">
+                                    <img src="http://telemed.docprime.com/images/healthservices/find_doctor_near_u.svg"
+                                         width="22px" height="22px">
+                                    <label style="font-size: 11px;">Book appointment with doctors near you</label></td>
+                            </tr>
+                        </table>
+                    </td>
+                    <td style="width: 33%; vertical-align: top;" valign="top">
+                        <table style="width: 100%">
+                            <tr>
+                                <td style="display: flex; justify-content: center;">
+                                    <img src="http://telemed.docprime.com/images/healthservices/forma-1%20(3).svg"
+                                         width="16px" height="16px"><label
+                                        style="font-size: 11px;">Book medical tests</label></td>
+                            </tr>
+                        </table>
+                    </td>
+                </tr>
+            </table>
+        </td>
+    </tr>
+</table>
+</body>
+</html>

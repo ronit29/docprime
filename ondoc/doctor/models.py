@@ -155,6 +155,7 @@ class Hospital(auth_model.TimeStampedModel, auth_model.CreatedByModel, auth_mode
     enabled_for_online_booking = models.BooleanField(verbose_name='enabled_for_online_booking?', default=True)
     merchant = GenericRelation(auth_model.AssociatedMerchant)
     merchant_payout = GenericRelation(MerchantPayout)
+    pyhsical_aggrement_signed = models.BooleanField(default=False)
 
     def __str__(self):
         return self.name
@@ -1321,6 +1322,9 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin):
     def save(self, *args, **kwargs):
         logger.warning("opd save started - " + str(self.id) + " timezone - " + str(timezone.now()))
         database_instance = OpdAppointment.objects.filter(pk=self.id).first()
+        if database_instance and (database_instance.status == self.COMPLETED or database_instance.status == self.CANCELLED) \
+                and (self.status != database_instance.status):
+            raise Exception('Cancelled or Completed appointment cannot be saved')
         # if not self.is_doctor_available():
         #     raise RestFrameworkValidationError("Doctor is on leave.")
 
