@@ -1,4 +1,4 @@
-from hardcopy import bytestring_to_pdf
+# from hardcopy import bytestring_to_pdf
 from rest_framework import mixins, viewsets, status
 from rest_framework.response import Response
 from django.contrib.gis.geos import Point, GEOSGeometry

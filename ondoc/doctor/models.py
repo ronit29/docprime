@@ -52,6 +52,8 @@ from ondoc.matrix.tasks import push_appointment_to_matrix, push_onboarding_qcsta
 from ondoc.ratings_review import models as ratings_models
 from django.utils import timezone
 import reversion
+from ondoc.doctor import models as doctor_models
+from django.db.models import Count
 
 logger = logging.getLogger(__name__)
 
@@ -1894,3 +1896,109 @@ class CancellationReason(auth_model.TimeStampedModel):
 
     def __str__(self):
         return self.name
+
+
+class PopularityScore(auth_model.TimeStampedModel):
+    doctor_id =models.ForeignKey(Doctor, on_delete=models.CASCADE)
+    practo_popularity_score = models.PositiveIntegerField(default=None, null=True)
+    years_of_experience = models.PositiveIntegerField(default=None, null=True)
+    doctors_in_clinic = models.PositiveIntegerField(default=None, null=True)
+    weightage = models.PositiveIntegerField(default=None, null=True)
+    dp_popularity_score = models.PositiveIntegerField(default=None, null=True)
+
+
+    class Meta:
+        db_table = 'popularity_score'
+
+
+def calculate_popularity_score():
+    popularity_score_dict = [{"Practo Popularity score" : [{"min":0,"max":1,"score":0},
+                                                            {"min":1,"max":2,"score":2},
+                                                            {"min":2,"max":4,"score":4},
+                                                            {"min":4,"max":6,"score":6},
+                                                            {"min":6,"max":8,"score":8},
+                                                            {"min":8,"max":10,"score":10}]},
+
+                               {"Years of experience" : [{"min":0,"max":5,"score":0},
+                                                         {"min":5,"max":10,"score":2},
+                                                         {"min":10,"max":15,"score":4},
+                                                         {"min":15,"max":20,"score":6},
+                                                         {"min":20,"max":25,"score":8}]},
+
+                              {"Doctors in clinic" : [{"min":0,"max":5,"score":0},
+                                                      {"min":5,"max":10,"score":1},
+                                                      {"min":10,"max":20,"score":3},
+                                                      {"min":20,"max":40,"score":6},
+                                                      {"min":40,"max":60,"score":7},
+                                                      {"min":60,"max":80,"score":8},
+                                                      {"min":80, "max":100, "score":9}]}]
+
+    doc_popularity = doctor_models.DoctorPopularity.objects.all().order_by('id').values('id', 'popularity_score')
+
+    for popularity in doc_popularity:
+        popularity_list = popularity_score_dict[0].get('Practo Popularity score')
+        if popularity.get('popularity_score'):
+            for score in popularity_list:
+                if popularity.get('popularity_score') == 10:
+                    popularity['practo_popularity_score'] = 10
+
+                elif popularity.get('popularity_score')>=score.get('min') and popularity.get('popularity_score')<score.get('max'):
+                    popularity['practo_popularity_score'] = score.get('score')
+                    break
+        else:
+            popularity['practo_popularity_score'] = 0
+
+
+    doctor_practicing_since = doctor_models.Doctor.objects.all().order_by('id').values('id', 'practicing_since')
+    for doctor in doctor_practicing_since:
+        if doctor.get('practicing_since'):
+            doctor['years_of_experience'] = datetime.datetime.now().year - doctor.get('practicing_since')
+            exp_years = popularity_score_dict[1].get('Years of experience')
+            for score in exp_years:
+                if doctor.get('years_of_experience')>25:
+                    doctor['experience_score'] = 10
+                elif doctor.get('years_of_experience')>=score.get('min') and doctor.get('years_of_experience') <score.get('max'):
+                    doctor['experience_score'] = score.get('score')
+                    break
+        else:
+            doctor['experience_score'] = 0
+        del doctor['practicing_since']
+
+    doc_obj = doctor_models.DoctorClinic.objects.prefetch_related('hospital__assoc_doctors').\
+        annotate(doctors_count=Count('hospital__assoc_doctors__id')).order_by('doctor_id').values('doctor_id', 'doctors_count')
+
+    doc_with_max_clinics = dict()
+    for doctor in doc_obj:
+       if doctor.get('doctor_id'):
+           id = doctor.get('doctor_id')
+           doctors_count = doctor.get('doctors_count')
+           if not doc_with_max_clinics.get(id):
+               doc_with_max_clinics[id] = doctor
+           else:
+               count_dict = doc_with_max_clinics.get(id)
+               if count_dict.get('doctors_count')<doctors_count:
+                   count_dict['doctors_count'] = doctors_count
+
+    for doctor in doc_with_max_clinics.values():
+        doctors_score_list = popularity_score_dict[2].get('Doctors in clinic')
+        for score in doctors_score_list:
+            if doctor.get('doctors_count') >100:
+                doctor['doctors_in_clinic_score'] = 10
+
+            elif doctor.get('doctors_count') >= score.get('min') and doctor.get('doctors_count') < score.get('max'):
+                doctor['doctors_in_clinic_score'] = score.get('score')
+                break
+
+    for pop_score in doc_popularity:
+        for exp_score in doctor_practicing_since:
+            if pop_score.get('id') == exp_score.get('id'):
+                pop_score['experience_score'] = exp_score.get('experience_score')
+                del pop_score['popularity_score']
+
+    for pop_score in doc_popularity:
+        for doctor_score in doc_with_max_clinics.values():
+            if pop_score.get('id') == doctor_score.get('doctor_id'):
+                pop_score['doctors_in_clinic_score'] = doctor_score.get('doctors_in_clinic_score')
+
+    return True
+
