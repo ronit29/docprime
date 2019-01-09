@@ -31,41 +31,21 @@ class SeoLabNetworkAdmin(admin.ModelAdmin):
 
 
 class NewDynamicAdminForm(forms.ModelForm):
+    top_content = forms.CharField(widget=forms.Textarea, required=False)
+    bottom_content = forms.CharField(widget=forms.Textarea, required=False)
+
     class Media:
-        extend = False
-        js = ('https://cdn.ckeditor.com/ckeditor5/10.1.0/classic/ckeditor.js', 'dynamic_content/init.js')
-        css = {'all': ('lab_test/css/style.css',)}
+        extend = True
+        js = ('https://cdn.ckeditor.com/ckeditor5/10.1.0/classic/ckeditor.js', 'new_dynamic/js/init.js')
+        css = {'all': ('new_dynamic/css/style.css',)}
 
 
-class NewDynamicAdmin(VersionAdmin):
+class NewDynamicAdmin(admin.ModelAdmin):
     model = NewDynamic
-    forms = NewDynamicAdminForm
+    form = NewDynamicAdminForm
     list_display = ['url', 'is_enabled']
     autocomplete_fields = ['url']
     search_fields = ['url__url']
 
 
 
-
-
-    # class DynamicContentAdminForm(forms.ModelForm):
-    #     class Media:
-    #         extend = False
-    #         js = ('https://cdn.ckeditor.com/ckeditor5/10.1.0/classic/ckeditor.js', 'dynamic_content/init.js')
-    #         css = {'all': ('lab_test/css/style.css',)}
-    #
-    # #
-    # # class DynamicContentInline(TabularInline):
-    # #     model = DynamicContent
-    # #     form = DynamicContentAdminForm
-    # #     extra = 0
-    # #     can_delete = True
-    # #     autocomplete_fields = ['url']
-    # class DynamicContentAdmin(admin.ModelAdmin):
-    #     model = DynamicContent
-    #     form = DynamicContentAdminForm
-    #     list_display = ['title', 'is_enabled']
-    #     # inlines = [DynamicContentInline]
-    #     raw_id_fields = ('url',)
-    #     search_fields = ['url']
-    #     # autocomplete_fields = ['url']
