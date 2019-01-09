@@ -155,7 +155,13 @@ class Hospital(auth_model.TimeStampedModel, auth_model.CreatedByModel, auth_mode
     enabled_for_online_booking = models.BooleanField(verbose_name='enabled_for_online_booking?', default=True)
     merchant = GenericRelation(auth_model.AssociatedMerchant)
     merchant_payout = GenericRelation(MerchantPayout)
-    pyhsical_aggrement_signed = models.BooleanField(default=False)
+    welcome_calling_done = models.BooleanField(default=False)
+    welcome_calling_done_at = models.DateTimeField(null=True, blank=True)
+    physical_agreement_signed = models.BooleanField(default=False)
+    physical_agreement_signed_at = models.DateTimeField(null=True, blank=True)
+    disabled_at = models.DateTimeField(null=True, blank=True)
+    disable_reason = models.PositiveIntegerField(null=True, blank=True, choices=NETWORK_CHOICES)
+    disable_comments = models.CharField(max_length=500, blank=True)
 
     def __str__(self):
         return self.name
@@ -209,7 +215,6 @@ class Hospital(auth_model.TimeStampedModel, auth_model.CreatedByModel, auth_mode
                 self.live_at = datetime.datetime.now()
         if self.is_live and (self.data_status != self.QC_APPROVED or self.enabled == False):
             self.is_live = False
-
 
     def save(self, *args, **kwargs):
         self.update_live_status()
