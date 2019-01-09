@@ -56,7 +56,8 @@ class SeoLabNetwork(TimeStampedModel):
 class NewDynamic(TimeStampedModel):
     top_content = models.TextField(null=False, blank=True)
     bottom_content = models.TextField(null=False, blank=True)
-    url = models.ForeignKey(EntityUrls, on_delete=models.CASCADE, null=False, blank=True)
+    url = models.ForeignKey(EntityUrls, on_delete=models.DO_NOTHING, null=True, blank=True)
+    url_value = models.TextField(null=False, blank=True)
     is_enabled = models.BooleanField(default=False)
     class Meta:
         db_table = "dynamic_url_content"
@@ -67,6 +68,9 @@ class NewDynamic(TimeStampedModel):
                 if self.url.url_type == EntityUrls.UrlType.SEARCHURL and PracticeSpecializationContent.objects.filter(
                         specialization_id=self.url.specialization_id):
                     self.top_content = PracticeSpecializationContent.objects.filter(specialization_id=self.url.specialization_id).first().content
+
+        if self.url:
+            self.url_value = self.url.url
 
         super().save(force_insert, force_update, using, update_fields)
 
