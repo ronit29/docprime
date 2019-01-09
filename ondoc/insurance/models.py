@@ -39,6 +39,18 @@ def generate_insurance_policy_number():
     else:
         raise ValueError('Sequence Produced is not valid.')
 
+def generate_insurance_reciept_number():
+    query = '''select nextval('userinsurance_policy_reciept_seq') as inc'''
+    seq = RawSql(query, []).fetch_all()
+    sequence = None
+    if seq:
+        sequence = seq[0]['inc'] if seq[0]['inc'] else None
+
+    if sequence:
+        return int("1%.8d" % sequence)
+    else:
+        raise ValueError('Sequence Produced is not valid.')
+
 
 class LiveMixin(models.Model):
     def save(self, *args, **kwargs):
@@ -158,7 +170,7 @@ class InsuranceThreshold(auth_model.TimeStampedModel, LiveMixin):
         days_diff = current_date - member['dob']
         days_diff = days_diff.days
         years_diff = days_diff / 365
-        years_diff = math.floor(years_diff)
+        years_diff = math.ceil(years_diff)
         adult_max_age = self.max_age
         adult_min_age = self.min_age
         child_min_age = self.child_min_age
@@ -174,10 +186,11 @@ class InsuranceThreshold(auth_model.TimeStampedModel, LiveMixin):
         # Age validation for child in days
         #TODO INSURANCE check max age
         if member['member_type'] == "child":
-            if child_min_age <= days_diff and math.floor(days_diff/365) < child_max_age:
+            if child_min_age <= days_diff and math.ceil(days_diff/365) <= child_max_age:
                 is_dob_valid = True
             else:
-                message = {"message": "Child Age should be more than " + str(child_min_age) + " days or less than 18 years"}
+                message = {"message": "Child Age should be more than " + str(child_min_age) + " days or less than" +
+                                      str(child_max_age) + " years"}
 
         return is_dob_valid, message
 
@@ -195,6 +208,7 @@ class UserInsurance(auth_model.TimeStampedModel):
     insured_members = JSONField(blank=False, null=False)
     premium_amount = models.PositiveIntegerField(default=0)
     order = models.ForeignKey(account_model.Order, on_delete=models.DO_NOTHING)
+    receipt_number = models.BigIntegerField(null=False, unique=True, default=generate_insurance_reciept_number)
     coi = models.FileField(default=None, null=True, upload_to='insurance/coi', validators=[FileExtensionValidator(allowed_extensions=['pdf'])])
 
     def __str__(self):
@@ -208,6 +222,7 @@ class UserInsurance(auth_model.TimeStampedModel):
         proposer_fname = proposer.first_name if proposer.first_name else ""
         proposer_mname = proposer.middle_name if proposer.middle_name else ""
         proposer_lname = proposer.last_name if proposer.last_name else ""
+        gst_state_code = proposer.state_code
 
         proposer_name = '%s %s %s %s' % (proposer.title, proposer_fname, proposer_mname, proposer_lname)
 
@@ -298,8 +313,8 @@ class UserInsurance(auth_model.TimeStampedModel):
             'insurer_signature': self.insurance_plan.insurer.signature.url,
             'company_name': self.insurance_plan.insurer.company_name,
             'insurer_name': self.insurance_plan.insurer.name,
-            'gst_state_code': '',
-            'reciept_number': ''
+            'gst_state_code': gst_state_code,
+            'reciept_number': self.receipt_number
         }
         html_body = render_to_string("pdfbody.html", context=context)
         policy_number = self.policy_number
@@ -589,6 +604,7 @@ class InsuredMembers(auth_model.TimeStampedModel):
     town = models.CharField(max_length=100, null=False)
     district = models.CharField(max_length=100, null=False)
     state = models.CharField(max_length=100, null=False)
+    state_code = models.CharField(max_length=10, null=True)
     user_insurance = models.ForeignKey(UserInsurance, related_name="members", on_delete=models.DO_NOTHING, null=False)
 
     class Meta:
@@ -615,6 +631,7 @@ class InsuredMembers(auth_model.TimeStampedModel):
                                                                         town=member.get('town'),
                                                                         district=member.get('district'),
                                                                         state=member.get('state'),
+                                                                        state_code = member.get('state_code'),
                                                                         user_insurance=user_insurance
                                                                         )
 

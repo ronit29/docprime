@@ -140,6 +140,7 @@ class InsuranceOrderViewSet(viewsets.GenericViewSet):
                 pre_insured_members['town'] = member['town']
                 pre_insured_members['district'] = member['district']
                 pre_insured_members['state'] = member['state']
+                pre_insured_members['state_code'] = member['state_code']
 
                 insured_members_list.append(pre_insured_members.copy())
 

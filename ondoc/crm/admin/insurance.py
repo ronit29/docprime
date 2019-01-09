@@ -8,6 +8,7 @@ import nested_admin
 from import_export import fields, resources
 from datetime import datetime
 from ondoc.insurance.models import InsuranceDisease
+from django.conf import settings
 
 
 class InsurerAdmin(admin.ModelAdmin):
@@ -71,6 +72,7 @@ class InsuredMemberResource(resources.ModelResource):
     cancer = fields.Field()
     pregnancy = fields.Field()
     customer_consent_recieved = fields.Field()
+    coi = fields.Field()
 
     def export(self, queryset=None, *args, **kwargs):
         queryset = self.get_queryset(**kwargs)
@@ -90,7 +92,7 @@ class InsuredMemberResource(resources.ModelResource):
                         'purchase_date', 'expiry_date', 'policy_number', 'insurance_plan', 'premium_amount',
                         'nominee_name', 'nominee_address', 'sum_insured', 'age', 'account_holder_name', 'account_number'
                         ,'ifsc', 'aadhar_number', 'diabetes', 'heart_diseases', 'cancer', 'pregnancy',
-                        'customer_consent_recieved')
+                        'customer_consent_recieved', 'coi')
 
     def dehydrate_purchase_date(self, insured_members):
         return str(insured_members.user_insurance.purchase_date.date())
@@ -157,6 +159,13 @@ class InsuredMemberResource(resources.ModelResource):
 
     def dehydrate_customer_consent_recieved(self, insured_members):
         return ""
+
+    def dehydrate_coi(self, insured_members):
+        # return insured_members.user_insurance.coi.url
+
+        return settings.BASE_URL + insured_members.user_insurance.coi.url if insured_members.user_insurance.coi is not None and \
+                                                                          insured_members.user_insurance.coi.name else ''
+
 
 
 class InsuredMembersAdmin(ImportExportMixin, nested_admin.NestedModelAdmin):
