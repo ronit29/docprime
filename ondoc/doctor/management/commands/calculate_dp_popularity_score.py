@@ -1,13 +1,10 @@
 from django.core.management.base import BaseCommand
-from ondoc.doctor import models
+from ondoc.doctor.services import update_search_score
 
 
 def calculate_dp_popularity_score():
-    success = models.calculate_popularity_score()
-    if success:
-        print("Successfull")
-    else:
-        print("Failed")
+    obj = update_search_score.DoctorSearchScore()
+    print(obj.calculate())
 
 
 class Command(BaseCommand):
