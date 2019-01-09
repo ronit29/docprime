@@ -1288,7 +1288,7 @@ class DoctorListViewSet(viewsets.GenericViewSet):
 
 
 
-            if object.top_content:
+            if object and object.top_content:
                 specialization_content = object.top_content
                 if specialization_content:
                     content = str(specialization_content)
@@ -1298,15 +1298,14 @@ class DoctorListViewSet(viewsets.GenericViewSet):
                     specialization_dynamic_content = content
 
             else:
-                object.top_content = models.PracticeSpecializationContent.objects.filter(
-                    specialization__id=specialization_id).first()
-                specialization_content = object.top_content
-                if specialization_content:
-                    content = str(specialization_content.content)
-                    content = content.replace('<location>', location)
-                    regex = re.compile(r'[\n\r\t]')
-                    content = regex.sub(" ", content)
-                    specialization_dynamic_content = content
+                if specialization_id:
+                    specialization_content = models.PracticeSpecializationContent.objects.filter(specialization__id=specialization_id).first()
+                    if specialization_content:
+                        content = str(specialization_content.content)
+                        content = content.replace('<location>', location)
+                        regex = re.compile(r'[\n\r\t]')
+                        content = regex.sub(" ", content)
+                        specialization_dynamic_content = content
 
         for resp in response:
             if id_url_dict.get(resp['id']):
