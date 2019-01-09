@@ -155,6 +155,7 @@ class Hospital(auth_model.TimeStampedModel, auth_model.CreatedByModel, auth_mode
     enabled_for_online_booking = models.BooleanField(verbose_name='enabled_for_online_booking?', default=True)
     merchant = GenericRelation(auth_model.AssociatedMerchant)
     merchant_payout = GenericRelation(MerchantPayout)
+    pyhsical_aggrement_signed = models.BooleanField(default=False)
 
     def __str__(self):
         return self.name
@@ -1776,7 +1777,7 @@ class PracticeSpecializationContent(auth_model.TimeStampedModel):
 
 class DoctorPracticeSpecialization(auth_model.TimeStampedModel):
     doctor = models.ForeignKey(Doctor, related_name="doctorpracticespecializations", on_delete=models.CASCADE)
-    specialization = models.ForeignKey(PracticeSpecialization, on_delete=models.CASCADE, blank=False, null=False)
+    specialization = models.ForeignKey(PracticeSpecialization, on_delete=models.CASCADE, blank=False, null=False, related_name='specialization')
 
     # def __str__(self):
     #     return "{}-{}".format(self.doctor.name, self.specialization.name)
