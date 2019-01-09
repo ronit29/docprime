@@ -33,7 +33,7 @@ import json
 import logging
 from dateutil import tz
 from django.conf import settings
-
+from ondoc.authentication import models as auth_models
 from ondoc.location.models import EntityUrls, EntityAddress
 from ondoc.procedure.models import DoctorClinicProcedure, Procedure, ProcedureCategory, \
     get_included_doctor_clinic_procedure, get_procedure_categories_with_procedures
@@ -716,6 +716,7 @@ class DoctorProfileUserViewSerializer(DoctorProfileSerializer):
     procedures = serializers.SerializerMethodField(read_only=True)
     hospital_count = serializers.IntegerField(read_only=True, allow_null=True)
     enabled_for_online_booking = serializers.BooleanField()
+    search_phone_number = serializers.SerializerMethodField()
     availability = None
     seo = serializers.SerializerMethodField()
     rating = serializers.SerializerMethodField()
@@ -725,6 +726,39 @@ class DoctorProfileUserViewSerializer(DoctorProfileSerializer):
     unrated_appointment = serializers.SerializerMethodField()
     is_gold = serializers.SerializerMethodField()
     search_data = serializers.SerializerMethodField()
+
+    def get_search_phone_number(self, obj):
+        if obj.doctor_clinics.all():
+            hospital = obj.doctor_clinics.all()[0].hospital
+            spoc_details = hospital.spoc_details.all()
+            if hospital and hospital.is_live and len(spoc_details)>0:
+                for type in [auth_models.SPOCDetails.SPOC, auth_models.SPOCDetails.MANAGER, auth_models.SPOCDetails.OTHER, auth_models.SPOCDetails.OWNER]:
+                    for spoc in spoc_details:
+                        if spoc.contact_type == type:
+                            final = None
+                            if spoc.std_code:
+                                final = '0' + str(spoc.std_code).lstrip('0') + str(spoc.number).lstrip('0')
+                            else:
+                                final = '0' + str(spoc.number).lstrip('0')
+                            if final:
+                                return 1
+
+                            else:
+                                return 0
+
+            doctor_details = DoctorMobile.objects.filter(doctor=obj).values('is_primary','number','std_code').order_by('-is_primary').first()
+
+            if not doctor_details:
+                return 0
+
+            final = str(doctor_details.get('number')).lstrip('0')
+            if doctor_details.get('std_code'):
+                final = '0'+str(doctor_details.get('std_code')).lstrip('0')+str(doctor_details.get('number')).lstrip('0')
+
+            if final:
+                return 1
+            else:
+                return 0
 
     def get_search_data(self, obj):
         data = {}
@@ -997,7 +1031,8 @@ class DoctorProfileUserViewSerializer(DoctorProfileSerializer):
         fields = ('about', 'is_license_verified', 'additional_details', 'display_name', 'associations', 'awards', 'experience_years', 'experiences', 'gender',
                   'hospital_count', 'hospitals', 'procedures', 'id', 'languages', 'name', 'practicing_since', 'qualifications',
                   'general_specialization', 'thumbnail', 'license', 'is_live', 'seo', 'breadcrumb', 'rating', 'rating_graph',
-                  'enabled_for_online_booking', 'unrated_appointment', 'display_rating_widget', 'is_gold', 'search_data')
+                  'enabled_for_online_booking', 'unrated_appointment', 'display_rating_widget', 'is_gold', 'search_data',
+                  'search_phone_number')
 
 
 class DoctorAvailabilityTimingSerializer(serializers.Serializer):

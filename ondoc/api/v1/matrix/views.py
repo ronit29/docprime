@@ -14,6 +14,7 @@ from django.conf import settings
 
 
 class MaskNumberViewSet(viewsets.GenericViewSet):
+    serializer_class = NumberMaskSerializer
 
     def mask_number(self, request):
         serializer = NumberMaskSerializer(data=request.data)
@@ -29,7 +30,6 @@ class MaskNumberViewSet(viewsets.GenericViewSet):
             "ExpirationDate": int((timezone.now() + timezone.timedelta(days=2)).timestamp()),
             "FromNumber": data.get('mobile') if str(data.get('mobile')).startswith('0') else "0%d" % data.get('mobile')
         }
-
 
         if hospital and hospital.is_live and len(spoc_details)>0:
             for type in [auth_models.SPOCDetails.SPOC, auth_models.SPOCDetails.MANAGER, auth_models.SPOCDetails.OTHER, auth_models.SPOCDetails.OWNER]:
