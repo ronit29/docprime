@@ -613,6 +613,12 @@ class EntityUrls(TimeStampedModel):
     location = models.PointField(geography=True, srid=4326, blank=True, null=True)
 
 
+
+    def __str__(self):
+        return self.url
+
+
+
     @property
     def additional_info(self):
         return self.extras

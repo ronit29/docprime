@@ -1,10 +1,13 @@
 from django.db import models
 from ondoc.authentication.models import TimeStampedModel
 from django.core.validators import FileExtensionValidator
-from ondoc.doctor.models import PracticeSpecialization
+from ondoc.doctor.models import PracticeSpecialization, PracticeSpecializationContent
 from ondoc.diagnostic.models import LabNetwork
 
 # Create your models here.
+from ondoc.location.models import EntityUrls
+
+
 class Sitemap(TimeStampedModel):
     file = models.FileField(upload_to='seo', validators=[FileExtensionValidator(allowed_extensions=['xml'])])
 
@@ -47,3 +50,23 @@ class SeoLabNetwork(TimeStampedModel):
 
     class Meta:
         db_table = "seo_lab_network"
+
+
+
+class NewDynamic(TimeStampedModel):
+    top_content = models.TextField(null=False, blank=True)
+    bottom_content = models.TextField(null=False, blank=True)
+    url = models.ForeignKey(EntityUrls, on_delete=models.CASCADE, null=False, blank=True)
+    is_enabled = models.BooleanField(default=False)
+    class Meta:
+        db_table = "dynamic_url_content"
+
+    def save(self, force_insert=False, force_update=False, using=None, update_fields=None):
+        if not self.id:
+            if not self.top_content:
+                if self.url.url_type == EntityUrls.UrlType.SEARCHURL and PracticeSpecializationContent.objects.filter(
+                        specialization_id=self.url.specialization_id):
+                    self.top_content = PracticeSpecializationContent.objects.filter(specialization_id=self.url.specialization_id).first().content
+
+        super().save(force_insert, force_update, using, update_fields)
+

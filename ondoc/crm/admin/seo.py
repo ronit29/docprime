@@ -1,7 +1,11 @@
-from ondoc.seo.models import SitemapManger
+from reversion.admin import VersionAdmin
+
+from ondoc.seo.models import SitemapManger, NewDynamic
 from ondoc.seo.models import SeoLabNetwork
 import datetime
 from django.contrib import admin
+from django import forms
+
 
 
 class SitemapManagerAdmin(admin.ModelAdmin):
@@ -24,3 +28,24 @@ class SeoLabNetworkAdmin(admin.ModelAdmin):
 
     model = SeoLabNetwork
     list_display = ['lab_network','rank']
+
+
+class NewDynamicAdminForm(forms.ModelForm):
+    top_content = forms.CharField(widget=forms.Textarea, required=False)
+    bottom_content = forms.CharField(widget=forms.Textarea, required=False)
+
+    class Media:
+        extend = True
+        js = ('https://cdn.ckeditor.com/ckeditor5/10.1.0/classic/ckeditor.js', 'new_dynamic/js/init.js')
+        css = {'all': ('new_dynamic/css/style.css',)}
+
+
+class NewDynamicAdmin(admin.ModelAdmin):
+    model = NewDynamic
+    form = NewDynamicAdminForm
+    list_display = ['url', 'is_enabled']
+    autocomplete_fields = ['url']
+    search_fields = ['url__url']
+
+
+
