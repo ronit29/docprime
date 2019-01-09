@@ -1,4 +1,4 @@
-from ondoc.location.models import  GoogleSearchEntry, GoogleSearches, GoogleResult
+from ondoc.location.models import GoogleSearchEntry, GoogleSearches, GoogleResult
 import requests
 from django.conf import settings
 from rest_framework import status
@@ -7,14 +7,8 @@ from django.db import transaction
 
 class SearchedDoctorData():
 
-    def get_queryset(self):
-        return None
-
-    def get_custom_queryset(self, search_keywords):
-        return GoogleSearches.objects.filter(search_keywords=search_keywords).first()
-
-    def find_doctor_data(self):
-        pincodes = [ '110092', '110051', '110032', '110051', '110090', '110053', '110091', '110094', '110095', '110031',
+    def find_doctor_data():
+        pincodes =    [ '110092', '110051', '110032', '110090', '110053', '110091', '110094', '110095', '110031',
                      '110096', '110093', '110006', '110033', '110036', '110034', '110054', '110052', '110039', '110085',
                      '110042', '110040', '110086', '110084', '110007', '110081', '110009', '110035', '110088', '110082',
                      '110083', '110056', '110089', '110002', '110055', '110005', '110001', '110008', '110003', '110012',
@@ -34,13 +28,13 @@ class SearchedDoctorData():
 
         for pincode in pincodes:
             search_keywords = 'Doctors in ' + pincode
-            print(self.searched_google_data(search_keywords))
+            print(search_keywords + ' ' +SearchedDoctorData.searched_google_data(search_keywords))
+        return 'success'
 
-    def searched_google_data(self, search_keywords):
-        google_data = self.get_custom_queryset(search_keywords)
+    def searched_google_data(search_keywords):
+        google_data = GoogleSearches.objects.filter(search_keywords=search_keywords).first()
         google_result = []
         count = 0
-        searched_result = []
 
         if not google_data:
             response = requests.get(
@@ -52,7 +46,7 @@ class SearchedDoctorData():
                 searched_data = response.json()
                 if isinstance(searched_data.get('results'), list) and \
                         len(searched_data.get('results')) == 0:
-                    return 'OVER_QUERY_LIMIT'
+                    return searched_data.get('status')
                 if searched_data.get('results'):
                     for data in searched_data.get('results'):
                         google_result.append(data)
@@ -68,13 +62,14 @@ class SearchedDoctorData():
                                         'key': settings.REVERSE_GEOCODING_API_KEY})
 
                             if next_page_response.status_code != status.HTTP_200_OK or not response.ok:
-                                return Response('failure  status_code: ' + str(response.status_code) + ', reason: ' + str(
+                                print('failure  status_code: ' + str(response.status_code) + ', reason: ' + str(
                                     response.reason))
+                                break
                             else:
                                 next_page_searched_data = next_page_response.json()
                                 if isinstance(next_page_searched_data.get('results'), list) and \
                                         len(next_page_searched_data.get('results')) == 0:
-                                    return Response('OVER_QUERY_LIMIT')
+                                    break
                                 if next_page_searched_data.get('results'):
                                     for data in next_page_searched_data.get('results'):
                                         google_result.append(data)
