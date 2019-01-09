@@ -405,6 +405,32 @@ class OndocViewSet(mixins.CreateModelMixin,
     pass
 
 
+class ReferralViewSet(GenericViewSet):
+    # authentication_classes = (JWTAuthentication, )
+    # permission_classes = (IsAuthenticated, IsNotAgent)
+
+    def retrieve(self, request):
+        user = request.user
+        if not user.is_authenticated:
+            return Response({"status": 0}, status=status.HTTP_401_UNAUTHORIZED)
+
+        referral = UserReferrals.objects.filter(user=user).first()
+        if not referral:
+            referral = UserReferrals()
+            referral.user = user
+            referral.save()
+        return Response({ "code" : referral.code, "status" : 1 })
+
+    def retrieve_by_code(self, request, code):
+        referral = UserReferrals.objects.filter(code__iexact=code).first()
+        if referral:
+            default_user_profile = UserProfile.objects.filter(user=referral.user, is_default_user=True).first()
+            if default_user_profile:
+                return Response({"name": default_user_profile.name, "status": 1})
+
+        return Response({"status": 0}, status=status.HTTP_404_NOT_FOUND)
+
+
 class UserAppointmentsViewSet(OndocViewSet):
 
     serializer_class = OpdAppointmentSerializer
