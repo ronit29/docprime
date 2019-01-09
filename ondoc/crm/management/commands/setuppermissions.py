@@ -40,7 +40,7 @@ from ondoc.diagnostic.models import LabPricing
 
 from ondoc.web.models import Career, OnlineLead
 from ondoc.ratings_review import models as rating_models
-from ondoc.articles.models import Article, ArticleLinkedUrl, LinkedArticle, ArticleContentBox
+from ondoc.articles.models import Article, ArticleLinkedUrl, LinkedArticle, ArticleContentBox, ArticleCategory
 
 from ondoc.authentication.models import BillingAccount, SPOCDetails, GenericAdmin, User, Merchant, AssociatedMerchant, DoctorNumber
 from ondoc.account.models import MerchantPayout
@@ -389,7 +389,7 @@ class Command(BaseCommand):
         group, created = Group.objects.get_or_create(name=constants['ARTICLE_TEAM'])
         group.permissions.clear()
 
-        content_types = ContentType.objects.get_for_models(Article, Sitemap, ArticleContentBox)
+        content_types = ContentType.objects.get_for_models(Article, Sitemap, ArticleContentBox, ArticleCategory)
 
         for cl, ct in content_types.items():
             permissions = Permission.objects.filter(
