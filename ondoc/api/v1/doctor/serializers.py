@@ -33,7 +33,7 @@ import json
 import logging
 from dateutil import tz
 from django.conf import settings
-
+from ondoc.authentication import models as auth_models
 from ondoc.location.models import EntityUrls, EntityAddress
 from ondoc.procedure.models import DoctorClinicProcedure, Procedure, ProcedureCategory, \
     get_included_doctor_clinic_procedure, get_procedure_categories_with_procedures
@@ -377,6 +377,17 @@ class DoctorHospitalSerializer(serializers.ModelSerializer):
     lat = serializers.SerializerMethodField(read_only=True)
     long = serializers.SerializerMethodField(read_only=True)
     enabled_for_online_booking = serializers.SerializerMethodField(read_only=True)
+    show_contact = serializers.SerializerMethodField(read_only=True)
+
+    def get_show_contact(self, obj):
+        if obj.doctor_clinic and obj.doctor_clinic.hospital and obj.doctor_clinic.hospital.spoc_details.all():
+            return 1
+
+        if obj.doctor_clinic and obj.doctor_clinic.doctor and obj.doctor_clinic.doctor.mobiles.all():
+            return 1
+
+        return 0
+
     
     def get_enabled_for_online_booking(self, obj):
         enable_for_online_booking = False
@@ -415,7 +426,7 @@ class DoctorHospitalSerializer(serializers.ModelSerializer):
     class Meta:
         model = DoctorClinicTiming
         fields = ('doctor', 'hospital_name', 'address','short_address', 'hospital_id', 'start', 'end', 'day', 'deal_price',
-                  'discounted_fees', 'hospital_thumbnail', 'mrp', 'lat', 'long', 'id','enabled_for_online_booking')
+                  'discounted_fees', 'hospital_thumbnail', 'mrp', 'lat', 'long', 'id','enabled_for_online_booking', 'show_contact')
         # fields = ('doctor', 'hospital_name', 'address', 'hospital_id', 'start', 'end', 'day', 'deal_price', 'fees',
         #           'discounted_fees', 'hospital_thumbnail', 'mrp',)
 
@@ -987,7 +998,7 @@ class DoctorProfileUserViewSerializer(DoctorProfileSerializer):
         data = DoctorClinicTiming.objects.filter(doctor_clinic__doctor=obj,
                                                  doctor_clinic__enabled=True,
                                                  doctor_clinic__hospital__is_live=True).select_related(
-            "doctor_clinic__doctor", "doctor_clinic__hospital")
+            "doctor_clinic__doctor", "doctor_clinic__hospital").prefetch_related("doctor_clinic__hospital__spoc_details","doctor_clinic__doctor__mobiles")
         return DoctorHospitalSerializer(data, context=self.context, many=True).data
 
     class Meta:

@@ -367,6 +367,7 @@ class CommonTestSerializer(serializers.ModelSerializer):
     name = serializers.ReadOnlyField(source='test.name')
     show_details = serializers.ReadOnlyField(source='test.show_details')
     icon = serializers.SerializerMethodField
+    test_type = serializers.ReadOnlyField(source='test.test_type')
 
     def get_icon(self, obj):
         request = self.context.get('request')
@@ -374,7 +375,7 @@ class CommonTestSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = CommonTest
-        fields = ('id', 'name', 'icon', 'show_details')
+        fields = ('id', 'name', 'icon', 'show_details', 'test_type')
 
 
 class CommonPackageSerializer(serializers.ModelSerializer):
