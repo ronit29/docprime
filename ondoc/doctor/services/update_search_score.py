@@ -68,14 +68,13 @@ class DoctorSearchScore:
     def get_popularity_score(self, doctor):
         pop_score = self.popularity_data.get(doctor.id)
         if pop_score:
-            popularity_list = self.scoring_data.get('popularity_score')
-            if doctor.id in self.popularity_data.keys():
-                for score in popularity_list:
-                    if pop_score == 10:
-                        return {'popularity_score': 10}
+            popularity_list = self.scoring_data.get('popularity_score')            
+            for score in popularity_list:
+                if pop_score == 10:
+                    return {'popularity_score': 10}
 
-                    elif pop_score >= score.get('min') and pop_score < score.get('max'):
-                        return {'popularity_score': score.get('score')}
+                elif pop_score >= score.get('min') and pop_score < score.get('max'):
+                    return {'popularity_score': score.get('score')}
         else:
             return {'popularity_score': 0}
 
@@ -97,7 +96,7 @@ class DoctorSearchScore:
     def get_doctors_score(self, doctor_in_hosp_count,doctor):
         doctors_count = 0
         for hospital in doctor.hospitals.all():
-            if hospital.id and hospital.id in doctor_in_hosp_count.keys():
+            if hospital.id and doctor_in_hosp_count.get(hospital.id):
                 if doctor_in_hosp_count[hospital.id] > doctors_count:
                     doctors_count = doctor_in_hosp_count[hospital.id]
 
