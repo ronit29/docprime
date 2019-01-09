@@ -1279,26 +1279,22 @@ class DoctorListViewSet(viewsets.GenericViewSet):
 
             search_url = validated_data.get('url')
             if search_url:
-                object = NewDynamic.objects.filter(url_value=kwargs.get('url'), is_enabled=True).first()
+                object = NewDynamic.objects.filter(url_value=search_url, is_enabled=True).first()
                 if object and object.top_content:
                     top_content = object.top_content
-
                 if object and object.bottom_content:
                     bottom_content = object.bottom_content
-
                 if not top_content and specialization_id:
-                    specialization_content = models.PracticeSpecializationContent.objects.filter(specialization__id=specialization_id).first()
+                    specialization_content = models.PracticeSpecializationContent.objects.filter(
+                        specialization__id=specialization_id).first()
                     if specialization_content:
                         top_content = specialization_content.content
 
-                
                 if top_content:
                     top_content = str(top_content)
                     top_content = top_content.replace('<location>', location)
                     regex = re.compile(r'[\n\r\t]')
                     top_content = regex.sub(" ", top_content)
-
-
                 if bottom_content:
                     bottom_content = str(bottom_content)
                     bottom_content = bottom_content.replace('<location>', location)
