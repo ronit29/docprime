@@ -1,6 +1,6 @@
 from django.urls import path
 
-from .views import SearchUrlsViewSet, DoctorsCitySearchViewSet,SearchedDoctorDataViewSet
+from .views import SearchUrlsViewSet, DoctorsCitySearchViewSet
 
 urlpatterns = [
     path('entity/list', SearchUrlsViewSet.as_view({'get': 'list'}), name='entity-list'),
@@ -12,6 +12,4 @@ urlpatterns = [
     path('static-footer', SearchUrlsViewSet.as_view({'get':'static_footer'}), name='static-footer-throughout-website'),
     path('dynamicfooters', DoctorsCitySearchViewSet.as_view({'get':'footer_api'}), name='footer_api'),
     path('static-speciality-footer', SearchUrlsViewSet.as_view({'get':'top_specialities_in_top_cities'}), name ='top_specialities_in_top_cities'),
-    path('doctor-data/<str:search_keywords>', SearchedDoctorDataViewSet.as_view({'get': 'searched_google_data'}), name='searched_doctor_data_from_google'),
-
 ]
