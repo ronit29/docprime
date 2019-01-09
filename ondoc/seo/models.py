@@ -59,7 +59,7 @@ class NewDynamic(TimeStampedModel):
     url = models.ForeignKey(EntityUrls, on_delete=models.CASCADE, null=False, blank=True)
     is_enabled = models.BooleanField(default=False)
     class Meta:
-        db_table = "dynamic"
+        db_table = "dynamic_url_content"
 
     def save(self, force_insert=False, force_update=False, using=None, update_fields=None):
         if not self.id:
