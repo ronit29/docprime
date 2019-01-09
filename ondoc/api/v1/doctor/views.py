@@ -578,7 +578,7 @@ class DoctorProfileView(viewsets.GenericViewSet):
 class DoctorProfileUserViewSet(viewsets.GenericViewSet):
 
     def prepare_response(self, response_data, selected_hospital):
-        import operator
+        import operator 
         # hospitals = sorted(response_data.get('hospitals'), key=itemgetter("hospital_id"))
         # [d['value'] for d in l if 'value' in d]
         hospital_ids = set(data['hospital_id'] for data in response_data.get('hospitals') if 'hospital_id' in data)
