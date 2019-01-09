@@ -1330,7 +1330,7 @@ class DoctorListViewSet(viewsets.GenericViewSet):
                          "breadcrumb": breadcrumb, 'search_content': specialization_dynamic_content,
                          'procedures': procedures, 'procedure_categories': procedure_categories,
                          'ratings':ratings, 'reviews': reviews, 'ratings_title': ratings_title,
-                         'bottom_content': kwargs.get("bottom_content", {})})
+                         'bottom_content': kwargs.get("bottom_content", "")})
 
     @transaction.non_atomic_requests
     def search_by_hospital(self, request):
