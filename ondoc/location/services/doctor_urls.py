@@ -27,7 +27,7 @@ class DoctorURL():
         self.create_search_urls()
         self.create_doctor_page_urls()        
         self.update_breadcrumbs()
-        self.insert_search_urls()
+         self.insert_search_urls()
 
     def insert_search_urls(self):
 
@@ -37,13 +37,15 @@ class DoctorURL():
                  url_type,  created_at, 
                  updated_at,  sublocality_latitude, sublocality_longitude, locality_latitude, 
                  locality_longitude, locality_id, sublocality_id,
-                 locality_value, sublocality_value, is_valid, locality_location, sublocality_location, location)
+                 locality_value, sublocality_value, is_valid, locality_location, sublocality_location, location, entity_id, 
+                 specialization_id, specialization, breadcrumb)
 
                  select %d as sequence ,a.extras, a.sitemap_identifier,getslug(a.url) as url, a.count, a.entity_type,
                   a.url_type, now() as created_at, now() as updated_at,
                   a.sublocality_latitude, a.sublocality_longitude, a.locality_latitude, a.locality_longitude,
                   a.locality_id, a.sublocality_id, a.locality_value, a.sublocality_value, a.is_valid, 
-                  a.locality_location, a.sublocality_location, a.location from temp_url a
+                  a.locality_location, a.sublocality_location, a.location, entity_id, 
+                  specialization_id, specialization, breadcrumb from temp_url a
                   ''' %seq
 
 
@@ -55,7 +57,7 @@ class DoctorURL():
         cleanup = '''delete from entity_urls where id in (select id from 
         (select eu.*, row_number() over(partition by url order by is_valid desc, sequence desc) rownum from entity_urls eu  
         )x where rownum>1
-        )y'''                           
+        ) '''                           
 
         RawSql(query, []).execute()
         RawSql(update_query, []).execute()
