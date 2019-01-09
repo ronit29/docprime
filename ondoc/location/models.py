@@ -28,6 +28,7 @@ from django.db import transaction
 
 logger = logging.getLogger(__name__)
 
+
 def split_and_append(initial_str, spliter, appender):
     value_chunks = initial_str.split(spliter)
     return appender.join(value_chunks)
@@ -61,6 +62,36 @@ class TempURL(TimeStampedModel):
 
     class Meta:
         db_table='temp_url'
+
+
+class GoogleSearches(TimeStampedModel):
+    search_keywords = models.CharField(max_length=200, null=False, blank=False)
+    results = JSONField()
+    count = models.PositiveIntegerField(default=None, null=True)
+
+    class Meta:
+        db_table = 'google_search'
+
+
+class GoogleSearchEntry(TimeStampedModel):
+    place_id = models.TextField()
+    place_result = JSONField()
+    doctor_details = JSONField()
+    place_search = models.ManyToManyField(GoogleSearches, through='GoogleResult',
+                                          through_fields=('place_entry','search_results'),
+                                          related_name='assoc_search_results',
+                                          )
+
+    class Meta:
+        db_table = 'google_search_place_entry'
+
+
+class GoogleResult(TimeStampedModel):
+    place_entry = models.ForeignKey(GoogleSearchEntry, on_delete=models.CASCADE, related_name='google_place_details')
+    search_results = models.ForeignKey(GoogleSearches, on_delete=models.CASCADE, related_name='google_search_details')
+
+    class Meta:
+        db_table = 'google_results'
 
 
 class GeocodingResults(TimeStampedModel):
