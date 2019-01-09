@@ -1519,6 +1519,9 @@ class HospitalAutocomplete(autocomplete.Select2QuerySetView):
 
 class CreateAdminViewSet(viewsets.GenericViewSet):
 
+    authentication_classes = (JWTAuthentication,)
+    permission_classes = (IsAuthenticated, IsDoctor)
+
     def get_queryset(self):
         return auth_models.GenericAdmin.objects.none()
 
