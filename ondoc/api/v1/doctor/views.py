@@ -1029,8 +1029,8 @@ class DoctorListViewSet(viewsets.GenericViewSet):
 
             extras = entity.additional_info
             if extras:
-                # kwargs['specialization_id'] = entity.specialization_id
-                # kwargs['url'] = url
+                kwargs['specialization_id'] = entity.specialization_id
+                kwargs['url'] = url
                 if kwargs['url']:
                     dc = NewDynamic.objects.filter(url__url=url, is_enabled=True).first()
                     resp3 = {}
@@ -1284,29 +1284,29 @@ class DoctorListViewSet(viewsets.GenericViewSet):
                 }
             }
 
-            queryset = NewDynamic.objects.filter(url__url=kwargs.get('url'))
+            object = NewDynamic.objects.filter(url__url=kwargs.get('url')).first()
 
 
-            for object in queryset:
-                if object.top_content:
-                    specialization_content = object.top_content
-                    if specialization_content:
-                        content = str(specialization_content)
-                        content = content.replace('<location>', location)
-                        regex = re.compile(r'[\n\r\t]')
-                        content = regex.sub(" ", content)
-                        specialization_dynamic_content = content
 
-                else:
-                    object.top_content = models.PracticeSpecializationContent.objects.filter(
-                        specialization__id=specialization_id).first()
-                    specialization_content = object.top_content
-                    if specialization_content:
-                        content = str(specialization_content.content)
-                        content = content.replace('<location>', location)
-                        regex = re.compile(r'[\n\r\t]')
-                        content = regex.sub(" ", content)
-                        specialization_dynamic_content = content
+            if object.top_content:
+                specialization_content = object.top_content
+                if specialization_content:
+                    content = str(specialization_content)
+                    content = content.replace('<location>', location)
+                    regex = re.compile(r'[\n\r\t]')
+                    content = regex.sub(" ", content)
+                    specialization_dynamic_content = content
+
+            else:
+                object.top_content = models.PracticeSpecializationContent.objects.filter(
+                    specialization__id=specialization_id).first()
+                specialization_content = object.top_content
+                if specialization_content:
+                    content = str(specialization_content.content)
+                    content = content.replace('<location>', location)
+                    regex = re.compile(r'[\n\r\t]')
+                    content = regex.sub(" ", content)
+                    specialization_dynamic_content = content
 
         for resp in response:
             if id_url_dict.get(resp['id']):
