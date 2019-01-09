@@ -56,8 +56,7 @@ class DoctorBillingViewSet(viewsets.GenericViewSet):
         return assoc_hosp
 
     def list(self, request):
-        # user = request.user
-        user = User.objects.get(id=53)
+        user = request.user
         queryset = auth_models.GenericAdmin.objects.select_related('doctor', 'hospital')\
                                                    .prefetch_related('hospital__hospital_doctors', 'hospital__hospital_doctors__doctor',
                                                                      'doctor__doctor_clinics', 'doctor__doctor_clinics__hospital')\
