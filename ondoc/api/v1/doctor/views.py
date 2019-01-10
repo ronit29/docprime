@@ -14,6 +14,7 @@ from ondoc.account import models as account_models
 from ondoc.location.models import EntityUrls, EntityAddress, DefaultRating
 from ondoc.procedure.models import Procedure, ProcedureCategory, CommonProcedureCategory, ProcedureToCategoryMapping, \
     get_selected_and_other_procedures, CommonProcedure
+from ondoc.seo.models import NewDynamic
 from . import serializers
 from ondoc.api.pagination import paginate_queryset, paginate_raw_query
 from ondoc.api.v1.utils import convert_timings, form_time_slot, IsDoctor, payment_details, aware_time_zone, TimeSlotExtraction, GenericAdminEntity
@@ -1064,6 +1065,9 @@ class DoctorListViewSet(viewsets.GenericViewSet):
 
 
         specialization_dynamic_content = ''
+        top_content = None
+        bottom_content = None
+
         ratings = None
         reviews = None
 
@@ -1273,14 +1277,50 @@ class DoctorListViewSet(viewsets.GenericViewSet):
                 }
             }
 
-            if specialization_id:
-                specialization_content = models.PracticeSpecializationContent.objects.filter(specialization__id=specialization_id).first()
-                if specialization_content:
-                    content = str(specialization_content.content)
-                    content = content.replace('<location>', location)
+            search_url = validated_data.get('url')
+            if search_url:
+                object = NewDynamic.objects.filter(url_value=search_url, is_enabled=True).first()
+                if object and object.top_content:
+                    top_content = object.top_content
+                if object and object.bottom_content:
+                    bottom_content = object.bottom_content
+                if not top_content and specialization_id:
+                    specialization_content = models.PracticeSpecializationContent.objects.filter(
+                        specialization__id=specialization_id).first()
+                    if specialization_content:
+                        top_content = specialization_content.content
+
+                if top_content:
+                    top_content = str(top_content)
+                    top_content = top_content.replace('<location>', location)
                     regex = re.compile(r'[\n\r\t]')
-                    content = regex.sub(" ", content)
-                    specialization_dynamic_content = content
+                    top_content = regex.sub(" ", top_content)
+                if bottom_content:
+                    bottom_content = str(bottom_content)
+                    bottom_content = bottom_content.replace('<location>', location)
+                    regex = re.compile(r'[\n\r\t]')
+                    bottom_content = regex.sub(" ", bottom_content)
+
+
+
+            # if object and object.top_content:
+            #     specialization_content = object.top_content
+            #     if specialization_content:
+            #         content = str(specialization_content)
+            #         content = content.replace('<location>', location)
+            #         regex = re.compile(r'[\n\r\t]')
+            #         content = regex.sub(" ", content)
+            #         specialization_dynamic_content = content
+
+            # else:
+            #     if specialization_id:
+            #         specialization_content = models.PracticeSpecializationContent.objects.filter(specialization__id=specialization_id).first()
+            #         if specialization_content:
+            #             content = str(specialization_content.content)
+            #             content = content.replace('<location>', location)
+            #             regex = re.compile(r'[\n\r\t]')
+            #             content = regex.sub(" ", content)
+            #             specialization_dynamic_content = content
 
         for resp in response:
             if id_url_dict.get(resp['id']):
@@ -1301,9 +1341,10 @@ class DoctorListViewSet(viewsets.GenericViewSet):
             reviews = validated_data.get('reviews')
         return Response({"result": response, "count": result_count,
                          'specializations': specializations, 'conditions': conditions, "seo": seo,
-                         "breadcrumb": breadcrumb, 'search_content': specialization_dynamic_content,
+                         "breadcrumb": breadcrumb, 'search_content': top_content,
                          'procedures': procedures, 'procedure_categories': procedure_categories,
-                         'ratings':ratings, 'reviews': reviews, 'ratings_title': ratings_title})
+                         'ratings':ratings, 'reviews': reviews, 'ratings_title': ratings_title,
+                         'bottom_content': bottom_content})
 
     @transaction.non_atomic_requests
     def search_by_hospital(self, request):

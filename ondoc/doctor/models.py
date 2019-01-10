@@ -52,6 +52,9 @@ from ondoc.matrix.tasks import push_appointment_to_matrix, push_onboarding_qcsta
 from ondoc.ratings_review import models as ratings_models
 from django.utils import timezone
 import reversion
+from ondoc.doctor import models as doctor_models
+from django.db.models import Count
+from ondoc.api.v1.utils import RawSql
 
 logger = logging.getLogger(__name__)
 
@@ -415,6 +418,7 @@ class Doctor(auth_model.TimeStampedModel, auth_model.QCModel, SearchKey):
     is_gold = models.BooleanField(verbose_name='Is Gold', default=False)
     merchant = GenericRelation(auth_model.AssociatedMerchant)
     merchant_payout = GenericRelation(MerchantPayout)
+    search_score = models.PositiveIntegerField(default=None, null=True)
     disabled_at = models.DateTimeField(null=True, blank=True)
     disabled_after = models.PositiveIntegerField(null=True, blank=True, choices=Hospital.DISABLED_AFTER_CHOICES)
     disable_reason = models.PositiveIntegerField(null=True, blank=True, choices=DISABLE_REASON_CHOICES)
@@ -1955,3 +1959,15 @@ class CancellationReason(auth_model.TimeStampedModel):
 
     def __str__(self):
         return self.name
+
+
+class SearchScore(auth_model.TimeStampedModel):
+    doctor = models.ForeignKey(Doctor, on_delete=models.CASCADE)
+    popularity_score = models.PositiveIntegerField(default=None, null=True)
+    years_of_experience_score = models.PositiveIntegerField(default=None, null=True)
+    doctors_in_clinic_score = models.PositiveIntegerField(default=None, null=True)
+    final_score = models.FloatField(default=None, null=True)
+
+    class Meta:
+        db_table = 'search_score'
+
