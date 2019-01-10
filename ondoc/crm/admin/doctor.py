@@ -562,6 +562,23 @@ class DoctorForm(FormCleanMixin):
             return None
         return data
 
+    def clean(self):
+        super().clean()
+        if any(self.errors):
+            return
+        data = self.cleaned_data
+        if data.get('enabled', False):
+            if any([data.get('disabled_after', None), data.get('disable_reason', None),
+                    data.get('disable_comments', None)]):
+                raise forms.ValidationError(
+                    "Cannot have disabled after/disabled reason/disable comments if doctor is enabled.")
+        else:
+            if not all([data.get('disabled_after', None), data.get('disable_reason', None)]):
+                raise forms.ValidationError("Must have disabled after/disable reason if doctor is not enabled.")
+            if data.get('disable_reason', None) and data.get('disable_reason', None) == Doctor.OTHERS and not data.get(
+                    'disable_comments', None):
+                raise forms.ValidationError("Must have disable comments if disable reason is others.")
+
 
 class CityFilter(SimpleListFilter):
     title = 'city'
@@ -925,7 +942,7 @@ class DoctorAdmin(AutoComplete, ImportExportMixin, VersionAdmin, ActionAdmin, QC
 
     def get_exclude(self, request, obj=None):
         exclude = ['source', 'user', 'created_by', 'is_phone_number_verified', 'is_email_verified', 'country_code', 'search_key', 'live_at',
-               'onboarded_at', 'qc_approved_at','enabled_for_online_booking_at']
+               'onboarded_at', 'qc_approved_at','enabled_for_online_booking_at', 'disabled_at']
 
         if request.user.is_member_of(constants['DOCTOR_SALES_GROUP']):
             exclude += ['source', 'batch', 'lead_url', 'registered', 'created_by', 'about', 'raw_about',
@@ -1106,6 +1123,10 @@ class DoctorAdmin(AutoComplete, ImportExportMixin, VersionAdmin, ActionAdmin, QC
                 obj.created_by = request.user
             if not obj.assigned_to:
                 obj.assigned_to = request.user
+        if not form.cleaned_data.get('enabled', False) and not obj.disabled_by:
+            obj.disabled_by = request.user
+        elif form.cleaned_data.get('enabled', False) and obj.disabled_by:
+            obj.disabled_by = None
         if '_submit_for_qc' in request.POST:
             obj.data_status = 2
         if '_qc_approve' in request.POST:
