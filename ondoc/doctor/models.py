@@ -1494,7 +1494,7 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin):
                          "deal_price": self.deal_price - procedures_total["deal_price"],
                          "agreed_price": self.fees - procedures_total["agreed_price"]}
         doctor_prices["discount"] = doctor_prices["mrp"] - doctor_prices["deal_price"]
-        procedures.insert(0, {"name": "Consultation Fees", "mrp": doctor_prices["mrp"],
+        procedures.insert(0, {"name": "Consultation", "mrp": doctor_prices["mrp"],
                               "deal_price": doctor_prices["deal_price"],
                               "agreed_price": doctor_prices["agreed_price"],
                               "discount": doctor_prices["discount"]})
