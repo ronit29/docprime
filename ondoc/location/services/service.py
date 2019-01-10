@@ -37,7 +37,7 @@ class SearchedDoctorData():
         params = {'query': search_keywords, 'key': settings.REVERSE_GEOCODING_API_KEY}
         results = {}
         if next_token:
-            params['next_token'] = next_token
+            params['pagetoken'] = next_token
 
         response = requests.get(
                 'https://maps.googleapis.com/maps/api/place/textsearch/json',
@@ -99,7 +99,7 @@ class SearchedDoctorData():
                                                                       doctor_details=doctor_details)
         create_google_result = GoogleResult.objects.create(place_entry=create_place_entry,
                                                            search_results=google_data)
-        return "% success" %place_id
+        return True
 
     @staticmethod
     def searched_google_data(search_keywords):
@@ -117,7 +117,8 @@ class SearchedDoctorData():
                 if result.get('count'):
                     count += result.get('count')
                 if result.get('data') and len(result.get('data'))>0:
-                    search_results.append(result.get('data'))
+                    for result in result.get('data'):
+                        search_results.append(result)
             google_data = GoogleSearches.objects.create(search_keywords=search_keywords,
                                                                         results=search_results, count=count)
             if google_data:
@@ -134,63 +135,3 @@ class SearchedDoctorData():
                         else:
                             print(SearchedDoctorData.create_place_data(data, google_data, place_id))
         return "success"
-
-
-
-
-
-
-
-        #
-        # if create_google_search_record:
-        #     id = create_google_search_record.id
-        #     results = create_google_search_record.results
-        #     place_entry_list = list()
-        #     for data in results:
-        #         place_id = data.get('place_id')
-        #         if place_id:
-        #             google_result_obj = GoogleResult.objects.filter(place_entry_id__place_id=place_id).first()
-        #             if google_result_obj:
-        #                 GoogleResult.objects.create(place_entry_id=google_result_obj.place_entry_id,
-        #                                             search_results_id=id)
-        #             else:
-        #
-        #                 place_response = requests.get('https://maps.googleapis.com/maps/api/place/details/json',
-        #                                   params={'place_id': place_id, 'key': settings.REVERSE_GEOCODING_API_KEY})
-        #                 if place_response.status_code != status.HTTP_200_OK or not response.ok:
-        #                     return 'failure  status_code: ' + str(response.status_code) + ', reason: ' + str(
-        #                         response.reason)
-        #                 else:
-        #                     place_searched_data = place_response.json()
-        #                     if place_searched_data.get('status') == 'OVER_QUERY_LIMIT':
-        #                         create_google_search_record.delete()
-        #                         return 'OVER_QUERY_LIMIT'
-        #
-        #                     doctor_details = dict()
-        #                     doctor_details['name'] = data.get('name')
-        #                     if place_searched_data.get('result'):
-        #                         place_searched_data = place_searched_data.get('result')
-        #                         doctor_details['address'] = place_searched_data.get('formatted_address')
-        #                         doctor_details['phone_number'] = place_searched_data.get('formatted_phone_number')
-        #                         doctor_details['website'] = place_searched_data.get('website')
-        #                         if place_searched_data.get('address_components'):
-        #                             address_components = place_searched_data.get('address_components')
-        #                             for address in address_components:
-        #                                 types = [key.upper() for key in address.get('types', [])]
-        #                                 if 'LOCALITY' in types:
-        #                                     doctor_details['city'] = address.get('long_name')
-        #                                 if 'POSTAL_CODE' in types:
-        #                                     doctor_details['pin_code'] = address.get('long_name')
-        #                     # searched_result.append(doctor_details)
-        #                     place_entry_list.append({'place_id':place_id,
-        #                                             'place_result':place_searched_data,
-        #                                             'doctor_details':doctor_details})
-        #     with transaction.atomic():
-        #         for place in place_entry_list:
-        #             create_google_search_entry = GoogleSearchEntry.objects.create(place_id=place.get('place_id'),
-        #                                          place_result=place.get('place_result'), doctor_details=place.get('doctor_details'))
-        #             create_google_result = GoogleResult.objects.create(place_entry=create_google_search_entry,
-        #                                                                            search_results=create_google_search_record)
-        #
-        #
-        # return 'success
