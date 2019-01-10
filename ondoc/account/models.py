@@ -495,11 +495,11 @@ class ConsumerAccount(TimeStampedModel):
         tx_type = PgTransaction.CREDIT
 
         if cashback_refund_amount:
-            consumer_tx_data = self.consumer_tx_appointment_data(appointment_obj, product_id, cashback_refund_amount, action, tx_type, ConsumerTransaction.CASHBACK_SOURCE)
+            consumer_tx_data = self.consumer_tx_appointment_data(appointment_obj.user, appointment_obj, product_id, cashback_refund_amount, action, tx_type, ConsumerTransaction.CASHBACK_SOURCE)
             ConsumerTransaction.objects.create(**consumer_tx_data)
 
         if wallet_refund_amount:
-            consumer_tx_data = self.consumer_tx_appointment_data(appointment_obj, product_id, wallet_refund_amount, action, tx_type, ConsumerTransaction.WALLET_SOURCE)
+            consumer_tx_data = self.consumer_tx_appointment_data(appointment_obj.user, appointment_obj, product_id, wallet_refund_amount, action, tx_type, ConsumerTransaction.WALLET_SOURCE)
             ConsumerTransaction.objects.create(**consumer_tx_data)
             
         self.save()
