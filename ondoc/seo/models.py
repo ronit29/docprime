@@ -1,4 +1,6 @@
 from django.db import models
+from django.utils.html import strip_tags
+
 from ondoc.authentication.models import TimeStampedModel
 from django.core.validators import FileExtensionValidator
 from ondoc.doctor.models import PracticeSpecialization, PracticeSpecializationContent
@@ -64,13 +66,12 @@ class NewDynamic(TimeStampedModel):
 
     def save(self, force_insert=False, force_update=False, using=None, update_fields=None):
         if not self.id:
-            if not self.top_content:
+            if not strip_tags(self.top_content).strip("&nbsp;").strip():
                 if self.url.url_type == EntityUrls.UrlType.SEARCHURL and PracticeSpecializationContent.objects.filter(
                         specialization_id=self.url.specialization_id):
-                    self.top_content = PracticeSpecializationContent.objects.filter(specialization_id=self.url.specialization_id).first().content
-
+                    self.top_content = PracticeSpecializationContent.objects.filter(
+                        specialization_id=self.url.specialization_id).first().content
         if self.url:
             self.url_value = self.url.url
-
         super().save(force_insert, force_update, using, update_fields)
 
