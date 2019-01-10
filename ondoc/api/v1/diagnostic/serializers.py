@@ -80,7 +80,7 @@ class LabModelSerializer(serializers.ModelSerializer):
         if self.parent:
             return None
 
-        if obj.rating.count() > 10:
+        if obj.rating.count() > 0:
             return True
         return False
 
@@ -93,7 +93,14 @@ class LabModelSerializer(serializers.ModelSerializer):
     def get_rating(self, obj):
         if self.parent:
             return None
-
+        if obj.network:
+            union_list = []
+            rating_queryset = obj.rating.prefetch_related('compliment').exclude(Q(review='') | Q(review=None)).filter(is_live=True).order_by('-updated_at')
+            for lab in obj.network.lab.all():
+                query = lab.rating.prefetch_related('compliment').exclude(Q(review='') | Q(review=None)).filter(is_live=True).order_by('-updated_at')
+                union_list.append(query)
+            if union_list:
+                rating_queryset.union(*union_list)
         app = LabAppointment.objects.select_related('profile').all()
         queryset = obj.rating.prefetch_related('compliment').exclude(Q(review='') | Q(review=None)).filter(is_live=True).order_by('-updated_at')
         reviews = rating_serializer.RatingsModelSerializer(queryset, many=True, context={'app':app})
