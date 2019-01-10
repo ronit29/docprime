@@ -2507,7 +2507,7 @@ class OfflineCustomerViewSet(viewsets.GenericViewSet):
         final_result = []
         for app in final_data:
             instance = ONLINE if isinstance(app, models.OpdAppointment) else OFFLINE
-            patient_name = is_docprime = effective_price = deal_price = patient_thumbnail = doctor_thumbnail = None
+            patient_name = is_docprime = effective_price = deal_price = patient_thumbnail = prescription = None
             error_flag = False
             error_message = ''
             phone_number = []
@@ -2548,6 +2548,7 @@ class OfflineCustomerViewSet(viewsets.GenericViewSet):
                     billing_status = PROCESSED
                 if app.merchant_payout:
                     payout_amount = app.merchant_payout.payable_amount
+                prescription = app.get_prescriptions(request)
             # if app.super_user:
             #     pem_type = 3
             # elif not app.super_user and not app.appointment_pem and app.billing_pem:
@@ -2581,6 +2582,7 @@ class OfflineCustomerViewSet(viewsets.GenericViewSet):
             ret_obj['error'] = error_flag
             ret_obj['error_message'] = error_message
             ret_obj['type'] = 'doctor'
+            ret_obj['prescriptions'] = prescription
             final_result.append(ret_obj)
             # if group.get(app.time_slot_start.strftime("%B %d, %Y")):
             #     group[app.time_slot_start.strftime("%B %d, %Y")].append(ret_obj)

@@ -1512,6 +1512,20 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin):
     class Meta:
         db_table = "opd_appointment"
 
+    def get_prescriptions(self, request):
+        prescriptions = []
+        for pres in self.prescriptions.all():
+            files = []
+            for file in pres.prescription_file.all():
+                url = request.build_absolute_uri(file.name.url) if file.name else None
+                files.append(url)
+            prescription_dict = {
+                                 "updated_at": pres.updated_at,
+                                 "details": pres.prescription_details,
+                                 "files": files
+                                }
+            prescriptions.append(prescription_dict)
+        return prescriptions
 
 class OpdAppointmentProcedureMapping(models.Model):
     opd_appointment = models.ForeignKey(OpdAppointment, on_delete=models.CASCADE, related_name='procedure_mappings')
@@ -1562,7 +1576,7 @@ class DoctorLeave(auth_model.TimeStampedModel):
 
 
 class Prescription(auth_model.TimeStampedModel):
-    appointment = models.ForeignKey(OpdAppointment, on_delete=models.CASCADE)
+    appointment = models.ForeignKey(OpdAppointment, related_name='prescriptions', on_delete=models.CASCADE)
     prescription_details = models.TextField(max_length=300, blank=True, null=True)
 
     def __str__(self):
@@ -1573,7 +1587,7 @@ class Prescription(auth_model.TimeStampedModel):
 
 
 class PrescriptionFile(auth_model.TimeStampedModel, auth_model.Document):
-    prescription = models.ForeignKey(Prescription, on_delete=models.CASCADE)
+    prescription = models.ForeignKey(Prescription, related_name='prescription_file', on_delete=models.CASCADE)
     name = models.FileField(upload_to='prescriptions', blank=False, null=False)
 
     def __str__(self):
