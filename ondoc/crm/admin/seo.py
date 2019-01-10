@@ -46,6 +46,7 @@ class NewDynamicAdmin(admin.ModelAdmin):
     list_display = ['url', 'is_enabled']
     autocomplete_fields = ['url']
     search_fields = ['url__url']
+    exclude = ['url_value']
 
 
 
