@@ -2547,8 +2547,8 @@ class OfflineCustomerViewSet(viewsets.GenericViewSet):
                 elif app.status == models.OpdAppointment.COMPLETED and (
                         app.merchant_payout and app.merchant_payout.status == account_models.MerchantPayout.PAID):
                     billing_status = PROCESSED
-                if app.merchant_payout:
-                    payout_amount = app.merchant_payout.payable_amount
+
+                payout_amount = app.merchant_payout.payable_amount if app.merchant_payout else app.fees
                 prescription = app.get_prescriptions(request)
             # if app.super_user:
             #     pem_type = 3
