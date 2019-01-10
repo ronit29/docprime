@@ -7,6 +7,7 @@ from django.db import transaction
 
 class SearchedDoctorData():
 
+    @staticmethod
     def find_doctor_data():
         pincodes = [ '110092', '110051', '110032', '110090', '110053', '110091', '110094', '110095', '110031',
                      '110096', '110093', '110006', '110033', '110036', '110034', '110054', '110052', '110039', '110085',
@@ -31,7 +32,8 @@ class SearchedDoctorData():
             print(search_keywords + ' ' + SearchedDoctorData.searched_google_data(search_keywords))
         return 'success'
 
-    def run_google_search( search_keywords, next_token):
+    @staticmethod
+    def run_google_search(search_keywords, next_token):
         params = {'query': search_keywords, 'key': settings.REVERSE_GEOCODING_API_KEY}
         results = {}
         if next_token:
@@ -63,6 +65,7 @@ class SearchedDoctorData():
 
         return results
 
+    @staticmethod
     def create_place_data(data, google_data, place_id):
         params = {'place_id': place_id, 'key': settings.REVERSE_GEOCODING_API_KEY}
         place_response = requests.get('https://maps.googleapis.com/maps/api/place/details/json',
@@ -98,6 +101,7 @@ class SearchedDoctorData():
                                                            search_results=google_data)
         return "% success" %place_id
 
+    @staticmethod
     def searched_google_data(search_keywords):
         google_data = GoogleSearches.objects.filter(search_keywords=search_keywords).first()
         count = 0
@@ -189,4 +193,4 @@ class SearchedDoctorData():
         #                                                                            search_results=create_google_search_record)
         #
         #
-        # return 'success'
+        # return 'success
