@@ -987,7 +987,11 @@ class LabAppointmentAdmin(nested_admin.NestedModelAdmin):
 
     def on_commit_tasks(self, obj_id):
         from ondoc.notification.tasks import send_lab_reports
-        send_lab_reports(obj_id)
+        try:
+            send_lab_reports.apply_async((obj_id,), countdown=1)
+        except Exception as e:
+            logger.error(str(e))
+        # send_lab_reports(obj_id)
 
 
 
