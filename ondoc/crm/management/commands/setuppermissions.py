@@ -44,8 +44,9 @@ from ondoc.articles.models import Article, ArticleLinkedUrl, LinkedArticle, Arti
 
 from ondoc.authentication.models import BillingAccount, SPOCDetails, GenericAdmin, User, Merchant, AssociatedMerchant, DoctorNumber
 from ondoc.account.models import MerchantPayout
-from ondoc.seo.models import Sitemap
+from ondoc.seo.models import Sitemap, NewDynamic
 from ondoc.elastic.models import DemoElastic
+from ondoc.location.models import EntityUrls
 
 class Command(BaseCommand):
     help = 'Create groups and setup permissions for teams'
@@ -389,7 +390,7 @@ class Command(BaseCommand):
         group, created = Group.objects.get_or_create(name=constants['ARTICLE_TEAM'])
         group.permissions.clear()
 
-        content_types = ContentType.objects.get_for_models(Article, Sitemap, ArticleContentBox, ArticleCategory)
+        content_types = ContentType.objects.get_for_models(Article, Sitemap, ArticleContentBox, ArticleCategory, EntityUrls)
 
         for cl, ct in content_types.items():
             permissions = Permission.objects.filter(
@@ -399,7 +400,7 @@ class Command(BaseCommand):
 
             group.permissions.add(*permissions)
 
-        content_types = ContentType.objects.get_for_models(ArticleLinkedUrl, LinkedArticle)
+        content_types = ContentType.objects.get_for_models(ArticleLinkedUrl, LinkedArticle, NewDynamic)
 
         for cl, ct in content_types.items():
             permissions = Permission.objects.filter(
