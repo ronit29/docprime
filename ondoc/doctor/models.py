@@ -371,7 +371,7 @@ class Doctor(auth_model.TimeStampedModel, auth_model.QCModel, SearchKey):
     is_gold = models.BooleanField(verbose_name='Is Gold', default=False)
     merchant = GenericRelation(auth_model.AssociatedMerchant)
     merchant_payout = GenericRelation(MerchantPayout)
-    search_score = models.PositiveIntegerField(default=0, null=True, editable=False)
+    search_score = models.FloatField(default=0, null=True, editable=False)
 
     def __str__(self):
         return '{} ({})'.format(self.name, self.id)
