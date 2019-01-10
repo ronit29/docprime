@@ -69,7 +69,8 @@ class DoctorBillingViewSet(viewsets.GenericViewSet):
                     entities[hname] = {'type': 'hospital',
                                        'id': admin.hospital.id,
                                        'super_user_permission': admin.super_user_permission,
-                                       'assoc': []
+                                       'assoc': [],
+                                       'permission_type': auth_models.GenericAdmin.ALL if admin.super_user_permission else admin.permission_type
                                        }
                     if entities[hname]['super_user_permission'] or (not admin.doctor):
                         pem_type = auth_models.GenericAdmin.ALL if entities[hname]['super_user_permission'] else admin.permission_type
@@ -85,6 +86,7 @@ class DoctorBillingViewSet(viewsets.GenericViewSet):
                             assoc_docs = self.get_super_user_dict(admin, pem_type)
                             entities[hname]['assoc'] = assoc_docs
                             entities[hname]['super_user_permission'] = True
+                            entities[hname]['permission_type'] = auth_models.GenericAdmin.ALL
                         elif not admin.super_user_permission and not admin.doctor:
                             for doc_clinic in admin.hospital.hospital_doctors.all():
                                 update = False
@@ -95,6 +97,8 @@ class DoctorBillingViewSet(viewsets.GenericViewSet):
                                 if not update:
                                     doc = self.get_doc_dict(doc_clinic, admin.permission_type)
                                     entities[hname]['assoc'].append(doc)
+                            if entities[hname]['permission_type'] != admin.permission_type:
+                                entities[hname]['permission_type'] = auth_models.GenericAdmin.ALL
                         elif not admin.super_user_permission and admin.doctor:
                             update = False
                             for old_docs in entities[hname]['assoc']:
@@ -110,7 +114,8 @@ class DoctorBillingViewSet(viewsets.GenericViewSet):
                     entities[hname] = {'type': 'doctor',
                                        'id': admin.doctor.id,
                                        'super_user_permission': admin.super_user_permission,
-                                       'assoc': []
+                                       'assoc': [],
+                                       'permission_type': auth_models.GenericAdmin.ALL if admin.super_user_permission else admin.permission_type
                                        }
                     if entities[hname]['super_user_permission'] or (not admin.hospital):
                         pem_type = auth_models.GenericAdmin.ALL if entities[hname][
@@ -127,6 +132,7 @@ class DoctorBillingViewSet(viewsets.GenericViewSet):
                             assoc_hosp = self.get_super_user_dict_hosp(admin, pem_type)
                             entities[hname]['assoc'] = assoc_hosp
                             entities[hname]['super_user_permission'] = True
+                            entities[hname]['permission_type'] = auth_models.GenericAdmin.ALL
                         elif not admin.super_user_permission and not admin.hospital:
                             for doc_clinic in admin.doctor.doctor_clinics.all():
                                 update = False
@@ -137,6 +143,8 @@ class DoctorBillingViewSet(viewsets.GenericViewSet):
                                 if not update:
                                     doc = self.get_hos_dict(doc_clinic, admin.permission_type)
                                     entities[hname]['assoc'].append(doc)
+                            if entities[hname]['permission_type'] != admin.permission_type:
+                                entities[hname]['permission_type'] = auth_models.GenericAdmin.ALL
                         elif not admin.super_user_permission and admin.hospital:
                             update = False
                             for old_docs in entities[hname]['assoc']:
