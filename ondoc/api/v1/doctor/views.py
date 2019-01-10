@@ -2485,7 +2485,8 @@ class OfflineCustomerViewSet(viewsets.GenericViewSet):
         serializer.is_valid(raise_exception=True)
         valid_data = serializer.validated_data
         online_queryset = get_opd_pem_queryset(request.user, models.OpdAppointment)\
-            .select_related('profile', 'merchant_payout').distinct()
+            .select_related('profile', 'merchant_payout')\
+            .prefetch_related('prescriptions', 'prescriptions__prescription_file').distinct()
 
         offline_queryset = get_opd_pem_queryset(request.user, models.OfflineOPDAppointments)\
             .select_related('user')\
