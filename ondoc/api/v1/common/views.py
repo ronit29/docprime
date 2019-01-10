@@ -888,6 +888,7 @@ class GetPaymentOptionsViewSet(viewsets.GenericViewSet):
     def list(self, request):
         queryset = PaymentOptions.objects.filter(is_enabled=True)
         options = []
+        first = True
         for data in queryset:
             resp = {}
             resp['name'] = data.name
@@ -895,8 +896,11 @@ class GetPaymentOptionsViewSet(viewsets.GenericViewSet):
             resp['description'] = data.description
             resp['is_enabled'] = data.is_enabled
             resp['action'] = data.action
-            if data.id == 1:
-                resp['is_selected'] = 'selected'
+            if first==True:
+                first = False
+                resp['is_selected'] = True
+            else:
+                resp['is_selected'] = False
             options.append(resp)
 
         return Response(options)
