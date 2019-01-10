@@ -6,7 +6,7 @@ Booking ID : {{instance.id}}
 Patient Name : {{patient_name|capfirst}}
 Doctor Name : Dr. {{doctor_name|capfirst}}
 Clinic : {{instance.hospital.name|capfirst}}
-Address : {{instance.hospital.get_hos_address}}
+Clinic Address : {{instance.hospital.get_hos_address}}
 Appointment Date and Time : {{instance.time_slot_start|date:"D jS F Y"}} || {{instance.time_slot_start|date:"h:i A"}}
 Helpline Toll Free Number : 1800-123-9419
 

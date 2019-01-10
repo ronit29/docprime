@@ -5,6 +5,7 @@ from ondoc.doctor import models
 from ondoc.authentication import models as auth_models
 from ondoc.diagnostic import models as lab_models
 #from ondoc.doctor.models import Hospital, DoctorClinic,Doctor,  OpdAppointment
+from ondoc.doctor.models import DoctorClinic
 from ondoc.notification.models import EmailNotification
 from django.utils.safestring import mark_safe
 from ondoc.coupon.models import Coupon
@@ -13,6 +14,7 @@ from ondoc.account import models as account_models
 from ondoc.location.models import EntityUrls, EntityAddress, DefaultRating
 from ondoc.procedure.models import Procedure, ProcedureCategory, CommonProcedureCategory, ProcedureToCategoryMapping, \
     get_selected_and_other_procedures, CommonProcedure
+from ondoc.seo.models import NewDynamic
 from . import serializers
 from ondoc.api.pagination import paginate_queryset, paginate_raw_query
 from ondoc.api.v1.utils import convert_timings, form_time_slot, IsDoctor, payment_details, aware_time_zone, TimeSlotExtraction, GenericAdminEntity
@@ -577,10 +579,21 @@ class DoctorProfileView(viewsets.GenericViewSet):
 class DoctorProfileUserViewSet(viewsets.GenericViewSet):
 
     def prepare_response(self, response_data, selected_hospital):
-        hospitals = sorted(response_data.get('hospitals'), key=itemgetter("hospital_id"))
+        import operator 
+        # hospitals = sorted(response_data.get('hospitals'), key=itemgetter("hospital_id"))
+        # [d['value'] for d in l if 'value' in d]
+        hospital_ids = set(data['hospital_id'] for data in response_data.get('hospitals') if 'hospital_id' in data)
+        doctor_clinic = DoctorClinic.objects.filter(hospital_id__in=hospital_ids).values('hospital_id').annotate(count=Count('doctor_id'))
+        for hospital in response_data.get('hospitals'):
+            for doctor_count in doctor_clinic:
+                if doctor_count.get('hospital_id') == hospital.get('hospital_id'):
+                    hospital['count'] = doctor_count.get('count')
+
+        sorted_by_enable_booking = sorted(response_data.get('hospitals'), key=itemgetter('enabled_for_online_booking', 'count'),reverse=True)
+
         procedures = response_data.pop('procedures')
         availability = []
-        for key, group in groupby(hospitals, lambda x: x['hospital_id']):
+        for key, group in groupby(sorted_by_enable_booking, lambda x: x['hospital_id']):
             hospital_groups = list(group)
             hospital_groups = sorted(hospital_groups, key=itemgetter("discounted_fees"))
             hospital = hospital_groups[0]
@@ -591,6 +604,7 @@ class DoctorProfileUserViewSet(viewsets.GenericViewSet):
             hospital.pop("start", None)
             hospital.pop("end", None)
             hospital.pop("day",  None)
+            hospital.pop("count", None)
             hospital.pop("discounted_fees", None)
             hospital['procedure_categories'] = procedures.get(key) if procedures else []
             if key == selected_hospital:
@@ -1051,6 +1065,9 @@ class DoctorListViewSet(viewsets.GenericViewSet):
 
 
         specialization_dynamic_content = ''
+        top_content = None
+        bottom_content = None
+
         ratings = None
         reviews = None
 
@@ -1260,14 +1277,50 @@ class DoctorListViewSet(viewsets.GenericViewSet):
                 }
             }
 
-            if specialization_id:
-                specialization_content = models.PracticeSpecializationContent.objects.filter(specialization__id=specialization_id).first()
-                if specialization_content:
-                    content = str(specialization_content.content)
-                    content = content.replace('<location>', location)
+            search_url = validated_data.get('url')
+            if search_url:
+                object = NewDynamic.objects.filter(url_value=search_url, is_enabled=True).first()
+                if object and object.top_content:
+                    top_content = object.top_content
+                if object and object.bottom_content:
+                    bottom_content = object.bottom_content
+                if not top_content and specialization_id:
+                    specialization_content = models.PracticeSpecializationContent.objects.filter(
+                        specialization__id=specialization_id).first()
+                    if specialization_content:
+                        top_content = specialization_content.content
+
+                if top_content:
+                    top_content = str(top_content)
+                    top_content = top_content.replace('<location>', location)
                     regex = re.compile(r'[\n\r\t]')
-                    content = regex.sub(" ", content)
-                    specialization_dynamic_content = content
+                    top_content = regex.sub(" ", top_content)
+                if bottom_content:
+                    bottom_content = str(bottom_content)
+                    bottom_content = bottom_content.replace('<location>', location)
+                    regex = re.compile(r'[\n\r\t]')
+                    bottom_content = regex.sub(" ", bottom_content)
+
+
+
+            # if object and object.top_content:
+            #     specialization_content = object.top_content
+            #     if specialization_content:
+            #         content = str(specialization_content)
+            #         content = content.replace('<location>', location)
+            #         regex = re.compile(r'[\n\r\t]')
+            #         content = regex.sub(" ", content)
+            #         specialization_dynamic_content = content
+
+            # else:
+            #     if specialization_id:
+            #         specialization_content = models.PracticeSpecializationContent.objects.filter(specialization__id=specialization_id).first()
+            #         if specialization_content:
+            #             content = str(specialization_content.content)
+            #             content = content.replace('<location>', location)
+            #             regex = re.compile(r'[\n\r\t]')
+            #             content = regex.sub(" ", content)
+            #             specialization_dynamic_content = content
 
         for resp in response:
             if id_url_dict.get(resp['id']):
@@ -1288,9 +1341,10 @@ class DoctorListViewSet(viewsets.GenericViewSet):
             reviews = validated_data.get('reviews')
         return Response({"result": response, "count": result_count,
                          'specializations': specializations, 'conditions': conditions, "seo": seo,
-                         "breadcrumb": breadcrumb, 'search_content': specialization_dynamic_content,
+                         "breadcrumb": breadcrumb, 'search_content': top_content,
                          'procedures': procedures, 'procedure_categories': procedure_categories,
-                         'ratings':ratings, 'reviews': reviews, 'ratings_title': ratings_title})
+                         'ratings':ratings, 'reviews': reviews, 'ratings_title': ratings_title,
+                         'bottom_content': bottom_content})
 
     @transaction.non_atomic_requests
     def search_by_hospital(self, request):

@@ -12,9 +12,11 @@ from ondoc.doctor.models import (Doctor, Language, MedicalService, Specializatio
 from ondoc.diagnostic.models import (Lab, LabNetwork, LabTest, LabTestType,LabService,
                                       AvailableLabTest, LabAppointment, CommonTest, CommonDiagnosticCondition, LabPricingGroup,
                                      TestParameter, CommonPackage, LabTestCategory)
-from ondoc.coupon.models import Coupon, UserSpecificCoupon
+from ondoc.coupon.models import Coupon, UserSpecificCoupon, RandomGeneratedCoupon
 from ondoc.lead.models import HospitalLead, DoctorLead, SearchLead
 from ondoc.account.models import ConsumerAccount, MerchantPayout
+from ondoc.location.admin import EntityUrlsAdmin
+from ondoc.location.models import EntityUrls
 from ondoc.notification import models as notifcation_model
 from ondoc.procedure.models import Procedure, ProcedureCategory, CommonProcedureCategory, CommonProcedure
 from .common import Cities, CitiesAdmin, MatrixCityMapping, MatrixCityAdmin, MerchantAdmin, MerchantPayoutAdmin
@@ -34,7 +36,7 @@ from .lab_network import LabNetworkAdmin
 from .notification import (EmailNotificationAdmin, SmsNotificationAdmin,
                            PushNotificationAdmin, AppNotificationAdmin)
 from .report import ReportAdmin
-from .coupon import CouponAdmin, UserSpecificCouponAdmin
+from .coupon import CouponAdmin, UserSpecificCouponAdmin, RandomGeneratedCouponAdmin
 from ondoc.reports import models as report_models
 from ondoc.authentication.models import GenericLabAdmin
 
@@ -50,8 +52,8 @@ from ondoc.ratings_review.models import RatingsReview, ReviewCompliments
 from ondoc.crm.admin.ratings import RatingsReviewAdmin, ReviewComplimentsAdmin
 from ondoc.doctor.models import GoogleDetailing
 from .doctor import GoogleDetailingAdmin
-from .seo import SitemapManagerAdmin, SeoSpecializationAdmin, SeoLabNetworkAdmin
-from ondoc.seo.models import SitemapManger
+from .seo import SitemapManagerAdmin, SeoSpecializationAdmin, SeoLabNetworkAdmin, NewDynamicAdmin
+from ondoc.seo.models import SitemapManger, NewDynamic
 from ondoc.seo.models import SeoSpecialization
 from ondoc.seo.models import SeoLabNetwork
 from ondoc.elastic.models import DemoElastic
@@ -134,6 +136,7 @@ admin.site.register(SitemapManger, SitemapManagerAdmin)
 admin.site.register(GoogleDetailing, GoogleDetailingAdmin)
 admin.site.register(Coupon, CouponAdmin)
 admin.site.register(UserSpecificCoupon, UserSpecificCouponAdmin)
+# admin.site.register(RandomGeneratedCoupon, RandomGeneratedCouponAdmin)
 admin.site.register(VisitReason, VisitReasonAdmin)
 admin.site.register(CancellationReason)
 admin.site.register(SeoSpecialization, SeoSpecializationAdmin)
@@ -146,3 +149,5 @@ admin.site.register(DemoElastic, DemoElasticAdmin)
 admin.site.register(Merchant, MerchantAdmin)
 admin.site.register(MerchantPayout, MerchantPayoutAdmin)
 #admin.site.register(AssociatedMerchant)
+admin.site.register(NewDynamic, NewDynamicAdmin)
+admin.site.register(EntityUrls, EntityUrlsAdmin)
