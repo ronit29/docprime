@@ -2,7 +2,7 @@ from ondoc.api.v1.diagnostic.serializers import CustomLabTestPackageSerializer
 from ondoc.authentication.backends import JWTAuthentication
 from ondoc.api.v1.diagnostic import serializers as diagnostic_serializer
 from ondoc.api.v1.auth.serializers import AddressSerializer
-
+from ondoc.ratings_review import models as rating_models
 from ondoc.diagnostic.models import (LabTest, AvailableLabTest, Lab, LabAppointment, LabTiming, PromotedLab,
                                      CommonDiagnosticCondition, CommonTest, CommonPackage,
                                      FrequentlyAddedTogetherTests, TestParameter, ParameterLabTest, QuestionAnswer,
@@ -851,16 +851,16 @@ class LabList(viewsets.ReadOnlyModelViewSet):
 
     @transaction.non_atomic_requests
     def retrieve(self, request, lab_id, entity=None):
-
-        lab_obj = Lab.objects.prefetch_related('rating','lab_documents').filter(id=lab_id, is_live=True).first()
+        lab_obj = Lab.objects.select_related('network')\
+                             .prefetch_related('rating', 'lab_documents')\
+                             .filter(id=lab_id, is_live=True).first()
 
         if not lab_obj:
             return Response(status=status.HTTP_404_NOT_FOUND)
 
         if not entity:
             entity = EntityUrls.objects.filter(entity_id=lab_id,
-                                               sitemap_identifier=EntityUrls.SitemapIdentifier.LAB_PAGE).order_by(
-                '-is_valid')
+                                               sitemap_identifier=EntityUrls.SitemapIdentifier.LAB_PAGE).order_by('-is_valid')
             if len(entity) > 0:
                 entity = entity[0]
 
@@ -900,8 +900,12 @@ class LabList(viewsets.ReadOnlyModelViewSet):
         #                                    entity_type__iexact='Lab')
         # if entity.exists():
         #     entity = entity.first()
-
-        lab_serializer = diagnostic_serializer.LabModelSerializer(lab_obj, context={"request": request, "entity": entity})
+        rating_queryset = lab_obj.rating.filter(is_live=True)
+        if lab_obj.network:
+            rating_queryset = rating_models.RatingsReview.objects.prefetch_related('compliment').filter(is_live=True, lab_ratings__network=lab_obj.network)
+        lab_serializer = diagnostic_serializer.LabModelSerializer(lab_obj, context={"request": request,
+                                                                                    "entity": entity,
+                                                                                    "rating_queryset": rating_queryset})
         lab_serializable_data = lab_serializer.data
         if entity:
             lab_serializable_data['url'] = entity.url
