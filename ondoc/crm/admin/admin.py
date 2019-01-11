@@ -8,7 +8,8 @@ from ondoc.doctor.models import (Doctor, Language, MedicalService, Specializatio
                                  MedicalCondition, AboutDoctor, HealthTip, CommonMedicalCondition, CommonSpecialization,
                                  DoctorClinic, DoctorMapping, DoctorImage, OpdAppointment, CompetitorInfo,
                                  SpecializationDepartment, SpecializationField, PracticeSpecialization,
-                                 VisitReason, CancellationReason, PracticeSpecializationContent)
+                                 VisitReason, CancellationReason, PracticeSpecializationContent,
+                                 DoctorMobileOtp)
 from ondoc.diagnostic.models import (Lab, LabNetwork, LabTest, LabTestType,LabService,
                                       AvailableLabTest, LabAppointment, CommonTest, CommonDiagnosticCondition, LabPricingGroup,
                                      TestParameter, CommonPackage, LabTestCategory)
@@ -149,5 +150,6 @@ admin.site.register(DemoElastic, DemoElasticAdmin)
 admin.site.register(Merchant, MerchantAdmin)
 admin.site.register(MerchantPayout, MerchantPayoutAdmin)
 #admin.site.register(AssociatedMerchant)
+admin.site.register(DoctorMobileOtp)
 admin.site.register(NewDynamic, NewDynamicAdmin)
 admin.site.register(EntityUrls, EntityUrlsAdmin)
