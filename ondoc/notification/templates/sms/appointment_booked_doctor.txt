@@ -7,5 +7,8 @@ Patient Name : {{patient_name|capfirst}}
 Doctor Name : Dr. {{doctor_name|capfirst}}
 Appointment Date and Time : {{instance.time_slot_start|date:"D jS F Y"}} || {{instance.time_slot_start|date:"h:i A"}}
 
+Please note that the consultation needs to be done under Credit Basis.
+Please do not ask for consultation charges.
+
 Thanks
 Team docprime
