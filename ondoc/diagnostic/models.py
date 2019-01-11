@@ -6,7 +6,8 @@ from django.core.validators import MaxValueValidator, MinValueValidator, FileExt
 
 from ondoc.account.models import MerchantPayout, ConsumerAccount, Order
 from ondoc.authentication.models import (TimeStampedModel, CreatedByModel, Image, Document, QCModel, UserProfile, User,
-                                         UserPermission, GenericAdmin, LabUserPermission, GenericLabAdmin, BillingAccount)
+                                         UserPermission, GenericAdmin, LabUserPermission, GenericLabAdmin,
+                                         BillingAccount, SPOCDetails)
 from ondoc.doctor.models import Hospital, SearchKey, CancellationReason
 from ondoc.coupon.models import Coupon
 from ondoc.notification import models as notification_models
@@ -323,6 +324,12 @@ class Lab(TimeStampedModel, CreatedByModel, QCModel, SearchKey):
     #     if push_to_matrix:
     #         push_onboarding_qcstatus_to_matrix.apply_async(({'obj_type': self.__class__.__name__, 'obj_id': self.id}
     #                                                         ,), countdown=5)
+    def get_managers_for_communication(self):
+        result = []
+        result.extend(list(self.labmanager_set.filter(contact_type__in=[LabManager.SPOC, LabManager.MANAGER])))
+        if not result:
+            result.extend(list(self.labmanager_set.filter(contact_type=LabManager.OWNER)))
+        return result
 
 
 class LabCertification(TimeStampedModel):

@@ -124,54 +124,33 @@
                         {{lab_name|capfirst}}
                     </td>
                 </tr>
-                </tbody>
-            </table>
-        </td>
-    </tr>
+                {% if instance.is_home_pickup %}
 
-    {% if instance.is_home_pickup %}
-    <tr>
-        <td>
-            <table cellpadding="0" cellspacing="0" style="width: 100%; padding: 20px 15px 0;">
-                <tbody>
                 <tr>
-                    <td style="color: #000000; font-weight: 600; font-size: 16px;">
+                    <td style="color:#000000;font-size:16px;font-weight:700;padding-top:16px;width:40%">
                         Home Pick up Address
                     </td>
-                </tr>
-                <tr>
-                    <td style="font-size: 14px; color: #070707; font-weight: 500; padding-top: 4px;">
+                    <td style="color:#3f3f3f;font-size:16px;font-weight:500;padding-top:16px">
                         {{instance.get_pickup_address}}
                     </td>
                 </tr>
+
+                {% else %}
+
                 <tr>
-                    <td style="font-size: 14px; color: #070707; font-weight: 500; padding-top: 2px;">
-                    </td>
-                </tr>
-                </tbody>
-            </table>
-        </td>
-    </tr>
-    {% else %}
-    <tr>
-        <td>
-            <table cellpadding="0" cellspacing="0" style="width: 100%; padding: 20px 15px 0;">
-                <tbody>
-                <tr>
-                    <td style="color: #000000; font-weight: 600; font-size: 16px;">
+                    <td style="color:#000000;font-size:16px;font-weight:700;padding-top:16px;width:40%">
                         Lab Address
                     </td>
-                </tr>
-                <tr>
-                    <td style="font-size: 14px; color: #070707; font-weight: 500; padding-top: 4px;">
+                    <td style="color:#3f3f3f;font-size:16px;font-weight:500;padding-top:16px">
                         {{instance.lab.get_lab_address}}
                     </td>
                 </tr>
+
+                {% endif %}
                 </tbody>
             </table>
         </td>
     </tr>
-    {% endif %}
     <tr>
         <td>
             <table cellpadding="0" cellspacing="0"
@@ -231,7 +210,8 @@
                 {% endfor %}
                 {% if coupon_discount %}
                 <tr>
-                    <td colspan="4" style="border: 1px solid black;text-align: center;color:#000000;font-size:16px;font-weight:700;">
+                    <td colspan="4"
+                        style="border: 1px solid black;text-align: center;color:#000000;font-size:16px;font-weight:700;">
                         Coupon Discount
                     </td>
                     <td style="border: 1px solid black;text-align: center;color:#3f3f3f;font-size:16px;font-weight:500;">
@@ -240,7 +220,8 @@
                 </tr>
                 {% endif %}
                 <tr>
-                    <td colspan="4" style="border: 1px solid black;text-align: center;color:#000000;font-size:16px;font-weight:700;">
+                    <td colspan="4"
+                        style="border: 1px solid black;text-align: center;color:#000000;font-size:16px;font-weight:700;">
                         Amount Paid
                     </td>
                     <td style="border: 1px solid black;text-align: center;color:#3f3f3f;font-size:16px;font-weight:500;">
