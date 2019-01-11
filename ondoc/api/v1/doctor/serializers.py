@@ -1,6 +1,6 @@
 from rest_framework import serializers
 from rest_framework.fields import CharField
-from django.db.models import Q, Avg, Count, Max
+from django.db.models import Q, Avg, Count, Max, F, ExpressionWrapper, DateTimeField
 from collections import defaultdict, OrderedDict
 from ondoc.api.v1.procedure.serializers import DoctorClinicProcedureSerializer, OpdAppointmentProcedureMappingSerializer
 from ondoc.doctor.models import (OpdAppointment, Doctor, Hospital, DoctorHospital, DoctorClinicTiming,
@@ -15,7 +15,7 @@ from ondoc.authentication.models import UserProfile, DoctorNumber, GenericAdmin,
 from django.db.models import Avg
 from django.db.models import Q
 
-from ondoc.coupon.models import Coupon
+from ondoc.coupon.models import Coupon, RandomGeneratedCoupon
 from ondoc.account.models import Order
 from django.contrib.staticfiles.templatetags.staticfiles import static
 from ondoc.api.v1.auth.serializers import UserProfileSerializer
@@ -33,7 +33,7 @@ import json
 import logging
 from dateutil import tz
 from django.conf import settings
-
+from ondoc.authentication import models as auth_models
 from ondoc.location.models import EntityUrls, EntityAddress
 from ondoc.procedure.models import DoctorClinicProcedure, Procedure, ProcedureCategory, \
     get_included_doctor_clinic_procedure, get_procedure_categories_with_procedures
@@ -247,25 +247,42 @@ class CreateAppointmentSerializer(serializers.Serializer):
                     request.data))
             raise serializers.ValidationError('Max'+str(MAX_APPOINTMENTS_ALLOWED)+' active appointments are allowed')
 
-        coupon_code = data.get("coupon_code", [])
-        coupon_obj = Coupon.objects.filter(code__in=coupon_code)
-        if len(coupon_code) == len(coupon_obj):
-            ##### DO NOT DELETE ######
-            # for coupon in coupon_obj:
-            #     obj = OpdAppointment()
-            #     if obj.validate_user_coupon(user=request.user, coupon_obj=coupon).get("is_valid"):
-            #         if coupon.is_user_specific:
-            #             if not obj.validate_product_coupon(coupon_obj=coupon,
-            #                                                      lab=data.get("lab"), test=data.get("test_ids"),
-            #                                                      product_id=Order.LAB_PRODUCT_ID):
-            #                 raise serializers.ValidationError('Invalid coupon code - ' + str(coupon))
-            #     else:
-            #         raise serializers.ValidationError('Invalid coupon code - ' + str(coupon))
-            ##########################
-            for coupon in coupon_obj:
-                obj = OpdAppointment()
-                if not obj.validate_user_coupon(user=request.user, coupon_obj=coupon).get("is_valid"):
-                    raise serializers.ValidationError('Invalid coupon code - ' + str(coupon))
+        if data.get("coupon_code"):
+            coupon_codes = data.get("coupon_code", [])
+            coupon_obj = None
+            if RandomGeneratedCoupon.objects.filter(random_coupon__in=coupon_codes).exists():
+                expression = F('sent_at') + datetime.timedelta(days=1) * F('validity')
+                annotate_expression = ExpressionWrapper(expression, DateTimeField())
+                random_coupons = RandomGeneratedCoupon.objects.annotate(last_date=annotate_expression
+                                                                       ).filter(random_coupon__in=coupon_codes,
+                                                                                sent_at__isnull=False,
+                                                                                consumed_at__isnull=True,
+                                                                                last_date__gte=datetime.datetime.now()
+                                                                                ).all()
+                if random_coupons:
+                    coupon_obj = Coupon.objects.filter(id__in=random_coupons.values_list('coupon', flat=True))
+                else:
+                    raise serializers.ValidationError('Invalid coupon codes')
+
+            if coupon_obj:
+                coupon_obj = Coupon.objects.filter(code__in=coupon_codes) | coupon_obj
+            else:
+                coupon_obj = Coupon.objects.filter(code__in=coupon_codes)
+
+            if coupon_obj:
+            # if len(coupon_code) == len(coupon_obj):
+                for coupon in coupon_obj:
+                    profile = data.get("profile")
+                    obj = OpdAppointment()
+                    if obj.validate_user_coupon(user=request.user, coupon_obj=coupon, profile=profile).get("is_valid"):
+                        if not obj.validate_product_coupon(coupon_obj=coupon,
+                                                           doctor=data.get("doctor"), hospital=data.get("hospital"),
+                                                           procedures=data.get("procedure_ids"),
+                                                           product_id=Order.DOCTOR_PRODUCT_ID):
+                            raise serializers.ValidationError('Invalid coupon code - ' + str(coupon))
+                    else:
+                        raise serializers.ValidationError('Invalid coupon code - ' + str(coupon))
+                data["coupon_obj"] = list(coupon_obj)
 
         return data
 
@@ -360,6 +377,17 @@ class DoctorHospitalSerializer(serializers.ModelSerializer):
     lat = serializers.SerializerMethodField(read_only=True)
     long = serializers.SerializerMethodField(read_only=True)
     enabled_for_online_booking = serializers.SerializerMethodField(read_only=True)
+    show_contact = serializers.SerializerMethodField(read_only=True)
+
+    def get_show_contact(self, obj):
+        if obj.doctor_clinic and obj.doctor_clinic.hospital and obj.doctor_clinic.hospital.spoc_details.all():
+            return 1
+
+        if obj.doctor_clinic and obj.doctor_clinic.doctor and obj.doctor_clinic.doctor.mobiles.all():
+            return 1
+
+        return 0
+
     
     def get_enabled_for_online_booking(self, obj):
         enable_for_online_booking = False
@@ -398,7 +426,7 @@ class DoctorHospitalSerializer(serializers.ModelSerializer):
     class Meta:
         model = DoctorClinicTiming
         fields = ('doctor', 'hospital_name', 'address','short_address', 'hospital_id', 'start', 'end', 'day', 'deal_price',
-                  'discounted_fees', 'hospital_thumbnail', 'mrp', 'lat', 'long', 'id','enabled_for_online_booking')
+                  'discounted_fees', 'hospital_thumbnail', 'mrp', 'lat', 'long', 'id','enabled_for_online_booking', 'show_contact')
         # fields = ('doctor', 'hospital_name', 'address', 'hospital_id', 'start', 'end', 'day', 'deal_price', 'fees',
         #           'discounted_fees', 'hospital_thumbnail', 'mrp',)
 
@@ -978,7 +1006,7 @@ class DoctorProfileUserViewSerializer(DoctorProfileSerializer):
         data = DoctorClinicTiming.objects.filter(doctor_clinic__doctor=obj,
                                                  doctor_clinic__enabled=True,
                                                  doctor_clinic__hospital__is_live=True).select_related(
-            "doctor_clinic__doctor", "doctor_clinic__hospital")
+            "doctor_clinic__doctor", "doctor_clinic__hospital").prefetch_related("doctor_clinic__hospital__spoc_details","doctor_clinic__doctor__mobiles")
         return DoctorHospitalSerializer(data, context=self.context, many=True).data
 
     class Meta:

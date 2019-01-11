@@ -3,6 +3,9 @@ import logging
 from django.shortcuts import get_object_or_404
 from rest_framework.response import Response
 from rest_framework import mixins, viewsets, status
+
+from ondoc.web.models import NonBookableDoctorLead
+
 logger = logging.getLogger(__name__)
 from .serializers import NumberMaskSerializer
 from ondoc.authentication import models as auth_models
@@ -19,7 +22,7 @@ class MaskNumberViewSet(viewsets.GenericViewSet):
         serializer = NumberMaskSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         data = serializer.validated_data
-
+        nb_doc_instance = NonBookableDoctorLead.create(validated_data=data)
         doctor_obj = data.get('doctor')
 
         hospital = data.get('hospital')
@@ -29,7 +32,6 @@ class MaskNumberViewSet(viewsets.GenericViewSet):
             "ExpirationDate": int((timezone.now() + timezone.timedelta(days=2)).timestamp()),
             "FromNumber": data.get('mobile') if str(data.get('mobile')).startswith('0') else "0%d" % data.get('mobile')
         }
-
 
         if hospital and hospital.is_live and len(spoc_details)>0:
             for type in [auth_models.SPOCDetails.SPOC, auth_models.SPOCDetails.MANAGER, auth_models.SPOCDetails.OTHER, auth_models.SPOCDetails.OWNER]:
@@ -42,11 +44,13 @@ class MaskNumberViewSet(viewsets.GenericViewSet):
                             final = '0' + str(spoc.number).lstrip('0')
                         if final:
                             request_data["ToNumber"] = final if final.startswith('0') else "0%s" % final
-
+                            nb_doc_instance.to_mobile = request_data["ToNumber"]
                             request_response_data = self.get_masked_number(request_data)
                             if not request_response_data:
                                 return Response({'status': 0, 'message': 'No Contact Number found'},
                                                 status.HTTP_404_NOT_FOUND)
+                            nb_doc_instance.masked_mobile = request_response_data
+                            nb_doc_instance.save()
                             return Response({'status': 1, 'number': request_response_data}, status.HTTP_200_OK)
 
         doctor_details = doctor_model.DoctorMobile.objects.filter(doctor=doctor_obj).values('is_primary','number','std_code').order_by('-is_primary').first()
@@ -59,11 +63,12 @@ class MaskNumberViewSet(viewsets.GenericViewSet):
             final = '0'+str(doctor_details.get('std_code')).lstrip('0')+str(doctor_details.get('number')).lstrip('0')
 
         request_data["ToNumber"] = final if final.startswith('0') else "0%s" % final
-
+        nb_doc_instance.to_mobile = request_data["ToNumber"]
         request_response_data = self.get_masked_number(request_data)
         if not request_response_data:
             return Response({'status': 0, 'message': 'No Contact Number found'}, status.HTTP_404_NOT_FOUND)
-
+        nb_doc_instance.masked_mobile = request_response_data
+        nb_doc_instance.save()
         return Response({'status': 1, 'number': request_response_data}, status.HTTP_200_OK)
 
     def get_masked_number(self, data):

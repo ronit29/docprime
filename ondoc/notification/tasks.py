@@ -372,7 +372,7 @@ def process_payout(payout_id):
             curr_txn["settledAmount"] = str(payout_data.payable_amount)
             curr_txn["merchantCode"] = merchant.id
             curr_txn["pgtxId"] = txn.transaction_id
-            curr_txn["refNo"] = txn.id
+            curr_txn["refNo"] = payout_data.payout_ref_id
             curr_txn["bookingId"] = appointment.id
             req_data["payload"].append(curr_txn)
             idx += 1
