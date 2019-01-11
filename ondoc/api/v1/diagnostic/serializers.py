@@ -574,6 +574,7 @@ class LabAppointmentCreateSerializer(serializers.Serializer):
     # address = serializers.IntegerField(required=False, allow_null=True)
     payment_type = serializers.IntegerField(default=OpdAppointment.PREPAID)
     coupon_code = serializers.ListField(child=serializers.CharField(), required=False, default=[])
+    use_wallet = serializers.BooleanField(required=False)
 
     def validate(self, data):
         MAX_APPOINTMENTS_ALLOWED = 10
@@ -636,6 +637,11 @@ class LabAppointmentCreateSerializer(serializers.Serializer):
                     else:
                         raise serializers.ValidationError('Invalid coupon code - ' + str(coupon))
                 data["coupon_obj"] = list(coupon_obj)
+
+        if 'use_wallet' in data and data['use_wallet'] is False:
+            data['use_wallet'] = False
+        else:
+            data['use_wallet'] = True
 
         self.test_lab_id_validator(data, request)
         self.time_slot_validator(data, request)

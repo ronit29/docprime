@@ -4,7 +4,7 @@ from django.contrib.gis.db import models
 from django.contrib.staticfiles.templatetags.staticfiles import static
 from django.core.validators import MaxValueValidator, MinValueValidator, FileExtensionValidator
 
-from ondoc.account.models import MerchantPayout, ConsumerAccount, Order
+from ondoc.account.models import MerchantPayout, ConsumerAccount, Order, UserReferred
 from ondoc.authentication.models import (TimeStampedModel, CreatedByModel, Image, Document, QCModel, UserProfile, User,
                                          UserPermission, GenericAdmin, LabUserPermission, GenericLabAdmin,
                                          BillingAccount, SPOCDetails)
@@ -1093,6 +1093,9 @@ class LabAppointment(TimeStampedModel, CouponsMixin):
                 if self.cashback is not None and self.cashback > 0:
                     ConsumerAccount.credit_cashback(self.user, self.cashback, database_instance,
                                                         Order.LAB_PRODUCT_ID)
+                # credit referral cashback if any
+                UserReferred.credit_after_completion(self.user, database_instance, Order.LAB_PRODUCT_ID)
+
         except Exception as e:
             logger.error("Error while saving payout mercahnt for lab- " + str(e))
 

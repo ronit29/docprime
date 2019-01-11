@@ -18,7 +18,7 @@ from ondoc.authentication.models import SPOCDetails
 
 from ondoc.location import models as location_models
 from ondoc.account.models import Order, ConsumerAccount, ConsumerTransaction, PgTransaction, ConsumerRefund, \
-    MerchantPayout
+    MerchantPayout, UserReferred
 from ondoc.notification.models import NotificationAction
 from ondoc.payout.models import Outstanding
 from ondoc.coupon.models import Coupon
@@ -1404,6 +1404,9 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin):
                 # credit cashback if any
                 if self.cashback is not None and self.cashback > 0:
                     ConsumerAccount.credit_cashback(self.user, self.cashback, database_instance, Order.DOCTOR_PRODUCT_ID)
+
+                # credit referral cashback if any
+                UserReferred.credit_after_completion(self.user, database_instance, Order.DOCTOR_PRODUCT_ID)
 
         except Exception as e:
             pass
