@@ -93,17 +93,11 @@ class LabModelSerializer(serializers.ModelSerializer):
     def get_rating(self, obj):
         if self.parent:
             return None
-        if obj.network:
-            union_list = []
-            rating_queryset = obj.rating.prefetch_related('compliment').exclude(Q(review='') | Q(review=None)).filter(is_live=True).order_by('-updated_at')
-            for lab in obj.network.lab.all():
-                query = lab.rating.prefetch_related('compliment').exclude(Q(review='') | Q(review=None)).filter(is_live=True).order_by('-updated_at')
-                union_list.append(query)
-            if union_list:
-                rating_queryset.union(*union_list)
         app = LabAppointment.objects.select_related('profile').all()
-        queryset = obj.rating.prefetch_related('compliment').exclude(Q(review='') | Q(review=None)).filter(is_live=True).order_by('-updated_at')
-        reviews = rating_serializer.RatingsModelSerializer(queryset, many=True, context={'app':app})
+        # rating_queryset = obj.rating.prefetch_related('compliment').exclude(Q(review='') | Q(review=None)).filter(is_live=True).order_by('-updated_at')
+        query = self.context.get('rating_queryset')
+        rating_queryset = query.prefetch_related('compliment').filter(Q(review__isnull=False), ~Q(review='')).order_by('-updated_at')
+        reviews = rating_serializer.RatingsModelSerializer(rating_queryset, many=True, context={'app': app})
         return reviews.data[:5]
 
     def get_unrated_appointment(self, obj):
@@ -126,9 +120,10 @@ class LabModelSerializer(serializers.ModelSerializer):
     def get_rating_graph(self, obj):
         if self.parent:
             return None
+        query = self.context.get('rating_queryset')
 
-        if obj and obj.rating:
-            data = rating_serializer.RatingsGraphSerializer(obj.rating, context={'request': self.context.get('request')}).data
+        if query:
+            data = rating_serializer.RatingsGraphSerializer(query, context={'request': self.context.get('request')}).data
             return data
         return None
 

@@ -96,7 +96,7 @@ class RatingsGraphSerializer(serializers.Serializer):
                  5: {'count': 0, 'percent': 0}}
         total = obj.count()
         if total:
-            for rate in obj.all():
+            for rate in obj:
                 star_data[rate.ratings]['count'] += 1
             for key, value in star_data.items():
                 star_data[key]['percent'] = '{0:.2f}'.format((star_data[key]['count'] / total * 100))
@@ -106,7 +106,7 @@ class RatingsGraphSerializer(serializers.Serializer):
 
     def get_avg_rating(self, obj):
         avg = None
-        if obj.all().first():
+        if obj.exists():
             all_rating = obj.values_list('ratings', flat=True)
             avg = sum(all_rating) / len(all_rating)
             avg = round(avg, 1)

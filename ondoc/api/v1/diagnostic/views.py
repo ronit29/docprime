@@ -851,16 +851,17 @@ class LabList(viewsets.ReadOnlyModelViewSet):
 
     @transaction.non_atomic_requests
     def retrieve(self, request, lab_id, entity=None):
-
-        lab_obj = Lab.objects.prefetch_related('rating','lab_documents').filter(id=lab_id, is_live=True).first()
+        request.user = User.objects.get(id=9)
+        lab_obj = Lab.objects.select_related('network')\
+                             .prefetch_related('rating', 'lab_documents')\
+                             .filter(id=lab_id, is_live=True).first()
 
         if not lab_obj:
             return Response(status=status.HTTP_404_NOT_FOUND)
 
         if not entity:
             entity = EntityUrls.objects.filter(entity_id=lab_id,
-                                               sitemap_identifier=EntityUrls.SitemapIdentifier.LAB_PAGE).order_by(
-                '-is_valid')
+                                               sitemap_identifier=EntityUrls.SitemapIdentifier.LAB_PAGE).order_by('-is_valid')
             if len(entity) > 0:
                 entity = entity[0]
 
@@ -900,8 +901,18 @@ class LabList(viewsets.ReadOnlyModelViewSet):
         #                                    entity_type__iexact='Lab')
         # if entity.exists():
         #     entity = entity.first()
-
-        lab_serializer = diagnostic_serializer.LabModelSerializer(lab_obj, context={"request": request, "entity": entity})
+        if lab_obj.network:
+            union_list = []
+            rating_queryset = lab_obj.rating.filter(is_live=True)
+            for lab in lab_obj.network.lab.all():
+                if lab.id != lab_obj.id:
+                    query = lab.rating.filter(is_live=True)
+                    union_list.append(query)
+            if union_list:
+                rating_queryset = rating_queryset.union(*union_list)
+        lab_serializer = diagnostic_serializer.LabModelSerializer(lab_obj, context={"request": request,
+                                                                                    "entity": entity,
+                                                                                    "rating_queryset": rating_queryset})
         lab_serializable_data = lab_serializer.data
         if entity:
             lab_serializable_data['url'] = entity.url
