@@ -1221,22 +1221,21 @@ class DoctorListViewSet(viewsets.GenericViewSet):
                 description += 'in '+ city
             description += '.'
 
-            if validated_data.get('sitemap_identifier') in ['SPECIALIZATION_CITY','SPECIALIZATION_LOCALITY_CITY', 'DOCTORS_LOCALITY_CITY']:
-                breadcrumb = validated_data.get('breadcrumb')
-                if breadcrumb:
-                    breadcrumb = [{'url': '/', 'title': 'Home'}] + breadcrumb
-                else:
-                    breadcrumb = [{'url': '/', 'title': 'Home'}]
+            breadcrumb = validated_data.get('breadcrumb')
+            if breadcrumb:
+                breadcrumb = [{'url': '/', 'title': 'Home'}] + breadcrumb
+            else:
+                breadcrumb = [{'url': '/', 'title': 'Home'}]
 
-                if validated_data.get('sitemap_identifier') == 'SPECIALIZATION_CITY':
-                    breadcrumb.append({'title': validated_data.get('specialization') + ' in ' + validated_data.get('locality_value')})
-                elif validated_data.get('sitemap_identifier') == 'SPECIALIZATION_LOCALITY_CITY':
-                    breadcrumb.append({'title': validated_data.get('specialization') + ' in ' +
-                                     validated_data.get('sublocality_value') + ' ' + validated_data.get('locality_value')})
-                elif validated_data.get('sitemap_identifier') == 'DOCTORS_LOCALITY_CITY':
-                    breadcrumb.append({'title': 'Doctors in ' + validated_data.get('sublocality_value') + ' ' + validated_data.get('locality_value')})
-                else:
-                    breadcrumb.append({'title': 'Doctors in ' + validated_data.get('locality_value')})
+            if validated_data.get('sitemap_identifier') == 'SPECIALIZATION_CITY':
+                breadcrumb.append({'title': validated_data.get('specialization') + ' in ' + validated_data.get('locality_value'), 'url': None})
+            elif validated_data.get('sitemap_identifier') == 'SPECIALIZATION_LOCALITY_CITY':
+                breadcrumb.append({'title': validated_data.get('specialization') + ' in ' +
+                                 validated_data.get('sublocality_value') + ' ' + validated_data.get('locality_value'), 'url': None})
+            elif validated_data.get('sitemap_identifier') == 'DOCTORS_LOCALITY_CITY':
+                breadcrumb.append({'title': 'Doctors in ' + validated_data.get('sublocality_value') + ' ' + validated_data.get('locality_value'), 'url': None})
+            else:
+                breadcrumb.append({'title': 'Doctors in ' + validated_data.get('locality_value'), 'url': None})
 
             # if breadcrumb_sublocality:
             #     breadcrumb =[ {
