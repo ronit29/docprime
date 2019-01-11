@@ -1,4 +1,4 @@
-oolfrom django.contrib.gis.geos import Point
+from django.contrib.gis.geos import Point
 from django.db.models import F
 
 from ondoc.api.v1.doctor.serializers import DoctorProfileUserViewSerializer

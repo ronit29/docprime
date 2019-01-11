@@ -54,9 +54,8 @@ class SearchedDoctorData():
                 params=params)
 
         if response.status_code != status.HTTP_200_OK or not response.ok:
+            print('failure  status_code: ' + str(response.status_code) + ', reason: ' + str(response.reason))
             return {}
-            return 'failure  status_code: ' + str(response.status_code) + ', reason: ' + str(response.reason)
-
         searched_data = response.json()
         google_result = []
 
@@ -125,8 +124,6 @@ class SearchedDoctorData():
             while next_page_token or page==1:
                 page += 1
                 result = SearchedDoctorData.run_google_search(search_keywords, next_page_token)
-                print(search_keywords)
-                print(result)
                 next_page_token = result.get('next_page_token')
                 if result.get('count'):
                     count += result.get('count')
