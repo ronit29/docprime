@@ -62,6 +62,8 @@ class SearchedDoctorData():
 
         if searched_data.get('next_page_token'):
             results['next_page_token'] = searched_data.get('next_page_token')
+        else:
+            results['next_page_token'] = None
 
         return results
 
@@ -99,7 +101,7 @@ class SearchedDoctorData():
                                                                       doctor_details=doctor_details)
         create_google_result = GoogleResult.objects.create(place_entry=create_place_entry,
                                                            search_results=google_data)
-        return True
+        return 'success ' + place_id
 
     @staticmethod
     def searched_google_data(search_keywords):
