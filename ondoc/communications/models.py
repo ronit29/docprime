@@ -32,6 +32,40 @@ User = get_user_model()
 logger = logging.getLogger(__name__)
 
 
+def get_spoc_email_and_number_hospital(spocs):
+    user_and_email = []
+    user_and_number = []
+    all_email = set()
+    all_phone_number = set()
+    for spoc in spocs:
+        if spoc.email:
+            all_email.add(spoc.email)
+        if spoc.number and spoc.number in range(1000000000, 9999999999):
+            all_phone_number.add(spoc.number)
+    for phone_number in all_phone_number:
+        user_and_number.append({'user': None, 'phone_number': phone_number})
+    for email in all_email:
+        user_and_email.append({'user': None, 'email': email})
+    return user_and_email, user_and_number
+
+
+def get_lab_manager_email_and_number(managers):
+    user_and_email = []
+    user_and_number = []
+    all_email = set()
+    all_phone_number = set()
+    for manager in managers:
+        if manager.email:
+            all_email.add(manager.email)
+        if manager.number and manager.number in range(1000000000, 9999999999):
+            all_phone_number.add(manager.number)
+    for phone_number in all_phone_number:
+        user_and_number.append({'user': None, 'phone_number': phone_number})
+    for email in all_email:
+        user_and_email.append({'user': None, 'email': email})
+    return user_and_email, user_and_number
+
+
 def unique_emails(list_):
     """Function accepts list of dictionaries and returns list of unique dictionaries"""
     temp = set()
@@ -193,19 +227,19 @@ class SMSNotification:
         if notification_type == NotificationAction.APPOINTMENT_ACCEPTED or \
                 notification_type == NotificationAction.OPD_OTP_BEFORE_APPOINTMENT:
             body_template = "sms/appointment_accepted.txt"
-        elif notification_type == NotificationAction.APPOINTMENT_BOOKED and user.user_type == User.CONSUMER:
+        elif notification_type == NotificationAction.APPOINTMENT_BOOKED and user and user.user_type == User.CONSUMER:
             body_template = "sms/appointment_booked_patient.txt"
-        elif notification_type == NotificationAction.APPOINTMENT_BOOKED and user.user_type == User.DOCTOR:
+        elif notification_type == NotificationAction.APPOINTMENT_BOOKED and (not user or user.user_type == User.DOCTOR):
             body_template = "sms/appointment_booked_doctor.txt"
-        elif notification_type == NotificationAction.APPOINTMENT_RESCHEDULED_BY_PATIENT and user.user_type == User.CONSUMER:
+        elif notification_type == NotificationAction.APPOINTMENT_RESCHEDULED_BY_PATIENT and user and user.user_type == User.CONSUMER:
             body_template = "sms/appointment_rescheduled_patient_initiated_to_patient.txt"
-        elif notification_type == NotificationAction.APPOINTMENT_RESCHEDULED_BY_PATIENT and user.user_type == User.DOCTOR:
+        elif notification_type == NotificationAction.APPOINTMENT_RESCHEDULED_BY_PATIENT and (not user or user.user_type == User.DOCTOR):
             body_template = "sms/appointment_rescheduled_patient_initiated_to_doctor.txt"
-        elif notification_type == NotificationAction.APPOINTMENT_RESCHEDULED_BY_DOCTOR and user.user_type == User.CONSUMER:
+        elif notification_type == NotificationAction.APPOINTMENT_RESCHEDULED_BY_DOCTOR and user and user.user_type == User.CONSUMER:
             body_template = "sms/appointment_rescheduled_doctor_initiated_to_patient.txt"
-        elif notification_type == NotificationAction.APPOINTMENT_CANCELLED and user.user_type == User.DOCTOR:
+        elif notification_type == NotificationAction.APPOINTMENT_CANCELLED and (not user or user.user_type == User.DOCTOR):
             body_template = "sms/appointment_cancelled_doctor.txt"
-        elif notification_type == NotificationAction.APPOINTMENT_CANCELLED and user.user_type == User.CONSUMER:
+        elif notification_type == NotificationAction.APPOINTMENT_CANCELLED and user and user.user_type == User.CONSUMER:
             body_template = "sms/appointment_cancelled_patient.txt"
         elif notification_type == NotificationAction.PRESCRIPTION_UPLOADED:
             body_template = "sms/prescription_uploaded.txt"
@@ -213,19 +247,19 @@ class SMSNotification:
         elif notification_type == NotificationAction.LAB_APPOINTMENT_ACCEPTED or \
                 notification_type == NotificationAction.LAB_OTP_BEFORE_APPOINTMENT:
             body_template = "sms/lab/appointment_accepted.txt"
-        elif notification_type == NotificationAction.LAB_APPOINTMENT_BOOKED and user.user_type == User.CONSUMER:
+        elif notification_type == NotificationAction.LAB_APPOINTMENT_BOOKED and user and user.user_type == User.CONSUMER:
             body_template = "sms/lab/appointment_booked_patient.txt"
-        elif notification_type == NotificationAction.LAB_APPOINTMENT_BOOKED and user.user_type == User.DOCTOR:
+        elif notification_type == NotificationAction.LAB_APPOINTMENT_BOOKED and (not user or user.user_type == User.DOCTOR):
             body_template = "sms/lab/appointment_booked_lab.txt"
-        elif notification_type == NotificationAction.LAB_APPOINTMENT_RESCHEDULED_BY_PATIENT and user.user_type == User.CONSUMER:
+        elif notification_type == NotificationAction.LAB_APPOINTMENT_RESCHEDULED_BY_PATIENT and user and user.user_type == User.CONSUMER:
             body_template = "sms/lab/appointment_rescheduled_patient_initiated_to_patient.txt"
-        elif notification_type == NotificationAction.LAB_APPOINTMENT_RESCHEDULED_BY_PATIENT and user.user_type == User.DOCTOR:
+        elif notification_type == NotificationAction.LAB_APPOINTMENT_RESCHEDULED_BY_PATIENT and (not user or user.user_type == User.DOCTOR):
             body_template = "sms/lab/appointment_rescheduled_patient_initiated_to_lab.txt"
-        elif notification_type == NotificationAction.LAB_APPOINTMENT_RESCHEDULED_BY_LAB and user.user_type == User.CONSUMER:
+        elif notification_type == NotificationAction.LAB_APPOINTMENT_RESCHEDULED_BY_LAB and user and user.user_type == User.CONSUMER:
             body_template = "sms/lab/appointment_rescheduled_lab_initiated_to_patient.txt"
-        elif notification_type == NotificationAction.LAB_APPOINTMENT_CANCELLED and user.user_type == User.CONSUMER:
+        elif notification_type == NotificationAction.LAB_APPOINTMENT_CANCELLED and user and user.user_type == User.CONSUMER:
             body_template = "sms/lab/appointment_cancelled_patient.txt"
-        elif notification_type == NotificationAction.LAB_APPOINTMENT_CANCELLED and user.user_type == User.DOCTOR:
+        elif notification_type == NotificationAction.LAB_APPOINTMENT_CANCELLED and (not user or user.user_type == User.DOCTOR):
             body_template = "sms/lab/appointment_cancelled_lab.txt"
         elif notification_type == NotificationAction.LAB_REPORT_UPLOADED:
             body_template = "sms/lab/lab_report_uploaded.txt"
@@ -244,7 +278,7 @@ class SMSNotification:
         notification_type = self.notification_type
         context = copy.deepcopy(context)
         html_body = render_to_string(template, context=context)
-        if phone_number and user.user_type == User.DOCTOR and notification_type in [
+        if phone_number and user and user.user_type == User.DOCTOR and notification_type in [
             NotificationAction.LAB_APPOINTMENT_CANCELLED,
             NotificationAction.LAB_APPOINTMENT_BOOKED,
             NotificationAction.LAB_APPOINTMENT_RESCHEDULED_BY_PATIENT]:
@@ -259,7 +293,7 @@ class SMSNotification:
             }
             message = json.dumps(message)
             publish_message(message)
-        elif phone_number and user:
+        elif phone_number:
             sms_noti = SmsNotification.objects.create(
                 user=user,
                 phone_number=phone_number,
@@ -300,25 +334,25 @@ class EMAILNotification:
         if notification_type == NotificationAction.APPOINTMENT_ACCEPTED:
             body_template = "email/appointment_accepted/body.html"
             subject_template = "email/appointment_accepted/subject.txt"
-        elif notification_type == NotificationAction.APPOINTMENT_BOOKED and user.user_type == User.CONSUMER:
+        elif notification_type == NotificationAction.APPOINTMENT_BOOKED and user and user.user_type == User.CONSUMER:
             body_template = "email/appointment_booked_patient/body.html"
             subject_template = "email/appointment_booked_patient/subject.txt"
-        elif notification_type == NotificationAction.APPOINTMENT_BOOKED and user.user_type == User.DOCTOR:
+        elif notification_type == NotificationAction.APPOINTMENT_BOOKED and (not user or user.user_type == User.DOCTOR):
             body_template = "email/appointment_booked_doctor/body.html"
             subject_template = "email/appointment_booked_doctor/subject.txt"
-        elif notification_type == NotificationAction.APPOINTMENT_RESCHEDULED_BY_PATIENT and user.user_type == User.CONSUMER:
+        elif notification_type == NotificationAction.APPOINTMENT_RESCHEDULED_BY_PATIENT and user and user.user_type == User.CONSUMER:
             body_template = "email/appointment_rescheduled_patient_initiated_to_patient/body.html"
             subject_template = "email/appointment_rescheduled_patient_initiated_to_patient/subject.txt"
-        elif notification_type == NotificationAction.APPOINTMENT_RESCHEDULED_BY_PATIENT and user.user_type == User.DOCTOR:
+        elif notification_type == NotificationAction.APPOINTMENT_RESCHEDULED_BY_PATIENT and (not user or user.user_type == User.DOCTOR):
             body_template = "email/appointment_rescheduled_patient_initiated_to_doctor/body.html"
             subject_template = "email/appointment_rescheduled_patient_initiated_to_doctor/subject.txt"
-        elif notification_type == NotificationAction.APPOINTMENT_RESCHEDULED_BY_DOCTOR and user.user_type == User.CONSUMER:
+        elif notification_type == NotificationAction.APPOINTMENT_RESCHEDULED_BY_DOCTOR and user and user.user_type == User.CONSUMER:
             body_template = "email/appointment_rescheduled_doctor_initiated_to_patient/body.html"
             subject_template = "email/appointment_rescheduled_doctor_initiated_to_patient/subject.txt"
-        elif notification_type == NotificationAction.APPOINTMENT_CANCELLED and user.user_type == User.DOCTOR:
+        elif notification_type == NotificationAction.APPOINTMENT_CANCELLED and (not user or user.user_type == User.DOCTOR):
             body_template = "email/appointment_cancelled_doctor/body.html"
             subject_template = "email/appointment_cancelled_doctor/subject.txt"
-        elif notification_type == NotificationAction.APPOINTMENT_CANCELLED and user.user_type == User.CONSUMER:
+        elif notification_type == NotificationAction.APPOINTMENT_CANCELLED and user and user.user_type == User.CONSUMER:
             body_template = "email/appointment_cancelled_patient/body.html"
             subject_template = "email/appointment_cancelled_patient/subject.txt"
         elif notification_type == NotificationAction.PRESCRIPTION_UPLOADED:
@@ -354,28 +388,28 @@ class EMAILNotification:
             body_template = "email/doctor_invoice/body.html"
             subject_template = "email/doctor_invoice/subject.txt"
 
-        if notification_type == NotificationAction.LAB_APPOINTMENT_ACCEPTED:
+        elif notification_type == NotificationAction.LAB_APPOINTMENT_ACCEPTED:
             body_template = "email/lab/appointment_accepted/body.html"
             subject_template = "email/lab/appointment_accepted/subject.txt"
-        elif notification_type == NotificationAction.LAB_APPOINTMENT_BOOKED and user.user_type == User.CONSUMER:
+        elif notification_type == NotificationAction.LAB_APPOINTMENT_BOOKED and user and user.user_type == User.CONSUMER:
             body_template = "email/lab/appointment_booked_patient/body.html"
             subject_template = "email/lab/appointment_booked_patient/subject.txt"
-        elif notification_type == NotificationAction.LAB_APPOINTMENT_BOOKED and user.user_type == User.DOCTOR:
+        elif notification_type == NotificationAction.LAB_APPOINTMENT_BOOKED and (not user or user.user_type == User.DOCTOR):
             body_template = "email/lab/appointment_booked_lab/body.html"
             subject_template = "email/lab/appointment_booked_lab/subject.txt"
-        elif notification_type == NotificationAction.LAB_APPOINTMENT_RESCHEDULED_BY_PATIENT and user.user_type == User.CONSUMER:
+        elif notification_type == NotificationAction.LAB_APPOINTMENT_RESCHEDULED_BY_PATIENT and user and user.user_type == User.CONSUMER:
             body_template = "email/lab/appointment_rescheduled_patient_initiated_to_patient/body.html"
             subject_template = "email/lab/appointment_rescheduled_patient_initiated_to_patient/subject.txt"
-        elif notification_type == NotificationAction.LAB_APPOINTMENT_RESCHEDULED_BY_PATIENT and user.user_type == User.DOCTOR:
+        elif notification_type == NotificationAction.LAB_APPOINTMENT_RESCHEDULED_BY_PATIENT and (not user or user.user_type == User.DOCTOR):
             body_template = "email/lab/appointment_rescheduled_patient_initiated_to_lab/body.html"
             subject_template = "email/lab/appointment_rescheduled_patient_initiated_to_lab/subject.txt"
-        elif notification_type == NotificationAction.LAB_APPOINTMENT_RESCHEDULED_BY_LAB and user.user_type == User.CONSUMER:
+        elif notification_type == NotificationAction.LAB_APPOINTMENT_RESCHEDULED_BY_LAB and user and user.user_type == User.CONSUMER:
             body_template = "email/lab/appointment_rescheduled_lab_initiated_to_patient/body.html"
             subject_template = "email/lab/appointment_rescheduled_lab_initiated_to_patient/subject.txt"
-        elif notification_type == NotificationAction.LAB_APPOINTMENT_CANCELLED and user.user_type == User.CONSUMER:
+        elif notification_type == NotificationAction.LAB_APPOINTMENT_CANCELLED and user and user.user_type == User.CONSUMER:
             body_template = "email/lab/appointment_cancelled_patient/body.html"
             subject_template = "email/lab/appointment_cancelled_patient/subject.txt"
-        elif notification_type == NotificationAction.LAB_APPOINTMENT_CANCELLED and user.user_type == User.DOCTOR:
+        elif notification_type == NotificationAction.LAB_APPOINTMENT_CANCELLED and (not user or user.user_type == User.DOCTOR):
             body_template = "email/lab/appointment_cancelled_lab/body.html"
             subject_template = "email/lab/appointment_cancelled_lab/subject.txt"
         elif notification_type == NotificationAction.LAB_REPORT_UPLOADED:
@@ -429,7 +463,7 @@ class EMAILNotification:
         context = copy.deepcopy(context)
         email_subject = render_to_string(template[0], context=context)
         html_body = render_to_string(template[1], context=context)
-        if email and user.user_type == User.DOCTOR and notification_type in [
+        if email and user and user.user_type == User.DOCTOR and notification_type in [
             NotificationAction.LAB_APPOINTMENT_CANCELLED,
             NotificationAction.LAB_APPOINTMENT_BOOKED,
             NotificationAction.LAB_APPOINTMENT_RESCHEDULED_BY_PATIENT]:
@@ -448,7 +482,7 @@ class EMAILNotification:
             }
             message = json.dumps(message)
             publish_message(message)
-        elif email and user:
+        elif email:
             email_noti = EmailNotification.objects.create(
                 user=user,
                 email=email,
@@ -606,7 +640,9 @@ class OpdNotification(Notification):
         notification_type = self.notification_type
         if not instance or not instance.user:
             return receivers
-        doctor_admins = GenericAdmin.get_appointment_admins(instance)
+        # doctor_spocs = GenericAdmin.get_appointment_admins(instance)
+        doctor_spocs = instance.hospital.get_spocs_for_communication() if instance.hospital else []
+        spocs_to_be_communicated = []
         if notification_type in [NotificationAction.APPOINTMENT_ACCEPTED,
                                  NotificationAction.APPOINTMENT_RESCHEDULED_BY_DOCTOR,
                                  NotificationAction.PRESCRIPTION_UPLOADED,
@@ -616,9 +652,10 @@ class OpdNotification(Notification):
         elif notification_type in [NotificationAction.APPOINTMENT_RESCHEDULED_BY_PATIENT,
                                    NotificationAction.APPOINTMENT_BOOKED,
                                    NotificationAction.APPOINTMENT_CANCELLED]:
-            receivers.extend(doctor_admins)
+            spocs_to_be_communicated = doctor_spocs
+            # receivers.extend(doctor_spocs)
             receivers.append(instance.user)
-        receivers = list(set(receivers))
+        # receivers = list(set(receivers))
         user_and_phone_number = []
         user_and_email = []
         app_receivers = receivers
@@ -652,6 +689,9 @@ class OpdNotification(Notification):
                 user_and_email.append({'user': user, 'email': email})
         user_and_email = unique_emails(user_and_email)
         user_and_phone_number = unique_phone_numbers(user_and_phone_number)
+        spoc_emails, spoc_numbers = get_spoc_email_and_number_hospital(spocs_to_be_communicated)
+        user_and_phone_number.extend(spoc_numbers)
+        user_and_email.extend(spoc_emails)
         all_receivers['sms_receivers'] = user_and_phone_number
         all_receivers['email_receivers'] = user_and_email
         all_receivers['app_receivers'] = app_receivers
@@ -737,7 +777,9 @@ class LabNotification(Notification):
         notification_type = self.notification_type
         if not instance or not instance.user:
             return receivers
-        lab_managers = instance.get_lab_admins()
+        # lab_spocs = instance.get_lab_admins()
+        lab_managers = instance.lab.get_managers_for_communication() if instance.lab else []
+        lab_managers_to_be_communicated = []
         if notification_type in [NotificationAction.LAB_APPOINTMENT_ACCEPTED,
                                  NotificationAction.LAB_APPOINTMENT_RESCHEDULED_BY_LAB,
                                  NotificationAction.LAB_REPORT_UPLOADED,
@@ -748,7 +790,8 @@ class LabNotification(Notification):
         elif notification_type in [NotificationAction.LAB_APPOINTMENT_RESCHEDULED_BY_PATIENT,
                                    NotificationAction.LAB_APPOINTMENT_BOOKED,
                                    NotificationAction.LAB_APPOINTMENT_CANCELLED]:
-            receivers.extend(lab_managers)
+            lab_managers_to_be_communicated = lab_managers
+            # receivers.extend(lab_spocs)
             receivers.append(instance.user)
         receivers = list(set(receivers))
         user_and_phone_number = []
@@ -784,7 +827,9 @@ class LabNotification(Notification):
                 user_and_email.append({'user': user, 'email': email})
         user_and_phone_number = unique_phone_numbers(user_and_phone_number)
         user_and_email = unique_emails(user_and_email)
-
+        manager_emails, manager_numbers = get_lab_manager_email_and_number(lab_managers_to_be_communicated)
+        user_and_phone_number.extend(manager_numbers)
+        user_and_email.extend(manager_emails)
         all_receivers['sms_receivers'] = user_and_phone_number
         all_receivers['email_receivers'] = user_and_email
         all_receivers['app_receivers'] = app_receivers

@@ -14,6 +14,7 @@ from datetime import timedelta
 from dateutil import tz
 from django.utils import timezone
 from ondoc.authentication import models as auth_model
+from ondoc.authentication.models import SPOCDetails
 
 from ondoc.location import models as location_models
 from ondoc.account.models import Order, ConsumerAccount, ConsumerTransaction, PgTransaction, ConsumerRefund, \
@@ -232,6 +233,13 @@ class Hospital(auth_model.TimeStampedModel, auth_model.CreatedByModel, auth_mode
 
         # if build_url and self.location and self.is_live:
         #     ea = location_models.EntityLocationRelationship.create(latitude=self.location.y, longitude=self.location.x, content_object=self)
+
+    def get_spocs_for_communication(self):
+        result = []
+        result.extend(list(self.spoc_details.filter(contact_type__in=[SPOCDetails.SPOC, SPOCDetails.MANAGER])))
+        if not result:
+            result.extend(list(self.spoc_details.filter(contact_type=SPOCDetails.OWNER)))
+        return result
 
 
 class HospitalAward(auth_model.TimeStampedModel):
@@ -1486,7 +1494,7 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin):
                          "deal_price": self.deal_price - procedures_total["deal_price"],
                          "agreed_price": self.fees - procedures_total["agreed_price"]}
         doctor_prices["discount"] = doctor_prices["mrp"] - doctor_prices["deal_price"]
-        procedures.insert(0, {"name": "Consultation Fees", "mrp": doctor_prices["mrp"],
+        procedures.insert(0, {"name": "Consultation", "mrp": doctor_prices["mrp"],
                               "deal_price": doctor_prices["deal_price"],
                               "agreed_price": doctor_prices["agreed_price"],
                               "discount": doctor_prices["discount"]})
