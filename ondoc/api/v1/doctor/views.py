@@ -691,10 +691,10 @@ class DoctorProfileUserViewSet(viewsets.GenericViewSet):
             if entity.breadcrumb:
                 breadcrumb = entity.breadcrumb
                 breadcrumb = [{'url': '/', 'title': 'Home'}] + breadcrumb
-                breadcrumb.append({'title': doctor.name})
+                breadcrumb.append({'title': 'Dr. ' + doctor.name})
                 response_data['breadcrumb'] = breadcrumb
             else:
-                breadcrumb = [{'url':'/', 'title': 'Home'}, {'title': doctor.name}]
+                breadcrumb = [{'url':'/', 'title': 'Home'}, {'title':'Dr. ' + doctor.name}]
                 response_data['breadcrumb'] = breadcrumb
 
         return Response(response_data)
@@ -1224,12 +1224,17 @@ class DoctorListViewSet(viewsets.GenericViewSet):
             if validated_data.get('breadcrumb') and validated_data.get('sitemap_identifier') in ['SPECIALIZATION_CITY','SPECIALIZATION_LOCALITY_CITY']:
                 breadcrumb = validated_data.get('breadcrumb')
                 breadcrumb = [{'url': '/', 'title': 'Home'}] + breadcrumb
-                breadcrumb.append({'title': str(validated_data.get('url'))})
+                if validated_data.get('sitemap_identifier') == 'SPECIALIZATION_CITY':
+                    breadcrumb.append({'title': validated_data.get('specialization') + ' in ' + validated_data.get('locality_value')})
+                else:
+                    breadcrumb.append({'title': validated_data.get('specialization') + ' in ' +
+                                     validated_data.get('sublocality_value') + ' ' + validated_data.get('locality_value')})
+
             elif validated_data.get('sitemap_identifier') == 'DOCTORS_CITY':
-                breadcrumb = [{'url': '/', 'title': 'Home'}, {'title': validated_data.get('locality_value')}]
+                breadcrumb = [{'url': '/', 'title': 'Home'}, {'title': 'Doctors in ' + validated_data.get('locality_value')}]
             elif validated_data.get('sitemap_identifier') == 'DOCTORS_LOCALITY_CITY':
                 breadcrumb = [{'url': '/', 'title': 'Home'}, {'title': validated_data.get('locality_value')},
-                              {validated_data.get('sublocality_value')}]
+                              {'title': 'Doctors in ' + validated_data.get('sublocality_value') + ' ' + validated_data.get('locality_value')}]
             else:
                 breadcrumb = [{'url': '/', 'title': 'Home'}]
 
