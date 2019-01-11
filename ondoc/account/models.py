@@ -575,7 +575,7 @@ class ConsumerAccount(TimeStampedModel):
         try:
             context = {
                 "title": "Referral Bonus",
-                "body": ("Rs. " + str(int(cashback_amount)) + " Referral Bonus Recieved"),
+                "body": ("Rs. " + str(int(cashback_amount)) + " Referral Bonus Received"),
                 "url": "/wallet",
                 "action_type": NotificationAction.CASHBACK_CREDITED,
             }
