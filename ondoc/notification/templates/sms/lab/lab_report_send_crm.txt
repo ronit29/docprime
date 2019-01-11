@@ -8,15 +8,12 @@ Lab : {{lab_name|capfirst}}
 Appointment Date and Time : {{instance.time_slot_start|date:"D jS F Y"}} || {{instance.time_slot_start|date:"h:i A"}}
 {% if instance.test_mappings.all %}
 Test(s) Booked :
-{% for test in instance.test_mappings.all %}
-{{test.test.name|capfirst}}{% if not forloop.last %},{% endif %}
-{% endfor %}
-{% endif %}
+{% for test in instance.test_mappings.all %}{{test.test.name|capfirst}}{% if not forloop.last %}, {% endif %}{% endfor %}{% endif %}
 
 {% if reports %}
 Link(s):
-{% for report in reports %}
-{{report}}{% if not forloop.last %}, {% endif %}
+{% for report in lab_reports %}
+{{report}}
 {% endfor %}
 {% endif %}
 
