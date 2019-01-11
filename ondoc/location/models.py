@@ -23,13 +23,75 @@ from collections import OrderedDict
 import re
 from django.contrib.postgres.fields import ArrayField
 from django.db.models import Prefetch
+from django.db import transaction
 
 
 logger = logging.getLogger(__name__)
 
+
 def split_and_append(initial_str, spliter, appender):
     value_chunks = initial_str.split(spliter)
     return appender.join(value_chunks)
+
+class TempURL(TimeStampedModel):
+
+    url = models.CharField(blank=False, null=True, max_length=2000, db_index=True)
+    url_type = models.CharField(max_length=24, null=True)
+    entity_type = models.CharField(max_length=24, null=True)
+    search_slug = models.CharField(max_length=1000, null=True)
+    extras = JSONField(null=True)
+    breadcrumb = JSONField(null=True)
+    entity_id = models.PositiveIntegerField(null=True, default=None)
+    is_valid = models.BooleanField(default=True)
+    count = models.IntegerField(max_length=30, null=True, default=0)
+    sitemap_identifier = models.CharField(max_length=28, null=True)
+    sequence = models.PositiveIntegerField(default=0, null=True)
+    locality_latitude = models.DecimalField(null=True, max_digits=10, decimal_places=8)
+    locality_longitude = models.DecimalField(null=True, max_digits=10, decimal_places=8)
+    sublocality_value = models.TextField(default='', null=True)
+    locality_value = models.TextField(default='', null=True)
+    sublocality_latitude = models.DecimalField(null=True, max_digits=10, decimal_places=8, blank=True)
+    sublocality_longitude = models.DecimalField(null=True, max_digits=10, decimal_places=8, blank=True)
+    locality_id = models.PositiveIntegerField(default=None,null=True)
+    sublocality_id = models.PositiveIntegerField(default=None, null=True)
+    specialization = models.TextField(default='', null=True)
+    specialization_id = models.PositiveIntegerField(default=None, null=True)
+    locality_location = models.PointField(geography=True, srid=4326, blank=True, null=True)
+    sublocality_location = models.PointField(geography=True, srid=4326, blank=True, null=True)
+    location = models.PointField(geography=True, srid=4326, blank=True, null=True)
+
+    class Meta:
+        db_table='temp_url'
+
+
+class GoogleSearches(TimeStampedModel):
+    search_keywords = models.CharField(max_length=200, null=False, blank=False)
+    results = JSONField()
+    count = models.PositiveIntegerField(default=None, null=True)
+
+    class Meta:
+        db_table = 'google_search'
+
+
+class GoogleSearchEntry(TimeStampedModel):
+    place_id = models.TextField()
+    place_result = JSONField()
+    doctor_details = JSONField()
+    place_search = models.ManyToManyField(GoogleSearches, through='GoogleResult',
+                                          through_fields=('place_entry','search_results'),
+                                          related_name='assoc_search_results',
+                                          )
+
+    class Meta:
+        db_table = 'google_search_place_entry'
+
+
+class GoogleResult(TimeStampedModel):
+    place_entry = models.ForeignKey(GoogleSearchEntry, on_delete=models.CASCADE, related_name='google_place_details')
+    search_results = models.ForeignKey(GoogleSearches, on_delete=models.CASCADE, related_name='google_search_details')
+
+    class Meta:
+        db_table = 'google_results'
 
 
 class GeocodingResults(TimeStampedModel):
@@ -151,7 +213,8 @@ class EntityAddress(TimeStampedModel):
     centroid = models.PointField(geography=True, srid=4326, blank=True, null=True)
     abs_centroid = models.PointField(geography=True, srid=4326, blank=True, null=True)
     #geocoding = models.ForeignKey(GeocodingResults, null=True, on_delete=models.DO_NOTHING)
-    no_of_childs = models.PositiveIntegerField(default=None, null=True)
+    no_of_childs = models.PositiveIntegerField(default=0, null=True)
+    child_count = models.PositiveIntegerField(default=None, null=True)
     use_in_url = models.BooleanField(verbose_name='Use in URL', default=False)
     order = models.PositiveIntegerField(default=None, null=True)
     search_slug = models.CharField(max_length=256, blank=True, null=True)
@@ -529,6 +592,7 @@ class EntityUrls(TimeStampedModel):
     url_type = models.CharField(max_length=24, choices=UrlType.as_choices(), null=True)
     entity_type = models.CharField(max_length=24, null=True)
     extras = JSONField()
+    breadcrumb = JSONField(null=True)
     entity_id = models.PositiveIntegerField(null=True, default=None)
     is_valid = models.BooleanField(default=True)
     count = models.IntegerField(max_length=30, null=True, default=0)
@@ -547,6 +611,9 @@ class EntityUrls(TimeStampedModel):
     locality_location = models.PointField(geography=True, srid=4326, blank=True, null=True)
     sublocality_location = models.PointField(geography=True, srid=4326, blank=True, null=True)
     location = models.PointField(geography=True, srid=4326, blank=True, null=True)
+
+    def __str__(self):
+        return self.url
 
 
     @property
@@ -601,12 +668,17 @@ class EntityUrls(TimeStampedModel):
                         locality_longitude, locality_id, sublocality_id,
                         locality_value, sublocality_value, is_valid, locality_location, sublocality_location, location)
 
-                        select specialization_id, specialization, sequence,extras, sitemap_identifier,getslug(url) as url, count, entity_type,
-                         url_type, now() as created_at, now() as updated_at,
-                         sublocality_latitude,sublocality_longitude,locality_latitude,locality_longitude,
-                         locality_id, sublocality_id, locality_value,sublocality_value, is_valid, 
-                         locality_location, sublocality_location, location
-                        from seo_doctor_specialization_search '''
+                        select a.specialization_id, a.specialization, a.sequence, a.extras, a.sitemap_identifier,
+                         getslug(a.url) as url, a.count, a.entity_type,
+                         a.url_type, now() as created_at, now() as updated_at,
+                         a.sublocality_latitude, a.sublocality_longitude, a.locality_latitude, a.locality_longitude,
+                         a.locality_id, a.sublocality_id, a.locality_value, a.sublocality_value, a.is_valid, 
+                         a.locality_location, a.sublocality_location, a.location
+                        from ( select  sdu.*, ea.child_count, ROW_NUMBER() over 
+                        (partition by sdu.url order by ea.child_count desc, sdu.count desc ) as row_number
+                        from seo_doctor_specialization_search sdu inner join entity_address ea on 
+                        case when sdu.sublocality_id is not null then sdu.sublocality_id else sdu.locality_id end = ea.id ) a
+                        where row_number=1 '''
 
         sequence_query = '''select sequence from seo_doctor_specialization_search limit 1 '''
 
@@ -616,40 +688,6 @@ class EntityUrls(TimeStampedModel):
                                   in ('SPECIALIZATION_LOCALITY_CITY', 'SPECIALIZATION_CITY') and sequence< %d''' % \
                        sequence[0].get(
                            'sequence')
-
-        from django.db import connection
-        with connection.cursor() as cursor:
-            try:
-                cursor.execute(query)
-                cursor.execute(update_query)
-            except Exception as e:
-                print(str(e))
-                return False
-
-        return True
-
-    def create_doctor_search_entity_urls():
-
-        query = '''insert into entity_urls(sequence,extras, sitemap_identifier, url, count, entity_type, 
-                 url_type,  created_at, 
-                 updated_at,  sublocality_latitude, sublocality_longitude, locality_latitude, 
-                 locality_longitude, locality_id, sublocality_id,
-                 locality_value, sublocality_value, is_valid, locality_location, sublocality_location, location)
-
-                 select sequence,extras, sitemap_identifier,getslug(url) as url, count, entity_type,
-                  url_type, now() as created_at, now() as updated_at,
-                  sublocality_latitude,sublocality_longitude,locality_latitude,locality_longitude,
-                  locality_id, sublocality_id, locality_value,sublocality_value, is_valid, 
-                  locality_location, sublocality_location, location
-                 from seo_doctor_search_urls '''
-
-        sequence_query = '''select sequence from seo_doctor_search_urls limit 1 '''
-
-        sequence = RawSql(sequence_query, []).fetch_all()
-
-        update_query = '''update entity_urls set is_valid=false where sitemap_identifier 
-                           in ('DOCTORS_LOCALITY_CITY', 'DOCTORS_CITY') and sequence< %d''' % sequence[0].get(
-            'sequence')
 
         from django.db import connection
         with connection.cursor() as cursor:
@@ -673,42 +711,45 @@ class EntityUrls(TimeStampedModel):
             sequence = 0
 
         create_temp_table_query = '''create table seo_doctor_search_urls as
-                    select  ea.alternative_value, ea.search_slug, null::json as extras , null::geography as sublocality_location,  
-                     null::geography as locality_location, null::geography as location,
+                    select max(ST_Distance(ea.centroid,h.location)) as distance,
+                    ea.alternative_value, ea.search_slug, null::json as extras , null::geography as sublocality_location,  
+                    null::geography as locality_location, null::geography as location,
                     case when ea.type = 'SUBLOCALITY' then 
-                    concat('doctors-in-', ea.search_slug, '-sptlitcit')
-                    else concat('doctors-in-', ea.search_slug, '-sptcit')
-                    end as url, ea.type, count(*) as count,
+                    getslug(concat('doctors-in-', ea.search_slug, '-sptlitcit'))
+                    else getslug(concat('doctors-in-', ea.search_slug, '-sptcit'))
+                    end as url, ea.type, count(distinct d.id) as count,
                     case when ea.type = 'SUBLOCALITY' then 
                     ea.id 
                     end as sublocality_id,
                     case when ea.type = 'LOCALITY' then ea.id 
-                    when ea.type = 'SUBLOCALITY' then eaparent.id
+                    when ea.type = 'SUBLOCALITY' then max(eaparent.id)
                     end as locality_id,
                     case when ea.type = 'SUBLOCALITY' then 
                     st_x(ea.centroid::geometry) end as sublocality_longitude,
                     case when ea.type = 'SUBLOCALITY' then 
                     st_y(ea.centroid::geometry) end as sublocality_latitude,
                     case when ea.type = 'LOCALITY' then st_x(ea.centroid::geometry)
-                    when ea.type = 'SUBLOCALITY' then st_x(eaparent.centroid::geometry)
+                    when ea.type = 'SUBLOCALITY' then max(st_x(eaparent.centroid::geometry))
                     end as locality_longitude,
                     case when ea.type = 'LOCALITY' then st_y(ea.centroid::geometry)
-                    when ea.type = 'SUBLOCALITY' then st_y(eaparent.centroid::geometry) 
+                    when ea.type = 'SUBLOCALITY' then max(st_y(eaparent.centroid::geometry)) 
                     end as locality_latitude,
                     case when ea.type = 'SUBLOCALITY' then ea.alternative_value end as sublocality_value,
                     case when ea.type = 'LOCALITY' then ea.alternative_value 
-                    when  ea.type = 'SUBLOCALITY' then eaparent.alternative_value end as locality_value,
+                    when  ea.type = 'SUBLOCALITY' then max(eaparent.alternative_value) end as locality_value,
                     case when ea.type = 'LOCALITY' then 'DOCTORS_CITY'
                     else 'DOCTORS_LOCALITY_CITY' end as sitemap_identifier,
                     %d as sequence,
-                     'Doctor' as entity_type,
-                     'SEARCHURL' url_type,
-                     True as is_valid
-                    from hospital h inner join entity_address ea on ST_DWithin(ea.centroid,h.location,500) and h.is_live=true
+                    'Doctor' as entity_type,
+                    'SEARCHURL' url_type,
+                    True as is_valid
+                    from hospital h inner join entity_address ea on ((ea.type = 'LOCALITY' and ST_DWithin(ea.centroid,h.location,15000)) OR 
+                    (ea.type = 'SUBLOCALITY' and ST_DWithin(ea.centroid,h.location,5000))) and h.is_live=true
                     and ea.type IN ('SUBLOCALITY' , 'LOCALITY') and ea.use_in_url=true inner join doctor_clinic dc on dc.hospital_id = h.id
+                    and dc.enabled=true 
                     inner join doctor d on dc.doctor_id= d.id
                     and d.is_live=true left join entity_address eaparent on ea.parent_id=eaparent.id and eaparent.use_in_url=true
-                    group by ea.id, eaparent.id having count(*) >= 3''' % sequence
+                    group by ea.id having count(distinct d.id) >= 3''' % sequence
         create_temp_table = RawSql(create_temp_table_query, []).execute()
 
         update_extras_query = '''update  seo_doctor_search_urls 
@@ -750,63 +791,68 @@ class EntityUrls(TimeStampedModel):
             sequence = 0
 
         create_temp_table_query = '''create table seo_doctor_specialization_search as
-                    select ps.id as specialization_id, ps.name as specialization, ea.alternative_value,
-                      ea.search_slug, null as url, null::json as extras, null::geography as locality_location, 
-                      null::geography as sublocality_location, null::geography as location,
-                     ea.type, count(*) as count,
+                    select  max(ST_Distance(ea.centroid,h.location)) as distance, 
+                    ps.id as specialization_id, ps.name as specialization, ea.alternative_value,
+                    ea.search_slug, null as url, null::json as extras, null::geography as locality_location, 
+                    null::geography as sublocality_location, null::geography as location,
+                    ea.type, count(distinct d.id) as count,
                     case when ea.type = 'SUBLOCALITY' then 
                     ea.id 
                     end as sublocality_id,
                     case when ea.type = 'LOCALITY' then ea.id 
-                    when ea.type = 'SUBLOCALITY' then eaparent.id
+                    when ea.type = 'SUBLOCALITY' then max(eaparent.id)
                     end as locality_id,
                     case when ea.type = 'SUBLOCALITY' then 
                     st_x(ea.centroid::geometry) end as sublocality_longitude,
                     case when ea.type = 'SUBLOCALITY' then 
                     st_y(ea.centroid::geometry) end as sublocality_latitude,
                     case when ea.type = 'LOCALITY' then st_x(ea.centroid::geometry)
-                    when ea.type = 'SUBLOCALITY' then st_x(eaparent.centroid::geometry)
+                    when ea.type = 'SUBLOCALITY' then max(st_x(eaparent.centroid::geometry))
                     end as locality_longitude,
                     case when ea.type = 'LOCALITY' then st_y(ea.centroid::geometry)
-                    when ea.type = 'SUBLOCALITY' then st_y(eaparent.centroid::geometry) 
+                    when ea.type = 'SUBLOCALITY' then max(st_y(eaparent.centroid::geometry))
                     end as locality_latitude,
                     case when ea.type = 'SUBLOCALITY' then ea.alternative_value end as sublocality_value,
                     case when ea.type = 'LOCALITY' then ea.alternative_value 
-                         when  ea.type = 'SUBLOCALITY' then eaparent.alternative_value end as locality_value,
+                     when  ea.type = 'SUBLOCALITY' then max(eaparent.alternative_value) end as locality_value,
                     case when ea.type = 'LOCALITY' then 'SPECIALIZATION_CITY'
                     else 'SPECIALIZATION_LOCALITY_CITY' end as sitemap_identifier,
                     %d as sequence,
                     'Doctor' as entity_type,
                     'SEARCHURL' url_type,
                     True as is_valid
-
-                    from hospital h inner join entity_address ea on ST_DWithin(ea.centroid,h.location,500) and h.is_live=true
+                    from hospital h inner join entity_address ea on ((ea.type = 'LOCALITY' and 
+                    ST_DWithin(ea.centroid,h.location,15000)) OR 
+                    (ea.type = 'SUBLOCALITY' and ST_DWithin(ea.centroid,h.location,5000))) and h.is_live=true
                     and ea.type IN ('SUBLOCALITY' , 'LOCALITY') and ea.use_in_url=true inner join doctor_clinic dc on dc.hospital_id = h.id
+                    and dc.enabled=true
                     inner join doctor d on dc.doctor_id= d.id
                     inner join doctor_practice_specialization dps on dps.doctor_id = d.id and d.is_live=true
                     inner join practice_specialization ps on ps.id = dps.specialization_id 
                     left join entity_address eaparent on ea.parent_id=eaparent.id and eaparent.use_in_url=true
-                    group by ps.id, ea.id, eaparent.id having count(*) >= 3 
+                    group by ps.id, ea.id having count(distinct d.id) >= 3 
                 ''' % sequence
 
         create_temp_table = RawSql(create_temp_table_query, []).execute()
 
         update_urls_query = '''update seo_doctor_specialization_search set url = case when type = 'SUBLOCALITY' then 
-                    concat(specialization,'-in-', search_slug, '-sptlitcit')
-                    else concat(specialization,'-in-', search_slug, '-sptcit')
+                    getslug(concat(specialization,'-in-', search_slug, '-sptlitcit'))
+                    else getslug(concat(specialization,'-in-', search_slug, '-sptcit'))
                     end'''
         update_urls = RawSql(update_urls_query, []).execute()
 
         update_extras_query = '''update  seo_doctor_specialization_search 
-                    set extras = case when type='LOCALITY' then
-                    json_build_object('location_json',json_build_object('locality_id',locality_id,'locality_value',locality_value, 
-                    'locality_latitude',locality_latitude,'locality_longitude',locality_longitude))
+                          set extras = case when type='LOCALITY' then
+                           json_build_object('specialization_id', specialization_id, 'location_json',
+                           json_build_object('locality_id', locality_id, 'locality_value', locality_value, 'locality_latitude', 
+                           locality_latitude,'locality_longitude', locality_longitude), 'specialization', specialization)
 
-                    else  json_build_object('location_json',
-                    json_build_object('sublocality_id',sublocality_id,'sublocality_value',sublocality_value,
-                    'locality_id', locality_id, 'locality_value', locality_value,'breadcrum_url',getslug(specialization||'-in-' || locality_value ||'-sptcit'),
-                    'sublocality_latitude',sublocality_latitude, 'sublocality_longitude',sublocality_longitude, 'locality_latitude',locality_latitude,
-                    'locality_longitude',locality_longitude)) end'''
+                          else  json_build_object('specialization_id', specialization_id,'location_json',
+                          json_build_object('sublocality_id',sublocality_id,'sublocality_value',sublocality_value,
+                           'locality_id', locality_id, 'locality_value', locality_value,
+                           'breadcrum_url',getslug(specialization || '-in-' || locality_value ||'-sptcit'),
+                          'sublocality_latitude',sublocality_latitude, 'sublocality_longitude',sublocality_longitude, 
+                          'locality_latitude',locality_latitude,'locality_longitude',locality_longitude),'specialization', specialization) end'''
         update_extras = RawSql(update_extras_query, []).execute()
 
         update_locality_loc_query = '''update seo_doctor_specialization_search set locality_location = st_setsrid(st_point(locality_longitude, locality_latitude),4326)::geography where 
@@ -2001,57 +2047,17 @@ class DoctorPageURL(object):
             to_create.append(EntityUrls(**data))
             #EntityUrls.objects.create(**data)
 
-        EntityUrls.objects.filter(id__in=to_delete).delete()
-        #EntityUrls.filter(id__in=to_delete).delete()
-        EntityUrls.objects.bulk_create(to_create)
-        EntityUrls.objects.filter(sitemap_identifier='DOCTOR_PAGE', sequence__lt=sequence).update(is_valid=False)    
-        return ("success: " + str(doctor.id))
+        with transaction.atomic():
 
-        
-class PageUrlCache():
+            EntityUrls.objects.filter(id__in=to_delete).delete()
+            #EntityUrls.filter(id__in=to_delete).delete()
+            EntityUrls.objects.bulk_create(to_create)
+            EntityUrls.objects.filter(sitemap_identifier='DOCTOR_PAGE', sequence__lt=sequence).update(is_valid=False)    
+            return ("success: " + str(doctor.id))
 
-    def __init__(self, sitemap_identifier):
-        self.url_cache = dict()
-        self.entity_cache = dict()
-
-        existing = EntityUrls.objects.filter(sitemap_identifier=sitemap_identifier)
-
-        for ex in existing:
-            if not self.url_cache.get(ex.url):
-                self.url_cache[ex.url] = []
-
-            if not self.entity_cache.get(ex.id):
-                self.entity_cache[ex.id] = []
-
-            self.url_cache[ex.url].append(ex)
-            self.entity_cache[ex.id].append(ex)
-
-    # def get(url):
-    #     return self.cache.get(url)
-
-    # def set():
-    #     pass
-
-    def is_duplicate(self, url, entity_id):
-        entities = self.url_cache.get(url)
-        if entities:
-            for ent in entities:
-                if ent.entity_id != entity_id:
-                    return True
-
-        return False
-
-    def get_deletions(self, url, entity_id):
-        deletions = []
-        entities = self.url_cache.get(url)
-        if entities:
-            for ent in entities:
-                if ent.entity_id == entity_id:
-                    deletions.append(ent.id)
-        return deletions
 
 class DefaultRating(TimeStampedModel):
-    ratings = models.PositiveIntegerField(null=True)
+    ratings = models.FloatField(null=True)
     reviews = models.PositiveIntegerField(null=True)
     url = models.TextField()
 

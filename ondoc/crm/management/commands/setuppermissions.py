@@ -3,6 +3,7 @@ from django.contrib.auth.models import Group, Permission
 from django.contrib.contenttypes.models import ContentType
 from django.db.models import Q
 
+from ondoc.banner.models import Banner
 from ondoc.coupon.models import Coupon, UserSpecificCoupon
 from ondoc.crm.constants import constants
 from ondoc.doctor.models import (Doctor, Hospital, DoctorClinicTiming, DoctorClinic,
@@ -39,12 +40,13 @@ from ondoc.diagnostic.models import LabPricing
 
 from ondoc.web.models import Career, OnlineLead
 from ondoc.ratings_review import models as rating_models
-from ondoc.articles.models import Article, ArticleLinkedUrl, LinkedArticle
+from ondoc.articles.models import Article, ArticleLinkedUrl, LinkedArticle, ArticleContentBox, ArticleCategory
 
 from ondoc.authentication.models import BillingAccount, SPOCDetails, GenericAdmin, User, Merchant, AssociatedMerchant, DoctorNumber
 from ondoc.account.models import MerchantPayout
-from ondoc.seo.models import Sitemap
+from ondoc.seo.models import Sitemap, NewDynamic
 from ondoc.elastic.models import DemoElastic
+from ondoc.location.models import EntityUrls
 
 class Command(BaseCommand):
     help = 'Create groups and setup permissions for teams'
@@ -335,6 +337,16 @@ class Command(BaseCommand):
 
             group.permissions.add(*permissions)
 
+        content_types = ContentType.objects.get_for_models(Banner)
+        for cl, ct in content_types.items():
+            permissions = Permission.objects.filter(
+                Q(content_type=ct),
+                Q(codename='add_' + ct.model) |
+                Q(codename='change_' + ct.model) |
+                Q(codename='delete_' + ct.model))
+
+            group.permissions.add(*permissions)
+
         # content_types = ContentType.objects.get_for_models(LabTest)
         #
         # for cl, ct in content_types.items():
@@ -353,7 +365,6 @@ class Command(BaseCommand):
         #Create testing group
         self.create_testing_group()
 
-        #Create Article team Group
         # Create OPD appointment management team
         self.create_opd_appointment_management_group()
 
@@ -379,7 +390,7 @@ class Command(BaseCommand):
         group, created = Group.objects.get_or_create(name=constants['ARTICLE_TEAM'])
         group.permissions.clear()
 
-        content_types = ContentType.objects.get_for_models(Article, Sitemap, ArticleLinkedUrl, LinkedArticle)
+        content_types = ContentType.objects.get_for_models(Article, Sitemap, ArticleContentBox, ArticleCategory, EntityUrls)
 
         for cl, ct in content_types.items():
             permissions = Permission.objects.filter(
@@ -388,6 +399,18 @@ class Command(BaseCommand):
                 Q(codename='change_' + ct.model))
 
             group.permissions.add(*permissions)
+
+        content_types = ContentType.objects.get_for_models(ArticleLinkedUrl, LinkedArticle, NewDynamic)
+
+        for cl, ct in content_types.items():
+            permissions = Permission.objects.filter(
+                Q(content_type=ct),
+                Q(codename='add_' + ct.model) |
+                Q(codename='change_' + ct.model) |
+                Q(codename='delete_' + ct.model))
+
+            group.permissions.add(*permissions)
+
 
         #Review team Group
         group, created = Group.objects.get_or_create(name=constants['REVIEW_TEAM_GROUP'])

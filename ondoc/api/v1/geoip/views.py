@@ -131,7 +131,7 @@ class GeoIPAddressURLViewSet(viewsets.GenericViewSet):
         resp = dict()
         resp["latitude"] = self.DELHI_CENTRE_LAT
         resp["longitude"] = self.DELHI_CENTRE_LONG
-        resp["city_name"] = 'Delhi'
+        resp["city"] = 'Delhi'
 
         ip_address, is_routable = get_client_ip(request)
         if not ip_address:
@@ -151,8 +151,8 @@ class GeoIPAddressURLViewSet(viewsets.GenericViewSet):
                 if response.status_code == status.HTTP_200_OK:
                     resp_data = response.json()
                     geo_ip_obj = GeoIPEntries.objects.create(ip_address=ip_address, location_detail=resp_data)
-                    resp["lat"] = resp_data["location"]["latitude"]
-                    resp["long"] = resp_data["location"]["longitude"]
+                    resp["latitude"] = resp_data["location"]["latitude"]
+                    resp["longitude"] = resp_data["location"]["longitude"]
                     resp["city"] = resp_data["city"]["names"]["en"]
                 else:
                     pass
@@ -161,8 +161,8 @@ class GeoIPAddressURLViewSet(viewsets.GenericViewSet):
 
         else:
             try:
-                resp["lat"] = geo_ip_obj.location_detail["location"]["latitude"]
-                resp["long"] = geo_ip_obj.location_detail["location"]["longitude"]
+                resp["latitude"] = geo_ip_obj.location_detail["location"]["latitude"]
+                resp["longitude"] = geo_ip_obj.location_detail["location"]["longitude"]
                 resp["city"] = geo_ip_obj.location_detail["city"]["names"]["en"]
                 resp["status"] = 1
             except Exception:

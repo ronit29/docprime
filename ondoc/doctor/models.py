@@ -53,6 +53,9 @@ from ondoc.ratings_review import models as ratings_models
 from django.utils import timezone
 from random import randint
 import reversion
+from ondoc.doctor import models as doctor_models
+from django.db.models import Count
+from ondoc.api.v1.utils import RawSql
 
 logger = logging.getLogger(__name__)
 
@@ -160,6 +163,7 @@ class Hospital(auth_model.TimeStampedModel, auth_model.CreatedByModel, auth_mode
     enabled_for_online_booking = models.BooleanField(verbose_name='enabled_for_online_booking?', default=True)
     merchant = GenericRelation(auth_model.AssociatedMerchant)
     merchant_payout = GenericRelation(MerchantPayout)
+    pyhsical_aggrement_signed = models.BooleanField(default=False)
 
     def __str__(self):
         return self.name
@@ -372,6 +376,7 @@ class Doctor(auth_model.TimeStampedModel, auth_model.QCModel, SearchKey):
     is_gold = models.BooleanField(verbose_name='Is Gold', default=False)
     merchant = GenericRelation(auth_model.AssociatedMerchant)
     merchant_payout = GenericRelation(MerchantPayout)
+    search_score = models.FloatField(default=0, null=True, editable=False)
 
     def __str__(self):
         return '{} ({})'.format(self.name, self.id)
@@ -1371,6 +1376,9 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin):
     def save(self, *args, **kwargs):
         logger.warning("opd save started - " + str(self.id) + " timezone - " + str(timezone.now()))
         database_instance = OpdAppointment.objects.filter(pk=self.id).first()
+        if database_instance and (database_instance.status == self.COMPLETED or database_instance.status == self.CANCELLED) \
+                and (self.status != database_instance.status):
+            raise Exception('Cancelled or Completed appointment cannot be saved')
         # if not self.is_doctor_available():
         #     raise RestFrameworkValidationError("Doctor is on leave.")
 
@@ -1823,7 +1831,7 @@ class PracticeSpecializationContent(auth_model.TimeStampedModel):
 
 class DoctorPracticeSpecialization(auth_model.TimeStampedModel):
     doctor = models.ForeignKey(Doctor, related_name="doctorpracticespecializations", on_delete=models.CASCADE)
-    specialization = models.ForeignKey(PracticeSpecialization, on_delete=models.CASCADE, blank=False, null=False)
+    specialization = models.ForeignKey(PracticeSpecialization, on_delete=models.CASCADE, blank=False, null=False, related_name='specialization')
 
     # def __str__(self):
     #     return "{}-{}".format(self.doctor.name, self.specialization.name)
@@ -1941,3 +1949,15 @@ class CancellationReason(auth_model.TimeStampedModel):
 
     def __str__(self):
         return self.name
+
+
+class SearchScore(auth_model.TimeStampedModel):
+    doctor = models.ForeignKey(Doctor, on_delete=models.CASCADE)
+    popularity_score = models.PositiveIntegerField(default=None, null=True)
+    years_of_experience_score = models.PositiveIntegerField(default=None, null=True)
+    doctors_in_clinic_score = models.PositiveIntegerField(default=None, null=True)
+    final_score = models.FloatField(default=None, null=True)
+
+    class Meta:
+        db_table = 'search_score'
+
