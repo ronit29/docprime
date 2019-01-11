@@ -1,3 +1,4 @@
+from urllib.parse import urlparse
 from rest_framework.views import exception_handler
 from rest_framework import permissions
 from collections import defaultdict
@@ -445,20 +446,30 @@ def get_lab_search_details(entity, req_params):
     return params_dict
 
 
-def doctor_query_parameters(entity_params, req_params):
+def doctor_query_parameters(entity, req_params):
     params_dict = copy.deepcopy(req_params)
-    if entity_params.get("location_json"):
-        if entity_params["location_json"].get("sublocality_latitude"):
-            params_dict["latitude"] = entity_params["location_json"]["sublocality_latitude"]
-        elif entity_params["location_json"].get("locality_latitude"):
-            params_dict["latitude"] = entity_params["location_json"]["locality_latitude"]
+    if entity.sublocality_latitude:
+        params_dict["latitude"] = entity.sublocality_latitude
+    elif entity.locality_latitude:
+        params_dict["latitude"] = entity.locality_latitude
+    if entity.sublocality_longitude:
+        params_dict["longitude"] = entity.sublocality_longitude
+    elif entity.locality_longitude:
+        params_dict["longitude"] = entity.locality_longitude
 
-        if entity_params["location_json"].get("sublocality_longitude"):
-            params_dict["longitude"] = entity_params["location_json"]["sublocality_longitude"]
-        elif entity_params["location_json"].get("locality_longitude"):
-            params_dict["longitude"] = entity_params["location_json"]["locality_longitude"]
-    if entity_params.get("specialization_id"):
-        params_dict["specialization_ids"] = str(entity_params["specialization_id"])
+
+    # if entity_params.get("location_json"):
+    #     if entity_params["location_json"].get("sublocality_latitude"):
+    #         params_dict["latitude"] = entity_params["location_json"]["sublocality_latitude"]
+    #     elif entity_params["location_json"].get("locality_latitude"):
+    #         params_dict["latitude"] = entity_params["location_json"]["locality_latitude"]
+    #
+    #     if entity_params["location_json"].get("sublocality_longitude"):
+    #         params_dict["longitude"] = entity_params["location_json"]["sublocality_longitude"]
+    #     elif entity_params["location_json"].get("locality_longitude"):
+    #         params_dict["longitude"] = entity_params["location_json"]["locality_longitude"]
+    if entity.specialization_id:
+        params_dict["specialization_ids"] = str(entity.specialization_id)
     else:
         params_dict["specialization_ids"] = ''
 
@@ -497,6 +508,7 @@ class CouponsMixin(object):
 
         user = kwargs.get("user")
         coupon_obj = kwargs.get("coupon_obj")
+        profile = kwargs.get("profile")
 
         if coupon_obj:
             if coupon_obj.is_user_specific and not user.is_authenticated:
@@ -519,9 +531,34 @@ class CouponsMixin(object):
                     return {"is_valid": False, "used_count": None}
 
             # check if a user is new i.e user has done any appointments
-            if user.is_authenticated and coupon_obj.new_user_constraint:
-                if not self.is_user_first_time(user):
+            if user.is_authenticated:
+                if profile:
+                    user_profile = user.profiles.filter(id=profile.id).first()
+                else:
+                    user_profile = user.profiles.filter(is_default_user=True).first()
+                if user_profile:
+                    user_age = user_profile.get_age()
+                else:
+                    user_age = None
+
+                if coupon_obj.new_user_constraint and not self.is_user_first_time(user):
                     return {"is_valid": False, "used_count": 0}
+
+                # TODO - COUPON APPLICABLE EVERY 5th or 3rd APPOINTMENT
+                # if coupon_obj.step_count != 1:
+                #     user_opd_completed = OpdAppointment.objects.filter(user=user,
+                #                                                        status__in=[OpdAppointment.COMPLETED]).count()
+                #     user_lab_completed = LabAppointment.objects.filter(user=user,
+                #                                                        status__in=[LabAppointment.COMPLETED]).count()
+                #     if ((user_opd_completed + user_lab_completed + 1) % coupon_obj.step_count != 0):
+                #         return {"is_valid": False, "used_count": None}
+
+                if coupon_obj.gender and (not user_profile or coupon_obj.gender != user_profile.gender):
+                    return {"is_valid": False, "used_count": None}
+
+                if ( (coupon_obj.age_start and (not user_age or coupon_obj.age_start > user_age))
+                        or (coupon_obj.age_end and (not user_age or coupon_obj.age_end < user_age)) ):
+                    return {"is_valid": False, "used_count": None}
 
             count = coupon_obj.used_coupon_count(user)
             total_used_count = coupon_obj.total_used_coupon_count()
@@ -536,6 +573,7 @@ class CouponsMixin(object):
     def validate_product_coupon(self, **kwargs):
         from ondoc.diagnostic.models import Lab
         from ondoc.account.models import Order
+        import re
 
         coupon_obj = kwargs.get("coupon_obj")
 
@@ -549,6 +587,9 @@ class CouponsMixin(object):
         # if product_id == Order.LAB_PRODUCT_ID:
         lab = kwargs.get("lab")
         tests = kwargs.get("test", [])
+        doctor = kwargs.get("doctor")
+        hospital = kwargs.get("hospital")
+        procedures = kwargs.get("procedures", [])
 
         if coupon_obj.lab and coupon_obj.lab != lab:
             return False
@@ -556,47 +597,65 @@ class CouponsMixin(object):
         if coupon_obj.lab_network and (not lab or lab.network!=coupon_obj.lab_network):
             return False
 
-        if tests and coupon_obj.test.exists():
-            count = coupon_obj.test.filter(id__in=[t.id for t in tests]).count()
-            #count = lab.lab_pricing_group.available_lab_tests.filter(enabled=True, test__id__in=tests).count()
-            if count == 0:
+        if coupon_obj.test.exists():
+            if tests:
+                count = coupon_obj.test.filter(id__in=[t.id for t in tests]).count()
+                if count == 0:
+                    return False
+            else:
+                return False
+
+        if coupon_obj.test_categories.exists():
+            if tests:
+                category_ids = []
+                for test in tests:
+                    categories = test.categories.values_list("id", flat=True)
+                    category_ids.extend(categories)
+                category_ids = list(set(category_ids))
+                test_cat_count = coupon_obj.test_categories.filter(id__in=category_ids).count()
+                if test_cat_count == 0:
+                    return False
+            else:
+                return False
+
+        if coupon_obj.cities:
+            if (lab and re.search(lab.city, coupon_obj.cities, re.IGNORECASE)) or not lab:
+                return False
+            if (hospital and re.search(hospital.city, coupon_obj.cities, re.IGNORECASE)) or not hospital:
+                return False
+
+        if coupon_obj.procedures.exists():
+            if procedures:
+                procedure_count = coupon_obj.procedures.filter(id__in=[proc.id for proc in procedures]).count()
+                if procedure_count == 0:
+                    return False
+            else:
+                return False
+
+        if coupon_obj.procedure_categories.exists():
+            if procedures:
+                category_ids = []
+                for procedure in procedures:
+                    categories = procedure.categories.values_list("id", flat=True)
+                    category_ids.extend(categories)
+                category_ids = list(set(category_ids))
+                procedure_cat_count = coupon_obj.procedure_categories.filter(id__in=category_ids).count()
+                if procedure_cat_count == 0:
+                    return False
+            else:
+                return False
+
+        if coupon_obj.specializations.exists():
+            if doctor:
+                spec_count = coupon_obj.specializations.filter(
+                    id__in=doctor.doctorpracticespecializations.values_list('specialization', flat=True)).count()
+                if spec_count == 0:
+                    return False
+            else:
                 return False
 
         return is_valid    
-                    
-        # elif kwargs.get("product_id") == Order.DOCTOR_PRODUCT_ID:
-        #     return True
-            # if kwargs.get("doctor"):
-            #     pass
 
-        # return is_valid    
-
-
-        #     coupon_obj.lab_network and coupon_obj.lab_network == lab.network
-
-        # if coupon_obj:
-
-        #     if kwargs.get("product_id") == Order.LAB_PRODUCT_ID:
-        #         lab = kwargs.get("lab")
-        #         if lab:
-        #             tests = kwargs.get("test", [])
-
-        #             available_lab_tests = lab.lab_pricing_group.available_lab_tests.filter(enabled=True, test__id__in=tests).prefetch_related('test')
-        #             available_lab_tests = lab.lab_pricing_group.available_lab_tests.all().prefetch_related('test')
-        #             lab_tests = list()
-        #             for lab_test in available_lab_tests:
-        #                 lab_tests.append(lab_test.test)
-        #             if set(tests) <= set(lab_tests):
-        #                 if (coupon_obj.lab_network and coupon_obj.lab_network == lab.network) or (not coupon_obj.lab_network):
-        #                     if (coupon_obj.lab and coupon_obj.lab==lab) or (not coupon_obj.lab):
-        #                         if (coupon_obj.test.exists() and set(tests) & set(coupon_obj.test.all())) or not coupon_obj.test.exists():
-        #                             is_valid = True
-
-        #     elif kwargs.get("product_id") == Order.DOCTOR_PRODUCT_ID:
-        #         if kwargs.get("doctor"):
-        #             pass
-
-        # return is_valid
 
     def get_discount(self, coupon_obj, price):
 
@@ -622,7 +681,6 @@ class CouponsMixin(object):
             return 0
 
     def get_applicable_tests_with_total_price(self, **kwargs):
-        from django.db.models import Sum
         from ondoc.diagnostic.models import AvailableLabTest
 
         coupon_obj = kwargs.get("coupon_obj")
@@ -639,6 +697,24 @@ class CouponsMixin(object):
                 total_price += test.custom_deal_price
             else:
                 total_price += test.computed_deal_price
+
+        return {"total_price": total_price}
+
+    def get_applicable_procedures_with_total_price(self, **kwargs):
+        from ondoc.procedure.models import DoctorClinicProcedure
+
+        coupon_obj = kwargs.get("coupon_obj")
+        doctor = kwargs.get("doctor")
+        hospital = kwargs.get("hospital")
+        procedures = kwargs.get("procedures")
+
+        queryset = DoctorClinicProcedure.objects.filter(doctor_clinic__doctor=doctor, doctor_clinic__hospital=hospital, procedure__in=procedures)
+        if coupon_obj.procedures.exists():
+            queryset = queryset.filter(procedure__in=coupon_obj.procedures.all())
+
+        total_price = 0
+        for procedure in queryset:
+            total_price += procedure.deal_price
 
         return {"total_price": total_price}
 
@@ -822,13 +898,17 @@ class GenericAdminEntity():
 def create_payout_checksum(all_txn, product_id):
     from ondoc.account.models import Order
 
-    secret_key = client_key = ""
-    if product_id == Order.DOCTOR_PRODUCT_ID:
-        secret_key = settings.PG_SECRET_KEY_P1
-        client_key = settings.PG_CLIENT_KEY_P1
-    elif product_id == Order.LAB_PRODUCT_ID:
-        secret_key = settings.PG_SECRET_KEY_P2
-        client_key = settings.PG_CLIENT_KEY_P2
+    # secret_key = client_key = ""
+    # if product_id == Order.DOCTOR_PRODUCT_ID:
+    #     secret_key = settings.PG_SECRET_KEY_P1
+    #     client_key = settings.PG_CLIENT_KEY_P1
+    # elif product_id == Order.LAB_PRODUCT_ID:
+    #     secret_key = settings.PG_SECRET_KEY_P2
+    #     client_key = settings.PG_CLIENT_KEY_P2
+
+    secret_key = settings.PG_SECRET_KEY_P2
+    client_key = settings.PG_CLIENT_KEY_P2
+
 
     all_txn = sorted(all_txn, key=lambda x : x["idx"])
     checksum = ""
@@ -846,3 +926,39 @@ def create_payout_checksum(all_txn, product_id):
     print("checksum string - " + str(checksum) + "checksum hash - " + str(checksum_hash))
     logger.error("checksum string - " + str(checksum) + "checksum hash - " + str(checksum_hash))
     return checksum_hash
+
+
+def html_to_pdf(html_body, filename):
+    file = None
+    try:
+        extra_args = {
+            'virtual-time-budget': 6000
+        }
+        from django.core.files.uploadedfile import TemporaryUploadedFile
+        temp_pdf_file = TemporaryUploadedFile(filename, 'byte', 1000, 'utf-8')
+        file = open(temp_pdf_file.temporary_file_path())
+        from hardcopy import bytestring_to_pdf
+        bytestring_to_pdf(html_body.encode(), file, **extra_args)
+        file.seek(0)
+        file.flush()
+        file.content_type = 'application/pdf'
+        from django.core.files.uploadedfile import InMemoryUploadedFile
+        file = InMemoryUploadedFile(temp_pdf_file, None, filename, 'application/pdf',
+                                    temp_pdf_file.tell(), None)
+
+    except Exception as e:
+        logger.error("Got error while creating PDF file :: {}.".format(e))
+    return file
+
+def util_absolute_url(url):
+    if bool(urlparse(url).netloc):
+        return url
+    else:
+        return settings.BASE_URL + url
+
+
+def util_file_name(filename):
+    import os
+    if filename:
+        filename = os.path.basename(filename)
+    return filename

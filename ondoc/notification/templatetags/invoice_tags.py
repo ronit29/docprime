@@ -33,7 +33,7 @@ def get_absolute_url(url):
     if bool(urlparse(url).netloc):
         return url
     else:
-        return settings.BASE_URL +url
+        return settings.BASE_URL + url
 
 
 @register.filter

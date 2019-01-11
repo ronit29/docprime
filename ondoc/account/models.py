@@ -820,6 +820,7 @@ class MerchantPayout(TimeStampedModel):
 
     STATUS_CHOICES = [(PENDING, 'Pending'), (ATTEMPTED, 'ATTEMPTED'), (PAID, 'Paid')]
 
+    payout_ref_id = models.IntegerField(null=True, unique=True)
     charged_amount = models.DecimalField(max_digits=10, decimal_places=2)
     payable_amount = models.DecimalField(max_digits=10, decimal_places=2)
     payout_approved = models.BooleanField(default=False)
@@ -834,6 +835,10 @@ class MerchantPayout(TimeStampedModel):
     content_object = GenericForeignKey()
 
     def save(self, *args, **kwargs):
+        first_instance = False
+        if not self.id:
+            first_instance = True
+
         if self.id and hasattr(self,'process_payout') and self.process_payout:
             if not self.content_object:
                 self.content_object = self.get_billed_to()
@@ -852,6 +857,10 @@ class MerchantPayout(TimeStampedModel):
                 logger.error(str(e))
 
         super().save(*args, **kwargs)
+
+        if first_instance:
+            self.payout_ref_id = self.id
+            self.save()
 
     def get_appointment(self):
         if self.lab_appointment.all():

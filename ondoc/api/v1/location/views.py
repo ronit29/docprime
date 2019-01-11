@@ -15,6 +15,7 @@ from ondoc.api.v1.doctor.serializers import DoctorListSerializer
 from ondoc.api.v1.doctor.serializers import DoctorProfileUserViewSerializer
 from ondoc.api.v1.utils import RawSql
 
+
 import logging
 
 logger = logging.getLogger(__name__)
