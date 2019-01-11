@@ -5,6 +5,8 @@ from django.db import transaction
 from celery import task
 import logging
 
+from ondoc.api.v1.utils import RawSql
+
 logger = logging.getLogger(__name__)
 
 
@@ -26,3 +28,15 @@ def doc_app_auto_cancel(self, prev_app_dict):
             logger.error("Error in Celery - No opd appointment for - " + str(prev_app_dict.get("id")))
     except Exception as e:
         logger.error("Error in Celery auto cancel flow - " + str(e))
+
+@task(bind=True)
+def create_doctor_score():
+    RawSql('''select d.search_score, ss.final_score as doctor_score from search_score ss inner join doctor d on 
+                  ss.doctor_id = d.id''', []).execute()
+
+    return "success"
+
+@task(bind=True)
+def delete_search_score():
+    RawSql('''delete from search_score''', []).execute()
+    return "success"

@@ -116,11 +116,3 @@ class DoctorSearchScore:
             return {'final_score': final_score}
 
 
-
-
-
-
-
-
-
-
