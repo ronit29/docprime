@@ -170,7 +170,7 @@ class CreateAppointmentSerializer(serializers.Serializer):
     payment_type = serializers.ChoiceField(choices=OpdAppointment.PAY_CHOICES)
     coupon_code = serializers.ListField(child=serializers.CharField(), required=False, default=[])
     procedure_ids = serializers.ListField(child=serializers.PrimaryKeyRelatedField(queryset=Procedure.objects.filter()), required=False)
-    use_wallet = serializers.BooleanField(required=False, default=True)
+    use_wallet = serializers.BooleanField(required=False)
     # procedure_category_ids = serializers.ListField(child=serializers.PrimaryKeyRelatedField(queryset=ProcedureCategory.objects.filter(is_live=True)), required=False, default=[])
     # time_slot_end = serializers.DateTimeField()
 
@@ -284,6 +284,13 @@ class CreateAppointmentSerializer(serializers.Serializer):
                     else:
                         raise serializers.ValidationError('Invalid coupon code - ' + str(coupon))
                 data["coupon_obj"] = list(coupon_obj)
+
+
+
+        if 'use_wallet' in data and data['use_wallet'] is False:
+            data['use_wallet'] = False
+        else:
+            data['use_wallet'] = True
 
         return data
 
