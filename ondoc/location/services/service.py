@@ -115,7 +115,7 @@ class SearchedDoctorData():
             while next_page_token or page==1:
                 page += 1
                 result = SearchedDoctorData.run_google_search(search_keywords, next_page_token)
-                next_page_token = result.get('next_page_token')
+                next_page_token = result.get('next_page_token') if result.get('next_page_token') else None
                 if result.get('count'):
                     count += result.get('count')
                 if result.get('data') and len(result.get('data'))>0:
@@ -123,12 +123,13 @@ class SearchedDoctorData():
                         search_results.append(result)
             google_data = GoogleSearches.objects.create(search_keywords=search_keywords,
                                                                         results=search_results, count=count)
-            if google_data:
-                id = google_data.id
-                results = google_data.results
-                for data in results:
-                    place_id = data.get('place_id')
-                    if place_id:
+        if google_data:
+            id = google_data.id
+            results = google_data.results
+            for data in results:
+                place_id = data.get('place_id')
+                if place_id:
+                    if not GoogleSearchEntry.objects.filter(place_id=place_id).first():
                         google_result_obj = GoogleResult.objects.filter(place_entry_id__place_id=place_id).first()
                         google_place_entry_obj = GoogleSearchEntry.objects.filter(place_id=place_id).first()
                         if google_result_obj and google_place_entry_obj:
