@@ -2,7 +2,7 @@ from ondoc.api.v1.diagnostic.serializers import CustomLabTestPackageSerializer
 from ondoc.authentication.backends import JWTAuthentication
 from ondoc.api.v1.diagnostic import serializers as diagnostic_serializer
 from ondoc.api.v1.auth.serializers import AddressSerializer
-
+from ondoc.ratings_review import models as rating_models
 from ondoc.diagnostic.models import (LabTest, AvailableLabTest, Lab, LabAppointment, LabTiming, PromotedLab,
                                      CommonDiagnosticCondition, CommonTest, CommonPackage,
                                      FrequentlyAddedTogetherTests, TestParameter, ParameterLabTest, QuestionAnswer,
@@ -851,7 +851,6 @@ class LabList(viewsets.ReadOnlyModelViewSet):
 
     @transaction.non_atomic_requests
     def retrieve(self, request, lab_id, entity=None):
-        request.user = User.objects.get(id=9)
         lab_obj = Lab.objects.select_related('network')\
                              .prefetch_related('rating', 'lab_documents')\
                              .filter(id=lab_id, is_live=True).first()
@@ -901,15 +900,9 @@ class LabList(viewsets.ReadOnlyModelViewSet):
         #                                    entity_type__iexact='Lab')
         # if entity.exists():
         #     entity = entity.first()
+        rating_queryset = lab_obj.rating.filter(is_live=True)
         if lab_obj.network:
-            union_list = []
-            rating_queryset = lab_obj.rating.filter(is_live=True)
-            for lab in lab_obj.network.lab.all():
-                if lab.id != lab_obj.id:
-                    query = lab.rating.filter(is_live=True)
-                    union_list.append(query)
-            if union_list:
-                rating_queryset = rating_queryset.union(*union_list)
+            rating_queryset = rating_models.RatingsReview.objects.prefetch_related('compliment').filter(is_live=True, lab_ratings__network=lab_obj.network)
         lab_serializer = diagnostic_serializer.LabModelSerializer(lab_obj, context={"request": request,
                                                                                     "entity": entity,
                                                                                     "rating_queryset": rating_queryset})

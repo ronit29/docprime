@@ -79,8 +79,15 @@ class LabModelSerializer(serializers.ModelSerializer):
     def get_display_rating_widget(self, obj):
         if self.parent:
             return None
-
-        if obj.rating.count() > 0:
+        rate_count = obj.rating.count()
+        avg = 0
+        if rate_count:
+            all_rating = []
+            for rate in obj.rating.all():
+                all_rating.append(rate.ratings)
+            if all_rating:
+                avg = sum(all_rating) / len(all_rating)
+        if rate_count > 5 or (rate_count <= 5 and avg > 4):
             return True
         return False
 
@@ -96,7 +103,7 @@ class LabModelSerializer(serializers.ModelSerializer):
         app = LabAppointment.objects.select_related('profile').all()
         # rating_queryset = obj.rating.prefetch_related('compliment').exclude(Q(review='') | Q(review=None)).filter(is_live=True).order_by('-updated_at')
         query = self.context.get('rating_queryset')
-        rating_queryset = query.prefetch_related('compliment').filter(Q(review__isnull=False), ~Q(review='')).order_by('-updated_at')
+        rating_queryset = query.exclude(Q(review='') | Q(review=None)).order_by('-updated_at')
         reviews = rating_serializer.RatingsModelSerializer(rating_queryset, many=True, context={'app': app})
         return reviews.data[:5]
 
