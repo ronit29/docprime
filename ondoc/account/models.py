@@ -2,6 +2,7 @@ from django.db import models
 from django.contrib.postgres.fields import JSONField
 from ondoc.authentication.models import TimeStampedModel, User, UserProfile, Merchant
 from ondoc.account.tasks import refund_curl_task
+from ondoc.notification.models import AppNotification, NotificationAction
 from ondoc.notification.tasks import process_payout
 # from ondoc.diagnostic.models import LabAppointment
 from django.db import transaction
@@ -571,6 +572,19 @@ class ConsumerAccount(TimeStampedModel):
         ConsumerTransaction.objects.create(**consumer_tx_data)
         consumer_account.save()
 
+        try:
+            context = {
+                "title": "Referral Bonus",
+                "body": ("Rs. " + str(int(cashback_amount)) + " Referral Bonus Recieved"),
+                "url": "/wallet",
+                "action_type": NotificationAction.CASHBACK_CREDITED,
+            }
+
+            AppNotification.send_notification(user=user, notification_type=NotificationAction.CASHBACK_CREDITED,
+                                              context=context)
+        except Exception as e:
+            logger.error(str(e))
+
     def consumer_tx_pg_data(self, data, amount, action, tx_type):
         consumer_tx_data = dict()
         consumer_tx_data['user'] = data['user']
@@ -909,14 +923,10 @@ class UserReferrals(TimeStampedModel):
 
     code = models.CharField(max_length=10, unique=True)
     user = models.ForeignKey(User, on_delete=models.DO_NOTHING, unique=True)
-    signup_cashback = models.DecimalField(max_digits=10, decimal_places=2, default=0)
-    completion_cashback = models.DecimalField(max_digits=10, decimal_places=2, default=0)
 
     def save(self, *args, **kwargs):
         if not self.code:
             self.code = self.generateCode()
-            self.signup_cashback = self.SIGNUP_CASHBACK
-            self.completion_cashback = self.COMPLETION_CASHBACK
         super().save(*args, **kwargs)
 
     def generateCode(self):
@@ -940,7 +950,7 @@ class UserReferred(TimeStampedModel):
         referred_obj = cls.objects.filter(user=user, used=False).first()
         if referred_obj:
             referral_obj = referred_obj.referral_code
-            ConsumerAccount.credit_referral(referral_obj.user, referral_obj.completion_cashback, appointment_obj, product_id)
+            ConsumerAccount.credit_referral(referral_obj.user, UserReferrals.COMPLETION_CASHBACK, appointment_obj, product_id)
             referred_obj.used = True
             referred_obj.save()
 

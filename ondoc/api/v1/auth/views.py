@@ -395,7 +395,7 @@ class UserProfileViewSet(mixins.CreateModelMixin, mixins.ListModelMixin,
         referral = UserReferrals.objects.filter(Q(code__iexact=referral_code), ~Q(user=user)).first()
         if referral and not UserReferred.objects.filter(user=user).exists():
             UserReferred.objects.create(user=user, referral_code=referral, used=False)
-            ConsumerAccount.credit_referral(user, referral.signup_cashback)
+            ConsumerAccount.credit_referral(user, UserReferrals.SIGNUP_CASHBACK)
 
 class OndocViewSet(mixins.CreateModelMixin,
                    mixins.RetrieveModelMixin,
