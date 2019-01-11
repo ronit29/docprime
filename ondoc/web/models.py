@@ -140,7 +140,7 @@ class NonBookableDoctorLead(TimeStampedModel):
     def create(cls, validated_data):
         t_from = validated_data.get('mobile', None)
         t_user = UserProfile.objects.filter(phone_number=t_from, is_default_user=True).first()
-        t_name = None
+        t_name = ''
         if t_user:
             t_name = t_user.name
         instance = NonBookableDoctorLead(name=t_name, from_mobile=t_from,
