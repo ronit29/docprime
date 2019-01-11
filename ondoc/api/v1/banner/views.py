@@ -27,6 +27,9 @@ class BannerListViewSet(viewsets.GenericViewSet):
             resp['start_date'] = data.start_date
             resp['end_date'] = data.end_date
             resp['priority'] = data.priority
+            resp['show_in_app'] = data.show_in_app
+            resp['app_params'] = data.app_params
+            resp['app_screen'] = data.app_screen
             resp['event_name'] = data.event_name
             if data.url:
                 path = urlparse(data.url).path
