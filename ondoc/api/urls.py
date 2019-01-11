@@ -21,6 +21,7 @@ from .v1.matrix.router import urlpatterns as matrix_url
 from .v1.coupon.router import urlpatterns as coupon_url
 from .v1.procedure.router import urlpatterns as procedure_url
 from .v1.banner.router import urlpatterns as banner_url
+from .v1.cart.router import urlpatterns as cart_url
 
 urlpatterns = [
     path('v1/doctor/', include(doctor_url)),
@@ -42,4 +43,5 @@ urlpatterns = [
     path('v1/procedure/', include(procedure_url)),
     path('v1/matrix/', include(matrix_url)),
     path('v1/banner/', include(banner_url)),
+    path('v1/cart/', include(cart_url)),
 ]
