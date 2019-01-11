@@ -10,7 +10,7 @@ from django.conf import settings
 from django.utils.dateparse import parse_datetime
 from ondoc.authentication.models import Merchant, AssociatedMerchant
 from ondoc.account.models import MerchantPayout
-from ondoc.common.models import Cities, MatrixCityMapping
+from ondoc.common.models import Cities, MatrixCityMapping, PaymentOptions
 from import_export import resources, fields
 from import_export.admin import ImportMixin, base_formats, ImportExportMixin, ImportExportModelAdmin
 from reversion.admin import VersionAdmin
@@ -421,3 +421,9 @@ class AssociatedMerchantInline(GenericTabularInline, nested_admin.NestedTabularI
     #fields = "__all__"
     #readonly_fields = ['merchant_id']
     #fields = ['merchant_id', 'type', 'account_number', 'ifsc_code', 'pan_number', 'pan_copy', 'account_copy', 'enabled']
+
+
+class PaymentOptionsAdmin(admin.ModelAdmin):
+    model = PaymentOptions
+    list_display = ['name', 'description', 'is_enabled']
+    search_fields = ['name']
