@@ -1911,3 +1911,27 @@ class SearchScore(auth_model.TimeStampedModel):
     class Meta:
         db_table = 'search_score'
 
+
+class UploadDoctorData(auth_model.TimeStampedModel):
+    CREATED = 1
+    IN_PROGRESS = 2
+    SUCCESS = 3
+    FAIL = 4
+    STATUS_CHOICES = ("", "Select"), \
+                     (CREATED, "Created"), \
+                     (IN_PROGRESS, "Upload in progress"), \
+                     (SUCCESS, "Upload successful"),\
+                     (FAIL, "Upload Failed")
+    # file, batch, status, error msg, source
+    file = models.FileField()
+    source = models.CharField(max_length=20)
+    batch = models.CharField(max_length=20)
+    status = models.PositiveSmallIntegerField(choices=STATUS_CHOICES, default=CREATED)
+    error_msg = models.TextField(blank=True)
+    lines = models.PositiveIntegerField(null=True, blank=True)
+
+    def save(self, *args, **kwargs):
+        from ondoc.notification.tasks import upload_doctor_data
+        super().save(*args, **kwargs)
+        if self.status == self.CREATED:
+            upload_doctor_data.apply_async((self.id,), countdown=1)

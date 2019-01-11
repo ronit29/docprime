@@ -3,12 +3,13 @@ from __future__ import absolute_import, unicode_literals
 import datetime
 import json
 import math
+import traceback
 from collections import OrderedDict
 
 from django.forms import model_to_dict
 from django.utils import timezone
 
-from ondoc.api.v1.utils import aware_time_zone
+from ondoc.api.v1.utils import aware_time_zone, util_absolute_url
 from ondoc.notification.labnotificationaction import LabNotificationAction
 from ondoc.notification import models as notification_models
 from celery import task
@@ -429,3 +430,28 @@ def send_lab_reports(appointment_id):
         lab_notification.send()
     except Exception as e:
         logger.error(str(e))
+
+
+@task()
+def upload_doctor_data(obj_id):
+    from ondoc.doctor.models import UploadDoctorData
+    from ondoc.crm.management.commands.upload_doctor_data import Command
+    instance = UploadDoctorData.objects.filter(id=obj_id).first()
+    if not instance:
+        return
+    try:
+        instance.status = UploadDoctorData.IN_PROGRESS
+        instance.save()
+        c = Command()
+        # c.handle(source=instance.source, batch=instance.batch, url=util_absolute_url(instance.file.url),
+        #          lines=instance.lines)
+        c.handle(source=instance.source, batch=instance.batch,
+                 # url=instance.file.url,
+                 lines=instance.lines)
+        instance.status = UploadDoctorData.SUCCESS
+        instance.save()
+    except Exception as e:
+        logger.error(traceback.format_exc() + str(e))
+        instance.status = UploadDoctorData.FAIL
+        instance.error_msg = str(e)
+        instance.save()

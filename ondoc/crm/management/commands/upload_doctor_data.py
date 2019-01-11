@@ -32,11 +32,16 @@ class Command(BaseCommand):
         print(options)
         source = options['source']
         batch = options['batch']
-        url = options['url']
-        lines = options['lines']
+        # url = options['url']
+        # lines = options['lines']
+        url = options.get('url', '/home/shashanksingh/Downloads/doctor_data_new.xlsx')
+        lines = options.get('lines', 10000000000)
 
-        r = requests.get(url)
-        content = BytesIO(r.content)
+        # r = requests.get(url)
+        # content = BytesIO(r.content)
+        import os
+        content = url
+
         wb = load_workbook(content)
         sheets = wb.worksheets
         doctor = UploadDoctor()

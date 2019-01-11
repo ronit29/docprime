@@ -39,7 +39,8 @@ from ondoc.doctor.models import (Doctor, DoctorQualification,
                                  OpdAppointment, CompetitorInfo, SpecializationDepartment,
                                  SpecializationField, PracticeSpecialization, SpecializationDepartmentMapping,
                                  DoctorPracticeSpecialization, CompetitorMonthlyVisit,
-                                 GoogleDetailing, VisitReason, VisitReasonMapping, PracticeSpecializationContent)
+                                 GoogleDetailing, VisitReason, VisitReasonMapping, PracticeSpecializationContent,
+                                 UploadDoctorData)
 from ondoc.authentication.models import User
 from .common import *
 from .autocomplete import CustomAutoComplete
@@ -1752,3 +1753,7 @@ class PracticeSpecializationContentAdmin(admin.ModelAdmin):
     display = ('specialization', 'content', )
     autocomplete_fields = ('specialization', )
 
+
+class UploadDoctorDataAdmin(admin.ModelAdmin):
+    list_display = ('source', 'batch', 'status', 'file', 'lines')
+    readonly_fields = ('status', 'error_msg')
