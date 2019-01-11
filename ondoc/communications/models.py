@@ -655,7 +655,7 @@ class OpdNotification(Notification):
             spocs_to_be_communicated = doctor_spocs
             # receivers.extend(doctor_spocs)
             receivers.append(instance.user)
-        # receivers = list(set(receivers))
+        receivers = list(set(receivers))
         user_and_phone_number = []
         user_and_email = []
         app_receivers = receivers
