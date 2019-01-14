@@ -15,7 +15,8 @@ from ondoc.doctor.models import (Doctor, DoctorPracticeSpecialization, PracticeS
 from django.contrib.gis.geos import Point, GEOSGeometry
 from django.contrib.contenttypes.models import ContentType
 
-from ondoc.authentication.models import SPOCDetails
+from ondoc.authentication.models import SPOCDetails, QCModel
+
 
 class Command(BaseCommand):
     help = 'Upload doctors via Excel'
@@ -255,6 +256,12 @@ class UploadDoctor(Doc):
         license = self.clean_data(sheet.cell(row=row, column=headers.get('license')).value)
         city = self.clean_data(sheet.cell(row=row, column=headers.get('city')).value)
         practicing_since = self.clean_data(sheet.cell(row=row, column=headers.get('practicing_since')).value)
+        is_license_verified = self.clean_data(sheet.cell(row=row, column=headers.get('is_license_verified')).value)
+        onboarding_status	= self.clean_data(sheet.cell(row=row, column=headers.get('onboarding_status')).value)
+        data_status = self.clean_data(sheet.cell(row=row, column=headers.get('data_status')).value)
+        enabled = self.clean_data(sheet.cell(row=row, column=headers.get('enabled')).value)
+        enabled_for_online_booking = self.clean_data(sheet.cell(row=row, column=headers.get('enabled_for_online_booking')).value)
+        is_live = self.clean_data(sheet.cell(row=row, column=headers.get('is_live')).value)
 
         if practicing_since:
             try:
@@ -262,8 +269,6 @@ class UploadDoctor(Doc):
             except:
                 print('Invalid Practicing since='+str(practicing_since))
                 practicing_since = None
-
-
 
         # practice_specialization_id = self.clean_data(sheet.cell(row=row, column=headers.get('practice_specialization_id')).value)
         # practice_specialization = None
@@ -275,7 +280,6 @@ class UploadDoctor(Doc):
         alternate_number_1 = self.clean_data(sheet.cell(row=row, column=headers.get('alternate_number_1')).value)
         alternate_number_2 = self.clean_data(sheet.cell(row=row, column=headers.get('alternate_number_2')).value)
         source = self.clean_data(sheet.cell(row=row, column=headers.get('phone_no_source')).value)
-
 
         num = self.get_number(primary_number, True, city, source)
         if num:
@@ -303,6 +307,12 @@ class UploadDoctor(Doc):
         data['numbers'] = number_entry
         data['image_url'] = image_url
         data['license'] = license
+        data['is_license_verified'] = is_license_verified
+        data['onboarding_status'] = onboarding_status
+        data['data_status'] = data_status
+        data['enabled'] = enabled
+        data['enabled_for_online_booking'] = enabled_for_online_booking
+        data['is_live'] = is_live
         return data
 
 
@@ -312,8 +322,16 @@ class UploadDoctor(Doc):
         if doctor:
             return doctor
 
-        doctor = Doctor.objects.create(name=data['name'], license=data.get('license',''), gender=data['gender'],
-                                                       practicing_since=data['practicing_since'], source=source, batch=batch, enabled=False, enabled_for_online_booking=False)
+        doctor = Doctor.objects.create(name=data['name'], license=data.get('license', ''), gender=data['gender'],
+                                       practicing_since=data['practicing_since'], source=source, batch=batch,
+                                       enabled=data.get('enabled', False),
+                                       enabled_for_online_booking=data.get('enabled_for_online_booking', False),
+                                       data_status=data.get('data_status', QCModel.IN_PROGRESS),
+                                       is_live=data.get('is_live', False),
+                                       onboarding_status=data.get('onboarding_status', Doctor.NOT_ONBOARDED),
+                                       is_license_verified=data.get('is_license_verified', False)
+                                       )
+
         SourceIdentifier.objects.create(type=SourceIdentifier.DOCTOR, unique_identifier=data.get('identifier'), reference_id=doctor.id)
         #self.save_image(batch,data.get('image_url'),data.get('identifier'))
         return doctor
@@ -564,7 +582,7 @@ class UploadHospital(Doc):
         rows = [row for row in sheet.rows]
         headers = {column.value.strip().lower(): i + 1 for i, column in enumerate(rows[0]) if column.value}
         reverse_day_map = {value[1]: value[0] for value in DoctorClinicTiming.SHORT_DAY_CHOICES}
-
+        type_choices_mapping = {value[1]: value[0] for value in DoctorClinicTiming.TYPE_CHOICES}
         doctor_obj_dict = dict()
         hospital_obj_dict = dict()
         doc_clinic_obj_dict = dict()
@@ -583,16 +601,42 @@ class UploadHospital(Doc):
             if not hospital_obj:
                 print('hospital not found')
                 continue
-            doc_clinic_obj = self.get_doc_clinic(doctor_obj, hospital_obj, doc_clinic_obj_dict)
+            followup_duration = self.clean_data(sheet.cell(row=i, column=headers.get('followup_duration')).value)
+            followup_charges = self.clean_data(sheet.cell(row=i, column=headers.get('followup_charges')).value)
+            try:
+                followup_duration = int(followup_duration)
+            except Exception as e:
+                print('invalid followup_duration' + str(followup_duration))
+                followup_duration = 7
+            try:
+                followup_charges = int(followup_charges)
+            except Exception as e:
+                print('invalid followup_charges' + str(followup_charges))
+                followup_charges = 0
+            doc_clinic_obj = self.get_doc_clinic(doctor_obj, hospital_obj, doc_clinic_obj_dict, followup_duration, followup_charges)
             day_list = self.parse_day_range(sheet.cell(row=i, column=headers.get('day_range')).value, reverse_day_map)
             start, end = self.parse_timing(sheet.cell(row=i, column=headers.get('timing')).value)
             clinic_time_data = list()
             fees = self.clean_data(sheet.cell(row=i, column=headers.get('fee')).value)
+            type = type_choices_mapping.get(self.clean_data(sheet.cell(row=i, column=headers.get('type')).value), 1)
+            deal_price = self.clean_data(sheet.cell(row=i, column=headers.get('deal_price')).value)
+            mrp = self.clean_data(sheet.cell(row=i, column=headers.get('mrp')).value)
+
             try:
                 fees = int(fees)
             except Exception as e:
                 print('invalid fees' + str(fees))
                 fees = None
+            try:
+                deal_price = int(deal_price)
+            except Exception as e:
+                print('invalid deal_price' + str(deal_price))
+                deal_price = None
+            try:
+                mrp = int(mrp)
+            except Exception as e:
+                print('invalid mrp' + str(mrp))
+                mrp = None
 
             for day in day_list:
                 if fees is not None and day is not None and start is not None and end is not None and start != end:
@@ -602,9 +646,9 @@ class UploadHospital(Doc):
                         "start": start,
                         "end": end,
                         "fees": fees,
-                        "deal_price":fees,
-                        "mrp":fees,
-                        "type":1
+                        "deal_price": deal_price,
+                        "mrp": mrp,
+                        "type": type
                     }
                     try:
                         DoctorClinicTiming.objects.get_or_create(**temp_data)
@@ -681,12 +725,16 @@ class UploadHospital(Doc):
 
         return hospital
 
-    def get_doc_clinic(self, doctor_obj, hospital_obj, doc_clinic_obj_dict):
+    def get_doc_clinic(self, doctor_obj, hospital_obj, doc_clinic_obj_dict, followup_duration, followup_charges):
         # print(doctor_obj, hospital_obj, "hello")
         # if doc_clinic_obj_dict.get((doctor_obj, hospital_obj)):
         #     doc_clinic_obj = doc_clinic_obj_dict.get((doctor_obj, hospital_obj))
         # else:
-        doc_clinic_obj, is_field_created = DoctorClinic.objects.get_or_create(doctor=doctor_obj, hospital=hospital_obj, defaults={'followup_charges':0, 'followup_duration':7,'enabled_for_online_booking':False})
+        doc_clinic_obj, is_field_created = DoctorClinic.objects.get_or_create(doctor=doctor_obj, hospital=hospital_obj,
+                                                                              followup_charges=followup_charges,
+                                                                              followup_duration=followup_duration,
+                                                                              defaults={
+                                                                                  'enabled_for_online_booking': False})
         # doc_clinic_obj_dict[(doctor_obj, hospital_obj)] = doc_clinic_obj
 
         return doc_clinic_obj
