@@ -1213,7 +1213,7 @@ class DoctorListViewSet(viewsets.GenericViewSet):
             ratings_title = title
             if specializations:
                 if not sublocality:
-                    title += ' | Best ' + specializations + ' Doctor in ' + city + ' - docprime'
+                    title += ' - Book Best ' + specializations +' Online'
                 else:
                     title += ' | Book & Get Best Deal'
 
