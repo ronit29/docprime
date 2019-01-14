@@ -1,12 +1,17 @@
-from django.db import models
+import logging
+
+from django.db import models, transaction
 from django.core.validators import MaxValueValidator, MinValueValidator, FileExtensionValidator
 from django.conf import settings
-from ondoc.authentication.models import TimeStampedModel
+from ondoc.authentication.models import TimeStampedModel, UserProfile
 from ondoc.common.models import Cities
-from ondoc.matrix.tasks import push_signup_lead_to_matrix
+from ondoc.doctor.models import Doctor, Hospital
+from ondoc.matrix.tasks import push_signup_lead_to_matrix, push_non_bookable_doctor_lead_to_matrix
 import json
 from django.contrib.postgres.fields import JSONField
 import hashlib
+
+logger = logging.getLogger(__name__)
 
 class OnlineLead(TimeStampedModel):
     DOCTOR = 1
@@ -120,3 +125,32 @@ class UploadImage(TimeStampedModel):
     def __str__(self):
         return "{}".format(self.name)
 
+
+class NonBookableDoctorLead(TimeStampedModel):
+    name = models.CharField(max_length=255, blank=True, default='')
+    from_mobile = models.CharField(max_length=25)
+    to_mobile = models.CharField(max_length=25, blank=True)
+    doctor = models.ForeignKey(Doctor, on_delete=models.SET_NULL, null=True)
+    hospital = models.ForeignKey(Hospital, on_delete=models.SET_NULL, null=True)
+    masked_mobile = models.CharField(max_length=25, blank=True, default='')
+    matrix_lead_id = models.IntegerField(null=True)
+    source = models.CharField(max_length=128, default='docprimeNB')
+
+    @classmethod
+    def create(cls, validated_data):
+        t_from = validated_data.get('mobile', None)
+        t_user = UserProfile.objects.filter(phone_number=t_from, is_default_user=True).first()
+        t_name = ''
+        if t_user:
+            t_name = t_user.name
+        instance = NonBookableDoctorLead(name=t_name, from_mobile=t_from,
+                       doctor=validated_data.get('doctor'), hospital=validated_data.get('hospital'))
+        instance.save()
+        try:
+            push_non_bookable_doctor_lead_to_matrix.apply_async((instance.id,), countdown=5)
+        except Exception as e:
+            logger.error(str(e))
+        return instance
+
+    class Meta:
+        db_table = "nb_doctor_lead"

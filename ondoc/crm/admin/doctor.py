@@ -39,8 +39,7 @@ from ondoc.doctor.models import (Doctor, DoctorQualification,
                                  OpdAppointment, CompetitorInfo, SpecializationDepartment,
                                  SpecializationField, PracticeSpecialization, SpecializationDepartmentMapping,
                                  DoctorPracticeSpecialization, CompetitorMonthlyVisit,
-                                 GoogleDetailing, VisitReason, VisitReasonMapping, PracticeSpecializationContent,
-                                 UploadDoctorData)
+                                 GoogleDetailing, VisitReason, VisitReasonMapping, PracticeSpecializationContent, DoctorMobileOtp, UploadDoctorData)
 from ondoc.authentication.models import User
 from .common import *
 from .autocomplete import CustomAutoComplete
@@ -53,6 +52,7 @@ from ondoc.authentication import models as auth_model
 from django import forms
 from decimal import Decimal
 from .common import AssociatedMerchantInline
+from ondoc.sms import api
 
 class AutoComplete:
     def autocomplete_view(self, request):
@@ -430,6 +430,8 @@ class HospitalDocumentInline(admin.TabularInline):
 class DoctorMobileForm(forms.ModelForm):
     number = forms.CharField(required=True)
     is_primary = forms.BooleanField(required=False)
+    mark_primary = forms.BooleanField(required=False)
+    otp = forms.IntegerField(required=False)
 
     def clean(self):
         super().clean()
@@ -443,18 +445,29 @@ class DoctorMobileForm(forms.ModelForm):
                 std_code=int(std_code)
             except:
                 raise forms.ValidationError("Invalid STD code")
-
+    
         try:
             number=int(number)
         except:
             raise forms.ValidationError("Invalid Number")
-
+    
         if std_code:
             if data.get('is_primary'):
                 raise forms.ValidationError("Primary number should be a mobile number")
         else:
             if number and (number<5000000000 or number>9999999999):
                 raise forms.ValidationError("Invalid mobile number")
+    
+        #Marking doctor mobile primary work.
+        # if std_code and data.get('mark_primary'):
+        #     raise forms.ValidationError('Primary number should be a mobile number')
+        
+        # if not std_code and data.get('mark_primary'):
+        #     if number and (number<5000000000 or number>9999999999):
+        #         raise forms.ValidationError("Invalid mobile number")
+
+    class Meta:
+        fields = '__all__'
 
 
 # class DoctorMobileFormSet(forms.BaseInlineFormSet):
@@ -462,27 +475,122 @@ class DoctorMobileForm(forms.ModelForm):
 #         super().clean()
 #         if any(self.errors):
 #             return
-#
+
 #         primary = 0
+#         mark_primary = 0
 #         count = 0
+
 #         for value in self.cleaned_data:
+#             std_code = value.get('std_code')
+#             number = value.get('number')
+#             if std_code:
+#                 try:
+#                     std_code=int(std_code)
+#                 except:
+#                     raise forms.ValidationError("Invalid STD code")
+
+#             try:
+#                 number=int(number)
+#             except:
+#                 raise forms.ValidationError("Invalid Number")
+
+#             if std_code:
+#                 if value.get('is_primary'):
+#                     raise forms.ValidationError("Primary number should be a mobile number")
+
+#                 if value.get('mark_primary'):
+#                     raise forms.ValidationError("Mark primary is only applicable for mobile numbers.")
+
+#             else:
+#                 if number and (number<5000000000 or number>9999999999):
+#                     raise forms.ValidationError("Invalid mobile number")
+
 #             count += 1
+
+
 #             if value.get('is_primary'):
+#                 if self.forms[0].instance.doctor.onboarding_status == 3:
+#                     if value.get('DELETE'):
+#                         raise forms.ValidationError('Primary number cannot be deleted.')
+
+#                     if not value.get('id'):
+#                         raise forms.ValidationError('Primary number can be marked only by checking mark_primary, '
+#                                                     'obtaining otp and entering otp again.')
+#                     id = value.get('id').id
+#                     if id and not DoctorMobile.objects.filter(id=id, is_primary=True).exists():
+#                         raise forms.ValidationError('Primary number can be marked only by checking mark_primary, '
+#                                                     'obtaining otp and entering otp again.')
+
+#                     if id and not DoctorMobile.objects.filter(id=id, number=value.get('number')).exists():
+#                         raise forms.ValidationError('Primary number cannot be changed. Add another number , mark it as primary'
+#                                                     ' and validate it with otp')
+
+#                     if value.get('mark_primary'):
+#                         raise forms.ValidationError('Number is already primary number.')
+
 #                 primary += 1
-#
+
+#             if value.get('mark_primary'):
+#                 mark_primary += 1
+
 #         if count > 0:
-#             if not primary == 1:
-#                 raise forms.ValidationError("Doctor must have one primary mobile number.")
+
+#             if primary > 1:
+#                 raise forms.ValidationError("Doctor can have only one primary number.")
+
+#             if DoctorMobile.objects.filter(doctor=self.forms[0].instance.doctor).exists() \
+#                     and self.forms[0].instance.doctor.onboarding_status == 3:
+#                 if primary != 1 :
+#                     raise forms.ValidationError("Doctor must have one primary mobile number.")
+#             if mark_primary > 1:
+#                 raise forms.ValidationError("Doctor can change only one primary mobile number.")
+
+#         record = None
+#         todo_make_primary = None
+#         for form in self.forms:
+#             if form.instance.mark_primary and not form.instance.otp:
+#                 # if not DoctorMobileOtp.objects.filter(doctor_mobile=form.instance).exists():
+#                 form.instance.save()
+#                 dmo = DoctorMobileOtp.create_otp(form.instance)
+#                 message = "The OTP for onboard process is %d" % dmo.otp
+
+#                 try:
+#                     api.send_sms(message, str(form.instance.number))
+#                 except Exception as e:
+#                     logger.error(str(e))
+
+#             elif form.instance.mark_primary and form.instance.otp:
+#                 doctor_mobile_otp = form.instance.mobiles_otp.all().last()
+#                 resonse = doctor_mobile_otp.consume()
+#                 if resonse:
+#                     # DoctorMobile.objects.filter(doctor=form.instance.doctor).update(is_primary=False)
+#                     # form.instance.is_primary = True
+#                     todo_make_primary = form.instance.id
+#                     form.instance.otp = None
+#                     form.instance.mark_primary = False
+#                 else:
+#                     raise forms.ValidationError("OTP is incorrect")
+
+
+#             elif not form.instance.mark_primary and form.instance.otp:
+#                 form.instance.otp = None
+
+#         if todo_make_primary:
+#             for form in self.forms:
+#                 if form.instance.id == todo_make_primary:
+#                     form.instance.is_primary = True
+#                 else:
+#                     form.instance.is_primary = False
 
 
 class DoctorMobileInline(nested_admin.NestedTabularInline):
     model = DoctorMobile
     form = DoctorMobileForm
-    # formset = DoctorMobileFormSet
+    #formset = DoctorMobileFormSet
     extra = 0
     can_delete = True
     show_change_link = False
-    fields = ['std_code','number', 'is_primary']
+    fields = ['std_code','number', 'is_primary', 'mark_primary', 'otp']
 
 
 class DoctorEmailForm(forms.ModelForm):
@@ -882,7 +990,7 @@ class DoctorAdmin(AutoComplete, ImportExportMixin, VersionAdmin, ActionAdmin, QC
     list_filter = (
         'data_status', 'onboarding_status', 'is_live', 'enabled', 'is_insurance_enabled', 'doctorpracticespecializations__specialization',
         CityFilter, CreatedByFilter)
-    #form = DoctorForm
+    form = DoctorForm
     inlines = [
         CompetitorInfoInline,
         CompetitorMonthlyVisitsInline,

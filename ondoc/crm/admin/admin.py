@@ -1,6 +1,7 @@
 
 from django.contrib.gis import admin
 
+from ondoc.common.models import PaymentOptions
 from ondoc.crm.admin.banner import BannerAdmin
 from ondoc.crm.admin.procedure import ProcedureCategoryAdmin, ProcedureAdmin
 from ondoc.doctor.models import (Doctor, Language, MedicalService, Specialization, College, Qualification, Hospital,
@@ -8,7 +9,8 @@ from ondoc.doctor.models import (Doctor, Language, MedicalService, Specializatio
                                  MedicalCondition, AboutDoctor, HealthTip, CommonMedicalCondition, CommonSpecialization,
                                  DoctorClinic, DoctorMapping, DoctorImage, OpdAppointment, CompetitorInfo,
                                  SpecializationDepartment, SpecializationField, PracticeSpecialization,
-                                 VisitReason, CancellationReason, PracticeSpecializationContent, UploadDoctorData)
+                                 VisitReason, CancellationReason, PracticeSpecializationContent,
+                                 DoctorMobileOtp, UploadDoctorData)
 from ondoc.diagnostic.models import (Lab, LabNetwork, LabTest, LabTestType,LabService,
                                       AvailableLabTest, LabAppointment, CommonTest, CommonDiagnosticCondition, LabPricingGroup,
                                      TestParameter, CommonPackage, LabTestCategory)
@@ -149,6 +151,8 @@ admin.site.register(DemoElastic, DemoElasticAdmin)
 admin.site.register(Merchant, MerchantAdmin)
 admin.site.register(MerchantPayout, MerchantPayoutAdmin)
 #admin.site.register(AssociatedMerchant)
+admin.site.register(DoctorMobileOtp)
 admin.site.register(NewDynamic, NewDynamicAdmin)
 admin.site.register(EntityUrls, EntityUrlsAdmin)
+admin.site.register(PaymentOptions, PaymentOptionsAdmin)
 admin.site.register(UploadDoctorData, UploadDoctorDataAdmin)

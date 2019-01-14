@@ -14,10 +14,11 @@ from datetime import timedelta
 from dateutil import tz
 from django.utils import timezone
 from ondoc.authentication import models as auth_model
+from ondoc.authentication.models import SPOCDetails
 
 from ondoc.location import models as location_models
 from ondoc.account.models import Order, ConsumerAccount, ConsumerTransaction, PgTransaction, ConsumerRefund, \
-    MerchantPayout
+    MerchantPayout, UserReferred
 from ondoc.notification.models import NotificationAction
 from ondoc.payout.models import Outstanding
 from ondoc.coupon.models import Coupon
@@ -51,12 +52,17 @@ from ondoc.matrix.tasks import push_appointment_to_matrix, push_onboarding_qcsta
 # from ondoc.procedure.models import Procedure
 from ondoc.ratings_review import models as ratings_models
 from django.utils import timezone
+from random import randint
 import reversion
 from ondoc.doctor import models as doctor_models
 from django.db.models import Count
 from ondoc.api.v1.utils import RawSql
 
 logger = logging.getLogger(__name__)
+
+
+def doctor_mobile_otp_validity():
+    return timezone.now() + timezone.timedelta(hours=2)
 
 
 class Migration(migrations.Migration):
@@ -232,6 +238,13 @@ class Hospital(auth_model.TimeStampedModel, auth_model.CreatedByModel, auth_mode
 
         # if build_url and self.location and self.is_live:
         #     ea = location_models.EntityLocationRelationship.create(latitude=self.location.y, longitude=self.location.x, content_object=self)
+
+    def get_spocs_for_communication(self):
+        result = []
+        result.extend(list(self.spoc_details.filter(contact_type__in=[SPOCDetails.SPOC, SPOCDetails.MANAGER])))
+        if not result:
+            result.extend(list(self.spoc_details.filter(contact_type=SPOCDetails.OWNER)))
+        return result
 
 
 class HospitalAward(auth_model.TimeStampedModel):
@@ -899,10 +912,55 @@ class DoctorMobile(auth_model.TimeStampedModel):
     is_primary = models.BooleanField(verbose_name='Primary Number?', default=False)
     is_phone_number_verified = models.BooleanField(verbose_name='Phone Number Verified?', default=False)
     source = models.CharField(max_length=2000, blank=True)
+    otp = models.PositiveIntegerField(null=True, blank=False)
+    mark_primary = models.BooleanField(default=False)
 
     class Meta:
         db_table = "doctor_mobile"
         unique_together = (("doctor", "number","std_code"),)
+
+
+class DoctorMobileOtpManager(models.Manager):
+    def get_queryset(self):
+        return super(DoctorMobileOtpManager, self).get_queryset().filter(usable_counter=1, validity__gte=timezone.now())
+
+
+class DoctorMobileOtp(auth_model.TimeStampedModel):
+    doctor_mobile = models.ForeignKey(DoctorMobile, related_name="mobiles_otp", on_delete=models.CASCADE)
+    otp = models.PositiveIntegerField()
+    validity = models.DateTimeField(default=doctor_mobile_otp_validity)
+    usable_counter = models.SmallIntegerField(default=1)
+
+    objects = DoctorMobileOtpManager()
+
+    @classmethod
+    def create_otp(cls, doctor_mobile_obj):
+        otp = randint(100000,999999)
+        dmo = cls(doctor_mobile=doctor_mobile_obj, otp=otp)
+        dmo.save()
+        print(dmo.otp)
+        return dmo
+
+    def is_valid(self):
+        if self.validity > timezone.now() and self.usable_counter == 1 :
+            return True
+        return False
+
+    def consume(self):
+        if self.is_valid():
+            if self.doctor_mobile.otp == self.otp:
+                self.usable_counter = 0
+                self.save()
+                return True
+            else:
+                print('OTP not matched')
+                return False
+        else:
+            print('[ERROR] Otp is expired.')
+            return False
+
+    class Meta:
+        db_table = "doctor_mobile_otp"
 
 
 class DoctorEmail(auth_model.TimeStampedModel):
@@ -1347,6 +1405,9 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin):
                 if self.cashback is not None and self.cashback > 0:
                     ConsumerAccount.credit_cashback(self.user, self.cashback, database_instance, Order.DOCTOR_PRODUCT_ID)
 
+                # credit referral cashback if any
+                UserReferred.credit_after_completion(self.user, database_instance, Order.DOCTOR_PRODUCT_ID)
+
         except Exception as e:
             pass
 
@@ -1486,7 +1547,7 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin):
                          "deal_price": self.deal_price - procedures_total["deal_price"],
                          "agreed_price": self.fees - procedures_total["agreed_price"]}
         doctor_prices["discount"] = doctor_prices["mrp"] - doctor_prices["deal_price"]
-        procedures.insert(0, {"name": "Consultation Fees", "mrp": doctor_prices["mrp"],
+        procedures.insert(0, {"name": "Consultation", "mrp": doctor_prices["mrp"],
                               "deal_price": doctor_prices["deal_price"],
                               "agreed_price": doctor_prices["agreed_price"],
                               "discount": doctor_prices["discount"]})
