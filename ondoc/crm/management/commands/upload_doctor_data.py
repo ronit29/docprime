@@ -16,6 +16,7 @@ from django.contrib.gis.geos import Point, GEOSGeometry
 from django.contrib.contenttypes.models import ContentType
 
 from ondoc.authentication.models import SPOCDetails, QCModel
+from django.db import transaction
 
 
 class Command(BaseCommand):
@@ -49,13 +50,15 @@ class Command(BaseCommand):
         specialization = UploadSpecialization()
 
         #doctor.p_image(sheets[0], source, batch)
-        doctor.upload(sheets[0], source, batch, lines)
-        qualification.upload(sheets[1], lines)
-        experience.upload(sheets[2], lines)
-        membership.upload(sheets[3], lines)
-        award.upload(sheets[4], lines)
-        hospital.upload(sheets[5], source, batch, lines)
-        specialization.upload(sheets[6], lines)
+
+        with transaction.atomic():
+            #doctor.upload(sheets[0], source, batch, lines)
+            # qualification.upload(sheets[1], lines)
+            #experience.upload(sheets[2], lines)
+            #membership.upload(sheets[3], lines)
+            #award.upload(sheets[4], lines)
+            hospital.upload(sheets[5], source, batch, lines)
+            # specialization.upload(sheets[6], lines)
 
 
 
@@ -65,7 +68,7 @@ class Doc():
         si_obj = SourceIdentifier.objects.filter(type=SourceIdentifier.DOCTOR, unique_identifier=doctor_identifier).first()
         doctor_obj = None
         if si_obj:
-            doctor_obj = Doctor.objects.get(pk=si_obj.reference_id)
+            doctor_obj = Doctor.objects.filter(pk=si_obj.reference_id).first()
         return doctor_obj
 
     def clean_data(self, value):
@@ -251,12 +254,12 @@ class UploadDoctor(Doc):
         license = self.clean_data(sheet.cell(row=row, column=headers.get('license')).value)
         city = self.clean_data(sheet.cell(row=row, column=headers.get('city')).value)
         practicing_since = self.clean_data(sheet.cell(row=row, column=headers.get('practicing_since')).value)
-        is_license_verified = self.clean_data(sheet.cell(row=row, column=headers.get('is_license_verified')).value)
-        onboarding_status	= self.clean_data(sheet.cell(row=row, column=headers.get('onboarding_status')).value)
-        data_status = self.clean_data(sheet.cell(row=row, column=headers.get('data_status')).value)
-        enabled = self.clean_data(sheet.cell(row=row, column=headers.get('enabled')).value)
-        enabled_for_online_booking = self.clean_data(sheet.cell(row=row, column=headers.get('enabled_for_online_booking')).value)
-        is_live = self.clean_data(sheet.cell(row=row, column=headers.get('is_live')).value)
+        is_license_verified = self.clean_data(sheet.cell(row=row, column=headers.get('is_license_verified', False)).value)
+        onboarding_status	= self.clean_data(sheet.cell(row=row, column=headers.get('onboarding_status', 1)).value)
+        data_status = self.clean_data(sheet.cell(row=row, column=headers.get('data_status', 1)).value)
+        enabled = self.clean_data(sheet.cell(row=row, column=headers.get('enabled', True)).value)
+        enabled_for_online_booking = self.clean_data(sheet.cell(row=row, column=headers.get('enabled_for_online_booking', False)).value)
+        is_live = self.clean_data(sheet.cell(row=row, column=headers.get('is_live', False)).value)
 
         if practicing_since:
             try:
@@ -327,7 +330,7 @@ class UploadDoctor(Doc):
                                        is_license_verified=data.get('is_license_verified', False)
                                        )
 
-        SourceIdentifier.objects.create(type=SourceIdentifier.DOCTOR, unique_identifier=data.get('identifier'), reference_id=doctor.id)
+        SourceIdentifier.objects.get_or_create(unique_identifier=data.get('identifier'), reference_id=doctor.id, type=SourceIdentifier.DOCTOR)
         #self.save_image(batch,data.get('image_url'),data.get('identifier'))
         return doctor
 
@@ -602,7 +605,7 @@ class UploadHospital(Doc):
                 followup_duration = int(followup_duration)
             except Exception as e:
                 print('invalid followup_duration' + str(followup_duration))
-                followup_duration = 7
+                followup_duration = 0
             try:
                 followup_charges = int(followup_charges)
             except Exception as e:
@@ -613,9 +616,12 @@ class UploadHospital(Doc):
             start, end = self.parse_timing(sheet.cell(row=i, column=headers.get('timing')).value)
             clinic_time_data = list()
             fees = self.clean_data(sheet.cell(row=i, column=headers.get('fee')).value)
-            type = type_choices_mapping.get(self.clean_data(sheet.cell(row=i, column=headers.get('type')).value), 1)
+            type = type_choices_mapping.get(self.clean_data(sheet.cell(row=i, column=headers.get('type')).value), None)
             deal_price = self.clean_data(sheet.cell(row=i, column=headers.get('deal_price')).value)
             mrp = self.clean_data(sheet.cell(row=i, column=headers.get('mrp')).value)
+
+            if not type:
+                raise Exception('Invalid type for clinic timing')
 
             try:
                 fees = int(fees)
@@ -725,11 +731,11 @@ class UploadHospital(Doc):
         # if doc_clinic_obj_dict.get((doctor_obj, hospital_obj)):
         #     doc_clinic_obj = doc_clinic_obj_dict.get((doctor_obj, hospital_obj))
         # else:
-        doc_clinic_obj, is_field_created = DoctorClinic.objects.get_or_create(doctor=doctor_obj, hospital=hospital_obj,
-                                                                              followup_charges=followup_charges,
-                                                                              followup_duration=followup_duration,
+        doc_clinic_obj, is_field_created = DoctorClinic.objects.get_or_create(doctor=doctor_obj, hospital=hospital_obj,                                                                              
                                                                               defaults={
-                                                                                  'enabled_for_online_booking': False})
+                                                                              'followup_charges':followup_charges,
+                                                                              'followup_duration':followup_duration,
+                                                                              'enabled_for_online_booking': True})
         # doc_clinic_obj_dict[(doctor_obj, hospital_obj)] = doc_clinic_obj
 
         return doc_clinic_obj
