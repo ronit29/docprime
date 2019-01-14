@@ -9,6 +9,15 @@ class SearchedDoctorData():
 
     @staticmethod
     def find_doctor_data():
+        specializations = ['Dentist', 'General Physician', 'Gynecologist', 'Pediatrician', 'Orthopedist', 'Homeopathy doctor',
+                           'Obstetrician & Gynecologist', 'Physiotherapist', 'Ophthalmologist', 'Dermatologist', 'General Surgeon',
+                           'ENT Doctor', 'Cardiologist', 'Psychologist', 'Diabetologist', 'Cosmetologist', 'Plastic Surgeon',
+                           'Oral And MaxilloFacial Surgeon', 'Laparoscopic Surgeon', 'Internal Medicine Specialist',
+                           'Infertility Specialist', 'Psychiatrist', 'Urologist', 'Dietitian', 'Neurologist', 'Gastroenterologist',
+                           'Pulmonologist', 'Radiologist', 'Neurosurgeon', 'Nephrologist', 'Pathologist', 'Endocrinologist',
+                           'Spine Surgeon', 'Hair Transplant Surgeon', 'Sexologist', 'Speech Therapist', 'Gastroenterology Surgeon',
+                           'Family Physician', 'Interventional Cardiologist', 'Bariatric surgeon', 'Yoga and Naturopathy Specialist']
+
         pincodes = [ '110092', '110051', '110032', '110090', '110053', '110091', '110094', '110095', '110031',
                      '110096', '110093', '110006', '110033', '110036', '110034', '110054', '110052', '110039', '110085',
                      '110042', '110040', '110086', '110084', '110007', '110081', '110009', '110035', '110088', '110082',
@@ -27,9 +36,10 @@ class SearchedDoctorData():
                      '122015', '122103', '122105', '201313', '201304', '201008', '201306', '201314', '201307', '201311',
                      '203207', '201312', '201310', '201309', '201305', '201301', '201303', '201307', '201008']
 
-        for pincode in pincodes:
-            search_keywords = 'Doctors in ' + pincode
-            print(search_keywords + ' ' + SearchedDoctorData.searched_google_data(search_keywords))
+        for specialization in specializations:
+            for pincode in pincodes:
+                search_keywords = specialization + ' in ' + pincode
+                print(search_keywords + ' ' + SearchedDoctorData.searched_google_data(search_keywords))
         return 'success'
 
     @staticmethod
@@ -45,14 +55,13 @@ class SearchedDoctorData():
 
         if response.status_code != status.HTTP_200_OK or not response.ok:
             print('failure  status_code: ' + str(response.status_code) + ', reason: ' + str(response.reason))
-            return results
-
+            return {}
         searched_data = response.json()
         google_result = []
 
         if isinstance(searched_data.get('results'), list) and \
                 len(searched_data.get('results')) == 0:
-            return searched_data.get('status')
+            return {}
 
         if searched_data.get('results'):
             for data in searched_data.get('results'):
@@ -115,7 +124,7 @@ class SearchedDoctorData():
             while next_page_token or page==1:
                 page += 1
                 result = SearchedDoctorData.run_google_search(search_keywords, next_page_token)
-                next_page_token = result.get('next_page_token') if result.get('next_page_token') else None
+                next_page_token = result.get('next_page_token')
                 if result.get('count'):
                     count += result.get('count')
                 if result.get('data') and len(result.get('data'))>0:
