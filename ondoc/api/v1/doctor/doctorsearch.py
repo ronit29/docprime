@@ -207,7 +207,7 @@ class DoctorSearchHelper:
                     order_by_field = " distance ASC, deal_price ASC, priority desc "
                     rank_by = " rnk=1 "
             else:
-                order_by_field = ' floor(distance/{bucket_size}) ASC, is_license_verified DESC, distance, priority desc '.format(bucket_size=str(bucket_size))
+                order_by_field = ' floor(distance/{bucket_size}) ASC, is_license_verified DESC, search_score desc '.format(bucket_size=str(bucket_size))
                 rank_by = "rnk=1"
 
             order_by_field = "{}, {} ".format(' enabled_for_online_booking DESC ', order_by_field)
@@ -294,7 +294,7 @@ class DoctorSearchHelper:
             "dct.id as doctor_clinic_timing_id,practicing_since, " \
             "d.enabled_for_online_booking and dc.enabled_for_online_booking and h.enabled_for_online_booking as enabled_for_online_booking, " \
             "is_license_verified, priority,deal_price, " \
-            "dc.hospital_id as hospital_id FROM doctor d " \
+            "dc.hospital_id as hospital_id, d.search_score FROM doctor d " \
             "INNER JOIN doctor_clinic dc ON d.id = dc.doctor_id and dc.enabled=true and d.is_live=true " \
             "and d.is_test_doctor is False and d.is_internal is False " \
             "INNER JOIN hospital h ON h.id = dc.hospital_id and h.is_live=true " \

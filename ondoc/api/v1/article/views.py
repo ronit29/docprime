@@ -70,7 +70,7 @@ class ArticleViewSet(viewsets.GenericViewSet):
         if article_contains and len(article_contains) > 2:
             article_data = article_data.filter(title__icontains=article_contains)
         articles_count = article_data.count()
-        article_data = paginate_queryset(article_data, request, 10)
+        article_data = paginate_queryset(article_data, request, 50)
         resp = serializers.ArticleListSerializer(article_data, many=True,
                                                  context={'request': request}).data
         title = ''

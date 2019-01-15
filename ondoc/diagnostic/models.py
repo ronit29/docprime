@@ -4,9 +4,10 @@ from django.contrib.gis.db import models
 from django.contrib.staticfiles.templatetags.staticfiles import static
 from django.core.validators import MaxValueValidator, MinValueValidator, FileExtensionValidator
 
-from ondoc.account.models import MerchantPayout, ConsumerAccount, Order
+from ondoc.account.models import MerchantPayout, ConsumerAccount, Order, UserReferred
 from ondoc.authentication.models import (TimeStampedModel, CreatedByModel, Image, Document, QCModel, UserProfile, User,
-                                         UserPermission, GenericAdmin, LabUserPermission, GenericLabAdmin, BillingAccount)
+                                         UserPermission, GenericAdmin, LabUserPermission, GenericLabAdmin,
+                                         BillingAccount, SPOCDetails)
 from ondoc.doctor.models import Hospital, SearchKey, CancellationReason
 from ondoc.coupon.models import Coupon
 from ondoc.notification import models as notification_models
@@ -202,7 +203,7 @@ class Lab(TimeStampedModel, CreatedByModel, QCModel, SearchKey):
     billing_merchant = GenericRelation(BillingAccount)
     home_collection_charges = GenericRelation(HomePickupCharges)
     entity = GenericRelation(location_models.EntityLocationRelationship)
-    rating = GenericRelation(ratings_models.RatingsReview)
+    rating = GenericRelation(ratings_models.RatingsReview, related_query_name='lab_ratings')
     enabled = models.BooleanField(verbose_name='Is Enabled', default=True, blank=True)
     booking_closing_hours_from_dayend = models.DecimalField(max_digits=10, decimal_places=2, default=0, validators=[MinValueValidator(Decimal('0.00'))])
     order_priority = models.PositiveIntegerField(blank=True, null=True, default=0)
@@ -323,6 +324,12 @@ class Lab(TimeStampedModel, CreatedByModel, QCModel, SearchKey):
     #     if push_to_matrix:
     #         push_onboarding_qcstatus_to_matrix.apply_async(({'obj_type': self.__class__.__name__, 'obj_id': self.id}
     #                                                         ,), countdown=5)
+    def get_managers_for_communication(self):
+        result = []
+        result.extend(list(self.labmanager_set.filter(contact_type__in=[LabManager.SPOC, LabManager.MANAGER])))
+        if not result:
+            result.extend(list(self.labmanager_set.filter(contact_type=LabManager.OWNER)))
+        return result
 
 
 class LabCertification(TimeStampedModel):
@@ -1086,6 +1093,9 @@ class LabAppointment(TimeStampedModel, CouponsMixin):
                 if self.cashback is not None and self.cashback > 0:
                     ConsumerAccount.credit_cashback(self.user, self.cashback, database_instance,
                                                         Order.LAB_PRODUCT_ID)
+                # credit referral cashback if any
+                UserReferred.credit_after_completion(self.user, database_instance, Order.LAB_PRODUCT_ID)
+
         except Exception as e:
             logger.error("Error while saving payout mercahnt for lab- " + str(e))
 
