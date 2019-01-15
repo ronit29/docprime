@@ -421,13 +421,16 @@ class ReferralViewSet(GenericViewSet):
                 referral.user = user
                 referral.save()
 
-        user_config = UserConfig.objects.filter(key="referral")
-        options = []
-        resp = {}
-        resp['data'] = user_config.data
-        options.append(resp)
-        return Response({"code": referral.code, "status": 1}, options,
-                        {"share_text": UserConfig.share_text, "share_url": UserConfig.share_url})
+        user_config = UserConfig.objects.filter(key="referral").first()
+        help_flow = []
+        share_text = ''
+        share_url = ''
+        if user_config:
+            help_flow = user_config.data
+            share_text = user_config.share_text.replace('$referral_code', referral.code)
+            share_url = user_config.share_url.replace('$referral_code', referral.code)
+        return Response({"code": referral.code, "status": 1, 'help_flow': help_flow,
+                         "share_text": share_text, "share_url": share_url})
 
     def retrieve_by_code(self, request, code):
         referral = UserReferrals.objects.filter(code__iexact=code).first()
