@@ -441,10 +441,12 @@ def upload_doctor_data(obj_id):
     from ondoc.crm.management.commands import upload_doctor_data as upload_command
     from ondoc.crm.management.commands.upload_doctor_data import Command
     instance = UploadDoctorData.objects.filter(id=obj_id).first()
-    if not instance:
+    errors = []
+    if not instance or not (instance.status == UploadDoctorData.CREATED or instance.status == UploadDoctorData.FAIL):
         return
     try:
         instance.status = UploadDoctorData.IN_PROGRESS
+        instance.error_msg = None
         instance.save()
         # c = Command()
         # # c.handle(source=instance.source, batch=instance.batch, url=util_absolute_url(instance.file.url),
@@ -452,23 +454,23 @@ def upload_doctor_data(obj_id):
         # c.handle(source=instance.source, batch=instance.batch,
         #          # url=instance.file.url,
         #          lines=instance.lines)
-
         source = instance.source
         batch = instance.batch
-        url = util_absolute_url(instance.file.url)
+        # url = util_absolute_url(instance.file.url)
         lines = instance.lines if instance else 100000000
+
         # url = options.get('url', '/home/shashanksingh/Downloads/doctor_data_new.xlsx')
-        r = requests.get(url)
-        content = BytesIO(r.content)
-        wb = load_workbook(content)
+        # r = requests.get(url)
+        # content = BytesIO(r.content)
+        wb = load_workbook(instance.file)
         sheets = wb.worksheets
-        doctor = upload_command.UploadDoctor()
-        qualification = upload_command.UploadQualification()
-        experience = upload_command.UploadExperience()
-        membership = upload_command.UploadMembership()
-        award = upload_command.UploadAward()
-        hospital = upload_command.UploadHospital()
-        specialization = upload_command.UploadSpecialization()
+        doctor = upload_command.UploadDoctor(errors)
+        qualification = upload_command.UploadQualification(errors)
+        experience = upload_command.UploadExperience(errors)
+        membership = upload_command.UploadMembership(errors)
+        award = upload_command.UploadAward(errors)
+        hospital = upload_command.UploadHospital(errors)
+        specialization = upload_command.UploadSpecialization(errors)
         with transaction.atomic():
             # doctor.p_image(sheets[0], source, batch)
             doctor.upload(sheets[0], source, batch, lines)
@@ -478,11 +480,16 @@ def upload_doctor_data(obj_id):
             award.upload(sheets[4], lines)
             hospital.upload(sheets[5], source, batch, lines)
             specialization.upload(sheets[6], lines)
-
+            if len(errors)>0:
+                raise Exception('errors in data')
         instance.status = UploadDoctorData.SUCCESS
         instance.save()
     except Exception as e:
-        logger.error(traceback.format_exc() + str(e))
+        error_message = traceback.format_exc() + str(e)
+        logger.error(error_message)
         instance.status = UploadDoctorData.FAIL
-        instance.error_msg = str(e)
+        if errors:
+            instance.error_msg = errors
+        else:
+            instance.error_msg = [{{'line number': 0, 'message': error_message}}]
         instance.save()

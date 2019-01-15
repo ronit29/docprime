@@ -1864,4 +1864,14 @@ class PracticeSpecializationContentAdmin(admin.ModelAdmin):
 
 class UploadDoctorDataAdmin(admin.ModelAdmin):
     list_display = ('source', 'batch', 'status', 'file', 'lines')
-    readonly_fields = ('status', 'error_msg')
+    readonly_fields = ('status', 'error_message')
+
+    def error_message(self, instance):
+        final_message = ''
+        if instance.error_msg:
+            for message in instance.error_msg:
+                if isinstance(message, dict):
+                    final_message += '{}  ::  {}\n\n'.format(message.get('line number', ''), message.get('message', ''))
+                else:
+                    final_message += str(message)
+        return final_message

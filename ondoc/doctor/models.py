@@ -1988,12 +1988,13 @@ class UploadDoctorData(auth_model.TimeStampedModel):
     file = models.FileField()
     source = models.CharField(max_length=20)
     batch = models.CharField(max_length=20)
-    status = models.PositiveSmallIntegerField(choices=STATUS_CHOICES, default=CREATED)
-    error_msg = models.TextField(blank=True)
+    status = models.PositiveSmallIntegerField(choices=STATUS_CHOICES, default=CREATED, editable=False)
+    error_msg = JSONField(editable=False, null=True, blank=True)
     lines = models.PositiveIntegerField(null=True, blank=True)
 
     def save(self, *args, **kwargs):
         from ondoc.notification.tasks import upload_doctor_data
         super().save(*args, **kwargs)
-        if self.status == self.CREATED:
+        if self.status == self.CREATED or self.status == self.FAIL:
             upload_doctor_data.apply_async((self.id,), countdown=1)
+            # upload_doctor_data(self.id)
