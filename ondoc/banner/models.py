@@ -1,4 +1,6 @@
 from django.contrib.gis.db import models
+from django.contrib.postgres.fields import JSONField
+
 from ondoc.authentication import models as auth_model
 from django.conf import settings
 from django.contrib.contenttypes.fields import GenericRelation
@@ -38,8 +40,7 @@ class Banner(auth_model.TimeStampedModel):
     longitude = models.FloatField(null=True, blank=True)
     show_in_app = models.BooleanField(default=True)
     app_screen = models.CharField(max_length=1000, null=True, blank=True)
-    app_params = models.CharField(max_length=10000, null=True, blank=True)
-
+    app_params = JSONField(null=True, blank=True)
 
 
     def __str__(self):
