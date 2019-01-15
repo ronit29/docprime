@@ -146,8 +146,6 @@ class NonBookableDoctorLead(TimeStampedModel):
         t_name = ''
         if t_user_prof:
             t_name = t_user_prof.name
-        if not t_name:
-            t_name = 'not applicable'
         instance = NonBookableDoctorLead(name=t_name, from_mobile=t_from,
                        doctor=validated_data.get('doctor'), hospital=validated_data.get('hospital'))
         instance.save()

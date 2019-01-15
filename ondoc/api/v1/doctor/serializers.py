@@ -729,7 +729,7 @@ class DoctorListSerializer(serializers.Serializer):
 class DoctorProfileUserViewSerializer(DoctorProfileSerializer):
     #emails = None
     experience_years = serializers.IntegerField(allow_null=True)
-    is_license_verified = serializers.BooleanField(read_only=True)
+    is_license_verified = serializers.SerializerMethodField()
     # hospitals = DoctorHospitalSerializer(read_only=True, many=True, source='get_hospitals')
     hospitals = serializers.SerializerMethodField(read_only=True)
     procedures = serializers.SerializerMethodField(read_only=True)
@@ -744,19 +744,14 @@ class DoctorProfileUserViewSerializer(DoctorProfileSerializer):
     unrated_appointment = serializers.SerializerMethodField()
     is_gold = serializers.SerializerMethodField()
     search_data = serializers.SerializerMethodField()
-    verified = serializers.SerializerMethodField()
 
-    def get_verified(self, obj):
-        hosp_enable_online_booking = False
+    def get_is_license_verified(self, obj):        
         doctor_clinics = obj.doctor_clinics.all()
         for doctor_clinic in doctor_clinics:
             if doctor_clinic and doctor_clinic.hospital:
-                if doctor_clinic.hospital.enabled_for_online_booking and doctor_clinic.enabled_for_online_booking:
-                    hosp_enable_online_booking = True
-        if obj.is_license_verified and obj.enabled_for_online_booking and hosp_enable_online_booking:
-            return True
-        else:
-            return False
+                if obj.is_license_verified and obj.enabled_for_online_booking and doctor_clinic.hospital.enabled_for_online_booking and doctor_clinic.enabled_for_online_booking:
+                    return True
+        return False
 
     def get_search_data(self, obj):
         data = {}
@@ -1037,7 +1032,7 @@ class DoctorProfileUserViewSerializer(DoctorProfileSerializer):
         fields = ('about', 'is_license_verified', 'additional_details', 'display_name', 'associations', 'awards', 'experience_years', 'experiences', 'gender',
                   'hospital_count', 'hospitals', 'procedures', 'id', 'languages', 'name', 'practicing_since', 'qualifications',
                   'general_specialization', 'thumbnail', 'license', 'is_live', 'seo', 'breadcrumb', 'rating', 'rating_graph',
-                  'enabled_for_online_booking', 'unrated_appointment', 'display_rating_widget', 'is_gold', 'search_data', 'verified')
+                  'enabled_for_online_booking', 'unrated_appointment', 'display_rating_widget', 'is_gold', 'search_data')
 
 
 class DoctorAvailabilityTimingSerializer(serializers.Serializer):
