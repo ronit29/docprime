@@ -424,7 +424,7 @@ class UploadQualification(Doc):
             if data.get('doctor'):
                 try:
                     DoctorQualification.objects.get_or_create(doctor=data.get('doctor'),
-                                                              qualification=re.sub(r'\s+', ' ', data.get('qualification', '')),
+                                                              qualification=data.get('qualification'),
                                                               college=data.get('college'),
                                                               specialization=data.get('specialization'),
                                                               passing_year=data.get('passing_year'))
@@ -439,6 +439,8 @@ class UploadQualification(Doc):
         qualification_id = self.clean_data(
             sheet.cell(row=row, column=headers.get('qualification_id')).value)
         qualification_name = self.clean_data(sheet.cell(row=row, column=headers.get('qualification')).value)
+        if qualification_name and isinstance(qualification_name, str):
+            qualification_name = re.sub(r'\s+', ' ', qualification_name)
         qualification = self.get_qualification(qualification_id, qualification_name)
 
         specialization_id = self.clean_data(
