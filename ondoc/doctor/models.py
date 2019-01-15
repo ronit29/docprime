@@ -28,7 +28,8 @@ from ondoc.payout import models as payout_model
 from ondoc.notification import models as notification_models
 from ondoc.notification import tasks as notification_tasks
 from django.contrib.contenttypes.fields import GenericRelation
-from ondoc.api.v1.utils import get_start_end_datetime, custom_form_datetime, CouponsMixin, aware_time_zone
+from ondoc.api.v1.utils import get_start_end_datetime, custom_form_datetime, CouponsMixin, aware_time_zone, \
+    form_time_slot
 from ondoc.common.models import AppointmentHistory
 from functools import reduce
 from operator import or_
@@ -1516,6 +1517,77 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin):
             if merchant:
                 return merchant.merchant
         return None
+
+    @classmethod
+    def get_price_details(cls, data):
+
+        procedures = data.get('procedure_ids', [])
+        selected_hospital = data.get('hospital')
+        doctor = data.get('doctor')
+        time_slot_start = form_time_slot(data.get("start_date"), data.get("start_time"))
+
+        doctor_clinic_timing = DoctorClinicTiming.objects.filter(
+            doctor_clinic__doctor=data.get('doctor'),
+            doctor_clinic__hospital=data.get('hospital'),
+            doctor_clinic__doctor__is_live=True, doctor_clinic__hospital__is_live=True,
+            day=time_slot_start.weekday(), start__lte=data.get("start_time"),
+            end__gte=data.get("start_time")).first()
+
+        effective_price = 0
+        if not procedures:
+            if data.get("payment_type") == cls.INSURANCE:
+                effective_price = doctor_clinic_timing.deal_price
+            elif data.get("payment_type") in [cls.COD, cls.PREPAID]:
+                coupon_discount, coupon_cashback, coupon_list = Coupon.get_total_deduction(data,
+                                                                                           doctor_clinic_timing.deal_price)
+                if coupon_discount >= doctor_clinic_timing.deal_price:
+                    effective_price = 0
+                else:
+                    effective_price = doctor_clinic_timing.deal_price - coupon_discount
+            deal_price = doctor_clinic_timing.deal_price
+            mrp = doctor_clinic_timing.mrp
+            fees = doctor_clinic_timing.fees
+        else:
+            total_deal_price, total_agreed_price, total_mrp = cls.get_procedure_prices(procedures, doctor,
+                                                                                        selected_hospital,
+                                                                                        doctor_clinic_timing)
+            if data.get("payment_type") == cls.INSURANCE:
+                effective_price = total_deal_price
+            elif data.get("payment_type") in [cls.COD, cls.PREPAID]:
+                coupon_discount, coupon_cashback, coupon_list = Coupon.get_total_deduction(data, total_deal_price)
+                if coupon_discount >= total_deal_price:
+                    effective_price = 0
+                else:
+                    effective_price = total_deal_price - coupon_discount
+
+            deal_price = total_deal_price
+            mrp = total_mrp
+            fees = total_agreed_price
+
+        return {
+            "deal_price": deal_price,
+            "mrp": mrp,
+            "fees": fees,
+            "effective_price": effective_price,
+            "coupon_discount": coupon_discount,
+            "coupon_cashback": coupon_cashback,
+            "coupon_list": coupon_list
+        }
+
+    def create_fulfillment_data(self):
+        pass
+
+    @staticmethod
+    def get_procedure_prices(procedures, doctor, selected_hospital, dct):
+        doctor_clinic = doctor.doctor_clinics.filter(hospital=selected_hospital).first()
+        doctor_clinic_procedures = doctor_clinic.doctorclinicprocedure_set.filter(procedure__in=procedures).order_by(
+            'procedure_id')
+        total_deal_price, total_agreed_price, total_mrp = 0, 0, 0
+        for doctor_clinic_procedure in doctor_clinic_procedures:
+            total_agreed_price += doctor_clinic_procedure.agreed_price
+            total_deal_price += doctor_clinic_procedure.deal_price
+            total_mrp += doctor_clinic_procedure.mrp
+        return total_deal_price + dct.deal_price, total_agreed_price + dct.fees, total_mrp + dct.mrp
 
     class Meta:
         db_table = "opd_appointment"

@@ -1343,6 +1343,51 @@ class LabAppointment(TimeStampedModel, CouponsMixin):
                 return merchant.merchant
         return None
 
+    @classmethod
+    def get_price_details(cls, data):
+
+        deal_price_calculation = Case(When(custom_deal_price__isnull=True, then=F('computed_deal_price')),
+                                      When(custom_deal_price__isnull=False, then=F('custom_deal_price')))
+        agreed_price_calculation = Case(When(custom_agreed_price__isnull=True, then=F('computed_agreed_price')),
+                                        When(custom_agreed_price__isnull=False, then=F('custom_agreed_price')))
+        lab_test_queryset = AvailableLabTest.objects.filter(lab_pricing_group__labs=data["lab"],
+                                                            test__in=data['test_ids'])
+        temp_lab_test = lab_test_queryset.values('lab_pricing_group__labs').annotate(total_mrp=Sum("mrp"),
+                                                                                     total_deal_price=Sum(
+                                                                                         deal_price_calculation),
+                                                                                     total_agreed_price=Sum(
+                                                                                         agreed_price_calculation))
+        total_agreed = total_deal_price = total_mrp = effective_price = home_pickup_charges = 0
+        if temp_lab_test:
+            total_mrp = temp_lab_test[0].get("total_mrp", 0)
+            total_agreed = temp_lab_test[0].get("total_agreed_price", 0)
+            total_deal_price = temp_lab_test[0].get("total_deal_price", 0)
+            effective_price = total_deal_price
+            if data["is_home_pickup"] and data["lab"].is_home_collection_enabled:
+                effective_price += data["lab"].home_pickup_charges
+                home_pickup_charges = data["lab"].home_pickup_charges
+
+        coupon_discount, coupon_cashback, coupon_list = Coupon.get_total_deduction(data, effective_price)
+
+        if data.get("payment_type") in [OpdAppointment.COD, OpdAppointment.PREPAID]:
+            if coupon_discount >= effective_price:
+                effective_price = 0
+            else:
+                effective_price = effective_price - coupon_discount
+
+        return {
+            "deal_price" : total_deal_price,
+            "mrp" : total_mrp,
+            "fees" : total_agreed,
+            "effective_price" :effective_price,
+            "coupon_discount" : coupon_discount,
+            "coupon_cashback" : coupon_cashback,
+            "coupon_list" : coupon_list
+        }
+
+    def create_fulfillment_data(self):
+        pass
+
     def __str__(self):
         return "{}, {}".format(self.profile.name if self.profile else "", self.lab.name)
 
