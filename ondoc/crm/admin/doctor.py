@@ -21,12 +21,13 @@ from django.db import transaction
 import logging
 from dal import autocomplete
 
+from ondoc.api.v1.utils import util_absolute_url, util_file_name
 from ondoc.procedure.models import DoctorClinicProcedure, Procedure
 
 logger = logging.getLogger(__name__)
 
 
-from ondoc.account.models import Order
+from ondoc.account.models import Order, Invoice
 from django.contrib.contenttypes.admin import GenericTabularInline
 from ondoc.authentication.models import GenericAdmin, SPOCDetails, AssociatedMerchant, Merchant
 from ondoc.doctor.models import (Doctor, DoctorQualification,
@@ -1401,7 +1402,7 @@ class DoctorOpdAppointmentAdmin(admin.ModelAdmin):
                     'contact_details', 'profile', 'profile_detail', 'user', 'booked_by', 'procedures_details',
                     'fees', 'effective_price', 'mrp', 'deal_price', 'payment_status', 'status', 'cancel_type',
                     'cancellation_reason', 'cancellation_comments',
-                    'start_date', 'start_time', 'payment_type', 'otp', 'insurance', 'outstanding')
+                    'start_date', 'start_time', 'payment_type', 'otp', 'insurance', 'outstanding', 'invoice_urls')
         elif request.user.groups.filter(name=constants['OPD_APPOINTMENT_MANAGEMENT_TEAM']).exists():
             return ('booking_id', 'doctor_name', 'doctor_id', 'doctor_details', 'hospital_name', 'hospital_details',
                     'kyc', 'contact_details', 'used_profile_name',
@@ -1410,15 +1411,15 @@ class DoctorOpdAppointmentAdmin(admin.ModelAdmin):
                     'fees', 'effective_price', 'mrp', 'deal_price', 'payment_status',
                     'payment_type', 'admin_information', 'otp', 'insurance', 'outstanding',
                     'status', 'cancel_type', 'cancellation_reason', 'cancellation_comments',
-                    'start_date', 'start_time')
+                    'start_date', 'start_time', 'invoice_urls')
         else:
             return ()
 
     def get_readonly_fields(self, request, obj=None):
         if request.user.is_superuser and request.user.is_staff:
-            return 'booking_id', 'doctor_id', 'doctor_details', 'contact_details', 'hospital_details', 'kyc', 'procedures_details'
+            return 'booking_id', 'doctor_id', 'doctor_details', 'contact_details', 'hospital_details', 'kyc', 'procedures_details', 'invoice_urls'
         elif request.user.groups.filter(name=constants['OPD_APPOINTMENT_MANAGEMENT_TEAM']).exists():
-            return ('booking_id', 'doctor_name', 'doctor_id', 'doctor_details', 'hospital_name',
+            return ('booking_id', 'doctor_name', 'doctor_id', 'doctor_details', 'hospital_name', 'invoice_urls'
                     'hospital_details', 'kyc', 'contact_details',
                     'used_profile_name', 'used_profile_number', 'default_profile_name',
                     'default_profile_number', 'user_id', 'user_number', 'booked_by',
@@ -1426,6 +1427,16 @@ class DoctorOpdAppointmentAdmin(admin.ModelAdmin):
                     'admin_information', 'otp', 'insurance', 'outstanding', 'procedures_details')
         else:
             return ()
+
+    def invoice_urls(self, instance):
+        invoices_urls = ''
+        if instance.id:
+            invoices = Invoice.objects.filter(reference_id=instance.id, product_id=Order.DOCTOR_PRODUCT_ID)
+            for invoice in invoices:
+                invoices_urls += "<a href={} target='_blank'>{}</a><br>".format(util_absolute_url(invoice.file.url),
+                                                                             util_file_name(invoice.file.url))
+        return mark_safe(invoices_urls)
+    invoice_urls.short_description = 'Invoice(s)'
 
     def procedures_details(self, obj):
         procedure_mappings = obj.procedure_mappings.all()
