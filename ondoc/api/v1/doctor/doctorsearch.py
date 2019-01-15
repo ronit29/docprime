@@ -353,6 +353,7 @@ class DoctorSearchHelper:
         response = []
         selected_procedure_ids, other_procedure_ids = get_selected_and_other_procedures(category_ids, procedure_ids)
         for doctor in doctor_data:
+            enable_online_booking = False
 
             is_gold = False #doctor.enabled_for_online_booking and doctor.is_gold
             doctor_clinics = [doctor_clinic for doctor_clinic in doctor.doctor_clinics.all() if
@@ -392,7 +393,6 @@ class DoctorSearchHelper:
                                                                         other_procedures_list)
                 # fees = self.get_doctor_fees(doctor, doctor_availability_mapping)
 
-                enable_online_booking = False
                 if doctor_clinic and doctor and doctor_clinic.hospital:
                     if doctor.enabled_for_online_booking and doctor_clinic.hospital.enabled_for_online_booking and doctor_clinic.enabled_for_online_booking:
                         enable_online_booking = True
@@ -423,7 +423,8 @@ class DoctorSearchHelper:
             temp = {
                 "doctor_id": doctor.id,
                 "enabled_for_online_booking": doctor.enabled_for_online_booking,
-                "is_license_verified" : doctor.is_license_verified,
+                "is_license_verified" : doctor.is_license_verified and enable_online_booking,
+                #"verified": True if doctor.is_license_verified and doctor.enabled_for_online_booking else False,
                 "hospital_count": self.count_hospitals(doctor),
                 "id": doctor.id,
                 "deal_price": filtered_deal_price,

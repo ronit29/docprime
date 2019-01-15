@@ -729,7 +729,7 @@ class DoctorListSerializer(serializers.Serializer):
 class DoctorProfileUserViewSerializer(DoctorProfileSerializer):
     #emails = None
     experience_years = serializers.IntegerField(allow_null=True)
-    is_license_verified = serializers.BooleanField(read_only=True)
+    is_license_verified = serializers.SerializerMethodField()
     # hospitals = DoctorHospitalSerializer(read_only=True, many=True, source='get_hospitals')
     hospitals = serializers.SerializerMethodField(read_only=True)
     procedures = serializers.SerializerMethodField(read_only=True)
@@ -744,6 +744,14 @@ class DoctorProfileUserViewSerializer(DoctorProfileSerializer):
     unrated_appointment = serializers.SerializerMethodField()
     is_gold = serializers.SerializerMethodField()
     search_data = serializers.SerializerMethodField()
+
+    def get_is_license_verified(self, obj):        
+        doctor_clinics = obj.doctor_clinics.all()
+        for doctor_clinic in doctor_clinics:
+            if doctor_clinic and doctor_clinic.hospital:
+                if obj.is_license_verified and obj.enabled_for_online_booking and doctor_clinic.hospital.enabled_for_online_booking and doctor_clinic.enabled_for_online_booking:
+                    return True
+        return False
 
     def get_search_data(self, obj):
         data = {}

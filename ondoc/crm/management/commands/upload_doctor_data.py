@@ -2,8 +2,6 @@ from django.core.management.base import BaseCommand
 import concurrent.futures
 from django.conf import settings
 from io import BytesIO
-
-from django.db import transaction
 from openpyxl import load_workbook
 import requests
 import re
@@ -18,6 +16,7 @@ from django.contrib.gis.geos import Point, GEOSGeometry
 from django.contrib.contenttypes.models import ContentType
 
 from ondoc.authentication.models import SPOCDetails, QCModel
+from django.db import transaction
 
 
 class Command(BaseCommand):
@@ -36,8 +35,7 @@ class Command(BaseCommand):
         batch = options['batch']
         url = options['url']
         lines = options['lines']
-        # url = options.get('url', '/home/shashanksingh/Downloads/doctor_data_new.xlsx')
-        lines = options.get('lines', 10000000000)
+
         r = requests.get(url)
         content = BytesIO(r.content)
         wb = load_workbook(content)
@@ -49,8 +47,10 @@ class Command(BaseCommand):
         award = UploadAward()
         hospital = UploadHospital()
         specialization = UploadSpecialization()
+
+        #doctor.p_image(sheets[0], source, batch)
+
         with transaction.atomic():
-            # doctor.p_image(sheets[0], source, batch)
             doctor.upload(sheets[0], source, batch, lines)
             qualification.upload(sheets[1], lines)
             experience.upload(sheets[2], lines)
@@ -66,7 +66,7 @@ class Doc():
         si_obj = SourceIdentifier.objects.filter(type=SourceIdentifier.DOCTOR, unique_identifier=doctor_identifier).first()
         doctor_obj = None
         if si_obj:
-            doctor_obj = Doctor.objects.get(pk=si_obj.reference_id)
+            doctor_obj = Doctor.objects.filter(pk=si_obj.reference_id).first()
         return doctor_obj
 
     def clean_data(self, value):
@@ -255,22 +255,17 @@ class UploadDoctor(Doc):
         license = self.clean_data(sheet.cell(row=row, column=headers.get('license')).value)
         city = self.clean_data(sheet.cell(row=row, column=headers.get('city')).value)
         practicing_since = self.clean_data(sheet.cell(row=row, column=headers.get('practicing_since')).value)
-        is_license_verified = self.clean_data(sheet.cell(row=row, column=headers.get('is_license_verified')).value)
-        onboarding_status = self.clean_data(sheet.cell(row=row, column=headers.get('onboarding_status')).value)
-        data_status = self.clean_data(sheet.cell(row=row, column=headers.get('data_status')).value)
-        enabled = self.clean_data(sheet.cell(row=row, column=headers.get('enabled')).value)
-        enabled_for_online_booking = self.clean_data(
-            sheet.cell(row=row, column=headers.get('enabled_for_online_booking')).value)
-        is_live = self.clean_data(sheet.cell(row=row, column=headers.get('is_live')).value)
+        is_license_verified = self.clean_data(sheet.cell(row=row, column=headers.get('is_license_verified', False)).value)
+        onboarding_status	= self.clean_data(sheet.cell(row=row, column=headers.get('onboarding_status', 1)).value)
+        data_status = self.clean_data(sheet.cell(row=row, column=headers.get('data_status', 1)).value)
+        enabled = self.clean_data(sheet.cell(row=row, column=headers.get('enabled', True)).value)
+        enabled_for_online_booking = self.clean_data(sheet.cell(row=row, column=headers.get('enabled_for_online_booking', False)).value)
+        is_live = self.clean_data(sheet.cell(row=row, column=headers.get('is_live', False)).value)
 
         if practicing_since:
             try:
                 practicing_since = int(practicing_since)
             except:
-                if self.log_arr:
-                    self.log_arr.append(
-                        'Invalid Practicing since = ' + str(practicing_since) + ' row number = ' + str(row)
-                        + ' sheet number = ' + str(sheet))
                 print('Invalid Practicing since='+str(practicing_since))
                 practicing_since = None
 
@@ -334,7 +329,7 @@ class UploadDoctor(Doc):
                                        is_license_verified=data.get('is_license_verified', False)
                                        )
 
-        SourceIdentifier.objects.create(type=SourceIdentifier.DOCTOR, unique_identifier=data.get('identifier'), reference_id=doctor.id)
+        SourceIdentifier.objects.get_or_create(unique_identifier=data.get('identifier'), reference_id=doctor.id, type=SourceIdentifier.DOCTOR)
         #self.save_image(batch,data.get('image_url'),data.get('identifier'))
         return doctor
 
@@ -443,6 +438,8 @@ class UploadQualification(Doc):
         qualification_id = self.clean_data(
             sheet.cell(row=row, column=headers.get('qualification_id')).value)
         qualification_name = self.clean_data(sheet.cell(row=row, column=headers.get('qualification')).value)
+        if qualification_name and isinstance(qualification_name, str):
+            qualification_name = re.sub(r'\s+', ' ', qualification_name)
         qualification = self.get_qualification(qualification_id, qualification_name)
 
         specialization_id = self.clean_data(
@@ -583,7 +580,7 @@ class UploadHospital(Doc):
     def upload(self, sheet, source, batch, lines):
         rows = [row for row in sheet.rows]
         headers = {column.value.strip().lower(): i + 1 for i, column in enumerate(rows[0]) if column.value}
-        reverse_day_map = {value[1]: value[0] for value in DoctorClinicTiming.SHORT_DAY_CHOICES}
+        reverse_day_map = {value[1].lower(): value[0] for value in DoctorClinicTiming.SHORT_DAY_CHOICES}
         type_choices_mapping = {value[1]: value[0] for value in DoctorClinicTiming.TYPE_CHOICES}
         doctor_obj_dict = dict()
         hospital_obj_dict = dict()
@@ -609,7 +606,7 @@ class UploadHospital(Doc):
                 followup_duration = int(followup_duration)
             except Exception as e:
                 print('invalid followup_duration' + str(followup_duration))
-                followup_duration = 7
+                followup_duration = 0
             try:
                 followup_charges = int(followup_charges)
             except Exception as e:
@@ -620,9 +617,12 @@ class UploadHospital(Doc):
             start, end = self.parse_timing(sheet.cell(row=i, column=headers.get('timing')).value)
             clinic_time_data = list()
             fees = self.clean_data(sheet.cell(row=i, column=headers.get('fee')).value)
-            type = type_choices_mapping.get(self.clean_data(sheet.cell(row=i, column=headers.get('type')).value), 1)
+            type = type_choices_mapping.get(self.clean_data(sheet.cell(row=i, column=headers.get('type')).value), None)
             deal_price = self.clean_data(sheet.cell(row=i, column=headers.get('deal_price')).value)
             mrp = self.clean_data(sheet.cell(row=i, column=headers.get('mrp')).value)
+
+            if not type:
+                raise Exception('Invalid type for clinic timing')
 
             try:
                 fees = int(fees)
@@ -732,11 +732,11 @@ class UploadHospital(Doc):
         # if doc_clinic_obj_dict.get((doctor_obj, hospital_obj)):
         #     doc_clinic_obj = doc_clinic_obj_dict.get((doctor_obj, hospital_obj))
         # else:
-        doc_clinic_obj, is_field_created = DoctorClinic.objects.get_or_create(doctor=doctor_obj, hospital=hospital_obj,
-                                                                              followup_charges=followup_charges,
-                                                                              followup_duration=followup_duration,
+        doc_clinic_obj, is_field_created = DoctorClinic.objects.get_or_create(doctor=doctor_obj, hospital=hospital_obj,                                                                              
                                                                               defaults={
-                                                                                  'enabled_for_online_booking': False})
+                                                                              'followup_charges':followup_charges,
+                                                                              'followup_duration':followup_duration,
+                                                                              'enabled_for_online_booking': True})
         # doc_clinic_obj_dict[(doctor_obj, hospital_obj)] = doc_clinic_obj
 
         return doc_clinic_obj
@@ -763,14 +763,14 @@ class UploadHospital(Doc):
             dr = dr.strip()
             rng_str = dr.split("-")
             if len(rng_str) == 1:
-                day = rng_str[0].strip()
+                day = rng_str[0].strip().lower()
                 if reverse_day_map.get(day) is None:
                     print('invalid day ' + str(day))
                 else:
                     days_list.append(reverse_day_map[day])
             elif len(rng_str) == 2:
-                s = rng_str[0].strip()
-                e = rng_str[1].strip()
+                s = rng_str[0].strip().lower()
+                e = rng_str[1].strip().lower()
                 if reverse_day_map.get(s) is None or reverse_day_map.get(e) is None:
                     print('invalid day range ' + str(day_range))
                 else:
@@ -790,8 +790,10 @@ class UploadHospital(Doc):
         return days_list
 
     def parse_timing(self, timing):
+
         if not timing:
             return None, None
+        print(timing)
         tlist = timing.strip().split("-")
         start = None
         end = None
@@ -804,7 +806,7 @@ class UploadHospital(Doc):
         return start, end
 
     def time_to_float(self, time):
-        hour_min, am_pm = time.strip().split(" ")
+        hour_min, am_pm = time.strip().split()
         hour, minute = hour_min.strip().split(":")
         hour = self.hour_to_int(int(hour.strip()), am_pm)
         minute = self.min_to_float(int(minute.strip()))
