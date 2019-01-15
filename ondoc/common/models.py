@@ -55,6 +55,7 @@ class PaymentOptions(TimeStampedModel):
     description = models.TextField(null=True, blank=True)
     is_enabled = models.BooleanField()
     action = models.CharField(max_length=50)
+    priority = models.IntegerField(default=0, null=True)
 
     def __str__(self):
         return "{}".format(self.name)

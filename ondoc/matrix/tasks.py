@@ -456,7 +456,7 @@ def push_non_bookable_doctor_lead_to_matrix(self, nb_doc_lead_id):
         request_data = {
             'LeadSource': obj.source,
             'PrimaryNo': int(obj.from_mobile),
-            'Name': obj.name,
+            'Name': obj.name if obj.name else 'not applicable',
             'ProductId': 5,
             'SubProductId': 2,
             'AppointmentDetails': {
