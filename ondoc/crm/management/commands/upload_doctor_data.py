@@ -424,7 +424,7 @@ class UploadQualification(Doc):
             if data.get('doctor'):
                 try:
                     DoctorQualification.objects.get_or_create(doctor=data.get('doctor'),
-                                                              qualification=data.get('qualification'),
+                                                              qualification=re.sub(r'\s+', ' ', data.get('qualification', '')),
                                                               college=data.get('college'),
                                                               specialization=data.get('specialization'),
                                                               passing_year=data.get('passing_year'))
