@@ -326,6 +326,7 @@ class College(auth_model.TimeStampedModel):
 
 class Doctor(auth_model.TimeStampedModel, auth_model.QCModel, SearchKey):
     SOURCE_PRACTO = "pr"
+    SOURCE_CRM = 'crm'
 
     NOT_ONBOARDED = 1
     REQUEST_SENT = 2
@@ -429,7 +430,7 @@ class Doctor(auth_model.TimeStampedModel, auth_model.QCModel, SearchKey):
 
     def update_live_status(self):
 
-        if self.source == self.SOURCE_PRACTO:
+        if self.source == self.SOURCE_PRACTO or self.source == self.SOURCE_CRM:
             if not self.is_live and self.enabled == True:
                 self.is_live = True
                 if not self.live_at:
