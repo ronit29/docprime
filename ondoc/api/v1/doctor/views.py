@@ -2555,8 +2555,10 @@ class OfflineCustomerViewSet(viewsets.GenericViewSet):
             offline_queryset = offline_queryset.filter(time_slot_start__date__range=(start_date, end_date))\
                 .order_by('time_slot_start')
         if updated_at:
-            online_queryset = online_queryset.filter(updated_at__gte=updated_at)
-            offline_queryset = offline_queryset.filter(updated_at__gte=updated_at)
+            admin_queryset = auth_models.GenericAdmin.objects.filter(user=request.user, updated_at__gte=updated_at)
+            if not admin_queryset.exists():
+                online_queryset = online_queryset.filter(updated_at__gte=updated_at)
+                offline_queryset = offline_queryset.filter(updated_at__gte=updated_at)
         final_data = sorted(chain(online_queryset, offline_queryset), key=lambda car: car.time_slot_start, reverse=False)
 
         final_result = []
