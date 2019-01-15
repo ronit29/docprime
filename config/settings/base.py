@@ -107,6 +107,9 @@ THIRD_PARTY_APPS = (
     'nested_admin',
     'ipware',
     'django_user_agents',
+    'fluent_comments',
+    'threadedcomments',
+    'django_comments',
     'ddtrace.contrib.django',
 )
 
@@ -364,3 +367,8 @@ CONN_MAX_AGE=600
 AWS_ACCESS_KEY_ID = env('AWS_ACCESS_KEY_ID', default='')
 AWS_SECRET_ACCESS_KEY = env('AWS_SECRET_ACCESS_KEY', default='')
 PROVIDER_EMAIL = env('PROVIDER_EMAIL', default='')
+
+
+#Comments Settings
+COMMENTS_APP = 'fluent_comments'
+SITE_ID = 1

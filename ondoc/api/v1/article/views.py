@@ -1,15 +1,20 @@
 from collections import defaultdict
-
-from ondoc.articles import models as article_models
+from django.contrib.contenttypes.models import ContentType
+from django.db import transaction
 from rest_framework import mixins, viewsets, status
 from rest_framework.permissions import IsAuthenticated
 from django.shortcuts import get_object_or_404
 from rest_framework.response import Response
+from datetime import datetime
+from django.conf import settings
 
+from fluent_comments.models import FluentComment
+
+from .serializers import CommentSerializer
+from ondoc.articles import models as article_models
 from ondoc.articles.models import ArticleCategory
 from . import serializers
 from ondoc.api.pagination import paginate_queryset
-from django.db import transaction
 from ondoc.api.v1.utils import RawSql
 
 
@@ -105,3 +110,37 @@ class ArticleViewSet(viewsets.GenericViewSet):
             return Response(response)
         else:
             return Response({"error": "Not Found"}, status=status.HTTP_404_NOT_FOUND)
+
+
+class CommentViewSet(viewsets.ModelViewSet):
+    queryset = FluentComment.objects.all()
+    serializer_class = CommentSerializer
+    def create(self, request, *args, **kwargs):
+        if request.user.is_authenticated or True:
+            data = self.request.data
+            comment = data['comment']
+            article = data['article']
+            if 'parent' in data:
+                parent = data['parent']
+            else:
+                parent = None
+            submit_date = datetime.now()
+            content = ContentType.objects.get(model="article").pk
+            comment = FluentComment.objects.create(object_pk=article,
+                                   comment=comment, submit_date=submit_date,
+                                   content_type_id=content,user_id = self.request.user.id,
+                                   site_id=settings.SITE_ID, parent_id=parent)
+
+            serializer = CommentSerializer(comment,context=  {'request': request})
+            return Response(serializer.data)
+
+    def list(self , request):
+        data = request.GET
+        article = data.get('article')
+        article = article_models.Article.objects.filter(id=article).first()
+        if article:
+            comments = self.queryset.filter(object_pk=article.id)
+            serializer = CommentSerializer(comments, many=True, context=  {'request': request})
+            return Response(serializer.data)
+
+
