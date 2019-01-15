@@ -424,6 +424,7 @@ class DoctorSearchHelper:
                 "doctor_id": doctor.id,
                 "enabled_for_online_booking": doctor.enabled_for_online_booking,
                 "is_license_verified" : doctor.is_license_verified,
+                "verified": True if doctor.is_license_verified and doctor.enabled_for_online_booking else False,
                 "hospital_count": self.count_hospitals(doctor),
                 "id": doctor.id,
                 "deal_price": filtered_deal_price,
