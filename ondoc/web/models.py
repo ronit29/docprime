@@ -3,7 +3,7 @@ import logging
 from django.db import models, transaction
 from django.core.validators import MaxValueValidator, MinValueValidator, FileExtensionValidator
 from django.conf import settings
-from ondoc.authentication.models import TimeStampedModel, UserProfile
+from ondoc.authentication.models import TimeStampedModel, UserProfile, User
 from ondoc.common.models import Cities
 from ondoc.doctor.models import Doctor, Hospital
 from ondoc.matrix.tasks import push_signup_lead_to_matrix, push_non_bookable_doctor_lead_to_matrix
@@ -139,10 +139,13 @@ class NonBookableDoctorLead(TimeStampedModel):
     @classmethod
     def create(cls, validated_data):
         t_from = validated_data.get('mobile', None)
-        t_user = UserProfile.objects.filter(phone_number=t_from, is_default_user=True).first()
+        user_obj = User.objects.filter(phone_number=t_from, user_type=User.CONSUMER).first()
+        t_user_prof = None
+        if user_obj:
+            t_user_prof = user_obj.profiles.filter(is_default_user=True).first()
         t_name = ''
-        if t_user:
-            t_name = t_user.name
+        if t_user_prof:
+            t_name = t_user_prof.name
         instance = NonBookableDoctorLead(name=t_name, from_mobile=t_from,
                        doctor=validated_data.get('doctor'), hospital=validated_data.get('hospital'))
         instance.save()

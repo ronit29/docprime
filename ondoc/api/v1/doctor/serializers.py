@@ -170,6 +170,7 @@ class CreateAppointmentSerializer(serializers.Serializer):
     payment_type = serializers.ChoiceField(choices=OpdAppointment.PAY_CHOICES)
     coupon_code = serializers.ListField(child=serializers.CharField(), required=False, default=[])
     procedure_ids = serializers.ListField(child=serializers.PrimaryKeyRelatedField(queryset=Procedure.objects.filter()), required=False)
+    use_wallet = serializers.BooleanField(required=False)
     # procedure_category_ids = serializers.ListField(child=serializers.PrimaryKeyRelatedField(queryset=ProcedureCategory.objects.filter(is_live=True)), required=False, default=[])
     # time_slot_end = serializers.DateTimeField()
 
@@ -283,6 +284,13 @@ class CreateAppointmentSerializer(serializers.Serializer):
                     else:
                         raise serializers.ValidationError('Invalid coupon code - ' + str(coupon))
                 data["coupon_obj"] = list(coupon_obj)
+
+
+
+        if 'use_wallet' in data and data['use_wallet'] is False:
+            data['use_wallet'] = False
+        else:
+            data['use_wallet'] = True
 
         return data
 
@@ -721,7 +729,7 @@ class DoctorListSerializer(serializers.Serializer):
 class DoctorProfileUserViewSerializer(DoctorProfileSerializer):
     #emails = None
     experience_years = serializers.IntegerField(allow_null=True)
-    is_license_verified = serializers.BooleanField(read_only=True)
+    is_license_verified = serializers.SerializerMethodField()
     # hospitals = DoctorHospitalSerializer(read_only=True, many=True, source='get_hospitals')
     hospitals = serializers.SerializerMethodField(read_only=True)
     procedures = serializers.SerializerMethodField(read_only=True)
@@ -736,6 +744,14 @@ class DoctorProfileUserViewSerializer(DoctorProfileSerializer):
     unrated_appointment = serializers.SerializerMethodField()
     is_gold = serializers.SerializerMethodField()
     search_data = serializers.SerializerMethodField()
+
+    def get_is_license_verified(self, obj):        
+        doctor_clinics = obj.doctor_clinics.all()
+        for doctor_clinic in doctor_clinics:
+            if doctor_clinic and doctor_clinic.hospital:
+                if obj.is_license_verified and obj.enabled_for_online_booking and doctor_clinic.hospital.enabled_for_online_booking and doctor_clinic.enabled_for_online_booking:
+                    return True
+        return False
 
     def get_search_data(self, obj):
         data = {}
@@ -806,7 +822,15 @@ class DoctorProfileUserViewSerializer(DoctorProfileSerializer):
         return None
 
     def get_display_rating_widget(self, obj):
-        if obj.rating.count() > 10:
+        rate_count = obj.rating.count()
+        avg = 0
+        if rate_count:
+            all_rating = []
+            for rate in obj.rating.all():
+                all_rating.append(rate.ratings)
+            if all_rating:
+                avg = sum(all_rating) / len(all_rating)
+        if rate_count > 5 or (rate_count <= 5 and avg > 4):
             return True
         return False
 
