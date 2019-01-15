@@ -52,13 +52,13 @@ class Command(BaseCommand):
         #doctor.p_image(sheets[0], source, batch)
 
         with transaction.atomic():
-            #doctor.upload(sheets[0], source, batch, lines)
-            # qualification.upload(sheets[1], lines)
-            #experience.upload(sheets[2], lines)
-            #membership.upload(sheets[3], lines)
-            #award.upload(sheets[4], lines)
+            doctor.upload(sheets[0], source, batch, lines)
+            qualification.upload(sheets[1], lines)
+            experience.upload(sheets[2], lines)
+            membership.upload(sheets[3], lines)
+            award.upload(sheets[4], lines)
             hospital.upload(sheets[5], source, batch, lines)
-            # specialization.upload(sheets[6], lines)
+            specialization.upload(sheets[6], lines)
 
 
 
@@ -579,7 +579,7 @@ class UploadHospital(Doc):
     def upload(self, sheet, source, batch, lines):
         rows = [row for row in sheet.rows]
         headers = {column.value.strip().lower(): i + 1 for i, column in enumerate(rows[0]) if column.value}
-        reverse_day_map = {value[1]: value[0] for value in DoctorClinicTiming.SHORT_DAY_CHOICES}
+        reverse_day_map = {value[1].lower(): value[0] for value in DoctorClinicTiming.SHORT_DAY_CHOICES}
         type_choices_mapping = {value[1]: value[0] for value in DoctorClinicTiming.TYPE_CHOICES}
         doctor_obj_dict = dict()
         hospital_obj_dict = dict()
@@ -762,14 +762,14 @@ class UploadHospital(Doc):
             dr = dr.strip()
             rng_str = dr.split("-")
             if len(rng_str) == 1:
-                day = rng_str[0].strip()
+                day = rng_str[0].strip().lower()
                 if reverse_day_map.get(day) is None:
                     print('invalid day ' + str(day))
                 else:
                     days_list.append(reverse_day_map[day])
             elif len(rng_str) == 2:
-                s = rng_str[0].strip()
-                e = rng_str[1].strip()
+                s = rng_str[0].strip().lower()
+                e = rng_str[1].strip().lower()
                 if reverse_day_map.get(s) is None or reverse_day_map.get(e) is None:
                     print('invalid day range ' + str(day_range))
                 else:
@@ -789,8 +789,10 @@ class UploadHospital(Doc):
         return days_list
 
     def parse_timing(self, timing):
+
         if not timing:
             return None, None
+        print(timing)
         tlist = timing.strip().split("-")
         start = None
         end = None
@@ -803,7 +805,7 @@ class UploadHospital(Doc):
         return start, end
 
     def time_to_float(self, time):
-        hour_min, am_pm = time.strip().split(" ")
+        hour_min, am_pm = time.strip().split()
         hour, minute = hour_min.strip().split(":")
         hour = self.hour_to_int(int(hour.strip()), am_pm)
         minute = self.min_to_float(int(minute.strip()))
