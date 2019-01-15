@@ -2,6 +2,8 @@ from django.core.management.base import BaseCommand
 import concurrent.futures
 from django.conf import settings
 from io import BytesIO
+
+from django.db import transaction
 from openpyxl import load_workbook
 import requests
 import re
@@ -29,20 +31,15 @@ class Command(BaseCommand):
 
 
     def handle(self, *args, **options):
-
         print(options)
         source = options['source']
         batch = options['batch']
-        # url = options['url']
-        # lines = options['lines']
-        url = options.get('url', '/home/shashanksingh/Downloads/doctor_data_new.xlsx')
+        url = options['url']
+        lines = options['lines']
+        # url = options.get('url', '/home/shashanksingh/Downloads/doctor_data_new.xlsx')
         lines = options.get('lines', 10000000000)
-
-        # r = requests.get(url)
-        # content = BytesIO(r.content)
-        import os
-        content = url
-
+        r = requests.get(url)
+        content = BytesIO(r.content)
         wb = load_workbook(content)
         sheets = wb.worksheets
         doctor = UploadDoctor()
@@ -52,16 +49,15 @@ class Command(BaseCommand):
         award = UploadAward()
         hospital = UploadHospital()
         specialization = UploadSpecialization()
-
-        #doctor.p_image(sheets[0], source, batch)
-        doctor.upload(sheets[0], source, batch, lines)
-        qualification.upload(sheets[1], lines)
-        experience.upload(sheets[2], lines)
-        membership.upload(sheets[3], lines)
-        award.upload(sheets[4], lines)
-        hospital.upload(sheets[5], source, batch, lines)
-        specialization.upload(sheets[6], lines)
-
+        with transaction.atomic():
+            # doctor.p_image(sheets[0], source, batch)
+            doctor.upload(sheets[0], source, batch, lines)
+            qualification.upload(sheets[1], lines)
+            experience.upload(sheets[2], lines)
+            membership.upload(sheets[3], lines)
+            award.upload(sheets[4], lines)
+            hospital.upload(sheets[5], source, batch, lines)
+            specialization.upload(sheets[6], lines)
 
 
 class Doc():
@@ -190,6 +186,10 @@ def s_image(batch, url, identifier):
 
 class UploadDoctor(Doc):
 
+    def __init__(self, log_arr=None) -> None:
+        self.log_arr = log_arr
+        super().__init__()
+
     def p_image(self, sheet, source, batch):
         rows = [row for row in sheet.rows]
         headers = {column.value.strip().lower(): i + 1 for i, column in enumerate(rows[0]) if column.value}
@@ -249,7 +249,6 @@ class UploadDoctor(Doc):
 
     def get_data(self, row, sheet, headers):
         gender_mapping = {value[1]: value[0] for value in Doctor.GENDER_CHOICES}
-
         gender = gender_mapping.get(self.clean_data(sheet.cell(row=row, column=headers.get('gender')).value))
         identifier = self.clean_data(sheet.cell(row=row, column=headers.get('identifier')).value)
         name = self.clean_data(sheet.cell(row=row, column=headers.get('doctor_name')).value)
@@ -257,16 +256,21 @@ class UploadDoctor(Doc):
         city = self.clean_data(sheet.cell(row=row, column=headers.get('city')).value)
         practicing_since = self.clean_data(sheet.cell(row=row, column=headers.get('practicing_since')).value)
         is_license_verified = self.clean_data(sheet.cell(row=row, column=headers.get('is_license_verified')).value)
-        onboarding_status	= self.clean_data(sheet.cell(row=row, column=headers.get('onboarding_status')).value)
+        onboarding_status = self.clean_data(sheet.cell(row=row, column=headers.get('onboarding_status')).value)
         data_status = self.clean_data(sheet.cell(row=row, column=headers.get('data_status')).value)
         enabled = self.clean_data(sheet.cell(row=row, column=headers.get('enabled')).value)
-        enabled_for_online_booking = self.clean_data(sheet.cell(row=row, column=headers.get('enabled_for_online_booking')).value)
+        enabled_for_online_booking = self.clean_data(
+            sheet.cell(row=row, column=headers.get('enabled_for_online_booking')).value)
         is_live = self.clean_data(sheet.cell(row=row, column=headers.get('is_live')).value)
 
         if practicing_since:
             try:
                 practicing_since = int(practicing_since)
             except:
+                if self.log_arr:
+                    self.log_arr.append(
+                        'Invalid Practicing since = ' + str(practicing_since) + ' row number = ' + str(row)
+                        + ' sheet number = ' + str(sheet))
                 print('Invalid Practicing since='+str(practicing_since))
                 practicing_since = None
 
@@ -315,9 +319,7 @@ class UploadDoctor(Doc):
         data['is_live'] = is_live
         return data
 
-
     def create_doctor(self, data, source, batch):
-
         doctor = self.get_doctor(data.get('identifier'))
         if doctor:
             return doctor

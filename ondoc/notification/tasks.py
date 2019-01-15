@@ -5,9 +5,12 @@ import json
 import math
 import traceback
 from collections import OrderedDict
+from io import BytesIO
 
+from django.db import transaction
 from django.forms import model_to_dict
 from django.utils import timezone
+from openpyxl import load_workbook
 
 from ondoc.api.v1.utils import aware_time_zone, util_absolute_url
 from ondoc.notification.labnotificationaction import LabNotificationAction
@@ -435,6 +438,7 @@ def send_lab_reports(appointment_id):
 @task()
 def upload_doctor_data(obj_id):
     from ondoc.doctor.models import UploadDoctorData
+    from ondoc.crm.management.commands import upload_doctor_data as upload_command
     from ondoc.crm.management.commands.upload_doctor_data import Command
     instance = UploadDoctorData.objects.filter(id=obj_id).first()
     if not instance:
@@ -442,12 +446,39 @@ def upload_doctor_data(obj_id):
     try:
         instance.status = UploadDoctorData.IN_PROGRESS
         instance.save()
-        c = Command()
-        # c.handle(source=instance.source, batch=instance.batch, url=util_absolute_url(instance.file.url),
+        # c = Command()
+        # # c.handle(source=instance.source, batch=instance.batch, url=util_absolute_url(instance.file.url),
+        # #          lines=instance.lines)
+        # c.handle(source=instance.source, batch=instance.batch,
+        #          # url=instance.file.url,
         #          lines=instance.lines)
-        c.handle(source=instance.source, batch=instance.batch,
-                 # url=instance.file.url,
-                 lines=instance.lines)
+
+        source = instance.source
+        batch = instance.batch
+        url = util_absolute_url(instance.file.url)
+        lines = instance.lines if instance else 100000000
+        # url = options.get('url', '/home/shashanksingh/Downloads/doctor_data_new.xlsx')
+        r = requests.get(url)
+        content = BytesIO(r.content)
+        wb = load_workbook(content)
+        sheets = wb.worksheets
+        doctor = upload_command.UploadDoctor()
+        qualification = upload_command.UploadQualification()
+        experience = upload_command.UploadExperience()
+        membership = upload_command.UploadMembership()
+        award = upload_command.UploadAward()
+        hospital = upload_command.UploadHospital()
+        specialization = upload_command.UploadSpecialization()
+        with transaction.atomic():
+            # doctor.p_image(sheets[0], source, batch)
+            doctor.upload(sheets[0], source, batch, lines)
+            qualification.upload(sheets[1], lines)
+            experience.upload(sheets[2], lines)
+            membership.upload(sheets[3], lines)
+            award.upload(sheets[4], lines)
+            hospital.upload(sheets[5], source, batch, lines)
+            specialization.upload(sheets[6], lines)
+
         instance.status = UploadDoctorData.SUCCESS
         instance.save()
     except Exception as e:
