@@ -2006,13 +2006,15 @@ class OfflinePatients(auth_model.TimeStampedModel):
         return self.name
 
     @staticmethod
-    def after_commit_sms(sms_list):
-        if sms_list:
-            for number in sms_list:
-                try:
-                    notification_tasks.send_offline_welcome_message.apply_async(kwargs={'number': number}, countdown=1)
-                except Exception as e:
-                    logger.error("Failed to Push Offline Welcome Message SMS Task "+ str(e))
+    def welcome_message_sms(sms_obj):
+        if sms_obj:
+            try:
+                default_text = '''Dear %s, you have been successfully added as a patient to %s. In case of any query, please reach out to the %s.''' \
+                               % (sms_obj['name'], sms_obj['appointment'].hospital.name, sms_obj['appointment'].hospital.name)
+                text = sms_obj['welcome_message'] if sms_obj['welcome_message'] else default_text
+                notification_tasks.send_offline_welcome_message.apply_async(kwargs={'number': sms_obj['phone_number'], 'text': text}, countdown=1)
+            except Exception as e:
+                logger.error("Failed to Push Offline Welcome Message SMS Task "+ str(e))
 
     class Meta:
         db_table = 'offline_patients'
@@ -2064,6 +2066,22 @@ class OfflineOPDAppointments(auth_model.TimeStampedModel):
 
     class Meta:
         db_table = "offline_opd_appointments"
+
+
+    @staticmethod
+    def after_commit_create_sms(sms_list):
+        for sms_obj in sms_list:
+            if sms_obj:
+                if sms_obj.get('display_welcome_message'):
+                    OfflinePatients.welcome_message_sms(sms_obj)
+                try:
+                    default_text = '''Dear %s, your appointment has been confirmed with %s at %s on %s.''' % (
+                                        sms_obj['name'], sms_obj['appointment'].doctor.get_display_name(), sms_obj['appointment'].hospital.name,
+                                        sms_obj['appointment'].time_slot_start.strftime("%B %d, %Y %H:%M"))
+                    notification_tasks.send_offline_appointment_message.apply_async(
+                        kwargs={'number': sms_obj['phone_number'], 'text': default_text}, countdown=1)
+                except Exception as e:
+                    logger.error("Failed to Push Offline Appointment Add Message SMS Task " + str(e))
 
 
 class SearchScore(auth_model.TimeStampedModel):

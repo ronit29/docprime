@@ -2185,7 +2185,7 @@ class OfflineCustomerViewSet(viewsets.GenericViewSet):
                 patient_data = self.update_patient(request, data['patient'], data['hospital'], data['doctor'])
 
             patient = patient_data['patient']
-            if patient_data['sms_list'] is not None:
+            if patient_data['sms_list']:
                 sms_list.append(patient_data['sms_list'])
             time_slot_start = data.get('time_slot_start')
             try:
@@ -2208,6 +2208,7 @@ class OfflineCustomerViewSet(viewsets.GenericViewSet):
                 resp.append(obj)
                 logger.error("Fialed Creating Appointment " + str(e))
                 continue
+            patient_data['sms_list']['appointment'] = appnt
             appntment_ids.append(appnt.id)
             patient_ids.append(patient.id)
             ret_obj = {}
@@ -2221,7 +2222,8 @@ class OfflineCustomerViewSet(viewsets.GenericViewSet):
             resp.append(ret_obj)
 
         if sms_list:
-            transaction.on_commit(lambda: models.OfflinePatients.after_commit_sms(sms_list))
+            # transaction.on_commit(lambda: models.OfflinePatients.after_commit_sms(sms_list))
+            transaction.on_commit(lambda: models.OfflineOPDAppointments.after_commit_create_sms(sms_list))
 
         return Response(resp)
 
@@ -2254,13 +2256,17 @@ class OfflineCustomerViewSet(viewsets.GenericViewSet):
             for num in data.get('phone_number'):
                 models.PatientMobile.objects.create(patient=patient,
                                                     phone_number=num.get('phone_number'),
-                                                    is_default=num.get('is_default', False))
+                                                    is_default=num.get('is_default', False)
+                                                    )
 
                 if 'is_default' in num and num['is_default']:
                     default_num = num['phone_number']
             if default_num and ('sms_notification' in data and data['sms_notification']):
-                sms_number = default_num
-        return {"sms_list": sms_number, 'display_welcome_message': patient.display_welcome_message, 'welcome_message': patient.welcome_message , "patient": patient}
+                sms_number = {'phone_number': default_num,
+                              'name': patient.name,
+                              'welcome_message': data.get('welcome_message'),
+                              'display_welcome_message': data.get('display_welcome_message', False)}
+        return {"sms_list": sms_number, "patient": patient}
 
     def update_patient(self, request, data, hospital, doctor):
         if data.get('share_with_hospital') and not hospital:
@@ -2302,8 +2308,11 @@ class OfflineCustomerViewSet(viewsets.GenericViewSet):
                     if 'is_default' in num and num['is_default']:
                         default_num = num['phone_number']
                 if default_num and ('sms_notification' in data and data['sms_notification']):
-                    sms_number = default_num
-            return {"sms_list": sms_number, 'display_welcome_message': patient.display_welcome_message, 'welcome_message': patient.welcome_message , "patient": patient}
+                    sms_number = {'phone_number': default_num,
+                                  'name': patient.name}
+                    sms_number['welcome_message'] = data.get('welcome_message')
+                    sms_number['display_welcome_message'] = False
+            return {"sms_list": sms_number, "patient": patient}
 
     def update_offline_appointments(self, request):
         serializer = serializers.OfflineAppointmentUpdateSerializer(data=request.data)

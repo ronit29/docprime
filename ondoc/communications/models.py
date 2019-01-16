@@ -640,7 +640,7 @@ class OpdNotification(Notification):
         notification_type = self.notification_type
         if not instance or not instance.user:
             return receivers
-        # doctor_spocs = GenericAdmin.get_appointment_admins(instance)
+        doctor_spocs_app_recievers = GenericAdmin.get_appointment_admins(instance)
         doctor_spocs = instance.hospital.get_spocs_for_communication() if instance.hospital else []
         spocs_to_be_communicated = []
         if notification_type in [NotificationAction.APPOINTMENT_ACCEPTED,
@@ -694,7 +694,7 @@ class OpdNotification(Notification):
         user_and_email.extend(spoc_emails)
         all_receivers['sms_receivers'] = user_and_phone_number
         all_receivers['email_receivers'] = user_and_email
-        all_receivers['app_receivers'] = app_receivers
+        all_receivers['app_receivers'] = app_receivers + doctor_spocs_app_recievers
         all_receivers['push_receivers'] = user_and_tokens
 
         return all_receivers
