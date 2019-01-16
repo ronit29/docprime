@@ -1075,6 +1075,7 @@ class DoctorAppointmentRetrieveSerializer(OpdAppointmentSerializer):
     profile = UserProfileSerializer()
     hospital = HospitalModelSerializer()
     doctor = AppointmentRetrieveDoctorSerializer()
+    prescription = serializers.SerializerMethodField()
 
     class Meta:
         model = OpdAppointment
@@ -1387,6 +1388,7 @@ class OfflineAppointmentFilterSerializer(serializers.Serializer):
     start_date = serializers.DateField(format="%Y-%m-%d", required=False)
     end_date = serializers.DateField(format="%Y-%m-%d", required=False)
     updated_at = serializers.DateField(format="%Y-%m-%d", required=False)
+    appointment_id = serializers.CharField(required=False)
 
 
 class OfflinePatientSerializer(serializers.ModelSerializer):

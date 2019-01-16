@@ -872,9 +872,8 @@ class PrescriptionFileViewset(OndocViewSet):
         return Response(response)
 
     def prescription_permission(self, user, appointment):
-        return auth_models.GenericAdmin.objects.filter(user=user, hospital=appointment.hospital,
-                                                permission_type__in=[auth_models.GenericAdmin.APPOINTMENT, auth_models.GenericAdmin.ALL],
-                                                write_permission=True).exists()
+        return auth_models.GenericAdmin.objects.filter(user=user, hospital=appointment.hospital,  is_disabled=False,
+                                                       write_permission=True).exists()
 
 
 class SearchedItemsViewSet(viewsets.GenericViewSet):
@@ -2081,7 +2080,9 @@ class OfflineCustomerViewSet(viewsets.GenericViewSet):
                                                                 hospital=valid_data.get('hospital_id'))
                                                             )
         if valid_data.get('updated_at'):
-            queryset = queryset.filter(updated_at__gte=valid_data.get('updated_at'))
+            admin_queryset = auth_models.GenericAdmin.objects.filter(user=request.user, updated_at__gte=valid_data.get('updated_at'))
+            if not admin_queryset.exists():
+                queryset = queryset.filter(updated_at__gte=valid_data.get('updated_at'))
         queryset = queryset.values('name', 'id', 'gender', 'doctor', 'hospital', 'age', 'dob', 'calculated_dob', 'updated_at',
                                    'share_with_hospital', 'sms_notification', 'medical_history',
                                    'referred_by', 'display_welcome_message', 'error'
@@ -2548,6 +2549,7 @@ class OfflineCustomerViewSet(viewsets.GenericViewSet):
         start_date = valid_data.get('start_date')
         end_date = valid_data.get('end_date')
         updated_at = valid_data.get('updated_at')
+        appointment_id = valid_data.get('appointment_id')
         final_data = []
         if start_date and end_date:
             online_queryset = online_queryset.filter(time_slot_start__date__range=(start_date, end_date))\
@@ -2559,9 +2561,25 @@ class OfflineCustomerViewSet(viewsets.GenericViewSet):
             if not admin_queryset.exists():
                 online_queryset = online_queryset.filter(updated_at__gte=updated_at)
                 offline_queryset = offline_queryset.filter(updated_at__gte=updated_at)
-        final_data = sorted(chain(online_queryset, offline_queryset), key=lambda car: car.time_slot_start, reverse=False)
+
+        if appointment_id:
+            offline_id= True
+            try:
+                id = UUID(appointment_id, version=4)
+            except ValueError:
+                offline_id = False
+            if not offline_id:
+                final_data = online_queryset.filter(id=appointment_id)
+                offline_queryset = None
+            else:
+                final_data = offline_queryset.filter(id=appointment_id)
+                online_queryset = None
+        if online_queryset and offline_queryset:
+            final_data = sorted(chain(online_queryset, offline_queryset), key=lambda car: car.time_slot_start, reverse=False)
 
         final_result = []
+        if appointment_id and not final_data:
+            return Response({'error': 'Not Found'}, status=status.HTTP_404_NOT_FOUND)
         for app in final_data:
             instance = ONLINE if isinstance(app, models.OpdAppointment) else OFFLINE
             patient_name = is_docprime = effective_price = deal_price = patient_thumbnail = prescription = None
