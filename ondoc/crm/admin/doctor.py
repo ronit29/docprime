@@ -1424,9 +1424,9 @@ class DoctorOpdAppointmentAdmin(admin.ModelAdmin):
                     'used_profile_name', 'used_profile_number', 'default_profile_name',
                     'default_profile_number', 'user_id', 'user_number', 'booked_by',
                     'fees', 'effective_price', 'mrp', 'deal_price', 'payment_status', 'payment_type',
-                    'admin_information', 'otp', 'insurance', 'outstanding', 'procedures_details')
+                    'admin_information', 'otp', 'insurance', 'outstanding', 'procedures_details','invoice_urls')
         else:
-            return ()
+            return ('invoice_urls')
 
     def invoice_urls(self, instance):
         invoices_urls = ''
