@@ -7,9 +7,9 @@ from django.contrib.staticfiles.templatetags.staticfiles import static
 from ondoc.authentication.models import UserProfile, Address
 from ondoc.api.v1.doctor.serializers import CreateAppointmentSerializer, CommaSepratedToListField
 from ondoc.api.v1.auth.serializers import AddressSerializer, UserProfileSerializer
-from ondoc.api.v1.utils import form_time_slot, GenericAdminEntity
+from ondoc.api.v1.utils import form_time_slot, GenericAdminEntity, util_absolute_url
 from ondoc.doctor.models import OpdAppointment
-from ondoc.account.models import Order
+from ondoc.account.models import Order, Invoice
 from ondoc.coupon.models import Coupon, RandomGeneratedCoupon
 from django.db.models import Count, Sum, When, Case, Q, F, ExpressionWrapper, DateTimeField
 from django.contrib.auth import get_user_model
@@ -438,6 +438,7 @@ class LabAppointmentModelSerializer(serializers.ModelSerializer):
     patient_name = serializers.SerializerMethodField()
     allowed_action = serializers.SerializerMethodField()
     lab_test = serializers.SerializerMethodField()
+    invoices = serializers.SerializerMethodField()
 
     def get_lab_test(self, obj):
         return list(obj.test_mappings.values_list('test_id', flat=True))
@@ -454,6 +455,14 @@ class LabAppointmentModelSerializer(serializers.ModelSerializer):
         if obj.profile_detail:
             return obj.profile_detail.get("name")
 
+    def get_invoices(self, obj):
+        invoices_urls = []
+        if obj.id:
+            invoices = Invoice.objects.filter(reference_id=obj.id, product_id=Order.LAB_PRODUCT_ID)
+            for invoice in invoices:
+                invoices_urls.append(util_absolute_url(invoice.file.url))
+        return invoices_urls
+
     def get_allowed_action(self, obj):
         user_type = ''
         if self.context.get('request'):
@@ -465,7 +474,7 @@ class LabAppointmentModelSerializer(serializers.ModelSerializer):
     class Meta:
         model = LabAppointment
         fields = ('id', 'lab', 'lab_test', 'profile', 'type', 'lab_name', 'status', 'deal_price', 'effective_price', 'time_slot_start', 'time_slot_end',
-                   'is_home_pickup', 'lab_thumbnail', 'lab_image', 'patient_thumbnail', 'patient_name', 'allowed_action', 'address')
+                   'is_home_pickup', 'lab_thumbnail', 'lab_image', 'patient_thumbnail', 'patient_name', 'allowed_action', 'address', 'invoices')
 
 
 class LabAppointmentBillingSerializer(serializers.ModelSerializer):
