@@ -672,5 +672,35 @@ class StateGSTCode(auth_model.TimeStampedModel):
     is_enabled = models.BooleanField(default=True)
     is_live = models.BooleanField(default=True)
 
+    @property
+    def get_active_city(self):
+        return self.related_cities.filter(is_live=True)
+
+    @property
+    def get_active_district(self):
+        return self.related_districts.filter(is_live=True)
+
     class Meta:
-        db_table = "state_gst_code"
+        db_table = "insurance_state"
+
+
+class InsuranceCity(auth_model.TimeStampedModel):
+    city_code = models.CharField(max_length=10)
+    city_name = models.CharField(max_length=100)
+    state = models.ForeignKey(StateGSTCode, related_name="related_cities", on_delete=models.SET_NULL, null=True)
+    is_enabled = models.BooleanField(default=True)
+    is_live = models.BooleanField(default=True)
+
+    class Meta:
+        db_table = "insurance_city"
+
+
+class InsuranceDistrict(auth_model.TimeStampedModel):
+    district_code = models.CharField(max_length=10)
+    district_name = models.CharField(max_length=100)
+    state = models.ForeignKey(StateGSTCode, related_name="related_districts", on_delete=models.SET_NULL, null=True)
+    is_enabled = models.BooleanField(default=True)
+    is_live = models.BooleanField(default=True)
+
+    class Meta:
+        db_table = "insurance_district"

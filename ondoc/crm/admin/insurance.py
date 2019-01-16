@@ -2,7 +2,8 @@ from django.contrib import admin
 from django import forms
 from rest_framework import serializers
 from ondoc.api.v1.insurance.serializers import InsuranceTransactionSerializer
-from ondoc.insurance.models import InsurancePlanContent, InsurancePlans, InsuredMembers, UserInsurance
+from ondoc.insurance.models import InsurancePlanContent, InsurancePlans, InsuredMembers, UserInsurance, StateGSTCode, \
+    InsuranceCity, InsuranceDistrict
 from import_export.admin import ImportExportMixin, ImportExportModelAdmin, base_formats
 import nested_admin
 from import_export import fields, resources
@@ -234,20 +235,41 @@ class UserInsuranceForm(forms.ModelForm):
 class InsuranceDiseaseAdmin(admin.ModelAdmin):
     list_display = ['disease']
 
-# class InsurancePlanContentForm(forms.ModelForm):
-#     content = forms.CharField(widget=forms.Textarea, required=False)
-#     plan = forms.ModelChoiceField(queryset=InsurancePlans.objects.all(),widget=forms.Select)
-#     title = forms.ChoiceField(choices=InsurancePlanContent.PossibleTitles.as_choices())
-#
-#     class Media:
-#         extend=False
-#         js = ('https://cdn.ckeditor.com/ckeditor5/10.1.0/classic/ckeditor.js', 'insurance/js/init.js')
-#         css = {'all':('insurance/css/style.css',)}
+
+class StateGSTCodeResource(resources.ModelResource):
+    class Meta:
+        model = StateGSTCode
+        fields = ('id', 'gst_code', 'state_name')
 
 
-# class InsurancePlanContentAdmin(admin.ModelAdmin):
-#     model = InsurancePlanContent
-#     fields = ('plan', 'title', 'content')
-#     list_display = ('plan', 'title',)
-#
-#
+class StateGSTCodeAdmin(ImportExportModelAdmin):
+    model = StateGSTCode
+    resource_class = StateGSTCodeResource
+    fields = ('id', 'gst_code', 'state_name')
+    list_display = ('id', 'gst_code', 'state_name')
+
+
+class InsuranceCityResource(resources.ModelResource):
+    class Meta:
+        model = InsuranceCity
+        fields = ('id', 'city_code', 'city_name', 'state')
+
+
+class InsuranceCityAdmin(ImportExportModelAdmin):
+    model = InsuranceCity
+    resource_class = InsuranceCityResource
+    fields = ('id', 'city_code', 'city_name', 'state')
+    list_display = ('id', 'city_code', 'city_name', 'state')
+
+
+class InsuranceDistrictResource(resources.ModelResource):
+    class Meta:
+        model = InsuranceDistrict
+        fields = ('id', 'district_code', 'district_name', 'state')
+
+
+class InsuranceDistrictAdmin(ImportExportModelAdmin):
+    model = InsuranceDistrict
+    resource_class = InsuranceDistrictResource
+    fields = ('id', 'district_code', 'district_name', 'state')
+    list_display = ('id', 'district_code', 'district_name', 'state')

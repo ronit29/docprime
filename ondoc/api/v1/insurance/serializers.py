@@ -7,7 +7,7 @@ from ondoc.diagnostic.models import Lab
 from ondoc.doctor.models import Doctor
 from ondoc.insurance.models import (Insurer, InsurancePlans, InsuranceThreshold, InsurerAccount, InsuredMembers,
                                     InsuranceTransaction, UserInsurance, InsuranceDisease, InsurancePlanContent,
-                                    StateGSTCode)
+                                    StateGSTCode, InsuranceCity, InsuranceDistrict)
 from ondoc.authentication.models import (User, UserProfile)
 from ondoc.account import models as account_models
 from ondoc.account.models import (Order)
@@ -158,10 +158,23 @@ class InsuranceValidationSerializer(serializers.Serializer):
     profile = serializers.PrimaryKeyRelatedField(queryset=UserProfile.objects.all())
 
 
-class StateGSTCodeSerializer(serializers.ModelSerializer):
+class InsuranceCitySerializer(serializers.ModelSerializer):
+    class Meta:
+        model = InsuranceCity
+        fields = ('city_code', 'city_name')
 
+
+class InsuranceDistrictSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = InsuranceDistrict
+        fields = ('district_code', 'district_name')
+
+
+class StateGSTCodeSerializer(serializers.ModelSerializer):
+    cities = InsuranceCitySerializer(source='get_active_city', many=True)
+    district = InsuranceDistrictSerializer(source='get_active_district', many=True)
     class Meta:
         model = StateGSTCode
-        fields = ('id', 'gst_code', 'state_name')
+        fields = ('id', 'gst_code', 'state_name', 'cities', 'district')
 
 
