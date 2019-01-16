@@ -129,7 +129,7 @@ class DoctorBillingViewSet(viewsets.GenericViewSet):
 
             elif admin.entity_type == v1_utils.GenericAdminEntity.DOCTOR:
                 hname = admin.doctor.name
-
+                merchant_dict = None
                 for merchants in admin.doctor.merchant.all():
                     if merchants.verified:
                         merchant_dict = self.get_merchant_dict(merchants)
