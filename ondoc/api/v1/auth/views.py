@@ -20,6 +20,7 @@ from rest_framework.authtoken.models import Token
 from django.db.models import F, Sum, Max, Q, Prefetch, Case, When, Count
 from django.forms.models import model_to_dict
 
+from ondoc.common.models import UserConfig
 from ondoc.coupon.models import UserSpecificCoupon, Coupon
 from ondoc.lead.models import UserLead
 from ondoc.sms.api import send_otp
@@ -413,13 +414,23 @@ class ReferralViewSet(GenericViewSet):
         user = request.user
         if not user.is_authenticated:
             return Response({"status": 0}, status=status.HTTP_401_UNAUTHORIZED)
+        if UserReferrals.objects.all():
+            referral = UserReferrals.objects.filter(user=user).first()
+            if not referral:
+                referral = UserReferrals()
+                referral.user = user
+                referral.save()
 
-        referral = UserReferrals.objects.filter(user=user).first()
-        if not referral:
-            referral = UserReferrals()
-            referral.user = user
-            referral.save()
-        return Response({ "code" : referral.code, "status" : 1 })
+        user_config = UserConfig.objects.filter(key="referral").first()
+        help_flow = []
+        share_text = ''
+        share_url = ''
+        if user_config:
+            help_flow = user_config.data
+            share_text = user_config.share_text.replace('$referral_code', referral.code)
+            share_url = user_config.share_url.replace('$referral_code', referral.code)
+        return Response({"code": referral.code, "status": 1, 'help_flow': help_flow,
+                         "share_text": share_text, "share_url": share_url})
 
     def retrieve_by_code(self, request, code):
         referral = UserReferrals.objects.filter(code__iexact=code).first()

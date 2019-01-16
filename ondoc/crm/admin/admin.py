@@ -1,7 +1,7 @@
 
 from django.contrib.gis import admin
 
-from ondoc.common.models import PaymentOptions
+from ondoc.common.models import PaymentOptions, UserConfig
 from ondoc.crm.admin.banner import BannerAdmin
 from ondoc.crm.admin.procedure import ProcedureCategoryAdmin, ProcedureAdmin
 from ondoc.doctor.models import (Doctor, Language, MedicalService, Specialization, College, Qualification, Hospital,
@@ -156,3 +156,4 @@ admin.site.register(DoctorMobileOtp)
 admin.site.register(NewDynamic, NewDynamicAdmin)
 admin.site.register(EntityUrls, EntityUrlsAdmin)
 admin.site.register(PaymentOptions, PaymentOptionsAdmin)
+admin.site.register(UserConfig)
