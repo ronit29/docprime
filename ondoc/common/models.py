@@ -67,8 +67,6 @@ class PaymentOptions(TimeStampedModel):
 class UserConfig(TimeStampedModel):
     key = models.CharField(max_length=500, unique=True)
     data = JSONField(blank=True, null=True)
-    share_text = models.CharField(max_length=500, default="")
-    share_url = models.URLField(max_length=1000, default="")
 
     class Meta:
         db_table = 'user_config'
