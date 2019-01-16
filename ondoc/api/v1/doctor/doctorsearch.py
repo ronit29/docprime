@@ -7,7 +7,7 @@ from ondoc.doctor import models
 from ondoc.api.v1.utils import clinic_convert_timings
 from ondoc.api.v1.doctor import serializers
 from ondoc.authentication.models import QCModel
-from ondoc.doctor.models import Doctor
+from ondoc.doctor.models import Doctor, PracticeSpecialization
 from ondoc.procedure.models import DoctorClinicProcedure, ProcedureCategory, ProcedureToCategoryMapping, \
     get_selected_and_other_procedures, get_included_doctor_clinic_procedure, \
     get_procedure_categories_with_procedures
@@ -415,6 +415,20 @@ class DoctorSearchHelper:
 
             thumbnail = doctor.get_thumbnail()
 
+            specialization_ids = self.query_params.get('specialization_ids')
+            specialization = PracticeSpecialization.objects.filter(id__in=specialization_ids).values('name')
+            general_specialization = serializers.DoctorPracticeSpecializationSerializer(doctor.doctorpracticespecializations.all(), many=True).data
+            specialization_list = []
+            for spec in general_specialization:
+                specialization_list.append(spec)
+
+            for data in specialization:
+                if data in specialization_list:
+                    specialization_list.remove(OrderedDict(data))
+                    specialization_list = [data] + specialization_list
+
+
+
             opening_hours = None
             if doctor_clinic.availability.exists():
                 opening_hours = '%.2f-%.2f' % (doctor_clinic.availability.all()[0].start,
@@ -438,9 +452,10 @@ class DoctorSearchHelper:
                 "experience_years": doctor.experience_years(),
                 #"experiences": serializers.DoctorExperienceSerializer(doctor.experiences.all(), many=True).data,
                 "qualifications": serializers.DoctorQualificationSerializer(doctor.qualifications.all(), many=True).data,
-                "general_specialization": serializers.DoctorPracticeSpecializationSerializer(
-                    doctor.doctorpracticespecializations.all(),
-                    many=True).data,
+                # "general_specialization": serializers.DoctorPracticeSpecializationSerializer(
+                #     doctor.doctorpracticespecializations.all(),
+                #     many=True).data,
+                "general_specialization": specialization_list,
                 "distance": self.get_distance(doctor, doctor_clinic_mapping),
                 "name": doctor.name,
                 "display_name": doctor.get_display_name(),
