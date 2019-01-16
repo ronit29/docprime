@@ -426,9 +426,10 @@ class ReferralViewSet(GenericViewSet):
         share_text = ''
         share_url = ''
         if user_config:
-            help_flow = user_config.data
-            share_text = user_config.share_text.replace('$referral_code', referral.code)
-            share_url = user_config.share_url.replace('$referral_code', referral.code)
+            all_data = user_config.data
+            help_flow = all_data.get('help_flow', [])
+            share_text = all_data.get('share_text', '').replace('$referral_code', referral.code)
+            share_url = all_data.get('share_url', '').replace('$referral_code', referral.code)
         return Response({"code": referral.code, "status": 1, 'help_flow': help_flow,
                          "share_text": share_text, "share_url": share_url})
 
