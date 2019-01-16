@@ -457,7 +457,7 @@ def upload_doctor_data(obj_id):
         source = instance.source
         batch = instance.batch
         # url = util_absolute_url(instance.file.url)
-        lines = instance.lines if instance else 100000000
+        lines = instance.lines if instance and instance.lines else 100000000
 
         # url = options.get('url', '/home/shashanksingh/Downloads/doctor_data_new.xlsx')
         # r = requests.get(url)
@@ -491,5 +491,5 @@ def upload_doctor_data(obj_id):
         if errors:
             instance.error_msg = errors
         else:
-            instance.error_msg = [{{'line number': 0, 'message': error_message}}]
+            instance.error_msg = [{'line number': 0, 'message': error_message}]
         instance.save()
