@@ -55,22 +55,40 @@ class DoctorBillingViewSet(viewsets.GenericViewSet):
             assoc_hosp.append(doc)
         return assoc_hosp
 
+    def get_merchant_dict(self, merchants):
+        ac_number = merchants.merchant.account_number if merchants.merchant and merchants.merchant.account_number else ''
+        if ac_number:
+            ac_number = "*" * (len(ac_number) - 4) + ac_number[-4:]
+        return {
+            'account_number': ac_number,
+            'pan_number': merchants.merchant.pan_number if merchants.merchant and merchants.merchant.pan_number else '',
+            'name': merchants.merchant.beneficiary_name if merchants.merchant and merchants.merchant.beneficiary_name else '',
+            'ifsc': merchants.merchant.ifsc_code if merchants.merchant and merchants.merchant.ifsc_code else ''}
+
     def list(self, request):
         user = request.user
         queryset = auth_models.GenericAdmin.objects.select_related('doctor', 'hospital')\
                                                    .prefetch_related('hospital__hospital_doctors', 'hospital__hospital_doctors__doctor',
+                                                                     'hospital__merchant', 'hospital__merchant__merchant',
+                                                                     'doctor__merchant', 'doctor__merchant__merchant',
                                                                      'doctor__doctor_clinics', 'doctor__doctor_clinics__hospital')\
                                                    .filter(user=user, is_disabled=False)
         entities = {}
         for admin in queryset.all():
             if admin.entity_type == v1_utils.GenericAdminEntity.HOSPITAL:
+                merchant_dict = None
                 hname = admin.hospital.name
+                for merchants in admin.hospital.merchant.all():
+                    if merchants.verified:
+                        merchant_dict = self.get_merchant_dict(merchants)
+
                 if not entities.get(hname):
                     entities[hname] = {'type': 'hospital',
                                        'id': admin.hospital.id,
                                        'super_user_permission': admin.super_user_permission,
                                        'assoc': [],
-                                       'permission_type': auth_models.GenericAdmin.ALL if admin.super_user_permission else admin.permission_type
+                                       'permission_type': auth_models.GenericAdmin.ALL if admin.super_user_permission else admin.permission_type,
+                                       'merchant': merchant_dict
                                        }
                     if entities[hname]['super_user_permission'] or (not admin.doctor):
                         pem_type = auth_models.GenericAdmin.ALL if entities[hname]['super_user_permission'] else admin.permission_type
@@ -108,14 +126,20 @@ class DoctorBillingViewSet(viewsets.GenericViewSet):
                             if not update:
                                 doc = self.get_doc_dict(admin, admin.permission_type)
                                 entities[hname]['assoc'].append(doc)
+
             elif admin.entity_type == v1_utils.GenericAdminEntity.DOCTOR:
                 hname = admin.doctor.name
+
+                for merchants in admin.doctor.merchant.all():
+                    if merchants.verified:
+                        merchant_dict = self.get_merchant_dict(merchants)
                 if not entities.get(hname):
                     entities[hname] = {'type': 'doctor',
                                        'id': admin.doctor.id,
                                        'super_user_permission': admin.super_user_permission,
                                        'assoc': [],
-                                       'permission_type': auth_models.GenericAdmin.ALL if admin.super_user_permission else admin.permission_type
+                                       'permission_type': auth_models.GenericAdmin.ALL if admin.super_user_permission else admin.permission_type,
+                                       'merchant': merchant_dict
                                        }
                     if entities[hname]['super_user_permission'] or (not admin.hospital):
                         pem_type = auth_models.GenericAdmin.ALL if entities[hname][
