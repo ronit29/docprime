@@ -1075,7 +1075,6 @@ class DoctorAppointmentRetrieveSerializer(OpdAppointmentSerializer):
     profile = UserProfileSerializer()
     hospital = HospitalModelSerializer()
     doctor = AppointmentRetrieveDoctorSerializer()
-    prescription = serializers.SerializerMethodField()
 
     class Meta:
         model = OpdAppointment
