@@ -167,7 +167,7 @@ class ApplicableCouponsViewSet(viewsets.GenericViewSet):
         #
         # user_lab_completed = LabAppointment.objects.filter(user=user, status__in=[LabAppointment.COMPLETED]).count()
 
-        coupons = coupons.prefetch_related('lab', 'test', total_opd_booked, user_opd_booked, total_lab_booked, user_lab_booked)
+        coupons = coupons.prefetch_related('user_specific_coupon', 'lab', 'test', total_opd_booked, user_opd_booked, total_lab_booked, user_lab_booked)
         # coupons = coupons.prefetch_related('lab_network', 'lab', 'test', 'test_categories',
         #                                    'specializations', 'procedures', 'procedure_categories',
         #                                    total_opd_booked, user_opd_booked, total_lab_booked, user_lab_booked)
@@ -196,10 +196,11 @@ class ApplicableCouponsViewSet(viewsets.GenericViewSet):
             if coupon.new_user_constraint and (len(coupon.user_opd_booked)>0 or len(coupon.user_lab_booked)>0):
                 allowed = False
 
-            if coupon.is_corporate and user:
-                user_specefic = UserSpecificCoupon.objects.filter(user=user, coupon=coupon).first()
-                if user_specefic and (len(coupon.user_opd_booked)+len(coupon.user_lab_booked)) >= user_specefic.count:
-                    allowed = False
+            if coupon.is_user_specific and user:
+                if coupon.user_specific_coupon.exists():
+                    user_specefic = coupon.user_specific_coupon.filter(user=user).first()
+                    if user_specefic and (len(coupon.user_opd_booked)+len(coupon.user_lab_booked)) >= user_specefic.count:
+                        allowed = False
 
             # is coupon lab specific
             if coupon.lab and lab and coupon.lab != lab:

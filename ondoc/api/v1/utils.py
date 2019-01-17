@@ -564,7 +564,7 @@ class CouponsMixin(object):
             count = coupon_obj.used_coupon_count(user)
             total_used_count = coupon_obj.total_used_coupon_count()
 
-            if coupon_obj.is_corporate and user:
+            if coupon_obj.is_user_specific and user:
                 user_specefic = UserSpecificCoupon.objects.filter(user=user, coupon=coupon_obj).first()
                 if user_specefic and count >= user_specefic.count:
                     return {"is_valid": False, "used_count": count}
