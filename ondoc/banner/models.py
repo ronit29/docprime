@@ -1,4 +1,6 @@
 from django.contrib.gis.db import models
+from django.contrib.postgres.fields import JSONField
+
 from ondoc.authentication import models as auth_model
 from django.conf import settings
 from django.contrib.contenttypes.fields import GenericRelation
@@ -25,7 +27,7 @@ class Banner(auth_model.TimeStampedModel):
                        (OFFERS_PAGE, 'offers_page')]
     title = models.CharField(max_length=500)
     image = models.ImageField('Banner image', upload_to='banner/images')
-    url = models.URLField(max_length=1000, null=True, blank=True)
+    url = models.URLField(max_length=10000, null=True, blank=True)
     priority = models.PositiveIntegerField(blank=True, null=True, default=0)
     slider_locate = models.SmallIntegerField(choices=slider_location)
     slider_action = models.SmallIntegerField(choices=slider_choice, null=True, blank=True)
@@ -36,6 +38,10 @@ class Banner(auth_model.TimeStampedModel):
     event_name = models.CharField(max_length=1000)
     latitude = models.FloatField(null=True, blank=True)
     longitude = models.FloatField(null=True, blank=True)
+    show_in_app = models.BooleanField(default=True)
+    app_screen = models.CharField(max_length=1000, null=True, blank=True)
+    app_params = JSONField(null=True, blank=True)
+
 
     def __str__(self):
         return self.title
