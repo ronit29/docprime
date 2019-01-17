@@ -2067,6 +2067,44 @@ class OfflineOPDAppointments(auth_model.TimeStampedModel):
     class Meta:
         db_table = "offline_opd_appointments"
 
+    @staticmethod
+    def appointment_add_sms(sms_obj):
+        try:
+            default_text = '''Dear %s, your appointment has been confirmed with %s at %s on %s.''' % (
+                sms_obj['name'], sms_obj['appointment'].doctor.get_display_name(), sms_obj['appointment'].hospital.name,
+                sms_obj['appointment'].time_slot_start.strftime("%B %d, %Y %H:%M"))
+            notification_tasks.send_offline_appointment_message.apply_async(
+                kwargs={'number': sms_obj['phone_number'], 'text': default_text, 'type': 'Appointment ADD'},
+                countdown=1)
+        except Exception as e:
+            logger.error("Failed to Push Offline Appointment Add Message SMS Task " + str(e))
+
+    @staticmethod
+    def appointment_cancel_sms(sms_obj):
+        try:
+            default_text = '''Dear %s, your appointment with %s at %s for %s has been cancelled. 
+                              In case of any query, please reach out to the clinic.''' % (
+                              sms_obj['name'], sms_obj['old_appointment'].doctor.get_display_name(), sms_obj['old_appointment'].hospital.name,
+                              sms_obj['old_appointment'].time_slot_start.strftime("%B %d, %Y %H:%M"))
+            notification_tasks.send_offline_appointment_message.apply_async(
+                kwargs={'number': sms_obj['phone_number'], 'text': default_text, 'type': 'Appointment CANCEL'},
+                countdown=1)
+        except Exception as e:
+            logger.error("Failed to Push Offline Appointment Cancel Message SMS Task " + str(e))
+
+
+    @staticmethod
+    def appointment_reschedule_sms(sms_obj):
+        try:
+            default_text = '''Dear %s, your appointment with %s at %s has been rescheduled to %s. 
+                              In case of any query, please reach out to the clinic..''' % (
+                              sms_obj['name'], sms_obj['appointment'].doctor.get_display_name(), sms_obj['appointment'].hospital.name,
+                              sms_obj['appointment'].time_slot_start.strftime("%B %d, %Y %H:%M"))
+            notification_tasks.send_offline_appointment_message.apply_async(
+                kwargs={'number': sms_obj['phone_number'], 'text': default_text, 'type': 'Appointment RESCHEDULE'},
+                countdown=1)
+        except Exception as e:
+            logger.error("Failed to Push Offline Appointment Rescehdule Message SMS Task " + str(e))
 
     @staticmethod
     def after_commit_create_sms(sms_list):
@@ -2074,14 +2112,17 @@ class OfflineOPDAppointments(auth_model.TimeStampedModel):
             if sms_obj:
                 if sms_obj.get('display_welcome_message'):
                     OfflinePatients.welcome_message_sms(sms_obj)
-                try:
-                    default_text = '''Dear %s, your appointment has been confirmed with %s at %s on %s.''' % (
-                                        sms_obj['name'], sms_obj['appointment'].doctor.get_display_name(), sms_obj['appointment'].hospital.name,
-                                        sms_obj['appointment'].time_slot_start.strftime("%B %d, %Y %H:%M"))
-                    notification_tasks.send_offline_appointment_message.apply_async(
-                        kwargs={'number': sms_obj['phone_number'], 'text': default_text, 'type': 'Appointment ADD'}, countdown=1)
-                except Exception as e:
-                    logger.error("Failed to Push Offline Appointment Add Message SMS Task " + str(e))
+                OfflineOPDAppointments.appointment_add_sms(sms_obj)
+
+    @staticmethod
+    def after_commit_update_sms(sms_list):
+        for sms_obj in sms_list:
+            if sms_obj:
+                if sms_obj.get('action_cancel') and sms_obj['action_cancel']:
+                    OfflineOPDAppointments.appointment_cancel_sms(sms_obj)
+                    OfflineOPDAppointments.appointment_add_sms(sms_obj)
+                elif sms_obj.get('action_reschedule') and sms_obj['action_reschedule']:
+                    OfflineOPDAppointments.appointment_reschedule_sms(sms_obj)
 
 
 class SearchScore(auth_model.TimeStampedModel):

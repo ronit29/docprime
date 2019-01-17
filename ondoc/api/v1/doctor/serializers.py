@@ -1332,11 +1332,11 @@ class OfflinePatientBodySerializer(serializers.Serializer):
     name = serializers.CharField(max_length=24)
     sms_notification = serializers.BooleanField(required=False)
     share_with_hospital = serializers.BooleanField(required=False)
-    gender = serializers.ChoiceField(choices=OfflinePatients.GENDER_CHOICES, required=False)
-    dob = serializers.DateField(required=False, format="%Y-%m-%d")
-    calculated_dob = serializers.DateField(required=False, format="%Y-%m-%d")
-    referred_by = serializers.ChoiceField(choices=OfflinePatients.REFERENCE_CHOICES, required=False)
-    medical_history = serializers.CharField(required=False, max_length=256)
+    gender = serializers.ChoiceField(choices=OfflinePatients.GENDER_CHOICES, required=False, allow_null=True)
+    dob = serializers.DateField(required=False, format="%Y-%m-%d", allow_null=True)
+    calculated_dob = serializers.DateField(required=False, format="%Y-%m-%d", allow_null=True)
+    referred_by = serializers.ChoiceField(choices=OfflinePatients.REFERENCE_CHOICES, required=False, allow_null=True)
+    medical_history = serializers.CharField(required=False, max_length=256, allow_null=True)
     welcome_message = serializers.CharField(required=False, max_length=256)
     display_welcome_message = serializers.BooleanField(required=False)
     phone_number = serializers.ListField(required=False)
@@ -1351,12 +1351,9 @@ class OfflinePatientExplicitSerializer(OfflinePatientBodySerializer):
 
 class OfflineAppointmentBodySerializer(serializers.Serializer):
     patient = OfflinePatientBodySerializer(many=False, allow_null=True, required=False)
-    # patient_id = serializers.PrimaryKeyRelatedField(queryset=OfflinePatients.objects.all(), required=False, allow_empty=True)
     doctor = serializers.PrimaryKeyRelatedField(queryset=Doctor.objects.all())
     hospital = serializers.PrimaryKeyRelatedField(queryset=Hospital.objects.all())
     time_slot_start = serializers.DateTimeField()
-    # start_time = serializers.FloatField()
-    # id = serializers.UUIDField()
     id = serializers.CharField()
 
 

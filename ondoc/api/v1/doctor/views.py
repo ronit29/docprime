@@ -2072,6 +2072,35 @@ class OfflineCustomerViewSet(viewsets.GenericViewSet):
             data['error_message'] = 'Doctor is not associated with given hospital!'
         return data
 
+    def validate_update_conditions(self, appnt, data, request):
+        response = {}
+        if appnt.error:
+            obj = self.get_error_obj(data)
+            obj['error_message'] = 'Cannot Update an invalid/error appointment!'
+            obj.update(self.get_offline_response_obj(appnt, request))
+            logger.error("PROVIDER_REQUEST - Updating a invalid/error Appointment! " + str(data))
+            response['obj'] = obj
+            response['break'] = True
+        elif appnt.status == models.OfflineOPDAppointments.CANCELLED or appnt.status == models.OfflineOPDAppointments.NO_SHOW:
+            obj = self.get_error_obj(data)
+            obj['error_message'] = 'Cannot Update a Cancelled/NoShow appointment!'
+            obj.update(self.get_offline_response_obj(appnt, request))
+            logger.error("PROVIDER_REQUEST - Updating a Cancelled/NoShow Appointment! " + str(data))
+            response['obj'] = obj
+            response['break'] = True
+
+        elif data.get('status') and data.get('status') not in [models.OfflineOPDAppointments.NO_SHOW,
+                                                             models.OfflineOPDAppointments.RESCHEDULED_DOCTOR,
+                                                             models.OfflineOPDAppointments.CANCELLED,
+                                                             models.OfflineOPDAppointments.ACCEPTED]:
+            obj = self.get_error_obj(data)
+            obj['error_message'] = 'Invalid Appointment Status Recieved!'
+            obj.update(self.get_offline_response_obj(appnt, request))
+            logger.error("PROVIDER_REQUEST - Invalid Appointment Status Recieved! " + str(data))
+            response['obj'] = obj
+            response['break'] = True
+        return response
+
     def list_patients(self, request):
         user = request.user
         serializer = serializers.GetOfflinePatientsSerializer(data=request.query_params)
@@ -2331,7 +2360,7 @@ class OfflineCustomerViewSet(viewsets.GenericViewSet):
         valid_data = serializer.validated_data
         sms_list = []
         resp = []
-        appntment_ids = models.OfflineOPDAppointments.objects.all()
+        appntment_ids = models.OfflineOPDAppointments.objects.select_related('doctor', 'hospital', 'user').all()
         patient_ids = list(models.OfflinePatients.objects.values_list('id', flat=True))
         req_hosp_ids = [data.get('hospital').id if data.get('hospital') else None for data in valid_data.get('data')]
         clinic_queryset = [(dc.doctor.id, dc.hospital.id) for dc in models.DoctorClinic.objects.filter(hospital__id__in=req_hosp_ids)]
@@ -2354,7 +2383,7 @@ class OfflineCustomerViewSet(viewsets.GenericViewSet):
                 found = False
                 for appnt in appntment_ids:
                     if id == appnt.id:
-                        patient = def_number = None
+                        patient = def_number = action_cancel = action_add = action_reschedule = None
                         found = True
                         if appnt.error:
                             obj = self.get_error_obj(data)
@@ -2394,26 +2423,34 @@ class OfflineCustomerViewSet(viewsets.GenericViewSet):
                                                                    data['doctor'])
 
                             patient = patient_data['patient']
-                            if patient_data['sms_list'] is not None:
+                            if patient_data.get('sms_list'):
+                                patient_data['sms_list']['old_appointment'] = appnt
                                 sms_list.append(patient_data['sms_list'])
                             appnt.user = patient
-
+                            action_cancel = True
                         else:
                             patient = appnt.user
+                            patient_data = {}
                             if patient.sms_notification:
                                 def_number = patient.patient_mobiles.filter(is_default=True).first()
                                 if def_number:
-                                    sms_list.append(def_number.phone_number)
+                                    patient_data['sms_list'] = {'phone_number': def_number.phone_number,
+                                                                'name': patient.name,
+                                                                'old_appointment': appnt}
+                                    sms_list.append(patient_data['sms_list'])
+                        if appnt.doctor.id != data.get('doctor').id or appnt.hospital.id != data.get('hospital').id:
+                            action_cancel = True
                         appnt.doctor = data.get('doctor')
                         appnt.hospital = data.get('hospital')
                         appnt.error = data.get('error')
                         appnt.error_message = data.get('error_message')
 
-                        if data.get("time_slot_start") and data.get('status') == models.OfflineOPDAppointments.RESCHEDULED_DOCTOR:
-                            # time_slot_start = form_time_slot(data.get("start_date"), data.get("start_time"))
+                        if data.get("time_slot_start"):
+                            action_reschedule = True
                             appnt.time_slot_start = data.get("time_slot_start")
                         if data.get('status'):
                             appnt.status = data.get('status')
+
                         try:
                             appnt.save()
                         except Exception as e:
@@ -2422,6 +2459,10 @@ class OfflineCustomerViewSet(viewsets.GenericViewSet):
                             obj.update(self.get_offline_response_obj(appnt, request))
                             resp.append(obj)
                             break
+                        if patient_data.get('sms_list'):
+                            patient_data['sms_list']['appointment'] = appnt
+                            patient_data['sms_list']['action_cancel'] = action_cancel
+                            patient_data['sms_list']['action_reschedule'] = action_reschedule
                         ret_obj = {}
                         ret_obj['id'] = appnt.id
                         ret_obj['patient_id'] = appnt.user.id
@@ -2437,8 +2478,8 @@ class OfflineCustomerViewSet(viewsets.GenericViewSet):
                     resp.append(obj)
                     logger.error("PROVIDER_REQUEST - Offline Update Appointment is not Found! " + str(data))
 
-        # if sms_list:
-        #     transaction.on_commit(lambda: models.OfflinePatients.after_commit_sms(sms_list))
+        if sms_list:
+            models.OfflineOPDAppointments.after_commit_update_sms(sms_list)
 
         return Response(resp)
 
