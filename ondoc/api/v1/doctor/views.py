@@ -298,7 +298,10 @@ class DoctorAppointmentsViewSet(OndocViewSet):
     def update(self, request, pk=None):
         user = request.user
         queryset = self.get_pem_queryset(user).distinct()
-        opd_appointment = get_object_or_404(queryset, pk=pk)
+        # opd_appointment = get_object_or_404(queryset, pk=pk)
+        opd_appointment = models.OpdAppointment.objects.filter(id=pk).first()
+        if not opd_appointment:
+            return Response({'error': 'Appointment Not Found'}, status=status.HTTP_404_NOT_FOUND)
         serializer = serializers.UpdateStatusSerializer(data=request.data,
                                             context={'request': request, 'opd_appointment': opd_appointment})
         serializer.is_valid(raise_exception=True)
@@ -1725,7 +1728,7 @@ class CreateAdminViewSet(viewsets.GenericViewSet):
 
     def assoc_hosp(self, request, pk=None):
         doctor = get_object_or_404(models.Doctor.objects.prefetch_related('hospitals'), pk=pk)
-        queryset = doctor.hospitals.filter(is_appointment_manager=False)
+        queryset = doctor.hospitals.filter(is_appointment_manager=False, is_live=True)
         return Response(queryset.values('name', 'id'))
 
     def list_entities(self, request):
@@ -1824,8 +1827,9 @@ class CreateAdminViewSet(viewsets.GenericViewSet):
                 hos_name = hos_obj.name
                 assoc_docs = hos_obj.assoc_doctors.extra(select={
                     'assigned': 'CASE WHEN  ((SELECT COUNT(*) FROM doctor_number WHERE doctor_id = doctor.id) = 0) THEN 0 ELSE 1  END',
-                    'phone_number': 'SELECT phone_number FROM doctor_number WHERE doctor_id = doctor.id'}) \
-                    .values('name', 'id', 'assigned', 'phone_number')
+                    'phone_number': 'SELECT phone_number FROM doctor_number WHERE doctor_id = doctor.id',
+                    'enabled': 'SELECT enabled FROM doctor_clinic WHERE doctor_id = doctor.id AND hospital_id='+str(hos_obj.id)}) \
+                    .values('name', 'id', 'assigned', 'phone_number', 'enabled', 'is_live')
 
             for x in response:
                 if temp.get(x['phone_number']):
@@ -1835,7 +1839,7 @@ class CreateAdminViewSet(viewsets.GenericViewSet):
                         temp[x['phone_number']]['permission_type'] = auth_models.GenericAdmin.ALL
                 else:
                     for doc in assoc_docs:
-                        if (doc.get('phone_number') and doc.get('phone_number') == x['phone_number']):
+                        if (doc.get('is_live') and doc.get('enabled')) and (doc.get('phone_number') and doc.get('phone_number') == x['phone_number']):
                             x['is_doctor'] = True
                             x['name'] = doc.get('name')
                             x['id'] = doc.get('id')
@@ -1851,7 +1855,7 @@ class CreateAdminViewSet(viewsets.GenericViewSet):
                     temp[x['phone_number']] = x
             admin_final_list = list(temp.values())
             for a_d in assoc_docs:
-                if not a_d.get('phone_number'):
+                if (a_d.get('is_live') and a_d.get('enabled')) and not a_d.get('phone_number'):
                     a_d['is_doctor'] = True
                     a_d['hospital_name'] = hos_name
                     admin_final_list.append(a_d)
@@ -2058,6 +2062,16 @@ class OfflineCustomerViewSet(viewsets.GenericViewSet):
         ret_obj['type'] = 'doctor'
         return ret_obj
 
+    def validate_permissions(self, data, doc_pem_list, hosp_pem_list, clinic_queryset):
+
+        if not data.get('doctor').id in doc_pem_list and not data.get('hospital').id in hosp_pem_list:
+            data['error'] = True
+            data['error_message'] = 'User forbidden to create Appointment with selected doctor or hospital!'
+        if (data.get('doctor').id, data.get('hospital').id) not in clinic_queryset:
+            data['error'] = True
+            data['error_message'] = 'Doctor is not associated with given hospital!'
+        return data
+
     def list_patients(self, request):
         user = request.user
         serializer = serializers.GetOfflinePatientsSerializer(data=request.query_params)
@@ -2153,6 +2167,9 @@ class OfflineCustomerViewSet(viewsets.GenericViewSet):
                 resp.append(obj)
                 logger.error("PROVIDER_REQUEST - Invalid UUid - Offline Appointment Create! " + str(data))
                 continue
+
+            self.validate_permissions(data, doc_pem_list, hosp_pem_list, clinic_queryset)
+
             if id in appntment_ids:
                 obj = {'id': data.get('id'),
                        'error': True,
@@ -2172,20 +2189,13 @@ class OfflineCustomerViewSet(viewsets.GenericViewSet):
                 logger.error("PROVIDER_REQUEST - Patient not Recieved for Offline Appointment! " + str(data))
                 continue
 
-            if not data.get('doctor').id in doc_pem_list and not data.get('hospital').id in hosp_pem_list:
-                data['error'] = True
-                data['error_message'] = 'User forbidden to create Appointment with selected doctor or hospital!'
-            if (data.get('doctor').id, data.get('hospital').id) not in clinic_queryset:
-                data['error'] = True
-                data['error_message'] = 'Doctor is not associated with given hospital!'
-
             if not data.get('patient')['id'] in patient_ids:
                 patient_data = self.create_patient(request, data['patient'], data['hospital'], data['doctor'])
             else:
                 patient_data = self.update_patient(request, data['patient'], data['hospital'], data['doctor'])
 
             patient = patient_data['patient']
-            if patient_data['sms_list']:
+            if patient_data.get('sms_list'):
                 sms_list.append(patient_data['sms_list'])
             time_slot_start = data.get('time_slot_start')
             try:
@@ -2208,7 +2218,8 @@ class OfflineCustomerViewSet(viewsets.GenericViewSet):
                 resp.append(obj)
                 logger.error("Fialed Creating Appointment " + str(e))
                 continue
-            patient_data['sms_list']['appointment'] = appnt
+            if patient_data.get('sms_list'):
+                patient_data['sms_list']['appointment'] = appnt
             appntment_ids.append(appnt.id)
             patient_ids.append(patient.id)
             ret_obj = {}
@@ -2359,12 +2370,9 @@ class OfflineCustomerViewSet(viewsets.GenericViewSet):
                             resp.append(obj)
                             logger.error("PROVIDER_REQUEST - Updating a Cancelled/NoShow Appointment! " + str(data))
                             break
-                        if not data.get('doctor').id in doc_pem_list and not data.get('hospital').id in hosp_pem_list:
-                            data['error'] = True
-                            data['error_message'] = 'User forbidden to update Appointment with selected doctor or hospital!'
-                        if (data.get('doctor').id, data.get('hospital').id) not in clinic_queryset:
-                            data['error'] = True
-                            data['error_message'] = 'Doctor is not associated with given hospital!'
+
+                        self.validate_permissions(data, doc_pem_list, hosp_pem_list, clinic_queryset)
+
                         if data.get('status') and data.get('status') not in [models.OfflineOPDAppointments.NO_SHOW,
                                                                              models.OfflineOPDAppointments.RESCHEDULED_DOCTOR,
                                                                              models.OfflineOPDAppointments.CANCELLED,

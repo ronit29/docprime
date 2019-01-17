@@ -286,24 +286,14 @@ def set_order_dummy_transaction(self, order_id, user_id):
         self.retry([order_id, user_id], countdown=300)
 
 @task
-def send_offline_welcome_message(number, text):
+def send_offline_appointment_message(number, text, type):
     data = {}
     data['phone_number'] = number
     data['text'] = mark_safe(text)
     try:
         notification_models.SmsNotification.send_rating_link(data)
     except Exception as e:
-        logger.error("Error sending welcome message - " + str(e))
-
-@task
-def send_offline_appointment_message(number, text):
-    data = {}
-    data['phone_number'] = number
-    data['text'] = mark_safe(text)
-    try:
-        notification_models.SmsNotification.send_rating_link(data)
-    except Exception as e:
-        logger.error("Error sending welcome message - " + str(e))
+        logger.error("Error sending " + str(type) + " message - " + str(e))
 
 @task
 def send_appointment_reminder_message(number, doctor, date):
