@@ -176,7 +176,6 @@ class LabList(viewsets.ReadOnlyModelViewSet):
                                                                                        searchable=True, is_package=True,
                                                                                        availablelabs__enabled=True,
                                                                                        availablelabs__lab_pricing_group__labs__is_live=True,
-                                                                                       availablelabs__lab_pricing_group__labs__enabled=True,
                                                                                        availablelabs__lab_pricing_group__labs__network__isnull=False,
                                                                                        availablelabs__lab_pricing_group__labs__location__dwithin=(
                                                                                            Point(float(long),
