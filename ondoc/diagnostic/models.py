@@ -4,7 +4,7 @@ from django.contrib.gis.db import models
 from django.contrib.staticfiles.templatetags.staticfiles import static
 from django.core.validators import MaxValueValidator, MinValueValidator, FileExtensionValidator
 
-from ondoc.account.models import MerchantPayout, ConsumerAccount, Order, UserReferred
+from ondoc.account.models import MerchantPayout, ConsumerAccount, Order, UserReferred, Invoice
 from ondoc.authentication.models import (TimeStampedModel, CreatedByModel, Image, Document, QCModel, UserProfile, User,
                                          UserPermission, GenericAdmin, LabUserPermission, GenericLabAdmin,
                                          BillingAccount, SPOCDetails)
@@ -14,7 +14,8 @@ from ondoc.notification import models as notification_models
 from ondoc.notification import tasks as notification_tasks
 from ondoc.notification.labnotificationaction import LabNotificationAction
 from django.core.files.storage import get_storage_class
-from ondoc.api.v1.utils import AgreedPriceCalculate, DealPriceCalculate, TimeSlotExtraction, CouponsMixin
+from ondoc.api.v1.utils import AgreedPriceCalculate, DealPriceCalculate, TimeSlotExtraction, CouponsMixin, \
+    util_absolute_url
 from ondoc.account import models as account_model
 from django.utils import timezone
 from datetime import timedelta
@@ -937,7 +938,13 @@ class LabAppointment(TimeStampedModel, CouponsMixin):
 
         return test_price
 
-
+    def get_invoices(self):
+        invoices_urls = []
+        if self.id:
+            invoices = Invoice.objects.filter(reference_id=self.id, product_id=Order.LAB_PRODUCT_ID)
+            for invoice in invoices:
+                invoices_urls.append(util_absolute_url(invoice.file.url))
+        return invoices_urls
 
     def get_reports(self):
         return self.reports.all()

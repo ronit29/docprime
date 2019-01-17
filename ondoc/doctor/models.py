@@ -18,7 +18,7 @@ from ondoc.authentication.models import SPOCDetails
 
 from ondoc.location import models as location_models
 from ondoc.account.models import Order, ConsumerAccount, ConsumerTransaction, PgTransaction, ConsumerRefund, \
-    MerchantPayout, UserReferred
+    MerchantPayout, UserReferred, Invoice
 from ondoc.notification.models import NotificationAction
 from ondoc.payout.models import Outstanding
 from ondoc.coupon.models import Coupon
@@ -29,7 +29,8 @@ from ondoc.payout import models as payout_model
 from ondoc.notification import models as notification_models
 from ondoc.notification import tasks as notification_tasks
 from django.contrib.contenttypes.fields import GenericRelation
-from ondoc.api.v1.utils import get_start_end_datetime, custom_form_datetime, CouponsMixin, aware_time_zone
+from ondoc.api.v1.utils import get_start_end_datetime, custom_form_datetime, CouponsMixin, aware_time_zone, \
+    util_absolute_url
 from ondoc.common.models import AppointmentHistory
 from functools import reduce
 from operator import or_
@@ -1215,6 +1216,14 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin):
                 allowed = [self.RESCHEDULED_PATIENT, self.CANCELLED]
 
         return allowed
+
+    def get_invoices(self):
+        invoices_urls = []
+        if self.id:
+            invoices = Invoice.objects.filter(reference_id=self.id, product_id=Order.DOCTOR_PRODUCT_ID)
+            for invoice in invoices:
+                invoices_urls.append(util_absolute_url(invoice.file.url))
+        return invoices_urls
 
     @classmethod
     def create_appointment(cls, appointment_data):
