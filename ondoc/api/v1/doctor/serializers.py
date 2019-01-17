@@ -1,3 +1,4 @@
+from django.utils.safestring import mark_safe
 from rest_framework import serializers
 from rest_framework.fields import CharField
 from django.db.models import Q, Avg, Count, Max, F, ExpressionWrapper, DateTimeField
@@ -16,11 +17,12 @@ from django.db.models import Avg
 from django.db.models import Q
 
 from ondoc.coupon.models import Coupon, RandomGeneratedCoupon
-from ondoc.account.models import Order
+from ondoc.account.models import Order, Invoice
 from django.contrib.staticfiles.templatetags.staticfiles import static
 from ondoc.api.v1.auth.serializers import UserProfileSerializer
 from ondoc.api.v1.ratings import serializers as rating_serializer
-from ondoc.api.v1.utils import is_valid_testing_data, form_time_slot, GenericAdminEntity
+from ondoc.api.v1.utils import is_valid_testing_data, form_time_slot, GenericAdminEntity, util_absolute_url, \
+    util_file_name
 from django.utils import timezone
 from django.contrib.auth import get_user_model
 import math
@@ -90,6 +92,7 @@ class OpdAppointmentSerializer(serializers.ModelSerializer):
     patient_image = serializers.SerializerMethodField()
     patient_thumbnail = serializers.SerializerMethodField()
     doctor_thumbnail = serializers.SerializerMethodField()
+    invoices = serializers.SerializerMethodField()
     type = serializers.ReadOnlyField(default='doctor')
     allowed_action = serializers.SerializerMethodField()
 
@@ -101,7 +104,7 @@ class OpdAppointmentSerializer(serializers.ModelSerializer):
         model = OpdAppointment
         fields = ('id', 'doctor_name', 'hospital_name', 'patient_name', 'patient_image', 'type',
                   'allowed_action', 'effective_price', 'deal_price', 'status', 'time_slot_start',
-                  'time_slot_end', 'doctor_thumbnail', 'patient_thumbnail', 'display_name')
+                  'time_slot_end', 'doctor_thumbnail', 'patient_thumbnail', 'display_name', 'invoices')
 
     def get_patient_image(self, obj):
         if obj.profile and obj.profile.profile_image:
@@ -126,6 +129,14 @@ class OpdAppointmentSerializer(serializers.ModelSerializer):
             return None
             # url = static('doctor_images/no_image.png')
             # return request.build_absolute_uri(url)
+
+    def get_invoices(self, obj):
+        invoices_urls = []
+        if obj.id:
+            invoices = Invoice.objects.filter(reference_id=obj.id, product_id=Order.DOCTOR_PRODUCT_ID)
+            for invoice in invoices:
+                invoices_urls.append(util_absolute_url(invoice.file.url))
+        return invoices_urls
 
 
 class OpdAppModelSerializer(serializers.ModelSerializer):

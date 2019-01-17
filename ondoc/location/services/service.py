@@ -3,22 +3,23 @@ import requests
 from django.conf import settings
 from rest_framework import status
 from django.db import transaction
-from ondoc.location.services.pincodes import pincodes
-
+from ondoc.location.services.mumbai_bangalore_pincodes import pincodes, specializations
+import time
 
 class SearchedDoctorData():
 
     @staticmethod
     def find_doctor_data():
-        specializations = ['Dentist', 'General Physician', 'Gynecologist', 'Pediatrician', 'Orthopedist', 'Homeopathy doctor',
-                           'Obstetrician & Gynecologist', 'Physiotherapist', 'Ophthalmologist', 'Dermatologist', 'General Surgeon',
-                           'ENT Doctor', 'Cardiologist', 'Psychologist', 'Diabetologist', 'Cosmetologist', 'Plastic Surgeon',
-                           'Oral And MaxilloFacial Surgeon', 'Laparoscopic Surgeon', 'Internal Medicine Specialist',
-                           'Infertility Specialist', 'Psychiatrist', 'Urologist', 'Dietitian', 'Neurologist', 'Gastroenterologist',
-                           'Pulmonologist', 'Radiologist', 'Neurosurgeon', 'Nephrologist', 'Pathologist', 'Endocrinologist',
-                           'Spine Surgeon', 'Hair Transplant Surgeon', 'Sexologist', 'Speech Therapist', 'Gastroenterology Surgeon',
-                           'Family Physician', 'Interventional Cardiologist', 'Bariatric surgeon', 'Yoga and Naturopathy Specialist']
-        #
+        # specializations = ['Dentist', 'General Physician', 'Gynecologist', 'Pediatrician', 'Orthopedist', 'Homeopathy doctor',
+        #                    'Obstetrician & Gynecologist', 'Physiotherapist', 'Ophthalmologist', 'Dermatologist', 'General Surgeon',
+        #                    'ENT Doctor', 'Cardiologist', 'Psychologist', 'Diabetologist', 'Cosmetologist', 'Plastic Surgeon',
+        #                    'Oral And MaxilloFacial Surgeon', 'Laparoscopic Surgeon', 'Internal Medicine Specialist',
+        #                    'Infertility Specialist', 'Psychiatrist', 'Urologist', 'Dietitian', 'Neurologist', 'Gastroenterologist',
+        #                    'Pulmonologist', 'Radiologist', 'Neurosurgeon', 'Nephrologist', 'Pathologist', 'Endocrinologist',
+        #                    'Spine Surgeon', 'Hair Transplant Surgeon', 'Sexologist', 'Speech Therapist', 'Gastroenterology Surgeon',
+        #                    'Family Physician', 'Interventional Cardiologist', 'Bariatric surgeon', 'Yoga and Naturopathy Specialist']
+
+
         # pincodes = [ '110092', '110051', '110032', '110090', '110053', '110091', '110094', '110095', '110031',
         #              '110096', '110093', '110006', '110033', '110036', '110034', '110054', '110052', '110039', '110085',
         #              '110042', '110040', '110086', '110084', '110007', '110081', '110009', '110035', '110088', '110082',
@@ -45,6 +46,7 @@ class SearchedDoctorData():
 
     @staticmethod
     def run_google_search(search_keywords, next_token):
+        time.sleep(2)
         params = {'query': search_keywords, 'key': settings.REVERSE_GEOCODING_API_KEY}
         results = {}
         if next_token:
