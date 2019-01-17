@@ -3,7 +3,7 @@ import requests
 from django.conf import settings
 from rest_framework import status
 from django.db import transaction
-from ondoc.location.services.pincodes import pincodes
+#from ondoc.location.services.pincodes import pincodes
 
 
 class SearchedDoctorData():

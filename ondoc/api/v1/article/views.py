@@ -113,8 +113,9 @@ class ArticleViewSet(viewsets.GenericViewSet):
 
 
 class CommentViewSet(viewsets.ModelViewSet):
-    queryset = FluentComment.objects.all()
+    queryset = FluentComment.objects.filter(is_public=True)
     serializer_class = CommentSerializer
+
     def create(self, request, *args, **kwargs):
         if request.user.is_authenticated or True:
             data = self.request.data
@@ -131,16 +132,14 @@ class CommentViewSet(viewsets.ModelViewSet):
                                    content_type_id=content,user_id = self.request.user.id,
                                    site_id=settings.SITE_ID, parent_id=parent)
 
-            serializer = CommentSerializer(comment,context=  {'request': request})
+            serializer = CommentSerializer(comment, context={'request': request})
             return Response(serializer.data)
 
-    def list(self , request):
+    def list(self, request):
         data = request.GET
         article = data.get('article')
         article = article_models.Article.objects.filter(id=article).first()
         if article:
             comments = self.queryset.filter(object_pk=article.id)
-            serializer = CommentSerializer(comments, many=True, context=  {'request': request})
+            serializer = CommentSerializer(comments, many=True, context={'request': request})
             return Response(serializer.data)
-
-

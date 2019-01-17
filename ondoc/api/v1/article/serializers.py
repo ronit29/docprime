@@ -135,10 +135,10 @@ class ArticleCategoryListSerializer(serializers.ModelSerializer):
         request = self.context.get('request')
         return request.build_absolute_uri(obj.url) if hasattr(obj, 'url') else None
 
-
     class Meta:
         model = ArticleCategory
         fields = ('name', 'url', 'title', 'description')
+
 
 class RecursiveField(serializers.Serializer):
     def to_representation(self, value):
@@ -146,6 +146,7 @@ class RecursiveField(serializers.Serializer):
             value,
             context=self.context)
         return serializer.data
+
 
 class CommentSerializer(serializers.ModelSerializer):
     children = RecursiveField(many=True)

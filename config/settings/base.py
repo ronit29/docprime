@@ -372,5 +372,5 @@ PROVIDER_EMAIL = env('PROVIDER_EMAIL', default='')
 #Comments Settings
 COMMENTS_APP = 'fluent_comments'
 SITE_ID = 1
-FLUENT_COMMENTS_REPLACE_ADMIN = True
+FLUENT_COMMENTS_REPLACE_ADMIN = False
 

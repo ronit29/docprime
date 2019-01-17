@@ -1,7 +1,7 @@
 import nested_admin
 from django.contrib.gis import admin
 from django_comments.models import Comment, CommentFlag
-from fluent_comments.admin import CommentModel
+#from fluent_comments.models import FluentComment
 from raven.utils import urlparse
 from django.utils.safestring import mark_safe
 
@@ -110,7 +110,7 @@ admin.site.register(ArticleImage, ArticleImageAdmin)
 admin.site.register(ArticleCategory)
 admin.site.register(ArticleContentBox)
 admin.site.unregister(ThreadedComment)
-admin.site.unregister(FluentComment)
+#admin.site.unregister(FluentComment)
 
 if appsettings.USE_THREADEDCOMMENTS:
     # Avoid getting weird situations where both comment apps are loaded in the admin.
@@ -144,12 +144,13 @@ class FluentCommentsAdmin(CommentsAdminBase):
     ]
 
     list_display = ('user_name_col', 'object_link', 'ip_address', 'submit_date', 'is_public', 'is_removed')
-    readonly_fields = ('parent_comment', 'parent_link', 'object_link', 'user', 'ip_address', 'submit_date',)
+    readonly_fields = ('parent_comment', 'object_link', 'user', 'ip_address', 'submit_date','comment',
+                       'user_name', 'user_email', 'user_url', 'title')
 
     # Adjust the fieldsets for threaded comments
     if appsettings.USE_THREADEDCOMMENTS:
         fieldsets[0][1]['fields'] = ('object_link', 'user_name', 'user_email', 'user_url', 'title', 'comment', 'submit_date',)  # add title field.
-        fieldsets.insert(2, ('Hierarchy', {'fields': ('parent_comment', 'parent_link')}))
+        fieldsets.insert(2, ('Hierarchy', {'fields': ('parent_comment', )}))
         raw_id_fields = ('parent',)
 
     def parent_comment(self, comment):
@@ -157,9 +158,6 @@ class FluentCommentsAdmin(CommentsAdminBase):
             return mark_safe('<a target="_blank" href="/admin/fluent_comments/fluentcomment/%s/change/">%s</a>' % (comment.parent.id, comment.parent.comment))
         else:
             return None
-
-    def parent_link(self, comment):
-        return 'admin/fluent_comments/fluentcomment/'+ str(comment.parent.id) +'/change/'
 
     def get_queryset(self, request):
         return super(FluentCommentsAdmin, self).get_queryset(request).select_related('user')
@@ -193,71 +191,17 @@ class FluentCommentsAdmin(CommentsAdminBase):
     user_name_col.short_description = _("user's name")
 
     def has_add_permission(self, request):
-        return False
+        return True
+
+    def has_change_permission(self, request, obj=None):
+        return True
 
     def formfield_for_dbfield(self, db_field, **kwargs):
         if db_field.name == 'title':
             kwargs['widget'] = AdminTextInputWidget
         return super(FluentCommentsAdmin, self).formfield_for_dbfield(db_field, **kwargs)
 
-admin.site.register(CommentModel, FluentCommentsAdmin)
 
-
-# admin.site.register(DjangoComments)
-
-# class CommentsAdmin(admin.ModelAdmin):
-#     fields = ['content_type','object_pk', 'site', 'article_url', 'user', 'user_name', 'user_email', 'user_url', 'comment', 'submit_date', 'ip_address', 'is_public', 'is_removed']
-#     readonly_fields = ['article_url']
-#
-#     # fieldsets = (
-#     #     (
-#     #         _('Content'),
-#     #         {'fields': ('user', 'object_pk', 'user_name', 'user_email', 'user_url', 'comment')}
-#     #     ),
-#     #     (
-#     #         _('Metadata'),
-#     #         {'fields': ('submit_date', 'ip_address', 'is_public', 'is_removed')}
-#     #     ),
-#     #
-#     # )
-#     #
-#
-#     list_display = ('name', 'object_pk',  'article_url', 'ip_address', 'submit_date', 'is_public', 'is_removed')
-#     list_filter = ('submit_date', 'is_public', 'is_removed')
-#     ordering = ('-submit_date',)
-#     actions = ["approve_comments", "remove_comments"]
-#
-#     def article_url(self, obj):
-#         return obj.content_object.url
-#
-#     def approve_comments(self, request, queryset):
-#         self._bulk_flag(request, queryset, perform_approve,
-#                         lambda n: ungettext('approved', 'approved', n))
-#
-#     # approve_comments.short_description = _("Approve selected comments")
-#
-#     def remove_comments(self, request, queryset):
-#         self._bulk_flag(request, queryset, perform_delete,
-#                         lambda n: ungettext('removed', 'removed', n))
-#
-#     # remove_comments.short_description = _("Remove selected comments")
-#
-#     def _bulk_flag(self, request, queryset, action, done_message):
-#         """
-#         Flag, approve, or remove some comments from an admin action. Actually
-#         calls the `action` argument to perform the heavy lifting.
-#         """
-#         n_comments = 0
-#         for comment in queryset:
-#             action(request, comment)
-#             n_comments += 1
-#
-#         msg = ungettext('%(count)s comment was successfully %(action)s.',
-#                         '%(count)s comments were successfully %(action)s.',
-#                         n_comments)
-#         self.message_user(request, msg % {'count': n_comments, 'action': done_message(n_comments)})
-
-# admin.site.register(Comment, CommentsAdmin)
-# admin.site.register(CommentFlag)
+admin.site.register(FluentComment, FluentCommentsAdmin)
 
 
