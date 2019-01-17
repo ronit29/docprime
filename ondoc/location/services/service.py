@@ -4,7 +4,7 @@ from django.conf import settings
 from rest_framework import status
 from django.db import transaction
 from ondoc.location.services.pincodes import pincodes
-
+import time
 
 class SearchedDoctorData():
 
@@ -45,6 +45,7 @@ class SearchedDoctorData():
 
     @staticmethod
     def run_google_search(search_keywords, next_token):
+        time.sleep(2)
         params = {'query': search_keywords, 'key': settings.REVERSE_GEOCODING_API_KEY}
         results = {}
         if next_token:
