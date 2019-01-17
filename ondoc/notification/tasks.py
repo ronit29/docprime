@@ -439,15 +439,14 @@ def send_lab_reports(appointment_id):
 def upload_doctor_data(obj_id):
     from ondoc.doctor.models import UploadDoctorData
     from ondoc.crm.management.commands import upload_doctor_data as upload_command
-    from ondoc.crm.management.commands.upload_doctor_data import Command
     instance = UploadDoctorData.objects.filter(id=obj_id).first()
     errors = []
-    if not instance or not (instance.status == UploadDoctorData.CREATED or instance.status == UploadDoctorData.FAIL):
+    if not instance or not instance.status == UploadDoctorData.IN_PROGRESS:
         return
     try:
-        instance.status = UploadDoctorData.IN_PROGRESS
-        instance.error_msg = None
-        instance.save()
+        # instance.status = UploadDoctorData.IN_PROGRESS
+        # instance.error_msg = None
+        # instance.save()
         # c = Command()
         # # c.handle(source=instance.source, batch=instance.batch, url=util_absolute_url(instance.file.url),
         # #          lines=instance.lines)
@@ -458,7 +457,6 @@ def upload_doctor_data(obj_id):
         batch = instance.batch
         # url = util_absolute_url(instance.file.url)
         lines = instance.lines if instance and instance.lines else 100000000
-
         # url = options.get('url', '/home/shashanksingh/Downloads/doctor_data_new.xlsx')
         # r = requests.get(url)
         # content = BytesIO(r.content)
@@ -492,4 +490,4 @@ def upload_doctor_data(obj_id):
             instance.error_msg = errors
         else:
             instance.error_msg = [{'line number': 0, 'message': error_message}]
-        instance.save()
+        instance.save(retry=False)

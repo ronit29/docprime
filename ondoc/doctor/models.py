@@ -1993,8 +1993,11 @@ class UploadDoctorData(auth_model.TimeStampedModel):
     lines = models.PositiveIntegerField(null=True, blank=True)
 
     def save(self, *args, **kwargs):
+        retry = kwargs.pop('retry', True)
         from ondoc.notification.tasks import upload_doctor_data
         super().save(*args, **kwargs)
-        if self.status == self.CREATED or self.status == self.FAIL:
+        if self.status == self.CREATED or (self.status == self.FAIL and retry):
+            self.status = self.IN_PROGRESS
+            self.error_msg = None
+            super().save(*args, **kwargs)
             upload_doctor_data.apply_async((self.id,), countdown=1)
-            # upload_doctor_data(self.id)
