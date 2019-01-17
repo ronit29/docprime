@@ -437,7 +437,7 @@ class DoctorSearchHelper:
                 "practicing_since": doctor.practicing_since,
                 "experience_years": doctor.experience_years(),
                 #"experiences": serializers.DoctorExperienceSerializer(doctor.experiences.all(), many=True).data,
-                #"qualifications": serializers.DoctorQualificationSerializer(doctor.qualifications.all(), many=True).data,
+                "qualifications": serializers.DoctorQualificationSerializer(doctor.qualifications.all(), many=True).data,
                 "general_specialization": serializers.DoctorPracticeSpecializationSerializer(
                     doctor.doctorpracticespecializations.all(),
                     many=True).data,
