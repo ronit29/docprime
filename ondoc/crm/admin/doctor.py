@@ -1874,8 +1874,14 @@ class PracticeSpecializationContentAdmin(admin.ModelAdmin):
 
 
 class UploadDoctorDataAdmin(admin.ModelAdmin):
-    list_display = ('source', 'batch', 'status', 'file', 'lines')
-    readonly_fields = ('status', 'error_message')
+    list_display = ('id', 'source', 'batch', 'status', 'file')
+    readonly_fields = ('status', 'error_message', 'user', 'lines')
+
+    def save_model(self, request, obj, form, change):
+        if obj:
+            if not obj.user:
+                obj.user = request.user
+        super().save_model(request, obj, form, change)
 
     def error_message(self, instance):
         final_message = ''

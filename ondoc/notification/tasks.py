@@ -444,22 +444,9 @@ def upload_doctor_data(obj_id):
     if not instance or not instance.status == UploadDoctorData.IN_PROGRESS:
         return
     try:
-        # instance.status = UploadDoctorData.IN_PROGRESS
-        # instance.error_msg = None
-        # instance.save()
-        # c = Command()
-        # # c.handle(source=instance.source, batch=instance.batch, url=util_absolute_url(instance.file.url),
-        # #          lines=instance.lines)
-        # c.handle(source=instance.source, batch=instance.batch,
-        #          # url=instance.file.url,
-        #          lines=instance.lines)
         source = instance.source
         batch = instance.batch
-        # url = util_absolute_url(instance.file.url)
         lines = instance.lines if instance and instance.lines else 100000000
-        # url = options.get('url', '/home/shashanksingh/Downloads/doctor_data_new.xlsx')
-        # r = requests.get(url)
-        # content = BytesIO(r.content)
         wb = load_workbook(instance.file)
         sheets = wb.worksheets
         doctor = upload_command.UploadDoctor(errors)
@@ -471,7 +458,7 @@ def upload_doctor_data(obj_id):
         specialization = upload_command.UploadSpecialization(errors)
         with transaction.atomic():
             # doctor.p_image(sheets[0], source, batch)
-            doctor.upload(sheets[0], source, batch, lines)
+            doctor.upload(sheets[0], source, batch, lines, instance.user)
             qualification.upload(sheets[1], lines)
             experience.upload(sheets[2], lines)
             membership.upload(sheets[3], lines)

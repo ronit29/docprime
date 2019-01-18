@@ -1991,6 +1991,8 @@ class UploadDoctorData(auth_model.TimeStampedModel):
     status = models.PositiveSmallIntegerField(choices=STATUS_CHOICES, default=CREATED, editable=False)
     error_msg = JSONField(editable=False, null=True, blank=True)
     lines = models.PositiveIntegerField(null=True, blank=True)
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, related_name="uploaded_doctor_data", null=True, editable=False,
+                             on_delete=models.SET_NULL)
 
     def save(self, *args, **kwargs):
         retry = kwargs.pop('retry', True)

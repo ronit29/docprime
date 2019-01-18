@@ -9,6 +9,8 @@ from PIL import Image as Img
 import os
 import math
 from django.core.files.storage import default_storage
+
+from ondoc.crm.constants import constants
 from ondoc.doctor.models import (Doctor, DoctorPracticeSpecialization, PracticeSpecialization, DoctorMobile, Qualification,
                                  Specialization, College, DoctorQualification, DoctorExperience, DoctorAward,
                                  DoctorClinicTiming, DoctorClinic, Hospital, SourceIdentifier, DoctorAssociation)
@@ -244,12 +246,12 @@ class UploadDoctor(Doc):
             #         except Exception as e:
             #             print('exception '+str(e))
 
-    def upload(self, sheet, source, batch, lines):
+    def upload(self, sheet, source, batch, lines, user=None):
         rows = [row for row in sheet.rows]
         headers = {column.value.strip().lower(): i + 1 for i, column in enumerate(rows[0]) if column.value}
 
         for i in range(2, min(len(rows), lines) + 1):
-            data = self.get_data(row=i, sheet=sheet, headers=headers)
+            data = self.get_data(row=i, sheet=sheet, headers=headers, user=user)
 
             try:
                 doctor = self.create_doctor(data, source, batch, i)
@@ -264,7 +266,7 @@ class UploadDoctor(Doc):
                 self.log_error(i, 'Invalid data for phone number. ({})'.format(e))
                 print('error' + str(e))
 
-    def get_data(self, row, sheet, headers):
+    def get_data(self, row, sheet, headers, user=None):
         gender_mapping = {value[1]: value[0] for value in Doctor.GENDER_CHOICES}
         gender = gender_mapping.get(self.clean_data(sheet.cell(row=row, column=headers.get('gender')).value))
         identifier = self.clean_data(sheet.cell(row=row, column=headers.get('identifier')).value)
@@ -273,13 +275,20 @@ class UploadDoctor(Doc):
         city = self.clean_data(sheet.cell(row=row, column=headers.get('city')).value)
         practicing_since = self.clean_data(sheet.cell(row=row, column=headers.get('practicing_since')).value)
         is_license_verified = self.clean_data(
-            sheet.cell(row=row, column=headers.get('is_license_verified', False)).value)
-        onboarding_status = self.clean_data(sheet.cell(row=row, column=headers.get('onboarding_status', 1)).value)
-        data_status = self.clean_data(sheet.cell(row=row, column=headers.get('data_status', 1)).value)
-        enabled = self.clean_data(sheet.cell(row=row, column=headers.get('enabled', True)).value)
-        enabled_for_online_booking = self.clean_data(
-            sheet.cell(row=row, column=headers.get('enabled_for_online_booking', False)).value)
-        is_live = self.clean_data(sheet.cell(row=row, column=headers.get('is_live', False)).value)
+            sheet.cell(row=row, column=headers.get('is_license_verified')).value)
+        enabled = self.clean_data(sheet.cell(row=row, column=headers.get('enabled')).value)
+        if user and (user.is_member_of(constants['SUPER_QC_GROUP']) or user.is_member_of(
+                constants['QC_GROUP_NAME']) or user.is_superuser):
+            onboarding_status = self.clean_data(sheet.cell(row=row, column=headers.get('onboarding_status')).value)
+            data_status = self.clean_data(sheet.cell(row=row, column=headers.get('data_status')).value)
+            enabled_for_online_booking = self.clean_data(
+                sheet.cell(row=row, column=headers.get('enabled_for_online_booking')).value)
+            is_live = self.clean_data(sheet.cell(row=row, column=headers.get('is_live')).value)
+        else:
+            onboarding_status = Doctor.NOT_ONBOARDED
+            data_status = QCModel.IN_PROGRESS
+            enabled_for_online_booking = False
+            is_live = False
 
         if practicing_since:
             try:
@@ -771,7 +780,7 @@ class UploadHospital(Doc):
 
 
     def get_hospital(self, row, sheet, headers, hospital_obj_dict, source, batch):
-        hospital_identifier = self.clean_data(sheet.cell(row=row, column=headers.get('hospital_url')).value)
+        hospital_identifier = self.clean_data(sheet.cell(row=row, column=headers.get('hospital_unique_identifier')).value)
         hospital_id = self.clean_data(sheet.cell(row=row, column=headers.get('hospital_id')).value)
 
         hospital = None
@@ -790,7 +799,7 @@ class UploadHospital(Doc):
                     building=''
 
                 city = self.clean_data(sheet.cell(row=row, column=headers.get('city')).value)
-                location = self.parse_gaddress(self.clean_data(sheet.cell(row=row, column=headers.get('gaddress')).value))
+                location = self.parse_gaddress(self.clean_data(sheet.cell(row=row, column=headers.get('hospital_lat_long')).value))
                 hospital = Hospital.objects.create(name=hospital_name, building=building, city=city, country='India', location=location, source=source, batch=batch, enabled_for_online_booking=False)
                 SourceIdentifier.objects.create(reference_id=hospital.id, unique_identifier=hospital_identifier,
                                                     type=SourceIdentifier.HOSPITAL)
