@@ -1430,11 +1430,9 @@ class DoctorOpdAppointmentAdmin(admin.ModelAdmin):
 
     def invoice_urls(self, instance):
         invoices_urls = ''
-        if instance.id:
-            invoices = Invoice.objects.filter(reference_id=instance.id, product_id=Order.DOCTOR_PRODUCT_ID)
-            for invoice in invoices:
-                invoices_urls += "<a href={} target='_blank'>{}</a><br>".format(util_absolute_url(invoice.file.url),
-                                                                             util_file_name(invoice.file.url))
+        for invoice in instance.get_invoices():
+            invoices_urls += "<a href={} target='_blank'>{}</a><br>".format(util_absolute_url(invoice),
+                                                                             util_file_name(invoice))
         return mark_safe(invoices_urls)
     invoice_urls.short_description = 'Invoice(s)'
 
