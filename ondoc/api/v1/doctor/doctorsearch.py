@@ -176,7 +176,7 @@ class DoctorSearchHelper:
 
         if self.query_params.get('url') and (not self.query_params.get('sort_on') \
                                              or self.query_params.get('sort_on')=='distance'):
-            return ' distance, priority desc ', ' rnk=1 '
+            return ' enabled_for_online_booking DESC, distance, priority desc ', ' rnk=1 '
 
         bucket_size=2000
 
@@ -224,6 +224,14 @@ class DoctorSearchHelper:
                 'max_distance') and self.query_params.get(
                 'max_distance') * 1000 < int(DoctorSearchHelper.MAX_DISTANCE) else DoctorSearchHelper.MAX_DISTANCE)
         min_distance = self.query_params.get('min_distance')*1000 if self.query_params.get('min_distance') else 0
+
+        if self.query_params and self.query_params.get('sitemap_identifier'):            
+            sitemap_identifier = self.query_params.get('sitemap_identifier')
+            if sitemap_identifier in ('SPECIALIZATION_LOCALITY_CITY', 'DOCTORS_LOCALITY_CITY' ):
+                max_distance = 5000
+            if sitemap_identifier in ('SPECIALIZATION_CITY', 'DOCTORS_CITY'):
+                max_distance = 15000
+
         # max_distance = 10000000000000000000000
         data = dict()
 
