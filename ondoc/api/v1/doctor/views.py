@@ -1109,7 +1109,9 @@ class DoctorListViewSet(viewsets.GenericViewSet):
                                                 "doctor_clinics__hospital",
                                                 "doctorpracticespecializations", "doctorpracticespecializations__specialization",
                                                 "images",
-                                                "doctor_clinics__doctorclinicprocedure_set__procedure__parent_categories_mapping").order_by(preserved)
+                                                "doctor_clinics__doctorclinicprocedure_set__procedure__parent_categories_mapping",
+                                                "qualifications__qualification","qualifications__college",
+                                                "qualifications__specialization").order_by(preserved)
 
         response = doctor_search_helper.prepare_search_response(doctor_data, doctor_search_result, request)
 
@@ -1279,6 +1281,35 @@ class DoctorListViewSet(viewsets.GenericViewSet):
             #     "description": description,
             #     "location" : location
             #     }
+            search_url = validated_data.get('url')
+            if search_url:
+                object = NewDynamic.objects.filter(url_value=search_url, is_enabled=True).first()
+                if object:
+                    if object.meta_title :
+                        title = object.meta_title
+                    if object.meta_description:
+                        description = object.meta_description
+                    if object.top_content:
+                        top_content = object.top_content
+                    if object.bottom_content:
+                        bottom_content = object.bottom_content
+
+                if not top_content and specialization_id:
+                    specialization_content = models.PracticeSpecializationContent.objects.filter(
+                        specialization__id=specialization_id).first()
+                    if specialization_content:
+                        top_content = specialization_content.content
+
+                if top_content:
+                    top_content = str(top_content)
+                    top_content = top_content.replace('<location>', location)
+                    regex = re.compile(r'[\n\r\t]')
+                    top_content = regex.sub(" ", top_content)
+                if bottom_content:
+                    bottom_content = str(bottom_content)
+                    bottom_content = bottom_content.replace('<location>', location)
+                    regex = re.compile(r'[\n\r\t]')
+                    bottom_content = regex.sub(" ", bottom_content)
 
             seo = {
                 "title": title,
@@ -1308,30 +1339,6 @@ class DoctorListViewSet(viewsets.GenericViewSet):
                     "priceRange": "0"
                 }
             }
-
-            search_url = validated_data.get('url')
-            if search_url:
-                object = NewDynamic.objects.filter(url_value=search_url, is_enabled=True).first()
-                if object and object.top_content:
-                    top_content = object.top_content
-                if object and object.bottom_content:
-                    bottom_content = object.bottom_content
-                if not top_content and specialization_id:
-                    specialization_content = models.PracticeSpecializationContent.objects.filter(
-                        specialization__id=specialization_id).first()
-                    if specialization_content:
-                        top_content = specialization_content.content
-
-                if top_content:
-                    top_content = str(top_content)
-                    top_content = top_content.replace('<location>', location)
-                    regex = re.compile(r'[\n\r\t]')
-                    top_content = regex.sub(" ", top_content)
-                if bottom_content:
-                    bottom_content = str(bottom_content)
-                    bottom_content = bottom_content.replace('<location>', location)
-                    regex = re.compile(r'[\n\r\t]')
-                    bottom_content = regex.sub(" ", bottom_content)
 
 
 
