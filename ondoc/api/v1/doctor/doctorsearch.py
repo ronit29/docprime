@@ -421,9 +421,12 @@ class DoctorSearchHelper:
             sorted_spec_list = []
             doctor_spec_list = []
             searched_spec_list = []
+            general_specialization = []
+            
+            for dps in doctor.doctorpracticespecializations.all():
+                general_specialization.append(dps.specialization)
 
-            general_specialization = list(doctor.doctorpracticespecializations.all())
-            general_specialization = sorted(general_specialization, key=operator.itemgetter('doctor_count'), reverse=True)
+            general_specialization = sorted(general_specialization, key=operator.attrgetter('doctor_count'), reverse=True)
             for spec in general_specialization:
                 if spec.id in specialization_ids:
                     searched_spec_list.append({'name':spec.name})
