@@ -1156,6 +1156,8 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin):
     AUTO_CANCELLED = 3
     CANCELLATION_TYPE_CHOICES = [(PATIENT_CANCELLED, 'Patient Cancelled'), (AGENT_CANCELLED, 'Agent Cancelled'),
                                  (AUTO_CANCELLED, 'Auto Cancelled')]
+
+    MAX_FREE_BOOKINGS_ALLOWED = 3
     # PATIENT_SHOW = 1
     # PATIENT_DIDNT_SHOW = 2
     # PATIENT_STATUS_CHOICES = [PATIENT_SHOW, PATIENT_DIDNT_SHOW]

@@ -322,9 +322,16 @@ class DoctorAppointmentsViewSet(OndocViewSet):
             "discount": int(coupon_discount),
             "cashback": int(coupon_cashback)
         }
-        resp = self.create_order(request, opd_data, account_models.Order.DOCTOR_PRODUCT_ID, data.get("use_wallet"))
 
+        if opd_data.get("deal_price") == 0 and not self.can_book_for_free(request.user):
+            return Response({'request_errors': { "code" : "invalid", "message" : "Only 3 active free bookings allowed per customer" }}, status=status.HTTP_400_BAD_REQUEST)
+
+        resp = self.create_order(request, opd_data, account_models.Order.DOCTOR_PRODUCT_ID, data.get("use_wallet"))
         return Response(data=resp)
+
+    def can_book_for_free(self, user):
+        return models.OpdAppointment.objects.filter(user=user, deal_price=0)\
+                   .exclude(status__in=[models.OpdAppointment.COMPLETED, models.OpdAppointment.CANCELLED]).count() < models.OpdAppointment.MAX_FREE_BOOKINGS_ALLOWED
 
     def update(self, request, pk=None):
         user = request.user
