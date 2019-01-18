@@ -267,7 +267,7 @@ def set_order_dummy_transaction(self, order_id, user_id):
                     tx_data['order_id'] = order_row.id
                     tx_data['reference_id'] = order_row.reference_id
                     tx_data['type'] = DummyTransactions.CREDIT
-                    tx_data['amount'] = 0
+                    tx_data['amount'] = appointment.effective_price
                     tx_data['payment_mode'] = "DC"
 
                     # tx_data['transaction_id'] = resp_data.get('orderNo')
@@ -339,7 +339,7 @@ def process_payout(payout_id):
             curr_txn["idx"] = idx
             curr_txn["orderNo"] = txn.order_no
             curr_txn["orderId"] = order_data.id
-            curr_txn["txnAmount"] = str(order_data.amount)
+            curr_txn["txnAmount"] = str(txn.amount)
             curr_txn["settledAmount"] = str(payout_data.payable_amount)
             curr_txn["merchantCode"] = merchant.id
             curr_txn["pgtxId"] = txn.transaction_id
