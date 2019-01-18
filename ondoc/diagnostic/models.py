@@ -913,6 +913,7 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin)
     AUTO_CANCELLED = 3
     CANCELLATION_TYPE_CHOICES = [(PATIENT_CANCELLED, 'Patient Cancelled'), (AGENT_CANCELLED, 'Agent Cancelled'),
                                  (AUTO_CANCELLED, 'Auto Cancelled')]
+    MAX_FREE_BOOKINGS_ALLOWED = 3
 
     lab = models.ForeignKey(Lab, on_delete=models.SET_NULL, related_name='labappointment', null=True)
     lab_test = models.ManyToManyField(AvailableLabTest)  # Not to be used
