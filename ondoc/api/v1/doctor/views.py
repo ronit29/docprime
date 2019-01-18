@@ -1001,12 +1001,11 @@ class DoctorListViewSet(viewsets.GenericViewSet):
         reviews = None
 
         entity_url_qs = EntityUrls.objects.filter(url=url, url_type=EntityUrls.UrlType.SEARCHURL,
-                                           entity_type__iexact='Doctor').order_by('-sequence')
+                                           entity_type='Doctor').order_by('-sequence')
         if len(entity_url_qs) > 0:
             entity = entity_url_qs[0]
             if not entity.is_valid:
-                valid_qs = EntityUrls.objects.filter(url_type=EntityUrls.UrlType.SEARCHURL, is_valid=True,
-                                          entity_type__iexact='Doctor', specialization_id=entity.specialization_id,
+                valid_qs = EntityUrls.objects.filter(is_valid=True, specialization_id=entity.specialization_id,
                                           locality_id=entity.locality_id, sublocality_id=entity.sublocality_id,
                                           sitemap_identifier=entity.sitemap_identifier).order_by('-sequence')
 
@@ -1109,15 +1108,17 @@ class DoctorListViewSet(viewsets.GenericViewSet):
                                                 "doctor_clinics__hospital",
                                                 "doctorpracticespecializations", "doctorpracticespecializations__specialization",
                                                 "images",
-                                                "doctor_clinics__doctorclinicprocedure_set__procedure__parent_categories_mapping").order_by(preserved)
+                                                "doctor_clinics__doctorclinicprocedure_set__procedure__parent_categories_mapping",
+                                                "qualifications__qualification","qualifications__college",
+                                                "qualifications__specialization").order_by(preserved)
 
         response = doctor_search_helper.prepare_search_response(doctor_data, doctor_search_result, request)
 
         entity_ids = [doctor_data['id'] for doctor_data in response]
 
         id_url_dict = dict()
-        entity = EntityUrls.objects.filter(entity_id__in=entity_ids, url_type='PAGEURL', is_valid='t',
-                                           entity_type__iexact='Doctor').values('entity_id', 'url')
+        entity = EntityUrls.objects.filter(entity_id__in=entity_ids, sitemap_identifier='DOCTOR_PAGE',
+                                           is_valid=True).values('entity_id', 'url')
         for data in entity:
             id_url_dict[data['entity_id']] = data['url']
 
@@ -1279,6 +1280,35 @@ class DoctorListViewSet(viewsets.GenericViewSet):
             #     "description": description,
             #     "location" : location
             #     }
+            search_url = validated_data.get('url')
+            if search_url:
+                object = NewDynamic.objects.filter(url_value=search_url, is_enabled=True).first()
+                if object:
+                    if object.meta_title :
+                        title = object.meta_title
+                    if object.meta_description:
+                        description = object.meta_description
+                    if object.top_content:
+                        top_content = object.top_content
+                    if object.bottom_content:
+                        bottom_content = object.bottom_content
+
+                if not top_content and specialization_id:
+                    specialization_content = models.PracticeSpecializationContent.objects.filter(
+                        specialization__id=specialization_id).first()
+                    if specialization_content:
+                        top_content = specialization_content.content
+
+                if top_content:
+                    top_content = str(top_content)
+                    top_content = top_content.replace('<location>', location)
+                    regex = re.compile(r'[\n\r\t]')
+                    top_content = regex.sub(" ", top_content)
+                if bottom_content:
+                    bottom_content = str(bottom_content)
+                    bottom_content = bottom_content.replace('<location>', location)
+                    regex = re.compile(r'[\n\r\t]')
+                    bottom_content = regex.sub(" ", bottom_content)
 
             seo = {
                 "title": title,
@@ -1308,30 +1338,6 @@ class DoctorListViewSet(viewsets.GenericViewSet):
                     "priceRange": "0"
                 }
             }
-
-            search_url = validated_data.get('url')
-            if search_url:
-                object = NewDynamic.objects.filter(url_value=search_url, is_enabled=True).first()
-                if object and object.top_content:
-                    top_content = object.top_content
-                if object and object.bottom_content:
-                    bottom_content = object.bottom_content
-                if not top_content and specialization_id:
-                    specialization_content = models.PracticeSpecializationContent.objects.filter(
-                        specialization__id=specialization_id).first()
-                    if specialization_content:
-                        top_content = specialization_content.content
-
-                if top_content:
-                    top_content = str(top_content)
-                    top_content = top_content.replace('<location>', location)
-                    regex = re.compile(r'[\n\r\t]')
-                    top_content = regex.sub(" ", top_content)
-                if bottom_content:
-                    bottom_content = str(bottom_content)
-                    bottom_content = bottom_content.replace('<location>', location)
-                    regex = re.compile(r'[\n\r\t]')
-                    bottom_content = regex.sub(" ", bottom_content)
 
 
 
