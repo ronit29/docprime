@@ -1,3 +1,5 @@
+import operator
+
 from django.contrib.gis.geos import Point
 from django.db.models import F
 
@@ -351,6 +353,12 @@ class DoctorSearchHelper:
         category_ids = [int(x) for x in category_ids]
         procedure_ids = [int(x) for x in procedure_ids]
         response = []
+        spec_params_list = []
+        specialization_ids = self.query_params.get('specialization_ids', [])
+        if specialization_ids:
+            specialization = PracticeSpecialization.objects.filter(id__in=specialization_ids).values('name')
+            for spec in specialization:
+                spec_params_list.append(spec.get('name'))
         selected_procedure_ids, other_procedure_ids = get_selected_and_other_procedures(category_ids, procedure_ids)
         for doctor in doctor_data:
             enable_online_booking = False
@@ -415,19 +423,19 @@ class DoctorSearchHelper:
 
             thumbnail = doctor.get_thumbnail()
 
-            specialization_ids = self.query_params.get('specialization_ids')
-            specialization = PracticeSpecialization.objects.filter(id__in=specialization_ids).values('name')
-            general_specialization = serializers.DoctorPracticeSpecializationSerializer(doctor.doctorpracticespecializations.all(), many=True).data
-            specialization_list = []
-            for spec in general_specialization:
-                specialization_list.append(spec)
+            general_specialization = list(serializers.DoctorPracticeSpecSerializer(doctor.doctorpracticespecializations.all(), many=True).data)
+            sorted_by_general_specialization = sorted(general_specialization,
+                                              key=operator.itemgetter('doctor_count'), reverse=True)
 
-            for data in specialization:
-                if data in specialization_list:
-                    specialization_list.remove(OrderedDict(data))
-                    specialization_list = [data] + specialization_list
+            sorted_spec_list = []
+            for data in sorted_by_general_specialization:
+                sorted_spec_list.append(data.get('name'))
 
-
+            if spec_params_list:
+                for data in spec_params_list:
+                    if data in sorted_spec_list:
+                        sorted_spec_list.remove(data)
+                        sorted_spec_list = [data] + sorted_spec_list
 
             opening_hours = None
             if doctor_clinic.availability.exists():
@@ -455,7 +463,7 @@ class DoctorSearchHelper:
                 # "general_specialization": serializers.DoctorPracticeSpecializationSerializer(
                 #     doctor.doctorpracticespecializations.all(),
                 #     many=True).data,
-                "general_specialization": specialization_list,
+                "general_specialization": sorted_spec_list,
                 "distance": self.get_distance(doctor, doctor_clinic_mapping),
                 "name": doctor.name,
                 "display_name": doctor.get_display_name(),

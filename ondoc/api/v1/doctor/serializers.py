@@ -9,8 +9,8 @@ from ondoc.doctor.models import (OpdAppointment, Doctor, Hospital, DoctorHospita
                                  DoctorAward, DoctorDocument, DoctorEmail, DoctorExperience, DoctorImage,
                                  DoctorLanguage, DoctorMedicalService, DoctorMobile, DoctorQualification, DoctorLeave,
                                  Prescription, PrescriptionFile, Specialization, DoctorSearchResult, HealthTip,
-                                 CommonMedicalCondition,CommonSpecialization, 
-                                 DoctorPracticeSpecialization, DoctorClinic)
+                                 CommonMedicalCondition, CommonSpecialization,
+                                 DoctorPracticeSpecialization, DoctorClinic, PracticeSpecialization)
 from ondoc.diagnostic import models as lab_models
 from ondoc.authentication.models import UserProfile, DoctorNumber, GenericAdmin, GenericLabAdmin
 from django.db.models import Avg
@@ -501,6 +501,15 @@ class DoctorPracticeSpecializationSerializer(serializers.ModelSerializer):
     class Meta:
         model = DoctorPracticeSpecialization
         fields = ('name', )
+
+
+class DoctorPracticeSpecSerializer(serializers.ModelSerializer):
+    name = serializers.CharField(read_only=True, source='specialization.name')
+    doctor_count = serializers.IntegerField(read_only=True, source='specialization.doctor_count')
+
+    class Meta:
+        model = DoctorPracticeSpecialization
+        fields = ('name', 'doctor_count', )
 
 
 class DoctorProfileSerializer(serializers.ModelSerializer):
