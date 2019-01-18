@@ -1888,8 +1888,10 @@ class CreateAdminViewSet(viewsets.GenericViewSet):
                 hos_name = hos_obj.name
                 assoc_docs = hos_obj.assoc_doctors.extra(select={
                     'assigned': 'CASE WHEN  ((SELECT COUNT(*) FROM doctor_number WHERE doctor_id = doctor.id) = 0) THEN 0 ELSE 1  END',
-                    'phone_number': 'SELECT phone_number FROM doctor_number WHERE doctor_id = doctor.id'}) \
-                    .values('name', 'id', 'assigned', 'phone_number')
+                    'phone_number': 'SELECT phone_number FROM doctor_number WHERE doctor_id = doctor.id',
+                    'enabled': 'SELECT enabled FROM doctor_clinic WHERE doctor_id = doctor.id AND hospital_id=' + str(
+                        hos_obj.id)}) \
+                    .values('name', 'id', 'assigned', 'phone_number', 'enabled', 'is_live')
 
             for x in response:
                 if temp.get(x['phone_number']):
@@ -1899,7 +1901,7 @@ class CreateAdminViewSet(viewsets.GenericViewSet):
                         temp[x['phone_number']]['permission_type'] = auth_models.GenericAdmin.ALL
                 else:
                     for doc in assoc_docs:
-                        if (doc.get('phone_number') and doc.get('phone_number') == x['phone_number']):
+                        if (doc.get('is_live') and doc.get('enabled')) and (doc.get('phone_number') and doc.get('phone_number') == x['phone_number']):
                             x['is_doctor'] = True
                             x['name'] = doc.get('name')
                             x['id'] = doc.get('id')
