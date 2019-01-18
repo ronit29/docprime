@@ -316,6 +316,11 @@ class MerchantPayoutForm(forms.ModelForm):
         if any(self.errors):
             return
 
+        if self.cleaned_data.get('type', MerchantPayout.AUTOMATIC) == MerchantPayout.MANUAL and not self.cleaned_data.get('utr_no', None):
+            raise forms.ValidationError("Enter UTR Number if payout type is manual.")
+        if not self.cleaned_data.get('type', MerchantPayout.AUTOMATIC) == MerchantPayout.MANUAL and (self.cleaned_data.get('utr_no', None) or self.cleaned_data.get('amount_paid', None)):
+            raise forms.ValidationError("No need for UTR Number/Amount Paid if payout type is not manual.")
+
         process_payout = self.cleaned_data.get('process_payout')
         if process_payout:
             if not self.instance.get_merchant():
@@ -343,7 +348,7 @@ class MerchantPayoutAdmin(VersionAdmin):
     form = MerchantPayoutForm
     model = MerchantPayout
     fields = ['id', 'charged_amount', 'updated_at', 'created_at', 'payable_amount', 'status', 'payout_time', 'paid_to',
-              'appointment_id', 'get_billed_to', 'get_merchant', 'process_payout']
+              'appointment_id', 'get_billed_to', 'get_merchant', 'process_payout', 'type', 'utr_no', 'amount_paid']
     list_display = ('id', 'status', 'payable_amount', 'appointment_id', 'doc_lab_name')
     search_fields = ['name']
     list_filter = ['status']
@@ -351,8 +356,8 @@ class MerchantPayoutAdmin(VersionAdmin):
     def get_queryset(self, request):
         return super().get_queryset(request).order_by('-id').prefetch_related('lab_appointment__lab',
                                                                              'opd_appointment__doctor')
-    def get_search_results(self, request, queryset, search_term):
 
+    def get_search_results(self, request, queryset, search_term):
         queryset, use_distinct = super().get_search_results(request, queryset, None)
 
         queryset = queryset.filter(Q(opd_appointment__doctor__name__icontains=search_term) |
@@ -362,7 +367,10 @@ class MerchantPayoutAdmin(VersionAdmin):
 
     def get_readonly_fields(self, request, obj=None):
         base = ['appointment_id', 'get_billed_to', 'get_merchant']
-        readonly = [f.name for f in self.model._meta.fields if f.name not in ['payout_approved']]
+        editable_fields = ['payout_approved']
+        if obj and not obj.status == MerchantPayout.PAID:
+            editable_fields += ['type', 'utr_no', 'amount_paid']
+        readonly = [f.name for f in self.model._meta.fields if f.name not in editable_fields]
         return base + readonly
 
     def save_model(self, request, obj, form, change):
