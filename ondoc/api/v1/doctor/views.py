@@ -2680,14 +2680,6 @@ class OfflineCustomerViewSet(viewsets.GenericViewSet):
 
                 payout_amount = app.merchant_payout.payable_amount if app.merchant_payout else app.fees
                 prescription = app.get_prescriptions(request)
-            # if app.super_user:
-            #     pem_type = 3
-            # elif not app.super_user and not app.appointment_pem and app.billing_pem:
-            #     pem_type = 2
-            # elif not app.super_user and app.appointment_pem and not app.billing_pem:
-            #     pem_type = 1
-            # elif not app.super_user and app.appointment_pem and app.billing_pem:
-            #     pem_type = 3
             ret_obj = {}
             ret_obj['id'] = app.id
             ret_obj['deal_price'] = deal_price
