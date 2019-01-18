@@ -2062,6 +2062,21 @@ class OfflineCustomerViewSet(viewsets.GenericViewSet):
         ret_obj['type'] = 'doctor'
         return ret_obj
 
+    def validate_uuid(self, data):
+        response = {}
+        try:
+            id = UUID(data.get('id'), version=4)
+            response['id'] = id
+        except ValueError:
+            obj = self.get_error_obj(data)
+            obj['doctor_id'] = data.get('doctor').id
+            obj['hospital_id'] = data.get('hospital').id
+            obj['error_message'] = 'Invalid UUid - Offline Appointment Create!'
+            logger.error("PROVIDER_REQUEST - Invalid UUid - Offline Appointment Create! " + str(data))
+            response['obj'] = obj
+            response['continue'] = True
+        return response
+
     def validate_permissions(self, data, doc_pem_list, hosp_pem_list, clinic_queryset):
 
         if not data.get('doctor').id in doc_pem_list and not data.get('hospital').id in hosp_pem_list:
@@ -2099,6 +2114,28 @@ class OfflineCustomerViewSet(viewsets.GenericViewSet):
             logger.error("PROVIDER_REQUEST - Invalid Appointment Status Recieved! " + str(data))
             response['obj'] = obj
             response['break'] = True
+        return response
+
+    def validate_create_conditions(self, appntment_ids, data, request):
+        response = {}
+        if id in appntment_ids:
+            obj = {'id': data.get('id'),
+                   'error': True,
+                   'error_message': "Appointment With Same UUid exists!"}
+            obj['doctor_id'] = data.get('doctor').id
+            obj['hospital_id'] = data.get('hospital').id
+            logger.error("PROVIDER_REQUEST - Offline Appointment With Same UUid exists! " + str(data))
+            response['obj'] = obj
+            response['continue'] = True
+        elif not data.get('patient'):
+            obj = {'id': data.get('id'),
+                   'error': True,
+                   'error_message': "Patient not Recieved for Offline Appointment!"}
+            obj['doctor_id'] = data.get('doctor').id
+            obj['hospital_id'] = data.get('hospital').id
+            logger.error("PROVIDER_REQUEST - Patient not Recieved for Offline Appointment! " + str(data))
+            response['obj'] = obj
+            response['continue'] = True
         return response
 
     def list_patients(self, request):
@@ -2186,52 +2223,37 @@ class OfflineCustomerViewSet(viewsets.GenericViewSet):
         doc_pem_list, hosp_pem_list = map(list, zip(*pem_queryset))
 
         for data in valid_data.get('data'):
-            try:
-                id = UUID(data.get('id'), version=4)
-            except ValueError:
-                obj = self.get_error_obj(data)
-                obj['doctor_id'] = data.get('doctor').id
-                obj['hospital_id'] = data.get('hospital').id
-                obj['error_message'] = 'Invalid UUid - Offline Appointment Create!'
-                resp.append(obj)
-                logger.error("PROVIDER_REQUEST - Invalid UUid - Offline Appointment Create! " + str(data))
+            #Validating valid UUID and skip the row if False
+            uuid_obj = self.validate_uuid(data)
+            id = uuid_obj.get('id') if 'id' in uuid_obj and uuid_obj.get('id') else None
+            if not id and 'continue' in uuid_obj and uuid_obj.get('continue'):
+                resp.append(uuid_obj.get('obj'))
                 continue
 
+            #Validate for correct permssions but create as the request might be recived for an earlier appointment
+            # which havenot been synced yet from provide request
             self.validate_permissions(data, doc_pem_list, hosp_pem_list, clinic_queryset)
 
-            if id in appntment_ids:
-                obj = {'id': data.get('id'),
-                       'error': True,
-                       'error_message': "Appointment With Same UUid exists!"}
-                obj['doctor_id'] = data.get('doctor').id
-                obj['hospital_id'] = data.get('hospital').id
-                resp.append(obj)
-                logger.error("PROVIDER_REQUEST - Offline Appointment With Same UUid exists! " + str(data))
-                continue
-            if not data.get('patient'):
-                obj = {'id': data.get('id'),
-                       'error': True,
-                       'error_message': "Patient not Recieved for Offline Appointment!"}
-                obj['doctor_id'] = data.get('doctor').id
-                obj['hospital_id'] = data.get('hospital').id
-                resp.append(obj)
-                logger.error("PROVIDER_REQUEST - Patient not Recieved for Offline Appointment! " + str(data))
+            #Validate if necessary and Valid data have been recieved Otherwise skip the row
+            create_obj = self.validate_create_conditions(appntment_ids, data, request)
+            if 'continue' in create_obj and create_obj.get('continue'):
+                resp.append(create_obj.get('obj'))
                 continue
 
+            #Create or Update Patient
             if not data.get('patient')['id'] in patient_ids:
                 patient_data = self.create_patient(request, data['patient'], data['hospital'], data['doctor'])
             else:
                 patient_data = self.update_patient(request, data['patient'], data['hospital'], data['doctor'])
-
             patient = patient_data['patient']
             if patient_data.get('sms_list'):
                 sms_list.append(patient_data['sms_list'])
-            time_slot_start = data.get('time_slot_start')
+
             try:
                 appnt = models.OfflineOPDAppointments.objects.create(doctor=data.get('doctor'),
                                                                      id=id,
                                                                      hospital=data.get('hospital'),
-                                                                     time_slot_start=time_slot_start,
+                                                                     time_slot_start=data.get('time_slot_start'),
                                                                      booked_by=request.user,
                                                                      user=patient,
                                                                      status=models.OfflineOPDAppointments.ACCEPTED,
@@ -2247,6 +2269,7 @@ class OfflineCustomerViewSet(viewsets.GenericViewSet):
                 resp.append(obj)
                 logger.error("Fialed Creating Appointment " + str(e))
                 continue
+
             if patient_data.get('sms_list'):
                 patient_data['sms_list']['appointment'] = appnt
             appntment_ids.append(appnt.id)
@@ -2256,13 +2279,10 @@ class OfflineCustomerViewSet(viewsets.GenericViewSet):
             ret_obj['patient_id'] = appnt.user.id
             ret_obj['error'] = appnt.error
             ret_obj['error_message'] = appnt.error_message
-
             ret_obj.update(self.get_offline_response_obj(appnt, request))
-
             resp.append(ret_obj)
 
         if sms_list:
-            # transaction.on_commit(lambda: models.OfflinePatients.after_commit_sms(sms_list))
             transaction.on_commit(lambda: models.OfflineOPDAppointments.after_commit_create_sms(sms_list))
 
         return Response(resp)
@@ -2370,48 +2390,25 @@ class OfflineCustomerViewSet(viewsets.GenericViewSet):
 
         for data in valid_data.get('data'):
             if not data.get('is_docprime'):
-                try:
-                    id = UUID(data.get('id'), version=4)
-                except ValueError:
-                    obj = self.get_error_obj(data)
-                    obj['doctor_id'] = data.get('doctor').id
-                    obj['hospital_id'] = data.get('hospital').id
-                    obj['error_message'] = 'Invalid UUid - Offline Appointment Update!'
-                    resp.append(obj)
-                    logger.error("PROVIDER_REQUEST - Invalid UUid - Offline Appointment Update! " + str(data))
+                uuid_obj = self.validate_uuid(data)
+                id = uuid_obj.get('id') if 'id' in uuid_obj and uuid_obj.get('id') else None
+                if not id and 'continue' in uuid_obj and uuid_obj.get('continue'):
+                    resp.append(uuid_obj.get('obj'))
                     continue
+
                 found = False
                 for appnt in appntment_ids:
                     if id == appnt.id:
                         patient = def_number = action_cancel = action_add = action_reschedule = None
                         found = True
-                        if appnt.error:
-                            obj = self.get_error_obj(data)
-                            obj['error_message'] = 'Cannot Update an invalid/error appointment!'
-                            obj.update(self.get_offline_response_obj(appnt, request))
-                            resp.append(obj)
-                            logger.error("PROVIDER_REQUEST - Updating a invalid/error Appointment! " + str(data))
-                            break
-                        if appnt.status == models.OfflineOPDAppointments.CANCELLED or appnt.status == models.OfflineOPDAppointments.NO_SHOW:
-                            obj = self.get_error_obj(data)
-                            obj['error_message'] = 'Cannot Update a Cancelled/NoShow appointment!'
-                            obj.update(self.get_offline_response_obj(appnt, request))
-                            resp.append(obj)
-                            logger.error("PROVIDER_REQUEST - Updating a Cancelled/NoShow Appointment! " + str(data))
-                            break
 
                         self.validate_permissions(data, doc_pem_list, hosp_pem_list, clinic_queryset)
 
-                        if data.get('status') and data.get('status') not in [models.OfflineOPDAppointments.NO_SHOW,
-                                                                             models.OfflineOPDAppointments.RESCHEDULED_DOCTOR,
-                                                                             models.OfflineOPDAppointments.CANCELLED,
-                                                                             models.OfflineOPDAppointments.ACCEPTED]:
-                            obj = self.get_error_obj(data)
-                            obj['error_message'] = 'Invalid Appointment Status Recieved!'
-                            obj.update(self.get_offline_response_obj(appnt, request))
-                            resp.append(obj)
-                            logger.error("PROVIDER_REQUEST - Invalid Appointment Status Recieved! " + str(data))
+                        update_obj = self.validate_update_conditions(appnt, data, request)
+                        if 'break' in update_obj and update_obj.get('break'):
+                            resp.append(update_obj)
                             break
+
                         if data.get('patient'):
                             if not data.get('patient')['id'] in patient_ids:
                                 patient_data = self.create_patient(request, data['patient'], data['hospital'],
@@ -2438,13 +2435,14 @@ class OfflineCustomerViewSet(viewsets.GenericViewSet):
                                                                 'name': patient.name,
                                                                 'old_appointment': appnt}
                                     sms_list.append(patient_data['sms_list'])
+
                         if appnt.doctor.id != data.get('doctor').id or appnt.hospital.id != data.get('hospital').id:
                             action_cancel = True
+
                         appnt.doctor = data.get('doctor')
                         appnt.hospital = data.get('hospital')
                         appnt.error = data.get('error')
                         appnt.error_message = data.get('error_message')
-
                         if data.get("time_slot_start"):
                             action_reschedule = True
                             appnt.time_slot_start = data.get("time_slot_start")
