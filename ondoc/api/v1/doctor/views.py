@@ -2155,7 +2155,7 @@ class OfflineCustomerViewSet(viewsets.GenericViewSet):
             response['break'] = True
         return response
 
-    def validate_create_conditions(self, appntment_ids, data, request):
+    def validate_create_conditions(self, id, appntment_ids, data, request):
         response = {}
         if id in appntment_ids:
             obj = {'id': data.get('id'),
@@ -2274,7 +2274,7 @@ class OfflineCustomerViewSet(viewsets.GenericViewSet):
             self.validate_permissions(data, doc_pem_list, hosp_pem_list, clinic_queryset)
 
             #Validate if necessary and Valid data have been recieved Otherwise skip the row
-            create_obj = self.validate_create_conditions(appntment_ids, data, request)
+            create_obj = self.validate_create_conditions(id, appntment_ids, data, request)
             if 'continue' in create_obj and create_obj.get('continue'):
                 resp.append(create_obj.get('obj'))
                 continue
