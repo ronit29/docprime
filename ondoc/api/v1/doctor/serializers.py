@@ -39,6 +39,7 @@ from ondoc.authentication import models as auth_models
 from ondoc.location.models import EntityUrls, EntityAddress
 from ondoc.procedure.models import DoctorClinicProcedure, Procedure, ProcedureCategory, \
     get_included_doctor_clinic_procedure, get_procedure_categories_with_procedures
+from ondoc.seo.models import NewDynamic
 
 logger = logging.getLogger(__name__)
 
@@ -885,6 +886,7 @@ class DoctorProfileUserViewSerializer(DoctorProfileSerializer):
         #                                    is_valid=True)
         sublocality = None
         locality = None
+        entity = None
         if self.context.get('entity'):
             entity = self.context.get('entity')
             if entity.additional_info:
@@ -981,6 +983,13 @@ class DoctorProfileUserViewSerializer(DoctorProfileSerializer):
             }
 
         }
+        if entity:
+            new_object = NewDynamic.objects.filter(url__url=entity.url, is_enabled=True).first()
+            if new_object:
+                if new_object.meta_title:
+                    title = new_object.meta_title
+                if new_object.meta_description:
+                    description = new_object.meta_description
 
         return {'title': title, "description": description, 'schema': schema}
 

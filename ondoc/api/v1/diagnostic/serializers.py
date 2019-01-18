@@ -27,6 +27,7 @@ from django.db.models import Avg
 from django.db.models import Q
 from ondoc.api.v1.ratings import serializers as rating_serializer
 from ondoc.location.models import EntityUrls, EntityAddress
+from ondoc.seo.models import NewDynamic
 
 logger = logging.getLogger(__name__)
 utc = pytz.UTC
@@ -143,6 +144,7 @@ class LabModelSerializer(serializers.ModelSerializer):
 
         locality = None
         sublocality = None
+        entity = None
         # if entity.exists():
             #entity = entity[0]
         if self.context.get('entity'):
@@ -159,6 +161,14 @@ class LabModelSerializer(serializers.ModelSerializer):
             title = obj.name + ' - Diagnostic Centre | DocPrime'
 
         description = obj.name + ': Book test at ' + obj.name + ' online, check fees, packages prices and more at DocPrime. '
+
+        if entity:
+            new_object = NewDynamic.objects.filter(url__url=entity.url, is_enabled=True).first()
+            if new_object:
+                if new_object.meta_title:
+                    title = new_object.meta_title
+                if new_object.meta_description:
+                    description = new_object.meta_description
         return {'title': title, "description": description}
 
     def get_breadcrumb(self, obj):

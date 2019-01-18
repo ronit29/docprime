@@ -1825,6 +1825,7 @@ class PracticeSpecialization(auth_model.TimeStampedModel, SearchKey):
     general_specialization_ids = ArrayField(models.IntegerField(blank=True, null=True), size=100,
                                             null=True, blank=True)
     synonyms = models.CharField(max_length=4000, null=True, blank=True)
+    doctor_count = models.PositiveIntegerField(default=0, null=True)
 
     class Meta:
         db_table = 'practice_specialization'
