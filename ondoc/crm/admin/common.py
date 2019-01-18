@@ -316,9 +316,9 @@ class MerchantPayoutForm(forms.ModelForm):
         if any(self.errors):
             return
 
-        if self.cleaned_data.get('type', MerchantPayout.AUTOMATIC) == MerchantPayout.MANUAL and not self.cleaned_data.get('utr_no', None):
+        if self.cleaned_data.get('type', None) == MerchantPayout.MANUAL and not self.cleaned_data.get('utr_no', None):
             raise forms.ValidationError("Enter UTR Number if payout type is manual.")
-        if not self.cleaned_data.get('type', MerchantPayout.AUTOMATIC) == MerchantPayout.MANUAL and (self.cleaned_data.get('utr_no', None) or self.cleaned_data.get('amount_paid', None)):
+        if not self.cleaned_data.get('type', None) == MerchantPayout.MANUAL and (self.cleaned_data.get('utr_no', None) or self.cleaned_data.get('amount_paid', None)):
             raise forms.ValidationError("No need for UTR Number/Amount Paid if payout type is not manual.")
 
         process_payout = self.cleaned_data.get('process_payout')
@@ -368,7 +368,7 @@ class MerchantPayoutAdmin(VersionAdmin):
     def get_readonly_fields(self, request, obj=None):
         base = ['appointment_id', 'get_billed_to', 'get_merchant']
         editable_fields = ['payout_approved']
-        if obj and not obj.status == MerchantPayout.PAID:
+        if obj and obj.status == MerchantPayout.PENDING:
             editable_fields += ['type', 'utr_no', 'amount_paid']
         readonly = [f.name for f in self.model._meta.fields if f.name not in editable_fields]
         return base + readonly

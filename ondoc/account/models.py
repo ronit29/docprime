@@ -856,7 +856,7 @@ class MerchantPayout(TimeStampedModel):
         if not self.id:
             first_instance = True
 
-        if self.id and hasattr(self,'process_payout') and self.process_payout:
+        if self.id and hasattr(self,'process_payout') and self.process_payout and self.status==self.PENDING and self.type==self.AUTOMATIC:
             self.type = self.AUTOMATIC
             if not self.content_object:
                 self.content_object = self.get_billed_to()
@@ -874,7 +874,7 @@ class MerchantPayout(TimeStampedModel):
             except Exception as e:
                 logger.error(str(e))
 
-        if self.type == self.MANUAL and self.utr_no and not self.status == self.PAID:
+        if self.type == self.MANUAL and self.utr_no and self.status == self.PENDING:
             self.status = self.PAID
 
         super().save(*args, **kwargs)
