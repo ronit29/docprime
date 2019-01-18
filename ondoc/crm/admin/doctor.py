@@ -20,13 +20,13 @@ import datetime
 from django.db import transaction
 import logging
 from dal import autocomplete
-from ondoc.api.v1.utils import GenericAdminEntity
+from ondoc.api.v1.utils import GenericAdminEntity, util_absolute_url, util_file_name
 from ondoc.procedure.models import DoctorClinicProcedure, Procedure
 
 logger = logging.getLogger(__name__)
 
 
-from ondoc.account.models import Order
+from ondoc.account.models import Order, Invoice
 from django.contrib.contenttypes.admin import GenericTabularInline
 from ondoc.authentication.models import GenericAdmin, SPOCDetails, AssociatedMerchant, Merchant
 from ondoc.doctor.models import (Doctor, DoctorQualification,
@@ -434,160 +434,160 @@ class DoctorMobileForm(forms.ModelForm):
     mark_primary = forms.BooleanField(required=False)
     otp = forms.IntegerField(required=False)
 
-    # def clean(self):
-    #     super().clean()
-    #     if any(self.errors):
-    #         return
-    #     data = self.cleaned_data
-    #     std_code = data.get('std_code')
-    #     number = data.get('number')
-    #     if std_code:
-    #         try:
-    #             std_code=int(std_code)
-    #         except:
-    #             raise forms.ValidationError("Invalid STD code")
-    #
-    #     try:
-    #         number=int(number)
-    #     except:
-    #         raise forms.ValidationError("Invalid Number")
-    #
-    #     if std_code:
-    #         if data.get('is_primary'):
-    #             raise forms.ValidationError("Primary number should be a mobile number")
-    #     else:
-    #         if number and (number<5000000000 or number>9999999999):
-    #             raise forms.ValidationError("Invalid mobile number")
-    #
-    #     Marking doctor mobile primary work.
-        # if std_code and data.get('mark_primary'):
-        #     raise forms.ValidationError('Primary number should be a mobile number')
-        #
-        # if not std_code and data.get('mark_primary'):
-        #     if number and (number<5000000000 or number>9999999999):
-        #         raise forms.ValidationError("Invalid mobile number")
-
-    # class Meta:
-    #     fields = '__all__'
-
-
-class DoctorMobileFormSet(forms.BaseInlineFormSet):
     def clean(self):
         super().clean()
         if any(self.errors):
             return
-
-        primary = 0
-        mark_primary = 0
-        count = 0
-
-        for value in self.cleaned_data:
-            std_code = value.get('std_code')
-            number = value.get('number')
-            if std_code:
-                try:
-                    std_code=int(std_code)
-                except:
-                    raise forms.ValidationError("Invalid STD code")
-
+        data = self.cleaned_data
+        std_code = data.get('std_code')
+        number = data.get('number')
+        if std_code:
             try:
-                number=int(number)
+                std_code=int(std_code)
             except:
-                raise forms.ValidationError("Invalid Number")
+                raise forms.ValidationError("Invalid STD code")
+    
+        try:
+            number=int(number)
+        except:
+            raise forms.ValidationError("Invalid Number")
+    
+        if std_code:
+            if data.get('is_primary'):
+                raise forms.ValidationError("Primary number should be a mobile number")
+        else:
+            if number and (number<5000000000 or number>9999999999):
+                raise forms.ValidationError("Invalid mobile number")
+    
+        #Marking doctor mobile primary work.
+        # if std_code and data.get('mark_primary'):
+        #     raise forms.ValidationError('Primary number should be a mobile number')
+        
+        # if not std_code and data.get('mark_primary'):
+        #     if number and (number<5000000000 or number>9999999999):
+        #         raise forms.ValidationError("Invalid mobile number")
 
-            if std_code:
-                if value.get('is_primary'):
-                    raise forms.ValidationError("Primary number should be a mobile number")
-
-                if value.get('mark_primary'):
-                    raise forms.ValidationError("Mark primary is only applicable for mobile numbers.")
-
-            else:
-                if number and (number<5000000000 or number>9999999999):
-                    raise forms.ValidationError("Invalid mobile number")
-
-            count += 1
-
-
-            if value.get('is_primary'):
-                if self.forms[0].instance.doctor.onboarding_status == 3:
-                    if value.get('DELETE'):
-                        raise forms.ValidationError('Primary number cannot be deleted.')
-
-                    if not value.get('id'):
-                        raise forms.ValidationError('Primary number can be marked only by checking mark_primary, '
-                                                    'obtaining otp and entering otp again.')
-                    id = value.get('id').id
-                    if id and not DoctorMobile.objects.filter(id=id, is_primary=True).exists():
-                        raise forms.ValidationError('Primary number can be marked only by checking mark_primary, '
-                                                    'obtaining otp and entering otp again.')
-
-                    if id and not DoctorMobile.objects.filter(id=id, number=value.get('number')).exists():
-                        raise forms.ValidationError('Primary number cannot be changed. Add another number , mark it as primary'
-                                                    ' and validate it with otp')
-
-                    if value.get('mark_primary'):
-                        raise forms.ValidationError('Number is already primary number.')
-
-                primary += 1
-
-            if value.get('mark_primary'):
-                mark_primary += 1
-
-        if count > 0:
-
-            if primary > 1:
-                raise forms.ValidationError("Doctor can have only one primary number.")
-
-            if DoctorMobile.objects.filter(doctor=self.forms[0].instance.doctor).exists() \
-                    and self.forms[0].instance.doctor.onboarding_status == 3:
-                if primary != 1 :
-                    raise forms.ValidationError("Doctor must have one primary mobile number.")
-            if mark_primary > 1:
-                raise forms.ValidationError("Doctor can change only one primary mobile number.")
-
-        record = None
-        todo_make_primary = None
-        for form in self.forms:
-            if form.instance.mark_primary and not form.instance.otp:
-                # if not DoctorMobileOtp.objects.filter(doctor_mobile=form.instance).exists():
-                form.instance.save()
-                dmo = DoctorMobileOtp.create_otp(form.instance)
-                message = "The OTP for onboard process is %d" % dmo.otp
-
-                try:
-                    api.send_sms(message, str(form.instance.number))
-                except Exception as e:
-                    logger.error(str(e))
-
-            elif form.instance.mark_primary and form.instance.otp:
-                doctor_mobile_otp = form.instance.mobiles_otp.all().last()
-                resonse = doctor_mobile_otp.consume()
-                if resonse:
-                    # DoctorMobile.objects.filter(doctor=form.instance.doctor).update(is_primary=False)
-                    # form.instance.is_primary = True
-                    todo_make_primary = form.instance.id
-                    form.instance.otp = None
-                    form.instance.mark_primary = False
-                else:
-                    raise forms.ValidationError("OTP is incorrect")
+    class Meta:
+        fields = '__all__'
 
 
-            elif not form.instance.mark_primary and form.instance.otp:
-                form.instance.otp = None
+# class DoctorMobileFormSet(forms.BaseInlineFormSet):
+#     def clean(self):
+#         super().clean()
+#         if any(self.errors):
+#             return
 
-        if todo_make_primary:
-            for form in self.forms:
-                if form.instance.id == todo_make_primary:
-                    form.instance.is_primary = True
-                else:
-                    form.instance.is_primary = False
+#         primary = 0
+#         mark_primary = 0
+#         count = 0
+
+#         for value in self.cleaned_data:
+#             std_code = value.get('std_code')
+#             number = value.get('number')
+#             if std_code:
+#                 try:
+#                     std_code=int(std_code)
+#                 except:
+#                     raise forms.ValidationError("Invalid STD code")
+
+#             try:
+#                 number=int(number)
+#             except:
+#                 raise forms.ValidationError("Invalid Number")
+
+#             if std_code:
+#                 if value.get('is_primary'):
+#                     raise forms.ValidationError("Primary number should be a mobile number")
+
+#                 if value.get('mark_primary'):
+#                     raise forms.ValidationError("Mark primary is only applicable for mobile numbers.")
+
+#             else:
+#                 if number and (number<5000000000 or number>9999999999):
+#                     raise forms.ValidationError("Invalid mobile number")
+
+#             count += 1
+
+
+#             if value.get('is_primary'):
+#                 if self.forms[0].instance.doctor.onboarding_status == 3:
+#                     if value.get('DELETE'):
+#                         raise forms.ValidationError('Primary number cannot be deleted.')
+
+#                     if not value.get('id'):
+#                         raise forms.ValidationError('Primary number can be marked only by checking mark_primary, '
+#                                                     'obtaining otp and entering otp again.')
+#                     id = value.get('id').id
+#                     if id and not DoctorMobile.objects.filter(id=id, is_primary=True).exists():
+#                         raise forms.ValidationError('Primary number can be marked only by checking mark_primary, '
+#                                                     'obtaining otp and entering otp again.')
+
+#                     if id and not DoctorMobile.objects.filter(id=id, number=value.get('number')).exists():
+#                         raise forms.ValidationError('Primary number cannot be changed. Add another number , mark it as primary'
+#                                                     ' and validate it with otp')
+
+#                     if value.get('mark_primary'):
+#                         raise forms.ValidationError('Number is already primary number.')
+
+#                 primary += 1
+
+#             if value.get('mark_primary'):
+#                 mark_primary += 1
+
+#         if count > 0:
+
+#             if primary > 1:
+#                 raise forms.ValidationError("Doctor can have only one primary number.")
+
+#             if DoctorMobile.objects.filter(doctor=self.forms[0].instance.doctor).exists() \
+#                     and self.forms[0].instance.doctor.onboarding_status == 3:
+#                 if primary != 1 :
+#                     raise forms.ValidationError("Doctor must have one primary mobile number.")
+#             if mark_primary > 1:
+#                 raise forms.ValidationError("Doctor can change only one primary mobile number.")
+
+#         record = None
+#         todo_make_primary = None
+#         for form in self.forms:
+#             if form.instance.mark_primary and not form.instance.otp:
+#                 # if not DoctorMobileOtp.objects.filter(doctor_mobile=form.instance).exists():
+#                 form.instance.save()
+#                 dmo = DoctorMobileOtp.create_otp(form.instance)
+#                 message = "The OTP for onboard process is %d" % dmo.otp
+
+#                 try:
+#                     api.send_sms(message, str(form.instance.number))
+#                 except Exception as e:
+#                     logger.error(str(e))
+
+#             elif form.instance.mark_primary and form.instance.otp:
+#                 doctor_mobile_otp = form.instance.mobiles_otp.all().last()
+#                 resonse = doctor_mobile_otp.consume()
+#                 if resonse:
+#                     # DoctorMobile.objects.filter(doctor=form.instance.doctor).update(is_primary=False)
+#                     # form.instance.is_primary = True
+#                     todo_make_primary = form.instance.id
+#                     form.instance.otp = None
+#                     form.instance.mark_primary = False
+#                 else:
+#                     raise forms.ValidationError("OTP is incorrect")
+
+
+#             elif not form.instance.mark_primary and form.instance.otp:
+#                 form.instance.otp = None
+
+#         if todo_make_primary:
+#             for form in self.forms:
+#                 if form.instance.id == todo_make_primary:
+#                     form.instance.is_primary = True
+#                 else:
+#                     form.instance.is_primary = False
 
 
 class DoctorMobileInline(nested_admin.NestedTabularInline):
     model = DoctorMobile
     form = DoctorMobileForm
-    formset = DoctorMobileFormSet
+    #formset = DoctorMobileFormSet
     extra = 0
     can_delete = True
     show_change_link = False
@@ -993,7 +993,7 @@ class DoctorAdmin(AutoComplete, ImportExportMixin, VersionAdmin, ActionAdmin, QC
     list_filter = (
         'data_status', 'onboarding_status', 'is_live', 'enabled', 'is_insurance_enabled', 'doctorpracticespecializations__specialization',
         CityFilter, CreatedByFilter)
-    #form = DoctorForm
+    form = DoctorForm
     inlines = [
         CompetitorInfoInline,
         CompetitorMonthlyVisitsInline,
@@ -1404,7 +1404,7 @@ class DoctorOpdAppointmentAdmin(admin.ModelAdmin):
                     'contact_details', 'profile', 'profile_detail', 'user', 'booked_by', 'procedures_details',
                     'fees', 'effective_price', 'mrp', 'deal_price', 'payment_status', 'status', 'cancel_type',
                     'cancellation_reason', 'cancellation_comments',
-                    'start_date', 'start_time', 'payment_type', 'otp', 'insurance', 'outstanding')
+                    'start_date', 'start_time', 'payment_type', 'otp', 'insurance', 'outstanding', 'invoice_urls')
         elif request.user.groups.filter(name=constants['OPD_APPOINTMENT_MANAGEMENT_TEAM']).exists():
             return ('booking_id', 'doctor_name', 'doctor_id', 'doctor_details', 'hospital_name', 'hospital_details',
                     'kyc', 'contact_details', 'used_profile_name',
@@ -1413,22 +1413,32 @@ class DoctorOpdAppointmentAdmin(admin.ModelAdmin):
                     'fees', 'effective_price', 'mrp', 'deal_price', 'payment_status',
                     'payment_type', 'admin_information', 'otp', 'insurance', 'outstanding',
                     'status', 'cancel_type', 'cancellation_reason', 'cancellation_comments',
-                    'start_date', 'start_time')
+                    'start_date', 'start_time', 'invoice_urls')
         else:
             return ()
 
     def get_readonly_fields(self, request, obj=None):
         if request.user.is_superuser and request.user.is_staff:
-            return 'booking_id', 'doctor_id', 'doctor_details', 'contact_details', 'hospital_details', 'kyc', 'procedures_details'
+            return 'booking_id', 'doctor_id', 'doctor_details', 'contact_details', 'hospital_details', 'kyc', 'procedures_details', 'invoice_urls'
         elif request.user.groups.filter(name=constants['OPD_APPOINTMENT_MANAGEMENT_TEAM']).exists():
             return ('booking_id', 'doctor_name', 'doctor_id', 'doctor_details', 'hospital_name',
                     'hospital_details', 'kyc', 'contact_details',
                     'used_profile_name', 'used_profile_number', 'default_profile_name',
                     'default_profile_number', 'user_id', 'user_number', 'booked_by',
                     'fees', 'effective_price', 'mrp', 'deal_price', 'payment_status', 'payment_type',
-                    'admin_information', 'otp', 'insurance', 'outstanding', 'procedures_details')
+                    'admin_information', 'otp', 'insurance', 'outstanding', 'procedures_details','invoice_urls')
         else:
-            return ()
+            return ('invoice_urls')
+
+    def invoice_urls(self, instance):
+        invoices_urls = ''
+        if instance.id:
+            invoices = Invoice.objects.filter(reference_id=instance.id, product_id=Order.DOCTOR_PRODUCT_ID)
+            for invoice in invoices:
+                invoices_urls += "<a href={} target='_blank'>{}</a><br>".format(util_absolute_url(invoice.file.url),
+                                                                             util_file_name(invoice.file.url))
+        return mark_safe(invoices_urls)
+    invoice_urls.short_description = 'Invoice(s)'
 
     def procedures_details(self, obj):
         procedure_mappings = obj.procedure_mappings.all()

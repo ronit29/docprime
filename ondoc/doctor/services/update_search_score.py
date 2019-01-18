@@ -117,20 +117,20 @@ class DoctorSearchScore:
             final_score = result[0]['popularity_score'] * final_score_list['popularity_score'] + result[1]['experience_score'] * final_score_list['years_of_experience'] +  result[2]['doctors_in_clinic_score'] * final_score_list['doctors_in_clinic']
             return {'final_score': final_score}
 
-    # def delete_search_score(self):
-    #     RawSql('''delete from search_score''', []).execute()
-    #     return "success"
-    #
-    # def create_doctor_score(self):
-    #     RawSql('''update doctor d set search_score=(select final_score from search_score ss where ss.doctor_id=d.id)''', []).execute()
-    #     return "success"
-    #
-    # @task(bind=True)
-    # #@transaction.atomic
-    # def create_search_score(self):
-    #     print(self.delete_search_score())
-    #     print(self.calculate())
-    #     print(self.create_doctor_score())
+    def delete_search_score(self):
+        RawSql('''delete from search_score''', []).execute()
+        return "success"
+    
+    def create_doctor_score(self):
+        RawSql('''update doctor d set search_score=(select final_score from search_score ss where ss.doctor_id=d.id)''', []).execute()
+        return "success"
+    
+    #@task(bind=True)
+    #@transaction.atomic
+    def create_search_score(self):
+        print(self.delete_search_score())
+        print(self.calculate())
+        print(self.create_doctor_score())
 
 
 

@@ -1,3 +1,4 @@
+from django.utils.safestring import mark_safe
 from rest_framework import serializers
 from rest_framework.fields import CharField
 from django.db.models import Q, Avg, Count, Max, F, ExpressionWrapper, DateTimeField
@@ -16,11 +17,12 @@ from django.db.models import Avg
 from django.db.models import Q
 
 from ondoc.coupon.models import Coupon, RandomGeneratedCoupon
-from ondoc.account.models import Order
+from ondoc.account.models import Order, Invoice
 from django.contrib.staticfiles.templatetags.staticfiles import static
 from ondoc.api.v1.auth.serializers import UserProfileSerializer
 from ondoc.api.v1.ratings import serializers as rating_serializer
-from ondoc.api.v1.utils import is_valid_testing_data, form_time_slot, GenericAdminEntity
+from ondoc.api.v1.utils import is_valid_testing_data, form_time_slot, GenericAdminEntity, util_absolute_url, \
+    util_file_name
 from django.utils import timezone
 from django.contrib.auth import get_user_model
 import math
@@ -37,6 +39,7 @@ from ondoc.authentication import models as auth_models
 from ondoc.location.models import EntityUrls, EntityAddress
 from ondoc.procedure.models import DoctorClinicProcedure, Procedure, ProcedureCategory, \
     get_included_doctor_clinic_procedure, get_procedure_categories_with_procedures
+from ondoc.seo.models import NewDynamic
 
 logger = logging.getLogger(__name__)
 
@@ -90,6 +93,7 @@ class OpdAppointmentSerializer(serializers.ModelSerializer):
     patient_image = serializers.SerializerMethodField()
     patient_thumbnail = serializers.SerializerMethodField()
     doctor_thumbnail = serializers.SerializerMethodField()
+    invoices = serializers.SerializerMethodField()
     type = serializers.ReadOnlyField(default='doctor')
     allowed_action = serializers.SerializerMethodField()
 
@@ -101,7 +105,7 @@ class OpdAppointmentSerializer(serializers.ModelSerializer):
         model = OpdAppointment
         fields = ('id', 'doctor_name', 'hospital_name', 'patient_name', 'patient_image', 'type',
                   'allowed_action', 'effective_price', 'deal_price', 'status', 'time_slot_start',
-                  'time_slot_end', 'doctor_thumbnail', 'patient_thumbnail', 'display_name')
+                  'time_slot_end', 'doctor_thumbnail', 'patient_thumbnail', 'display_name', 'invoices')
 
     def get_patient_image(self, obj):
         if obj.profile and obj.profile.profile_image:
@@ -126,6 +130,14 @@ class OpdAppointmentSerializer(serializers.ModelSerializer):
             return None
             # url = static('doctor_images/no_image.png')
             # return request.build_absolute_uri(url)
+
+    def get_invoices(self, obj):
+        invoices_urls = []
+        if obj.id:
+            invoices = Invoice.objects.filter(reference_id=obj.id, product_id=Order.DOCTOR_PRODUCT_ID)
+            for invoice in invoices:
+                invoices_urls.append(util_absolute_url(invoice.file.url))
+        return invoices_urls
 
 
 class OpdAppModelSerializer(serializers.ModelSerializer):
@@ -170,6 +182,7 @@ class CreateAppointmentSerializer(serializers.Serializer):
     payment_type = serializers.ChoiceField(choices=OpdAppointment.PAY_CHOICES)
     coupon_code = serializers.ListField(child=serializers.CharField(), required=False, default=[])
     procedure_ids = serializers.ListField(child=serializers.PrimaryKeyRelatedField(queryset=Procedure.objects.filter()), required=False)
+    use_wallet = serializers.BooleanField(required=False)
     # procedure_category_ids = serializers.ListField(child=serializers.PrimaryKeyRelatedField(queryset=ProcedureCategory.objects.filter(is_live=True)), required=False, default=[])
     # time_slot_end = serializers.DateTimeField()
 
@@ -283,6 +296,13 @@ class CreateAppointmentSerializer(serializers.Serializer):
                     else:
                         raise serializers.ValidationError('Invalid coupon code - ' + str(coupon))
                 data["coupon_obj"] = list(coupon_obj)
+
+
+
+        if 'use_wallet' in data and data['use_wallet'] is False:
+            data['use_wallet'] = False
+        else:
+            data['use_wallet'] = True
 
         return data
 
@@ -721,7 +741,7 @@ class DoctorListSerializer(serializers.Serializer):
 class DoctorProfileUserViewSerializer(DoctorProfileSerializer):
     #emails = None
     experience_years = serializers.IntegerField(allow_null=True)
-    is_license_verified = serializers.BooleanField(read_only=True)
+    is_license_verified = serializers.SerializerMethodField()
     # hospitals = DoctorHospitalSerializer(read_only=True, many=True, source='get_hospitals')
     hospitals = serializers.SerializerMethodField(read_only=True)
     procedures = serializers.SerializerMethodField(read_only=True)
@@ -736,6 +756,14 @@ class DoctorProfileUserViewSerializer(DoctorProfileSerializer):
     unrated_appointment = serializers.SerializerMethodField()
     is_gold = serializers.SerializerMethodField()
     search_data = serializers.SerializerMethodField()
+
+    def get_is_license_verified(self, obj):        
+        doctor_clinics = obj.doctor_clinics.all()
+        for doctor_clinic in doctor_clinics:
+            if doctor_clinic and doctor_clinic.hospital:
+                if obj.is_license_verified and obj.enabled_for_online_booking and doctor_clinic.hospital.enabled_for_online_booking and doctor_clinic.enabled_for_online_booking:
+                    return True
+        return False
 
     def get_search_data(self, obj):
         data = {}
@@ -858,6 +886,7 @@ class DoctorProfileUserViewSerializer(DoctorProfileSerializer):
         #                                    is_valid=True)
         sublocality = None
         locality = None
+        entity = None
         if self.context.get('entity'):
             entity = self.context.get('entity')
             if entity.additional_info:
@@ -954,6 +983,13 @@ class DoctorProfileUserViewSerializer(DoctorProfileSerializer):
             }
 
         }
+        if entity:
+            new_object = NewDynamic.objects.filter(url__url=entity.url, is_enabled=True).first()
+            if new_object:
+                if new_object.meta_title:
+                    title = new_object.meta_title
+                if new_object.meta_description:
+                    description = new_object.meta_description
 
         return {'title': title, "description": description, 'schema': schema}
 
