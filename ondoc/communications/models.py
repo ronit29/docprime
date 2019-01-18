@@ -685,12 +685,7 @@ class LabNotification(Notification):
         est = pytz.timezone(settings.TIME_ZONE)
         time_slot_start = self.appointment.time_slot_start.astimezone(est)
         tests = self.appointment.get_tests_and_prices()
-        reports = instance.reports.all()
-        report_file_links = set()
-        for report in reports:
-            report_file_links = report_file_links.union(
-                set([report_file.name.url for report_file in report.files.all()]))
-        report_file_links = [util_absolute_url(report_file_link) for report_file_link in report_file_links]
+        report_file_links = instance.get_report_urls()
         for test in tests:
             test['mrp'] = str(test['mrp'])
             test['deal_price'] = str(test['deal_price'])

@@ -449,6 +449,7 @@ class LabAppointmentModelSerializer(serializers.ModelSerializer):
     allowed_action = serializers.SerializerMethodField()
     lab_test = serializers.SerializerMethodField()
     invoices = serializers.SerializerMethodField()
+    reports = serializers.SerializerMethodField()
 
     def get_lab_test(self, obj):
         return list(obj.test_mappings.values_list('test_id', flat=True))
@@ -468,6 +469,9 @@ class LabAppointmentModelSerializer(serializers.ModelSerializer):
     def get_invoices(self, obj):
         return obj.get_invoice_urls()
 
+    def get_reports(self, obj):
+        return obj.get_report_urls()
+
     def get_allowed_action(self, obj):
         user_type = ''
         if self.context.get('request'):
@@ -479,7 +483,7 @@ class LabAppointmentModelSerializer(serializers.ModelSerializer):
     class Meta:
         model = LabAppointment
         fields = ('id', 'lab', 'lab_test', 'profile', 'type', 'lab_name', 'status', 'deal_price', 'effective_price', 'time_slot_start', 'time_slot_end',
-                   'is_home_pickup', 'lab_thumbnail', 'lab_image', 'patient_thumbnail', 'patient_name', 'allowed_action', 'address', 'invoices')
+                   'is_home_pickup', 'lab_thumbnail', 'lab_image', 'patient_thumbnail', 'patient_name', 'allowed_action', 'address', 'invoices', 'reports')
 
 
 class LabAppointmentBillingSerializer(serializers.ModelSerializer):
