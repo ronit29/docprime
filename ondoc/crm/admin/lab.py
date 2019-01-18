@@ -698,6 +698,10 @@ class LabAppointmentForm(forms.ModelForm):
         if cleaned_data.get('send_email_sms_report', False) and self.instance and self.instance.id and not sum(
                 self.instance.reports.annotate(no_of_files=Count('files')).values_list('no_of_files', flat=True)):
                 raise forms.ValidationError("Can't send reports as none are available. Please upload.")
+
+        if cleaned_data.get('send_email_sms_report',
+                            False) and self.instance and self.instance.id and not self.instance.status == LabAppointment.COMPLETED:
+                raise forms.ValidationError("Can't send reports as appointment is not completed")
         # SHASHANK_SINGH if no report error.
 
         # if self.instance.status in [LabAppointment.CANCELLED, LabAppointment.COMPLETED] and len(cleaned_data):

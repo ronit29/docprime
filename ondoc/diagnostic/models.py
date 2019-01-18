@@ -876,6 +876,10 @@ class LabAppointmentInvoiceMixin(object):
                 from ondoc.communications.models import LabNotification
                 lab_notification = LabNotification(self)
                 context = lab_notification.get_context()
+            invoice = Invoice.objects.create(reference_id=context.get("instance").id,
+                                             product_id=Order.LAB_PRODUCT_ID)
+            context = deepcopy(context)
+            context['invoice'] = invoice
             html_body = render_to_string("email/lab_invoice/invoice_template.html", context=context)
             filename = "invoice_{}_{}.pdf".format(str(timezone.now().strftime("%I%M_%d%m%Y")),
                                                   random.randint(1111111111, 9999999999))
@@ -883,8 +887,8 @@ class LabAppointmentInvoiceMixin(object):
             if not file:
                 logger.error("Got error while creating pdf for lab invoice.")
                 return []
-            invoice, created = Invoice.objects.get_or_create(reference_id=context.get("instance").id,
-                                                             product_id=Order.LAB_PRODUCT_ID, file=file)
+            invoice.file = file
+            invoice.save()
             invoices = [invoice]
         return invoices
 
