@@ -148,8 +148,8 @@ class SearchedDoctorData():
                     if not existing_place_entry:
                         existing_place_entry = SearchedDoctorData.create_place_data(data, place_id)
 
-                     if existing_place_entry:
-                        create_google_result = GoogleResult.objects.get_or_create(place_entry=create_place_entry,
+                    if existing_place_entry:
+                        create_google_result = GoogleResult.objects.get_or_create(place_entry=existing_place_entry,
                                                             search_results=google_data)                    
                         
         return "success"
