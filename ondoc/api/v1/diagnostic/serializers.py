@@ -466,7 +466,7 @@ class LabAppointmentModelSerializer(serializers.ModelSerializer):
             return obj.profile_detail.get("name")
 
     def get_invoices(self, obj):
-        return obj.get_invoices()
+        return obj.get_invoice_urls()
 
     def get_allowed_action(self, obj):
         user_type = ''
@@ -893,7 +893,7 @@ class LabAppointmentRetrieveSerializer(LabAppointmentModelSerializer):
         return reports
 
     def get_invoices(self, obj):
-        return obj.get_invoices()
+        return obj.get_invoice_urls()
 
     def get_address(self, obj):
         resp_address = ""

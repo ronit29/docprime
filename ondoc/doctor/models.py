@@ -7,6 +7,7 @@ from django.contrib.postgres.fields import JSONField, ArrayField
 from django.core.validators import MaxValueValidator, MinValueValidator, FileExtensionValidator
 from django.core.exceptions import ValidationError
 from django.core.exceptions import NON_FIELD_ERRORS
+from django.template.loader import render_to_string
 from rest_framework.exceptions import ValidationError as RestFrameworkValidationError
 from django.core.files.storage import get_storage_class
 from django.conf import settings
@@ -15,7 +16,6 @@ from dateutil import tz
 from django.utils import timezone
 from ondoc.authentication import models as auth_model
 from ondoc.authentication.models import SPOCDetails
-
 from ondoc.location import models as location_models
 from ondoc.account.models import Order, ConsumerAccount, ConsumerTransaction, PgTransaction, ConsumerRefund, \
     MerchantPayout, UserReferred, Invoice
@@ -30,7 +30,7 @@ from ondoc.notification import models as notification_models
 from ondoc.notification import tasks as notification_tasks
 from django.contrib.contenttypes.fields import GenericRelation
 from ondoc.api.v1.utils import get_start_end_datetime, custom_form_datetime, CouponsMixin, aware_time_zone, \
-    util_absolute_url
+    util_absolute_url, html_to_pdf
 from ondoc.common.models import AppointmentHistory
 from functools import reduce
 from operator import or_
@@ -1126,8 +1126,29 @@ class DoctorOnboardingToken(auth_model.TimeStampedModel):
 #     class Meta:
 #         db_table = "hospital_network_mapping"
 
+class OpdAppointmentInvoiceMixin(object):
+    def generate_invoice(self, context=None):
+        invoices = self.get_invoice_objects()
+        if not invoices:
+            if not context:
+                from ondoc.communications.models import OpdNotification
+                opd_notification = OpdNotification(self)
+                context = opd_notification.get_context()
+            html_body = render_to_string("email/doctor_invoice/invoice_template.html", context=context)
+            filename = "invoice_{}_{}.pdf".format(str(timezone.now().strftime("%I%M_%d%m%Y")),
+                                                  random.randint(1111111111, 9999999999))
+            file = html_to_pdf(html_body, filename)
+            if not file:
+                logger.error("Got error while creating pdf for opd invoice.")
+                return []
+            invoice, created = Invoice.objects.get_or_create(reference_id=context.get("instance").id,
+                                                             product_id=Order.DOCTOR_PRODUCT_ID, file=file)
+            invoices = [invoice]
+        return invoices
+
+
 @reversion.register()
-class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin):
+class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentInvoiceMixin):
     CREATED = 1
     BOOKED = 2
     RESCHEDULED_DOCTOR = 3
@@ -1217,10 +1238,13 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin):
 
         return allowed
 
-    def get_invoices(self):
+    def get_invoice_objects(self):
+        return Invoice.objects.filter(reference_id=self.id, product_id=Order.DOCTOR_PRODUCT_ID)
+
+    def get_invoice_urls(self):
         invoices_urls = []
         if self.id:
-            invoices = Invoice.objects.filter(reference_id=self.id, product_id=Order.DOCTOR_PRODUCT_ID)
+            invoices = self.get_invoice_objects()
             for invoice in invoices:
                 invoices_urls.append(util_absolute_url(invoice.file.url))
         return invoices_urls
@@ -1297,9 +1321,6 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin):
                 out_obj = payout_model.Outstanding.create_outstanding(admin_obj, out_level, app_outstanding_fees)
                 self.outstanding = out_obj
         self.save()
-
-    def generate_invoice(self):
-        pass
 
     def get_billable_admin_level(self):
         if self.hospital.network and self.hospital.network.is_billing_enabled:

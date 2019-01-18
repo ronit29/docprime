@@ -854,7 +854,7 @@ class LabAppointmentAdmin(nested_admin.NestedModelAdmin):
 
     def invoice_urls(self, instance):
         invoices_urls = ''
-        for invoice in instance.get_invoices():
+        for invoice in instance.get_invoice_urls():
             invoices_urls += "<a href={} target='_blank'>{}</a><br>".format(util_absolute_url(invoice),
                                                                              util_file_name(invoice))
         return mark_safe(invoices_urls)

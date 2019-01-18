@@ -132,7 +132,7 @@ class OpdAppointmentSerializer(serializers.ModelSerializer):
             # return request.build_absolute_uri(url)
 
     def get_invoices(self, obj):
-        return obj.get_invoices()
+        return obj.get_invoice_urls()
 
 
 class OpdAppModelSerializer(serializers.ModelSerializer):
@@ -1103,7 +1103,7 @@ class AppointmentRetrieveSerializer(OpdAppointmentSerializer):
         return []
 
     def get_invoices(self, obj):
-        return obj.get_invoices()
+        return obj.get_invoice_urls()
 
 
 class DoctorAppointmentRetrieveSerializer(OpdAppointmentSerializer):

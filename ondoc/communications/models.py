@@ -359,35 +359,18 @@ class EMAILNotification:
             body_template = "email/prescription_uploaded/body.html"
             subject_template = "email/prescription_uploaded/subject.txt"
         elif notification_type == NotificationAction.DOCTOR_INVOICE:
-
-            invoice, created = Invoice.objects.get_or_create(reference_id=context.get("instance").id,
-                                                             product_id=Order.DOCTOR_PRODUCT_ID)
-            context.update({"invoice": invoice})
-            html_body = render_to_string("email/doctor_invoice/invoice_template.html", context=context)
-            filename = "invoice_{}_{}.pdf".format(str(timezone.now().strftime("%I%M_%d%m%Y")),
-                                                  random.randint(1111111111, 9999999999))
-            try:
-                extra_args = {
-                    'virtual-time-budget': 6000
-                }
-                temp_pdf_file = TemporaryUploadedFile(filename, 'byte', 1000, 'utf-8')
-                file = open(temp_pdf_file.temporary_file_path())
-                bytestring_to_pdf(html_body.encode(), file, **extra_args)
-                file.seek(0)
-                file.flush()
-                file.content_type = 'application/pdf'
-                invoice.file = InMemoryUploadedFile(temp_pdf_file, None, filename, 'application/pdf',
-                                                    temp_pdf_file.tell(), None)
-                invoice.save()
-            except Exception as e:
-                logger.error("Got error while creating pdf for opd invoice {}".format(e))
-            context.update({"invoice_url": invoice.file.url})
+            invoices = context.get("instance").generate_invoice(context)
+            if not invoices:
+                logger.error("Got error while creating pdf for opd invoice")
+                return '', ''
+            context.update({"invoice": invoices[0]})
+            context.update({"invoice_url": invoices[0].file.url})
             context.update(
                 {"attachments": [
-                    {"filename": util_file_name(invoice.file.url), "path": util_absolute_url(invoice.file.url)}]})
+                    {"filename": util_file_name(invoices[0].file.url),
+                     "path": util_absolute_url(invoices[0].file.url)}]})
             body_template = "email/doctor_invoice/body.html"
             subject_template = "email/doctor_invoice/subject.txt"
-
         elif notification_type == NotificationAction.LAB_APPOINTMENT_ACCEPTED:
             body_template = "email/lab/appointment_accepted/body.html"
             subject_template = "email/lab/appointment_accepted/subject.txt"
@@ -416,33 +399,17 @@ class EMAILNotification:
             body_template = "email/lab/lab_report_uploaded/body.html"
             subject_template = "email/lab/lab_report_uploaded/subject.txt"
         elif notification_type == NotificationAction.LAB_INVOICE:
-            invoice, created = Invoice.objects.get_or_create(reference_id=context.get("instance").id,
-                                                             product_id=Order.LAB_PRODUCT_ID)
-            context.update({"invoice": invoice})
-            html_body = render_to_string("email/lab_invoice/invoice_template.html", context=context)
-            filename = "invoice_{}_{}.pdf".format(str(timezone.now().strftime("%I%M_%d%m%Y")),
-                                                  random.randint(1111111111, 9999999999))
-            try:
-                extra_args = {
-                    'virtual-time-budget': 6000
-                }
-                temp_pdf_file = TemporaryUploadedFile(filename, 'byte', 1000, 'utf-8')
-                file = open(temp_pdf_file.temporary_file_path())
-                bytestring_to_pdf(html_body.encode(), file, **extra_args)
-                file.seek(0)
-                file.flush()
-                file.content_type = 'application/pdf'
-                invoice.file = InMemoryUploadedFile(temp_pdf_file, None, filename, 'application/pdf',
-                                                    temp_pdf_file.tell(), None)
-                invoice.save()
-            except Exception as e:
-                logger.error("Got error while creating pdf for opd invoice {}".format(e))
-            context.update({"invoice_url": invoice.file.url})
+            invoices = context.get("instance").generate_invoice(context)
+            if not invoices:
+                logger.error("Got error while creating pdf for lab invoice")
+                return '', ''
+            context.update({"invoice": invoices[0]})
+            context.update({"invoice_url": invoices[0].file.url})
             context.update(
-                {"attachments": [{"filename": util_file_name(invoice.file.url), "path": util_absolute_url(invoice.file.url)}]})
+                {"attachments": [{"filename": util_file_name(invoices[0].file.url),
+                                  "path": util_absolute_url(invoices[0].file.url)}]})
             body_template = "email/lab_invoice/body.html"
             subject_template = "email/lab_invoice/subject.txt"
-
         elif notification_type == NotificationAction.LAB_REPORT_SEND_VIA_CRM:
             attachments = []
             for report_link in context.get('reports', []):
@@ -454,6 +421,8 @@ class EMAILNotification:
         return subject_template, body_template
 
     def trigger(self, receiver, template, context):
+        if not template[0] and not template[1]:
+            return
         cc = []
         bcc = [settings.PROVIDER_EMAIL]
         attachments = context.get('attachments', [])
