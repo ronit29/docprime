@@ -831,9 +831,10 @@ class MerchantPayout(TimeStampedModel):
     PENDING = 1
     ATTEMPTED = 2
     PAID = 3
-
+    AUTOMATIC = 1
+    MANUAL = 2
     STATUS_CHOICES = [(PENDING, 'Pending'), (ATTEMPTED, 'ATTEMPTED'), (PAID, 'Paid')]
-
+    TYPE_CHOICES = [(AUTOMATIC, 'Automatic'), (MANUAL, 'Manual')]
     payout_ref_id = models.IntegerField(null=True, unique=True)
     charged_amount = models.DecimalField(max_digits=10, decimal_places=2)
     payable_amount = models.DecimalField(max_digits=10, decimal_places=2)
@@ -843,7 +844,9 @@ class MerchantPayout(TimeStampedModel):
     api_response = JSONField(blank=True, null=True)
     retry_count = models.PositiveIntegerField(default=0)
     paid_to = models.ForeignKey(Merchant, on_delete=models.DO_NOTHING, related_name='payouts', null=True)
-
+    utr_no = models.CharField(max_length=500, blank=True, default='')
+    type = models.PositiveIntegerField(default=None, choices=TYPE_CHOICES, null=True, blank=True)
+    amount_paid = models.DecimalField(max_digits=10, decimal_places=2, default=None, null=True, blank=True)
     content_type = models.ForeignKey(ContentType, on_delete=models.CASCADE, null=True, blank=True)
     object_id = models.PositiveIntegerField(null=True, blank=True)
     content_object = GenericForeignKey()
@@ -853,7 +856,8 @@ class MerchantPayout(TimeStampedModel):
         if not self.id:
             first_instance = True
 
-        if self.id and hasattr(self,'process_payout') and self.process_payout:
+        if self.id and hasattr(self,'process_payout') and self.process_payout and self.status==self.PENDING and self.type==self.AUTOMATIC:
+            self.type = self.AUTOMATIC
             if not self.content_object:
                 self.content_object = self.get_billed_to()
             if not self.paid_to:
@@ -869,6 +873,9 @@ class MerchantPayout(TimeStampedModel):
                     transaction.on_commit(lambda: set_order_dummy_transaction.apply_async((order_data.id, appointment.user_id,), countdown=5))
             except Exception as e:
                 logger.error(str(e))
+
+        if self.type == self.MANUAL and self.utr_no and self.status == self.PENDING:
+            self.status = self.PAID
 
         super().save(*args, **kwargs)
 

@@ -1001,12 +1001,11 @@ class DoctorListViewSet(viewsets.GenericViewSet):
         reviews = None
 
         entity_url_qs = EntityUrls.objects.filter(url=url, url_type=EntityUrls.UrlType.SEARCHURL,
-                                           entity_type__iexact='Doctor').order_by('-sequence')
+                                           entity_type='Doctor').order_by('-sequence')
         if len(entity_url_qs) > 0:
             entity = entity_url_qs[0]
             if not entity.is_valid:
-                valid_qs = EntityUrls.objects.filter(url_type=EntityUrls.UrlType.SEARCHURL, is_valid=True,
-                                          entity_type__iexact='Doctor', specialization_id=entity.specialization_id,
+                valid_qs = EntityUrls.objects.filter(is_valid=True, specialization_id=entity.specialization_id,
                                           locality_id=entity.locality_id, sublocality_id=entity.sublocality_id,
                                           sitemap_identifier=entity.sitemap_identifier).order_by('-sequence')
 
@@ -1118,8 +1117,8 @@ class DoctorListViewSet(viewsets.GenericViewSet):
         entity_ids = [doctor_data['id'] for doctor_data in response]
 
         id_url_dict = dict()
-        entity = EntityUrls.objects.filter(entity_id__in=entity_ids, url_type='PAGEURL', is_valid='t',
-                                           entity_type__iexact='Doctor').values('entity_id', 'url')
+        entity = EntityUrls.objects.filter(entity_id__in=entity_ids, sitemap_identifier='DOCTOR_PAGE',
+                                           is_valid=True).values('entity_id', 'url')
         for data in entity:
             id_url_dict[data['entity_id']] = data['url']
 
