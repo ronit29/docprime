@@ -1,3 +1,5 @@
+import operator
+
 from django.contrib.gis.geos import Point
 from django.db.models import F
 
@@ -7,7 +9,7 @@ from ondoc.doctor import models
 from ondoc.api.v1.utils import clinic_convert_timings
 from ondoc.api.v1.doctor import serializers
 from ondoc.authentication.models import QCModel
-from ondoc.doctor.models import Doctor
+from ondoc.doctor.models import Doctor, PracticeSpecialization
 from ondoc.procedure.models import DoctorClinicProcedure, ProcedureCategory, ProcedureToCategoryMapping, \
     get_selected_and_other_procedures, get_included_doctor_clinic_procedure, \
     get_procedure_categories_with_procedures
@@ -351,6 +353,7 @@ class DoctorSearchHelper:
         category_ids = [int(x) for x in category_ids]
         procedure_ids = [int(x) for x in procedure_ids]
         response = []
+        specialization_ids = self.query_params.get('specialization_ids', [])
         selected_procedure_ids, other_procedure_ids = get_selected_and_other_procedures(category_ids, procedure_ids)
         for doctor in doctor_data:
             enable_online_booking = False
@@ -414,6 +417,20 @@ class DoctorSearchHelper:
                 }]
 
             thumbnail = doctor.get_thumbnail()
+            
+            sorted_spec_list = []
+            doctor_spec_list = []
+            searched_spec_list = []
+
+            general_specialization = list(doctor.doctorpracticespecializations.all())
+            general_specialization = sorted(general_specialization, key=operator.itemgetter('doctor_count'), reverse=True)
+            for spec in general_specialization:
+                if spec.id in specialization_ids:
+                    searched_spec_list.append({'name':spec.name})
+                else:    
+                    doctor_spec_list.append({'name':spec.name})
+
+            sorted_spec_list = searched_spec_list + doctor_spec_list
 
             opening_hours = None
             if doctor_clinic.availability.exists():
@@ -438,9 +455,10 @@ class DoctorSearchHelper:
                 "experience_years": doctor.experience_years(),
                 #"experiences": serializers.DoctorExperienceSerializer(doctor.experiences.all(), many=True).data,
                 "qualifications": serializers.DoctorQualificationSerializer(doctor.qualifications.all(), many=True).data,
-                "general_specialization": serializers.DoctorPracticeSpecializationSerializer(
-                    doctor.doctorpracticespecializations.all(),
-                    many=True).data,
+                # "general_specialization": serializers.DoctorPracticeSpecializationSerializer(
+                #     doctor.doctorpracticespecializations.all(),
+                #     many=True).data,
+                "general_specialization": sorted_spec_list,
                 "distance": self.get_distance(doctor, doctor_clinic_mapping),
                 "name": doctor.name,
                 "display_name": doctor.get_display_name(),
