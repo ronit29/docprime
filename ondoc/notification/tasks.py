@@ -3,12 +3,16 @@ from __future__ import absolute_import, unicode_literals
 import datetime
 import json
 import math
+import traceback
 from collections import OrderedDict
+from io import BytesIO
 
+from django.db import transaction
 from django.forms import model_to_dict
 from django.utils import timezone
+from openpyxl import load_workbook
 
-from ondoc.api.v1.utils import aware_time_zone
+from ondoc.api.v1.utils import aware_time_zone, util_absolute_url
 from ondoc.notification.labnotificationaction import LabNotificationAction
 from ondoc.notification import models as notification_models
 from celery import task
@@ -429,3 +433,48 @@ def send_lab_reports(appointment_id):
         lab_notification.send()
     except Exception as e:
         logger.error(str(e))
+
+
+@task()
+def upload_doctor_data(obj_id):
+    from ondoc.doctor.models import UploadDoctorData
+    from ondoc.crm.management.commands import upload_doctor_data as upload_command
+    instance = UploadDoctorData.objects.filter(id=obj_id).first()
+    errors = []
+    if not instance or not instance.status == UploadDoctorData.IN_PROGRESS:
+        return
+    try:
+        source = instance.source
+        batch = instance.batch
+        lines = instance.lines if instance and instance.lines else 100000000
+        wb = load_workbook(instance.file)
+        sheets = wb.worksheets
+        doctor = upload_command.UploadDoctor(errors)
+        qualification = upload_command.UploadQualification(errors)
+        experience = upload_command.UploadExperience(errors)
+        membership = upload_command.UploadMembership(errors)
+        award = upload_command.UploadAward(errors)
+        hospital = upload_command.UploadHospital(errors)
+        specialization = upload_command.UploadSpecialization(errors)
+        with transaction.atomic():
+            # doctor.p_image(sheets[0], source, batch)
+            doctor.upload(sheets[0], source, batch, lines, instance.user)
+            qualification.upload(sheets[1], lines)
+            experience.upload(sheets[2], lines)
+            membership.upload(sheets[3], lines)
+            award.upload(sheets[4], lines)
+            hospital.upload(sheets[5], source, batch, lines)
+            specialization.upload(sheets[6], lines)
+            if len(errors)>0:
+                raise Exception('errors in data')
+        instance.status = UploadDoctorData.SUCCESS
+        instance.save()
+    except Exception as e:
+        error_message = traceback.format_exc() + str(e)
+        logger.error(error_message)
+        instance.status = UploadDoctorData.FAIL
+        if errors:
+            instance.error_msg = errors
+        else:
+            instance.error_msg = [{'line number': 0, 'message': error_message}]
+        instance.save(retry=False)
