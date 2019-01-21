@@ -100,9 +100,9 @@ def get_title_body(notification_type, context, user):
     body = ''
     if notification_type == NotificationAction.APPOINTMENT_ACCEPTED:
         title = "Appointment Confirmed"
-        body = "Appointment Confirmed for {} requested with Dr. {} at {}, {}.".format(
-            patient_name, doctor_name, time_slot_start.strftime("%I:%M %P"),
-            time_slot_start.strftime("%d/%m/%y"), doctor_name)
+        body = "Appointment Confirmed for {} requested with Dr. {} for {}, {}.".format(
+            patient_name, doctor_name, time_slot_start.strftime("%d/%m/%y"),
+            time_slot_start.strftime("%I:%M %P"), doctor_name)
     elif notification_type == NotificationAction.APPOINTMENT_RESCHEDULED_BY_PATIENT and user.user_type == User.CONSUMER:
         title = "Appointment Reschedule"
         body = "Reschedule request received for the appointment with Dr. {}".format(doctor_name)
@@ -114,8 +114,10 @@ def get_title_body(notification_type, context, user):
         body = "Reschedule request received for the appointment from Dr. {}".format(doctor_name)
     elif notification_type == NotificationAction.APPOINTMENT_BOOKED and user and user.user_type == User.CONSUMER:
         title = "New Appointment"
-        body = "New Appointment for {} at {}, {} with Dr. {}. You will receive a confirmation as soon as it is accepted by the doctor.".format(
-            patient_name, time_slot_start.strftime("%I:%M %P"), time_slot_start.strftime("%d/%m/%y"), doctor_name)
+        # body = "New Appointment for {} at {}, {} with Dr. {}. You will receive a confirmation as soon as it is accepted by the doctor.".format(
+        #     patient_name, time_slot_start.strftime("%I:%M %P"), time_slot_start.strftime("%d/%m/%y"), doctor_name)
+        body = "New Appointment is received for {} with Dr. {} for {}, {}. Awaiting confirmation from the doctor.".format(
+            patient_name, doctor_name, time_slot_start.strftime("%d/%m/%y"), time_slot_start.strftime("%I:%M %P"))
     elif notification_type == NotificationAction.APPOINTMENT_BOOKED and user and user.user_type == User.DOCTOR:
         title = "New Appointment"
         body = "New appointment for {} at {}, {}. Please confirm.".format(
@@ -126,14 +128,11 @@ def get_title_body(notification_type, context, user):
             patient_name, time_slot_start.strftime("%I:%M %P"), time_slot_start.strftime("%d/%m/%y"))
     elif notification_type == NotificationAction.APPOINTMENT_CANCELLED and user and user.user_type == User.CONSUMER:
         if instance.cancellation_type != instance.AUTO_CANCELLED:
-            body = "Appointment with Dr. {} at {}, {} has been cancelled as per your request.".format(
-                doctor_name, time_slot_start.strftime("%I:%M %P"),
-                time_slot_start.strftime("%d/%m/%y")
-            )
+            body = "Appointment with Dr. {} for {}, {} has been cancelled as per your request.".format(
+                doctor_name, time_slot_start.strftime("%d/%m/%y"), time_slot_start.strftime("%I:%M %P"))
         else:
-            body = "Appointment with Dr. {} at {}, {} has been cancelled due to unavailability of doctor manager.".format(
-                doctor_name, time_slot_start.strftime("%I:%M %P"),
-                time_slot_start.strftime("%d/%m/%y"))
+            body = "Appointment with Dr. {} for {}, {} has been cancelled due to unavailability of doctor manager.".format(
+                doctor_name, time_slot_start.strftime("%d/%m/%y"), time_slot_start.strftime("%I:%M %P"))
         title = "Appointment Cancelled"
     # elif notification_type == NotificationAction.DOCTOR_INVOICE:
     #     title = "Invoice Generated"
@@ -145,9 +144,8 @@ def get_title_body(notification_type, context, user):
 
     elif notification_type == NotificationAction.LAB_APPOINTMENT_ACCEPTED:
         title = "Appointment Confirmed"
-        body = "Appointment Confirmed for {} requested with Lab - {} at {}, {}.".format(
-            patient_name, lab_name, time_slot_start.strftime("%I:%M %P"),
-            time_slot_start.strftime("%d/%m/%y"), lab_name)
+        body = "Appointment Confirmed for {} requested with Lab - {} for {}, {}.".format(
+            patient_name, lab_name, time_slot_start.strftime("%d/%m/%y"), time_slot_start.strftime("%I:%M %P"), lab_name)
     elif notification_type == NotificationAction.LAB_APPOINTMENT_RESCHEDULED_BY_PATIENT and user.user_type == User.CONSUMER:
         title = "Appointment Reschedule"
         body = "Reschedule request received for the appointment with Lab - {}".format(lab_name)
@@ -159,19 +157,19 @@ def get_title_body(notification_type, context, user):
         body = "Reschedule request received for the appointment from Lab - {}".format(lab_name)
     elif notification_type == NotificationAction.LAB_APPOINTMENT_BOOKED and user and user.user_type == User.CONSUMER:
         title = "New Appointment"
-        body = "New Appointment for {} at {}, {} with Lab - {}. You will receive a confirmation as soon as it is accepted by the lab".format(
-            patient_name, time_slot_start.strftime("%I:%M %P"), time_slot_start.strftime("%d/%m/%y"), lab_name)
+        body = "New Appointment is received for {} with Lab - {} for {}, {} . Awaiting confirmation from the lab".format(
+            patient_name, lab_name, time_slot_start.strftime("%d/%m/%y"), time_slot_start.strftime("%I:%M %P"))
     elif notification_type == NotificationAction.LAB_APPOINTMENT_BOOKED and user and user.user_type == User.DOCTOR:
         title = "New Appointment"
         body = "New appointment for {} at {}, {}. Please confirm.".format(
             patient_name, time_slot_start.strftime("%I:%M %P"), time_slot_start.strftime("%d/%m/%y"))
     elif notification_type == NotificationAction.LAB_APPOINTMENT_CANCELLED and user and user.user_type == User.CONSUMER:
         if instance.cancellation_type != instance.AUTO_CANCELLED:
-            body = "Appointment with Lab - {} at {}, {} has been cancelled as per your request.".format(
-                lab_name, time_slot_start.strftime("%I:%M %P"), time_slot_start.strftime("%d/%m/%y"))
+            body = "Appointment with Lab - {} for {}, {} has been cancelled as per your request.".format(
+                lab_name, time_slot_start.strftime("%d/%m/%y"), time_slot_start.strftime("%I:%M %P"))
         else:
-            body = "Appointment with Lab - {} at {}, {} has cancelled due to unavailability of lab manager.".format(
-                lab_name, time_slot_start.strftime("%I:%M %P"), time_slot_start.strftime("%d/%m/%y"))
+            body = "Appointment with Lab - {} for {}, {} has cancelled due to unavailability of lab manager.".format(
+                lab_name, time_slot_start.strftime("%d/%m/%y"), time_slot_start.strftime("%I:%M %P"))
         title = "Appointment Cancelled"
     elif notification_type == NotificationAction.LAB_APPOINTMENT_CANCELLED:
         title = "Appointment Cancelled"
@@ -608,7 +606,9 @@ class OpdNotification(Notification):
             "payment_type": dict(OpdAppointment.PAY_CHOICES)[self.appointment.payment_type],
             "image_url": "",
             "time_slot_start": time_slot_start,
-            "attachments": {}  # Updated later
+            "attachments": {},  # Updated later
+            "screen": "appointment",
+            "type": "doctor"
         }
         return context
 
@@ -740,7 +740,9 @@ class LabNotification(Notification):
             "time_slot_start": time_slot_start,
             "tests": tests,
             "reports": report_file_links,
-            "attachments": {}  # Updated later
+            "attachments": {},  # Updated later
+            "screen": "appointment",
+            "type": "lab"
         }
         return context
 
