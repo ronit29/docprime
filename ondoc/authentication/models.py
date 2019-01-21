@@ -979,12 +979,15 @@ class GenericAdmin(TimeStampedModel, CreatedByModel):
             Q(is_disabled=False),
             Q(
                 (Q(doctor=appoinment.doctor,
+                   super_user_permission=False,
                    hospital=appoinment.hospital)
                  |
                  Q(doctor__isnull=True,
+                   super_user_permission=False,
                    hospital=appoinment.hospital)
                  |
                  Q(hospital__isnull=True,
+                   super_user_permission=False,
                    doctor=appoinment.doctor)
                  )
              ),
