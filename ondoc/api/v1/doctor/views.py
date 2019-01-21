@@ -836,10 +836,10 @@ class PrescriptionFileViewset(OndocViewSet):
 
     @transaction.non_atomic_requests
     def list(self, request, *args, **kwargs):
-        appointment = int(request.query_params.get("appointment"))
+        appointment = request.query_params.get("appointment")
         if not appointment:
             return Response(status=400)
-        queryset = self.get_queryset().filter(prescription__appointment=appointment)
+        queryset = self.get_queryset().filter(prescription__appointment=int(appointment))
         serializer = serializers.PrescriptionFileSerializer(queryset, many=True, context={"request": request})
         return Response(serializer.data)
 

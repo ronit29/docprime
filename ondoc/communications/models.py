@@ -637,10 +637,11 @@ class OpdNotification(Notification):
         all_receivers = {}
         instance = self.appointment
         receivers = []
+        doctor_spocs_app_recievers = []
         notification_type = self.notification_type
         if not instance or not instance.user:
             return receivers
-        doctor_spocs_app_recievers = GenericAdmin.get_appointment_admins(instance)
+        
         doctor_spocs = instance.hospital.get_spocs_for_communication() if instance.hospital else []
         spocs_to_be_communicated = []
         if notification_type in [NotificationAction.APPOINTMENT_ACCEPTED,
@@ -653,6 +654,7 @@ class OpdNotification(Notification):
                                    NotificationAction.APPOINTMENT_BOOKED,
                                    NotificationAction.APPOINTMENT_CANCELLED]:
             spocs_to_be_communicated = doctor_spocs
+            doctor_spocs_app_recievers = GenericAdmin.get_appointment_admins(instance)
             # receivers.extend(doctor_spocs)
             receivers.append(instance.user)
         receivers = list(set(receivers))
