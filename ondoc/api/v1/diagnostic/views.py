@@ -1,3 +1,5 @@
+import operator
+
 from ondoc.api.v1.diagnostic.serializers import CustomLabTestPackageSerializer
 from ondoc.authentication.backends import JWTAuthentication
 from ondoc.api.v1.diagnostic import serializers as diagnostic_serializer
@@ -160,11 +162,15 @@ class LabList(viewsets.ReadOnlyModelViewSet):
         validated_data = serializer.validated_data
         long = validated_data.get('long')
         lat = validated_data.get('lat')
+        min_distance = validated_data.get('min_distance')
+        max_distance = validated_data.get('max_distance')
+        min_price = validated_data.get('min_price')
+        max_price = validated_data.get('max_price')
+        sort_on = validated_data.get('sort_on')
+        category_ids = validated_data.get('category_ids', None)
         point_string = 'POINT(' + str(long) + ' ' + str(lat) + ')'
         pnt = GEOSGeometry(point_string, srid=4326)
-        max_distance = 10000
-        category_ids = validated_data.get('category_ids', None)
-        lab_tests = None
+        max_distance = max_distance if max_distance is not None else 10000
         if not category_ids:
             category_ids = LabTestCategory.objects.filter(is_live=True, is_package_category=True).values_list('id',
                                                                                                               flat=True)
@@ -190,7 +196,7 @@ class LabList(viewsets.ReadOnlyModelViewSet):
                      then=F('availablelabs__custom_deal_price'))),
             rank=Window(expression=RowNumber(), order_by=F('distance').asc(),
                         partition_by=[F(
-                            'availablelabs__lab_pricing_group__labs__network'), F('id')])).order_by('-priority')
+                            'availablelabs__lab_pricing_group__labs__network'), F('id')]))
 
         all_packages_in_non_network_labs = LabTest.objects.prefetch_related('test').filter(enable_for_retail=True,
                                                                                            searchable=True,
@@ -211,12 +217,26 @@ class LabList(viewsets.ReadOnlyModelViewSet):
                      then=F('availablelabs__computed_deal_price')),
                 When(availablelabs__custom_deal_price__isnull=False,
                      then=F('availablelabs__custom_deal_price'))),
-        ).order_by('-priority')
+        )
         all_packages_in_non_network_labs = all_packages_in_non_network_labs.filter(id__in=lab_tests)
         all_packages_in_network_labs = all_packages_in_network_labs.filter(id__in=lab_tests)
-
+        if min_distance:
+            all_packages_in_non_network_labs = all_packages_in_non_network_labs.filter(distance__gte=min_distance)
+            all_packages_in_network_labs = all_packages_in_network_labs.filter(distance__gte=min_distance)
+        if min_price:
+            all_packages_in_non_network_labs = all_packages_in_non_network_labs.filter(price__gte=min_price)
+            all_packages_in_network_labs = all_packages_in_network_labs.filter(price__gte=min_price)
+        if max_price:
+            all_packages_in_non_network_labs = all_packages_in_non_network_labs.filter(price__lte=max_price)
+            all_packages_in_network_labs = all_packages_in_network_labs.filter(price__lte=max_price)
         all_packages = [package for package in all_packages_in_network_labs if package.rank == 1]
         all_packages.extend([package for package in all_packages_in_non_network_labs])
+        if not sort_on:
+            all_packages = sorted(all_packages, key=operator.attrgetter('priority'), reverse=True)
+        elif sort_on == 'fees':
+            all_packages = sorted(all_packages, key=operator.attrgetter('price'))
+        elif sort_on == 'distance':
+            all_packages = sorted(all_packages, key=operator.attrgetter('distance'))
         lab_ids = [package.lab for package in all_packages]
         lab_data = Lab.objects.prefetch_related('rating', 'lab_documents', 'lab_timings', 'network',
                                                 'home_collection_charges').annotate(

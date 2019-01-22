@@ -1032,7 +1032,7 @@ class CustomLabTestPackageSerializer(serializers.ModelSerializer):
         model = LabTest
         fields = ('id', 'name', 'lab', 'mrp', 'distance', 'price', 'lab_timings', 'lab_timings_data',
                   'test_type', 'is_package', 'number_of_tests', 'why', 'pre_test_info', 'is_package',
-                  'pickup_charges', 'pickup_available', 'distance_related_charges')
+                  'pickup_charges', 'pickup_available', 'distance_related_charges', 'priority', 'show_details')
 
     def get_lab(self, obj):
         lab_data = self.context.get('lab_data')
@@ -1096,6 +1096,11 @@ class CustomLabTestPackageSerializer(serializers.ModelSerializer):
 class LabPackageListSerializer(serializers.Serializer):
     long = serializers.FloatField(default=77.071848)
     lat = serializers.FloatField(default=28.450367)
+    min_distance = serializers.IntegerField(required=False)
+    max_distance = serializers.IntegerField(required=False)
+    min_price = serializers.IntegerField(required=False)
+    max_price = serializers.IntegerField(required=False)
+    sort_on = serializers.CharField(required=False)
     category_ids = CommaSepratedToListField(required=False, max_length=500, typecast_to=int)
 
     def validate_category_ids(self, attrs):
