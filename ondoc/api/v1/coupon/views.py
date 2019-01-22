@@ -219,7 +219,7 @@ class ApplicableCouponsViewSet(viewsets.GenericViewSet):
                             "network_id": coupon.lab_network.id if coupon.lab_network else None,
                             "is_cashback": coupon.coupon_type == Coupon.CASHBACK,
                             "tnc": coupon.tnc,
-                            "payment_option":coupon.payment_option.name if coupon.payment_option else None})
+                            "payment_option": model_to_dict(coupon.payment_option) if coupon.payment_option else None})
                 if user:
                     for random_coupon in coupon.random_generated_coupon.all():
                         applicable_coupons.append({"is_random_generated": True,
@@ -237,7 +237,7 @@ class ApplicableCouponsViewSet(viewsets.GenericViewSet):
                                 "tests": [test.id for test in coupon.test.all()],
                                 "network_id": coupon.lab_network.id if coupon.lab_network else None,
                                 "tnc": coupon.tnc,
-                                "payment_option": coupon.payment_option.name if coupon.payment_option else None})
+                                "payment_option": model_to_dict(coupon.payment_option) if coupon.payment_option else None})
 
 
         if applicable_coupons:
@@ -263,6 +263,8 @@ class ApplicableCouponsViewSet(viewsets.GenericViewSet):
 
             def remove_coupon_data(c):
                 c.pop('coupon')
+                if c.get("payment_option"):
+                    c["payment_option"]["image"] = c["payment_option"]["image"].path
                 return c
             applicable_coupons = list(map(remove_coupon_data, applicable_coupons))
 
