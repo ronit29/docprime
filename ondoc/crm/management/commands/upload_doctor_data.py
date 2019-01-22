@@ -290,6 +290,8 @@ class UploadDoctor(Doc):
             enabled_for_online_booking = False
             is_live = False
 
+        matrix_lead_id = self.clean_data(sheet.cell(row=row, column=headers.get('matrix_lead_id')).value)
+
         if practicing_since:
             try:
                 practicing_since = int(practicing_since)
@@ -341,6 +343,7 @@ class UploadDoctor(Doc):
         data['enabled'] = enabled
         data['enabled_for_online_booking'] = enabled_for_online_booking
         data['is_live'] = is_live
+        data['matrix_lead_id'] = matrix_lead_id
         return data
 
     def create_doctor(self, data, source, batch, line_no):
@@ -354,7 +357,8 @@ class UploadDoctor(Doc):
                                        data_status=data.get('data_status', QCModel.IN_PROGRESS),
                                        is_live=data.get('is_live', False),
                                        onboarding_status=data.get('onboarding_status', Doctor.NOT_ONBOARDED),
-                                       is_license_verified=data.get('is_license_verified', False)
+                                       is_license_verified=data.get('is_license_verified', False),
+                                       matrix_lead_id=data.get('matrix_lead_id', None)
                                        )
 
         SourceIdentifier.objects.get_or_create(unique_identifier=data.get('identifier'), reference_id=doctor.id,
