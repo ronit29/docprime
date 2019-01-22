@@ -674,11 +674,11 @@ class StateGSTCode(auth_model.TimeStampedModel):
 
     @property
     def get_active_city(self):
-        return self.related_cities.filter(is_live=True)
+        return self.related_cities.filter(is_live=True).order_by('city_name')
 
     @property
     def get_active_district(self):
-        return self.related_districts.filter(is_live=True)
+        return self.related_districts.filter(is_live=True).order_by('district_name')
 
     class Meta:
         db_table = "insurance_state"
