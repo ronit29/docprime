@@ -15,6 +15,7 @@ from django.contrib.auth import get_user_model
 from rest_framework import status
 from django.db import transaction
 from django.db.models import Q, Sum, Count, F, ExpressionWrapper, DateTimeField
+from django.forms.models import model_to_dict
 from . import serializers
 from django.conf import settings
 import requests, re, json
@@ -217,7 +218,8 @@ class ApplicableCouponsViewSet(viewsets.GenericViewSet):
                             "tests": [ test.id for test in coupon.test.all() ],
                             "network_id": coupon.lab_network.id if coupon.lab_network else None,
                             "is_cashback": coupon.coupon_type == Coupon.CASHBACK,
-                            "tnc": coupon.tnc})
+                            "tnc": coupon.tnc,
+                            "payment_option":coupon.payment_option.name if coupon.payment_option else None})
                 if user:
                     for random_coupon in coupon.random_generated_coupon.all():
                         applicable_coupons.append({"is_random_generated": True,
@@ -234,7 +236,8 @@ class ApplicableCouponsViewSet(viewsets.GenericViewSet):
                                 "is_corporate": coupon.is_corporate,
                                 "tests": [test.id for test in coupon.test.all()],
                                 "network_id": coupon.lab_network.id if coupon.lab_network else None,
-                                "tnc": coupon.tnc})
+                                "tnc": coupon.tnc,
+                                "payment_option": coupon.payment_option.name if coupon.payment_option else None})
 
 
         if applicable_coupons:
