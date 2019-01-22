@@ -115,6 +115,7 @@ class SearchedDoctorData():
                                                                       doctor_details=doctor_details)
         # create_google_result = GoogleResult.objects.create(place_entry=create_place_entry,
         #                                                    search_results=google_data)
+        print('success ' + place_id)
         return new_place_entry
         #return 'success ' + place_id
 

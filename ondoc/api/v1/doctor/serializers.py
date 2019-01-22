@@ -205,6 +205,11 @@ class CreateAppointmentSerializer(serializers.Serializer):
 
         time_slot_end = None
 
+        if OpdAppointment.objects.filter(profile=data.get("profile"), doctor=data.get("doctor"),
+                                         hospital=data.get("hospital"), time_slot_start=time_slot_start) \
+                                .exclude(status__in=[OpdAppointment.COMPLETED, OpdAppointment.CANCELLED]).exists():
+            raise serializers.ValidationError("Appointment for the selected date & time already exists. Please change the date & time of the appointment.")
+
         if not is_valid_testing_data(request.user, data["doctor"]):
             logger.error("Error 'Both User and Doctor should be for testing' for opd appointment with data - " + json.dumps(request.data))
             raise serializers.ValidationError("Both User and Doctor should be for testing")
@@ -850,7 +855,7 @@ class DoctorProfileUserViewSerializer(DoctorProfileSerializer):
         return False #obj.is_gold and obj.enabled_for_online_booking
 
     def get_rating(self, obj):
-        app = OpdAppointment.objects.select_related('profile').all()
+        app = OpdAppointment.objects.select_related('profile').filter(doctor_id=obj.id).all()
 
         queryset = obj.rating.prefetch_related('compliment').exclude(Q(review='') | Q(review=None)).filter(is_live=True).order_by('-updated_at')
         reviews = rating_serializer.RatingsModelSerializer(queryset, many=True, context={'app':app})

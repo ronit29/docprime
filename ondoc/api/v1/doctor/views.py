@@ -291,9 +291,16 @@ class DoctorAppointmentsViewSet(OndocViewSet):
             "discount": int(coupon_discount),
             "cashback": int(coupon_cashback)
         }
-        resp = self.create_order(request, opd_data, account_models.Order.DOCTOR_PRODUCT_ID, data.get("use_wallet"))
 
+        if opd_data.get("deal_price") == 0 and not self.can_book_for_free(request.user):
+            return Response({'request_errors': { "code" : "invalid", "message" : "Only 3 active free bookings allowed per customer" }}, status=status.HTTP_400_BAD_REQUEST)
+
+        resp = self.create_order(request, opd_data, account_models.Order.DOCTOR_PRODUCT_ID, data.get("use_wallet"))
         return Response(data=resp)
+
+    def can_book_for_free(self, user):
+        return models.OpdAppointment.objects.filter(user=user, deal_price=0)\
+                   .exclude(status__in=[models.OpdAppointment.COMPLETED, models.OpdAppointment.CANCELLED]).count() < models.OpdAppointment.MAX_FREE_BOOKINGS_ALLOWED
 
     def update(self, request, pk=None):
         user = request.user
@@ -971,12 +978,11 @@ class DoctorListViewSet(viewsets.GenericViewSet):
         reviews = None
 
         entity_url_qs = EntityUrls.objects.filter(url=url, url_type=EntityUrls.UrlType.SEARCHURL,
-                                           entity_type__iexact='Doctor').order_by('-sequence')
+                                           entity_type='Doctor').order_by('-sequence')
         if len(entity_url_qs) > 0:
             entity = entity_url_qs[0]
             if not entity.is_valid:
-                valid_qs = EntityUrls.objects.filter(url_type=EntityUrls.UrlType.SEARCHURL, is_valid=True,
-                                          entity_type__iexact='Doctor', specialization_id=entity.specialization_id,
+                valid_qs = EntityUrls.objects.filter(is_valid=True, specialization_id=entity.specialization_id,
                                           locality_id=entity.locality_id, sublocality_id=entity.sublocality_id,
                                           sitemap_identifier=entity.sitemap_identifier).order_by('-sequence')
 
@@ -1088,8 +1094,8 @@ class DoctorListViewSet(viewsets.GenericViewSet):
         entity_ids = [doctor_data['id'] for doctor_data in response]
 
         id_url_dict = dict()
-        entity = EntityUrls.objects.filter(entity_id__in=entity_ids, url_type='PAGEURL', is_valid='t',
-                                           entity_type__iexact='Doctor').values('entity_id', 'url')
+        entity = EntityUrls.objects.filter(entity_id__in=entity_ids, sitemap_identifier='DOCTOR_PAGE',
+                                           is_valid=True).values('entity_id', 'url')
         for data in entity:
             id_url_dict[data['entity_id']] = data['url']
 
@@ -1867,7 +1873,7 @@ class CreateAdminViewSet(viewsets.GenericViewSet):
                 assoc_docs = hos_obj.assoc_doctors.extra(select={
                     'assigned': 'CASE WHEN  ((SELECT COUNT(*) FROM doctor_number WHERE doctor_id = doctor.id) = 0) THEN 0 ELSE 1  END',
                     'phone_number': 'SELECT phone_number FROM doctor_number WHERE doctor_id = doctor.id',
-                    'enabled': 'SELECT enabled FROM doctor_clinic WHERE doctor_id = doctor.id AND hospital_id='+str(hos_obj.id)}) \
+                    'enabled': 'SELECT enabled FROM doctor_clinic WHERE doctor_id = doctor.id AND hospital_id='+str(hos_obj.id)})\
                     .values('name', 'id', 'assigned', 'phone_number', 'enabled', 'is_live')
 
             for x in response:
