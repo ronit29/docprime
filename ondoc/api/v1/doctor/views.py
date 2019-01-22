@@ -2161,9 +2161,9 @@ class OfflineCustomerViewSet(viewsets.GenericViewSet):
             response['break'] = True
         return response
 
-    def validate_create_conditions(self, id, appntment_ids, data, request):
+    def validate_create_conditions(self, appntment_ids, data, request):
         response = {}
-        if id in appntment_ids:
+        if data.get('id') in appntment_ids:
             obj = {'id': data.get('id'),
                    'error': True,
                    'error_message': "Appointment With Same UUid exists!"}
@@ -2259,33 +2259,36 @@ class OfflineCustomerViewSet(viewsets.GenericViewSet):
         patient = None
         sms_list = []
         resp = []
-        appntment_ids = list(models.OfflineOPDAppointments.objects.values_list('id', flat=True))
-        patient_ids = list(models.OfflinePatients.objects.values_list('id', flat=True))
-        req_hosp_ids = [data.get('hospital').id if data.get('hospital') else None for data in valid_data.get('data')]
+        req_hosp_ids = []
+        appntment_ids = []
+        patient_ids = []
+        for data in valid_data.get('data'):
+            if data.get('hospital'):
+                req_hosp_ids.append(data.get('hospital').id)
+            if data.get('id'):
+                appntment_ids.append(data.get('id'))
+            if data.get('patient') and data['patient'].get('id'):
+                patient_ids.append(data['patient']['id'])
+        patient_ids = list(models.OfflinePatients.objects.filter(id__in=patient_ids).values_list('id', flat=True))
         clinic_queryset = [(dc.doctor.id, dc.hospital.id) for dc in
                            models.DoctorClinic.objects.filter(hospital__id__in=req_hosp_ids)]
         pem_queryset = [(ga.doctor.id if ga.doctor else None, ga.hospital.id if ga.hospital else None) for ga in auth_models.GenericAdmin.objects.filter(is_disabled=False, user=request.user).all()]
         doc_pem_list, hosp_pem_list = map(list, zip(*pem_queryset))
 
         for data in valid_data.get('data'):
-            #Validating valid UUID and skip the row if False
             uuid_obj = self.validate_uuid(data)
             id = uuid_obj.get('id') if 'id' in uuid_obj and uuid_obj.get('id') else None
             if not id and 'continue' in uuid_obj and uuid_obj.get('continue'):
                 resp.append(uuid_obj.get('obj'))
                 continue
 
-            #Validate for correct permssions but create as the request might be recived for an earlier appointment
-            # which havenot been synced yet from provide request
             self.validate_permissions(data, doc_pem_list, hosp_pem_list, clinic_queryset)
 
-            #Validate if necessary and Valid data have been recieved Otherwise skip the row
-            create_obj = self.validate_create_conditions(id, appntment_ids, data, request)
+            create_obj = self.validate_create_conditions(appntment_ids, data, request)
             if 'continue' in create_obj and create_obj.get('continue'):
                 resp.append(create_obj.get('obj'))
                 continue
 
-            #Create or Update Patient
             if not data.get('patient')['id'] in patient_ids:
                 patient_data = self.create_patient(request, data['patient'], data['hospital'], data['doctor'])
             else:
@@ -2304,7 +2307,7 @@ class OfflineCustomerViewSet(viewsets.GenericViewSet):
                                                                      status=models.OfflineOPDAppointments.ACCEPTED,
                                                                      error=data.get('error') if data.get('error') else False,
                                                                      error_message=data.get('error_message') if data.get('error_message') else None
-                                                                     )
+                                                                              )
             except Exception as e:
                 obj = {'id': data.get('id'),
                        'error': True,
@@ -2317,7 +2320,7 @@ class OfflineCustomerViewSet(viewsets.GenericViewSet):
 
             if patient_data.get('sms_list'):
                 patient_data['sms_list']['appointment'] = appnt
-            appntment_ids.append(appnt.id)
+            appntment_ids.append(str(appnt.id))
             patient_ids.append(patient.id)
             ret_obj = {}
             ret_obj['id'] = appnt.id
@@ -2425,9 +2428,19 @@ class OfflineCustomerViewSet(viewsets.GenericViewSet):
         valid_data = serializer.validated_data
         sms_list = []
         resp = []
-        appntment_ids = models.OfflineOPDAppointments.objects.select_related('doctor', 'hospital', 'user').all()
-        patient_ids = list(models.OfflinePatients.objects.values_list('id', flat=True))
-        req_hosp_ids = [data.get('hospital').id if data.get('hospital') else None for data in valid_data.get('data')]
+        appnt_ids = []
+        req_hosp_ids = []
+        patient_ids  = []
+        for data in valid_data.get('data'):
+            if data.get('hospital'):
+                req_hosp_ids.append(data.get('hospital').id)
+            if data.get('id'):
+                appnt_ids.append(data.get('id'))
+            if data.get('patient') and data['patient'].get('id'):
+                patient_ids.append(data['patient']['id'])
+        appntment_ids = models.OfflineOPDAppointments.objects.select_related('doctor', 'hospital', 'user')\
+                                                     .filter(id__in=appnt_ids).all()
+        patient_ids = list(models.OfflinePatients.objects.filter(id__in=patient_ids).values_list('id', flat=True))
         clinic_queryset = [(dc.doctor.id, dc.hospital.id) for dc in models.DoctorClinic.objects.filter(hospital__id__in=req_hosp_ids)]
         pem_queryset = [(ga.doctor.id if ga.doctor else None, ga.hospital.id if ga.hospital else None) for ga in
                         auth_models.GenericAdmin.objects.filter(is_disabled=False, user=request.user).all()]
