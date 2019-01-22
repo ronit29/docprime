@@ -216,6 +216,26 @@ class Lab(TimeStampedModel, CreatedByModel, QCModel, SearchKey):
     class Meta:
         db_table = "lab"
 
+    def lab_timings_today(self, day_now=timezone.now().weekday()):
+        lab_timing = list()
+        lab_timing_data = list()
+        time_choices = {item[0]: item[1] for item in LabTiming.TIME_CHOICES}
+        if self.always_open:
+            lab_timing.append("12:00 AM - 11:45 PM")
+            lab_timing_data.append({
+                "start": str(0.0),
+                "end": str(23.75)
+            })
+        else:
+            timing_queryset = self.lab_timings.all()
+            for data in timing_queryset:
+                if data.day == day_now:
+                    lab_timing.append('{} - {}'.format(time_choices[data.start], time_choices[data.end]))
+                    lab_timing_data.append({"start": str(data.start), "end": str(data.end)})
+        return ' | '.join(lab_timing), lab_timing_data
+
+    # Lab.lab_timings_today = get_lab_timings_today
+
     def get_ratings(self):
         return self.rating.all()
 
@@ -1667,25 +1687,3 @@ class LabAppointmentTestMapping(models.Model):
 
     class Meta:
         db_table = 'lab_appointment_test_mapping'
-
-
-def get_lab_timings_today(self, day_now=timezone.now().weekday()):
-    lab_timing = list()
-    lab_timing_data = list()
-    time_choices = {item[0]: item[1] for item in LabTiming.TIME_CHOICES}
-    if self.always_open:
-        lab_timing.append("12:00 AM - 11:45 PM")
-        lab_timing_data.append({
-            "start": str(0.0),
-            "end": str(23.75)
-        })
-    else:
-        timing_queryset = self.lab_timings.all()
-        for data in timing_queryset:
-            if data.day == day_now:
-                lab_timing.append('{} - {}'.format(time_choices[data.start], time_choices[data.end]))
-                lab_timing_data.append({"start": str(data.start), "end": str(data.end)})
-    return ' | '.join(lab_timing), lab_timing_data
-
-
-Lab.lab_timings_today = get_lab_timings_today
