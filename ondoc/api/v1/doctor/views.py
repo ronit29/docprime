@@ -873,7 +873,10 @@ class PrescriptionFileViewset(OndocViewSet):
                                                                                   context={"request": request})
         prescription_file_serializer.is_valid(raise_exception=True)
         prescription_file_serializer.save()
-        resp_data = prescription_file_serializer.data
+        # resp_data = prescription_file_serializer.data
+        resp_data = serializers.DoctorAppointmentRetrieveSerializer(validated_data.get('appointment'), many=True,
+                                                                         context={'request': request})
+
         return Response(resp_data)
 
     def remove(self, request):

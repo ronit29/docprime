@@ -976,31 +976,28 @@ class GenericAdmin(TimeStampedModel, CreatedByModel):
         if not appoinment:
             return []
         admins = GenericAdmin.objects.filter(
-            Q(is_disabled=False),
-            Q(
-                (Q(doctor=appoinment.doctor,
-                   super_user_permission=False,
-                   hospital=appoinment.hospital)
-                 |
-                 Q(doctor__isnull=True,
-                   super_user_permission=False,
-                   hospital=appoinment.hospital)
-                 |
-                 Q(hospital__isnull=True,
-                   super_user_permission=False,
-                   doctor=appoinment.doctor)
-                 )
-             ),
-            Q(
-                Q(super_user_permission=True,
-                  entity_type=GenericAdminEntity.DOCTOR,
-                  doctor=appoinment.doctor)
-                |
-                Q(super_user_permission=True,
-                  entity_type=GenericAdminEntity.HOSPITAL,
-                  hospital=appoinment.hospital)
-            )
-        )
+                Q(is_disabled=False),
+                (Q(
+                    (Q(doctor=appoinment.doctor,
+                       hospital=appoinment.hospital)
+                     |
+                     Q(doctor__isnull=True,
+                       hospital=appoinment.hospital)
+                     |
+                     Q(hospital__isnull=True,
+                       doctor=appoinment.doctor)
+                     )
+                 )|
+                Q(
+                    Q(super_user_permission=True,
+                      entity_type=GenericAdminEntity.DOCTOR,
+                      doctor=appoinment.doctor)
+                    |
+                    Q(super_user_permission=True,
+                      entity_type=GenericAdminEntity.HOSPITAL,
+                      hospital=appoinment.hospital)
+                ))
+        ).distinct('user')
         admin_users = []
         for admin in admins:
             if admin.user:
