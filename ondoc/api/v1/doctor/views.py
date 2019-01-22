@@ -874,8 +874,8 @@ class PrescriptionFileViewset(OndocViewSet):
         prescription_file_serializer.is_valid(raise_exception=True)
         prescription_file_serializer.save()
         # resp_data = prescription_file_serializer.data
-        resp_data = serializers.DoctorAppointmentRetrieveSerializer(validated_data.get('appointment'), many=True,
-                                                                         context={'request': request})
+        resp_data = serializers.DoctorAppointmentRetrieveSerializer(validated_data.get('appointment'),
+                                                                         context={'request': request}).data
 
         return Response(resp_data)
 
