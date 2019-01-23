@@ -19,7 +19,7 @@ class IntegratorMapping(TimeStampedModel):
     # product_object_id = models.PositiveIntegerField()
     # product_content_object = GenericForeignKey()
 
-    test_id = models.ForeignKey(LabTest, on_delete=models.CASCADE)
+    test = models.ForeignKey(LabTest, on_delete=models.CASCADE)
     interator_class_name = models.CharField(max_length=40, null=False, blank=False)
 
     class Meta:
