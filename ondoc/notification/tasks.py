@@ -3,12 +3,16 @@ from __future__ import absolute_import, unicode_literals
 import datetime
 import json
 import math
+import traceback
 from collections import OrderedDict
+from io import BytesIO
 
+from django.db import transaction
 from django.forms import model_to_dict
 from django.utils import timezone
+from openpyxl import load_workbook
 
-from ondoc.api.v1.utils import aware_time_zone
+from ondoc.api.v1.utils import aware_time_zone, util_absolute_url
 from ondoc.notification.labnotificationaction import LabNotificationAction
 from ondoc.notification import models as notification_models
 from celery import task
@@ -16,7 +20,7 @@ import logging
 from django.conf import settings
 import requests
 from rest_framework import status
-
+from django.utils.safestring import mark_safe
 from ondoc.notification.models import NotificationAction
 
 logger = logging.getLogger(__name__)
@@ -33,8 +37,10 @@ def send_lab_notifications_refactored(appointment_id):
         instance = lab_models.LabAppointment.objects.filter(id=appointment_id).first()
         if not instance or not instance.user:
             return
-        opd_notification = LabNotification(instance)
-        opd_notification.send()
+        if instance.status == lab_models.LabAppointment.COMPLETED:
+            instance.generate_invoice()
+        lab_notification = LabNotification(instance)
+        lab_notification.send()
     except Exception as e:
         logger.error(str(e))
 
@@ -110,7 +116,8 @@ def send_opd_notifications_refactored(appointment_id):
         instance = OpdAppointment.objects.filter(id=appointment_id).first()
         if not instance or not instance.user:
             return
-
+        if instance.status == OpdAppointment.COMPLETED:
+            instance.generate_invoice()
         opd_notification = OpdNotification(instance)
         opd_notification.send()
     except Exception as e:
@@ -188,8 +195,6 @@ def send_opd_rating_message(appointment_id, type):
     from ondoc.doctor.models import OpdAppointment
     from ondoc.diagnostic.models import LabAppointment
     from django.conf import settings
-    from django.utils.safestring import mark_safe
-
     data = {}
     name = ''
     try:
@@ -263,7 +268,7 @@ def set_order_dummy_transaction(self, order_id, user_id):
                     tx_data['order_id'] = order_row.id
                     tx_data['reference_id'] = order_row.reference_id
                     tx_data['type'] = DummyTransactions.CREDIT
-                    tx_data['amount'] = 0
+                    tx_data['amount'] = appointment.effective_price
                     tx_data['payment_mode'] = "DC"
 
                     # tx_data['transaction_id'] = resp_data.get('orderNo')
@@ -286,6 +291,40 @@ def set_order_dummy_transaction(self, order_id, user_id):
     except Exception as e:
         logger.error("Error in Setting Dummy Transaction of user with data - " + json.dumps(req_data) + " with exception - " + str(e))
         self.retry([order_id, user_id], countdown=300)
+
+@task
+def send_offline_appointment_message(number, text, type):
+    data = {}
+    data['phone_number'] = number
+    data['text'] = mark_safe(text)
+    try:
+        notification_models.SmsNotification.send_rating_link(data)
+    except Exception as e:
+        logger.error("Error sending " + str(type) + " message - " + str(e))
+
+@task
+def send_appointment_reminder_message(number, doctor, date):
+    data = {}
+    data['phone_number'] = number
+    text = '''You have an upcomming Appointment with Dr. %s scheduled on %s''' % (doctor, date)
+    data['text'] = mark_safe(text)
+    try:
+        notification_models.SmsNotification.send_rating_link(data)
+    except Exception as e:
+        logger.error("Error sending Reminder message - " + str(e))
+
+@task
+def send_appointment_location_message(number, hospital_lat, hospital_long):
+    data = {}
+    data['phone_number'] = number
+
+    link = '''http://maps.google.com/maps?q=loc:%s,%s''' % (hospital_lat, hospital_long)
+    text = '''Location for your Upcoming Appointment %s ''' % (link)
+    data['text'] = mark_safe(text)
+    try:
+        notification_models.SmsNotification.send_rating_link(data)
+    except Exception as e:
+        logger.error("Error sending Location message - " + str(e))
 
 @task()
 def process_payout(payout_id):
@@ -335,7 +374,7 @@ def process_payout(payout_id):
             curr_txn["idx"] = idx
             curr_txn["orderNo"] = txn.order_no
             curr_txn["orderId"] = order_data.id
-            curr_txn["txnAmount"] = str(order_data.amount)
+            curr_txn["txnAmount"] = str(txn.amount)
             curr_txn["settledAmount"] = str(payout_data.payable_amount)
             curr_txn["merchantCode"] = merchant.id
             curr_txn["pgtxId"] = txn.transaction_id
@@ -429,3 +468,48 @@ def send_lab_reports(appointment_id):
         lab_notification.send()
     except Exception as e:
         logger.error(str(e))
+
+
+@task()
+def upload_doctor_data(obj_id):
+    from ondoc.doctor.models import UploadDoctorData
+    from ondoc.crm.management.commands import upload_doctor_data as upload_command
+    instance = UploadDoctorData.objects.filter(id=obj_id).first()
+    errors = []
+    if not instance or not instance.status == UploadDoctorData.IN_PROGRESS:
+        return
+    try:
+        source = instance.source
+        batch = instance.batch
+        lines = instance.lines if instance and instance.lines else 100000000
+        wb = load_workbook(instance.file)
+        sheets = wb.worksheets
+        doctor = upload_command.UploadDoctor(errors)
+        qualification = upload_command.UploadQualification(errors)
+        experience = upload_command.UploadExperience(errors)
+        membership = upload_command.UploadMembership(errors)
+        award = upload_command.UploadAward(errors)
+        hospital = upload_command.UploadHospital(errors)
+        specialization = upload_command.UploadSpecialization(errors)
+        with transaction.atomic():
+            # doctor.p_image(sheets[0], source, batch)
+            doctor.upload(sheets[0], source, batch, lines, instance.user)
+            qualification.upload(sheets[1], lines)
+            experience.upload(sheets[2], lines)
+            membership.upload(sheets[3], lines)
+            award.upload(sheets[4], lines)
+            hospital.upload(sheets[5], source, batch, lines)
+            specialization.upload(sheets[6], lines)
+            if len(errors)>0:
+                raise Exception('errors in data')
+        instance.status = UploadDoctorData.SUCCESS
+        instance.save()
+    except Exception as e:
+        error_message = traceback.format_exc() + str(e)
+        logger.error(error_message)
+        instance.status = UploadDoctorData.FAIL
+        if errors:
+            instance.error_msg = errors
+        else:
+            instance.error_msg = [{'line number': 0, 'message': error_message}]
+        instance.save(retry=False)

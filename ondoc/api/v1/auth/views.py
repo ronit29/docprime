@@ -20,6 +20,7 @@ from rest_framework.authtoken.models import Token
 from django.db.models import F, Sum, Max, Q, Prefetch, Case, When, Count
 from django.forms.models import model_to_dict
 
+from ondoc.common.models import UserConfig
 from ondoc.coupon.models import UserSpecificCoupon, Coupon
 from ondoc.lead.models import UserLead
 from ondoc.sms.api import send_otp
@@ -413,13 +414,24 @@ class ReferralViewSet(GenericViewSet):
         user = request.user
         if not user.is_authenticated:
             return Response({"status": 0}, status=status.HTTP_401_UNAUTHORIZED)
+        if UserReferrals.objects.all():
+            referral = UserReferrals.objects.filter(user=user).first()
+            if not referral:
+                referral = UserReferrals()
+                referral.user = user
+                referral.save()
 
-        referral = UserReferrals.objects.filter(user=user).first()
-        if not referral:
-            referral = UserReferrals()
-            referral.user = user
-            referral.save()
-        return Response({ "code" : referral.code, "status" : 1 })
+        user_config = UserConfig.objects.filter(key="referral").first()
+        help_flow = []
+        share_text = ''
+        share_url = ''
+        if user_config:
+            all_data = user_config.data
+            help_flow = all_data.get('help_flow', [])
+            share_text = all_data.get('share_text', '').replace('$referral_code', referral.code)
+            share_url = all_data.get('share_url', '').replace('$referral_code', referral.code)
+        return Response({"code": referral.code, "status": 1, 'help_flow': help_flow,
+                         "share_text": share_text, "share_url": share_url})
 
     def retrieve_by_code(self, request, code):
         referral = UserReferrals.objects.filter(code__iexact=code).first()
@@ -1280,43 +1292,60 @@ class HospitalDoctorAppointmentPermissionViewSet(GenericViewSet):
     authentication_classes = (JWTAuthentication, )
     permission_classes = (IsAuthenticated, IsDoctor,)
 
+    # building = models.CharField(max_length=1000, blank=True)
+    # sublocality = models.CharField(max_length=100, blank=True)
+    # locality = models.CharField(max_length=100, blank=True)
+    # city = models.CharField(max_length=100)
+    # state = models.CharField(max_length=100, blank=True)
+    # country = models.CharField(max_length=100)
+
     @transaction.non_atomic_requests
     def list(self, request):
         user = request.user
         doc_hosp_queryset = (DoctorClinic.objects
                              .select_related('doctor', 'hospital')
                              .prefetch_related('doctor__manageable_doctors', 'hospital__manageable_hospitals')
-                             .filter(doctor__is_live=True, hospital__is_live=True).annotate(
-            hospital_name=F('hospital__name'), doctor_name=F('doctor__name')).filter(
-            Q(
-                Q(doctor__manageable_doctors__user=user,
-                  doctor__manageable_doctors__hospital=F('hospital'),
-                  doctor__manageable_doctors__is_disabled=False,
-                  doctor__manageable_doctors__permission_type__in=[GenericAdmin.APPOINTMENT, GenericAdmin.ALL],
-                  doctor__manageable_doctors__write_permission=True) |
-                Q(doctor__manageable_doctors__user=user,
-                  doctor__manageable_doctors__hospital__isnull=True,
-                  doctor__manageable_doctors__is_disabled=False,
-                  doctor__manageable_doctors__permission_type__in=[GenericAdmin.APPOINTMENT, GenericAdmin.ALL],
-                  doctor__manageable_doctors__write_permission=True) |
-                Q(hospital__manageable_hospitals__doctor__isnull=True,
-                  hospital__manageable_hospitals__user=user,
-                  hospital__manageable_hospitals__is_disabled=False,
-                  hospital__manageable_hospitals__permission_type__in=[GenericAdmin.APPOINTMENT, GenericAdmin.ALL],
-                  hospital__manageable_hospitals__write_permission=True)
-            )|
-                Q(
-                    Q(doctor__manageable_doctors__user=user,
-                     doctor__manageable_doctors__super_user_permission=True,
-                     doctor__manageable_doctors__is_disabled=False,
-                     doctor__manageable_doctors__entity_type=GenericAdminEntity.DOCTOR,)|
-                    Q(hospital__manageable_hospitals__user=user,
-                      hospital__manageable_hospitals__super_user_permission=True,
-                      hospital__manageable_hospitals__is_disabled=False,
-                      hospital__manageable_hospitals__entity_type=GenericAdminEntity.HOSPITAL)
-            )
-            ).values('hospital', 'doctor', 'hospital_name', 'doctor_name').distinct('hospital', 'doctor')
+                             .filter(doctor__is_live=True, hospital__is_live=True)
+                             .annotate(doctor_gender=F('doctor__gender'),
+                                       hospital_building=F('hospital__building'),
+                                       hospital_name=F('hospital__name'),
+                                       doctor_name=F('doctor__name')
+                                       )
+                             .filter(
+                                    Q(
+                                        Q(doctor__manageable_doctors__user=user,
+                                          doctor__manageable_doctors__hospital=F('hospital'),
+                                          doctor__manageable_doctors__is_disabled=False,
+                                          doctor__manageable_doctors__permission_type__in=[GenericAdmin.APPOINTMENT, GenericAdmin.ALL],
+                                          doctor__manageable_doctors__write_permission=True) |
+                                        Q(doctor__manageable_doctors__user=user,
+                                          doctor__manageable_doctors__hospital__isnull=True,
+                                          doctor__manageable_doctors__is_disabled=False,
+                                          doctor__manageable_doctors__permission_type__in=[GenericAdmin.APPOINTMENT, GenericAdmin.ALL],
+                                          doctor__manageable_doctors__write_permission=True) |
+                                        Q(hospital__manageable_hospitals__doctor__isnull=True,
+                                          hospital__manageable_hospitals__user=user,
+                                          hospital__manageable_hospitals__is_disabled=False,
+                                          hospital__manageable_hospitals__permission_type__in=[GenericAdmin.APPOINTMENT, GenericAdmin.ALL],
+                                          hospital__manageable_hospitals__write_permission=True)
+                                    )|
+                                        Q(
+                                            Q(doctor__manageable_doctors__user=user,
+                                             doctor__manageable_doctors__super_user_permission=True,
+                                             doctor__manageable_doctors__is_disabled=False,
+                                             doctor__manageable_doctors__entity_type=GenericAdminEntity.DOCTOR,)|
+                                            Q(hospital__manageable_hospitals__user=user,
+                                              hospital__manageable_hospitals__super_user_permission=True,
+                                              hospital__manageable_hospitals__is_disabled=False,
+                                              hospital__manageable_hospitals__entity_type=GenericAdminEntity.HOSPITAL)
+                                    ))
+                             .values('hospital', 'doctor', 'hospital_name', 'doctor_name', 'doctor_gender').distinct('hospital', 'doctor')
                              )
+
+        # all_docs = [doc_hosp_queryset
+        # all_hospitals = doc_hosp_queryset
+
+
         return Response(doc_hosp_queryset)
 
 

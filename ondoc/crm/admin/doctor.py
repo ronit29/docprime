@@ -20,8 +20,7 @@ import datetime
 from django.db import transaction
 import logging
 from dal import autocomplete
-
-from ondoc.api.v1.utils import util_absolute_url, util_file_name
+from ondoc.api.v1.utils import GenericAdminEntity, util_absolute_url, util_file_name
 from ondoc.procedure.models import DoctorClinicProcedure, Procedure
 
 logger = logging.getLogger(__name__)
@@ -40,7 +39,9 @@ from ondoc.doctor.models import (Doctor, DoctorQualification,
                                  OpdAppointment, CompetitorInfo, SpecializationDepartment,
                                  SpecializationField, PracticeSpecialization, SpecializationDepartmentMapping,
                                  DoctorPracticeSpecialization, CompetitorMonthlyVisit,
-                                 GoogleDetailing, VisitReason, VisitReasonMapping, PracticeSpecializationContent, DoctorMobileOtp)
+                                 GoogleDetailing, VisitReason, VisitReasonMapping, PracticeSpecializationContent, PatientMobile, DoctorMobileOtp,
+                                 UploadDoctorData)
+
 from ondoc.authentication.models import User
 from .common import *
 from .autocomplete import CustomAutoComplete
@@ -764,7 +765,9 @@ class GenericAdminInline(nested_admin.NestedTabularInline):
         return ['user', 'updated_at']
 
     def get_queryset(self, request):
-        return super(GenericAdminInline, self).get_queryset(request).select_related('doctor', 'hospital', 'user')
+        return super(GenericAdminInline, self).get_queryset(request).select_related('doctor', 'hospital', 'user')\
+            .filter(entity_type=GenericAdminEntity.DOCTOR)
+
 
     def formfield_for_foreignkey(self, db_field, request, **kwargs):
         if db_field.name == "hospital":
@@ -1419,22 +1422,20 @@ class DoctorOpdAppointmentAdmin(admin.ModelAdmin):
         if request.user.is_superuser and request.user.is_staff:
             return 'booking_id', 'doctor_id', 'doctor_details', 'contact_details', 'hospital_details', 'kyc', 'procedures_details', 'invoice_urls'
         elif request.user.groups.filter(name=constants['OPD_APPOINTMENT_MANAGEMENT_TEAM']).exists():
-            return ('booking_id', 'doctor_name', 'doctor_id', 'doctor_details', 'hospital_name', 'invoice_urls'
+            return ('booking_id', 'doctor_name', 'doctor_id', 'doctor_details', 'hospital_name',
                     'hospital_details', 'kyc', 'contact_details',
                     'used_profile_name', 'used_profile_number', 'default_profile_name',
                     'default_profile_number', 'user_id', 'user_number', 'booked_by',
                     'fees', 'effective_price', 'mrp', 'deal_price', 'payment_status', 'payment_type',
-                    'admin_information', 'otp', 'insurance', 'outstanding', 'procedures_details')
+                    'admin_information', 'otp', 'insurance', 'outstanding', 'procedures_details','invoice_urls')
         else:
-            return ()
+            return ('invoice_urls')
 
     def invoice_urls(self, instance):
         invoices_urls = ''
-        if instance.id:
-            invoices = Invoice.objects.filter(reference_id=instance.id, product_id=Order.DOCTOR_PRODUCT_ID)
-            for invoice in invoices:
-                invoices_urls += "<a href={} target='_blank'>{}</a><br>".format(util_absolute_url(invoice.file.url),
-                                                                             util_file_name(invoice.file.url))
+        for invoice in instance.get_invoice_urls():
+            invoices_urls += "<a href={} target='_blank'>{}</a><br>".format(util_absolute_url(invoice),
+                                                                             util_file_name(invoice))
         return mark_safe(invoices_urls)
     invoice_urls.short_description = 'Invoice(s)'
 
@@ -1872,3 +1873,36 @@ class PracticeSpecializationContentAdmin(admin.ModelAdmin):
     display = ('specialization', 'content', )
     autocomplete_fields = ('specialization', )
 
+
+class PatientMobileInline(admin.TabularInline):
+    model = PatientMobile
+    extra = 0
+    can_delete = True
+    show_change_link = True
+
+
+class OfflinePatientAdmin(VersionAdmin):
+    list_display = ('name', 'gender', 'referred_by')
+    date_hierarchy = 'created_at'
+    inlines = [PatientMobileInline]
+
+
+class UploadDoctorDataAdmin(admin.ModelAdmin):
+    list_display = ('id', 'source', 'batch', 'status', 'file')
+    readonly_fields = ('status', 'error_message', 'user', 'lines')
+
+    def save_model(self, request, obj, form, change):
+        if obj:
+            if not obj.user:
+                obj.user = request.user
+        super().save_model(request, obj, form, change)
+
+    def error_message(self, instance):
+        final_message = ''
+        if instance.error_msg:
+            for message in instance.error_msg:
+                if isinstance(message, dict):
+                    final_message += '{}  ::  {}\n\n'.format(message.get('line number', ''), message.get('message', ''))
+                else:
+                    final_message += str(message)
+        return final_message

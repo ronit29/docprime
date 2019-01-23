@@ -175,6 +175,7 @@ class LabList(viewsets.ReadOnlyModelViewSet):
         all_packages_in_network_labs = LabTest.objects.prefetch_related('test').filter(enable_for_retail=True,
                                                                                        searchable=True, is_package=True,
                                                                                        availablelabs__enabled=True,
+                                                                                       availablelabs__lab_pricing_group__labs__is_live=True,
                                                                                        availablelabs__lab_pricing_group__labs__network__isnull=False,
                                                                                        availablelabs__lab_pricing_group__labs__location__dwithin=(
                                                                                            Point(float(long),
@@ -195,6 +196,8 @@ class LabList(viewsets.ReadOnlyModelViewSet):
                                                                                            searchable=True,
                                                                                            is_package=True,
                                                                                            availablelabs__enabled=True,
+                                                                                           availablelabs__lab_pricing_group__labs__is_live=True,
+                                                                                           availablelabs__lab_pricing_group__labs__enabled=True,
                                                                                            availablelabs__lab_pricing_group__labs__network__isnull=True,
                                                                                            availablelabs__lab_pricing_group__labs__location__dwithin=(
                                                                                                Point(float(long),
@@ -1751,13 +1754,15 @@ class TestDetailsViewset(viewsets.GenericViewSet):
                for fbt in fbts:
                     name = fbt.name
                     id = fbt.id
-                    booked_together.append({'id': id, 'lab_test': name})
+                    show_details = fbt.show_details
+                    booked_together.append({'id': id, 'lab_test': name, 'show_details': show_details})
 
             else:
                 for fbt in data.base_test.all():
                     name = fbt.booked_together_test.name
                     id = fbt.booked_together_test.id
-                    booked_together.append({'id': id, 'lab_test': name})
+                    show_details = fbt.booked_together_test.show_details
+                    booked_together.append({'id': id, 'lab_test': name, 'show_details': show_details})
 
             result['frequently_booked_together'] = {'title': 'Frequently booked together', 'value': booked_together}
             result['show_details'] = data.show_details
