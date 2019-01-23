@@ -890,8 +890,10 @@ def get_opd_pem_queryset(user, model):
     #                                super_user_permission=false AND is_disabled=false AND permission_type=2) > 0) THEN 1  ELSE 0 END'''
     queryset = model.objects \
         .select_related('doctor', 'hospital', 'user') \
-        .prefetch_related('doctor__manageable_doctors', 'hospital__manageable_hospitals', 'doctor__images','doctor__qualifications', 'doctor__qualifications__qualification',
-                          'doctor__qualifications__specialization', 'doctor__qualifications__college', 'doctor__doctorpracticespecializations') \
+        .prefetch_related('doctor__manageable_doctors', 'hospital__manageable_hospitals', 'doctor__images',
+                          'doctor__qualifications', 'doctor__qualifications__qualification',
+                          'doctor__qualifications__specialization', 'doctor__qualifications__college',
+                          'doctor__doctorpracticespecializations', 'doctor__doctorpracticespecializations__specialization') \
         .filter(hospital__is_live=True, doctor__is_live=True) \
         .filter(
         Q(
