@@ -101,7 +101,7 @@ class LabModelSerializer(serializers.ModelSerializer):
     def get_rating(self, obj):
         if self.parent:
             return None
-        app = LabAppointment.objects.select_related('profile').all()
+        app = LabAppointment.objects.select_related('profile').filter(lab_id=obj.id).all()
         # rating_queryset = obj.rating.prefetch_related('compliment').exclude(Q(review='') | Q(review=None)).filter(is_live=True).order_by('-updated_at')
         query = self.context.get('rating_queryset')
         rating_queryset = query.exclude(Q(review='') | Q(review=None)).order_by('-updated_at')
@@ -1006,12 +1006,17 @@ class LabEntitySerializer(serializers.ModelSerializer):
 
 class CustomPackageLabSerializer(LabModelSerializer):
     avg_rating = serializers.ReadOnlyField()
+    url = serializers.SerializerMethodField()
 
     class Meta:
         model = Lab
         fields = ('id', 'lat', 'long', 'lab_thumbnail', 'name', 'operational_since', 'locality', 'address',
                   'sublocality', 'city', 'state', 'country', 'always_open', 'about', 'home_pickup_charges',
-                  'is_home_collection_enabled', 'seo', 'breadcrumb', 'center_visit_enabled', 'avg_rating')
+                  'is_home_collection_enabled', 'seo', 'breadcrumb', 'center_visit_enabled', 'avg_rating', 'url')
+
+    def get_url(self, obj):
+        entity_url_dict = self.context.get('entity_url_dict')
+        return entity_url_dict.get(obj.id, [''])[0] if obj.id else ''
 
     # def get_avg_rating(self, obj):
     #     return obj.avg_rating
@@ -1039,9 +1044,10 @@ class CustomLabTestPackageSerializer(serializers.ModelSerializer):
     def get_lab(self, obj):
         lab_data = self.context.get('lab_data')
         request = self.context.get('request')
+        entity_url_dict = self.context.get('entity_url_dict')
         for data in lab_data:
             if data.id == obj.lab:
-                return CustomPackageLabSerializer(data, context={'request': request}).data
+                return CustomPackageLabSerializer(data, context={'entity_url_dict': entity_url_dict,'request': request}).data
 
     def get_distance(self, obj):
         return int(obj.distance.m)
