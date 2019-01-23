@@ -1140,7 +1140,7 @@ class RecommendedPackageCategoryList(serializers.ModelSerializer):
     def get_tests(self, obj):
         test_id = []
         if obj:
-            for tst in obj.lab_test.all():
+            for tst in obj.recommended_lab_tests.all():
                 test_id.append({"id": tst.id, "name": tst.name})
         return test_id
 
