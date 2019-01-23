@@ -698,6 +698,10 @@ class LabAppointmentForm(forms.ModelForm):
         if cleaned_data.get('send_email_sms_report', False) and self.instance and self.instance.id and not sum(
                 self.instance.reports.annotate(no_of_files=Count('files')).values_list('no_of_files', flat=True)):
                 raise forms.ValidationError("Can't send reports as none are available. Please upload.")
+
+        if cleaned_data.get('send_email_sms_report',
+                            False) and self.instance and self.instance.id and not self.instance.status == LabAppointment.COMPLETED:
+                raise forms.ValidationError("Can't send reports as appointment is not completed")
         # SHASHANK_SINGH if no report error.
 
         # if self.instance.status in [LabAppointment.CANCELLED, LabAppointment.COMPLETED] and len(cleaned_data):
@@ -854,11 +858,9 @@ class LabAppointmentAdmin(nested_admin.NestedModelAdmin):
 
     def invoice_urls(self, instance):
         invoices_urls = ''
-        if instance.id:
-            invoices = Invoice.objects.filter(reference_id=instance.id, product_id=Order.LAB_PRODUCT_ID)
-            for invoice in invoices:
-                invoices_urls += "<a href={} target='_blank'>{}</a><br>".format(util_absolute_url(invoice.file.url),
-                                                                             util_file_name(invoice.file.url))
+        for invoice in instance.get_invoice_urls():
+            invoices_urls += "<a href={} target='_blank'>{}</a><br>".format(util_absolute_url(invoice),
+                                                                             util_file_name(invoice))
         return mark_safe(invoices_urls)
     invoice_urls.short_description = 'Invoice(s)'
 

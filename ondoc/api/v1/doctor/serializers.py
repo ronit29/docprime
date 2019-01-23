@@ -96,6 +96,7 @@ class OpdAppointmentSerializer(serializers.ModelSerializer):
     invoices = serializers.SerializerMethodField()
     type = serializers.ReadOnlyField(default='doctor')
     allowed_action = serializers.SerializerMethodField()
+    reports = serializers.SerializerMethodField()
 
     def get_allowed_action(self, obj):
         request = self.context.get('request')
@@ -105,7 +106,7 @@ class OpdAppointmentSerializer(serializers.ModelSerializer):
         model = OpdAppointment
         fields = ('id', 'doctor_name', 'hospital_name', 'patient_name', 'patient_image', 'type',
                   'allowed_action', 'effective_price', 'deal_price', 'status', 'time_slot_start',
-                  'time_slot_end', 'doctor_thumbnail', 'patient_thumbnail', 'display_name', 'invoices')
+                  'time_slot_end', 'doctor_thumbnail', 'patient_thumbnail', 'display_name', 'invoices', 'reports')
 
     def get_patient_image(self, obj):
         if obj.profile and obj.profile.profile_image:
@@ -132,12 +133,10 @@ class OpdAppointmentSerializer(serializers.ModelSerializer):
             # return request.build_absolute_uri(url)
 
     def get_invoices(self, obj):
-        invoices_urls = []
-        if obj.id:
-            invoices = Invoice.objects.filter(reference_id=obj.id, product_id=Order.DOCTOR_PRODUCT_ID)
-            for invoice in invoices:
-                invoices_urls.append(util_absolute_url(invoice.file.url))
-        return invoices_urls
+        return obj.get_invoice_urls()
+
+    def get_reports(self, obj):
+        return []
 
 
 class OpdAppModelSerializer(serializers.ModelSerializer):
@@ -1099,17 +1098,21 @@ class AppointmentRetrieveSerializer(OpdAppointmentSerializer):
     hospital = HospitalModelSerializer()
     doctor = AppointmentRetrieveDoctorSerializer()
     procedures = serializers.SerializerMethodField()
+    invoices = serializers.SerializerMethodField()
 
     class Meta:
         model = OpdAppointment
         fields = ('id', 'patient_image', 'patient_name', 'type', 'profile', 'otp', 'is_rated', 'rating_declined',
                   'allowed_action', 'effective_price', 'deal_price', 'status', 'time_slot_start', 'time_slot_end',
-                  'doctor', 'hospital', 'allowed_action', 'doctor_thumbnail', 'patient_thumbnail', 'procedures', 'mrp')
+                  'doctor', 'hospital', 'allowed_action', 'doctor_thumbnail', 'patient_thumbnail', 'procedures', 'mrp', 'invoices')
 
     def get_procedures(self, obj):
         if obj:
             return OpdAppointmentProcedureMappingSerializer(obj.procedure_mappings.all().select_related('procedure'), many=True).data
         return []
+
+    def get_invoices(self, obj):
+        return obj.get_invoice_urls()
 
 
 class DoctorAppointmentRetrieveSerializer(OpdAppointmentSerializer):
