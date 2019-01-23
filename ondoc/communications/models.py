@@ -357,35 +357,18 @@ class EMAILNotification:
             body_template = "email/prescription_uploaded/body.html"
             subject_template = "email/prescription_uploaded/subject.txt"
         elif notification_type == NotificationAction.DOCTOR_INVOICE:
-
-            invoice, created = Invoice.objects.get_or_create(reference_id=context.get("instance").id,
-                                                             product_id=Order.DOCTOR_PRODUCT_ID)
-            context.update({"invoice": invoice})
-            html_body = render_to_string("email/doctor_invoice/invoice_template.html", context=context)
-            filename = "invoice_{}_{}.pdf".format(str(timezone.now().strftime("%I%M_%d%m%Y")),
-                                                  random.randint(1111111111, 9999999999))
-            try:
-                extra_args = {
-                    'virtual-time-budget': 6000
-                }
-                temp_pdf_file = TemporaryUploadedFile(filename, 'byte', 1000, 'utf-8')
-                file = open(temp_pdf_file.temporary_file_path())
-                bytestring_to_pdf(html_body.encode(), file, **extra_args)
-                file.seek(0)
-                file.flush()
-                file.content_type = 'application/pdf'
-                invoice.file = InMemoryUploadedFile(temp_pdf_file, None, filename, 'application/pdf',
-                                                    temp_pdf_file.tell(), None)
-                invoice.save()
-            except Exception as e:
-                logger.error("Got error while creating pdf for opd invoice {}".format(e))
-            context.update({"invoice_url": invoice.file.url})
+            invoices = context.get("instance").generate_invoice(context)
+            if not invoices:
+                logger.error("Got error while creating pdf for opd invoice")
+                return '', ''
+            context.update({"invoice": invoices[0]})
+            context.update({"invoice_url": invoices[0].file.url})
             context.update(
                 {"attachments": [
-                    {"filename": util_file_name(invoice.file.url), "path": util_absolute_url(invoice.file.url)}]})
+                    {"filename": util_file_name(invoices[0].file.url),
+                     "path": util_absolute_url(invoices[0].file.url)}]})
             body_template = "email/doctor_invoice/body.html"
             subject_template = "email/doctor_invoice/subject.txt"
-
         elif notification_type == NotificationAction.LAB_APPOINTMENT_ACCEPTED:
             body_template = "email/lab/appointment_accepted/body.html"
             subject_template = "email/lab/appointment_accepted/subject.txt"
@@ -414,33 +397,17 @@ class EMAILNotification:
             body_template = "email/lab/lab_report_uploaded/body.html"
             subject_template = "email/lab/lab_report_uploaded/subject.txt"
         elif notification_type == NotificationAction.LAB_INVOICE:
-            invoice, created = Invoice.objects.get_or_create(reference_id=context.get("instance").id,
-                                                             product_id=Order.LAB_PRODUCT_ID)
-            context.update({"invoice": invoice})
-            html_body = render_to_string("email/lab_invoice/invoice_template.html", context=context)
-            filename = "invoice_{}_{}.pdf".format(str(timezone.now().strftime("%I%M_%d%m%Y")),
-                                                  random.randint(1111111111, 9999999999))
-            try:
-                extra_args = {
-                    'virtual-time-budget': 6000
-                }
-                temp_pdf_file = TemporaryUploadedFile(filename, 'byte', 1000, 'utf-8')
-                file = open(temp_pdf_file.temporary_file_path())
-                bytestring_to_pdf(html_body.encode(), file, **extra_args)
-                file.seek(0)
-                file.flush()
-                file.content_type = 'application/pdf'
-                invoice.file = InMemoryUploadedFile(temp_pdf_file, None, filename, 'application/pdf',
-                                                    temp_pdf_file.tell(), None)
-                invoice.save()
-            except Exception as e:
-                logger.error("Got error while creating pdf for opd invoice {}".format(e))
-            context.update({"invoice_url": invoice.file.url})
+            invoices = context.get("instance").generate_invoice(context)
+            if not invoices:
+                logger.error("Got error while creating pdf for lab invoice")
+                return '', ''
+            context.update({"invoice": invoices[0]})
+            context.update({"invoice_url": invoices[0].file.url})
             context.update(
-                {"attachments": [{"filename": util_file_name(invoice.file.url), "path": util_absolute_url(invoice.file.url)}]})
+                {"attachments": [{"filename": util_file_name(invoices[0].file.url),
+                                  "path": util_absolute_url(invoices[0].file.url)}]})
             body_template = "email/lab_invoice/body.html"
             subject_template = "email/lab_invoice/subject.txt"
-
         elif notification_type == NotificationAction.LAB_REPORT_SEND_VIA_CRM:
             attachments = []
             for report_link in context.get('reports', []):
@@ -452,6 +419,8 @@ class EMAILNotification:
         return subject_template, body_template
 
     def trigger(self, receiver, template, context):
+        if not template[0] and not template[1]:
+            return
         cc = []
         bcc = [settings.PROVIDER_EMAIL]
         attachments = context.get('attachments', [])
@@ -637,10 +606,11 @@ class OpdNotification(Notification):
         all_receivers = {}
         instance = self.appointment
         receivers = []
+        doctor_spocs_app_recievers = []
         notification_type = self.notification_type
         if not instance or not instance.user:
             return receivers
-        # doctor_spocs = GenericAdmin.get_appointment_admins(instance)
+        
         doctor_spocs = instance.hospital.get_spocs_for_communication() if instance.hospital else []
         spocs_to_be_communicated = []
         if notification_type in [NotificationAction.APPOINTMENT_ACCEPTED,
@@ -653,6 +623,7 @@ class OpdNotification(Notification):
                                    NotificationAction.APPOINTMENT_BOOKED,
                                    NotificationAction.APPOINTMENT_CANCELLED]:
             spocs_to_be_communicated = doctor_spocs
+            doctor_spocs_app_recievers = GenericAdmin.get_appointment_admins(instance)
             # receivers.extend(doctor_spocs)
             receivers.append(instance.user)
         receivers = list(set(receivers))
@@ -661,8 +632,9 @@ class OpdNotification(Notification):
         app_receivers = receivers
         user_and_tokens = []
 
+        push_recievers = receivers+doctor_spocs_app_recievers
         user_and_token = [{'user': token.user, 'token': token.token} for token in
-                          NotificationEndpoint.objects.filter(user__in=receivers).order_by('user')]
+                          NotificationEndpoint.objects.filter(user__in=push_recievers).order_by('user')]
         for user, user_token_group in groupby(user_and_token, key=lambda x: x['user']):
             user_and_tokens.append({'user': user, 'tokens': [t['token'] for t in user_token_group]})
 
@@ -694,7 +666,7 @@ class OpdNotification(Notification):
         user_and_email.extend(spoc_emails)
         all_receivers['sms_receivers'] = user_and_phone_number
         all_receivers['email_receivers'] = user_and_email
-        all_receivers['app_receivers'] = app_receivers
+        all_receivers['app_receivers'] = app_receivers + doctor_spocs_app_recievers
         all_receivers['push_receivers'] = user_and_tokens
 
         return all_receivers
@@ -716,12 +688,7 @@ class LabNotification(Notification):
         est = pytz.timezone(settings.TIME_ZONE)
         time_slot_start = self.appointment.time_slot_start.astimezone(est)
         tests = self.appointment.get_tests_and_prices()
-        reports = instance.reports.all()
-        report_file_links = set()
-        for report in reports:
-            report_file_links = report_file_links.union(
-                set([report_file.name.url for report_file in report.files.all()]))
-        report_file_links = [util_absolute_url(report_file_link) for report_file_link in report_file_links]
+        report_file_links = instance.get_report_urls()
         for test in tests:
             test['mrp'] = str(test['mrp'])
             test['deal_price'] = str(test['deal_price'])

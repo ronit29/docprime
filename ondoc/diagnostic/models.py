@@ -3,8 +3,10 @@ from copy import deepcopy
 from django.contrib.gis.db import models
 from django.contrib.staticfiles.templatetags.staticfiles import static
 from django.core.validators import MaxValueValidator, MinValueValidator, FileExtensionValidator
+from django.template.loader import render_to_string
+from hardcopy import bytestring_to_pdf
 
-from ondoc.account.models import MerchantPayout, ConsumerAccount, Order, UserReferred
+from ondoc.account.models import MerchantPayout, ConsumerAccount, Order, UserReferred, Invoice
 from ondoc.authentication.models import (TimeStampedModel, CreatedByModel, Image, Document, QCModel, UserProfile, User,
                                          UserPermission, GenericAdmin, LabUserPermission, GenericLabAdmin,
                                          BillingAccount, SPOCDetails)
@@ -14,7 +16,8 @@ from ondoc.notification import models as notification_models
 from ondoc.notification import tasks as notification_tasks
 from ondoc.notification.labnotificationaction import LabNotificationAction
 from django.core.files.storage import get_storage_class
-from ondoc.api.v1.utils import AgreedPriceCalculate, DealPriceCalculate, TimeSlotExtraction, CouponsMixin
+from ondoc.api.v1.utils import AgreedPriceCalculate, DealPriceCalculate, TimeSlotExtraction, CouponsMixin, \
+    util_absolute_url, html_to_pdf
 from ondoc.account import models as account_model
 from django.utils import timezone
 from datetime import timedelta
@@ -24,7 +27,7 @@ from django.contrib.postgres.fields import JSONField
 from ondoc.doctor.models import OpdAppointment
 from ondoc.payout.models import Outstanding
 from ondoc.authentication import models as auth_model
-from django.core.files.uploadedfile import InMemoryUploadedFile
+from django.core.files.uploadedfile import InMemoryUploadedFile, TemporaryUploadedFile
 from io import BytesIO
 import datetime
 from ondoc.api.v1.utils import get_start_end_datetime, custom_form_datetime
@@ -865,8 +868,33 @@ class AvailableLabTest(TimeStampedModel):
         ]
 
 
+class LabAppointmentInvoiceMixin(object):
+    def generate_invoice(self, context=None):
+        invoices = self.get_invoice_objects()
+        if not invoices:
+            if not context:
+                from ondoc.communications.models import LabNotification
+                lab_notification = LabNotification(self)
+                context = lab_notification.get_context()
+            invoice = Invoice.objects.create(reference_id=context.get("instance").id,
+                                             product_id=Order.LAB_PRODUCT_ID)
+            context = deepcopy(context)
+            context['invoice'] = invoice
+            html_body = render_to_string("email/lab_invoice/invoice_template.html", context=context)
+            filename = "invoice_{}_{}.pdf".format(str(timezone.now().strftime("%I%M_%d%m%Y")),
+                                                  random.randint(1111111111, 9999999999))
+            file = html_to_pdf(html_body, filename)
+            if not file:
+                logger.error("Got error while creating pdf for lab invoice.")
+                return []
+            invoice.file = file
+            invoice.save()
+            invoices = [invoice]
+        return invoices
+
+
 @reversion.register()
-class LabAppointment(TimeStampedModel, CouponsMixin):
+class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin):
     CREATED = 1
     BOOKED = 2
     RESCHEDULED_LAB = 3
@@ -938,7 +966,25 @@ class LabAppointment(TimeStampedModel, CouponsMixin):
 
         return test_price
 
+    def get_invoice_objects(self):
+        return Invoice.objects.filter(reference_id=self.id, product_id=Order.LAB_PRODUCT_ID)
 
+    def get_invoice_urls(self):
+        invoices_urls = []
+        if self.id:
+            invoices = self.get_invoice_objects()
+            for invoice in invoices:
+                invoices_urls.append(util_absolute_url(invoice.file.url))
+        return invoices_urls
+
+    def get_report_urls(self):
+        reports = self.reports.all()
+        report_file_links = set()
+        for report in reports:
+            report_file_links = report_file_links.union(
+                set([report_file.name.url for report_file in report.files.all()]))
+        report_file_links = [util_absolute_url(report_file_link) for report_file_link in report_file_links]
+        return list(report_file_links)
 
     def get_reports(self):
         return self.reports.all()

@@ -9,8 +9,9 @@ from ondoc.doctor.models import (Doctor, Language, MedicalService, Specializatio
                                  MedicalCondition, AboutDoctor, HealthTip, CommonMedicalCondition, CommonSpecialization,
                                  DoctorClinic, DoctorMapping, DoctorImage, OpdAppointment, CompetitorInfo,
                                  SpecializationDepartment, SpecializationField, PracticeSpecialization,
-                                 VisitReason, CancellationReason, PracticeSpecializationContent,
+                                 VisitReason, CancellationReason, PracticeSpecializationContent, OfflinePatients, OfflineOPDAppointments,
                                  DoctorMobileOtp, UploadDoctorData)
+
 from ondoc.diagnostic.models import (Lab, LabNetwork, LabTest, LabTestType,LabService,
                                       AvailableLabTest, LabAppointment, CommonTest, CommonDiagnosticCondition, LabPricingGroup,
                                      TestParameter, CommonPackage, LabTestCategory)
@@ -28,7 +29,8 @@ from .doctor import (DoctorAdmin, MedicalServiceAdmin, SpecializationAdmin, Qual
                      CollegeAdmin, MedicalConditionAdmin, HealthTipAdmin, DoctorClinicAdmin,
                      DoctorMappingAdmin, DoctorImageAdmin, DoctorOpdAppointmentAdmin, CommonSpecializationAdmin,
                      SpecializationFieldAdmin, SpecializationDepartmentAdmin, PracticeSpecializationAdmin,
-                     CompetitorInfoImportAdmin, VisitReasonAdmin, PracticeSpecializationContentAdmin, UploadDoctorDataAdmin)
+                     CompetitorInfoImportAdmin, VisitReasonAdmin, PracticeSpecializationContentAdmin, OfflinePatientAdmin,
+                     UploadDoctorDataAdmin)
 from .aboutdoctor import AboutDoctorAdmin
 from .hospital import HospitalAdmin
 from .user import CustomUserAdmin
@@ -94,6 +96,8 @@ admin.site.register(CommonSpecialization, CommonSpecializationAdmin)
 admin.site.register(Specialization, SpecializationAdmin)
 admin.site.register(MedicalCondition, MedicalConditionAdmin)
 admin.site.register(HealthTip, HealthTipAdmin)
+admin.site.register(OfflinePatients, OfflinePatientAdmin)
+admin.site.register(OfflineOPDAppointments)
 
 admin.site.register(College, CollegeAdmin)
 admin.site.register(HospitalNetwork, HospitalNetworkAdmin)

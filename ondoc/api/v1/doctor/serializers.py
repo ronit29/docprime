@@ -9,8 +9,8 @@ from ondoc.doctor.models import (OpdAppointment, Doctor, Hospital, DoctorHospita
                                  DoctorAward, DoctorDocument, DoctorEmail, DoctorExperience, DoctorImage,
                                  DoctorLanguage, DoctorMedicalService, DoctorMobile, DoctorQualification, DoctorLeave,
                                  Prescription, PrescriptionFile, Specialization, DoctorSearchResult, HealthTip,
-                                 CommonMedicalCondition,CommonSpecialization, 
-                                 DoctorPracticeSpecialization, DoctorClinic)
+                                 CommonMedicalCondition,CommonSpecialization,
+                                 DoctorPracticeSpecialization, DoctorClinic, OfflineOPDAppointments, OfflinePatients)
 from ondoc.diagnostic import models as lab_models
 from ondoc.authentication.models import UserProfile, DoctorNumber, GenericAdmin, GenericLabAdmin
 from django.db.models import Avg
@@ -96,6 +96,7 @@ class OpdAppointmentSerializer(serializers.ModelSerializer):
     invoices = serializers.SerializerMethodField()
     type = serializers.ReadOnlyField(default='doctor')
     allowed_action = serializers.SerializerMethodField()
+    reports = serializers.SerializerMethodField()
 
     def get_allowed_action(self, obj):
         request = self.context.get('request')
@@ -105,7 +106,7 @@ class OpdAppointmentSerializer(serializers.ModelSerializer):
         model = OpdAppointment
         fields = ('id', 'doctor_name', 'hospital_name', 'patient_name', 'patient_image', 'type',
                   'allowed_action', 'effective_price', 'deal_price', 'status', 'time_slot_start',
-                  'time_slot_end', 'doctor_thumbnail', 'patient_thumbnail', 'display_name', 'invoices')
+                  'time_slot_end', 'doctor_thumbnail', 'patient_thumbnail', 'display_name', 'invoices', 'reports')
 
     def get_patient_image(self, obj):
         if obj.profile and obj.profile.profile_image:
@@ -132,12 +133,10 @@ class OpdAppointmentSerializer(serializers.ModelSerializer):
             # return request.build_absolute_uri(url)
 
     def get_invoices(self, obj):
-        invoices_urls = []
-        if obj.id:
-            invoices = Invoice.objects.filter(reference_id=obj.id, product_id=Order.DOCTOR_PRODUCT_ID)
-            for invoice in invoices:
-                invoices_urls.append(util_absolute_url(invoice.file.url))
-        return invoices_urls
+        return obj.get_invoice_urls()
+
+    def get_reports(self, obj):
+        return []
 
 
 class OpdAppModelSerializer(serializers.ModelSerializer):
@@ -1061,8 +1060,8 @@ class DoctorProfileUserViewSerializer(DoctorProfileSerializer):
 
 
 class DoctorAvailabilityTimingSerializer(serializers.Serializer):
-    doctor_id = serializers.PrimaryKeyRelatedField(queryset=Doctor.objects.filter(is_live=True))
-    hospital_id = serializers.PrimaryKeyRelatedField(queryset=Hospital.objects.filter(is_live=True))
+    doctor_id = serializers.PrimaryKeyRelatedField(queryset=Doctor.objects.filter(is_live=True), required=False)
+    hospital_id = serializers.PrimaryKeyRelatedField(queryset=Hospital.objects.filter(is_live=True), required=False)
 
 
 class DoctorTimeSlotSerializer(serializers.Serializer):
@@ -1099,17 +1098,21 @@ class AppointmentRetrieveSerializer(OpdAppointmentSerializer):
     hospital = HospitalModelSerializer()
     doctor = AppointmentRetrieveDoctorSerializer()
     procedures = serializers.SerializerMethodField()
+    invoices = serializers.SerializerMethodField()
 
     class Meta:
         model = OpdAppointment
         fields = ('id', 'patient_image', 'patient_name', 'type', 'profile', 'otp', 'is_rated', 'rating_declined',
                   'allowed_action', 'effective_price', 'deal_price', 'status', 'time_slot_start', 'time_slot_end',
-                  'doctor', 'hospital', 'allowed_action', 'doctor_thumbnail', 'patient_thumbnail', 'procedures', 'mrp')
+                  'doctor', 'hospital', 'allowed_action', 'doctor_thumbnail', 'patient_thumbnail', 'procedures', 'mrp', 'invoices')
 
     def get_procedures(self, obj):
         if obj:
             return OpdAppointmentProcedureMappingSerializer(obj.procedure_mappings.all().select_related('procedure'), many=True).data
         return []
+
+    def get_invoices(self, obj):
+        return obj.get_invoice_urls()
 
 
 class DoctorAppointmentRetrieveSerializer(OpdAppointmentSerializer):
@@ -1367,4 +1370,92 @@ class DoctorDetailsRequestSerializer(serializers.Serializer):
                 return attrs
         except:
             raise serializers.ValidationError('Invalid Hospital ID.')
-        raise serializers.ValidationError('Invalid Hospital ID.')
+
+
+class OfflinePatientBodySerializer(serializers.Serializer):
+    name = serializers.CharField(max_length=24)
+    sms_notification = serializers.BooleanField(required=False)
+    share_with_hospital = serializers.BooleanField(required=False)
+    gender = serializers.ChoiceField(choices=OfflinePatients.GENDER_CHOICES, required=False, allow_null=True)
+    dob = serializers.DateField(required=False, format="%Y-%m-%d", allow_null=True)
+    calculated_dob = serializers.DateField(required=False, format="%Y-%m-%d", allow_null=True)
+    referred_by = serializers.ChoiceField(choices=OfflinePatients.REFERENCE_CHOICES, required=False, allow_null=True)
+    medical_history = serializers.CharField(required=False, max_length=256, allow_null=True)
+    welcome_message = serializers.CharField(required=False, max_length=256)
+    display_welcome_message = serializers.BooleanField(required=False)
+    phone_number = serializers.ListField(required=False)
+    id = serializers.UUIDField()
+    age = serializers.IntegerField(required=False)
+
+
+class OfflinePatientExplicitSerializer(OfflinePatientBodySerializer):
+    doctor = serializers.PrimaryKeyRelatedField(queryset=Doctor.objects.all())
+    hospital = serializers.PrimaryKeyRelatedField(queryset=Hospital.objects.all(), required=False)
+
+
+class OfflineAppointmentBodySerializer(serializers.Serializer):
+    patient = OfflinePatientBodySerializer(many=False, allow_null=True, required=False)
+    doctor = serializers.PrimaryKeyRelatedField(queryset=Doctor.objects.all())
+    hospital = serializers.PrimaryKeyRelatedField(queryset=Hospital.objects.all())
+    time_slot_start = serializers.DateTimeField()
+    id = serializers.CharField()
+
+
+class OfflineAppointmentUpdateBodySerializer(OfflineAppointmentBodySerializer):
+    status = serializers.IntegerField()
+    is_docprime = serializers.BooleanField()
+
+
+class OfflineAppointmentCreateSerializer(serializers.Serializer):
+    data = OfflineAppointmentBodySerializer(many=True)
+
+
+class OfflineAppointmentUpdateSerializer(serializers.Serializer):
+    data = OfflineAppointmentUpdateBodySerializer(many=True)
+
+
+class OfflinePatientCreateSerializer(serializers.Serializer):
+    data = OfflinePatientExplicitSerializer(many=True)
+
+
+class GetOfflinePatientsSerializer(serializers.Serializer):
+    doctor_id = serializers.PrimaryKeyRelatedField(queryset=Doctor.objects.filter(is_live=True), required=False)
+    hospital_id = serializers.PrimaryKeyRelatedField(queryset=Hospital.objects.filter(is_live=True), required=False)
+    updated_at = serializers.DateField(format="%Y-%m-%d", required=False)
+
+
+class OfflineAppointmentFilterSerializer(serializers.Serializer):
+    start_date = serializers.DateField(format="%Y-%m-%d", required=False)
+    end_date = serializers.DateField(format="%Y-%m-%d", required=False)
+    updated_at = serializers.DateField(format="%Y-%m-%d", required=False)
+    appointment_id = serializers.CharField(required=False)
+
+
+class OfflinePatientSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = OfflinePatients
+        fields = ('id', 'name', 'dob', 'calculated_dob', 'gender', 'referred_by', 'display_welcome_message',
+                  'share_with_hospital', 'sms_notification', 'medical_history', 'updated_at')
+
+
+class AppointmentMessageSerializer(serializers.Serializer):
+    REMINDER = 1
+    DIRECTIONS = 2
+
+    type_choices = ((REMINDER, "Reminder"), (DIRECTIONS, "Directions"))
+
+    type = serializers.ChoiceField(choices=type_choices)
+    id = serializers.CharField()
+    is_docprime = serializers.BooleanField()
+
+    def validate(self, attrs):
+        from ondoc.doctor.models import OpdAppointment, OfflineOPDAppointments
+
+        if attrs.get('is_docprime'):
+            query = OpdAppointment.objects.filter(id=attrs['id'])
+        else:
+            query = OfflineOPDAppointments.objects.filter(id=attrs['id'])
+        if not query.exists():
+            raise serializers.ValidationError('Appointment Id Not Found')
+        attrs['appointment'] = query.first()
+        return attrs
