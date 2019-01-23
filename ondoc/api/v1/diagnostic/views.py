@@ -80,6 +80,7 @@ class SearchPageViewSet(viewsets.ReadOnlyModelViewSet):
         condition_serializer = diagnostic_serializer.CommonConditionsSerializer(conditions_queryset, many=True)
         temp_data = dict()
         temp_data['common_tests'] = test_serializer.data
+        temp_data['recommended_package'] = {}
         temp_data['common_package'] = package_serializer.data
         temp_data['preferred_labs'] = lab_serializer.data
         temp_data['common_conditions'] = condition_serializer.data

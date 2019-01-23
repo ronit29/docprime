@@ -843,6 +843,18 @@ class LabTest(TimeStampedModel, SearchKey):
                                         through=LabTestCategoryMapping,
                                         through_fields=('lab_test', 'parent_category'),
                                         related_name='lab_tests')
+    min_age = models.PositiveSmallIntegerField(default=None, blank=True, null=True)
+    max_age = models.PositiveSmallIntegerField(default=None, blank=True, null=True)
+    MALE = 1
+    FEMALE = 2
+    ALL = 3
+    GENDER_TYPE_CHOICES = (
+	    ('', 'Select'),
+        (MALE, 'male'),
+        (FEMALE, 'female'),
+        (ALL, 'all')
+    )
+    gender_type = models.PositiveIntegerField(choices=GENDER_TYPE_CHOICES, blank=True, null=True)
 
     # test_sub_type = models.ManyToManyField(
     #     LabTestSubType,
