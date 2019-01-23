@@ -2228,15 +2228,18 @@ class OfflineCustomerViewSet(viewsets.GenericViewSet):
 
         for data in valid_data['data']:
             if data.get('id') in patient_ids:
-                obj = {'doctor': data.get('doctor').id,
-                       'hospital': data.get('hospital').id if data.get('hospital') else None,
-                       'id': data.get('id'),
-                       'error': True,
-                       'error_message': "Patient With Same UUid exists!"}
-                resp.append(obj)
-                logger.error("Patient With Same UUid exists! " + str(data))
-                continue
-            patient_data = self.create_patient(request, data, data.get('hospital'), data.get('doctor'))
+                # obj = {'doctor': data.get('doctor').id,
+                #        'hospital': data.get('hospital').id if data.get('hospital') else None,
+                #        'id': data.get('id'),
+                #        'error': True,
+                #        'error_message': "Patient With Same UUid exists!"}
+                # resp.append(obj)
+                # logger.error("Patient With Same UUid exists! " + str(data))
+                # continue
+
+                patient_data = self.update_patient(request, data, data.get('hospital'), data.get('doctor'))
+            else:
+                patient_data = self.create_patient(request, data, data.get('hospital'), data.get('doctor'))
             patient = patient_data['patient']
             if patient_data['sms_list'] is not None:
                 sms_list.append(patient_data['sms_list'])
@@ -2250,7 +2253,7 @@ class OfflineCustomerViewSet(viewsets.GenericViewSet):
             resp.append(ret_obj)
 
             if sms_list:
-                transaction.on_commit(lambda: models.OfflinePatients.after_commit_sms(sms_list))
+                transaction.on_commit(lambda: models.OfflineOPDAppointments.after_commit_create_sms(sms_list))
 
         return Response(resp)
 
