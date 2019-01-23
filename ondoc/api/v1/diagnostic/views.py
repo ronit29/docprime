@@ -173,6 +173,10 @@ class LabList(viewsets.ReadOnlyModelViewSet):
         max_distance = validated_data.get('max_distance')
         min_price = validated_data.get('min_price')
         max_price = validated_data.get('max_price')
+        max_age = validated_data.get('max_age')
+        min_age = validated_data.get('min_age')
+        gender = validated_data.get('gender')
+        package_type = validated_data.get('package_type')
         sort_on = validated_data.get('sort_on')
         category_ids = validated_data.get('category_ids', None)
         point_string = 'POINT(' + str(long) + ' ' + str(lat) + ')'
@@ -227,6 +231,7 @@ class LabList(viewsets.ReadOnlyModelViewSet):
         )
         all_packages_in_non_network_labs = all_packages_in_non_network_labs.filter(id__in=lab_tests)
         all_packages_in_network_labs = all_packages_in_network_labs.filter(id__in=lab_tests)
+
         if min_distance:
             all_packages_in_non_network_labs = all_packages_in_non_network_labs.filter(distance__gte=min_distance)
             all_packages_in_network_labs = all_packages_in_network_labs.filter(distance__gte=min_distance)
@@ -236,6 +241,21 @@ class LabList(viewsets.ReadOnlyModelViewSet):
         if max_price:
             all_packages_in_non_network_labs = all_packages_in_non_network_labs.filter(price__lte=max_price)
             all_packages_in_network_labs = all_packages_in_network_labs.filter(price__lte=max_price)
+        if max_age:
+            all_packages_in_non_network_labs = all_packages_in_non_network_labs.filter(max_age__lte=max_age)
+            all_packages_in_network_labs = all_packages_in_network_labs.filter(max_age__lte=max_age)
+        if min_age:
+            all_packages_in_non_network_labs = all_packages_in_non_network_labs.filter(min_age__gte=min_age)
+            all_packages_in_network_labs = all_packages_in_network_labs.filter(min_age__gte=min_age)
+        if gender:
+            all_packages_in_non_network_labs = all_packages_in_non_network_labs.filter(gender_type=gender)
+            all_packages_in_network_labs = all_packages_in_network_labs.filter(gender_type=gender)
+        if package_type == 1:
+            all_packages_in_non_network_labs = all_packages_in_non_network_labs.filter(home_collection_possible=True)
+            all_packages_in_network_labs = all_packages_in_network_labs.filter(home_collection_possible=True)
+        if package_type == 2:
+            all_packages_in_non_network_labs = all_packages_in_non_network_labs.filter(home_collection_possible=False)
+            all_packages_in_network_labs = all_packages_in_network_labs.filter(home_collection_possible=False)
         all_packages = [package for package in all_packages_in_network_labs if package.rank == 1]
         all_packages.extend([package for package in all_packages_in_non_network_labs])
         if not sort_on:

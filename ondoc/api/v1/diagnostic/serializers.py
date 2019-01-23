@@ -1122,6 +1122,11 @@ class LabPackageListSerializer(serializers.Serializer):
     max_price = serializers.IntegerField(required=False)
     sort_on = serializers.CharField(required=False)
     category_ids = CommaSepratedToListField(required=False, max_length=500, typecast_to=int)
+    min_age = serializers.IntegerField(required=False)
+    max_age = serializers.IntegerField(required=False)
+    gender = serializers.IntegerField(required=True)
+    package_type = serializers.BooleanField(required=True)
+
 
     def validate_category_ids(self, attrs):
         try:
