@@ -94,7 +94,7 @@ class RatingsGraphSerializer(serializers.Serializer):
                  3: {'count': 0, 'percent': 0},
                  4: {'count': 0, 'percent': 0},
                  5: {'count': 0, 'percent': 0}}
-        total = obj.count()
+        total = len(obj)
         if total:
             for rate in obj:
                 star_data[rate.ratings]['count'] += 1
