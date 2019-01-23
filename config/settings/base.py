@@ -143,6 +143,7 @@ LOCAL_APPS = (
     'ondoc.ckedit',
     'ondoc.screen',
     'ondoc.comments'
+    'ondoc.integrations'
 )
 
 INSTALLED_APPS = DJANGO_APPS + THIRD_PARTY_APPS + LOCAL_APPS
