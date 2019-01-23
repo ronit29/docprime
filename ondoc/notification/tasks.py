@@ -37,8 +37,10 @@ def send_lab_notifications_refactored(appointment_id):
         instance = lab_models.LabAppointment.objects.filter(id=appointment_id).first()
         if not instance or not instance.user:
             return
-        opd_notification = LabNotification(instance)
-        opd_notification.send()
+        if instance.status == lab_models.LabAppointment.COMPLETED:
+            instance.generate_invoice()
+        lab_notification = LabNotification(instance)
+        lab_notification.send()
     except Exception as e:
         logger.error(str(e))
 
@@ -114,7 +116,8 @@ def send_opd_notifications_refactored(appointment_id):
         instance = OpdAppointment.objects.filter(id=appointment_id).first()
         if not instance or not instance.user:
             return
-
+        if instance.status == OpdAppointment.COMPLETED:
+            instance.generate_invoice()
         opd_notification = OpdNotification(instance)
         opd_notification.send()
     except Exception as e:
