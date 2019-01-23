@@ -238,11 +238,19 @@ class LabList(viewsets.ReadOnlyModelViewSet):
         elif sort_on == 'distance':
             all_packages = sorted(all_packages, key=operator.attrgetter('distance'))
         lab_ids = [package.lab for package in all_packages]
+        entity_url_qs = EntityUrls.objects.filter(entity_id__in=lab_ids, is_valid=True, url__isnull=False,
+                                                  sitemap_identifier=EntityUrls.SitemapIdentifier.LAB_PAGE).values(
+            'url', lab_id=F('entity_id'))
+        entity_url_dict = {}
+        for item in entity_url_qs:
+            entity_url_dict.setdefault(item.get('lab_id'), [])
+            entity_url_dict[item.get('lab_id')].append(item.get('url'))
         lab_data = Lab.objects.prefetch_related('rating', 'lab_documents', 'lab_timings', 'network',
                                                 'home_collection_charges').annotate(
             avg_rating=Avg('rating__ratings')).filter(id__in=lab_ids)
         serializer = CustomLabTestPackageSerializer(all_packages, many=True,
-                                                    context={'lab_data': lab_data, 'request': request})
+                                                    context={'entity_url_dict': entity_url_dict, 'lab_data': lab_data,
+                                                             'request': request})
         category_queryset = LabTestCategory.objects.filter(is_package_category=True, is_live=True)
         category_result = []
         for category in category_queryset:
