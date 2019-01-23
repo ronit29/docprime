@@ -136,7 +136,8 @@ LOCAL_APPS = (
     'ondoc.procedure',
     'ondoc.elastic',
     'ondoc.banner',
-    'ondoc.ckedit'
+    'ondoc.ckedit',
+    'ondoc.integrations'
 )
 
 INSTALLED_APPS = DJANGO_APPS + THIRD_PARTY_APPS + LOCAL_APPS
