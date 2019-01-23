@@ -606,10 +606,11 @@ class OpdNotification(Notification):
         all_receivers = {}
         instance = self.appointment
         receivers = []
+        doctor_spocs_app_recievers = []
         notification_type = self.notification_type
         if not instance or not instance.user:
             return receivers
-        # doctor_spocs = GenericAdmin.get_appointment_admins(instance)
+        
         doctor_spocs = instance.hospital.get_spocs_for_communication() if instance.hospital else []
         spocs_to_be_communicated = []
         if notification_type in [NotificationAction.APPOINTMENT_ACCEPTED,
@@ -622,6 +623,7 @@ class OpdNotification(Notification):
                                    NotificationAction.APPOINTMENT_BOOKED,
                                    NotificationAction.APPOINTMENT_CANCELLED]:
             spocs_to_be_communicated = doctor_spocs
+            doctor_spocs_app_recievers = GenericAdmin.get_appointment_admins(instance)
             # receivers.extend(doctor_spocs)
             receivers.append(instance.user)
         receivers = list(set(receivers))
@@ -630,8 +632,9 @@ class OpdNotification(Notification):
         app_receivers = receivers
         user_and_tokens = []
 
+        push_recievers = receivers+doctor_spocs_app_recievers
         user_and_token = [{'user': token.user, 'token': token.token} for token in
-                          NotificationEndpoint.objects.filter(user__in=receivers).order_by('user')]
+                          NotificationEndpoint.objects.filter(user__in=push_recievers).order_by('user')]
         for user, user_token_group in groupby(user_and_token, key=lambda x: x['user']):
             user_and_tokens.append({'user': user, 'tokens': [t['token'] for t in user_token_group]})
 
@@ -663,7 +666,7 @@ class OpdNotification(Notification):
         user_and_email.extend(spoc_emails)
         all_receivers['sms_receivers'] = user_and_phone_number
         all_receivers['email_receivers'] = user_and_email
-        all_receivers['app_receivers'] = app_receivers
+        all_receivers['app_receivers'] = app_receivers + doctor_spocs_app_recievers
         all_receivers['push_receivers'] = user_and_tokens
 
         return all_receivers
