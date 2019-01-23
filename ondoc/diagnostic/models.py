@@ -884,7 +884,7 @@ class LabTest(TimeStampedModel, SearchKey):
     # )
 
     def __str__(self):
-        return self.name
+        return '{} ({})'.format(self.name, "PACKAGE" if self.is_package else "TEST")
 
     class Meta:
         db_table = "lab_test"

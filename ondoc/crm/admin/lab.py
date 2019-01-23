@@ -28,7 +28,9 @@ from ondoc.diagnostic.models import (LabTiming, LabImage,
                                      LabNetwork, Lab, LabOnboardingToken, LabService, LabDoctorAvailability,
                                      LabDoctor, LabDocument, LabTest, DiagnosticConditionLabTest, LabNetworkDocument,
                                      LabAppointment, HomePickupCharges,
-                                     TestParameter, ParameterLabTest, FrequentlyAddedTogetherTests, QuestionAnswer, LabReport, LabReportFile, LabTestCategoryMapping)
+                                     TestParameter, ParameterLabTest, FrequentlyAddedTogetherTests, QuestionAnswer,
+                                     LabReport, LabReportFile, LabTestCategoryMapping,
+                                     LabTestRecommendedCategoryMapping)
 from .common import *
 from ondoc.authentication.models import GenericAdmin, User, QCModel, GenericLabAdmin, AssociatedMerchant
 from ondoc.crm.admin.doctor import CustomDateInput, TimePickerWidget, CreatedByFilter, AutoComplete
@@ -1074,6 +1076,30 @@ class LabTestPackageInline(admin.TabularInline):
             lab_test__is_package=False, package__is_package=True)
 
 
+class LabTestToRecommendedCategoryInlineForm(forms.ModelForm):
+    def clean(self):
+        super().clean()
+        if any(self.errors):
+            return
+        cleaned_data = self.cleaned_data
+        if self.instance and self.instance.lab_test and self.instance.lab_test.is_package:
+            raise forms.ValidationError("Recommended category can only be added on lab test.")
+        temp_recommended_category = cleaned_data.get('parent_category')
+        if temp_recommended_category and not temp_recommended_category.is_package_category:
+            raise forms.ValidationError("Recommended category can only be a lab test package category.")
+
+
+class LabTestRecommendedCategoryInline(AutoComplete, TabularInline):
+    model = LabTestRecommendedCategoryMapping
+    form = LabTestToRecommendedCategoryInlineForm
+    fk_name = 'lab_test'
+    extra = 0
+    can_delete = True
+    autocomplete_fields = ['parent_category']
+    verbose_name = "Recommended Category"
+    verbose_name_plural = "Recommended Categories"
+
+
 class LabTestToParentCategoryInlineFormset(forms.BaseInlineFormSet):
     def clean(self):
         super().clean()
@@ -1151,13 +1177,11 @@ class LabTestAdminForm(forms.ModelForm):
                 raise forms.ValidationError('Please dont enter gender_type')
 
 
-
-
 class LabTestAdmin(PackageAutoCompleteView, ImportExportMixin, VersionAdmin):
     form = LabTestAdminForm
     change_list_template = 'superuser_import_export.html'
     formats = (base_formats.XLS, base_formats.XLSX,)
-    inlines = [LabTestCategoryInline, FAQLabTestInLine, FrequentlyBookedTogetherTestInLine]
+    inlines = [LabTestCategoryInline, LabTestRecommendedCategoryInline, FAQLabTestInLine, FrequentlyBookedTogetherTestInLine]
     search_fields = ['name']
     list_filter = ('is_package', 'enable_for_ppc', 'enable_for_retail')
     exclude = ['search_key']
