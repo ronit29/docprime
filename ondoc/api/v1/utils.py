@@ -5,7 +5,7 @@ from collections import defaultdict
 from operator import itemgetter
 from itertools import groupby
 from django.db import connection, transaction
-from django.db.models import F, Func, Q, Count, Sum
+from django.db.models import F, Func, Q, Count, Sum, Case, When, Value, IntegerField
 from django.utils import timezone
 import math
 import datetime
@@ -28,6 +28,7 @@ from collections import OrderedDict
 import datetime
 from django.utils.dateparse import parse_datetime
 import hashlib
+from ondoc.authentication import models as auth_models
 import logging
 logger = logging.getLogger(__name__)
 
@@ -781,24 +782,8 @@ class TimeSlotExtraction(object):
             return self.EVENING  #, pm
 
     def form_time_string(self, time, am_pm=''):
-
-        day_time_hour = int(time)
-        day_time_min = (time - day_time_hour) * 60
-
-        if day_time_hour > 12:
-            day_time_hour -= 12
-
-        day_time_hour_str = str(int(day_time_hour))
-        if int(day_time_hour) < 10:
-            day_time_hour_str = '0' + str(int(day_time_hour))
-
-        day_time_min_str = str(int(day_time_min))
-        if int(day_time_min) < 10:
-            day_time_min_str = '0' + str(int(day_time_min))
-
-        time_str = day_time_hour_str + ":" + day_time_min_str  # + " " + am_pm
-
-        return time_str
+        time = form_dc_time(time, am_pm)
+        return time
 
     def get_timing_list(self):
         whole_timing_data = dict()
@@ -895,6 +880,126 @@ class GenericAdminEntity():
     EntityChoices = [(DOCTOR, 'Doctor'), (HOSPITAL, 'Hospital'), (LAB, 'Lab')]
 
 
+def get_opd_pem_queryset(user, model):
+
+    # super_user_query = '''CASE WHEN ((SELECT COUNT(id) FROM generic_admin WHERE user_id=%s AND hospital_id=hospital.id AND
+    #                                   super_user_permission=true AND is_disabled=false) > 0) THEN 1  ELSE 0 END'''
+    # appoint_query = '''CASE WHEN ((SELECT COUNT(id) FROM generic_admin WHERE user_id=%s AND hospital_id=hospital.id AND
+    #                              super_user_permission=false AND is_disabled=false AND permission_type=1) > 0) THEN 1  ELSE 0 END'''
+    # billing_query = '''CASE WHEN ((SELECT COUNT(id) FROM generic_admin WHERE user_id=%s AND hospital_id=hospital.id AND
+    #                                super_user_permission=false AND is_disabled=false AND permission_type=2) > 0) THEN 1  ELSE 0 END'''
+    queryset = model.objects \
+        .select_related('doctor', 'hospital', 'user') \
+        .prefetch_related('doctor__manageable_doctors', 'hospital__manageable_hospitals', 'doctor__images',
+                          'doctor__qualifications', 'doctor__qualifications__qualification',
+                          'doctor__qualifications__specialization', 'doctor__qualifications__college',
+                          'doctor__doctorpracticespecializations', 'doctor__doctorpracticespecializations__specialization') \
+        .filter(hospital__is_live=True, doctor__is_live=True) \
+        .filter(
+        Q(
+            Q(doctor__manageable_doctors__user=user,
+              doctor__manageable_doctors__hospital=F('hospital'),
+              doctor__manageable_doctors__is_disabled=False,) |
+            Q(doctor__manageable_doctors__user=user,
+                doctor__manageable_doctors__hospital__isnull=True,
+                doctor__manageable_doctors__is_disabled=False,
+                )
+             |
+            Q(hospital__manageable_hospitals__doctor__isnull=True,
+              hospital__manageable_hospitals__user=user,
+              hospital__manageable_hospitals__is_disabled=False,
+              )
+        ) |
+        Q(
+            Q(doctor__manageable_doctors__user=user,
+              doctor__manageable_doctors__super_user_permission=True,
+              doctor__manageable_doctors__is_disabled=False,
+              doctor__manageable_doctors__entity_type=GenericAdminEntity.DOCTOR, ) |
+            Q(hospital__manageable_hospitals__user=user,
+              hospital__manageable_hospitals__super_user_permission=True,
+              hospital__manageable_hospitals__is_disabled=False,
+              hospital__manageable_hospitals__entity_type=GenericAdminEntity.HOSPITAL)
+        ))\
+    .annotate(pem_type=Case(When(Q(hospital__manageable_hospitals__user=user) &
+                                   Q(hospital__manageable_hospitals__super_user_permission=True) &
+                                   Q(hospital__manageable_hospitals__is_disabled=False), then=Value(3)),
+                              When(Q(hospital__manageable_hospitals__user=user) &
+                                   Q(hospital__manageable_hospitals__super_user_permission=False) &
+                                   Q(hospital__manageable_hospitals__permission_type=auth_models.GenericAdmin.BILLINNG) &
+                                   ~Q(hospital__manageable_hospitals__permission_type=auth_models.GenericAdmin.APPOINTMENT) &
+                                   Q(hospital__manageable_hospitals__is_disabled=False), then=Value(2)),
+                              When(Q(hospital__manageable_hospitals__user=user) &
+                                   Q(hospital__manageable_hospitals__super_user_permission=False) &
+                                   Q(hospital__manageable_hospitals__permission_type=auth_models.GenericAdmin.BILLINNG) &
+                                   Q(hospital__manageable_hospitals__permission_type=auth_models.GenericAdmin.APPOINTMENT) &
+                                   Q(hospital__manageable_hospitals__is_disabled=False), then=Value(3)),
+                              default=Value(1),
+                              output_field=IntegerField()
+                              )
+              )
+    # .extra(select={'super_user': super_user_query, 'appointment_pem': appoint_query, 'billing_pem': billing_query}, params=(user_id, user_id, user_id))
+    return queryset
+
+
+def offline_get_day_slot(time):
+    am = 'AM'
+    pm = 'PM'
+    if time < 12:
+        return am
+    elif time < 16:
+        return pm
+    else:
+        return pm
+
+
+def form_dc_time(time, am_pm):
+    day_time_hour = int(time)
+    day_time_min = (time - day_time_hour) * 60
+
+    if day_time_hour > 12:
+        day_time_hour -= 12
+
+    day_time_hour_str = str(int(day_time_hour))
+    if int(day_time_hour) < 10:
+        day_time_hour_str = '0' + str(int(day_time_hour))
+
+    day_time_min_str = str(int(day_time_min))
+    if int(day_time_min) < 10:
+        day_time_min_str = '0' + str(int(day_time_min))
+
+    time_str = day_time_hour_str + ":" + day_time_min_str + " " + am_pm
+
+    return time_str
+
+
+def offline_form_time_slots(data, timing, is_available=True, is_doctor=True):
+    start = Decimal(str(data['start']))
+    end = Decimal(str(data['end']))
+    time_span = TimeSlotExtraction.TIME_SPAN
+    day = data.get('day')
+
+    float_span = (Decimal(time_span) / Decimal(60))
+    if not timing[day].get('timing'):
+        timing[day] = []
+    temp_start = start
+    while temp_start <= end:
+        am_pm = offline_get_day_slot(temp_start)
+        time_str = form_dc_time(temp_start, am_pm)
+        timing[day].append({'text': time_str,
+                                      'value': temp_start,
+                                      'mrp': data['fees'],
+                                      'deal_price':data['deal_price']}
+                                     )
+        price_available_obj = {"price": data['fees'], "is_available": is_available}
+        if is_doctor:
+            price_available_obj.update({
+                "mrp": data.get('mrp'),
+                "deal_price": data.get('deal_price')
+            })
+        # price_available[day][temp_start] = price_available_obj
+        temp_start += float_span
+    return timing
+
 def create_payout_checksum(all_txn, product_id):
     from ondoc.account.models import Order
 
@@ -926,7 +1031,6 @@ def create_payout_checksum(all_txn, product_id):
     print("checksum string - " + str(checksum) + "checksum hash - " + str(checksum_hash))
     logger.error("checksum string - " + str(checksum) + "checksum hash - " + str(checksum_hash))
     return checksum_hash
-
 
 def html_to_pdf(html_body, filename):
     file = None
@@ -962,3 +1066,4 @@ def util_file_name(filename):
     if filename:
         filename = os.path.basename(filename)
     return filename
+
