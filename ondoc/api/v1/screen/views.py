@@ -65,7 +65,8 @@ class ScreenViewSet(viewsets.GenericViewSet):
 
         payment_options = GetPaymentOptionsViewSet.list(payment_obj, request).data
 
-        resp = {"home":{
+        resp = {"home":
+                    {
                     "show_search_header": show_search_header,
                     "show_footer": show_footer,
                     "grid_list": grid_list,
