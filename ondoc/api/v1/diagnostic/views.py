@@ -757,17 +757,17 @@ class LabList(viewsets.ReadOnlyModelViewSet):
                         deal_price=test.computed_deal_price
                     tests[obj.id].append({"id": test.test_id, "name": test.test.name, "deal_price": deal_price, "mrp": test.mrp})
 
-        day_now = timezone.now().weekday()
-        days_array = [i for i in range(7)]
-        rotated_days_array = days_array[day_now:] + days_array[:day_now]
+        # day_now = timezone.now().weekday()
+        # days_array = [i for i in range(7)]
+        # rotated_days_array = days_array[day_now:] + days_array[:day_now]
         #lab_network = dict()
         for row in queryset:
 
-            lab_timing = list()
-            lab_timing_data = list()
-            next_lab_timing_dict = {}
-            next_lab_timing_data_dict = {}
-            data_array = [list() for i in range(7)]
+            # lab_timing = list()
+            # lab_timing_data = list()
+            # next_lab_timing_dict = {}
+            # next_lab_timing_data_dict = {}
+            # data_array = [list() for i in range(7)]
             lab_obj = temp_var[row["id"]]
             if lab_obj.sublocality and lab_obj.city:
                 row['address'] = lab_obj.sublocality + ' ' + lab_obj.city
@@ -781,37 +781,39 @@ class LabList(viewsets.ReadOnlyModelViewSet):
             row['home_pickup_charges'] = lab_obj.home_pickup_charges
             row['is_home_collection_enabled'] = lab_obj.is_home_collection_enabled
 
-            if lab_obj.always_open:
-                lab_timing = "12:00 AM - 11:45 PM"
-                next_lab_timing_dict = {rotated_days_array[1]: "12:00 AM - 11:45 PM"}
-                lab_timing_data = [{
-                    "start": 0.0,
-                    "end": 23.75
-                }]
-                next_lab_timing_data_dict = {rotated_days_array[1]: {
-                    "start": 0.0,
-                    "end": 23.75
-                }}
-            else:
-                timing_queryset =lab_obj.lab_timings.all()
+            # if lab_obj.always_open:
+            #     lab_timing = "12:00 AM - 11:45 PM"
+            #     next_lab_timing_dict = {rotated_days_array[1]: "12:00 AM - 11:45 PM"}
+            #     lab_timing_data = [{
+            #         "start": 0.0,
+            #         "end": 23.75
+            #     }]
+            #     next_lab_timing_data_dict = {rotated_days_array[1]: {
+            #         "start": 0.0,
+            #         "end": 23.75
+            #     }}
+            # else:
+            #     timing_queryset =lab_obj.lab_timings.all()
+            #
+            #     for data in timing_queryset:
+            #         data_array[data.day].append(data)
+            #
+            #     rotated_data_array = data_array[day_now:] + data_array[:day_now]
+            #
+            #     for count, timing_data in enumerate(rotated_data_array):
+            #         day = rotated_days_array[count]
+            #         if count == 0:
+            #             if timing_data:
+            #                 lab_timing, lab_timing_data = self.get_lab_timing(timing_data)
+            #                 lab_timing_data = sorted(lab_timing_data, key=lambda k: k["start"])
+            #         elif timing_data:
+            #             next_lab_timing, next_lab_timing_data = self.get_lab_timing(timing_data)
+            #             next_lab_timing_data = sorted(next_lab_timing_data, key=lambda k: k["start"])
+            #             next_lab_timing_dict[day] = next_lab_timing
+            #             next_lab_timing_data_dict[day] = next_lab_timing_data
+            #             break
 
-                for data in timing_queryset:
-                    data_array[data.day].append(data)
-
-                rotated_data_array = data_array[day_now:] + data_array[:day_now]
-
-                for count, timing_data in enumerate(rotated_data_array):
-                    day = rotated_days_array[count]
-                    if count == 0:
-                        if timing_data:
-                            lab_timing, lab_timing_data = self.get_lab_timing(timing_data)
-                            lab_timing_data = sorted(lab_timing_data, key=lambda k: k["start"])
-                    elif timing_data:
-                        next_lab_timing, next_lab_timing_data = self.get_lab_timing(timing_data)
-                        next_lab_timing_data = sorted(next_lab_timing_data, key=lambda k: k["start"])
-                        next_lab_timing_dict[day] = next_lab_timing
-                        next_lab_timing_data_dict[day] = next_lab_timing_data
-                        break
+            lab_timing, lab_timing_data, next_lab_timing_dict, next_lab_timing_data_dict = lab_obj.lab_timings_today_and_next()[0:4]
 
             if lab_obj.home_collection_charges.exists():
                 row["distance_related_charges"] = 1
@@ -901,7 +903,7 @@ class LabList(viewsets.ReadOnlyModelViewSet):
         # for Demo
         demo_lab_test = AvailableLabTest.objects.filter(test__enable_for_retail=True, lab_pricing_group=lab_obj.lab_pricing_group, enabled=True).order_by("-test__priority").prefetch_related('test')[:2]
         lab_test_serializer = diagnostic_serializer.AvailableLabTestSerializer(demo_lab_test, many=True, context={"lab": lab_obj})
-        day_now = timezone.now().weekday()
+        # day_now = timezone.now().weekday()
         timing_queryset = list()
         lab_serializable_data = list()
         lab_timing = None
@@ -916,8 +918,8 @@ class LabList(viewsets.ReadOnlyModelViewSet):
                 "end": 23.75
             }]
         else:
-            timing_queryset = lab_obj.lab_timings.filter(day=day_now)
-            lab_timing, lab_timing_data = self.get_lab_timing(timing_queryset)
+            # timing_queryset = lab_obj.lab_timings.filter(day=day_now)
+            lab_timing, lab_timing_data = lab_obj.lab_timings_today_and_next()[0:2]
 
         # entity = EntityUrls.objects.filter(entity_id=lab_id, url_type='PAGEURL', is_valid='t',
         #                                    entity_type__iexact='Lab')
@@ -948,34 +950,34 @@ class LabList(viewsets.ReadOnlyModelViewSet):
 
         return Response(temp_data)
 
-    def get_lab_timing(self, queryset):
-        lab_timing = ''
-        lab_timing_data = list()
-        temp_list = list()
-
-        for qdata in queryset:
-            temp_list.append({"start": qdata.start, "end": qdata.end})
-
-        temp_list = sorted(temp_list, key=lambda k: k["start"])
-
-        index = 0
-        while index < len(temp_list):
-            temp_dict = dict()
-            x = index
-            if not lab_timing:
-                lab_timing += self.convert_time(temp_list[index]["start"]) + " - "
-            else:
-                lab_timing += " | " + self.convert_time(temp_list[index]["start"]) + " - "
-            temp_dict["start"] = temp_list[index]["start"]
-            while x + 1 < len(temp_list) and temp_list[x]["end"] >= temp_list[x+1]["start"]:
-                x += 1
-            index = x
-            lab_timing += self.convert_time(temp_list[index]["end"])
-            temp_dict["end"] = temp_list[index]["end"]
-            lab_timing_data.append(temp_dict)
-            index += 1
-
-        return lab_timing, lab_timing_data
+    # def get_lab_timing(self, queryset):
+    #     lab_timing = ''
+    #     lab_timing_data = list()
+    #     temp_list = list()
+    #
+    #     for qdata in queryset:
+    #         temp_list.append({"start": qdata.start, "end": qdata.end})
+    #
+    #     temp_list = sorted(temp_list, key=lambda k: k["start"])
+    #
+    #     index = 0
+    #     while index < len(temp_list):
+    #         temp_dict = dict()
+    #         x = index
+    #         if not lab_timing:
+    #             lab_timing += self.convert_time(temp_list[index]["start"]) + " - "
+    #         else:
+    #             lab_timing += " | " + self.convert_time(temp_list[index]["start"]) + " - "
+    #         temp_dict["start"] = temp_list[index]["start"]
+    #         while x + 1 < len(temp_list) and temp_list[x]["end"] >= temp_list[x+1]["start"]:
+    #             x += 1
+    #         index = x
+    #         lab_timing += self.convert_time(temp_list[index]["end"])
+    #         temp_dict["end"] = temp_list[index]["end"]
+    #         lab_timing_data.append(temp_dict)
+    #         index += 1
+    #
+    #     return lab_timing, lab_timing_data
 
     def convert_time(self, time):
         hour = int(time)
@@ -1138,48 +1140,51 @@ class LabList(viewsets.ReadOnlyModelViewSet):
                     else:
                         deal_price=test.computed_deal_price
                     tests[obj.id].append({"id": test.test_id, "name": test.test.name, "deal_price": deal_price, "mrp": test.mrp})
-        day_now = timezone.now().weekday()
-        days_array = [i for i in range(7)]
-        rotated_days_array = days_array[day_now:] + days_array[:day_now]
+        # day_now = timezone.now().weekday()
+        # days_array = [i for i in range(7)]
+        # rotated_days_array = days_array[day_now:] + days_array[:day_now]
         for row in queryset:
-            lab_timing = list()
-            lab_timing_data = list()
-            next_lab_timing_dict = {}
-            next_lab_timing_data_dict = {}
-            data_array = [list() for i in range(7)]
+        #     lab_timing = list()
+        #     lab_timing_data = list()
+        #     next_lab_timing_dict = {}
+        #     next_lab_timing_data_dict = {}
+        #     data_array = [list() for i in range(7)]
             row["lab"] = temp_var[row["id"]]
+        #
+        #     if row["lab"].always_open:
+        #         lab_timing = "12:00 AM - 11:45 PM"
+        #         next_lab_timing_dict = {rotated_days_array[1]: "12:00 AM - 11:45 PM"}
+        #         lab_timing_data = [{
+        #             "start": 0.0,
+        #             "end": 23.75
+        #         }]
+        #         next_lab_timing_data_dict = {rotated_days_array[1]: {
+        #             "start": 0.0,
+        #             "end": 23.75
+        #         }}
+        #     else:
+        #         timing_queryset = row["lab"].lab_timings.all()
+        #
+        #         for data in timing_queryset:
+        #             data_array[data.day].append(data)
+        #
+        #         rotated_data_array = data_array[day_now:] + data_array[:day_now]
+        #
+        #         for count, timing_data in enumerate(rotated_data_array):
+        #             day = rotated_days_array[count]
+        #             if count == 0:
+        #                 if timing_data:
+        #                     lab_timing, lab_timing_data = self.get_lab_timing(timing_data)
+        #                     lab_timing_data = sorted(lab_timing_data, key=lambda k: k["start"])
+        #             elif timing_data:
+        #                 next_lab_timing, next_lab_timing_data = self.get_lab_timing(timing_data)
+        #                 next_lab_timing_data = sorted(next_lab_timing_data, key=lambda k: k["start"])
+        #                 next_lab_timing_dict[day] = next_lab_timing
+        #                 next_lab_timing_data_dict[day] = next_lab_timing_data
+        #                 break
 
-            if row["lab"].always_open:
-                lab_timing = "12:00 AM - 11:45 PM"
-                next_lab_timing_dict = {rotated_days_array[1]: "12:00 AM - 11:45 PM"}
-                lab_timing_data = [{
-                    "start": 0.0,
-                    "end": 23.75
-                }]
-                next_lab_timing_data_dict = {rotated_days_array[1]: {
-                    "start": 0.0,
-                    "end": 23.75
-                }}
-            else:
-                timing_queryset = row["lab"].lab_timings.all()
-
-                for data in timing_queryset:
-                    data_array[data.day].append(data)
-
-                rotated_data_array = data_array[day_now:] + data_array[:day_now]
-
-                for count, timing_data in enumerate(rotated_data_array):
-                    day = rotated_days_array[count]
-                    if count == 0:
-                        if timing_data:
-                            lab_timing, lab_timing_data = self.get_lab_timing(timing_data)
-                            lab_timing_data = sorted(lab_timing_data, key=lambda k: k["start"])
-                    elif timing_data:
-                        next_lab_timing, next_lab_timing_data = self.get_lab_timing(timing_data)
-                        next_lab_timing_data = sorted(next_lab_timing_data, key=lambda k: k["start"])
-                        next_lab_timing_dict[day] = next_lab_timing
-                        next_lab_timing_data_dict[day] = next_lab_timing_data
-                        break
+            lab_timing, lab_timing_data, next_lab_timing_dict, next_lab_timing_data_dict = row["lab"].lab_timings_today_and_next()[
+                                                                                           0:4]
 
             if row["lab"].home_collection_charges.exists():
                 row["distance_related_charges"] = 1

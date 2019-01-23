@@ -216,25 +216,112 @@ class Lab(TimeStampedModel, CreatedByModel, QCModel, SearchKey):
     class Meta:
         db_table = "lab"
 
-    def lab_timings_today(self, day_now=timezone.now().weekday()):
+    def convert_min(self, min):
+        min_str = str(min)
+        if min/10 < 1:
+            min_str = '0' + str(min)
+        return min_str
+
+    def convert_time(self, time):
+        hour = int(time)
+        min = int((time - hour) * 60)
+        am_pm = ''
+        if time < 12:
+            am_pm = 'AM'
+        else:
+            am_pm = 'PM'
+            hour -= 12
+        min_str = self.convert_min(min)
+        return str(hour) + ":" + min_str + " " + am_pm
+
+    def get_lab_timing(self, queryset):
+        lab_timing = ''
+        lab_timing_data = list()
+        temp_list = list()
+
+        for qdata in queryset:
+            temp_list.append({"start": qdata.start, "end": qdata.end})
+
+        temp_list = sorted(temp_list, key=lambda k: k["start"])
+
+        index = 0
+        while index < len(temp_list):
+            temp_dict = dict()
+            x = index
+            if not lab_timing:
+                lab_timing += self.convert_time(temp_list[index]["start"]) + " - "
+            else:
+                lab_timing += " | " + self.convert_time(temp_list[index]["start"]) + " - "
+            temp_dict["start"] = temp_list[index]["start"]
+            while x + 1 < len(temp_list) and temp_list[x]["end"] >= temp_list[x+1]["start"]:
+                x += 1
+            index = x
+            lab_timing += self.convert_time(temp_list[index]["end"])
+            temp_dict["end"] = temp_list[index]["end"]
+            lab_timing_data.append(temp_dict)
+            index += 1
+
+        return lab_timing, lab_timing_data
+
+    # def lab_timings_today(self, day_now=timezone.now().weekday()):
+    #     lab_timing = list()
+    #     lab_timing_data = list()
+    #     time_choices = {item[0]: item[1] for item in LabTiming.TIME_CHOICES}
+    #     if self.always_open:
+    #         lab_timing.append("12:00 AM - 11:45 PM")
+    #         lab_timing_data.append({
+    #             "start": str(0.0),
+    #             "end": str(23.75)
+    #         })
+    #     else:
+    #         timing_queryset = self.lab_timings.all()
+    #         for data in timing_queryset:
+    #             if data.day == day_now:
+    #                 lab_timing, lab_timing_data = self.get_lab_timing(data)
+    #                 # lab_timing.append('{} - {}'.format(time_choices[data.start], time_choices[data.end]))
+    #                 # lab_timing_data.append({"start": str(data.start), "end": str(data.end)})
+        return lab_timing, lab_timing_data
+
+    # Lab.lab_timings_today = get_lab_timings_today
+
+    def lab_timings_today_and_next(self, day_now=timezone.now().weekday()):
+
         lab_timing = list()
         lab_timing_data = list()
-        time_choices = {item[0]: item[1] for item in LabTiming.TIME_CHOICES}
+        next_lab_timing_dict = {}
+        next_lab_timing_data_dict = {}
+        data_array = [list() for i in range(7)]
+        days_array = [i for i in range(7)]
+        rotated_days_array = days_array[day_now:] + days_array[:day_now]
         if self.always_open:
-            lab_timing.append("12:00 AM - 11:45 PM")
-            lab_timing_data.append({
-                "start": str(0.0),
-                "end": str(23.75)
-            })
+            lab_timing = "12:00 AM - 11:45 PM"
+            lab_timing_data = [{
+                "start": 0.0,
+                "end": 23.75
+            }]
+            next_lab_timing_dict = {day_now+1: "12:00 AM - 11:45 PM"}
+            next_lab_timing_data_dict = {day_now+1: {
+                "start": 0.0,
+                "end": 23.75
+            }}
         else:
             timing_queryset = self.lab_timings.all()
             for data in timing_queryset:
-                if data.day == day_now:
-                    lab_timing.append('{} - {}'.format(time_choices[data.start], time_choices[data.end]))
-                    lab_timing_data.append({"start": str(data.start), "end": str(data.end)})
-        return ' | '.join(lab_timing), lab_timing_data
+                data_array[data.day].append(data)
+            rotated_data_array = data_array[day_now:] + data_array[:day_now]
 
-    # Lab.lab_timings_today = get_lab_timings_today
+            for count, timing_data in enumerate(rotated_data_array):
+                day = rotated_days_array[count]
+                if count == 0:
+                    lab_timing, lab_timing_data = self.get_lab_timing(timing_data)
+                    lab_timing_data = sorted(lab_timing_data, key=lambda k: k["start"])
+                elif timing_data:
+                    next_lab_timing, next_lab_timing_data = self.get_lab_timing(timing_data)
+                    next_lab_timing_data = sorted(next_lab_timing_data, key=lambda k: k["start"])
+                    next_lab_timing_dict[day] = next_lab_timing
+                    next_lab_timing_data_dict[day] = next_lab_timing_data
+                    break
+        return lab_timing, lab_timing_data, next_lab_timing_dict, next_lab_timing_data_dict
 
     def get_ratings(self):
         return self.rating.all()

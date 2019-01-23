@@ -1024,14 +1024,16 @@ class CustomLabTestPackageSerializer(serializers.ModelSerializer):
     price = serializers.SerializerMethodField()
     lab_timings = serializers.SerializerMethodField()
     lab_timings_data = serializers.SerializerMethodField()
+    next_lab_timings = serializers.SerializerMethodField()
+    next_lab_timings_data = serializers.SerializerMethodField()
     pickup_charges = serializers.SerializerMethodField()
     pickup_available = serializers.SerializerMethodField()
     distance_related_charges = serializers.SerializerMethodField()
 
     class Meta:
         model = LabTest
-        fields = ('id', 'name', 'lab', 'mrp', 'distance', 'price', 'lab_timings', 'lab_timings_data',
-                  'test_type', 'is_package', 'number_of_tests', 'why', 'pre_test_info', 'is_package',
+        fields = ('id', 'name', 'lab', 'mrp', 'distance', 'price', 'lab_timings', 'lab_timings_data', 'next_lab_timings',
+                  'next_lab_timings_data', 'test_type', 'is_package', 'number_of_tests', 'why', 'pre_test_info', 'is_package',
                   'pickup_charges', 'pickup_available', 'distance_related_charges', 'priority', 'show_details')
 
     def get_lab(self, obj):
@@ -1054,13 +1056,25 @@ class CustomLabTestPackageSerializer(serializers.ModelSerializer):
         lab_data = self.context.get('lab_data', [])
         for data in lab_data:
             if data.id == obj.lab:
-                return data.lab_timings_today()[0]
+                return data.lab_timings_today_and_next()[0]
 
     def get_lab_timings_data(self, obj):
         lab_data = self.context.get('lab_data', [])
         for data in lab_data:
             if data.id == obj.lab:
-                return data.lab_timings_today()[1]
+                return data.lab_timings_today_and_next()[1]
+
+    def get_next_lab_timings(self, obj):
+        lab_data = self.context.get('lab_data', [])
+        for data in lab_data:
+            if data.id == obj.lab:
+                return data.lab_timings_today_and_next()[2]
+
+    def get_next_lab_timings_data(self, obj):
+        lab_data = self.context.get('lab_data', [])
+        for data in lab_data:
+            if data.id == obj.lab:
+                return data.lab_timings_today_and_next()[3]
 
     def get_rating(self, obj):
         lab_data = self.context.get('lab_data', [])
