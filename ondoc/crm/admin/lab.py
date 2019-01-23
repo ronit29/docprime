@@ -1133,6 +1133,25 @@ class LabTestAdminForm(forms.ModelForm):
                 if self.instance.parent_lab_test_category_mappings.filter(parent_category__is_package_category=True).count():
                     raise forms.ValidationError("Already has lab test package category as parent(s). Remove all of them and try again.")
 
+        if cleaned_data.get('is_package') == True:
+            if not cleaned_data.get('min_age'):
+                raise forms.ValidationError('Please enter min_age')
+            if not cleaned_data.get('max_age'):
+                raise forms.ValidationError('Please enter max_age')
+            if not cleaned_data.get('gender_type'):
+                raise forms.ValidationError('Please enter gender_type')
+            if cleaned_data.get('min_age') > cleaned_data.get('max_age'):
+                raise forms.ValidationError('min_age cannot be more than max_age')
+        else :
+            if cleaned_data.get('min_age'):
+                raise forms.ValidationError('Please dont enter min_age')
+            if cleaned_data.get('max_age'):
+                raise forms.ValidationError('Please dont enter max_age')
+            if cleaned_data.get('gender_type'):
+                raise forms.ValidationError('Please dont enter gender_type')
+
+
+
 
 class LabTestAdmin(PackageAutoCompleteView, ImportExportMixin, VersionAdmin):
     form = LabTestAdminForm
