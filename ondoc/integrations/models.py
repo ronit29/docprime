@@ -4,7 +4,7 @@ from django.contrib.contenttypes.models import ContentType
 from ondoc.authentication.models import TimeStampedModel
 from ondoc.diagnostic.models import LabTest
 from ondoc.common.helper import Choices
-
+from django.contrib.postgres.fields import JSONField
 
 # Create your models here.
 
@@ -44,3 +44,11 @@ class IntegratorMapping(TimeStampedModel):
     class Meta:
         db_table = 'integrator_mapping'
 
+
+class IntegratorProductDetail(TimeStampedModel):
+
+    integrator = models.ForeignKey(IntegratorMapping, on_delete=models.CASCADE)
+    product_data = JSONField(blank=True, null=True)
+
+    class Meta:
+        db_table = 'integrator_product_detail'
