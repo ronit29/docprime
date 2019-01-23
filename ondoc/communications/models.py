@@ -100,9 +100,9 @@ def get_title_body(notification_type, context, user):
     body = ''
     if notification_type == NotificationAction.APPOINTMENT_ACCEPTED:
         title = "Appointment Confirmed"
-        body = "Appointment Confirmed for {} requested with Dr. {} at {}, {}.".format(
-            patient_name, doctor_name, time_slot_start.strftime("%I:%M %P"),
-            time_slot_start.strftime("%d/%m/%y"), doctor_name)
+        body = "Appointment Confirmed for {} requested with Dr. {} for {}, {}.".format(
+            patient_name, doctor_name, time_slot_start.strftime("%d/%m/%y"),
+            time_slot_start.strftime("%I:%M %P"), doctor_name)
     elif notification_type == NotificationAction.APPOINTMENT_RESCHEDULED_BY_PATIENT and user.user_type == User.CONSUMER:
         title = "Appointment Reschedule"
         body = "Reschedule request received for the appointment with Dr. {}".format(doctor_name)
@@ -114,8 +114,10 @@ def get_title_body(notification_type, context, user):
         body = "Reschedule request received for the appointment from Dr. {}".format(doctor_name)
     elif notification_type == NotificationAction.APPOINTMENT_BOOKED and user and user.user_type == User.CONSUMER:
         title = "New Appointment"
-        body = "New Appointment for {} at {}, {} with Dr. {}. You will receive a confirmation as soon as it is accepted by the doctor.".format(
-            patient_name, time_slot_start.strftime("%I:%M %P"), time_slot_start.strftime("%d/%m/%y"), doctor_name)
+        # body = "New Appointment for {} at {}, {} with Dr. {}. You will receive a confirmation as soon as it is accepted by the doctor.".format(
+        #     patient_name, time_slot_start.strftime("%I:%M %P"), time_slot_start.strftime("%d/%m/%y"), doctor_name)
+        body = "New Appointment is received for {} with Dr. {} for {}, {}. Awaiting confirmation from the doctor.".format(
+            patient_name, doctor_name, time_slot_start.strftime("%d/%m/%y"), time_slot_start.strftime("%I:%M %P"))
     elif notification_type == NotificationAction.APPOINTMENT_BOOKED and user and user.user_type == User.DOCTOR:
         title = "New Appointment"
         body = "New appointment for {} at {}, {}. Please confirm.".format(
@@ -126,14 +128,11 @@ def get_title_body(notification_type, context, user):
             patient_name, time_slot_start.strftime("%I:%M %P"), time_slot_start.strftime("%d/%m/%y"))
     elif notification_type == NotificationAction.APPOINTMENT_CANCELLED and user and user.user_type == User.CONSUMER:
         if instance.cancellation_type != instance.AUTO_CANCELLED:
-            body = "Appointment with Dr. {} at {}, {} has been cancelled as per your request.".format(
-                doctor_name, time_slot_start.strftime("%I:%M %P"),
-                time_slot_start.strftime("%d/%m/%y")
-            )
+            body = "Appointment with Dr. {} for {}, {} has been cancelled as per your request.".format(
+                doctor_name, time_slot_start.strftime("%d/%m/%y"), time_slot_start.strftime("%I:%M %P"))
         else:
-            body = "Appointment with Dr. {} at {}, {} has been cancelled due to unavailability of doctor manager.".format(
-                doctor_name, time_slot_start.strftime("%I:%M %P"),
-                time_slot_start.strftime("%d/%m/%y"))
+            body = "Appointment with Dr. {} for {}, {} has been cancelled due to unavailability of doctor manager.".format(
+                doctor_name, time_slot_start.strftime("%d/%m/%y"), time_slot_start.strftime("%I:%M %P"))
         title = "Appointment Cancelled"
     # elif notification_type == NotificationAction.DOCTOR_INVOICE:
     #     title = "Invoice Generated"
@@ -145,9 +144,8 @@ def get_title_body(notification_type, context, user):
 
     elif notification_type == NotificationAction.LAB_APPOINTMENT_ACCEPTED:
         title = "Appointment Confirmed"
-        body = "Appointment Confirmed for {} requested with Lab - {} at {}, {}.".format(
-            patient_name, lab_name, time_slot_start.strftime("%I:%M %P"),
-            time_slot_start.strftime("%d/%m/%y"), lab_name)
+        body = "Appointment Confirmed for {} requested with Lab - {} for {}, {}.".format(
+            patient_name, lab_name, time_slot_start.strftime("%d/%m/%y"), time_slot_start.strftime("%I:%M %P"), lab_name)
     elif notification_type == NotificationAction.LAB_APPOINTMENT_RESCHEDULED_BY_PATIENT and user.user_type == User.CONSUMER:
         title = "Appointment Reschedule"
         body = "Reschedule request received for the appointment with Lab - {}".format(lab_name)
@@ -159,19 +157,19 @@ def get_title_body(notification_type, context, user):
         body = "Reschedule request received for the appointment from Lab - {}".format(lab_name)
     elif notification_type == NotificationAction.LAB_APPOINTMENT_BOOKED and user and user.user_type == User.CONSUMER:
         title = "New Appointment"
-        body = "New Appointment for {} at {}, {} with Lab - {}. You will receive a confirmation as soon as it is accepted by the lab".format(
-            patient_name, time_slot_start.strftime("%I:%M %P"), time_slot_start.strftime("%d/%m/%y"), lab_name)
+        body = "New Appointment is received for {} with Lab - {} for {}, {} . Awaiting confirmation from the lab".format(
+            patient_name, lab_name, time_slot_start.strftime("%d/%m/%y"), time_slot_start.strftime("%I:%M %P"))
     elif notification_type == NotificationAction.LAB_APPOINTMENT_BOOKED and user and user.user_type == User.DOCTOR:
         title = "New Appointment"
         body = "New appointment for {} at {}, {}. Please confirm.".format(
             patient_name, time_slot_start.strftime("%I:%M %P"), time_slot_start.strftime("%d/%m/%y"))
     elif notification_type == NotificationAction.LAB_APPOINTMENT_CANCELLED and user and user.user_type == User.CONSUMER:
         if instance.cancellation_type != instance.AUTO_CANCELLED:
-            body = "Appointment with Lab - {} at {}, {} has been cancelled as per your request.".format(
-                lab_name, time_slot_start.strftime("%I:%M %P"), time_slot_start.strftime("%d/%m/%y"))
+            body = "Appointment with Lab - {} for {}, {} has been cancelled as per your request.".format(
+                lab_name, time_slot_start.strftime("%d/%m/%y"), time_slot_start.strftime("%I:%M %P"))
         else:
-            body = "Appointment with Lab - {} at {}, {} has cancelled due to unavailability of lab manager.".format(
-                lab_name, time_slot_start.strftime("%I:%M %P"), time_slot_start.strftime("%d/%m/%y"))
+            body = "Appointment with Lab - {} for {}, {} has cancelled due to unavailability of lab manager.".format(
+                lab_name, time_slot_start.strftime("%d/%m/%y"), time_slot_start.strftime("%I:%M %P"))
         title = "Appointment Cancelled"
     elif notification_type == NotificationAction.LAB_APPOINTMENT_CANCELLED:
         title = "Appointment Cancelled"
@@ -359,35 +357,18 @@ class EMAILNotification:
             body_template = "email/prescription_uploaded/body.html"
             subject_template = "email/prescription_uploaded/subject.txt"
         elif notification_type == NotificationAction.DOCTOR_INVOICE:
-
-            invoice, created = Invoice.objects.get_or_create(reference_id=context.get("instance").id,
-                                                             product_id=Order.DOCTOR_PRODUCT_ID)
-            context.update({"invoice": invoice})
-            html_body = render_to_string("email/doctor_invoice/invoice_template.html", context=context)
-            filename = "invoice_{}_{}.pdf".format(str(timezone.now().strftime("%I%M_%d%m%Y")),
-                                                  random.randint(1111111111, 9999999999))
-            try:
-                extra_args = {
-                    'virtual-time-budget': 6000
-                }
-                temp_pdf_file = TemporaryUploadedFile(filename, 'byte', 1000, 'utf-8')
-                file = open(temp_pdf_file.temporary_file_path())
-                bytestring_to_pdf(html_body.encode(), file, **extra_args)
-                file.seek(0)
-                file.flush()
-                file.content_type = 'application/pdf'
-                invoice.file = InMemoryUploadedFile(temp_pdf_file, None, filename, 'application/pdf',
-                                                    temp_pdf_file.tell(), None)
-                invoice.save()
-            except Exception as e:
-                logger.error("Got error while creating pdf for opd invoice {}".format(e))
-            context.update({"invoice_url": invoice.file.url})
+            invoices = context.get("instance").generate_invoice(context)
+            if not invoices:
+                logger.error("Got error while creating pdf for opd invoice")
+                return '', ''
+            context.update({"invoice": invoices[0]})
+            context.update({"invoice_url": invoices[0].file.url})
             context.update(
                 {"attachments": [
-                    {"filename": util_file_name(invoice.file.url), "path": util_absolute_url(invoice.file.url)}]})
+                    {"filename": util_file_name(invoices[0].file.url),
+                     "path": util_absolute_url(invoices[0].file.url)}]})
             body_template = "email/doctor_invoice/body.html"
             subject_template = "email/doctor_invoice/subject.txt"
-
         elif notification_type == NotificationAction.LAB_APPOINTMENT_ACCEPTED:
             body_template = "email/lab/appointment_accepted/body.html"
             subject_template = "email/lab/appointment_accepted/subject.txt"
@@ -416,33 +397,17 @@ class EMAILNotification:
             body_template = "email/lab/lab_report_uploaded/body.html"
             subject_template = "email/lab/lab_report_uploaded/subject.txt"
         elif notification_type == NotificationAction.LAB_INVOICE:
-            invoice, created = Invoice.objects.get_or_create(reference_id=context.get("instance").id,
-                                                             product_id=Order.LAB_PRODUCT_ID)
-            context.update({"invoice": invoice})
-            html_body = render_to_string("email/lab_invoice/invoice_template.html", context=context)
-            filename = "invoice_{}_{}.pdf".format(str(timezone.now().strftime("%I%M_%d%m%Y")),
-                                                  random.randint(1111111111, 9999999999))
-            try:
-                extra_args = {
-                    'virtual-time-budget': 6000
-                }
-                temp_pdf_file = TemporaryUploadedFile(filename, 'byte', 1000, 'utf-8')
-                file = open(temp_pdf_file.temporary_file_path())
-                bytestring_to_pdf(html_body.encode(), file, **extra_args)
-                file.seek(0)
-                file.flush()
-                file.content_type = 'application/pdf'
-                invoice.file = InMemoryUploadedFile(temp_pdf_file, None, filename, 'application/pdf',
-                                                    temp_pdf_file.tell(), None)
-                invoice.save()
-            except Exception as e:
-                logger.error("Got error while creating pdf for opd invoice {}".format(e))
-            context.update({"invoice_url": invoice.file.url})
+            invoices = context.get("instance").generate_invoice(context)
+            if not invoices:
+                logger.error("Got error while creating pdf for lab invoice")
+                return '', ''
+            context.update({"invoice": invoices[0]})
+            context.update({"invoice_url": invoices[0].file.url})
             context.update(
-                {"attachments": [{"filename": util_file_name(invoice.file.url), "path": util_absolute_url(invoice.file.url)}]})
+                {"attachments": [{"filename": util_file_name(invoices[0].file.url),
+                                  "path": util_absolute_url(invoices[0].file.url)}]})
             body_template = "email/lab_invoice/body.html"
             subject_template = "email/lab_invoice/subject.txt"
-
         elif notification_type == NotificationAction.LAB_REPORT_SEND_VIA_CRM:
             attachments = []
             for report_link in context.get('reports', []):
@@ -454,6 +419,8 @@ class EMAILNotification:
         return subject_template, body_template
 
     def trigger(self, receiver, template, context):
+        if not template[0] and not template[1]:
+            return
         cc = []
         bcc = [settings.PROVIDER_EMAIL]
         attachments = context.get('attachments', [])
@@ -608,7 +575,9 @@ class OpdNotification(Notification):
             "payment_type": dict(OpdAppointment.PAY_CHOICES)[self.appointment.payment_type],
             "image_url": "",
             "time_slot_start": time_slot_start,
-            "attachments": {}  # Updated later
+            "attachments": {},  # Updated later
+            "screen": "appointment",
+            "type": "doctor"
         }
         return context
 
@@ -664,10 +633,11 @@ class OpdNotification(Notification):
         user_and_tokens = []
 
         push_recievers = receivers+doctor_spocs_app_recievers
-        user_and_token = [{'user': token.user, 'token': token.token} for token in
+        user_and_token = [{'user': token.user, 'token': token.token, 'app_name': token.app_name} for token in
                           NotificationEndpoint.objects.filter(user__in=push_recievers).order_by('user')]
         for user, user_token_group in groupby(user_and_token, key=lambda x: x['user']):
-            user_and_tokens.append({'user': user, 'tokens': [t['token'] for t in user_token_group]})
+            user_and_tokens.append(
+                {'user': user, 'tokens': [{"token": t['token'], "app_name": t["app_name"]} for t in user_token_group]})
 
         for user in receivers:
             if user.user_type == User.CONSUMER:
@@ -719,12 +689,7 @@ class LabNotification(Notification):
         est = pytz.timezone(settings.TIME_ZONE)
         time_slot_start = self.appointment.time_slot_start.astimezone(est)
         tests = self.appointment.get_tests_and_prices()
-        reports = instance.reports.all()
-        report_file_links = set()
-        for report in reports:
-            report_file_links = report_file_links.union(
-                set([report_file.name.url for report_file in report.files.all()]))
-        report_file_links = [util_absolute_url(report_file_link) for report_file_link in report_file_links]
+        report_file_links = instance.get_report_urls()
         for test in tests:
             test['mrp'] = str(test['mrp'])
             test['deal_price'] = str(test['deal_price'])
@@ -743,7 +708,9 @@ class LabNotification(Notification):
             "time_slot_start": time_slot_start,
             "tests": tests,
             "reports": report_file_links,
-            "attachments": {}  # Updated later
+            "attachments": {},  # Updated later
+            "screen": "appointment",
+            "type": "lab"
         }
         return context
 
@@ -802,10 +769,11 @@ class LabNotification(Notification):
         app_receivers = receivers
         user_and_tokens = []
 
-        user_and_token = [{'user': token.user, 'token': token.token} for token in
+        user_and_token = [{'user': token.user, 'token': token.token, 'app_name': token.app_name} for token in
                           NotificationEndpoint.objects.filter(user__in=receivers).order_by('user')]
         for user, user_token_group in groupby(user_and_token, key=lambda x: x['user']):
-            user_and_tokens.append({'user': user, 'tokens': [t['token'] for t in user_token_group]})
+            user_and_tokens.append(
+                {'user': user, 'tokens': [{"token": t['token'], "app_name": t["app_name"]} for t in user_token_group]})
 
         for user in receivers:
             if user.user_type == User.CONSUMER:
