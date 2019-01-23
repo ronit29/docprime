@@ -23,7 +23,7 @@ class IntegratorMapping(TimeStampedModel):
     # product_content_object = GenericForeignKey()
 
     test = models.ForeignKey(LabTest, on_delete=models.CASCADE)
-    interator_class_name = models.CharField(max_length=40, null=False, blank=False)
+    integrator_class_name = models.CharField(max_length=40, null=False, blank=False)
     service_type = models.CharField(max_length=30, choices=ServiceType.as_choices(), null=False, blank=False, default=None)
 
     @classmethod
@@ -37,9 +37,10 @@ class IntegratorMapping(TimeStampedModel):
         # Part of the integrations.
         if mapping_wrt_test.content_type == ContentType.objects.get(model='labtest'):
             return {
-                'class_name': mapping_wrt_test.interator_class_name,
+                'class_name': mapping_wrt_test.integrator_class_name,
                 'service_type': mapping_wrt_test.service_type
             }
 
     class Meta:
         db_table = 'integrator_mapping'
+
