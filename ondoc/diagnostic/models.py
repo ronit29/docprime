@@ -759,6 +759,7 @@ class ParameterLabTest(TimeStampedModel):
     def __str__(self):
         return "{}".format(self.parameter.name)
 
+
 class FrequentlyAddedTogetherTests(TimeStampedModel):
     original_test = models.ForeignKey('diagnostic.LabTest', related_name='base_test' ,null =True, blank =False, on_delete=models.CASCADE)
     booked_together_test = models.ForeignKey('diagnostic.LabTest', related_name='booked_together' ,null=True, blank=False, on_delete=models.CASCADE)
@@ -766,12 +767,14 @@ class FrequentlyAddedTogetherTests(TimeStampedModel):
     class Meta:
         db_table = "frequently_added_tests"
 
+
 class LabTestCategory(auth_model.TimeStampedModel, SearchKey):
     name = models.CharField(max_length=500, unique=True)
     preferred_lab_test = models.ForeignKey('LabTest', on_delete=models.SET_NULL,
                                             related_name='preferred_in_lab_test_category', null=True, blank=True)
     is_live = models.BooleanField(default=False)
     is_package_category = models.BooleanField(verbose_name='Is this a test package category?')
+    show_on_recommended_screen = models.BooleanField(default=False)
 
     def __str__(self):
         return self.name
@@ -874,7 +877,6 @@ class LabTest(TimeStampedModel, SearchKey):
                                         through=LabTestRecommendedCategoryMapping,
                                         through_fields=('lab_test', 'parent_category'),
                                         related_name='recommended_lab_tests')
-    show_on_recommended_screen = models.BooleanField(default=False)
     # test_sub_type = models.ManyToManyField(
     #     LabTestSubType,
     #     through='LabTestSubTypeMapping',

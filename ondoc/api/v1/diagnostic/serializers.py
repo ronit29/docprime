@@ -1131,3 +1131,19 @@ class LabPackageListSerializer(serializers.Serializer):
         except:
             raise serializers.ValidationError('Invalid Category IDs')
         raise serializers.ValidationError('Invalid Category IDs')
+
+
+class RecommendedPackageCategoryList(serializers.ModelSerializer):
+
+    tests = serializers.SerializerMethodField()
+
+    def get_tests(self, obj):
+        test_id = []
+        if obj:
+            for tst in obj.lab_test.all():
+                test_id.append({"id": tst.id, "name": tst.name})
+        return test_id
+
+    class Meta:
+        model = LabTestCategory
+        fields = ('id', 'name', 'tests')
