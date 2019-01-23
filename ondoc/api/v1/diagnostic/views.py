@@ -74,13 +74,19 @@ class SearchPageViewSet(viewsets.ReadOnlyModelViewSet):
         conditions_queryset = CommonDiagnosticCondition.objects.prefetch_related('lab_test').all()
         lab_queryset = PromotedLab.objects.select_related('lab').filter(lab__is_live=True, lab__is_test_lab=False)
         package_queryset = CommonPackage.objects.prefetch_related('package').filter(package__enable_for_retail=True)[:count]
+        recommended_package_qs = LabTestCategory.objects.prefetch_related('recommended_lab_tests').filter(is_live=True,
+                                                                                                          show_on_recommended_screen=True,
+                                                                                                          recommended_lab_tests__is_live=True,
+                                                                                                          recommended_lab_tests__searchable=True,
+                                                                                                          recommended_lab_tests__enable_for_retail=True)[:count]
         test_serializer = diagnostic_serializer.CommonTestSerializer(test_queryset, many=True, context={'request': request})
         package_serializer = diagnostic_serializer.CommonPackageSerializer(package_queryset, many=True, context={'request': request})
         lab_serializer = diagnostic_serializer.PromotedLabsSerializer(lab_queryset, many=True)
         condition_serializer = diagnostic_serializer.CommonConditionsSerializer(conditions_queryset, many=True)
+        recommended_package = diagnostic_serializer.RecommendedPackageCategoryList(recommended_package_qs, many=True)
         temp_data = dict()
         temp_data['common_tests'] = test_serializer.data
-        temp_data['recommended_package'] = {}
+        temp_data['recommended_package'] = recommended_package.data
         temp_data['common_package'] = package_serializer.data
         temp_data['preferred_labs'] = lab_serializer.data
         temp_data['common_conditions'] = condition_serializer.data

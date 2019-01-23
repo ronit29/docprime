@@ -759,6 +759,7 @@ class ParameterLabTest(TimeStampedModel):
     def __str__(self):
         return "{}".format(self.parameter.name)
 
+
 class FrequentlyAddedTogetherTests(TimeStampedModel):
     original_test = models.ForeignKey('diagnostic.LabTest', related_name='base_test' ,null =True, blank =False, on_delete=models.CASCADE)
     booked_together_test = models.ForeignKey('diagnostic.LabTest', related_name='booked_together' ,null=True, blank=False, on_delete=models.CASCADE)
@@ -766,12 +767,14 @@ class FrequentlyAddedTogetherTests(TimeStampedModel):
     class Meta:
         db_table = "frequently_added_tests"
 
+
 class LabTestCategory(auth_model.TimeStampedModel, SearchKey):
     name = models.CharField(max_length=500, unique=True)
     preferred_lab_test = models.ForeignKey('LabTest', on_delete=models.SET_NULL,
                                             related_name='preferred_in_lab_test_category', null=True, blank=True)
     is_live = models.BooleanField(default=False)
     is_package_category = models.BooleanField(verbose_name='Is this a test package category?')
+    show_on_recommended_screen = models.BooleanField(default=False)
 
     def __str__(self):
         return self.name
@@ -792,6 +795,21 @@ class LabTestCategoryMapping(models.Model):
 
     class Meta:
         db_table = "lab_test_to_category_mapping"
+        unique_together = (('lab_test', 'parent_category'),)
+
+
+class LabTestRecommendedCategoryMapping(models.Model):
+    lab_test = models.ForeignKey('LabTest', on_delete=models.CASCADE,
+                                 related_name='recommended_lab_test_category_mappings')
+    parent_category = models.ForeignKey(LabTestCategory, on_delete=models.CASCADE,
+                                        related_name='recommended_lab_test_mappings')
+    show_on_recommended_screen = models.BooleanField(default=False)
+
+    def __str__(self):
+        return '({}){}'.format(self.lab_test, self.parent_category)
+
+    class Meta:
+        db_table = "lab_test_recommended_category_mapping"
         unique_together = (('lab_test', 'parent_category'),)
 
 
@@ -843,19 +861,22 @@ class LabTest(TimeStampedModel, SearchKey):
                                         through=LabTestCategoryMapping,
                                         through_fields=('lab_test', 'parent_category'),
                                         related_name='lab_tests')
-    min_age = models.PositiveSmallIntegerField(default=None, blank=True, null=True)
-    max_age = models.PositiveSmallIntegerField(default=None, blank=True, null=True)
+    min_age = models.PositiveSmallIntegerField(default=None, blank=True, null=True, validators=[MaxValueValidator(120), MinValueValidator(1)])
+    max_age = models.PositiveSmallIntegerField(default=None, blank=True, null=True, validators=[MaxValueValidator(120), MinValueValidator(1)])
     MALE = 1
     FEMALE = 2
     ALL = 3
     GENDER_TYPE_CHOICES = (
-	    ('', 'Select'),
+        ('', 'Select'),
         (MALE, 'male'),
         (FEMALE, 'female'),
         (ALL, 'all')
     )
     gender_type = models.PositiveIntegerField(choices=GENDER_TYPE_CHOICES, blank=True, null=True)
-
+    recommended_categories = models.ManyToManyField(LabTestCategory,
+                                        through=LabTestRecommendedCategoryMapping,
+                                        through_fields=('lab_test', 'parent_category'),
+                                        related_name='recommended_lab_tests')
     # test_sub_type = models.ManyToManyField(
     #     LabTestSubType,
     #     through='LabTestSubTypeMapping',
