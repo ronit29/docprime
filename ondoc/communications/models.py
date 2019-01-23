@@ -633,10 +633,11 @@ class OpdNotification(Notification):
         user_and_tokens = []
 
         push_recievers = receivers+doctor_spocs_app_recievers
-        user_and_token = [{'user': token.user, 'token': token.token} for token in
+        user_and_token = [{'user': token.user, 'token': token.token, 'app_name': token.app_name} for token in
                           NotificationEndpoint.objects.filter(user__in=push_recievers).order_by('user')]
         for user, user_token_group in groupby(user_and_token, key=lambda x: x['user']):
-            user_and_tokens.append({'user': user, 'tokens': [t['token'] for t in user_token_group]})
+            user_and_tokens.append(
+                {'user': user, 'tokens': [{"token": t['token'], "app_name": t["app_name"]} for t in user_token_group]})
 
         for user in receivers:
             if user.user_type == User.CONSUMER:
