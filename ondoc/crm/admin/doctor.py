@@ -20,8 +20,7 @@ import datetime
 from django.db import transaction
 import logging
 from dal import autocomplete
-
-from ondoc.api.v1.utils import util_absolute_url, util_file_name
+from ondoc.api.v1.utils import GenericAdminEntity, util_absolute_url, util_file_name
 from ondoc.procedure.models import DoctorClinicProcedure, Procedure
 
 logger = logging.getLogger(__name__)
@@ -40,7 +39,9 @@ from ondoc.doctor.models import (Doctor, DoctorQualification,
                                  OpdAppointment, CompetitorInfo, SpecializationDepartment,
                                  SpecializationField, PracticeSpecialization, SpecializationDepartmentMapping,
                                  DoctorPracticeSpecialization, CompetitorMonthlyVisit,
-                                 GoogleDetailing, VisitReason, VisitReasonMapping, PracticeSpecializationContent, DoctorMobileOtp, UploadDoctorData)
+                                 GoogleDetailing, VisitReason, VisitReasonMapping, PracticeSpecializationContent, PatientMobile, DoctorMobileOtp,
+                                 UploadDoctorData)
+
 from ondoc.authentication.models import User
 from .common import *
 from .autocomplete import CustomAutoComplete
@@ -764,7 +765,9 @@ class GenericAdminInline(nested_admin.NestedTabularInline):
         return ['user', 'updated_at']
 
     def get_queryset(self, request):
-        return super(GenericAdminInline, self).get_queryset(request).select_related('doctor', 'hospital', 'user')
+        return super(GenericAdminInline, self).get_queryset(request).select_related('doctor', 'hospital', 'user')\
+            .filter(entity_type=GenericAdminEntity.DOCTOR)
+
 
     def formfield_for_foreignkey(self, db_field, request, **kwargs):
         if db_field.name == "hospital":
@@ -1871,6 +1874,19 @@ class PracticeSpecializationContentAdmin(admin.ModelAdmin):
     list_display = ('specialization',)
     display = ('specialization', 'content', )
     autocomplete_fields = ('specialization', )
+
+
+class PatientMobileInline(admin.TabularInline):
+    model = PatientMobile
+    extra = 0
+    can_delete = True
+    show_change_link = True
+
+
+class OfflinePatientAdmin(VersionAdmin):
+    list_display = ('name', 'gender', 'referred_by')
+    date_hierarchy = 'created_at'
+    inlines = [PatientMobileInline]
 
 
 class UploadDoctorDataAdmin(admin.ModelAdmin):

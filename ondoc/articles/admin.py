@@ -10,7 +10,7 @@ from django.conf import settings
 
 class ArticleForm(forms.ModelForm):
     body = forms.CharField(widget=forms.Textarea, required=False)
-    category = forms.ModelChoiceField(queryset=ArticleCategory.objects.all(),widget=forms.Select)
+    category = forms.ModelChoiceField(queryset=ArticleCategory.objects.all(), widget=forms.Select)
     author_name = forms.CharField(required=False)
 
     class Media:
