@@ -138,7 +138,8 @@ LOCAL_APPS = (
     'ondoc.geoip',
     'ondoc.procedure',
     'ondoc.elastic',
-    'ondoc.banner'
+    'ondoc.banner',
+    'ondoc.comments',
 )
 
 INSTALLED_APPS = DJANGO_APPS + THIRD_PARTY_APPS + LOCAL_APPS
@@ -369,7 +370,7 @@ AWS_SECRET_ACCESS_KEY = env('AWS_SECRET_ACCESS_KEY', default='')
 PROVIDER_EMAIL = env('PROVIDER_EMAIL', default='')
 
 
-#Comments Settings
+#comments Settings
 COMMENTS_APP = 'fluent_comments'
 SITE_ID = 1
 FLUENT_COMMENTS_REPLACE_ADMIN = False

@@ -10,11 +10,14 @@ from django.conf import settings
 
 from fluent_comments.models import FluentComment
 
+from ondoc.api.v1.article.serializers import CommentAuthorSerializer
+from ondoc.comments.models import CustomComment
 from .serializers import CommentSerializer
 from ondoc.articles import models as article_models
-from ondoc.articles.models import ArticleCategory
+from ondoc.articles.models import ArticleCategory, Article
 from . import serializers
 from ondoc.api.pagination import paginate_queryset
+from ondoc.authentication.models import User
 from ondoc.api.v1.utils import RawSql
 
 
@@ -117,23 +120,55 @@ class CommentViewSet(viewsets.ModelViewSet):
     serializer_class = CommentSerializer
 
     def create(self, request, *args, **kwargs):
-        if request.user.is_authenticated or True:
+        user = None
+        if request.user.is_authenticated:
+            user = request.user
+        if True:
             data = self.request.data
+            user = self.request.user
+
             comment = data['comment']
+            user_name = data['name']
+            user_email = data['email']
+            user_name = None
             article = data['article']
+
+            if user and user.user_type == User.CONSUMER:
+                user_name = user.full_name
+                user_email = user.get_default_email
+
+            if not user_name:
+                user_name = 'Anonymous'
+
             if 'parent' in data:
                 parent = data['parent']
+
+            # article_parent_obj = Article.objects.filter(id=parent).first()
+            # if article_parent_obj:
+            #     parent = article_parent_obj
             else:
                 parent = None
+
+            if not parent:
+                parent=None
+
             submit_date = datetime.now()
             content = ContentType.objects.get(model="article").pk
             comment = FluentComment.objects.create(object_pk=article,
                                    comment=comment, submit_date=submit_date,
-                                   content_type_id=content,user_id = self.request.user.id,
-                                   site_id=settings.SITE_ID, parent_id=parent)
-
+                                   content_type_id=content, user_id=self.request.user.id,
+                                   site_id=settings.SITE_ID, parent_id=parent, user_name=user_name,
+                                   user_email=user_email, user=user)
+            if article:
+                article_obj = Article.objects.filter(id=int(article)).first()
+                custom_comment = CustomComment.objects.create(author=article_obj.author, comment=comment)
             serializer = CommentSerializer(comment, context={'request': request})
-            return Response(serializer.data)
+            response = {}
+            response['status'] = 1
+            response['message'] = 'Comment posted successfully'
+            response['comment'] = serializer.data
+
+            return Response(response)
 
     def list(self, request):
         data = request.GET
@@ -141,5 +176,6 @@ class CommentViewSet(viewsets.ModelViewSet):
         article = article_models.Article.objects.filter(id=article).first()
         if article:
             comments = self.queryset.filter(object_pk=article.id)
+
             serializer = CommentSerializer(comments, many=True, context={'request': request})
             return Response(serializer.data)

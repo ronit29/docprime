@@ -1,3 +1,4 @@
+from django_comments.models import Comment
 from rest_framework import serializers
 
 from fluent_comments.models import FluentComment
@@ -37,6 +38,12 @@ class ArticleRetrieveSerializer(serializers.ModelSerializer):
     linked = serializers.SerializerMethodField()
     author = ArticleAuthorSerializer()
     last_updated_at = serializers.SerializerMethodField()
+    comments = serializers.SerializerMethodField()
+
+    def get_comments(self, obj):
+        comments = FluentComment.objects.filter(object_pk=str(obj.id))
+        serializer = CommentSerializer(comments, many=True, context={'request': self.context.get('request')})
+        return serializer.data
 
     def get_linked(self, obj):
         resp = {}
@@ -88,7 +95,7 @@ class ArticleRetrieveSerializer(serializers.ModelSerializer):
     class Meta:
         model = Article
         fields = ('title','heading_title', 'url', 'body', 'icon', 'id', 'seo', 'header_image', 'header_image_alt', 'category',
-                  'linked', 'author_name', 'published_date', 'author', 'last_updated_at')
+                  'linked', 'author_name', 'published_date', 'author', 'last_updated_at', 'comments')
 
 
 class ArticleListSerializer(serializers.ModelSerializer):
@@ -150,14 +157,32 @@ class RecursiveField(serializers.Serializer):
 
 class CommentSerializer(serializers.ModelSerializer):
     children = RecursiveField(many=True)
-    
+    author = serializers.SerializerMethodField()
+
+    def get_author(self, obj):
+        serializer = CommentAuthorSerializer(obj.content_object, context={'request': self.context.get('request')})
+        return serializer.data
+
     class Meta:
         model = FluentComment
         fields = (
-            'comment',
             'id',
+            'comment',
             'children',
+            'submit_date',
+            'user_name',
+            'author',
            )
+
+
+
+class CommentAuthorSerializer(serializers.ModelSerializer):
+    author = ArticleAuthorSerializer()
+
+    class Meta:
+        model = Article
+        fields = ('author',)
+
 
 # class PollSerializer(serializers.Serializer)
 #     comments= serializers.SerializerMethodField()
