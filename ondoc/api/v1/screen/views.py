@@ -32,9 +32,8 @@ class ScreenViewSet(viewsets.GenericViewSet):
             {
                 'priority': 0,
                 'title': "Find a Doctor",
-                'items': [
-                    specializations_serializer.data
-                ],
+                'type': "Specialization",
+                'items': specializations_serializer.data,
                 'tag': "Upto 50% off",
                 'tagColor': "#ff0000",
                 'addSearchItem': "Doctor"
@@ -42,9 +41,8 @@ class ScreenViewSet(viewsets.GenericViewSet):
             {
                 'priority': 1,
                 'title': "Book a Test",
-                'items': [
-                    test_serializer.data
-                ],
+                'type': "CommonTest",
+                'items': test_serializer.data,
                 'tag': "Upto 50% off",
                 'tagColor': "#ff0000",
                 'addSearchItem': "Lab"
@@ -52,9 +50,8 @@ class ScreenViewSet(viewsets.GenericViewSet):
             {
                 'priority': 2,
                 'title': "Book a Test",
-                'items': [
-                    package_serializer.data
-                ],
+                'type': "CommonPackage",
+                'items': package_serializer.data,
                 'tag': "Upto 50% off",
                 'tagColor': "#ff0000",
                 'addSearchItem': "Package"
