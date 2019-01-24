@@ -16,7 +16,7 @@ class IntegratorMapping(TimeStampedModel):
     content_type = models.ForeignKey(ContentType, on_delete=models.DO_NOTHING, related_name="resource_contenttype")
     object_id = models.PositiveIntegerField()
     content_object = GenericForeignKey()
-    test = models.ForeignKey(LabTest, on_delete=models.CASCADE)
+    test = models.ForeignKey(LabTest, on_delete=models.CASCADE, null=True)
     integrator_class_name = models.CharField(max_length=40, null=False, blank=False)
     service_type = models.CharField(max_length=30, choices=ServiceType.as_choices(), null=False, blank=False, default=None)
     integrator_product_data = JSONField(blank=True, null=True)
