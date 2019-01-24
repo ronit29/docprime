@@ -1389,7 +1389,7 @@ class OfflinePatientBodySerializer(serializers.Serializer):
 
 
 class OfflinePatientExplicitSerializer(OfflinePatientBodySerializer):
-    doctor = serializers.PrimaryKeyRelatedField(queryset=Doctor.objects.all())
+    doctor = serializers.PrimaryKeyRelatedField(queryset=Doctor.objects.all(), required=False)
     hospital = serializers.PrimaryKeyRelatedField(queryset=Hospital.objects.all(), required=False)
 
 
