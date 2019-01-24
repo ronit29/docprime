@@ -130,7 +130,6 @@ class CommentViewSet(viewsets.ModelViewSet):
             comment = data['comment']
             user_name = data['name']
             user_email = data['email']
-            user_name = None
             article = data['article']
 
             if user and user.user_type == User.CONSUMER:
@@ -164,7 +163,6 @@ class CommentViewSet(viewsets.ModelViewSet):
                 article_obj = Article.objects.filter(id=int(article)).first()
                 custom_comment = CustomComment.objects.create(author=article_obj.author, comment=comment)
                 serializer = CommentSerializer(comment, context={'request': request})
-
 
                 response['status'] = 1
                 response['message'] = 'Comment posted successfully'
