@@ -57,3 +57,8 @@ class Thyrocare(BaseIntegrator):
                               service_type=IntegratorMapping.ServiceType.LabTest, object_id=obj_id,
                               content_type=ContentType.objects.get(model='labtest')).save()
 
+    def _get_appointment_slots(self):
+        return {}
+
+    def _get_is_user_area_serviceable(self, pincode):
+        return False
