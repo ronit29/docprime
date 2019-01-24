@@ -64,6 +64,7 @@ from ondoc.seo.models import SeoLabNetwork
 from ondoc.elastic.models import DemoElastic
 from .elastic import DemoElasticAdmin
 from ondoc.banner.models import Banner
+from .integrations import IntegratorMapping, IntegratorMappingAdmin
 
 # Admin Site config
 admin.site.site_header = 'Ondoc CRM'
@@ -162,3 +163,5 @@ admin.site.register(EntityUrls, EntityUrlsAdmin)
 admin.site.register(PaymentOptions, PaymentOptionsAdmin)
 admin.site.register(UserConfig)
 admin.site.register(UploadDoctorData, UploadDoctorDataAdmin)
+
+admin.site.register(IntegratorMapping, IntegratorMappingAdmin)
