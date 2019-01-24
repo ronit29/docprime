@@ -176,21 +176,24 @@ class DoctorAppointmentsViewSet(OndocViewSet):
 
         if not opd_appointment:
             return Response({"message": "Invalid appointment id"}, status.HTTP_404_NOT_FOUND)
-        permission = auth_models.GenericAdmin.objects.filter(Q(is_disabled=False,
-                                                                    user=user,
-                                                                    doctor_id=opd_appointment.doctor.id,
-                                                                    permission_type__in=[auth_models.GenericAdmin.APPOINTMENT,
-                                                                                           auth_models.GenericAdmin.ALL])|
-                                                                  Q(user=user,
-                                                                    is_disabled=False,
-                                                                    hospital_id=opd_appointment.hospital.id,
-                                                                    permission_type__in=[auth_models.GenericAdmin.APPOINTMENT,
-                                                                                               auth_models.GenericAdmin.ALL]
-                                                                    )
-                                                                  ).first()
-
-        if not permission:
-            return Response({"message": "UnAuthorized"}, status.HTTP_403_FORBIDDEN)
+        pem_queryset = auth_models.GenericAdmin.objects.filter(Q(user=user, is_disabled=False),
+                                                               Q(Q(super_user_permission=True,
+                                                                   hospital=opd_appointment.hospital,
+                                                                   entity_type=GenericAdminEntity.HOSPITAL)
+                                                                 |
+                                                                 Q(super_user_permission=True,
+                                                                   doctor=opd_appointment.doctor,
+                                                                   entity_type=GenericAdminEntity.DOCTOR))
+                                                               |
+                                                               Q(Q(doctor=opd_appointment.doctor,
+                                                                 hospital=opd_appointment.hospital)
+                                                                 |
+                                                                 Q(doctor__isnull=True,
+                                                                   hospital=opd_appointment.hospital)
+                                                                 )
+                                                               ).first()
+        if not pem_queryset:
+            return Response({"message": "No Permissions"}, status.HTTP_403_FORBIDDEN)
         if request.user.user_type == User.DOCTOR:
             otp_valid_serializer = serializers.OTPConfirmationSerializer(data=request.data)
             otp_valid_serializer.is_valid(raise_exception=True)
