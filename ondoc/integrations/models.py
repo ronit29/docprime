@@ -16,18 +16,11 @@ class IntegratorMapping(TimeStampedModel):
     content_type = models.ForeignKey(ContentType, on_delete=models.DO_NOTHING, related_name="resource_contenttype")
     object_id = models.PositiveIntegerField()
     content_object = GenericForeignKey()
-
-    # # product can be lab tests.
-    # product_content_type = models.ForeignKey(ContentType, on_delete=models.DO_NOTHING, related_name="product_contenttype")
-    # product_object_id = models.PositiveIntegerField()
-    # product_content_object = GenericForeignKey()
-
     test = models.ForeignKey(LabTest, on_delete=models.CASCADE)
     integrator_class_name = models.CharField(max_length=40, null=False, blank=False)
     service_type = models.CharField(max_length=30, choices=ServiceType.as_choices(), null=False, blank=False, default=None)
     integrator_product_data = JSONField(blank=True, null=True)
     integrator_test_name = models.CharField(max_length=60, null=False, blank=False, default=None)
-
 
     @classmethod
     def get_if_third_party_integration(cls, test_id):
@@ -47,11 +40,3 @@ class IntegratorMapping(TimeStampedModel):
     class Meta:
         db_table = 'integrator_mapping'
 
-
-# class IntegratorProductDetail(TimeStampedModel):
-#
-#     integrator = models.ForeignKey(IntegratorMapping, on_delete=models.CASCADE)
-#     product_data = JSONField(blank=True, null=True)
-#
-#     class Meta:
-#         db_table = 'integrator_product_detail'
