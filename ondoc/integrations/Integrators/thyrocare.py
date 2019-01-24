@@ -57,8 +57,14 @@ class Thyrocare(BaseIntegrator):
                               service_type=IntegratorMapping.ServiceType.LabTest, object_id=obj_id,
                               content_type=ContentType.objects.get(model='labtest')).save()
 
-    def _get_appointment_slots(self):
-        return {}
+    def _get_appointment_slots(self, pincode, date):
+        url = 'https://www.thyrocare.com/API_BETA/ORDER.svc/%s/%s/GetAppointmentSlots' % (pincode, date)
+        response = requests.get(url)
+        if response.status_code != status.HTTP_200_OK or not response.ok:
+            logger.error("[ERROR] Thyrocare Time slot api failed.")
+            return None
+
+        return response
 
     def _get_is_user_area_serviceable(self, pincode):
         return False

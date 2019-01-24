@@ -8,7 +8,6 @@ from django.contrib.postgres.fields import JSONField
 
 # Create your models here.
 
-
 class IntegratorMapping(TimeStampedModel):
     class ServiceType(Choices):
         LabTest = 'LABTEST'
@@ -40,3 +39,4 @@ class IntegratorMapping(TimeStampedModel):
 
     class Meta:
         db_table = 'integrator_mapping'
+
