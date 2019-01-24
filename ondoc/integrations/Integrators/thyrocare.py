@@ -64,7 +64,8 @@ class Thyrocare(BaseIntegrator):
             logger.error("[ERROR] Thyrocare Time slot api failed.")
             return None
 
-        return response
+        resp_data = response.json()
+        return resp_data
 
     def _get_is_user_area_serviceable(self, pincode):
         url = "https://www.thyrocare.com/API_BETA/order.svc/%s/%s/PincodeAvailability" % (settings.THYROCARE_API_KEY, pincode)
