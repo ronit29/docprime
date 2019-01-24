@@ -1325,7 +1325,6 @@ class DoctorOpdAppointmentForm(forms.ModelForm):
             raise forms.ValidationError(
                 "If Reason for Cancelled appointment is others it should be mentioned in cancellation comment.")
 
-
         if not DoctorClinicTiming.objects.filter(doctor_clinic__doctor=doctor,
                                                  doctor_clinic__hospital=hospital,
                                                  day=time_slot_start.weekday(),
@@ -1333,19 +1332,19 @@ class DoctorOpdAppointmentForm(forms.ModelForm):
             raise forms.ValidationError("Doctor do not sit at the given hospital in this time slot.")
 
         if self.instance.id:
-
-            if self.instance.procedure_mappings.count():
-                doctor_details = self.instance.get_procedures()[0]
-                deal_price = Decimal(doctor_details["deal_price"])
-
-            else:
-                deal_price = cleaned_data.get('deal_price') if cleaned_data.get('deal_price') else self.instance.deal_price
-            if not DoctorClinicTiming.objects.filter(doctor_clinic__doctor=doctor,
-                                                     doctor_clinic__hospital=hospital,
-                                                     day=time_slot_start.weekday(),
-                                                     start__lte=hour, end__gt=hour,
-                                                     deal_price=deal_price).exists():
-                raise forms.ValidationError("Deal price is different for this time slot.")
+            if cleaned_data.get('status') == OpdAppointment.RESCHEDULED_PATIENT or cleaned_data.get(
+                    'status') == OpdAppointment.RESCHEDULED_DOCTOR:
+                if self.instance.procedure_mappings.count():
+                    doctor_details = self.instance.get_procedures()[0]
+                    deal_price = Decimal(doctor_details["deal_price"])
+                else:
+                    deal_price = cleaned_data.get('deal_price') if cleaned_data.get('deal_price') else self.instance.deal_price
+                if not DoctorClinicTiming.objects.filter(doctor_clinic__doctor=doctor,
+                                                         doctor_clinic__hospital=hospital,
+                                                         day=time_slot_start.weekday(),
+                                                         start__lte=hour, end__gt=hour,
+                                                         deal_price=deal_price).exists():
+                    raise forms.ValidationError("Deal price is different for this time slot.")
 
         return cleaned_data
 
