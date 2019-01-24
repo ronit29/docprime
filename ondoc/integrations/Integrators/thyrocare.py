@@ -53,7 +53,7 @@ class Thyrocare(BaseIntegrator):
 
         for result_obj in result_array:
             IntegratorMapping(integrator_product_data=result_obj, integrator_test_name=result_obj['name'],
-                              integrator_class_name=Thyrocare.__class__.__name__,
+                              integrator_class_name=Thyrocare.__name__,
                               service_type=IntegratorMapping.ServiceType.LabTest, object_id=obj_id,
                               content_type=ContentType.objects.get(model='labtest')).save()
 
