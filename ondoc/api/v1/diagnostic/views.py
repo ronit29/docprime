@@ -178,6 +178,7 @@ class LabList(viewsets.ReadOnlyModelViewSet):
         package_type = validated_data.get('package_type')
         sort_on = validated_data.get('sort_on')
         category_ids = validated_data.get('category_ids', None)
+        test_ids = validated_data.get('test_ids', None)
         point_string = 'POINT(' + str(long) + ' ' + str(lat) + ')'
         pnt = GEOSGeometry(point_string, srid=4326)
         max_distance = max_distance*1000 if max_distance is not None else 10000
@@ -231,6 +232,14 @@ class LabList(viewsets.ReadOnlyModelViewSet):
         all_packages_in_non_network_labs = all_packages_in_non_network_labs.filter(id__in=lab_tests)
         all_packages_in_network_labs = all_packages_in_network_labs.filter(id__in=lab_tests)
 
+        if test_ids:
+            all_packages_in_non_network_labs = all_packages_in_non_network_labs.filter(test__id__in=test_ids).annotate(
+                included_test_count=Count('test'))
+            all_packages_in_network_labs = all_packages_in_network_labs.filter(test__id__in=test_ids).annotate(
+                included_test_count=Count('test'))
+            all_packages_in_non_network_labs = all_packages_in_non_network_labs.filter(
+                included_test_count=len(test_ids))
+            all_packages_in_network_labs = all_packages_in_network_labs.filter(included_test_count=len(test_ids))
         if min_distance:
             all_packages_in_non_network_labs = all_packages_in_non_network_labs.filter(distance__gte=min_distance)
             all_packages_in_network_labs = all_packages_in_network_labs.filter(distance__gte=min_distance)

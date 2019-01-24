@@ -1125,11 +1125,11 @@ class LabPackageListSerializer(serializers.Serializer):
     max_price = serializers.IntegerField(required=False)
     sort_on = serializers.CharField(required=False)
     category_ids = CommaSepratedToListField(required=False, max_length=500, typecast_to=int)
+    test_ids = CommaSepratedToListField(required=False, max_length=500, typecast_to=int)
     min_age = serializers.IntegerField(required=False)
     max_age = serializers.IntegerField(required=False)
     gender = serializers.IntegerField(required=False)
     package_type = serializers.IntegerField(required=False)
-
 
     def validate_category_ids(self, attrs):
         try:
@@ -1139,6 +1139,15 @@ class LabPackageListSerializer(serializers.Serializer):
         except:
             raise serializers.ValidationError('Invalid Category IDs')
         raise serializers.ValidationError('Invalid Category IDs')
+
+    def validate_test_ids(self, attrs):
+        try:
+            temp_attrs = [int(attr) for attr in attrs]
+            if LabTest.objects.filter(enable_for_retail=True, searchable=True, id__in=temp_attrs).count() == len(temp_attrs):
+                return attrs
+        except:
+            raise serializers.ValidationError('Invalid Test IDs')
+        raise serializers.ValidationError('Invalid Test IDs')
 
 
 class RecommendedPackageCategoryList(serializers.ModelSerializer):
