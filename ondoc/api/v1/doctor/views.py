@@ -2729,12 +2729,12 @@ class OfflineCustomerViewSet(viewsets.GenericViewSet):
                 effective_price = app.effective_price
                 deal_price = app.deal_price
                 allowed_actions = app.allowed_action(User.DOCTOR, request)
-                phone_number.append({"phone_number": app.user.phone_number, "is_default": True})
+                # phone_number.append({"phone_number": app.user.phone_number, "is_default": True})
                 patient_profile = auth_serializers.UserProfileSerializer(app.profile, context={'request': request}).data
                 patient_thumbnail = patient_profile['profile_image']
                 patient_profile['user_id'] = app.user.id if app.user else None
                 patient_profile['profile_id'] = app.profile.id if hasattr(app, 'profile') else None
-                patient_profile['phone_numbers'] = phone_number
+                # patient_profile['phone_numbers'] = phone_number
                 patient_name = app.profile.name if hasattr(app, 'profile') else None
                 if app.time_slot_start <= timezone.now() and \
                         app.status not in [models.OpdAppointment.COMPLETED, models.OpdAppointment.CANCELLED, models.OpdAppointment.BOOKED]:
