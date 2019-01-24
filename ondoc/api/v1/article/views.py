@@ -153,7 +153,8 @@ class CommentViewSet(viewsets.ModelViewSet):
                 parent = None
 
             if not article:
-                article = None
+                if parent:
+                    article = parent
 
             article_id = None
             submit_date = datetime.now()
@@ -164,11 +165,10 @@ class CommentViewSet(viewsets.ModelViewSet):
                                    site_id=settings.SITE_ID, parent_id=parent, user_name=user_name,
                                    user_email=user_email, user=user)
 
-            if article:
-                article_id = article
-
-            elif parent:
+            if parent:
                 article_id = parent
+            elif article:
+                article_id = article
 
             if article or parent:
                 article_obj = Article.objects.filter(id=article_id).first()
