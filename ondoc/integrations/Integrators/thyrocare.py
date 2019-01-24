@@ -67,4 +67,14 @@ class Thyrocare(BaseIntegrator):
         return response
 
     def _get_is_user_area_serviceable(self, pincode):
-        return False
+        url = "https://www.thyrocare.com/API_BETA/order.svc/%s/%s/PincodeAvailability" % (settings.THYROCARE_API_KEY, pincode)
+        response = requests.get(url)
+        if response.status_code != status.HTTP_200_OK or not response.ok:
+            logger.error("[ERROR] Thyrocare pincode availability api failed")
+            return None
+
+        resp_data = response.json()
+        if not resp_data.get('status', None):
+            return False
+
+        return True if resp_data['status'] == 'Y' else False
