@@ -82,6 +82,7 @@ class CustomCommentsAdmin(CommentsAdminBase):
             thread = ThreadedComment.objects.create(user_name=name, user_email=email,comment=new_comment, object_pk=int(obj.object_pk),
                                               content_type_id=obj.content_type_id, user=request.user, ip_address=None, is_public=True,
                                                is_removed=False, site_id=obj.site_id, parent=obj)
+            # custom_comment = CustomComment.objects.create(author=obj.author, comment=thread.id)
         return 'success'
 
     def parent_comment(self, comment):

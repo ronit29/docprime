@@ -150,8 +150,12 @@ class CommentViewSet(viewsets.ModelViewSet):
                 parent = None
 
             if not parent:
-                parent=None
+                parent = None
 
+            if not article:
+                article = None
+
+            article_id = None
             submit_date = datetime.now()
             content = ContentType.objects.get(model="article").pk
             comment = FluentComment.objects.create(object_pk=article,
@@ -159,8 +163,15 @@ class CommentViewSet(viewsets.ModelViewSet):
                                    content_type_id=content, user_id=self.request.user.id,
                                    site_id=settings.SITE_ID, parent_id=parent, user_name=user_name,
                                    user_email=user_email, user=user)
+
             if article:
-                article_obj = Article.objects.filter(id=int(article)).first()
+                article_id = article
+
+            elif parent:
+                article_id = parent
+
+            if article or parent:
+                article_obj = Article.objects.filter(id=article_id).first()
                 custom_comment = CustomComment.objects.create(author=article_obj.author, comment=comment)
             serializer = CommentSerializer(comment, context={'request': request})
 
