@@ -180,7 +180,7 @@ class LabList(viewsets.ReadOnlyModelViewSet):
         category_ids = validated_data.get('category_ids', None)
         point_string = 'POINT(' + str(long) + ' ' + str(lat) + ')'
         pnt = GEOSGeometry(point_string, srid=4326)
-        max_distance = max_distance if max_distance is not None else 10000
+        max_distance = max_distance*1000 if max_distance is not None else 10000
         if not category_ids:
             category_ids = LabTestCategory.objects.filter(is_live=True, is_package_category=True).values_list('id',
                                                                                                               flat=True)
