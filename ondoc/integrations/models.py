@@ -21,6 +21,7 @@ class IntegratorMapping(TimeStampedModel):
     service_type = models.CharField(max_length=30, choices=ServiceType.as_choices(), null=False, blank=False, default=None)
     integrator_product_data = JSONField(blank=True, null=True)
     integrator_test_name = models.CharField(max_length=60, null=False, blank=False, default=None)
+    is_active = models.BooleanField(default=False)
 
     @classmethod
     def get_if_third_party_integration(cls, test_id):
@@ -39,4 +40,3 @@ class IntegratorMapping(TimeStampedModel):
 
     class Meta:
         db_table = 'integrator_mapping'
-
