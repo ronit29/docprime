@@ -2245,15 +2245,15 @@ class OfflineCustomerViewSet(viewsets.GenericViewSet):
                 sms_list.append(patient_data['sms_list'])
 
             ret_obj = {}
-            ret_obj['doctor'] = patient.doctor.id
+            ret_obj['doctor'] = patient.doctor.id if patient.doctor else None
             ret_obj['hospital'] = patient.hospital.id if patient.hospital else None
             ret_obj['id'] = patient.id
             ret_obj['error'] = patient.error
             ret_obj['error_message'] = patient.error_message
             resp.append(ret_obj)
 
-            if sms_list:
-                transaction.on_commit(lambda: models.OfflineOPDAppointments.after_commit_create_sms(sms_list))
+            # if sms_list:
+            #     transaction.on_commit(lambda: models.OfflineOPDAppointments.after_commit_create_sms(sms_list))
 
         return Response(resp)
 
@@ -2275,6 +2275,7 @@ class OfflineCustomerViewSet(viewsets.GenericViewSet):
                 appntment_ids.append(data.get('id'))
             if data.get('patient') and data['patient'].get('id'):
                 patient_ids.append(data['patient']['id'])
+        appointment_ids = list(models.OfflineOPDAppointments.objects.filter(id__in=appntment_ids).values_list('id', flat=True))
         patient_ids = list(models.OfflinePatients.objects.filter(id__in=patient_ids).values_list('id', flat=True))
         clinic_queryset = [(dc.doctor.id, dc.hospital.id) for dc in
                            models.DoctorClinic.objects.filter(hospital__id__in=req_hosp_ids)]
@@ -2287,16 +2288,17 @@ class OfflineCustomerViewSet(viewsets.GenericViewSet):
             if not id and 'continue' in uuid_obj and uuid_obj.get('continue'):
                 resp.append(uuid_obj.get('obj'))
                 continue
-
+            data['id'] = id
             self.validate_permissions(data, doc_pem_list, hosp_pem_list, clinic_queryset)
 
-            create_obj = self.validate_create_conditions(appntment_ids, data, request)
+            create_obj = self.validate_create_conditions(appointment_ids, data, request)
             if 'continue' in create_obj and create_obj.get('continue'):
                 resp.append(create_obj.get('obj'))
                 continue
 
             if not data.get('patient')['id'] in patient_ids:
                 patient_data = self.create_patient(request, data['patient'], data['hospital'], data['doctor'])
+                patient_ids.append(patient_data['patient'].id)
             else:
                 patient_data = self.update_patient(request, data['patient'], data['hospital'], data['doctor'])
             patient = patient_data['patient']
@@ -2326,8 +2328,7 @@ class OfflineCustomerViewSet(viewsets.GenericViewSet):
 
             if patient_data.get('sms_list'):
                 patient_data['sms_list']['appointment'] = appnt
-            appntment_ids.append(str(appnt.id))
-            patient_ids.append(patient.id)
+            appointment_ids.append(appnt.id)
             ret_obj = {}
             ret_obj['id'] = appnt.id
             ret_obj['patient_id'] = appnt.user.id
@@ -2406,6 +2407,8 @@ class OfflineCustomerViewSet(viewsets.GenericViewSet):
                 patient.share_with_hospital = data.get('share_with_hospital')
             if hosp:
                 patient.hospital = hosp
+            if doctor:
+                patient.doctor = doctor
             patient.save()
             default_num = None
             sms_number = None
