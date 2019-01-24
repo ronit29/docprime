@@ -130,6 +130,7 @@ class CommentViewSet(viewsets.ModelViewSet):
             comment = data['comment']
             user_name = data['name']
             user_email = data['email']
+
             article = data['article']
 
             if user and user.user_type == User.CONSUMER:
@@ -153,27 +154,22 @@ class CommentViewSet(viewsets.ModelViewSet):
 
             submit_date = datetime.now()
             content = ContentType.objects.get(model="article").pk
-            response = {}
             comment = FluentComment.objects.create(object_pk=article,
                                    comment=comment, submit_date=submit_date,
                                    content_type_id=content, user_id=self.request.user.id,
                                    site_id=settings.SITE_ID, parent_id=parent, user_name=user_name,
                                    user_email=user_email, user=user)
-            if comment and article:
+            if article:
                 article_obj = Article.objects.filter(id=int(article)).first()
                 custom_comment = CustomComment.objects.create(author=article_obj.author, comment=comment)
-                serializer = CommentSerializer(comment, context={'request': request})
+            serializer = CommentSerializer(comment, context={'request': request})
 
-                response['status'] = 1
-                response['message'] = 'Comment posted successfully'
-                response['comment'] = serializer.data
+            response = {}
+            response['status'] = 1
+            response['message'] = 'Comment posted successfully'
+            response['comment'] = serializer.data
 
-                return Response(response)
-            else:
-                response['status'] = 0
-                response['message'] = 'Comment not posted successfully'
-                return Response(response)
-
+            return Response(response)
 
     def list(self, request):
         data = request.GET
