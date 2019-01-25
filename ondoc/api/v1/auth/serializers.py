@@ -169,7 +169,7 @@ class UserProfileSerializer(serializers.ModelSerializer):
 
     def get_age(self, obj):
         from datetime import date
-        age = None
+        age = ''
         birth_date = None
         if hasattr(obj, 'dob'):
             birth_date = obj.dob
