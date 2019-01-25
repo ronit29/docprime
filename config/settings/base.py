@@ -14,6 +14,7 @@ import environ
 import datetime
 import json
 import os
+from pymongo import MongoClient
 
 # Build paths inside the project like this: os.path.join(BASE_DIR, ...)
 #BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -364,3 +365,6 @@ CONN_MAX_AGE=600
 AWS_ACCESS_KEY_ID = env('AWS_ACCESS_KEY_ID', default='')
 AWS_SECRET_ACCESS_KEY = env('AWS_SECRET_ACCESS_KEY', default='')
 PROVIDER_EMAIL = env('PROVIDER_EMAIL', default='')
+
+MONGODB = MongoClient('localhost', 27017).docprime
+MONGO_STORE = env.bool('MONGO_STORE', default=False)
