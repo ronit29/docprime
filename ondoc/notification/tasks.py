@@ -303,10 +303,10 @@ def send_offline_appointment_message(number, text, type):
         logger.error("Error sending " + str(type) + " message - " + str(e))
 
 @task
-def send_appointment_reminder_message(number, doctor, date):
+def send_appointment_reminder_message(number, patient_name, doctor, hospital_name, date):
     data = {}
     data['phone_number'] = number
-    text = '''You have an upcomming Appointment with Dr. %s scheduled on %s''' % (doctor, date)
+    text = '''Dear %s, you have an appointment scheduled with %s at %s on %s''' % (patient_name, doctor, hospital_name, date)
     data['text'] = mark_safe(text)
     try:
         notification_models.SmsNotification.send_rating_link(data)
