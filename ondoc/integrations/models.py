@@ -25,7 +25,7 @@ class IntegratorMapping(TimeStampedModel):
 
     @classmethod
     def get_if_third_party_integration(cls, test_id):
-        mapping_wrt_test = cls.objects.filter(test__id=test_id).first()
+        mapping_wrt_test = cls.objects.filter(test__id=test_id, is_active=True).first()
 
         # Return if no test exist over here and it depicts that it is not a part of integrations.
         if not mapping_wrt_test:
