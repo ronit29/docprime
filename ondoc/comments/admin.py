@@ -1,3 +1,5 @@
+import datetime
+
 from fluent_comments import appsettings
 from django.contrib.admin.widgets import AdminTextInputWidget
 from django.core.exceptions import ImproperlyConfigured
@@ -41,7 +43,7 @@ class CustomCommentsAdmin(CommentsAdminBase):
     form = CustomCommentForm
     fieldsets = [
         (_('Content'),
-           {'fields': ('object_link', 'user_name', 'user_email', 'comment', 'submit_date',)}
+           {'fields': ('object_link', 'user_name', 'user_email', 'comment', 'submit_date', 'author', )}
         ),
         (_('Add new comment'),
          {'fields': ('new_comment','name','email','is_author',)}
@@ -57,12 +59,12 @@ class CustomCommentsAdmin(CommentsAdminBase):
 
     list_display = ('user_name_col', 'email', 'comment', 'object_link',  'submit_date', 'is_public')
     readonly_fields = ('parent_comment', 'object_link', 'user', 'ip_address', 'submit_date','comment',
-                       'user_name', 'user_email', 'user_url', 'title')
+                       'user_name', 'user_email', 'user_url', 'title', 'author', )
     #inlines = [FluentCommentsInline]
 
     # Adjust the fieldsets for threaded comments
     if appsettings.USE_THREADEDCOMMENTS:
-        fieldsets[0][1]['fields'] = ('object_link', 'user_name', 'user_email', 'comment', 'submit_date',)  # add title field.
+        fieldsets[0][1]['fields'] = ('object_link', 'user_name', 'user_email', 'comment', 'submit_date', 'author', )  # add title field.
         fieldsets.insert(2, ('Hierarchy', {'fields': ('parent_comment', )}))
         raw_id_fields = ('parent',)
 
@@ -73,17 +75,38 @@ class CustomCommentsAdmin(CommentsAdminBase):
         is_author = form.cleaned_data.get('is_author')
         name = form.cleaned_data.get('name')
         email = form.cleaned_data.get('email')
-
+        submit_date = None
         if new_comment:
             if is_author:
                 email = ''
                 name = ''
+                submit_date = datetime.now()
 
-            thread = ThreadedComment.objects.create(user_name=name, user_email=email,comment=new_comment, object_pk=int(obj.object_pk),
-                                              content_type_id=obj.content_type_id, user=request.user, ip_address=None, is_public=True,
-                                               is_removed=False, site_id=obj.site_id, parent=obj)
-            # custom_comment = CustomComment.objects.create(author=obj.author, comment=thread.id)
-        return 'success'
+            comment = FluentComment.objects.create(object_pk=obj.object_pk,
+                                                   comment=new_comment,
+                                                   content_type_id=obj.content_type_id,
+                                                   site_id=obj.site_id, parent=obj,
+                                                   user_name=name,
+                                                   user_email=email, user=request.user,
+                                                   is_public=True,  is_removed=False)
+
+            if comment.id:
+                if obj and obj.content_object and obj.content_object.author.id:
+                    author_id = obj.content_object.author.id
+                    custom_comment = CustomComment.objects.create(author_id=author_id, comment_id=comment.id)
+                else:
+                    author_id = None
+
+    def author(self, comment):
+        if comment:
+            if comment.content_object and comment.content_object.author.id:
+                author = comment.content_object.author
+                author_id = author.id
+                author_name = author.name
+            return mark_safe('<a target="_blank" href="/admin/doctor/doctor/%s/change/">%s</a>' % (
+                author_id, author_name))
+
+        return None
 
     def parent_comment(self, comment):
         if comment.parent:
@@ -133,7 +156,6 @@ class CustomCommentsAdmin(CommentsAdminBase):
         if db_field.name == 'title':
             kwargs['widget'] = AdminTextInputWidget
         return super(CustomCommentsAdmin, self).formfield_for_dbfield(db_field, **kwargs)
-
 
 
 admin.site.unregister(ThreadedComment)

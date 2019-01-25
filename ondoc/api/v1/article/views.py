@@ -123,15 +123,16 @@ class CommentViewSet(viewsets.ModelViewSet):
         user = None
         if request.user.is_authenticated:
             user = request.user
-        if True:
-            data = self.request.data
-            user = self.request.user
 
-            comment = data['comment']
+        data = self.request.data
+        #user = self.request.user
+        parent_id = None
+        comment = data['comment']
+        if comment:
             user_name = data['name']
             user_email = data['email']
 
-            article = data['article']
+            article_id = data['article']
 
             if user and user.user_type == User.CONSUMER:
                 user_name = user.full_name
@@ -141,38 +142,41 @@ class CommentViewSet(viewsets.ModelViewSet):
                 user_name = 'Anonymous'
 
             if 'parent' in data:
-                parent = data['parent']
+                parent_id = data['parent']
 
             # article_parent_obj = Article.objects.filter(id=parent).first()
             # if article_parent_obj:
             #     parent = article_parent_obj
-            else:
-                parent = None
-
-            if not parent:
-                parent = None
-
-            if not article:
-                if parent:
-                    article = parent
-
-            article_id = None
-            submit_date = datetime.now()
-            content = ContentType.objects.get(model="article").pk
-            comment = FluentComment.objects.create(object_pk=article,
-                                   comment=comment, submit_date=submit_date,
-                                   content_type_id=content, user_id=self.request.user.id,
-                                   site_id=settings.SITE_ID, parent_id=parent, user_name=user_name,
-                                   user_email=user_email, user=user)
-
+            parent = None
+            article = None
+            if parent_id:
+                parent = FluentComment.objects.filter(id=parent_id).first()
             if parent:
-                article_id = parent
-            elif article:
-                article_id = article
+                article = parent.content_object
+                    #Article.objects.filter(id=parent.object_pk).first()
+            elif article_id:
+                article = Article.objects.filter(id=article_id).first()
+            if not article:
+                return Response(status=status.HTTP_404_NOT_FOUND, data={'error': 'article not found'})
+                ##raise error
 
-            if article or parent:
-                article_obj = Article.objects.filter(id=article_id).first()
-                custom_comment = CustomComment.objects.create(author=article_obj.author, comment=comment)
+            submit_date = datetime.now()
+            content_type = ContentType.objects.get(model="article").pk
+            comment = FluentComment.objects.create(object_pk=article.id,
+                                   comment=comment,
+                                   content_type_id=content_type,
+                                   site_id=settings.SITE_ID, parent_id=parent.id if parent else None, user_name=user_name,
+                                   user_email=user_email, user=user, is_public=False)
+
+            # if parent:
+            #     article_id = parent
+            # elif article:
+            #     article_id = article
+            #
+            # if article or parent:
+            #     article_obj = Article.objects.filter(id=article_id).first()
+            #     custom_comment = CustomComment.objects.create(author=article_obj.author, comment=comment)
+
             serializer = CommentSerializer(comment, context={'request': request})
 
             response = {}
@@ -181,6 +185,9 @@ class CommentViewSet(viewsets.ModelViewSet):
             response['comment'] = serializer.data
 
             return Response(response)
+
+        else:
+            return Response(status=status.HTTP_404_NOT_FOUND, data={'error': 'comment not found'})
 
     def list(self, request):
         data = request.GET
@@ -191,3 +198,8 @@ class CommentViewSet(viewsets.ModelViewSet):
 
             serializer = CommentSerializer(comments, many=True, context={'request': request})
             return Response(serializer.data)
+
+
+
+
+

@@ -110,7 +110,7 @@ THIRD_PARTY_APPS = (
     'fluent_comments',
     'threadedcomments',
     'django_comments',
-    'ddtrace.contrib.django',
+    #'ddtrace.contrib.django',
 )
 
 LOCAL_APPS = (
