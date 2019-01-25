@@ -1389,9 +1389,6 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
                 self.outstanding = out_obj
         self.save()
 
-    def generate_invoice(self):
-        pass
-
     def get_billable_admin_level(self):
         if self.hospital.network and self.hospital.network.is_billing_enabled:
             return self.hospital.network, payout_model.Outstanding.HOSPITAL_NETWORK_LEVEL
