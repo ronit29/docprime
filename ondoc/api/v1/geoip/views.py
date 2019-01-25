@@ -131,9 +131,9 @@ class GeoIPAddressURLViewSet(viewsets.GenericViewSet):
     def get_geoip_data(self, request):
 
         default = dict()
-        default["latitude"] = self.DELHI_CENTRE_LAT
-        default["longitude"] = self.DELHI_CENTRE_LONG
-        default["city"] = 'Delhi'
+        default["latitude"] = None
+        default["longitude"] = None
+        default["city"] = None
 
         ip_address, is_routable = get_client_ip(request)
         if not ip_address or not is_routable:
