@@ -470,7 +470,6 @@ def send_lab_reports(appointment_id):
     except Exception as e:
         logger.error(str(e))
 
-
 @task()
 def upload_doctor_data(obj_id):
     from ondoc.doctor.models import UploadDoctorData
@@ -514,3 +513,18 @@ def upload_doctor_data(obj_id):
         else:
             instance.error_msg = [{'line number': 0, 'message': error_message}]
         instance.save(retry=False)
+
+@task()
+def send_pg_acknowledge(order_id=None, order_no=None):
+    try:
+        if order_id is None or order_no is None:
+            logger.error("Cannot acknowledge without order_id and order_no")
+            return
+
+        url = settings.PG_PAYMENT_ACKNOWLEDGE_URL + "?orderNo=" + str(order_no) + "&orderId=" + str(order_id)
+        response = requests.get(url)
+        if response.status_code == status.HTTP_200_OK:
+            print("Payment acknowledged")
+
+    except Exception as e:
+        logger.error("Error in sending pg acknowledge - " + str(e))
