@@ -6,6 +6,7 @@ from fluent_comments.models import FluentComment
 from ondoc.articles.models import Article, ArticleLinkedUrl, LinkedArticle
 from ondoc.articles.models import ArticleCategory
 from ondoc.doctor.v1.serializers import DoctorSerializer, ArticleAuthorSerializer
+from django.db import models
 
 
 class LinkedArticleSerializer(serializers.ModelSerializer):
@@ -147,17 +148,32 @@ class ArticleCategoryListSerializer(serializers.ModelSerializer):
         fields = ('name', 'url', 'title', 'description')
 
 
-class RecursiveField(serializers.Serializer):
-    def to_representation(self, value):
-        serializer = self.parent.parent.__class__(
-            value,
-            context=self.context)
-        return serializer.data
+class FilteredCommentsManager(models.Manager):
+    def get_queryset(self):
+        return super().get_queryset().filter(is_public=True)
+
+
+
+# class RecursiveField(serializers.Serializer):
+#     def to_representation(self, value):
+#         #value.children = value.children.filter('is_public')
+#         value.filter_children = value.children.filter(is_public=True)
+#         if value.is_public == True:
+#             serializer = self.parent.parent.__class__(
+#                 value,
+#                 context=self.context)
+#             return serializer.data
 
 
 class CommentSerializer(serializers.ModelSerializer):
-    children = RecursiveField(many=True)
+    #children = RecursiveField(many=True)
+    children = serializers.SerializerMethodField()
     author = serializers.SerializerMethodField()
+
+    def get_children(self, obj):
+        if len(obj.children.filter(is_public=True))>0:
+            return CommentSerializer(obj.children.filter(is_public=True), many=True).data
+        return None
 
     def get_author(self, obj):
         custom_data = obj.customcomment_set.first()
