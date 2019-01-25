@@ -1048,12 +1048,6 @@ class TransactionViewSet(viewsets.GenericViewSet):
 
                         try:
                             if pg_tx_queryset:
-                                send_pg_acknowledge.apply_async((response_data.get("order_id"), response_data.get("order_no"),), countdown=1)
-                        except Exception as e:
-                            logger.error("Error in sending pg acknowledge - " + str(e))
-
-                        try:
-                            if pg_tx_queryset:
                                 appointment_obj = order_obj.process_order()
                         except Exception as e:
                             logger.error("Error in building appointment - " + str(e))
@@ -1106,6 +1100,15 @@ class TransactionViewSet(viewsets.GenericViewSet):
             OrderLog.objects.create(**log_data)
         except Exception as e:
             logger.error("Error in logging Order - " + str(e))
+
+        try:
+            if response and response.get("orderNo"):
+                pg_txn = PgTransaction.objects.filter(order_no__iexact=response.get("orderNo")).first()
+                if pg_txn:
+                    send_pg_acknowledge.apply_async((pg_txn.order_id, pg_txn.order_no,), countdown=1)
+        except Exception as e:
+            logger.error("Error in sending pg acknowledge - " + str(e))
+
 
         # return Response({"url": REDIRECT_URL})
         return HttpResponseRedirect(redirect_to=REDIRECT_URL)
