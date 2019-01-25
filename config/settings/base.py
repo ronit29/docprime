@@ -135,7 +135,8 @@ LOCAL_APPS = (
     'ondoc.geoip',
     'ondoc.procedure',
     'ondoc.elastic',
-    'ondoc.banner'
+    'ondoc.banner',
+    'ondoc.ckedit'
 )
 
 INSTALLED_APPS = DJANGO_APPS + THIRD_PARTY_APPS + LOCAL_APPS
@@ -328,6 +329,7 @@ TIME_BEFORE_APPOINTMENT_TO_SEND_OTP = 60  # in minutes
 # MONGO_URL = env.list('MONGO_URL')
 #GOOGLE_MAP_API_KEY = env('GOOGLE_MAP_API_KEY')
 MATRIX_NUMBER_MASKING = env('MATRIX_NUMBER_MASKING')
+UPDATE_DOCTOR_SEARCH_SCORE_TIME = 24  # In hours
 
 ANYMAIL = {
     "MAILGUN_API_KEY": env('MAILGUN_API_KEY', default=None),

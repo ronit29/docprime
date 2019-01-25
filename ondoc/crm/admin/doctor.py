@@ -20,13 +20,13 @@ import datetime
 from django.db import transaction
 import logging
 from dal import autocomplete
-
+from ondoc.api.v1.utils import GenericAdminEntity, util_absolute_url, util_file_name
 from ondoc.procedure.models import DoctorClinicProcedure, Procedure
 
 logger = logging.getLogger(__name__)
 
 
-from ondoc.account.models import Order
+from ondoc.account.models import Order, Invoice
 from django.contrib.contenttypes.admin import GenericTabularInline
 from ondoc.authentication.models import GenericAdmin, SPOCDetails, AssociatedMerchant, Merchant
 from ondoc.doctor.models import (Doctor, DoctorQualification,
@@ -39,7 +39,10 @@ from ondoc.doctor.models import (Doctor, DoctorQualification,
                                  OpdAppointment, CompetitorInfo, SpecializationDepartment,
                                  SpecializationField, PracticeSpecialization, SpecializationDepartmentMapping,
                                  DoctorPracticeSpecialization, CompetitorMonthlyVisit,
-                                 GoogleDetailing, VisitReason, VisitReasonMapping, PracticeSpecializationContent)
+                                 GoogleDetailing, VisitReason, VisitReasonMapping, PracticeSpecializationContent,
+                                 PatientMobile, DoctorMobileOtp,
+                                 UploadDoctorData, CancellationReason)
+
 from ondoc.authentication.models import User
 from .common import *
 from .autocomplete import CustomAutoComplete
@@ -52,6 +55,7 @@ from ondoc.authentication import models as auth_model
 from django import forms
 from decimal import Decimal
 from .common import AssociatedMerchantInline
+from ondoc.sms import api
 
 class AutoComplete:
     def autocomplete_view(self, request):
@@ -429,6 +433,8 @@ class HospitalDocumentInline(admin.TabularInline):
 class DoctorMobileForm(forms.ModelForm):
     number = forms.CharField(required=True)
     is_primary = forms.BooleanField(required=False)
+    mark_primary = forms.BooleanField(required=False)
+    otp = forms.IntegerField(required=False)
 
     def clean(self):
         super().clean()
@@ -442,18 +448,29 @@ class DoctorMobileForm(forms.ModelForm):
                 std_code=int(std_code)
             except:
                 raise forms.ValidationError("Invalid STD code")
-
+    
         try:
             number=int(number)
         except:
             raise forms.ValidationError("Invalid Number")
-
+    
         if std_code:
             if data.get('is_primary'):
                 raise forms.ValidationError("Primary number should be a mobile number")
         else:
             if number and (number<5000000000 or number>9999999999):
                 raise forms.ValidationError("Invalid mobile number")
+    
+        #Marking doctor mobile primary work.
+        # if std_code and data.get('mark_primary'):
+        #     raise forms.ValidationError('Primary number should be a mobile number')
+        
+        # if not std_code and data.get('mark_primary'):
+        #     if number and (number<5000000000 or number>9999999999):
+        #         raise forms.ValidationError("Invalid mobile number")
+
+    class Meta:
+        fields = '__all__'
 
 
 # class DoctorMobileFormSet(forms.BaseInlineFormSet):
@@ -461,27 +478,122 @@ class DoctorMobileForm(forms.ModelForm):
 #         super().clean()
 #         if any(self.errors):
 #             return
-#
+
 #         primary = 0
+#         mark_primary = 0
 #         count = 0
+
 #         for value in self.cleaned_data:
+#             std_code = value.get('std_code')
+#             number = value.get('number')
+#             if std_code:
+#                 try:
+#                     std_code=int(std_code)
+#                 except:
+#                     raise forms.ValidationError("Invalid STD code")
+
+#             try:
+#                 number=int(number)
+#             except:
+#                 raise forms.ValidationError("Invalid Number")
+
+#             if std_code:
+#                 if value.get('is_primary'):
+#                     raise forms.ValidationError("Primary number should be a mobile number")
+
+#                 if value.get('mark_primary'):
+#                     raise forms.ValidationError("Mark primary is only applicable for mobile numbers.")
+
+#             else:
+#                 if number and (number<5000000000 or number>9999999999):
+#                     raise forms.ValidationError("Invalid mobile number")
+
 #             count += 1
+
+
 #             if value.get('is_primary'):
+#                 if self.forms[0].instance.doctor.onboarding_status == 3:
+#                     if value.get('DELETE'):
+#                         raise forms.ValidationError('Primary number cannot be deleted.')
+
+#                     if not value.get('id'):
+#                         raise forms.ValidationError('Primary number can be marked only by checking mark_primary, '
+#                                                     'obtaining otp and entering otp again.')
+#                     id = value.get('id').id
+#                     if id and not DoctorMobile.objects.filter(id=id, is_primary=True).exists():
+#                         raise forms.ValidationError('Primary number can be marked only by checking mark_primary, '
+#                                                     'obtaining otp and entering otp again.')
+
+#                     if id and not DoctorMobile.objects.filter(id=id, number=value.get('number')).exists():
+#                         raise forms.ValidationError('Primary number cannot be changed. Add another number , mark it as primary'
+#                                                     ' and validate it with otp')
+
+#                     if value.get('mark_primary'):
+#                         raise forms.ValidationError('Number is already primary number.')
+
 #                 primary += 1
-#
+
+#             if value.get('mark_primary'):
+#                 mark_primary += 1
+
 #         if count > 0:
-#             if not primary == 1:
-#                 raise forms.ValidationError("Doctor must have one primary mobile number.")
+
+#             if primary > 1:
+#                 raise forms.ValidationError("Doctor can have only one primary number.")
+
+#             if DoctorMobile.objects.filter(doctor=self.forms[0].instance.doctor).exists() \
+#                     and self.forms[0].instance.doctor.onboarding_status == 3:
+#                 if primary != 1 :
+#                     raise forms.ValidationError("Doctor must have one primary mobile number.")
+#             if mark_primary > 1:
+#                 raise forms.ValidationError("Doctor can change only one primary mobile number.")
+
+#         record = None
+#         todo_make_primary = None
+#         for form in self.forms:
+#             if form.instance.mark_primary and not form.instance.otp:
+#                 # if not DoctorMobileOtp.objects.filter(doctor_mobile=form.instance).exists():
+#                 form.instance.save()
+#                 dmo = DoctorMobileOtp.create_otp(form.instance)
+#                 message = "The OTP for onboard process is %d" % dmo.otp
+
+#                 try:
+#                     api.send_sms(message, str(form.instance.number))
+#                 except Exception as e:
+#                     logger.error(str(e))
+
+#             elif form.instance.mark_primary and form.instance.otp:
+#                 doctor_mobile_otp = form.instance.mobiles_otp.all().last()
+#                 resonse = doctor_mobile_otp.consume()
+#                 if resonse:
+#                     # DoctorMobile.objects.filter(doctor=form.instance.doctor).update(is_primary=False)
+#                     # form.instance.is_primary = True
+#                     todo_make_primary = form.instance.id
+#                     form.instance.otp = None
+#                     form.instance.mark_primary = False
+#                 else:
+#                     raise forms.ValidationError("OTP is incorrect")
+
+
+#             elif not form.instance.mark_primary and form.instance.otp:
+#                 form.instance.otp = None
+
+#         if todo_make_primary:
+#             for form in self.forms:
+#                 if form.instance.id == todo_make_primary:
+#                     form.instance.is_primary = True
+#                 else:
+#                     form.instance.is_primary = False
 
 
 class DoctorMobileInline(nested_admin.NestedTabularInline):
     model = DoctorMobile
     form = DoctorMobileForm
-    # formset = DoctorMobileFormSet
+    #formset = DoctorMobileFormSet
     extra = 0
     can_delete = True
     show_change_link = False
-    fields = ['std_code','number', 'is_primary']
+    fields = ['std_code','number', 'is_primary', 'mark_primary', 'otp']
 
 
 class DoctorEmailForm(forms.ModelForm):
@@ -671,7 +783,9 @@ class GenericAdminInline(nested_admin.NestedTabularInline):
         return ['user', 'updated_at']
 
     def get_queryset(self, request):
-        return super(GenericAdminInline, self).get_queryset(request).select_related('doctor', 'hospital', 'user')
+        return super(GenericAdminInline, self).get_queryset(request).select_related('doctor', 'hospital', 'user')\
+            .filter(entity_type=GenericAdminEntity.DOCTOR)
+
 
     def formfield_for_foreignkey(self, db_field, request, **kwargs):
         if db_field.name == "hospital":
@@ -898,7 +1012,7 @@ class DoctorAdmin(AutoComplete, ImportExportMixin, VersionAdmin, ActionAdmin, QC
     list_filter = (
         'data_status', 'onboarding_status', 'is_live', 'enabled', 'is_insurance_enabled', 'doctorpracticespecializations__specialization',
         CityFilter, CreatedByFilter)
-    #form = DoctorForm
+    form = DoctorForm
     inlines = [
         CompetitorInfoInline,
         CompetitorMonthlyVisitsInline,
@@ -1233,7 +1347,6 @@ class DoctorOpdAppointmentForm(forms.ModelForm):
             raise forms.ValidationError(
                 "If Reason for Cancelled appointment is others it should be mentioned in cancellation comment.")
 
-
         if not DoctorClinicTiming.objects.filter(doctor_clinic__doctor=doctor,
                                                  doctor_clinic__hospital=hospital,
                                                  day=time_slot_start.weekday(),
@@ -1241,19 +1354,19 @@ class DoctorOpdAppointmentForm(forms.ModelForm):
             raise forms.ValidationError("Doctor do not sit at the given hospital in this time slot.")
 
         if self.instance.id:
-
-            if self.instance.procedure_mappings.count():
-                doctor_details = self.instance.get_procedures()[0]
-                deal_price = Decimal(doctor_details["deal_price"])
-
-            else:
-                deal_price = cleaned_data.get('deal_price') if cleaned_data.get('deal_price') else self.instance.deal_price
-            if not DoctorClinicTiming.objects.filter(doctor_clinic__doctor=doctor,
-                                                     doctor_clinic__hospital=hospital,
-                                                     day=time_slot_start.weekday(),
-                                                     start__lte=hour, end__gt=hour,
-                                                     deal_price=deal_price).exists():
-                raise forms.ValidationError("Deal price is different for this time slot.")
+            if cleaned_data.get('status') == OpdAppointment.RESCHEDULED_PATIENT or cleaned_data.get(
+                    'status') == OpdAppointment.RESCHEDULED_DOCTOR:
+                if self.instance.procedure_mappings.count():
+                    doctor_details = self.instance.get_procedures()[0]
+                    deal_price = Decimal(doctor_details["deal_price"])
+                else:
+                    deal_price = cleaned_data.get('deal_price') if cleaned_data.get('deal_price') else self.instance.deal_price
+                if not DoctorClinicTiming.objects.filter(doctor_clinic__doctor=doctor,
+                                                         doctor_clinic__hospital=hospital,
+                                                         day=time_slot_start.weekday(),
+                                                         start__lte=hour, end__gt=hour,
+                                                         deal_price=deal_price).exists():
+                    raise forms.ValidationError("Deal price is different for this time slot.")
 
         return cleaned_data
 
@@ -1301,6 +1414,8 @@ class DoctorOpdAppointmentAdmin(admin.ModelAdmin):
     def get_form(self, request, obj=None, **kwargs):
         form = super().get_form(request, obj=obj, **kwargs)
         form.request = request
+        form.base_fields['cancellation_reason'].queryset = CancellationReason.objects.filter(
+            Q(type=Order.DOCTOR_PRODUCT_ID) | Q(type__isnull=True), visible_on_admin=True)
         if obj is not None and obj.time_slot_start:
             time_slot_start = timezone.localtime(obj.time_slot_start, pytz.timezone(settings.TIME_ZONE))
             form.base_fields['start_date'].initial = time_slot_start.strftime('%Y-%m-%d')
@@ -1313,7 +1428,7 @@ class DoctorOpdAppointmentAdmin(admin.ModelAdmin):
                     'contact_details', 'profile', 'profile_detail', 'user', 'booked_by', 'procedures_details',
                     'fees', 'effective_price', 'mrp', 'deal_price', 'payment_status', 'status', 'cancel_type',
                     'cancellation_reason', 'cancellation_comments',
-                    'start_date', 'start_time', 'payment_type', 'otp', 'insurance', 'outstanding')
+                    'start_date', 'start_time', 'payment_type', 'otp', 'insurance', 'outstanding', 'invoice_urls')
         elif request.user.groups.filter(name=constants['OPD_APPOINTMENT_MANAGEMENT_TEAM']).exists():
             return ('booking_id', 'doctor_name', 'doctor_id', 'doctor_details', 'hospital_name', 'hospital_details',
                     'kyc', 'contact_details', 'used_profile_name',
@@ -1322,22 +1437,30 @@ class DoctorOpdAppointmentAdmin(admin.ModelAdmin):
                     'fees', 'effective_price', 'mrp', 'deal_price', 'payment_status',
                     'payment_type', 'admin_information', 'otp', 'insurance', 'outstanding',
                     'status', 'cancel_type', 'cancellation_reason', 'cancellation_comments',
-                    'start_date', 'start_time')
+                    'start_date', 'start_time', 'invoice_urls')
         else:
             return ()
 
     def get_readonly_fields(self, request, obj=None):
         if request.user.is_superuser and request.user.is_staff:
-            return 'booking_id', 'doctor_id', 'doctor_details', 'contact_details', 'hospital_details', 'kyc', 'procedures_details'
+            return 'booking_id', 'doctor_id', 'doctor_details', 'contact_details', 'hospital_details', 'kyc', 'procedures_details', 'invoice_urls'
         elif request.user.groups.filter(name=constants['OPD_APPOINTMENT_MANAGEMENT_TEAM']).exists():
             return ('booking_id', 'doctor_name', 'doctor_id', 'doctor_details', 'hospital_name',
                     'hospital_details', 'kyc', 'contact_details',
                     'used_profile_name', 'used_profile_number', 'default_profile_name',
                     'default_profile_number', 'user_id', 'user_number', 'booked_by',
                     'fees', 'effective_price', 'mrp', 'deal_price', 'payment_status', 'payment_type',
-                    'admin_information', 'otp', 'insurance', 'outstanding', 'procedures_details')
+                    'admin_information', 'otp', 'insurance', 'outstanding', 'procedures_details','invoice_urls')
         else:
-            return ()
+            return ('invoice_urls')
+
+    def invoice_urls(self, instance):
+        invoices_urls = ''
+        for invoice in instance.get_invoice_urls():
+            invoices_urls += "<a href={} target='_blank'>{}</a><br>".format(util_absolute_url(invoice),
+                                                                             util_file_name(invoice))
+        return mark_safe(invoices_urls)
+    invoice_urls.short_description = 'Invoice(s)'
 
     def procedures_details(self, obj):
         procedure_mappings = obj.procedure_mappings.all()
@@ -1773,3 +1896,36 @@ class PracticeSpecializationContentAdmin(admin.ModelAdmin):
     display = ('specialization', 'content', )
     autocomplete_fields = ('specialization', )
 
+
+class PatientMobileInline(admin.TabularInline):
+    model = PatientMobile
+    extra = 0
+    can_delete = True
+    show_change_link = True
+
+
+class OfflinePatientAdmin(VersionAdmin):
+    list_display = ('name', 'gender', 'referred_by')
+    date_hierarchy = 'created_at'
+    inlines = [PatientMobileInline]
+
+
+class UploadDoctorDataAdmin(admin.ModelAdmin):
+    list_display = ('id', 'source', 'batch', 'status', 'file')
+    readonly_fields = ('status', 'error_message', 'user', 'lines')
+
+    def save_model(self, request, obj, form, change):
+        if obj:
+            if not obj.user:
+                obj.user = request.user
+        super().save_model(request, obj, form, change)
+
+    def error_message(self, instance):
+        final_message = ''
+        if instance.error_msg:
+            for message in instance.error_msg:
+                if isinstance(message, dict):
+                    final_message += '{}  ::  {}\n\n'.format(message.get('line number', ''), message.get('message', ''))
+                else:
+                    final_message += str(message)
+        return final_message

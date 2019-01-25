@@ -58,9 +58,11 @@ class SeoLabNetwork(TimeStampedModel):
 class NewDynamic(TimeStampedModel):
     top_content = models.TextField(null=False, blank=True)
     bottom_content = models.TextField(null=False, blank=True)
-    url = models.ForeignKey(EntityUrls, on_delete=models.DO_NOTHING, null=True, blank=True)
+    url = models.ForeignKey(EntityUrls, on_delete=models.DO_NOTHING, null=True, blank=True, db_constraint=False)
     url_value = models.TextField(null=False, blank=True)
     is_enabled = models.BooleanField(default=False)
+    meta_title = models.CharField(max_length=5000, default='', blank=True)
+    meta_description = models.CharField(max_length=5000, default='', blank=True)
     class Meta:
         db_table = "dynamic_url_content"
 

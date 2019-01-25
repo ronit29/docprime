@@ -56,7 +56,7 @@ class RatingsGraphSerializer(serializers.Serializer):
         response = []
         comp_count = {}
         request = self.context.get('request')
-        for rate in obj.prefetch_related('compliment').filter(compliment__rating_level__in=[4, 5]):
+        for rate in obj.filter(compliment__rating_level__in=[4, 5]):
             for cmlmnt in rate.compliment.all():
                 r = {'id': cmlmnt.id,
                      'message': cmlmnt.message,
@@ -94,19 +94,18 @@ class RatingsGraphSerializer(serializers.Serializer):
                  3: {'count': 0, 'percent': 0},
                  4: {'count': 0, 'percent': 0},
                  5: {'count': 0, 'percent': 0}}
-        total = obj.count()
+        total = len(obj)
         if total:
-            for rate in obj.all():
+            for rate in obj:
                 star_data[rate.ratings]['count'] += 1
             for key, value in star_data.items():
                 star_data[key]['percent'] = '{0:.2f}'.format((star_data[key]['count'] / total * 100))
             return star_data
         return star_data
 
-
     def get_avg_rating(self, obj):
         avg = None
-        if obj.all().first():
+        if obj.exists():
             all_rating = obj.values_list('ratings', flat=True)
             avg = sum(all_rating) / len(all_rating)
             avg = round(avg, 1)

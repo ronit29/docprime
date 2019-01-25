@@ -2,7 +2,7 @@ from ondoc.api.v1.diagnostic.serializers import CustomLabTestPackageSerializer
 from ondoc.authentication.backends import JWTAuthentication
 from ondoc.api.v1.diagnostic import serializers as diagnostic_serializer
 from ondoc.api.v1.auth.serializers import AddressSerializer
-
+from ondoc.ratings_review import models as rating_models
 from ondoc.diagnostic.models import (LabTest, AvailableLabTest, Lab, LabAppointment, LabTiming, PromotedLab,
                                      CommonDiagnosticCondition, CommonTest, CommonPackage,
                                      FrequentlyAddedTogetherTests, TestParameter, ParameterLabTest, QuestionAnswer,
@@ -68,10 +68,10 @@ class SearchPageViewSet(viewsets.ReadOnlyModelViewSet):
         count = int(count)
         if count <= 0:
             count = 10
-        test_queryset = CommonTest.objects.filter(test__enable_for_retail=True)[:count]
+        test_queryset = CommonTest.objects.filter(test__enable_for_retail=True, test__searchable=True)[:count]
         conditions_queryset = CommonDiagnosticCondition.objects.prefetch_related('lab_test').all()
         lab_queryset = PromotedLab.objects.select_related('lab').filter(lab__is_live=True, lab__is_test_lab=False)
-        package_queryset = CommonPackage.objects.prefetch_related('package').filter(package__enable_for_retail=True)[:count]
+        package_queryset = CommonPackage.objects.prefetch_related('package').filter(package__enable_for_retail=True, package__searchable=True)[:count]
         test_serializer = diagnostic_serializer.CommonTestSerializer(test_queryset, many=True, context={'request': request})
         package_serializer = diagnostic_serializer.CommonPackageSerializer(package_queryset, many=True, context={'request': request})
         lab_serializer = diagnostic_serializer.PromotedLabsSerializer(lab_queryset, many=True)
@@ -175,6 +175,7 @@ class LabList(viewsets.ReadOnlyModelViewSet):
         all_packages_in_network_labs = LabTest.objects.prefetch_related('test').filter(enable_for_retail=True,
                                                                                        searchable=True, is_package=True,
                                                                                        availablelabs__enabled=True,
+                                                                                       availablelabs__lab_pricing_group__labs__is_live=True,
                                                                                        availablelabs__lab_pricing_group__labs__network__isnull=False,
                                                                                        availablelabs__lab_pricing_group__labs__location__dwithin=(
                                                                                            Point(float(long),
@@ -195,6 +196,8 @@ class LabList(viewsets.ReadOnlyModelViewSet):
                                                                                            searchable=True,
                                                                                            is_package=True,
                                                                                            availablelabs__enabled=True,
+                                                                                           availablelabs__lab_pricing_group__labs__is_live=True,
+                                                                                           availablelabs__lab_pricing_group__labs__enabled=True,
                                                                                            availablelabs__lab_pricing_group__labs__network__isnull=True,
                                                                                            availablelabs__lab_pricing_group__labs__location__dwithin=(
                                                                                                Point(float(long),
@@ -637,7 +640,8 @@ class LabList(viewsets.ReadOnlyModelViewSet):
                         and St_dwithin( St_setsrid(St_point((%(longitude)s), (%(latitude)s)), 4326),lb.location, (%(max_distance)s)) 
                         and St_dwithin(St_setsrid(St_point((%(longitude)s), (%(latitude)s)), 4326), lb.location,  (%(min_distance)s)) = false 
                         and avlt.enabled = True 
-                        inner join lab_test lt on lt.id = avlt.test_id where 1=1 {filter_query_string}
+                        inner join lab_test lt on lt.id = avlt.test_id and lt.enable_for_retail=True 
+                         where 1=1 {filter_query_string}
 
                         group by lb.id having count(*)=(%(length)s))a
                         {group_filter_query_string})y )x where rank<=5 )z 
@@ -851,16 +855,16 @@ class LabList(viewsets.ReadOnlyModelViewSet):
 
     @transaction.non_atomic_requests
     def retrieve(self, request, lab_id, entity=None):
-
-        lab_obj = Lab.objects.prefetch_related('rating','lab_documents').filter(id=lab_id, is_live=True).first()
+        lab_obj = Lab.objects.select_related('network')\
+                             .prefetch_related('rating', 'lab_documents')\
+                             .filter(id=lab_id, is_live=True).first()
 
         if not lab_obj:
             return Response(status=status.HTTP_404_NOT_FOUND)
 
         if not entity:
             entity = EntityUrls.objects.filter(entity_id=lab_id,
-                                               sitemap_identifier=EntityUrls.SitemapIdentifier.LAB_PAGE).order_by(
-                '-is_valid')
+                                               sitemap_identifier=EntityUrls.SitemapIdentifier.LAB_PAGE).order_by('-is_valid')
             if len(entity) > 0:
                 entity = entity[0]
 
@@ -876,7 +880,7 @@ class LabList(viewsets.ReadOnlyModelViewSet):
         test_serializer = diagnostic_serializer.AvailableLabTestPackageSerializer(queryset, many=True,
                                                                            context={"lab": lab_obj})
         # for Demo
-        demo_lab_test = AvailableLabTest.objects.filter(test__enable_for_retail=True, lab_pricing_group=lab_obj.lab_pricing_group, enabled=True).order_by("-test__priority").prefetch_related('test')[:2]
+        demo_lab_test = AvailableLabTest.objects.filter(test__enable_for_retail=True, lab_pricing_group=lab_obj.lab_pricing_group, enabled=True, test__searchable=True).order_by("-test__priority").prefetch_related('test')[:2]
         lab_test_serializer = diagnostic_serializer.AvailableLabTestSerializer(demo_lab_test, many=True, context={"lab": lab_obj})
         day_now = timezone.now().weekday()
         timing_queryset = list()
@@ -900,8 +904,12 @@ class LabList(viewsets.ReadOnlyModelViewSet):
         #                                    entity_type__iexact='Lab')
         # if entity.exists():
         #     entity = entity.first()
-
-        lab_serializer = diagnostic_serializer.LabModelSerializer(lab_obj, context={"request": request, "entity": entity})
+        rating_queryset = lab_obj.rating.filter(is_live=True)
+        if lab_obj.network:
+            rating_queryset = rating_models.RatingsReview.objects.prefetch_related('compliment').filter(is_live=True, lab_ratings__network=lab_obj.network)
+        lab_serializer = diagnostic_serializer.LabModelSerializer(lab_obj, context={"request": request,
+                                                                                    "entity": entity,
+                                                                                    "rating_queryset": rating_queryset})
         lab_serializable_data = lab_serializer.data
         if entity:
             lab_serializable_data['url'] = entity.url
@@ -1254,7 +1262,7 @@ class LabAppointmentView(mixins.CreateModelMixin,
         serializer.is_valid(raise_exception=True)
         appointment_data = self.form_lab_app_data(request, serializer.validated_data)
 
-        resp = self.create_order(request, appointment_data, account_models.Order.LAB_PRODUCT_ID)
+        resp = self.create_order(request, appointment_data, account_models.Order.LAB_PRODUCT_ID, data.get("use_wallet"))
 
         return Response(data=resp)
 
@@ -1370,13 +1378,18 @@ class LabAppointmentView(mixins.CreateModelMixin,
         }
         return Response(response)
 
-    def create_order(self, request, appointment_details, product_id):
-        remaining_amount = 0
+    def create_order(self, request, appointment_details, product_id, use_wallet=True):
+
         user = request.user
-        consumer_account = account_models.ConsumerAccount.objects.get_or_create(user=user)
-        consumer_account = account_models.ConsumerAccount.objects.select_for_update().get(user=user)
-        balance = consumer_account.balance
-        cashback_balance = consumer_account.cashback
+        balance = 0
+        cashback_balance = 0
+
+        if use_wallet:
+            consumer_account = account_models.ConsumerAccount.objects.get_or_create(user=user)
+            consumer_account = account_models.ConsumerAccount.objects.select_for_update().get(user=user)
+            balance = consumer_account.balance
+            cashback_balance = consumer_account.cashback
+
         total_balance = balance + cashback_balance
         resp = {}
 
@@ -1742,13 +1755,15 @@ class TestDetailsViewset(viewsets.GenericViewSet):
                for fbt in fbts:
                     name = fbt.name
                     id = fbt.id
-                    booked_together.append({'id': id, 'lab_test': name})
+                    show_details = fbt.show_details
+                    booked_together.append({'id': id, 'lab_test': name, 'show_details': show_details})
 
             else:
                 for fbt in data.base_test.all():
                     name = fbt.booked_together_test.name
                     id = fbt.booked_together_test.id
-                    booked_together.append({'id': id, 'lab_test': name})
+                    show_details = fbt.booked_together_test.show_details
+                    booked_together.append({'id': id, 'lab_test': name, 'show_details': show_details})
 
             result['frequently_booked_together'] = {'title': 'Frequently booked together', 'value': booked_together}
             result['show_details'] = data.show_details

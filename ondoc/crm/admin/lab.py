@@ -20,8 +20,9 @@ from django.utils.timezone import make_aware
 from django.utils.html import format_html_join
 import pytz
 
-from ondoc.account.models import Order
-from ondoc.doctor.models import Hospital
+from ondoc.account.models import Order, Invoice
+from ondoc.api.v1.utils import util_absolute_url, util_file_name
+from ondoc.doctor.models import Hospital, CancellationReason
 from ondoc.diagnostic.models import (LabTiming, LabImage,
                                      LabManager, LabAccreditation, LabAward, LabCertification, AvailableLabTest,
                                      LabNetwork, Lab, LabOnboardingToken, LabService, LabDoctorAvailability,
@@ -671,7 +672,7 @@ class LabAppointmentForm(forms.ModelForm):
     start_time = forms.CharField(widget=TimePickerWidget())
     cancel_type = forms.ChoiceField(label='Cancel Type', choices=((0, 'Cancel and Rebook'),
                                                                   (1, 'Cancel and Refund'),), initial=0, widget=forms.RadioSelect)
-    # send_email_sms_report = forms.BooleanField(label='Send reports via message and email', initial=False, required=False)
+    send_email_sms_report = forms.BooleanField(label='Send reports via message and email', initial=False, required=False)
 
     def clean(self):
         super().clean()
@@ -694,9 +695,13 @@ class LabAppointmentForm(forms.ModelForm):
             lab = self.instance.lab
         else:
             raise forms.ValidationError("Lab and lab test details not entered.")
-        # if cleaned_data.get('send_email_sms_report', False) and self.instance and self.instance.id and not sum(
-        #         self.instance.reports.annotate(no_of_files=Count('files')).values_list('no_of_files', flat=True)):
-        #         raise forms.ValidationError("Can't send reports as none are available. Please upload.")
+        if cleaned_data.get('send_email_sms_report', False) and self.instance and self.instance.id and not sum(
+                self.instance.reports.annotate(no_of_files=Count('files')).values_list('no_of_files', flat=True)):
+                raise forms.ValidationError("Can't send reports as none are available. Please upload.")
+
+        if cleaned_data.get('send_email_sms_report',
+                            False) and self.instance and self.instance.id and not self.instance.status == LabAppointment.COMPLETED:
+                raise forms.ValidationError("Can't send reports as appointment is not completed")
         # SHASHANK_SINGH if no report error.
 
         # if self.instance.status in [LabAppointment.CANCELLED, LabAppointment.COMPLETED] and len(cleaned_data):
@@ -767,7 +772,7 @@ class LabAppointmentAdmin(nested_admin.NestedModelAdmin):
 
     def get_autocomplete_fields(self, request):
         if request.user.is_superuser:
-            temp_autocomplete_fields = ('lab', 'profile', 'user', 'cancellation_reason')
+            temp_autocomplete_fields = ('lab', 'profile', 'user')
         else:
             temp_autocomplete_fields = super().get_autocomplete_fields(request)
         return temp_autocomplete_fields
@@ -799,6 +804,8 @@ class LabAppointmentAdmin(nested_admin.NestedModelAdmin):
     def get_form(self, request, obj=None, **kwargs):
         form = super().get_form(request, obj=obj, **kwargs)
         form.request = request
+        form.base_fields['cancellation_reason'].queryset = CancellationReason.objects.filter(
+            Q(type=Order.LAB_PRODUCT_ID) | Q(type__isnull=True), visible_on_admin=True)
         if obj is not None and obj.time_slot_start:
             time_slot_start = timezone.localtime(obj.time_slot_start, pytz.timezone(settings.TIME_ZONE))
             form.base_fields['start_date'].initial = time_slot_start.strftime('%Y-%m-%d') if time_slot_start else None
@@ -812,7 +819,7 @@ class LabAppointmentAdmin(nested_admin.NestedModelAdmin):
                     'get_lab_test', 'price', 'agreed_price',
                     'deal_price', 'effective_price', 'start_date', 'start_time', 'otp', 'payment_status',
                     'payment_type', 'insurance', 'is_home_pickup', 'address', 'outstanding',
-                    # 'send_email_sms_report'
+                    'send_email_sms_report', 'invoice_urls'
                     )
         elif request.user.groups.filter(name=constants['LAB_APPOINTMENT_MANAGEMENT_TEAM']).exists():
             return ('booking_id', 'order_id',  'lab_id', 'lab_name', 'get_lab_test', 'lab_contact_details',
@@ -821,22 +828,26 @@ class LabAppointmentAdmin(nested_admin.NestedModelAdmin):
                     'deal_price', 'effective_price', 'payment_status', 'payment_type', 'insurance', 'is_home_pickup',
                     'get_pickup_address', 'get_lab_address', 'outstanding', 'otp', 'status', 'cancel_type',
                     'cancellation_reason', 'cancellation_comments', 'start_date', 'start_time',
-                    # 'send_email_sms_report'
+                    'send_email_sms_report', 'invoice_urls'
                     )
         else:
             return ()
 
     def get_readonly_fields(self, request, obj=None):
         if request.user.is_superuser:
-            return 'booking_id', 'order_id', 'lab_id', 'lab_contact_details', 'get_lab_test'
+            read_only =  ['booking_id', 'order_id', 'lab_id', 'lab_contact_details', 'get_lab_test', 'invoice_urls']
         elif request.user.groups.filter(name=constants['LAB_APPOINTMENT_MANAGEMENT_TEAM']).exists():
-            return ('booking_id', 'order_id', 'lab_name', 'lab_id', 'get_lab_test',
+            read_only = ['booking_id', 'order_id', 'lab_name', 'lab_id', 'get_lab_test', 'invoice_urls',
                     'lab_contact_details', 'used_profile_name', 'used_profile_number',
                     'default_profile_name', 'default_profile_number', 'user_number', 'user_id', 'price', 'agreed_price',
                     'deal_price', 'effective_price', 'payment_status', 'otp',
-                    'payment_type', 'insurance', 'is_home_pickup', 'get_pickup_address', 'get_lab_address', 'outstanding')
+                    'payment_type', 'insurance', 'is_home_pickup', 'get_pickup_address', 'get_lab_address', 'outstanding']
         else:
-            return ()
+            read_only = []
+
+        if obj.status == LabAppointment.COMPLETED or obj.status == LabAppointment.CANCELLED:
+            read_only.extend(['status'])
+        return read_only
 
     # def get_inline_instances(self, request, obj=None):  # ALMOST DONE (Inline To be created) SHASHANK_SINGH CHANGE 16
     #     inline_instance = super().get_inline_instances(request=request, obj=obj)
@@ -846,6 +857,14 @@ class LabAppointmentAdmin(nested_admin.NestedModelAdmin):
     #     else:
     #         inline_instance.append(LabReportInline(self.model, self.admin_site))
     #     return inline_instance
+
+    def invoice_urls(self, instance):
+        invoices_urls = ''
+        for invoice in instance.get_invoice_urls():
+            invoices_urls += "<a href={} target='_blank'>{}</a><br>".format(util_absolute_url(invoice),
+                                                                             util_file_name(invoice))
+        return mark_safe(invoices_urls)
+    invoice_urls.short_description = 'Invoice(s)'
 
     def order_id(self, obj):
         if obj and obj.id:
@@ -957,7 +976,7 @@ class LabAppointmentAdmin(nested_admin.NestedModelAdmin):
             # time = datetime.datetime.strptime(request.POST['start_time'], '%H:%M').time()
             #
             # date_time = datetime.datetime.combine(date, time)
-            # send_email_sms_report = form.cleaned_data.get('send_email_sms_report', False)
+            send_email_sms_report = form.cleaned_data.get('send_email_sms_report', False)
             if request.POST['start_date'] and request.POST['start_time']:
                 date_time_field = request.POST['start_date'] + " " + request.POST['start_time']
                 to_zone = tz.gettz(settings.TIME_ZONE)
@@ -973,17 +992,21 @@ class LabAppointmentAdmin(nested_admin.NestedModelAdmin):
                     logger.warning("Lab Admin Cancel started - " + str(obj.id) + " timezone - " + str(timezone.now()))
                     obj.action_cancelled(cancel_type)
                     logger.warning("Lab Admin Cancel completed - " + str(obj.id) + " timezone - " + str(timezone.now()))
-            # elif lab_app_obj and (lab_app_obj.status == LabAppointment.COMPLETED):
-            #     pass
+            elif lab_app_obj and (lab_app_obj.status == LabAppointment.COMPLETED):
+                pass
             else:
                 super().save_model(request, obj, form, change)
-            # if send_email_sms_report and sum(
-            #         obj.reports.annotate(no_of_files=Count('files')).values_list('no_of_files', flat=True)):
-            #     transaction.on_commit(lambda: self.on_commit_tasks(obj.id))
+            if send_email_sms_report and sum(
+                    obj.reports.annotate(no_of_files=Count('files')).values_list('no_of_files', flat=True)):
+                transaction.on_commit(lambda: self.on_commit_tasks(obj.id))
 
     def on_commit_tasks(self, obj_id):
         from ondoc.notification.tasks import send_lab_reports
-        send_lab_reports(obj_id)
+        try:
+            send_lab_reports.apply_async((obj_id,), countdown=1)
+        except Exception as e:
+            logger.error(str(e))
+        # send_lab_reports(obj_id)
 
 
 

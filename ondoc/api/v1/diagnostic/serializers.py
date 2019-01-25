@@ -7,9 +7,9 @@ from django.contrib.staticfiles.templatetags.staticfiles import static
 from ondoc.authentication.models import UserProfile, Address
 from ondoc.api.v1.doctor.serializers import CreateAppointmentSerializer, CommaSepratedToListField
 from ondoc.api.v1.auth.serializers import AddressSerializer, UserProfileSerializer
-from ondoc.api.v1.utils import form_time_slot, GenericAdminEntity
+from ondoc.api.v1.utils import form_time_slot, GenericAdminEntity, util_absolute_url
 from ondoc.doctor.models import OpdAppointment
-from ondoc.account.models import Order
+from ondoc.account.models import Order, Invoice
 from ondoc.coupon.models import Coupon, RandomGeneratedCoupon
 from django.db.models import Count, Sum, When, Case, Q, F, ExpressionWrapper, DateTimeField
 from django.contrib.auth import get_user_model
@@ -27,6 +27,7 @@ from django.db.models import Avg
 from django.db.models import Q
 from ondoc.api.v1.ratings import serializers as rating_serializer
 from ondoc.location.models import EntityUrls, EntityAddress
+from ondoc.seo.models import NewDynamic
 
 logger = logging.getLogger(__name__)
 utc = pytz.UTC
@@ -79,8 +80,15 @@ class LabModelSerializer(serializers.ModelSerializer):
     def get_display_rating_widget(self, obj):
         if self.parent:
             return None
-
-        if obj.rating.count() > 10:
+        rate_count = obj.rating.count()
+        avg = 0
+        if rate_count:
+            all_rating = []
+            for rate in obj.rating.all():
+                all_rating.append(rate.ratings)
+            if all_rating:
+                avg = sum(all_rating) / len(all_rating)
+        if rate_count > 5 or (rate_count <= 5 and avg > 4):
             return True
         return False
 
@@ -93,10 +101,11 @@ class LabModelSerializer(serializers.ModelSerializer):
     def get_rating(self, obj):
         if self.parent:
             return None
-
-        app = LabAppointment.objects.select_related('profile').all()
-        queryset = obj.rating.prefetch_related('compliment').exclude(Q(review='') | Q(review=None)).filter(is_live=True).order_by('-updated_at')
-        reviews = rating_serializer.RatingsModelSerializer(queryset, many=True, context={'app':app})
+        app = LabAppointment.objects.select_related('profile').filter(lab_id=obj.id).all()
+        # rating_queryset = obj.rating.prefetch_related('compliment').exclude(Q(review='') | Q(review=None)).filter(is_live=True).order_by('-updated_at')
+        query = self.context.get('rating_queryset')
+        rating_queryset = query.exclude(Q(review='') | Q(review=None)).order_by('-updated_at')
+        reviews = rating_serializer.RatingsModelSerializer(rating_queryset, many=True, context={'app': app})
         return reviews.data[:5]
 
     def get_unrated_appointment(self, obj):
@@ -119,9 +128,10 @@ class LabModelSerializer(serializers.ModelSerializer):
     def get_rating_graph(self, obj):
         if self.parent:
             return None
+        query = self.context.get('rating_queryset')
 
-        if obj and obj.rating:
-            data = rating_serializer.RatingsGraphSerializer(obj.rating, context={'request': self.context.get('request')}).data
+        if query:
+            data = rating_serializer.RatingsGraphSerializer(query, context={'request': self.context.get('request')}).data
             return data
         return None
 
@@ -134,6 +144,7 @@ class LabModelSerializer(serializers.ModelSerializer):
 
         locality = None
         sublocality = None
+        entity = None
         # if entity.exists():
             #entity = entity[0]
         if self.context.get('entity'):
@@ -150,6 +161,14 @@ class LabModelSerializer(serializers.ModelSerializer):
             title = obj.name + ' - Diagnostic Centre | DocPrime'
 
         description = obj.name + ': Book test at ' + obj.name + ' online, check fees, packages prices and more at DocPrime. '
+
+        if entity:
+            new_object = NewDynamic.objects.filter(url__url=entity.url, is_enabled=True).first()
+            if new_object:
+                if new_object.meta_title:
+                    title = new_object.meta_title
+                if new_object.meta_description:
+                    description = new_object.meta_description
         return {'title': title, "description": description}
 
     def get_breadcrumb(self, obj):
@@ -429,6 +448,8 @@ class LabAppointmentModelSerializer(serializers.ModelSerializer):
     patient_name = serializers.SerializerMethodField()
     allowed_action = serializers.SerializerMethodField()
     lab_test = serializers.SerializerMethodField()
+    invoices = serializers.SerializerMethodField()
+    reports = serializers.SerializerMethodField()
 
     def get_lab_test(self, obj):
         return list(obj.test_mappings.values_list('test_id', flat=True))
@@ -445,6 +466,12 @@ class LabAppointmentModelSerializer(serializers.ModelSerializer):
         if obj.profile_detail:
             return obj.profile_detail.get("name")
 
+    def get_invoices(self, obj):
+        return obj.get_invoice_urls()
+
+    def get_reports(self, obj):
+        return obj.get_report_urls()
+
     def get_allowed_action(self, obj):
         user_type = ''
         if self.context.get('request'):
@@ -456,7 +483,7 @@ class LabAppointmentModelSerializer(serializers.ModelSerializer):
     class Meta:
         model = LabAppointment
         fields = ('id', 'lab', 'lab_test', 'profile', 'type', 'lab_name', 'status', 'deal_price', 'effective_price', 'time_slot_start', 'time_slot_end',
-                   'is_home_pickup', 'lab_thumbnail', 'lab_image', 'patient_thumbnail', 'patient_name', 'allowed_action', 'address')
+                   'is_home_pickup', 'lab_thumbnail', 'lab_image', 'patient_thumbnail', 'patient_name', 'allowed_action', 'address', 'invoices', 'reports')
 
 
 class LabAppointmentBillingSerializer(serializers.ModelSerializer):
@@ -574,6 +601,7 @@ class LabAppointmentCreateSerializer(serializers.Serializer):
     # address = serializers.IntegerField(required=False, allow_null=True)
     payment_type = serializers.IntegerField(default=OpdAppointment.PREPAID)
     coupon_code = serializers.ListField(child=serializers.CharField(), required=False, default=[])
+    use_wallet = serializers.BooleanField(required=False)
 
     def validate(self, data):
         MAX_APPOINTMENTS_ALLOWED = 10
@@ -636,6 +664,11 @@ class LabAppointmentCreateSerializer(serializers.Serializer):
                     else:
                         raise serializers.ValidationError('Invalid coupon code - ' + str(coupon))
                 data["coupon_obj"] = list(coupon_obj)
+
+        if 'use_wallet' in data and data['use_wallet'] is False:
+            data['use_wallet'] = False
+        else:
+            data['use_wallet'] = True
 
         self.test_lab_id_validator(data, request)
         self.time_slot_validator(data, request)
@@ -852,6 +885,7 @@ class LabAppointmentRetrieveSerializer(LabAppointmentModelSerializer):
     address = serializers.SerializerMethodField()
     type = serializers.ReadOnlyField(default='lab')
     reports = serializers.SerializerMethodField()
+    invoices = serializers.SerializerMethodField()
 
     def get_lab_test(self, obj):
         return LabAppointmentTestMappingSerializer(obj.test_mappings.all(), many=True).data
@@ -861,6 +895,9 @@ class LabAppointmentRetrieveSerializer(LabAppointmentModelSerializer):
         for rep in obj.get_reports():
             reports.append({"details": rep.report_details, "files":[file.name.url for file in rep.files.all()]})
         return reports
+
+    def get_invoices(self, obj):
+        return obj.get_invoice_urls()
 
     def get_address(self, obj):
         resp_address = ""
@@ -884,7 +921,7 @@ class LabAppointmentRetrieveSerializer(LabAppointmentModelSerializer):
     class Meta:
         model = LabAppointment
         fields = ('id', 'type', 'lab_name', 'status', 'deal_price', 'effective_price', 'time_slot_start', 'time_slot_end','is_rated', 'rating_declined',
-                   'is_home_pickup', 'lab_thumbnail', 'lab_image', 'profile', 'allowed_action', 'lab_test', 'lab', 'otp', 'address', 'type', 'reports')
+                   'is_home_pickup', 'lab_thumbnail', 'lab_image', 'profile', 'allowed_action', 'lab_test', 'lab', 'otp', 'address', 'type', 'reports', 'invoices')
 
 
 class DoctorLabAppointmentRetrieveSerializer(LabAppointmentModelSerializer):

@@ -20,6 +20,7 @@ from rest_framework.authtoken.models import Token
 from django.db.models import F, Sum, Max, Q, Prefetch, Case, When, Count
 from django.forms.models import model_to_dict
 
+from ondoc.common.models import UserConfig
 from ondoc.coupon.models import UserSpecificCoupon, Coupon
 from ondoc.lead.models import UserLead
 from ondoc.sms.api import send_otp
@@ -28,7 +29,8 @@ from ondoc.authentication.models import (OtpVerifications, NotificationEndpoint,
                                          Address, AppointmentTransaction, GenericAdmin, UserSecretKey, GenericLabAdmin,
                                          AgentToken, DoctorNumber)
 from ondoc.notification.models import SmsNotification, EmailNotification
-from ondoc.account.models import PgTransaction, ConsumerAccount, ConsumerTransaction, Order, ConsumerRefund, OrderLog
+from ondoc.account.models import PgTransaction, ConsumerAccount, ConsumerTransaction, Order, ConsumerRefund, OrderLog, \
+    UserReferrals, UserReferred
 from django.contrib.auth import get_user_model
 from django.shortcuts import get_object_or_404
 from ondoc.api.pagination import paginate_queryset
@@ -136,6 +138,11 @@ class UserViewset(GenericViewSet):
             user = User.objects.create(phone_number=data['phone_number'],
                                        is_phone_number_verified=True,
                                        user_type=User.CONSUMER)
+
+            # for new user, create a referral coupon entry
+            self.set_referral(user)
+
+
         self.set_coupons(user)
 
         token_object = JWTAuthentication.generate_token(user)
@@ -153,6 +160,12 @@ class UserViewset(GenericViewSet):
 
     def set_coupons(self, user):
         UserSpecificCoupon.objects.filter(phone_number=user.phone_number, user__isnull=True).update(user=user)
+
+    def set_referral(self, user):
+        try:
+            UserReferrals.objects.create(user=user)
+        except Exception as e:
+            logger.error(str(e))
 
     @transaction.atomic
     def logout(self, request):
@@ -307,11 +320,13 @@ class UserProfileViewSet(mixins.CreateModelMixin, mixins.ListModelMixin,
         data['email'] = request.data.get('email')
         data['phone_number'] = request.data.get('phone_number')
         data['user'] = request.user.id
+        first_profile = False
 
         if not queryset.exists():
             data.update({
                 "is_default_user": True
             })
+            first_profile = True
 
         if request.data.get('age'):
             try:
@@ -338,6 +353,12 @@ class UserProfileViewSet(mixins.CreateModelMixin, mixins.ListModelMixin,
             # }, status=status.HTTP_400_BAD_REQUEST)
             return Response(serializer.data)
         serializer.save()
+        # for new profile credit referral amount if any refrral code is used
+        if first_profile and request.data.get('referral_code'):
+            try:
+                self.credit_referral(request.data.get('referral_code'), request.user)
+            except Exception as e:
+                logger.error(str(e))
         return Response(serializer.data)
 
     def update(self, request, *args, **kwargs):
@@ -370,6 +391,12 @@ class UserProfileViewSet(mixins.CreateModelMixin, mixins.ListModelMixin,
         serializer.save()
         return Response(serializer.data)
 
+    @transaction.atomic()
+    def credit_referral(self, referral_code, user):
+        referral = UserReferrals.objects.filter(Q(code__iexact=referral_code), ~Q(user=user)).first()
+        if referral and not UserReferred.objects.filter(user=user).exists():
+            UserReferred.objects.create(user=user, referral_code=referral, used=False)
+            ConsumerAccount.credit_referral(user, UserReferrals.SIGNUP_CASHBACK)
 
 class OndocViewSet(mixins.CreateModelMixin,
                    mixins.RetrieveModelMixin,
@@ -377,6 +404,43 @@ class OndocViewSet(mixins.CreateModelMixin,
                    mixins.ListModelMixin,
                    viewsets.GenericViewSet):
     pass
+
+
+class ReferralViewSet(GenericViewSet):
+    # authentication_classes = (JWTAuthentication, )
+    # permission_classes = (IsAuthenticated, IsNotAgent)
+
+    def retrieve(self, request):
+        user = request.user
+        if not user.is_authenticated:
+            return Response({"status": 0}, status=status.HTTP_401_UNAUTHORIZED)
+        if UserReferrals.objects.all():
+            referral = UserReferrals.objects.filter(user=user).first()
+            if not referral:
+                referral = UserReferrals()
+                referral.user = user
+                referral.save()
+
+        user_config = UserConfig.objects.filter(key="referral").first()
+        help_flow = []
+        share_text = ''
+        share_url = ''
+        if user_config:
+            all_data = user_config.data
+            help_flow = all_data.get('help_flow', [])
+            share_text = all_data.get('share_text', '').replace('$referral_code', referral.code)
+            share_url = all_data.get('share_url', '').replace('$referral_code', referral.code)
+        return Response({"code": referral.code, "status": 1, 'help_flow': help_flow,
+                         "share_text": share_text, "share_url": share_url})
+
+    def retrieve_by_code(self, request, code):
+        referral = UserReferrals.objects.filter(code__iexact=code).first()
+        if referral:
+            default_user_profile = UserProfile.objects.filter(user=referral.user, is_default_user=True).first()
+            if default_user_profile:
+                return Response({"name": default_user_profile.name, "status": 1})
+
+        return Response({"status": 0}, status=status.HTTP_404_NOT_FOUND)
 
 
 class UserAppointmentsViewSet(OndocViewSet):
@@ -1228,43 +1292,60 @@ class HospitalDoctorAppointmentPermissionViewSet(GenericViewSet):
     authentication_classes = (JWTAuthentication, )
     permission_classes = (IsAuthenticated, IsDoctor,)
 
+    # building = models.CharField(max_length=1000, blank=True)
+    # sublocality = models.CharField(max_length=100, blank=True)
+    # locality = models.CharField(max_length=100, blank=True)
+    # city = models.CharField(max_length=100)
+    # state = models.CharField(max_length=100, blank=True)
+    # country = models.CharField(max_length=100)
+
     @transaction.non_atomic_requests
     def list(self, request):
         user = request.user
         doc_hosp_queryset = (DoctorClinic.objects
                              .select_related('doctor', 'hospital')
                              .prefetch_related('doctor__manageable_doctors', 'hospital__manageable_hospitals')
-                             .filter(doctor__is_live=True, hospital__is_live=True).annotate(
-            hospital_name=F('hospital__name'), doctor_name=F('doctor__name')).filter(
-            Q(
-                Q(doctor__manageable_doctors__user=user,
-                  doctor__manageable_doctors__hospital=F('hospital'),
-                  doctor__manageable_doctors__is_disabled=False,
-                  doctor__manageable_doctors__permission_type__in=[GenericAdmin.APPOINTMENT, GenericAdmin.ALL],
-                  doctor__manageable_doctors__write_permission=True) |
-                Q(doctor__manageable_doctors__user=user,
-                  doctor__manageable_doctors__hospital__isnull=True,
-                  doctor__manageable_doctors__is_disabled=False,
-                  doctor__manageable_doctors__permission_type__in=[GenericAdmin.APPOINTMENT, GenericAdmin.ALL],
-                  doctor__manageable_doctors__write_permission=True) |
-                Q(hospital__manageable_hospitals__doctor__isnull=True,
-                  hospital__manageable_hospitals__user=user,
-                  hospital__manageable_hospitals__is_disabled=False,
-                  hospital__manageable_hospitals__permission_type__in=[GenericAdmin.APPOINTMENT, GenericAdmin.ALL],
-                  hospital__manageable_hospitals__write_permission=True)
-            )|
-                Q(
-                    Q(doctor__manageable_doctors__user=user,
-                     doctor__manageable_doctors__super_user_permission=True,
-                     doctor__manageable_doctors__is_disabled=False,
-                     doctor__manageable_doctors__entity_type=GenericAdminEntity.DOCTOR,)|
-                    Q(hospital__manageable_hospitals__user=user,
-                      hospital__manageable_hospitals__super_user_permission=True,
-                      hospital__manageable_hospitals__is_disabled=False,
-                      hospital__manageable_hospitals__entity_type=GenericAdminEntity.HOSPITAL)
-            )
-            ).values('hospital', 'doctor', 'hospital_name', 'doctor_name').distinct('hospital', 'doctor')
+                             .filter(doctor__is_live=True, hospital__is_live=True)
+                             .annotate(doctor_gender=F('doctor__gender'),
+                                       hospital_building=F('hospital__building'),
+                                       hospital_name=F('hospital__name'),
+                                       doctor_name=F('doctor__name')
+                                       )
+                             .filter(
+                                    Q(
+                                        Q(doctor__manageable_doctors__user=user,
+                                          doctor__manageable_doctors__hospital=F('hospital'),
+                                          doctor__manageable_doctors__is_disabled=False,
+                                          doctor__manageable_doctors__permission_type__in=[GenericAdmin.APPOINTMENT, GenericAdmin.ALL],
+                                          doctor__manageable_doctors__write_permission=True) |
+                                        Q(doctor__manageable_doctors__user=user,
+                                          doctor__manageable_doctors__hospital__isnull=True,
+                                          doctor__manageable_doctors__is_disabled=False,
+                                          doctor__manageable_doctors__permission_type__in=[GenericAdmin.APPOINTMENT, GenericAdmin.ALL],
+                                          doctor__manageable_doctors__write_permission=True) |
+                                        Q(hospital__manageable_hospitals__doctor__isnull=True,
+                                          hospital__manageable_hospitals__user=user,
+                                          hospital__manageable_hospitals__is_disabled=False,
+                                          hospital__manageable_hospitals__permission_type__in=[GenericAdmin.APPOINTMENT, GenericAdmin.ALL],
+                                          hospital__manageable_hospitals__write_permission=True)
+                                    )|
+                                        Q(
+                                            Q(doctor__manageable_doctors__user=user,
+                                             doctor__manageable_doctors__super_user_permission=True,
+                                             doctor__manageable_doctors__is_disabled=False,
+                                             doctor__manageable_doctors__entity_type=GenericAdminEntity.DOCTOR,)|
+                                            Q(hospital__manageable_hospitals__user=user,
+                                              hospital__manageable_hospitals__super_user_permission=True,
+                                              hospital__manageable_hospitals__is_disabled=False,
+                                              hospital__manageable_hospitals__entity_type=GenericAdminEntity.HOSPITAL)
+                                    ))
+                             .values('hospital', 'doctor', 'hospital_name', 'doctor_name', 'doctor_gender').distinct('hospital', 'doctor')
                              )
+
+        # all_docs = [doc_hosp_queryset
+        # all_hospitals = doc_hosp_queryset
+
+
         return Response(doc_hosp_queryset)
 
 

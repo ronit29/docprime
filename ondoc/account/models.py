@@ -2,6 +2,7 @@ from django.db import models
 from django.contrib.postgres.fields import JSONField
 from ondoc.authentication.models import TimeStampedModel, User, UserProfile, Merchant
 from ondoc.account.tasks import refund_curl_task
+from ondoc.notification.models import AppNotification, NotificationAction
 from ondoc.notification.tasks import process_payout
 # from ondoc.diagnostic.models import LabAppointment
 from django.db import transaction
@@ -20,6 +21,8 @@ from decimal import Decimal
 from ondoc.notification.tasks import set_order_dummy_transaction
 from django.contrib.contenttypes.fields import GenericForeignKey
 from django.contrib.contenttypes.models import ContentType
+import string
+import random
 
 logger = logging.getLogger(__name__)
 
@@ -493,11 +496,11 @@ class ConsumerAccount(TimeStampedModel):
         tx_type = PgTransaction.CREDIT
 
         if cashback_refund_amount:
-            consumer_tx_data = self.consumer_tx_appointment_data(appointment_obj, product_id, cashback_refund_amount, action, tx_type, ConsumerTransaction.CASHBACK_SOURCE)
+            consumer_tx_data = self.consumer_tx_appointment_data(appointment_obj.user, appointment_obj, product_id, cashback_refund_amount, action, tx_type, ConsumerTransaction.CASHBACK_SOURCE)
             ConsumerTransaction.objects.create(**consumer_tx_data)
 
         if wallet_refund_amount:
-            consumer_tx_data = self.consumer_tx_appointment_data(appointment_obj, product_id, wallet_refund_amount, action, tx_type, ConsumerTransaction.WALLET_SOURCE)
+            consumer_tx_data = self.consumer_tx_appointment_data(appointment_obj.user, appointment_obj, product_id, wallet_refund_amount, action, tx_type, ConsumerTransaction.WALLET_SOURCE)
             ConsumerTransaction.objects.create(**consumer_tx_data)
             
         self.save()
@@ -524,11 +527,11 @@ class ConsumerAccount(TimeStampedModel):
         tx_type = PgTransaction.DEBIT
 
         if cashback_deducted:
-            consumer_tx_data = self.consumer_tx_appointment_data(appointment_obj, product_id, cashback_deducted, action, tx_type, ConsumerTransaction.CASHBACK_SOURCE)
+            consumer_tx_data = self.consumer_tx_appointment_data(appointment_obj.user, appointment_obj, product_id, cashback_deducted, action, tx_type, ConsumerTransaction.CASHBACK_SOURCE)
             ConsumerTransaction.objects.create(**consumer_tx_data)
 
         if balance_deducted:
-            consumer_tx_data = self.consumer_tx_appointment_data(appointment_obj, product_id, balance_deducted, action, tx_type, ConsumerTransaction.WALLET_SOURCE)
+            consumer_tx_data = self.consumer_tx_appointment_data(appointment_obj.user, appointment_obj, product_id, balance_deducted, action, tx_type, ConsumerTransaction.WALLET_SOURCE)
             ConsumerTransaction.objects.create(**consumer_tx_data)
 
         self.save()
@@ -538,7 +541,7 @@ class ConsumerAccount(TimeStampedModel):
         self.balance += amount
         action = ConsumerTransaction.RESCHEDULE_PAYMENT
         tx_type = PgTransaction.CREDIT
-        consumer_tx_data = self.consumer_tx_appointment_data(appointment_obj, product_id, amount, action, tx_type)
+        consumer_tx_data = self.consumer_tx_appointment_data(appointment_obj.user, appointment_obj, product_id, amount, action, tx_type)
         ConsumerTransaction.objects.create(**consumer_tx_data)
         self.save()
 
@@ -552,9 +555,35 @@ class ConsumerAccount(TimeStampedModel):
         consumer_account.cashback += cashback_amount
         action = ConsumerTransaction.CASHBACK_CREDIT
         tx_type = PgTransaction.CREDIT
-        consumer_tx_data = consumer_account.consumer_tx_appointment_data(appointment_obj, product_id, cashback_amount, action, tx_type)
+        consumer_tx_data = consumer_account.consumer_tx_appointment_data(appointment_obj.user, appointment_obj, product_id, cashback_amount, action, tx_type)
         ConsumerTransaction.objects.create(**consumer_tx_data)
         consumer_account.save()
+
+    @classmethod
+    def credit_referral(cls, user, cashback_amount, appointment_obj=None, product_id=None):
+        consumer_account = cls.objects.get_or_create(user=user)
+        consumer_account = cls.objects.select_for_update().get(user=user)
+
+        consumer_account.cashback += cashback_amount
+        action = ConsumerTransaction.REFERRAL_CREDIT
+        tx_type = PgTransaction.CREDIT
+        consumer_tx_data = consumer_account.consumer_tx_appointment_data(user, None, product_id, cashback_amount,
+                                                                         action, tx_type, ConsumerTransaction.CASHBACK_SOURCE)
+        ConsumerTransaction.objects.create(**consumer_tx_data)
+        consumer_account.save()
+
+        try:
+            context = {
+                "title": "Referral Bonus",
+                "body": ("Rs. " + str(int(cashback_amount)) + " Referral Bonus Received"),
+                "url": "/wallet",
+                "action_type": NotificationAction.CASHBACK_CREDITED,
+            }
+
+            AppNotification.send_notification(user=user, notification_type=NotificationAction.CASHBACK_CREDITED,
+                                              context=context)
+        except Exception as e:
+            logger.error(str(e))
 
     def consumer_tx_pg_data(self, data, amount, action, tx_type):
         consumer_tx_data = dict()
@@ -568,16 +597,16 @@ class ConsumerAccount(TimeStampedModel):
         consumer_tx_data['amount'] = amount
         return consumer_tx_data
 
-    def consumer_tx_appointment_data(self, app_obj, product_id, amount, action, tx_type, source=None):
+    def consumer_tx_appointment_data(self, user, app_obj, product_id, amount, action, tx_type, source=None):
         if source is None:
             source = ConsumerTransaction.WALLET_SOURCE
 
         consumer_tx_data = dict()
-        consumer_tx_data['user'] = app_obj.user
-        consumer_tx_data['product_id'] = product_id
-        consumer_tx_data['reference_id'] = app_obj.id
-        # consumer_tx_data['transaction_id'] = data.get('transaction_id')
-        # consumer_tx_data['order_id'] = data.get('order_id')
+        consumer_tx_data['user'] = user
+        if product_id is not None:
+            consumer_tx_data['product_id'] = product_id
+        if app_obj:
+            consumer_tx_data['reference_id'] = app_obj.id
         consumer_tx_data['type'] = tx_type
         consumer_tx_data['action'] = action
         consumer_tx_data['amount'] = amount
@@ -595,12 +624,13 @@ class ConsumerTransaction(TimeStampedModel):
     SALE = 3
     RESCHEDULE_PAYMENT = 4
     CASHBACK_CREDIT = 5
+    REFERRAL_CREDIT = 6
 
     WALLET_SOURCE = 1
     CASHBACK_SOURCE = 2
 
     SOURCE_TYPE = [(WALLET_SOURCE, "Wallet"), (CASHBACK_SOURCE, "Cashback")]
-    action_list = ["Cancellation", "Payment", "Refund", "Sale", "CashbackCredit"]
+    action_list = ["Cancellation", "Payment", "Refund", "Sale", "CashbackCredit", "ReferralCredit"]
     ACTION_CHOICES = list(enumerate(action_list, 0))
     user = models.ForeignKey(User, on_delete=models.DO_NOTHING)
     product_id = models.SmallIntegerField(choices=Order.PRODUCT_IDS, blank=True, null=True)
@@ -801,9 +831,10 @@ class MerchantPayout(TimeStampedModel):
     PENDING = 1
     ATTEMPTED = 2
     PAID = 3
-
+    AUTOMATIC = 1
+    MANUAL = 2
     STATUS_CHOICES = [(PENDING, 'Pending'), (ATTEMPTED, 'ATTEMPTED'), (PAID, 'Paid')]
-
+    TYPE_CHOICES = [(AUTOMATIC, 'Automatic'), (MANUAL, 'Manual')]
     payout_ref_id = models.IntegerField(null=True, unique=True)
     charged_amount = models.DecimalField(max_digits=10, decimal_places=2)
     payable_amount = models.DecimalField(max_digits=10, decimal_places=2)
@@ -813,7 +844,9 @@ class MerchantPayout(TimeStampedModel):
     api_response = JSONField(blank=True, null=True)
     retry_count = models.PositiveIntegerField(default=0)
     paid_to = models.ForeignKey(Merchant, on_delete=models.DO_NOTHING, related_name='payouts', null=True)
-
+    utr_no = models.CharField(max_length=500, blank=True, default='')
+    type = models.PositiveIntegerField(default=None, choices=TYPE_CHOICES, null=True, blank=True)
+    amount_paid = models.DecimalField(max_digits=10, decimal_places=2, default=None, null=True, blank=True)
     content_type = models.ForeignKey(ContentType, on_delete=models.CASCADE, null=True, blank=True)
     object_id = models.PositiveIntegerField(null=True, blank=True)
     content_object = GenericForeignKey()
@@ -823,7 +856,8 @@ class MerchantPayout(TimeStampedModel):
         if not self.id:
             first_instance = True
 
-        if self.id and hasattr(self,'process_payout') and self.process_payout:
+        if self.id and hasattr(self,'process_payout') and self.process_payout and self.status==self.PENDING and self.type==self.AUTOMATIC:
+            self.type = self.AUTOMATIC
             if not self.content_object:
                 self.content_object = self.get_billed_to()
             if not self.paid_to:
@@ -839,6 +873,9 @@ class MerchantPayout(TimeStampedModel):
                     transaction.on_commit(lambda: set_order_dummy_transaction.apply_async((order_data.id, appointment.user_id,), countdown=5))
             except Exception as e:
                 logger.error(str(e))
+
+        if self.type == self.MANUAL and self.utr_no and self.status == self.PENDING:
+            self.status = self.PAID
 
         super().save(*args, **kwargs)
 
@@ -885,3 +922,48 @@ class MerchantPayout(TimeStampedModel):
 
     class Meta:
         db_table = "merchant_payout"
+
+
+class UserReferrals(TimeStampedModel):
+    SIGNUP_CASHBACK = 50
+    COMPLETION_CASHBACK = 50
+
+    code = models.CharField(max_length=10, unique=True)
+    user = models.ForeignKey(User, on_delete=models.DO_NOTHING, unique=True)
+
+    def save(self, *args, **kwargs):
+        if not self.code:
+            self.code = self.generateCode()
+        super().save(*args, **kwargs)
+
+    def generateCode(self):
+        return ''.join(random.choice(string.ascii_uppercase + string.digits) for _ in range(7))
+
+    def __str__(self):
+        return "{}".format(self.id)
+
+    class Meta:
+        db_table = "user_referrals"
+
+
+class UserReferred(TimeStampedModel):
+    user = models.ForeignKey(User, on_delete=models.DO_NOTHING, unique=True)
+    referral_code = models.ForeignKey(UserReferrals, on_delete=models.DO_NOTHING)
+    used = models.BooleanField(default=False)
+
+    @classmethod
+    @transaction.atomic
+    def credit_after_completion(cls, user, appointment_obj, product_id):
+        referred_obj = cls.objects.filter(user=user, used=False).first()
+        if referred_obj:
+            referral_obj = referred_obj.referral_code
+            ConsumerAccount.credit_referral(referral_obj.user, UserReferrals.COMPLETION_CASHBACK, appointment_obj, product_id)
+            referred_obj.used = True
+            referred_obj.save()
+
+    def __str__(self):
+        return "{}".format(self.id)
+
+    class Meta:
+        db_table = "user_referred"
+

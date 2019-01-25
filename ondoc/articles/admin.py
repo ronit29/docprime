@@ -10,12 +10,12 @@ from django.conf import settings
 
 class ArticleForm(forms.ModelForm):
     body = forms.CharField(widget=forms.Textarea, required=False)
-    category = forms.ModelChoiceField(queryset=ArticleCategory.objects.all(),widget=forms.Select)
+    category = forms.ModelChoiceField(queryset=ArticleCategory.objects.all(), widget=forms.Select)
     author_name = forms.CharField(required=False)
 
     class Media:
         extend=False
-        js = ('https://cdn.ckeditor.com/ckeditor5/10.1.0/classic/ckeditor.js', 'articles/js/init.js')
+        js = ('ckedit/js/ckeditor.js', 'articles/js/init.js')
         css = {'all':('articles/css/style.css',)}
 
 

@@ -22,7 +22,7 @@ def getsitemap(request):
     if len(request_partial_path_list) < 2 :
         return HttpResponse(status=status.HTTP_400_BAD_REQUEST)
 
-    sitemap_manager_qs = SitemapManger.objects.filter(file__contains=request_partial_path_list[len(request_partial_path_list)-1])
+    sitemap_manager_qs = SitemapManger.objects.filter(file__contains=request_partial_path_list[len(request_partial_path_list)-1]).order_by('-created_at')
     if sitemap_manager_qs.exists():
         return HttpResponse(sitemap_manager_qs.first().file, content_type='text/xml')
     else:

@@ -31,7 +31,7 @@ class Image(models.Model):
 
     def get_thumbnail_path(self, path, prefix):
         first, last = path.rsplit('/', 1)
-        return "{}/{}/{}".format(first,prefix,last)
+        return "{}/{}/{}".format(first, prefix, last)
 
 
     def has_image_changed(self):
@@ -972,12 +972,33 @@ class GenericAdmin(TimeStampedModel, CreatedByModel):
 
     @classmethod
     def get_appointment_admins(cls, appoinment):
+        from ondoc.api.v1.utils import GenericAdminEntity
         if not appoinment:
             return []
         admins = GenericAdmin.objects.filter(
-            Q(is_disabled=False, hospital=appoinment.hospital),
-            (Q(doctor__isnull=True) | Q(doctor__isnull=False, doctor=appoinment.doctor)))
-        admin_users= []
+                Q(is_disabled=False),
+                (Q(
+                    (Q(doctor=appoinment.doctor,
+                       hospital=appoinment.hospital)
+                     |
+                     Q(doctor__isnull=True,
+                       hospital=appoinment.hospital)
+                     |
+                     Q(hospital__isnull=True,
+                       doctor=appoinment.doctor)
+                     )
+                 )|
+                Q(
+                    Q(super_user_permission=True,
+                      entity_type=GenericAdminEntity.DOCTOR,
+                      doctor=appoinment.doctor)
+                    |
+                    Q(super_user_permission=True,
+                      entity_type=GenericAdminEntity.HOSPITAL,
+                      hospital=appoinment.hospital)
+                ))
+        ).distinct('user')
+        admin_users = []
         for admin in admins:
             if admin.user:
                 admin_users.append(admin.user)

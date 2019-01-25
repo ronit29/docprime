@@ -13,6 +13,7 @@ from django.contrib.admin import SimpleListFilter
 from ondoc.authentication.models import GenericAdmin, User, QCModel, DoctorNumber, AssociatedMerchant
 from ondoc.authentication.admin import SPOCDetailsInline
 from django import forms
+from ondoc.api.v1.utils import GenericAdminEntity
 import nested_admin
 from .common import AssociatedMerchantInline
 
@@ -147,7 +148,8 @@ class GenericAdminInline(admin.TabularInline):
               'write_permission', 'user', 'updated_at']
 
     def get_queryset(self, request):
-        return super(GenericAdminInline, self).get_queryset(request).select_related('doctor', 'hospital', 'user')
+        return super(GenericAdminInline, self).get_queryset(request).select_related('doctor', 'hospital', 'user')\
+            .filter(entity_type=GenericAdminEntity.HOSPITAL)
 
     def formfield_for_foreignkey(self, db_field, request, **kwargs):
         if db_field.name == "doctor":
