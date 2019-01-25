@@ -41,7 +41,7 @@ class ArticleRetrieveSerializer(serializers.ModelSerializer):
     comments = serializers.SerializerMethodField()
 
     def get_comments(self, obj):
-        comments = FluentComment.objects.filter(object_pk=str(obj.id), parent_id = None)
+        comments = FluentComment.objects.filter(object_pk=str(obj.id), parent_id=None, is_public=True)
         serializer = CommentSerializer(comments, many=True, context={'request': self.context.get('request')})
         return serializer.data
 
@@ -162,7 +162,7 @@ class CommentSerializer(serializers.ModelSerializer):
     def get_author(self, obj):
         custom_data = obj.customcomment_set.first()
         if custom_data and custom_data.author:
-            return ArticleAuthorSerializer(obj.content_object).data
+            return ArticleAuthorSerializer(obj.content_object.author).data
         return None
 
     class Meta:
