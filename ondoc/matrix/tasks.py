@@ -107,7 +107,7 @@ def prepare_and_hit(self, data):
         'AppointmentDetails': appointment_details
     }
 
-    #logger.error(json.dumps(request_data))
+    logger.error(json.dumps(request_data))
 
     url = settings.MATRIX_API_URL
     matrix_api_token = settings.MATRIX_API_TOKEN
@@ -252,7 +252,7 @@ def push_signup_lead_to_matrix(self, data):
             'UtmTerm': utm.get('utm_term', ''),
         }
 
-        #logger.error(json.dumps(request_data))
+        logger.error(json.dumps(request_data))
 
         url = settings.MATRIX_API_URL
         matrix_api_token = settings.MATRIX_API_TOKEN
@@ -329,7 +329,7 @@ def push_order_to_matrix(self, data):
             }
         }
 
-        #logger.error(json.dumps(request_data))
+        logger.error(json.dumps(request_data))
 
         url = settings.MATRIX_API_URL
         matrix_api_token = settings.MATRIX_API_TOKEN
@@ -417,7 +417,7 @@ def push_onboarding_qcstatus_to_matrix(self, data):
             'ExitPointUrl': exit_point_url,
         }
 
-        #logger.error(json.dumps(request_data))
+        logger.error(json.dumps(request_data))
 
         url = settings.MATRIX_API_URL
         matrix_api_token = settings.MATRIX_API_TOKEN
@@ -469,6 +469,8 @@ def push_non_bookable_doctor_lead_to_matrix(self, nb_doc_lead_id):
                 'ProviderAddress': obj.hospital.get_hos_address() if obj.hospital else ''
             }
         }
+
+        logger.error(json.dumps(request_data))
 
     url = settings.MATRIX_API_URL
     matrix_api_token = settings.MATRIX_API_TOKEN
