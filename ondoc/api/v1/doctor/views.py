@@ -2702,7 +2702,8 @@ class OfflineCustomerViewSet(viewsets.GenericViewSet):
                 online_queryset = None
         if online_queryset and offline_queryset:
             final_data = sorted(chain(online_queryset, offline_queryset), key=lambda car: car.time_slot_start, reverse=False)
-
+        if not final_data:
+            final_data = online_queryset if online_queryset else offline_queryset
         final_result = []
         if appointment_id and not final_data:
             return Response({'error': 'Not Found'}, status=status.HTTP_404_NOT_FOUND)

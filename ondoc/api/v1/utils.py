@@ -985,7 +985,7 @@ def offline_form_time_slots(data, timing, is_available=True, is_doctor=True):
     day = data.get('day')
 
     float_span = (Decimal(time_span) / Decimal(60))
-    if not timing[day].get('timing'):
+    if isinstance(timing[day], dict) and not timing[day].get('timing'):
         timing[day] = []
     temp_start = start
     while temp_start <= end:
