@@ -226,7 +226,7 @@ def set_order_dummy_transaction(self, order_id, user_id):
 
         if order_row and user and order_row.reference_id:
             if order_row.getTransactions():
-                print("dummy Transaction already set")
+                #print("dummy Transaction already set")
                 return
 
             appointment = order_row.getAppointment()
@@ -259,7 +259,7 @@ def set_order_dummy_transaction(self, order_id, user_id):
             response = requests.post(url, data=json.dumps(req_data), headers=headers)
             if response.status_code == status.HTTP_200_OK:
                 resp_data = response.json()
-                logger.error(resp_data)
+                #logger.error(resp_data)
                 if resp_data.get("ok") is not None and resp_data.get("ok") == 1:
                     tx_data = {}
                     tx_data['user'] = user
@@ -284,7 +284,7 @@ def set_order_dummy_transaction(self, order_id, user_id):
                     # tx_data['pb_gateway_name'] = response.get('pbGatewayName')
 
                     DummyTransactions.objects.create(**tx_data)
-                    print("SAVED DUMMY TRANSACTION")
+                    #print("SAVED DUMMY TRANSACTION")
             else:
                 raise Exception("Retry on invalid Http response status - " + str(response.content))
 
@@ -406,8 +406,10 @@ def process_payout(payout_id):
                     payout_data.status = payout_data.PAID
                     payout_data.api_response = json.dumps(resp_data)
                     payout_data.save()
-                    print("Payout processed")
+                    #print("Payout processed")
                     return
+                else:
+                    logger.error("payout failed for request data - " + str(req_data))                
 
         payout_data.retry_count += 1
         payout_data.api_response = json.dumps(resp_data)
@@ -427,10 +429,10 @@ def opd_send_otp_before_appointment(appointment_id, previous_appointment_date_ti
                 not instance.user or \
                 str(math.floor(instance.time_slot_start.timestamp())) != previous_appointment_date_time \
                 or instance.status != OpdAppointment.ACCEPTED:
-            logger.error(
-                'instance : {}, time : {}, str: {}'.format(str(model_to_dict(instance)),
-                                                           previous_appointment_date_time,
-                                                           str(math.floor(instance.time_slot_start.timestamp()))))
+            # logger.error(
+            #     'instance : {}, time : {}, str: {}'.format(str(model_to_dict(instance)),
+            #                                                previous_appointment_date_time,
+            #                                                str(math.floor(instance.time_slot_start.timestamp()))))
             return
         opd_notification = OpdNotification(instance, NotificationAction.OPD_OTP_BEFORE_APPOINTMENT)
         opd_notification.send()
@@ -447,10 +449,10 @@ def lab_send_otp_before_appointment(appointment_id, previous_appointment_date_ti
                 not instance.user or \
                 str(math.floor(instance.time_slot_start.timestamp())) != previous_appointment_date_time \
                 or instance.status != LabAppointment.ACCEPTED:
-            logger.error(
-                'instance : {}, time : {}, str: {}'.format(str(model_to_dict(instance)),
-                                                           previous_appointment_date_time,
-                                                           str(math.floor(instance.time_slot_start.timestamp()))))
+            # logger.error(
+            #     'instance : {}, time : {}, str: {}'.format(str(model_to_dict(instance)),
+            #                                                previous_appointment_date_time,
+            #                                                str(math.floor(instance.time_slot_start.timestamp()))))
             return
         lab_notification = LabNotification(instance, NotificationAction.LAB_OTP_BEFORE_APPOINTMENT)
         lab_notification.send()
@@ -469,7 +471,6 @@ def send_lab_reports(appointment_id):
         lab_notification.send()
     except Exception as e:
         logger.error(str(e))
-
 
 @task()
 def upload_doctor_data(obj_id):
@@ -514,3 +515,18 @@ def upload_doctor_data(obj_id):
         else:
             instance.error_msg = [{'line number': 0, 'message': error_message}]
         instance.save(retry=False)
+
+@task()
+def send_pg_acknowledge(order_id=None, order_no=None):
+    try:
+        if order_id is None or order_no is None:
+            logger.error("Cannot acknowledge without order_id and order_no")
+            return
+
+        url = settings.PG_PAYMENT_ACKNOWLEDGE_URL + "?orderNo=" + str(order_no) + "&orderId=" + str(order_id)
+        response = requests.get(url)
+        if response.status_code == status.HTTP_200_OK:
+            print("Payment acknowledged")
+
+    except Exception as e:
+        logger.error("Error in sending pg acknowledge - " + str(e))

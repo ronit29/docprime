@@ -56,6 +56,7 @@ import logging
 import jwt
 from decimal import Decimal
 from ondoc.web.models import ContactUs
+from ondoc.notification.tasks import send_pg_acknowledge
 
 logger = logging.getLogger(__name__)
 User = get_user_model()
@@ -1044,6 +1045,12 @@ class TransactionViewSet(viewsets.GenericViewSet):
                             pg_tx_queryset = PgTransaction.objects.create(**response_data)
                         except Exception as e:
                             logger.error("Error in saving PG Transaction Data - " + str(e))
+
+                        try:
+                            if pg_tx_queryset:
+                                send_pg_acknowledge.apply_async((response_data.get("order_id"), response_data.get("order_no"),), countdown=1)
+                        except Exception as e:
+                            logger.error("Error in sending pg acknowledge - " + str(e))
 
                         try:
                             if pg_tx_queryset:
