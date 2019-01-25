@@ -22,7 +22,7 @@ import pytz
 
 from ondoc.account.models import Order, Invoice
 from ondoc.api.v1.utils import util_absolute_url, util_file_name
-from ondoc.doctor.models import Hospital
+from ondoc.doctor.models import Hospital, CancellationReason
 from ondoc.diagnostic.models import (LabTiming, LabImage,
                                      LabManager, LabAccreditation, LabAward, LabCertification, AvailableLabTest,
                                      LabNetwork, Lab, LabOnboardingToken, LabService, LabDoctorAvailability,
@@ -774,7 +774,7 @@ class LabAppointmentAdmin(nested_admin.NestedModelAdmin):
 
     def get_autocomplete_fields(self, request):
         if request.user.is_superuser:
-            temp_autocomplete_fields = ('lab', 'profile', 'user', 'cancellation_reason')
+            temp_autocomplete_fields = ('lab', 'profile', 'user')
         else:
             temp_autocomplete_fields = super().get_autocomplete_fields(request)
         return temp_autocomplete_fields
@@ -806,6 +806,8 @@ class LabAppointmentAdmin(nested_admin.NestedModelAdmin):
     def get_form(self, request, obj=None, **kwargs):
         form = super().get_form(request, obj=obj, **kwargs)
         form.request = request
+        form.base_fields['cancellation_reason'].queryset = CancellationReason.objects.filter(
+            Q(type=Order.LAB_PRODUCT_ID) | Q(type__isnull=True), visible_on_admin=True)
         if obj is not None and obj.time_slot_start:
             time_slot_start = timezone.localtime(obj.time_slot_start, pytz.timezone(settings.TIME_ZONE))
             form.base_fields['start_date'].initial = time_slot_start.strftime('%Y-%m-%d') if time_slot_start else None

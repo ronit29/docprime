@@ -2005,11 +2005,16 @@ class VisitReasonMapping(models.Model):
 
 
 class CancellationReason(auth_model.TimeStampedModel):
+    TYPE_CHOICES = [("", "Both")]
+    TYPE_CHOICES.extend(Order.PRODUCT_IDS)
     name = models.CharField(max_length=200)
+    type = models.PositiveSmallIntegerField(default=None, null=True, blank=True, choices=TYPE_CHOICES)
+    visible_on_front_end = models.BooleanField(default=True)
+    visible_on_admin = models.BooleanField(default=True)
 
     class Meta:
         db_table = 'cancellation_reason'
-        unique_together = (('name',),)
+        unique_together = (('name','type'),)
 
     def __str__(self):
         return self.name

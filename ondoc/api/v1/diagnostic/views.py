@@ -703,7 +703,8 @@ class LabList(viewsets.ReadOnlyModelViewSet):
                         and St_dwithin( St_setsrid(St_point((%(longitude)s), (%(latitude)s)), 4326),lb.location, (%(max_distance)s)) 
                         and St_dwithin(St_setsrid(St_point((%(longitude)s), (%(latitude)s)), 4326), lb.location,  (%(min_distance)s)) = false 
                         and avlt.enabled = True 
-                        inner join lab_test lt on lt.id = avlt.test_id where 1=1 {filter_query_string}
+                        inner join lab_test lt on lt.id = avlt.test_id and lt.enable_for_retail=True 
+                         where 1=1 {filter_query_string}
 
                         group by lb.id having count(*)=(%(length)s))a
                         {group_filter_query_string})y )x where rank<=5 )z 
@@ -944,7 +945,7 @@ class LabList(viewsets.ReadOnlyModelViewSet):
         test_serializer = diagnostic_serializer.AvailableLabTestPackageSerializer(queryset, many=True,
                                                                            context={"lab": lab_obj})
         # for Demo
-        demo_lab_test = AvailableLabTest.objects.filter(test__enable_for_retail=True, lab_pricing_group=lab_obj.lab_pricing_group, enabled=True).order_by("-test__priority").prefetch_related('test')[:2]
+        demo_lab_test = AvailableLabTest.objects.filter(test__enable_for_retail=True, lab_pricing_group=lab_obj.lab_pricing_group, enabled=True, test__searchable=True).order_by("-test__priority").prefetch_related('test')[:2]
         lab_test_serializer = diagnostic_serializer.AvailableLabTestSerializer(demo_lab_test, many=True, context={"lab": lab_obj})
         # day_now = timezone.now().weekday()
         timing_queryset = list()

@@ -176,21 +176,24 @@ class DoctorAppointmentsViewSet(OndocViewSet):
 
         if not opd_appointment:
             return Response({"message": "Invalid appointment id"}, status.HTTP_404_NOT_FOUND)
-        permission = auth_models.GenericAdmin.objects.filter(Q(is_disabled=False,
-                                                                    user=user,
-                                                                    doctor_id=opd_appointment.doctor.id,
-                                                                    permission_type__in=[auth_models.GenericAdmin.APPOINTMENT,
-                                                                                           auth_models.GenericAdmin.ALL])|
-                                                                  Q(user=user,
-                                                                    is_disabled=False,
-                                                                    hospital_id=opd_appointment.hospital.id,
-                                                                    permission_type__in=[auth_models.GenericAdmin.APPOINTMENT,
-                                                                                               auth_models.GenericAdmin.ALL]
-                                                                    )
-                                                                  ).first()
-
-        if not permission:
-            return Response({"message": "UnAuthorized"}, status.HTTP_403_FORBIDDEN)
+        pem_queryset = auth_models.GenericAdmin.objects.filter(Q(user=user, is_disabled=False),
+                                                               Q(Q(super_user_permission=True,
+                                                                   hospital=opd_appointment.hospital,
+                                                                   entity_type=GenericAdminEntity.HOSPITAL)
+                                                                 |
+                                                                 Q(super_user_permission=True,
+                                                                   doctor=opd_appointment.doctor,
+                                                                   entity_type=GenericAdminEntity.DOCTOR))
+                                                               |
+                                                               Q(Q(doctor=opd_appointment.doctor,
+                                                                 hospital=opd_appointment.hospital)
+                                                                 |
+                                                                 Q(doctor__isnull=True,
+                                                                   hospital=opd_appointment.hospital)
+                                                                 )
+                                                               ).first()
+        if not pem_queryset:
+            return Response({"message": "No Permissions"}, status.HTTP_403_FORBIDDEN)
         if request.user.user_type == User.DOCTOR:
             otp_valid_serializer = serializers.OTPConfirmationSerializer(data=request.data)
             otp_valid_serializer.is_valid(raise_exception=True)
@@ -2245,15 +2248,15 @@ class OfflineCustomerViewSet(viewsets.GenericViewSet):
                 sms_list.append(patient_data['sms_list'])
 
             ret_obj = {}
-            ret_obj['doctor'] = patient.doctor.id
+            ret_obj['doctor'] = patient.doctor.id if patient.doctor else None
             ret_obj['hospital'] = patient.hospital.id if patient.hospital else None
             ret_obj['id'] = patient.id
             ret_obj['error'] = patient.error
             ret_obj['error_message'] = patient.error_message
             resp.append(ret_obj)
 
-            if sms_list:
-                transaction.on_commit(lambda: models.OfflineOPDAppointments.after_commit_create_sms(sms_list))
+            # if sms_list:
+            #     transaction.on_commit(lambda: models.OfflineOPDAppointments.after_commit_create_sms(sms_list))
 
         return Response(resp)
 
@@ -2275,6 +2278,7 @@ class OfflineCustomerViewSet(viewsets.GenericViewSet):
                 appntment_ids.append(data.get('id'))
             if data.get('patient') and data['patient'].get('id'):
                 patient_ids.append(data['patient']['id'])
+        appointment_ids = list(models.OfflineOPDAppointments.objects.filter(id__in=appntment_ids).values_list('id', flat=True))
         patient_ids = list(models.OfflinePatients.objects.filter(id__in=patient_ids).values_list('id', flat=True))
         clinic_queryset = [(dc.doctor.id, dc.hospital.id) for dc in
                            models.DoctorClinic.objects.filter(hospital__id__in=req_hosp_ids)]
@@ -2287,16 +2291,17 @@ class OfflineCustomerViewSet(viewsets.GenericViewSet):
             if not id and 'continue' in uuid_obj and uuid_obj.get('continue'):
                 resp.append(uuid_obj.get('obj'))
                 continue
-
+            data['id'] = id
             self.validate_permissions(data, doc_pem_list, hosp_pem_list, clinic_queryset)
 
-            create_obj = self.validate_create_conditions(appntment_ids, data, request)
+            create_obj = self.validate_create_conditions(appointment_ids, data, request)
             if 'continue' in create_obj and create_obj.get('continue'):
                 resp.append(create_obj.get('obj'))
                 continue
 
             if not data.get('patient')['id'] in patient_ids:
                 patient_data = self.create_patient(request, data['patient'], data['hospital'], data['doctor'])
+                patient_ids.append(patient_data['patient'].id)
             else:
                 patient_data = self.update_patient(request, data['patient'], data['hospital'], data['doctor'])
             patient = patient_data['patient']
@@ -2326,8 +2331,7 @@ class OfflineCustomerViewSet(viewsets.GenericViewSet):
 
             if patient_data.get('sms_list'):
                 patient_data['sms_list']['appointment'] = appnt
-            appntment_ids.append(str(appnt.id))
-            patient_ids.append(patient.id)
+            appointment_ids.append(appnt.id)
             ret_obj = {}
             ret_obj['id'] = appnt.id
             ret_obj['patient_id'] = appnt.user.id
@@ -2406,6 +2410,8 @@ class OfflineCustomerViewSet(viewsets.GenericViewSet):
                 patient.share_with_hospital = data.get('share_with_hospital')
             if hosp:
                 patient.hospital = hosp
+            if doctor:
+                patient.doctor = doctor
             patient.save()
             default_num = None
             sms_number = None
@@ -2696,7 +2702,8 @@ class OfflineCustomerViewSet(viewsets.GenericViewSet):
                 online_queryset = None
         if online_queryset and offline_queryset:
             final_data = sorted(chain(online_queryset, offline_queryset), key=lambda car: car.time_slot_start, reverse=False)
-
+        if not final_data:
+            final_data = online_queryset if online_queryset else offline_queryset
         final_result = []
         if appointment_id and not final_data:
             return Response({'error': 'Not Found'}, status=status.HTTP_404_NOT_FOUND)
@@ -2723,12 +2730,12 @@ class OfflineCustomerViewSet(viewsets.GenericViewSet):
                 effective_price = app.effective_price
                 deal_price = app.deal_price
                 allowed_actions = app.allowed_action(User.DOCTOR, request)
-                phone_number.append({"phone_number": app.user.phone_number, "is_default": True})
+                # phone_number.append({"phone_number": app.user.phone_number, "is_default": True})
                 patient_profile = auth_serializers.UserProfileSerializer(app.profile, context={'request': request}).data
                 patient_thumbnail = patient_profile['profile_image']
                 patient_profile['user_id'] = app.user.id if app.user else None
                 patient_profile['profile_id'] = app.profile.id if hasattr(app, 'profile') else None
-                patient_profile['phone_numbers'] = phone_number
+                # patient_profile['phone_numbers'] = phone_number
                 patient_name = app.profile.name if hasattr(app, 'profile') else None
                 if app.time_slot_start <= timezone.now() and \
                         app.status not in [models.OpdAppointment.COMPLETED, models.OpdAppointment.CANCELLED, models.OpdAppointment.BOOKED]:

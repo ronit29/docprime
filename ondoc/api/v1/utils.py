@@ -14,6 +14,7 @@ import calendar
 from django.contrib.auth import get_user_model
 from django.contrib.gis.geos import GEOSGeometry
 from ondoc.account.tasks import refund_curl_task
+from ondoc.coupon.models import UserSpecificCoupon
 from ondoc.crm.constants import constants
 import copy
 import requests
@@ -564,6 +565,11 @@ class CouponsMixin(object):
             count = coupon_obj.used_coupon_count(user)
             total_used_count = coupon_obj.total_used_coupon_count()
 
+            if coupon_obj.is_user_specific and user:
+                user_specefic = UserSpecificCoupon.objects.filter(user=user, coupon=coupon_obj).first()
+                if user_specefic and count >= user_specefic.count:
+                    return {"is_valid": False, "used_count": count}
+
             if (coupon_obj.count is None or count < coupon_obj.count) and (coupon_obj.total_count is None or total_used_count < coupon_obj.total_count):
                 return {"is_valid": True, "used_count": count}
             else:
@@ -979,7 +985,7 @@ def offline_form_time_slots(data, timing, is_available=True, is_doctor=True):
     day = data.get('day')
 
     float_span = (Decimal(time_span) / Decimal(60))
-    if not timing[day].get('timing'):
+    if isinstance(timing[day], dict) and not timing[day].get('timing'):
         timing[day] = []
     temp_start = start
     while temp_start <= end:
