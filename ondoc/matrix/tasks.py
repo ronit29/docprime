@@ -107,7 +107,7 @@ def prepare_and_hit(self, data):
         'AppointmentDetails': appointment_details
     }
 
-    logger.error(json.dumps(request_data))
+    #logger.error(json.dumps(request_data))
 
     url = settings.MATRIX_API_URL
     matrix_api_token = settings.MATRIX_API_TOKEN
@@ -126,6 +126,7 @@ def prepare_and_hit(self, data):
     resp_data = response.json()
 
     if not resp_data.get('Id', None):
+        logger.error(json.dumps(request_data))
         raise Exception("[ERROR] Id not recieved from the matrix while pushing appointment lead.")
 
     # save the appointment with the matrix lead id.
@@ -252,7 +253,7 @@ def push_signup_lead_to_matrix(self, data):
             'UtmTerm': utm.get('utm_term', ''),
         }
 
-        logger.error(json.dumps(request_data))
+        #logger.error(json.dumps(request_data))
 
         url = settings.MATRIX_API_URL
         matrix_api_token = settings.MATRIX_API_TOKEN
@@ -274,6 +275,7 @@ def push_signup_lead_to_matrix(self, data):
         # save the appointment with the matrix lead id.
 
         if not resp_data.get('Id', None):
+            logger.error(json.dumps(request_data))
             raise Exception("[ERROR] Id not recieved from the matrix while pushing online lead.")
 
         online_lead_obj.matrix_lead_id = resp_data.get('Id', None)
@@ -329,7 +331,7 @@ def push_order_to_matrix(self, data):
             }
         }
 
-        logger.error(json.dumps(request_data))
+        #logger.error(json.dumps(request_data))
 
         url = settings.MATRIX_API_URL
         matrix_api_token = settings.MATRIX_API_TOKEN
@@ -349,6 +351,7 @@ def push_order_to_matrix(self, data):
             #logger.error(response.text)
 
             if not resp_data.get('Id', None):
+                logger.error(json.dumps(request_data))
                 raise Exception("[ERROR] Id not recieved from the matrix while pushing order to matrix.")
 
             # save the order with the matrix lead id.
@@ -417,7 +420,7 @@ def push_onboarding_qcstatus_to_matrix(self, data):
             'ExitPointUrl': exit_point_url,
         }
 
-        logger.error(json.dumps(request_data))
+        #logger.error(json.dumps(request_data))
 
         url = settings.MATRIX_API_URL
         matrix_api_token = settings.MATRIX_API_TOKEN
@@ -437,6 +440,7 @@ def push_onboarding_qcstatus_to_matrix(self, data):
             #logger.error(response.text)
 
             if not resp_data.get('Id', None):
+                logger.error(json.dumps(request_data))
                 raise Exception("[ERROR] Id not recieved from the matrix while pushing doctor or lab lead.")
 
             # save the order with the matrix lead id.
@@ -470,8 +474,6 @@ def push_non_bookable_doctor_lead_to_matrix(self, nb_doc_lead_id):
             }
         }
 
-        logger.error(json.dumps(request_data))
-
     url = settings.MATRIX_API_URL
     matrix_api_token = settings.MATRIX_API_TOKEN
     response = requests.post(url, data=json.dumps(request_data), headers={'Authorization': matrix_api_token,
@@ -488,6 +490,7 @@ def push_non_bookable_doctor_lead_to_matrix(self, nb_doc_lead_id):
         resp_data = response.json()
         # logger.error(response.text)
         if not resp_data.get('Id', None):
+            logger.error(json.dumps(request_data))
             raise Exception("[ERROR] Id not received from the matrix while pushing NB doctor lead.")
 
         # save the order with the matrix lead id.
