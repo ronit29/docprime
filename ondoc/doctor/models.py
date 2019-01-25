@@ -2005,7 +2005,7 @@ class VisitReasonMapping(models.Model):
 
 
 class CancellationReason(auth_model.TimeStampedModel):
-    TYPE_CHOICES = [("", "Select")]
+    TYPE_CHOICES = [("", "Both")]
     TYPE_CHOICES.extend(Order.PRODUCT_IDS)
     name = models.CharField(max_length=200)
     type = models.PositiveSmallIntegerField(default=None, null=True, blank=True, choices=TYPE_CHOICES)
