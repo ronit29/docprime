@@ -74,10 +74,10 @@ class SearchPageViewSet(viewsets.ReadOnlyModelViewSet):
         conditions_queryset = CommonDiagnosticCondition.objects.prefetch_related('lab_test').all()
         lab_queryset = PromotedLab.objects.select_related('lab').filter(lab__is_live=True, lab__is_test_lab=False)
         package_queryset = CommonPackage.objects.select_related('package').filter(package__enable_for_retail=True)[:count]
-        recommended_package_qs = LabTestCategory.objects.prefetch_related('recommended_lab_tests').filter(is_live=True,
+        recommended_package_qs = LabTestCategory.objects.prefetch_related('recommended_lab_tests__parameter').filter(is_live=True,
                                                                                                           show_on_recommended_screen=True,
                                                                                                           recommended_lab_tests__searchable=True,
-                                                                                                          recommended_lab_tests__enable_for_retail=True)[:count]
+                                                                                                          recommended_lab_tests__enable_for_retail=True).distinct()[:count]
         test_serializer = diagnostic_serializer.CommonTestSerializer(test_queryset, many=True, context={'request': request})
         package_serializer = diagnostic_serializer.CommonPackageSerializer(package_queryset, many=True, context={'request': request})
         lab_serializer = diagnostic_serializer.PromotedLabsSerializer(lab_queryset, many=True)
@@ -256,8 +256,8 @@ class LabList(viewsets.ReadOnlyModelViewSet):
             all_packages_in_non_network_labs = all_packages_in_non_network_labs.filter(min_age__gte=min_age)
             all_packages_in_network_labs = all_packages_in_network_labs.filter(min_age__gte=min_age)
         if gender:
-            all_packages_in_non_network_labs = all_packages_in_non_network_labs.filter(gender_type=gender)
-            all_packages_in_network_labs = all_packages_in_network_labs.filter(gender_type=gender)
+            all_packages_in_non_network_labs = all_packages_in_non_network_labs.filter(gender_type__in=[gender, LabTest.ALL])
+            all_packages_in_network_labs = all_packages_in_network_labs.filter(gender_type__in=[gender, LabTest.ALL])
         if package_type == 1:
             all_packages_in_non_network_labs = all_packages_in_non_network_labs.filter(home_collection_possible=True)
             all_packages_in_network_labs = all_packages_in_network_labs.filter(home_collection_possible=True)

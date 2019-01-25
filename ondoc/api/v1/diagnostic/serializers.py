@@ -1128,7 +1128,7 @@ class LabPackageListSerializer(serializers.Serializer):
     test_ids = CommaSepratedToListField(required=False, max_length=500, typecast_to=int)
     min_age = serializers.IntegerField(required=False)
     max_age = serializers.IntegerField(required=False)
-    gender = serializers.IntegerField(required=False)
+    gender = serializers.ChoiceField(choices=LabTest.GENDER_TYPE_CHOICES, required=False)
     package_type = serializers.IntegerField(required=False)
 
     def validate_category_ids(self, attrs):
@@ -1158,7 +1158,11 @@ class RecommendedPackageCategoryList(serializers.ModelSerializer):
         test_id = []
         if obj:
             for tst in obj.recommended_lab_tests.all():
-                test_id.append({"id": tst.id, "name": tst.name})
+                temp_parameters = list(tst.parameter.all())
+                num_of_parameters = len(temp_parameters)
+                temp_parameters_names = [param.name for param in temp_parameters]
+                test_id.append({"id": tst.id, "name": tst.name, "num_of_parameters": num_of_parameters,
+                                "parameters": temp_parameters_names})
         return test_id
 
     class Meta:
