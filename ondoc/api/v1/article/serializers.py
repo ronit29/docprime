@@ -170,9 +170,9 @@ class CommentSerializer(serializers.ModelSerializer):
     #children = RecursiveField(many=True)
     children = serializers.SerializerMethodField()
     author = serializers.SerializerMethodField()
-    image = serializers.SerializerMethodField()
+    profile_img = serializers.SerializerMethodField()
 
-    def get_image(self, obj):
+    def get_profile_img(self, obj):
         profile_image = None
 
         user = obj.user
@@ -205,7 +205,7 @@ class CommentSerializer(serializers.ModelSerializer):
             'submit_date',
             'user_name',
             'author',
-            'image',
+            'profile_img',
            )
 
 
