@@ -1,6 +1,7 @@
 from ondoc.diagnostic import models as lab_models
 from ondoc.ratings_review import models
 from django.db import transaction
+from django.db.models import Q
 from ondoc.ratings_review.models import (RatingsReview, ReviewCompliments)
 from django.shortcuts import get_object_or_404
 from ondoc.doctor import models as doc_models
@@ -19,7 +20,7 @@ class RatingsViewSet(viewsets.GenericViewSet):
     permission_classes = (IsAuthenticated, IsConsumer, IsNotAgent)
 
     def get_queryset(self):
-        pass
+        return RatingsReview.objects.prefetch_related('compliment').filter(is_live=True)
 
     def prompt_close(self, request):
         serializer = serializers.RatingPromptCloseBodySerializer(data=request.data)
@@ -37,7 +38,6 @@ class RatingsViewSet(viewsets.GenericViewSet):
         except Exception as e:
             return Response({'error': 'Something went wrong'}, status=status.HTTP_404_NOT_FOUND)
         return Response(resp)
-
 
     def create(self, request):
         serializer = serializers.RatingCreateBodySerializer(data=request.data)
@@ -77,18 +77,23 @@ class RatingsViewSet(viewsets.GenericViewSet):
         else:
             return Response({'error': 'Object Not Found'}, status=status.HTTP_400_BAD_REQUEST)
 
-
     def list(self, request):
         serializer = serializers.RatingListBodySerializerdata(data=request.query_params)
         serializer.is_valid(raise_exception=True)
         valid_data = serializer.validated_data
         if valid_data.get('content_type') == RatingsReview.OPD:
-            content_data = doc_models.Doctor.objects.filter(id=valid_data.get('object_id')).first()
+            queryset = self.get_queryset().exclude(Q(review='') | Q(review=None))\
+                                          .filter(doc_ratings__id=valid_data.get('object_id'))\
+                                          .order_by('-updated_at')
+            appointment = doc_models.OpdAppointment.objects.select_related('profile').filter(doctor_id=valid_data.get('object_id')).all()
         else:
-            content_data = lab_models.Lab.objects.filter(id=valid_data.get('object_id')).first()
-        if content_data:
-                ratings = content_data.get_ratings()
-                body_serializer = serializers.RatingsModelSerializer(ratings, many=True, context={'request':request})
+            queryset = self.get_queryset().exclude(Q(review='') | Q(review=None))\
+                                          .filter(lab_ratings__id=valid_data.get('object_id'))\
+                                          .order_by('-updated_at')
+            appointment = lab_models.LabAppointment.objects.select_related('profile').filter(lab_id=valid_data.get('object_id')).all()
+        if len(queryset):
+                body_serializer = serializers.RatingsModelSerializer(queryset, many=True, context={'request': request,
+                                                                                                   'app': appointment})
         else:
             return Response({'error': 'Invalid Object'}, status=status.HTTP_404_NOT_FOUND)
         return Response(body_serializer.data)

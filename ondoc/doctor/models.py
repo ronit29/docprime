@@ -376,7 +376,7 @@ class Doctor(auth_model.TimeStampedModel, auth_model.QCModel, SearchKey):
     matrix_reference_id = models.BigIntegerField(blank=True, null=True)
     signature = models.ImageField('Doctor Signature', upload_to='doctor/images', null=True, blank=True)
     billing_merchant = GenericRelation(auth_model.BillingAccount)
-    rating = GenericRelation(ratings_models.RatingsReview)
+    rating = GenericRelation(ratings_models.RatingsReview, related_query_name='doc_ratings')
     enabled = models.BooleanField(verbose_name='Is Enabled', default=True, blank=True)
     source = models.CharField(max_length=20, blank=True)
     batch = models.CharField(max_length=20, blank=True)

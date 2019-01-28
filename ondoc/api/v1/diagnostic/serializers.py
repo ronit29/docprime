@@ -104,7 +104,7 @@ class LabModelSerializer(serializers.ModelSerializer):
         app = LabAppointment.objects.select_related('profile').filter(lab_id=obj.id).all()
         # rating_queryset = obj.rating.prefetch_related('compliment').exclude(Q(review='') | Q(review=None)).filter(is_live=True).order_by('-updated_at')
         query = self.context.get('rating_queryset')
-        rating_queryset = query.exclude(Q(review='') | Q(review=None)).order_by('-updated_at')
+        rating_queryset = query.exclude(Q(review='') | Q(review=None)).order_by('-ratings', '-updated_at')
         reviews = rating_serializer.RatingsModelSerializer(rating_queryset, many=True, context={'app': app})
         return reviews.data[:5]
 
