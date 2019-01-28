@@ -2470,7 +2470,7 @@ class OfflineCustomerViewSet(viewsets.GenericViewSet):
                 found = False
                 for appnt in appntment_ids:
                     if id == appnt.id:
-                        patient = def_number = action_cancel = action_add = action_reschedule = None
+                        patient = def_number = action_cancel = action_add = action_reschedule = action_complete = None
                         found = True
 
                         self.validate_permissions(data, doc_pem_list, hosp_pem_list, clinic_queryset)
@@ -2485,17 +2485,15 @@ class OfflineCustomerViewSet(viewsets.GenericViewSet):
                                 patient_data = self.create_patient(request, data['patient'], data['hospital'],
                                                                    data['doctor'])
                                 patient_ids.append(patient_data['patient'].id)
-
+                                action_cancel = True
                             else:
                                 patient_data = self.update_patient(request, data['patient'], data['hospital'],
                                                                    data['doctor'])
-
                             patient = patient_data['patient']
                             if patient_data.get('sms_list'):
                                 patient_data['sms_list']['old_appointment'] = appnt
                                 sms_list.append(patient_data['sms_list'])
                             appnt.user = patient
-                            action_cancel = True
                         else:
                             patient = appnt.user
                             patient_data = {}
@@ -2509,13 +2507,15 @@ class OfflineCustomerViewSet(viewsets.GenericViewSet):
 
                         if appnt.doctor.id != data.get('doctor').id or appnt.hospital.id != data.get('hospital').id:
                             action_cancel = True
-
+                        if not action_cancel and (data.get('time_slot_start') != appnt.time_slot_start):
+                            action_reschedule = True
+                        if data.get('status') == models.OfflineOPDAppointments.COMPLETED:
+                            action_complete = True
                         appnt.doctor = data.get('doctor')
                         appnt.hospital = data.get('hospital')
                         appnt.error = data.get('error', False)
                         appnt.error_message = data.get('error_message')
                         if data.get("time_slot_start"):
-                            action_reschedule = True
                             appnt.time_slot_start = data.get("time_slot_start")
                         if data.get('status'):
                             appnt.status = data.get('status')
@@ -2531,6 +2531,7 @@ class OfflineCustomerViewSet(viewsets.GenericViewSet):
                             patient_data['sms_list']['appointment'] = appnt
                             patient_data['sms_list']['action_cancel'] = action_cancel
                             patient_data['sms_list']['action_reschedule'] = action_reschedule
+                            patient_data['sms_list']['action_complete'] = action_complete
                         ret_obj = {}
                         ret_obj['id'] = appnt.id
                         ret_obj['patient_id'] = appnt.user.id
