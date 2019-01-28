@@ -2195,7 +2195,9 @@ class OfflineCustomerViewSet(viewsets.GenericViewSet):
         serializer = serializers.GetOfflinePatientsSerializer(data=request.query_params)
         serializer.is_valid(raise_exception=True)
         valid_data = serializer.validated_data
-        queryset = models.OfflinePatients.objects.filter(Q(doctor__manageable_doctors__user=user,
+        queryset = models.OfflinePatients.objects.prefetch_related('patient_mobiles')\
+                                                 .select_related('doctor', 'hospital')\
+                                                 .filter(Q(doctor__manageable_doctors__user=user,
                                                            doctor__manageable_doctors__entity_type=GenericAdminEntity.DOCTOR,
                                                            doctor__manageable_doctors__is_disabled=False,
                                                            )
@@ -2215,11 +2217,36 @@ class OfflineCustomerViewSet(viewsets.GenericViewSet):
             admin_queryset = auth_models.GenericAdmin.objects.filter(user=request.user, updated_at__gte=valid_data.get('updated_at'))
             if not admin_queryset.exists():
                 queryset = queryset.filter(updated_at__gte=valid_data.get('updated_at'))
-        queryset = queryset.values('name', 'id', 'gender', 'doctor', 'hospital', 'age', 'dob', 'calculated_dob', 'updated_at',
-                                   'share_with_hospital', 'sms_notification', 'medical_history',
-                                   'referred_by', 'display_welcome_message', 'error'
-                                   ).distinct()
-        return Response(queryset)
+        # queryset = queryset.values('name', 'id', 'gender', 'doctor', 'hospital', 'age', 'dob', 'calculated_dob', 'updated_at',
+        #                            'share_with_hospital', 'sms_notification', 'medical_history',
+        #                            'referred_by', 'display_welcome_message', 'error'
+        #                            ).distinct()
+        response = []
+        for data in queryset.distinct().all():
+            patient_dict = {}
+            patient_dict['id'] = data.id
+            patient_dict['name'] = data.name if data.name else None
+            patient_dict['gender'] = data.gender if data.gender else None
+            patient_dict['doctor'] = data.doctor.id if data.doctor else None
+            patient_dict['hospital'] = data.hospital.id if data.hospital else None
+            patient_dict['age'] = data.age if data.age else None
+            patient_dict['dob'] = data.dob if data.dob else None
+            patient_dict['calculated_dob'] = data.calculated_dob if data.calculated_dob else None
+            patient_dict['updated_at'] = data.updated_at if data.updated_at else None
+            patient_dict['share_with_hospital'] = data.share_with_hospital if data.share_with_hospital else None
+            patient_dict['sms_notification'] = data.sms_notification if data.sms_notification else None
+            patient_dict['medical_history'] = data.medical_history if data.medical_history else None
+            patient_dict['referred_by'] = data.referred_by if data.referred_by else None
+            patient_dict[
+                'display_welcome_message'] = data.display_welcome_message if data.display_welcome_message else None
+            patient_dict['error'] = data.error if data.error else None
+            phone_number = []
+            if hasattr(data, 'patient_mobiles'):
+                for mob in data.patient_mobiles.all():
+                    phone_number.append({"phone_number": mob.phone_number, "is_default": mob.is_default})
+            patient_dict['patient_numbers'] = phone_number
+            response.append(patient_dict)
+        return Response(response)
 
     @transaction.atomic
     def create_offline_patients(self, request):
@@ -2886,12 +2913,13 @@ class AppointmentMessageViewset(viewsets.GenericViewSet):
         if data.get('type') == serializers.AppointmentMessageSerializer.REMINDER:
             if phone_number:
                 try:
+                    time = aware_time_zone(appnt.time_slot_start)
                     notification_tasks.send_appointment_reminder_message.apply_async(
                         kwargs={'number': phone_number,
                                 'patient_name': patient_name,
                                 'doctor': appnt.doctor.name,
                                 'hospital_name': appnt.hospital.name,
-                                'date': appnt.time_slot_start.strftime("%B %d, %Y %H:%M")},
+                                'date': time.strftime("%B %d, %Y %H:%M")},
                         countdown=1)
 
                 except Exception as e:
