@@ -632,6 +632,7 @@ class DoctorEmailInline(nested_admin.NestedTabularInline):
 
 class DoctorForm(FormCleanMixin):
     additional_details = forms.CharField(widget=forms.Textarea, required=False)
+    disable_comments = forms.CharField(widget=forms.Textarea, required=False)
     raw_about = forms.CharField(widget=forms.Textarea, required=False)
     # primary_mobile = forms.CharField(required=True)
     # email = forms.EmailField(required=True)
@@ -1005,6 +1006,13 @@ class DoctorAdmin(AutoComplete, ImportExportMixin, VersionAdmin, ActionAdmin, QC
     resource_class = DoctorResource
     change_list_template = 'superuser_import_export.html'
 
+    fieldsets = ((None,{'fields':('name','gender','practicing_since','license','is_license_verified','signature','raw_about' \
+                  ,'about',  'onboarding_url', 'get_onboard_link', 'additional_details')}),
+                 (None,{'fields':('assigned_to',)}),
+                  (None,{'fields':('enabled_for_online_booking','is_internal','is_test_doctor','is_insurance_enabled','is_retail_enabled', \
+                    'is_online_consultation_enabled','online_consultation_fees')}),
+                    (None,{'fields':('enabled','disabled_after','disable_reason','disable_comments','onboarding_status','assigned_to', \
+                     'matrix_lead_id','batch', 'is_gold', 'lead_url', 'registered','is_live')}))
     list_display = (
         'name', 'updated_at', 'data_status', 'onboarding_status', 'list_created_by', 'list_assigned_to', 'registered',
         'get_onboard_link')
