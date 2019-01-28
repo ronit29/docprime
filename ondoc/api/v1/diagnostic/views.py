@@ -89,6 +89,7 @@ class SearchPageViewSet(viewsets.ReadOnlyModelViewSet):
         temp_data['common_package'] = package_serializer.data
         temp_data['preferred_labs'] = lab_serializer.data
         temp_data['common_conditions'] = condition_serializer.data
+        temp_data['information'] = {'screening': 'Screening text', 'physical': 'Physical Text'}
 
         return Response(temp_data)
 
