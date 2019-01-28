@@ -5,6 +5,7 @@ from fluent_comments.models import FluentComment
 
 from ondoc.articles.models import Article, ArticleLinkedUrl, LinkedArticle
 from ondoc.articles.models import ArticleCategory
+from ondoc.authentication.models import User
 from ondoc.doctor.v1.serializers import DoctorSerializer, ArticleAuthorSerializer
 from django.db import models
 
@@ -169,6 +170,20 @@ class CommentSerializer(serializers.ModelSerializer):
     #children = RecursiveField(many=True)
     children = serializers.SerializerMethodField()
     author = serializers.SerializerMethodField()
+    image = serializers.SerializerMethodField()
+
+    def get_image(self, obj):
+        profile_image = None
+
+        user = obj.user
+        if user and user.user_type == User.CONSUMER:
+            profile = user.profiles.filter(is_default_user=True).first()
+            if profile:
+                profile_image = profile.get_thumbnail()
+
+        #if not profile image
+
+        return profile_image
 
     def get_children(self, obj):
         if len(obj.children.filter(is_public=True))>0:
@@ -190,6 +205,7 @@ class CommentSerializer(serializers.ModelSerializer):
             'submit_date',
             'user_name',
             'author',
+            'image',
            )
 
 

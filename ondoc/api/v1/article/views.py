@@ -104,7 +104,6 @@ class ArticleViewSet(viewsets.GenericViewSet):
         article_url = serializer.validated_data.get('url')
         queryset = self.get_queryset().filter(url=article_url)
 
-
         if not preview:
             queryset = queryset.filter(is_published=True)
         if queryset.exists():
