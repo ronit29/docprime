@@ -20,8 +20,12 @@ class BaseIntegrator(object):
 
         return {}
 
-    def post_order(self):
-        pass
+    def post_order(self, lab_appointment):
+        try:
+            order_detail = self._post_order_details(lab_appointment)
+            return order_detail
+        except Exception as e:
+            pass
 
     def list_orders(self):
         pass
@@ -31,3 +35,5 @@ class BaseIntegrator(object):
 
     def order_details(self):
         pass
+
+    def get_pricing
