@@ -1,4 +1,4 @@
-from ondoc.coupon.models import Coupon, RandomGeneratedCoupon
+from ondoc.coupon.models import Coupon, RandomGeneratedCoupon, UserSpecificCoupon
 from ondoc.account.models import Order
 from ondoc.doctor.models import OpdAppointment
 from ondoc.diagnostic.models import LabAppointment, AvailableLabTest, LabTest
@@ -15,6 +15,7 @@ from django.contrib.auth import get_user_model
 from rest_framework import status
 from django.db import transaction
 from django.db.models import Q, Sum, Count, F, ExpressionWrapper, DateTimeField
+from django.forms.models import model_to_dict
 from . import serializers
 from django.conf import settings
 import requests, re, json
@@ -104,39 +105,40 @@ class ApplicableCouponsViewSet(viewsets.GenericViewSet):
         else:
             coupons = coupons.filter(is_user_specific=False)
 
-        if tests:
-            coupons = coupons.filter(Q(test__isnull=True) | Q(test__in=tests))
-            test_categories = set(tests.values_list('categories', flat=True))
-            coupons = coupons.filter(Q(test_categories__isnull=True) | Q(test_categories__in=test_categories))
-        else:
-            coupons = coupons.filter(test__isnull=True)
-            coupons = coupons.filter(test_categories__isnull=True)
+        if product_id:
+            if tests:
+                coupons = coupons.filter(Q(test__isnull=True) | Q(test__in=tests))
+                test_categories = set(tests.values_list('categories', flat=True))
+                coupons = coupons.filter(Q(test_categories__isnull=True) | Q(test_categories__in=test_categories))
+            else:
+                coupons = coupons.filter(test__isnull=True)
+                coupons = coupons.filter(test_categories__isnull=True)
 
-        if lab:
-            coupons = coupons.filter(Q(cities__isnull=True) | Q(cities__icontains=lab.city))
-        else:
-            coupons = coupons.filter(cities__isnull=True)
+            if lab:
+                coupons = coupons.filter(Q(cities__isnull=True) | Q(cities__icontains=lab.city))
+            else:
+                coupons = coupons.filter(cities__isnull=True)
 
-        if hospital:
-            coupons = coupons.filter(Q(cities__isnull=True) | Q(cities__icontains=hospital.city))
-        else:
-            coupons = coupons.filter(cities__isnull=True)
+            if hospital:
+                coupons = coupons.filter(Q(cities__isnull=True) | Q(cities__icontains=hospital.city))
+            else:
+                coupons = coupons.filter(cities__isnull=True)
 
-        if doctor:
-            coupons = coupons.filter(Q(specializations__isnull=True)
-                                     | Q(specializations__in=
-                                       doctor.doctorpracticespecializations.values_list('specialization', flat=True))
-                                     )
-        else:
-            coupons = coupons.filter(specializations__isnull=True)
+            if doctor:
+                coupons = coupons.filter(Q(specializations__isnull=True)
+                                         | Q(specializations__in=
+                                           doctor.doctorpracticespecializations.values_list('specialization', flat=True))
+                                         )
+            else:
+                coupons = coupons.filter(specializations__isnull=True)
 
-        if procedures:
-            coupons = coupons.filter(Q(procedures__isnull=True) | Q(procedures__in=procedures))
-            procedure_categories = set(procedures.values_list('categories', flat=True))
-            coupons = coupons.filter(Q(procedure_categories__isnull=True) | Q(procedure_categories__in=procedure_categories))
-        else:
-            coupons = coupons.filter(procedures__isnull=True)
-            coupons = coupons.filter(procedure_categories__isnull=True)
+            if procedures:
+                coupons = coupons.filter(Q(procedures__isnull=True) | Q(procedures__in=procedures))
+                procedure_categories = set(procedures.values_list('categories', flat=True))
+                coupons = coupons.filter(Q(procedure_categories__isnull=True) | Q(procedure_categories__in=procedure_categories))
+            else:
+                coupons = coupons.filter(procedures__isnull=True)
+                coupons = coupons.filter(procedure_categories__isnull=True)
 
         if product_id:
             coupons = coupons.filter(is_corporate=False)
@@ -166,7 +168,7 @@ class ApplicableCouponsViewSet(viewsets.GenericViewSet):
         #
         # user_lab_completed = LabAppointment.objects.filter(user=user, status__in=[LabAppointment.COMPLETED]).count()
 
-        coupons = coupons.prefetch_related('lab', 'test', total_opd_booked, user_opd_booked, total_lab_booked, user_lab_booked)
+        coupons = coupons.prefetch_related('user_specific_coupon', 'lab', 'test', total_opd_booked, user_opd_booked, total_lab_booked, user_lab_booked)
         # coupons = coupons.prefetch_related('lab_network', 'lab', 'test', 'test_categories',
         #                                    'specializations', 'procedures', 'procedure_categories',
         #                                    total_opd_booked, user_opd_booked, total_lab_booked, user_lab_booked)
@@ -195,6 +197,12 @@ class ApplicableCouponsViewSet(viewsets.GenericViewSet):
             if coupon.new_user_constraint and (len(coupon.user_opd_booked)>0 or len(coupon.user_lab_booked)>0):
                 allowed = False
 
+            if coupon.is_user_specific and user:
+                if coupon.user_specific_coupon.exists():
+                    user_specefic = coupon.user_specific_coupon.filter(user=user).first()
+                    if user_specefic and (len(coupon.user_opd_booked)+len(coupon.user_lab_booked)) >= user_specefic.count:
+                        allowed = False
+
             # is coupon lab specific
             if coupon.lab and lab and coupon.lab != lab:
                 allowed = False
@@ -217,7 +225,8 @@ class ApplicableCouponsViewSet(viewsets.GenericViewSet):
                             "tests": [ test.id for test in coupon.test.all() ],
                             "network_id": coupon.lab_network.id if coupon.lab_network else None,
                             "is_cashback": coupon.coupon_type == Coupon.CASHBACK,
-                            "tnc": coupon.tnc})
+                            "tnc": coupon.tnc,
+                            "payment_option": model_to_dict(coupon.payment_option) if coupon.payment_option else None})
                 if user:
                     for random_coupon in coupon.random_generated_coupon.all():
                         applicable_coupons.append({"is_random_generated": True,
@@ -234,7 +243,8 @@ class ApplicableCouponsViewSet(viewsets.GenericViewSet):
                                 "is_corporate": coupon.is_corporate,
                                 "tests": [test.id for test in coupon.test.all()],
                                 "network_id": coupon.lab_network.id if coupon.lab_network else None,
-                                "tnc": coupon.tnc})
+                                "tnc": coupon.tnc,
+                                "payment_option": model_to_dict(coupon.payment_option) if coupon.payment_option else None})
 
 
         if applicable_coupons:
@@ -260,6 +270,8 @@ class ApplicableCouponsViewSet(viewsets.GenericViewSet):
 
             def remove_coupon_data(c):
                 c.pop('coupon')
+                if c.get("payment_option"):
+                    c["payment_option"]["image"] = c["payment_option"]["image"].path
                 return c
             applicable_coupons = list(map(remove_coupon_data, applicable_coupons))
 

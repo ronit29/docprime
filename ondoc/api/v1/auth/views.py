@@ -56,6 +56,7 @@ import logging
 import jwt
 from decimal import Decimal
 from ondoc.web.models import ContactUs
+from ondoc.notification.tasks import send_pg_acknowledge
 
 logger = logging.getLogger(__name__)
 User = get_user_model()
@@ -1099,6 +1100,15 @@ class TransactionViewSet(viewsets.GenericViewSet):
             OrderLog.objects.create(**log_data)
         except Exception as e:
             logger.error("Error in logging Order - " + str(e))
+
+        try:
+            if response and response.get("orderNo"):
+                pg_txn = PgTransaction.objects.filter(order_no__iexact=response.get("orderNo")).first()
+                if pg_txn:
+                    send_pg_acknowledge.apply_async((pg_txn.order_id, pg_txn.order_no,), countdown=1)
+        except Exception as e:
+            logger.error("Error in sending pg acknowledge - " + str(e))
+
 
         # return Response({"url": REDIRECT_URL})
         return HttpResponseRedirect(redirect_to=REDIRECT_URL)

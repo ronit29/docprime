@@ -14,6 +14,7 @@ import calendar
 from django.contrib.auth import get_user_model
 from django.contrib.gis.geos import GEOSGeometry
 from ondoc.account.tasks import refund_curl_task
+from ondoc.coupon.models import UserSpecificCoupon
 from ondoc.crm.constants import constants
 import copy
 import requests
@@ -564,6 +565,11 @@ class CouponsMixin(object):
             count = coupon_obj.used_coupon_count(user)
             total_used_count = coupon_obj.total_used_coupon_count()
 
+            if coupon_obj.is_user_specific and user:
+                user_specefic = UserSpecificCoupon.objects.filter(user=user, coupon=coupon_obj).first()
+                if user_specefic and count >= user_specefic.count:
+                    return {"is_valid": False, "used_count": count}
+
             if (coupon_obj.count is None or count < coupon_obj.count) and (coupon_obj.total_count is None or total_used_count < coupon_obj.total_count):
                 return {"is_valid": True, "used_count": count}
             else:
@@ -890,9 +896,10 @@ def get_opd_pem_queryset(user, model):
     #                                super_user_permission=false AND is_disabled=false AND permission_type=2) > 0) THEN 1  ELSE 0 END'''
     queryset = model.objects \
         .select_related('doctor', 'hospital', 'user') \
-        .prefetch_related('doctor__manageable_doctors', 'hospital__manageable_hospitals', 'doctor__images','doctor__qualifications', 'doctor__qualifications__qualification',
-                          'doctor__qualifications__specialization', 'doctor__qualifications__college', 'doctor__doctorpracticespecializations') \
-        .filter(hospital__is_live=True, doctor__is_live=True) \
+        .prefetch_related('doctor__manageable_doctors', 'hospital__manageable_hospitals', 'doctor__images',
+                          'doctor__qualifications', 'doctor__qualifications__qualification',
+                          'doctor__qualifications__specialization', 'doctor__qualifications__college',
+                          'doctor__doctorpracticespecializations', 'doctor__doctorpracticespecializations__specialization') \
         .filter(
         Q(
             Q(doctor__manageable_doctors__user=user,
@@ -977,7 +984,7 @@ def offline_form_time_slots(data, timing, is_available=True, is_doctor=True):
     day = data.get('day')
 
     float_span = (Decimal(time_span) / Decimal(60))
-    if not timing[day].get('timing'):
+    if isinstance(timing[day], dict) and not timing[day].get('timing'):
         timing[day] = []
     temp_start = start
     while temp_start <= end:

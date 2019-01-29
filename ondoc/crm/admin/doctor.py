@@ -39,8 +39,9 @@ from ondoc.doctor.models import (Doctor, DoctorQualification,
                                  OpdAppointment, CompetitorInfo, SpecializationDepartment,
                                  SpecializationField, PracticeSpecialization, SpecializationDepartmentMapping,
                                  DoctorPracticeSpecialization, CompetitorMonthlyVisit,
-                                 GoogleDetailing, VisitReason, VisitReasonMapping, PracticeSpecializationContent, PatientMobile, DoctorMobileOtp,
-                                 UploadDoctorData)
+                                 GoogleDetailing, VisitReason, VisitReasonMapping, PracticeSpecializationContent,
+                                 PatientMobile, DoctorMobileOtp,
+                                 UploadDoctorData, CancellationReason)
 
 from ondoc.authentication.models import User
 from .common import *
@@ -1325,27 +1326,26 @@ class DoctorOpdAppointmentForm(forms.ModelForm):
             raise forms.ValidationError(
                 "If Reason for Cancelled appointment is others it should be mentioned in cancellation comment.")
 
-
         if not DoctorClinicTiming.objects.filter(doctor_clinic__doctor=doctor,
                                                  doctor_clinic__hospital=hospital,
                                                  day=time_slot_start.weekday(),
                                                  start__lte=hour, end__gt=hour).exists():
             raise forms.ValidationError("Doctor do not sit at the given hospital in this time slot.")
 
-        if self.instance.id:
-
-            if self.instance.procedure_mappings.count():
-                doctor_details = self.instance.get_procedures()[0]
-                deal_price = Decimal(doctor_details["deal_price"])
-
-            else:
-                deal_price = cleaned_data.get('deal_price') if cleaned_data.get('deal_price') else self.instance.deal_price
-            if not DoctorClinicTiming.objects.filter(doctor_clinic__doctor=doctor,
-                                                     doctor_clinic__hospital=hospital,
-                                                     day=time_slot_start.weekday(),
-                                                     start__lte=hour, end__gt=hour,
-                                                     deal_price=deal_price).exists():
-                raise forms.ValidationError("Deal price is different for this time slot.")
+        # if self.instance.id:
+        #     if cleaned_data.get('status') == OpdAppointment.RESCHEDULED_PATIENT or cleaned_data.get(
+        #             'status') == OpdAppointment.RESCHEDULED_DOCTOR:
+        #         if self.instance.procedure_mappings.count():
+        #             doctor_details = self.instance.get_procedures()[0]
+        #             deal_price = Decimal(doctor_details["deal_price"])
+        #         else:
+        #             deal_price = cleaned_data.get('deal_price') if cleaned_data.get('deal_price') else self.instance.deal_price
+        #         if not DoctorClinicTiming.objects.filter(doctor_clinic__doctor=doctor,
+        #                                                  doctor_clinic__hospital=hospital,
+        #                                                  day=time_slot_start.weekday(),
+        #                                                  start__lte=hour, end__gt=hour,
+        #                                                  deal_price=deal_price).exists():
+        #             raise forms.ValidationError("Deal price is different for this time slot.")
 
         return cleaned_data
 
@@ -1393,6 +1393,8 @@ class DoctorOpdAppointmentAdmin(admin.ModelAdmin):
     def get_form(self, request, obj=None, **kwargs):
         form = super().get_form(request, obj=obj, **kwargs)
         form.request = request
+        form.base_fields['cancellation_reason'].queryset = CancellationReason.objects.filter(
+            Q(type=Order.DOCTOR_PRODUCT_ID) | Q(type__isnull=True), visible_on_admin=True)
         if obj is not None and obj.time_slot_start:
             time_slot_start = timezone.localtime(obj.time_slot_start, pytz.timezone(settings.TIME_ZONE))
             form.base_fields['start_date'].initial = time_slot_start.strftime('%Y-%m-%d')
