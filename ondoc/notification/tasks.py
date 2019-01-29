@@ -537,14 +537,18 @@ def refund_initiated_sms_task(obj_id):
     from ondoc.account.models import ConsumerRefund
     from ondoc.communications.models import SMSNotification
     from ondoc.notification.models import NotificationAction
+    from ondoc.authentication.models import UserProfile
     try:
         # check if still pending
         instance = ConsumerRefund.objects.filter(id=obj_id).first()
-        if not instance \
-                or instance.refund_state == ConsumerRefund.PENDING:  # SHASHANK_SINGH Is it necessary to ask here:
+        if not instance:
             return
         context = {'amount': instance.refund_amount}
-        receivers = {}
+        receivers = []
+        default_user_profile = UserProfile.objects.filter(user=instance.user, is_default_user=True).first()
+        if default_user_profile and default_user_profile.phone_number:
+            receivers.append({'user': instance.user, 'phone_number': default_user_profile.phone_number})
+        receivers.append({'user': instance.user, 'phone_number': instance.user.phone_number})
         sms_notification = SMSNotification(NotificationAction.REFUND_INITIATED, context)
         sms_notification.send(receivers)
     except Exception as e:
@@ -556,6 +560,8 @@ def refund_completed_sms_task(obj_id):
     from ondoc.account.models import ConsumerRefund
     from ondoc.communications.models import SMSNotification
     from ondoc.notification.models import NotificationAction
+    from ondoc.authentication.models import UserProfile
+    from ondoc.communications.models import unique_phone_numbers
     try:
         # check if any more obj incomplete status
         instance = ConsumerRefund.objects.filter(id=obj_id).first()
@@ -563,7 +569,12 @@ def refund_completed_sms_task(obj_id):
                                                          refund_state=ConsumerRefund.PENDING).count() > 1:
             return
         context = {'amount': instance.refund_amount}
-        receivers = {}
+        receivers = []
+        default_user_profile = UserProfile.objects.filter(user=instance.user, is_default_user=True).first()
+        if default_user_profile and default_user_profile.phone_number:
+            receivers.append({'user': instance.user, 'phone_number': default_user_profile.phone_number})
+        receivers.append({'user': instance.user, 'phone_number': instance.user.phone_number})
+        receivers= unique_phone_numbers(receivers)
         sms_notification = SMSNotification(NotificationAction.REFUND_COMPLETED, context)
         sms_notification.send(receivers)
     except Exception as e:
@@ -574,12 +585,19 @@ def refund_completed_sms_task(obj_id):
 def refund_breakup_sms_task(obj_id):
     from ondoc.account.models import ConsumerTransaction
     from ondoc.communications.models import SMSNotification
+    from ondoc.authentication.models import UserProfile
+    from ondoc.communications.models import unique_phone_numbers
     try:
         instance = ConsumerTransaction.objects.filter(id=obj_id).first()
         if not instance:
             return
-        context = {}
-        receivers = {}
+        context = {'amount': instance.amount}
+        receivers = []
+        default_user_profile = UserProfile.objects.filter(user=instance.user, is_default_user=True).first()
+        if default_user_profile and default_user_profile.phone_number:
+            receivers.append({'user': instance.user, 'phone_number': default_user_profile.phone_number})
+        receivers.append({'user': instance.user, 'phone_number': instance.user.phone_number})
+        receivers = unique_phone_numbers(receivers)
         sms_notification = SMSNotification(NotificationAction.REFUND_BREAKUP, context)
         sms_notification.send(receivers)
     except Exception as e:
