@@ -1,3 +1,5 @@
+from copy import deepcopy
+
 from django.contrib.gis.db import models
 from django.db import migrations, transaction
 from django.db.models import Count, Sum, When, Case, Q, F, Avg
@@ -7,6 +9,7 @@ from django.contrib.postgres.fields import JSONField, ArrayField
 from django.core.validators import MaxValueValidator, MinValueValidator, FileExtensionValidator
 from django.core.exceptions import ValidationError
 from django.core.exceptions import NON_FIELD_ERRORS
+from django.template.loader import render_to_string
 from rest_framework.exceptions import ValidationError as RestFrameworkValidationError
 from django.core.files.storage import get_storage_class
 from django.conf import settings
@@ -15,10 +18,9 @@ from dateutil import tz
 from django.utils import timezone
 from ondoc.authentication import models as auth_model
 from ondoc.authentication.models import SPOCDetails
-
 from ondoc.location import models as location_models
 from ondoc.account.models import Order, ConsumerAccount, ConsumerTransaction, PgTransaction, ConsumerRefund, \
-    MerchantPayout, UserReferred, MoneyPool
+    MerchantPayout, UserReferred, MoneyPool, Invoice
 from ondoc.notification.models import NotificationAction
 from ondoc.payout.models import Outstanding
 from ondoc.coupon.models import Coupon
@@ -30,15 +32,12 @@ from ondoc.notification import models as notification_models
 from ondoc.notification import tasks as notification_tasks
 from django.contrib.contenttypes.fields import GenericRelation
 from ondoc.api.v1.utils import get_start_end_datetime, custom_form_datetime, CouponsMixin, aware_time_zone, \
-    form_time_slot
+    form_time_slot, util_absolute_url, html_to_pdf
 from ondoc.common.models import AppointmentHistory
 from functools import reduce
 from operator import or_
 import logging
-import math
-import random
-import os
-import re
+import re, uuid, os, math, random
 import datetime
 from django.db.models import Q
 from django.core.files.uploadedfile import InMemoryUploadedFile
@@ -327,6 +326,7 @@ class College(auth_model.TimeStampedModel):
 
 class Doctor(auth_model.TimeStampedModel, auth_model.QCModel, SearchKey):
     SOURCE_PRACTO = "pr"
+    SOURCE_CRM = 'crm'
 
     NOT_ONBOARDED = 1
     REQUEST_SENT = 2
@@ -430,7 +430,7 @@ class Doctor(auth_model.TimeStampedModel, auth_model.QCModel, SearchKey):
 
     def update_live_status(self):
 
-        if self.source == self.SOURCE_PRACTO:
+        if self.source == self.SOURCE_PRACTO or self.source == self.SOURCE_CRM:
             if not self.is_live and self.enabled == True:
                 self.is_live = True
                 if not self.live_at:
@@ -1125,8 +1125,33 @@ class DoctorOnboardingToken(auth_model.TimeStampedModel):
 #     class Meta:
 #         db_table = "hospital_network_mapping"
 
+class OpdAppointmentInvoiceMixin(object):
+    def generate_invoice(self, context=None):
+        invoices = self.get_invoice_objects()
+        if not invoices:
+            if not context:
+                from ondoc.communications.models import OpdNotification
+                opd_notification = OpdNotification(self)
+                context = opd_notification.get_context()
+            invoice = Invoice.objects.create(reference_id=context.get("instance").id,
+                                             product_id=Order.DOCTOR_PRODUCT_ID)
+            context = deepcopy(context)
+            context['invoice'] = invoice
+            html_body = render_to_string("email/doctor_invoice/invoice_template.html", context=context)
+            filename = "invoice_{}_{}.pdf".format(str(timezone.now().strftime("%I%M_%d%m%Y")),
+                                                  random.randint(1111111111, 9999999999))
+            file = html_to_pdf(html_body, filename)
+            if not file:
+                logger.error("Got error while creating pdf for opd invoice.")
+                return []
+            invoice.file = file
+            invoice.save()
+            invoices = [invoice]
+        return invoices
+
+
 @reversion.register()
-class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin):
+class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentInvoiceMixin):
     CREATED = 1
     BOOKED = 2
     RESCHEDULED_DOCTOR = 3
@@ -1156,6 +1181,8 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin):
     AUTO_CANCELLED = 3
     CANCELLATION_TYPE_CHOICES = [(PATIENT_CANCELLED, 'Patient Cancelled'), (AGENT_CANCELLED, 'Agent Cancelled'),
                                  (AUTO_CANCELLED, 'Auto Cancelled')]
+
+    MAX_FREE_BOOKINGS_ALLOWED = 3
     # PATIENT_SHOW = 1
     # PATIENT_DIDNT_SHOW = 2
     # PATIENT_STATUS_CHOICES = [PATIENT_SHOW, PATIENT_DIDNT_SHOW]
@@ -1210,12 +1237,25 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin):
                 allowed = [self.RESCHEDULED_DOCTOR, self.COMPLETED]
             elif self.status == self.RESCHEDULED_DOCTOR:
                 allowed = [self.ACCEPTED]
-
+        elif user_type == auth_model.User.DOCTOR and self.time_slot_start.date() < today:
+            if self.status == self.ACCEPTED:
+                allowed = [self.COMPLETED]
         elif user_type == auth_model.User.CONSUMER and current_datetime <= self.time_slot_start:
             if self.status in (self.BOOKED, self.ACCEPTED, self.RESCHEDULED_DOCTOR, self.RESCHEDULED_PATIENT):
                 allowed = [self.RESCHEDULED_PATIENT, self.CANCELLED]
 
         return allowed
+
+    def get_invoice_objects(self):
+        return Invoice.objects.filter(reference_id=self.id, product_id=Order.DOCTOR_PRODUCT_ID)
+
+    def get_invoice_urls(self):
+        invoices_urls = []
+        if self.id:
+            invoices = self.get_invoice_objects()
+            for invoice in invoices:
+                invoices_urls.append(util_absolute_url(invoice.file.url))
+        return invoices_urls
 
     @classmethod
     def create_appointment(cls, appointment_data):
@@ -1301,9 +1341,6 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin):
                 out_obj = payout_model.Outstanding.create_outstanding(admin_obj, out_level, app_outstanding_fees)
                 self.outstanding = out_obj
         self.save()
-
-    def generate_invoice(self):
-        pass
 
     def get_billable_admin_level(self):
         if self.hospital.network and self.hospital.network.is_billing_enabled:
@@ -1710,6 +1747,20 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin):
     class Meta:
         db_table = "opd_appointment"
 
+    def get_prescriptions(self, request):
+        prescriptions = []
+        for pres in self.prescriptions.all():
+            files = []
+            for file in pres.prescription_file.all():
+                url = request.build_absolute_uri(file.name.url) if file.name else None
+                files.append(url)
+            prescription_dict = {
+                                 "updated_at": pres.updated_at,
+                                 "details": pres.prescription_details,
+                                 "files": files
+                                }
+            prescriptions.append(prescription_dict)
+        return prescriptions
 
 class OpdAppointmentProcedureMapping(models.Model):
     opd_appointment = models.ForeignKey(OpdAppointment, on_delete=models.CASCADE, related_name='procedure_mappings')
@@ -1760,7 +1811,7 @@ class DoctorLeave(auth_model.TimeStampedModel):
 
 
 class Prescription(auth_model.TimeStampedModel):
-    appointment = models.ForeignKey(OpdAppointment, on_delete=models.CASCADE)
+    appointment = models.ForeignKey(OpdAppointment, related_name='prescriptions', on_delete=models.CASCADE)
     prescription_details = models.TextField(max_length=300, blank=True, null=True)
 
     def __str__(self):
@@ -1771,7 +1822,7 @@ class Prescription(auth_model.TimeStampedModel):
 
 
 class PrescriptionFile(auth_model.TimeStampedModel, auth_model.Document):
-    prescription = models.ForeignKey(Prescription, on_delete=models.CASCADE)
+    prescription = models.ForeignKey(Prescription, related_name='prescription_file', on_delete=models.CASCADE)
     name = models.FileField(upload_to='prescriptions', blank=False, null=False)
 
     def __str__(self):
@@ -1953,6 +2004,7 @@ class PracticeSpecialization(auth_model.TimeStampedModel, SearchKey):
     general_specialization_ids = ArrayField(models.IntegerField(blank=True, null=True), size=100,
                                             null=True, blank=True)
     synonyms = models.CharField(max_length=4000, null=True, blank=True)
+    doctor_count = models.PositiveIntegerField(default=0, null=True)
 
     class Meta:
         db_table = 'practice_specialization'
@@ -2081,14 +2133,184 @@ class VisitReasonMapping(models.Model):
 
 
 class CancellationReason(auth_model.TimeStampedModel):
+    TYPE_CHOICES = [("", "Both")]
+    TYPE_CHOICES.extend(Order.PRODUCT_IDS)
     name = models.CharField(max_length=200)
+    type = models.PositiveSmallIntegerField(default=None, null=True, blank=True, choices=TYPE_CHOICES)
+    visible_on_front_end = models.BooleanField(default=True)
+    visible_on_admin = models.BooleanField(default=True)
 
     class Meta:
         db_table = 'cancellation_reason'
-        unique_together = (('name',),)
+        unique_together = (('name','type'),)
 
     def __str__(self):
         return self.name
+
+
+class OfflinePatients(auth_model.TimeStampedModel):
+    DOCPRIME = 1
+    GOOGLE = 2
+    JUSTDIAL = 3
+    FRIENDS = 4
+    OTHERS = 5
+    MALE = 'm'
+    FEMALE = 'f'
+    OTHER = 'o'
+    GENDER_CHOICES = [(MALE, "Male"), (FEMALE, "Female"), (OTHER, "Other")]
+    REFERENCE_CHOICES = [(DOCPRIME, "Docprime"), (GOOGLE, "Google"), (JUSTDIAL, "JustDial"), (FRIENDS, "Friends"),
+                         (OTHERS, "Others")]
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    name = models.CharField(max_length=32)
+    sms_notification = models.BooleanField(default=False)
+    gender = models.CharField(max_length=2, default=None, blank=True, null=True, choices=GENDER_CHOICES)
+    dob = models.DateField(blank=True, null=True)
+    calculated_dob = models.DateField(blank=True, null=True)
+    referred_by = models.PositiveSmallIntegerField(choices=REFERENCE_CHOICES, null=True, blank=True)
+    medical_history = models.CharField(max_length=256, null=True, blank=True)
+    welcome_message = models.CharField(max_length=128, null=True, blank=True)
+    display_welcome_message = models.BooleanField(default=False)
+    doctor = models.ForeignKey(Doctor, related_name="patients_doc", on_delete=models.SET_NULL, null=True)
+    hospital = models.ForeignKey(Hospital, related_name="patients_hos", on_delete=models.SET_NULL, null=True, blank=True)
+    share_with_hospital = models.BooleanField(default=False)
+    created_by = models.ForeignKey(auth_model.User, on_delete=models.SET_NULL, null=True, blank=True)
+    error = models.BooleanField(default=False)
+    error_message = models.CharField(max_length=256, blank=True, null=True)
+    age = models.IntegerField(null=True, blank=True)
+
+    def __str__(self):
+        return self.name
+
+    @staticmethod
+    def welcome_message_sms(sms_obj):
+        if sms_obj:
+            try:
+                default_text = '''Dear %s, you have been successfully added as a patient to %s. In case of any query, please reach out to the %s.''' \
+                               % (sms_obj['name'], sms_obj['appointment'].hospital.name, sms_obj['appointment'].hospital.name)
+                text = sms_obj['welcome_message'] if sms_obj['welcome_message'] else default_text
+                notification_tasks.send_offline_appointment_message.apply_async(kwargs={'number': sms_obj['phone_number'], 'text': text, 'type': 'Welcome SMS'}, countdown=1)
+            except Exception as e:
+                logger.error("Failed to Push Offline Welcome Message SMS Task "+ str(e))
+
+    class Meta:
+        db_table = 'offline_patients'
+
+
+class PatientMobile(auth_model.TimeStampedModel):
+    patient = models.ForeignKey(OfflinePatients, related_name="patient_mobiles", on_delete=models.CASCADE)
+    phone_number = models.BigIntegerField(blank=True, null=True,
+                                          validators=[MaxValueValidator(9999999999), MinValueValidator(6000000000)])
+    is_default = models.BooleanField(verbose_name='Default Number?', default=False)
+
+    def __str__(self):
+        return '{}'.format(self.phone_number)
+
+    class Meta:
+        db_table = "patient_mobile"
+
+
+class OfflineOPDAppointments(auth_model.TimeStampedModel):
+    CREATED = 1
+    BOOKED = 2
+    RESCHEDULED_DOCTOR = 3
+    NO_SHOW = 4
+    ACCEPTED = 5
+    CANCELLED = 6
+    COMPLETED = 7
+    REMINDER = 8
+    SEND_MAP_LINK = 9
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    STATUS_CHOICES = [(CREATED, 'Created'), (BOOKED, 'Booked'),
+                      (RESCHEDULED_DOCTOR, 'Rescheduled by Doctor'),
+                      (NO_SHOW, 'No Show'),
+                      (ACCEPTED, 'Accepted'), (CANCELLED, 'Cancelled'),
+                      (COMPLETED, 'Completed')]
+    doctor = models.ForeignKey(Doctor, related_name="offline_doctor_appointments", on_delete=models.SET_NULL, null=True)
+    hospital = models.ForeignKey(Hospital, related_name="offline_hospital_appointments", on_delete=models.SET_NULL, null=True)
+    user = models.ForeignKey(OfflinePatients, related_name="offline_patients_appointment", on_delete=models.SET_NULL, null=True)
+    booked_by = models.ForeignKey(auth_model.User, related_name="offline_booked_appointements",
+                                  on_delete=models.SET_NULL,
+                                  null=True)
+    status = models.PositiveSmallIntegerField(default=CREATED, choices=STATUS_CHOICES)
+    time_slot_start = models.DateTimeField(blank=True, null=True)
+    error = models.BooleanField(default=False)
+    error_message = models.CharField(max_length=256, blank=True, null=True)
+
+    def __str__(self):
+        return '{}-{}'.format(self.doctor, self.hospital)
+
+    class Meta:
+        db_table = "offline_opd_appointments"
+
+    @staticmethod
+    def appointment_add_sms(sms_obj):
+        try:
+            default_text = '''Dear %s, your appointment has been confirmed with %s at %s on %s.''' % (
+                sms_obj['name'], sms_obj['appointment'].doctor.get_display_name(), sms_obj['appointment'].hospital.name,
+                sms_obj['appointment'].time_slot_start.strftime("%B %d, %Y %H:%M"))
+            notification_tasks.send_offline_appointment_message.apply_async(
+                kwargs={'number': sms_obj['phone_number'], 'text': default_text, 'type': 'Appointment ADD'},
+                countdown=1)
+        except Exception as e:
+            logger.error("Failed to Push Offline Appointment Add Message SMS Task " + str(e))
+
+    @staticmethod
+    def appointment_cancel_sms(sms_obj):
+        try:
+            default_text = "Dear %s, your appointment with %s at %s for %s has been cancelled. In case of any query, please reach out to the clinic." % (
+                              sms_obj['name'], sms_obj['old_appointment'].doctor.get_display_name(), sms_obj['old_appointment'].hospital.name,
+                              sms_obj['old_appointment'].time_slot_start.strftime("%B %d, %Y %H:%M"))
+            notification_tasks.send_offline_appointment_message.apply_async(
+                kwargs={'number': sms_obj['phone_number'], 'text': default_text, 'type': 'Appointment CANCEL'},
+                countdown=1)
+        except Exception as e:
+            logger.error("Failed to Push Offline Appointment Cancel Message SMS Task " + str(e))
+
+    @staticmethod
+    def appointment_complete_sms(sms_obj):
+        try:
+            default_text = "Dear %s, your appointment with %s at %s is complete. In case of any query, please reach out to the %s." % \
+                           (sms_obj['name'], sms_obj['appointment'].doctor.get_display_name(),
+                            sms_obj['appointment'].hospital.name, sms_obj['appointment'].hospital.name)
+            notification_tasks.send_offline_appointment_message.apply_async(
+                kwargs={'number': sms_obj['phone_number'], 'text': default_text, 'type': 'Appointment COMPLETE'},
+                countdown=1)
+        except Exception as e:
+            logger.error("Failed to Push Offline Appointment Cancel Message SMS Task " + str(e))
+
+    @staticmethod
+    def appointment_reschedule_sms(sms_obj):
+        try:
+            default_text = '''Dear %s, your appointment with %s at %s has been rescheduled to %s. 
+                              In case of any query, please reach out to the clinic..''' % (
+                              sms_obj['name'], sms_obj['appointment'].doctor.get_display_name(), sms_obj['appointment'].hospital.name,
+                              sms_obj['appointment'].time_slot_start.strftime("%B %d, %Y %H:%M"))
+            notification_tasks.send_offline_appointment_message.apply_async(
+                kwargs={'number': sms_obj['phone_number'], 'text': default_text, 'type': 'Appointment RESCHEDULE'},
+                countdown=1)
+        except Exception as e:
+            logger.error("Failed to Push Offline Appointment Rescehdule Message SMS Task " + str(e))
+
+    @staticmethod
+    def after_commit_create_sms(sms_list):
+        for sms_obj in sms_list:
+            if sms_obj:
+                if sms_obj.get('display_welcome_message'):
+                    OfflinePatients.welcome_message_sms(sms_obj)
+                OfflineOPDAppointments.appointment_add_sms(sms_obj)
+
+    @staticmethod
+    def after_commit_update_sms(sms_list):
+        for sms_obj in sms_list:
+            if sms_obj:
+                if sms_obj.get('action_complete') and sms_obj['action_complete']:
+                    OfflineOPDAppointments.appointment_complete_sms(sms_obj)
+                elif sms_obj.get('action_cancel') and sms_obj['action_cancel']:
+                    OfflineOPDAppointments.appointment_cancel_sms(sms_obj)
+                    OfflineOPDAppointments.appointment_add_sms(sms_obj)
+                elif sms_obj.get('action_reschedule') and sms_obj['action_reschedule']:
+                    OfflineOPDAppointments.appointment_reschedule_sms(sms_obj)
 
 
 class SearchScore(auth_model.TimeStampedModel):
@@ -2100,4 +2322,35 @@ class SearchScore(auth_model.TimeStampedModel):
 
     class Meta:
         db_table = 'search_score'
+
+
+class UploadDoctorData(auth_model.TimeStampedModel):
+    CREATED = 1
+    IN_PROGRESS = 2
+    SUCCESS = 3
+    FAIL = 4
+    STATUS_CHOICES = ("", "Select"), \
+                     (CREATED, "Created"), \
+                     (IN_PROGRESS, "Upload in progress"), \
+                     (SUCCESS, "Upload successful"),\
+                     (FAIL, "Upload Failed")
+    # file, batch, status, error msg, source
+    file = models.FileField()
+    source = models.CharField(max_length=20)
+    batch = models.CharField(max_length=20)
+    status = models.PositiveSmallIntegerField(choices=STATUS_CHOICES, default=CREATED, editable=False)
+    error_msg = JSONField(editable=False, null=True, blank=True)
+    lines = models.PositiveIntegerField(null=True, blank=True)
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, related_name="uploaded_doctor_data", null=True, editable=False,
+                             on_delete=models.SET_NULL)
+
+    def save(self, *args, **kwargs):
+        retry = kwargs.pop('retry', True)
+        from ondoc.notification.tasks import upload_doctor_data
+        super().save(*args, **kwargs)
+        if (self.status == self.CREATED or self.status == self.FAIL) and retry:
+            self.status = self.IN_PROGRESS
+            self.error_msg = None
+            super().save(*args, **kwargs)
+            upload_doctor_data.apply_async((self.id,), countdown=1)
 

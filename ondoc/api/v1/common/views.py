@@ -886,7 +886,7 @@ class SearchLeadViewSet(viewsets.GenericViewSet):
 class GetPaymentOptionsViewSet(viewsets.GenericViewSet):
 
     def list(self, request):
-        queryset = PaymentOptions.objects.filter(is_enabled=True)
+        queryset = PaymentOptions.objects.filter(is_enabled=True).order_by('-priority')
         options = []
         first = True
         for data in queryset:
@@ -896,6 +896,8 @@ class GetPaymentOptionsViewSet(viewsets.GenericViewSet):
             resp['description'] = data.description
             resp['is_enabled'] = data.is_enabled
             resp['action'] = data.action
+            resp['payment_gateway'] = data.payment_gateway
+
             if first==True:
                 first = False
                 resp['is_selected'] = True

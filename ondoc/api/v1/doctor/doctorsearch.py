@@ -1,3 +1,5 @@
+import operator
+
 from django.contrib.gis.geos import Point
 from django.db.models import F
 
@@ -7,7 +9,7 @@ from ondoc.doctor import models
 from ondoc.api.v1.utils import clinic_convert_timings
 from ondoc.api.v1.doctor import serializers
 from ondoc.authentication.models import QCModel
-from ondoc.doctor.models import Doctor
+from ondoc.doctor.models import Doctor, PracticeSpecialization
 from ondoc.procedure.models import DoctorClinicProcedure, ProcedureCategory, ProcedureToCategoryMapping, \
     get_selected_and_other_procedures, get_included_doctor_clinic_procedure, \
     get_procedure_categories_with_procedures
@@ -174,7 +176,7 @@ class DoctorSearchHelper:
 
         if self.query_params.get('url') and (not self.query_params.get('sort_on') \
                                              or self.query_params.get('sort_on')=='distance'):
-            return ' distance, priority desc ', ' rnk=1 '
+            return ' enabled_for_online_booking DESC, distance, priority desc ', ' rnk=1 '
 
         bucket_size=2000
 
@@ -222,6 +224,14 @@ class DoctorSearchHelper:
                 'max_distance') and self.query_params.get(
                 'max_distance') * 1000 < int(DoctorSearchHelper.MAX_DISTANCE) else DoctorSearchHelper.MAX_DISTANCE)
         min_distance = self.query_params.get('min_distance')*1000 if self.query_params.get('min_distance') else 0
+
+        if self.query_params and self.query_params.get('sitemap_identifier'):            
+            sitemap_identifier = self.query_params.get('sitemap_identifier')
+            if sitemap_identifier in ('SPECIALIZATION_LOCALITY_CITY', 'DOCTORS_LOCALITY_CITY' ):
+                max_distance = 5000
+            if sitemap_identifier in ('SPECIALIZATION_CITY', 'DOCTORS_CITY'):
+                max_distance = 15000
+
         # max_distance = 10000000000000000000000
         data = dict()
 
@@ -351,8 +361,10 @@ class DoctorSearchHelper:
         category_ids = [int(x) for x in category_ids]
         procedure_ids = [int(x) for x in procedure_ids]
         response = []
+        specialization_ids = self.query_params.get('specialization_ids', [])
         selected_procedure_ids, other_procedure_ids = get_selected_and_other_procedures(category_ids, procedure_ids)
         for doctor in doctor_data:
+            enable_online_booking = False
 
             is_gold = False #doctor.enabled_for_online_booking and doctor.is_gold
             doctor_clinics = [doctor_clinic for doctor_clinic in doctor.doctor_clinics.all() if
@@ -392,7 +404,6 @@ class DoctorSearchHelper:
                                                                         other_procedures_list)
                 # fees = self.get_doctor_fees(doctor, doctor_availability_mapping)
 
-                enable_online_booking = False
                 if doctor_clinic and doctor and doctor_clinic.hospital:
                     if doctor.enabled_for_online_booking and doctor_clinic.hospital.enabled_for_online_booking and doctor_clinic.enabled_for_online_booking:
                         enable_online_booking = True
@@ -414,6 +425,23 @@ class DoctorSearchHelper:
                 }]
 
             thumbnail = doctor.get_thumbnail()
+            
+            sorted_spec_list = []
+            doctor_spec_list = []
+            searched_spec_list = []
+            general_specialization = []
+            
+            for dps in doctor.doctorpracticespecializations.all():
+                general_specialization.append(dps.specialization)
+
+            general_specialization = sorted(general_specialization, key=operator.attrgetter('doctor_count'), reverse=True)
+            for spec in general_specialization:
+                if spec.id in specialization_ids:
+                    searched_spec_list.append({'name':spec.name})
+                else:    
+                    doctor_spec_list.append({'name':spec.name})
+
+            sorted_spec_list = searched_spec_list + doctor_spec_list
 
             opening_hours = None
             if doctor_clinic.availability.exists():
@@ -423,7 +451,8 @@ class DoctorSearchHelper:
             temp = {
                 "doctor_id": doctor.id,
                 "enabled_for_online_booking": doctor.enabled_for_online_booking,
-                "is_license_verified" : doctor.is_license_verified,
+                "is_license_verified" : doctor.is_license_verified and enable_online_booking,
+                #"verified": True if doctor.is_license_verified and doctor.enabled_for_online_booking else False,
                 "hospital_count": self.count_hospitals(doctor),
                 "id": doctor.id,
                 "deal_price": filtered_deal_price,
@@ -436,10 +465,11 @@ class DoctorSearchHelper:
                 "practicing_since": doctor.practicing_since,
                 "experience_years": doctor.experience_years(),
                 #"experiences": serializers.DoctorExperienceSerializer(doctor.experiences.all(), many=True).data,
-                #"qualifications": serializers.DoctorQualificationSerializer(doctor.qualifications.all(), many=True).data,
-                "general_specialization": serializers.DoctorPracticeSpecializationSerializer(
-                    doctor.doctorpracticespecializations.all(),
-                    many=True).data,
+                "qualifications": serializers.DoctorQualificationSerializer(doctor.qualifications.all(), many=True).data,
+                # "general_specialization": serializers.DoctorPracticeSpecializationSerializer(
+                #     doctor.doctorpracticespecializations.all(),
+                #     many=True).data,
+                "general_specialization": sorted_spec_list,
                 "distance": self.get_distance(doctor, doctor_clinic_mapping),
                 "name": doctor.name,
                 "display_name": doctor.get_display_name(),
