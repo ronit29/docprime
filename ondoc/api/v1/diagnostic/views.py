@@ -240,7 +240,7 @@ class LabList(viewsets.ReadOnlyModelViewSet):
 
             for package_result in result:
                 if "price" in package_result:
-                    price = int(package_result["price"])
+                    price = int(float(package_result["price"]))
                     discounted_price = price if not search_coupon else search_coupon.get_search_coupon_discounted_price(price)
                     package_result["discounted_price"] = discounted_price
 
