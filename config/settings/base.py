@@ -43,10 +43,10 @@ SECRET_KEY = env('DJANGO_SECRET_KEY')
 JWT_AUTH = {
     'JWT_VERIFY': True,
     'JWT_VERIFY_EXPIRATION': True,
-    'JWT_EXPIRATION_DELTA': datetime.timedelta(days=7),
+    'JWT_EXPIRATION_DELTA': datetime.timedelta(days=365),
     'JWT_AUTH_HEADER_PREFIX': 'Token',
     'JWT_ALLOW_REFRESH': True,
-    'JWT_REFRESH_EXPIRATION_DELTA': datetime.timedelta(days=7),
+    'JWT_REFRESH_EXPIRATION_DELTA': datetime.timedelta(days=365),
 }
 
 # SECURITY WARNING: don't run with debug turned on in production!
