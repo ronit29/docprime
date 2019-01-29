@@ -152,7 +152,6 @@ class LabList(viewsets.ReadOnlyModelViewSet):
     serializer_class = diagnostic_serializer.LabModelSerializer
     lookup_field = 'id'
 
-
     @transaction.non_atomic_requests
     def list_packages(self, request, **kwrgs):
         parameters = request.query_params

@@ -772,7 +772,8 @@ class LabTest(TimeStampedModel, SearchKey):
 
         duplicate_urls = EntityUrls.objects.filter(~Q(entity_id=self.id), url__iexact=self.url, sitemap_identifier=LabTest.LAB_TEST_SITEMAP_IDENTIFIER)
         if duplicate_urls.exists():
-            url = url.rstrip('-'+self.URL_SUFFIX)
+            url = url.rstrip(self.URL_SUFFIX)
+            url = url.rstrip('-')
             url = url+'-'+str(id)+'-'+self.URL_SUFFIX
 
         return url
