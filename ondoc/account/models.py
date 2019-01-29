@@ -686,19 +686,12 @@ class ConsumerRefund(TimeStampedModel):
     refund_initiated_at = models.DateTimeField(blank=True, null=True)
 
     def save(self, *args, **kwargs):
-        print('inside save', model_to_dict(self))
         database_instance = ConsumerRefund.objects.filter(pk=self.id).first()
         super().save(*args, **kwargs)
         transaction.on_commit(lambda: self.app_commit_tasks(database_instance))
 
     def app_commit_tasks(self, old_instance):
-        print('inside commit \n\n', model_to_dict(self), 'original instance',model_to_dict(old_instance))
         from ondoc.notification import tasks as notification_tasks
-        if not old_instance and self.refund_state == self.PENDING:
-            try:
-                notification_tasks.refund_initiated_sms_task.apply_async((self.id,), countdown=1)
-            except Exception as e:
-                logger.error(str(e))
         if old_instance and old_instance.refund_state != self.refund_state and self.refund_state == self.COMPLETED:
             try:
                 notification_tasks.refund_completed_sms_task.apply_async((self.id,), countdown=1)

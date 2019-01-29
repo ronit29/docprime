@@ -268,8 +268,6 @@ class SMSNotification:
                 temp_short_url = generate_short_url(report)
                 lab_reports.append(temp_short_url)
             self.context['lab_reports'] = lab_reports
-        elif notification_type == NotificationAction.REFUND_INITIATED:
-            body_template = "sms/refund_initiated.txt"
         elif notification_type == NotificationAction.REFUND_COMPLETED:
             body_template = "sms/refund_completed.txt"
         elif notification_type == NotificationAction.REFUND_BREAKUP:
