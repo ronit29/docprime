@@ -152,6 +152,7 @@ class LabList(viewsets.ReadOnlyModelViewSet):
     serializer_class = diagnostic_serializer.LabModelSerializer
     lookup_field = 'id'
 
+
     @transaction.non_atomic_requests
     def list_packages(self, request, **kwrgs):
         parameters = request.query_params
@@ -1704,28 +1705,61 @@ class TestDetailsViewset(viewsets.GenericViewSet):
     def get_queryset(self):
         return None
 
-    def retrieve(self, request):
-        params = request.query_params
-        try:
-            test_ids = params.get('test_ids', None)
-            if test_ids:
-                test_ids = [int(x) for x in test_ids.split(',')]
-                test_ids = set(test_ids)
-            lab_id = params.get('lab_id', None)
-            if lab_id:
-                try:
-                    lab_id = int(lab_id)
-                except:
-                    return Response([], status=status.HTTP_400_BAD_REQUEST)
+    def retrieve_test_by_url(self, request):
 
-        except:
-            return Response([], status=status.HTTP_400_BAD_REQUEST)
+        url = request.GET.get('url')
+        if not url:
+            return Response(status=status.HTTP_404_NOT_FOUND)
+
+        url = url.lower()
+        entity = EntityUrls.objects.filter(url=url, sitemap_identifier=LabTest.LAB_TEST_SITEMAP_IDENTIFIER).order_by(
+            '-is_valid')
+        if len(entity) > 0:
+            entity = entity[0]
+            if not entity.is_valid:
+                valid_entity_url_qs = EntityUrls.objects.filter(
+                    sitemap_identifier=LabTest.LAB_TEST_SITEMAP_IDENTIFIER, entity_id=entity.entity_id,
+                    is_valid='t')
+                if valid_entity_url_qs.exists():
+                    corrected_url = valid_entity_url_qs[0].url
+                    return Response(status=status.HTTP_301_MOVED_PERMANENTLY, data={'url': corrected_url})
+                else:
+                    return Response(status=status.HTTP_404_NOT_FOUND)
+
+            # entity_id = entity.entity_id
+            response = self.retrieve(request, entity)
+            return response
+        else:
+            return Response(status=status.HTTP_404_NOT_FOUND)
+
+    def retrieve(self, request, entity=None):
+        params = request.query_params
+        if params.get('url'):
+            test_ids = [entity.entity_id]
+            lab_id = None
+
+        else:
+            try:
+                test_ids = params.get('test_ids', None)
+                if test_ids:
+                    test_ids = [int(x) for x in test_ids.split(',')]
+                    test_ids = set(test_ids)
+                lab_id = params.get('lab_id', None)
+                if lab_id:
+                    try:
+                        lab_id = int(lab_id)
+                    except:
+                        return Response([], status=status.HTTP_400_BAD_REQUEST)
+
+            except:
+                return Response([], status=status.HTTP_400_BAD_REQUEST)
+
+
         queryset = LabTest.objects.prefetch_related('labtests__parameter', 'faq',
                                                     'base_test__booked_together_test', 'availablelabs',
                                                     'availablelabs__lab_pricing_group',
                                                     'availablelabs__lab_pricing_group__labs').filter(id__in=test_ids,
                                                                                                      show_details=True)
-
 
         if not queryset:
             return Response([])
@@ -1749,7 +1783,8 @@ class TestDetailsViewset(viewsets.GenericViewSet):
                 result['faqs'].append({'title': 'Frequently asked questions','value':{'test_question': qa.test_question, 'test_answer': qa.test_answer}})
 
             booked_together=[]
-            fbts = data.frequently_booked_together.filter(availablelabs__enabled=True,
+            if lab_id:
+                fbts = data.frequently_booked_together.filter(availablelabs__enabled=True,
                                                           availablelabs__lab_pricing_group__labs__id=lab_id).distinct()
             if lab_id:
                for fbt in fbts:
@@ -1767,6 +1802,7 @@ class TestDetailsViewset(viewsets.GenericViewSet):
 
             result['frequently_booked_together'] = {'title': 'Frequently booked together', 'value': booked_together}
             result['show_details'] = data.show_details
+            result['url'] = entity.url if entity and entity.url else None
             final_result.append(result)
 
         return Response(final_result)

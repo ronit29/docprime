@@ -591,7 +591,7 @@ class EntityUrls(TimeStampedModel):
     url = models.CharField(blank=False, null=True, max_length=2000, db_index=True)
     url_type = models.CharField(max_length=24, choices=UrlType.as_choices(), null=True)
     entity_type = models.CharField(max_length=24, null=True)
-    extras = JSONField()
+    extras = JSONField(null=True)
     breadcrumb = JSONField(null=True)
     entity_id = models.PositiveIntegerField(null=True, default=None)
     is_valid = models.BooleanField(default=True)
