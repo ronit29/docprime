@@ -750,7 +750,7 @@ class TimeSlotExtraction(object):
             self.price_available[i] = dict()
 
     def form_time_slots(self, day, start, end, price=None, is_available=True,
-                        deal_price=None, mrp=None, is_doctor=False):
+                        on_call=1, deal_price=None, mrp=None, is_doctor=False):
         start = Decimal(str(start))
         end = Decimal(str(end))
         time_span = self.TIME_SPAN
@@ -774,6 +774,9 @@ class TimeSlotExtraction(object):
                     "mrp": mrp,
                     "deal_price": deal_price
                 })
+            price_available.update({
+                "on_call": bool(on_call==2)
+            })
             self.price_available[day][temp_start] = price_available
             temp_start += float_span
 
@@ -810,10 +813,10 @@ class TimeSlotExtraction(object):
             if 'mrp' in pa[k].keys() and 'deal_price' in pa[k].keys():
                 data_list.append({"value": k, "text": v, "price": pa[k]["price"],
                                   "mrp": pa[k]['mrp'], 'deal_price': pa[k]['deal_price'],
-                                  "is_available": pa[k]["is_available"]})
+                                  "is_available": pa[k]["is_available"], "on_call": pa[k]["on_call"]})
             else:
                 data_list.append({"value": k, "text": v, "price": pa[k]["price"],
-                                  "is_available": pa[k]["is_available"]})
+                                  "is_available": pa[k]["is_available"], "on_call": pa[k]["on_call"]})
         format_data = dict()
         format_data['type'] = 'AM' if day_time == self.MORNING else 'PM'
         format_data['title'] = day_time
