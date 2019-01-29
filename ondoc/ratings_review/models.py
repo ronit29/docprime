@@ -30,7 +30,11 @@ class ReviewCompliments(auth_model.TimeStampedModel):
 class RatingsReview(auth_model.TimeStampedModel):
     LAB = 1
     OPD = 2
+    APPROVED = 1
+    PENDING = 2
+    DENIED = 3
     APPOINTMENT_TYPE_CHOICES = [(LAB, 'Lab'), (OPD, 'Opd')]
+    MODERATION_TYPE_CHOICES = [(APPROVED, 'Approved'), (PENDING, 'Pending'), (DENIED, 'Denied')]
     user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
     ratings = models.PositiveIntegerField(null=True)
     review = models.CharField(max_length=5000, null=True, blank=True)
@@ -38,6 +42,8 @@ class RatingsReview(auth_model.TimeStampedModel):
     appointment_type = models.PositiveSmallIntegerField(choices=APPOINTMENT_TYPE_CHOICES, blank=True, null=True)
     is_live = models.BooleanField(default=True)
     compliment = models.ManyToManyField(ReviewCompliments, related_name='compliment_review')
+    moderation_status = models.PositiveSmallIntegerField(choices=MODERATION_TYPE_CHOICES, blank=True, default=PENDING)
+    moderation_comments = models.CharField(max_length=1000, null=True, blank=True)
     content_type = models.ForeignKey(ContentType, on_delete=models.CASCADE)
     object_id = models.PositiveIntegerField()
     content_object = GenericForeignKey()

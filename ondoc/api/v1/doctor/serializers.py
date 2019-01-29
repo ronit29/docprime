@@ -40,6 +40,7 @@ from ondoc.location.models import EntityUrls, EntityAddress
 from ondoc.procedure.models import DoctorClinicProcedure, Procedure, ProcedureCategory, \
     get_included_doctor_clinic_procedure, get_procedure_categories_with_procedures
 from ondoc.seo.models import NewDynamic
+from ondoc.ratings_review import models as rate_models
 
 logger = logging.getLogger(__name__)
 
@@ -856,7 +857,10 @@ class DoctorProfileUserViewSerializer(DoctorProfileSerializer):
     def get_rating(self, obj):
         app = OpdAppointment.objects.select_related('profile').filter(doctor_id=obj.id).all()
 
-        queryset = obj.rating.prefetch_related('compliment').exclude(Q(review='') | Q(review=None)).filter(is_live=True).order_by('-ratings', '-updated_at')
+        queryset = obj.rating.prefetch_related('compliment').exclude(Q(review='') | Q(review=None))\
+                                                            .filter(is_live=True, moderation_status__in=[rate_models.RatingsReview.PENDING,
+                                                                                                         rate_models.RatingsReview.APPROVED])\
+                                                            .order_by('-ratings', '-updated_at')
         reviews = rating_serializer.RatingsModelSerializer(queryset, many=True, context={'app': app})
         return reviews.data[:5]
 
@@ -876,7 +880,12 @@ class DoctorProfileUserViewSerializer(DoctorProfileSerializer):
 
     def get_rating_graph(self, obj):
         if obj and obj.rating:
-            data = rating_serializer.RatingsGraphSerializer(obj.rating.filter(is_live=True), context={'request':self.context.get('request')}).data
+            data = rating_serializer.RatingsGraphSerializer(obj.rating.filter(is_live=True,
+                                                                              moderation_status__in=[
+                                                                                  rate_models.RatingsReview.PENDING,
+                                                                                  rate_models.RatingsReview.APPROVED]
+                                                                              ),
+                                                            context={'request':self.context.get('request')}).data
             return data
         return None
 

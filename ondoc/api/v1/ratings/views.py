@@ -1,3 +1,4 @@
+from ondoc.api.pagination import paginate_queryset
 from ondoc.diagnostic import models as lab_models
 from ondoc.ratings_review import models
 from django.db import transaction
@@ -20,7 +21,8 @@ class RatingsViewSet(viewsets.GenericViewSet):
     permission_classes = (IsAuthenticated, IsConsumer, IsNotAgent)
 
     def get_queryset(self):
-        return RatingsReview.objects.prefetch_related('compliment').filter(is_live=True)
+        return RatingsReview.objects.prefetch_related('compliment').filter(is_live=True, moderation_status__in=[RatingsReview.PENDING,
+                                                                                                                RatingsReview.APPROVED])
 
     def prompt_close(self, request):
         serializer = serializers.RatingPromptCloseBodySerializer(data=request.data)
@@ -91,6 +93,7 @@ class RatingsViewSet(viewsets.GenericViewSet):
                                           .filter(lab_ratings__id=valid_data.get('object_id'))\
                                           .order_by('-updated_at')
             appointment = lab_models.LabAppointment.objects.select_related('profile').filter(lab_id=valid_data.get('object_id')).all()
+        queryset = paginate_queryset(queryset, request)
         if len(queryset):
                 body_serializer = serializers.RatingsModelSerializer(queryset, many=True, context={'request': request,
                                                                                                    'app': appointment})

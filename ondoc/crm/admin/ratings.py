@@ -79,17 +79,20 @@ class RatingsReviewResource(resources.ModelResource):
 class RatingsReviewAdmin(ImportExportMixin, admin.ModelAdmin):
     resource_class = RatingsReviewResource
     inlines = [ReviewActionsInLine]
-    list_display = (['name', 'booking_id', 'appointment_type', 'ratings', 'updated_at'])
-    readonly_fields = ['name', 'booking_id']
+    list_display = (['name', 'booking_id', 'appointment_type', 'ratings', 'moderation_status', 'updated_at'])
+    readonly_fields = ['name', 'booking_id', 'appointment_type']
     form = RatingsReviewForm
 
     def get_queryset(self, request):
-        queryset = super(RatingsReviewAdmin, self).get_queryset(request)
         doctors = Doctor.objects.filter(rating__isnull=False).all().distinct()
         labs = Lab.objects.filter(rating__isnull=False).all().distinct()
         self.docs = doctors
         self.labs = labs
         return super(RatingsReviewAdmin, self).get_queryset(request).select_related('content_type')
+
+    # def save_model(self, request, obj, form, change):
+    #     data = 1
+    #     super().save_model(request, obj, form, change)
 
     def get_form(self, request, obj=None, **kwargs):
         form = super(RatingsReviewAdmin, self).get_form(request, obj, **kwargs)
@@ -98,10 +101,10 @@ class RatingsReviewAdmin(ImportExportMixin, admin.ModelAdmin):
 
     def booking_id(self, instance):
         url = None
-        if instance.content_type==ContentType.objects.get_for_model(Doctor):
+        if instance.content_type == ContentType.objects.get_for_model(Doctor):
             url = "/admin/doctor/opdappointment/"+ str(instance.appointment_id)+"/change"
 
-        elif instance.content_type==ContentType.objects.get_for_model(Lab):
+        elif instance.content_type == ContentType.objects.get_for_model(Lab):
             url = "/admin/diagnostic/labappointment/" + str(instance.appointment_id) + "/change"
         if url:
             response = mark_safe('''<a href='%s' target='_blank'>%s</a>''' % (url, instance.appointment_id))
@@ -109,11 +112,11 @@ class RatingsReviewAdmin(ImportExportMixin, admin.ModelAdmin):
         return ''
 
     def name(self, instance):
-        if instance.content_type==ContentType.objects.get_for_model(Doctor):
+        if instance.content_type == ContentType.objects.get_for_model(Doctor):
             for doc in self.docs:
                 if doc.id == instance.object_id:
                     return doc.name
-        elif instance.content_type==ContentType.objects.get_for_model(Lab):
+        elif instance.content_type == ContentType.objects.get_for_model(Lab):
             for lab in self.labs:
                 if lab.id == instance.object_id:
                     return lab.name
