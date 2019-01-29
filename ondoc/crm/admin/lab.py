@@ -762,7 +762,9 @@ class LabReportInline(nested_admin.NestedTabularInline):
 
 class LabAppointmentAdmin(nested_admin.NestedModelAdmin):
     form = LabAppointmentForm
-    list_display = ('booking_id', 'get_profile', 'get_lab', 'status', 'reports_uploaded', 'time_slot_start', 'created_at', 'updated_at')
+    list_display = (
+    'booking_id', 'get_profile', 'get_lab', 'status', 'reports_uploaded', 'time_slot_start', 'created_at', 'updated_at',
+    'get_lab_test_name')
     list_filter = ('status', )
     date_hierarchy = 'created_at'
 
@@ -919,6 +921,13 @@ class LabAppointmentAdmin(nested_admin.NestedModelAdmin):
             ((),),
         )
     get_lab_test.short_description = 'Lab Test'
+
+    def get_lab_test_name(self, obj):
+        format_string = ""
+        for data in obj.test_mappings.all():
+            format_string += "{},".format(data.test.name)
+        return format_string
+    get_lab_test_name.short_description = 'Lab Test Names'
 
     def get_lab_address(self, obj):
         address_items = [
