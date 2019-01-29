@@ -326,7 +326,10 @@ def payment_details(request, order):
     base_url = "https://{}".format(request.get_host())
     surl = base_url + '/api/v1/user/transaction/save'
     furl = base_url + '/api/v1/user/transaction/save'
-    # profile = UserProfile.objects.get(pk=order.action_data.get("profile"))
+    profile = user.get_default_profile()
+    profile_name = ""
+    if profile:
+        profile_name = profile.name
     pgdata = {
         'custId': user.id,
         'mobile': user.phone_number,
@@ -336,7 +339,7 @@ def payment_details(request, order):
         'furl': furl,
         'referenceId': "",
         'orderId': order.id,
-        'name': order.action_data.get("profile_detail").get("name"),
+        'name': profile_name,
         'txAmount': str(order.amount),
     }
     secret_key = client_key = ""
@@ -509,6 +512,7 @@ class CouponsMixin(object):
         user = kwargs.get("user")
         coupon_obj = kwargs.get("coupon_obj")
         profile = kwargs.get("profile")
+        cart_item = kwargs.get("cart_item")
 
         if coupon_obj:
             if coupon_obj.is_user_specific and not user.is_authenticated:
@@ -560,7 +564,7 @@ class CouponsMixin(object):
                         or (coupon_obj.age_end and (not user_age or coupon_obj.age_end < user_age)) ):
                     return {"is_valid": False, "used_count": None}
 
-            count = coupon_obj.used_coupon_count(user)
+            count = coupon_obj.used_coupon_count(user, cart_item)
             total_used_count = coupon_obj.total_used_coupon_count()
 
             if (coupon_obj.count is None or count < coupon_obj.count) and (coupon_obj.total_count is None or total_used_count < coupon_obj.total_count):
@@ -962,3 +966,9 @@ def util_file_name(filename):
     if filename:
         filename = os.path.basename(filename)
     return filename
+
+def format_iso_date(date_str):
+    date_field = date_str.find('T')
+    if date_field:
+        date_field = date_str[:date_field]
+    return date_field

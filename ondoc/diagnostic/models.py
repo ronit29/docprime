@@ -4,7 +4,7 @@ from django.contrib.gis.db import models
 from django.contrib.staticfiles.templatetags.staticfiles import static
 from django.core.validators import MaxValueValidator, MinValueValidator, FileExtensionValidator
 
-from ondoc.account.models import MerchantPayout, ConsumerAccount, Order, UserReferred
+from ondoc.account.models import MerchantPayout, ConsumerAccount, Order, UserReferred, MoneyPool
 from ondoc.authentication.models import (TimeStampedModel, CreatedByModel, Image, Document, QCModel, UserProfile, User,
                                          UserPermission, GenericAdmin, LabUserPermission, GenericLabAdmin,
                                          BillingAccount, SPOCDetails)
@@ -14,7 +14,8 @@ from ondoc.notification import models as notification_models
 from ondoc.notification import tasks as notification_tasks
 from ondoc.notification.labnotificationaction import LabNotificationAction
 from django.core.files.storage import get_storage_class
-from ondoc.api.v1.utils import AgreedPriceCalculate, DealPriceCalculate, TimeSlotExtraction, CouponsMixin
+from ondoc.api.v1.utils import AgreedPriceCalculate, DealPriceCalculate, TimeSlotExtraction, CouponsMixin, \
+    form_time_slot
 from ondoc.account import models as account_model
 from django.utils import timezone
 from datetime import timedelta
@@ -29,6 +30,7 @@ from io import BytesIO
 import datetime
 from ondoc.api.v1.utils import get_start_end_datetime, custom_form_datetime
 from ondoc.diagnostic import tasks
+from ondoc.authentication.models import UserProfile, Address
 from dateutil import tz
 from django.conf import settings
 import logging
@@ -920,6 +922,7 @@ class LabAppointment(TimeStampedModel, CouponsMixin):
     merchant_payout = models.ForeignKey(MerchantPayout, related_name="lab_appointment", on_delete=models.SET_NULL, null=True)
     price_data = JSONField(blank=True, null=True)
     tests = models.ManyToManyField(LabTest, through='LabAppointmentTestMapping', through_fields=('appointment', 'test'))
+    money_pool = models.ForeignKey(MoneyPool, on_delete=models.SET_NULL, null=True)
 
     def get_tests_and_prices(self):
         # DONE SHASHANK_SINGH CHANGE 10
@@ -1211,11 +1214,25 @@ class LabAppointment(TimeStampedModel, CouponsMixin):
 
             if self.payment_type == OpdAppointment.PREPAID and account_model.ConsumerTransaction.valid_appointment_for_cancellation(
                     self.id, product_id):
-                cancel_amount = self.effective_price
-                consumer_account.credit_cancellation(self, account_model.Order.LAB_PRODUCT_ID, cancel_amount)
+
+                wallet_refund, cashback_refund = self.get_cancellation_breakup()
+
+                consumer_account.credit_cancellation(self, account_model.Order.LAB_PRODUCT_ID, wallet_refund, cashback_refund)
                 if refund_flag:
                     ctx_obj = consumer_account.debit_refund()
                     account_model.ConsumerRefund.initiate_refund(self.user, ctx_obj)
+
+    def get_cancellation_breakup(self):
+        wallet_refund = cashback_refund = 0
+        if self.money_pool:
+            wallet_refund, cashback_refund = self.money_pool.get_refund_breakup(self.effective_price)
+        elif self.price_data:
+            wallet_refund = self.price_data["wallet_amount"]
+            cashback_refund = self.price_data["cashback_amount"]
+        else:
+            wallet_refund = self.effective_price
+
+        return wallet_refund, cashback_refund
 
     def action_completed(self):
         self.status = self.COMPLETED
@@ -1392,11 +1409,65 @@ class LabAppointment(TimeStampedModel, CouponsMixin):
             "effective_price" :effective_price,
             "coupon_discount" : coupon_discount,
             "coupon_cashback" : coupon_cashback,
-            "coupon_list" : coupon_list
+            "coupon_list" : coupon_list,
+            "home_pickup_charges" : home_pickup_charges
         }
 
-    def create_fulfillment_data(self):
-        pass
+    @classmethod
+    def create_fulfillment_data(cls, user, data, price_data):
+        from ondoc.api.v1.auth.serializers import AddressSerializer
+
+        lab_test_queryset = AvailableLabTest.objects.filter(lab_pricing_group__labs=data["lab"], test__in=data['test_ids'])
+        test_ids_list = list()
+        extra_details = list()
+        for obj in lab_test_queryset:
+            test_ids_list.append(obj.id)
+            extra_details.append({
+                "id": str(obj.test.id),
+                "name": str(obj.test.name),
+                "custom_deal_price": str(obj.custom_deal_price),
+                "computed_deal_price": str(obj.computed_deal_price),
+                "mrp": str(obj.mrp),
+                "computed_agreed_price": str(obj.computed_agreed_price),
+                "custom_agreed_price": str(obj.custom_agreed_price)
+            })
+
+        start_dt = form_time_slot(data["start_date"], data["start_time"])
+        profile_detail = {
+            "name": data["profile"].name,
+            "gender": data["profile"].gender,
+            "dob": str(data["profile"].dob),
+        }
+
+        fulfillment_data = {
+            "lab": data["lab"],
+            "user": user,
+            "profile": data["profile"],
+            "price": price_data.get("mrp"),
+            "agreed_price": price_data.get("fees"),
+            "deal_price": price_data.get("deal_price"),
+            "effective_price": price_data.get("effective_price"),
+            "home_pickup_charges": price_data.get("home_pickup_charges"),
+            "time_slot_start": start_dt,
+            "is_home_pickup": data["is_home_pickup"],
+            "profile_detail": profile_detail,
+            "status": LabAppointment.BOOKED,
+            "payment_type": data["payment_type"],
+            "lab_test": test_ids_list,
+            "extra_details": extra_details,
+            "coupon": price_data.get("coupon_list"),
+            "discount": int(price_data.get("coupon_discount")),
+            "cashback": int(price_data.get("coupon_cashback"))
+        }
+
+        if data.get("is_home_pickup") is True:
+            address = Address.objects.filter(pk=data.get("address").id).first()
+            address_serialzer = AddressSerializer(address)
+            fulfillment_data.update({
+                "address": address_serialzer.data,
+                "is_home_pickup": True
+            })
+        return fulfillment_data
 
     def __str__(self):
         return "{}, {}".format(self.profile.name if self.profile else "", self.lab.name)

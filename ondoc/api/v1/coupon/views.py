@@ -407,6 +407,7 @@ class CouponDiscountViewSet(viewsets.GenericViewSet):
         hospital = input_data.get("hospital")
         procedures = input_data.get("procedures", [])
         profile = input_data.get("profile")
+        cart_item_id = input_data.get('cart_item').id if input_data.get('cart_item') else None
 
         if str(product_id) == str(Order.DOCTOR_PRODUCT_ID):
             obj = OpdAppointment()
@@ -416,7 +417,7 @@ class CouponDiscountViewSet(viewsets.GenericViewSet):
         discount = 0
 
         for coupon in coupons_data:
-            if obj.validate_user_coupon(user=request.user, coupon_obj=coupon,
+            if obj.validate_user_coupon(cart_item=cart_item_id, user=request.user, coupon_obj=coupon,
                                         profile=profile).get("is_valid"):
                 if lab and tests:
                     total_price = obj.get_applicable_tests_with_total_price(coupon_obj=coupon,
