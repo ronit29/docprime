@@ -23,18 +23,23 @@ class IntegratorMapping(TimeStampedModel):
     is_active = models.BooleanField(default=False)
 
     @classmethod
-    def get_if_third_party_integration(cls, test_id):
-        mapping_wrt_test = cls.objects.filter(test__id=test_id, is_active=True).first()
+    def get_if_third_party_integration(cls, test_id=None, network_id=None):
+        if test_id:
+            mapping = cls.objects.filter(test__id=test_id, is_active=True).first()
+        elif network_id:
+            mapping = cls.objects.filter(object_id=network_id, is_active=True).first()
+        else:
+            return None
 
         # Return if no test exist over here and it depicts that it is not a part of integrations.
-        if not mapping_wrt_test:
+        if not mapping:
             return None
 
         # Part of the integrations.
-        if mapping_wrt_test.content_type == ContentType.objects.get(model='labtest'):
+        if mapping.content_type == ContentType.objects.get(model='labtest'):
             return {
-                'class_name': mapping_wrt_test.integrator_class_name,
-                'service_type': mapping_wrt_test.service_type
+                'class_name': mapping.integrator_class_name,
+                'service_type': mapping.service_type
             }
 
     class Meta:

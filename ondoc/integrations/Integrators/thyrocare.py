@@ -1,3 +1,4 @@
+from ondoc.api.v1.utils import TimeSlotExtraction
 from .baseIntegrator import BaseIntegrator
 import requests
 import json
@@ -5,6 +6,7 @@ from rest_framework import status
 from django.conf import settings
 import logging
 logger = logging.getLogger(__name__)
+from datetime import timedelta
 from ondoc.integrations.models import IntegratorMapping
 from django.contrib.contenttypes.models import ContentType
 
@@ -58,15 +60,47 @@ class Thyrocare(BaseIntegrator):
                               service_type=IntegratorMapping.ServiceType.LabTest, object_id=obj_id,
                               content_type=ContentType.objects.get(model='labtest')).save()
 
-    def _get_appointment_slots(self, pincode, date):
-        url = 'https://www.thyrocare.com/API_BETA/ORDER.svc/%s/%s/GetAppointmentSlots' % (pincode, date)
-        response = requests.get(url)
-        if response.status_code != status.HTTP_200_OK or not response.ok:
-            logger.error("[ERROR] Thyrocare Time slot api failed.")
-            return None
+    def _get_appointment_slots(self, pincode, date, **kwargs):
+        obj = TimeSlotExtraction()
+        for i in range(7):
+            next_date = date + timedelta(i)
+            url = 'https://www.thyrocare.com/API_BETA/ORDER.svc/%s/%s/GetAppointmentSlots' % (pincode, next_date.strftime("%d-%m-%Y"))
+            response = requests.get(url)
+            if response.status_code != status.HTTP_200_OK or not response.ok:
+                logger.error("[ERROR] Thyrocare Time slot api failed.")
+                return None
 
-        resp_data = response.json()
-        return resp_data
+            resp_data = response.json()
+            available_slots = resp_data.get('LSlotDataRes', [])
+
+            if available_slots:
+                start = available_slots[0]['Slot'].split("-")[0]
+                hour, minutes = start.split(":")
+                hour, minutes = float(hour), int(minutes)
+                minutes = float("%0.2f" % (minutes/60))
+                start = hour + minutes
+
+                end = available_slots[len(available_slots)-1]['Slot'].split("-")[1]
+
+                hour, minutes = end.split(":")
+                hour, minutes = float(hour), int(minutes)
+                minutes = float("%0.2f" % (minutes/60))
+                end = hour + minutes
+
+                obj.form_time_slots(next_date.date().weekday(), start, end, None, True)
+
+        resp_list = obj.get_timing_list()
+        is_home_pickup = kwargs.get('is_home_pickup', False)
+        today_min, tomorrow_min, today_max = obj.initial_start_times(is_thyrocare=True, is_home_pickup=is_home_pickup, time_slots=resp_list)
+
+        res_data = {
+            "time_slots": resp_list,
+            "today_min": today_min,
+            "tomorrow_min": tomorrow_min,
+            "today_max": today_max
+        }
+
+        return res_data
 
     def _get_is_user_area_serviceable(self, pincode):
         url = "https://www.thyrocare.com/API_BETA/order.svc/%s/%s/PincodeAvailability" % (settings.THYROCARE_API_KEY, pincode)
@@ -80,7 +114,6 @@ class Thyrocare(BaseIntegrator):
             return False
 
         return True if resp_data['status'] == 'Y' else False
-
 
     def __post_order_details(self, lab_appointment):
         # Need to update when thyrocare API works. Static value for now

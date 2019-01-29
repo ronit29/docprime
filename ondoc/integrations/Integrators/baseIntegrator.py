@@ -11,9 +11,9 @@ class BaseIntegrator(object):
         return True
 
     # This method fetches the available timeslot from respective integrator according to the object.
-    def get_appointment_slots(self, pincode, date):
+    def get_appointment_slots(self, pincode, date, **kwargs):
         try:
-            timeslot_dictionary = self._get_appointment_slots(pincode, date)
+            timeslot_dictionary = self._get_appointment_slots(pincode, date, **kwargs)
             return timeslot_dictionary
         except Exception as e:
             pass
