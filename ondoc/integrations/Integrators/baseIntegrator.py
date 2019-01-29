@@ -36,4 +36,5 @@ class BaseIntegrator(object):
     def order_details(self):
         pass
 
-    def get_pricing
+    def get_pricing(self):
+        pass
