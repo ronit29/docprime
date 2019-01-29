@@ -60,6 +60,25 @@ class Coupon(auth_model.TimeStampedModel):
             self.age_start = 0
         return super().save(*args, **kwargs)
 
+    def get_search_coupon_discounted_price(self, deal_price):
+        from ondoc.api.v1.utils import CouponsMixin
+        mixin_obj = CouponsMixin()
+        discount = mixin_obj.get_discount(self, deal_price)
+        return max(0, deal_price - discount)
+
+    @classmethod
+    def get_search_coupon(cls, user):
+        coupon_obj = cls.objects.filter(code="WELCOME").first()
+        used_count = 0
+
+        if coupon_obj and user.is_authenticated:
+            used_count = coupon_obj.used_coupon_count()
+
+        if coupon_obj and used_count >= coupon_obj.count:
+            coupon_obj = None
+
+        return coupon_obj
+
     def used_coupon_count(self, user):
         from ondoc.doctor.models import OpdAppointment
         from ondoc.diagnostic.models import LabAppointment

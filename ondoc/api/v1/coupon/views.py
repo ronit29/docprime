@@ -271,7 +271,7 @@ class ApplicableCouponsViewSet(viewsets.GenericViewSet):
             def remove_coupon_data(c):
                 c.pop('coupon')
                 if c.get("payment_option"):
-                    c["payment_option"]["image"] = c["payment_option"]["image"].path
+                    c["payment_option"]["image"] = request.build_absolute_uri(c["payment_option"]["image"].url)
                 return c
             applicable_coupons = list(map(remove_coupon_data, applicable_coupons))
 

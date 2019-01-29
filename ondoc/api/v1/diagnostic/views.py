@@ -233,9 +233,19 @@ class LabList(viewsets.ReadOnlyModelViewSet):
                 is_selected = True
             category_result.append({'name': name, 'id': category_id, 'is_selected': is_selected})
 
-        return Response({'result': serializer.data, 'categories': category_result, 'count': len(all_packages),
-                         'categories_count': len(category_result)})
+        result = serializer.data
+        if result:
+            from ondoc.coupon.models import Coupon
+            search_coupon = Coupon.get_search_coupon(request.user)
 
+            for package_result in result:
+                if "price" in package_result:
+                    price = int(package_result["price"])
+                    discounted_price = price if not search_coupon else search_coupon.get_search_coupon_discounted_price(price)
+                    package_result["discounted_price"] = discounted_price
+
+        return Response({'result': result, 'categories': category_result, 'count': len(all_packages),
+                         'categories_count': len(category_result)})
 
 
     @transaction.non_atomic_requests
@@ -435,6 +445,15 @@ class LabList(viewsets.ReadOnlyModelViewSet):
         #count = len(queryset_result)
         #paginated_queryset = paginate_queryset(queryset_result, request)
         result = self.form_lab_search_whole_data(queryset_result, parameters.get("ids"))
+
+        if result:
+            from ondoc.coupon.models import Coupon
+            search_coupon = Coupon.get_search_coupon(request.user)
+
+            for lab_result in result:
+                if "price" in lab_result:
+                    discounted_price = lab_result["price"] if not search_coupon else search_coupon.get_search_coupon_discounted_price(lab_result["price"])
+                    lab_result["discounted_price"] = discounted_price
 
         # result = list()
         # for data in response_queryset.items():
