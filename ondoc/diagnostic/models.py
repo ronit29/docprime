@@ -51,6 +51,7 @@ from decimal import Decimal
 from ondoc.common.models import AppointmentHistory
 import reversion
 from decimal import Decimal
+from django.utils.text import slugify
 
 logger = logging.getLogger(__name__)
 
@@ -692,6 +693,8 @@ class LabTestCategoryMapping(models.Model):
 
 
 class LabTest(TimeStampedModel, SearchKey):
+    LAB_TEST_SITEMAP_IDENTIFIER = 'LAB_TEST'
+    URL_SUFFIX = 'ltpp'
     RADIOLOGY = 1
     PATHOLOGY = 2
     OTHER = 3
@@ -739,6 +742,7 @@ class LabTest(TimeStampedModel, SearchKey):
                                         through=LabTestCategoryMapping,
                                         through_fields=('lab_test', 'parent_category'),
                                         related_name='lab_tests')
+    url = models.CharField(max_length=500, blank=True)
 
     # test_sub_type = models.ManyToManyField(
     #     LabTestSubType,
@@ -748,6 +752,46 @@ class LabTest(TimeStampedModel, SearchKey):
 
     def __str__(self):
         return self.name
+
+    def save(self, *args, **kwargs):
+
+        if not self.url:
+            self.url = slugify(self.name)+'-'+self.URL_SUFFIX
+
+        generated_url = self.generated_url(self.url)
+        if generated_url!=self.url:
+            self.url = generated_url
+
+        super().save(*args, **kwargs)
+        
+        self.create_url()
+
+
+    def generate_url(self, url):
+
+        duplicate_urls = EntityUrls.objects.filter(url__iexact=self.url, \
+                sitemap_identifier=LAB_TEST_SITEMAP_IDENTIFIER, ~Q(entity_id=self.id))
+        if duplicate_urls.exists():
+            url = rstrip(url,'-'+self.URL_SUFFIX)
+            url = url+'-'+str(id)+'-'+self.URL_SUFFIX
+
+        return url    
+
+
+    def create_url(self):
+
+        existings_urls = EntityUrls.objects.filter(url__iexact=self.url, \
+            sitemap_identifier=LAB_TEST_SITEMAP_IDENTIFIER, entity_id=self.id).all()
+
+        if not existings_urls.exists():
+            url_entry = EntityUrls.objects.create(url=url, entity_id=self.id, sitemap_identifier=self.LAB_TEST_SITEMAP_IDENTIFIER,\
+                is_valid=True,url_type='PAGEURL', entity_type='LabTest')            
+        else:
+            if not existings_urls.filter(is_valid=True).exists():
+                eu = existings_urls.first()
+                eu.is_valid = False
+                eu.save()
+                existings_urls.filter(~Q(id=eu.id)).update(is_valid=False)
 
     class Meta:
         db_table = "lab_test"
