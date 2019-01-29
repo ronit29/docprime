@@ -1,5 +1,6 @@
 from django.contrib import admin
 from django.contrib.contenttypes.models import ContentType
+from django.utils.safestring import mark_safe
 from import_export import fields, resources
 from ondoc.ratings_review.models import ReviewActions, RatingsReview
 from ondoc.diagnostic.models import LabAppointment, Lab
@@ -78,11 +79,16 @@ class RatingsReviewResource(resources.ModelResource):
 class RatingsReviewAdmin(ImportExportMixin, admin.ModelAdmin):
     resource_class = RatingsReviewResource
     inlines = [ReviewActionsInLine]
-    list_display = (['name', 'appointment_type', 'ratings', 'updated_at'])
-    readonly_fields = ['name']
+    list_display = (['name', 'booking_id', 'appointment_type', 'ratings', 'updated_at'])
+    readonly_fields = ['name', 'booking_id']
     form = RatingsReviewForm
 
     def get_queryset(self, request):
+        queryset = super(RatingsReviewAdmin, self).get_queryset(request)
+        doctors = Doctor.objects.filter(rating__isnull=False).all().distinct()
+        labs = Lab.objects.filter(rating__isnull=False).all().distinct()
+        self.docs = doctors
+        self.labs = labs
         return super(RatingsReviewAdmin, self).get_queryset(request).select_related('content_type')
 
     def get_form(self, request, obj=None, **kwargs):
@@ -90,17 +96,27 @@ class RatingsReviewAdmin(ImportExportMixin, admin.ModelAdmin):
         form.base_fields['compliment'].widget = forms.CheckboxSelectMultiple()
         return form
 
+    def booking_id(self, instance):
+        url = None
+        if instance.content_type==ContentType.objects.get_for_model(Doctor):
+            url = "/admin/doctor/opdappointment/"+ str(instance.appointment_id)+"/change"
+
+        elif instance.content_type==ContentType.objects.get_for_model(Lab):
+            url = "/admin/diagnostic/labappointment/" + str(instance.appointment_id) + "/change"
+        if url:
+            response = mark_safe('''<a href='%s' target='_blank'>%s</a>''' % (url, instance.appointment_id))
+            return response
+        return ''
+
     def name(self, instance):
         if instance.content_type==ContentType.objects.get_for_model(Doctor):
-            doc = Doctor.objects.filter(pk=instance.object_id).first()
-            if doc:
-                return doc.name
+            for doc in self.docs:
+                if doc.id == instance.object_id:
+                    return doc.name
         elif instance.content_type==ContentType.objects.get_for_model(Lab):
-            lab = Lab.objects.filter(pk=instance.object_id).first()
-            if lab:
-                return lab.name
-            else:
-                return None
+            for lab in self.labs:
+                if lab.id == instance.object_id:
+                    return lab.name
 
         return ''
 
