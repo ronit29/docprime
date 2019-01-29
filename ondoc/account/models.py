@@ -652,7 +652,7 @@ class ConsumerTransaction(TimeStampedModel):
         from ondoc.notification import tasks as notification_tasks
         if not old_instance and self.type == PgTransaction.DEBIT and self.action == self.action_list.index('Refund'):
             try:
-                notification_tasks.refund_breakup_sms_task.apply_async(self.id)
+                notification_tasks.refund_breakup_sms_task.apply_async((self.id),)
             except Exception as e:
                 logger.error(str(e))
 
@@ -692,12 +692,12 @@ class ConsumerRefund(TimeStampedModel):
         from ondoc.notification import tasks as notification_tasks
         if not old_instance and self.refund_state == self.PENDING:
             try:
-                notification_tasks.refund_initiated_sms_task.apply_async(self.id)
+                notification_tasks.refund_initiated_sms_task.apply_async((self.id),)
             except Exception as e:
                 logger.error(str(e))
         if old_instance and old_instance.refund_state != self.refund_state and self.refund_state == self.COMPLETED:
             try:
-                notification_tasks.refund_completed_sms_task.apply_async(self.id)
+                notification_tasks.refund_completed_sms_task.apply_async((self.id,))
             except Exception as e:
                 logger.error(str(e))
 
