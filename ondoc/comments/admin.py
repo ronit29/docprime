@@ -75,12 +75,11 @@ class CustomCommentsAdmin(CommentsAdminBase):
         is_author = form.cleaned_data.get('is_author')
         name = form.cleaned_data.get('name')
         email = form.cleaned_data.get('email')
-        submit_date = None
+
         if new_comment:
             if is_author:
                 email = ''
                 name = ''
-                submit_date = datetime.now()
 
             comment = FluentComment.objects.create(object_pk=obj.object_pk,
                                                    comment=new_comment,
