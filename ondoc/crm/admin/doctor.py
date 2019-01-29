@@ -20,8 +20,7 @@ import datetime
 from django.db import transaction
 import logging
 from dal import autocomplete
-
-from ondoc.api.v1.utils import util_absolute_url, util_file_name
+from ondoc.api.v1.utils import GenericAdminEntity, util_absolute_url, util_file_name
 from ondoc.procedure.models import DoctorClinicProcedure, Procedure
 
 logger = logging.getLogger(__name__)
@@ -40,7 +39,10 @@ from ondoc.doctor.models import (Doctor, DoctorQualification,
                                  OpdAppointment, CompetitorInfo, SpecializationDepartment,
                                  SpecializationField, PracticeSpecialization, SpecializationDepartmentMapping,
                                  DoctorPracticeSpecialization, CompetitorMonthlyVisit,
-                                 GoogleDetailing, VisitReason, VisitReasonMapping, PracticeSpecializationContent, DoctorMobileOtp, UploadDoctorData)
+                                 GoogleDetailing, VisitReason, VisitReasonMapping, PracticeSpecializationContent,
+                                 PatientMobile, DoctorMobileOtp,
+                                 UploadDoctorData, CancellationReason)
+
 from ondoc.authentication.models import User
 from .common import *
 from .autocomplete import CustomAutoComplete
@@ -764,7 +766,9 @@ class GenericAdminInline(nested_admin.NestedTabularInline):
         return ['user', 'updated_at']
 
     def get_queryset(self, request):
-        return super(GenericAdminInline, self).get_queryset(request).select_related('doctor', 'hospital', 'user')
+        return super(GenericAdminInline, self).get_queryset(request).select_related('doctor', 'hospital', 'user')\
+            .filter(entity_type=GenericAdminEntity.DOCTOR)
+
 
     def formfield_for_foreignkey(self, db_field, request, **kwargs):
         if db_field.name == "hospital":
@@ -1322,27 +1326,26 @@ class DoctorOpdAppointmentForm(forms.ModelForm):
             raise forms.ValidationError(
                 "If Reason for Cancelled appointment is others it should be mentioned in cancellation comment.")
 
-
         if not DoctorClinicTiming.objects.filter(doctor_clinic__doctor=doctor,
                                                  doctor_clinic__hospital=hospital,
                                                  day=time_slot_start.weekday(),
                                                  start__lte=hour, end__gt=hour).exists():
             raise forms.ValidationError("Doctor do not sit at the given hospital in this time slot.")
 
-        if self.instance.id:
-
-            if self.instance.procedure_mappings.count():
-                doctor_details = self.instance.get_procedures()[0]
-                deal_price = Decimal(doctor_details["deal_price"])
-
-            else:
-                deal_price = cleaned_data.get('deal_price') if cleaned_data.get('deal_price') else self.instance.deal_price
-            if not DoctorClinicTiming.objects.filter(doctor_clinic__doctor=doctor,
-                                                     doctor_clinic__hospital=hospital,
-                                                     day=time_slot_start.weekday(),
-                                                     start__lte=hour, end__gt=hour,
-                                                     deal_price=deal_price).exists():
-                raise forms.ValidationError("Deal price is different for this time slot.")
+        # if self.instance.id:
+        #     if cleaned_data.get('status') == OpdAppointment.RESCHEDULED_PATIENT or cleaned_data.get(
+        #             'status') == OpdAppointment.RESCHEDULED_DOCTOR:
+        #         if self.instance.procedure_mappings.count():
+        #             doctor_details = self.instance.get_procedures()[0]
+        #             deal_price = Decimal(doctor_details["deal_price"])
+        #         else:
+        #             deal_price = cleaned_data.get('deal_price') if cleaned_data.get('deal_price') else self.instance.deal_price
+        #         if not DoctorClinicTiming.objects.filter(doctor_clinic__doctor=doctor,
+        #                                                  doctor_clinic__hospital=hospital,
+        #                                                  day=time_slot_start.weekday(),
+        #                                                  start__lte=hour, end__gt=hour,
+        #                                                  deal_price=deal_price).exists():
+        #             raise forms.ValidationError("Deal price is different for this time slot.")
 
         return cleaned_data
 
@@ -1390,6 +1393,8 @@ class DoctorOpdAppointmentAdmin(admin.ModelAdmin):
     def get_form(self, request, obj=None, **kwargs):
         form = super().get_form(request, obj=obj, **kwargs)
         form.request = request
+        form.base_fields['cancellation_reason'].queryset = CancellationReason.objects.filter(
+            Q(type=Order.DOCTOR_PRODUCT_ID) | Q(type__isnull=True), visible_on_admin=True)
         if obj is not None and obj.time_slot_start:
             time_slot_start = timezone.localtime(obj.time_slot_start, pytz.timezone(settings.TIME_ZONE))
             form.base_fields['start_date'].initial = time_slot_start.strftime('%Y-%m-%d')
@@ -1430,11 +1435,9 @@ class DoctorOpdAppointmentAdmin(admin.ModelAdmin):
 
     def invoice_urls(self, instance):
         invoices_urls = ''
-        if instance.id:
-            invoices = Invoice.objects.filter(reference_id=instance.id, product_id=Order.DOCTOR_PRODUCT_ID)
-            for invoice in invoices:
-                invoices_urls += "<a href={} target='_blank'>{}</a><br>".format(util_absolute_url(invoice.file.url),
-                                                                             util_file_name(invoice.file.url))
+        for invoice in instance.get_invoice_urls():
+            invoices_urls += "<a href={} target='_blank'>{}</a><br>".format(util_absolute_url(invoice),
+                                                                             util_file_name(invoice))
         return mark_safe(invoices_urls)
     invoice_urls.short_description = 'Invoice(s)'
 
@@ -1871,6 +1874,19 @@ class PracticeSpecializationContentAdmin(admin.ModelAdmin):
     list_display = ('specialization',)
     display = ('specialization', 'content', )
     autocomplete_fields = ('specialization', )
+
+
+class PatientMobileInline(admin.TabularInline):
+    model = PatientMobile
+    extra = 0
+    can_delete = True
+    show_change_link = True
+
+
+class OfflinePatientAdmin(VersionAdmin):
+    list_display = ('name', 'gender', 'referred_by')
+    date_hierarchy = 'created_at'
+    inlines = [PatientMobileInline]
 
 
 class UploadDoctorDataAdmin(admin.ModelAdmin):

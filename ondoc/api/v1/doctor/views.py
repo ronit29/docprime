@@ -1,9 +1,15 @@
+from collections import defaultdict, OrderedDict
+from uuid import UUID
+from ondoc.api.v1.auth.serializers import UserProfileSerializer
+from ondoc.api.v1.doctor.serializers import HospitalModelSerializer, AppointmentRetrieveDoctorSerializer, \
+    OfflinePatientSerializer
 from ondoc.api.v1.doctor.DoctorSearchByHospitalHelper import DoctorSearchByHospitalHelper
 from ondoc.api.v1.procedure.serializers import CommonProcedureCategorySerializer, ProcedureInSerializer, \
     ProcedureSerializer, DoctorClinicProcedureSerializer, CommonProcedureSerializer
 from ondoc.doctor import models
 from ondoc.authentication import models as auth_models
 from ondoc.diagnostic import models as lab_models
+from ondoc.notification import tasks as notification_tasks
 #from ondoc.doctor.models import Hospital, DoctorClinic,Doctor,  OpdAppointment
 from ondoc.doctor.models import DoctorClinic
 from ondoc.notification.models import EmailNotification
@@ -17,7 +23,8 @@ from ondoc.procedure.models import Procedure, ProcedureCategory, CommonProcedure
 from ondoc.seo.models import NewDynamic
 from . import serializers
 from ondoc.api.pagination import paginate_queryset, paginate_raw_query
-from ondoc.api.v1.utils import convert_timings, form_time_slot, IsDoctor, payment_details, aware_time_zone, TimeSlotExtraction, GenericAdminEntity
+from ondoc.api.v1.utils import convert_timings, form_time_slot, IsDoctor, payment_details, aware_time_zone, \
+    TimeSlotExtraction, GenericAdminEntity, get_opd_pem_queryset, offline_form_time_slots
 from ondoc.api.v1 import insurance as insurance_utility
 from ondoc.api.v1.doctor.doctorsearch import DoctorSearchHelper
 from django.db.models import Min
@@ -28,23 +35,19 @@ from rest_framework import mixins
 from rest_framework.response import Response
 from rest_framework import status, permissions
 from rest_framework.permissions import IsAuthenticated
-from rest_framework.authentication import TokenAuthentication
 from ondoc.authentication.backends import JWTAuthentication
 from django.utils import timezone
 from django.db import transaction
 from django.http import Http404
 from django.db.models import Q, Value, Case, When
 from operator import itemgetter
-from itertools import groupby
+from itertools import groupby,chain
 from ondoc.api.v1.utils import RawSql, is_valid_testing_data, doctor_query_parameters
 from django.contrib.auth import get_user_model
 from django.conf import settings
 from django.db.models import F, Count
 from django.db.models.functions import StrIndex
-import datetime
-import copy
-import re
-import hashlib
+import datetime, logging, copy, re
 from ondoc.api.v1.utils import opdappointment_transform
 from ondoc.location import models as location_models
 from ondoc.ratings_review import models as rating_models
@@ -58,7 +61,7 @@ from dal import autocomplete
 from django.contrib.staticfiles.templatetags.staticfiles import static
 from django.db.models import Avg
 from django.db.models import Count
-import logging
+from ondoc.api.v1.auth import serializers as auth_serializers
 
 logger = logging.getLogger(__name__)
 import random
@@ -96,44 +99,10 @@ class DoctorAppointmentsViewSet(OndocViewSet):
     serializer_class = serializers.OpdAppointmentSerializer
 
     def get_queryset(self):
-
         return None
 
     def get_pem_queryset(self, user):
-        queryset = models.OpdAppointment.objects \
-            .select_related('doctor', 'hospital', 'profile') \
-            .prefetch_related('doctor__manageable_doctors', 'hospital__manageable_hospitals', 'doctor__images',
-                              'doctor__qualifications', 'doctor__doctorpracticespecializations') \
-            .filter(hospital__is_live=True, doctor__is_live=True) \
-            .filter(
-            Q(
-                Q(doctor__manageable_doctors__user=user,
-                  doctor__manageable_doctors__hospital=F('hospital'),
-                  doctor__manageable_doctors__is_disabled=False,
-                  doctor__manageable_doctors__permission_type__in=[auth_models.GenericAdmin.APPOINTMENT,
-                                                                   auth_models.GenericAdmin.ALL]) |
-                Q(doctor__manageable_doctors__user=user,
-                    doctor__manageable_doctors__hospital__isnull=True,
-                    doctor__manageable_doctors__is_disabled=False,
-                    doctor__manageable_doctors__permission_type__in=[auth_models.GenericAdmin.APPOINTMENT,
-                                                                   auth_models.GenericAdmin.ALL])
-                 |
-                Q(hospital__manageable_hospitals__doctor__isnull=True,
-                  hospital__manageable_hospitals__user=user,
-                  hospital__manageable_hospitals__is_disabled=False,
-                  hospital__manageable_hospitals__permission_type__in=[auth_models.GenericAdmin.APPOINTMENT,
-                                                                       auth_models.GenericAdmin.ALL])
-            ) |
-            Q(
-                Q(doctor__manageable_doctors__user=user,
-                  doctor__manageable_doctors__super_user_permission=True,
-                  doctor__manageable_doctors__is_disabled=False,
-                  doctor__manageable_doctors__entity_type=GenericAdminEntity.DOCTOR, ) |
-                Q(hospital__manageable_hospitals__user=user,
-                  hospital__manageable_hospitals__super_user_permission=True,
-                  hospital__manageable_hospitals__is_disabled=False,
-                  hospital__manageable_hospitals__entity_type=GenericAdminEntity.HOSPITAL)
-            ))
+        queryset = get_opd_pem_queryset(user, models.OpdAppointment)
         return queryset
 
     @transaction.non_atomic_requests
@@ -207,21 +176,24 @@ class DoctorAppointmentsViewSet(OndocViewSet):
 
         if not opd_appointment:
             return Response({"message": "Invalid appointment id"}, status.HTTP_404_NOT_FOUND)
-        permission = auth_models.GenericAdmin.objects.filter(Q(is_disabled=False,
-                                                                    user=user,
-                                                                    doctor_id=opd_appointment.doctor.id,
-                                                                    permission_type__in=[auth_models.GenericAdmin.APPOINTMENT,
-                                                                                           auth_models.GenericAdmin.ALL])|
-                                                                  Q(user=user,
-                                                                    is_disabled=False,
-                                                                    hospital_id=opd_appointment.hospital.id,
-                                                                    permission_type__in=[auth_models.GenericAdmin.APPOINTMENT,
-                                                                                               auth_models.GenericAdmin.ALL]
-                                                                    )
-                                                                  ).first()
-
-        if not permission:
-            return Response({"message": "UnAuthorized"}, status.HTTP_403_FORBIDDEN)
+        pem_queryset = auth_models.GenericAdmin.objects.filter(Q(user=user, is_disabled=False),
+                                                               Q(Q(super_user_permission=True,
+                                                                   hospital=opd_appointment.hospital,
+                                                                   entity_type=GenericAdminEntity.HOSPITAL)
+                                                                 |
+                                                                 Q(super_user_permission=True,
+                                                                   doctor=opd_appointment.doctor,
+                                                                   entity_type=GenericAdminEntity.DOCTOR))
+                                                               |
+                                                               Q(Q(doctor=opd_appointment.doctor,
+                                                                 hospital=opd_appointment.hospital)
+                                                                 |
+                                                                 Q(doctor__isnull=True,
+                                                                   hospital=opd_appointment.hospital)
+                                                                 )
+                                                               ).first()
+        if not pem_queryset:
+            return Response({"message": "No Permissions"}, status.HTTP_403_FORBIDDEN)
         if request.user.user_type == User.DOCTOR:
             otp_valid_serializer = serializers.OTPConfirmationSerializer(data=request.data)
             otp_valid_serializer.is_valid(raise_exception=True)
@@ -336,7 +308,10 @@ class DoctorAppointmentsViewSet(OndocViewSet):
     def update(self, request, pk=None):
         user = request.user
         queryset = self.get_pem_queryset(user).distinct()
-        opd_appointment = get_object_or_404(queryset, pk=pk)
+        # opd_appointment = get_object_or_404(queryset, pk=pk)
+        opd_appointment = models.OpdAppointment.objects.filter(id=pk).first()
+        if not opd_appointment:
+            return Response({'error': 'Appointment Not Found'}, status=status.HTTP_404_NOT_FOUND)
         serializer = serializers.UpdateStatusSerializer(data=request.data,
                                             context={'request': request, 'opd_appointment': opd_appointment})
         serializer.is_valid(raise_exception=True)
@@ -362,9 +337,8 @@ class DoctorAppointmentsViewSet(OndocViewSet):
         }
         return Response(response)
 
-    @transaction.atomic
-    def create_order(self, request, appointment_details, product_id, use_wallet=True):
 
+    def create_order(self, request, appointment_details, product_id, use_wallet=True):
         user = request.user
         balance = 0
         cashback_balance = 0
@@ -872,10 +846,10 @@ class PrescriptionFileViewset(OndocViewSet):
 
     @transaction.non_atomic_requests
     def list(self, request, *args, **kwargs):
-        appointment = int(request.query_params.get("appointment"))
+        appointment = request.query_params.get("appointment")
         if not appointment:
             return Response(status=400)
-        queryset = self.get_queryset().filter(prescription__appointment=appointment)
+        queryset = self.get_queryset().filter(prescription__appointment=int(appointment))
         serializer = serializers.PrescriptionFileSerializer(queryset, many=True, context={"request": request})
         return Response(serializer.data)
 
@@ -902,7 +876,10 @@ class PrescriptionFileViewset(OndocViewSet):
                                                                                   context={"request": request})
         prescription_file_serializer.is_valid(raise_exception=True)
         prescription_file_serializer.save()
-        resp_data = prescription_file_serializer.data
+        # resp_data = prescription_file_serializer.data
+        resp_data = serializers.DoctorAppointmentRetrieveSerializer(validated_data.get('appointment'),
+                                                                         context={'request': request}).data
+
         return Response(resp_data)
 
     def remove(self, request):
@@ -925,9 +902,8 @@ class PrescriptionFileViewset(OndocViewSet):
         return Response(response)
 
     def prescription_permission(self, user, appointment):
-        return auth_models.GenericAdmin.objects.filter(user=user, hospital=appointment.hospital,
-                                                permission_type__in=[auth_models.GenericAdmin.APPOINTMENT, auth_models.GenericAdmin.ALL],
-                                                write_permission=True).exists()
+        return auth_models.GenericAdmin.objects.filter(user=user, hospital=appointment.hospital,  is_disabled=False,
+                                                       write_permission=True).exists()
 
 
 class SearchedItemsViewSet(viewsets.GenericViewSet):
@@ -1650,6 +1626,9 @@ class HospitalAutocomplete(autocomplete.Select2QuerySetView):
 
 class CreateAdminViewSet(viewsets.GenericViewSet):
 
+    authentication_classes = (JWTAuthentication,)
+    permission_classes = (IsAuthenticated, IsDoctor)
+
     def get_queryset(self):
         return auth_models.GenericAdmin.objects.none()
 
@@ -1696,6 +1675,7 @@ class CreateAdminViewSet(viewsets.GenericViewSet):
                 try:
                     auth_models.GenericAdmin.objects.bulk_create(create_admins)
                 except Exception as e:
+                    logger.error(str(e))
                     return Response({'error': 'something went wrong!'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
             else:
                 create_admins = []
@@ -1710,6 +1690,7 @@ class CreateAdminViewSet(viewsets.GenericViewSet):
                 try:
                     auth_models.GenericAdmin.objects.bulk_create(create_admins)
                 except Exception as e:
+                    logger.error(str(e))
                     return Response({'error': 'something went wrong!'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
         elif valid_data.get('entity_type') == GenericAdminEntity.HOSPITAL:
             hosp = models.Hospital.objects.get(id=valid_data['id'])
@@ -1719,6 +1700,7 @@ class CreateAdminViewSet(viewsets.GenericViewSet):
                 try:
                     auth_models.DoctorNumber.objects.create(phone_number=valid_data.get('phone_number'), doctor=valid_data.get('doc_profile'), hospital=hosp)
                 except Exception as e:
+                    logger.error(str(e))
                     return Response({'error': 'something went wrong!'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
             valid_data['name'] = name
             if valid_data.get('assoc_doc'):
@@ -1735,6 +1717,7 @@ class CreateAdminViewSet(viewsets.GenericViewSet):
                 try:
                     auth_models.GenericAdmin.objects.bulk_create(create_admins)
                 except Exception as e:
+                    logger.error(str(e))
                     return Response({'error': 'something went wrong!'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
             else:
                 create_admins = []
@@ -1749,6 +1732,7 @@ class CreateAdminViewSet(viewsets.GenericViewSet):
                 try:
                     auth_models.GenericAdmin.objects.bulk_create(create_admins)
                 except Exception as e:
+                    logger.error(str(e))
                     return Response({'error': 'something went wrong!'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
         elif valid_data.get('entity_type') == GenericAdminEntity.LAB:
             lab = lab_models.Lab.objects.get(id=valid_data.get('id'))
@@ -1795,7 +1779,7 @@ class CreateAdminViewSet(viewsets.GenericViewSet):
 
     def assoc_hosp(self, request, pk=None):
         doctor = get_object_or_404(models.Doctor.objects.prefetch_related('hospitals'), pk=pk)
-        queryset = doctor.hospitals.filter(is_appointment_manager=False)
+        queryset = doctor.hospitals.filter(is_appointment_manager=False, is_live=True)
         return Response(queryset.values('name', 'id'))
 
     def list_entities(self, request):
@@ -1895,8 +1879,7 @@ class CreateAdminViewSet(viewsets.GenericViewSet):
                 assoc_docs = hos_obj.assoc_doctors.extra(select={
                     'assigned': 'CASE WHEN  ((SELECT COUNT(*) FROM doctor_number WHERE doctor_id = doctor.id) = 0) THEN 0 ELSE 1  END',
                     'phone_number': 'SELECT phone_number FROM doctor_number WHERE doctor_id = doctor.id',
-                    'enabled': 'SELECT enabled FROM doctor_clinic WHERE doctor_id = doctor.id AND hospital_id=' + str(
-                        hos_obj.id)}) \
+                    'enabled': 'SELECT enabled FROM doctor_clinic WHERE doctor_id = doctor.id AND hospital_id='+str(hos_obj.id)})\
                     .values('name', 'id', 'assigned', 'phone_number', 'enabled', 'is_live')
 
             for x in response:
@@ -1923,7 +1906,7 @@ class CreateAdminViewSet(viewsets.GenericViewSet):
                     temp[x['phone_number']] = x
             admin_final_list = list(temp.values())
             for a_d in assoc_docs:
-                if not a_d.get('phone_number'):
+                if (a_d.get('is_live') and a_d.get('enabled')) and not a_d.get('phone_number'):
                     a_d['is_doctor'] = True
                     a_d['hospital_name'] = hos_name
                     admin_final_list.append(a_d)
@@ -2039,7 +2022,6 @@ class CreateAdminViewSet(viewsets.GenericViewSet):
                         logger.error("Error Updating Entity Hospital " + str(e))
                         return Response({'error': 'something went wrong!'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
-
             delete_queryset = auth_models.GenericAdmin.objects.filter(phone_number=phone_number,
                                                                       entity_type=GenericAdminEntity.HOSPITAL,
                                                                       super_user_permission=False)
@@ -2086,6 +2068,750 @@ class CreateAdminViewSet(viewsets.GenericViewSet):
             if admin.exists():
                 admin.update(user=user, name=valid_data.get('name'), phone_number=valid_data.get('phone_number'))
         return Response({'success': 'Created Successfully'})
+
+
+class OfflineCustomerViewSet(viewsets.GenericViewSet):
+
+    authentication_classes = (JWTAuthentication,)
+    permission_classes = (IsAuthenticated, IsDoctor)
+
+    def get_queryset(self):
+        return None
+
+    def get_error_obj(self, data):
+        return {'id': data.get('id'),
+                'error': True}
+
+    def get_offline_response_obj(self, appnt, request):
+        phone_number = []
+        patient_profile = OfflinePatientSerializer(appnt.user).data
+        patient_name = appnt.user.name if hasattr(appnt.user, 'name') else None
+        if hasattr(appnt.user, 'patient_mobiles'):
+            for mob in appnt.user.patient_mobiles.all():
+                phone_number.append({"phone_number": mob.phone_number, "is_default": mob.is_default})
+        patient_profile['patient_numbers'] = phone_number
+
+        ret_obj = {}
+        ret_obj['patient_name'] = patient_name
+        # ret_obj['patient_number'] = phone_number
+        ret_obj['profile'] = patient_profile
+        ret_obj['patient_thumbnail'] = None
+        ret_obj['deal_price'] = None
+        ret_obj['effective_price'] = None
+        ret_obj['allowed_action'] = []
+        ret_obj['updated_at'] = appnt.updated_at
+        ret_obj['doctor_name'] = appnt.doctor.name
+        ret_obj['doctor_id'] = appnt.doctor.id
+        ret_obj['doctor_thumbnail'] = request.build_absolute_uri(appnt.doctor.get_thumbnail()) if appnt.doctor.get_thumbnail() else None
+        ret_obj['hospital_id'] = appnt.hospital.id
+        ret_obj['hospital_name'] = appnt.hospital.name
+        ret_obj['time_slot_start'] = appnt.time_slot_start
+        ret_obj['status'] = appnt.status
+        ret_obj['hospital'] = HospitalModelSerializer(appnt.hospital).data
+        ret_obj['doctor'] = AppointmentRetrieveDoctorSerializer(appnt.doctor).data
+        ret_obj['is_docprime'] = False
+        ret_obj['type'] = 'doctor'
+        return ret_obj
+
+    def validate_uuid(self, data):
+        response = {}
+        try:
+            id = UUID(data.get('id'), version=4)
+            response['id'] = id
+        except ValueError:
+            obj = self.get_error_obj(data)
+            obj['doctor_id'] = data.get('doctor').id
+            obj['hospital_id'] = data.get('hospital').id
+            obj['error_message'] = 'Invalid UUid - Offline Appointment Create!'
+            logger.error("PROVIDER_REQUEST - Invalid UUid - Offline Appointment Create! " + str(data))
+            response['obj'] = obj
+            response['continue'] = True
+        return response
+
+    def validate_permissions(self, data, doc_pem_list, hosp_pem_list, clinic_queryset):
+
+        if not data.get('doctor').id in doc_pem_list and not data.get('hospital').id in hosp_pem_list:
+            data['error'] = True
+            data['error_message'] = 'User forbidden to create Appointment with selected doctor or hospital!'
+        if (data.get('doctor').id, data.get('hospital').id) not in clinic_queryset:
+            data['error'] = True
+            data['error_message'] = 'Doctor is not associated with given hospital!'
+        return data
+
+    def validate_update_conditions(self, appnt, data, request):
+        response = {}
+        if appnt.error:
+            obj = self.get_error_obj(data)
+            obj['error_message'] = 'Cannot Update an invalid/error appointment!'
+            obj.update(self.get_offline_response_obj(appnt, request))
+            logger.error("PROVIDER_REQUEST - Updating a invalid/error Appointment! " + str(data))
+            response['obj'] = obj
+            response['break'] = True
+        elif appnt.status == models.OfflineOPDAppointments.CANCELLED or appnt.status == models.OfflineOPDAppointments.NO_SHOW:
+            obj = self.get_error_obj(data)
+            obj['error_message'] = 'Cannot Update a Cancelled/NoShow appointment!'
+            obj.update(self.get_offline_response_obj(appnt, request))
+            logger.error("PROVIDER_REQUEST - Updating a Cancelled/NoShow Appointment! " + str(data))
+            response['obj'] = obj
+            response['break'] = True
+
+        elif data.get('status') and data.get('status') not in [models.OfflineOPDAppointments.NO_SHOW,
+                                                             models.OfflineOPDAppointments.RESCHEDULED_DOCTOR,
+                                                             models.OfflineOPDAppointments.CANCELLED,
+                                                             models.OfflineOPDAppointments.ACCEPTED,
+                                                             models.OfflineOPDAppointments.COMPLETED]:
+            obj = self.get_error_obj(data)
+            obj['error_message'] = 'Invalid Appointment Status Recieved!'
+            obj.update(self.get_offline_response_obj(appnt, request))
+            logger.error("PROVIDER_REQUEST - Invalid Appointment Status Recieved! " + str(data))
+            response['obj'] = obj
+            response['break'] = True
+        return response
+
+    def validate_create_conditions(self, appntment_ids, data, request):
+        response = {}
+        if data.get('id') in appntment_ids:
+            obj = {'id': data.get('id'),
+                   'error': True,
+                   'error_message': "Appointment With Same UUid exists!"}
+            obj['doctor_id'] = data.get('doctor').id
+            obj['hospital_id'] = data.get('hospital').id
+            # logger.error("PROVIDER_REQUEST - Offline Appointment With Same UUid exists! " + str(data))
+            response['obj'] = obj
+            response['continue'] = True
+        elif not data.get('patient'):
+            obj = {'id': data.get('id'),
+                   'error': True,
+                   'error_message': "Patient not Recieved for Offline Appointment!"}
+            obj['doctor_id'] = data.get('doctor').id
+            obj['hospital_id'] = data.get('hospital').id
+            logger.error("PROVIDER_REQUEST - Patient not Recieved for Offline Appointment! " + str(data))
+            response['obj'] = obj
+            response['continue'] = True
+        return response
+
+    def list_patients(self, request):
+        user = request.user
+        serializer = serializers.GetOfflinePatientsSerializer(data=request.query_params)
+        serializer.is_valid(raise_exception=True)
+        valid_data = serializer.validated_data
+        queryset = models.OfflinePatients.objects.prefetch_related('patient_mobiles')\
+                                                 .select_related('doctor', 'hospital')\
+                                                 .filter(Q(doctor__manageable_doctors__user=user,
+                                                           doctor__manageable_doctors__entity_type=GenericAdminEntity.DOCTOR,
+                                                           doctor__manageable_doctors__is_disabled=False,
+                                                           )
+                                                         |
+                                                         Q(hospital__isnull=False,
+                                                           hospital__manageable_hospitals__user=user,
+                                                           hospital__manageable_hospitals__is_disabled=False,
+                                                           hospital__manageable_hospitals__entity_type=GenericAdminEntity.HOSPITAL)
+                                                         )
+        if valid_data.get('doctor_id') and valid_data.get('hospital_id'):
+            queryset = queryset.filter(Q(hospital__isnull=True, doctor=valid_data.get('doctor_id'))
+                                                              |
+                                                              Q(hospital__isnull=False,
+                                                                hospital=valid_data.get('hospital_id'))
+                                                            )
+        if valid_data.get('updated_at'):
+            admin_queryset = auth_models.GenericAdmin.objects.filter(user=request.user, updated_at__gte=valid_data.get('updated_at'))
+            if not admin_queryset.exists():
+                queryset = queryset.filter(updated_at__gte=valid_data.get('updated_at'))
+        # queryset = queryset.values('name', 'id', 'gender', 'doctor', 'hospital', 'age', 'dob', 'calculated_dob', 'updated_at',
+        #                            'share_with_hospital', 'sms_notification', 'medical_history',
+        #                            'referred_by', 'display_welcome_message', 'error'
+        #                            ).distinct()
+        response = []
+        for data in queryset.distinct().all():
+            patient_dict = {}
+            patient_dict['id'] = data.id
+            patient_dict['name'] = data.name if data.name else None
+            patient_dict['gender'] = data.gender if data.gender else None
+            patient_dict['doctor'] = data.doctor.id if data.doctor else None
+            patient_dict['hospital'] = data.hospital.id if data.hospital else None
+            patient_dict['age'] = data.age if data.age else None
+            patient_dict['dob'] = data.dob if data.dob else None
+            patient_dict['calculated_dob'] = data.calculated_dob if data.calculated_dob else None
+            patient_dict['updated_at'] = data.updated_at if data.updated_at else None
+            patient_dict['share_with_hospital'] = data.share_with_hospital if data.share_with_hospital else None
+            patient_dict['sms_notification'] = data.sms_notification if data.sms_notification else None
+            patient_dict['medical_history'] = data.medical_history if data.medical_history else None
+            patient_dict['referred_by'] = data.referred_by if data.referred_by else None
+            patient_dict[
+                'display_welcome_message'] = data.display_welcome_message if data.display_welcome_message else None
+            patient_dict['error'] = data.error if data.error else None
+            phone_number = ''
+            if hasattr(data, 'patient_mobiles'):
+                for mob in data.patient_mobiles.all():
+                    if mob.is_default:
+                        phone_number = mob.phone_number
+            patient_dict['patient_numbers'] = phone_number
+            response.append(patient_dict)
+        return Response(response)
+
+    @transaction.atomic
+    def create_offline_patients(self, request):
+        serializer = serializers.OfflinePatientCreateSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        valid_data = serializer.validated_data
+        sms_list = []
+        resp = []
+        patient_ids = models.OfflinePatients.objects.values_list('id', flat=True)
+
+        for data in valid_data['data']:
+            if data.get('id') in patient_ids:
+                # obj = {'doctor': data.get('doctor').id,
+                #        'hospital': data.get('hospital').id if data.get('hospital') else None,
+                #        'id': data.get('id'),
+                #        'error': True,
+                #        'error_message': "Patient With Same UUid exists!"}
+                # resp.append(obj)
+                # logger.error("Patient With Same UUid exists! " + str(data))
+                # continue
+
+                patient_data = self.update_patient(request, data, data.get('hospital'), data.get('doctor'))
+            else:
+                patient_data = self.create_patient(request, data, data.get('hospital'), data.get('doctor'))
+            patient = patient_data['patient']
+            if patient_data['sms_list'] is not None:
+                sms_list.append(patient_data['sms_list'])
+
+            ret_obj = {}
+            ret_obj['doctor'] = patient.doctor.id if patient.doctor else None
+            ret_obj['hospital'] = patient.hospital.id if patient.hospital else None
+            ret_obj['id'] = patient.id
+            ret_obj['error'] = patient.error
+            ret_obj['error_message'] = patient.error_message
+            resp.append(ret_obj)
+
+            # if sms_list:
+            #     transaction.on_commit(lambda: models.OfflineOPDAppointments.after_commit_create_sms(sms_list))
+
+        return Response(resp)
+
+    @transaction.atomic
+    def create_offline_appointments(self, request):
+        serializer = serializers.OfflineAppointmentCreateSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        valid_data = serializer.validated_data
+        patient = None
+        sms_list = []
+        resp = []
+        req_hosp_ids = []
+        filter_appntment_ids = []
+        patient_ids = []
+        for data in valid_data.get('data'):
+            if data.get('hospital'):
+                req_hosp_ids.append(data.get('hospital').id)
+            if data.get('id'):
+                filter_appntment_ids.append(data.get('id'))
+            if data.get('patient') and data['patient'].get('id'):
+                patient_ids.append(data['patient']['id'])
+        appointment_ids = list(models.OfflineOPDAppointments.objects.filter(id__in=filter_appntment_ids).values_list('id', flat=True))
+        patient_ids = list(models.OfflinePatients.objects.filter(id__in=patient_ids).values_list('id', flat=True))
+        clinic_queryset = [(dc.doctor.id, dc.hospital.id) for dc in
+                           models.DoctorClinic.objects.filter(hospital__id__in=req_hosp_ids)]
+        pem_queryset = [(ga.doctor.id if ga.doctor else None, ga.hospital.id if ga.hospital else None) for ga in auth_models.GenericAdmin.objects.filter(is_disabled=False, user=request.user).all()]
+        doc_pem_list, hosp_pem_list = map(list, zip(*pem_queryset))
+
+        for data in valid_data.get('data'):
+            uuid_obj = self.validate_uuid(data)
+            id = uuid_obj.get('id') if 'id' in uuid_obj and uuid_obj.get('id') else None
+            if not id and 'continue' in uuid_obj and uuid_obj.get('continue'):
+                resp.append(uuid_obj.get('obj'))
+                continue
+            data['id'] = id
+            self.validate_permissions(data, doc_pem_list, hosp_pem_list, clinic_queryset)
+
+            create_obj = self.validate_create_conditions(appointment_ids, data, request)
+            if 'continue' in create_obj and create_obj.get('continue'):
+                resp.append(create_obj.get('obj'))
+                continue
+
+            if not data.get('patient')['id'] in patient_ids:
+                patient_data = self.create_patient(request, data['patient'], data['hospital'], data['doctor'])
+                patient_ids.append(patient_data['patient'].id)
+            else:
+                patient_data = self.update_patient(request, data['patient'], data['hospital'], data['doctor'])
+            patient = patient_data['patient']
+            if patient_data.get('sms_list'):
+                sms_list.append(patient_data['sms_list'])
+
+            try:
+                appnt = models.OfflineOPDAppointments.objects.create(doctor=data.get('doctor'),
+                                                                     id=id,
+                                                                     hospital=data.get('hospital'),
+                                                                     time_slot_start=data.get('time_slot_start'),
+                                                                     booked_by=request.user,
+                                                                     user=patient,
+                                                                     status=models.OfflineOPDAppointments.ACCEPTED,
+                                                                     error=data.get('error') if data.get('error') else False,
+                                                                     error_message=data.get('error_message') if data.get('error_message') else None
+                                                                              )
+            except Exception as e:
+                obj = {'id': data.get('id'),
+                       'error': True,
+                       'error_message': "Something Went Wrong!"}
+                obj['doctor_id'] = data.get('doctor').id
+                obj['hospital_id'] = data.get('hospital').id
+                resp.append(obj)
+                logger.error("Fialed Creating Appointment " + str(e))
+                continue
+
+            if patient_data.get('sms_list'):
+                patient_data['sms_list']['appointment'] = appnt
+            appointment_ids.append(appnt.id)
+            ret_obj = {}
+            ret_obj['id'] = appnt.id
+            ret_obj['patient_id'] = appnt.user.id
+            ret_obj['error'] = appnt.error
+            ret_obj['error_message'] = appnt.error_message
+            ret_obj.update(self.get_offline_response_obj(appnt, request))
+            resp.append(ret_obj)
+
+        if sms_list:
+            transaction.on_commit(lambda: models.OfflineOPDAppointments.after_commit_create_sms(sms_list))
+
+        return Response(resp)
+
+    def create_patient(self, request, data, hospital, doctor):
+        if data.get('share_with_hospital') and not hospital:
+            logger.error('PROVIDER_REQUEST - Hospital Not Given when Shared with Hospital Set'+ str(data))
+        hosp = hospital if data.get('share_with_hospital') and hospital else None
+        patient = models.OfflinePatients.objects.create(name=data.get('name'),
+                                                        id=data.get('id'),
+                                                        sms_notification=data.get('sms_notification', False),
+                                                        gender=data.get('gender'),
+                                                        dob=data.get("dob"),
+                                                        calculated_dob=data.get("calculated_dob"),
+                                                        age=data.get('age'),
+                                                        referred_by=data.get('referred_by'),
+                                                        medical_history=data.get('medical_history'),
+                                                        welcome_message=data.get('welcome_message'),
+                                                        display_welcome_message=data.get('display_welcome_message',
+                                                                                         False),
+                                                        doctor=doctor,
+                                                        hospital=hosp,
+                                                        created_by=request.user,
+                                                        error=data.get('error') if data.get('error') else False,
+                                                        error_message=data.get('error_message') if data.get(
+                                                            'error_message') else False
+                                                        )
+        default_num = None
+        sms_number = None
+        if data.get('phone_number'):
+            for num in data.get('phone_number'):
+                models.PatientMobile.objects.create(patient=patient,
+                                                    phone_number=num.get('phone_number'),
+                                                    is_default=num.get('is_default', False)
+                                                    )
+
+                if 'is_default' in num and num['is_default']:
+                    default_num = num['phone_number']
+            if default_num and ('sms_notification' in data and data['sms_notification']):
+                sms_number = {'phone_number': default_num,
+                              'name': patient.name,
+                              'welcome_message': data.get('welcome_message'),
+                              'display_welcome_message': data.get('display_welcome_message', False)}
+        return {"sms_list": sms_number, "patient": patient}
+
+    def update_patient(self, request, data, hospital, doctor):
+        if data.get('share_with_hospital') and not hospital:
+            logger.error('PROVIDER_REQUEST - Hospital Not Given when Shared with Hospital Set'+ str(data))
+        hosp = hospital if data.get('share_with_hospital') and hospital else None
+        patient = models.OfflinePatients.objects.filter(id=data.get('id')).first()
+        if patient:
+            if data.get('gender'):
+                patient.gender = data.get('gender')
+            if data.get('dob'):
+                patient.dob = data.get('dob')
+            if data.get('calculated_dob'):
+                patient.calculated_dob = data.get('calculated_dob')
+            if data.get('referred_by'):
+                patient.referred_by = data.get('referred_by')
+            if data.get('medical_history'):
+                patient.medical_history = data.get('medical_history')
+            if data.get('sms_notification'):
+                patient.sms_notification = data.get('sms_notification')
+            if data.get('display_welcome_message'):
+                patient.display_welcome_message = data.get('display_welcome_message')
+            if data.get('share_with_hospital'):
+                patient.share_with_hospital = data.get('share_with_hospital')
+            if hosp:
+                patient.hospital = hosp
+            if doctor:
+                patient.doctor = doctor
+            patient.save()
+            default_num = None
+            sms_number = None
+
+            if data.get('phone_number'):
+                del_queryset = models.PatientMobile.objects.filter(patient=patient)
+                if del_queryset.exists():
+                    del_queryset.delete()
+                for num in data.get('phone_number'):
+                    models.PatientMobile.objects.create(patient=patient,
+                                                        phone_number=num.get('phone_number'),
+                                                        is_default=num.get('is_default', False))
+
+                    if 'is_default' in num and num['is_default']:
+                        default_num = num['phone_number']
+                if default_num and ('sms_notification' in data and data['sms_notification']):
+                    sms_number = {'phone_number': default_num,
+                                  'name': patient.name}
+                    sms_number['welcome_message'] = data.get('welcome_message')
+                    sms_number['display_welcome_message'] = False
+            return {"sms_list": sms_number, "patient": patient}
+
+    def update_offline_appointments(self, request):
+        serializer = serializers.OfflineAppointmentUpdateSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        valid_data = serializer.validated_data
+        sms_list = []
+        resp = []
+        appnt_ids = []
+        req_hosp_ids = []
+        patient_ids  = []
+        for data in valid_data.get('data'):
+            if data.get('hospital'):
+                req_hosp_ids.append(data.get('hospital').id)
+            if data.get('id'):
+                appnt_ids.append(data.get('id'))
+            if data.get('patient') and data['patient'].get('id'):
+                patient_ids.append(data['patient']['id'])
+        appntment_ids = models.OfflineOPDAppointments.objects.select_related('doctor', 'hospital', 'user')\
+                                                     .filter(id__in=appnt_ids).all()
+        patient_ids = list(models.OfflinePatients.objects.filter(id__in=patient_ids).values_list('id', flat=True))
+        clinic_queryset = [(dc.doctor.id, dc.hospital.id) for dc in models.DoctorClinic.objects.filter(hospital__id__in=req_hosp_ids)]
+        pem_queryset = [(ga.doctor.id if ga.doctor else None, ga.hospital.id if ga.hospital else None) for ga in
+                        auth_models.GenericAdmin.objects.filter(is_disabled=False, user=request.user).all()]
+        doc_pem_list, hosp_pem_list = map(list, zip(*pem_queryset))
+
+        for data in valid_data.get('data'):
+            if not data.get('is_docprime'):
+                uuid_obj = self.validate_uuid(data)
+                id = uuid_obj.get('id') if 'id' in uuid_obj and uuid_obj.get('id') else None
+                if not id and 'continue' in uuid_obj and uuid_obj.get('continue'):
+                    resp.append(uuid_obj.get('obj'))
+                    continue
+
+                found = False
+                for appnt in appntment_ids:
+                    if id == appnt.id:
+                        patient = def_number = action_cancel = action_add = action_reschedule = action_complete = None
+                        found = True
+
+                        self.validate_permissions(data, doc_pem_list, hosp_pem_list, clinic_queryset)
+
+                        update_obj = self.validate_update_conditions(appnt, data, request)
+                        if 'break' in update_obj and update_obj.get('break'):
+                            resp.append(update_obj.get('obj'))
+                            break
+
+                        if data.get('patient'):
+                            if not data.get('patient')['id'] in patient_ids:
+                                patient_data = self.create_patient(request, data['patient'], data['hospital'],
+                                                                   data['doctor'])
+                                patient_ids.append(patient_data['patient'].id)
+                                action_cancel = True
+                            else:
+                                patient_data = self.update_patient(request, data['patient'], data['hospital'],
+                                                                   data['doctor'])
+                            patient = patient_data['patient']
+                            if patient_data.get('sms_list'):
+                                patient_data['sms_list']['old_appointment'] = appnt
+                                sms_list.append(patient_data['sms_list'])
+                            appnt.user = patient
+                        else:
+                            patient = appnt.user
+                            patient_data = {}
+                            if patient.sms_notification:
+                                def_number = patient.patient_mobiles.filter(is_default=True).first()
+                                if def_number:
+                                    patient_data['sms_list'] = {'phone_number': def_number.phone_number,
+                                                                'name': patient.name,
+                                                                'old_appointment': appnt}
+                                    sms_list.append(patient_data['sms_list'])
+
+                        if appnt.doctor.id != data.get('doctor').id or appnt.hospital.id != data.get('hospital').id:
+                            action_cancel = True
+                        if not action_cancel and (data.get('time_slot_start') != appnt.time_slot_start):
+                            action_reschedule = True
+                        if data.get('status') == models.OfflineOPDAppointments.COMPLETED:
+                            action_complete = True
+                        appnt.doctor = data.get('doctor')
+                        appnt.hospital = data.get('hospital')
+                        appnt.error = data.get('error', False)
+                        appnt.error_message = data.get('error_message')
+                        if data.get("time_slot_start"):
+                            appnt.time_slot_start = data.get("time_slot_start")
+                        if data.get('status'):
+                            appnt.status = data.get('status')
+                        try:
+                            appnt.save()
+                        except Exception as e:
+                            obj = self.get_error_obj(data)
+                            obj['error_message'] = 'Error Saving Appointment ' + str(e)
+                            obj.update(self.get_offline_response_obj(appnt, request))
+                            resp.append(obj)
+                            break
+                        if patient_data.get('sms_list'):
+                            patient_data['sms_list']['appointment'] = appnt
+                            patient_data['sms_list']['action_cancel'] = action_cancel
+                            patient_data['sms_list']['action_reschedule'] = action_reschedule
+                            patient_data['sms_list']['action_complete'] = action_complete
+                        ret_obj = {}
+                        ret_obj['id'] = appnt.id
+                        ret_obj['patient_id'] = appnt.user.id
+                        ret_obj['error'] = appnt.error
+                        ret_obj['status'] = data.get('status') if data.get('status') else appnt.status
+                        ret_obj['error_message'] = appnt.error_message if appnt.error_message else None
+                        ret_obj.update(self.get_offline_response_obj(appnt, request))
+                        resp.append(ret_obj)
+                        break
+                if not found:
+                    obj = self.get_error_obj(data)
+                    obj['error_message'] = "Appointment not Found!"
+                    resp.append(obj)
+                    logger.error("PROVIDER_REQUEST - Offline Update Appointment is not Found! " + str(data))
+
+        if sms_list:
+            models.OfflineOPDAppointments.after_commit_update_sms(sms_list)
+
+        return Response(resp)
+
+    def offline_timings(self, request):
+        user = request.user
+        serializer = serializers.DoctorAvailabilityTimingSerializer(data=request.query_params)
+        serializer.is_valid(raise_exception=True)
+        validated_data = serializer.validated_data
+
+        dc_queryset = models.DoctorClinic.objects.filter(Q(
+                                                   Q(doctor__manageable_doctors__user=user,
+                                                     doctor__manageable_doctors__entity_type=GenericAdminEntity.DOCTOR,
+                                                     doctor__manageable_doctors__is_disabled=False,
+                                                     doctor__manageable_doctors__hospital__isnull=True)
+                                                   |
+                                                   Q(doctor__manageable_doctors__user=user,
+                                                     doctor__manageable_doctors__entity_type=GenericAdminEntity.DOCTOR,
+                                                     doctor__manageable_doctors__is_disabled=False,
+                                                     doctor__manageable_doctors__hospital__isnull=False,
+                                                     doctor__manageable_doctors__hospital=F('hospital'))
+                                                   |
+                                                   Q(hospital__manageable_hospitals__user=user,
+                                                     hospital__manageable_hospitals__is_disabled=False,
+                                                     hospital__manageable_hospitals__entity_type=GenericAdminEntity.HOSPITAL)
+                                                   )
+                                                  |
+                                                  Q(
+                                                      Q(doctor__manageable_doctors__user=user,
+                                                        doctor__manageable_doctors__super_user_permission=True,
+                                                        doctor__manageable_doctors__is_disabled=False,
+                                                        doctor__manageable_doctors__entity_type=GenericAdminEntity.DOCTOR)
+                                                      |
+                                                      Q(hospital__manageable_hospitals__user=user,
+                                                        hospital__manageable_hospitals__is_disabled=False,
+                                                        hospital__manageable_hospitals__entity_type=GenericAdminEntity.HOSPITAL,
+                                                        hospital__manageable_hospitals__super_user_permission=True)
+                                                   )
+                                                  ).distinct().values('id', 'doctor', 'hospital')
+        if dc_queryset:
+            dc_list = [(dc['id'], dc['doctor']) for dc in dc_queryset]
+            dc_id_list, dc_doc_list = zip(*dc_list)
+
+            if not validated_data.get('doctor_id') and not validated_data.get('hospital_id'):
+
+                dct_queryset = models.DoctorClinicTiming.objects.filter(doctor_clinic__id__in=dc_id_list).values('doctor_clinic',
+                                                                                                                 'day',
+                                                                                                                 'start',
+                                                                                                                 'end',
+                                                                                                                 'fees',
+                                                                                                                 'deal_price',
+                                                                                                                 'mrp')
+                dl_queryset = models.DoctorLeave.objects.filter(doctor_id__in=dc_doc_list, deleted_at__isnull=True).all()
+
+                all_timing = {}
+                for dclinic in dc_queryset:
+                    key = str(dclinic['doctor']) + '_' + str(dclinic['hospital'])
+                    for dclinictime in dct_queryset:
+                        if dclinictime.get('doctor_clinic') == dclinic.get('id'):
+                            if not key in all_timing:
+                                timing = {}
+                                for i in range(7):
+                                    timing[i] = dict()
+                                all_timing[key] = {}
+                                for dl in dl_queryset:
+                                    dl_data = None
+                                    if dl.doctor_id == dclinic['doctor']:
+
+                                        dl_data = {'interval': dl.interval,
+                                                   'start_time': dl.start_time,
+                                                   'end_time': dl.end_time,
+                                                   'leave_start_time': dl.start_time_in_float(),
+                                                   'leave_end_time': dl.end_time_in_float()}
+                                    all_timing[key]['doctor_leaves'] = dl_data
+                            else:
+                                timing = all_timing[key]['timeslots']
+                            timing_data = offline_form_time_slots(dclinictime, timing)
+                            all_timing[key]['timeslots'] = timing_data
+                return Response(all_timing)
+            else:
+                if not validated_data['doctor_id'].id in dc_doc_list:
+                    return Response({"error": "Forbidden"}, status=status.HTTP_403_FORBIDDEN)
+                queryset = models.DoctorClinicTiming.objects.filter(doctor_clinic__doctor=validated_data.get('doctor_id'),
+                                                                    doctor_clinic__hospital=validated_data.get(
+                                                                        'hospital_id')).order_by("start")
+                doctor_leave_serializer = serializers.DoctorLeaveSerializer(
+                    models.DoctorLeave.objects.filter(doctor=validated_data.get("doctor_id"), deleted_at__isnull=True),
+                    many=True)
+
+                timeslots = dict()
+                obj = TimeSlotExtraction()
+
+                for data in queryset:
+                    obj.form_time_slots(data.day, data.start, data.end, data.fees, True,
+                                        data.deal_price, data.mrp, True)
+
+                timeslots = obj.get_timing_list()
+                for day, slots in timeslots.items():
+                    day_timing = []
+                    for slot_unit in slots:
+                        day_timing.extend(slot_unit['timing'])
+                    timeslots[day] = day_timing
+                return Response({"timeslots": timeslots,
+                                 "doctor_leaves": doctor_leave_serializer.data})
+
+        else:
+            return Response([])
+
+    def list_appointments(self, request):
+        ONLINE = 1
+        OFFLINE = 2
+        INCOMPLETE = 1
+        ELIGIBLE = 2
+        INITIATED = 3
+        PROCESSED = 4
+        serializer = serializers.OfflineAppointmentFilterSerializer(data=request.query_params)
+        serializer.is_valid(raise_exception=True)
+        valid_data = serializer.validated_data
+        online_queryset = get_opd_pem_queryset(request.user, models.OpdAppointment)\
+            .select_related('profile', 'merchant_payout')\
+            .prefetch_related('prescriptions', 'prescriptions__prescription_file').distinct()
+
+        offline_queryset = get_opd_pem_queryset(request.user, models.OfflineOPDAppointments)\
+            .select_related('user')\
+            .prefetch_related('user__patient_mobiles').distinct()
+        start_date = valid_data.get('start_date')
+        end_date = valid_data.get('end_date')
+        updated_at = valid_data.get('updated_at')
+        appointment_id = valid_data.get('appointment_id')
+        final_data = []
+        if start_date and end_date:
+            online_queryset = online_queryset.filter(time_slot_start__date__range=(start_date, end_date))\
+                .order_by('time_slot_start')
+            offline_queryset = offline_queryset.filter(time_slot_start__date__range=(start_date, end_date))\
+                .order_by('time_slot_start')
+        if updated_at:
+            admin_queryset = auth_models.GenericAdmin.objects.filter(user=request.user, updated_at__gte=updated_at)
+            if not admin_queryset.exists():
+                online_queryset = online_queryset.filter(updated_at__gte=updated_at)
+                offline_queryset = offline_queryset.filter(updated_at__gte=updated_at)
+
+        if appointment_id:
+            offline_id= True
+            try:
+                id = UUID(appointment_id, version=4)
+            except ValueError:
+                offline_id = False
+            if not offline_id:
+                final_data = online_queryset.filter(id=appointment_id)
+                offline_queryset = None
+            else:
+                final_data = offline_queryset.filter(id=appointment_id)
+                online_queryset = None
+        if online_queryset and offline_queryset:
+            final_data = sorted(chain(online_queryset, offline_queryset), key=lambda car: car.time_slot_start, reverse=False)
+        if not final_data:
+            final_data = online_queryset if online_queryset else offline_queryset
+        final_result = []
+        if appointment_id and not final_data:
+            return Response({'error': 'Not Found'}, status=status.HTTP_404_NOT_FOUND)
+        for app in final_data:
+            instance = ONLINE if isinstance(app, models.OpdAppointment) else OFFLINE
+            patient_name = is_docprime = effective_price = deal_price = patient_thumbnail = prescription = None
+            error_flag = False
+            error_message = ''
+            phone_number = []
+            allowed_actions = []
+            payout_amount = billing_status = None
+            if instance == OFFLINE:
+                patient_profile = OfflinePatientSerializer(app.user).data
+                is_docprime = False
+                patient_name = app.user.name if hasattr(app.user, 'name') else None
+                if hasattr(app.user, 'patient_mobiles'):
+                    for mob in app.user.patient_mobiles.all():
+                        phone_number.append({"phone_number": mob.phone_number, "is_default": mob.is_default})
+                patient_profile['phone_numbers'] = phone_number
+                error_flag = app.error if app.error else False
+                error_message = app.error_message if app.error_message else ''
+            else:
+                is_docprime = True
+                effective_price = app.effective_price
+                deal_price = app.deal_price
+                allowed_actions = app.allowed_action(User.DOCTOR, request)
+                # phone_number.append({"phone_number": app.user.phone_number, "is_default": True})
+                patient_profile = auth_serializers.UserProfileSerializer(app.profile, context={'request': request}).data
+                patient_thumbnail = patient_profile['profile_image']
+                patient_profile['user_id'] = app.user.id if app.user else None
+                patient_profile['profile_id'] = app.profile.id if hasattr(app, 'profile') else None
+                # patient_profile['phone_numbers'] = phone_number
+                patient_name = app.profile.name if hasattr(app, 'profile') else None
+                if app.time_slot_start <= timezone.now() and \
+                        app.status not in [models.OpdAppointment.COMPLETED, models.OpdAppointment.CANCELLED, models.OpdAppointment.BOOKED]:
+                    billing_status = INCOMPLETE
+                elif app.status == models.OpdAppointment.COMPLETED and (not app.merchant_payout or app.merchant_payout.status not in \
+                        [account_models.MerchantPayout.ATTEMPTED, account_models.MerchantPayout.PAID]):
+                    billing_status = ELIGIBLE
+                elif app.status == models.OpdAppointment.COMPLETED and (app.merchant_payout and app.merchant_payout.status == account_models.MerchantPayout.ATTEMPTED):
+                    billing_status = INITIATED
+                elif app.status == models.OpdAppointment.COMPLETED and (
+                        app.merchant_payout and app.merchant_payout.status == account_models.MerchantPayout.PAID):
+                    billing_status = PROCESSED
+
+                payout_amount = app.merchant_payout.payable_amount if app.merchant_payout else app.fees
+                prescription = app.get_prescriptions(request)
+            ret_obj = {}
+            ret_obj['id'] = app.id
+            ret_obj['deal_price'] = deal_price
+            ret_obj['payout_amount'] = payout_amount
+            ret_obj['effective_price'] = effective_price
+            ret_obj['allowed_action'] = allowed_actions
+            ret_obj['patient_name'] = patient_name
+            ret_obj['updated_at'] = app.updated_at
+            ret_obj['doctor_name'] = app.doctor.name
+            ret_obj['doctor_id'] = app.doctor.id
+            ret_obj['doctor_thumbnail'] = request.build_absolute_uri(app.doctor.get_thumbnail()) if app.doctor.get_thumbnail() else None
+            ret_obj['hospital_id'] = app.hospital.id
+            ret_obj['hospital_name'] = app.hospital.name
+            ret_obj['time_slot_start'] = app.time_slot_start
+            ret_obj['status'] = app.status
+            ret_obj['billing_status'] = billing_status
+            ret_obj['profile'] = patient_profile
+            ret_obj['permission_type'] = app.pem_type
+            ret_obj['hospital'] = HospitalModelSerializer(app.hospital).data
+            ret_obj['doctor'] = AppointmentRetrieveDoctorSerializer(app.doctor).data
+            ret_obj['is_docprime'] = is_docprime
+            ret_obj['patient_thumbnail'] = patient_thumbnail
+            ret_obj['error'] = error_flag
+            ret_obj['error_message'] = error_message
+            ret_obj['type'] = 'doctor'
+            ret_obj['prescriptions'] = prescription
+            final_result.append(ret_obj)
+            # if group.get(app.time_slot_start.strftime("%B %d, %Y")):
+            #     group[app.time_slot_start.strftime("%B %d, %Y")].append(ret_obj)
+            # else:
+            #     group[app.time_slot_start.strftime("%B %d, %Y")] = [ret_obj]
+        return Response(final_result)
 
 
 class HospitalNetworkListViewset(viewsets.GenericViewSet):
@@ -2156,3 +2882,73 @@ class HospitalNetworkListViewset(viewsets.GenericViewSet):
                     resp1 = {"network_name": network_name, "hospitals": info}
 
         return Response(resp1)
+
+
+class AppointmentMessageViewset(viewsets.GenericViewSet):
+
+    authentication_classes = (JWTAuthentication,)
+    permission_classes = (IsAuthenticated, IsDoctor)
+
+    def send_message(self, request):
+        serializer = serializers.AppointmentMessageSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        data = serializer.validated_data
+        appnt = data.get('appointment')
+        patient = appnt.user
+        obj = {"error": False}
+        phone_number = None
+        if not data.get('is_docprime'):
+            if patient.sms_notification:
+                def_number = patient.patient_mobiles.filter(is_default=True).first()
+                if def_number:
+                    phone_number = def_number.phone_number
+            else:
+                obj['error'] = True
+                obj['message'] = 'Sms Notifications Not Enabled!'
+                return Response(obj, status=status.HTTP_400_BAD_REQUEST)
+            patient_name = patient.name
+        else:
+            phone_number = patient.phone_number
+            patient_name = appnt.profile.name if appnt.profile else ''
+
+        if data.get('type') == serializers.AppointmentMessageSerializer.REMINDER:
+            if phone_number:
+                try:
+                    time = aware_time_zone(appnt.time_slot_start)
+                    notification_tasks.send_appointment_reminder_message.apply_async(
+                        kwargs={'number': phone_number,
+                                'patient_name': patient_name,
+                                'doctor': appnt.doctor.name,
+                                'hospital_name': appnt.hospital.name,
+                                'date': time.strftime("%B %d, %Y %H:%M")},
+                        countdown=1)
+
+                except Exception as e:
+                    obj['error'] = True
+                    obj['message'] = 'Error Sending Appointment Reminder Message!'
+                    logger.error("Error Sending Appointment Reminder Message " + str(e))
+            else:
+                obj['error'] = True
+                obj['message'] = 'No Default Number'
+                return Response(obj, status=status.HTTP_400_BAD_REQUEST)
+        if data.get('type') == serializers.AppointmentMessageSerializer.DIRECTIONS:
+            if phone_number and appnt.hospital.location:
+                try:
+                    notification_tasks.send_appointment_location_message.apply_async(
+                        kwargs={'number': phone_number,
+                                'hospital_lat': appnt.hospital.location.y,
+                                'hospital_long': appnt.hospital.location.x,
+                                },
+                        countdown=1)
+
+                except Exception as e:
+                    obj['error'] = True
+                    obj['message'] = 'Error Sending Appointment Reminder Message!'
+                    logger.error("Error Sending Appointment Reminder Message " + str(e))
+            else:
+                obj['error'] = True
+                obj['message'] = 'No PhoneNumber/HospitaLocation Found'
+                return Response(obj, status=status.HTTP_400_BAD_REQUEST)
+        if not 'message' in obj:
+            obj['message'] = "Message Sent Successfully"
+        return Response(obj)
