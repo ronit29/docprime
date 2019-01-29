@@ -1211,6 +1211,8 @@ class DoctorFeedbackBodySerializer(serializers.Serializer):
     feedback = serializers.CharField(max_length=512, required=False)
     feedback_tags = serializers.ListField(required=False)
     email = serializers.EmailField(required=False)
+    app_version = serializers.CharField(required=False, allow_blank=True)
+    code_push_version = serializers.CharField(required=False, allow_blank=True)
 
 
 class AdminCreateBodySerializer(serializers.Serializer):
