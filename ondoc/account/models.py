@@ -1,5 +1,7 @@
 from django.db import models
 from django.contrib.postgres.fields import JSONField
+from django.forms import model_to_dict
+
 from ondoc.authentication.models import TimeStampedModel, User, UserProfile, Merchant
 from ondoc.account.tasks import refund_curl_task
 from ondoc.notification.models import AppNotification, NotificationAction
@@ -684,11 +686,13 @@ class ConsumerRefund(TimeStampedModel):
     refund_initiated_at = models.DateTimeField(blank=True, null=True)
 
     def save(self, *args, **kwargs):
+        print('inside save', model_to_dict(self))
         database_instance = ConsumerRefund.objects.filter(pk=self.id).first()
         super().save(*args, **kwargs)
         transaction.on_commit(lambda: self.app_commit_tasks(database_instance))
 
     def app_commit_tasks(self, old_instance):
+        print('inside commit \n\n', model_to_dict(self), 'original instance',model_to_dict(old_instance))
         from ondoc.notification import tasks as notification_tasks
         if not old_instance and self.refund_state == self.PENDING:
             try:

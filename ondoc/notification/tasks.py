@@ -534,6 +534,7 @@ def send_pg_acknowledge(order_id=None, order_no=None):
 
 @task()
 def refund_initiated_sms_task(obj_id):
+    print('inside initiate task \n\n')
     from ondoc.account.models import ConsumerRefund
     from ondoc.communications.models import SMSNotification
     from ondoc.notification.models import NotificationAction
@@ -541,7 +542,9 @@ def refund_initiated_sms_task(obj_id):
     try:
         # check if still pending
         instance = ConsumerRefund.objects.filter(id=obj_id).first()
+        print('inside initiate task instance \n\n', model_to_dict(instance))
         if not instance:
+
             return
         context = {'amount': instance.refund_amount}
         receivers = []
@@ -557,6 +560,7 @@ def refund_initiated_sms_task(obj_id):
 
 @task()
 def refund_completed_sms_task(obj_id):
+    print('inside complete task \n\n')
     from ondoc.account.models import ConsumerRefund
     from ondoc.communications.models import SMSNotification
     from ondoc.notification.models import NotificationAction
@@ -565,8 +569,10 @@ def refund_completed_sms_task(obj_id):
     try:
         # check if any more obj incomplete status
         instance = ConsumerRefund.objects.filter(id=obj_id).first()
+        print('inside complete task instance\n\n', instance)
         if not instance or ConsumerRefund.objects.filter(consumer_transaction_id=instance.consumer_transaction_id,
                                                          refund_state=ConsumerRefund.PENDING).count() > 1:
+            print('inside complete task failed if \n\n', model_to_dict(instance))
             return
         context = {'amount': instance.refund_amount}
         receivers = []
