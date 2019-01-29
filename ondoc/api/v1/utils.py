@@ -900,7 +900,6 @@ def get_opd_pem_queryset(user, model):
                           'doctor__qualifications', 'doctor__qualifications__qualification',
                           'doctor__qualifications__specialization', 'doctor__qualifications__college',
                           'doctor__doctorpracticespecializations', 'doctor__doctorpracticespecializations__specialization') \
-        .filter(hospital__is_live=True, doctor__is_live=True) \
         .filter(
         Q(
             Q(doctor__manageable_doctors__user=user,

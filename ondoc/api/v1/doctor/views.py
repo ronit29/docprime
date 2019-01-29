@@ -2240,10 +2240,11 @@ class OfflineCustomerViewSet(viewsets.GenericViewSet):
             patient_dict[
                 'display_welcome_message'] = data.display_welcome_message if data.display_welcome_message else None
             patient_dict['error'] = data.error if data.error else None
-            phone_number = []
+            phone_number = ''
             if hasattr(data, 'patient_mobiles'):
                 for mob in data.patient_mobiles.all():
-                    phone_number.append({"phone_number": mob.phone_number, "is_default": mob.is_default})
+                    if mob.is_default:
+                        phone_number = mob.phone_number
             patient_dict['patient_numbers'] = phone_number
             response.append(patient_dict)
         return Response(response)
