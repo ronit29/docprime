@@ -250,10 +250,13 @@ class LabList(viewsets.ReadOnlyModelViewSet):
         if max_price:
             all_packages_in_non_network_labs = all_packages_in_non_network_labs.filter(price__lte=max_price)
             all_packages_in_network_labs = all_packages_in_network_labs.filter(price__lte=max_price)
-        if max_age:
+        if min_age and max_age:
+            all_packages_in_non_network_labs = all_packages_in_non_network_labs.filter(max_age__gte=max_age, min_age__lte=min_age)
+            all_packages_in_network_labs = all_packages_in_network_labs.filter(max_age__gte=max_age, min_age__lte=min_age)
+        elif max_age:
             all_packages_in_non_network_labs = all_packages_in_non_network_labs.filter(max_age__gte=max_age)
             all_packages_in_network_labs = all_packages_in_network_labs.filter(max_age__gte=max_age)
-        if min_age:
+        elif min_age:
             all_packages_in_non_network_labs = all_packages_in_non_network_labs.filter(min_age__lte=min_age)
             all_packages_in_network_labs = all_packages_in_network_labs.filter(min_age__lte=min_age)
         if gender:
