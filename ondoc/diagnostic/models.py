@@ -12,6 +12,7 @@ from ondoc.authentication.models import (TimeStampedModel, CreatedByModel, Image
                                          BillingAccount, SPOCDetails)
 from ondoc.doctor.models import Hospital, SearchKey, CancellationReason
 from ondoc.coupon.models import Coupon
+from ondoc.location.models import EntityUrls
 from ondoc.notification import models as notification_models
 from ondoc.notification import tasks as notification_tasks
 from ondoc.notification.labnotificationaction import LabNotificationAction
@@ -770,9 +771,9 @@ class LabTest(TimeStampedModel, SearchKey):
     def generate_url(self, url):
 
         duplicate_urls = EntityUrls.objects.filter(url__iexact=self.url, \
-                sitemap_identifier=LAB_TEST_SITEMAP_IDENTIFIER, ~Q(entity_id=self.id))
+                sitemap_identifier=LabTest.LAB_TEST_SITEMAP_IDENTIFIER, ~Q(entity_id=self.id))
         if duplicate_urls.exists():
-            url = rstrip(url,'-'+self.URL_SUFFIX)
+            url = url.rstrip('-'+self.URL_SUFFIX)
             url = url+'-'+str(id)+'-'+self.URL_SUFFIX
 
         return url    
@@ -781,10 +782,10 @@ class LabTest(TimeStampedModel, SearchKey):
     def create_url(self):
 
         existings_urls = EntityUrls.objects.filter(url__iexact=self.url, \
-            sitemap_identifier=LAB_TEST_SITEMAP_IDENTIFIER, entity_id=self.id).all()
+            sitemap_identifier=LabTest.LAB_TEST_SITEMAP_IDENTIFIER, entity_id=self.id).all()
 
         if not existings_urls.exists():
-            url_entry = EntityUrls.objects.create(url=url, entity_id=self.id, sitemap_identifier=self.LAB_TEST_SITEMAP_IDENTIFIER,\
+            url_entry = EntityUrls.objects.create(url=self.url, entity_id=self.id, sitemap_identifier=self.LAB_TEST_SITEMAP_IDENTIFIER,\
                 is_valid=True,url_type='PAGEURL', entity_type='LabTest')            
         else:
             if not existings_urls.filter(is_valid=True).exists():
