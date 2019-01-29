@@ -763,8 +763,8 @@ class LabReportInline(nested_admin.NestedTabularInline):
 class LabAppointmentAdmin(nested_admin.NestedModelAdmin):
     form = LabAppointmentForm
     list_display = (
-    'booking_id', 'get_profile', 'get_lab', 'status', 'reports_uploaded', 'time_slot_start', 'created_at', 'updated_at',
-    'get_lab_test_name')
+        'booking_id', 'get_profile', 'get_lab', 'status', 'reports_uploaded', 'time_slot_start', 'effective_price',
+        'created_at', 'updated_at', 'get_lab_test_name')
     list_filter = ('status', )
     date_hierarchy = 'created_at'
 
