@@ -330,6 +330,8 @@ def send_appointment_location_message(number, hospital_lat, hospital_long):
 def process_payout(payout_id):
     from ondoc.account.models import MerchantPayout, Order
     from ondoc.api.v1.utils import create_payout_checksum
+    from ondoc.account.models import DummyTransactions
+
 
     try:
         if not payout_id:
@@ -368,13 +370,19 @@ def process_payout(payout_id):
 
         req_data = { "payload" : [], "checkSum" : "" }
 
+
         idx = 0
         for txn in all_txn:
+            transaction_amount = txn.amount
+
+            if isinstance(txn, DummyTransactions):
+                transaction_amount = 0
+
             curr_txn = OrderedDict()
             curr_txn["idx"] = idx
             curr_txn["orderNo"] = txn.order_no
             curr_txn["orderId"] = order_data.id
-            curr_txn["txnAmount"] = str(txn.amount)
+            curr_txn["txnAmount"] = str(transaction_amount)
             curr_txn["settledAmount"] = str(payout_data.payable_amount)
             curr_txn["merchantCode"] = merchant.id
             if txn.transaction_id:

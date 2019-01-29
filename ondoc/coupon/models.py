@@ -1,5 +1,6 @@
 from django.db import models
 from ondoc.authentication import models as auth_model
+from ondoc.common.models import PaymentOptions
 from django.core.validators import MaxValueValidator, MinValueValidator
 import datetime
 from django.utils.crypto import get_random_string
@@ -48,6 +49,7 @@ class Coupon(auth_model.TimeStampedModel):
     is_visible = models.BooleanField(default=True)
     new_user_constraint = models.BooleanField(default=False)
     coupon_type = models.IntegerField(choices=COUPON_TYPE_CHOICES, default=DISCOUNT)
+    payment_option = models.ForeignKey(PaymentOptions, on_delete=models.SET_NULL, blank=True, null=True)
 
     def save(self, *args, **kwargs):
         if not self.id:
