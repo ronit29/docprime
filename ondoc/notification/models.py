@@ -49,6 +49,10 @@ class NotificationAction:
     OPD_OTP_BEFORE_APPOINTMENT = 30
     LAB_OTP_BEFORE_APPOINTMENT = 31
 
+    REFUND_BREAKUP = 40
+    REFUND_INITIATED = 41
+    REFUND_COMPLETED = 42
+
     CASHBACK_CREDITED = 55
 
     NOTIFICATION_TYPE_CHOICES = (
@@ -72,7 +76,11 @@ class NotificationAction:
         (RECEIPT, "Receipt"),
         (DOCTOR_INVOICE, "Doctor Invoice"),
         (LAB_INVOICE, "Lab Invoice"),
-        (CASHBACK_CREDITED, "Cashback Credited")
+        (CASHBACK_CREDITED, "Cashback Credited"),
+
+        (REFUND_BREAKUP, 'Refund break up'),
+        (REFUND_INITIATED, 'Refund Initiated'),
+        (REFUND_COMPLETED, 'Refund Completed')
     )
 
     OPD_APPOINTMENT = "opd_appointment"

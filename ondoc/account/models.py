@@ -643,6 +643,21 @@ class ConsumerTransaction(TimeStampedModel):
     amount = models.DecimalField(max_digits=10, decimal_places=2, default=0)
     source = models.SmallIntegerField(choices=SOURCE_TYPE, blank=True, null=True)
 
+    def save(self, *args, **kwargs):
+        database_instance = ConsumerTransaction.objects.filter(pk=self.id).first()
+        super().save(*args, **kwargs)
+        transaction.on_commit(lambda: self.app_commit_tasks(database_instance))
+
+    def app_commit_tasks(self, old_instance):
+        from ondoc.notification import tasks as notification_tasks
+        if not old_instance and self.type == PgTransaction.DEBIT and self.action == self.action_list.index('Refund'):
+            try:
+                notification_tasks.refund_breakup_sms_task.apply_async(self.id)
+            except Exception as e:
+                logger.error(str(e))
+
+
+
     @classmethod
     def valid_appointment_for_cancellation(cls, app_id, product_id):
         return not cls.objects.filter(type=PgTransaction.CREDIT, reference_id=app_id, product_id=product_id,
@@ -667,6 +682,24 @@ class ConsumerRefund(TimeStampedModel):
     pg_transaction = models.ForeignKey(PgTransaction, related_name='pg_refund', blank=True, null=True, on_delete=models.DO_NOTHING)
     refund_state = models.PositiveSmallIntegerField(choices=state_type, default=PENDING)
     refund_initiated_at = models.DateTimeField(blank=True, null=True)
+
+    def save(self, *args, **kwargs):
+        database_instance = ConsumerRefund.objects.filter(pk=self.id).first()
+        super().save(*args, **kwargs)
+        transaction.on_commit(lambda: self.app_commit_tasks(database_instance))
+
+    def app_commit_tasks(self, old_instance):
+        from ondoc.notification import tasks as notification_tasks
+        if not old_instance and self.refund_state == self.PENDING:
+            try:
+                notification_tasks.refund_initiated_sms_task.apply_async(self.id)
+            except Exception as e:
+                logger.error(str(e))
+        if old_instance and old_instance.refund_state != self.refund_state and self.refund_state == self.COMPLETED:
+            try:
+                notification_tasks.refund_completed_sms_task.apply_async(self.id)
+            except Exception as e:
+                logger.error(str(e))
 
     @classmethod
     def initiate_refund(cls, user, ctx_obj):

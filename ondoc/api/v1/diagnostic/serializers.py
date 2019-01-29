@@ -387,6 +387,16 @@ class CommonTestSerializer(serializers.ModelSerializer):
     show_details = serializers.ReadOnlyField(source='test.show_details')
     icon = serializers.SerializerMethodField
     test_type = serializers.ReadOnlyField(source='test.test_type')
+    mrp = serializers.DecimalField(max_digits=10, decimal_places=2)
+    deal_price = serializers.DecimalField(max_digits=10, decimal_places=2)
+
+    def get_icon(self, obj):
+        request = self.context.get('request')
+        return request.build_absolute_uri(obj['icon']) if obj['icon'] else None
+
+    def get_icon(self, obj):
+        request = self.context.get('request')
+        return request.build_absolute_uri(obj['icon']) if obj['icon'] else None
 
     def get_icon(self, obj):
         request = self.context.get('request')
@@ -402,6 +412,28 @@ class CommonPackageSerializer(serializers.ModelSerializer):
     name = serializers.ReadOnlyField(source='package.name')
     show_details = serializers.ReadOnlyField(source='test.show_details')
     icon = serializers.SerializerMethodField()
+    mrp = serializers.SerializerMethodField()
+    deal_price = serializers.SerializerMethodField()
+
+    def get_mrp(self, obj):
+        if not hasattr(obj, 'alt'):
+            return None
+        mrp = None
+        for t_alt in obj.package.availablelabs.all():
+            if t_alt.id == obj.alt:
+                mrp = t_alt.mrp
+                break
+        return mrp
+
+    def get_deal_price(self, obj):
+        if not hasattr(obj, 'alt'):
+            return None
+        deal_price = None
+        for t_alt in obj.package.availablelabs.all():
+            if t_alt.id == obj.alt:
+                deal_price = t_alt.custom_deal_price if t_alt.custom_deal_price else t_alt.computed_deal_price
+                break
+        return deal_price
 
     def get_icon(self, obj):
         request = self.context.get('request')
@@ -409,7 +441,7 @@ class CommonPackageSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = CommonPackage
-        fields = ('id', 'name', 'icon', 'show_details')
+        fields = ('id', 'name', 'icon', 'show_details', 'mrp', 'deal_price')
 
 
 class CommonConditionsSerializer(serializers.ModelSerializer):

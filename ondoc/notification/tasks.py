@@ -530,3 +530,57 @@ def send_pg_acknowledge(order_id=None, order_no=None):
 
     except Exception as e:
         logger.error("Error in sending pg acknowledge - " + str(e))
+
+
+@task()
+def refund_initiated_sms_task(obj_id):
+    from ondoc.account.models import ConsumerRefund
+    from ondoc.communications.models import SMSNotification
+    from ondoc.notification.models import NotificationAction
+    try:
+        # check if still pending
+        instance = ConsumerRefund.objects.filter(id=obj_id).first()
+        if not instance \
+                or instance.refund_state == ConsumerRefund.PENDING:  # SHASHANK_SINGH Is it necessary to ask here:
+            return
+        context = {'amount': instance.refund_amount}
+        receivers = {}
+        sms_notification = SMSNotification(NotificationAction.REFUND_INITIATED, context)
+        sms_notification.send(receivers)
+    except Exception as e:
+        logger.error(str(e))
+
+
+@task()
+def refund_completed_sms_task(obj_id):
+    from ondoc.account.models import ConsumerRefund
+    from ondoc.communications.models import SMSNotification
+    from ondoc.notification.models import NotificationAction
+    try:
+        # check if any more obj incomplete status
+        instance = ConsumerRefund.objects.filter(id=obj_id).first()
+        if not instance or ConsumerRefund.objects.filter(consumer_transaction_id=instance.consumer_transaction_id,
+                                                         refund_state=ConsumerRefund.PENDING).count() > 1:
+            return
+        context = {'amount': instance.refund_amount}
+        receivers = {}
+        sms_notification = SMSNotification(NotificationAction.REFUND_COMPLETED, context)
+        sms_notification.send(receivers)
+    except Exception as e:
+        logger.error(str(e))
+
+
+@task()
+def refund_breakup_sms_task(obj_id):
+    from ondoc.account.models import ConsumerTransaction
+    from ondoc.communications.models import SMSNotification
+    try:
+        instance = ConsumerTransaction.objects.filter(id=obj_id).first()
+        if not instance:
+            return
+        context = {}
+        receivers = {}
+        sms_notification = SMSNotification(NotificationAction.REFUND_BREAKUP, context)
+        sms_notification.send(receivers)
+    except Exception as e:
+        logger.error(str(e))
