@@ -72,7 +72,7 @@ class Coupon(auth_model.TimeStampedModel):
         used_count = 0
 
         if coupon_obj and user.is_authenticated:
-            used_count = coupon_obj.used_coupon_count()
+            used_count = coupon_obj.used_coupon_count(user)
 
         if coupon_obj and used_count >= coupon_obj.count:
             coupon_obj = None

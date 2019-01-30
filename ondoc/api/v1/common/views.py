@@ -898,6 +898,7 @@ class GetPaymentOptionsViewSet(viewsets.GenericViewSet):
             resp['action'] = data.action
             resp['payment_gateway'] = data.payment_gateway
             resp['id'] = data.id
+            resp['payment_gateway'] = data.payment_gateway
             if first==True:
                 first = False
                 resp['is_selected'] = True
