@@ -1,3 +1,4 @@
+from ondoc.cart.models import Cart
 from ondoc.coupon.models import Coupon, RandomGeneratedCoupon, UserSpecificCoupon
 from ondoc.account.models import Order
 from ondoc.doctor.models import OpdAppointment
@@ -44,6 +45,9 @@ class ApplicableCouponsViewSet(viewsets.GenericViewSet):
         deal_price = input_data.get("deal_price")
         coupon_code = input_data.get("coupon_code")
         profile = input_data.get("profile_id", None)
+        cart_item_id = input_data.get('cart_item').id if input_data.get('cart_item') else None
+        show_all = input_data.get('show_all', False)
+
         types = []
         if deal_price==0:
             deal_price=None
@@ -176,14 +180,22 @@ class ApplicableCouponsViewSet(viewsets.GenericViewSet):
         applicable_coupons = []
         for coupon in coupons:
             allowed = True
+            valid = True
+            invalidating_message = ""
 
             if coupon.total_count and len(coupon.total_opd_booked) \
                 + len(coupon.total_lab_booked) >= coupon.total_count:
                 allowed = False
+                valid = False
 
-            if coupon.count and (len(coupon.user_opd_booked)+len(coupon.user_lab_booked)) \
-                >=coupon.count:
-                allowed = False
+
+            cart_count = Cart.objects.filter(user=user, deleted_at__isnull=True, data__coupon_code__contains=coupon.code).exclude(id=cart_item_id).count()
+            coupon.cart_count = cart_count
+            if coupon.count and (len(coupon.user_opd_booked) + len(coupon.user_lab_booked) + coupon.cart_count) \
+                    >= coupon.count:
+                allowed = True and show_all
+                valid = False
+                invalidating_message = "Coupon can only be used " + str(coupon.count) + " times per user."
 
             # TODO
             # if ((user_opd_completed + user_lab_completed + 1) % coupon.step_count != 0 ):
@@ -192,26 +204,33 @@ class ApplicableCouponsViewSet(viewsets.GenericViewSet):
             if coupon.start_date and coupon.start_date>timezone.now() \
                 or (coupon.start_date + datetime.timedelta(days=coupon.validity))<timezone.now():
                 allowed = False
+                valid = False
 
             if coupon.new_user_constraint and (len(coupon.user_opd_booked)>0 or len(coupon.user_lab_booked)>0):
                 allowed = False
+                valid = False
 
             if coupon.is_user_specific and user:
                 if coupon.user_specific_coupon.exists():
                     user_specefic = coupon.user_specific_coupon.filter(user=user).first()
                     if user_specefic and (len(coupon.user_opd_booked)+len(coupon.user_lab_booked)) >= user_specefic.count:
                         allowed = False
+                        valid = False
 
             # is coupon lab specific
             if coupon.lab and lab and coupon.lab != lab:
                 allowed = False
+                valid = False
 
             # is coupon specific to a network
             if coupon.lab_network and lab and coupon.lab_network != lab.network:
                 allowed = False
+                valid = False
 
             if allowed:
                 applicable_coupons.append({"is_random_generated": False,
+                            "valid": valid,
+                            "invalidating_message": invalidating_message,
                             "coupon_type": coupon.type,
                             "coupon_id": coupon.id,
                             "code": coupon.code,
@@ -228,6 +247,8 @@ class ApplicableCouponsViewSet(viewsets.GenericViewSet):
                 if user:
                     for random_coupon in coupon.random_generated_coupon.all():
                         applicable_coupons.append({"is_random_generated": True,
+                               "valid": valid,
+                               "invalidating_message": invalidating_message,
                                 "coupon_type": coupon.type,
                                 "random_coupon_id": random_coupon.id,
                                 "coupon_id": coupon.id,

@@ -33,6 +33,8 @@ class ProductIDSerializer(serializers.Serializer):
     # gender = serializers.ChoiceField(required=False, choices=UserProfile.GENDER_CHOICES)
     # age_range = CommaSepratedToListField(required=False, max_length=2, min_length=2)
     # cities = serializers.CharField(required=False)
+    cart_item = serializers.PrimaryKeyRelatedField(queryset=Cart.objects.all(), required=False, allow_null=True)
+    show_all = serializers.BooleanField(required=False)
 
     def validate(self, attrs):
         # age_range = attrs.get("age_range")
