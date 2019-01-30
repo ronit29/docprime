@@ -216,14 +216,3 @@ class CommentAuthorSerializer(serializers.ModelSerializer):
         model = Article
         fields = ('author',)
 
-
-# class PollSerializer(serializers.Serializer)
-#     comments= serializers.SerializerMethodField()
-    
-#     class Meta:
-#          model = Poll
-#          fields = ('name','details','comments')
-#     def get_comments(self,obj):
-#          poll_comment = FluentComment.objects.filter(object_pk = obj.id, parent_id = None)
-#          serializer = CommentSerializer(poll_comment,many=True)
-#          return serializer.data
