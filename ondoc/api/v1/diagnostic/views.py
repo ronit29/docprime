@@ -491,7 +491,7 @@ class LabList(viewsets.ReadOnlyModelViewSet):
                     }]
 
         if kwargs.get('test_flag') == 1:
-            return {"result": result[0:3],
+            return {"result": result[0:3] if len(result)>0 else result,
                              "count": count, 'tests': tests,
                              "seo": seo, 'breadcrumb': breadcrumb}
 
@@ -1808,20 +1808,20 @@ class TestDetailsViewset(viewsets.GenericViewSet):
             result['frequently_booked_together'] = {'title': 'Frequently booked together', 'value': booked_together}
             result['show_details'] = data.show_details
             result['url'] = entity.url if entity and entity.url else None
-            lab = LabList()
-            test_ids = list(test_ids)
+        lab = LabList()
+        test_ids = list(test_ids)
 
-            for i in range(len(test_ids)):
-                test_ids[i] = str(test_ids[i])
+        for i in range(len(test_ids)):
+            test_ids[i] = str(test_ids[i])
 
-            parameters = dict()
-            parameters['ids'] = ",".join(test_ids)
+        parameters = dict()
+        parameters['ids'] = ",".join(test_ids)
 
-            kwargs['parameters'] = parameters
-            kwargs['test_flag'] = 1
+        kwargs['parameters'] = parameters
+        kwargs['test_flag'] = 1
 
-            result['labs'] = lab.search(request, **kwargs)
-            final_result.append(result)
+        result['labs'] = lab.search(request, **kwargs)
+        final_result.append(result)
 
         return Response(final_result)
 
