@@ -236,7 +236,7 @@ class ApplicableCouponsViewSet(viewsets.GenericViewSet):
                             "code": coupon.code,
                             "desc": coupon.description,
                             "coupon_count": coupon.count,
-                            "used_count": len(coupon.user_opd_booked)+len(coupon.user_lab_booked),
+                            "used_count": len(coupon.user_opd_booked)+len(coupon.user_lab_booked)+coupon.cart_count,
                             "coupon": coupon,
                             "heading": coupon.heading,
                             "is_corporate" : coupon.is_corporate,
