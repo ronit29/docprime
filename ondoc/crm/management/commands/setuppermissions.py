@@ -49,6 +49,11 @@ from ondoc.seo.models import Sitemap, NewDynamic
 from ondoc.elastic.models import DemoElastic
 from ondoc.location.models import EntityUrls
 
+#from fluent_comments.admin import CommentModel
+from threadedcomments.models import ThreadedComment
+from fluent_comments.models import FluentComment
+from django_comments.models import Comment
+
 class Command(BaseCommand):
     help = 'Create groups and setup permissions for teams'
 
@@ -465,6 +470,8 @@ class Command(BaseCommand):
 
         self.stdout.write('Successfully created groups and permissions')
 
+        self.setup_comment_group()
+
     def create_about_doctor_group(self):
         group, created = Group.objects.get_or_create(name=constants['ABOUT_DOCTOR_TEAM'])
         group.permissions.clear()
@@ -633,5 +640,36 @@ class Command(BaseCommand):
                 Q(codename='add_' + ct.model) |
                 Q(codename='change_' + ct.model) |
                 Q(codename='delete_' + ct.model))
+
+            group.permissions.add(*permissions)
+
+    def setup_comment_group(self):
+        group, created = Group.objects.get_or_create(name=constants['COMMENT_TEAM'])
+        group.permissions.clear()
+
+        # content_types = ContentType.objects.get_for_models(Comment)
+        # print(content_types)
+        #
+        # for cl, ct in content_types.items():
+        #     permissions = Permission.objects.filter(
+        #         Q(content_type=ct),
+        #         Q(codename='add_' + ct.model) | Q(codename='change_' + ct.model))
+        #
+        #     group.permissions.add(*permissions)
+
+
+        content_types = ContentType.objects.get_for_models(FluentComment, for_concrete_models=False)
+        # print(content_types)
+
+        for cl, ct in content_types.items():
+            permissions = Permission.objects.get_or_create(
+                content_type=ct, codename='change_' + ct.model)
+            permissions = Permission.objects.get_or_create(
+                content_type=ct, codename='add_' + ct.model)
+
+
+            permissions = Permission.objects.filter(
+                Q(content_type=ct),
+                Q(codename='add_' + ct.model) | Q(codename='change_' + ct.model))
 
             group.permissions.add(*permissions)
