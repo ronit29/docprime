@@ -36,7 +36,7 @@ class IntegratorMapping(TimeStampedModel):
             return None
 
         # Part of the integrations.
-        if mapping.content_type == ContentType.objects.get(model='labtest'):
+        if mapping.content_type == ContentType.objects.get(model='labnetwork'):
             return {
                 'class_name': mapping.integrator_class_name,
                 'service_type': mapping.service_type
@@ -69,7 +69,7 @@ class IntegratorProfileMapping(TimeStampedModel):
             return None
 
         # Part of the integrations.
-        if mapping_wrt_package.content_type == ContentType.objects.get(model='labtest'):
+        if mapping_wrt_package.content_type == ContentType.objects.get(model='labnetwork'):
             return {
                 'class_name': mapping_wrt_package.integrator_class_name,
                 'service_type': mapping_wrt_package.service_type

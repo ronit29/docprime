@@ -1,3 +1,7 @@
+import  logging
+logger = logging.getLogger(__name__)
+
+
 class BaseIntegrator(object):
 
     # This method check if the user area is serviceable by the integrator or not.
@@ -6,7 +10,7 @@ class BaseIntegrator(object):
             is_serviceable = self._get_is_user_area_serviceable(pincode)
             return is_serviceable
         except Exception as e:
-            pass
+            logger.error("[ERROR]" + self.__class__.__name__ + " get serviceable area error. " + str(e))
 
         return True
 
@@ -16,7 +20,7 @@ class BaseIntegrator(object):
             timeslot_dictionary = self._get_appointment_slots(pincode, date, **kwargs)
             return timeslot_dictionary
         except Exception as e:
-            pass
+            logger.error("[ERROR]" + self.__class__.__name__ + " get timeslot error. " + str(e))
 
         return {}
 
@@ -25,7 +29,9 @@ class BaseIntegrator(object):
             order_detail = self._post_order_details(lab_appointment)
             return order_detail
         except Exception as e:
-            pass
+            logger.error("[ERROR]" + self.__class__.__name__ + " order booking error. " + str(e))
+
+        return None
 
     def list_orders(self):
         pass

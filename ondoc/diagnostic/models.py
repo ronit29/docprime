@@ -45,6 +45,7 @@ from django.contrib.contenttypes.fields import GenericRelation
 from django.contrib.contenttypes.fields import GenericForeignKey
 from django.contrib.contenttypes.models import ContentType
 from ondoc.matrix.tasks import push_appointment_to_matrix, push_onboarding_qcstatus_to_matrix
+from ondoc.integrations.task import push_lab_appointment_to_integrator
 from ondoc.location import models as location_models
 from ondoc.ratings_review import models as ratings_models
 from decimal import Decimal
@@ -805,6 +806,9 @@ class AvailableLabTest(TimeStampedModel):
     enabled = models.BooleanField(default=False)
     lab_pricing_group = models.ForeignKey(LabPricingGroup, blank=True, null=True, on_delete=models.SET_NULL,
                                           related_name='available_lab_tests')
+    supplier_name = models.CharField(null=True, blank=True, max_length=40, default=None)
+    supplier_price = models.DecimalField(default=None, max_digits=10, decimal_places=2, null=True, blank=True)
+    desired_docprime_price = models.DecimalField(default=None, max_digits=10, decimal_places=2, null=True, blank=True)
     rating = GenericRelation(ratings_models.RatingsReview)
 
 
@@ -1031,13 +1035,19 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin)
             return [admin.user for admin in self.lab.manageable_lab_admins.filter(is_disabled=False)
                     if admin.user]
 
-    def app_commit_tasks(self, old_instance, push_to_matrix):
+    def app_commit_tasks(self, old_instance, push_to_matrix, push_to_integrator):
         if push_to_matrix:
             # Push the appointment data to the matrix
             try:
                 push_appointment_to_matrix.apply_async(
                     ({'type': 'LAB_APPOINTMENT', 'appointment_id': self.id, 'product_id': 5,
                       'sub_product_id': 2},), countdown=5)
+            except Exception as e:
+                logger.error(str(e))
+
+        if push_to_integrator:
+            try:
+                push_lab_appointment_to_integrator.apply_async(({'appointment_id': self.id},), countdown=5)
             except Exception as e:
                 logger.error(str(e))
 
@@ -1162,7 +1172,12 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin)
         if push_to_history:
             AppointmentHistory.create(content_object=self)
 
-        transaction.on_commit(lambda: self.app_commit_tasks(database_instance, push_to_matrix))
+        # Push the appointment to the integrator.
+        push_to_integrator = kwargs.get('push_to_integrator', True)
+        if 'push_to_integrator' in kwargs.keys():
+            kwargs.pop('push_to_integrator')
+
+        transaction.on_commit(lambda: self.app_commit_tasks(database_instance, push_to_matrix, push_to_integrator))
 
     def save_merchant_payout(self):
         payout_amount = self.agreed_price

@@ -137,8 +137,8 @@ class Thyrocare(BaseIntegrator):
 
     def __post_order_details(self, lab_appointment):
         # Need to update when thyrocare API works. Static value for now
-        payload = { 'Api_key': settings.THYROCARE_API_KEY, 'orderid': '4301', 'address': 'c-19/13', 'pincode': '122001', 'product': 'TESTS', 'Std': '', 'phone_no': '', 'mobile': '9460746448', 'email':'mayankgupta@docprime.com', 'Tsp': '', 'service_type': 'H', 'order_by': 'Mayank', 'rate': '180', 'hc': '20', 'appt_date': '2019-02-01 05:00 PM', 'reports': 'N', 'ref_code':'', 'pay_type':'Prepaid', 'Geo_loction':'', 'bencount':'1', 'bendataxml': '<NewDataSet><Ben_details><Name>Mayank</Name><Age>30</Age><Gender>M</Gender></Ben_details></NewDataSet>'}
-        headers = { 'Content-Type': "application/json" }
+        payload = {'Api_key': settings.THYROCARE_API_KEY, 'orderid': '4301', 'address': 'c-19/13', 'pincode': '122001', 'product': 'TESTS', 'Std': '', 'phone_no': '', 'mobile': '9460746448', 'email':'mayankgupta@docprime.com', 'Tsp': '', 'service_type': 'H', 'order_by': 'Mayank', 'rate': '180', 'hc': '20', 'appt_date': '2019-02-01 05:00 PM', 'reports': 'N', 'ref_code':'', 'pay_type':'Prepaid', 'Geo_loction':'', 'bencount':'1', 'bendataxml': '<NewDataSet><Ben_details><Name>Mayank</Name><Age>30</Age><Gender>M</Gender></Ben_details></NewDataSet>'}
+        headers = {'Content-Type': "application/json"}
         url = "https://www.thyrocare.com/API_BETA/ORDER.svc/Postorderdata"
 
         response = requests.post(url, data=json.dumps(payload), headers=headers)
