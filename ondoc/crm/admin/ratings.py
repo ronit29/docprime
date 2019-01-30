@@ -82,6 +82,9 @@ class RatingsReviewAdmin(ImportExportMixin, admin.ModelAdmin):
     readonly_fields = ['name']
     form = RatingsReviewForm
 
+    def get_queryset(self, request):
+        return super(RatingsReviewAdmin, self).get_queryset(request).select_related('content_type')
+
     def get_form(self, request, obj=None, **kwargs):
         form = super(RatingsReviewAdmin, self).get_form(request, obj, **kwargs)
         form.base_fields['compliment'].widget = forms.CheckboxSelectMultiple()

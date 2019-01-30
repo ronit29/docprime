@@ -1211,6 +1211,9 @@ class DoctorFeedbackBodySerializer(serializers.Serializer):
     feedback = serializers.CharField(max_length=512, required=False)
     feedback_tags = serializers.ListField(required=False)
     email = serializers.EmailField(required=False)
+    app_version = serializers.CharField(required=False, allow_blank=True)
+    code_push_version = serializers.CharField(required=False, allow_blank=True)
+    os = serializers.CharField(required=False, allow_blank=True)
 
 
 class AdminCreateBodySerializer(serializers.Serializer):
@@ -1434,7 +1437,7 @@ class OfflineAppointmentFilterSerializer(serializers.Serializer):
 class OfflinePatientSerializer(serializers.ModelSerializer):
     class Meta:
         model = OfflinePatients
-        fields = ('id', 'name', 'dob', 'calculated_dob', 'gender', 'referred_by', 'display_welcome_message',
+        fields = ('id', 'name', 'dob', 'calculated_dob', 'gender', 'age','referred_by', 'display_welcome_message',
                   'share_with_hospital', 'sms_notification', 'medical_history', 'updated_at')
 
 

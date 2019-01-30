@@ -448,6 +448,10 @@ class DoctorSearchHelper:
                 opening_hours = '%.2f-%.2f' % (doctor_clinic.availability.all()[0].start,
                                                    doctor_clinic.availability.all()[0].end),
 
+            from ondoc.coupon.models import Coupon
+            search_coupon = Coupon.get_search_coupon(request.user)
+            discounted_price = filtered_deal_price if not search_coupon else search_coupon.get_search_coupon_discounted_price(filtered_deal_price)
+
             temp = {
                 "doctor_id": doctor.id,
                 "enabled_for_online_booking": doctor.enabled_for_online_booking,
@@ -461,6 +465,7 @@ class DoctorSearchHelper:
                 "is_gold": is_gold,
                 # "fees": filtered_fees,*********show mrp here
                 "discounted_fees": filtered_deal_price,
+                "discounted_price": discounted_price,
                 # "discounted_fees": filtered_fees, **********deal_price
                 "practicing_since": doctor.practicing_since,
                 "experience_years": doctor.experience_years(),

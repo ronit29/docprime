@@ -2190,8 +2190,7 @@ class OfflineOPDAppointments(auth_model.TimeStampedModel):
     @staticmethod
     def appointment_cancel_sms(sms_obj):
         try:
-            default_text = '''Dear %s, your appointment with %s at %s for %s has been cancelled. 
-                              In case of any query, please reach out to the clinic.''' % (
+            default_text = "Dear %s, your appointment with %s at %s for %s has been cancelled. In case of any query, please reach out to the clinic." % (
                               sms_obj['name'], sms_obj['old_appointment'].doctor.get_display_name(), sms_obj['old_appointment'].hospital.name,
                               sms_obj['old_appointment'].time_slot_start.strftime("%B %d, %Y %H:%M"))
             notification_tasks.send_offline_appointment_message.apply_async(
@@ -2200,6 +2199,17 @@ class OfflineOPDAppointments(auth_model.TimeStampedModel):
         except Exception as e:
             logger.error("Failed to Push Offline Appointment Cancel Message SMS Task " + str(e))
 
+    @staticmethod
+    def appointment_complete_sms(sms_obj):
+        try:
+            default_text = "Dear %s, your appointment with %s at %s is complete. In case of any query, please reach out to the %s." % \
+                           (sms_obj['name'], sms_obj['appointment'].doctor.get_display_name(),
+                            sms_obj['appointment'].hospital.name, sms_obj['appointment'].hospital.name)
+            notification_tasks.send_offline_appointment_message.apply_async(
+                kwargs={'number': sms_obj['phone_number'], 'text': default_text, 'type': 'Appointment COMPLETE'},
+                countdown=1)
+        except Exception as e:
+            logger.error("Failed to Push Offline Appointment Cancel Message SMS Task " + str(e))
 
     @staticmethod
     def appointment_reschedule_sms(sms_obj):
@@ -2226,7 +2236,9 @@ class OfflineOPDAppointments(auth_model.TimeStampedModel):
     def after_commit_update_sms(sms_list):
         for sms_obj in sms_list:
             if sms_obj:
-                if sms_obj.get('action_cancel') and sms_obj['action_cancel']:
+                if sms_obj.get('action_complete') and sms_obj['action_complete']:
+                    OfflineOPDAppointments.appointment_complete_sms(sms_obj)
+                elif sms_obj.get('action_cancel') and sms_obj['action_cancel']:
                     OfflineOPDAppointments.appointment_cancel_sms(sms_obj)
                     OfflineOPDAppointments.appointment_add_sms(sms_obj)
                 elif sms_obj.get('action_reschedule') and sms_obj['action_reschedule']:

@@ -2195,7 +2195,9 @@ class OfflineCustomerViewSet(viewsets.GenericViewSet):
         serializer = serializers.GetOfflinePatientsSerializer(data=request.query_params)
         serializer.is_valid(raise_exception=True)
         valid_data = serializer.validated_data
-        queryset = models.OfflinePatients.objects.filter(Q(doctor__manageable_doctors__user=user,
+        queryset = models.OfflinePatients.objects.prefetch_related('patient_mobiles')\
+                                                 .select_related('doctor', 'hospital')\
+                                                 .filter(Q(doctor__manageable_doctors__user=user,
                                                            doctor__manageable_doctors__entity_type=GenericAdminEntity.DOCTOR,
                                                            doctor__manageable_doctors__is_disabled=False,
                                                            )
@@ -2215,11 +2217,37 @@ class OfflineCustomerViewSet(viewsets.GenericViewSet):
             admin_queryset = auth_models.GenericAdmin.objects.filter(user=request.user, updated_at__gte=valid_data.get('updated_at'))
             if not admin_queryset.exists():
                 queryset = queryset.filter(updated_at__gte=valid_data.get('updated_at'))
-        queryset = queryset.values('name', 'id', 'gender', 'doctor', 'hospital', 'age', 'dob', 'calculated_dob', 'updated_at',
-                                   'share_with_hospital', 'sms_notification', 'medical_history',
-                                   'referred_by', 'display_welcome_message', 'error'
-                                   ).distinct()
-        return Response(queryset)
+        # queryset = queryset.values('name', 'id', 'gender', 'doctor', 'hospital', 'age', 'dob', 'calculated_dob', 'updated_at',
+        #                            'share_with_hospital', 'sms_notification', 'medical_history',
+        #                            'referred_by', 'display_welcome_message', 'error'
+        #                            ).distinct()
+        response = []
+        for data in queryset.distinct().all():
+            patient_dict = {}
+            patient_dict['id'] = data.id
+            patient_dict['name'] = data.name if data.name else None
+            patient_dict['gender'] = data.gender if data.gender else None
+            patient_dict['doctor'] = data.doctor.id if data.doctor else None
+            patient_dict['hospital'] = data.hospital.id if data.hospital else None
+            patient_dict['age'] = data.age if data.age else None
+            patient_dict['dob'] = data.dob if data.dob else None
+            patient_dict['calculated_dob'] = data.calculated_dob if data.calculated_dob else None
+            patient_dict['updated_at'] = data.updated_at if data.updated_at else None
+            patient_dict['share_with_hospital'] = data.share_with_hospital if data.share_with_hospital else None
+            patient_dict['sms_notification'] = data.sms_notification if data.sms_notification else None
+            patient_dict['medical_history'] = data.medical_history if data.medical_history else None
+            patient_dict['referred_by'] = data.referred_by if data.referred_by else None
+            patient_dict[
+                'display_welcome_message'] = data.display_welcome_message if data.display_welcome_message else None
+            patient_dict['error'] = data.error if data.error else None
+            phone_number = ''
+            if hasattr(data, 'patient_mobiles'):
+                for mob in data.patient_mobiles.all():
+                    if mob.is_default:
+                        phone_number = mob.phone_number
+            patient_dict['patient_numbers'] = phone_number
+            response.append(patient_dict)
+        return Response(response)
 
     @transaction.atomic
     def create_offline_patients(self, request):
@@ -2470,7 +2498,7 @@ class OfflineCustomerViewSet(viewsets.GenericViewSet):
                 found = False
                 for appnt in appntment_ids:
                     if id == appnt.id:
-                        patient = def_number = action_cancel = action_add = action_reschedule = None
+                        patient = def_number = action_cancel = action_add = action_reschedule = action_complete = None
                         found = True
 
                         self.validate_permissions(data, doc_pem_list, hosp_pem_list, clinic_queryset)
@@ -2485,17 +2513,15 @@ class OfflineCustomerViewSet(viewsets.GenericViewSet):
                                 patient_data = self.create_patient(request, data['patient'], data['hospital'],
                                                                    data['doctor'])
                                 patient_ids.append(patient_data['patient'].id)
-
+                                action_cancel = True
                             else:
                                 patient_data = self.update_patient(request, data['patient'], data['hospital'],
                                                                    data['doctor'])
-
                             patient = patient_data['patient']
                             if patient_data.get('sms_list'):
                                 patient_data['sms_list']['old_appointment'] = appnt
                                 sms_list.append(patient_data['sms_list'])
                             appnt.user = patient
-                            action_cancel = True
                         else:
                             patient = appnt.user
                             patient_data = {}
@@ -2509,13 +2535,15 @@ class OfflineCustomerViewSet(viewsets.GenericViewSet):
 
                         if appnt.doctor.id != data.get('doctor').id or appnt.hospital.id != data.get('hospital').id:
                             action_cancel = True
-
+                        if not action_cancel and (data.get('time_slot_start') != appnt.time_slot_start):
+                            action_reschedule = True
+                        if data.get('status') == models.OfflineOPDAppointments.COMPLETED:
+                            action_complete = True
                         appnt.doctor = data.get('doctor')
                         appnt.hospital = data.get('hospital')
                         appnt.error = data.get('error', False)
                         appnt.error_message = data.get('error_message')
                         if data.get("time_slot_start"):
-                            action_reschedule = True
                             appnt.time_slot_start = data.get("time_slot_start")
                         if data.get('status'):
                             appnt.status = data.get('status')
@@ -2531,6 +2559,7 @@ class OfflineCustomerViewSet(viewsets.GenericViewSet):
                             patient_data['sms_list']['appointment'] = appnt
                             patient_data['sms_list']['action_cancel'] = action_cancel
                             patient_data['sms_list']['action_reschedule'] = action_reschedule
+                            patient_data['sms_list']['action_complete'] = action_complete
                         ret_obj = {}
                         ret_obj['id'] = appnt.id
                         ret_obj['patient_id'] = appnt.user.id
@@ -2885,12 +2914,13 @@ class AppointmentMessageViewset(viewsets.GenericViewSet):
         if data.get('type') == serializers.AppointmentMessageSerializer.REMINDER:
             if phone_number:
                 try:
+                    time = aware_time_zone(appnt.time_slot_start)
                     notification_tasks.send_appointment_reminder_message.apply_async(
                         kwargs={'number': phone_number,
                                 'patient_name': patient_name,
                                 'doctor': appnt.doctor.name,
                                 'hospital_name': appnt.hospital.name,
-                                'date': appnt.time_slot_start.strftime("%B %d, %Y %H:%M")},
+                                'date': time.strftime("%B %d, %Y %H:%M")},
                         countdown=1)
 
                 except Exception as e:
