@@ -880,7 +880,8 @@ class DoctorProfileUserViewSerializer(DoctorProfileSerializer):
 
     def get_rating_graph(self, obj):
         if obj and obj.rating:
-            data = rating_serializer.RatingsGraphSerializer(obj.rating.filter(is_live=True,
+            data = rating_serializer.RatingsGraphSerializer(obj.rating.prefetch_related('compliment')
+                                                                      .filter(is_live=True,
                                                                               moderation_status__in=[
                                                                                   rate_models.RatingsReview.PENDING,
                                                                                   rate_models.RatingsReview.APPROVED]

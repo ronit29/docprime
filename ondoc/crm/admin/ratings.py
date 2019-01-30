@@ -83,6 +83,7 @@ class RatingsReviewAdmin(ImportExportMixin, admin.ModelAdmin):
     readonly_fields = ['user', 'name', 'booking_id', 'appointment_type']
     fields = ('user', 'ratings', 'review', 'name', 'booking_id', 'appointment_type', 'compliment',
               'moderation_status', 'moderation_comments')
+    list_filter = ('appointment_type', 'moderation_status', 'ratings')
     # form = RatingsReviewForm
 
     def get_queryset(self, request):
@@ -100,7 +101,7 @@ class RatingsReviewAdmin(ImportExportMixin, admin.ModelAdmin):
     def booking_id(self, instance):
         url = None
         if instance.content_type == ContentType.objects.get_for_model(Doctor):
-            url = "/admin/doctor/opdappointment/"+ str(instance.appointment_id)+"/change"
+            url = "/admin/doctor/opdappointment/" + str(instance.appointment_id) + "/change"
 
         elif instance.content_type == ContentType.objects.get_for_model(Lab):
             url = "/admin/diagnostic/labappointment/" + str(instance.appointment_id) + "/change"

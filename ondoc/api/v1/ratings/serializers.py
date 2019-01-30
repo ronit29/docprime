@@ -56,21 +56,22 @@ class RatingsGraphSerializer(serializers.Serializer):
         response = []
         comp_count = {}
         request = self.context.get('request')
-        for rate in obj.filter(compliment__rating_level__in=[4, 5]):
+        for rate in obj:
             for cmlmnt in rate.compliment.all():
-                r = {'id': cmlmnt.id,
-                     'message': cmlmnt.message,
-                     'level': cmlmnt.rating_level,
-                     'icon': cmlmnt.icon.url if cmlmnt.icon else None}
-                if comp_count.get(r['id']):
-                    comp_count[r['id']]['count'] += 1
+                if cmlmnt.rating_level == 4 or cmlmnt.rating_level == 5:
+                    r = {'id': cmlmnt.id,
+                         'message': cmlmnt.message,
+                         'level': cmlmnt.rating_level,
+                         'icon': cmlmnt.icon.url if cmlmnt.icon else None}
+                    if comp_count.get(r['id']):
+                        comp_count[r['id']]['count'] += 1
 
-                else:
-                    comp_count[r['id']] = r
-                    comp_count[r['id']]['count'] = 1
-                    comp_count[r['id']]['icon'] = request.build_absolute_uri(r['icon']) if r.get(
-                        'icon') is not None else None
-                    comp.append(comp_count[r['id']])
+                    else:
+                        comp_count[r['id']] = r
+                        comp_count[r['id']]['count'] = 1
+                        comp_count[r['id']]['icon'] = request.build_absolute_uri(r['icon']) if r.get(
+                            'icon') is not None else None
+                        comp.append(comp_count[r['id']])
         temp = {}
         for x in comp:
             if temp.get(x['message']):
