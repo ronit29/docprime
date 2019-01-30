@@ -22,9 +22,18 @@ class Cart(auth_model.TimeStampedModel, auth_model.SoftDeleteModel):
         item_data.pop('use_wallet', None)
         data.pop('cart_item', None)
         item_data.pop('cart_item', None)
+
+        is_valid_tests = True
+        # special handling for tests , checking subset
+        if "test_ids" in item_data and "test_ids" in data:
+            if set(data["test_ids"]).issubset(set(item_data["test_ids"])):
+                is_valid_tests = False
+            data.pop('test_ids', None)
+            item_data.pop('test_ids', None)
+
         data['start_date'] = format_iso_date(data['start_date'])
         item_data['start_date'] = format_iso_date(item_data['start_date'])
-        return data != item_data
+        return data != item_data and is_valid_tests
 
     @classmethod
     def validate_duplicate(cls, data, user, product_id, cart_item=None):

@@ -77,6 +77,8 @@ class CartViewSet(viewsets.GenericViewSet):
                     "actual_data": item.data
                 })
 
+        items = sorted(items, key=lambda x: 0 if x["valid"] else -1)
+
         return Response({"cart_items" : items, "status": 1})
 
     def process(self, request, *args, **kwargs):
