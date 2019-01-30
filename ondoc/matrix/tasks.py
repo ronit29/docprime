@@ -8,6 +8,7 @@ import requests
 import json
 import logging
 import datetime
+from datetime import date
 from ondoc.authentication.models import Address
 from ondoc.api.v1.utils import resolve_address
 logger = logging.getLogger(__name__)
@@ -67,6 +68,10 @@ def prepare_and_hit(self, data):
 
     appointment_details = {
         'AppointmentStatus': appointment.status,
+        'Age': calculate_age(appointment.profile.dob) if appointment else '',
+        'Email': appointment.profile.email if appointment else '',
+        'VirtualNo': '',
+        'OTP': '',
         'KYC': kyc,
         'Location': location,
         'PaymentStatus': 300,
@@ -152,6 +157,13 @@ def prepare_and_hit(self, data):
         logger.info("[ERROR] Appointment could not be published to the matrix system")
 
 
+def calculate_age(dob):
+    if not dob:
+        return ''
+    today = date.today()
+    return today.year - dob.year - ((today.month, today.day) < (dob.month, dob.day))
+
+
 @task(bind=True, max_retries=2)
 def push_appointment_to_matrix(self, data):
     from ondoc.doctor.models import OpdAppointment
@@ -190,10 +202,10 @@ def push_appointment_to_matrix(self, data):
                                     'Name': spoc_name,
                                     'Type': spoc_obj.contact_type})
 
-            # Doctor mobile numbers
-            doctor_mobiles = [doctor_mobile.number for doctor_mobile in appointment.doctor.mobiles.all()]
-            doctor_mobiles = [{'MobileNo': number, 'Name': appointment.doctor.name, 'Type': 2} for number in doctor_mobiles]
-            mobile_list.extend(doctor_mobiles)
+            # Doctor mobile numbers ## Removed Doctor Number
+            # doctor_mobiles = [doctor_mobile.number for doctor_mobile in appointment.doctor.mobiles.all()]
+            # doctor_mobiles = [{'MobileNo': number, 'Name': appointment.doctor.name, 'Type': 2} for number in doctor_mobiles]
+            # mobile_list.extend(doctor_mobiles)
         elif data.get('type') == 'LAB_APPOINTMENT':
             order_product_id = 2
             appointment = LabAppointment.objects.filter(pk=appointment_id).first()
