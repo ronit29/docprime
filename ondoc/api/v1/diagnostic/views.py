@@ -490,6 +490,12 @@ class LabList(viewsets.ReadOnlyModelViewSet):
                         'url': parameters.get('url')
                     }]
 
+        if kwargs.get('test_flag') == 1:
+            return {"result": result[0:3],
+                             "count": count, 'tests': tests,
+                             "seo": seo, 'breadcrumb': breadcrumb}
+
+
         return Response({"result": result,
                          "count": count, 'tests': tests,
                          "seo": seo, 'breadcrumb':breadcrumb})
@@ -1731,7 +1737,7 @@ class TestDetailsViewset(viewsets.GenericViewSet):
         else:
             return Response(status=status.HTTP_404_NOT_FOUND)
 
-    def retrieve(self, request, entity=None):
+    def retrieve(self, request, entity=None, *args, **kwargs):
         params = request.query_params
         if params.get('url'):
             test_ids = [entity.entity_id]
@@ -1802,6 +1808,19 @@ class TestDetailsViewset(viewsets.GenericViewSet):
             result['frequently_booked_together'] = {'title': 'Frequently booked together', 'value': booked_together}
             result['show_details'] = data.show_details
             result['url'] = entity.url if entity and entity.url else None
+            lab = LabList()
+            test_ids = list(test_ids)
+
+            for i in range(len(test_ids)):
+                test_ids[i] = str(test_ids[i])
+
+            parameters = dict()
+            parameters['ids'] = ",".join(test_ids)
+
+            kwargs['parameters'] = parameters
+            kwargs['test_flag'] = 1
+
+            result['labs'] = lab.search(request, **kwargs)
             final_result.append(result)
 
         return Response(final_result)
