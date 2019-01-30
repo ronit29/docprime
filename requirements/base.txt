@@ -36,3 +36,4 @@ setproctitle
 django-fluent-comments
 django-threadedcomments
 django-contrib-comments
+geoip2

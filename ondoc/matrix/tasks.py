@@ -126,6 +126,7 @@ def prepare_and_hit(self, data):
     resp_data = response.json()
 
     if not resp_data.get('Id', None):
+        logger.error(json.dumps(request_data))
         raise Exception("[ERROR] Id not recieved from the matrix while pushing appointment lead.")
 
     # save the appointment with the matrix lead id.
@@ -274,6 +275,7 @@ def push_signup_lead_to_matrix(self, data):
         # save the appointment with the matrix lead id.
 
         if not resp_data.get('Id', None):
+            logger.error(json.dumps(request_data))
             raise Exception("[ERROR] Id not recieved from the matrix while pushing online lead.")
 
         online_lead_obj.matrix_lead_id = resp_data.get('Id', None)
@@ -349,6 +351,7 @@ def push_order_to_matrix(self, data):
             #logger.error(response.text)
 
             if not resp_data.get('Id', None):
+                logger.error(json.dumps(request_data))
                 raise Exception("[ERROR] Id not recieved from the matrix while pushing order to matrix.")
 
             # save the order with the matrix lead id.
@@ -437,6 +440,7 @@ def push_onboarding_qcstatus_to_matrix(self, data):
             #logger.error(response.text)
 
             if not resp_data.get('Id', None):
+                logger.error(json.dumps(request_data))
                 raise Exception("[ERROR] Id not recieved from the matrix while pushing doctor or lab lead.")
 
             # save the order with the matrix lead id.
@@ -453,7 +457,12 @@ def push_non_bookable_doctor_lead_to_matrix(self, nb_doc_lead_id):
     from ondoc.web.models import NonBookableDoctorLead
     obj = NonBookableDoctorLead.objects.filter(id= nb_doc_lead_id).first()
     if obj:
+        exit_point_url = ""
+        if obj.doctor and obj.doctor.id and obj.hospital and obj.hospital.id:
+            exit_point_url = "%s/opd/doctor/%d?hospital_id=%d" % (settings.CONSUMER_APP_DOMAIN, obj.doctor.id, obj.hospital.id)
+
         request_data = {
+            'ExitPointUrl': exit_point_url,
             'LeadSource': obj.source,
             'PrimaryNo': int(obj.from_mobile),
             'Name': obj.name if obj.name else 'not applicable',
@@ -481,6 +490,7 @@ def push_non_bookable_doctor_lead_to_matrix(self, nb_doc_lead_id):
         resp_data = response.json()
         # logger.error(response.text)
         if not resp_data.get('Id', None):
+            logger.error(json.dumps(request_data))
             raise Exception("[ERROR] Id not received from the matrix while pushing NB doctor lead.")
 
         # save the order with the matrix lead id.

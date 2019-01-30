@@ -68,10 +68,10 @@ class SearchPageViewSet(viewsets.ReadOnlyModelViewSet):
         count = int(count)
         if count <= 0:
             count = 10
-        test_queryset = CommonTest.objects.filter(test__enable_for_retail=True)[:count]
+        test_queryset = CommonTest.objects.filter(test__enable_for_retail=True, test__searchable=True)[:count]
         conditions_queryset = CommonDiagnosticCondition.objects.prefetch_related('lab_test').all()
         lab_queryset = PromotedLab.objects.select_related('lab').filter(lab__is_live=True, lab__is_test_lab=False)
-        package_queryset = CommonPackage.objects.prefetch_related('package').filter(package__enable_for_retail=True)[:count]
+        package_queryset = CommonPackage.objects.prefetch_related('package').filter(package__enable_for_retail=True, package__searchable=True)[:count]
         test_serializer = diagnostic_serializer.CommonTestSerializer(test_queryset, many=True, context={'request': request})
         package_serializer = diagnostic_serializer.CommonPackageSerializer(package_queryset, many=True, context={'request': request})
         lab_serializer = diagnostic_serializer.PromotedLabsSerializer(lab_queryset, many=True)
@@ -175,6 +175,7 @@ class LabList(viewsets.ReadOnlyModelViewSet):
         all_packages_in_network_labs = LabTest.objects.prefetch_related('test').filter(enable_for_retail=True,
                                                                                        searchable=True, is_package=True,
                                                                                        availablelabs__enabled=True,
+                                                                                       availablelabs__lab_pricing_group__labs__is_live=True,
                                                                                        availablelabs__lab_pricing_group__labs__network__isnull=False,
                                                                                        availablelabs__lab_pricing_group__labs__location__dwithin=(
                                                                                            Point(float(long),
@@ -195,6 +196,8 @@ class LabList(viewsets.ReadOnlyModelViewSet):
                                                                                            searchable=True,
                                                                                            is_package=True,
                                                                                            availablelabs__enabled=True,
+                                                                                           availablelabs__lab_pricing_group__labs__is_live=True,
+                                                                                           availablelabs__lab_pricing_group__labs__enabled=True,
                                                                                            availablelabs__lab_pricing_group__labs__network__isnull=True,
                                                                                            availablelabs__lab_pricing_group__labs__location__dwithin=(
                                                                                                Point(float(long),
@@ -230,9 +233,19 @@ class LabList(viewsets.ReadOnlyModelViewSet):
                 is_selected = True
             category_result.append({'name': name, 'id': category_id, 'is_selected': is_selected})
 
-        return Response({'result': serializer.data, 'categories': category_result, 'count': len(all_packages),
-                         'categories_count': len(category_result)})
+        result = serializer.data
+        if result:
+            from ondoc.coupon.models import Coupon
+            search_coupon = Coupon.get_search_coupon(request.user)
 
+            for package_result in result:
+                if "price" in package_result:
+                    price = int(float(package_result["price"]))
+                    discounted_price = price if not search_coupon else search_coupon.get_search_coupon_discounted_price(price)
+                    package_result["discounted_price"] = discounted_price
+
+        return Response({'result': result, 'categories': category_result, 'count': len(all_packages),
+                         'categories_count': len(category_result)})
 
 
     @transaction.non_atomic_requests
@@ -432,6 +445,15 @@ class LabList(viewsets.ReadOnlyModelViewSet):
         #count = len(queryset_result)
         #paginated_queryset = paginate_queryset(queryset_result, request)
         result = self.form_lab_search_whole_data(queryset_result, parameters.get("ids"))
+
+        if result:
+            from ondoc.coupon.models import Coupon
+            search_coupon = Coupon.get_search_coupon(request.user)
+
+            for lab_result in result:
+                if "price" in lab_result:
+                    discounted_price = lab_result["price"] if not search_coupon else search_coupon.get_search_coupon_discounted_price(lab_result["price"])
+                    lab_result["discounted_price"] = discounted_price
 
         # result = list()
         # for data in response_queryset.items():
@@ -637,7 +659,8 @@ class LabList(viewsets.ReadOnlyModelViewSet):
                         and St_dwithin( St_setsrid(St_point((%(longitude)s), (%(latitude)s)), 4326),lb.location, (%(max_distance)s)) 
                         and St_dwithin(St_setsrid(St_point((%(longitude)s), (%(latitude)s)), 4326), lb.location,  (%(min_distance)s)) = false 
                         and avlt.enabled = True 
-                        inner join lab_test lt on lt.id = avlt.test_id where 1=1 {filter_query_string}
+                        inner join lab_test lt on lt.id = avlt.test_id and lt.enable_for_retail=True 
+                         where 1=1 {filter_query_string}
 
                         group by lb.id having count(*)=(%(length)s))a
                         {group_filter_query_string})y )x where rank<=5 )z 
@@ -732,7 +755,8 @@ class LabList(viewsets.ReadOnlyModelViewSet):
                         deal_price=test.custom_deal_price
                     else:
                         deal_price=test.computed_deal_price
-                    tests[obj.id].append({"id": test.test_id, "name": test.test.name, "deal_price": deal_price, "mrp": test.mrp})
+                    tests[obj.id].append({"id": test.test_id, "name": test.test.name, "deal_price": deal_price, "mrp": test.mrp,
+                                          "number_of_tests": test.test.number_of_tests})
 
         day_now = timezone.now().weekday()
         days_array = [i for i in range(7)]
@@ -876,7 +900,7 @@ class LabList(viewsets.ReadOnlyModelViewSet):
         test_serializer = diagnostic_serializer.AvailableLabTestPackageSerializer(queryset, many=True,
                                                                            context={"lab": lab_obj})
         # for Demo
-        demo_lab_test = AvailableLabTest.objects.filter(test__enable_for_retail=True, lab_pricing_group=lab_obj.lab_pricing_group, enabled=True).order_by("-test__priority").prefetch_related('test')[:2]
+        demo_lab_test = AvailableLabTest.objects.filter(test__enable_for_retail=True, lab_pricing_group=lab_obj.lab_pricing_group, enabled=True, test__searchable=True).order_by("-test__priority").prefetch_related('test')[:2]
         lab_test_serializer = diagnostic_serializer.AvailableLabTestSerializer(demo_lab_test, many=True, context={"lab": lab_obj})
         day_now = timezone.now().weekday()
         timing_queryset = list()
@@ -1751,13 +1775,15 @@ class TestDetailsViewset(viewsets.GenericViewSet):
                for fbt in fbts:
                     name = fbt.name
                     id = fbt.id
-                    booked_together.append({'id': id, 'lab_test': name})
+                    show_details = fbt.show_details
+                    booked_together.append({'id': id, 'lab_test': name, 'show_details': show_details})
 
             else:
                 for fbt in data.base_test.all():
                     name = fbt.booked_together_test.name
                     id = fbt.booked_together_test.id
-                    booked_together.append({'id': id, 'lab_test': name})
+                    show_details = fbt.booked_together_test.show_details
+                    booked_together.append({'id': id, 'lab_test': name, 'show_details': show_details})
 
             result['frequently_booked_together'] = {'title': 'Frequently booked together', 'value': booked_together}
             result['show_details'] = data.show_details

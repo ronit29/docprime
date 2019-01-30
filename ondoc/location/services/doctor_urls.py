@@ -319,13 +319,18 @@ class DoctorURL():
         RawSql('''update temp_url tu set breadcrumb=json_build_array()''', []).execute()
 
         #update for speciality city
-        RawSql('''update temp_url tu set breadcrumb=(select json_build_array(json_build_object('title', locality_value, 'url', url)) 
+        RawSql('''update temp_url tu set breadcrumb=(select json_build_array(json_build_object('title', locality_value, 'url', url, 'link_title', concat('Doctors in ',locality_value))) 
             from temp_url where sitemap_identifier ='DOCTORS_CITY' and lower(locality_value)=lower(tu.locality_value)
             and st_dwithin(location::geography, tu.location::geography, 20000) order by st_distance(location, tu.location) asc limit 1)
             where sitemap_identifier ='SPECIALIZATION_CITY' ''', []).execute()
 
+        RawSql('''update temp_url tu set breadcrumb=(select json_build_array(json_build_object('title', locality_value, 'url', url, 'link_title', concat('Doctors in ',locality_value))) 
+                   from temp_url where sitemap_identifier ='DOCTORS_CITY' and lower(locality_value)=lower(tu.locality_value)
+                   and st_dwithin(location::geography, tu.location::geography, 20000) order by st_distance(location, tu.location) asc limit 1)
+                   where sitemap_identifier ='DOCTORS_LOCALITY_CITY' ''', []).execute()
+
         #update for speciality locality city
-        RawSql('''update temp_url tu set breadcrumb = (select  breadcrumb || jsonb_build_array(jsonb_build_object('title', specialization, 'url', url))
+        RawSql('''update temp_url tu set breadcrumb = (select  breadcrumb || jsonb_build_array(jsonb_build_object('title', specialization, 'url', url, 'link_title', concat(specialization, ' in ', locality_value)))
             from temp_url  where sitemap_identifier ='SPECIALIZATION_CITY' and lower(locality_value)=lower(tu.locality_value)
             and specialization_id = tu.specialization_id
             and st_dwithin(location::geography, tu.location::geography, 20000) order by st_distance(location, tu.location) asc limit 1) 
@@ -334,7 +339,7 @@ class DoctorURL():
 
         #update for doctor profile
         RawSql('''update temp_url tu set breadcrumb = (select  breadcrumb || 
-            jsonb_build_array(jsonb_build_object('title', concat(sublocality_value,' ',locality_value), 'url', url))
+            jsonb_build_array(jsonb_build_object('title', concat(sublocality_value,' ',locality_value), 'url', url, 'link_title', concat(specialization, ' in ', sublocality_value,' ',locality_value) ))
             from temp_url  where sitemap_identifier ='SPECIALIZATION_LOCALITY_CITY' and lower(locality_value)=lower(tu.locality_value)
             and lower(sublocality_value)=lower(tu.sublocality_value) and specialization_id = tu.specialization_id
             and st_dwithin(location::geography, tu.location::geography, 10000) order by st_distance(location, tu.location) asc limit 1) 

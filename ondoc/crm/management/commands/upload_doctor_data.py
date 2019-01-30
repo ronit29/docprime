@@ -9,6 +9,8 @@ from PIL import Image as Img
 import os
 import math
 from django.core.files.storage import default_storage
+
+from ondoc.crm.constants import constants
 from ondoc.doctor.models import (Doctor, DoctorPracticeSpecialization, PracticeSpecialization, DoctorMobile, Qualification,
                                  Specialization, College, DoctorQualification, DoctorExperience, DoctorAward,
                                  DoctorClinicTiming, DoctorClinic, Hospital, SourceIdentifier, DoctorAssociation)
@@ -30,7 +32,6 @@ class Command(BaseCommand):
 
 
     def handle(self, *args, **options):
-
         print(options)
         source = options['source']
         batch = options['batch']
@@ -41,15 +42,19 @@ class Command(BaseCommand):
         content = BytesIO(r.content)
         wb = load_workbook(content)
         sheets = wb.worksheets
-        doctor = UploadDoctor()
-        qualification = UploadQualification()
-        experience = UploadExperience()
-        membership = UploadMembership()
-        award = UploadAward()
-        hospital = UploadHospital()
-        specialization = UploadSpecialization()
+
+        error_log = []
+
+        doctor = UploadDoctor(error_log)
+        qualification = UploadQualification(error_log)
+        experience = UploadExperience(error_log)
+        membership = UploadMembership(error_log)
+        award = UploadAward(error_log)
+        hospital = UploadHospital(error_log)
+        specialization = UploadSpecialization(error_log)
 
         #doctor.p_image(sheets[0], source, batch)
+
 
         with transaction.atomic():
             doctor.upload(sheets[0], source, batch, lines)
@@ -61,8 +66,14 @@ class Command(BaseCommand):
             specialization.upload(sheets[6], lines)
 
 
-
 class Doc():
+
+    def __init__(self):
+        if not hasattr(self, 'log_arr'):
+            raise Exception('error log not initialized')
+
+    def log_error(self, line_number, message):
+        self.log_arr.append({'line number': line_number, 'message': message})
 
     def get_doctor(self, doctor_identifier):
         si_obj = SourceIdentifier.objects.filter(type=SourceIdentifier.DOCTOR, unique_identifier=doctor_identifier).first()
@@ -77,7 +88,7 @@ class Doc():
         return value
 
 
-    def get_number(self, number, is_primary, city, source):
+    def get_number(self, number, is_primary, city, source, line_no=0):
         code=[11,44,22,129,40,120,33,215,124]
         data = {}
         std_code = None
@@ -100,6 +111,7 @@ class Doc():
             else:
                 return {'std_code': comps[0], 'number': comps[1], 'is_primary': False, 'source': source}
         elif len(comps)>3:
+            self.log_error(line_no, ' Invalid number : {}'.format(number))
             print('invalid number' + str(number))
 
         for cd in code:
@@ -113,10 +125,12 @@ class Doc():
         try:
             number = int(number)
             if number < 5000000000 or number > 9999999999:
+                self.log_error(line_no, ' Invalid number : {}'.format(number))
                 print('invalid number' + str(number))
                 return None
         except Exception as e:
             print(e)
+            self.log_error(line_no, ' Invalid number while parsing  : {}'.format(number))
             print('invalid number while parsing '+str(number))
             return None
 
@@ -188,6 +202,11 @@ def s_image(batch, url, identifier):
 
 class UploadDoctor(Doc):
 
+    def __init__(self, log_arr=None) -> None:
+        self.log_arr = log_arr
+        self.sheet = 'Doctor Details'
+        super().__init__()
+
     def p_image(self, sheet, source, batch):
         rows = [row for row in sheet.rows]
         headers = {column.value.strip().lower(): i + 1 for i, column in enumerate(rows[0]) if column.value}
@@ -227,44 +246,57 @@ class UploadDoctor(Doc):
             #         except Exception as e:
             #             print('exception '+str(e))
 
-    def upload(self, sheet, source, batch, lines):
+    def upload(self, sheet, source, batch, lines, user=None):
         rows = [row for row in sheet.rows]
         headers = {column.value.strip().lower(): i + 1 for i, column in enumerate(rows[0]) if column.value}
 
         for i in range(2, min(len(rows), lines) + 1):
-            data = self.get_data(row=i, sheet=sheet, headers=headers)
+            data = self.get_data(row=i, sheet=sheet, headers=headers, user=user)
 
             try:
-                doctor = self.create_doctor(data, source, batch)
+                doctor = self.create_doctor(data, source, batch, i)
             except Exception as e:
+                self.log_error(i, 'Invalid data for doctor. ({})'.format(e))
                 print('error' + str(e))
 
-            #self.map_doctor_specialization(doctor, data.get('practice_specialization'))
+            # self.map_doctor_specialization(doctor, data.get('practice_specialization'))
             try:
                 self.add_doctor_phone_numbers(doctor, data.get('numbers'))
             except Exception as e:
+                self.log_error(i, 'Invalid data for phone number. ({})'.format(e))
                 print('error' + str(e))
 
-    def get_data(self, row, sheet, headers):
+    def get_data(self, row, sheet, headers, user=None):
         gender_mapping = {value[1]: value[0] for value in Doctor.GENDER_CHOICES}
-
         gender = gender_mapping.get(self.clean_data(sheet.cell(row=row, column=headers.get('gender')).value))
         identifier = self.clean_data(sheet.cell(row=row, column=headers.get('identifier')).value)
         name = self.clean_data(sheet.cell(row=row, column=headers.get('doctor_name')).value)
         license = self.clean_data(sheet.cell(row=row, column=headers.get('license')).value)
         city = self.clean_data(sheet.cell(row=row, column=headers.get('city')).value)
         practicing_since = self.clean_data(sheet.cell(row=row, column=headers.get('practicing_since')).value)
-        is_license_verified = self.clean_data(sheet.cell(row=row, column=headers.get('is_license_verified', False)).value)
-        onboarding_status	= self.clean_data(sheet.cell(row=row, column=headers.get('onboarding_status', 1)).value)
-        data_status = self.clean_data(sheet.cell(row=row, column=headers.get('data_status', 1)).value)
-        enabled = self.clean_data(sheet.cell(row=row, column=headers.get('enabled', True)).value)
-        enabled_for_online_booking = self.clean_data(sheet.cell(row=row, column=headers.get('enabled_for_online_booking', False)).value)
-        is_live = self.clean_data(sheet.cell(row=row, column=headers.get('is_live', False)).value)
+        is_license_verified = self.clean_data(
+            sheet.cell(row=row, column=headers.get('is_license_verified')).value)
+        enabled = self.clean_data(sheet.cell(row=row, column=headers.get('enabled')).value)
+        if user and (user.is_member_of(constants['SUPER_QC_GROUP']) or user.is_member_of(
+                constants['QC_GROUP_NAME']) or user.is_superuser):
+            onboarding_status = self.clean_data(sheet.cell(row=row, column=headers.get('onboarding_status')).value)
+            data_status = self.clean_data(sheet.cell(row=row, column=headers.get('data_status')).value)
+            enabled_for_online_booking = self.clean_data(
+                sheet.cell(row=row, column=headers.get('enabled_for_online_booking')).value)
+            is_live = self.clean_data(sheet.cell(row=row, column=headers.get('is_live')).value)
+        else:
+            onboarding_status = Doctor.NOT_ONBOARDED
+            data_status = QCModel.IN_PROGRESS
+            enabled_for_online_booking = False
+            is_live = False
+
+        matrix_lead_id = self.clean_data(sheet.cell(row=row, column=headers.get('matrix_lead_id')).value)
 
         if practicing_since:
             try:
                 practicing_since = int(practicing_since)
-            except:
+            except Exception as e:
+                self.log_error(row, 'Invalid Practicing since : {} ({})'.format(practicing_since, e))
                 print('Invalid Practicing since='+str(practicing_since))
                 practicing_since = None
 
@@ -279,15 +311,15 @@ class UploadDoctor(Doc):
         alternate_number_2 = self.clean_data(sheet.cell(row=row, column=headers.get('alternate_number_2')).value)
         source = self.clean_data(sheet.cell(row=row, column=headers.get('phone_no_source')).value)
 
-        num = self.get_number(primary_number, True, city, source)
+        num = self.get_number(primary_number, True, city, source, row)
         if num:
             number_entry.append(num)
 
-        num = self.get_number(alternate_number_1, False, city, source)
+        num = self.get_number(alternate_number_1, False, city, source, row)
         if num:
             number_entry.append(num)
 
-        num = self.get_number(alternate_number_2, False, city, source)
+        num = self.get_number(alternate_number_2, False, city, source, row)
         if num:
             number_entry.append(num)
 
@@ -311,15 +343,13 @@ class UploadDoctor(Doc):
         data['enabled'] = enabled
         data['enabled_for_online_booking'] = enabled_for_online_booking
         data['is_live'] = is_live
+        data['matrix_lead_id'] = matrix_lead_id
         return data
 
-
-    def create_doctor(self, data, source, batch):
-
+    def create_doctor(self, data, source, batch, line_no):
         doctor = self.get_doctor(data.get('identifier'))
         if doctor:
             return doctor
-
         doctor = Doctor.objects.create(name=data['name'], license=data.get('license', ''), gender=data['gender'],
                                        practicing_since=data['practicing_since'], source=source, batch=batch,
                                        enabled=data.get('enabled', False),
@@ -327,10 +357,12 @@ class UploadDoctor(Doc):
                                        data_status=data.get('data_status', QCModel.IN_PROGRESS),
                                        is_live=data.get('is_live', False),
                                        onboarding_status=data.get('onboarding_status', Doctor.NOT_ONBOARDED),
-                                       is_license_verified=data.get('is_license_verified', False)
+                                       is_license_verified=data.get('is_license_verified', False),
+                                       matrix_lead_id=data.get('matrix_lead_id', None)
                                        )
 
-        SourceIdentifier.objects.get_or_create(unique_identifier=data.get('identifier'), reference_id=doctor.id, type=SourceIdentifier.DOCTOR)
+        SourceIdentifier.objects.get_or_create(unique_identifier=data.get('identifier'), reference_id=doctor.id,
+                                               type=SourceIdentifier.DOCTOR)
         #self.save_image(batch,data.get('image_url'),data.get('identifier'))
         return doctor
 
@@ -411,6 +443,11 @@ class UploadDoctor(Doc):
 
 class UploadQualification(Doc):
 
+    def __init__(self, log_arr=None) -> None:
+        self.log_arr = log_arr
+        self.sheet = 'Qualifications'
+        super().__init__()
+
     def upload(self, sheet, lines):
         rows = [row for row in sheet.rows]
         headers = {column.value.strip().lower(): i + 1 for i, column in enumerate(rows[0]) if column.value}
@@ -428,7 +465,8 @@ class UploadQualification(Doc):
                                                               college=data.get('college'),
                                                               specialization=data.get('specialization'),
                                                               passing_year=data.get('passing_year'))
-                except:
+                except Exception as e:
+                    self.log_error(i, 'Error saving doctor qualification. ()'.format(e))
                     print('error saving doctor qualification')
 
 
@@ -441,12 +479,12 @@ class UploadQualification(Doc):
         qualification_name = self.clean_data(sheet.cell(row=row, column=headers.get('qualification')).value)
         if qualification_name and isinstance(qualification_name, str):
             qualification_name = re.sub(r'\s+', ' ', qualification_name)
-        qualification = self.get_qualification(qualification_id, qualification_name)
+        qualification = self.get_qualification(qualification_id, qualification_name, row)
 
         specialization_id = self.clean_data(
             sheet.cell(row=row, column=headers.get('specialization_id')).value)
         specialization_name = self.clean_data(sheet.cell(row=row, column=headers.get('specialization')).value)
-        specialization = self.get_specialization(specialization_id, specialization_name)
+        specialization = self.get_specialization(specialization_id, specialization_name, row)
 
         college_id = self.clean_data(
             sheet.cell(row=row, column=headers.get('college_id')).value)
@@ -465,7 +503,7 @@ class UploadQualification(Doc):
         return data;
 
 
-    def get_qualification(self, qualification_id, qualification_name):
+    def get_qualification(self, qualification_id, qualification_name, line_no=0):
 
         qualification = None
         if qualification_id:
@@ -473,12 +511,14 @@ class UploadQualification(Doc):
         if not qualification:
             qualification = Qualification.objects.filter(name__iexact=qualification_name).first()
         if not qualification and qualification_name:
-            qualification, create = Qualification.objects.get_or_create(name=qualification_name)
+            try:
+                qualification, create = Qualification.objects.get_or_create(name=qualification_name)
+            except Exception as e:
+                self.log_error(line_no, 'Error while creating qualification. ({})'.format(e))
 
         return qualification
 
-
-    def get_specialization(self, specialization_id, specialization_name):
+    def get_specialization(self, specialization_id, specialization_name, line_no=0):
 
         specialization = None
         if specialization_id:
@@ -486,11 +526,13 @@ class UploadQualification(Doc):
         if not specialization:
             specialization = Specialization.objects.filter(name__iexact=specialization_name).first()
         if not specialization and specialization_name:
-            specialization, create = Specialization.objects.get_or_create(name=specialization_name)
-
+            try:
+                specialization, create = Specialization.objects.get_or_create(name=specialization_name)
+            except Exception as e:
+                self.log_error(line_no, 'Error while creating Specialization. ({})'.format(e))
         return specialization
 
-    def get_college(self, college_id, college_name):
+    def get_college(self, college_id, college_name, line_no=0):
 
         college = None
         if college_id:
@@ -498,10 +540,18 @@ class UploadQualification(Doc):
         if not college:
             college = College.objects.filter(name__iexact=college_name).first()
         if not college and college_name:
-            college, create = College.objects.get_or_create(name=college_name)
+            try:
+                college, create = College.objects.get_or_create(name=college_name)
+            except Exception as e:
+                self.log_error(line_no, 'Error while creating college. ({})'.format(e))
         return college
 
 class UploadExperience(Doc):
+
+    def __init__(self, log_arr=None) -> None:
+        self.log_arr = log_arr
+        self.sheet = 'Experience'
+        super().__init__()
 
     def upload(self, sheet, lines):
         rows = [row for row in sheet.rows]
@@ -517,10 +567,16 @@ class UploadExperience(Doc):
                     DoctorExperience.objects.get_or_create(doctor=doctor, start_year=start_year, end_year=end_year,
                                                    hospital=hospital)
                 except Exception as e:
+                    self.log_error(i, 'Error while creating doctor experience. ({})'.format(e))
                     print('error' + str(e))
 
 
 class UploadSpecialization(Doc):
+
+    def __init__(self, log_arr=None) -> None:
+        self.log_arr = log_arr
+        self.sheet = 'Specialization'
+        super().__init__()
 
     def upload(self, sheet, lines):
         rows = [row for row in sheet.rows]
@@ -537,12 +593,19 @@ class UploadSpecialization(Doc):
                         try:
                             DoctorPracticeSpecialization.objects.get_or_create(doctor=doctor, specialization=practice_specialization)
                         except Exception as e:
+                            self.log_error(i, 'Error while creating Doctor Practice Specialization. ({})'.format(e))
                             print('error' + str(e))
                 except Exception as e2:
+                    self.log_error(i, 'Error while creating Practice Specialization. ({})'.format(e))
                     print('error' + str(e2))
 
 
 class UploadMembership(Doc):
+
+    def __init__(self, log_arr=None) -> None:
+        self.log_arr = log_arr
+        self.sheet = 'Membership'
+        super().__init__()
 
     def upload(self, sheet, lines):
         rows = [row for row in sheet.rows]
@@ -556,10 +619,16 @@ class UploadMembership(Doc):
                 try:
                     DoctorAssociation.objects.get_or_create(doctor=doctor, name=member)
                 except Exception as e:
+                    self.log_error(i, 'Error while creating doctor membership. ({})'.format(e))
                     print('error' + str(e))
 
 
 class UploadAward(Doc):
+
+    def __init__(self, log_arr=None) -> None:
+        self.log_arr = log_arr
+        self.sheet = 'Awards'
+        super().__init__()
 
     def upload(self, sheet, lines):
         rows = [row for row in sheet.rows]
@@ -573,10 +642,16 @@ class UploadAward(Doc):
                 try:
                     DoctorAward.objects.get_or_create(doctor=doctor, name=award, year=year)
                 except Exception as e:
+                    self.log_error(i, 'Error while creating doctor awards. ({})'.format(e))
                     print('error' + str(e))
 
 
 class UploadHospital(Doc):
+
+    def __init__(self, log_arr=None) -> None:
+        self.log_arr = log_arr
+        self.sheet = 'DoctorHospital'
+        super().__init__()
 
     def upload(self, sheet, source, batch, lines):
         rows = [row for row in sheet.rows]
@@ -592,6 +667,7 @@ class UploadHospital(Doc):
             doctor_obj = self.get_doctor(identifier)
             if not doctor_obj:
                 if identifier:
+                    self.log_error(i, 'Doctor not found for identifier : {}.'.format(identifier))
                     print('Doctor not found for identifier: '+identifier)
                 else:
                     print('Doctor not found for identifier: ')
@@ -599,6 +675,7 @@ class UploadHospital(Doc):
 
             hospital_obj = self.get_hospital(i, sheet, headers, hospital_obj_dict, source, batch)
             if not hospital_obj:
+                self.log_error(i, 'Hospital not found')
                 print('hospital not found')
                 continue
             followup_duration = self.clean_data(sheet.cell(row=i, column=headers.get('followup_duration')).value)
@@ -606,11 +683,13 @@ class UploadHospital(Doc):
             try:
                 followup_duration = int(followup_duration)
             except Exception as e:
+                self.log_error(i, 'invalid followup_duration : {} ({})'.format(followup_duration, e))
                 print('invalid followup_duration' + str(followup_duration))
                 followup_duration = 0
             try:
                 followup_charges = int(followup_charges)
             except Exception as e:
+                self.log_error(i, 'invalid followup_charges : {} ({})'.format(followup_charges, e))
                 print('invalid followup_charges' + str(followup_charges))
                 followup_charges = 0
             doc_clinic_obj = self.get_doc_clinic(doctor_obj, hospital_obj, doc_clinic_obj_dict, followup_duration, followup_charges)
@@ -623,21 +702,25 @@ class UploadHospital(Doc):
             mrp = self.clean_data(sheet.cell(row=i, column=headers.get('mrp')).value)
 
             if not type:
+                self.log_error(i, 'Invalid type for clinic timing')
                 raise Exception('Invalid type for clinic timing')
 
             try:
                 fees = int(fees)
             except Exception as e:
+                self.log_error(i, 'Invalid fees : {} ({})'.format(fees, e))
                 print('invalid fees' + str(fees))
                 fees = None
             try:
                 deal_price = int(deal_price)
             except Exception as e:
+                self.log_error(i, 'Invalid deal_price : {} ({})'.format(deal_price, e))
                 print('invalid deal_price' + str(deal_price))
                 deal_price = None
             try:
                 mrp = int(mrp)
             except Exception as e:
+                self.log_error(i, 'Invalid mrp : {} ({})'.format(mrp, e))
                 print('invalid mrp' + str(mrp))
                 mrp = None
 
@@ -656,6 +739,7 @@ class UploadHospital(Doc):
                     try:
                         DoctorClinicTiming.objects.get_or_create(**temp_data)
                     except:
+                        self.log_error(i, 'Error while creating doctor clinic timing. ({})'.format(e))
                         print('query error')
                     #clinic_time_data.append(DoctorClinicTiming(**temp_data))
             # if clinic_time_data:
@@ -688,19 +772,19 @@ class UploadHospital(Doc):
             try:
                 self.add_clinic_phone_numbers(hospital_obj, number_entry)
             except Exception as e:
+                self.log_error(i, 'Error while creating doctor clinic phone number. ({})'.format(e))
                 print(e)
 
 
     def add_clinic_phone_numbers(self, hospital, numbers):
         ct = ContentType.objects.get_for_model(hospital)
-
         for num in numbers:
             #print(num)
             SPOCDetails.objects.get_or_create(content_type=ct, object_id=hospital.id, std_code=num.get('std_code'),number=num.get('number'), defaults={'contact_type':1, 'source':num.get('source')})
 
 
     def get_hospital(self, row, sheet, headers, hospital_obj_dict, source, batch):
-        hospital_identifier = self.clean_data(sheet.cell(row=row, column=headers.get('hospital_url')).value)
+        hospital_identifier = self.clean_data(sheet.cell(row=row, column=headers.get('hospital_unique_identifier')).value)
         hospital_id = self.clean_data(sheet.cell(row=row, column=headers.get('hospital_id')).value)
 
         hospital = None
@@ -719,11 +803,12 @@ class UploadHospital(Doc):
                     building=''
 
                 city = self.clean_data(sheet.cell(row=row, column=headers.get('city')).value)
-                location = self.parse_gaddress(self.clean_data(sheet.cell(row=row, column=headers.get('gaddress')).value))
+                location = self.parse_gaddress(self.clean_data(sheet.cell(row=row, column=headers.get('hospital_lat_long')).value))
                 hospital = Hospital.objects.create(name=hospital_name, building=building, city=city, country='India', location=location, source=source, batch=batch, enabled_for_online_booking=False)
                 SourceIdentifier.objects.create(reference_id=hospital.id, unique_identifier=hospital_identifier,
                                                     type=SourceIdentifier.HOSPITAL)
         except Exception as e:
+            self.log_error(row, 'Error while creating hospital. ({})'.format(e))
             print(str(e))
 
         return hospital

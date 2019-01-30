@@ -43,10 +43,10 @@ SECRET_KEY = env('DJANGO_SECRET_KEY')
 JWT_AUTH = {
     'JWT_VERIFY': True,
     'JWT_VERIFY_EXPIRATION': True,
-    'JWT_EXPIRATION_DELTA': datetime.timedelta(days=7),
+    'JWT_EXPIRATION_DELTA': datetime.timedelta(days=365),
     'JWT_AUTH_HEADER_PREFIX': 'Token',
     'JWT_ALLOW_REFRESH': True,
-    'JWT_REFRESH_EXPIRATION_DELTA': datetime.timedelta(days=7),
+    'JWT_REFRESH_EXPIRATION_DELTA': datetime.timedelta(days=365),
 }
 
 # SECURITY WARNING: don't run with debug turned on in production!
@@ -110,7 +110,7 @@ THIRD_PARTY_APPS = (
     'fluent_comments',
     'threadedcomments',
     'django_comments',
-    #'ddtrace.contrib.django',
+    'ddtrace.contrib.django',
 )
 
 LOCAL_APPS = (
@@ -139,6 +139,8 @@ LOCAL_APPS = (
     'ondoc.procedure',
     'ondoc.elastic',
     'ondoc.banner',
+    'ondoc.ckedit',
+    'ondoc.screen',
     'ondoc.comments',
 )
 
@@ -315,6 +317,7 @@ PG_DUMMY_TRANSACTION_URL = env('PG_DUMMY_TRANSACTION_URL')
 PG_DUMMY_TRANSACTION_TOKEN = env('PG_DUMMY_TRANSACTION_TOKEN')
 PG_REFUND_STATUS_API_URL = env('PG_REFUND_STATUS_API_URL')
 PG_SETTLEMENT_URL = env('PG_SETTLEMENT_URL')
+PG_PAYMENT_ACKNOWLEDGE_URL = env('PG_PAYMENT_ACKNOWLEDGE_URL')
 PAYOUTS_ENABLED = env('PAYOUTS_ENABLED')
 PG_REFUND_STATUS_POLL_TIME = 60  # In min
 REFUND_INACTIVE_TIME = 24  # In hours
