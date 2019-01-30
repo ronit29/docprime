@@ -11,6 +11,7 @@ from django.db import transaction
 class CartViewSet(viewsets.GenericViewSet):
 
     def add(self, request, *args, **kwargs):
+        from ondoc.doctor.models import OpdAppointment
 
         user = request.user
         if not user.is_authenticated:
@@ -27,12 +28,15 @@ class CartViewSet(viewsets.GenericViewSet):
             opd_app_serializer = CreateAppointmentSerializer(data=valid_data.get('data'), context={'request': request, 'data' : valid_data.get('data')})
             opd_app_serializer.is_valid(raise_exception=True)
             serialized_data = opd_app_serializer.validated_data
+            cart_item_id = serialized_data.get('cart_item').id if serialized_data.get('cart_item') else None
+            if not OpdAppointment.can_book_for_free(request, serialized_data, cart_item_id):
+                return Response({'request_errors': {"code": "invalid", "message": "Only 3 active free bookings allowed per customer"}}, status.HTTP_400_BAD_REQUEST)
         elif product_id == Order.LAB_PRODUCT_ID:
             lab_app_serializer = LabAppointmentCreateSerializer(data=valid_data.get('data'), context={'request': request, 'data' : valid_data.get('data')})
             lab_app_serializer.is_valid(raise_exception=True)
             serialized_data = lab_app_serializer.validated_data
+            cart_item_id = serialized_data.get('cart_item').id if serialized_data.get('cart_item') else None
 
-        cart_item_id = serialized_data.get('cart_item').id if serialized_data.get('cart_item') else None
         Cart.objects.update_or_create( id=cart_item_id, deleted_at__isnull=True,
                                        product_id=valid_data.get("product_id"), user=user, defaults={"data" : valid_data.get("data")} )
 

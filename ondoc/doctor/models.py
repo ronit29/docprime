@@ -1762,6 +1762,20 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
             prescriptions.append(prescription_dict)
         return prescriptions
 
+    @classmethod
+    def can_book_for_free(cls, request, validated_data, cart_item=None):
+        from ondoc.cart.models import Cart
+
+        price_data = cls.get_price_details(validated_data)
+        if price_data["deal_price"] > 0:
+            return True
+
+        user = request.user
+        free_appointment_count = cls.objects.filter(user=user, deal_price=0).exclude(status__in=[cls.COMPLETED,cls.CANCELLED]).count()
+        free_cart_count = Cart.get_free_opd_item_count(request, cart_item)
+
+        return (free_appointment_count + free_cart_count) < cls.MAX_FREE_BOOKINGS_ALLOWED
+
 class OpdAppointmentProcedureMapping(models.Model):
     opd_appointment = models.ForeignKey(OpdAppointment, on_delete=models.CASCADE, related_name='procedure_mappings')
     procedure = models.ForeignKey('procedure.Procedure', on_delete=models.CASCADE, related_name='opd_appointment_mappings')

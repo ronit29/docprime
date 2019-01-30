@@ -210,16 +210,16 @@ class DoctorAppointmentsViewSet(OndocViewSet):
         validated_data = serializer.validated_data
 
         cart_item_id = validated_data.get('cart_item').id if validated_data.get('cart_item') else None
-        cart_item, is_new = Cart.objects.update_or_create(id=cart_item_id, deleted_at__isnull=True, product_id=account_models.Order.DOCTOR_PRODUCT_ID,
+        if models.OpdAppointment.can_book_for_free(request, validated_data, cart_item_id):
+            cart_item, is_new = Cart.objects.update_or_create(id=cart_item_id, deleted_at__isnull=True, product_id=account_models.Order.DOCTOR_PRODUCT_ID,
                                                   user=request.user,defaults={"data": request.data})
+        else:
+            return Response({'request_errors': {"code": "invalid", "message": "Only 3 active free bookings allowed per customer"}}, status=status.HTTP_400_BAD_REQUEST)
 
         if hasattr(request, 'agent') and request.agent:
             resp = { 'is_agent': True , "status" : 1 }
         else:
             resp = account_models.Order.create_order(request, [cart_item], validated_data.get("use_wallet"))
-
-        # if opd_data.get("deal_price") == 0 and not self.can_book_for_free(request.user):
-        #     return Response({'request_errors': { "code" : "invalid", "message" : "Only 3 active free bookings allowed per customer" }}, status=status.HTTP_400_BAD_REQUEST)
 
         return Response(data=resp)
 
