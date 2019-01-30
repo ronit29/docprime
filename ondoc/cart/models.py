@@ -33,7 +33,7 @@ class Cart(auth_model.TimeStampedModel, auth_model.SoftDeleteModel):
 
         data['start_date'] = format_iso_date(data['start_date'])
         item_data['start_date'] = format_iso_date(item_data['start_date'])
-        return data != item_data and is_valid_tests
+        return data != item_data or is_valid_tests
 
     @classmethod
     def validate_duplicate(cls, data, user, product_id, cart_item=None):
