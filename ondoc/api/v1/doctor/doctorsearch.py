@@ -421,7 +421,8 @@ class DoctorSearchHelper:
                     "mrp": min_price["mrp"],
                     "discounted_fees": min_price["deal_price"],
                     "timings": clinic_convert_timings(doctor_clinic.availability.all(), is_day_human_readable=False),
-                    "procedure_categories": final_result
+                    "procedure_categories": final_result,
+                    "location": {'lat': doctor_clinic.hospital.location.y, 'long': doctor_clinic.hospital.location.x}
                 }]
 
             thumbnail = doctor.get_thumbnail()
