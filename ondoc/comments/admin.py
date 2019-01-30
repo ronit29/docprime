@@ -90,7 +90,7 @@ class CustomCommentsAdmin(CommentsAdminBase):
                                                    is_public=True,  is_removed=False)
 
             if comment.id:
-                if obj and obj.content_object and obj.content_object.author.id:
+                if obj and obj.content_object and obj.content_object.author and obj.content_object.author.id:
                     author_id = obj.content_object.author.id
                     custom_comment = CustomComment.objects.create(author_id=author_id, comment_id=comment.id)
                 else:
