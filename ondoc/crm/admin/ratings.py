@@ -80,8 +80,10 @@ class RatingsReviewAdmin(ImportExportMixin, admin.ModelAdmin):
     resource_class = RatingsReviewResource
     inlines = [ReviewActionsInLine]
     list_display = (['name', 'booking_id', 'appointment_type', 'ratings', 'moderation_status', 'updated_at'])
-    readonly_fields = ['name', 'booking_id', 'appointment_type']
-    form = RatingsReviewForm
+    readonly_fields = ['user', 'name', 'booking_id', 'appointment_type']
+    fields = ('user', 'ratings', 'review', 'name', 'booking_id', 'appointment_type', 'compliment',
+              'moderation_status', 'moderation_comments')
+    # form = RatingsReviewForm
 
     def get_queryset(self, request):
         doctors = Doctor.objects.filter(rating__isnull=False).all().distinct()
@@ -89,10 +91,6 @@ class RatingsReviewAdmin(ImportExportMixin, admin.ModelAdmin):
         self.docs = doctors
         self.labs = labs
         return super(RatingsReviewAdmin, self).get_queryset(request).select_related('content_type')
-
-    # def save_model(self, request, obj, form, change):
-    #     data = 1
-    #     super().save_model(request, obj, form, change)
 
     def get_form(self, request, obj=None, **kwargs):
         form = super(RatingsReviewAdmin, self).get_form(request, obj, **kwargs)
