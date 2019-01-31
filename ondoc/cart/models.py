@@ -29,34 +29,39 @@ class Cart(auth_model.TimeStampedModel, auth_model.SoftDeleteModel):
 
     @classmethod
     def compare_item_data(cls, data, item_data):
-        # compare data after cleanup
+        '''
+            This method compare two cart item's data and return if they are exactly similar.
+            based on provided conditions.
+            returns True => if not similar, False => if similar
+        '''
         data = dict(data)
-        data.pop('coupon_code', None)
-        item_data.pop('coupon_code', None)
-        data.pop('use_wallet', None)
-        item_data.pop('use_wallet', None)
-        data.pop('cart_item', None)
-        item_data.pop('cart_item', None)
-
-        is_valid_tests = True
-        is_lab = False
-        # special handling for tests , checking subset
-        if "test_ids" in item_data and "test_ids" in data:
-            is_lab = True
-            if set(data["test_ids"]).issubset(set(item_data["test_ids"])):
-                is_valid_tests = False
-            data.pop('test_ids', None)
-            item_data.pop('test_ids', None)
-
         data['start_date'] = format_iso_date(data['start_date'])
         item_data['start_date'] = format_iso_date(item_data['start_date'])
 
-        if data == item_data:
-            if is_lab:
-                return is_valid_tests
-            return False
-        else:
-            return True
+        equal_check = ["lab", "doctor", "hospital", "profile", "start_date", "start_time"]
+        subset_check = ["test_ids", "procedure_ids"]
+
+        items_equal = True
+        for key in equal_check:
+            if key in item_data and key in data and item_data[key] != data[key]:
+                items_equal = False
+                continue
+            if key in item_data and key not in data:
+                items_equal = False
+                continue
+            if key in data and key not in item_data:
+                items_equal = False
+                continue
+
+        if not items_equal:
+            return not items_equal
+
+        for key in subset_check:
+            if key in item_data and key in data:
+                if not set(data[key]).issubset(set(item_data[key])):
+                    items_equal = False
+
+        return not items_equal
 
     @classmethod
     def validate_duplicate(cls, data, user, product_id, cart_item=None):
@@ -73,10 +78,10 @@ class Cart(auth_model.TimeStampedModel, auth_model.SoftDeleteModel):
 
         self.data["cart_item"] = self.id
         if self.product_id == Order.DOCTOR_PRODUCT_ID:
-            serializer = CreateAppointmentSerializer(data=self.data, context={'request': request})
+            serializer = CreateAppointmentSerializer(data=self.data, context={'request': request, 'data' : self.data})
             serializer.is_valid(raise_exception=True)
         elif self.product_id == Order.LAB_PRODUCT_ID:
-            serializer = LabAppointmentCreateSerializer(data=self.data, context={'request': request})
+            serializer = LabAppointmentCreateSerializer(data=self.data, context={'request': request, 'data' : self.data})
             serializer.is_valid(raise_exception=True)
 
         validated_data = serializer.validated_data
