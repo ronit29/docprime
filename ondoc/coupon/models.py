@@ -1,5 +1,6 @@
 from django.db import models
 from ondoc.authentication import models as auth_model
+from ondoc.common.models import PaymentOptions
 from django.core.validators import MaxValueValidator, MinValueValidator
 import datetime
 from django.utils.crypto import get_random_string
@@ -48,6 +49,7 @@ class Coupon(auth_model.TimeStampedModel):
     is_visible = models.BooleanField(default=True)
     new_user_constraint = models.BooleanField(default=False)
     coupon_type = models.IntegerField(choices=COUPON_TYPE_CHOICES, default=DISCOUNT)
+    payment_option = models.ForeignKey(PaymentOptions, on_delete=models.SET_NULL, blank=True, null=True)
 
     def save(self, *args, **kwargs):
         if not self.id:
@@ -57,6 +59,25 @@ class Coupon(auth_model.TimeStampedModel):
         if self.age_end and not self.age_start:
             self.age_start = 0
         return super().save(*args, **kwargs)
+
+    def get_search_coupon_discounted_price(self, deal_price):
+        from ondoc.api.v1.utils import CouponsMixin
+        mixin_obj = CouponsMixin()
+        discount = mixin_obj.get_discount(self, deal_price)
+        return max(0, deal_price - discount)
+
+    @classmethod
+    def get_search_coupon(cls, user):
+        coupon_obj = cls.objects.filter(code="WELCOME").first()
+        used_count = 0
+
+        if coupon_obj and user.is_authenticated:
+            used_count = coupon_obj.used_coupon_count(user)
+
+        if coupon_obj and used_count >= coupon_obj.count:
+            coupon_obj = None
+
+        return coupon_obj
 
     def used_coupon_count(self, user):
         from ondoc.doctor.models import OpdAppointment

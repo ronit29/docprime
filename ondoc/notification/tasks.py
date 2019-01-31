@@ -247,9 +247,9 @@ def set_order_dummy_transaction(self, order_id, user_id):
                 "productId": order_row.product_id,
                 "orderId": order_id,
                 "name": appointment.profile.name,
-                "txAmount": str(appointment.effective_price),
+                "txAmount": 0,
                 "couponCode": "",
-                "couponAmt": 0,
+                "couponAmt": str(appointment.effective_price),
                 "paymentMode": "DC",
                 "AppointmentId": order_row.reference_id,
                 "buCallbackSuccessUrl": "",
@@ -303,10 +303,10 @@ def send_offline_appointment_message(number, text, type):
         logger.error("Error sending " + str(type) + " message - " + str(e))
 
 @task
-def send_appointment_reminder_message(number, doctor, date):
+def send_appointment_reminder_message(number, patient_name, doctor, hospital_name, date):
     data = {}
     data['phone_number'] = number
-    text = '''You have an upcomming Appointment with Dr. %s scheduled on %s''' % (doctor, date)
+    text = '''Dear %s, you have an appointment scheduled with %s at %s on %s''' % (patient_name, doctor, hospital_name, date)
     data['text'] = mark_safe(text)
     try:
         notification_models.SmsNotification.send_rating_link(data)
@@ -330,6 +330,8 @@ def send_appointment_location_message(number, hospital_lat, hospital_long):
 def process_payout(payout_id):
     from ondoc.account.models import MerchantPayout, Order
     from ondoc.api.v1.utils import create_payout_checksum
+    from ondoc.account.models import DummyTransactions
+
 
     try:
         if not payout_id:
@@ -368,13 +370,19 @@ def process_payout(payout_id):
 
         req_data = { "payload" : [], "checkSum" : "" }
 
+
         idx = 0
         for txn in all_txn:
+            transaction_amount = txn.amount
+
+            if isinstance(txn, DummyTransactions):
+                transaction_amount = 0
+
             curr_txn = OrderedDict()
             curr_txn["idx"] = idx
             curr_txn["orderNo"] = txn.order_no
             curr_txn["orderId"] = order_data.id
-            curr_txn["txnAmount"] = str(txn.amount)
+            curr_txn["txnAmount"] = str(transaction_amount)
             curr_txn["settledAmount"] = str(payout_data.payable_amount)
             curr_txn["merchantCode"] = merchant.id
             if txn.transaction_id:
@@ -472,7 +480,6 @@ def send_lab_reports(appointment_id):
     except Exception as e:
         logger.error(str(e))
 
-
 @task()
 def upload_doctor_data(obj_id):
     from ondoc.doctor.models import UploadDoctorData
@@ -516,3 +523,18 @@ def upload_doctor_data(obj_id):
         else:
             instance.error_msg = [{'line number': 0, 'message': error_message}]
         instance.save(retry=False)
+
+@task()
+def send_pg_acknowledge(order_id=None, order_no=None):
+    try:
+        if order_id is None or order_no is None:
+            logger.error("Cannot acknowledge without order_id and order_no")
+            return
+
+        url = settings.PG_PAYMENT_ACKNOWLEDGE_URL + "?orderNo=" + str(order_no) + "&orderId=" + str(order_id)
+        response = requests.get(url)
+        if response.status_code == status.HTTP_200_OK:
+            print("Payment acknowledged")
+
+    except Exception as e:
+        logger.error("Error in sending pg acknowledge - " + str(e))
