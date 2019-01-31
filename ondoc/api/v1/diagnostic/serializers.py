@@ -1065,25 +1065,25 @@ class CustomLabTestPackageSerializer(serializers.ModelSerializer):
         lab_data = self.context.get('lab_data', [])
         for data in lab_data:
             if data.id == obj.lab:
-                return data.lab_timings_today_and_next()[0]['lab_timing']
+                return data.lab_timings_today_and_next()['lab_timing']
 
     def get_lab_timing_data(self, obj):
         lab_data = self.context.get('lab_data', [])
         for data in lab_data:
             if data.id == obj.lab:
-                return data.lab_timings_today_and_next()[0]['lab_timing_data']
+                return data.lab_timings_today_and_next()['lab_timing_data']
 
     def get_next_lab_timing(self, obj):
         lab_data = self.context.get('lab_data', [])
         for data in lab_data:
             if data.id == obj.lab:
-                return data.lab_timings_today_and_next()[1]['next_lab_timing_dict']
+                return data.lab_timings_today_and_next()['next_lab_timing_dict']
 
     def get_next_lab_timing_data(self, obj):
         lab_data = self.context.get('lab_data', [])
         for data in lab_data:
             if data.id == obj.lab:
-                return data.lab_timings_today_and_next()[1]['next_lab_timing_data_dict']
+                return data.lab_timings_today_and_next()['next_lab_timing_data_dict']
 
     def get_rating(self, obj):
         lab_data = self.context.get('lab_data', [])

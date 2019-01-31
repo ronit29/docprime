@@ -874,10 +874,9 @@ class LabList(viewsets.ReadOnlyModelViewSet):
             #     'next_lab_timing_dict': next_lab_timing_dict, 'next_lab_timing_data_dict': next_lab_timing_data_dict}
             # lab_timing, lab_timing_data, next_lab_timing_dict, next_lab_timing_data_dict = lab_obj.lab_timings_today_and_next()[0:4]
             lab_timing_temp_dict = lab_obj.lab_timings_today_and_next()
-            lab_timing, lab_timing_data = lab_timing_temp_dict[0]['lab_timing'], lab_timing_temp_dict[0][
-                'lab_timing_data']
-            next_lab_timing_dict, next_lab_timing_data_dict = lab_timing_temp_dict[1]['next_lab_timing_dict'], \
-                                                              lab_timing_temp_dict[1]['next_lab_timing_data_dict']
+            lab_timing, lab_timing_data = lab_timing_temp_dict['lab_timing'], lab_timing_temp_dict['lab_timing_data']
+            next_lab_timing_dict, next_lab_timing_data_dict = lab_timing_temp_dict['next_lab_timing_dict'], \
+                                                              lab_timing_temp_dict['next_lab_timing_data_dict']
 
             if lab_obj.home_collection_charges.exists():
                 row["distance_related_charges"] = 1
@@ -984,8 +983,7 @@ class LabList(viewsets.ReadOnlyModelViewSet):
         else:
             # timing_queryset = lab_obj.lab_timings.filter(day=day_now)
             lab_timing_temp_result = lab_obj.lab_timings_today_and_next()
-            lab_timing, lab_timing_data = lab_timing_temp_result[0]['lab_timing'], lab_timing_temp_result[0][
-                'lab_timing_data']
+            lab_timing, lab_timing_data = lab_timing_temp_result['lab_timing'], lab_timing_temp_result['lab_timing_data']
 
             # entity = EntityUrls.objects.filter(entity_id=lab_id, url_type='PAGEURL', is_valid='t',
         #                                    entity_type__iexact='Lab')
@@ -1250,9 +1248,9 @@ class LabList(viewsets.ReadOnlyModelViewSet):
         #                 break
 
             lab_timing_temp_dict = row["lab"].lab_timings_today_and_next()
-            lab_timing, lab_timing_data = lab_timing_temp_dict[0]['lab_timing'], lab_timing_temp_dict[0]['lab_timing_data']
-            next_lab_timing_dict, next_lab_timing_data_dict = lab_timing_temp_dict[1]['next_lab_timing_dict'], \
-                                                              lab_timing_temp_dict[1]['next_lab_timing_data_dict']
+            lab_timing, lab_timing_data = lab_timing_temp_dict['lab_timing'], lab_timing_temp_dict['lab_timing_data']
+            next_lab_timing_dict, next_lab_timing_data_dict = lab_timing_temp_dict['next_lab_timing_dict'], \
+                                                              lab_timing_temp_dict['next_lab_timing_data_dict']
 
             if row["lab"].home_collection_charges.exists():
                 row["distance_related_charges"] = 1

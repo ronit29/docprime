@@ -328,7 +328,7 @@ class Lab(TimeStampedModel, CreatedByModel, QCModel, SearchKey):
                     next_lab_timing_dict[day] = next_lab_timing
                     next_lab_timing_data_dict[day] = next_lab_timing_data
                     break
-        return {'lab_timing': lab_timing, 'lab_timing_data': lab_timing_data}, {
+        return {'lab_timing': lab_timing, 'lab_timing_data': lab_timing_data,
             'next_lab_timing_dict': next_lab_timing_dict, 'next_lab_timing_data_dict': next_lab_timing_data_dict}
 
     def get_ratings(self):
