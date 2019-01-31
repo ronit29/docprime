@@ -178,18 +178,13 @@ class LabList(viewsets.ReadOnlyModelViewSet):
         gender = validated_data.get('gender')
         package_type = validated_data.get('package_type')
         sort_on = validated_data.get('sort_on')
-        category_ids = validated_data.get('category_ids', None)
-        test_ids = validated_data.get('test_ids', None)
+        category_ids = validated_data.get('category_ids', [])
+        test_ids = validated_data.get('test_ids', [])
         point_string = 'POINT(' + str(long) + ' ' + str(lat) + ')'
         pnt = GEOSGeometry(point_string, srid=4326)
         max_distance = max_distance*1000 if max_distance is not None else 10000
-        if not category_ids:
-            category_ids = LabTestCategory.objects.filter(is_live=True, is_package_category=True).values_list('id',
-                                                                                                              flat=True)
-
-        lab_tests = LabTestCategoryMapping.objects.filter(parent_category_id__in=category_ids).values_list(
-            'lab_test', flat=True)
-
+        lab_tests = LabTestCategoryMapping.objects.filter(parent_category__isnull=False).values_list(
+            'lab_test', flat=True).distinct()
         all_packages_in_network_labs = LabTest.objects.prefetch_related('test').filter(enable_for_retail=True,
                                                                                        searchable=True, is_package=True,
                                                                                        availablelabs__enabled=True,
@@ -232,7 +227,6 @@ class LabList(viewsets.ReadOnlyModelViewSet):
         )
         all_packages_in_non_network_labs = all_packages_in_non_network_labs.filter(id__in=lab_tests)
         all_packages_in_network_labs = all_packages_in_network_labs.filter(id__in=lab_tests)
-
         if test_ids:
             all_packages_in_non_network_labs = all_packages_in_non_network_labs.filter(test__id__in=test_ids).annotate(
                 included_test_count=Count('test'))
@@ -268,6 +262,15 @@ class LabList(viewsets.ReadOnlyModelViewSet):
         if package_type == 2:
             all_packages_in_non_network_labs = all_packages_in_non_network_labs.filter(home_collection_possible=False)
             all_packages_in_network_labs = all_packages_in_network_labs.filter(home_collection_possible=False)
+        if category_ids:
+            all_packages_in_non_network_labs = all_packages_in_non_network_labs.filter(categories__id__in=category_ids).annotate(category_count=Count(F('categories')))
+            all_packages_in_network_labs = all_packages_in_network_labs.filter(categories__id__in=category_ids).annotate(category_count=Count(F('categories')))
+            all_packages_in_non_network_labs = all_packages_in_non_network_labs.filter(category_count=len(category_ids))
+            all_packages_in_network_labs = all_packages_in_network_labs.filter(category_count=len(category_ids))
+
+        all_packages_in_non_network_labs = all_packages_in_non_network_labs.distinct()
+        all_packages_in_network_labs = all_packages_in_network_labs.distinct()
+
         all_packages = [package for package in all_packages_in_network_labs if package.rank == 1]
         all_packages.extend([package for package in all_packages_in_non_network_labs])
         if not sort_on:
