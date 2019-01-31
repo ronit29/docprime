@@ -680,7 +680,10 @@ class DoctorForm(FormCleanMixin):
         if any(self.errors):
             return
         data = self.cleaned_data
-        if data.get('enabled', False):
+        is_enabled = data.get('enabled', None)
+        if is_enabled is None:
+            is_enabled = self.instance.enabled if self.instance else False
+        if is_enabled:
             if any([data.get('disabled_after', None), data.get('disable_reason', None),
                     data.get('disable_comments', None)]):
                 raise forms.ValidationError(
@@ -1006,13 +1009,13 @@ class DoctorAdmin(AutoComplete, ImportExportMixin, VersionAdmin, ActionAdmin, QC
     resource_class = DoctorResource
     change_list_template = 'superuser_import_export.html'
 
-    fieldsets = ((None,{'fields':('name','gender','practicing_since','license','is_license_verified','signature','raw_about' \
-                  ,'about',  'onboarding_url', 'get_onboard_link', 'additional_details')}),
-                 (None,{'fields':('assigned_to',)}),
-                  (None,{'fields':('enabled_for_online_booking','is_internal','is_test_doctor','is_insurance_enabled','is_retail_enabled', \
-                    'is_online_consultation_enabled','online_consultation_fees')}),
-                    (None,{'fields':('enabled','disabled_after','disable_reason','disable_comments','onboarding_status','assigned_to', \
-                     'matrix_lead_id','batch', 'is_gold', 'lead_url', 'registered','is_live')}))
+    # fieldsets = ((None,{'fields':('name','gender','practicing_since','license','is_license_verified','signature','raw_about' \
+    #               ,'about',  'onboarding_url', 'get_onboard_link', 'additional_details')}),
+    #              (None,{'fields':('assigned_to',)}),
+    #               (None,{'fields':('enabled_for_online_booking','is_internal','is_test_doctor','is_insurance_enabled','is_retail_enabled', \
+    #                 'is_online_consultation_enabled','online_consultation_fees')}),
+    #                 (None,{'fields':('enabled','disabled_after','disable_reason','disable_comments','onboarding_status','assigned_to', \
+    #                  'matrix_lead_id','batch', 'is_gold', 'lead_url', 'registered','is_live')}))
     list_display = (
         'name', 'updated_at', 'data_status', 'onboarding_status', 'list_created_by', 'list_assigned_to', 'registered',
         'get_onboard_link')
