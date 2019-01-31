@@ -208,13 +208,31 @@ class HospitalForm(FormCleanMixin):
         if self.cleaned_data['network_type']==2 and not self.cleaned_data['network']:
             raise forms.ValidationError("Network cannot be empty for Network Hospital")
 
+    def clean(self):
+        super().clean()
+        if any(self.errors):
+            return
+        data = self.cleaned_data
+        if data.get('enabled', False):
+            if any([data.get('disabled_after', None), data.get('disable_reason', None),
+                    data.get('disable_comments', None)]):
+                raise forms.ValidationError(
+                    "Cannot have disabled after/disabled reason/disable comments if hospital is enabled.")
+        else:
+            if not all([data.get('disabled_after', None), data.get('disable_reason', None)]):
+                raise forms.ValidationError("Must have disabled after/disable reason if hospital is not enabled.")
+            if data.get('disable_reason', None) and data.get('disable_reason', None) == Hospital.OTHERS and not data.get(
+                    'disable_comments', None):
+                raise forms.ValidationError("Must have disable comments if disable reason is others.")
+
 
 class HospCityFilter(SimpleListFilter):
     title = 'city'
     parameter_name = 'city'
 
     def lookups(self, request, model_admin):
-        cities = set([(c['city'].upper(),c['city'].upper()) if(c.get('city')) else ('','') for c in Hospital.objects.all().values('city')])
+        cities = set([(c['city'].upper(), c['city'].upper()) if (c.get('city')) else ('', '') for c in
+                      Hospital.objects.all().values('city')])
         return cities
 
     def queryset(self, request, queryset):
@@ -225,7 +243,8 @@ class HospCityFilter(SimpleListFilter):
 class HospitalAdmin(admin.GeoModelAdmin, VersionAdmin, ActionAdmin, QCPemAdmin):
     list_filter = ('data_status', HospCityFilter, CreatedByFilter)
     readonly_fields = ('source', 'batch', 'associated_doctors', 'is_live', )
-    exclude = ('search_key', 'live_at', 'qc_approved_at')
+    exclude = (
+    'search_key', 'live_at', 'qc_approved_at', 'disabled_at', 'physical_agreement_signed_at', 'welcome_calling_done_at')
 
     def associated_doctors(self, instance):
         if instance.id:
@@ -240,6 +259,10 @@ class HospitalAdmin(admin.GeoModelAdmin, VersionAdmin, ActionAdmin, QCPemAdmin):
     def save_model(self, request, obj, form, change):
         if not obj.created_by:
             obj.created_by = request.user
+        if not form.cleaned_data.get('enabled', False) and not obj.disabled_by:
+            obj.disabled_by = request.user
+        elif form.cleaned_data.get('enabled', False) and obj.disabled_by:
+            obj.disabled_by = None
         if not obj.assigned_to:
             obj.assigned_to = request.user
         if '_submit_for_qc' in request.POST:

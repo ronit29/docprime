@@ -1099,11 +1099,22 @@ class DoctorListViewSet(viewsets.GenericViewSet):
 
         entity_ids = [doctor_data['id'] for doctor_data in response]
 
-        id_url_dict = dict()
+        entity_data = dict()
         entity = EntityUrls.objects.filter(entity_id__in=entity_ids, sitemap_identifier='DOCTOR_PAGE',
-                                           is_valid=True).values('entity_id', 'url')
+                                           is_valid=True).values('entity_id', 'url', 'breadcrumb', 'location')
+        spec_locality_url = None
         for data in entity:
-            id_url_dict[data['entity_id']] = data['url']
+            entity_data[data['entity_id']] = dict()
+            entity_data[data['entity_id']]['url'] = data['url']
+            #id_url_dict[data['entity_id']] = data['url']
+            breadcrumb = data.get('breadcrumb')
+            if breadcrumb:
+                spec_locality_breadcrumb = breadcrumb[-1]
+                spec_locality_url = spec_locality_breadcrumb.get('url')
+                if not spec_locality_url.startswith('doctors') and spec_locality_url.endswith('sptlitcit'):
+                    entity_data[data['entity_id']]['parent_url'] = spec_locality_url
+                    entity_data[data['entity_id']]['location'] = data.get('location')
+
 
         title = ''
         description = ''
@@ -1344,12 +1355,23 @@ class DoctorListViewSet(viewsets.GenericViewSet):
             #             specialization_dynamic_content = content
 
         for resp in response:
-            if id_url_dict.get(resp['id']):
-                resp['url'] = id_url_dict[resp['id']]
-                resp['schema']['url'] = id_url_dict[resp['id']]
-            else:
-                resp['url'] = None
-                resp['schema']['url'] = None
+            resp['url'] = None
+            resp['schema']['url'] = None
+            resp['parent_url'] = None
+
+            doctor_entity = entity_data.get(resp['id'])
+            if doctor_entity:
+                if doctor_entity.get('url'):
+                    resp['url'] = doctor_entity.get('url')
+                    resp['schema']['url'] = doctor_entity.get('url')
+                parent_location = doctor_entity.get('location')
+                parent_url = doctor_entity.get('parent_url')
+                if parent_location and parent_url:
+                    if resp.get('hospitals')[0] and resp.get('hospitals')[0].get("location"):
+                        hospital_location = Point(resp.get('hospitals')[0].get("location").get('long'),resp.get('hospitals')[0].get("location").get('lat'), srid=4326)
+                        if hospital_location.distance(parent_location)*100 < 1:
+                            resp['parent_url'] = parent_url
+
 
         validated_data.get('procedure_categories', [])
         procedures = list(Procedure.objects.filter(pk__in=validated_data.get('procedure_ids', [])).values('id', 'name'))

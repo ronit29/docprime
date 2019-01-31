@@ -2,6 +2,8 @@ from django.db import models
 from django.utils.safestring import mark_safe
 from ondoc.authentication.models import TimeStampedModel, CreatedByModel, Image
 import datetime
+from django.contrib.contenttypes.models import ContentType
+from django.urls import reverse
 
 from ondoc.doctor.models import Doctor
 
@@ -43,6 +45,10 @@ class Article(TimeStampedModel, CreatedByModel):
     published_date = models.DateField(default=datetime.date.today)
     linked_articles = models.ManyToManyField('self', symmetrical=False, through='LinkedArticle',
                                              through_fields=('article', 'linked_article'))
+
+    def get_absolute_url(self):
+        content_type = ContentType.objects.get_for_model(self)
+        return reverse('admin:%s_%s_change' % (content_type.app_label, content_type.model), args=[self.id])
 
     def icon_tag(self):
         if self.icon:
