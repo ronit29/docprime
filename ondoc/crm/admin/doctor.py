@@ -680,7 +680,10 @@ class DoctorForm(FormCleanMixin):
         if any(self.errors):
             return
         data = self.cleaned_data
-        if data.get('enabled', False):
+        is_enabled = data.get('enabled', None)
+        if is_enabled is None:
+            is_enabled = self.instance.enabled if self.instance else False
+        if is_enabled:
             if any([data.get('disabled_after', None), data.get('disable_reason', None),
                     data.get('disable_comments', None)]):
                 raise forms.ValidationError(
