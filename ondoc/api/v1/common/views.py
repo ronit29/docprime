@@ -886,7 +886,10 @@ class SearchLeadViewSet(viewsets.GenericViewSet):
 class GetPaymentOptionsViewSet(viewsets.GenericViewSet):
 
     def get_queryset(self):
-        request = self.request
+        return None
+
+    def return_queryset(self, request):
+        
         params = request.query_params
         from_app = params.get("from_app", False)
         if from_app:
@@ -896,7 +899,7 @@ class GetPaymentOptionsViewSet(viewsets.GenericViewSet):
         return queryset
 
     def list(self, request):
-        queryset = self.get_queryset()
+        queryset = self.return_queryset(request)
         options = []
         first = True
         for data in queryset:
