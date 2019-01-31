@@ -762,7 +762,9 @@ class LabReportInline(nested_admin.NestedTabularInline):
 
 class LabAppointmentAdmin(nested_admin.NestedModelAdmin):
     form = LabAppointmentForm
-    list_display = ('booking_id', 'get_profile', 'get_lab', 'status', 'time_slot_start', 'created_at', 'updated_at')
+    list_display = (
+        'booking_id', 'get_profile', 'get_lab', 'status', 'reports_uploaded', 'time_slot_start', 'effective_price',
+        'created_at', 'updated_at', 'get_lab_test_name')
     list_filter = ('status', )
     date_hierarchy = 'created_at'
 
@@ -819,7 +821,7 @@ class LabAppointmentAdmin(nested_admin.NestedModelAdmin):
                     'get_lab_test', 'price', 'agreed_price',
                     'deal_price', 'effective_price', 'start_date', 'start_time', 'otp', 'payment_status',
                     'payment_type', 'insurance', 'is_home_pickup', 'address', 'outstanding',
-                    'send_email_sms_report', 'invoice_urls'
+                    'send_email_sms_report', 'invoice_urls', 'reports_uploaded'
                     )
         elif request.user.groups.filter(name=constants['LAB_APPOINTMENT_MANAGEMENT_TEAM']).exists():
             return ('booking_id', 'order_id',  'lab_id', 'lab_name', 'get_lab_test', 'lab_contact_details',
@@ -828,20 +830,21 @@ class LabAppointmentAdmin(nested_admin.NestedModelAdmin):
                     'deal_price', 'effective_price', 'payment_status', 'payment_type', 'insurance', 'is_home_pickup',
                     'get_pickup_address', 'get_lab_address', 'outstanding', 'otp', 'status', 'cancel_type',
                     'cancellation_reason', 'cancellation_comments', 'start_date', 'start_time',
-                    'send_email_sms_report', 'invoice_urls'
+                    'send_email_sms_report', 'invoice_urls', 'reports_uploaded'
                     )
         else:
             return ()
 
     def get_readonly_fields(self, request, obj=None):
         if request.user.is_superuser:
-            read_only =  ['booking_id', 'order_id', 'lab_id', 'lab_contact_details', 'get_lab_test', 'invoice_urls']
+            read_only =  ['booking_id', 'order_id', 'lab_id', 'lab_contact_details', 'get_lab_test', 'invoice_urls', 'reports_uploaded']
         elif request.user.groups.filter(name=constants['LAB_APPOINTMENT_MANAGEMENT_TEAM']).exists():
             read_only = ['booking_id', 'order_id', 'lab_name', 'lab_id', 'get_lab_test', 'invoice_urls',
                     'lab_contact_details', 'used_profile_name', 'used_profile_number',
                     'default_profile_name', 'default_profile_number', 'user_number', 'user_id', 'price', 'agreed_price',
                     'deal_price', 'effective_price', 'payment_status', 'otp',
-                    'payment_type', 'insurance', 'is_home_pickup', 'get_pickup_address', 'get_lab_address', 'outstanding']
+                    'payment_type', 'insurance', 'is_home_pickup', 'get_pickup_address', 'get_lab_address',
+                         'outstanding', 'reports_uploaded']
         else:
             read_only = []
 
@@ -857,6 +860,12 @@ class LabAppointmentAdmin(nested_admin.NestedModelAdmin):
     #     else:
     #         inline_instance.append(LabReportInline(self.model, self.admin_site))
     #     return inline_instance
+
+    def reports_uploaded(self, instance):
+        if instance and instance.id and sum(
+                instance.reports.annotate(no_of_files=Count('files')).values_list('no_of_files', flat=True)):
+            return True
+        return False
 
     def invoice_urls(self, instance):
         invoices_urls = ''
@@ -912,6 +921,13 @@ class LabAppointmentAdmin(nested_admin.NestedModelAdmin):
             ((),),
         )
     get_lab_test.short_description = 'Lab Test'
+
+    def get_lab_test_name(self, obj):
+        format_string = ""
+        for data in obj.test_mappings.all():
+            format_string += "{},".format(data.test.name)
+        return format_string
+    get_lab_test_name.short_description = 'Lab Test Names'
 
     def get_lab_address(self, obj):
         address_items = [

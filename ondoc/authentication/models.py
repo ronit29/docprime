@@ -260,6 +260,31 @@ class User(AbstractBaseUser, PermissionsMixin):
         #     return self.staffprofile.name
         # return str(self.phone_number)
 
+    def get_full_name(self):
+        return self.full_name
+
+    @cached_property
+    def full_name(self):
+        profile = self.get_default_profile
+        if profile and profile.name:
+            return profile.name
+        return ''
+
+    @cached_property
+    def get_default_email(self):
+        profile = self.get_default_profile
+        if profile and profile.email:
+            return profile.email
+        return ''
+
+    @cached_property
+    def get_default_profile(self):
+        user_profile = self.profiles.all().filter(is_default_user=True).first()
+        if user_profile:
+            return user_profile
+        return ''
+        # self.profiles.filter(is_default=True).first()
+
     @cached_property
     def my_groups(self):
         return self.groups.all()
