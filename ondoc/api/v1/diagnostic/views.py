@@ -4,6 +4,7 @@ from ondoc.api.v1.diagnostic.serializers import CustomLabTestPackageSerializer
 from ondoc.authentication.backends import JWTAuthentication
 from ondoc.api.v1.diagnostic import serializers as diagnostic_serializer
 from ondoc.api.v1.auth.serializers import AddressSerializer
+from ondoc.common.models import UserConfig
 from ondoc.ratings_review import models as rating_models
 from ondoc.diagnostic.models import (LabTest, AvailableLabTest, Lab, LabAppointment, LabTiming, PromotedLab,
                                      CommonDiagnosticCondition, CommonTest, CommonPackage,
@@ -84,9 +85,14 @@ class SearchPageViewSet(viewsets.ReadOnlyModelViewSet):
         condition_serializer = diagnostic_serializer.CommonConditionsSerializer(conditions_queryset, many=True)
         recommended_package = diagnostic_serializer.RecommendedPackageCategoryList(recommended_package_qs, many=True)
         temp_data = dict()
+        user_config = UserConfig.objects.filter(key='package_advisor_filters').first()
+        advisor_filter = []
+        if user_config:
+            advisor_filter = user_config.data
         temp_data['common_tests'] = test_serializer.data
         temp_data['recommended_package'] = {'result': recommended_package.data,
-                                            'information': {'screening': 'Screening text', 'physical': 'Physical Text'}}
+                                            'information': {'screening': 'Screening text', 'physical': 'Physical Text'},
+                                            'filters': advisor_filter}
         temp_data['common_package'] = package_serializer.data
         temp_data['preferred_labs'] = lab_serializer.data
         temp_data['common_conditions'] = condition_serializer.data
