@@ -1061,9 +1061,6 @@ class CustomLabTestPackageSerializer(serializers.ModelSerializer):
     def get_price(self, obj):
         return str(obj.price)
 
-    # {'lab_timing': lab_timing, 'lab_timing_data': lab_timing_data}, {
-    #             'next_lab_timing_dict': next_lab_timing_dict, 'next_lab_timing_data_dict': next_lab_timing_data_dict}
-
     def get_lab_timing(self, obj):
         lab_data = self.context.get('lab_data', [])
         for data in lab_data:
