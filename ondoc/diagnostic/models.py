@@ -264,7 +264,7 @@ class Lab(TimeStampedModel, CreatedByModel, QCModel, SearchKey):
             lab_timing_data.append(temp_dict)
             index += 1
 
-        return lab_timing, lab_timing_data
+        return {'lab_timing': lab_timing, 'lab_timing_data': lab_timing_data}
 
     # def lab_timings_today(self, day_now=timezone.now().weekday()):
     #     lab_timing = list()
@@ -283,13 +283,13 @@ class Lab(TimeStampedModel, CreatedByModel, QCModel, SearchKey):
     #                 lab_timing, lab_timing_data = self.get_lab_timing(data)
     #                 # lab_timing.append('{} - {}'.format(time_choices[data.start], time_choices[data.end]))
     #                 # lab_timing_data.append({"start": str(data.start), "end": str(data.end)})
-        return lab_timing, lab_timing_data
+    #    return lab_timing, lab_timing_data
 
     # Lab.lab_timings_today = get_lab_timings_today
 
     def lab_timings_today_and_next(self, day_now=timezone.now().weekday()):
 
-        lab_timing = list()
+        lab_timing = ""
         lab_timing_data = list()
         next_lab_timing_dict = {}
         next_lab_timing_data_dict = {}
@@ -316,15 +316,20 @@ class Lab(TimeStampedModel, CreatedByModel, QCModel, SearchKey):
             for count, timing_data in enumerate(rotated_data_array):
                 day = rotated_days_array[count]
                 if count == 0:
-                    lab_timing, lab_timing_data = self.get_lab_timing(timing_data)
+                    # {'lab_timing': lab_timing, 'lab_timing_data': lab_timing_data}
+                    timing_dict = self.get_lab_timing(timing_data)
+                    lab_timing, lab_timing_data = timing_dict['lab_timing'], timing_dict['lab_timing_data']
                     lab_timing_data = sorted(lab_timing_data, key=lambda k: k["start"])
                 elif timing_data:
-                    next_lab_timing, next_lab_timing_data = self.get_lab_timing(timing_data)
+                    next_timing_dict = self.get_lab_timing(timing_data)
+                    next_lab_timing, next_lab_timing_data = next_timing_dict['lab_timing'], next_timing_dict['lab_timing_data']
+                    # next_lab_timing, next_lab_timing_data = self.get_lab_timing(timing_data)
                     next_lab_timing_data = sorted(next_lab_timing_data, key=lambda k: k["start"])
                     next_lab_timing_dict[day] = next_lab_timing
                     next_lab_timing_data_dict[day] = next_lab_timing_data
                     break
-        return lab_timing, lab_timing_data, next_lab_timing_dict, next_lab_timing_data_dict
+        return {'lab_timing': lab_timing, 'lab_timing_data': lab_timing_data}, {
+            'next_lab_timing_dict': next_lab_timing_dict, 'next_lab_timing_data_dict': next_lab_timing_data_dict}
 
     def get_ratings(self):
         return self.rating.all()

@@ -1018,7 +1018,7 @@ class CustomPackageLabSerializer(LabModelSerializer):
                   'is_home_collection_enabled', 'seo', 'breadcrumb', 'center_visit_enabled', 'avg_rating', 'url')
 
     def get_url(self, obj):
-        entity_url_dict = self.context.get('entity_url_dict')
+        entity_url_dict = self.context.get('entity_url_dict', {})
         return entity_url_dict.get(obj.id, [''])[0] if obj.id else ''
 
     # def get_avg_rating(self, obj):
@@ -1030,18 +1030,18 @@ class CustomLabTestPackageSerializer(serializers.ModelSerializer):
     distance = serializers.SerializerMethodField()
     mrp = serializers.SerializerMethodField()
     price = serializers.SerializerMethodField()
-    lab_timings = serializers.SerializerMethodField()
-    lab_timings_data = serializers.SerializerMethodField()
-    next_lab_timings = serializers.SerializerMethodField()
-    next_lab_timings_data = serializers.SerializerMethodField()
+    lab_timing = serializers.SerializerMethodField()
+    lab_timing_data = serializers.SerializerMethodField()
+    next_lab_timing = serializers.SerializerMethodField()
+    next_lab_timing_data = serializers.SerializerMethodField()
     pickup_charges = serializers.SerializerMethodField()
     pickup_available = serializers.SerializerMethodField()
     distance_related_charges = serializers.SerializerMethodField()
 
     class Meta:
         model = LabTest
-        fields = ('id', 'name', 'lab', 'mrp', 'distance', 'price', 'lab_timings', 'lab_timings_data', 'next_lab_timings',
-                  'next_lab_timings_data', 'test_type', 'is_package', 'number_of_tests', 'why', 'pre_test_info', 'is_package',
+        fields = ('id', 'name', 'lab', 'mrp', 'distance', 'price', 'lab_timing', 'lab_timing_data', 'next_lab_timing',
+                  'next_lab_timing_data', 'test_type', 'is_package', 'number_of_tests', 'why', 'pre_test_info', 'is_package',
                   'pickup_charges', 'pickup_available', 'distance_related_charges', 'priority', 'show_details')
 
     def get_lab(self, obj):
@@ -1061,29 +1061,32 @@ class CustomLabTestPackageSerializer(serializers.ModelSerializer):
     def get_price(self, obj):
         return str(obj.price)
 
-    def get_lab_timings(self, obj):
-        lab_data = self.context.get('lab_data', [])
-        for data in lab_data:
-            if data.id == obj.lab:
-                return data.lab_timings_today_and_next()[0]
+    # {'lab_timing': lab_timing, 'lab_timing_data': lab_timing_data}, {
+    #             'next_lab_timing_dict': next_lab_timing_dict, 'next_lab_timing_data_dict': next_lab_timing_data_dict}
 
-    def get_lab_timings_data(self, obj):
+    def get_lab_timing(self, obj):
         lab_data = self.context.get('lab_data', [])
         for data in lab_data:
             if data.id == obj.lab:
-                return data.lab_timings_today_and_next()[1]
+                return data.lab_timings_today_and_next()[0]['lab_timing']
 
-    def get_next_lab_timings(self, obj):
+    def get_lab_timing_data(self, obj):
         lab_data = self.context.get('lab_data', [])
         for data in lab_data:
             if data.id == obj.lab:
-                return data.lab_timings_today_and_next()[2]
+                return data.lab_timings_today_and_next()[0]['lab_timing_data']
 
-    def get_next_lab_timings_data(self, obj):
+    def get_next_lab_timing(self, obj):
         lab_data = self.context.get('lab_data', [])
         for data in lab_data:
             if data.id == obj.lab:
-                return data.lab_timings_today_and_next()[3]
+                return data.lab_timings_today_and_next()[1]['next_lab_timing_dict']
+
+    def get_next_lab_timing_data(self, obj):
+        lab_data = self.context.get('lab_data', [])
+        for data in lab_data:
+            if data.id == obj.lab:
+                return data.lab_timings_today_and_next()[1]['next_lab_timing_data_dict']
 
     def get_rating(self, obj):
         lab_data = self.context.get('lab_data', [])

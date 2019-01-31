@@ -70,7 +70,7 @@ class SearchPageViewSet(viewsets.ReadOnlyModelViewSet):
         count = int(count)
         if count <= 0:
             count = 10
-        test_queryset = CommonTest.objects.select_related('test').filter(test__enable_for_retail=True)[:count]
+        test_queryset = CommonTest.objects.select_related('test').filter(test__enable_for_retail=True, test__searchable=True)[:count]
         conditions_queryset = CommonDiagnosticCondition.objects.prefetch_related('lab_test').all()
         lab_queryset = PromotedLab.objects.select_related('lab').filter(lab__is_live=True, lab__is_test_lab=False)
         package_queryset = CommonPackage.objects.select_related('package').filter(package__enable_for_retail=True)[:count]
@@ -85,12 +85,11 @@ class SearchPageViewSet(viewsets.ReadOnlyModelViewSet):
         recommended_package = diagnostic_serializer.RecommendedPackageCategoryList(recommended_package_qs, many=True)
         temp_data = dict()
         temp_data['common_tests'] = test_serializer.data
-        temp_data['recommended_package'] = recommended_package.data
+        temp_data['recommended_package'] = {'result': recommended_package.data,
+                                            'information': {'screening': 'Screening text', 'physical': 'Physical Text'}}
         temp_data['common_package'] = package_serializer.data
         temp_data['preferred_labs'] = lab_serializer.data
         temp_data['common_conditions'] = condition_serializer.data
-        temp_data['information'] = {'screening': 'Screening text', 'physical': 'Physical Text'}
-
         return Response(temp_data)
 
 
@@ -884,7 +883,14 @@ class LabList(viewsets.ReadOnlyModelViewSet):
             #             next_lab_timing_data_dict[day] = next_lab_timing_data
             #             break
 
-            lab_timing, lab_timing_data, next_lab_timing_dict, next_lab_timing_data_dict = lab_obj.lab_timings_today_and_next()[0:4]
+            # {'lab_timing': lab_timing, 'lab_timing_data': lab_timing_data}, {
+            #     'next_lab_timing_dict': next_lab_timing_dict, 'next_lab_timing_data_dict': next_lab_timing_data_dict}
+            # lab_timing, lab_timing_data, next_lab_timing_dict, next_lab_timing_data_dict = lab_obj.lab_timings_today_and_next()[0:4]
+            lab_timing_temp_dict = lab_obj.lab_timings_today_and_next()
+            lab_timing, lab_timing_data = lab_timing_temp_dict[0]['lab_timing'], lab_timing_temp_dict[0][
+                'lab_timing_data']
+            next_lab_timing_dict, next_lab_timing_data_dict = lab_timing_temp_dict[1]['next_lab_timing_dict'], \
+                                                              lab_timing_temp_dict[1]['next_lab_timing_data_dict']
 
             if lab_obj.home_collection_charges.exists():
                 row["distance_related_charges"] = 1
@@ -990,9 +996,11 @@ class LabList(viewsets.ReadOnlyModelViewSet):
             }]
         else:
             # timing_queryset = lab_obj.lab_timings.filter(day=day_now)
-            lab_timing, lab_timing_data = lab_obj.lab_timings_today_and_next()[0:2]
+            lab_timing_temp_result = lab_obj.lab_timings_today_and_next()
+            lab_timing, lab_timing_data = lab_timing_temp_result[0]['lab_timing'], lab_timing_temp_result[0][
+                'lab_timing_data']
 
-        # entity = EntityUrls.objects.filter(entity_id=lab_id, url_type='PAGEURL', is_valid='t',
+            # entity = EntityUrls.objects.filter(entity_id=lab_id, url_type='PAGEURL', is_valid='t',
         #                                    entity_type__iexact='Lab')
         # if entity.exists():
         #     entity = entity.first()
@@ -1254,8 +1262,10 @@ class LabList(viewsets.ReadOnlyModelViewSet):
         #                 next_lab_timing_data_dict[day] = next_lab_timing_data
         #                 break
 
-            lab_timing, lab_timing_data, next_lab_timing_dict, next_lab_timing_data_dict = row["lab"].lab_timings_today_and_next()[
-                                                                                           0:4]
+            lab_timing_temp_dict = row["lab"].lab_timings_today_and_next()
+            lab_timing, lab_timing_data = lab_timing_temp_dict[0]['lab_timing'], lab_timing_temp_dict[0]['lab_timing_data']
+            next_lab_timing_dict, next_lab_timing_data_dict = lab_timing_temp_dict[1]['next_lab_timing_dict'], \
+                                                              lab_timing_temp_dict[1]['next_lab_timing_data_dict']
 
             if row["lab"].home_collection_charges.exists():
                 row["distance_related_charges"] = 1
