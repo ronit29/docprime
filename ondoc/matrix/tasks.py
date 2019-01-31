@@ -66,10 +66,14 @@ def prepare_and_hit(self, data):
     except Exception as e:
         pass
 
+    p_email = ''
+    if appointment.profile:
+        p_email = appointment.profile.email
+
     appointment_details = {
         'AppointmentStatus': appointment.status,
-        'Age': calculate_age(appointment.profile.dob) if appointment else '',
-        'Email': appointment.profile.email if appointment else '',
+        'Age': calculate_age(appointment),
+        'Email': p_email,
         'VirtualNo': '',
         'OTP': '',
         'KYC': kyc,
@@ -157,9 +161,12 @@ def prepare_and_hit(self, data):
         logger.info("[ERROR] Appointment could not be published to the matrix system")
 
 
-def calculate_age(dob):
-    if not dob:
+def calculate_age(appointment):
+    if not appointment.profile:
         return ''
+    if not appointment.profile.dob:
+        return ''
+    dob = appointment.profile.dob
     today = date.today()
     return today.year - dob.year - ((today.month, today.day) < (dob.month, dob.day))
 
@@ -202,10 +209,10 @@ def push_appointment_to_matrix(self, data):
                                     'Name': spoc_name,
                                     'Type': spoc_obj.contact_type})
 
-            # Doctor mobile numbers ## Removed Doctor Number
-            # doctor_mobiles = [doctor_mobile.number for doctor_mobile in appointment.doctor.mobiles.all()]
-            # doctor_mobiles = [{'MobileNo': number, 'Name': appointment.doctor.name, 'Type': 2} for number in doctor_mobiles]
-            # mobile_list.extend(doctor_mobiles)
+            # Doctor mobile numbers
+            doctor_mobiles = [doctor_mobile.number for doctor_mobile in appointment.doctor.mobiles.all()]
+            doctor_mobiles = [{'MobileNo': number, 'Name': appointment.doctor.name, 'Type': 2} for number in doctor_mobiles]
+            mobile_list.extend(doctor_mobiles)
         elif data.get('type') == 'LAB_APPOINTMENT':
             order_product_id = 2
             appointment = LabAppointment.objects.filter(pk=appointment_id).first()
