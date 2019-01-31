@@ -885,8 +885,18 @@ class SearchLeadViewSet(viewsets.GenericViewSet):
 
 class GetPaymentOptionsViewSet(viewsets.GenericViewSet):
 
+    def get_queryset(self):
+        request = self.request
+        params = request.query_params
+        from_app = params.get("from_app", False)
+        if from_app:
+            queryset = PaymentOptions.objects.filter(is_enabled=True, payment_gateway__iexact="paytm").order_by('-priority')
+        else:
+            queryset = PaymentOptions.objects.filter(is_enabled=True).order_by('-priority')
+        return queryset
+
     def list(self, request):
-        queryset = PaymentOptions.objects.filter(is_enabled=True).order_by('-priority')
+        queryset = self.get_queryset()
         options = []
         first = True
         for data in queryset:
