@@ -1045,12 +1045,14 @@ class CustomLabTestPackageSerializer(serializers.ModelSerializer):
                   'pickup_charges', 'pickup_available', 'distance_related_charges', 'priority', 'show_details')
 
     def get_lab(self, obj):
-        lab_data = self.context.get('lab_data')
+        lab_data = self.context.get('lab_data', {})
         request = self.context.get('request')
-        entity_url_dict = self.context.get('entity_url_dict')
-        for data in lab_data:
-            if data.id == obj.lab:
-                return CustomPackageLabSerializer(data, context={'entity_url_dict': entity_url_dict,'request': request}).data
+        entity_url_dict = self.context.get('entity_url_dict', {})
+        data = lab_data.get(obj.lab, None)
+        if data is not None:
+            return CustomPackageLabSerializer(data,
+                                              context={'entity_url_dict': entity_url_dict, 'request': request}).data
+        return None
 
     def get_distance(self, obj):
         return int(obj.distance.m)
@@ -1062,58 +1064,64 @@ class CustomLabTestPackageSerializer(serializers.ModelSerializer):
         return str(obj.price)
 
     def get_lab_timing(self, obj):
-        lab_data = self.context.get('lab_data', [])
-        for data in lab_data:
-            if data.id == obj.lab:
-                return data.lab_timings_today_and_next()['lab_timing']
+        lab_data = self.context.get('lab_data', {})
+        data = lab_data.get(obj.lab, None)
+        if data is not None:
+            data.lab_timings_today_and_next().get('lab_timing', '')
+        return ''
 
     def get_lab_timing_data(self, obj):
-        lab_data = self.context.get('lab_data', [])
-        for data in lab_data:
-            if data.id == obj.lab:
-                return data.lab_timings_today_and_next()['lab_timing_data']
+        lab_data = self.context.get('lab_data', {})
+        data = lab_data.get(obj.lab, None)
+        if data is not None:
+            return data.lab_timings_today_and_next().get('lab_timing_data', [])
+        return []
 
     def get_next_lab_timing(self, obj):
-        lab_data = self.context.get('lab_data', [])
-        for data in lab_data:
-            if data.id == obj.lab:
-                return data.lab_timings_today_and_next()['next_lab_timing_dict']
+        lab_data = self.context.get('lab_data', {})
+        data = lab_data.get(obj.lab, None)
+        if data is not None:
+            return data.lab_timings_today_and_next().get('next_lab_timing_dict', {})
+        return {}
 
     def get_next_lab_timing_data(self, obj):
-        lab_data = self.context.get('lab_data', [])
-        for data in lab_data:
-            if data.id == obj.lab:
-                return data.lab_timings_today_and_next()['next_lab_timing_data_dict']
+        lab_data = self.context.get('lab_data', {})
+        data = lab_data.get(obj.lab, None)
+        if data is not None:
+            return data.lab_timings_today_and_next().get('next_lab_timing_data_dict', {})
+        return {}
 
     def get_rating(self, obj):
-        lab_data = self.context.get('lab_data', [])
-        for data in lab_data:
-            if data.id == obj.lab:
-                return data.avg_rating
+        lab_data = self.context.get('lab_data', {})
+        data = lab_data.get(obj.lab, None)
+        if data is not None:
+            return data.avg_rating
+        return {}
 
     def get_pickup_charges(self, obj):
-        lab_data = self.context.get('lab_data', [])
-        for data in lab_data:
-            if data.id == obj.lab and data.is_home_collection_enabled:
-                return data.home_pickup_charges
-            else:
-                return 0
+        lab_data = self.context.get('lab_data', {})
+        data = lab_data.get(obj.lab, None)
+        if data is not None and data.id == obj.lab and data.is_home_collection_enabled:
+            return data.home_pickup_charges
+        else:
+            return 0
 
     def get_pickup_available(self, obj):
         for temp_test in obj.test.all():
             if not temp_test.home_collection_possible:
                 return 0
-        lab_data = self.context.get('lab_data', [])
-        for data in lab_data:
-            if data.id == obj.lab:
-                return 1 if data.is_home_collection_enabled else 0
+        lab_data = self.context.get('lab_data', {})
+        data = lab_data.get(obj.lab, None)
+        if data is not None:
+            return 1 if data.is_home_collection_enabled else 0
         return 0
 
     def get_distance_related_charges(self, obj):
-        lab_data = self.context.get('lab_data', [])
-        for data in lab_data:
-            if data.id == obj.lab:
-                return 1 if bool(data.home_collection_charges.all()) else 0
+        lab_data = self.context.get('lab_data', {})
+        data = lab_data.get(obj.lab, None)
+        if data is not None:
+            return 1 if bool(data.home_collection_charges.all()) else 0
+        return 0
 
 
 class LabPackageListSerializer(serializers.Serializer):
