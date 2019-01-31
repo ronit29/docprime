@@ -163,9 +163,9 @@ def prepare_and_hit(self, data):
 
 def calculate_age(appointment):
     if not appointment.profile:
-        return ''
+        return 0
     if not appointment.profile.dob:
-        return ''
+        return 0
     dob = appointment.profile.dob
     today = date.today()
     return today.year - dob.year - ((today.month, today.day) < (dob.month, dob.day))
