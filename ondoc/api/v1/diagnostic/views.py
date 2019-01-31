@@ -229,9 +229,6 @@ class LabList(viewsets.ReadOnlyModelViewSet):
                 included_test_count=Count('test')).filter(included_test_count=len(test_ids))
             all_packages_in_network_labs = all_packages_in_network_labs.filter(test__id__in=test_ids).annotate(
                 included_test_count=Count('test')).filter(included_test_count=len(test_ids))
-            # all_packages_in_non_network_labs = all_packages_in_non_network_labs.filter(
-            #     included_test_count=len(test_ids))
-            # all_packages_in_network_labs = all_packages_in_network_labs.filter(included_test_count=len(test_ids))
         if category_ids:
             all_packages_in_non_network_labs = all_packages_in_non_network_labs.filter(
                 categories__id__in=category_ids).annotate(category_count=Count(F('categories'))).filter(
@@ -239,49 +236,28 @@ class LabList(viewsets.ReadOnlyModelViewSet):
             all_packages_in_network_labs = all_packages_in_network_labs.filter(
                 categories__id__in=category_ids).annotate(category_count=Count(F('categories'))).filter(
                 category_count=len(category_ids))
-            # all_packages_in_non_network_labs = all_packages_in_non_network_labs.filter(category_count=len(category_ids))
-            # all_packages_in_network_labs = all_packages_in_network_labs.filter(category_count=len(category_ids))
-
         all_packages_in_non_network_labs = all_packages_in_non_network_labs.distinct()
         all_packages_in_network_labs = all_packages_in_network_labs.distinct()
         all_packages = [package for package in all_packages_in_network_labs if package.rank == 1]
         all_packages.extend([package for package in all_packages_in_non_network_labs])
         all_packages = filter(lambda x: x, all_packages)
         if min_distance:
-            # all_packages_in_non_network_labs = all_packages_in_non_network_labs.filter(distance__gte=min_distance)
-            # all_packages_in_network_labs = all_packages_in_network_labs.filter(distance__gte=min_distance)
             all_packages = filter(lambda x: x.distance >= min_distance, all_packages)
         if min_price:
-            # all_packages_in_non_network_labs = all_packages_in_non_network_labs.filter(price__gte=min_price)
-            # all_packages_in_network_labs = all_packages_in_network_labs.filter(price__gte=min_price)
             all_packages = filter(lambda x: x.price >= min_price, all_packages)
         if max_price:
-            # all_packages_in_non_network_labs = all_packages_in_non_network_labs.filter(price__lte=max_price)
-            # all_packages_in_network_labs = all_packages_in_network_labs.filter(price__lte=max_price)
             all_packages = filter(lambda x: x.price <= max_price, all_packages)
         if min_age and max_age:
-            # all_packages_in_non_network_labs = all_packages_in_non_network_labs.filter(min_age__lte=max_age, max_age__gte=min_age)
-            # all_packages_in_network_labs = all_packages_in_network_labs.filter(min_age__lte=max_age, max_age__gte=min_age)
             all_packages = filter(lambda x: x.min_age <= max_age and x.max_age >= min_age, all_packages)
         elif max_age:
-            # all_packages_in_non_network_labs = all_packages_in_non_network_labs.filter(min_age__lte=max_age)
-            # all_packages_in_network_labs = all_packages_in_network_labs.filter(min_age__lte=max_age)
             all_packages = filter(lambda x: x.min_age <= max_age, all_packages)
         elif min_age:
-            # all_packages_in_non_network_labs = all_packages_in_non_network_labs.filter(max_age__gte=min_age)
-            # all_packages_in_network_labs = all_packages_in_network_labs.filter(max_age__gte=min_age)
             all_packages = filter(lambda x: x.max_age >= min_age, all_packages)
         if gender:
-            # all_packages_in_non_network_labs = all_packages_in_non_network_labs.filter(gender_type__in=[gender, LabTest.ALL])
-            # all_packages_in_network_labs = all_packages_in_network_labs.filter(gender_type__in=[gender, LabTest.ALL])
             all_packages = filter(lambda x: x.gender_type in [gender, LabTest.ALL], all_packages)
         if package_type == 1:
-            # all_packages_in_non_network_labs = all_packages_in_non_network_labs.filter(home_collection_possible=True)
-            # all_packages_in_network_labs = all_packages_in_network_labs.filter(home_collection_possible=True)
             all_packages = filter(lambda x: x.home_collection_possible, all_packages)
         if package_type == 2:
-            # all_packages_in_non_network_labs = all_packages_in_non_network_labs.filter(home_collection_possible=False)
-            # all_packages_in_network_labs = all_packages_in_network_labs.filter(home_collection_possible=False)
             all_packages = filter(lambda x: not x.home_collection_possible, all_packages)
         if not sort_on:
             all_packages = sorted(all_packages, key=operator.attrgetter('priority'), reverse=True)
