@@ -224,22 +224,23 @@ class LabList(viewsets.ReadOnlyModelViewSet):
                 When(availablelabs__custom_deal_price__isnull=False,
                      then=F('availablelabs__custom_deal_price'))),
         )
-        all_packages_in_non_network_labs = all_packages_in_non_network_labs.filter(id__in=lab_tests_with_categories)
-        all_packages_in_network_labs = all_packages_in_network_labs.filter(id__in=lab_tests_with_categories)
         if test_ids:
             all_packages_in_non_network_labs = all_packages_in_non_network_labs.filter(test__id__in=test_ids).annotate(
-                included_test_count=Count('test'))
+                included_test_count=Count('test')).filter(included_test_count=len(test_ids))
             all_packages_in_network_labs = all_packages_in_network_labs.filter(test__id__in=test_ids).annotate(
-                included_test_count=Count('test'))
-            all_packages_in_non_network_labs = all_packages_in_non_network_labs.filter(
-                included_test_count=len(test_ids))
-            all_packages_in_network_labs = all_packages_in_network_labs.filter(included_test_count=len(test_ids))
-
+                included_test_count=Count('test')).filter(included_test_count=len(test_ids))
+            # all_packages_in_non_network_labs = all_packages_in_non_network_labs.filter(
+            #     included_test_count=len(test_ids))
+            # all_packages_in_network_labs = all_packages_in_network_labs.filter(included_test_count=len(test_ids))
         if category_ids:
-            all_packages_in_non_network_labs = all_packages_in_non_network_labs.filter(categories__id__in=category_ids).annotate(category_count=Count(F('categories')))
-            all_packages_in_network_labs = all_packages_in_network_labs.filter(categories__id__in=category_ids).annotate(category_count=Count(F('categories')))
-            all_packages_in_non_network_labs = all_packages_in_non_network_labs.filter(category_count=len(category_ids))
-            all_packages_in_network_labs = all_packages_in_network_labs.filter(category_count=len(category_ids))
+            all_packages_in_non_network_labs = all_packages_in_non_network_labs.filter(
+                categories__id__in=category_ids).annotate(category_count=Count(F('categories'))).filter(
+                category_count=len(category_ids))
+            all_packages_in_network_labs = all_packages_in_network_labs.filter(
+                categories__id__in=category_ids).annotate(category_count=Count(F('categories'))).filter(
+                category_count=len(category_ids))
+            # all_packages_in_non_network_labs = all_packages_in_non_network_labs.filter(category_count=len(category_ids))
+            # all_packages_in_network_labs = all_packages_in_network_labs.filter(category_count=len(category_ids))
 
         all_packages_in_non_network_labs = all_packages_in_non_network_labs.distinct()
         all_packages_in_network_labs = all_packages_in_network_labs.distinct()
