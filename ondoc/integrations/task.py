@@ -31,29 +31,36 @@ def push_lab_appointment_to_integrator(self, data):
             raise Exception("Appointment could not found against id - " + str(appointment_id))
 
         lab = appointment.lab
-        lab_test = appointment.lab_test
+        lab_tests = appointment.tests.all()
         lab_network = lab.network
 
-        if not lab or not lab_test or not lab_network:
+        if not lab or not lab_tests or not lab_network:
             logger.error("[ERROR] Cant find lab, lab_network or lab_test")
 
         lab_network_content_type = ContentType.objects.get_for_model(lab_network)
 
         integrator_mapping = None
 
-        if lab_test.is_package:
-            integrator_mapping = IntegratorProfileMapping.objects.filter(content_type=lab_network_content_type, object_id=lab_network.id, test=lab_test)
-        else:
-            integrator_mapping = IntegratorMapping.objects.filter(content_type=lab_network_content_type, object_id=lab_network.id, test=lab_test)
+        tests = list()
+        packages = list()
+        for test in lab_tests:
+            if test.is_package:
+                packages.append(test)
+            else:
+                tests.append(test)
 
-        if not integrator_mapping:
-            logger.error("[ERROR]")
+        if tests and packages[0]:
+            integrator_mapping = IntegratorProfileMapping.objects.filter(content_type=lab_network_content_type, object_id=lab_network.id, test=packages[0])
+        elif packages and tests[0]:
+            integrator_mapping = IntegratorMapping.objects.filter(content_type=lab_network_content_type, object_id=lab_network.id, test=tests[0])
+        else:
+            logger.error('[ERROR]')
 
         integrator_obj = service.create_integrator_obj(integrator_mapping.integrator_class_name)
-        integrator_response = integrator_obj.post_order(appointment)
+        integrator_response = integrator_obj.post_order(appointment, tests=tests, packages=packages)
 
         if not integrator_response:
-            countdown_time = (2 ** self.request.retries) * 60 * 10
+            countdown_time = 1 * 60
             print(countdown_time)
             self.retry([data], countdown=countdown_time)
 

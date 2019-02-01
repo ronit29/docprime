@@ -24,9 +24,9 @@ class BaseIntegrator(object):
 
         return {}
 
-    def post_order(self, lab_appointment):
+    def post_order(self, lab_appointment, **kwargs):
         try:
-            order_detail = self._post_order_details(lab_appointment)
+            order_detail = self._post_order_details(lab_appointment, **kwargs)
             return order_detail
         except Exception as e:
             logger.error("[ERROR]" + self.__class__.__name__ + " order booking error. " + str(e))
