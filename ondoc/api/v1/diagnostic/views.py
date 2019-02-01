@@ -47,6 +47,7 @@ from django.db.models import Q, Value
 from django.db.models.functions import StrIndex
 
 from ondoc.location.models import EntityUrls, EntityAddress
+from ondoc.seo.models import NewDynamic
 from . import serializers
 import copy
 import re
@@ -306,8 +307,15 @@ class LabList(viewsets.ReadOnlyModelViewSet):
                     discounted_price = price if not search_coupon else search_coupon.get_search_coupon_discounted_price(price)
                     package_result["discounted_price"] = discounted_price
 
+        top_content = None
+        bottom_content = None
+        dynamic = NewDynamic.objects.filter(url__url='full-body-checkup-health-packages', is_enabled=True).first()
+        if dynamic:
+            top_content = dynamic.top_content
+            bottom_content = dynamic.bottom_content
         return Response({'result': result, 'categories': category_result, 'count': len(all_packages),
-                         'categories_count': len(category_result)})
+                         'categories_count': len(category_result), 'bottom_content': bottom_content,
+                         'search_content': top_content})
 
 
     @transaction.non_atomic_requests
