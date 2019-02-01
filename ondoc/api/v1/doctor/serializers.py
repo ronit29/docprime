@@ -362,8 +362,9 @@ class UpdateStatusSerializer(serializers.Serializer):
     start_date = serializers.DateTimeField(required=False)
     # start_date = serializers.CharField(required=False)
     start_time = serializers.FloatField(required=False)
-    cancellation_reason = serializers.PrimaryKeyRelatedField(CancellationReason.objects.filter(visible_on_front_end=True))
-    cancellation_comment = serializers.CharField(required=True)
+    cancellation_reason = serializers.PrimaryKeyRelatedField(
+        queryset=CancellationReason.objects.filter(visible_on_front_end=True), required=False)
+    cancellation_comment = serializers.CharField(required=False)
 
 
 class DoctorImageSerializer(serializers.ModelSerializer):
@@ -1108,7 +1109,8 @@ class AppointmentRetrieveSerializer(OpdAppointmentSerializer):
         model = OpdAppointment
         fields = ('id', 'patient_image', 'patient_name', 'type', 'profile', 'otp', 'is_rated', 'rating_declined',
                   'allowed_action', 'effective_price', 'deal_price', 'status', 'time_slot_start', 'time_slot_end',
-                  'doctor', 'hospital', 'allowed_action', 'doctor_thumbnail', 'patient_thumbnail', 'procedures', 'mrp', 'invoices', 'cancellation_reason')
+                  'doctor', 'hospital', 'allowed_action', 'doctor_thumbnail', 'patient_thumbnail', 'procedures', 'mrp',
+                  'invoices', 'cancellation_reason')
 
     def get_procedures(self, obj):
         if obj:

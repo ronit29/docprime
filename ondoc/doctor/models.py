@@ -1309,7 +1309,8 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
         return Invoice.objects.filter(reference_id=self.id, product_id=Order.DOCTOR_PRODUCT_ID)
 
     def get_cancellation_reason(self):
-        return CancellationReason.objects.filter(visible_on_front_end=True, type=Order.DOCTOR_PRODUCT_ID)
+        return CancellationReason.objects.filter(Q(type=Order.DOCTOR_PRODUCT_ID) | Q(type__isnull=True),
+                                                 visible_on_front_end=True)
 
     def get_serialized_cancellation_reason(self):
         res = []

@@ -951,7 +951,6 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin)
     tests = models.ManyToManyField(LabTest, through='LabAppointmentTestMapping', through_fields=('appointment', 'test'))
 
     def get_tests_and_prices(self):
-        # DONE SHASHANK_SINGH CHANGE 10
         test_price = []
         for test in self.test_mappings.all():
             test_price.append({'name': test.test.name, 'mrp': test.mrp, 'deal_price': (
@@ -978,7 +977,8 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin)
         return invoices_urls
 
     def get_cancellation_reason(self):
-        return CancellationReason.objects.filter(visible_on_front_end=True, type=Order.LAB_PRODUCT_ID)
+        return CancellationReason.objects.filter(Q(type=Order.LAB_PRODUCT_ID) | Q(type__isnull=True),
+                                                 visible_on_front_end=True)
 
     def get_serialized_cancellation_reason(self):
         res = []
@@ -1269,8 +1269,6 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin)
             if self.payment_type == OpdAppointment.PREPAID and account_model.ConsumerTransaction.valid_appointment_for_cancellation(
                     self.id, product_id):
                 cancel_amount = self.effective_price
-                cancellation_reason = self.cancellation_reason
-                cancellation_comments = self.cancellation_comments
                 consumer_account.credit_cancellation(self, account_model.Order.LAB_PRODUCT_ID, cancel_amount)
                 if refund_flag:
                     ctx_obj = consumer_account.debit_refund()
