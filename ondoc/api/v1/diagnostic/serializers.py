@@ -1036,7 +1036,7 @@ class CustomLabTestPackageSerializer(serializers.ModelSerializer):
         model = LabTest
         fields = ('id', 'name', 'lab', 'mrp', 'distance', 'price', 'lab_timings', 'lab_timings_data',
                   'test_type', 'is_package', 'number_of_tests', 'why', 'pre_test_info', 'is_package',
-                  'pickup_charges', 'pickup_available', 'distance_related_charges')
+                  'pickup_charges', 'pickup_available', 'distance_related_charges', 'url')
 
     def get_lab(self, obj):
         lab_data = self.context.get('lab_data')
