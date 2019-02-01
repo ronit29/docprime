@@ -1067,7 +1067,7 @@ class CustomLabTestPackageSerializer(serializers.ModelSerializer):
         lab_data = self.context.get('lab_data', {})
         data = lab_data.get(obj.lab, None)
         if data is not None:
-            data.lab_timings_today_and_next().get('lab_timing', '')
+            return data.lab_timings_today_and_next().get('lab_timing', '')
         return ''
 
     def get_lab_timing_data(self, obj):
