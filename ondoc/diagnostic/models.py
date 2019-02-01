@@ -219,6 +219,118 @@ class Lab(TimeStampedModel, CreatedByModel, QCModel, SearchKey):
     class Meta:
         db_table = "lab"
 
+    def convert_min(self, min):
+        min_str = str(min)
+        if min/10 < 1:
+            min_str = '0' + str(min)
+        return min_str
+
+    def convert_time(self, time):
+        hour = int(time)
+        min = int((time - hour) * 60)
+        am_pm = ''
+        if time < 12:
+            am_pm = 'AM'
+        else:
+            am_pm = 'PM'
+            hour -= 12
+        min_str = self.convert_min(min)
+        return str(hour) + ":" + min_str + " " + am_pm
+
+    def get_lab_timing(self, queryset):
+        lab_timing = ''
+        lab_timing_data = list()
+        temp_list = list()
+
+        for qdata in queryset:
+            temp_list.append({"start": qdata.start, "end": qdata.end})
+
+        temp_list = sorted(temp_list, key=lambda k: k["start"])
+
+        index = 0
+        while index < len(temp_list):
+            temp_dict = dict()
+            x = index
+            if not lab_timing:
+                lab_timing += self.convert_time(temp_list[index]["start"]) + " - "
+            else:
+                lab_timing += " | " + self.convert_time(temp_list[index]["start"]) + " - "
+            temp_dict["start"] = temp_list[index]["start"]
+            while x + 1 < len(temp_list) and temp_list[x]["end"] >= temp_list[x+1]["start"]:
+                x += 1
+            index = x
+            lab_timing += self.convert_time(temp_list[index]["end"])
+            temp_dict["end"] = temp_list[index]["end"]
+            lab_timing_data.append(temp_dict)
+            index += 1
+
+        return {'lab_timing': lab_timing, 'lab_timing_data': lab_timing_data}
+
+    # def lab_timings_today(self, day_now=timezone.now().weekday()):
+    #     lab_timing = list()
+    #     lab_timing_data = list()
+    #     time_choices = {item[0]: item[1] for item in LabTiming.TIME_CHOICES}
+    #     if self.always_open:
+    #         lab_timing.append("12:00 AM - 11:45 PM")
+    #         lab_timing_data.append({
+    #             "start": str(0.0),
+    #             "end": str(23.75)
+    #         })
+    #     else:
+    #         timing_queryset = self.lab_timings.all()
+    #         for data in timing_queryset:
+    #             if data.day == day_now:
+    #                 lab_timing, lab_timing_data = self.get_lab_timing(data)
+    #                 # lab_timing.append('{} - {}'.format(time_choices[data.start], time_choices[data.end]))
+    #                 # lab_timing_data.append({"start": str(data.start), "end": str(data.end)})
+    #    return lab_timing, lab_timing_data
+
+    # Lab.lab_timings_today = get_lab_timings_today
+
+    def lab_timings_today_and_next(self, day_now=timezone.now().weekday()):
+
+        lab_timing = ""
+        lab_timing_data = list()
+        next_lab_timing_dict = {}
+        next_lab_timing_data_dict = {}
+        data_array = [list() for i in range(7)]
+        days_array = [i for i in range(7)]
+        rotated_days_array = days_array[day_now:] + days_array[:day_now]
+        if self.always_open:
+            lab_timing = "12:00 AM - 11:45 PM"
+            lab_timing_data = [{
+                "start": 0.0,
+                "end": 23.75
+            }]
+            next_lab_timing_dict = {day_now+1: "12:00 AM - 11:45 PM"}
+            next_lab_timing_data_dict = {day_now+1: {
+                "start": 0.0,
+                "end": 23.75
+            }}
+        else:
+            timing_queryset = self.lab_timings.all()
+            for data in timing_queryset:
+                data_array[data.day].append(data)
+            rotated_data_array = data_array[day_now:] + data_array[:day_now]
+
+            for count, timing_data in enumerate(rotated_data_array):
+                day = rotated_days_array[count]
+                if count == 0:
+                    # {'lab_timing': lab_timing, 'lab_timing_data': lab_timing_data}
+                    timing_dict = self.get_lab_timing(timing_data)
+                    lab_timing, lab_timing_data = timing_dict['lab_timing'], timing_dict['lab_timing_data']
+                    lab_timing_data = sorted(lab_timing_data, key=lambda k: k["start"])
+                elif timing_data:
+                    next_timing_dict = self.get_lab_timing(timing_data)
+                    next_lab_timing, next_lab_timing_data = next_timing_dict['lab_timing'], next_timing_dict['lab_timing_data']
+                    # next_lab_timing, next_lab_timing_data = self.get_lab_timing(timing_data)
+                    next_lab_timing_data = sorted(next_lab_timing_data, key=lambda k: k["start"])
+                    next_lab_timing_dict[day] = next_lab_timing
+                    next_lab_timing_data_dict[day] = next_lab_timing_data
+                    break
+        return {'lab_timing': lab_timing, 'lab_timing_data': lab_timing_data,
+            'next_lab_timing_dict': next_lab_timing_dict, 'next_lab_timing_data_dict': next_lab_timing_data_dict}
+
     def get_ratings(self):
         return self.rating.all()
 
@@ -655,6 +767,7 @@ class ParameterLabTest(TimeStampedModel):
     def __str__(self):
         return "{}".format(self.parameter.name)
 
+
 class FrequentlyAddedTogetherTests(TimeStampedModel):
     original_test = models.ForeignKey('diagnostic.LabTest', related_name='base_test' ,null =True, blank =False, on_delete=models.CASCADE)
     booked_together_test = models.ForeignKey('diagnostic.LabTest', related_name='booked_together' ,null=True, blank=False, on_delete=models.CASCADE)
@@ -662,12 +775,14 @@ class FrequentlyAddedTogetherTests(TimeStampedModel):
     class Meta:
         db_table = "frequently_added_tests"
 
+
 class LabTestCategory(auth_model.TimeStampedModel, SearchKey):
     name = models.CharField(max_length=500, unique=True)
     preferred_lab_test = models.ForeignKey('LabTest', on_delete=models.SET_NULL,
                                             related_name='preferred_in_lab_test_category', null=True, blank=True)
     is_live = models.BooleanField(default=False)
     is_package_category = models.BooleanField(verbose_name='Is this a test package category?')
+    show_on_recommended_screen = models.BooleanField(default=False)
 
     def __str__(self):
         return self.name
@@ -688,6 +803,21 @@ class LabTestCategoryMapping(models.Model):
 
     class Meta:
         db_table = "lab_test_to_category_mapping"
+        unique_together = (('lab_test', 'parent_category'),)
+
+
+class LabTestRecommendedCategoryMapping(models.Model):
+    lab_test = models.ForeignKey('LabTest', on_delete=models.CASCADE,
+                                 related_name='recommended_lab_test_category_mappings')
+    parent_category = models.ForeignKey(LabTestCategory, on_delete=models.CASCADE,
+                                        related_name='recommended_lab_test_mappings')
+    show_on_recommended_screen = models.BooleanField(default=False)
+
+    def __str__(self):
+        return '({}){}'.format(self.lab_test, self.parent_category)
+
+    class Meta:
+        db_table = "lab_test_recommended_category_mapping"
         unique_together = (('lab_test', 'parent_category'),)
 
 
@@ -739,7 +869,22 @@ class LabTest(TimeStampedModel, SearchKey):
                                         through=LabTestCategoryMapping,
                                         through_fields=('lab_test', 'parent_category'),
                                         related_name='lab_tests')
-
+    min_age = models.PositiveSmallIntegerField(default=None, blank=True, null=True, validators=[MaxValueValidator(120), MinValueValidator(1)])
+    max_age = models.PositiveSmallIntegerField(default=None, blank=True, null=True, validators=[MaxValueValidator(120), MinValueValidator(1)])
+    MALE = 1
+    FEMALE = 2
+    ALL = 3
+    GENDER_TYPE_CHOICES = (
+        ('', 'Select'),
+        (MALE, 'male'),
+        (FEMALE, 'female'),
+        (ALL, 'all')
+    )
+    gender_type = models.PositiveIntegerField(choices=GENDER_TYPE_CHOICES, blank=True, null=True)
+    recommended_categories = models.ManyToManyField(LabTestCategory,
+                                        through=LabTestRecommendedCategoryMapping,
+                                        through_fields=('lab_test', 'parent_category'),
+                                        related_name='recommended_lab_tests')
     # test_sub_type = models.ManyToManyField(
     #     LabTestSubType,
     #     through='LabTestSubTypeMapping',
@@ -747,7 +892,7 @@ class LabTest(TimeStampedModel, SearchKey):
     # )
 
     def __str__(self):
-        return self.name
+        return '{} ({})'.format(self.name, "PACKAGE" if self.is_package else "TEST")
 
     class Meta:
         db_table = "lab_test"
@@ -1713,25 +1858,3 @@ class LabAppointmentTestMapping(models.Model):
 
     class Meta:
         db_table = 'lab_appointment_test_mapping'
-
-
-def get_lab_timings_today(self, day_now=timezone.now().weekday()):
-    lab_timing = list()
-    lab_timing_data = list()
-    time_choices = {item[0]: item[1] for item in LabTiming.TIME_CHOICES}
-    if self.always_open:
-        lab_timing.append("12:00 AM - 11:45 PM")
-        lab_timing_data.append({
-            "start": str(0.0),
-            "end": str(23.75)
-        })
-    else:
-        timing_queryset = self.lab_timings.all()
-        for data in timing_queryset:
-            if data.day == day_now:
-                lab_timing.append('{} - {}'.format(time_choices[data.start], time_choices[data.end]))
-                lab_timing_data.append({"start": str(data.start), "end": str(data.end)})
-    return ' | '.join(lab_timing), lab_timing_data
-
-
-Lab.lab_timings_today = get_lab_timings_today
