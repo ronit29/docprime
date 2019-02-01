@@ -4,7 +4,7 @@ from django.conf import settings
 from rest_framework import status
 from django.db import transaction
 from ondoc.location.services.mumbai_bangalore_pincodes import pincodes, specializations
-from ondoc.location.services.latlong import latlong
+from ondoc.location.services.latlong import latitudelongitude
 import time
 
 class SearchedDoctorData():
@@ -43,14 +43,18 @@ class SearchedDoctorData():
         #     for pincode in pincodes:
         #         search_keywords = specialization + ' in ' + str(pincode)
         #         print(search_keywords + ' ' + SearchedDoctorData.searched_google_data(search_keywords))
+
+        for latlong in latitudelongitude:
+            search_keywords = latlong
+            print(search_keywords + ' ' + SearchedDoctorData.searched_google_data(search_keywords))
         return 'success'
 
 
     @staticmethod
-    def run_google_search(search_keywords, next_token):
+    def run_google_search_by_lat_long(search_keywords, next_token):
         if next_token:
             time.sleep(2)
-        params = {'query': search_keywords, 'key': settings.REVERSE_GEOCODING_API_KEY}
+        params = {'location':str(search_keywords[0]) + ',' + str(search_keywords[1]), 'radius':1000,'type':'doctor', 'key': settings.REVERSE_GEOCODING_API_KEY}
         results = {}
         if next_token:
             params['pagetoken'] = next_token
@@ -81,6 +85,43 @@ class SearchedDoctorData():
             results['next_page_token'] = None
 
         return results
+
+    #
+    # @staticmethod
+    # def run_google_search(search_keywords, next_token):
+    #     if next_token:
+    #         time.sleep(2)
+    #     params = {'query': search_keywords, 'key': settings.REVERSE_GEOCODING_API_KEY}
+    #     results = {}
+    #     if next_token:
+    #         params['pagetoken'] = next_token
+    #
+    #     response = requests.get(
+    #             'https://maps.googleapis.com/maps/api/place/textsearch/json',
+    #             params=params)
+    #
+    #     if response.status_code != status.HTTP_200_OK or not response.ok:
+    #         print('failure  status_code: ' + str(response.status_code) + ', reason: ' + str(response.reason))
+    #         return {}
+    #     searched_data = response.json()
+    #     google_result = []
+    #
+    #     if isinstance(searched_data.get('results'), list) and \
+    #             len(searched_data.get('results')) == 0:
+    #         return {}
+    #
+    #     if searched_data.get('results'):
+    #         for data in searched_data.get('results'):
+    #             google_result.append(data)
+    #         results['data'] = google_result
+    #         results['count'] = len(google_result)
+    #
+    #     if searched_data.get('next_page_token'):
+    #         results['next_page_token'] = searched_data.get('next_page_token')
+    #     else:
+    #         results['next_page_token'] = None
+    #
+    #     return results
 
     @staticmethod
     def create_place_data(data, place_id):
@@ -133,13 +174,15 @@ class SearchedDoctorData():
         if not google_data:
             while next_page_token or page==1:
                 page += 1
-                result = SearchedDoctorData.run_google_search(search_keywords, next_page_token)
+                result = SearchedDoctorData.run_google_search_by_lat_long(search_keywords, next_page_token)
                 next_page_token = result.get('next_page_token')
                 if result.get('count'):
                     count += result.get('count')
                 if result.get('data') and len(result.get('data'))>0:
                     for result in result.get('data'):
                         search_results.append(result)
+
+            search_keywords = 'Doctors in ' + search_keywords
             google_data = GoogleSearches.objects.create(search_keywords=search_keywords,
                                                                         results=search_results, count=count)
         if google_data:
