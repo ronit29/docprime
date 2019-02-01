@@ -2111,6 +2111,8 @@ class OfflineCustomerViewSet(viewsets.GenericViewSet):
         if hasattr(appnt.user, 'patient_mobiles'):
             for mob in appnt.user.patient_mobiles.all():
                 phone_number.append({"phone_number": mob.phone_number, "is_default": mob.is_default})
+                if mob.is_default:
+                    patient_profile['phone_number'] = mob.phone_number
         patient_profile['patient_numbers'] = phone_number
 
         ret_obj = {}
@@ -2262,12 +2264,13 @@ class OfflineCustomerViewSet(viewsets.GenericViewSet):
             patient_dict[
                 'display_welcome_message'] = data.display_welcome_message if data.display_welcome_message else None
             patient_dict['error'] = data.error if data.error else None
-            phone_number = ''
+            patient_numbers = []
             if hasattr(data, 'patient_mobiles'):
                 for mob in data.patient_mobiles.all():
+                    patient_numbers.append({"phone_number": mob.phone_number, "is_default": mob.is_default})
                     if mob.is_default:
-                        phone_number = mob.phone_number
-            patient_dict['patient_numbers'] = phone_number
+                        patient_dict['phone_number'] = mob.phone_number
+            patient_dict['patient_numbers'] = patient_numbers
             response.append(patient_dict)
         return Response(response)
 
@@ -2773,7 +2776,9 @@ class OfflineCustomerViewSet(viewsets.GenericViewSet):
                 if hasattr(app.user, 'patient_mobiles'):
                     for mob in app.user.patient_mobiles.all():
                         phone_number.append({"phone_number": mob.phone_number, "is_default": mob.is_default})
-                patient_profile['phone_numbers'] = phone_number
+                        if mob.is_default:
+                            patient_profile['phone_number'] = mob.phone_number
+                patient_profile['patient_numbers'] = phone_number
                 error_flag = app.error if app.error else False
                 error_message = app.error_message if app.error_message else ''
             else:
