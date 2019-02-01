@@ -49,7 +49,7 @@ class ScreenViewSet(viewsets.GenericViewSet):
             },
             {
                 'priority': 2,
-                'title': "Book a Test",
+                'title': "Health Packages",
                 'type': "CommonPackage",
                 'items': package_serializer.data,
                 'tag': "Upto 50% off",
@@ -60,7 +60,7 @@ class ScreenViewSet(viewsets.GenericViewSet):
 
         payment_obj = GetPaymentOptionsViewSet()
 
-        payment_options = GetPaymentOptionsViewSet.list(payment_obj, request).data
+        payment_options = payment_obj.list(request).data
 
         resp = {"home":
                     {
