@@ -973,7 +973,8 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin)
         if self.id:
             invoices = self.get_invoice_objects()
             for invoice in invoices:
-                invoices_urls.append(util_absolute_url(invoice.file.url))
+                if invoice.file:
+                    invoices_urls.append(util_absolute_url(invoice.file.url))
         return invoices_urls
 
     def get_cancellation_reason(self):

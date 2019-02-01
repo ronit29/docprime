@@ -1323,7 +1323,8 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
         if self.id:
             invoices = self.get_invoice_objects()
             for invoice in invoices:
-                invoices_urls.append(util_absolute_url(invoice.file.url))
+                if invoice.file:
+                    invoices_urls.append(util_absolute_url(invoice.file.url))
         return invoices_urls
 
     @classmethod
