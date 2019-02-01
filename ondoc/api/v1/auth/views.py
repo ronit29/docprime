@@ -1670,6 +1670,7 @@ class OrderDetailViewSet(GenericViewSet):
             curr = {
                 "mrp" : order.action_data["mrp"] if "mrp" in order.action_data else order.action_data["agreed_price"],
                 "deal_price": order.action_data["deal_price"],
+                "effective_price": order.action_data["effective_price"],
                 "data" : cart_serializers.CartItemSerializer(item, context={"validated_data" : None}).data,
                 "booking_id" : order.reference_id,
                 "time_slot_start" : order.action_data["time_slot_start"]
