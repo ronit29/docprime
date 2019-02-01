@@ -544,7 +544,6 @@ def send_pg_acknowledge(order_id=None, order_no=None):
 
 @task()
 def refund_completed_sms_task(obj_id):
-    print('inside complete task \n\n')
     from ondoc.account.models import ConsumerRefund
     from ondoc.communications.models import SMSNotification
     from ondoc.notification.models import NotificationAction
@@ -553,10 +552,8 @@ def refund_completed_sms_task(obj_id):
     try:
         # check if any more obj incomplete status
         instance = ConsumerRefund.objects.filter(id=obj_id).first()
-        print('inside complete task instance\n\n', instance)
         if not instance or ConsumerRefund.objects.filter(consumer_transaction_id=instance.consumer_transaction_id,
                                                          refund_state=ConsumerRefund.PENDING).count() > 1:
-            print('inside complete task failed if \n\n', model_to_dict(instance))
             return
         context = {'amount': instance.consumer_transaction.amount}
         receivers = []
@@ -579,7 +576,7 @@ def refund_breakup_sms_task(obj_id):
     from ondoc.communications.models import unique_phone_numbers
     try:
         instance = ConsumerTransaction.objects.filter(id=obj_id).first()
-        if not instance:
+        if not instance or not instance.user:
             return
         context = {'amount': instance.amount}
         receivers = []
