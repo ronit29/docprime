@@ -1487,8 +1487,8 @@ class DoctorAvailabilityTimingViewSet(viewsets.ViewSet):
         obj = TimeSlotExtraction()
 
         for data in queryset:
-            obj.form_time_slots(data.day, data.start, data.end, data.fees, True, data.type,
-                                data.deal_price, data.mrp, True)
+            obj.form_time_slots(data.day, data.start, data.end, data.fees, True,
+                                data.deal_price, data.mrp, True, data.type)
 
         timeslots = obj.get_timing_list()
         return Response({"timeslots": timeslots, "doctor_data": doctor_serializer.data,

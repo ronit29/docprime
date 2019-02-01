@@ -750,7 +750,7 @@ class TimeSlotExtraction(object):
             self.price_available[i] = dict()
 
     def form_time_slots(self, day, start, end, price=None, is_available=True,
-                        on_call=1, deal_price=None, mrp=None, is_doctor=False):
+                        deal_price=None, mrp=None, is_doctor=False, on_call=1):
         start = Decimal(str(start))
         end = Decimal(str(end))
         time_span = self.TIME_SPAN
