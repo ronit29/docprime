@@ -1195,6 +1195,8 @@ class LabTestAdminForm(forms.ModelForm):
                 raise forms.ValidationError('Please dont enter max_age')
             if cleaned_data.get('gender_type'):
                 raise forms.ValidationError('Please dont enter gender_type')
+            if cleaned_data.get('reference_code'):
+                raise forms.ValidationError('Please dont enter reference code for a test')
 
 
 class LabTestAdmin(PackageAutoCompleteView, ImportExportMixin, VersionAdmin):
