@@ -848,7 +848,7 @@ class LabAppointmentAdmin(nested_admin.NestedModelAdmin):
         else:
             read_only = []
 
-        if obj.status == LabAppointment.COMPLETED or obj.status == LabAppointment.CANCELLED:
+        if obj and (obj.status == LabAppointment.COMPLETED or obj.status == LabAppointment.CANCELLED):
             read_only.extend(['status'])
         return read_only
 

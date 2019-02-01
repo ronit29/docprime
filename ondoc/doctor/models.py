@@ -1308,6 +1308,15 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
     def get_invoice_objects(self):
         return Invoice.objects.filter(reference_id=self.id, product_id=Order.DOCTOR_PRODUCT_ID)
 
+    def get_cancellation_reason(self):
+        return CancellationReason.objects.filter(visible_on_front_end=True, type=Order.DOCTOR_PRODUCT_ID)
+
+    def get_serialized_cancellation_reason(self):
+        res = []
+        for cr in self.get_cancellation_reason():
+            res.append({'id': cr.id, 'name': cr.name})
+        return res
+
     def get_invoice_urls(self):
         invoices_urls = []
         if self.id:

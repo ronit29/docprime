@@ -9,8 +9,9 @@ from ondoc.doctor.models import (OpdAppointment, Doctor, Hospital, DoctorHospita
                                  DoctorAward, DoctorDocument, DoctorEmail, DoctorExperience, DoctorImage,
                                  DoctorLanguage, DoctorMedicalService, DoctorMobile, DoctorQualification, DoctorLeave,
                                  Prescription, PrescriptionFile, Specialization, DoctorSearchResult, HealthTip,
-                                 CommonMedicalCondition,CommonSpecialization,
-                                 DoctorPracticeSpecialization, DoctorClinic, OfflineOPDAppointments, OfflinePatients)
+                                 CommonMedicalCondition, CommonSpecialization,
+                                 DoctorPracticeSpecialization, DoctorClinic, OfflineOPDAppointments, OfflinePatients,
+                                 CancellationReason)
 from ondoc.diagnostic import models as lab_models
 from ondoc.authentication.models import UserProfile, DoctorNumber, GenericAdmin, GenericLabAdmin
 from django.db.models import Avg
@@ -361,6 +362,8 @@ class UpdateStatusSerializer(serializers.Serializer):
     start_date = serializers.DateTimeField(required=False)
     # start_date = serializers.CharField(required=False)
     start_time = serializers.FloatField(required=False)
+    cancellation_reason = serializers.PrimaryKeyRelatedField(CancellationReason.objects.filter(visible_on_front_end=True))
+    cancellation_comment = serializers.CharField(required=True)
 
 
 class DoctorImageSerializer(serializers.ModelSerializer):
@@ -1099,12 +1102,13 @@ class AppointmentRetrieveSerializer(OpdAppointmentSerializer):
     doctor = AppointmentRetrieveDoctorSerializer()
     procedures = serializers.SerializerMethodField()
     invoices = serializers.SerializerMethodField()
+    cancellation_reason = serializers.SerializerMethodField()
 
     class Meta:
         model = OpdAppointment
         fields = ('id', 'patient_image', 'patient_name', 'type', 'profile', 'otp', 'is_rated', 'rating_declined',
                   'allowed_action', 'effective_price', 'deal_price', 'status', 'time_slot_start', 'time_slot_end',
-                  'doctor', 'hospital', 'allowed_action', 'doctor_thumbnail', 'patient_thumbnail', 'procedures', 'mrp', 'invoices')
+                  'doctor', 'hospital', 'allowed_action', 'doctor_thumbnail', 'patient_thumbnail', 'procedures', 'mrp', 'invoices', 'cancellation_reason')
 
     def get_procedures(self, obj):
         if obj:
@@ -1113,6 +1117,9 @@ class AppointmentRetrieveSerializer(OpdAppointmentSerializer):
 
     def get_invoices(self, obj):
         return obj.get_invoice_urls()
+
+    def get_cancellation_reason(self, obj):
+        return obj.get_serialized_cancellation_reason()
 
 
 class DoctorAppointmentRetrieveSerializer(OpdAppointmentSerializer):
