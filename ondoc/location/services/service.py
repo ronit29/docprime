@@ -56,7 +56,7 @@ class SearchedDoctorData():
     def run_google_search(search_keywords, next_token):
         if next_token:
             time.sleep(1)
-        params = {'location':str(search_keywords[0]) + ',' + str(search_keywords[1]), 'radius':5000,'type':'doctor', 'key': settings.REVERSE_GEOCODING_API_KEY}
+        params = {'location':str(search_keywords[0]) + ',' + str(search_keywords[1]), 'radius':1000,'type':'doctor', 'key': settings.REVERSE_GEOCODING_API_KEY}
         results = {}
         if next_token:
             params['pagetoken'] = next_token
