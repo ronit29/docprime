@@ -813,10 +813,10 @@ class TimeSlotExtraction(object):
             if 'mrp' in pa[k].keys() and 'deal_price' in pa[k].keys():
                 data_list.append({"value": k, "text": v, "price": pa[k]["price"],
                                   "mrp": pa[k]['mrp'], 'deal_price': pa[k]['deal_price'],
-                                  "is_available": pa[k]["is_available"], "on_call": pa[k]["on_call"]})
+                                  "is_available": pa[k]["is_available"], "on_call": pa[k].get("on_call", False)})
             else:
                 data_list.append({"value": k, "text": v, "price": pa[k]["price"],
-                                  "is_available": pa[k]["is_available"], "on_call": pa[k]["on_call"]})
+                                  "is_available": pa[k]["is_available"], "on_call": pa[k].get("on_call", False)})
         format_data = dict()
         format_data['type'] = 'AM' if day_time == self.MORNING else 'PM'
         format_data['title'] = day_time
