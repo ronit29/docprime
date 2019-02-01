@@ -552,16 +552,12 @@ def refund_completed_sms_task(obj_id):
     try:
         # check if any more obj incomplete status
         instance = ConsumerRefund.objects.filter(id=obj_id).first()
-        if not instance or ConsumerRefund.objects.filter(consumer_transaction_id=instance.consumer_transaction_id,
-                                                         refund_state=ConsumerRefund.PENDING).count() > 1:
+        if not instance or not instance.user or ConsumerRefund.objects.filter(
+                consumer_transaction_id=instance.consumer_transaction_id,
+                refund_state=ConsumerRefund.PENDING).count() > 1:
             return
         context = {'amount': instance.consumer_transaction.amount}
-        receivers = []
-        default_user_profile = UserProfile.objects.filter(user=instance.user, is_default_user=True).first()
-        if default_user_profile and default_user_profile.phone_number:
-            receivers.append({'user': instance.user, 'phone_number': default_user_profile.phone_number})
-        receivers.append({'user': instance.user, 'phone_number': instance.user.phone_number})
-        receivers=unique_phone_numbers(receivers)
+        receivers = instance.user.get_phone_number_for_communication()
         sms_notification = SMSNotification(NotificationAction.REFUND_COMPLETED, context)
         sms_notification.send(receivers)
     except Exception as e:
@@ -579,12 +575,7 @@ def refund_breakup_sms_task(obj_id):
         if not instance or not instance.user:
             return
         context = {'amount': instance.amount}
-        receivers = []
-        default_user_profile = UserProfile.objects.filter(user=instance.user, is_default_user=True).first()
-        if default_user_profile and default_user_profile.phone_number:
-            receivers.append({'user': instance.user, 'phone_number': default_user_profile.phone_number})
-        receivers.append({'user': instance.user, 'phone_number': instance.user.phone_number})
-        receivers = unique_phone_numbers(receivers)
+        receivers
         sms_notification = SMSNotification(NotificationAction.REFUND_BREAKUP, context)
         sms_notification.send(receivers)
     except Exception as e:

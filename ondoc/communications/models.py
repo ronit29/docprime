@@ -68,6 +68,8 @@ def get_lab_manager_email_and_number(managers):
 
 def unique_emails(list_):
     """Function accepts list of dictionaries and returns list of unique dictionaries"""
+    if not list_:
+        return list_
     temp = set()
 
     for item in list_:
@@ -79,6 +81,8 @@ def unique_emails(list_):
 
 def unique_phone_numbers(list_):
     """Function accepts list of dictionaries and returns list of unique dictionaries"""
+    if not list_:
+        return list_
     temp = set()
 
     for item in list_:
