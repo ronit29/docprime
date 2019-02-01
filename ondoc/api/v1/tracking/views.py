@@ -1,4 +1,5 @@
 from ondoc.tracking import models as track_models
+from ondoc.tracking import mongo_models as track_mongo_models
 import logging
 logger = logging.getLogger(__name__)
 from rest_framework.response import Response
@@ -40,14 +41,16 @@ class EventCreateViewSet(GenericViewSet):
                     if settings.MONGO_STORE:
                         requestUserId = request.user.id if request.user.is_authenticated else ""  # todo - need to check if blank will not be stored in mongodb
                         mongo_data = data
-                        eventJson = {"name":event_name, "visitId":visit_id, "userId":requestUserId}
+                        eventJson = {"id":event.id, "name":event_name, "visitId":visit_id, "userId":requestUserId}
                         removable_keys = ['UAID', 'event', 'Action', 'Tracker', 'addToGA']
                         for key in removable_keys:
                             if key in mongo_data:
                                 del mongo_data[key]
-
                         eventJson.update(mongo_data)
-                        settings.MONGODB.tracking_event.insert_one(eventJson)
+                        # settings.MONGODB.tracking_event.insert_one(eventJson)
+                        mongo_event = track_mongo_models.TrackingEvent(**eventJson)
+                        mongo_event.save()
+
 
                     resp['success'] = "Event Saved Successfully!"
                 except Exception as e:
@@ -57,7 +60,8 @@ class EventCreateViewSet(GenericViewSet):
                 modify_visit = False
 
                 if settings.MONGO_STORE:
-                    mongo_visit = settings.MONGODB.tracking_visit.find_one({"_id": visit_id})
+                    # mongo_visit = settings.MONGODB.tracking_visit.find_one({"_id": visit_id})
+                    mongo_visit = track_mongo_models.TrackingVisit.objects.filter(id=visit_id).first()
                     modify_mongo_visit = False
 
                 if event_name == 'utm-events':
@@ -72,7 +76,7 @@ class EventCreateViewSet(GenericViewSet):
                         visit.data = ud
                         modify_visit = True
                     if settings.MONGO_STORE:
-                        if not mongo_visit.get('data'):
+                        if not mongo_visit.__dict__.get('data'):
                             modify_mongo_visit = True
 
                 elif event_name == 'visitor-info':
@@ -85,31 +89,41 @@ class EventCreateViewSet(GenericViewSet):
                         visitor.device_info = ud
                         visitor.save()
                     if settings.MONGO_STORE:
-                        mongo_visitor = settings.MONGODB.tracking_visitor.find_one({"_id": visitor_id})
-                        if not mongo_visitor.get('device_info'):
-                            settings.MONGODB.tracking_visitor.update_one({"_id": visitor_id}, {"$set": {"device_info": ud}})
+                        # mongo_visitor = settings.MONGODB.tracking_visitor.find_one({"_id": visitor_id})
+                        mongo_visitor = track_mongo_models.TrackingVisitor.objects.filter(id=visitor_id).first()
+                        # if not mongo_visitor.get('device_info'):
+                        if not mongo_visitor.__dict__.get('device_info'):
+                            # settings.MONGODB.tracking_visitor.update_one({"_id": visitor_id}, {"$set": {"device_info": ud}})
+                            # mongo_visitor = track_mongo_models.TrackingVisitor(id=visitor_id, device_info=ud)
+                            mongo_visitor.deviceInfo = ud
+                            mongo_visitor.save()
 
                 elif event_name == "change-location":
                     if not visit.location:
                         visit.location = data.get('location', {})
                         modify_visit = True
                     if settings.MONGO_STORE:
-                        if not mongo_visit['location']:
+                        if not mongo_visit.__dict__.get('location'):
                             modify_mongo_visit = True
 
                 if not visit.user_agent and userAgent:
                     visit.user_agent = userAgent
                     modify_visit = True
                 if settings.MONGO_STORE:
-                    if not mongo_visit.get('user_agent') and userAgent:
+                    if not mongo_visit.__dict__.get('user_agent') and userAgent:
                         modify_mongo_visit = True
 
                 if modify_visit:
                     visit.save()
                 if settings.MONGO_STORE:
                     if modify_mongo_visit:
-                        visitJson = {"data": visit.data, "location": visit.location, "userAgent": visit.user_agent, "ipAddress": visit.ip_address}
-                        settings.MONGODB.tracking_visit.update_one({"visitorId": visitor_id}, { "$set": visitJson})
+                        # visitJson = {"data": visit.data, "location": visit.location, "userAgent": visit.user_agent, "ipAddress": visit.ip_address}
+                        # settings.MONGODB.tracking_visit.update_one({"visitorId": visitor_id}, { "$set": visitJson})
+                        mongo_visit.visitor_id = visitor_id
+                        mongo_visit.data = visit.data
+                        mongo_visit.location = visit.location
+                        mongo_visit.userAgent = visit.user_agent
+                        mongo_visit.ip_address = visit.ip_address
 
             else:
                 resp['error'] = "Event name not Found!"
@@ -140,21 +154,29 @@ class EventCreateViewSet(GenericViewSet):
                 track_models.TrackingVisitor.objects.get_or_create(id=visitor_id)
 
                 if settings.MONGO_STORE:
-                    visitorQuery = {"_id": visitor_id}
-                    mongo_visitor = settings.MONGODB.tracking_visitor.find_one(visitorQuery)
-                    if not mongo_visitor:
-                        settings.MONGODB.tracking_visitor.insert_one(visitorQuery)
+                    # visitorQuery = {"_id": visitor_id}
+                    # mongo_visitor = settings.MONGODB.tracking_visitor.find_one(visitorQuery)
+                    mongo_visitor = track_mongo_models.TrackingVisitor.objects.filter(id=visitor_id)
+                    # if not mongo_visitor:
+                    if mongo_visitor.count() == 0:
+                        # settings.MONGODB.tracking_visitor.insert_one(visitorQuery)
+                        mongo_visitor = track_mongo_models.TrackingVisitor(id=visitor_id)
+                        mongo_visitor.save()
 
             if visit_id:
                 track_models.TrackingVisit.objects.get_or_create(id=visit_id,
                     defaults={'visitor_id': visitor_id, 'ip_address': client_ip})
 
                 if settings.MONGO_STORE:
-                    visitQuery = {"_id": visit_id}
-                    mongo_visit = settings.MONGODB.tracking_visit.find_one(visitQuery)
-                    if not mongo_visit:
-                        visitQuery.update({'visitorId': visitor_id, 'ipAddress': client_ip})
-                        settings.MONGODB.tracking_visit.insert_one(visitQuery)
+                    # visitQuery = {"_id": visit_id}
+                    # mongo_visit = settings.MONGODB.tracking_visit.find_one(visitQuery)
+                    mongo_visit = track_mongo_models.TrackingVisit.objects.filter(id=visit_id)
+                    # if not mongo_visit:
+                    if mongo_visit.count() == 0:
+                        # visitQuery.update({'visitorId': visitor_id, 'ipAddress': client_ip})
+                        # settings.MONGODB.tracking_visit.insert_one(visitQuery)
+                        mongo_visit = track_mongo_models.TrackingVisit(id=visit_id, visitor_id=visitor_id, ip_address=client_ip)
+                        mongo_visit.save()
 
         return (visitor_id, visit_id)
 
@@ -175,8 +197,8 @@ class EventCreateViewSet(GenericViewSet):
             visitor = track_models.TrackingVisitor.create_visitor()
             visitor_id = visitor.id
 
-            if settings.MONGO_STORE:
-                settings.MONGODB.tracking_visitor.insert_one({"_id": visitor_id, "device_info": {"Device": null, "Mobile": null, "platform": null}})
+            # if settings.MONGO_STORE:
+            #     settings.MONGODB.tracking_visitor.insert_one({"_id": visitor_id, "device_info": {"Device": null, "Mobile": null, "platform": null}})
 
         if last_visit_time:
             get_time_diff = get_time_delta_in_minutes(last_visit_time)
@@ -192,8 +214,8 @@ class EventCreateViewSet(GenericViewSet):
             visit = track_models.TrackingVisit.create_visit(visitor_id, client_ip)
             visit_id = visit.id
 
-            if settings.MONGO_STORE:
-                settings.MONGODB.tracking_visit.insert_one({"_id": visit_id, "visitorId": visitor_id, "clientId": client_ip})
+            # if settings.MONGO_STORE:
+            #     settings.MONGODB.tracking_visit.insert_one({"_id": visit_id, "visitorId": visitor_id, "clientId": client_ip})
 
         return (visitor_id, visit_id)
 
