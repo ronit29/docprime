@@ -178,6 +178,8 @@ class ApplicableCouponsViewSet(viewsets.GenericViewSet):
         #                                    total_opd_booked, user_opd_booked, total_lab_booked, user_lab_booked)
         coupons = coupons.distinct()
 
+        payment_option_filter = Cart.has_pg_coupon(user, cart_item_id)
+
         applicable_coupons = []
         for coupon in coupons:
             allowed = True
@@ -197,6 +199,11 @@ class ApplicableCouponsViewSet(viewsets.GenericViewSet):
                 allowed = True and show_all
                 valid = False
                 invalidating_message = "Coupon can only be used " + str(coupon.count) + " times per user."
+
+            if payment_option_filter and coupon.payment_option and coupon.payment_option.id != payment_option_filter.id:
+                allowed = True and show_all
+                valid = False
+                invalidating_message = "Only one type of Payment Gateway Coupon is allowed."
 
             # TODO
             # if ((user_opd_completed + user_lab_completed + 1) % coupon.step_count != 0 ):
@@ -244,8 +251,7 @@ class ApplicableCouponsViewSet(viewsets.GenericViewSet):
                             "tests": [ test.id for test in coupon.test.all() ],
                             "network_id": coupon.lab_network.id if coupon.lab_network else None,
                             "is_cashback": coupon.coupon_type == Coupon.CASHBACK,
-                            "tnc": coupon.tnc,
-                            "payment_option": model_to_dict(coupon.payment_option) if coupon.payment_option else None})
+                            "tnc": coupon.tnc})
                 if user:
                     for random_coupon in coupon.random_generated_coupon.all():
                         applicable_coupons.append({"is_random_generated": True,
@@ -264,8 +270,7 @@ class ApplicableCouponsViewSet(viewsets.GenericViewSet):
                                 "is_corporate": coupon.is_corporate,
                                 "tests": [test.id for test in coupon.test.all()],
                                 "network_id": coupon.lab_network.id if coupon.lab_network else None,
-                                "tnc": coupon.tnc,
-                                "payment_option": model_to_dict(coupon.payment_option) if coupon.payment_option else None})
+                                "tnc": coupon.tnc})
 
 
         if applicable_coupons:

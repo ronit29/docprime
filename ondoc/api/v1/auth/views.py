@@ -20,7 +20,7 @@ from rest_framework.authtoken.models import Token
 from django.db.models import F, Sum, Max, Q, Prefetch, Case, When, Count
 from django.forms.models import model_to_dict
 
-from ondoc.common.models import UserConfig
+from ondoc.common.models import UserConfig, PaymentOptions
 from ondoc.coupon.models import UserSpecificCoupon, Coupon
 from ondoc.lead.models import UserLead
 from ondoc.sms.api import send_otp
@@ -1518,6 +1518,7 @@ class OrderViewSet(GenericViewSet):
 
         resp["status"] = 1
         resp['data'], resp["payment_required"] = utils.payment_details(request, order_obj)
+        resp['payment_options'] = PaymentOptions.filtered_payment_option(order_obj)
         return Response(resp)
 
 

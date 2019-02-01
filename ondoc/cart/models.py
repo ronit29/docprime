@@ -114,5 +114,18 @@ class Cart(auth_model.TimeStampedModel, auth_model.SoftDeleteModel):
 
         return fulfillment_data
 
+    @classmethod
+    def has_pg_coupon(cls, user, cart_item=None):
+        from ondoc.coupon.models import Coupon
+
+        existing_cart_items = Cart.objects.filter(deleted_at__isnull=True, user=user).exclude(id=cart_item)
+        used_coupon = []
+        for item in existing_cart_items:
+            if "coupon_code" in item.data:
+                used_coupon.extend(item.data["coupon_code"])
+        used_coupon = list(set(used_coupon))
+        pg_specific_coupon = Coupon.objects.filter(code__in=used_coupon).exclude(payment_option__isnull=True).first()
+        return pg_specific_coupon.payment_option if pg_specific_coupon else None
+
     def __str__(self):
         return str(self.id)
