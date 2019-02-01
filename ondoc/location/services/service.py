@@ -4,6 +4,7 @@ from django.conf import settings
 from rest_framework import status
 from django.db import transaction
 from ondoc.location.services.mumbai_bangalore_pincodes import pincodes, specializations
+from ondoc.location.services.latlong import latlong
 import time
 
 class SearchedDoctorData():
@@ -38,11 +39,12 @@ class SearchedDoctorData():
         #              '122015', '122103', '122105', '201313', '201304', '201008', '201306', '201314', '201307', '201311',
         #              '203207', '201312', '201310', '201309', '201305', '201301', '201303', '201307', '201008']
 
-        for specialization in specializations:
-            for pincode in pincodes:
-                search_keywords = specialization + ' in ' + str(pincode)
-                print(search_keywords + ' ' + SearchedDoctorData.searched_google_data(search_keywords))
+        # for specialization in specializations:
+        #     for pincode in pincodes:
+        #         search_keywords = specialization + ' in ' + str(pincode)
+        #         print(search_keywords + ' ' + SearchedDoctorData.searched_google_data(search_keywords))
         return 'success'
+
 
     @staticmethod
     def run_google_search(search_keywords, next_token):
