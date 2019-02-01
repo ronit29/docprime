@@ -14,7 +14,7 @@ from ondoc.coupon.models import Coupon
 from ondoc.doctor import models as doctor_model
 from ondoc.api.v1 import insurance as insurance_utility
 from ondoc.api.v1.utils import form_time_slot, IsConsumer, labappointment_transform, IsDoctor, payment_details, \
-    aware_time_zone, get_lab_search_details, TimeSlotExtraction, RawSql
+    aware_time_zone, get_lab_search_details, TimeSlotExtraction, RawSql, util_absolute_url
 from ondoc.api.pagination import paginate_queryset
 
 from rest_framework import viewsets, mixins
@@ -491,6 +491,7 @@ class LabList(viewsets.ReadOnlyModelViewSet):
                     }]
 
         if kwargs.get('test_flag') == 1:
+            result = list(result)
             return {"result": result[0:3] if len(result)>0 else result,
                              "count": count, 'tests': tests,
                              "seo": seo, 'breadcrumb': breadcrumb}
@@ -762,8 +763,9 @@ class LabList(viewsets.ReadOnlyModelViewSet):
                 row['address'] = lab_obj.city
             else:
                 row['address'] = ""
+            row['lab_thumbnail'] = util_absolute_url(lab_obj.get_thumbnail()) if lab_obj.get_thumbnail() else None
 
-            row['lab_thumbnail'] = self.request.build_absolute_uri(lab_obj.get_thumbnail()) if lab_obj.get_thumbnail() else None
+            # row['lab_thumbnail'] = self.request.build_absolute_uri(lab_obj.get_thumbnail()) if lab_obj.get_thumbnail() else None
 
             row['home_pickup_charges'] = lab_obj.home_pickup_charges
             row['is_home_collection_enabled'] = lab_obj.is_home_collection_enabled
