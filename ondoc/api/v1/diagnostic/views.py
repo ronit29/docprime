@@ -449,7 +449,7 @@ class LabList(viewsets.ReadOnlyModelViewSet):
 
         test_ids = parameters.get('ids', [])
 
-        tests = list(LabTest.objects.filter(id__in=test_ids).values('id', 'name', 'hide_price', 'show_details','test_type'))
+        tests = list(LabTest.objects.filter(id__in=test_ids).values('id', 'name', 'hide_price', 'show_details','test_type', 'url'))
         seo = None
         breadcrumb = None
         location = None
@@ -743,7 +743,8 @@ class LabList(viewsets.ReadOnlyModelViewSet):
                         deal_price=test.custom_deal_price
                     else:
                         deal_price=test.computed_deal_price
-                    tests[obj.id].append({"id": test.test_id, "name": test.test.name, "deal_price": deal_price, "mrp": test.mrp})
+                    tests[obj.id].append({"id": test.test_id, "name": test.test.name, "deal_price": deal_price, "mrp": test.mrp,
+                                          "url": test.test.url})
 
         day_now = timezone.now().weekday()
         days_array = [i for i in range(7)]
@@ -1778,6 +1779,7 @@ class TestDetailsViewset(viewsets.GenericViewSet):
             result['about_test'] = {'title': 'About the test', 'value': data.about_test}
             result['preparations'] = {'title': 'Preparations', 'value': data.preparations}
             result['why_get_tested'] = {'title': 'Why get tested?', 'value': data.why}
+            result['url'] = data.url
             info=[]
             for lab_test in data.labtests.all():
                 name = lab_test.parameter.name
@@ -1809,7 +1811,7 @@ class TestDetailsViewset(viewsets.GenericViewSet):
 
             result['frequently_booked_together'] = {'title': 'Frequently booked together', 'value': booked_together}
             result['show_details'] = data.show_details
-            result['url'] = entity.url if entity and entity.url else None
+
         lab = LabList()
         test_ids = list(test_ids)
 
