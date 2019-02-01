@@ -46,12 +46,14 @@ class SearchedDoctorData():
 
         for latlong in latitudelongitude:
             search_keywords = latlong
-            print(search_keywords + ' ' + SearchedDoctorData.searched_google_data(search_keywords))
+            result = SearchedDoctorData.searched_google_data(search_keywords)
+            search_keywords = 'Doctors in ' + str(search_keywords[0]) + ', ' + str(search_keywords[1])
+            print(search_keywords + ' ' + result)
         return 'success'
 
 
     @staticmethod
-    def run_google_search_by_lat_long(search_keywords, next_token):
+    def run_google_search(search_keywords, next_token):
         if next_token:
             time.sleep(2)
         params = {'location':str(search_keywords[0]) + ',' + str(search_keywords[1]), 'radius':1000,'type':'doctor', 'key': settings.REVERSE_GEOCODING_API_KEY}
@@ -174,15 +176,15 @@ class SearchedDoctorData():
         if not google_data:
             while next_page_token or page==1:
                 page += 1
-                result = SearchedDoctorData.run_google_search_by_lat_long(search_keywords, next_page_token)
+                result = SearchedDoctorData.run_google_search(search_keywords, next_page_token)
                 next_page_token = result.get('next_page_token')
                 if result.get('count'):
                     count += result.get('count')
                 if result.get('data') and len(result.get('data'))>0:
                     for result in result.get('data'):
                         search_results.append(result)
-
-            search_keywords = 'Doctors in ' + search_keywords
+            if isinstance(search_keywords, list):
+                search_keywords = 'Doctors in ' + str(search_keywords[0]) + ', ' + str(search_keywords[1])
             google_data = GoogleSearches.objects.create(search_keywords=search_keywords,
                                                                         results=search_results, count=count)
         if google_data:
