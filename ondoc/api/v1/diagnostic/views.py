@@ -85,7 +85,7 @@ class SearchPageViewSet(viewsets.ReadOnlyModelViewSet):
         condition_serializer = diagnostic_serializer.CommonConditionsSerializer(conditions_queryset, many=True)
         recommended_package = diagnostic_serializer.RecommendedPackageCategoryList(recommended_package_qs, many=True)
         temp_data = dict()
-        user_config = UserConfig.objects.filter(key='package_advisor_filters').first()
+        user_config = UserConfig.objects.filter(key='package_adviser_filters').first()
         advisor_filter = []
         if user_config:
             advisor_filter = user_config.data
