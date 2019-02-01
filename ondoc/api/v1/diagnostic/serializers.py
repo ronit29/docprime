@@ -49,7 +49,7 @@ class LabListSerializer(serializers.ModelSerializer):
 class LabTestSerializer(serializers.ModelSerializer):
     class Meta:
         model = LabTest
-        fields = ('id', 'name', 'pre_test_info', 'why', 'show_details')
+        fields = ('id', 'name', 'pre_test_info', 'why', 'show_details', 'url')
         # fields = ('id', 'account_name', 'users', 'created')
 
 
