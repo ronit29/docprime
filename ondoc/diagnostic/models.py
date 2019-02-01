@@ -886,6 +886,7 @@ class LabTest(TimeStampedModel, SearchKey):
                                         through=LabTestRecommendedCategoryMapping,
                                         through_fields=('lab_test', 'parent_category'),
                                         related_name='recommended_lab_tests')
+    reference_code = models.CharField(max_length=150, blank=True, default='')
     # test_sub_type = models.ManyToManyField(
     #     LabTestSubType,
     #     through='LabTestSubTypeMapping',

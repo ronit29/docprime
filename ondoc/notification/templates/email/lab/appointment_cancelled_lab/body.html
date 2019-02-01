@@ -116,7 +116,7 @@
                             {% for test in instance.test_mappings.all %}
                             <tr>
                                 <td style="color:#3f3f3f;font-size:16px;font-weight:500;padding-top:8px;padding-left:8px;border:1px solid black;text-align:center;">
-                                    {{test.test.name}}
+                                    {{test.test.name}}  {% if test.test.reference_code %}({{test.test.reference_code}}){% endif %}
                                 </td>
                             </tr>
                             {% endfor %}
