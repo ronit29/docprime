@@ -1130,7 +1130,7 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin)
     def get_serialized_cancellation_reason(self):
         res = []
         for cr in self.get_cancellation_reason():
-            res.append({'id': cr.id, 'name': cr.name})
+            res.append({'id': cr.id, 'name': cr.name, 'is_comment_needed': cr.is_comment_needed})
         return res
 
 
