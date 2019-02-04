@@ -8,6 +8,7 @@ import requests
 import json
 import logging
 import datetime
+from datetime import date
 from ondoc.authentication.models import Address
 from ondoc.api.v1.utils import resolve_address
 logger = logging.getLogger(__name__)
@@ -65,8 +66,16 @@ def prepare_and_hit(self, data):
     except Exception as e:
         pass
 
+    p_email = ''
+    if appointment.profile:
+        p_email = appointment.profile.email
+
     appointment_details = {
         'AppointmentStatus': appointment.status,
+        'Age': calculate_age(appointment),
+        'Email': p_email,
+        'VirtualNo': '',
+        'OTP': '',
         'KYC': kyc,
         'Location': location,
         'PaymentStatus': 300,
@@ -126,6 +135,7 @@ def prepare_and_hit(self, data):
     resp_data = response.json()
 
     if not resp_data.get('Id', None):
+        logger.error(json.dumps(request_data))
         raise Exception("[ERROR] Id not recieved from the matrix while pushing appointment lead.")
 
     # save the appointment with the matrix lead id.
@@ -149,6 +159,16 @@ def prepare_and_hit(self, data):
         pass
     else:
         logger.info("[ERROR] Appointment could not be published to the matrix system")
+
+
+def calculate_age(appointment):
+    if not appointment.profile:
+        return 0
+    if not appointment.profile.dob:
+        return 0
+    dob = appointment.profile.dob
+    today = date.today()
+    return today.year - dob.year - ((today.month, today.day) < (dob.month, dob.day))
 
 
 @task(bind=True, max_retries=2)
@@ -274,6 +294,7 @@ def push_signup_lead_to_matrix(self, data):
         # save the appointment with the matrix lead id.
 
         if not resp_data.get('Id', None):
+            logger.error(json.dumps(request_data))
             raise Exception("[ERROR] Id not recieved from the matrix while pushing online lead.")
 
         online_lead_obj.matrix_lead_id = resp_data.get('Id', None)
@@ -349,6 +370,7 @@ def push_order_to_matrix(self, data):
             #logger.error(response.text)
 
             if not resp_data.get('Id', None):
+                logger.error(json.dumps(request_data))
                 raise Exception("[ERROR] Id not recieved from the matrix while pushing order to matrix.")
 
             # save the order with the matrix lead id.
@@ -437,6 +459,7 @@ def push_onboarding_qcstatus_to_matrix(self, data):
             #logger.error(response.text)
 
             if not resp_data.get('Id', None):
+                logger.error(json.dumps(request_data))
                 raise Exception("[ERROR] Id not recieved from the matrix while pushing doctor or lab lead.")
 
             # save the order with the matrix lead id.
@@ -446,3 +469,50 @@ def push_onboarding_qcstatus_to_matrix(self, data):
 
     except Exception as e:
         logger.error("Error in Celery. Failed pushing order to the matrix- " + str(e))
+
+
+@task(bind=True, max_retries=2)
+def push_non_bookable_doctor_lead_to_matrix(self, nb_doc_lead_id):
+    from ondoc.web.models import NonBookableDoctorLead
+    obj = NonBookableDoctorLead.objects.filter(id= nb_doc_lead_id).first()
+    if obj:
+        exit_point_url = ""
+        if obj.doctor and obj.doctor.id and obj.hospital and obj.hospital.id:
+            exit_point_url = "%s/opd/doctor/%d?hospital_id=%d" % (settings.CONSUMER_APP_DOMAIN, obj.doctor.id, obj.hospital.id)
+
+        request_data = {
+            'ExitPointUrl': exit_point_url,
+            'LeadSource': obj.source,
+            'PrimaryNo': int(obj.from_mobile),
+            'Name': obj.name if obj.name else 'not applicable',
+            'ProductId': 5,
+            'SubProductId': 2,
+            'AppointmentDetails': {
+                'ProviderName': obj.doctor.name if obj.doctor else '',
+                'ProviderAddress': obj.hospital.get_hos_address() if obj.hospital else ''
+            }
+        }
+
+    url = settings.MATRIX_API_URL
+    matrix_api_token = settings.MATRIX_API_TOKEN
+    response = requests.post(url, data=json.dumps(request_data), headers={'Authorization': matrix_api_token,
+                                                                          'Content-Type': 'application/json'})
+
+    if response.status_code != status.HTTP_200_OK or not response.ok:
+        logger.info("[ERROR] NB Doctor Lead could not be published to the matrix system")
+        logger.info("[ERROR] %s", response.reason)
+        countdown_time = (2 ** self.request.retries) * 60 * 10
+        logging.error("Lead sync with the Matrix System failed with response - " + str(response.content))
+        print(countdown_time)
+        self.retry(obj.id, countdown=countdown_time)
+    else:
+        resp_data = response.json()
+        # logger.error(response.text)
+        if not resp_data.get('Id', None):
+            logger.error(json.dumps(request_data))
+            raise Exception("[ERROR] Id not received from the matrix while pushing NB doctor lead.")
+
+        # save the order with the matrix lead id.
+        obj.matrix_lead_id = resp_data.get('Id', None)
+        obj.matrix_lead_id = int(obj.matrix_lead_id)
+        obj.save()

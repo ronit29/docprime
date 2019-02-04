@@ -59,6 +59,8 @@ class NotificationAction:
     OPD_OTP_BEFORE_APPOINTMENT = 30
     LAB_OTP_BEFORE_APPOINTMENT = 31
 
+    CASHBACK_CREDITED = 55
+
     NOTIFICATION_TYPE_CHOICES = (
         (APPOINTMENT_ACCEPTED, "Appointment Accepted"),
         (APPOINTMENT_CANCELLED, "Appointment Cancelled"),
@@ -80,8 +82,8 @@ class NotificationAction:
         (RECEIPT, "Receipt"),
         (DOCTOR_INVOICE, "Doctor Invoice"),
         (LAB_INVOICE, "Lab Invoice"),
-
         (INSURANCE_CONFIRMED, "Insurance Confirmed"),
+        (CASHBACK_CREDITED, "Cashback Credited")
     )
 
     OPD_APPOINTMENT = "opd_appointment"

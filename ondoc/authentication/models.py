@@ -17,6 +17,7 @@ import random, string
 from django.contrib.contenttypes.fields import GenericForeignKey
 from django.contrib.contenttypes.models import ContentType
 from django.utils.functional import cached_property
+from datetime import date, timedelta, datetime
 
 
 class Image(models.Model):
@@ -30,7 +31,7 @@ class Image(models.Model):
 
     def get_thumbnail_path(self, path, prefix):
         first, last = path.rsplit('/', 1)
-        return "{}/{}/{}".format(first,prefix,last)
+        return "{}/{}/{}".format(first, prefix, last)
 
 
     def has_image_changed(self):
@@ -259,6 +260,31 @@ class User(AbstractBaseUser, PermissionsMixin):
         #     return self.staffprofile.name
         # return str(self.phone_number)
 
+    def get_full_name(self):
+        return self.full_name
+
+    @cached_property
+    def full_name(self):
+        profile = self.get_default_profile
+        if profile and profile.name:
+            return profile.name
+        return ''
+
+    @cached_property
+    def get_default_email(self):
+        profile = self.get_default_profile
+        if profile and profile.email:
+            return profile.email
+        return ''
+
+    @cached_property
+    def get_default_profile(self):
+        user_profile = self.profiles.all().filter(is_default_user=True).first()
+        if user_profile:
+            return user_profile
+        return ''
+        # self.profiles.filter(is_default=True).first()
+
     @cached_property
     def my_groups(self):
         return self.groups.all()
@@ -297,6 +323,13 @@ class User(AbstractBaseUser, PermissionsMixin):
             self.email = self.email.lower()
         return super().save(*args, **kwargs)
 
+    def get_default_profile(self):
+        default_profile = self.profiles.filter(is_default_user=True)
+        if default_profile.exists():
+            return default_profile.first()
+        else:
+            return None
+
     class Meta:
         unique_together = (("email", "user_type"), ("phone_number","user_type"))
         db_table = "auth_user"
@@ -328,6 +361,16 @@ class TimeStampedModel(models.Model):
 
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        abstract = True
+
+class SoftDeleteModel(models.Model):
+    deleted_at = models.DateTimeField(blank=True, null=True)
+
+    def mark_delete(self):
+        self.deleted_at = datetime.now()
+        self.save()
 
     class Meta:
         abstract = True
@@ -370,6 +413,13 @@ class UserProfile(TimeStampedModel):
             return True
         old_value = self.__class__._default_manager.filter(pk=self.pk).values('profile_image').get()['profile_image']
         return not getattr(self, 'profile_image').name == old_value
+
+    def get_age(self):
+        user_age = None
+        if self.dob:
+            today = date.today()
+            user_age = today.year - self.dob.year - ((today.month, today.day) < (self.dob.month, self.dob.day))
+        return user_age
 
     def save(self, *args, **kwargs):
         if not self.has_image_changed():
@@ -964,12 +1014,33 @@ class GenericAdmin(TimeStampedModel, CreatedByModel):
 
     @classmethod
     def get_appointment_admins(cls, appoinment):
+        from ondoc.api.v1.utils import GenericAdminEntity
         if not appoinment:
             return []
         admins = GenericAdmin.objects.filter(
-            Q(is_disabled=False, hospital=appoinment.hospital),
-            (Q(doctor__isnull=True) | Q(doctor__isnull=False, doctor=appoinment.doctor)))
-        admin_users= []
+                Q(is_disabled=False),
+                (Q(
+                    (Q(doctor=appoinment.doctor,
+                       hospital=appoinment.hospital)
+                     |
+                     Q(doctor__isnull=True,
+                       hospital=appoinment.hospital)
+                     |
+                     Q(hospital__isnull=True,
+                       doctor=appoinment.doctor)
+                     )
+                 )|
+                Q(
+                    Q(super_user_permission=True,
+                      entity_type=GenericAdminEntity.DOCTOR,
+                      doctor=appoinment.doctor)
+                    |
+                    Q(super_user_permission=True,
+                      entity_type=GenericAdminEntity.HOSPITAL,
+                      hospital=appoinment.hospital)
+                ))
+        ).distinct('user')
+        admin_users = []
         for admin in admins:
             if admin.user:
                 admin_users.append(admin.user)

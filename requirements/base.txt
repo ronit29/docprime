@@ -35,3 +35,7 @@ docopt==0.6.2
 num2words==0.5.8
 ddtrace
 setproctitle
+django-fluent-comments
+django-threadedcomments
+django-contrib-comments
+geoip2

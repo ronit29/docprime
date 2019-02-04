@@ -1,4 +1,3 @@
-import nested_admin
 from django.contrib.gis import admin
 from .models import Article, ArticleImage, ArticleCategory, ArticleLinkedUrl, LinkedArticle, ArticleContentBox
 from reversion.admin import VersionAdmin
@@ -7,15 +6,14 @@ from django.utils.safestring import mark_safe
 from django import forms
 from django.conf import settings
 
-
 class ArticleForm(forms.ModelForm):
     body = forms.CharField(widget=forms.Textarea, required=False)
-    category = forms.ModelChoiceField(queryset=ArticleCategory.objects.all(),widget=forms.Select)
+    category = forms.ModelChoiceField(queryset=ArticleCategory.objects.all(), widget=forms.Select)
     author_name = forms.CharField(required=False)
 
     class Media:
         extend=False
-        js = ('https://cdn.ckeditor.com/ckeditor5/10.1.0/classic/ckeditor.js', 'articles/js/init.js')
+        js = ('ckedit/js/ckeditor.js', 'articles/js/init.js')
         css = {'all':('articles/css/style.css',)}
 
 
@@ -96,3 +94,15 @@ admin.site.register(Article, ArticleAdmin)
 admin.site.register(ArticleImage, ArticleImageAdmin)
 admin.site.register(ArticleCategory)
 admin.site.register(ArticleContentBox)
+
+# class FluentCommentsInline(TabularInline):
+#     model = Comment
+#     can_delete = True
+#     verbose_name = "Reply"
+
+
+
+#admin.site.register(FluentComment, FluentCommentsAdmin)
+
+
+

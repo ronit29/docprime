@@ -23,6 +23,8 @@ class HospitalNetworkCertificationInline(admin.TabularInline):
     can_delete = True
     show_change_link = False
 
+    def get_queryset(self, request):
+        return super().get_queryset(request).select_related('network')
 
 class HospitalNetworkAwardForm(forms.ModelForm):
     year = forms.ChoiceField(choices=award_year_choices_no_blank, required=True)
@@ -35,6 +37,8 @@ class HospitalNetworkAwardInline(admin.TabularInline):
     can_delete = True
     show_change_link = False
 
+    def get_queryset(self, request):
+        return super().get_queryset(request).select_related('network')
 
 class HospitalNetworkAccreditationInline(admin.TabularInline):
     model = HospitalNetworkAccreditation
@@ -42,12 +46,18 @@ class HospitalNetworkAccreditationInline(admin.TabularInline):
     can_delete = True
     show_change_link = False
 
+    def get_queryset(self, request):
+        return super().get_queryset(request).select_related('network')
+
 
 class HospitalNetworkEmailInline(admin.TabularInline):
     model = HospitalNetworkEmail
     extra = 0
     can_delete = True
     show_change_link = False
+
+    def get_queryset(self, request):
+        return super().get_queryset(request).select_related('network')
 
 
 class HospitalNetworkHelplineInline(admin.TabularInline):
@@ -59,6 +69,9 @@ class HospitalNetworkHelplineInline(admin.TabularInline):
         models.BigIntegerField: {'widget': forms.TextInput},
     }
 
+    def get_queryset(self, request):
+        return super().get_queryset(request).select_related('network')
+
 
 class HospitalNetworkManagerInline(admin.TabularInline):
     model = HospitalNetworkManager
@@ -69,6 +82,10 @@ class HospitalNetworkManagerInline(admin.TabularInline):
     extra = 0
     can_delete = True
     show_change_link = False
+
+
+    def get_queryset(self, request):
+        return super().get_queryset(request).select_related('network')
 
 
 class GenericAdminInline(admin.TabularInline):
@@ -148,6 +165,9 @@ class HospitalNetworkDocumentInline(admin.TabularInline):
     extra = 0
     can_delete = True
     show_change_link = False
+
+    def get_queryset(self, request):
+        return super().get_queryset(request).select_related('hospital_network')
 
 
 class HospitalNetworkAdmin(VersionAdmin, ActionAdmin, QCPemAdmin):

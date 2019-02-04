@@ -14,8 +14,7 @@ class Migration(migrations.Migration):
             model_name='entityaddress',
             name='no_of_childs',
             field=models.PositiveIntegerField(default=0, null=True),
-        ),
-        migrations.RunSQL(
+        ), migrations.RunSQL(
             '''CREATE OR REPLACE FUNCTION slugify_url(url varchar) RETURNS VARCHAR AS
             $$
             DECLARE
@@ -28,4 +27,5 @@ class Migration(migrations.Migration):
             $$
             LANGUAGE PLPGSQL;'''
         ),
+
     ]

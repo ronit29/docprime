@@ -8,6 +8,7 @@ import logging
 from django.contrib.gis.geos import Point
 from django.db import transaction
 from random import randint
+import geoip2.webservice
 
 logger = logging.getLogger(__name__)
 
@@ -127,11 +128,49 @@ class GeoIPAddressURLViewSet(viewsets.GenericViewSet):
         return resp
 
     @transaction.non_atomic_requests
+    def get_geoip_data(self, request):
+
+        default = dict()
+        default["latitude"] = None
+        default["longitude"] = None
+        default["city"] = None
+
+        ip_address, is_routable = get_client_ip(request)
+        if not ip_address or not is_routable:
+            return Response(default)
+
+        req_data = request.query_params
+        visitor_ip_add_obj = VisitorIpAddress.objects.create(ip_address=ip_address,
+                                                             visitor_id=req_data.get("visitor_id"),
+                                                             visit_id=req_data.get("visit_id"))
+
+        geo_ip_obj = GeoIPEntries.objects.filter(ip_address=ip_address).first()
+        url = settings.MAXMIND_CITY_API_URL + str(ip_address)
+        if not geo_ip_obj:
+            try:
+                client = geoip2.webservice.Client(settings.MAXMIND_ACCOUNT_ID, settings.MAXMIND_LICENSE_KEY)
+                response = client.city(ip_address)
+                resp = {}
+                resp['city'] = response.city.name
+                resp['latitude'] = response.location.latitude
+                resp['longitude'] = response.location.longitude
+                resp['status'] = 1
+
+                geo_ip_obj = GeoIPEntries.objects.create(ip_address=ip_address, location_detail=resp)
+                return Response(resp)
+            except Exception as e:
+                pass
+        else:
+            return Response(geo_ip_obj.location_detail)       
+
+        return Response(default)
+
+    @transaction.non_atomic_requests
     def get_lat_long_city(self, request):
         resp = dict()
         resp["latitude"] = self.DELHI_CENTRE_LAT
         resp["longitude"] = self.DELHI_CENTRE_LONG
-        resp["city_name"] = 'Delhi'
+        resp["city"] = 'Delhi'
 
         ip_address, is_routable = get_client_ip(request)
         if not ip_address:
@@ -151,8 +190,8 @@ class GeoIPAddressURLViewSet(viewsets.GenericViewSet):
                 if response.status_code == status.HTTP_200_OK:
                     resp_data = response.json()
                     geo_ip_obj = GeoIPEntries.objects.create(ip_address=ip_address, location_detail=resp_data)
-                    resp["lat"] = resp_data["location"]["latitude"]
-                    resp["long"] = resp_data["location"]["longitude"]
+                    resp["latitude"] = resp_data["location"]["latitude"]
+                    resp["longitude"] = resp_data["location"]["longitude"]
                     resp["city"] = resp_data["city"]["names"]["en"]
                 else:
                     pass
@@ -161,8 +200,8 @@ class GeoIPAddressURLViewSet(viewsets.GenericViewSet):
 
         else:
             try:
-                resp["lat"] = geo_ip_obj.location_detail["location"]["latitude"]
-                resp["long"] = geo_ip_obj.location_detail["location"]["longitude"]
+                resp["latitude"] = geo_ip_obj.location_detail["location"]["latitude"]
+                resp["longitude"] = geo_ip_obj.location_detail["location"]["longitude"]
                 resp["city"] = geo_ip_obj.location_detail["city"]["names"]["en"]
                 resp["status"] = 1
             except Exception:

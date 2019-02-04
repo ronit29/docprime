@@ -2,6 +2,8 @@ from django.db import models
 from django.utils.safestring import mark_safe
 from ondoc.authentication.models import TimeStampedModel, CreatedByModel, Image
 import datetime
+from django.contrib.contenttypes.models import ContentType
+from django.urls import reverse
 
 from ondoc.doctor.models import Doctor
 
@@ -31,7 +33,7 @@ class Article(TimeStampedModel, CreatedByModel):
     url = models.CharField(blank=False, null=True, max_length=500, unique=True)
     heading_title = models.CharField(blank=True, null=False, max_length=500)
     body = models.CharField(blank=False, null=False, max_length=200000)
-    category = models.ForeignKey(ArticleCategory, null=True, related_name='articles', on_delete=models.CASCADE)
+    category = models.ForeignKey(ArticleCategory, null=True, related_name='articles', on_delete=models.SET_NULL)
     header_image = models.ImageField(upload_to='articles/header/images', null=True, blank=True, default='')
     header_image_alt = models.CharField(max_length=512, blank=True, null=True, default='')
     icon = models.ImageField(upload_to='articles/icons', null=True, blank=True, default='')
@@ -43,6 +45,10 @@ class Article(TimeStampedModel, CreatedByModel):
     published_date = models.DateField(default=datetime.date.today)
     linked_articles = models.ManyToManyField('self', symmetrical=False, through='LinkedArticle',
                                              through_fields=('article', 'linked_article'))
+
+    def get_absolute_url(self):
+        content_type = ContentType.objects.get_for_model(self)
+        return reverse('admin:%s_%s_change' % (content_type.app_label, content_type.model), args=[self.id])
 
     def icon_tag(self):
         if self.icon:

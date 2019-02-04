@@ -1,7 +1,13 @@
+from django_comments.models import Comment
 from rest_framework import serializers
+
+from fluent_comments.models import FluentComment
+
 from ondoc.articles.models import Article, ArticleLinkedUrl, LinkedArticle
 from ondoc.articles.models import ArticleCategory
+from ondoc.authentication.models import User
 from ondoc.doctor.v1.serializers import DoctorSerializer, ArticleAuthorSerializer
+from django.db import models
 
 
 class LinkedArticleSerializer(serializers.ModelSerializer):
@@ -34,6 +40,12 @@ class ArticleRetrieveSerializer(serializers.ModelSerializer):
     linked = serializers.SerializerMethodField()
     author = ArticleAuthorSerializer()
     last_updated_at = serializers.SerializerMethodField()
+    comments = serializers.SerializerMethodField()
+
+    def get_comments(self, obj):
+        comments = FluentComment.objects.filter(object_pk=str(obj.id), parent_id=None, is_public=True)
+        serializer = CommentSerializer(comments, many=True, context={'request': self.context.get('request')})
+        return serializer.data
 
     def get_linked(self, obj):
         resp = {}
@@ -85,7 +97,7 @@ class ArticleRetrieveSerializer(serializers.ModelSerializer):
     class Meta:
         model = Article
         fields = ('title','heading_title', 'url', 'body', 'icon', 'id', 'seo', 'header_image', 'header_image_alt', 'category',
-                  'linked', 'author_name', 'published_date', 'author', 'last_updated_at')
+                  'linked', 'author_name', 'published_date', 'author', 'last_updated_at', 'comments')
 
 
 class ArticleListSerializer(serializers.ModelSerializer):
@@ -132,7 +144,75 @@ class ArticleCategoryListSerializer(serializers.ModelSerializer):
         request = self.context.get('request')
         return request.build_absolute_uri(obj.url) if hasattr(obj, 'url') else None
 
-
     class Meta:
         model = ArticleCategory
         fields = ('name', 'url', 'title', 'description')
+
+
+class FilteredCommentsManager(models.Manager):
+    def get_queryset(self):
+        return super().get_queryset().filter(is_public=True)
+
+
+
+# class RecursiveField(serializers.Serializer):
+#     def to_representation(self, value):
+#         #value.children = value.children.filter('is_public')
+#         value.filter_children = value.children.filter(is_public=True)
+#         if value.is_public == True:
+#             serializer = self.parent.parent.__class__(
+#                 value,
+#                 context=self.context)
+#             return serializer.data
+
+
+class CommentSerializer(serializers.ModelSerializer):
+    #children = RecursiveField(many=True)
+    children = serializers.SerializerMethodField()
+    author = serializers.SerializerMethodField()
+    profile_img = serializers.SerializerMethodField()
+
+    def get_profile_img(self, obj):
+        profile_image = None
+
+        user = obj.user
+        if user and user.user_type == User.CONSUMER:
+            profile = user.profiles.filter(is_default_user=True).first()
+            if profile:
+                profile_image = profile.get_thumbnail()
+
+        #if not profile image
+
+        return profile_image
+
+    def get_children(self, obj):
+        if len(obj.children.filter(is_public=True))>0:
+            return CommentSerializer(obj.children.filter(is_public=True), many=True).data
+        return None
+
+    def get_author(self, obj):
+        custom_data = obj.customcomment_set.first()
+        if custom_data and custom_data.author:
+            return ArticleAuthorSerializer(obj.content_object.author).data
+        return None
+
+    class Meta:
+        model = FluentComment
+        fields = (
+            'id',
+            'comment',
+            'children',
+            'submit_date',
+            'user_name',
+            'author',
+            'profile_img',
+           )
+
+
+class CommentAuthorSerializer(serializers.ModelSerializer):
+    author = ArticleAuthorSerializer()
+
+    class Meta:
+        model = Article
+        fields = ('author',)
+

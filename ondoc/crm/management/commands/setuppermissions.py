@@ -4,6 +4,7 @@ from django.contrib.contenttypes.models import ContentType
 from django.db.models import Q
 
 from ondoc.banner.models import Banner
+from ondoc.common.models import PaymentOptions, UserConfig
 from ondoc.coupon.models import Coupon, UserSpecificCoupon
 from ondoc.crm.constants import constants
 from ondoc.doctor.models import (Doctor, Hospital, DoctorClinicTiming, DoctorClinic,
@@ -17,9 +18,10 @@ from ondoc.doctor.models import (Doctor, Hospital, DoctorClinicTiming, DoctorCli
                                  HospitalNetworkAccreditation, HospitalNetworkAward, HospitalNetworkDocument,
                                  HospitalNetworkCertification, DoctorPracticeSpecialization, AboutDoctor,
                                  DoctorMapping, OpdAppointment, CommonMedicalCondition, CommonSpecialization,
-                                 MedicalCondition, PracticeSpecialization, SpecializationDepartment, SpecializationField,
+                                 MedicalCondition, PracticeSpecialization, SpecializationDepartment,
+                                 SpecializationField,
                                  MedicalConditionSpecialization, CompetitorInfo, CompetitorMonthlyVisit,
-                                 SpecializationDepartmentMapping)
+                                 SpecializationDepartmentMapping, CancellationReason, UploadDoctorData)
 
 from ondoc.diagnostic.models import (Lab, LabTiming, LabImage, GenericLabAdmin,
                                      LabManager, LabAccreditation, LabAward, LabCertification,
@@ -30,7 +32,8 @@ from ondoc.diagnostic.models import (Lab, LabTiming, LabImage, GenericLabAdmin,
                                      LabDoctor, LabDocument, LabPricingGroup, LabNetworkDocument, CommonTest,
                                      CommonDiagnosticCondition, DiagnosticConditionLabTest, HomePickupCharges,
                                      TestParameter, ParameterLabTest, LabTestPackage, LabReportFile, LabReport,
-                                     CommonPackage, LabTestCategory, LabTestCategoryMapping)
+                                     CommonPackage, LabTestCategory, LabTestCategoryMapping,
+                                     LabTestRecommendedCategoryMapping)
 
 from ondoc.procedure.models import Procedure, ProcedureCategory, CommonProcedureCategory, DoctorClinicProcedure, \
     ProcedureCategoryMapping, ProcedureToCategoryMapping, CommonProcedure
@@ -40,12 +43,18 @@ from ondoc.diagnostic.models import LabPricing
 
 from ondoc.web.models import Career, OnlineLead
 from ondoc.ratings_review import models as rating_models
-from ondoc.articles.models import Article, ArticleLinkedUrl, LinkedArticle
+from ondoc.articles.models import Article, ArticleLinkedUrl, LinkedArticle, ArticleContentBox, ArticleCategory
 
 from ondoc.authentication.models import BillingAccount, SPOCDetails, GenericAdmin, User, Merchant, AssociatedMerchant, DoctorNumber
 from ondoc.account.models import MerchantPayout
-from ondoc.seo.models import Sitemap
+from ondoc.seo.models import Sitemap, NewDynamic
 from ondoc.elastic.models import DemoElastic
+from ondoc.location.models import EntityUrls
+
+#from fluent_comments.admin import CommentModel
+from threadedcomments.models import ThreadedComment
+from fluent_comments.models import FluentComment
+from django_comments.models import Comment
 
 class Command(BaseCommand):
     help = 'Create groups and setup permissions for teams'
@@ -57,8 +66,7 @@ class Command(BaseCommand):
         group, created = Group.objects.get_or_create(name=constants['DOCTOR_NETWORK_GROUP_NAME'])
         group.permissions.clear()
 
-
-        content_types = ContentType.objects.get_for_models(Merchant, Doctor, Hospital, HospitalNetwork)
+        content_types = ContentType.objects.get_for_models(Merchant, Doctor, Hospital, HospitalNetwork, UploadDoctorData)
         for cl, ct in content_types.items():
 
             permissions = Permission.objects.filter(
@@ -139,7 +147,7 @@ class Command(BaseCommand):
                                                            Qualification, Specialization, Language, MedicalService,
                                                            College, SpecializationDepartment,
                                                            SpecializationField,
-                                                           SpecializationDepartmentMapping
+                                                           SpecializationDepartmentMapping, UploadDoctorData
                                                            )
 
         for cl, ct in content_types.items():
@@ -221,7 +229,7 @@ class Command(BaseCommand):
             LabTestType, LabService, TestParameter, PracticeSpecialization,
             SpecializationField, SpecializationDepartment, SpecializationDepartmentMapping,
             Procedure, ProcedureCategory, CommonProcedureCategory,
-            ProcedureToCategoryMapping, ProcedureCategoryMapping, LabTestCategory, Merchant
+            ProcedureToCategoryMapping, ProcedureCategoryMapping, LabTestCategory, Merchant, CancellationReason, UploadDoctorData
         )
 
         for cl, ct in content_types.items():
@@ -364,7 +372,6 @@ class Command(BaseCommand):
         #Create testing group
         self.create_testing_group()
 
-        #Create Article team Group
         # Create OPD appointment management team
         self.create_opd_appointment_management_group()
 
@@ -390,7 +397,7 @@ class Command(BaseCommand):
         group, created = Group.objects.get_or_create(name=constants['ARTICLE_TEAM'])
         group.permissions.clear()
 
-        content_types = ContentType.objects.get_for_models(Article, Sitemap, ArticleLinkedUrl, LinkedArticle)
+        content_types = ContentType.objects.get_for_models(Article, Sitemap, ArticleContentBox, ArticleCategory, EntityUrls)
 
         for cl, ct in content_types.items():
             permissions = Permission.objects.filter(
@@ -399,6 +406,18 @@ class Command(BaseCommand):
                 Q(codename='change_' + ct.model))
 
             group.permissions.add(*permissions)
+
+        content_types = ContentType.objects.get_for_models(ArticleLinkedUrl, LinkedArticle, NewDynamic)
+
+        for cl, ct in content_types.items():
+            permissions = Permission.objects.filter(
+                Q(content_type=ct),
+                Q(codename='add_' + ct.model) |
+                Q(codename='change_' + ct.model) |
+                Q(codename='delete_' + ct.model))
+
+            group.permissions.add(*permissions)
+
 
         #Review team Group
         group, created = Group.objects.get_or_create(name=constants['REVIEW_TEAM_GROUP'])
@@ -451,7 +470,32 @@ class Command(BaseCommand):
 
             group.permissions.add(*permissions)
 
+        group, created = Group.objects.get_or_create(name=constants['PRODUCT_TEAM'])
+        group.permissions.clear()
+
+        content_types = ContentType.objects.get_for_models(LabTestRecommendedCategoryMapping, Banner, UserConfig, NewDynamic)
+        for cl, ct in content_types.items():
+            permissions = Permission.objects.filter(
+                Q(content_type=ct),
+                Q(codename='add_' + ct.model) |
+                Q(codename='change_' + ct.model) |
+                Q(codename='delete_' + ct.model))
+
+            group.permissions.add(*permissions)
+
+        content_types = ContentType.objects.get_for_models(PaymentOptions, EntityUrls)
+
+        for cl, ct in content_types.items():
+            permissions = Permission.objects.filter(
+                Q(content_type=ct),
+                Q(codename='add_' + ct.model) |
+                Q(codename='change_' + ct.model))
+
+            group.permissions.add(*permissions)
+
         self.stdout.write('Successfully created groups and permissions')
+
+        self.setup_comment_group()
 
     def create_about_doctor_group(self):
         group, created = Group.objects.get_or_create(name=constants['ABOUT_DOCTOR_TEAM'])
@@ -621,5 +665,36 @@ class Command(BaseCommand):
                 Q(codename='add_' + ct.model) |
                 Q(codename='change_' + ct.model) |
                 Q(codename='delete_' + ct.model))
+
+            group.permissions.add(*permissions)
+
+    def setup_comment_group(self):
+        group, created = Group.objects.get_or_create(name=constants['COMMENT_TEAM'])
+        group.permissions.clear()
+
+        # content_types = ContentType.objects.get_for_models(Comment)
+        # print(content_types)
+        #
+        # for cl, ct in content_types.items():
+        #     permissions = Permission.objects.filter(
+        #         Q(content_type=ct),
+        #         Q(codename='add_' + ct.model) | Q(codename='change_' + ct.model))
+        #
+        #     group.permissions.add(*permissions)
+
+
+        content_types = ContentType.objects.get_for_models(FluentComment, for_concrete_models=False)
+        # print(content_types)
+
+        for cl, ct in content_types.items():
+            permissions = Permission.objects.get_or_create(
+                content_type=ct, codename='change_' + ct.model)
+            permissions = Permission.objects.get_or_create(
+                content_type=ct, codename='add_' + ct.model)
+
+
+            permissions = Permission.objects.filter(
+                Q(content_type=ct),
+                Q(codename='add_' + ct.model) | Q(codename='change_' + ct.model))
 
             group.permissions.add(*permissions)

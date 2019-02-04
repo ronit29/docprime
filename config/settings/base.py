@@ -43,10 +43,10 @@ SECRET_KEY = env('DJANGO_SECRET_KEY')
 JWT_AUTH = {
     'JWT_VERIFY': True,
     'JWT_VERIFY_EXPIRATION': True,
-    'JWT_EXPIRATION_DELTA': datetime.timedelta(days=7),
+    'JWT_EXPIRATION_DELTA': datetime.timedelta(days=365),
     'JWT_AUTH_HEADER_PREFIX': 'Token',
     'JWT_ALLOW_REFRESH': True,
-    'JWT_REFRESH_EXPIRATION_DELTA': datetime.timedelta(days=7),
+    'JWT_REFRESH_EXPIRATION_DELTA': datetime.timedelta(days=365),
 }
 
 # SECURITY WARNING: don't run with debug turned on in production!
@@ -107,6 +107,9 @@ THIRD_PARTY_APPS = (
     'nested_admin',
     'ipware',
     'django_user_agents',
+    'fluent_comments',
+    'threadedcomments',
+    'django_comments',
     'ddtrace.contrib.django',
 )
 
@@ -135,7 +138,11 @@ LOCAL_APPS = (
     'ondoc.geoip',
     'ondoc.procedure',
     'ondoc.elastic',
-    'ondoc.banner'
+    'ondoc.banner',
+    'ondoc.cart',
+    'ondoc.ckedit',
+    'ondoc.screen',
+    'ondoc.comments'
 )
 
 INSTALLED_APPS = DJANGO_APPS + THIRD_PARTY_APPS + LOCAL_APPS
@@ -311,6 +318,7 @@ PG_DUMMY_TRANSACTION_URL = env('PG_DUMMY_TRANSACTION_URL')
 PG_DUMMY_TRANSACTION_TOKEN = env('PG_DUMMY_TRANSACTION_TOKEN')
 PG_REFUND_STATUS_API_URL = env('PG_REFUND_STATUS_API_URL')
 PG_SETTLEMENT_URL = env('PG_SETTLEMENT_URL')
+PG_PAYMENT_ACKNOWLEDGE_URL = env('PG_PAYMENT_ACKNOWLEDGE_URL')
 PAYOUTS_ENABLED = env('PAYOUTS_ENABLED')
 PG_REFUND_STATUS_POLL_TIME = 60  # In min
 REFUND_INACTIVE_TIME = 24  # In hours
@@ -332,6 +340,7 @@ PG_CLIENT_KEY_P3 = env('PG_CLIENT_KEY_P3')
 GYNECOLOGIST_SPECIALIZATION_IDS = env('GYNECOLOGIST_SPECIALIZATION_IDS')
 ONCOLOGIST_SPECIALIZATION_IDS = env('ONCOLOGIST_SPECIALIZATION_IDS')
 MATRIX_NUMBER_MASKING = env('MATRIX_NUMBER_MASKING')
+UPDATE_DOCTOR_SEARCH_SCORE_TIME = 24  # In hours
 
 ANYMAIL = {
     "MAILGUN_API_KEY": env('MAILGUN_API_KEY', default=None),
@@ -367,3 +376,10 @@ CONN_MAX_AGE=600
 AWS_ACCESS_KEY_ID = env('AWS_ACCESS_KEY_ID', default='')
 AWS_SECRET_ACCESS_KEY = env('AWS_SECRET_ACCESS_KEY', default='')
 PROVIDER_EMAIL = env('PROVIDER_EMAIL', default='')
+
+
+#comments Settings
+COMMENTS_APP = 'fluent_comments'
+SITE_ID = 1
+FLUENT_COMMENTS_REPLACE_ADMIN = False
+

@@ -3,17 +3,21 @@ from copy import deepcopy
 from django.contrib.gis.db import models
 from django.contrib.staticfiles.templatetags.staticfiles import static
 from django.core.validators import MaxValueValidator, MinValueValidator, FileExtensionValidator
+from django.template.loader import render_to_string
+# from hardcopy import bytestring_to_pdf
 
-from ondoc.account.models import MerchantPayout, ConsumerAccount, Order
+from ondoc.account.models import MerchantPayout, ConsumerAccount, Order, UserReferred, MoneyPool, Invoice
 from ondoc.authentication.models import (TimeStampedModel, CreatedByModel, Image, Document, QCModel, UserProfile, User,
-                                         UserPermission, GenericAdmin, LabUserPermission, GenericLabAdmin, BillingAccount)
+                                         UserPermission, GenericAdmin, LabUserPermission, GenericLabAdmin,
+                                         BillingAccount, SPOCDetails)
 from ondoc.doctor.models import Hospital, SearchKey, CancellationReason
 from ondoc.coupon.models import Coupon
 from ondoc.notification import models as notification_models
 from ondoc.notification import tasks as notification_tasks
 from ondoc.notification.labnotificationaction import LabNotificationAction
 from django.core.files.storage import get_storage_class
-from ondoc.api.v1.utils import AgreedPriceCalculate, DealPriceCalculate, TimeSlotExtraction, CouponsMixin
+from ondoc.api.v1.utils import AgreedPriceCalculate, DealPriceCalculate, TimeSlotExtraction, CouponsMixin, \
+    form_time_slot, util_absolute_url, html_to_pdf
 from ondoc.account import models as account_model
 from django.utils import timezone
 from datetime import timedelta
@@ -23,11 +27,12 @@ from django.contrib.postgres.fields import JSONField
 from ondoc.doctor.models import OpdAppointment
 from ondoc.payout.models import Outstanding
 from ondoc.authentication import models as auth_model
-from django.core.files.uploadedfile import InMemoryUploadedFile
+from django.core.files.uploadedfile import InMemoryUploadedFile, TemporaryUploadedFile
 from io import BytesIO
 import datetime
 from ondoc.api.v1.utils import get_start_end_datetime, custom_form_datetime
 from ondoc.diagnostic import tasks
+from ondoc.authentication.models import UserProfile, Address
 from dateutil import tz
 from django.conf import settings
 import logging
@@ -162,7 +167,7 @@ class Lab(TimeStampedModel, CreatedByModel, QCModel, SearchKey):
     network_type = models.PositiveSmallIntegerField(blank=True, null=True,
                                                     choices=[("", "Select"), (1, "Non Network Lab"),
                                                              (2, "Network Lab")])
-    network = models.ForeignKey('LabNetwork', null=True, blank=True, on_delete=models.SET_NULL)
+    network = models.ForeignKey('LabNetwork', null=True, blank=True, on_delete=models.SET_NULL, related_name='lab')
     location = models.PointField(geography=True, srid=4326, blank=True, null=True)
     location_error = models.PositiveIntegerField(blank=True, null=True)
     building = models.CharField(max_length=100, blank=True)
@@ -202,7 +207,7 @@ class Lab(TimeStampedModel, CreatedByModel, QCModel, SearchKey):
     billing_merchant = GenericRelation(BillingAccount)
     home_collection_charges = GenericRelation(HomePickupCharges)
     entity = GenericRelation(location_models.EntityLocationRelationship)
-    rating = GenericRelation(ratings_models.RatingsReview)
+    rating = GenericRelation(ratings_models.RatingsReview, related_query_name='lab_ratings')
     enabled = models.BooleanField(verbose_name='Is Enabled', default=True, blank=True)
     booking_closing_hours_from_dayend = models.DecimalField(max_digits=10, decimal_places=2, default=0, validators=[MinValueValidator(Decimal('0.00'))])
     order_priority = models.PositiveIntegerField(blank=True, null=True, default=0)
@@ -214,6 +219,118 @@ class Lab(TimeStampedModel, CreatedByModel, QCModel, SearchKey):
 
     class Meta:
         db_table = "lab"
+
+    def convert_min(self, min):
+        min_str = str(min)
+        if min/10 < 1:
+            min_str = '0' + str(min)
+        return min_str
+
+    def convert_time(self, time):
+        hour = int(time)
+        min = int((time - hour) * 60)
+        am_pm = ''
+        if time < 12:
+            am_pm = 'AM'
+        else:
+            am_pm = 'PM'
+            hour -= 12
+        min_str = self.convert_min(min)
+        return str(hour) + ":" + min_str + " " + am_pm
+
+    def get_lab_timing(self, queryset):
+        lab_timing = ''
+        lab_timing_data = list()
+        temp_list = list()
+
+        for qdata in queryset:
+            temp_list.append({"start": qdata.start, "end": qdata.end})
+
+        temp_list = sorted(temp_list, key=lambda k: k["start"])
+
+        index = 0
+        while index < len(temp_list):
+            temp_dict = dict()
+            x = index
+            if not lab_timing:
+                lab_timing += self.convert_time(temp_list[index]["start"]) + " - "
+            else:
+                lab_timing += " | " + self.convert_time(temp_list[index]["start"]) + " - "
+            temp_dict["start"] = temp_list[index]["start"]
+            while x + 1 < len(temp_list) and temp_list[x]["end"] >= temp_list[x+1]["start"]:
+                x += 1
+            index = x
+            lab_timing += self.convert_time(temp_list[index]["end"])
+            temp_dict["end"] = temp_list[index]["end"]
+            lab_timing_data.append(temp_dict)
+            index += 1
+
+        return {'lab_timing': lab_timing, 'lab_timing_data': lab_timing_data}
+
+    # def lab_timings_today(self, day_now=timezone.now().weekday()):
+    #     lab_timing = list()
+    #     lab_timing_data = list()
+    #     time_choices = {item[0]: item[1] for item in LabTiming.TIME_CHOICES}
+    #     if self.always_open:
+    #         lab_timing.append("12:00 AM - 11:45 PM")
+    #         lab_timing_data.append({
+    #             "start": str(0.0),
+    #             "end": str(23.75)
+    #         })
+    #     else:
+    #         timing_queryset = self.lab_timings.all()
+    #         for data in timing_queryset:
+    #             if data.day == day_now:
+    #                 lab_timing, lab_timing_data = self.get_lab_timing(data)
+    #                 # lab_timing.append('{} - {}'.format(time_choices[data.start], time_choices[data.end]))
+    #                 # lab_timing_data.append({"start": str(data.start), "end": str(data.end)})
+    #    return lab_timing, lab_timing_data
+
+    # Lab.lab_timings_today = get_lab_timings_today
+
+    def lab_timings_today_and_next(self, day_now=timezone.now().weekday()):
+
+        lab_timing = ""
+        lab_timing_data = list()
+        next_lab_timing_dict = {}
+        next_lab_timing_data_dict = {}
+        data_array = [list() for i in range(7)]
+        days_array = [i for i in range(7)]
+        rotated_days_array = days_array[day_now:] + days_array[:day_now]
+        if self.always_open:
+            lab_timing = "12:00 AM - 11:45 PM"
+            lab_timing_data = [{
+                "start": 0.0,
+                "end": 23.75
+            }]
+            next_lab_timing_dict = {day_now+1: "12:00 AM - 11:45 PM"}
+            next_lab_timing_data_dict = {day_now+1: {
+                "start": 0.0,
+                "end": 23.75
+            }}
+        else:
+            timing_queryset = self.lab_timings.all()
+            for data in timing_queryset:
+                data_array[data.day].append(data)
+            rotated_data_array = data_array[day_now:] + data_array[:day_now]
+
+            for count, timing_data in enumerate(rotated_data_array):
+                day = rotated_days_array[count]
+                if count == 0:
+                    # {'lab_timing': lab_timing, 'lab_timing_data': lab_timing_data}
+                    timing_dict = self.get_lab_timing(timing_data)
+                    lab_timing, lab_timing_data = timing_dict['lab_timing'], timing_dict['lab_timing_data']
+                    lab_timing_data = sorted(lab_timing_data, key=lambda k: k["start"])
+                elif timing_data:
+                    next_timing_dict = self.get_lab_timing(timing_data)
+                    next_lab_timing, next_lab_timing_data = next_timing_dict['lab_timing'], next_timing_dict['lab_timing_data']
+                    # next_lab_timing, next_lab_timing_data = self.get_lab_timing(timing_data)
+                    next_lab_timing_data = sorted(next_lab_timing_data, key=lambda k: k["start"])
+                    next_lab_timing_dict[day] = next_lab_timing
+                    next_lab_timing_data_dict[day] = next_lab_timing_data
+                    break
+        return {'lab_timing': lab_timing, 'lab_timing_data': lab_timing_data,
+            'next_lab_timing_dict': next_lab_timing_dict, 'next_lab_timing_data_dict': next_lab_timing_data_dict}
 
     def get_ratings(self):
         return self.rating.all()
@@ -323,6 +440,12 @@ class Lab(TimeStampedModel, CreatedByModel, QCModel, SearchKey):
     #     if push_to_matrix:
     #         push_onboarding_qcstatus_to_matrix.apply_async(({'obj_type': self.__class__.__name__, 'obj_id': self.id}
     #                                                         ,), countdown=5)
+    def get_managers_for_communication(self):
+        result = []
+        result.extend(list(self.labmanager_set.filter(contact_type__in=[LabManager.SPOC, LabManager.MANAGER])))
+        if not result:
+            result.extend(list(self.labmanager_set.filter(contact_type=LabManager.OWNER)))
+        return result
 
 
 class LabCertification(TimeStampedModel):
@@ -645,6 +768,7 @@ class ParameterLabTest(TimeStampedModel):
     def __str__(self):
         return "{}".format(self.parameter.name)
 
+
 class FrequentlyAddedTogetherTests(TimeStampedModel):
     original_test = models.ForeignKey('diagnostic.LabTest', related_name='base_test' ,null =True, blank =False, on_delete=models.CASCADE)
     booked_together_test = models.ForeignKey('diagnostic.LabTest', related_name='booked_together' ,null=True, blank=False, on_delete=models.CASCADE)
@@ -652,12 +776,14 @@ class FrequentlyAddedTogetherTests(TimeStampedModel):
     class Meta:
         db_table = "frequently_added_tests"
 
+
 class LabTestCategory(auth_model.TimeStampedModel, SearchKey):
     name = models.CharField(max_length=500, unique=True)
     preferred_lab_test = models.ForeignKey('LabTest', on_delete=models.SET_NULL,
                                             related_name='preferred_in_lab_test_category', null=True, blank=True)
     is_live = models.BooleanField(default=False)
     is_package_category = models.BooleanField(verbose_name='Is this a test package category?')
+    show_on_recommended_screen = models.BooleanField(default=False)
 
     def __str__(self):
         return self.name
@@ -678,6 +804,21 @@ class LabTestCategoryMapping(models.Model):
 
     class Meta:
         db_table = "lab_test_to_category_mapping"
+        unique_together = (('lab_test', 'parent_category'),)
+
+
+class LabTestRecommendedCategoryMapping(models.Model):
+    lab_test = models.ForeignKey('LabTest', on_delete=models.CASCADE,
+                                 related_name='recommended_lab_test_category_mappings')
+    parent_category = models.ForeignKey(LabTestCategory, on_delete=models.CASCADE,
+                                        related_name='recommended_lab_test_mappings')
+    show_on_recommended_screen = models.BooleanField(default=False)
+
+    def __str__(self):
+        return '({}){}'.format(self.lab_test, self.parent_category)
+
+    class Meta:
+        db_table = "lab_test_recommended_category_mapping"
         unique_together = (('lab_test', 'parent_category'),)
 
 
@@ -729,7 +870,23 @@ class LabTest(TimeStampedModel, SearchKey):
                                         through=LabTestCategoryMapping,
                                         through_fields=('lab_test', 'parent_category'),
                                         related_name='lab_tests')
-
+    min_age = models.PositiveSmallIntegerField(default=None, blank=True, null=True, validators=[MaxValueValidator(120), MinValueValidator(1)])
+    max_age = models.PositiveSmallIntegerField(default=None, blank=True, null=True, validators=[MaxValueValidator(120), MinValueValidator(1)])
+    MALE = 1
+    FEMALE = 2
+    ALL = 3
+    GENDER_TYPE_CHOICES = (
+        ('', 'Select'),
+        (MALE, 'male'),
+        (FEMALE, 'female'),
+        (ALL, 'all')
+    )
+    gender_type = models.PositiveIntegerField(choices=GENDER_TYPE_CHOICES, blank=True, null=True)
+    recommended_categories = models.ManyToManyField(LabTestCategory,
+                                        through=LabTestRecommendedCategoryMapping,
+                                        through_fields=('lab_test', 'parent_category'),
+                                        related_name='recommended_lab_tests')
+    reference_code = models.CharField(max_length=150, blank=True, default='')
     # test_sub_type = models.ManyToManyField(
     #     LabTestSubType,
     #     through='LabTestSubTypeMapping',
@@ -737,7 +894,7 @@ class LabTest(TimeStampedModel, SearchKey):
     # )
 
     def __str__(self):
-        return self.name
+        return '{} ({})'.format(self.name, "PACKAGE" if self.is_package else "TEST")
 
     class Meta:
         db_table = "lab_test"
@@ -858,8 +1015,33 @@ class AvailableLabTest(TimeStampedModel):
         ]
 
 
+class LabAppointmentInvoiceMixin(object):
+    def generate_invoice(self, context=None):
+        invoices = self.get_invoice_objects()
+        if not invoices:
+            if not context:
+                from ondoc.communications.models import LabNotification
+                lab_notification = LabNotification(self)
+                context = lab_notification.get_context()
+            invoice = Invoice.objects.create(reference_id=context.get("instance").id,
+                                             product_id=Order.LAB_PRODUCT_ID)
+            context = deepcopy(context)
+            context['invoice'] = invoice
+            html_body = render_to_string("email/lab_invoice/invoice_template.html", context=context)
+            filename = "invoice_{}_{}.pdf".format(str(timezone.now().strftime("%I%M_%d%m%Y")),
+                                                  random.randint(1111111111, 9999999999))
+            file = html_to_pdf(html_body, filename)
+            if not file:
+                logger.error("Got error while creating pdf for lab invoice.")
+                return []
+            invoice.file = file
+            invoice.save()
+            invoices = [invoice]
+        return invoices
+
+
 @reversion.register()
-class LabAppointment(TimeStampedModel, CouponsMixin):
+class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin):
     CREATED = 1
     BOOKED = 2
     RESCHEDULED_LAB = 3
@@ -878,6 +1060,7 @@ class LabAppointment(TimeStampedModel, CouponsMixin):
     AUTO_CANCELLED = 3
     CANCELLATION_TYPE_CHOICES = [(PATIENT_CANCELLED, 'Patient Cancelled'), (AGENT_CANCELLED, 'Agent Cancelled'),
                                  (AUTO_CANCELLED, 'Auto Cancelled')]
+    MAX_FREE_BOOKINGS_ALLOWED = 3
 
     lab = models.ForeignKey(Lab, on_delete=models.SET_NULL, related_name='labappointment', null=True)
     lab_test = models.ManyToManyField(AvailableLabTest)  # Not to be used
@@ -913,6 +1096,7 @@ class LabAppointment(TimeStampedModel, CouponsMixin):
     merchant_payout = models.ForeignKey(MerchantPayout, related_name="lab_appointment", on_delete=models.SET_NULL, null=True)
     price_data = JSONField(blank=True, null=True)
     tests = models.ManyToManyField(LabTest, through='LabAppointmentTestMapping', through_fields=('appointment', 'test'))
+    money_pool = models.ForeignKey(MoneyPool, on_delete=models.SET_NULL, null=True)
 
     def get_tests_and_prices(self):
         # DONE SHASHANK_SINGH CHANGE 10
@@ -930,7 +1114,25 @@ class LabAppointment(TimeStampedModel, CouponsMixin):
 
         return test_price
 
+    def get_invoice_objects(self):
+        return Invoice.objects.filter(reference_id=self.id, product_id=Order.LAB_PRODUCT_ID)
 
+    def get_invoice_urls(self):
+        invoices_urls = []
+        if self.id:
+            invoices = self.get_invoice_objects()
+            for invoice in invoices:
+                invoices_urls.append(util_absolute_url(invoice.file.url))
+        return invoices_urls
+
+    def get_report_urls(self):
+        reports = self.reports.all()
+        report_file_links = set()
+        for report in reports:
+            report_file_links = report_file_links.union(
+                set([report_file.name.url for report_file in report.files.all()]))
+        report_file_links = [util_absolute_url(report_file_link) for report_file_link in report_file_links]
+        return list(report_file_links)
 
     def get_reports(self):
         return self.reports.all()
@@ -1086,6 +1288,9 @@ class LabAppointment(TimeStampedModel, CouponsMixin):
                 if self.cashback is not None and self.cashback > 0:
                     ConsumerAccount.credit_cashback(self.user, self.cashback, database_instance,
                                                         Order.LAB_PRODUCT_ID)
+                # credit referral cashback if any
+                UserReferred.credit_after_completion(self.user, database_instance, Order.LAB_PRODUCT_ID)
+
         except Exception as e:
             logger.error("Error while saving payout mercahnt for lab- " + str(e))
 
@@ -1201,11 +1406,25 @@ class LabAppointment(TimeStampedModel, CouponsMixin):
 
             if self.payment_type == OpdAppointment.PREPAID and account_model.ConsumerTransaction.valid_appointment_for_cancellation(
                     self.id, product_id):
-                cancel_amount = self.effective_price
-                consumer_account.credit_cancellation(self, account_model.Order.LAB_PRODUCT_ID, cancel_amount)
+
+                wallet_refund, cashback_refund = self.get_cancellation_breakup()
+
+                consumer_account.credit_cancellation(self, account_model.Order.LAB_PRODUCT_ID, wallet_refund, cashback_refund)
                 if refund_flag:
                     ctx_obj = consumer_account.debit_refund()
                     account_model.ConsumerRefund.initiate_refund(self.user, ctx_obj)
+
+    def get_cancellation_breakup(self):
+        wallet_refund = cashback_refund = 0
+        if self.money_pool:
+            wallet_refund, cashback_refund = self.money_pool.get_refund_breakup(self.effective_price)
+        elif self.price_data:
+            wallet_refund = self.price_data["wallet_amount"]
+            cashback_refund = self.price_data["cashback_amount"]
+        else:
+            wallet_refund = self.effective_price
+
+        return wallet_refund, cashback_refund
 
     def action_completed(self):
         self.status = self.COMPLETED
@@ -1342,6 +1561,105 @@ class LabAppointment(TimeStampedModel, CouponsMixin):
             if merchant:
                 return merchant.merchant
         return None
+
+    @classmethod
+    def get_price_details(cls, data):
+
+        deal_price_calculation = Case(When(custom_deal_price__isnull=True, then=F('computed_deal_price')),
+                                      When(custom_deal_price__isnull=False, then=F('custom_deal_price')))
+        agreed_price_calculation = Case(When(custom_agreed_price__isnull=True, then=F('computed_agreed_price')),
+                                        When(custom_agreed_price__isnull=False, then=F('custom_agreed_price')))
+        lab_test_queryset = AvailableLabTest.objects.filter(lab_pricing_group__labs=data["lab"],
+                                                            test__in=data['test_ids'])
+        temp_lab_test = lab_test_queryset.values('lab_pricing_group__labs').annotate(total_mrp=Sum("mrp"),
+                                                                                     total_deal_price=Sum(
+                                                                                         deal_price_calculation),
+                                                                                     total_agreed_price=Sum(
+                                                                                         agreed_price_calculation))
+        total_agreed = total_deal_price = total_mrp = effective_price = home_pickup_charges = 0
+        if temp_lab_test:
+            total_mrp = temp_lab_test[0].get("total_mrp", 0)
+            total_agreed = temp_lab_test[0].get("total_agreed_price", 0)
+            total_deal_price = temp_lab_test[0].get("total_deal_price", 0)
+            effective_price = total_deal_price
+            if data["is_home_pickup"] and data["lab"].is_home_collection_enabled:
+                effective_price += data["lab"].home_pickup_charges
+                home_pickup_charges = data["lab"].home_pickup_charges
+
+        coupon_discount, coupon_cashback, coupon_list = Coupon.get_total_deduction(data, effective_price)
+
+        if data.get("payment_type") in [OpdAppointment.COD, OpdAppointment.PREPAID]:
+            if coupon_discount >= effective_price:
+                effective_price = 0
+            else:
+                effective_price = effective_price - coupon_discount
+
+        return {
+            "deal_price" : total_deal_price,
+            "mrp" : total_mrp,
+            "fees" : total_agreed,
+            "effective_price" :effective_price,
+            "coupon_discount" : coupon_discount,
+            "coupon_cashback" : coupon_cashback,
+            "coupon_list" : coupon_list,
+            "home_pickup_charges" : home_pickup_charges
+        }
+
+    @classmethod
+    def create_fulfillment_data(cls, user, data, price_data):
+        from ondoc.api.v1.auth.serializers import AddressSerializer
+
+        lab_test_queryset = AvailableLabTest.objects.filter(lab_pricing_group__labs=data["lab"], test__in=data['test_ids'])
+        test_ids_list = list()
+        extra_details = list()
+        for obj in lab_test_queryset:
+            test_ids_list.append(obj.id)
+            extra_details.append({
+                "id": str(obj.test.id),
+                "name": str(obj.test.name),
+                "custom_deal_price": str(obj.custom_deal_price),
+                "computed_deal_price": str(obj.computed_deal_price),
+                "mrp": str(obj.mrp),
+                "computed_agreed_price": str(obj.computed_agreed_price),
+                "custom_agreed_price": str(obj.custom_agreed_price)
+            })
+
+        start_dt = form_time_slot(data["start_date"], data["start_time"])
+        profile_detail = {
+            "name": data["profile"].name,
+            "gender": data["profile"].gender,
+            "dob": str(data["profile"].dob),
+        }
+
+        fulfillment_data = {
+            "lab": data["lab"],
+            "user": user,
+            "profile": data["profile"],
+            "price": price_data.get("mrp"),
+            "agreed_price": price_data.get("fees"),
+            "deal_price": price_data.get("deal_price"),
+            "effective_price": price_data.get("effective_price"),
+            "home_pickup_charges": price_data.get("home_pickup_charges"),
+            "time_slot_start": start_dt,
+            "is_home_pickup": data["is_home_pickup"],
+            "profile_detail": profile_detail,
+            "status": LabAppointment.BOOKED,
+            "payment_type": data["payment_type"],
+            "lab_test": test_ids_list,
+            "extra_details": extra_details,
+            "coupon": price_data.get("coupon_list"),
+            "discount": int(price_data.get("coupon_discount")),
+            "cashback": int(price_data.get("coupon_cashback"))
+        }
+
+        if data.get("is_home_pickup") is True:
+            address = Address.objects.filter(pk=data.get("address").id).first()
+            address_serialzer = AddressSerializer(address)
+            fulfillment_data.update({
+                "address": address_serialzer.data,
+                "is_home_pickup": True
+            })
+        return fulfillment_data
 
     def __str__(self):
         return "{}, {}".format(self.profile.name if self.profile else "", self.lab.name)
@@ -1656,25 +1974,3 @@ class LabAppointmentTestMapping(models.Model):
 
     class Meta:
         db_table = 'lab_appointment_test_mapping'
-
-
-def get_lab_timings_today(self, day_now=timezone.now().weekday()):
-    lab_timing = list()
-    lab_timing_data = list()
-    time_choices = {item[0]: item[1] for item in LabTiming.TIME_CHOICES}
-    if self.always_open:
-        lab_timing.append("12:00 AM - 11:45 PM")
-        lab_timing_data.append({
-            "start": str(0.0),
-            "end": str(23.75)
-        })
-    else:
-        timing_queryset = self.lab_timings.all()
-        for data in timing_queryset:
-            if data.day == day_now:
-                lab_timing.append('{} - {}'.format(time_choices[data.start], time_choices[data.end]))
-                lab_timing_data.append({"start": str(data.start), "end": str(data.end)})
-    return ' | '.join(lab_timing), lab_timing_data
-
-
-Lab.lab_timings_today = get_lab_timings_today

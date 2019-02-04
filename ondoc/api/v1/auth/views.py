@@ -20,6 +20,7 @@ from rest_framework.authtoken.models import Token
 from django.db.models import F, Sum, Max, Q, Prefetch, Case, When, Count
 from django.forms.models import model_to_dict
 
+from ondoc.common.models import UserConfig, PaymentOptions
 from ondoc.coupon.models import UserSpecificCoupon, Coupon
 from ondoc.lead.models import UserLead
 from ondoc.sms.api import send_otp
@@ -28,7 +29,8 @@ from ondoc.authentication.models import (OtpVerifications, NotificationEndpoint,
                                          Address, AppointmentTransaction, GenericAdmin, UserSecretKey, GenericLabAdmin,
                                          AgentToken, DoctorNumber)
 from ondoc.notification.models import SmsNotification, EmailNotification
-from ondoc.account.models import PgTransaction, ConsumerAccount, ConsumerTransaction, Order, ConsumerRefund, OrderLog
+from ondoc.account.models import PgTransaction, ConsumerAccount, ConsumerTransaction, Order, ConsumerRefund, OrderLog, \
+    UserReferrals, UserReferred
 from django.contrib.auth import get_user_model
 from django.shortcuts import get_object_or_404
 from ondoc.api.pagination import paginate_queryset
@@ -56,6 +58,7 @@ import jwt
 from ondoc.insurance.models import InsuranceTransaction, UserInsurance, InsuredMembers
 from decimal import Decimal
 from ondoc.web.models import ContactUs
+from ondoc.notification.tasks import send_pg_acknowledge
 
 logger = logging.getLogger(__name__)
 User = get_user_model()
@@ -138,6 +141,11 @@ class UserViewset(GenericViewSet):
             user = User.objects.create(phone_number=data['phone_number'],
                                        is_phone_number_verified=True,
                                        user_type=User.CONSUMER)
+
+            # for new user, create a referral coupon entry
+            self.set_referral(user)
+
+
         self.set_coupons(user)
 
         token_object = JWTAuthentication.generate_token(user)
@@ -155,6 +163,12 @@ class UserViewset(GenericViewSet):
 
     def set_coupons(self, user):
         UserSpecificCoupon.objects.filter(phone_number=user.phone_number, user__isnull=True).update(user=user)
+
+    def set_referral(self, user):
+        try:
+            UserReferrals.objects.create(user=user)
+        except Exception as e:
+            logger.error(str(e))
 
     @transaction.atomic
     def logout(self, request):
@@ -309,11 +323,13 @@ class UserProfileViewSet(mixins.CreateModelMixin, mixins.ListModelMixin,
         data['email'] = request.data.get('email')
         data['phone_number'] = request.data.get('phone_number')
         data['user'] = request.user.id
+        first_profile = False
 
         if not queryset.exists():
             data.update({
                 "is_default_user": True
             })
+            first_profile = True
 
         if request.data.get('age'):
             try:
@@ -340,6 +356,12 @@ class UserProfileViewSet(mixins.CreateModelMixin, mixins.ListModelMixin,
             # }, status=status.HTTP_400_BAD_REQUEST)
             return Response(serializer.data)
         serializer.save()
+        # for new profile credit referral amount if any refrral code is used
+        if first_profile and request.data.get('referral_code'):
+            try:
+                self.credit_referral(request.data.get('referral_code'), request.user)
+            except Exception as e:
+                logger.error(str(e))
         return Response(serializer.data)
 
     def update(self, request, *args, **kwargs):
@@ -381,6 +403,12 @@ class UserProfileViewSet(mixins.CreateModelMixin, mixins.ListModelMixin,
         serializer.save()
         return Response(serializer.data)
 
+    @transaction.atomic()
+    def credit_referral(self, referral_code, user):
+        referral = UserReferrals.objects.filter(Q(code__iexact=referral_code), ~Q(user=user)).first()
+        if referral and not UserReferred.objects.filter(user=user).exists():
+            UserReferred.objects.create(user=user, referral_code=referral, used=False)
+            ConsumerAccount.credit_referral(user, UserReferrals.SIGNUP_CASHBACK)
 
 class OndocViewSet(mixins.CreateModelMixin,
                    mixins.RetrieveModelMixin,
@@ -388,6 +416,43 @@ class OndocViewSet(mixins.CreateModelMixin,
                    mixins.ListModelMixin,
                    viewsets.GenericViewSet):
     pass
+
+
+class ReferralViewSet(GenericViewSet):
+    # authentication_classes = (JWTAuthentication, )
+    # permission_classes = (IsAuthenticated, IsNotAgent)
+
+    def retrieve(self, request):
+        user = request.user
+        if not user.is_authenticated:
+            return Response({"status": 0}, status=status.HTTP_401_UNAUTHORIZED)
+        if UserReferrals.objects.all():
+            referral = UserReferrals.objects.filter(user=user).first()
+            if not referral:
+                referral = UserReferrals()
+                referral.user = user
+                referral.save()
+
+        user_config = UserConfig.objects.filter(key="referral").first()
+        help_flow = []
+        share_text = ''
+        share_url = ''
+        if user_config:
+            all_data = user_config.data
+            help_flow = all_data.get('help_flow', [])
+            share_text = all_data.get('share_text', '').replace('$referral_code', referral.code)
+            share_url = all_data.get('share_url', '').replace('$referral_code', referral.code)
+        return Response({"code": referral.code, "status": 1, 'help_flow': help_flow,
+                         "share_text": share_text, "share_url": share_url})
+
+    def retrieve_by_code(self, request, code):
+        referral = UserReferrals.objects.filter(code__iexact=code).first()
+        if referral:
+            default_user_profile = UserProfile.objects.filter(user=referral.user, is_default_user=True).first()
+            if default_user_profile:
+                return Response({"name": default_user_profile.name, "status": 1})
+
+        return Response({"status": 0}, status=status.HTTP_404_NOT_FOUND)
 
 
 class UserAppointmentsViewSet(OndocViewSet):
@@ -967,14 +1032,17 @@ class TransactionViewSet(viewsets.GenericViewSet):
 
     @transaction.atomic
     def save(self, request):
-        LAB_REDIRECT_URL = settings.BASE_URL + "/lab/appointment"
-        OPD_REDIRECT_URL = settings.BASE_URL + "/opd/appointment"
-        INSURANCE_REDIRECT_URL = settings.BASE_URL + "/insurance/complete"
-        INSURANCE_FAILURE_REDIRECT_URL = settings.BASE_URL + "/insurancereviews"
-        LAB_FAILURE_REDIRECT_URL = settings.BASE_URL + "/lab/%s/book?error_code=%s"
-        OPD_FAILURE_REDIRECT_URL = settings.BASE_URL + "/opd/doctor/%s/%s/bookdetails?error_code=%s"
-        ERROR_REDIRECT_URL = settings.BASE_URL + "/error?error_code=%s"
-        REDIRECT_URL = ERROR_REDIRECT_URL % ErrorCodeMapping.IVALID_APPOINTMENT_ORDER
+#         LAB_REDIRECT_URL = settings.BASE_URL + "/lab/appointment"
+#         OPD_REDIRECT_URL = settings.BASE_URL + "/opd/appointment"
+#         INSURANCE_REDIRECT_URL = settings.BASE_URL + "/insurance/complete"
+#         INSURANCE_FAILURE_REDIRECT_URL = settings.BASE_URL + "/insurancereviews"
+#         LAB_FAILURE_REDIRECT_URL = settings.BASE_URL + "/lab/%s/book?error_code=%s"
+#         OPD_FAILURE_REDIRECT_URL = settings.BASE_URL + "/opd/doctor/%s/%s/bookdetails?error_code=%s"
+#         ERROR_REDIRECT_URL = settings.BASE_URL + "/error?error_code=%s"
+#         REDIRECT_URL = ERROR_REDIRECT_URL % ErrorCodeMapping.IVALID_APPOINTMENT_ORDER
+        ERROR_REDIRECT_URL = settings.BASE_URL + "/cart?error_message=%s"
+        REDIRECT_URL = ERROR_REDIRECT_URL % "Error processing payment, please try again."
+        SUCCESS_REDIRECT_URL = settings.BASE_URL + "/order/summary/%s"
 
         try:
             response = None
@@ -992,7 +1060,7 @@ class TransactionViewSet(viewsets.GenericViewSet):
 
             # For testing only
             # response = request.data
-            appointment_obj = None
+            success_in_process = False
 
             try:
                 pg_resp_code = int(response.get('statusCode'))
@@ -1000,7 +1068,7 @@ class TransactionViewSet(viewsets.GenericViewSet):
                 logger.error("ValueError : statusCode is not type integer")
                 pg_resp_code = None
 
-            order_obj = Order.objects.select_for_update().filter(pk=response.get("orderId"), reference_id__isnull=True).first()
+            order_obj = Order.objects.select_for_update().filter(pk=response.get("orderId")).first()
             if pg_resp_code == 1 and order_obj:
                 response_data = None
                 resp_serializer = serializers.TransactionSerializer(data=response)
@@ -1018,74 +1086,68 @@ class TransactionViewSet(viewsets.GenericViewSet):
 
                         try:
                             if pg_tx_queryset:
-                                appointment_obj = order_obj.process_order()
+                                order_obj.process_pg_order()
+                                success_in_process = True
                         except Exception as e:
-                            logger.error("Error in building appointment - " + str(e))
+                            logger.error("Error in processing order - " + str(e))
                 else:
                     logger.error("Invalid pg data - " + json.dumps(resp_serializer.errors))
 
-                if order_obj.product_id == account_models.Order.LAB_PRODUCT_ID:
-                    if appointment_obj:
-                        REDIRECT_URL = LAB_REDIRECT_URL + "/" + str(appointment_obj.id) + "?payment_success=true"
-                    elif order_obj:
-                        REDIRECT_URL = LAB_FAILURE_REDIRECT_URL % (
-                            order_obj.action_data.get("lab"), response.get('statusCode'))
-                elif order_obj.product_id == account_models.Order.DOCTOR_PRODUCT_ID:
-                    if appointment_obj:
-                        REDIRECT_URL = OPD_REDIRECT_URL + "/" + str(appointment_obj.id) + "?payment_success=true"
-                    elif order_obj:
-                        REDIRECT_URL = OPD_FAILURE_REDIRECT_URL % (order_obj.action_data.get("doctor"),
-                                                                   order_obj.action_data.get("hospital"),
-                                                                   response.get('statusCode'))
-                elif order_obj.product_id == account_models.Order.INSURANCE_PRODUCT_ID:
-                    if appointment_obj:
-                        REDIRECT_URL = INSURANCE_REDIRECT_URL + "?payment_success=true&id=" + str(appointment_obj.id)
-                    elif order_obj:
-                        REDIRECT_URL = INSURANCE_FAILURE_REDIRECT_URL % (order_obj.action_data,
-                                                                   response.get('statusCode'))
-            else:
-                if not order_obj:
-                    REDIRECT_URL = ERROR_REDIRECT_URL % ErrorCodeMapping.IVALID_APPOINTMENT_ORDER
-                else:
-                    if order_obj.product_id == account_models.Order.LAB_PRODUCT_ID:
-                        REDIRECT_URL = LAB_FAILURE_REDIRECT_URL % (
-                        order_obj.action_data.get("lab"), response.get('statusCode'))
-                    elif order_obj.product_id == account_models.Order.DOCTOR_PRODUCT_ID:
-                        REDIRECT_URL = OPD_FAILURE_REDIRECT_URL % (order_obj.action_data.get("doctor"),
-                                                                   order_obj.action_data.get("hospital"),
-                                                                   response.get('statusCode'))
-                    elif order_obj.product_id == account_models.Order.INSURANCE_PRODUCT_ID:
-                        REDIRECT_URL = INSURANCE_FAILURE_REDIRECT_URL % (order_obj.action_data,
-                                                                   response.get('statusCode'))
+#                 if order_obj.product_id == account_models.Order.LAB_PRODUCT_ID:
+#                     if appointment_obj:
+#                         REDIRECT_URL = LAB_REDIRECT_URL + "/" + str(appointment_obj.id) + "?payment_success=true"
+#                     elif order_obj:
+#                         REDIRECT_URL = LAB_FAILURE_REDIRECT_URL % (
+#                             order_obj.action_data.get("lab"), response.get('statusCode'))
+#                 elif order_obj.product_id == account_models.Order.DOCTOR_PRODUCT_ID:
+#                     if appointment_obj:
+#                         REDIRECT_URL = OPD_REDIRECT_URL + "/" + str(appointment_obj.id) + "?payment_success=true"
+#                     elif order_obj:
+#                         REDIRECT_URL = OPD_FAILURE_REDIRECT_URL % (order_obj.action_data.get("doctor"),
+#                                                                    order_obj.action_data.get("hospital"),
+#                                                                    response.get('statusCode'))
+#                 elif order_obj.product_id == account_models.Order.INSURANCE_PRODUCT_ID:
+#                     if appointment_obj:
+#                         REDIRECT_URL = INSURANCE_REDIRECT_URL + "?payment_success=true&id=" + str(appointment_obj.id)
+#                     elif order_obj:
+#                         REDIRECT_URL = INSURANCE_FAILURE_REDIRECT_URL % (order_obj.action_data,
+#                                                                    response.get('statusCode'))
+#             else:
+#                 if not order_obj:
+#                     REDIRECT_URL = ERROR_REDIRECT_URL % ErrorCodeMapping.IVALID_APPOINTMENT_ORDER
+#                 else:
+#                     if order_obj.product_id == account_models.Order.LAB_PRODUCT_ID:
+#                         REDIRECT_URL = LAB_FAILURE_REDIRECT_URL % (
+#                         order_obj.action_data.get("lab"), response.get('statusCode'))
+#                     elif order_obj.product_id == account_models.Order.DOCTOR_PRODUCT_ID:
+#                         REDIRECT_URL = OPD_FAILURE_REDIRECT_URL % (order_obj.action_data.get("doctor"),
+#                                                                    order_obj.action_data.get("hospital"),
+#                                                                    response.get('statusCode'))
+#                     elif order_obj.product_id == account_models.Order.INSURANCE_PRODUCT_ID:
+#                         REDIRECT_URL = INSURANCE_FAILURE_REDIRECT_URL % (order_obj.action_data,
+#                                                                    response.get('statusCode'))
+                if success_in_process:
+                    REDIRECT_URL = SUCCESS_REDIRECT_URL % order_obj.id
 
         except Exception as e:
             logger.error("Error - " + str(e))
 
         try:
-            # log redirects
-            log_data = { "url" : REDIRECT_URL }
-            if order_obj:
-                log_data["product_id"] = order_obj.product_id
-                log_data["order_id"] = order_obj.id
-            if appointment_obj:
-                log_data["appointment_id"] = appointment_obj.id
-            log_data['referer_data'] = { 'HTTP_USER_AGENT' : request.META['HTTP_USER_AGENT'], 'HTTP_HOST' : request.META['HTTP_HOST'] }
-            if request.user:
-                log_data['user'] = request.user.id
-            if hasattr(request, 'agent'):
-                log_data['is_agent'] = True
-            if response:
-                log_data['pg_data'] = response
-            OrderLog.objects.create(**log_data)
+            if response and response.get("orderNo"):
+                pg_txn = PgTransaction.objects.filter(order_no__iexact=response.get("orderNo")).first()
+                if pg_txn:
+                    send_pg_acknowledge.apply_async((pg_txn.order_id, pg_txn.order_no,), countdown=1)
         except Exception as e:
-            logger.error("Error in logging Order - " + str(e))
+            logger.error("Error in sending pg acknowledge - " + str(e))
+
 
         # return Response({"url": REDIRECT_URL})
         return HttpResponseRedirect(redirect_to=REDIRECT_URL)
 
     def form_pg_transaction_data(self, response, order_obj):
         data = dict()
-        user = get_object_or_404(User, pk=order_obj.action_data.get("user"))
+        user_id = order_obj.get_user_id()
+        user = get_object_or_404(User, pk=user_id)
         data['user'] = user
         data['product_id'] = order_obj.product_id
         data['order_no'] = response.get('orderNo')
@@ -1318,43 +1380,60 @@ class HospitalDoctorAppointmentPermissionViewSet(GenericViewSet):
     authentication_classes = (JWTAuthentication, )
     permission_classes = (IsAuthenticated, IsDoctor,)
 
+    # building = models.CharField(max_length=1000, blank=True)
+    # sublocality = models.CharField(max_length=100, blank=True)
+    # locality = models.CharField(max_length=100, blank=True)
+    # city = models.CharField(max_length=100)
+    # state = models.CharField(max_length=100, blank=True)
+    # country = models.CharField(max_length=100)
+
     @transaction.non_atomic_requests
     def list(self, request):
         user = request.user
         doc_hosp_queryset = (DoctorClinic.objects
                              .select_related('doctor', 'hospital')
                              .prefetch_related('doctor__manageable_doctors', 'hospital__manageable_hospitals')
-                             .filter(doctor__is_live=True, hospital__is_live=True).annotate(
-            hospital_name=F('hospital__name'), doctor_name=F('doctor__name')).filter(
-            Q(
-                Q(doctor__manageable_doctors__user=user,
-                  doctor__manageable_doctors__hospital=F('hospital'),
-                  doctor__manageable_doctors__is_disabled=False,
-                  doctor__manageable_doctors__permission_type__in=[GenericAdmin.APPOINTMENT, GenericAdmin.ALL],
-                  doctor__manageable_doctors__write_permission=True) |
-                Q(doctor__manageable_doctors__user=user,
-                  doctor__manageable_doctors__hospital__isnull=True,
-                  doctor__manageable_doctors__is_disabled=False,
-                  doctor__manageable_doctors__permission_type__in=[GenericAdmin.APPOINTMENT, GenericAdmin.ALL],
-                  doctor__manageable_doctors__write_permission=True) |
-                Q(hospital__manageable_hospitals__doctor__isnull=True,
-                  hospital__manageable_hospitals__user=user,
-                  hospital__manageable_hospitals__is_disabled=False,
-                  hospital__manageable_hospitals__permission_type__in=[GenericAdmin.APPOINTMENT, GenericAdmin.ALL],
-                  hospital__manageable_hospitals__write_permission=True)
-            )|
-                Q(
-                    Q(doctor__manageable_doctors__user=user,
-                     doctor__manageable_doctors__super_user_permission=True,
-                     doctor__manageable_doctors__is_disabled=False,
-                     doctor__manageable_doctors__entity_type=GenericAdminEntity.DOCTOR,)|
-                    Q(hospital__manageable_hospitals__user=user,
-                      hospital__manageable_hospitals__super_user_permission=True,
-                      hospital__manageable_hospitals__is_disabled=False,
-                      hospital__manageable_hospitals__entity_type=GenericAdminEntity.HOSPITAL)
-            )
-            ).values('hospital', 'doctor', 'hospital_name', 'doctor_name').distinct('hospital', 'doctor')
+                             .filter(doctor__is_live=True, hospital__is_live=True)
+                             .annotate(doctor_gender=F('doctor__gender'),
+                                       hospital_building=F('hospital__building'),
+                                       hospital_name=F('hospital__name'),
+                                       doctor_name=F('doctor__name')
+                                       )
+                             .filter(
+                                    Q(
+                                        Q(doctor__manageable_doctors__user=user,
+                                          doctor__manageable_doctors__hospital=F('hospital'),
+                                          doctor__manageable_doctors__is_disabled=False,
+                                          doctor__manageable_doctors__permission_type__in=[GenericAdmin.APPOINTMENT, GenericAdmin.ALL],
+                                          doctor__manageable_doctors__write_permission=True) |
+                                        Q(doctor__manageable_doctors__user=user,
+                                          doctor__manageable_doctors__hospital__isnull=True,
+                                          doctor__manageable_doctors__is_disabled=False,
+                                          doctor__manageable_doctors__permission_type__in=[GenericAdmin.APPOINTMENT, GenericAdmin.ALL],
+                                          doctor__manageable_doctors__write_permission=True) |
+                                        Q(hospital__manageable_hospitals__doctor__isnull=True,
+                                          hospital__manageable_hospitals__user=user,
+                                          hospital__manageable_hospitals__is_disabled=False,
+                                          hospital__manageable_hospitals__permission_type__in=[GenericAdmin.APPOINTMENT, GenericAdmin.ALL],
+                                          hospital__manageable_hospitals__write_permission=True)
+                                    )|
+                                        Q(
+                                            Q(doctor__manageable_doctors__user=user,
+                                             doctor__manageable_doctors__super_user_permission=True,
+                                             doctor__manageable_doctors__is_disabled=False,
+                                             doctor__manageable_doctors__entity_type=GenericAdminEntity.DOCTOR,)|
+                                            Q(hospital__manageable_hospitals__user=user,
+                                              hospital__manageable_hospitals__super_user_permission=True,
+                                              hospital__manageable_hospitals__is_disabled=False,
+                                              hospital__manageable_hospitals__entity_type=GenericAdminEntity.HOSPITAL)
+                                    ))
+                             .values('hospital', 'doctor', 'hospital_name', 'doctor_name', 'doctor_gender').distinct('hospital', 'doctor')
                              )
+
+        # all_docs = [doc_hosp_queryset
+        # all_hospitals = doc_hosp_queryset
+
+
         return Response(doc_hosp_queryset)
 
 
@@ -1543,7 +1622,10 @@ class OrderViewSet(GenericViewSet):
     @transaction.non_atomic_requests
     def retrieve(self, request, pk):
         user = request.user
-        order_obj = Order.objects.filter(pk=pk, payment_status=Order.PAYMENT_PENDING, action_data__user=user.id).first()
+        order_obj = Order.objects.filter(pk=pk, payment_status=Order.PAYMENT_PENDING).first()
+        if not order_obj.validate_user(user):
+            return Response({"status": 0}, status.HTTP_404_NOT_FOUND)
+
         resp = dict()
         resp["status"] = 0
 
@@ -1552,6 +1634,7 @@ class OrderViewSet(GenericViewSet):
 
         resp["status"] = 1
         resp['data'], resp["payment_required"] = utils.payment_details(request, order_obj)
+        resp['payment_options'] = PaymentOptions.filtered_payment_option(order_obj)
         return Response(resp)
 
 
@@ -1656,7 +1739,11 @@ class OrderDetailViewSet(GenericViewSet):
     def details(self, request, order_id):
         if not order_id:
             return Response(status=status.HTTP_400_BAD_REQUEST)
-        queryset = Order.objects.filter(id=order_id, action_data__user=request.user.id).first()
+
+        queryset = Order.objects.filter(id=order_id).first()
+        if not queryset.validate_user(request.user):
+            return Response({"status": 0}, status.HTTP_404_NOT_FOUND)
+
         if not queryset:
             return Response(status=status.HTTP_404_NOT_FOUND)
         resp = dict()
@@ -1679,6 +1766,42 @@ class OrderDetailViewSet(GenericViewSet):
             resp = serializer.data
 
         return Response(resp)
+
+    @transaction.non_atomic_requests
+    def summary(self, request, order_id):
+        from ondoc.api.v1.cart import serializers as cart_serializers
+
+        if not order_id:
+            return Response(status=status.HTTP_400_BAD_REQUEST)
+        order_data = Order.objects.filter(id=order_id).first()
+
+        if not order_data.validate_user(request.user):
+            return Response({"status": 0}, status.HTTP_404_NOT_FOUND)
+
+        if not order_data:
+            return Response(status=status.HTTP_404_NOT_FOUND)
+
+        processed_order_data = []
+        child_orders = order_data.orders.all()
+
+        class OrderCartItemMapper():
+            def __init__(self, order_obj):
+                self.data = order_obj.action_data
+                self.order = order_obj
+
+        for order in child_orders:
+            item = OrderCartItemMapper(order)
+            curr = {
+                "mrp" : order.action_data["mrp"] if "mrp" in order.action_data else order.action_data["agreed_price"],
+                "deal_price": order.action_data["deal_price"],
+                "effective_price": order.action_data["effective_price"],
+                "data" : cart_serializers.CartItemSerializer(item, context={"validated_data" : None}).data,
+                "booking_id" : order.reference_id,
+                "time_slot_start" : order.action_data["time_slot_start"]
+            }
+            processed_order_data.append(curr)
+
+        return Response({"data": processed_order_data})
 
 
 class UserTokenViewSet(GenericViewSet):

@@ -267,7 +267,6 @@ class DoctorSearchByHospitalHelper:
                            "INNER JOIN doctor_clinic_timing dct ON dc.id = dct.doctor_clinic_id " \
                            "INNER JOIN doctor_clinic_procedure dcp ON dc.id = dcp.doctor_clinic_id " \
                            "WHERE {filtering_params} AND " \
-                           "d.enabled_for_online_booking and dc.enabled_for_online_booking and h.enabled_for_online_booking AND " \
                            "St_dwithin(St_setsrid(St_point((%(longitude)s), (%(latitude)s)), 4326 ), h.location, (%(max_distance)s)) AND " \
                            "St_dwithin(St_setsrid(St_point((%(longitude)s), (%(latitude)s)), 4326 ), h.location, (%(min_distance)s)) = false " \
                            " ) " \
@@ -326,8 +325,7 @@ class DoctorSearchByHospitalHelper:
                            "INNER JOIN doctor_clinic_timing dct ON dc.id = dct.doctor_clinic_id " \
                            "{sp_cond}" \
                            "WHERE {filtering_params}" \
-                           " and d.enabled_for_online_booking and dc.enabled_for_online_booking and h.enabled_for_online_booking   " \
-                           "and St_dwithin(St_setsrid(St_point((%(longitude)s), (%(latitude)s)), 4326 ), h.location, (%(max_distance)s)) " \
+                           " and St_dwithin(St_setsrid(St_point((%(longitude)s), (%(latitude)s)), 4326 ), h.location, (%(max_distance)s)) " \
                            "{min_dist_cond}" \
                            " )x " \
                            "where {rank_by}".format(rank_part=rank_part, sp_cond=sp_cond, \
@@ -424,6 +422,10 @@ class DoctorSearchByHospitalHelper:
         selected_procedure_ids, other_procedure_ids = get_selected_and_other_procedures(category_ids, procedure_ids)
 
         hospital_card = OrderedDict()
+
+        from ondoc.coupon.models import Coupon
+        search_coupon = Coupon.get_search_coupon(request.user)
+
         for result in doctor_search_result:
             
             existing = hospital_card.get(result['hospital_id'])
@@ -458,12 +460,15 @@ class DoctorSearchByHospitalHelper:
 
                     h_data['procedure_categories'] = final_result
                 existing = h_data
-            
+
+            discounted_price = result["deal_price"] if not search_coupon else search_coupon.get_search_coupon_discounted_price(result["deal_price"])
+
             d_data = {}    
             d_data["id"] = result["doctor_id"]
             d_data["doctor_id"] = result["doctor_id"]
             d_data["deal_price"] = result["deal_price"]
             d_data["discounted_fees"] = result["deal_price"]
+            d_data["discounted_price"] = discounted_price
             d_data["is_license_verified"] = result["is_license_verified"]
             d_data["distance"] = result["distance"]/1000
             d_data["mrp"] = result["mrp"]
