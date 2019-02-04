@@ -1002,8 +1002,8 @@ class TransactionViewSet(viewsets.GenericViewSet):
 
     @transaction.atomic
     def save(self, request):
-        ERROR_REDIRECT_URL = settings.BASE_URL + "/error?error_code=%s"
-        REDIRECT_URL = ERROR_REDIRECT_URL % ErrorCodeMapping.IVALID_APPOINTMENT_ORDER
+        ERROR_REDIRECT_URL = settings.BASE_URL + "/cart?error_message=%s"
+        REDIRECT_URL = ERROR_REDIRECT_URL % "Error processing payment, please try again."
         SUCCESS_REDIRECT_URL = settings.BASE_URL + "/order/summary/%s"
 
         try:
@@ -1054,14 +1054,6 @@ class TransactionViewSet(viewsets.GenericViewSet):
 
                 if success_in_process:
                     REDIRECT_URL = SUCCESS_REDIRECT_URL % order_obj.id
-                else:
-                    REDIRECT_URL = ERROR_REDIRECT_URL % 1
-
-            else:
-                if not order_obj:
-                    REDIRECT_URL = ERROR_REDIRECT_URL % ErrorCodeMapping.IVALID_APPOINTMENT_ORDER
-                else:
-                    REDIRECT_URL = ERROR_REDIRECT_URL % 1
 
         except Exception as e:
             logger.error("Error - " + str(e))
@@ -1662,7 +1654,7 @@ class OrderDetailViewSet(GenericViewSet):
         if not order_id:
             return Response(status=status.HTTP_400_BAD_REQUEST)
         order_data = Order.objects.filter(id=order_id).first()
-        
+
         if not order_data.validate_user(request.user):
             return Response({"status": 0}, status.HTTP_404_NOT_FOUND)
 
