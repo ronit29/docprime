@@ -39,6 +39,8 @@ urlpatterns = [
     #      name='payment-retry'),
     path('labtiming', LabTimingListView.as_view({'get': 'list'}),
          name='lab-timing'),
+    path('labtimingslot', LabTimingListView.as_view({'get': 'time_slot'}),
+         name='lab-timing-slot'),
     path('labtest/<int:lab_id>', AvailableTestViewSet.as_view({'get': 'retrieve'}),
          name='lab-available-test'),
     path('lab-report-file', LabReportFileViewset.as_view({'get': 'list'}), name='lab-upload-list'),

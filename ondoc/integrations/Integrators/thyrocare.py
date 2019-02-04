@@ -6,9 +6,10 @@ from rest_framework import status
 from django.conf import settings
 import logging
 logger = logging.getLogger(__name__)
-from datetime import timedelta
+from datetime import timedelta, datetime
 from ondoc.integrations.models import IntegratorMapping, IntegratorProfileMapping
 from django.contrib.contenttypes.models import ContentType
+
 
 
 class Thyrocare(BaseIntegrator):
@@ -62,7 +63,7 @@ class Thyrocare(BaseIntegrator):
                     IntegratorMapping(integrator_product_data=result_obj, integrator_test_name=result_obj['name'],
                                       integrator_class_name=Thyrocare.__name__,
                                       service_type=IntegratorMapping.ServiceType.LabTest, object_id=obj_id,
-                                      content_type=ContentType.objects.get(model='labtest')).save()
+                                      content_type=ContentType.objects.get(model='labnetwork')).save()
             else:
                 try:
                     IntegratorProfileMapping.objects.get(integrator_package_name=result_obj['name'], object_id=obj_id)
@@ -70,7 +71,7 @@ class Thyrocare(BaseIntegrator):
                     IntegratorProfileMapping(integrator_product_data=result_obj, integrator_package_name=result_obj['name'],
                                              integrator_class_name=Thyrocare.__name__,
                                              service_type=IntegratorProfileMapping.ServiceType.LabTest, object_id=obj_id,
-                                             content_type=ContentType.objects.get(model='labtest')).save()
+                                             content_type=ContentType.objects.get(model='labnetwork')).save()
 
     @classmethod
     def thyrocare_product_data(cls, obj_id, type):
@@ -82,34 +83,33 @@ class Thyrocare(BaseIntegrator):
 
     def _get_appointment_slots(self, pincode, date, **kwargs):
         obj = TimeSlotExtraction()
-        for i in range(7):
-            next_date = date + timedelta(i)
-            url = 'https://www.thyrocare.com/API_BETA/ORDER.svc/%s/%s/GetAppointmentSlots' % (pincode, next_date.strftime("%d-%m-%Y"))
-            response = requests.get(url)
-            if response.status_code != status.HTTP_200_OK or not response.ok:
-                logger.error("[ERROR] Thyrocare Time slot api failed.")
-                return None
 
-            resp_data = response.json()
-            available_slots = resp_data.get('LSlotDataRes', [])
+        url = 'https://www.thyrocare.com/API_BETA/ORDER.svc/%s/%s/GetAppointmentSlots' % (pincode, date)
+        response = requests.get(url)
+        if response.status_code != status.HTTP_200_OK or not response.ok:
+            logger.error("[ERROR] Thyrocare Time slot api failed.")
+            return None
 
-            if available_slots:
-                start = available_slots[0]['Slot'].split("-")[0]
-                hour, minutes = start.split(":")
-                hour, minutes = float(hour), int(minutes)
-                minutes = float("%0.2f" % (minutes/60))
-                start = hour + minutes
+        resp_data = response.json()
+        available_slots = resp_data.get('LSlotDataRes', [])
 
-                end = available_slots[len(available_slots)-1]['Slot'].split("-")[1]
+        if available_slots:
+            start = available_slots[0]['Slot'].split("-")[0]
+            hour, minutes = start.split(":")
+            hour, minutes = float(hour), int(minutes)
+            minutes = float("%0.2f" % (minutes/60))
+            start = hour + minutes
 
-                hour, minutes = end.split(":")
-                hour, minutes = float(hour), int(minutes)
-                minutes = float("%0.2f" % (minutes/60))
-                end = hour + minutes
+            end = available_slots[len(available_slots)-1]['Slot'].split("-")[1]
 
-                obj.form_time_slots(next_date.date().weekday(), start, end, None, True)
+            hour, minutes = end.split(":")
+            hour, minutes = float(hour), int(minutes)
+            minutes = float("%0.2f" % (minutes/60))
+            end = hour + minutes
 
-        resp_list = obj.get_timing_list()
+            obj.form_time_slots(datetime.strptime(date, '%d-%m-%Y').weekday(), start, end, None, True)
+
+        resp_list = obj.get_timing_list(is_thyrocare=True)
         is_home_pickup = kwargs.get('is_home_pickup', False)
         today_min, tomorrow_min, today_max = obj.initial_start_times(is_thyrocare=True, is_home_pickup=is_home_pickup, time_slots=resp_list)
 

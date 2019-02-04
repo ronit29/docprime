@@ -794,7 +794,7 @@ class TimeSlotExtraction(object):
         time = form_dc_time(time, am_pm)
         return time
 
-    def get_timing_list(self):
+    def get_timing_list(self, is_thyrocare=False):
         whole_timing_data = dict()
         for i in range(7):
             whole_timing_data[i] = list()
@@ -805,7 +805,11 @@ class TimeSlotExtraction(object):
                 # whole_timing_data[i].append(self.format_data(self.timing[i]['timing'][self.AFTERNOON], self.AFTERNOON, pa))
                 whole_timing_data[i].append(self.format_data(self.timing[i]['timing'][self.EVENING], self.EVENING, pa))
 
-        return whole_timing_data
+        if is_thyrocare:
+            whole_timing_data = dict([(k, v) for k, v in whole_timing_data.items() if len(v) > 0])
+            return whole_timing_data
+        else:
+            return whole_timing_data
 
     def format_data(self, data, day_time, pa):
         data_list = list()
