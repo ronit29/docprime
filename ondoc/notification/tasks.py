@@ -1,5 +1,6 @@
 from __future__ import absolute_import, unicode_literals
 
+import copy
 import datetime
 import json
 import math
@@ -329,9 +330,7 @@ def send_appointment_location_message(number, hospital_lat, hospital_long):
 @task()
 def process_payout(payout_id):
     from ondoc.account.models import MerchantPayout, Order
-    from ondoc.api.v1.utils import create_payout_checksum
     from ondoc.account.models import DummyTransactions
-
 
     try:
         if not payout_id:
@@ -369,20 +368,17 @@ def process_payout(payout_id):
             raise Exception("No transactions found for given payout " + str(payout_data))
 
         req_data = { "payload" : [], "checkSum" : "" }
+        req_data2 = { "payload" : [], "checkSum" : "" }
 
 
         idx = 0
         for txn in all_txn:
-            transaction_amount = txn.amount
-
-            if isinstance(txn, DummyTransactions):
-                transaction_amount = 0
-
+            
             curr_txn = OrderedDict()
             curr_txn["idx"] = idx
             curr_txn["orderNo"] = txn.order_no
             curr_txn["orderId"] = order_data.id
-            curr_txn["txnAmount"] = str(transaction_amount)
+            curr_txn["txnAmount"] = str(txn.amount)
             curr_txn["settledAmount"] = str(payout_data.payable_amount)
             curr_txn["merchantCode"] = merchant.id
             if txn.transaction_id:
@@ -391,41 +387,58 @@ def process_payout(payout_id):
             curr_txn["bookingId"] = appointment.id
             req_data["payload"].append(curr_txn)
             idx += 1
+            if isinstance(txn, DummyTransactions) and txn.amount>0:
+                curr_txn2 = copy.deepcopy(curr_txn)
+                curr_txn2["txnAmount"] = str(0)
+                curr_txn2["idx"] = len(req_data2.get('payload'))
+                req_data2["payload"].append(curr_txn2)
 
-        req_data["checkSum"] = create_payout_checksum(req_data["payload"], order_data.product_id)
-        headers = {
-            "auth": settings.PG_REFUND_AUTH_TOKEN,
-            "Content-Type": "application/json"
-        }
-        url = settings.PG_SETTLEMENT_URL
+        payout_status = None
+        if len(req_data2.get('payload'))>0:
+            payout_status = request_payout(req_data2, order_data)
 
-        response = requests.post(url, data=json.dumps(req_data), headers=headers)
-        if response.status_code == status.HTTP_200_OK:
-            resp_data = response.json()
-            if resp_data.get("ok") is not None and resp_data.get("ok") == '1':
-                success_payout = False
-                result = resp_data.get('result')
-                if result:
-                    for res_txn in result:
-                        success_payout = res_txn['status'] == "SUCCESSFULLY_INSERTED"
+        if not payout_status or not payout_status.get('status'):
+            payout_status = request_payout(req_data, order_data)
 
-                if success_payout:
-                    payout_data.payout_time = datetime.datetime.now()
-                    payout_data.status = payout_data.PAID
-                    payout_data.api_response = json.dumps(resp_data)
-                    payout_data.save()
-                    #print("Payout processed")
-                    return
-                else:
-                    logger.error("payout failed for request data - " + str(req_data))                
+        if payout_status:
+            payout_data.api_response = json.dumps(payout_status.get("response"))
+            if payout_status.get("status"):
+                payout_data.payout_time = datetime.datetime.now()
+                payout_data.status = payout_data.PAID
+            else:
+                payout_data.retry_count += 1
 
-        payout_data.retry_count += 1
-        payout_data.api_response = json.dumps(resp_data)
-        payout_data.save()
-        raise Exception("Retry on invalid Http response status - " + str(response.content))
+            payout_data.save()
+
 
     except Exception as e:
         logger.error("Error in processing payout - with exception - " + str(e))
+
+def request_payout(req_data, order_data):
+    from ondoc.api.v1.utils import create_payout_checksum
+
+    req_data["checkSum"] = create_payout_checksum(req_data["payload"], order_data.product_id)
+    headers = {
+        "auth": settings.PG_REFUND_AUTH_TOKEN,
+        "Content-Type": "application/json"
+    }
+    url = settings.PG_SETTLEMENT_URL
+    resp_data = None
+
+    response = requests.post(url, data=json.dumps(req_data), headers=headers)
+    if response.status_code == status.HTTP_200_OK:
+        resp_data = response.json()
+        if resp_data.get("ok") is not None and resp_data.get("ok") == '1':
+            success_payout = False
+            result = resp_data.get('result')
+            if result:
+                for res_txn in result:
+                    success_payout = res_txn['status'] == "SUCCESSFULLY_INSERTED"
+                    return {"status":1,"response":resp_data}
+            
+    
+    logger.error("payout failed for request data - " + str(req_data))
+    return {"status":0,"response":resp_data}
 
 @task()
 def opd_send_otp_before_appointment(appointment_id, previous_appointment_date_time):

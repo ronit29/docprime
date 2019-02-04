@@ -8,6 +8,7 @@ import requests
 import json
 import logging
 import datetime
+from datetime import date
 from ondoc.authentication.models import Address
 from ondoc.api.v1.utils import resolve_address
 logger = logging.getLogger(__name__)
@@ -65,8 +66,16 @@ def prepare_and_hit(self, data):
     except Exception as e:
         pass
 
+    p_email = ''
+    if appointment.profile:
+        p_email = appointment.profile.email
+
     appointment_details = {
         'AppointmentStatus': appointment.status,
+        'Age': calculate_age(appointment),
+        'Email': p_email,
+        'VirtualNo': '',
+        'OTP': '',
         'KYC': kyc,
         'Location': location,
         'PaymentStatus': 300,
@@ -150,6 +159,16 @@ def prepare_and_hit(self, data):
         pass
     else:
         logger.info("[ERROR] Appointment could not be published to the matrix system")
+
+
+def calculate_age(appointment):
+    if not appointment.profile:
+        return 0
+    if not appointment.profile.dob:
+        return 0
+    dob = appointment.profile.dob
+    today = date.today()
+    return today.year - dob.year - ((today.month, today.day) < (dob.month, dob.day))
 
 
 @task(bind=True, max_retries=2)
