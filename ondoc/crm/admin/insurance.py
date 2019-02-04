@@ -1,7 +1,10 @@
 from django.contrib import admin
 from django import forms
+from django.db.models import Count, Q
+from django.db.models import F
 from rest_framework import serializers
 from ondoc.api.v1.insurance.serializers import InsuranceTransactionSerializer
+from ondoc.doctor.models import OpdAppointment
 from ondoc.insurance.models import InsurancePlanContent, InsurancePlans, InsuredMembers, UserInsurance, StateGSTCode, \
     InsuranceCity, InsuranceDistrict
 from import_export.admin import ImportExportMixin, ImportExportModelAdmin, base_formats
@@ -168,7 +171,6 @@ class InsuredMemberResource(resources.ModelResource):
                                                                           insured_members.user_insurance.coi.name else ''
 
 
-
 class InsuredMembersAdmin(ImportExportMixin, nested_admin.NestedModelAdmin):
     resource_class = InsuredMemberResource
     export_template_name = "export_template_name.html"
@@ -198,7 +200,134 @@ class InsuredMembersAdmin(ImportExportMixin, nested_admin.NestedModelAdmin):
         return False
 
 
-class UserInsuranceAdmin(admin.ModelAdmin):
+class UserInsuranceResource(resources.ModelResource):
+    policy_number = fields.Field()
+    member_id = fields.Field()
+    name = fields.Field()
+    relationship_with_proposer = fields.Field()
+    date_of_consultation = fields.Field()
+    name_of_doctor = fields.Field()
+    provider_code_of_doctor = fields.Field()
+    speciality_of_doctor = fields.Field()
+    diagnosis = fields.Field()
+    icd_code_of_diagnosis = fields.Field()
+    name_of_clinic = fields.Field()
+    address_of_clinic = fields.Field()
+    pan_card_of_clinic = fields.Field()
+    existing_condition = fields.Field()
+    amount_to_be_paid = fields.Field()
+    bank_detail_of_center = fields.Field()
+    gst_number_of_center = fields.Field()
+
+    def export(self, queryset=None, *args, **kwargs):
+        queryset = self.get_queryset(**kwargs)
+        fetched_queryset = list(queryset)
+        return super().export(fetched_queryset)
+
+    def get_queryset(self, **kwargs):
+
+        date_range = [datetime.strptime(kwargs.get('from_date'), '%Y-%m-%d').date(), datetime.strptime(
+                                        kwargs.get('to_date'), '%Y-%m-%d').date()]
+        # return InsuredMembers.objects.filter(created_at__date__range=date_range).prefetch_related('user_insurance')
+        if kwargs.get('appointment_type') == 'doctor':
+            appointment = OpdAppointment.objects.filter(created_at__date__range=date_range, payment_type=3).prefetch_related(
+                                                'insurance')
+            return appointment
+            # insurance_ids = OpdAppointment.objects.filter(created_at__date__range=date_range).values_list('insurance_id')
+            # return UserInsurance.objects.filter(id__in=insurance_ids).distinct('id').annotate(count=Count(id, filter=F(id__in=insurance_ids)))
+            # return UserInsurance.objects.filter(id__in=insurance_ids).extra(select={'type': 'doctor'})
+        elif kwargs.get('appointment_type') == 'lab':
+            return UserInsurance.objects.filter(created_at__date__range=date_range).prefetch_related(
+                                                'lab_appointment').extra(select={'type': 'lab'})
+
+    class Meta:
+        model = UserInsurance
+        fields = ()
+        export_order = ('policy_number', 'member_id', 'name', 'relationship_with_proposer', 'date_of_consultation',
+                        'name_of_doctor', 'provider_code_of_doctor', 'speciality_of_doctor', 'diagnosis',
+                        'icd_code_of_diagnosis', 'name_of_clinic', 'address_of_clinic', 'existing_condition',
+                        'amount_to_be_paid', 'bank_detail_of_center', 'gst_number_of_center')
+
+    def get_insured_member(self, profile):
+        insured_member = InsuredMembers.objects.filter(profile_id=profile).first()
+        if insured_member:
+            return insured_member
+        else:
+            return None
+
+    def dehydrate_appointment_type(self,appointment):
+        type = appointment.__class__.__name__
+        if type == 'OpdAppointment':
+            return "Doctor"
+        elif type == 'LabAppointment':
+            return "Lab"
+
+    def dehydrate_policy_number(self, appointment):
+        return str(appointment.insurance.policy_number)
+
+    def dehydrate_member_id(self, appointment):
+        member = self.get_insured_member(appointment.profile_id)
+        if member:
+            return str(member.id)
+        else:
+            return ""
+
+    def dehydrate_name(self, appointment):
+        member = self.get_insured_member(appointment.profile_id)
+        if member:
+            return str(member.first_name)
+        else:
+            return ""
+
+    def dehydrate_relationship_with_proposer(self, appointment):
+        member = self.get_insured_member(appointment.profile_id)
+        if member:
+            return str(member.relation)
+        else:
+            return ""
+
+    def dehydrate_date_of_consultation(self, appointment):
+        return str(appointment.time_slot_start.date())
+
+    def dehydrate_name_of_doctor(self, appointment):
+        return str(appointment.doctor.name)
+
+    def dehydrate_provider_code_of_doctor(self, appointment):
+        return ""
+
+    def dehydrate_speciality_of_doctor(self, appointment):
+        # return str(appointment.doctor.speciality)
+        return ""
+    def dehydrate_diagnosis(self, appointment):
+        return ""
+
+    def dehydrate_icd_code_of_diagnosis(self, appointment):
+        return ""
+
+    def dehydrate_name_of_clinic(self, appointment):
+        return ""
+
+    def dehydrate_address_of_clinic(self, appointment):
+        return ""
+
+    def dehydrate_existing_condition(self, appointment):
+        return ""
+
+    def dehydrate_amount_to_be_paid(self, appointment):
+        return ""
+
+    def dehydrate_bank_detail_of_center(self, appointment):
+        return ""
+
+    def dehydrate_gst_number_of_center(self, appointment):
+        return ""
+
+
+class UserInsuranceAdmin(ImportExportMixin, admin.ModelAdmin):
+    resource_class = UserInsuranceResource
+    export_template_name = "export_insurance_report.html"
+    formats = (base_formats.XLS,)
+    model = UserInsurance
 
     def user_policy_number(self, obj):
         return str(obj.policy_number)
@@ -208,6 +337,22 @@ class UserInsuranceAdmin(admin.ModelAdmin):
     readonly_fields = ('insurance_plan', 'user', 'purchase_date', 'expiry_date', 'policy_number', 'premium_amount',)
     inlines = [InsuredMembersInline]
     # form = UserInsuranceForm
+
+    def get_export_queryset(self, request):
+        super().get_export_queryset(request)
+
+    def get_export_data(self, file_format, queryset, *args, **kwargs):
+        """
+        Returns file_format representation for given queryset.
+        """
+        kwargs['from_date'] = kwargs.get('request').POST.get('from_date')
+        kwargs['to_date'] = kwargs.get('request').POST.get('to_date')
+        kwargs['appointment_type'] = kwargs.get('request').POST.get('appointment_type')
+        request = kwargs.pop("request")
+        resource_class = self.get_export_resource_class()
+        data = resource_class(**self.get_export_resource_kwargs(request)).export(queryset, *args, **kwargs)
+        export_data = file_format.export_data(data)
+        return export_data
 
     def has_add_permission(self, request, obj=None):
         return False
