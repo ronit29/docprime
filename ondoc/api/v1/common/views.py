@@ -22,7 +22,7 @@ from ondoc.notification.rabbitmq_client import publish_message
 # from ondoc.notification.sqs_client import publish_message
 from django.template.loader import render_to_string
 from . import serializers
-from ondoc.common.models import Cities
+from ondoc.common.models import Cities, PaymentOptions
 from ondoc.common.utils import send_email, send_sms
 from ondoc.authentication.backends import JWTAuthentication
 from django.core.files.uploadedfile import SimpleUploadedFile, TemporaryUploadedFile, InMemoryUploadedFile
@@ -881,3 +881,41 @@ class SearchLeadViewSet(viewsets.GenericViewSet):
         for email in settings.OPS_EMAIL_ID:
             EmailNotification.publish_ops_email(email, html_body, 'New Search Lead')
         return Response({'msg': 'success'}, status=status.HTTP_200_OK)
+
+
+class GetPaymentOptionsViewSet(viewsets.GenericViewSet):
+    def get_queryset(self):
+        return None
+
+    def return_queryset(self, request):
+
+        params = request.query_params
+        from_app = params.get("from_app", False)
+        if from_app:
+            queryset = PaymentOptions.objects.filter(is_enabled=True, payment_gateway__iexact="paytm").order_by(
+                '-priority')
+        else:
+            queryset = PaymentOptions.objects.filter(is_enabled=True).order_by('-priority')
+        return queryset
+
+    def list(self, request):
+        queryset = self.return_queryset(request)
+        options = []
+        first = True
+        for data in queryset:
+            resp = {}
+            resp['name'] = data.name
+            resp['image'] = data.image.url
+            resp['description'] = data.description
+            resp['is_enabled'] = data.is_enabled
+            resp['action'] = data.action
+            resp['payment_gateway'] = data.payment_gateway
+            resp['id'] = data.id
+            resp['payment_gateway'] = data.payment_gateway
+            if first == True:
+                first = False
+                resp['is_selected'] = True
+            else:
+                resp['is_selected'] = False
+            options.append(resp)
+        return Response(options)

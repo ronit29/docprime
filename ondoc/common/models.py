@@ -93,3 +93,19 @@ class AppointmentHistory(TimeStampedModel):
 
     class Meta:
         db_table = 'appointment_history'
+
+
+class PaymentOptions(TimeStampedModel):
+    image = models.ImageField('Payment image', upload_to='payment/images')
+    name = models.CharField(max_length=100)
+    description = models.TextField(null=True, blank=True)
+    is_enabled = models.BooleanField()
+    action = models.CharField(max_length=50)
+    priority = models.IntegerField(default=0, null=True)
+    payment_gateway = models.TextField(blank=True, default='')
+
+    def __str__(self):
+        return "{}".format(self.name)
+
+    class Meta:
+        db_table = 'payment_options'
