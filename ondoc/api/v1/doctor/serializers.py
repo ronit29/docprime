@@ -364,7 +364,7 @@ class UpdateStatusSerializer(serializers.Serializer):
     start_time = serializers.FloatField(required=False)
     cancellation_reason = serializers.PrimaryKeyRelatedField(
         queryset=CancellationReason.objects.filter(visible_on_front_end=True), required=False)
-    cancellation_comment = serializers.CharField(required=False)
+    cancellation_comment = serializers.CharField(required=False, allow_blank=True)
 
 
 class DoctorImageSerializer(serializers.ModelSerializer):
