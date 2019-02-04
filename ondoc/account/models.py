@@ -400,7 +400,9 @@ class Order(TimeStampedModel):
             resp["status"] = 1
             resp["payment_required"] = False
             resp["data"] = {
-                "orderId" : pg_order.id
+                "orderId" : pg_order.id,
+                "type" : appointment_ids.get("type", "all"),
+                "id" : appointment_ids.get("id", None)
             }
             resp["appointments"] = appointment_ids
 
@@ -458,7 +460,13 @@ class Order(TimeStampedModel):
         if lab_appointment_ids:
             LabAppointment.objects.filter(id__in=lab_appointment_ids).update(money_pool=money_pool)
 
-        return { "opd" : opd_appointment_ids , "lab" : lab_appointment_ids }
+        resp = { "opd" : opd_appointment_ids , "lab" : lab_appointment_ids, "type" : "all", "id" : None }
+        # Handle backward compatibility, in case of single booking, return the booking id
+        if (len(opd_appointment_ids) + len(lab_appointment_ids)) == 1:
+            resp["type"] = "doctor" if len(opd_appointment_ids) > 0 else "lab"
+            resp["id"] = opd_appointment_ids[0] if len(opd_appointment_ids) > 0 else lab_appointment_ids[0]
+
+        return resp
 
     def validate_user(self, user=None):
         if not user:

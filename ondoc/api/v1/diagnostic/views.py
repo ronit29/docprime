@@ -1364,12 +1364,16 @@ class LabAppointmentView(mixins.CreateModelMixin,
         if not data.get("is_home_pickup"):
             data.pop("address", None)
 
-        serializer = diagnostic_serializer.LabAppointmentCreateSerializer(data=data, context={'request': request, 'data' : request.data})
+        serializer = diagnostic_serializer.LabAppointmentCreateSerializer(data=data, context={'request': request, 'data' : request.data, 'use_duplicate' : True})
         serializer.is_valid(raise_exception=True)
         validated_data = serializer.validated_data
 
         cart_item_id = validated_data.get('cart_item').id if validated_data.get('cart_item') else None
-        cart_item, is_new = Cart.objects.update_or_create(id=cart_item_id, deleted_at__isnull=True, product_id=account_models.Order.LAB_PRODUCT_ID,
+
+        if validated_data.get("existing_cart_item"):
+            cart_item = validated_data.get("existing_cart_item")
+        else:
+            cart_item, is_new = Cart.objects.update_or_create(id=cart_item_id, deleted_at__isnull=True, product_id=account_models.Order.LAB_PRODUCT_ID,
                                                   user=request.user, defaults={"data": data})
 
         if hasattr(request, 'agent') and request.agent:
