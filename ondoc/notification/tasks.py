@@ -1,5 +1,6 @@
 from __future__ import absolute_import, unicode_literals
 
+import copy
 import datetime
 import json
 import math
@@ -226,7 +227,7 @@ def set_order_dummy_transaction(self, order_id, user_id):
 
         if order_row and user and order_row.reference_id:
             if order_row.getTransactions():
-                print("dummy Transaction already set")
+                #print("dummy Transaction already set")
                 return
 
             appointment = order_row.getAppointment()
@@ -247,9 +248,9 @@ def set_order_dummy_transaction(self, order_id, user_id):
                 "productId": order_row.product_id,
                 "orderId": order_id,
                 "name": appointment.profile.name,
-                "txAmount": str(appointment.effective_price),
+                "txAmount": 0,
                 "couponCode": "",
-                "couponAmt": 0,
+                "couponAmt": str(appointment.effective_price),
                 "paymentMode": "DC",
                 "AppointmentId": order_row.reference_id,
                 "buCallbackSuccessUrl": "",
@@ -259,7 +260,7 @@ def set_order_dummy_transaction(self, order_id, user_id):
             response = requests.post(url, data=json.dumps(req_data), headers=headers)
             if response.status_code == status.HTTP_200_OK:
                 resp_data = response.json()
-                logger.error(resp_data)
+                #logger.error(resp_data)
                 if resp_data.get("ok") is not None and resp_data.get("ok") == 1:
                     tx_data = {}
                     tx_data['user'] = user
@@ -284,7 +285,7 @@ def set_order_dummy_transaction(self, order_id, user_id):
                     # tx_data['pb_gateway_name'] = response.get('pbGatewayName')
 
                     DummyTransactions.objects.create(**tx_data)
-                    print("SAVED DUMMY TRANSACTION")
+                    #print("SAVED DUMMY TRANSACTION")
             else:
                 raise Exception("Retry on invalid Http response status - " + str(response.content))
 
@@ -303,10 +304,10 @@ def send_offline_appointment_message(number, text, type):
         logger.error("Error sending " + str(type) + " message - " + str(e))
 
 @task
-def send_appointment_reminder_message(number, doctor, date):
+def send_appointment_reminder_message(number, patient_name, doctor, hospital_name, date):
     data = {}
     data['phone_number'] = number
-    text = '''You have an upcomming Appointment with Dr. %s scheduled on %s''' % (doctor, date)
+    text = '''Dear %s, you have an appointment scheduled with %s at %s on %s''' % (patient_name, doctor, hospital_name, date)
     data['text'] = mark_safe(text)
     try:
         notification_models.SmsNotification.send_rating_link(data)
@@ -329,7 +330,7 @@ def send_appointment_location_message(number, hospital_lat, hospital_long):
 @task()
 def process_payout(payout_id):
     from ondoc.account.models import MerchantPayout, Order
-    from ondoc.api.v1.utils import create_payout_checksum
+    from ondoc.account.models import DummyTransactions
 
     try:
         if not payout_id:
@@ -367,9 +368,12 @@ def process_payout(payout_id):
             raise Exception("No transactions found for given payout " + str(payout_data))
 
         req_data = { "payload" : [], "checkSum" : "" }
+        req_data2 = { "payload" : [], "checkSum" : "" }
+
 
         idx = 0
         for txn in all_txn:
+            
             curr_txn = OrderedDict()
             curr_txn["idx"] = idx
             curr_txn["orderNo"] = txn.order_no
@@ -377,44 +381,64 @@ def process_payout(payout_id):
             curr_txn["txnAmount"] = str(txn.amount)
             curr_txn["settledAmount"] = str(payout_data.payable_amount)
             curr_txn["merchantCode"] = merchant.id
-            curr_txn["pgtxId"] = txn.transaction_id
+            if txn.transaction_id:
+                curr_txn["pgtxId"] = txn.transaction_id
             curr_txn["refNo"] = payout_data.payout_ref_id
             curr_txn["bookingId"] = appointment.id
             req_data["payload"].append(curr_txn)
             idx += 1
+            if isinstance(txn, DummyTransactions) and txn.amount>0:
+                curr_txn2 = copy.deepcopy(curr_txn)
+                curr_txn2["txnAmount"] = str(0)
+                curr_txn2["idx"] = len(req_data2.get('payload'))
+                req_data2["payload"].append(curr_txn2)
 
-        req_data["checkSum"] = create_payout_checksum(req_data["payload"], order_data.product_id)
-        headers = {
-            "auth": settings.PG_REFUND_AUTH_TOKEN,
-            "Content-Type": "application/json"
-        }
-        url = settings.PG_SETTLEMENT_URL
+        payout_status = None
+        if len(req_data2.get('payload'))>0:
+            payout_status = request_payout(req_data2, order_data)
 
-        response = requests.post(url, data=json.dumps(req_data), headers=headers)
-        if response.status_code == status.HTTP_200_OK:
-            resp_data = response.json()
-            if resp_data.get("ok") is not None and resp_data.get("ok") == '1':
-                success_payout = False
-                result = resp_data.get('result')
-                if result:
-                    for res_txn in result:
-                        success_payout = res_txn['status'] == "SUCCESSFULLY_INSERTED"
+        if not payout_status or not payout_status.get('status'):
+            payout_status = request_payout(req_data, order_data)
 
-                if success_payout:
-                    payout_data.payout_time = datetime.datetime.now()
-                    payout_data.status = payout_data.PAID
-                    payout_data.api_response = json.dumps(resp_data)
-                    payout_data.save()
-                    print("Payout processed")
-                    return
+        if payout_status:
+            payout_data.api_response = json.dumps(payout_status.get("response"))
+            if payout_status.get("status"):
+                payout_data.payout_time = datetime.datetime.now()
+                payout_data.status = payout_data.PAID
+            else:
+                payout_data.retry_count += 1
 
-        payout_data.retry_count += 1
-        payout_data.api_response = json.dumps(resp_data)
-        payout_data.save()
-        raise Exception("Retry on invalid Http response status - " + str(response.content))
+            payout_data.save()
+
 
     except Exception as e:
         logger.error("Error in processing payout - with exception - " + str(e))
+
+def request_payout(req_data, order_data):
+    from ondoc.api.v1.utils import create_payout_checksum
+
+    req_data["checkSum"] = create_payout_checksum(req_data["payload"], order_data.product_id)
+    headers = {
+        "auth": settings.PG_REFUND_AUTH_TOKEN,
+        "Content-Type": "application/json"
+    }
+    url = settings.PG_SETTLEMENT_URL
+    resp_data = None
+
+    response = requests.post(url, data=json.dumps(req_data), headers=headers)
+    if response.status_code == status.HTTP_200_OK:
+        resp_data = response.json()
+        if resp_data.get("ok") is not None and resp_data.get("ok") == '1':
+            success_payout = False
+            result = resp_data.get('result')
+            if result:
+                for res_txn in result:
+                    success_payout = res_txn['status'] == "SUCCESSFULLY_INSERTED"
+                    return {"status":1,"response":resp_data}
+            
+    
+    logger.error("payout failed for request data - " + str(req_data))
+    return {"status":0,"response":resp_data}
 
 @task()
 def opd_send_otp_before_appointment(appointment_id, previous_appointment_date_time):
@@ -426,10 +450,10 @@ def opd_send_otp_before_appointment(appointment_id, previous_appointment_date_ti
                 not instance.user or \
                 str(math.floor(instance.time_slot_start.timestamp())) != previous_appointment_date_time \
                 or instance.status != OpdAppointment.ACCEPTED:
-            logger.error(
-                'instance : {}, time : {}, str: {}'.format(str(model_to_dict(instance)),
-                                                           previous_appointment_date_time,
-                                                           str(math.floor(instance.time_slot_start.timestamp()))))
+            # logger.error(
+            #     'instance : {}, time : {}, str: {}'.format(str(model_to_dict(instance)),
+            #                                                previous_appointment_date_time,
+            #                                                str(math.floor(instance.time_slot_start.timestamp()))))
             return
         opd_notification = OpdNotification(instance, NotificationAction.OPD_OTP_BEFORE_APPOINTMENT)
         opd_notification.send()
@@ -446,10 +470,10 @@ def lab_send_otp_before_appointment(appointment_id, previous_appointment_date_ti
                 not instance.user or \
                 str(math.floor(instance.time_slot_start.timestamp())) != previous_appointment_date_time \
                 or instance.status != LabAppointment.ACCEPTED:
-            logger.error(
-                'instance : {}, time : {}, str: {}'.format(str(model_to_dict(instance)),
-                                                           previous_appointment_date_time,
-                                                           str(math.floor(instance.time_slot_start.timestamp()))))
+            # logger.error(
+            #     'instance : {}, time : {}, str: {}'.format(str(model_to_dict(instance)),
+            #                                                previous_appointment_date_time,
+            #                                                str(math.floor(instance.time_slot_start.timestamp()))))
             return
         lab_notification = LabNotification(instance, NotificationAction.LAB_OTP_BEFORE_APPOINTMENT)
         lab_notification.send()
@@ -468,7 +492,6 @@ def send_lab_reports(appointment_id):
         lab_notification.send()
     except Exception as e:
         logger.error(str(e))
-
 
 @task()
 def upload_doctor_data(obj_id):
@@ -513,3 +536,18 @@ def upload_doctor_data(obj_id):
         else:
             instance.error_msg = [{'line number': 0, 'message': error_message}]
         instance.save(retry=False)
+
+@task()
+def send_pg_acknowledge(order_id=None, order_no=None):
+    try:
+        if order_id is None or order_no is None:
+            logger.error("Cannot acknowledge without order_id and order_no")
+            return
+
+        url = settings.PG_PAYMENT_ACKNOWLEDGE_URL + "?orderNo=" + str(order_no) + "&orderId=" + str(order_id)
+        response = requests.get(url)
+        if response.status_code == status.HTTP_200_OK:
+            print("Payment acknowledged")
+
+    except Exception as e:
+        logger.error("Error in sending pg acknowledge - " + str(e))

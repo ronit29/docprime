@@ -132,6 +132,18 @@ class Hospital(auth_model.TimeStampedModel, auth_model.CreatedByModel, auth_mode
     NETWORK_HOSPITAL = 2
     NETWORK_CHOICES = [("", "Select"), (NON_NETWORK_HOSPITAL, "Non Network Hospital"), (NETWORK_HOSPITAL, "Network Hospital")]
     HOSPITAL_TYPE_CHOICES = (("", "Select"), (PRIVATE, 'Private'), (CLINIC, "Clinic"), (HOSPITAL, "Hospital"),)
+    INCORRECT_CONTACT_DETAILS = 1
+    MOU_AGREEMENT_NEEDED = 2
+    HOSPITAL_NOT_INTERESTED = 3
+    CHARGES_ISSUES = 4
+    OTHERS = 9
+    WELCOME_CALLING = 1
+    ESCALATION = 2
+    DISABLED_REASONS_CHOICES = (
+        ("", "Select"), (INCORRECT_CONTACT_DETAILS, "Incorrect contact details"),
+        (MOU_AGREEMENT_NEEDED, "MoU agreement needed"), (HOSPITAL_NOT_INTERESTED, "Hospital not interested for tie-up"),
+        (CHARGES_ISSUES, "Issue in discount % / consultation charges"), (OTHERS, "Others (please specify)"))
+    DISABLED_AFTER_CHOICES = (("", "Select"), (WELCOME_CALLING, "Welcome Calling"), (ESCALATION, "Escalation"))
     name = models.CharField(max_length=200)
     location = models.PointField(geography=True, srid=4326, blank=True, null=True)
     location_error = models.PositiveIntegerField(blank=True, null=True)
@@ -164,7 +176,16 @@ class Hospital(auth_model.TimeStampedModel, auth_model.CreatedByModel, auth_mode
     enabled_for_online_booking = models.BooleanField(verbose_name='enabled_for_online_booking?', default=True)
     merchant = GenericRelation(auth_model.AssociatedMerchant)
     merchant_payout = GenericRelation(MerchantPayout)
-    pyhsical_aggrement_signed = models.BooleanField(default=False)
+    welcome_calling_done = models.BooleanField(default=False)
+    welcome_calling_done_at = models.DateTimeField(null=True, blank=True)
+    physical_agreement_signed = models.BooleanField(default=False)
+    physical_agreement_signed_at = models.DateTimeField(null=True, blank=True)
+    disabled_at = models.DateTimeField(null=True, blank=True)
+    disabled_after = models.PositiveIntegerField(null=True, blank=True, choices=DISABLED_AFTER_CHOICES)
+    disable_reason = models.PositiveIntegerField(null=True, blank=True, choices=DISABLED_REASONS_CHOICES)
+    disable_comments = models.CharField(max_length=500, blank=True)
+    disabled_by = models.ForeignKey(settings.AUTH_USER_MODEL, related_name="disabled_hospitals", null=True, editable=False,
+                                    on_delete=models.SET_NULL)
 
     def __str__(self):
         return self.name
@@ -210,32 +231,43 @@ class Hospital(auth_model.TimeStampedModel, auth_model.CreatedByModel, auth_mode
         return ", ".join(address_items)
 
     def update_live_status(self):
-
         if not self.is_live and ( self.data_status == self.QC_APPROVED and self.enabled == True):
-
             self.is_live = True
             if not self.live_at:
                 self.live_at = datetime.datetime.now()
         if self.is_live and (self.data_status != self.QC_APPROVED or self.enabled == False):
             self.is_live = False
 
+    def update_time_stamps(self):
+        if self.welcome_calling_done and not self.welcome_calling_done_at:
+            self.welcome_calling_done_at = timezone.now()
+        elif not self.welcome_calling_done and self.welcome_calling_done_at:
+            self.welcome_calling_done_at = None
+
+        if self.physical_agreement_signed and not self.physical_agreement_signed_at:
+            self.physical_agreement_signed_at = timezone.now()
+        elif not self.physical_agreement_signed and self.physical_agreement_signed_at:
+            self.physical_agreement_signed_at = None
+
+        if not self.enabled and not self.disabled_at:
+            self.disabled_at = timezone.now()
+        elif self.enabled and self.disabled_at:
+            self.disabled_at = None
 
     def save(self, *args, **kwargs):
+        self.update_time_stamps()
         self.update_live_status()
         # build_url = True
         # if self.is_live and self.id and self.location:
         #     if Hospital.objects.filter(location__distance_lte=(self.location, 0), id=self.id).exists():
         #         build_url = False
-
         super(Hospital, self).save(*args, **kwargs)
-
         if self.is_appointment_manager:
             auth_model.GenericAdmin.objects.filter(hospital=self, entity_type=auth_model.GenericAdmin.DOCTOR, permission_type=auth_model.GenericAdmin.APPOINTMENT)\
                 .update(is_disabled=True)
         else:
             auth_model.GenericAdmin.objects.filter(hospital=self, entity_type=auth_model.GenericAdmin.DOCTOR, permission_type=auth_model.GenericAdmin.APPOINTMENT)\
                 .update(is_disabled=False)
-
         # if build_url and self.location and self.is_live:
         #     ea = location_models.EntityLocationRelationship.create(latitude=self.location.y, longitude=self.location.x, content_object=self)
 
@@ -334,6 +366,21 @@ class Doctor(auth_model.TimeStampedModel, auth_model.QCModel, SearchKey):
     ONBOARDING_STATUS = [(NOT_ONBOARDED, "Not Onboarded"), (REQUEST_SENT, "Onboarding Request Sent"),
                          (ONBOARDED, "Onboarded")]
     GENDER_CHOICES = [("", "Select"), ("m", "Male"), ("f", "Female"), ("o", "Other")]
+    DOCTOR_NOT_ASSOCIATED = 1
+    DOCTOR_ONLY_FOR_IPD_SERVICES = 2
+    DOCTOR_AVAILABLE_ON_CALL = 3
+    INCORRECT_CONTACT_DETAILS = 4
+    MOU_AGREEMENT_NEEDED = 5
+    DOCTOR_NOT_INTERESTED_FOR_TIE_UP = 6
+    CHARGES_ISSUES = 7
+    OTHERS = 9
+    DISABLE_REASON_CHOICES = (
+        ("", "Select"), (DOCTOR_NOT_ASSOCIATED, "Doctor not associated with the hospital anymore"),
+        (DOCTOR_ONLY_FOR_IPD_SERVICES, "Doctor only for IPD services"),
+        (DOCTOR_AVAILABLE_ON_CALL, "Doctor available only On-Call"),
+        (INCORRECT_CONTACT_DETAILS, "Incorrect contact details"), (MOU_AGREEMENT_NEEDED, "MoU agreement needed"),
+        (DOCTOR_NOT_INTERESTED_FOR_TIE_UP, "Doctor not interested for tie-up"),
+        (CHARGES_ISSUES, "Issue in discount % / consultation charges"), (OTHERS, "Others (please specify)"))
     name = models.CharField(max_length=200)
     gender = models.CharField(max_length=2, default=None, blank=True, null=True,
                               choices=GENDER_CHOICES)
@@ -386,6 +433,12 @@ class Doctor(auth_model.TimeStampedModel, auth_model.QCModel, SearchKey):
     merchant = GenericRelation(auth_model.AssociatedMerchant)
     merchant_payout = GenericRelation(MerchantPayout)
     search_score = models.FloatField(default=0, null=True, editable=False)
+    disabled_at = models.DateTimeField(null=True, blank=True)
+    disabled_after = models.PositiveIntegerField(null=True, blank=True, choices=Hospital.DISABLED_AFTER_CHOICES)
+    disable_reason = models.PositiveIntegerField(null=True, blank=True, choices=DISABLE_REASON_CHOICES)
+    disable_comments = models.CharField(max_length=500, blank=True)
+    disabled_by = models.ForeignKey(settings.AUTH_USER_MODEL, related_name="disabled_doctors", null=True, editable=False,
+                                   on_delete=models.SET_NULL)
 
     def __str__(self):
         return '{} ({})'.format(self.name, self.id)
@@ -459,7 +512,14 @@ class Doctor(auth_model.TimeStampedModel, auth_model.QCModel, SearchKey):
         if not self.onboarding_status == self.ONBOARDED:
             self.enabled_for_online_booking = False
 
+    def update_time_stamps(self):
+        if not self.enabled and not self.disabled_at:
+            self.disabled_at = timezone.now()
+        elif self.enabled and self.disabled_at:
+            self.disabled_at = None
+
     def save(self, *args, **kwargs):
+        self.update_time_stamps()
         self.update_live_status()
 
         # On every update of onboarding status or Qcstatus push to matrix
@@ -2005,11 +2065,16 @@ class VisitReasonMapping(models.Model):
 
 
 class CancellationReason(auth_model.TimeStampedModel):
+    TYPE_CHOICES = [("", "Both")]
+    TYPE_CHOICES.extend(Order.PRODUCT_IDS)
     name = models.CharField(max_length=200)
+    type = models.PositiveSmallIntegerField(default=None, null=True, blank=True, choices=TYPE_CHOICES)
+    visible_on_front_end = models.BooleanField(default=True)
+    visible_on_admin = models.BooleanField(default=True)
 
     class Meta:
         db_table = 'cancellation_reason'
-        unique_together = (('name',),)
+        unique_together = (('name','type'),)
 
     def __str__(self):
         return self.name
@@ -2125,8 +2190,7 @@ class OfflineOPDAppointments(auth_model.TimeStampedModel):
     @staticmethod
     def appointment_cancel_sms(sms_obj):
         try:
-            default_text = '''Dear %s, your appointment with %s at %s for %s has been cancelled. 
-                              In case of any query, please reach out to the clinic.''' % (
+            default_text = "Dear %s, your appointment with %s at %s for %s has been cancelled. In case of any query, please reach out to the clinic." % (
                               sms_obj['name'], sms_obj['old_appointment'].doctor.get_display_name(), sms_obj['old_appointment'].hospital.name,
                               sms_obj['old_appointment'].time_slot_start.strftime("%B %d, %Y %H:%M"))
             notification_tasks.send_offline_appointment_message.apply_async(
@@ -2135,6 +2199,17 @@ class OfflineOPDAppointments(auth_model.TimeStampedModel):
         except Exception as e:
             logger.error("Failed to Push Offline Appointment Cancel Message SMS Task " + str(e))
 
+    @staticmethod
+    def appointment_complete_sms(sms_obj):
+        try:
+            default_text = "Dear %s, your appointment with %s at %s is complete. In case of any query, please reach out to the %s." % \
+                           (sms_obj['name'], sms_obj['appointment'].doctor.get_display_name(),
+                            sms_obj['appointment'].hospital.name, sms_obj['appointment'].hospital.name)
+            notification_tasks.send_offline_appointment_message.apply_async(
+                kwargs={'number': sms_obj['phone_number'], 'text': default_text, 'type': 'Appointment COMPLETE'},
+                countdown=1)
+        except Exception as e:
+            logger.error("Failed to Push Offline Appointment Cancel Message SMS Task " + str(e))
 
     @staticmethod
     def appointment_reschedule_sms(sms_obj):
@@ -2161,7 +2236,9 @@ class OfflineOPDAppointments(auth_model.TimeStampedModel):
     def after_commit_update_sms(sms_list):
         for sms_obj in sms_list:
             if sms_obj:
-                if sms_obj.get('action_cancel') and sms_obj['action_cancel']:
+                if sms_obj.get('action_complete') and sms_obj['action_complete']:
+                    OfflineOPDAppointments.appointment_complete_sms(sms_obj)
+                elif sms_obj.get('action_cancel') and sms_obj['action_cancel']:
                     OfflineOPDAppointments.appointment_cancel_sms(sms_obj)
                     OfflineOPDAppointments.appointment_add_sms(sms_obj)
                 elif sms_obj.get('action_reschedule') and sms_obj['action_reschedule']:
