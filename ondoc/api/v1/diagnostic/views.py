@@ -267,11 +267,11 @@ class LabList(viewsets.ReadOnlyModelViewSet):
         if package_type == 2:
             all_packages = filter(lambda x: not x.home_collection_possible, all_packages)
         if not sort_on:
-            all_packages = sorted(all_packages, key=operator.attrgetter('priority'), reverse=True)
+            all_packages = sorted(all_packages, key=lambda x: x.priority if hasattr(x, 'priority') and x.priority is not None else -float('inf'), reverse=True)
         elif sort_on == 'fees':
-            all_packages = sorted(all_packages, key=operator.attrgetter('price'))
+            all_packages = sorted(all_packages, key=lambda x: x.price if hasattr(x, 'price') and x.price is not None else -float('inf'))
         elif sort_on == 'distance':
-            all_packages = sorted(all_packages, key=operator.attrgetter('distance'))
+            all_packages = sorted(all_packages, key=lambda x: x.distance if hasattr(x, 'distance') and x.distance is not None else -float('inf'))
         lab_ids = [package.lab for package in all_packages]
         entity_url_qs = EntityUrls.objects.filter(entity_id__in=lab_ids, is_valid=True, url__isnull=False,
                                                   sitemap_identifier=EntityUrls.SitemapIdentifier.LAB_PAGE).values(
