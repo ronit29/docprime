@@ -136,13 +136,15 @@ class Hospital(auth_model.TimeStampedModel, auth_model.CreatedByModel, auth_mode
     MOU_AGREEMENT_NEEDED = 2
     HOSPITAL_NOT_INTERESTED = 3
     CHARGES_ISSUES = 4
+    DUPLICATE = 5
     OTHERS = 9
     WELCOME_CALLING = 1
     ESCALATION = 2
     DISABLED_REASONS_CHOICES = (
         ("", "Select"), (INCORRECT_CONTACT_DETAILS, "Incorrect contact details"),
         (MOU_AGREEMENT_NEEDED, "MoU agreement needed"), (HOSPITAL_NOT_INTERESTED, "Hospital not interested for tie-up"),
-        (CHARGES_ISSUES, "Issue in discount % / consultation charges"), (OTHERS, "Others (please specify)"))
+        (CHARGES_ISSUES, "Issue in discount % / consultation charges"),
+        (DUPLICATE, "Duplicate"), (OTHERS, "Others (please specify)"))
     DISABLED_AFTER_CHOICES = (("", "Select"), (WELCOME_CALLING, "Welcome Calling"), (ESCALATION, "Escalation"))
     name = models.CharField(max_length=200)
     location = models.PointField(geography=True, srid=4326, blank=True, null=True)
@@ -373,6 +375,7 @@ class Doctor(auth_model.TimeStampedModel, auth_model.QCModel, SearchKey):
     MOU_AGREEMENT_NEEDED = 5
     DOCTOR_NOT_INTERESTED_FOR_TIE_UP = 6
     CHARGES_ISSUES = 7
+    DUPLICATE = 8
     OTHERS = 9
     DISABLE_REASON_CHOICES = (
         ("", "Select"), (DOCTOR_NOT_ASSOCIATED, "Doctor not associated with the hospital anymore"),
@@ -380,7 +383,8 @@ class Doctor(auth_model.TimeStampedModel, auth_model.QCModel, SearchKey):
         (DOCTOR_AVAILABLE_ON_CALL, "Doctor available only On-Call"),
         (INCORRECT_CONTACT_DETAILS, "Incorrect contact details"), (MOU_AGREEMENT_NEEDED, "MoU agreement needed"),
         (DOCTOR_NOT_INTERESTED_FOR_TIE_UP, "Doctor not interested for tie-up"),
-        (CHARGES_ISSUES, "Issue in discount % / consultation charges"), (OTHERS, "Others (please specify)"))
+        (CHARGES_ISSUES, "Issue in discount % / consultation charges"),
+        (DUPLICATE, "Duplicate"), (OTHERS, "Others (please specify)"))
     name = models.CharField(max_length=200)
     gender = models.CharField(max_length=2, default=None, blank=True, null=True,
                               choices=GENDER_CHOICES)

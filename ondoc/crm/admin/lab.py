@@ -774,12 +774,12 @@ class LabAppointmentAdmin(nested_admin.NestedModelAdmin):
         LabReportInline
     ]
 
-    def get_autocomplete_fields(self, request):
-        if request.user.is_superuser:
-            temp_autocomplete_fields = ('lab', 'profile', 'user')
-        else:
-            temp_autocomplete_fields = super().get_autocomplete_fields(request)
-        return temp_autocomplete_fields
+    # def get_autocomplete_fields(self, request):
+    #     if request.user.is_superuser:
+    #         temp_autocomplete_fields = ('lab', 'profile', 'user')
+    #     else:
+    #         temp_autocomplete_fields = super().get_autocomplete_fields(request)
+    #     return temp_autocomplete_fields
 
     def get_profile(self, obj):
         if not obj.profile:
