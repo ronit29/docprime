@@ -30,7 +30,10 @@ class CartViewSet(viewsets.GenericViewSet):
             serialized_data = opd_app_serializer.validated_data
             cart_item_id = serialized_data.get('cart_item').id if serialized_data.get('cart_item') else None
             if not OpdAppointment.can_book_for_free(request, serialized_data, cart_item_id):
-                return Response({'request_errors': {"code": "invalid", "message": "Only 3 active free bookings allowed per customer"}}, status.HTTP_400_BAD_REQUEST)
+                return Response({'request_errors': {"code": "invalid",
+                                                    "message": "Only {} active free bookings allowed per customer".format(
+                                                        OpdAppointment.MAX_FREE_BOOKINGS_ALLOWED)}},
+                                status.HTTP_400_BAD_REQUEST)
         elif product_id == Order.LAB_PRODUCT_ID:
             lab_app_serializer = LabAppointmentCreateSerializer(data=valid_data.get('data'), context={'request': request, 'data' : valid_data.get('data')})
             lab_app_serializer.is_valid(raise_exception=True)

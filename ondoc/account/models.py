@@ -164,7 +164,7 @@ class Order(TimeStampedModel):
                 }
 
         # if order is done without PG transaction, then make an async task to create a dummy transaction and set it.
-        if not self.txn.first():
+        if not self.getTransactions():
             try:
                 transaction.on_commit(lambda: set_order_dummy_transaction.apply_async((self.id, appointment_data['user'].id,), countdown=5))
             except Exception as e:
@@ -274,6 +274,10 @@ class Order(TimeStampedModel):
         return None
 
     def getTransactions(self):
+        # if trying to get txn on a child order, recurse for its parent instead
+        if self.parent:
+            return self.parent.getTransactions()
+
         all_txn = None
         if self.txn.exists():
             all_txn = self.txn.all()
@@ -455,6 +459,19 @@ class Order(TimeStampedModel):
             LabAppointment.objects.filter(id__in=lab_appointment_ids).update(money_pool=money_pool)
 
         return { "opd" : opd_appointment_ids , "lab" : lab_appointment_ids }
+
+    def validate_user(self, user=None):
+        if not user:
+            return True
+        order_user_id = self.get_user_id()
+        return order_user_id == user.id
+
+    def get_user_id(self):
+        if self.user:
+            return self.user.id
+        if self.action_data and "user" in self.action_data:
+            return self.action_data["user"]
+        return None
 
     class Meta:
         db_table = "order"

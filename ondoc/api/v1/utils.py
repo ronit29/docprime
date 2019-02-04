@@ -570,7 +570,7 @@ class CouponsMixin(object):
             total_used_count = coupon_obj.total_used_coupon_count()
 
             from ondoc.cart.models import Cart
-            payment_option_filter = Cart.has_pg_coupon(user, cart_item)
+            payment_option_filter = Cart.get_pg_if_pgcoupon(user, cart_item)
             if payment_option_filter and coupon_obj.payment_option and coupon_obj.payment_option.id != payment_option_filter.id:
                 return {"is_valid": False, "used_count": count}
 

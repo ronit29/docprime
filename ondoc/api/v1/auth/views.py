@@ -1080,7 +1080,8 @@ class TransactionViewSet(viewsets.GenericViewSet):
 
     def form_pg_transaction_data(self, response, order_obj):
         data = dict()
-        user = get_object_or_404(User, pk=order_obj.user.id)
+        user_id = order_obj.get_user_id()
+        user = get_object_or_404(User, pk=user_id)
         data['user'] = user
         data['product_id'] = order_obj.product_id
         data['order_no'] = response.get('orderNo')
@@ -1509,7 +1510,10 @@ class OrderViewSet(GenericViewSet):
     @transaction.non_atomic_requests
     def retrieve(self, request, pk):
         user = request.user
-        order_obj = Order.objects.filter(pk=pk, payment_status=Order.PAYMENT_PENDING, user=user).first()
+        order_obj = Order.objects.filter(pk=pk, payment_status=Order.PAYMENT_PENDING).first()
+        if not order_obj.validate_user(user):
+            return Response({"status": 0}, status.HTTP_404_NOT_FOUND)
+
         resp = dict()
         resp["status"] = 0
 
@@ -1623,7 +1627,11 @@ class OrderDetailViewSet(GenericViewSet):
     def details(self, request, order_id):
         if not order_id:
             return Response(status=status.HTTP_400_BAD_REQUEST)
-        queryset = Order.objects.filter(id=order_id, user=request.user.id).first()
+
+        queryset = Order.objects.filter(id=order_id).first()
+        if not queryset.validate_user(request.user):
+            return Response({"status": 0}, status.HTTP_404_NOT_FOUND)
+
         if not queryset:
             return Response(status=status.HTTP_404_NOT_FOUND)
         resp = dict()
@@ -1653,7 +1661,11 @@ class OrderDetailViewSet(GenericViewSet):
 
         if not order_id:
             return Response(status=status.HTTP_400_BAD_REQUEST)
-        order_data = Order.objects.filter(id=order_id, user=request.user.id).first()
+        order_data = Order.objects.filter(id=order_id).first()
+        
+        if not order_data.validate_user(request.user):
+            return Response({"status": 0}, status.HTTP_404_NOT_FOUND)
+
         if not order_data:
             return Response(status=status.HTTP_404_NOT_FOUND)
 

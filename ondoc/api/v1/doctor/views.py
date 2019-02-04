@@ -214,7 +214,10 @@ class DoctorAppointmentsViewSet(OndocViewSet):
             cart_item, is_new = Cart.objects.update_or_create(id=cart_item_id, deleted_at__isnull=True, product_id=account_models.Order.DOCTOR_PRODUCT_ID,
                                                   user=request.user,defaults={"data": request.data})
         else:
-            return Response({'request_errors': {"code": "invalid", "message": "Only 3 active free bookings allowed per customer"}}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({'request_errors': {"code": "invalid",
+                                                "message": "Only {} active free bookings allowed per customer".format(
+                                                    models.OpdAppointment.MAX_FREE_BOOKINGS_ALLOWED)}},
+                            status=status.HTTP_400_BAD_REQUEST)
 
         if hasattr(request, 'agent') and request.agent:
             resp = { 'is_agent': True , "status" : 1 }

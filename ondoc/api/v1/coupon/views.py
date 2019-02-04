@@ -178,7 +178,7 @@ class ApplicableCouponsViewSet(viewsets.GenericViewSet):
         #                                    total_opd_booked, user_opd_booked, total_lab_booked, user_lab_booked)
         coupons = coupons.distinct()
 
-        payment_option_filter = Cart.has_pg_coupon(user, cart_item_id)
+        payment_option_filter = Cart.get_pg_if_pgcoupon(user, cart_item_id)
 
         applicable_coupons = []
         for coupon in coupons:
