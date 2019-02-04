@@ -11,9 +11,9 @@ class Migration(migrations.Migration):
     ]
 
     operations = [
-        migrations.AlterField(
-            model_name='userinsurance',
-            name='policy_number',
-            field=models.CharField(default=ondoc.insurance.models.generate_insurance_policy_number, max_length=100, unique=True),
-        ),
+        # migrations.AlterField(
+        #     model_name='userinsurance',
+        #     name='policy_number',
+        #     field=models.CharField(default=ondoc.insurance.models.generate_insurance_policy_number, max_length=100, unique=True),
+        # ),
     ]

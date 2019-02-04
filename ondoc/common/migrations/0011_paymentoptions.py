@@ -10,20 +10,20 @@ class Migration(migrations.Migration):
     ]
 
     operations = [
-        migrations.CreateModel(
-            name='PaymentOptions',
-            fields=[
-                ('id', models.AutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
-                ('created_at', models.DateTimeField(auto_now_add=True)),
-                ('updated_at', models.DateTimeField(auto_now=True)),
-                ('image', models.ImageField(upload_to='payment/images', verbose_name='Payment image')),
-                ('name', models.CharField(max_length=100)),
-                ('description', models.TextField(blank=True, null=True)),
-                ('is_enabled', models.BooleanField()),
-                ('action', models.CharField(max_length=50)),
-            ],
-            options={
-                'db_table': 'payment_options',
-            },
-        ),
+        # migrations.CreateModel(
+        #     name='PaymentOptions',
+        #     fields=[
+        #         ('id', models.AutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
+        #         ('created_at', models.DateTimeField(auto_now_add=True)),
+        #         ('updated_at', models.DateTimeField(auto_now=True)),
+        #         ('image', models.ImageField(upload_to='payment/images', verbose_name='Payment image')),
+        #         ('name', models.CharField(max_length=100)),
+        #         ('description', models.TextField(blank=True, null=True)),
+        #         ('is_enabled', models.BooleanField()),
+        #         ('action', models.CharField(max_length=50)),
+        #     ],
+        #     options={
+        #         'db_table': 'payment_options',
+        #     },
+        # ),
     ]

@@ -129,11 +129,11 @@ class Migration(migrations.Migration):
             name='order',
             field=models.ForeignKey(on_delete=django.db.models.deletion.DO_NOTHING, to='account.Order'),
         ),
-        migrations.AlterField(
-            model_name='userinsurance',
-            name='policy_number',
-            field=models.CharField(default=ondoc.insurance.models.generate_insurance_policy_number, max_length=50),
-        ),
+        # migrations.AlterField(
+        #     model_name='userinsurance',
+        #     name='policy_number',
+        #     field=models.CharField(default=ondoc.insurance.models.generate_insurance_policy_number, max_length=50),
+        # ),
         migrations.AlterField(
             model_name='userinsurance',
             name='premium_amount',

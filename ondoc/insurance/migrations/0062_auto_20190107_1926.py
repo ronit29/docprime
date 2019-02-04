@@ -11,9 +11,9 @@ class Migration(migrations.Migration):
     ]
 
     operations = [
-        migrations.AlterField(
-            model_name='userinsurance',
-            name='receipt_number',
-            field=models.BigIntegerField(default=ondoc.insurance.models.generate_insurance_reciept_number, unique=True),
-        ),
+        # migrations.AlterField(
+        #     model_name='userinsurance',
+        #     name='receipt_number',
+        #     field=models.BigIntegerField(default=ondoc.insurance.models.generate_insurance_reciept_number, unique=True),
+        # ),
     ]
