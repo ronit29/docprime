@@ -1,7 +1,10 @@
+import operator
+
 from ondoc.api.v1.diagnostic.serializers import CustomLabTestPackageSerializer
 from ondoc.authentication.backends import JWTAuthentication
 from ondoc.api.v1.diagnostic import serializers as diagnostic_serializer
 from ondoc.api.v1.auth.serializers import AddressSerializer
+from ondoc.common.models import UserConfig
 from ondoc.ratings_review import models as rating_models
 from ondoc.diagnostic.models import (LabTest, AvailableLabTest, Lab, LabAppointment, LabTiming, PromotedLab,
                                      CommonDiagnosticCondition, CommonTest, CommonPackage,
@@ -44,6 +47,7 @@ from django.db.models import Q, Value
 from django.db.models.functions import StrIndex
 
 from ondoc.location.models import EntityUrls, EntityAddress
+from ondoc.seo.models import NewDynamic
 from . import serializers
 import copy
 import re
@@ -68,7 +72,7 @@ class SearchPageViewSet(viewsets.ReadOnlyModelViewSet):
         count = int(count)
         if count <= 0:
             count = 10
-        test_queryset = CommonTest.objects.filter(test__enable_for_retail=True, test__searchable=True)[:count]
+        test_queryset = CommonTest.objects.select_related('test').filter(test__enable_for_retail=True, test__searchable=True)[:count]
         conditions_queryset = CommonDiagnosticCondition.objects.prefetch_related('lab_test').all()
         lab_queryset = PromotedLab.objects.select_related('lab').filter(lab__is_live=True, lab__is_test_lab=False)
         # package_queryset = CommonPackage.objects.prefetch_related('package').filter(package__enable_for_retail=True, package__searchable=True)[:count]
@@ -81,12 +85,24 @@ class SearchPageViewSet(viewsets.ReadOnlyModelViewSet):
                 dp=deal_price_calculation).order_by('dp').values('pk')[:1]))
         test_serializer = diagnostic_serializer.CommonTestSerializer(test_queryset, many=True,
                                                                      context={'request': request})
-        package_serializer = diagnostic_serializer.CommonPackageSerializer(package_queryset, many=True,
+	recommended_package_qs = LabTestCategory.objects.prefetch_related('recommended_lab_tests__parameter').filter(is_live=True,
+                                                                                                          show_on_recommended_screen=True,
+                                                                                                          recommended_lab_tests__searchable=True,
+                                                                                                          recommended_lab_tests__enable_for_retail=True).distinct()[:count]        
+	package_serializer = diagnostic_serializer.CommonPackageSerializer(package_queryset, many=True,
                                                                            context={'request': request})
         lab_serializer = diagnostic_serializer.PromotedLabsSerializer(lab_queryset, many=True)
         condition_serializer = diagnostic_serializer.CommonConditionsSerializer(conditions_queryset, many=True)
+        recommended_package = diagnostic_serializer.RecommendedPackageCategoryList(recommended_package_qs, many=True)
         temp_data = dict()
+        user_config = UserConfig.objects.filter(key='package_adviser_filters').first()
+        advisor_filter = []
+        if user_config:
+            advisor_filter = user_config.data
         temp_data['common_tests'] = test_serializer.data
+        temp_data['recommended_package'] = {'result': recommended_package.data,
+                                            'information': {'screening': 'Screening text', 'physical': 'Physical Text'},
+                                            'filters': advisor_filter}
         temp_data['common_package'] = package_serializer.data
         temp_data['preferred_labs'] = lab_serializer.data
         temp_data['common_conditions'] = condition_serializer.data
@@ -168,18 +184,22 @@ class LabList(viewsets.ReadOnlyModelViewSet):
         validated_data = serializer.validated_data
         long = validated_data.get('long')
         lat = validated_data.get('lat')
+        min_distance = validated_data.get('min_distance')
+        max_distance = validated_data.get('max_distance')
+        min_price = validated_data.get('min_price')
+        max_price = validated_data.get('max_price')
+        max_age = validated_data.get('max_age')
+        min_age = validated_data.get('min_age')
+        gender = validated_data.get('gender')
+        package_type = validated_data.get('package_type')
+        sort_on = validated_data.get('sort_on')
+        category_ids = validated_data.get('category_ids', [])
+        test_ids = validated_data.get('test_ids', [])
         point_string = 'POINT(' + str(long) + ' ' + str(lat) + ')'
         pnt = GEOSGeometry(point_string, srid=4326)
-        max_distance = 10000
-        category_ids = validated_data.get('category_ids', None)
-        lab_tests = None
-        if not category_ids:
-            category_ids = LabTestCategory.objects.filter(is_live=True, is_package_category=True).values_list('id',
-                                                                                                              flat=True)
-
-        lab_tests = LabTestCategoryMapping.objects.filter(parent_category_id__in=category_ids).values_list(
-            'lab_test', flat=True)
-
+        max_distance = max_distance*1000 if max_distance is not None else 10000
+        lab_tests_with_categories = LabTestCategoryMapping.objects.filter(parent_category__isnull=False).values_list(
+            'lab_test', flat=True).distinct()
         all_packages_in_network_labs = LabTest.objects.prefetch_related('test').filter(enable_for_retail=True,
                                                                                        searchable=True, is_package=True,
                                                                                        availablelabs__enabled=True,
@@ -198,7 +218,7 @@ class LabList(viewsets.ReadOnlyModelViewSet):
                      then=F('availablelabs__custom_deal_price'))),
             rank=Window(expression=RowNumber(), order_by=F('distance').asc(),
                         partition_by=[F(
-                            'availablelabs__lab_pricing_group__labs__network'), F('id')])).order_by('-priority')
+                            'availablelabs__lab_pricing_group__labs__network'), F('id')]))
 
         all_packages_in_non_network_labs = LabTest.objects.prefetch_related('test').filter(enable_for_retail=True,
                                                                                            searchable=True,
@@ -219,18 +239,62 @@ class LabList(viewsets.ReadOnlyModelViewSet):
                      then=F('availablelabs__computed_deal_price')),
                 When(availablelabs__custom_deal_price__isnull=False,
                      then=F('availablelabs__custom_deal_price'))),
-        ).order_by('-priority')
-        all_packages_in_non_network_labs = all_packages_in_non_network_labs.filter(id__in=lab_tests)
-        all_packages_in_network_labs = all_packages_in_network_labs.filter(id__in=lab_tests)
-
+        )
+        if test_ids:
+            all_packages_in_non_network_labs = all_packages_in_non_network_labs.filter(test__id__in=test_ids).annotate(
+                included_test_count=Count('test')).filter(included_test_count=len(test_ids))
+            all_packages_in_network_labs = all_packages_in_network_labs.filter(test__id__in=test_ids).annotate(
+                included_test_count=Count('test')).filter(included_test_count=len(test_ids))
+        if category_ids:
+            all_packages_in_non_network_labs = all_packages_in_non_network_labs.filter(
+                categories__id__in=category_ids).annotate(category_count=Count(F('categories'))).filter(
+                category_count=len(category_ids))
+            all_packages_in_network_labs = all_packages_in_network_labs.filter(
+                categories__id__in=category_ids).annotate(category_count=Count(F('categories'))).filter(
+                category_count=len(category_ids))
+        all_packages_in_non_network_labs = all_packages_in_non_network_labs.distinct()
+        all_packages_in_network_labs = all_packages_in_network_labs.distinct()
         all_packages = [package for package in all_packages_in_network_labs if package.rank == 1]
         all_packages.extend([package for package in all_packages_in_non_network_labs])
+        all_packages = filter(lambda x: x, all_packages)
+        if min_distance:
+            all_packages = filter(lambda x: x.distance >= min_distance, all_packages)
+        if min_price:
+            all_packages = filter(lambda x: x.price >= min_price, all_packages)
+        if max_price:
+            all_packages = filter(lambda x: x.price <= max_price, all_packages)
+        if min_age and max_age:
+            all_packages = filter(lambda x: x.min_age <= max_age and x.max_age >= min_age, all_packages)
+        elif max_age:
+            all_packages = filter(lambda x: x.min_age <= max_age, all_packages)
+        elif min_age:
+            all_packages = filter(lambda x: x.max_age >= min_age, all_packages)
+        if gender:
+            all_packages = filter(lambda x: x.gender_type in [gender, LabTest.ALL], all_packages)
+        if package_type == 1:
+            all_packages = filter(lambda x: x.home_collection_possible, all_packages)
+        if package_type == 2:
+            all_packages = filter(lambda x: not x.home_collection_possible, all_packages)
+        if not sort_on:
+            all_packages = sorted(all_packages, key=operator.attrgetter('priority'), reverse=True)
+        elif sort_on == 'fees':
+            all_packages = sorted(all_packages, key=operator.attrgetter('price'))
+        elif sort_on == 'distance':
+            all_packages = sorted(all_packages, key=operator.attrgetter('distance'))
         lab_ids = [package.lab for package in all_packages]
+        entity_url_qs = EntityUrls.objects.filter(entity_id__in=lab_ids, is_valid=True, url__isnull=False,
+                                                  sitemap_identifier=EntityUrls.SitemapIdentifier.LAB_PAGE).values(
+            'url', lab_id=F('entity_id'))
+        entity_url_dict = {}
+        for item in entity_url_qs:
+            entity_url_dict.setdefault(item.get('lab_id'), [])
+            entity_url_dict[item.get('lab_id')].append(item.get('url'))
         lab_data = Lab.objects.prefetch_related('rating', 'lab_documents', 'lab_timings', 'network',
                                                 'home_collection_charges').annotate(
-            avg_rating=Avg('rating__ratings')).filter(id__in=lab_ids)
+            avg_rating=Avg('rating__ratings')).in_bulk(lab_ids)
         serializer = CustomLabTestPackageSerializer(all_packages, many=True,
-                                                    context={'lab_data': lab_data, 'request': request})
+                                                    context={'entity_url_dict': entity_url_dict, 'lab_data': lab_data,
+                                                             'request': request})
         category_queryset = LabTestCategory.objects.filter(is_package_category=True, is_live=True)
         category_result = []
         for category in category_queryset:
@@ -252,8 +316,15 @@ class LabList(viewsets.ReadOnlyModelViewSet):
                     discounted_price = price if not search_coupon else search_coupon.get_search_coupon_discounted_price(price)
                     package_result["discounted_price"] = discounted_price
 
+        top_content = None
+        bottom_content = None
+        dynamic = NewDynamic.objects.filter(url__url='full-body-checkup-health-packages', is_enabled=True).first()
+        if dynamic:
+            top_content = dynamic.top_content
+            bottom_content = dynamic.bottom_content
         return Response({'result': result, 'categories': category_result, 'count': len(all_packages),
-                         'categories_count': len(category_result)})
+                         'categories_count': len(category_result), 'bottom_content': bottom_content,
+                         'search_content': top_content})
 
 
     @transaction.non_atomic_requests
@@ -766,17 +837,17 @@ class LabList(viewsets.ReadOnlyModelViewSet):
                     tests[obj.id].append({"id": test.test_id, "name": test.test.name, "deal_price": deal_price, "mrp": test.mrp,
                                           "number_of_tests": test.test.number_of_tests})
 
-        day_now = timezone.now().weekday()
-        days_array = [i for i in range(7)]
-        rotated_days_array = days_array[day_now:] + days_array[:day_now]
+        # day_now = timezone.now().weekday()
+        # days_array = [i for i in range(7)]
+        # rotated_days_array = days_array[day_now:] + days_array[:day_now]
         #lab_network = dict()
         for row in queryset:
 
-            lab_timing = list()
-            lab_timing_data = list()
-            next_lab_timing_dict = {}
-            next_lab_timing_data_dict = {}
-            data_array = [list() for i in range(7)]
+            # lab_timing = list()
+            # lab_timing_data = list()
+            # next_lab_timing_dict = {}
+            # next_lab_timing_data_dict = {}
+            # data_array = [list() for i in range(7)]
             lab_obj = temp_var[row["id"]]
             if lab_obj.sublocality and lab_obj.city:
                 row['address'] = lab_obj.sublocality + ' ' + lab_obj.city
@@ -790,37 +861,45 @@ class LabList(viewsets.ReadOnlyModelViewSet):
             row['home_pickup_charges'] = lab_obj.home_pickup_charges
             row['is_home_collection_enabled'] = lab_obj.is_home_collection_enabled
 
-            if lab_obj.always_open:
-                lab_timing = "12:00 AM - 11:45 PM"
-                next_lab_timing_dict = {rotated_days_array[1]: "12:00 AM - 11:45 PM"}
-                lab_timing_data = [{
-                    "start": 0.0,
-                    "end": 23.75
-                }]
-                next_lab_timing_data_dict = {rotated_days_array[1]: {
-                    "start": 0.0,
-                    "end": 23.75
-                }}
-            else:
-                timing_queryset =lab_obj.lab_timings.all()
+            # if lab_obj.always_open:
+            #     lab_timing = "12:00 AM - 11:45 PM"
+            #     next_lab_timing_dict = {rotated_days_array[1]: "12:00 AM - 11:45 PM"}
+            #     lab_timing_data = [{
+            #         "start": 0.0,
+            #         "end": 23.75
+            #     }]
+            #     next_lab_timing_data_dict = {rotated_days_array[1]: {
+            #         "start": 0.0,
+            #         "end": 23.75
+            #     }}
+            # else:
+            #     timing_queryset =lab_obj.lab_timings.all()
+            #
+            #     for data in timing_queryset:
+            #         data_array[data.day].append(data)
+            #
+            #     rotated_data_array = data_array[day_now:] + data_array[:day_now]
+            #
+            #     for count, timing_data in enumerate(rotated_data_array):
+            #         day = rotated_days_array[count]
+            #         if count == 0:
+            #             if timing_data:
+            #                 lab_timing, lab_timing_data = self.get_lab_timing(timing_data)
+            #                 lab_timing_data = sorted(lab_timing_data, key=lambda k: k["start"])
+            #         elif timing_data:
+            #             next_lab_timing, next_lab_timing_data = self.get_lab_timing(timing_data)
+            #             next_lab_timing_data = sorted(next_lab_timing_data, key=lambda k: k["start"])
+            #             next_lab_timing_dict[day] = next_lab_timing
+            #             next_lab_timing_data_dict[day] = next_lab_timing_data
+            #             break
 
-                for data in timing_queryset:
-                    data_array[data.day].append(data)
-
-                rotated_data_array = data_array[day_now:] + data_array[:day_now]
-
-                for count, timing_data in enumerate(rotated_data_array):
-                    day = rotated_days_array[count]
-                    if count == 0:
-                        if timing_data:
-                            lab_timing, lab_timing_data = self.get_lab_timing(timing_data)
-                            lab_timing_data = sorted(lab_timing_data, key=lambda k: k["start"])
-                    elif timing_data:
-                        next_lab_timing, next_lab_timing_data = self.get_lab_timing(timing_data)
-                        next_lab_timing_data = sorted(next_lab_timing_data, key=lambda k: k["start"])
-                        next_lab_timing_dict[day] = next_lab_timing
-                        next_lab_timing_data_dict[day] = next_lab_timing_data
-                        break
+            # {'lab_timing': lab_timing, 'lab_timing_data': lab_timing_data}, {
+            #     'next_lab_timing_dict': next_lab_timing_dict, 'next_lab_timing_data_dict': next_lab_timing_data_dict}
+            # lab_timing, lab_timing_data, next_lab_timing_dict, next_lab_timing_data_dict = lab_obj.lab_timings_today_and_next()[0:4]
+            lab_timing_temp_dict = lab_obj.lab_timings_today_and_next()
+            lab_timing, lab_timing_data = lab_timing_temp_dict['lab_timing'], lab_timing_temp_dict['lab_timing_data']
+            next_lab_timing_dict, next_lab_timing_data_dict = lab_timing_temp_dict['next_lab_timing_dict'], \
+                                                              lab_timing_temp_dict['next_lab_timing_data_dict']
 
             if lab_obj.home_collection_charges.exists():
                 row["distance_related_charges"] = 1
@@ -910,7 +989,7 @@ class LabList(viewsets.ReadOnlyModelViewSet):
         # for Demo
         demo_lab_test = AvailableLabTest.objects.filter(test__enable_for_retail=True, lab_pricing_group=lab_obj.lab_pricing_group, enabled=True, test__searchable=True).order_by("-test__priority").prefetch_related('test')[:2]
         lab_test_serializer = diagnostic_serializer.AvailableLabTestSerializer(demo_lab_test, many=True, context={"lab": lab_obj})
-        day_now = timezone.now().weekday()
+        # day_now = timezone.now().weekday()
         timing_queryset = list()
         lab_serializable_data = list()
         lab_timing = None
@@ -925,10 +1004,11 @@ class LabList(viewsets.ReadOnlyModelViewSet):
                 "end": 23.75
             }]
         else:
-            timing_queryset = lab_obj.lab_timings.filter(day=day_now)
-            lab_timing, lab_timing_data = self.get_lab_timing(timing_queryset)
+            # timing_queryset = lab_obj.lab_timings.filter(day=day_now)
+            lab_timing_temp_result = lab_obj.lab_timings_today_and_next()
+            lab_timing, lab_timing_data = lab_timing_temp_result['lab_timing'], lab_timing_temp_result['lab_timing_data']
 
-        # entity = EntityUrls.objects.filter(entity_id=lab_id, url_type='PAGEURL', is_valid='t',
+            # entity = EntityUrls.objects.filter(entity_id=lab_id, url_type='PAGEURL', is_valid='t',
         #                                    entity_type__iexact='Lab')
         # if entity.exists():
         #     entity = entity.first()
@@ -957,34 +1037,34 @@ class LabList(viewsets.ReadOnlyModelViewSet):
 
         return Response(temp_data)
 
-    def get_lab_timing(self, queryset):
-        lab_timing = ''
-        lab_timing_data = list()
-        temp_list = list()
-
-        for qdata in queryset:
-            temp_list.append({"start": qdata.start, "end": qdata.end})
-
-        temp_list = sorted(temp_list, key=lambda k: k["start"])
-
-        index = 0
-        while index < len(temp_list):
-            temp_dict = dict()
-            x = index
-            if not lab_timing:
-                lab_timing += self.convert_time(temp_list[index]["start"]) + " - "
-            else:
-                lab_timing += " | " + self.convert_time(temp_list[index]["start"]) + " - "
-            temp_dict["start"] = temp_list[index]["start"]
-            while x + 1 < len(temp_list) and temp_list[x]["end"] >= temp_list[x+1]["start"]:
-                x += 1
-            index = x
-            lab_timing += self.convert_time(temp_list[index]["end"])
-            temp_dict["end"] = temp_list[index]["end"]
-            lab_timing_data.append(temp_dict)
-            index += 1
-
-        return lab_timing, lab_timing_data
+    # def get_lab_timing(self, queryset):
+    #     lab_timing = ''
+    #     lab_timing_data = list()
+    #     temp_list = list()
+    #
+    #     for qdata in queryset:
+    #         temp_list.append({"start": qdata.start, "end": qdata.end})
+    #
+    #     temp_list = sorted(temp_list, key=lambda k: k["start"])
+    #
+    #     index = 0
+    #     while index < len(temp_list):
+    #         temp_dict = dict()
+    #         x = index
+    #         if not lab_timing:
+    #             lab_timing += self.convert_time(temp_list[index]["start"]) + " - "
+    #         else:
+    #             lab_timing += " | " + self.convert_time(temp_list[index]["start"]) + " - "
+    #         temp_dict["start"] = temp_list[index]["start"]
+    #         while x + 1 < len(temp_list) and temp_list[x]["end"] >= temp_list[x+1]["start"]:
+    #             x += 1
+    #         index = x
+    #         lab_timing += self.convert_time(temp_list[index]["end"])
+    #         temp_dict["end"] = temp_list[index]["end"]
+    #         lab_timing_data.append(temp_dict)
+    #         index += 1
+    #
+    #     return lab_timing, lab_timing_data
 
     def convert_time(self, time):
         hour = int(time)
@@ -1147,48 +1227,53 @@ class LabList(viewsets.ReadOnlyModelViewSet):
                     else:
                         deal_price=test.computed_deal_price
                     tests[obj.id].append({"id": test.test_id, "name": test.test.name, "deal_price": deal_price, "mrp": test.mrp})
-        day_now = timezone.now().weekday()
-        days_array = [i for i in range(7)]
-        rotated_days_array = days_array[day_now:] + days_array[:day_now]
+        # day_now = timezone.now().weekday()
+        # days_array = [i for i in range(7)]
+        # rotated_days_array = days_array[day_now:] + days_array[:day_now]
         for row in queryset:
-            lab_timing = list()
-            lab_timing_data = list()
-            next_lab_timing_dict = {}
-            next_lab_timing_data_dict = {}
-            data_array = [list() for i in range(7)]
+        #     lab_timing = list()
+        #     lab_timing_data = list()
+        #     next_lab_timing_dict = {}
+        #     next_lab_timing_data_dict = {}
+        #     data_array = [list() for i in range(7)]
             row["lab"] = temp_var[row["id"]]
+        #
+        #     if row["lab"].always_open:
+        #         lab_timing = "12:00 AM - 11:45 PM"
+        #         next_lab_timing_dict = {rotated_days_array[1]: "12:00 AM - 11:45 PM"}
+        #         lab_timing_data = [{
+        #             "start": 0.0,
+        #             "end": 23.75
+        #         }]
+        #         next_lab_timing_data_dict = {rotated_days_array[1]: {
+        #             "start": 0.0,
+        #             "end": 23.75
+        #         }}
+        #     else:
+        #         timing_queryset = row["lab"].lab_timings.all()
+        #
+        #         for data in timing_queryset:
+        #             data_array[data.day].append(data)
+        #
+        #         rotated_data_array = data_array[day_now:] + data_array[:day_now]
+        #
+        #         for count, timing_data in enumerate(rotated_data_array):
+        #             day = rotated_days_array[count]
+        #             if count == 0:
+        #                 if timing_data:
+        #                     lab_timing, lab_timing_data = self.get_lab_timing(timing_data)
+        #                     lab_timing_data = sorted(lab_timing_data, key=lambda k: k["start"])
+        #             elif timing_data:
+        #                 next_lab_timing, next_lab_timing_data = self.get_lab_timing(timing_data)
+        #                 next_lab_timing_data = sorted(next_lab_timing_data, key=lambda k: k["start"])
+        #                 next_lab_timing_dict[day] = next_lab_timing
+        #                 next_lab_timing_data_dict[day] = next_lab_timing_data
+        #                 break
 
-            if row["lab"].always_open:
-                lab_timing = "12:00 AM - 11:45 PM"
-                next_lab_timing_dict = {rotated_days_array[1]: "12:00 AM - 11:45 PM"}
-                lab_timing_data = [{
-                    "start": 0.0,
-                    "end": 23.75
-                }]
-                next_lab_timing_data_dict = {rotated_days_array[1]: {
-                    "start": 0.0,
-                    "end": 23.75
-                }}
-            else:
-                timing_queryset = row["lab"].lab_timings.all()
-
-                for data in timing_queryset:
-                    data_array[data.day].append(data)
-
-                rotated_data_array = data_array[day_now:] + data_array[:day_now]
-
-                for count, timing_data in enumerate(rotated_data_array):
-                    day = rotated_days_array[count]
-                    if count == 0:
-                        if timing_data:
-                            lab_timing, lab_timing_data = self.get_lab_timing(timing_data)
-                            lab_timing_data = sorted(lab_timing_data, key=lambda k: k["start"])
-                    elif timing_data:
-                        next_lab_timing, next_lab_timing_data = self.get_lab_timing(timing_data)
-                        next_lab_timing_data = sorted(next_lab_timing_data, key=lambda k: k["start"])
-                        next_lab_timing_dict[day] = next_lab_timing
-                        next_lab_timing_data_dict[day] = next_lab_timing_data
-                        break
+            lab_timing_temp_dict = row["lab"].lab_timings_today_and_next()
+            lab_timing, lab_timing_data = lab_timing_temp_dict['lab_timing'], lab_timing_temp_dict['lab_timing_data']
+            next_lab_timing_dict, next_lab_timing_data_dict = lab_timing_temp_dict['next_lab_timing_dict'], \
+                                                              lab_timing_temp_dict['next_lab_timing_data_dict']
 
             if row["lab"].home_collection_charges.exists():
                 row["distance_related_charges"] = 1

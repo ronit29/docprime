@@ -4,6 +4,7 @@ from django.contrib.contenttypes.models import ContentType
 from django.db.models import Q
 
 from ondoc.banner.models import Banner
+from ondoc.common.models import PaymentOptions, UserConfig
 from ondoc.coupon.models import Coupon, UserSpecificCoupon
 from ondoc.crm.constants import constants
 from ondoc.doctor.models import (Doctor, Hospital, DoctorClinicTiming, DoctorClinic,
@@ -31,7 +32,8 @@ from ondoc.diagnostic.models import (Lab, LabTiming, LabImage, GenericLabAdmin,
                                      LabDoctor, LabDocument, LabPricingGroup, LabNetworkDocument, CommonTest,
                                      CommonDiagnosticCondition, DiagnosticConditionLabTest, HomePickupCharges,
                                      TestParameter, ParameterLabTest, LabTestPackage, LabReportFile, LabReport,
-                                     CommonPackage, LabTestCategory, LabTestCategoryMapping)
+                                     CommonPackage, LabTestCategory, LabTestCategoryMapping,
+                                     LabTestRecommendedCategoryMapping)
 
 from ondoc.procedure.models import Procedure, ProcedureCategory, CommonProcedureCategory, DoctorClinicProcedure, \
     ProcedureCategoryMapping, ProcedureToCategoryMapping, CommonProcedure
@@ -464,6 +466,29 @@ class Command(BaseCommand):
         for cl, ct in content_types.items():
             permissions = Permission.objects.filter(
                 Q(content_type=ct),
+                Q(codename='change_' + ct.model))
+
+            group.permissions.add(*permissions)
+
+        group, created = Group.objects.get_or_create(name=constants['PRODUCT_TEAM'])
+        group.permissions.clear()
+
+        content_types = ContentType.objects.get_for_models(LabTestRecommendedCategoryMapping, Banner, UserConfig, NewDynamic)
+        for cl, ct in content_types.items():
+            permissions = Permission.objects.filter(
+                Q(content_type=ct),
+                Q(codename='add_' + ct.model) |
+                Q(codename='change_' + ct.model) |
+                Q(codename='delete_' + ct.model))
+
+            group.permissions.add(*permissions)
+
+        content_types = ContentType.objects.get_for_models(PaymentOptions, EntityUrls)
+
+        for cl, ct in content_types.items():
+            permissions = Permission.objects.filter(
+                Q(content_type=ct),
+                Q(codename='add_' + ct.model) |
                 Q(codename='change_' + ct.model))
 
             group.permissions.add(*permissions)
