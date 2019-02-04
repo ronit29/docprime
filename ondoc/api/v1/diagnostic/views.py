@@ -72,7 +72,8 @@ class SearchPageViewSet(viewsets.ReadOnlyModelViewSet):
         count = int(count)
         if count <= 0:
             count = 10
-        test_queryset = CommonTest.objects.select_related('test').filter(test__enable_for_retail=True, test__searchable=True)[:count]
+        test_queryset = CommonTest.objects.select_related('test').filter(test__enable_for_retail=True,
+                                                                         test__searchable=True)[:count]
         conditions_queryset = CommonDiagnosticCondition.objects.prefetch_related('lab_test').all()
         lab_queryset = PromotedLab.objects.select_related('lab').filter(lab__is_live=True, lab__is_test_lab=False)
         # package_queryset = CommonPackage.objects.prefetch_related('package').filter(package__enable_for_retail=True, package__searchable=True)[:count]
@@ -85,11 +86,12 @@ class SearchPageViewSet(viewsets.ReadOnlyModelViewSet):
                 dp=deal_price_calculation).order_by('dp').values('pk')[:1]))
         test_serializer = diagnostic_serializer.CommonTestSerializer(test_queryset, many=True,
                                                                      context={'request': request})
-	recommended_package_qs = LabTestCategory.objects.prefetch_related('recommended_lab_tests__parameter').filter(is_live=True,
-                                                                                                          show_on_recommended_screen=True,
-                                                                                                          recommended_lab_tests__searchable=True,
-                                                                                                          recommended_lab_tests__enable_for_retail=True).distinct()[:count]        
-	package_serializer = diagnostic_serializer.CommonPackageSerializer(package_queryset, many=True,
+        recommended_package_qs = LabTestCategory.objects.prefetch_related('recommended_lab_tests__parameter').filter(
+            is_live=True,
+            show_on_recommended_screen=True,
+            recommended_lab_tests__searchable=True,
+            recommended_lab_tests__enable_for_retail=True).distinct()[:count]
+        package_serializer = diagnostic_serializer.CommonPackageSerializer(package_queryset, many=True,
                                                                            context={'request': request})
         lab_serializer = diagnostic_serializer.PromotedLabsSerializer(lab_queryset, many=True)
         condition_serializer = diagnostic_serializer.CommonConditionsSerializer(conditions_queryset, many=True)
