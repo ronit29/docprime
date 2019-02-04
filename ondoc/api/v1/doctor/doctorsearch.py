@@ -487,7 +487,7 @@ class DoctorSearchHelper:
 
                 "schema": {
                     "@context": 'http://schema.org',
-                    "@type":  sorted_spec_list[0].get('name') if sorted_spec_list[0].get('name') else None,
+                    "@type":  sorted_spec_list[0].get('name') if sorted_spec_list[0] and sorted_spec_list[0].get('name') else None,
                     "currenciesAccepted": "INR",
                     "MedicalSpeciality": [spec['name'] for spec in sorted_spec_list],
                     "name": doctor.get_display_name(),
@@ -518,23 +518,25 @@ class DoctorSearchHelper:
                         }
                     },
                     "branchOf": [
-                            {
-                                "@type": "MedicalClinic",
-                                "name": doctor_clinic.hospital.name,
-                                "priceRange": min_price["deal_price"],
-                                "image": doctor_clinic.hospital.get_thumbnail() if doctor_clinic.hospital.get_thumbnail() else None,
-                                "address":
-                                    {
-                                         "@type": 'PostalAddress',
-                        "addressLocality": doctor_clinic.hospital.locality if doctor_clinic and getattr(doctor_clinic, 'hospital', None) else '',
-                        "addressRegion": doctor_clinic.hospital.city if doctor_clinic and getattr(doctor_clinic, 'hospital', None) else '',
+                        {
+                            "@type": "MedicalClinic",
+                            "name": doctor_clinic.hospital.name,
+                            "priceRange": min_price["deal_price"],
+                            "image": doctor_clinic.hospital.get_thumbnail() if doctor_clinic.hospital.get_thumbnail() else None,
+                            "address":
+                                {
+                                    "@type": 'PostalAddress',
+                                    "addressLocality": doctor_clinic.hospital.locality if doctor_clinic and getattr(
+                                        doctor_clinic, 'hospital', None) else '',
+                                    "addressRegion": doctor_clinic.hospital.city if doctor_clinic and getattr(
+                                        doctor_clinic, 'hospital', None) else '',
 
-                                    }
+                                }
 
-                            }
-                        ]
+                        }
+                    ]
 
-            }
+                }
             }
             response.append(temp)
         return response
