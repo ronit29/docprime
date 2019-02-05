@@ -1041,13 +1041,13 @@ class CustomLabTestPackageSerializer(serializers.ModelSerializer):
     pickup_charges = serializers.SerializerMethodField()
     pickup_available = serializers.SerializerMethodField()
     distance_related_charges = serializers.SerializerMethodField()
-    category_ids = serializers.SerializerMethodField()
+    categories = serializers.SerializerMethodField()
 
     class Meta:
         model = LabTest
         fields = ('id', 'name', 'lab', 'mrp', 'distance', 'price', 'lab_timing', 'lab_timing_data', 'next_lab_timing',
                   'next_lab_timing_data', 'test_type', 'is_package', 'number_of_tests', 'why', 'pre_test_info', 'is_package',
-                  'pickup_charges', 'pickup_available', 'distance_related_charges', 'priority', 'show_details', 'category_ids')
+                  'pickup_charges', 'pickup_available', 'distance_related_charges', 'priority', 'show_details', 'categories')
 
     def get_lab(self, obj):
         lab_data = self.context.get('lab_data', {})
@@ -1059,7 +1059,7 @@ class CustomLabTestPackageSerializer(serializers.ModelSerializer):
                                               context={'entity_url_dict': entity_url_dict, 'request': request}).data
         return None
 
-    def get_category_ids(self, obj):
+    def get_categories(self, obj):
         queryset = obj.categories.all()
         res = []
         for data in queryset:
