@@ -479,7 +479,7 @@ class UserAppointmentsViewSet(OndocViewSet):
             else:
                 combined_data.extend(v)
         combined_data.extend(status_six_data)
-        combined_data = combined_data[:80]
+        combined_data = combined_data[:200]
         return Response(combined_data)
 
     @transaction.non_atomic_requests
@@ -813,7 +813,8 @@ class UserAppointmentsViewSet(OndocViewSet):
 
     def lab_appointment_list(self, request, params):
         user = request.user
-        queryset = LabAppointment.objects.select_related('lab').filter(user=user)
+        queryset = LabAppointment.objects.select_related('lab', 'profile', 'user')\
+                                        .prefetch_related('lab__lab_image', 'lab__lab_documents', 'reports').filter(user=user)
         if queryset and params.get('profile_id'):
             queryset = queryset.filter(profile=params['profile_id'])
         range = params.get('range')
@@ -822,13 +823,13 @@ class UserAppointmentsViewSet(OndocViewSet):
                                        status__in=LabAppointment.ACTIVE_APPOINTMENT_STATUS).order_by('time_slot_start')
         else:
             queryset = queryset.order_by('-time_slot_start')
-        queryset = paginate_queryset(queryset, request, 40)
+        queryset = paginate_queryset(queryset, request, 100)
         serializer = LabAppointmentModelSerializer(queryset, many=True, context={"request": request})
         return serializer
 
     def doctor_appointment_list(self, request, params):
         user = request.user
-        queryset = OpdAppointment.objects.filter(user=user)
+        queryset = OpdAppointment.objects.select_related('profile', 'doctor', 'hospital', 'user').prefetch_related('doctor__images').filter(user=user)
 
         if not queryset:
             return Response([])
@@ -857,7 +858,7 @@ class UserAppointmentsViewSet(OndocViewSet):
         else:
             queryset = queryset.order_by('-time_slot_start')
 
-        queryset = paginate_queryset(queryset, request, 40)
+        queryset = paginate_queryset(queryset, request, 100)
         serializer = OpdAppointmentSerializer(queryset, many=True,context={"request": request})
         return serializer
 
