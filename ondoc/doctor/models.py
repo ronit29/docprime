@@ -1312,12 +1312,23 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
     def get_invoice_objects(self):
         return Invoice.objects.filter(reference_id=self.id, product_id=Order.DOCTOR_PRODUCT_ID)
 
+    def get_cancellation_reason(self):
+        return CancellationReason.objects.filter(Q(type=Order.DOCTOR_PRODUCT_ID) | Q(type__isnull=True),
+                                                 visible_on_front_end=True)
+
+    def get_serialized_cancellation_reason(self):
+        res = []
+        for cr in self.get_cancellation_reason():
+            res.append({'id': cr.id, 'name': cr.name, 'is_comment_needed': cr.is_comment_needed})
+        return res
+
     def get_invoice_urls(self):
         invoices_urls = []
         if self.id:
             invoices = self.get_invoice_objects()
             for invoice in invoices:
-                invoices_urls.append(util_absolute_url(invoice.file.url))
+                if invoice.file:
+                    invoices_urls.append(util_absolute_url(invoice.file.url))
         return invoices_urls
 
     @classmethod
@@ -2075,6 +2086,7 @@ class CancellationReason(auth_model.TimeStampedModel):
     type = models.PositiveSmallIntegerField(default=None, null=True, blank=True, choices=TYPE_CHOICES)
     visible_on_front_end = models.BooleanField(default=True)
     visible_on_admin = models.BooleanField(default=True)
+    is_comment_needed = models.BooleanField(default=False)
 
     class Meta:
         db_table = 'cancellation_reason'
