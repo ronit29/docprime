@@ -1,4 +1,7 @@
 import json
+
+from django.contrib.contenttypes.fields import GenericForeignKey
+from django.contrib.contenttypes.models import ContentType
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.db import models
 from django.contrib.postgres.fields import JSONField, ArrayField
@@ -446,6 +449,9 @@ class EmailNotification(TimeStampedModel, EmailNotificationOpdMixin, EmailNotifi
     cc = ArrayField(models.EmailField(), default=[], blank=[])
     bcc = ArrayField(models.EmailField(), default=[], blank=[])
     attachments = JSONField(default=[], blank=[])
+    content_type = models.ForeignKey(ContentType, on_delete=models.CASCADE, null=True)
+    object_id = models.PositiveIntegerField(null=True)
+    content_object = GenericForeignKey()
 
     class Meta:
         db_table = "email_notification"
