@@ -437,7 +437,7 @@ class DoctorSearchHelper:
 
             general_specialization = sorted(general_specialization, key=operator.attrgetter('doctor_count'), reverse=True)
             for spec in general_specialization:
-                if spec.id in specialization_ids:
+                if str(spec.id) in specialization_ids:
                     searched_spec_list.append({'name':spec.name})
                 else:    
                     doctor_spec_list.append({'name':spec.name})

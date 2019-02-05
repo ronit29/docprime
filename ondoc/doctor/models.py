@@ -136,13 +136,15 @@ class Hospital(auth_model.TimeStampedModel, auth_model.CreatedByModel, auth_mode
     MOU_AGREEMENT_NEEDED = 2
     HOSPITAL_NOT_INTERESTED = 3
     CHARGES_ISSUES = 4
+    DUPLICATE = 5
     OTHERS = 9
     WELCOME_CALLING = 1
     ESCALATION = 2
     DISABLED_REASONS_CHOICES = (
         ("", "Select"), (INCORRECT_CONTACT_DETAILS, "Incorrect contact details"),
         (MOU_AGREEMENT_NEEDED, "MoU agreement needed"), (HOSPITAL_NOT_INTERESTED, "Hospital not interested for tie-up"),
-        (CHARGES_ISSUES, "Issue in discount % / consultation charges"), (OTHERS, "Others (please specify)"))
+        (CHARGES_ISSUES, "Issue in discount % / consultation charges"),
+        (DUPLICATE, "Duplicate"), (OTHERS, "Others (please specify)"))
     DISABLED_AFTER_CHOICES = (("", "Select"), (WELCOME_CALLING, "Welcome Calling"), (ESCALATION, "Escalation"))
     name = models.CharField(max_length=200)
     location = models.PointField(geography=True, srid=4326, blank=True, null=True)
@@ -373,6 +375,7 @@ class Doctor(auth_model.TimeStampedModel, auth_model.QCModel, SearchKey):
     MOU_AGREEMENT_NEEDED = 5
     DOCTOR_NOT_INTERESTED_FOR_TIE_UP = 6
     CHARGES_ISSUES = 7
+    DUPLICATE = 8
     OTHERS = 9
     DISABLE_REASON_CHOICES = (
         ("", "Select"), (DOCTOR_NOT_ASSOCIATED, "Doctor not associated with the hospital anymore"),
@@ -380,7 +383,8 @@ class Doctor(auth_model.TimeStampedModel, auth_model.QCModel, SearchKey):
         (DOCTOR_AVAILABLE_ON_CALL, "Doctor available only On-Call"),
         (INCORRECT_CONTACT_DETAILS, "Incorrect contact details"), (MOU_AGREEMENT_NEEDED, "MoU agreement needed"),
         (DOCTOR_NOT_INTERESTED_FOR_TIE_UP, "Doctor not interested for tie-up"),
-        (CHARGES_ISSUES, "Issue in discount % / consultation charges"), (OTHERS, "Others (please specify)"))
+        (CHARGES_ISSUES, "Issue in discount % / consultation charges"),
+        (DUPLICATE, "Duplicate"), (OTHERS, "Others (please specify)"))
     name = models.CharField(max_length=200)
     gender = models.CharField(max_length=2, default=None, blank=True, null=True,
                               choices=GENDER_CHOICES)
@@ -2180,7 +2184,7 @@ class OfflineOPDAppointments(auth_model.TimeStampedModel):
         try:
             default_text = '''Dear %s, your appointment has been confirmed with %s at %s on %s.''' % (
                 sms_obj['name'], sms_obj['appointment'].doctor.get_display_name(), sms_obj['appointment'].hospital.name,
-                sms_obj['appointment'].time_slot_start.strftime("%B %d, %Y %H:%M"))
+                sms_obj['appointment'].time_slot_start.strftime("%B %d, %Y %I:%M %p"))
             notification_tasks.send_offline_appointment_message.apply_async(
                 kwargs={'number': sms_obj['phone_number'], 'text': default_text, 'type': 'Appointment ADD'},
                 countdown=1)
@@ -2192,7 +2196,7 @@ class OfflineOPDAppointments(auth_model.TimeStampedModel):
         try:
             default_text = "Dear %s, your appointment with %s at %s for %s has been cancelled. In case of any query, please reach out to the clinic." % (
                               sms_obj['name'], sms_obj['old_appointment'].doctor.get_display_name(), sms_obj['old_appointment'].hospital.name,
-                              sms_obj['old_appointment'].time_slot_start.strftime("%B %d, %Y %H:%M"))
+                              sms_obj['old_appointment'].time_slot_start.strftime("%B %d, %Y %I:%M %p"))
             notification_tasks.send_offline_appointment_message.apply_async(
                 kwargs={'number': sms_obj['phone_number'], 'text': default_text, 'type': 'Appointment CANCEL'},
                 countdown=1)
@@ -2214,10 +2218,9 @@ class OfflineOPDAppointments(auth_model.TimeStampedModel):
     @staticmethod
     def appointment_reschedule_sms(sms_obj):
         try:
-            default_text = '''Dear %s, your appointment with %s at %s has been rescheduled to %s. 
-                              In case of any query, please reach out to the clinic..''' % (
+            default_text = "Dear %s, your appointment with %s at %s has been rescheduled to %s. In case of any query, please reach out to the clinic." % (
                               sms_obj['name'], sms_obj['appointment'].doctor.get_display_name(), sms_obj['appointment'].hospital.name,
-                              sms_obj['appointment'].time_slot_start.strftime("%B %d, %Y %H:%M"))
+                              sms_obj['appointment'].time_slot_start.strftime("%B %d, %Y %I:%M %p"))
             notification_tasks.send_offline_appointment_message.apply_async(
                 kwargs={'number': sms_obj['phone_number'], 'text': default_text, 'type': 'Appointment RESCHEDULE'},
                 countdown=1)

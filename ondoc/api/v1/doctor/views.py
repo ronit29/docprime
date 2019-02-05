@@ -62,6 +62,7 @@ from django.contrib.staticfiles.templatetags.staticfiles import static
 from django.db.models import Avg
 from django.db.models import Count
 from ondoc.api.v1.auth import serializers as auth_serializers
+from copy import deepcopy
 
 logger = logging.getLogger(__name__)
 import random
@@ -902,8 +903,13 @@ class PrescriptionFileViewset(OndocViewSet):
         return Response(response)
 
     def prescription_permission(self, user, appointment):
-        return auth_models.GenericAdmin.objects.filter(user=user, hospital=appointment.hospital,  is_disabled=False,
-                                                       write_permission=True).exists()
+        return auth_models.GenericAdmin.objects.filter(Q(user=user, is_disabled=False),
+                                                       Q(
+                                                           Q(hospital=appointment.hospital)
+                                                            |
+                                                           Q(doctor=appointment.doctor)
+                                                       )
+                                                       ).exists()
 
 
 class SearchedItemsViewSet(viewsets.GenericViewSet):
@@ -2108,9 +2114,12 @@ class OfflineCustomerViewSet(viewsets.GenericViewSet):
         phone_number = []
         patient_profile = OfflinePatientSerializer(appnt.user).data
         patient_name = appnt.user.name if hasattr(appnt.user, 'name') else None
+        patient_profile['phone_number'] = None
         if hasattr(appnt.user, 'patient_mobiles'):
             for mob in appnt.user.patient_mobiles.all():
                 phone_number.append({"phone_number": mob.phone_number, "is_default": mob.is_default})
+                if mob.is_default:
+                    patient_profile['phone_number'] = mob.phone_number
         patient_profile['patient_numbers'] = phone_number
 
         ret_obj = {}
@@ -2262,12 +2271,14 @@ class OfflineCustomerViewSet(viewsets.GenericViewSet):
             patient_dict[
                 'display_welcome_message'] = data.display_welcome_message if data.display_welcome_message else None
             patient_dict['error'] = data.error if data.error else None
-            phone_number = ''
+            patient_numbers = []
+            patient_dict['phone_number'] = None
             if hasattr(data, 'patient_mobiles'):
                 for mob in data.patient_mobiles.all():
+                    patient_numbers.append({"phone_number": mob.phone_number, "is_default": mob.is_default})
                     if mob.is_default:
-                        phone_number = mob.phone_number
-            patient_dict['patient_numbers'] = phone_number
+                        patient_dict['phone_number'] = mob.phone_number
+            patient_dict['patient_numbers'] = patient_numbers
             response.append(patient_dict)
         return Response(response)
 
@@ -2529,7 +2540,7 @@ class OfflineCustomerViewSet(viewsets.GenericViewSet):
                         if 'break' in update_obj and update_obj.get('break'):
                             resp.append(update_obj.get('obj'))
                             break
-
+                        old_appnt = deepcopy(appnt)
                         if data.get('patient'):
                             if not data.get('patient')['id'] in patient_ids:
                                 patient_data = self.create_patient(request, data['patient'], data['hospital'],
@@ -2541,7 +2552,7 @@ class OfflineCustomerViewSet(viewsets.GenericViewSet):
                                                                    data['doctor'])
                             patient = patient_data['patient']
                             if patient_data.get('sms_list'):
-                                patient_data['sms_list']['old_appointment'] = appnt
+                                patient_data['sms_list']['old_appointment'] = old_appnt
                                 sms_list.append(patient_data['sms_list'])
                             appnt.user = patient
                         else:
@@ -2552,7 +2563,7 @@ class OfflineCustomerViewSet(viewsets.GenericViewSet):
                                 if def_number:
                                     patient_data['sms_list'] = {'phone_number': def_number.phone_number,
                                                                 'name': patient.name,
-                                                                'old_appointment': appnt}
+                                                                'old_appointment': old_appnt}
                                     sms_list.append(patient_data['sms_list'])
 
                         if appnt.doctor.id != data.get('doctor').id or appnt.hospital.id != data.get('hospital').id:
@@ -2770,10 +2781,13 @@ class OfflineCustomerViewSet(viewsets.GenericViewSet):
                 patient_profile = OfflinePatientSerializer(app.user).data
                 is_docprime = False
                 patient_name = app.user.name if hasattr(app.user, 'name') else None
+                patient_profile['phone_number'] = None
                 if hasattr(app.user, 'patient_mobiles'):
                     for mob in app.user.patient_mobiles.all():
                         phone_number.append({"phone_number": mob.phone_number, "is_default": mob.is_default})
-                patient_profile['phone_numbers'] = phone_number
+                        if mob.is_default:
+                            patient_profile['phone_number'] = mob.phone_number
+                patient_profile['patient_numbers'] = phone_number
                 error_flag = app.error if app.error else False
                 error_message = app.error_message if app.error_message else ''
             else:

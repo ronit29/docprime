@@ -765,8 +765,8 @@ class LabReportInline(nested_admin.NestedTabularInline):
 class LabAppointmentAdmin(nested_admin.NestedModelAdmin):
     form = LabAppointmentForm
     list_display = (
-        'booking_id', 'get_profile', 'get_lab', 'status', 'reports_uploaded', 'time_slot_start', 'effective_price',
-        'created_at', 'updated_at', 'get_lab_test_name')
+        'booking_id', 'get_profile', 'get_lab', 'status', 'reports_uploaded', 'time_slot_start', 'effective_price', 'get_profile_email',
+        'get_profile_age', 'created_at', 'updated_at', 'get_lab_test_name')
     list_filter = ('status', )
     date_hierarchy = 'created_at'
 
@@ -774,12 +774,28 @@ class LabAppointmentAdmin(nested_admin.NestedModelAdmin):
         LabReportInline
     ]
 
-    def get_autocomplete_fields(self, request):
-        if request.user.is_superuser:
-            temp_autocomplete_fields = ('lab', 'profile', 'user')
-        else:
-            temp_autocomplete_fields = super().get_autocomplete_fields(request)
-        return temp_autocomplete_fields
+    # def get_autocomplete_fields(self, request):
+    #     if request.user.is_superuser:
+    #         temp_autocomplete_fields = ('lab', 'profile', 'user')
+    #     else:
+    #         temp_autocomplete_fields = super().get_autocomplete_fields(request)
+    #     return temp_autocomplete_fields
+
+    def get_profile_email(self, obj):
+        if not obj.profile:
+            return None
+        return obj.profile.email
+
+    get_profile_email.admin_order_field = 'profile'
+    get_profile_email.short_description = 'Profile Email'
+
+    def get_profile_age(self, obj):
+        if not obj.profile:
+            return None
+        return obj.profile.get_age()
+
+    get_profile_age.admin_order_field = 'profile'
+    get_profile_age.short_description = 'Profile Age'
 
     def get_profile(self, obj):
         if not obj.profile:
@@ -850,7 +866,7 @@ class LabAppointmentAdmin(nested_admin.NestedModelAdmin):
         else:
             read_only = []
 
-        if obj.status == LabAppointment.COMPLETED or obj.status == LabAppointment.CANCELLED:
+        if obj and (obj.status == LabAppointment.COMPLETED or obj.status == LabAppointment.CANCELLED):
             read_only.extend(['status'])
         return read_only
 
