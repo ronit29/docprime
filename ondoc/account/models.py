@@ -510,15 +510,15 @@ class PgTransaction(TimeStampedModel):
     amount = models.DecimalField(max_digits=10, decimal_places=2, default=0)
     payment_mode = models.CharField(max_length=50, null=True, blank=True)
     response_code = models.CharField(max_length=50)
-    bank_id = models.CharField(max_length=50)
+    bank_id = models.CharField(max_length=50, null=True, blank=True)
     transaction_date = models.DateTimeField(auto_now=True)
-    bank_name = models.CharField(max_length=100)
-    currency = models.CharField(max_length=15)
+    bank_name = models.CharField(max_length=100, null=True, blank=True)
+    currency = models.CharField(max_length=15, null=True, blank=True)
     status_code = models.IntegerField()
-    pg_name = models.CharField(max_length=100)
+    pg_name = models.CharField(max_length=100, null=True, blank=True)
     status_type = models.CharField(max_length=50)
     transaction_id = models.CharField(max_length=100, unique=True)
-    pb_gateway_name = models.CharField(max_length=100)
+    pb_gateway_name = models.CharField(max_length=100, null=True, blank=True)
 
     @transaction.atomic
     def save(self, *args, **kwargs):
