@@ -102,8 +102,8 @@ class RatingsViewSet(viewsets.GenericViewSet):
                                                                       context={'request': request})
         else:
             return Response({'error': 'Invalid Object'}, status=status.HTTP_404_NOT_FOUND)
-        return Response({'reviews': body_serializer.data,
-                         'graph': graph_serializer.data})
+        return Response({'rating': body_serializer.data,
+                         'rating_graph': graph_serializer.data})
 
 
     def retrieve(self,request, pk):
