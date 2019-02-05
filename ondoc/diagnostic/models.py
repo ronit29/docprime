@@ -1099,7 +1099,6 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin)
     money_pool = models.ForeignKey(MoneyPool, on_delete=models.SET_NULL, null=True)
 
     def get_tests_and_prices(self):
-        # DONE SHASHANK_SINGH CHANGE 10
         test_price = []
         for test in self.test_mappings.all():
             test_price.append({'name': test.test.name, 'mrp': test.mrp, 'deal_price': (
@@ -1122,8 +1121,20 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin)
         if self.id:
             invoices = self.get_invoice_objects()
             for invoice in invoices:
-                invoices_urls.append(util_absolute_url(invoice.file.url))
+                if invoice.file:
+                    invoices_urls.append(util_absolute_url(invoice.file.url))
         return invoices_urls
+
+    def get_cancellation_reason(self):
+        return CancellationReason.objects.filter(Q(type=Order.LAB_PRODUCT_ID) | Q(type__isnull=True),
+                                                 visible_on_front_end=True)
+
+    def get_serialized_cancellation_reason(self):
+        res = []
+        for cr in self.get_cancellation_reason():
+            res.append({'id': cr.id, 'name': cr.name, 'is_comment_needed': cr.is_comment_needed})
+        return res
+
 
     def get_report_urls(self):
         reports = self.reports.all()

@@ -553,6 +553,8 @@ class UserAppointmentsViewSet(OndocViewSet):
         if validated_data.get('status'):
             if validated_data['status'] == LabAppointment.CANCELLED:
                 lab_appointment.cancellation_type = LabAppointment.PATIENT_CANCELLED
+                lab_appointment.cancellation_reason = validated_data.get('cancellation_reason', None)
+                lab_appointment.cancellation_comments = validated_data.get('cancellation_comment', '')
                 lab_appointment.action_cancelled(request.data.get('refund', 1))
                 resp = LabAppointmentRetrieveSerializer(lab_appointment, context={"request": request}).data
             elif validated_data.get('status') == LabAppointment.RESCHEDULED_PATIENT:
@@ -622,6 +624,8 @@ class UserAppointmentsViewSet(OndocViewSet):
             if validated_data['status'] == OpdAppointment.CANCELLED:
                 logger.warning("Starting to cancel for id - " + str(opd_appointment.id) + " timezone - " + str(timezone.now()))
                 opd_appointment.cancellation_type = OpdAppointment.PATIENT_CANCELLED
+                opd_appointment.cancellation_reason = validated_data.get('cancellation_reason', None)
+                opd_appointment.cancellation_comments = validated_data.get('cancellation_comment', '')
                 opd_appointment.action_cancelled(request.data.get("refund", 1))
                 logger.warning(
                     "Ending for id - " + str(opd_appointment.id) + " timezone - " + str(timezone.now()))

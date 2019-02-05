@@ -1045,8 +1045,8 @@ def create_payout_checksum(all_txn, product_id):
     checksum = secret_key + "|[" + checksum + "]|" + client_key
     checksum_hash = hashlib.sha256(str(checksum).encode())
     checksum_hash = checksum_hash.hexdigest()
-    print("checksum string - " + str(checksum) + "checksum hash - " + str(checksum_hash))
-    logger.error("checksum string - " + str(checksum) + "checksum hash - " + str(checksum_hash))
+    #print("checksum string - " + str(checksum) + "checksum hash - " + str(checksum_hash))
+    #logger.error("checksum string - " + str(checksum) + "checksum hash - " + str(checksum_hash))
     return checksum_hash
 
 def html_to_pdf(html_body, filename):

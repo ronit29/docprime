@@ -10,7 +10,7 @@ from ondoc.authentication.models import UserProfile, Address
 from ondoc.api.v1.doctor.serializers import CreateAppointmentSerializer, CommaSepratedToListField
 from ondoc.api.v1.auth.serializers import AddressSerializer, UserProfileSerializer
 from ondoc.api.v1.utils import form_time_slot, GenericAdminEntity, util_absolute_url
-from ondoc.doctor.models import OpdAppointment
+from ondoc.doctor.models import OpdAppointment, CancellationReason
 from ondoc.account.models import Order, Invoice
 from ondoc.coupon.models import Coupon, RandomGeneratedCoupon
 from django.db.models import Count, Sum, When, Case, Q, F, ExpressionWrapper, DateTimeField
@@ -911,9 +911,13 @@ class LabAppointmentRetrieveSerializer(LabAppointmentModelSerializer):
     type = serializers.ReadOnlyField(default='lab')
     reports = serializers.SerializerMethodField()
     invoices = serializers.SerializerMethodField()
+    cancellation_reason = serializers.SerializerMethodField()
 
     def get_lab_test(self, obj):
         return LabAppointmentTestMappingSerializer(obj.test_mappings.all(), many=True).data
+
+    def get_cancellation_reason(self, obj):
+        return obj.get_serialized_cancellation_reason()
 
     def get_reports(self, obj):
         reports = []
@@ -946,7 +950,7 @@ class LabAppointmentRetrieveSerializer(LabAppointmentModelSerializer):
     class Meta:
         model = LabAppointment
         fields = ('id', 'type', 'lab_name', 'status', 'deal_price', 'effective_price', 'time_slot_start', 'time_slot_end','is_rated', 'rating_declined',
-                   'is_home_pickup', 'lab_thumbnail', 'lab_image', 'profile', 'allowed_action', 'lab_test', 'lab', 'otp', 'address', 'type', 'reports', 'invoices')
+                   'is_home_pickup', 'lab_thumbnail', 'lab_image', 'profile', 'allowed_action', 'lab_test', 'lab', 'otp', 'address', 'type', 'reports', 'invoices', 'cancellation_reason')
 
 
 class DoctorLabAppointmentRetrieveSerializer(LabAppointmentModelSerializer):
@@ -1166,8 +1170,8 @@ class LabPackageListSerializer(serializers.Serializer):
 
     def validate_category_ids(self, attrs):
         try:
-            temp_attrs = [int(attr) for attr in attrs]
-            if LabTestCategory.objects.filter(is_live=True, is_package_category=True, id__in=temp_attrs).count() == len(temp_attrs):
+            attrs = set(attrs)
+            if LabTestCategory.objects.filter(is_live=True, is_package_category=True, id__in=attrs).count() == len(attrs):
                 return attrs
         except:
             raise serializers.ValidationError('Invalid Category IDs')
@@ -1175,8 +1179,8 @@ class LabPackageListSerializer(serializers.Serializer):
 
     def validate_test_ids(self, attrs):
         try:
-            temp_attrs = [int(attr) for attr in attrs]
-            if LabTest.objects.filter(enable_for_retail=True, searchable=True, id__in=temp_attrs).count() == len(temp_attrs):
+            attrs = set(attrs)
+            if LabTest.objects.filter(enable_for_retail=True, searchable=True, id__in=attrs).count() == len(attrs):
                 return attrs
         except:
             raise serializers.ValidationError('Invalid Test IDs')
