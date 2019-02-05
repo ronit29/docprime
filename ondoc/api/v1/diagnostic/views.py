@@ -4,6 +4,7 @@ from ondoc.api.v1.diagnostic.serializers import CustomLabTestPackageSerializer
 from ondoc.authentication.backends import JWTAuthentication
 from ondoc.api.v1.diagnostic import serializers as diagnostic_serializer
 from ondoc.api.v1.auth.serializers import AddressSerializer
+from ondoc.cart.models import Cart
 from ondoc.common.models import UserConfig
 from ondoc.ratings_review import models as rating_models
 from ondoc.diagnostic.models import (LabTest, AvailableLabTest, Lab, LabAppointment, LabTiming, PromotedLab,
@@ -1362,11 +1363,23 @@ class LabAppointmentView(mixins.CreateModelMixin,
         data = dict(request.data)
         if not data.get("is_home_pickup"):
             data.pop("address", None)
-        serializer = diagnostic_serializer.LabAppointmentCreateSerializer(data=data, context={'request': request})
-        serializer.is_valid(raise_exception=True)
-        appointment_data = self.form_lab_app_data(request, serializer.validated_data)
 
-        resp = self.create_order(request, appointment_data, account_models.Order.LAB_PRODUCT_ID, data.get("use_wallet"))
+        serializer = diagnostic_serializer.LabAppointmentCreateSerializer(data=data, context={'request': request, 'data' : request.data, 'use_duplicate' : True})
+        serializer.is_valid(raise_exception=True)
+        validated_data = serializer.validated_data
+
+        cart_item_id = validated_data.get('cart_item').id if validated_data.get('cart_item') else None
+
+        if validated_data.get("existing_cart_item"):
+            cart_item = validated_data.get("existing_cart_item")
+        else:
+            cart_item, is_new = Cart.objects.update_or_create(id=cart_item_id, deleted_at__isnull=True, product_id=account_models.Order.LAB_PRODUCT_ID,
+                                                  user=request.user, defaults={"data": data})
+
+        if hasattr(request, 'agent') and request.agent:
+            resp = { 'is_agent': True , "status" : 1 }
+        else:
+            resp = account_models.Order.create_order(request, [cart_item], validated_data.get("use_wallet"))
 
         return Response(data=resp)
 

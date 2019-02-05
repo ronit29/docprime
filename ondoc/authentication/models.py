@@ -17,7 +17,7 @@ import random, string
 from django.contrib.contenttypes.fields import GenericForeignKey
 from django.contrib.contenttypes.models import ContentType
 from django.utils.functional import cached_property
-from datetime import date, timedelta
+from datetime import date, timedelta, datetime
 
 
 class Image(models.Model):
@@ -323,6 +323,13 @@ class User(AbstractBaseUser, PermissionsMixin):
             self.email = self.email.lower()
         return super().save(*args, **kwargs)
 
+    def get_default_profile(self):
+        default_profile = self.profiles.filter(is_default_user=True)
+        if default_profile.exists():
+            return default_profile.first()
+        else:
+            return None
+
     class Meta:
         unique_together = (("email", "user_type"), ("phone_number","user_type"))
         db_table = "auth_user"
@@ -354,6 +361,16 @@ class TimeStampedModel(models.Model):
 
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        abstract = True
+
+class SoftDeleteModel(models.Model):
+    deleted_at = models.DateTimeField(blank=True, null=True)
+
+    def mark_delete(self):
+        self.deleted_at = datetime.now()
+        self.save()
 
     class Meta:
         abstract = True
