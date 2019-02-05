@@ -251,17 +251,17 @@ class LabList(viewsets.ReadOnlyModelViewSet):
         if min_distance:
             all_packages = filter(lambda x: x.distance >= min_distance, all_packages)
         if min_price:
-            all_packages = filter(lambda x: x.price >= min_price, all_packages)
+            all_packages = filter(lambda x: x.price >= min_price if x.price is not None else False, all_packages)
         if max_price:
-            all_packages = filter(lambda x: x.price <= max_price, all_packages)
+            all_packages = filter(lambda x: x.price <= max_price if x.price is not None else False, all_packages)
         if min_age and max_age:
-            all_packages = filter(lambda x: x.min_age <= max_age and x.max_age >= min_age, all_packages)
+            all_packages = filter(lambda x: (x.min_age <= max_age if x.min_age is not None else False) and (x.max_age >= min_age if x.max_age is not None else False), all_packages)
         elif max_age:
-            all_packages = filter(lambda x: x.min_age <= max_age, all_packages)
+            all_packages = filter(lambda x: x.min_age <= max_age if x.min_age is not None else False, all_packages)
         elif min_age:
-            all_packages = filter(lambda x: x.max_age >= min_age, all_packages)
+            all_packages = filter(lambda x: x.max_age >= min_age if x.max_age is not None else False, all_packages)
         if gender:
-            all_packages = filter(lambda x: x.gender_type in [gender, LabTest.ALL], all_packages)
+            all_packages = filter(lambda x: x.gender_type in [gender, LabTest.ALL] if x.gender_type is not None else False, all_packages)
         if package_type == 1:
             all_packages = filter(lambda x: x.home_collection_possible, all_packages)
         if package_type == 2:

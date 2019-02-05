@@ -62,6 +62,7 @@ from django.contrib.staticfiles.templatetags.staticfiles import static
 from django.db.models import Avg
 from django.db.models import Count
 from ondoc.api.v1.auth import serializers as auth_serializers
+from copy import deepcopy
 
 logger = logging.getLogger(__name__)
 import random
@@ -902,8 +903,13 @@ class PrescriptionFileViewset(OndocViewSet):
         return Response(response)
 
     def prescription_permission(self, user, appointment):
-        return auth_models.GenericAdmin.objects.filter(user=user, hospital=appointment.hospital,  is_disabled=False,
-                                                       write_permission=True).exists()
+        return auth_models.GenericAdmin.objects.filter(Q(user=user, is_disabled=False),
+                                                       Q(
+                                                           Q(hospital=appointment.hospital)
+                                                            |
+                                                           Q(doctor=appointment.doctor)
+                                                       )
+                                                       ).exists()
 
 
 class SearchedItemsViewSet(viewsets.GenericViewSet):
@@ -2534,7 +2540,7 @@ class OfflineCustomerViewSet(viewsets.GenericViewSet):
                         if 'break' in update_obj and update_obj.get('break'):
                             resp.append(update_obj.get('obj'))
                             break
-
+                        old_appnt = deepcopy(appnt)
                         if data.get('patient'):
                             if not data.get('patient')['id'] in patient_ids:
                                 patient_data = self.create_patient(request, data['patient'], data['hospital'],
@@ -2546,7 +2552,7 @@ class OfflineCustomerViewSet(viewsets.GenericViewSet):
                                                                    data['doctor'])
                             patient = patient_data['patient']
                             if patient_data.get('sms_list'):
-                                patient_data['sms_list']['old_appointment'] = appnt
+                                patient_data['sms_list']['old_appointment'] = old_appnt
                                 sms_list.append(patient_data['sms_list'])
                             appnt.user = patient
                         else:
@@ -2557,7 +2563,7 @@ class OfflineCustomerViewSet(viewsets.GenericViewSet):
                                 if def_number:
                                     patient_data['sms_list'] = {'phone_number': def_number.phone_number,
                                                                 'name': patient.name,
-                                                                'old_appointment': appnt}
+                                                                'old_appointment': old_appnt}
                                     sms_list.append(patient_data['sms_list'])
 
                         if appnt.doctor.id != data.get('doctor').id or appnt.hospital.id != data.get('hospital').id:
