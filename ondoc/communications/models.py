@@ -11,10 +11,12 @@ from hardcopy import bytestring_to_pdf
 from ondoc.api.v1.utils import util_absolute_url, util_file_name, generate_short_url
 from ondoc.doctor.models import OpdAppointment
 from ondoc.diagnostic.models import LabAppointment
+from ondoc.common.models import UserConfig
 from django.core.files.uploadedfile import SimpleUploadedFile, TemporaryUploadedFile, InMemoryUploadedFile
 from django.forms import model_to_dict
 from django.template.loader import render_to_string
 from django.contrib.auth import get_user_model
+from django.contrib.postgres.fields.jsonb import KeyTransform
 import logging
 from django.conf import settings
 from django.utils import timezone
@@ -562,6 +564,8 @@ class OpdNotification(Notification):
         procedures = self.appointment.get_procedures()
         est = pytz.timezone(settings.TIME_ZONE)
         time_slot_start = self.appointment.time_slot_start.astimezone(est)
+        email_banners_html = UserConfig.objects.filter(key__iexact="email_banners") \
+                        .annotate(html_code=KeyTransform('html_code', 'data')).values_list('html_code', flat=True)[0]
         context = {
             "doctor_name": doctor_name,
             "patient_name": patient_name,
@@ -577,7 +581,8 @@ class OpdNotification(Notification):
             "time_slot_start": time_slot_start,
             "attachments": {},  # Updated later
             "screen": "appointment",
-            "type": "doctor"
+            "type": "doctor",
+            "email_banners": email_banners_html
         }
         return context
 
@@ -690,6 +695,8 @@ class LabNotification(Notification):
         time_slot_start = self.appointment.time_slot_start.astimezone(est)
         tests = self.appointment.get_tests_and_prices()
         report_file_links = instance.get_report_urls()
+        email_banners_html = UserConfig.objects.filter(key__iexact="email_banners") \
+                        .annotate(html_code=KeyTransform('html_code', 'data')).values_list('html_code', flat=True)[0]
         for test in tests:
             test['mrp'] = str(test['mrp'])
             test['deal_price'] = str(test['deal_price'])
@@ -710,7 +717,8 @@ class LabNotification(Notification):
             "reports": report_file_links,
             "attachments": {},  # Updated later
             "screen": "appointment",
-            "type": "lab"
+            "type": "lab",
+            "email_banners": email_banners_html
         }
         return context
 
