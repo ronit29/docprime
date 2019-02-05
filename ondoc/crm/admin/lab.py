@@ -895,7 +895,13 @@ class LabAppointmentAdmin(nested_admin.NestedModelAdmin):
     invoice_urls.short_description = 'Invoice(s)'
 
     def email_notification_timestamp(self, instance):
-        return str(instance.email_notification.all().values_list('created_at', flat=True))
+        time_format = '%Y-%m-%d %H:%M:%S'
+        l = instance.email_notification.all().values_list('created_at', flat=True)
+        result = []
+        for item in l:
+            formated_date = datetime.datetime.strftime(item, time_format)
+            result.append(formated_date)
+        return ", ".join(result)
     email_notification_timestamp.short_description = 'Report(s) sent at'
 
     def order_id(self, obj):
