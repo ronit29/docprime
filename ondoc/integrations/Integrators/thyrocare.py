@@ -9,7 +9,7 @@ logger = logging.getLogger(__name__)
 from datetime import timedelta, datetime
 from ondoc.integrations.models import IntegratorMapping, IntegratorProfileMapping
 from django.contrib.contenttypes.models import ContentType
-
+from ondoc.api.v1.utils import resolve_address
 
 
 class Thyrocare(BaseIntegrator):
@@ -135,47 +135,51 @@ class Thyrocare(BaseIntegrator):
 
         return True if resp_data['status'] == 'Y' else False
 
-
     def __post_order_details(self, lab_appointment, **kwargs):
         # Need to update when thyrocare API works. Static value for now
 
         tests = kwargs.get('tests', None)
         packages = kwargs.get('packages', None)
-        payload = prepare_data(tests, packages, lab_appointment)
+        payload = self.prepare_data(tests, packages, lab_appointment)
 
         headers = {'Content-Type': "application/json"}
         url = "https://www.thyrocare.com/API_BETA/ORDER.svc/Postorderdata"
 
         response = requests.post(url, data=json.dumps(payload), headers=headers)
         if response.status_code == status.HTTP_201_CREATED:
-            return True
-        return False
+            return response.json()
+
+        return None
 
     def prepare_data(self, tests, packages, lab_appointment):
         patient_address = ""
         if hasattr(lab_appointment, 'address') and lab_appointment.address:
             patient_address = resolve_address(lab_appointment.address)
 
-        if not tests:
+        payload = {
+            "api_key": settings.THYROCARE_API_KEY,
+            "orderid": lab_appointment.id,
+            "address": patient_address,
+            "pincode": "122001",
+            "product": "TEST",
+            "mobile": lab_appointment.profile.phone_number,
+            "email": lab_appointment.profile.email,
+            "service_type": "H",
+            "order_by": lab_appointment.profile.name,
+            "rate": "400",
+            "hc": "0",
+            "appt_date": "2019-02-06 05:00:00 AM",
+            "reports": "N",
+            "ref_code": "119",
+            "pay_type": "POSTPAID",
+            "bencount": "1",
+            "bendataxml": "<NewDataSet><Ben_details><Name>Mayank</Name><Age>30</Age><Gender>M</Gender></Ben_details></NewDataSet>"
+        }
 
-        else:
-            for test in tests:
-                payload = {
-                    "api_key": settings.THYROCARE_API_KEY,
-                    "orderid": lab_appointment.id,
-                    "address": patient_address,
-                    "pincode": "122001",
-                    "product": "TEST",
-                    "mobile": lab_appointment.profile.phone_number,
-                    "email": lab_appointment.profile.email,
-                    "service_type": "H",
-                    "order_by": lab_appointment.profile.name,
-                    "rate": "400",
-                    "hc": "0",
-                    "appt_date": "2019-02-06 05:00:00 AM",
-                    "reports": "N",
-                    "ref_code": "119",
-                    "pay_type": "POSTPAID",
-                    "bencount": "1",
-                    "bendataxml": "<NewDataSet><Ben_details><Name>Mayank</Name><Age>30</Age><Gender>M</Gender></Ben_details></NewDataSet>"
-                }
+        if tests:
+            pass
+
+        if packages:
+            pass
+
+        return payload

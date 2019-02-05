@@ -49,12 +49,14 @@ def push_lab_appointment_to_integrator(self, data):
             else:
                 tests.append(test)
 
-        if tests and packages[0]:
+        if not tests and not packages:
+            raise Exception('[ERROR] Could not find any test and packages for the appointment id %d' % appointment.id)
+
+        if packages:
             integrator_mapping = IntegratorProfileMapping.objects.filter(content_type=lab_network_content_type, object_id=lab_network.id, test=packages[0])
-        elif packages and tests[0]:
+        elif tests:
             integrator_mapping = IntegratorMapping.objects.filter(content_type=lab_network_content_type, object_id=lab_network.id, test=tests[0])
-        else:
-            logger.error('[ERROR]')
+
 
         integrator_obj = service.create_integrator_obj(integrator_mapping.integrator_class_name)
         integrator_response = integrator_obj.post_order(appointment, tests=tests, packages=packages)
