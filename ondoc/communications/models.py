@@ -565,7 +565,7 @@ class OpdNotification(Notification):
         est = pytz.timezone(settings.TIME_ZONE)
         time_slot_start = self.appointment.time_slot_start.astimezone(est)
         email_banners_html = UserConfig.objects.filter(key__iexact="email_banners") \
-                        .annotate(html_code=KeyTransform('html_code', 'data')).values_list('html_code', flat=True)[0]
+                    .annotate(html_code=KeyTransform('html_code', 'data')).values_list('html_code', flat=True).first()
         context = {
             "doctor_name": doctor_name,
             "patient_name": patient_name,
@@ -696,7 +696,7 @@ class LabNotification(Notification):
         tests = self.appointment.get_tests_and_prices()
         report_file_links = instance.get_report_urls()
         email_banners_html = UserConfig.objects.filter(key__iexact="email_banners") \
-                        .annotate(html_code=KeyTransform('html_code', 'data')).values_list('html_code', flat=True)[0]
+                    .annotate(html_code=KeyTransform('html_code', 'data')).values_list('html_code', flat=True).first()
         for test in tests:
             test['mrp'] = str(test['mrp'])
             test['deal_price'] = str(test['deal_price'])
