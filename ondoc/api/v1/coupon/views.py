@@ -205,7 +205,7 @@ class ApplicableCouponsViewSet(viewsets.GenericViewSet):
             if payment_option_filter and coupon.payment_option and coupon.payment_option.id != payment_option_filter.id:
                 allowed = True and show_all
                 valid = False
-                invalidating_message = "2 payment gateways cannot be used in the same transaction."
+                invalidating_message = "2 payment gateway coupons cannot be used in the same transaction."
 
             # TODO
             # if ((user_opd_completed + user_lab_completed + 1) % coupon.step_count != 0 ):
