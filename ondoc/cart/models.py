@@ -43,7 +43,7 @@ class Cart(auth_model.TimeStampedModel, auth_model.SoftDeleteModel):
 
         items_equal = True
         for key in equal_check:
-            if key in item_data and key in data and item_data[key] != data[key]:
+            if key in item_data and key in data and str(item_data[key]) != str(data[key]):
                 items_equal = False
                 continue
             if key in item_data and key not in data:
@@ -73,7 +73,12 @@ class Cart(auth_model.TimeStampedModel, auth_model.SoftDeleteModel):
         if existing_cart_items:
             for item in existing_cart_items:
                 if not cls.compare_item_data(data, item.get("data")):
-                    return False, cls.get_cart_item_by_id(item.get("id"))
+                    # if cart_item is set, we are trying to validate while updating an existing cart_item , in this case do not
+                    # send the duplicate appointment back to the caller
+                    if cart_item:
+                        return False, None
+                    else:
+                        return False, cls.get_cart_item_by_id(item.get("id"))
         return True, None
 
     @classmethod
