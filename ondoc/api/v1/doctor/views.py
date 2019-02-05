@@ -111,7 +111,6 @@ class DoctorAppointmentsViewSet(OndocViewSet):
     def list(self, request):
         user = request.user
         queryset = self.get_pem_queryset(user)
-        queryset = queryset.distinct()
         if not queryset:
             return Response([])
         serializer = serializers.AppointmentFilterSerializer(data=request.query_params)
@@ -151,7 +150,7 @@ class DoctorAppointmentsViewSet(OndocViewSet):
 
         if date:
             queryset = queryset.filter(time_slot_start__date=date)
-
+        queryset = queryset.distinct('id', 'time_slot_start')
         queryset = paginate_queryset(queryset, request)
         serializer = serializers.DoctorAppointmentRetrieveSerializer(queryset, many=True, context={'request': request})
         return Response(serializer.data)
