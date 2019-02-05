@@ -3,7 +3,7 @@ from ondoc.api.v1.utils import format_iso_date
 from ondoc.authentication import models as auth_model
 from ondoc.account.models import Order
 from django.contrib.postgres.fields import JSONField
-
+from datetime import date, timedelta, datetime
 
 class Cart(auth_model.TimeStampedModel, auth_model.SoftDeleteModel):
 
@@ -11,6 +11,14 @@ class Cart(auth_model.TimeStampedModel, auth_model.SoftDeleteModel):
     user = models.ForeignKey(auth_model.User, on_delete=models.CASCADE)
     deleted_at = models.DateTimeField(blank=True, null=True)
     data = JSONField()
+
+    @classmethod
+    def remove_all(cls, user):
+        try:
+            curr_time = datetime.now()
+            cls.objects.filter(user=user, deleted_at__isnull=True).update(deleted_at=curr_time)
+        except Exception as e:
+            pass
 
     @classmethod
     def get_free_opd_item_count(cls, request, cart_item=None):

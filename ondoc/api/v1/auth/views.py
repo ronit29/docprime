@@ -1511,6 +1511,8 @@ class OrderViewSet(GenericViewSet):
     @transaction.non_atomic_requests
     def retrieve(self, request, pk):
         user = request.user
+        params = request.query_params
+        from_app = params.get("from_app", False)
         order_obj = Order.objects.filter(pk=pk, payment_status=Order.PAYMENT_PENDING).first()
         if not order_obj.validate_user(user):
             return Response({"status": 0}, status.HTTP_404_NOT_FOUND)
@@ -1520,6 +1522,11 @@ class OrderViewSet(GenericViewSet):
 
         if not order_obj:
             return Response(resp)
+
+        # remove all cart_items => Workaround TODO: remove later
+        if from_app:
+            from ondoc.cart.models import Cart
+            Cart.remove_all(user)
 
         resp["status"] = 1
         resp['data'], resp["payment_required"] = utils.payment_details(request, order_obj)
