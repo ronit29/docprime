@@ -10,7 +10,7 @@ from django.conf import settings
 from django.utils.dateparse import parse_datetime
 from ondoc.authentication.models import Merchant, AssociatedMerchant
 from ondoc.account.models import MerchantPayout
-from ondoc.common.models import Cities, MatrixCityMapping, PaymentOptions
+from ondoc.common.models import Cities, MatrixCityMapping, PaymentOptions, Remark
 from import_export import resources, fields
 from import_export.admin import ImportMixin, base_formats, ImportExportMixin, ImportExportModelAdmin
 from reversion.admin import VersionAdmin
@@ -23,6 +23,7 @@ from import_export.admin import ImportExportMixin
 from ondoc.diagnostic.models import Lab, LabAppointment
 from ondoc.doctor.models import Hospital, Doctor, OpdAppointment
 from django.db.models import Q
+from django import forms
 
 
 def practicing_since_choices():
@@ -435,3 +436,34 @@ class PaymentOptionsAdmin(admin.ModelAdmin):
     model = PaymentOptions
     list_display = ['name', 'description', 'is_enabled']
     search_fields = ['name']
+
+
+# class RemarkInlineForm(forms.ModelForm):
+#     # content = forms.CharField(widget=forms.Textarea, required=False)
+#     # print(content)
+#
+#     class Meta:
+#         model = Remark
+#         fields = ('__all__')
+#
+#     def __init__(self, *args, **kwargs):
+#         a=5
+#         super(RemarkInlineForm, self).__init__(*args, **kwargs)
+
+
+
+class RemarkInline(GenericTabularInline, nested_admin.NestedTabularInline):
+    can_delete = True
+    extra = 0
+    model = Remark
+    show_change_link = False
+    readonly_fields = ['user']
+    fields = ['user', 'content']
+    # form = RemarkInlineForm
+
+    # def get_readonly_fields(self, request, obj=None):
+    #     print(self)
+    #     editable_fields = ['user']
+    #     if obj:
+    #         editable_fields += ['content']
+    #     return editable_fields

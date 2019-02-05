@@ -33,7 +33,7 @@ from ondoc.notification import tasks as notification_tasks
 from django.contrib.contenttypes.fields import GenericRelation
 from ondoc.api.v1.utils import get_start_end_datetime, custom_form_datetime, CouponsMixin, aware_time_zone, \
     util_absolute_url, html_to_pdf
-from ondoc.common.models import AppointmentHistory
+from ondoc.common.models import AppointmentHistory, Remark
 from functools import reduce
 from operator import or_
 import logging
@@ -188,6 +188,7 @@ class Hospital(auth_model.TimeStampedModel, auth_model.CreatedByModel, auth_mode
     disable_comments = models.CharField(max_length=500, blank=True)
     disabled_by = models.ForeignKey(settings.AUTH_USER_MODEL, related_name="disabled_hospitals", null=True, editable=False,
                                     on_delete=models.SET_NULL)
+    remark = GenericRelation(Remark)
 
     def __str__(self):
         return self.name

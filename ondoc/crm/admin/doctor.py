@@ -54,7 +54,7 @@ from django.contrib.admin.widgets import AdminSplitDateTime
 from ondoc.authentication import models as auth_model
 from django import forms
 from decimal import Decimal
-from .common import AssociatedMerchantInline
+from .common import AssociatedMerchantInline, RemarkInline
 from ondoc.sms import api
 
 class AutoComplete:
@@ -1040,7 +1040,8 @@ class DoctorAdmin(AutoComplete, ImportExportMixin, VersionAdmin, ActionAdmin, QC
         DoctorImageInline,
         DoctorDocumentInline,
         GenericAdminInline,
-        AssociatedMerchantInline
+        AssociatedMerchantInline,
+        RemarkInline
     ]
 
     search_fields = ['name']
@@ -1209,6 +1210,9 @@ class DoctorAdmin(AutoComplete, ImportExportMixin, VersionAdmin, ActionAdmin, QC
                 if (not instance.id):
                     instance.source_type = GenericAdmin.CRM
                     instance.entity_type = GenericAdmin.DOCTOR
+            if isinstance(instance, Remark):
+                if (not instance.user):
+                    instance.user = request.user
             instance.save()
         formset.save_m2m()
 

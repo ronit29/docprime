@@ -6,6 +6,7 @@ from django.contrib.contenttypes.models import ContentType
 from ondoc.authentication.models import TimeStampedModel
 # from ondoc.doctor.models import OpdAppointment
 # from ondoc.diagnostic.models import LabAppointment
+from ondoc.authentication import models as auth_model
 
 
 class Cities(models.Model):
@@ -71,3 +72,14 @@ class UserConfig(TimeStampedModel):
 
     class Meta:
         db_table = 'user_config'
+
+
+class Remark(auth_model.TimeStampedModel):
+    content_type = models.ForeignKey(ContentType, on_delete=models.DO_NOTHING)
+    object_id = models.PositiveIntegerField()
+    content_object = GenericForeignKey()
+    user = models.ForeignKey(auth_model.User, on_delete=models.SET_NULL, null=True, blank=True)
+    content = models.TextField(null=True, blank=True)
+
+    class Meta:
+        db_table = 'remark'
