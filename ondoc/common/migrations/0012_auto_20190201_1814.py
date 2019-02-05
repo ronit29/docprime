@@ -10,14 +10,14 @@ class Migration(migrations.Migration):
     ]
 
     operations = [
-        migrations.AddField(
-            model_name='paymentoptions',
-            name='payment_gateway',
-            field=models.TextField(blank=True, default=''),
-        ),
-        migrations.AddField(
-            model_name='paymentoptions',
-            name='priority',
-            field=models.IntegerField(default=0, null=True),
-        ),
+        # migrations.AddField(
+        #     model_name='paymentoptions',
+        #     name='payment_gateway',
+        #     field=models.TextField(blank=True, default=''),
+        # ),
+        # migrations.AddField(
+        #     model_name='paymentoptions',
+        #     name='priority',
+        #     field=models.IntegerField(default=0, null=True),
+        # ),
     ]

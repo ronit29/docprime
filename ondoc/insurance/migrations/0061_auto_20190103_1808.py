@@ -20,7 +20,7 @@ class Migration(migrations.Migration):
             name='receipt_number',
             field=models.BigIntegerField(default=0),
         ),
-        migrations.RunSQL(
-            '''CREATE SEQUENCE IF NOT EXISTS userinsurance_policy_reciept_seq START 1;'''
-        ),
+        # migrations.RunSQL(
+        #     '''CREATE SEQUENCE IF NOT EXISTS userinsurance_policy_reciept_seq START 1;'''
+        # ),
     ]
