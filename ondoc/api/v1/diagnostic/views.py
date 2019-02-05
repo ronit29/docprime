@@ -191,7 +191,7 @@ class LabList(viewsets.ReadOnlyModelViewSet):
         max_distance = max_distance*1000 if max_distance is not None else 10000
         lab_tests_with_categories = LabTestCategoryMapping.objects.filter(parent_category__isnull=False).values_list(
             'lab_test', flat=True).distinct()
-        all_packages_in_network_labs = LabTest.objects.prefetch_related('test').filter(enable_for_retail=True,
+        all_packages_in_network_labs = LabTest.objects.prefetch_related('test', 'categories').filter(enable_for_retail=True,
                                                                                        searchable=True, is_package=True,
                                                                                        availablelabs__enabled=True,
                                                                                        availablelabs__lab_pricing_group__labs__is_live=True,
@@ -211,7 +211,7 @@ class LabList(viewsets.ReadOnlyModelViewSet):
                         partition_by=[F(
                             'availablelabs__lab_pricing_group__labs__network'), F('id')]))
 
-        all_packages_in_non_network_labs = LabTest.objects.prefetch_related('test').filter(enable_for_retail=True,
+        all_packages_in_non_network_labs = LabTest.objects.prefetch_related('test', 'categories').filter(enable_for_retail=True,
                                                                                            searchable=True,
                                                                                            is_package=True,
                                                                                            availablelabs__enabled=True,
