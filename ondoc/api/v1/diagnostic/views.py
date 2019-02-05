@@ -58,7 +58,7 @@ from django.contrib.auth import get_user_model
 from ondoc.matrix.tasks import push_order_to_matrix
 from django.contrib.gis.geos import Point
 from django.contrib.gis.measure import D
-from django.db.models.expressions import Window, OuterRef, Subquery
+from django.db.models.expressions import Window
 from django.db.models.functions import RowNumber
 from django.db.models import Avg
 User = get_user_model()
@@ -72,27 +72,16 @@ class SearchPageViewSet(viewsets.ReadOnlyModelViewSet):
         count = int(count)
         if count <= 0:
             count = 10
-        test_queryset = CommonTest.objects.select_related('test').filter(test__enable_for_retail=True,
-                                                                         test__searchable=True)[:count]
+        test_queryset = CommonTest.objects.select_related('test').filter(test__enable_for_retail=True, test__searchable=True)[:count]
         conditions_queryset = CommonDiagnosticCondition.objects.prefetch_related('lab_test').all()
         lab_queryset = PromotedLab.objects.select_related('lab').filter(lab__is_live=True, lab__is_test_lab=False)
-        # package_queryset = CommonPackage.objects.prefetch_related('package').filter(package__enable_for_retail=True, package__searchable=True)[:count]
-        deal_price_calculation = Case(When(custom_deal_price__isnull=True, then=F('computed_deal_price')),
-                                      When(custom_deal_price__isnull=False, then=F('custom_deal_price')))
-        package_queryset = CommonPackage.objects.prefetch_related('package__availablelabs').filter(
-            package__enable_for_retail=True,
-            package__searchable=True).annotate(
-            alt=Subquery(AvailableLabTest.objects.filter(test_id=OuterRef('package_id'), enabled=True).annotate(
-                dp=deal_price_calculation).order_by('dp').values('pk')[:1]))
-        test_serializer = diagnostic_serializer.CommonTestSerializer(test_queryset, many=True,
-                                                                     context={'request': request})
-        recommended_package_qs = LabTestCategory.objects.prefetch_related('recommended_lab_tests__parameter').filter(
-            is_live=True,
-            show_on_recommended_screen=True,
-            recommended_lab_tests__searchable=True,
-            recommended_lab_tests__enable_for_retail=True).distinct()[:count]
-        package_serializer = diagnostic_serializer.CommonPackageSerializer(package_queryset, many=True,
-                                                                           context={'request': request})
+        package_queryset = CommonPackage.objects.prefetch_related('package').filter(package__enable_for_retail=True, package__searchable=True)[:count]
+        recommended_package_qs = LabTestCategory.objects.prefetch_related('recommended_lab_tests__parameter').filter(is_live=True,
+                                                                                                          show_on_recommended_screen=True,
+                                                                                                          recommended_lab_tests__searchable=True,
+                                                                                                          recommended_lab_tests__enable_for_retail=True).distinct()[:count]
+        test_serializer = diagnostic_serializer.CommonTestSerializer(test_queryset, many=True, context={'request': request})
+        package_serializer = diagnostic_serializer.CommonPackageSerializer(package_queryset, many=True, context={'request': request})
         lab_serializer = diagnostic_serializer.PromotedLabsSerializer(lab_queryset, many=True)
         condition_serializer = diagnostic_serializer.CommonConditionsSerializer(conditions_queryset, many=True)
         recommended_package = diagnostic_serializer.RecommendedPackageCategoryList(recommended_package_qs, many=True)

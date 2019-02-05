@@ -567,7 +567,7 @@ def refund_completed_sms_task(obj_id):
         instance = ConsumerRefund.objects.filter(id=obj_id).first()
         if not instance or not instance.user or ConsumerRefund.objects.filter(
                 consumer_transaction_id=instance.consumer_transaction_id,
-                refund_state=ConsumerRefund.PENDING).count() > 1:
+                refund_state__in=[ConsumerRefund.PENDING, ConsumerRefund.REQUESTED]).count() > 1:
             return
         context = {'amount': instance.consumer_transaction.amount}
         receivers = instance.user.get_phone_number_for_communication()
@@ -587,8 +587,13 @@ def refund_breakup_sms_task(obj_id):
         instance = ConsumerTransaction.objects.filter(id=obj_id).first()
         if not instance or not instance.user:
             return
-        context = {'amount': instance.amount}
-        receivers
+        amount_breakup = []
+        for consumer_refund in instance.pg_refund.all():
+            if consumer_refund.pg_transaction:
+                amount_breakup.append(
+                    {'name': consumer_refund.pg_transaction.bank_name, 'amount': consumer_refund.refund_amount})
+        context = {'amount': instance.amount, 'amount_breakup': amount_breakup}
+        receivers = instance.user.get_phone_number_for_communication()
         sms_notification = SMSNotification(NotificationAction.REFUND_BREAKUP, context)
         sms_notification.send(receivers)
     except Exception as e:
