@@ -199,6 +199,7 @@ class CreateAppointmentSerializer(serializers.Serializer):
         request = self.context.get("request")
         unserialized_data = self.context.get("data")
         cart_item_id = data.get('cart_item').id if data.get('cart_item') else None
+        use_duplicate = self.context.get("use_duplicate", False)
         time_slot_start = (form_time_slot(data.get('start_date'), data.get('start_time'))
                            if not data.get("time_slot_start") else data.get("time_slot_start"))
 
@@ -300,9 +301,14 @@ class CreateAppointmentSerializer(serializers.Serializer):
                         raise serializers.ValidationError('Invalid coupon code - ' + str(coupon))
                 data["coupon_obj"] = list(coupon_obj)
 
-
-        if unserialized_data and not Cart.validate_duplicate(unserialized_data, request.user, Order.DOCTOR_PRODUCT_ID, cart_item_id):
-            raise serializers.ValidationError("Item already exists in cart.")
+        data["existing_cart_item"] = None
+        if unserialized_data:
+            is_valid, duplicate_cart_item = Cart.validate_duplicate(unserialized_data, request.user, Order.DOCTOR_PRODUCT_ID, cart_item_id)
+            if not is_valid:
+                if use_duplicate and duplicate_cart_item:
+                    data["existing_cart_item"] = duplicate_cart_item
+                else:
+                    raise serializers.ValidationError("Item already exists in cart.")
 
         if OpdAppointment.objects.filter(profile=data.get("profile"), doctor=data.get("doctor"),
                                          hospital=data.get("hospital"), procedures__in=data.get("procedure_ids", []),

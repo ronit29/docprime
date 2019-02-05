@@ -65,12 +65,20 @@ class Cart(auth_model.TimeStampedModel, auth_model.SoftDeleteModel):
 
     @classmethod
     def validate_duplicate(cls, data, user, product_id, cart_item=None):
+        '''
+        This method will compare a given cart_item data to all items present in cart.
+        If any duplicate item is found , it will return the same.
+        '''
         existing_cart_items = Cart.objects.filter(deleted_at__isnull=True, user=user, product_id=product_id).values('id', 'data').exclude(id=cart_item)
         if existing_cart_items:
             for item in existing_cart_items:
                 if not cls.compare_item_data(data, item.get("data")):
-                    return False
-        return True
+                    return False, cls.get_cart_item_by_id(item.get("id"))
+        return True, None
+
+    @classmethod
+    def get_cart_item_by_id(cls, item_id):
+        return cls.objects.filter(id=item_id).first()
 
     def validate(self, request):
         from ondoc.api.v1.doctor.serializers import CreateAppointmentSerializer

@@ -1040,9 +1040,12 @@ class TransactionViewSet(viewsets.GenericViewSet):
 #         OPD_FAILURE_REDIRECT_URL = settings.BASE_URL + "/opd/doctor/%s/%s/bookdetails?error_code=%s"
 #         ERROR_REDIRECT_URL = settings.BASE_URL + "/error?error_code=%s"
 #         REDIRECT_URL = ERROR_REDIRECT_URL % ErrorCodeMapping.IVALID_APPOINTMENT_ORDER
-        ERROR_REDIRECT_URL = settings.BASE_URL + "/cart?error_message=%s"
+
+        ERROR_REDIRECT_URL = settings.BASE_URL + "/cart?error_code=1&error_message=%s"
         REDIRECT_URL = ERROR_REDIRECT_URL % "Error processing payment, please try again."
         SUCCESS_REDIRECT_URL = settings.BASE_URL + "/order/summary/%s"
+        LAB_REDIRECT_URL = settings.BASE_URL + "/lab/appointment"
+        OPD_REDIRECT_URL = settings.BASE_URL + "/opd/appointment"
 
         try:
             response = None
@@ -1061,6 +1064,7 @@ class TransactionViewSet(viewsets.GenericViewSet):
             # For testing only
             # response = request.data
             success_in_process = False
+            processed_data = {}
 
             try:
                 pg_resp_code = int(response.get('statusCode'))
@@ -1086,7 +1090,7 @@ class TransactionViewSet(viewsets.GenericViewSet):
 
                         try:
                             if pg_tx_queryset:
-                                order_obj.process_pg_order()
+                                processed_data = order_obj.process_pg_order()
                                 success_in_process = True
                         except Exception as e:
                             logger.error("Error in processing order - " + str(e))
@@ -1127,7 +1131,12 @@ class TransactionViewSet(viewsets.GenericViewSet):
 #                         REDIRECT_URL = INSURANCE_FAILURE_REDIRECT_URL % (order_obj.action_data,
 #                                                                    response.get('statusCode'))
                 if success_in_process:
-                    REDIRECT_URL = SUCCESS_REDIRECT_URL % order_obj.id
+                    if processed_data.get("type") == "all":
+                        REDIRECT_URL = SUCCESS_REDIRECT_URL % order_obj.id
+                    elif processed_data.get("type") == "doctor":
+                        REDIRECT_URL = OPD_REDIRECT_URL + "/" + str(processed_data.get("id","")) + "?payment_success=true"
+                    elif processed_data.get("type") == "lab":
+                        REDIRECT_URL = LAB_REDIRECT_URL + "/" + str(processed_data.get("id","")) + "?payment_success=true"
 
         except Exception as e:
             logger.error("Error - " + str(e))

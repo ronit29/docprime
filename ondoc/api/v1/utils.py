@@ -605,13 +605,13 @@ class CouponsMixin(object):
                         or (coupon_obj.age_end and (not user_age or coupon_obj.age_end < user_age)) ):
                     return {"is_valid": False, "used_count": None}
 
+                from ondoc.cart.models import Cart
+                payment_option_filter = Cart.get_pg_if_pgcoupon(user, cart_item)
+                if payment_option_filter and coupon_obj.payment_option and coupon_obj.payment_option.id != payment_option_filter.id:
+                    return {"is_valid": False, "used_count": 0}
+
             count = coupon_obj.used_coupon_count(user, cart_item)
             total_used_count = coupon_obj.total_used_coupon_count()
-
-            from ondoc.cart.models import Cart
-            payment_option_filter = Cart.get_pg_if_pgcoupon(user, cart_item)
-            if payment_option_filter and coupon_obj.payment_option and coupon_obj.payment_option.id != payment_option_filter.id:
-                return {"is_valid": False, "used_count": count}
 
             if coupon_obj.is_user_specific and user:
                 user_specefic = UserSpecificCoupon.objects.filter(user=user, coupon=coupon_obj).first()
