@@ -15,7 +15,7 @@ from ondoc.authentication.admin import SPOCDetailsInline
 from django import forms
 from ondoc.api.v1.utils import GenericAdminEntity
 import nested_admin
-from .common import AssociatedMerchantInline
+from .common import AssociatedMerchantInline, RemarkInline
 
 
 class HospitalImageInline(admin.TabularInline):
@@ -289,6 +289,9 @@ class HospitalAdmin(admin.GeoModelAdmin, VersionAdmin, ActionAdmin, QCPemAdmin):
                 if (not instance.id):
                     instance.entity_type = GenericAdmin.HOSPITAL
                     instance.source_type = GenericAdmin.CRM
+            if isinstance(instance, Remark):
+                if (not instance.user):
+                    instance.user = request.user
             instance.save()
         formset.save_m2m()
 
@@ -334,7 +337,8 @@ class HospitalAdmin(admin.GeoModelAdmin, VersionAdmin, ActionAdmin, QCPemAdmin):
         HospitalCertificationInline,
         GenericAdminInline,
         SPOCDetailsInline,
-        AssociatedMerchantInline
+        AssociatedMerchantInline,
+        RemarkInline
     ]
 
     map_width = 200
