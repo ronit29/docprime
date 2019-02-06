@@ -5,6 +5,9 @@ jQuery(document).ready(function(){
         jQuery("div.field-cancellation_reason").hide();
         jQuery("div.field-cancellation_comments").hide();
         var status = jQuery("div.field-status select option:selected").val();
+        var cancelled_status = jQuery("div.field-status div.readonly").text();
+        console.log(cancelled_status);
+
         if(status==6){
                 jQuery("div.field-cancel_type").show();
                 jQuery("div.field-cancellation_reason").show();
@@ -28,6 +31,11 @@ jQuery(document).ready(function(){
                     jQuery("div.field-cancellation_comments").hide();
             }
         });
+        if(cancelled_status.toLowerCase() == 'cancelled'){
+        console.log('test');
+                jQuery("div.field-cancellation_reason").show();
+                jQuery("div.field-cancellation_comments").show();
+        }
     }
 	jQuery('body').on('change','#doctormobile_set-group .field-is_primary input', function() {
 	    jQuery(this).closest('#doctormobile_set-group').find('.field-is_primary input').not(this).prop('checked',false)

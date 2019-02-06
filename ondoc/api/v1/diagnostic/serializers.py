@@ -1,5 +1,7 @@
 from rest_framework import serializers
 from rest_framework.fields import CharField
+
+from ondoc.cart.models import Cart
 from ondoc.diagnostic.models import (LabTest, AvailableLabTest, Lab, LabAppointment, LabTiming, PromotedLab,
                                      CommonTest, CommonDiagnosticCondition, LabImage, LabReportFile, CommonPackage,
                                      LabTestCategory, LabAppointmentTestMapping)
@@ -602,12 +604,17 @@ class LabAppointmentCreateSerializer(serializers.Serializer):
     payment_type = serializers.IntegerField(default=OpdAppointment.PREPAID)
     coupon_code = serializers.ListField(child=serializers.CharField(), required=False, default=[])
     use_wallet = serializers.BooleanField(required=False)
+    cart_item = serializers.PrimaryKeyRelatedField(queryset=Cart.objects.all(), required=False, allow_null=True)
 
     def validate(self, data):
         MAX_APPOINTMENTS_ALLOWED = 10
         ACTIVE_APPOINTMENT_STATUS = [LabAppointment.BOOKED, LabAppointment.ACCEPTED,
                                      LabAppointment.RESCHEDULED_PATIENT, LabAppointment.RESCHEDULED_LAB]
+
         request = self.context.get("request")
+        unserialized_data = self.context.get("data")
+        cart_item_id = data.get('cart_item').id if data.get('cart_item') else None
+        use_duplicate = self.context.get("use_duplicate", False)
 
         if not utils.is_valid_testing_lab_data(request.user, data["lab"]):
             raise serializers.ValidationError("Both User and Lab should be for testing")
@@ -656,7 +663,7 @@ class LabAppointmentCreateSerializer(serializers.Serializer):
             if coupon_obj:
                 for coupon in coupon_obj:
                     obj = LabAppointment()
-                    if obj.validate_user_coupon(user=request.user, coupon_obj=coupon, profile=profile).get("is_valid"):
+                    if obj.validate_user_coupon(cart_item=cart_item_id, user=request.user, coupon_obj=coupon, profile=profile).get("is_valid"):
                         if not obj.validate_product_coupon(coupon_obj=coupon,
                                                            lab=data.get("lab"), test=data.get("test_ids"),
                                                            product_id=Order.LAB_PRODUCT_ID):
@@ -664,6 +671,24 @@ class LabAppointmentCreateSerializer(serializers.Serializer):
                     else:
                         raise serializers.ValidationError('Invalid coupon code - ' + str(coupon))
                 data["coupon_obj"] = list(coupon_obj)
+
+        
+        data["existing_cart_item"] = None
+        if unserialized_data:
+            is_valid, duplicate_cart_item = Cart.validate_duplicate(unserialized_data, request.user, Order.LAB_PRODUCT_ID, cart_item_id)
+            if not is_valid:
+                if use_duplicate and duplicate_cart_item:
+                    data["existing_cart_item"] = duplicate_cart_item
+                else:
+                    raise serializers.ValidationError("Item already exists in cart.")
+
+        time_slot_start = (form_time_slot(data.get('start_date'), data.get('start_time'))
+                           if not data.get("time_slot_start") else data.get("time_slot_start"))
+
+        if LabAppointment.objects.filter(profile=data.get("profile"), lab=data.get("lab"),
+                                         tests__in=data.get("test_ids"), time_slot_start=time_slot_start) \
+                .exclude(status__in=[LabAppointment.COMPLETED, LabAppointment.CANCELLED]).exists():
+            raise serializers.ValidationError("One active appointment for the selected date & time already exists. Please change the date & time of the appointment.")
 
         if 'use_wallet' in data and data['use_wallet'] is False:
             data['use_wallet'] = False
@@ -1041,12 +1066,13 @@ class CustomLabTestPackageSerializer(serializers.ModelSerializer):
     pickup_charges = serializers.SerializerMethodField()
     pickup_available = serializers.SerializerMethodField()
     distance_related_charges = serializers.SerializerMethodField()
+    categories = serializers.SerializerMethodField()
 
     class Meta:
         model = LabTest
         fields = ('id', 'name', 'lab', 'mrp', 'distance', 'price', 'lab_timing', 'lab_timing_data', 'next_lab_timing',
                   'next_lab_timing_data', 'test_type', 'is_package', 'number_of_tests', 'why', 'pre_test_info', 'is_package',
-                  'pickup_charges', 'pickup_available', 'distance_related_charges', 'priority', 'show_details')
+                  'pickup_charges', 'pickup_available', 'distance_related_charges', 'priority', 'show_details', 'categories')
 
     def get_lab(self, obj):
         lab_data = self.context.get('lab_data', {})
@@ -1057,6 +1083,17 @@ class CustomLabTestPackageSerializer(serializers.ModelSerializer):
             return CustomPackageLabSerializer(data,
                                               context={'entity_url_dict': entity_url_dict, 'request': request}).data
         return None
+
+    def get_categories(self, obj):
+        queryset = obj.categories.all()
+        res = []
+        for data in queryset:
+            resp = {}
+            resp['id'] = data.id
+            resp['name'] = data.name
+            res.append(resp)
+
+        return res
 
     def get_distance(self, obj):
         return int(obj.distance.m)
