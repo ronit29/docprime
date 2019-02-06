@@ -109,7 +109,7 @@ class Thyrocare(BaseIntegrator):
 
             obj.form_time_slots(datetime.strptime(date, '%d-%m-%Y').weekday(), start, end, None, True)
 
-        resp_list = obj.get_timing_list(is_thyrocare=True)
+        resp_list = obj.get_timing_slots(date, is_thyrocare=True)
         is_home_pickup = kwargs.get('is_home_pickup', False)
         today_min, tomorrow_min, today_max = obj.initial_start_times(is_thyrocare=True, is_home_pickup=is_home_pickup, time_slots=resp_list)
 

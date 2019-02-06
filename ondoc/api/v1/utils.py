@@ -8,7 +8,6 @@ from django.db import connection, transaction
 from django.db.models import F, Func, Q, Count, Sum, Case, When, Value, IntegerField
 from django.utils import timezone
 import math
-import datetime
 import pytz
 import calendar
 from django.contrib.auth import get_user_model
@@ -31,6 +30,7 @@ from django.utils.dateparse import parse_datetime
 import hashlib
 from ondoc.authentication import models as auth_models
 import logging
+from datetime import datetime, timedelta
 logger = logging.getLogger(__name__)
 
 User = get_user_model()
@@ -794,7 +794,7 @@ class TimeSlotExtraction(object):
         time = form_dc_time(time, am_pm)
         return time
 
-    def get_timing_list(self, is_thyrocare=False):
+    def get_timing_list(self):
         whole_timing_data = dict()
         for i in range(7):
             whole_timing_data[i] = list()
@@ -805,11 +805,36 @@ class TimeSlotExtraction(object):
                 # whole_timing_data[i].append(self.format_data(self.timing[i]['timing'][self.AFTERNOON], self.AFTERNOON, pa))
                 whole_timing_data[i].append(self.format_data(self.timing[i]['timing'][self.EVENING], self.EVENING, pa))
 
+        return whole_timing_data
+
+    def get_timing_slots(self, date, is_thyrocare=False):
+        date = datetime.strptime(date, '%d-%m-%Y')
+        day = date.weekday()
+        whole_timing_data = OrderedDict()
+        j = 0
         if is_thyrocare:
-            whole_timing_data = dict([(k, v) for k, v in whole_timing_data.items() if len(v) > 0])
-            return whole_timing_data
+            self.get_slots(date, day, j, whole_timing_data)
         else:
-            return whole_timing_data
+            for k in range(4):
+                for i in range(7):
+                    if k == 0:
+                        if i >= day:
+                            self.get_slots(date, i, j, whole_timing_data)
+                            j = j + 1
+                    else:
+                        self.get_slots(date, i, j, whole_timing_data)
+                        j = j + 1
+        return whole_timing_data
+
+    def get_slots(self, date, i, j, whole_timing_data):
+        converted_date = (date + timedelta(days=j)).strftime('%d-%m-%Y')
+        whole_timing_data[converted_date] = list()
+        pa = self.price_available[i]
+        if self.timing[i].get('timing'):
+            whole_timing_data[converted_date].append(
+                self.format_data(self.timing[i]['timing'][self.MORNING], self.MORNING, pa))
+            whole_timing_data[converted_date].append(
+                self.format_data(self.timing[i]['timing'][self.EVENING], self.EVENING, pa))
 
     def format_data(self, data, day_time, pa):
         data_list = list()
@@ -832,7 +857,7 @@ class TimeSlotExtraction(object):
         tomorrow_min = None
         today_max = None
 
-        now = datetime.datetime.now()
+        now = datetime.now()
         curr_time = now.hour
         curr_minute = round(round(float(now.minute) / 60, 2) * 2) / 2
         curr_time += curr_minute

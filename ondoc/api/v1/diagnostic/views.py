@@ -1647,16 +1647,13 @@ class LabTimingListView(mixins.ListModelMixin,
             }
         return Response(resp_data)
 
-
     def time_slot(self, request, *args, **kwargs):
         params = request.query_params
-
         for_home_pickup = True if int(params.get('pickup', 0)) else False
         lab = params.get('lab')
 
         from ondoc.integrations import service
         pincode = params.get('pincode')
-        # is_package = params.get('is_package')
         date = params.get('date')
         integration_dict = None
         if lab:
@@ -1665,7 +1662,7 @@ class LabTimingListView(mixins.ListModelMixin,
                 integration_dict = IntegratorMapping.get_if_third_party_integration(network_id=lab_obj.network.id)
 
         if not integration_dict:
-            resp_data = LabTiming.timing_manager.lab_booking_slots(lab__id=lab, lab__is_live=True,
+            resp_data = LabTiming.timing_manager.lab_timings_slots(date, lab__id=lab, lab__is_live=True,
                                                                    for_home_pickup=for_home_pickup)
         else:
             class_name = integration_dict['class_name']
