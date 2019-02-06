@@ -718,10 +718,9 @@ class LabAppointmentForm(forms.ModelForm):
             raise forms.ValidationError("Reason for Cancelled appointment should be set.")
 
         if cleaned_data.get('status') is LabAppointment.CANCELLED and cleaned_data.get(
-                'cancellation_reason') and 'others' in cleaned_data.get(
-                'cancellation_reason').name.lower() and not cleaned_data.get('cancellation_comments'):
+                'cancellation_reason', None) and cleaned_data.get('cancellation_reason').is_comment_needed and not cleaned_data.get('cancellation_comments'):
             raise forms.ValidationError(
-                "If Reason for Cancelled appointment is others it should be mentioned in cancellation comment.")
+                "Cancellation comments must be mentioned for selected cancellation reason.")
 
         if not lab.lab_pricing_group:
             raise forms.ValidationError("Lab is not in any lab pricing group.")
