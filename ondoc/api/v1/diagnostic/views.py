@@ -1865,11 +1865,12 @@ class TestDetailsViewset(viewsets.GenericViewSet):
                     for pack in queryset:
                         pack_list = []
                         for ptest in pack.test.all():
-                            resp = {}
-                            resp['name'] = ptest.name
-                            resp['id'] = ptest.id
-                            resp['parameters'] = ptest.parameter.values_list('name', flat=True)
-                            pack_list.append(resp)
+                            if ptest.searchable == True and ptest.enable_for_retail == True:
+                                resp = {}
+                                resp['name'] = ptest.name
+                                resp['id'] = ptest.id
+                                resp['parameters'] = ptest.parameter.values_list('name', flat=True)
+                                pack_list.append(resp)
             result['this_package_will_include'] = {'title': 'This package will include', 'Tests': pack_list}
 
             queryset1 = data.faq.all()
