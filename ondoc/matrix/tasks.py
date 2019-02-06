@@ -11,6 +11,8 @@ import datetime
 from datetime import date
 from ondoc.authentication.models import Address
 from ondoc.api.v1.utils import resolve_address
+from ondoc.common.models import AppointmentMaskNumber
+
 logger = logging.getLogger(__name__)
 
 
@@ -160,6 +162,30 @@ def prepare_and_hit(self, data):
     else:
         logger.info("[ERROR] Appointment could not be published to the matrix system")
 
+def generate_mask_number(appointment):
+    phone_number = appointment.user.phone_number
+    time_slot = appointment.time_slot_start
+    updated_time_slot = time_slot + datetime.timedelta(days=1)
+    validity_up_to = int((time_slot + datetime.timedelta(days=1)).timestamp())
+    if phone_number:
+        request_data = {
+                "ExpirationDate": validity_up_to,
+                "FromId": appointment.id,
+                "ToNumber": phone_number
+        }
+        url = settings.MATRIX_NUMBER_MASKING
+        matrix_api_token = settings.MATRIX_API_TOKEN
+        response = requests.post(url, data=json.dumps(request_data), headers={'Authorization': matrix_api_token,
+                                                                              'Content-Type': 'application/json'})
+
+        if response.status_code != status.HTTP_200_OK or not response.ok:
+            logger.info("[ERROR] Appointment could not be get Mask Number")
+            logger.info("[ERROR] %s", response.reason)
+        else:
+            mask_number = str(response.text)
+            AppointmentMaskNumber.objects.create(content_object=appointment, mask_number=mask_number,
+                                         validity_up_to=updated_time_slot)
+
 
 def calculate_age(appointment):
     if not appointment.profile:
@@ -232,6 +258,7 @@ def push_appointment_to_matrix(self, data):
         # Preparing the data and now pushing the data to the matrix system.
         if appointment:
             prepare_and_hit(self, {'appointment': appointment, 'mobile_list': mobile_list, 'task_data': data, 'order': appointment_order})
+            generate_mask_number(appointment)
         else:
             logger.error("Appointment not found for the appointment id ", appointment_id)
 

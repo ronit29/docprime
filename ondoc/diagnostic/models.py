@@ -49,7 +49,7 @@ from ondoc.matrix.tasks import push_appointment_to_matrix, push_onboarding_qcsta
 from ondoc.location import models as location_models
 from ondoc.ratings_review import models as ratings_models
 from decimal import Decimal
-from ondoc.common.models import AppointmentHistory
+from ondoc.common.models import AppointmentHistory, AppointmentMaskNumber
 import reversion
 from decimal import Decimal
 
@@ -629,6 +629,7 @@ class LabNetwork(TimeStampedModel, CreatedByModel, QCModel):
     spoc_details = GenericRelation(auth_model.SPOCDetails)
     merchant = GenericRelation(auth_model.AssociatedMerchant)
     merchant_payout = GenericRelation(account_model.MerchantPayout)
+    is_mask_number_required = models.BooleanField(default=True)
 
     def all_associated_labs(self):
         if self.id:
@@ -1097,6 +1098,7 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin)
     price_data = JSONField(blank=True, null=True)
     tests = models.ManyToManyField(LabTest, through='LabAppointmentTestMapping', through_fields=('appointment', 'test'))
     money_pool = models.ForeignKey(MoneyPool, on_delete=models.SET_NULL, null=True)
+    mask_number = GenericRelation(AppointmentMaskNumber)
 
     def get_tests_and_prices(self):
         test_price = []
