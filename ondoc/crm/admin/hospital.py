@@ -274,6 +274,10 @@ class HospitalAdmin(admin.GeoModelAdmin, VersionAdmin, ActionAdmin, QCPemAdmin):
             obj.qc_approved_at = datetime.datetime.now()
         if '_mark_in_progress' in request.POST:
             obj.data_status = 1
+        if '_reopen' in request.POST:
+            obj.data_status = 4
+
+
         super().save_model(request, obj, form, change)
 
     def save_formset(self, request, form, formset, change):

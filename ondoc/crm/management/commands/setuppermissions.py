@@ -147,7 +147,7 @@ class Command(BaseCommand):
                                                            Qualification, Specialization, Language, MedicalService,
                                                            College, SpecializationDepartment,
                                                            SpecializationField,
-                                                           SpecializationDepartmentMapping, UploadDoctorData
+                                                           SpecializationDepartmentMapping, UploadDoctorData, Remark
                                                            )
 
         for cl, ct in content_types.items():
@@ -492,6 +492,20 @@ class Command(BaseCommand):
                 Q(codename='change_' + ct.model))
 
             group.permissions.add(*permissions)
+
+
+        group, created = Group.objects.get_or_create(name=constants['WELCOME_CALLING_TEAM'])
+        group.permissions.clear()
+
+        content_types = ContentType.objects.get_for_models(Doctor, Remark)
+        for cl, ct in content_types.items():
+            permissions = Permission.objects.filter(
+                Q(content_type=ct),
+                Q(codename='add_' + ct.model) |
+                Q(codename='change_' + ct.model))
+
+            group.permissions.add(*permissions)
+
 
         self.stdout.write('Successfully created groups and permissions')
 

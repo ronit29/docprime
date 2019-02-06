@@ -179,7 +179,8 @@ class QCModel(models.Model):
     IN_PROGRESS = 1
     SUBMITTED_FOR_QC = 2
     QC_APPROVED = 3
-    DATA_STATUS_CHOICES = [(IN_PROGRESS, "In Progress"), (SUBMITTED_FOR_QC, "Submitted For QC Check"), (QC_APPROVED, "QC approved")]
+    REOPENED = 4
+    DATA_STATUS_CHOICES = [(IN_PROGRESS, "In Progress"), (SUBMITTED_FOR_QC, "Submitted For QC Check"), (QC_APPROVED, "QC approved"), (REOPENED, "Reopened")]
     data_status = models.PositiveSmallIntegerField(default=1, editable=False, choices=DATA_STATUS_CHOICES)
     qc_approved_at = models.DateTimeField(null=True, blank=True)
     class Meta:

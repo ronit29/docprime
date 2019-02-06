@@ -102,8 +102,7 @@ class QCPemAdmin(admin.ModelAdmin):
 
 class FormCleanMixin(forms.ModelForm):
     def clean(self):
-        if not self.request.user.is_superuser and not self.request.user.groups.filter(
-                name=constants['SUPER_QC_GROUP']).exists():
+        if (not self.request.user.is_superuser and not self.request.user.groups.filter(name=constants['SUPER_QC_GROUP']).exists()) and (not '_reopen' in self.data and not self.request.user.groups.filter(name__in=[constants['QC_GROUP_NAME'], constants['WELCOME_CALLING_TEAM']]).exists()):
             if self.instance.data_status == 3:
                 raise forms.ValidationError("Cannot modify QC approved Data")
             if not self.request.user.groups.filter(name=constants['QC_GROUP_NAME']).exists():
@@ -458,8 +457,9 @@ class RemarkInline(GenericTabularInline, nested_admin.NestedTabularInline):
     model = Remark
     show_change_link = False
     readonly_fields = ['user']
-    fields = ['user', 'content']
+    fields = ['status', 'user', 'content']
     # form = RemarkInlineForm
+    # formset = RemarkInlineFormSet
 
     # def get_readonly_fields(self, request, obj=None):
     #     print(self)

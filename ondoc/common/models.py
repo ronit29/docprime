@@ -118,11 +118,17 @@ class UserConfig(TimeStampedModel):
 
 
 class Remark(auth_model.TimeStampedModel):
+    FEEDBACK = 1
+    REOPEN = 2
+    OTHER = 3
+    STATUS_CHOICES = [("", "Select"), (FEEDBACK, "Feedback"), (REOPEN, "Reopen"), (OTHER, "Other")]
+
     content_type = models.ForeignKey(ContentType, on_delete=models.DO_NOTHING)
     object_id = models.PositiveIntegerField()
     content_object = GenericForeignKey()
     user = models.ForeignKey(auth_model.User, on_delete=models.SET_NULL, null=True, blank=True)
     content = models.TextField(null=True, blank=True)
+    status = models.PositiveSmallIntegerField(default=0, choices=STATUS_CHOICES)
 
     class Meta:
         db_table = 'remark'
