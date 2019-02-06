@@ -1837,10 +1837,10 @@ class TestDetailsViewset(viewsets.GenericViewSet):
 
         except:
             return Response([], status=status.HTTP_400_BAD_REQUEST)
-        queryset = LabTest.objects.prefetch_related('labtests', 'labtests__parameter', 'faq',
+        queryset = LabTest.objects.prefetch_related('labtests__parameter', 'faq',
                                                     'base_test__booked_together_test', 'availablelabs',
                                                     'availablelabs__lab_pricing_group',
-                                                    'availablelabs__lab_pricing_group__labs', 'test', 'test__parameter').filter(id__in=test_ids,
+                                                    'availablelabs__lab_pricing_group__labs', 'test__parameter').filter(id__in=test_ids,
                                                                                                      show_details=True)
 
 
@@ -1860,17 +1860,14 @@ class TestDetailsViewset(viewsets.GenericViewSet):
                 info.append(name)
             result['test_may_include'] = {'title': 'This test may include', 'value': info}
             pack_list = []
-            if data.is_package == True and data.searchable == True and data.enable_for_retail == True:
-                if data.test.all():
-                    for pack in queryset:
-                        pack_list = []
-                        for ptest in pack.test.all():
-                            if ptest.searchable == True and ptest.enable_for_retail == True:
-                                resp = {}
-                                resp['name'] = ptest.name
-                                resp['id'] = ptest.id
-                                resp['parameters'] = ptest.parameter.values_list('name', flat=True)
-                                pack_list.append(resp)
+            if data.is_package == True:
+                for ptest in data.test.all():
+                    if ptest.searchable == True and ptest.enable_for_retail == True:
+                        resp = {}
+                        resp['name'] = ptest.name
+                        resp['id'] = ptest.id
+                        resp['parameters'] = ptest.parameter.values_list('name', flat=True)
+                        pack_list.append(resp)
             result['this_package_will_include'] = {'title': 'This package will include', 'Tests': pack_list}
 
             queryset1 = data.faq.all()
