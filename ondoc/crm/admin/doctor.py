@@ -209,6 +209,39 @@ class DoctorClinicInline(nested_admin.NestedTabularInline):
     # autocomplete_fields = ['hospital']
     inlines = [DoctorClinicTimingInline, DoctorClinicProcedureInline, AssociatedMerchantInline]
 
+    def get_fields(self, *args, **kwargs):
+        # HOSPITAL	FOLLOWUP DURATION	FOLLOWUP CHARGES	ENABLED_FOR_ONLINE_BOOKING?	ENABLED	PRIORITY	ADD HOSPITAL	DELETE?
+        # hospital = models.ForeignKey(Hospital, on_delete=models.CASCADE, related_name='hospital_doctors')
+        #     followup_duration = models.PositiveSmallIntegerField(blank=True, null=True)
+        #     followup_charges = models.PositiveSmallIntegerField(blank=True, null=True)
+        #     enabled_for_online_booking = models.BooleanField(verbose_name='enabled_for_online_booking?', default=False)
+        #     enabled = models.BooleanField(verbose_name='Enabled', default=True)
+        #     priority = models.PositiveSmallIntegerField(blank=True, null=True, default=0)
+        #     merchant = GenericRelation(auth_model.AssociatedMerchant)
+        #     merchant_payout = GenericRelation(MerchantPayout)
+        # return ['hospital', 'add_hospital', 'followup_duration']
+        all_fields = super().get_fields(*args, **kwargs)
+        all_fields.insert(2, 'add_hospital_link')
+        return all_fields
+
+    def get_readonly_fields(self, *args, **kwargs):
+        read_only = super().get_readonly_fields(*args, **kwargs)
+        if args:
+            request = args[0]
+            if request.GET.get('AgentId', None):
+                self.matrix_agent_id = request.GET.get('AgentId', None)
+            read_only += ('add_hospital_link',)
+        return read_only
+
+    def add_hospital_link(self, obj):
+        content_type = ContentType.objects.get_for_model(Hospital)
+        add_hospital_url = reverse('admin:%s_%s_add' % (content_type.app_label, content_type.model))
+        # add_hospital_url+='?_to_field=id&_popup=1'
+        if hasattr(self, 'matrix_agent_id') and self.matrix_agent_id:
+            add_hospital_url += 'AgentId={}'.format(self.matrix_agent_id)
+        html = '''<a href='%s' target=_blank>%s</a><br>''' % (add_hospital_url, "Add Hospital")
+        return mark_safe(html)
+
     def get_queryset(self, request):
         return super(DoctorClinicInline, self).get_queryset(request).select_related('hospital')
 
@@ -638,6 +671,13 @@ class DoctorForm(FormCleanMixin):
     # email = forms.EmailField(required=True)
     practicing_since = forms.ChoiceField(required=False, choices=practicing_since_choices)
     # onboarding_status = forms.ChoiceField(disabled=True, required=False, choices=Doctor.ONBOARDING_STATUS)
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        if self and self.request and isinstance(self.request.GET, dict):
+            # http://127.0.0.1:8000/admin/doctor/doctor/add/?Lead_id=1234&AgentId=9876
+            self.request_matrix_lead_id = self.request.GET.get('LeadId', None)
+            self.request_agent_lead_id = self.request.GET.get('AgentId', None)
 
     def validate_qc(self):
         qc_required = {'name': 'req', 'gender': 'req',
@@ -1247,7 +1287,9 @@ class DoctorAdmin(AutoComplete, ImportExportMixin, VersionAdmin, ActionAdmin, QC
     #             GenericAdmin.create_admin_billing_permissions(doctor)
 
     def save_model(self, request, obj, form, change):
-        if not request.user.is_member_of(constants['DOCTOR_SALES_GROUP']):        
+        if obj and not obj.id and not obj.matrix_lead_id:
+            obj.matrix_lead_id = form.request_matrix_lead_id if hasattr(form, 'request_matrix_lead_id') else None
+        if not request.user.is_member_of(constants['DOCTOR_SALES_GROUP']):
             if not obj.created_by:
                 obj.created_by = request.user
             if not obj.assigned_to:
