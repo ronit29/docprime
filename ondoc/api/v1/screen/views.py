@@ -3,11 +3,11 @@ from rest_framework.response import Response
 from ondoc.doctor.models import CommonSpecialization
 from ondoc.diagnostic.models import CommonTest
 from ondoc.diagnostic.models import CommonPackage
+from ondoc.banner.models import Banner
+from ondoc.common.models import PaymentOptions
 from ondoc.api.v1.doctor.serializers import CommonSpecializationsSerializer
 from ondoc.api.v1.diagnostic.serializers import CommonTestSerializer
 from ondoc.api.v1.diagnostic.serializers import CommonPackageSerializer
-from ondoc.api.v1.common.views import GetPaymentOptionsViewSet
-from ondoc.api.v1.banner.views import BannerListViewSet
 
 
 class ScreenViewSet(viewsets.GenericViewSet):
@@ -29,8 +29,7 @@ class ScreenViewSet(viewsets.GenericViewSet):
         package_queryset = CommonPackage.objects.prefetch_related('package').filter(package__enable_for_retail=True)[:grid_size-1]
         package_serializer = CommonPackageSerializer(package_queryset, many=True, context={'request': request})
 
-        banner_obj = BannerListViewSet()
-        banner_list = banner_obj.list(request).data
+        banner_list = Banner.get_all_banners(request)
         banner_list_homepage = list()
         for banner in banner_list:
             if banner.get('slider_location') == 'home_page':
@@ -72,9 +71,8 @@ class ScreenViewSet(viewsets.GenericViewSet):
             }
         ]
 
-        payment_obj = GetPaymentOptionsViewSet()
-
-        payment_options = payment_obj.list(request).data
+        queryset = PaymentOptions.objects.filter(is_enabled=True).order_by('-priority')
+        payment_options = PaymentOptions.build_payment_option(queryset)
 
         resp = {"home":
                     {
