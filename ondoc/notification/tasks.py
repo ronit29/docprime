@@ -225,6 +225,9 @@ def set_order_dummy_transaction(self, order_id, user_id):
         order_row = Order.objects.filter(id=order_id).first()
         user = User.objects.filter(id=user_id).first()
 
+        if order_row and order_row.parent:
+            raise Exception("Cannot create dummy payout for a child order.")
+
         if order_row and user:
             if order_row.getTransactions():
                 #print("dummy Transaction already set")

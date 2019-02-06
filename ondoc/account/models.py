@@ -259,7 +259,8 @@ class Order(TimeStampedModel):
         from ondoc.diagnostic.models import LabAppointment
 
         if self.orders.exists():
-            return self.orders.first().getAppointment()
+            completed_order = self.orders.filter(reference_id__isnull=False).first()
+            return completed_order.getAppointment() if completed_order else None
 
         if not self.reference_id:
             return None
@@ -271,6 +272,9 @@ class Order(TimeStampedModel):
         return None
 
     def get_total_price(self):
+        if self.parent:
+            raise Exception("Cannot calculate price on a child order")
+
         return ( self.amount or 0 ) + ( self.wallet_amount or 0 )
 
     def getTransactions(self):
