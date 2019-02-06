@@ -1,4 +1,4 @@
-from hardcopy import bytestring_to_pdf
+# from hardcopy import bytestring_to_pdf
 from rest_framework import mixins, viewsets, status
 from rest_framework.response import Response
 from django.contrib.gis.geos import Point, GEOSGeometry
@@ -900,23 +900,6 @@ class GetPaymentOptionsViewSet(viewsets.GenericViewSet):
 
     def list(self, request):
         queryset = self.return_queryset(request)
-        options = []
-        first = True
-        for data in queryset:
-            resp = {}
-            resp['name'] = data.name
-            resp['image'] = data.image.url
-            resp['description'] = data.description
-            resp['is_enabled'] = data.is_enabled
-            resp['action'] = data.action
-            resp['payment_gateway'] = data.payment_gateway
-            resp['id'] = data.id
-            resp['payment_gateway'] = data.payment_gateway
-            if first==True:
-                first = False
-                resp['is_selected'] = True
-            else:
-                resp['is_selected'] = False
-            options.append(resp)
+        options = PaymentOptions.build_payment_option(queryset)
 
         return Response(options)
