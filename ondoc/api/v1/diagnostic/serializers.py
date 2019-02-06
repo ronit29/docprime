@@ -76,6 +76,14 @@ class LabModelSerializer(serializers.ModelSerializer):
     unrated_appointment = serializers.SerializerMethodField()
     center_visit_enabled = serializers.SerializerMethodField()
     display_rating_widget = serializers.SerializerMethodField()
+    is_thyrocare = serializers.SerializerMethodField()
+
+    def get_is_thyrocare(self, obj):
+        if obj and obj.network and settings.THYROCARE_NETWORK_ID:
+            if obj.network.id == settings.THYROCARE_NETWORK_ID:
+                return True
+        else:
+            return False
 
     def get_display_rating_widget(self, obj):
         if self.parent:
@@ -134,7 +142,6 @@ class LabModelSerializer(serializers.ModelSerializer):
             data = rating_serializer.RatingsGraphSerializer(query, context={'request': self.context.get('request')}).data
             return data
         return None
-
 
     def get_seo(self, obj):
         if self.parent:
@@ -209,7 +216,7 @@ class LabModelSerializer(serializers.ModelSerializer):
         fields = ('id', 'lat', 'long', 'lab_thumbnail', 'name', 'operational_since', 'locality', 'address',
                   'sublocality', 'city', 'state', 'country', 'always_open', 'about', 'home_pickup_charges',
                   'is_home_collection_enabled', 'seo', 'breadcrumb', 'rating', 'rating_graph', 'unrated_appointment',
-                  'center_visit_enabled', 'display_rating_widget')
+                  'center_visit_enabled', 'display_rating_widget', 'is_thyrocare')
 
 
 class LabProfileSerializer(LabModelSerializer):

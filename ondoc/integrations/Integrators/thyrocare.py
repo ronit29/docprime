@@ -135,7 +135,7 @@ class Thyrocare(BaseIntegrator):
 
         return True if resp_data['status'] == 'Y' else False
 
-    def __post_order_details(self, lab_appointment, **kwargs):
+    def _post_order_details(self, lab_appointment, **kwargs):
         # Need to update when thyrocare API works. Static value for now
 
         tests = kwargs.get('tests', None)
