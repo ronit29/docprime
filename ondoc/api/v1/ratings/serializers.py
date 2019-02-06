@@ -43,6 +43,13 @@ class RatingListBodySerializerdata(serializers.Serializer):
     content_type = serializers.ChoiceField(choices=RatingsReview.APPOINTMENT_TYPE_CHOICES)
     object_id = serializers.IntegerField()
 
+    def validate(self, attrs):
+        if attrs.get('content_type') == RatingsReview.OPD and not doc_models.Doctor.objects.filter(id=attrs.get('object_id')).exists():
+            raise serializers.ValidationError('Doctor Not Found')
+        elif attrs.get('content_type') == RatingsReview.LAB and not lab_models.Lab.objects.filter(id=attrs.get('object_id')).exists():
+            raise serializers.ValidationError('Lab Not Found')
+        return attrs
+
 
 class RatingsGraphSerializer(serializers.Serializer):
     rating_count = serializers.SerializerMethodField()

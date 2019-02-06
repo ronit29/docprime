@@ -89,11 +89,19 @@ class RatingsViewSet(viewsets.GenericViewSet):
             graph_queryset = self.get_queryset().filter(doc_ratings__id=valid_data.get('object_id'))
             appointment = doc_models.OpdAppointment.objects.select_related('profile').filter(doctor_id=valid_data.get('object_id')).all()
         else:
-            queryset = self.get_queryset().exclude(Q(review='') | Q(review=None))\
-                                          .filter(lab_ratings__id=valid_data.get('object_id'))\
-                                          .order_by('-updated_at')
-            graph_queryset = self.get_queryset().filter(lab_ratings__id=valid_data.get('object_id'))
-            appointment = lab_models.LabAppointment.objects.select_related('profile').filter(lab_id=valid_data.get('object_id')).all()
+            lab = lab_models.Lab.objects.filter(id=valid_data.get('object_id')).first()
+            if lab and lab.network:
+                queryset = self.get_queryset().exclude(Q(review='') | Q(review=None)) \
+                    .filter(lab_ratings__network=lab.network) \
+                    .order_by('-updated_at')
+                graph_queryset = self.get_queryset().filter(lab_ratings__network=lab.network)
+                appointment = lab_models.LabAppointment.objects.select_related('profile').filter(lab__network=lab.network).all()
+            else:
+                queryset = self.get_queryset().exclude(Q(review='') | Q(review=None))\
+                                              .filter(lab_ratings__id=valid_data.get('object_id'))\
+                                              .order_by('-updated_at')
+                graph_queryset = self.get_queryset().filter(lab_ratings__id=valid_data.get('object_id'))
+                appointment = lab_models.LabAppointment.objects.select_related('profile').filter(lab_id=valid_data.get('object_id')).all()
         queryset = paginate_queryset(queryset, request)
         if len(queryset):
                 body_serializer = serializers.RatingsModelSerializer(queryset, many=True, context={'request': request,
@@ -113,9 +121,7 @@ class RatingsViewSet(viewsets.GenericViewSet):
 
 
     def update(self, request, pk):
-
         rating = get_object_or_404(models.RatingsReview, pk=pk)
-
         serializer = serializers.RatingUpdateBodySerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         valid_data = serializer.validated_data
