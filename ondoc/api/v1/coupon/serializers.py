@@ -1,5 +1,6 @@
 from rest_framework import serializers
 from ondoc.account.models import Order
+from ondoc.cart.models import Cart
 from ondoc.diagnostic.models import Lab, LabTest, AvailableLabTest, LabAppointment, LabTestCategory
 from ondoc.coupon.models import Coupon, RandomGeneratedCoupon
 from ondoc.doctor.models import Doctor, Hospital, PracticeSpecialization, OpdAppointment
@@ -32,6 +33,8 @@ class ProductIDSerializer(serializers.Serializer):
     # gender = serializers.ChoiceField(required=False, choices=UserProfile.GENDER_CHOICES)
     # age_range = CommaSepratedToListField(required=False, max_length=2, min_length=2)
     # cities = serializers.CharField(required=False)
+    cart_item = serializers.PrimaryKeyRelatedField(queryset=Cart.objects.all(), required=False, allow_null=True)
+    show_all = serializers.BooleanField(required=False)
 
     def validate(self, attrs):
         # age_range = attrs.get("age_range")
@@ -92,6 +95,7 @@ class UserSpecificCouponSerializer(CouponListSerializer):
     doctor = serializers.PrimaryKeyRelatedField(required=False, queryset=Doctor.objects.filter(is_live=True), allow_null=True)
     hospital = serializers.PrimaryKeyRelatedField(required=False, queryset=Hospital.objects.filter(is_live=True), allow_null=True)
     profile = serializers.PrimaryKeyRelatedField(required=False, queryset=UserProfile.objects.all(), allow_null=True)
+    cart_item = serializers.PrimaryKeyRelatedField(queryset=Cart.objects.all(), required=False, allow_null=True)
 
     def validate(self, attrs):
 
