@@ -127,7 +127,7 @@ class Remark(auth_model.TimeStampedModel):
     object_id = models.PositiveIntegerField()
     content_object = GenericForeignKey()
     user = models.ForeignKey(auth_model.User, on_delete=models.SET_NULL, null=True, blank=True)
-    content = models.TextField(null=True, blank=True)
+    content = models.TextField()
     status = models.PositiveSmallIntegerField(default=0, choices=STATUS_CHOICES)
 
     class Meta:

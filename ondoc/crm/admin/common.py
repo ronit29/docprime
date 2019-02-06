@@ -102,7 +102,8 @@ class QCPemAdmin(admin.ModelAdmin):
 
 class FormCleanMixin(forms.ModelForm):
     def clean(self):
-        if (not self.request.user.is_superuser and not self.request.user.groups.filter(name=constants['SUPER_QC_GROUP']).exists()) and (not '_reopen' in self.data and not self.request.user.groups.filter(name__in=[constants['QC_GROUP_NAME'], constants['WELCOME_CALLING_TEAM']]).exists()):
+        if (not self.request.user.is_superuser and not self.request.user.groups.filter(name=constants['SUPER_QC_GROUP']).exists()):
+            # and (not '_reopen' in self.data and not self.request.user.groups.filter(name__in=[constants['QC_GROUP_NAME'], constants['WELCOME_CALLING_TEAM']]).exists()):
             if self.instance.data_status == 3:
                 raise forms.ValidationError("Cannot modify QC approved Data")
             if not self.request.user.groups.filter(name=constants['QC_GROUP_NAME']).exists():
@@ -141,6 +142,8 @@ class FormCleanMixin(forms.ModelForm):
                                 'Form') + ": " + self.instance.network.name)
 
             if '_mark_in_progress' in self.data:
+                if self.data.get('common-remark-content_type-object_id-INITIAL_FORMS', 0) == self.data.get('common-remark-content_type-object_id-TOTAL_FORMS', 1):
+                    raise forms.ValidationError("Must add a remark with reopen status before rejecting.")
                 if self.instance.data_status == 3:
                     raise forms.ValidationError("Cannot reject QC approved data")
             return super().clean()
@@ -437,17 +440,24 @@ class PaymentOptionsAdmin(admin.ModelAdmin):
     search_fields = ['name']
 
 
-# class RemarkInlineForm(forms.ModelForm):
-#     # content = forms.CharField(widget=forms.Textarea, required=False)
-#     # print(content)
-#
-#     class Meta:
-#         model = Remark
-#         fields = ('__all__')
-#
-#     def __init__(self, *args, **kwargs):
-#         a=5
-#         super(RemarkInlineForm, self).__init__(*args, **kwargs)
+class RemarkInlineForm(forms.ModelForm):
+    # content = forms.CharField(widget=forms.Textarea, required=False)
+    # print(content)
+
+    # class Meta:
+    #     model = Remark
+    #     fields = ('__all__')
+
+    # def __init__(self, *args, **kwargs):
+    #     a=5
+    #     super(RemarkInlineForm, self).__init__(*args, **kwargs)
+    def clean(self):
+        super().clean()
+        if any(self.errors):
+            return
+        if self.instance and self.instance.id:
+            if self.changed_data:
+                raise forms.ValidationError("Cannot alter already saved remarks.")
 
 
 
@@ -458,7 +468,7 @@ class RemarkInline(GenericTabularInline, nested_admin.NestedTabularInline):
     show_change_link = False
     readonly_fields = ['user']
     fields = ['status', 'user', 'content']
-    # form = RemarkInlineForm
+    form = RemarkInlineForm
     # formset = RemarkInlineFormSet
 
     # def get_readonly_fields(self, request, obj=None):

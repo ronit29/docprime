@@ -28,7 +28,7 @@ logger = logging.getLogger(__name__)
 
 from ondoc.account.models import Order, Invoice
 from django.contrib.contenttypes.admin import GenericTabularInline
-from ondoc.authentication.models import GenericAdmin, SPOCDetails, AssociatedMerchant, Merchant
+from ondoc.authentication.models import GenericAdmin, SPOCDetails, AssociatedMerchant, Merchant, QCModel
 from ondoc.doctor.models import (Doctor, DoctorQualification,
                                  DoctorLanguage, DoctorAward, DoctorAssociation, DoctorExperience,
                                  MedicalConditionSpecialization, DoctorMedicalService, DoctorImage,
@@ -1257,14 +1257,14 @@ class DoctorAdmin(AutoComplete, ImportExportMixin, VersionAdmin, ActionAdmin, QC
         elif form.cleaned_data.get('enabled', False) and obj.disabled_by:
             obj.disabled_by = None
         if '_submit_for_qc' in request.POST:
-            obj.data_status = 2
+            obj.data_status = QCModel.SUBMITTED_FOR_QC
         if '_qc_approve' in request.POST:
-            obj.data_status = 3
+            obj.data_status = QCModel.QC_APPROVED
             obj.qc_approved_at = datetime.datetime.now()
         if '_mark_in_progress' in request.POST:
-            obj.data_status = 1
-        if '_reopen' in request.POST:
-            obj.data_status = 4
+            obj.data_status = QCModel.REOPENED
+        # if '_reopen' in request.POST:
+        #     obj.data_status = 4
 
         super().save_model(request, obj, form, change)
 

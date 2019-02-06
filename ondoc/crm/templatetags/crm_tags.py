@@ -39,7 +39,6 @@ def show_actions(context, original):
         elif data_status == 2:
             actions['_qc_approve'] = available_actions['_qc_approve']
             actions['_mark_in_progress'] = available_actions['_mark_in_progress']
-        actions['_reopen'] = available_actions['_reopen']
 
     # if field team member
     if request.user.is_member_of(constants['DOCTOR_NETWORK_GROUP_NAME']):
