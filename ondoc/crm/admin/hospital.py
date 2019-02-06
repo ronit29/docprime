@@ -324,7 +324,7 @@ class HospitalAdmin(admin.GeoModelAdmin, VersionAdmin, ActionAdmin, QCPemAdmin):
             return ''
 
 
-    list_display = ('name', 'updated_at', 'data_status', 'doctor_count', 'list_created_by', 'list_assigned_to')
+    list_display = ('name', 'updated_at', 'data_status', 'welcome_calling_done', 'doctor_count', 'list_created_by', 'list_assigned_to')
     form = HospitalForm
     search_fields = ['name']
     inlines = [
