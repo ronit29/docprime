@@ -163,13 +163,6 @@ class Order(TimeStampedModel):
                     "payment_status": Order.PAYMENT_ACCEPTED
                 }
 
-        # if order is done without PG transaction, then make an async task to create a dummy transaction and set it.
-        if not self.getTransactions():
-            try:
-                transaction.on_commit(lambda: set_order_dummy_transaction.apply_async((self.id, appointment_data['user'].id,), countdown=5))
-            except Exception as e:
-                logger.error(str(e))
-
         if order_dict:
             self.update_order(order_dict)
 
@@ -264,6 +257,10 @@ class Order(TimeStampedModel):
     def getAppointment(self):
         from ondoc.doctor.models import OpdAppointment
         from ondoc.diagnostic.models import LabAppointment
+
+        if self.orders.exists():
+            return self.orders.first().getAppointment()
+
         if not self.reference_id:
             return None
 
@@ -272,6 +269,9 @@ class Order(TimeStampedModel):
         elif self.product_id == self.DOCTOR_PRODUCT_ID:
             return OpdAppointment.objects.filter(id=self.reference_id).first()
         return None
+
+    def get_total_price(self):
+        return ( self.amount or 0 ) + ( self.wallet_amount or 0 )
 
     def getTransactions(self):
         # if trying to get txn on a child order, recurse for its parent instead
@@ -452,6 +452,15 @@ class Order(TimeStampedModel):
 
         if not opd_appointment_ids and not lab_appointment_ids:
             raise Exception("Could not process entire order")
+
+        # if order is done without PG transaction, then make an async task to create a dummy transaction and set it.
+        if not self.getTransactions():
+            try:
+                transaction.on_commit(
+                    lambda: set_order_dummy_transaction.apply_async((self.id, self.get_user_id(),),
+                                                                    countdown=5))
+            except Exception as e:
+                logger.error(str(e))
 
         money_pool = MoneyPool.objects.create(wallet=total_wallet_used, cashback=total_cashback_used, logs=[])
 
