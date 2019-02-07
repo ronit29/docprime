@@ -105,7 +105,8 @@ class FormCleanMixin(forms.ModelForm):
         if (not self.request.user.is_superuser and not self.request.user.groups.filter(name=constants['SUPER_QC_GROUP']).exists()):
             # and (not '_reopen' in self.data and not self.request.user.groups.filter(name__in=[constants['QC_GROUP_NAME'], constants['WELCOME_CALLING_TEAM']]).exists()):
             if self.instance.data_status == 3:
-                raise forms.ValidationError("Cannot modify QC approved Data")
+                if not ('_mark_in_progress' in self.data and self.request.user.groups.filter(name=constants['WELCOME_CALLING_TEAM']).exists()):
+                    raise forms.ValidationError("Cannot modify QC approved Data")
             if not self.request.user.groups.filter(name=constants['QC_GROUP_NAME']).exists():
                 if self.instance.data_status == 2:
                     raise forms.ValidationError("Cannot update Data submitted for QC approval")
@@ -145,7 +146,8 @@ class FormCleanMixin(forms.ModelForm):
                 if self.data.get('common-remark-content_type-object_id-INITIAL_FORMS', 0) == self.data.get('common-remark-content_type-object_id-TOTAL_FORMS', 1):
                     raise forms.ValidationError("Must add a remark with reopen status before rejecting.")
                 if self.instance.data_status == 3:
-                    raise forms.ValidationError("Cannot reject QC approved data")
+                    if not self.request.user.groups.filter(name=constants['WELCOME_CALLING_TEAM']).exists():
+                        raise forms.ValidationError("Cannot reject QC approved data")
             return super().clean()
 
 
