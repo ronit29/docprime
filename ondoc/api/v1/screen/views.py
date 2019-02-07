@@ -29,12 +29,6 @@ class ScreenViewSet(viewsets.GenericViewSet):
         package_queryset = CommonPackage.objects.prefetch_related('package').filter(package__enable_for_retail=True)[:grid_size-1]
         package_serializer = CommonPackageSerializer(package_queryset, many=True, context={'request': request})
 
-        banner_list = Banner.get_all_banners(request)
-        banner_list_homepage = list()
-        for banner in banner_list:
-            if banner.get('slider_location') == 'home_page':
-                banner_list_homepage.append(banner)
-
         grid_list = [
             {
                 'priority': 0,
@@ -44,12 +38,6 @@ class ScreenViewSet(viewsets.GenericViewSet):
                 'tag': "Upto 50% off",
                 'tagColor': "#ff0000",
                 'addSearchItem': "Doctor"
-            },
-            {
-                'priority': 1,
-                'type': "Banners",
-                'title': "Banners",
-                'items': banner_list_homepage
             },
             {
                 'priority': 2,
@@ -71,7 +59,25 @@ class ScreenViewSet(viewsets.GenericViewSet):
             }
         ]
 
-        queryset = PaymentOptions.objects.filter(is_enabled=True).order_by('-priority')
+        banner_list = Banner.get_all_banners(request)
+        banner_list_homepage = list()
+        for banner in banner_list:
+            if banner.get('slider_location') == 'home_page':
+                banner_list_homepage.append(banner)
+        banner = [{
+            'priority': 1,
+            'type': "Banners",
+            'title': "Banners",
+            'items': banner_list_homepage
+        }]
+
+        params = request.query_params
+        from_app = params.get("from_app", False)
+        if from_app:
+            queryset = PaymentOptions.objects.filter(is_enabled=True, payment_gateway__iexact="paytm").order_by(
+                '-priority')
+        else:
+            queryset = PaymentOptions.objects.filter(is_enabled=True).order_by('-priority')
         payment_options = PaymentOptions.build_payment_option(queryset)
 
         resp = {"home":
@@ -80,6 +86,7 @@ class ScreenViewSet(viewsets.GenericViewSet):
                     "show_footer": show_footer,
                     "grid_list": grid_list,
                     },
+                "banner": banner,
                 "payment_options": payment_options
         }
 
