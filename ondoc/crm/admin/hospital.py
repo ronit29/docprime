@@ -246,6 +246,15 @@ class HospitalAdmin(admin.GeoModelAdmin, VersionAdmin, ActionAdmin, QCPemAdmin):
     exclude = (
     'search_key', 'live_at', 'qc_approved_at', 'disabled_at', 'physical_agreement_signed_at', 'welcome_calling_done_at')
 
+    def get_fields(self, request, obj=None):
+        all_fields = super().get_fields(request, obj)
+        if 'network' in all_fields:
+            if 'add_network_link' in all_fields:
+                all_fields.remove('add_network_link')
+            network_index = all_fields.index('network')
+            all_fields.insert(network_index + 1, 'add_network_link')
+        return all_fields
+
     def associated_doctors(self, instance):
         if instance.id:
             html = "<ul style='margin-left:0px !important'>"
@@ -310,7 +319,10 @@ class HospitalAdmin(admin.GeoModelAdmin, VersionAdmin, ActionAdmin, QCPemAdmin):
     def get_form(self, request, obj=None, **kwargs):
         form = super(HospitalAdmin, self).get_form(request, obj=obj, **kwargs)
         form.request = request
-        form.base_fields['network'].queryset = HospitalNetwork.objects.filter(Q(data_status=2) | Q(data_status=3) | Q(created_by=request.user))
+        network_field = form.base_fields.get('network')
+        if network_field:
+            network_field.queryset = HospitalNetwork.objects.filter(Q(data_status=2) | Q(data_status=3) | Q(created_by=request.user))
+            network_field.widget.can_add_related = False
         form.base_fields['assigned_to'].queryset = User.objects.filter(user_type=User.STAFF)
         if (not request.user.is_superuser) and (not request.user.groups.filter(name=constants['QC_GROUP_NAME']).exists()):
             form.base_fields['assigned_to'].disabled = True
@@ -325,6 +337,23 @@ class HospitalAdmin(admin.GeoModelAdmin, VersionAdmin, ActionAdmin, QCPemAdmin):
 
         else:
             return ''
+
+    def get_readonly_fields(self, *args, **kwargs):
+        read_only = super().get_readonly_fields(*args, **kwargs)
+        if args:
+            request = args[0]
+            if request.GET.get('AgentId', None):
+                self.matrix_agent_id = request.GET.get('AgentId', None)
+            read_only += ('add_network_link',)
+        return read_only
+
+    def add_network_link(self, obj):
+        content_type = ContentType.objects.get_for_model(HospitalNetwork)
+        add_network_link = reverse('admin:%s_%s_add' % (content_type.app_label, content_type.model))
+        if hasattr(self, 'matrix_agent_id') and self.matrix_agent_id:
+            add_network_link += '?AgentId={}'.format(self.matrix_agent_id)
+        html = '''<a href='%s' target=_blank>%s</a><br>''' % (add_network_link, "Add Network")
+        return mark_safe(html)
 
 
     list_display = ('name', 'updated_at', 'data_status', 'welcome_calling_done', 'doctor_count', 'list_created_by', 'list_assigned_to')

@@ -208,21 +208,7 @@ class DoctorClinicInline(nested_admin.NestedTabularInline):
     show_change_link = False
     # autocomplete_fields = ['hospital']
     inlines = [DoctorClinicTimingInline, DoctorClinicProcedureInline, AssociatedMerchantInline]
-
-    def get_fields(self, *args, **kwargs):
-        # HOSPITAL	FOLLOWUP DURATION	FOLLOWUP CHARGES	ENABLED_FOR_ONLINE_BOOKING?	ENABLED	PRIORITY	ADD HOSPITAL	DELETE?
-        # hospital = models.ForeignKey(Hospital, on_delete=models.CASCADE, related_name='hospital_doctors')
-        #     followup_duration = models.PositiveSmallIntegerField(blank=True, null=True)
-        #     followup_charges = models.PositiveSmallIntegerField(blank=True, null=True)
-        #     enabled_for_online_booking = models.BooleanField(verbose_name='enabled_for_online_booking?', default=False)
-        #     enabled = models.BooleanField(verbose_name='Enabled', default=True)
-        #     priority = models.PositiveSmallIntegerField(blank=True, null=True, default=0)
-        #     merchant = GenericRelation(auth_model.AssociatedMerchant)
-        #     merchant_payout = GenericRelation(MerchantPayout)
-        # return ['hospital', 'add_hospital', 'followup_duration']
-        all_fields = super().get_fields(*args, **kwargs)
-        all_fields.insert(2, 'add_hospital_link')
-        return all_fields
+    fields = ['hospital', 'add_hospital_link', 'followup_duration', 'followup_charges', 'enabled_for_online_booking', 'enabled', 'priority']
 
     def get_readonly_fields(self, *args, **kwargs):
         read_only = super().get_readonly_fields(*args, **kwargs)
