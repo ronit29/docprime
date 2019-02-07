@@ -601,7 +601,7 @@ class EmailNotification(TimeStampedModel, EmailNotificationOpdMixin, EmailNotifi
             publish_message(message)
 
     @classmethod
-    def send_booking_url(cls, token, order_id, email):
+    def send_booking_url(cls, token, email):
         booking_url = "{}/agent/booking?token={}".format(settings.CONSUMER_APP_DOMAIN, token)
         html_body = "Your booking url is - {} . Please pay to confirm".format(booking_url)
         email_subject = "Booking Url"
@@ -727,7 +727,7 @@ class SmsNotification(TimeStampedModel, SmsNotificationOpdMixin, SmsNotification
             publish_message(message)
 
     @classmethod
-    def send_booking_url(cls, token, order_id, phone_number):
+    def send_booking_url(cls, token, phone_number):
         booking_url = "{}/agent/booking?token={}".format(settings.CONSUMER_APP_DOMAIN, token)
         html_body = "Your booking url is - {} . Please pay to confirm".format(booking_url)
         if phone_number:
