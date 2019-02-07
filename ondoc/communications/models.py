@@ -562,6 +562,8 @@ class OpdNotification(Notification):
         procedures = self.appointment.get_procedures()
         est = pytz.timezone(settings.TIME_ZONE)
         time_slot_start = self.appointment.time_slot_start.astimezone(est)
+        mask_number_instance = self.appointment.mask_number.filter(is_deleted=False).first()
+        mask_number = mask_number_instance.mask_number
         context = {
             "doctor_name": doctor_name,
             "patient_name": patient_name,
@@ -577,7 +579,8 @@ class OpdNotification(Notification):
             "time_slot_start": time_slot_start,
             "attachments": {},  # Updated later
             "screen": "appointment",
-            "type": "doctor"
+            "type": "doctor",
+            "mask_number": mask_number
         }
         return context
 
