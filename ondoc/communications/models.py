@@ -563,7 +563,9 @@ class OpdNotification(Notification):
         est = pytz.timezone(settings.TIME_ZONE)
         time_slot_start = self.appointment.time_slot_start.astimezone(est)
         mask_number_instance = self.appointment.mask_number.filter(is_deleted=False).first()
-        mask_number = mask_number_instance.mask_number
+        mask_number=''
+        if mask_number_instance:
+            mask_number = mask_number_instance.mask_number
         context = {
             "doctor_name": doctor_name,
             "patient_name": patient_name,
