@@ -73,10 +73,10 @@ class SearchPageViewSet(viewsets.ReadOnlyModelViewSet):
         count = int(count)
         if count <= 0:
             count = 10
-        test_queryset = CommonTest.objects.select_related('test').filter(test__enable_for_retail=True, test__searchable=True)[:count]
-        conditions_queryset = CommonDiagnosticCondition.objects.prefetch_related('lab_test').all()
+        test_queryset = CommonTest.objects.select_related('test').filter(test__enable_for_retail=True, test__searchable=True).order_by('-priority')[:count]
+        conditions_queryset = CommonDiagnosticCondition.objects.prefetch_related('lab_test').all().order_by('-priority')[:count]
         lab_queryset = PromotedLab.objects.select_related('lab').filter(lab__is_live=True, lab__is_test_lab=False)
-        package_queryset = CommonPackage.objects.prefetch_related('package').filter(package__enable_for_retail=True, package__searchable=True)[:count]
+        package_queryset = CommonPackage.objects.prefetch_related('package').filter(package__enable_for_retail=True, package__searchable=True).order_by('-priority')[:count]
         recommended_package_qs = LabTestCategory.objects.prefetch_related('recommended_lab_tests__parameter').filter(is_live=True,
                                                                                                           show_on_recommended_screen=True,
                                                                                                           recommended_lab_tests__searchable=True,
@@ -1372,6 +1372,8 @@ class LabAppointmentView(mixins.CreateModelMixin,
 
         if validated_data.get("existing_cart_item"):
             cart_item = validated_data.get("existing_cart_item")
+            cart_item.data = request.data
+            cart_item.save()
         else:
             cart_item, is_new = Cart.objects.update_or_create(id=cart_item_id, deleted_at__isnull=True, product_id=account_models.Order.LAB_PRODUCT_ID,
                                                   user=request.user, defaults={"data": data})

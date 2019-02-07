@@ -1684,6 +1684,7 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin)
 class CommonTest(TimeStampedModel):
     test = models.ForeignKey(LabTest, on_delete=models.CASCADE, related_name='commontest')
     icon = models.ImageField(upload_to='diagnostic/common_test_icons', null=True)
+    priority = models.PositiveIntegerField(default=0)
 
     def __str__(self):
         return "{}-{}".format(self.test.name, self.id)
@@ -1692,7 +1693,7 @@ class CommonTest(TimeStampedModel):
 class CommonPackage(TimeStampedModel):
     package = models.ForeignKey(LabTest, on_delete=models.CASCADE, related_name='commonpackage')
     icon = models.ImageField(upload_to='diagnostic/common_package_icons', null=True)
-
+    priority = models.PositiveIntegerField(default=0)
     def __str__(self):
         return "{}-{}".format(self.package.name, self.id)
 
@@ -1707,6 +1708,7 @@ class CommonDiagnosticCondition(TimeStampedModel):
         through='DiagnosticConditionLabTest',
         through_fields=('diagnostic_condition', 'lab_test'),
     )
+    priority = models.PositiveIntegerField(default=0)
     # test = models.ManyToManyField(LabTest)
 
     def __str__(self):
