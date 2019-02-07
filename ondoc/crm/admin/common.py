@@ -105,7 +105,12 @@ class FormCleanMixin(forms.ModelForm):
         if (not self.request.user.is_superuser and not self.request.user.groups.filter(name=constants['SUPER_QC_GROUP']).exists()):
             # and (not '_reopen' in self.data and not self.request.user.groups.filter(name__in=[constants['QC_GROUP_NAME'], constants['WELCOME_CALLING_TEAM']]).exists()):
             if self.instance.data_status == 3:
-                if not ('_mark_in_progress' in self.data and self.request.user.groups.filter(name=constants['WELCOME_CALLING_TEAM']).exists()):
+                if '_mark_in_progress' in self.data and self.request.user.groups.filter(name=constants['WELCOME_CALLING_TEAM']).exists():
+                    pass
+                    # todo - condition to check if changing any other data except enabled and welcome_calling_done flag
+                    # if not 'enabled' in self.changed_data:
+                    #     raise forms.ValidationError("Cannot modify QC approved Data except enabled")
+                else:
                     raise forms.ValidationError("Cannot modify QC approved Data")
             if not self.request.user.groups.filter(name=constants['QC_GROUP_NAME']).exists():
                 if self.instance.data_status == 2:
@@ -468,8 +473,8 @@ class RemarkInline(GenericTabularInline, nested_admin.NestedTabularInline):
     extra = 0
     model = Remark
     show_change_link = False
-    readonly_fields = ['user']
-    fields = ['status', 'user', 'content']
+    readonly_fields = ['user', 'created_at']
+    fields = ['status', 'user', 'content', 'created_at']
     form = RemarkInlineForm
     # formset = RemarkInlineFormSet
 

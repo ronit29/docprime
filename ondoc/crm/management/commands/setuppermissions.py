@@ -497,7 +497,7 @@ class Command(BaseCommand):
         group, created = Group.objects.get_or_create(name=constants['WELCOME_CALLING_TEAM'])
         group.permissions.clear()
 
-        content_types = ContentType.objects.get_for_models(Doctor, Remark)
+        content_types = ContentType.objects.get_for_models(Doctor, Remark, Hospital, HospitalNetwork)
         for cl, ct in content_types.items():
             permissions = Permission.objects.filter(
                 Q(content_type=ct),
