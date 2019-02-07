@@ -7,6 +7,11 @@ from ondoc.diagnostic.models import LabAppointment, Lab
 from ondoc.doctor.models import OpdAppointment, Doctor
 from django import forms
 from import_export.admin import ImportExportMixin, ImportExportActionModelAdmin
+from django.conf import settings
+from ondoc.api.v1 import utils as v1_utils
+from ondoc.notification import tasks as notification_tasks
+import logging
+logger = logging.getLogger(__name__)
 
 
 class RatingsReviewForm(forms.ModelForm):
@@ -76,13 +81,18 @@ class RatingsReviewResource(resources.ModelResource):
         export_order = ('id', 'type', 'appointment_id', 'ratings', 'review', 'compliments', 'updated_at')
 
 
+class RatingsReviewForm(forms.ModelForm):
+    send_update_sms = forms.BooleanField(required=False)
+
+
 class RatingsReviewAdmin(ImportExportMixin, admin.ModelAdmin):
+    form = RatingsReviewForm
     resource_class = RatingsReviewResource
     inlines = [ReviewActionsInLine]
     list_display = (['name', 'booking_id', 'appointment_type', 'ratings', 'moderation_status', 'updated_at'])
     readonly_fields = ['user', 'name', 'booking_id', 'appointment_type']
     fields = ('user', 'ratings', 'review', 'name', 'booking_id', 'appointment_type', 'compliment',
-              'moderation_status', 'moderation_comments')
+              'moderation_status', 'moderation_comments', 'send_update_sms')
     list_filter = ('appointment_type', 'moderation_status', 'ratings')
     # form = RatingsReviewForm
 
@@ -110,6 +120,23 @@ class RatingsReviewAdmin(ImportExportMixin, admin.ModelAdmin):
             return response
         return ''
 
+    def send_update_sms(self, instance):
+        from ondoc.authentication.backends import JWTAuthentication
+        if instance:
+            if instance.user:
+                login_object = JWTAuthentication.generate_token(instance.user)
+                token = login_object['token'] if login_object.get('token') else None
+                url = settings.CONSUMER_APP_DOMAIN + "/" + token.decode("utf-8")
+                short_url = v1_utils.generate_short_url(url)
+                text = "Please Find the url to Update your Feedback "+ str(short_url)
+                try:
+                    notification_tasks.send_rating_update_message.apply_async(
+                        kwargs={'number': instance.user.phone_number, 'text': text},
+                        countdown=1)
+                except Exception as e:
+                    logger.error("Failed to send User Rating update message  " + str(e))
+
+
     def name(self, instance):
         if instance.content_type == ContentType.objects.get_for_model(Doctor):
             for doc in self.docs:
@@ -121,6 +148,11 @@ class RatingsReviewAdmin(ImportExportMixin, admin.ModelAdmin):
                     return lab.name
 
         return ''
+
+    def save_model(self, request, obj, form, change):
+        if form.cleaned_data.get('send_update_sms'):
+            self.send_update_sms(obj)
+        super().save_model(request, obj, form, change)
 
         # if instance.appoitnment_type:
         #     if instance.appoitnment_type == RatingsReview.LAB :
