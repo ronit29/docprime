@@ -1647,6 +1647,7 @@ class LabTimingListView(mixins.ListModelMixin,
             }
         return Response(resp_data)
 
+    @transaction.non_atomic_requests
     def time_slot(self, request, *args, **kwargs):
         params = request.query_params
         for_home_pickup = True if int(params.get('pickup', 0)) else False

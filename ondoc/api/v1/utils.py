@@ -815,7 +815,7 @@ class TimeSlotExtraction(object):
         if is_thyrocare:
             self.get_slots(date, day, j, whole_timing_data)
         else:
-            for k in range(4):
+            for k in range(int(settings.NO_OF_WEEKS_FOR_TIME_SLOTS)):
                 for i in range(7):
                     if k == 0:
                         if i >= day:
