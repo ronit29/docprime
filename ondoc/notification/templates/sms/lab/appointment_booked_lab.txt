@@ -5,6 +5,7 @@ The booking details are as below :
 Booking ID : {{instance.id}}
 Patient Name : {{patient_name|capfirst}}
 Lab Name : {{lab_name|capfirst}}
+Contact Number : {{instance.mask_number.first().mask_number}}
 Appointment Date and Time : {{instance.time_slot_start|date:"D jS F Y"}} || {{instance.time_slot_start|date:"h:i A"}}
 
 Please note that the test(s) needs to be done on Credit Basis.
