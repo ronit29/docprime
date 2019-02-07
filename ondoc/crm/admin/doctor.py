@@ -238,7 +238,7 @@ class DoctorClinicInline(nested_admin.NestedTabularInline):
         add_hospital_url = reverse('admin:%s_%s_add' % (content_type.app_label, content_type.model))
         # add_hospital_url+='?_to_field=id&_popup=1'
         if hasattr(self, 'matrix_agent_id') and self.matrix_agent_id:
-            add_hospital_url += 'AgentId={}'.format(self.matrix_agent_id)
+            add_hospital_url += '?AgentId={}'.format(self.matrix_agent_id)
         html = '''<a href='%s' target=_blank>%s</a><br>''' % (add_hospital_url, "Add Hospital")
         return mark_safe(html)
 
