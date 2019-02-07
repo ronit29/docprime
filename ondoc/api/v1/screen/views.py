@@ -46,12 +46,12 @@ class ScreenViewSet(viewsets.GenericViewSet):
                 'tagColor': "#ff0000",
                 'addSearchItem': "Doctor"
             },
-            {
-                'priority': 1,
-                'type': "Banners",
-                'title': "Banners",
-                'items': banner_list_homepage
-            },
+            #{
+            #    'priority': 1,
+            #    'type': "Banners",
+            #    'title': "Banners",
+            #    'items': banner_list_homepage
+            #},
             {
                 'priority': 2,
                 'title': "Health Packages",
