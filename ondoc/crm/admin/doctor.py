@@ -1043,7 +1043,7 @@ class DoctorAdmin(AutoComplete, ImportExportMixin, VersionAdmin, ActionAdmin, QC
     #                 (None,{'fields':('enabled','disabled_after','disable_reason','disable_comments','onboarding_status','assigned_to', \
     #                  'matrix_lead_id','batch', 'is_gold', 'lead_url', 'registered','is_live')}))
     list_display = (
-        'name', 'updated_at', 'data_status', 'onboarding_status', 'list_created_by', 'list_assigned_to', 'registered',
+        'name', 'updated_at', 'data_status', 'welcome_calling_done', 'onboarding_status', 'list_created_by', 'list_assigned_to', 'registered',
         'get_onboard_link')
     date_hierarchy = 'created_at'
     list_filter = (
@@ -1082,7 +1082,17 @@ class DoctorAdmin(AutoComplete, ImportExportMixin, VersionAdmin, ActionAdmin, QC
     #                                                                                   'doctor_clinics__availability',
     #                                                                                   'documents')
     #exclude = ('source','batch','lead_url','registered')
-    
+
+    # reorder welcome_calling after additional_details
+    # todo - code improvement needed
+    def get_fields(self, request, obj=None):
+        all_fields = super().get_fields(request, obj)
+        if 'additional_details' in all_fields and 'welcome_calling_done' in all_fields:
+            all_fields.remove('welcome_calling_done')
+            additional_details_index = all_fields.index('additional_details')
+            all_fields.insert(additional_details_index + 1, 'welcome_calling_done')
+        return all_fields
+
     def get_queryset(self, request):
         qs = super().get_queryset(request)
         if request.user.is_member_of(constants['DOCTOR_SALES_GROUP']):
@@ -1094,7 +1104,7 @@ class DoctorAdmin(AutoComplete, ImportExportMixin, VersionAdmin, ActionAdmin, QC
 
     def get_exclude(self, request, obj=None):
         exclude = ['source', 'user', 'created_by', 'is_phone_number_verified', 'is_email_verified', 'country_code', 'search_key', 'live_at',
-               'onboarded_at', 'qc_approved_at','enabled_for_online_booking_at', 'disabled_at']
+               'onboarded_at', 'qc_approved_at','enabled_for_online_booking_at', 'disabled_at', 'welcome_calling_done_at']
 
         if request.user.is_member_of(constants['DOCTOR_SALES_GROUP']):
             exclude += ['source', 'batch', 'lead_url', 'registered', 'created_by', 'about', 'raw_about',

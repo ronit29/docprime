@@ -1452,3 +1452,12 @@ class StatusHistory(TimeStampedModel):
 
     class Meta:
         db_table = 'status_history'
+
+
+class WelcomeCallingDone(models.Model):
+    welcome_calling_done = models.BooleanField(default=False)
+    welcome_calling_done_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        abstract = True
+

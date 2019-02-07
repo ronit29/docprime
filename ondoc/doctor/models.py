@@ -124,7 +124,7 @@ class MedicalService(auth_model.TimeStampedModel, UniqueNameModel):
         db_table = "medical_service"
 
 
-class Hospital(auth_model.TimeStampedModel, auth_model.CreatedByModel, auth_model.QCModel, SearchKey):
+class Hospital(auth_model.TimeStampedModel, auth_model.CreatedByModel, auth_model.QCModel, SearchKey, auth_model.WelcomeCallingDone):
     PRIVATE = 1
     CLINIC = 2
     HOSPITAL = 3
@@ -178,8 +178,8 @@ class Hospital(auth_model.TimeStampedModel, auth_model.CreatedByModel, auth_mode
     enabled_for_online_booking = models.BooleanField(verbose_name='enabled_for_online_booking?', default=True)
     merchant = GenericRelation(auth_model.AssociatedMerchant)
     merchant_payout = GenericRelation(MerchantPayout)
-    welcome_calling_done = models.BooleanField(default=False)
-    welcome_calling_done_at = models.DateTimeField(null=True, blank=True)
+    # welcome_calling_done = models.BooleanField(default=False)
+    # welcome_calling_done_at = models.DateTimeField(null=True, blank=True)
     physical_agreement_signed = models.BooleanField(default=False)
     physical_agreement_signed_at = models.DateTimeField(null=True, blank=True)
     disabled_at = models.DateTimeField(null=True, blank=True)
@@ -359,7 +359,7 @@ class College(auth_model.TimeStampedModel):
         db_table = "college"
 
 
-class Doctor(auth_model.TimeStampedModel, auth_model.QCModel, SearchKey):
+class Doctor(auth_model.TimeStampedModel, auth_model.QCModel, SearchKey, auth_model.WelcomeCallingDone):
     SOURCE_PRACTO = "pr"
     SOURCE_CRM = 'crm'
 
