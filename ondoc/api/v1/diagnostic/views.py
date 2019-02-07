@@ -1372,6 +1372,8 @@ class LabAppointmentView(mixins.CreateModelMixin,
 
         if validated_data.get("existing_cart_item"):
             cart_item = validated_data.get("existing_cart_item")
+            cart_item.data = request.data
+            cart_item.save()
         else:
             cart_item, is_new = Cart.objects.update_or_create(id=cart_item_id, deleted_at__isnull=True, product_id=account_models.Order.LAB_PRODUCT_ID,
                                                   user=request.user, defaults={"data": data})
