@@ -1,6 +1,6 @@
 from __future__ import absolute_import, unicode_literals
 from ondoc.account.models import Order
-
+from django.contrib.contenttypes.models import ContentType
 from rest_framework import status
 from django.conf import settings
 from celery import task
@@ -182,8 +182,17 @@ def generate_mask_number(appointment):
             logger.info("[ERROR] Appointment could not be get Mask Number")
             logger.info("[ERROR] %s", response.reason)
         else:
+
             mask_number = str(response.text)
-            AppointmentMaskNumber.objects.create(content_object=appointment, mask_number=mask_number,
+            mask_number_instance = AppointmentMaskNumber.objects.filter(content_type=ContentType.objects.get_for_model(
+                appointment), object_id=appointment.id).first()
+            if mask_number_instance:
+                mask_number_instance.is_deleted = True
+                mask_number_instance.save()
+                AppointmentMaskNumber.objects.create(content_object=appointment, mask_number=mask_number,
+                                         validity_up_to=updated_time_slot)
+            else:
+                AppointmentMaskNumber.objects.create(content_object=appointment, mask_number=mask_number,
                                          validity_up_to=updated_time_slot)
 
 

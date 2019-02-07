@@ -183,6 +183,8 @@ class NotificationAction:
             patient_name = instance.profile.name if instance.profile.name else ""
             doctor_name = instance.doctor.name if instance.doctor.name else ""
             procedures = instance.get_procedures()
+            mask_number_instance = instance.mask_number.filter(is_deleted=False).first()
+            mask_number = mask_number_instance.mask_number
             context = {
                 "patient_name": patient_name,
                 "doctor_name": doctor_name,
@@ -195,7 +197,8 @@ class NotificationAction:
                 "url": "/opd/appointment/{}".format(instance.id),
                 "action_type": NotificationAction.OPD_APPOINTMENT,
                 "action_id": instance.id,
-                "image_url": ""
+                "image_url": "",
+                "mask_number": mask_number
             }
             NotificationAction.trigger_all(user=user, notification_type=notification_type, context=context)
         elif notification_type == NotificationAction.APPOINTMENT_CANCELLED and user and user.user_type == User.DOCTOR:
