@@ -188,8 +188,8 @@ def generate_mask_number(appointment):
             #     appointment), object_id=appointment.id).first()
             existing_mask_number_obj = appointment.mask_number.filter(is_deleted=False).first()
             if existing_mask_number_obj:
-                existing_mask_number_obj.update(is_deleted=True)
-                # existing_mask_number_obj.save()
+                existing_mask_number_obj.is_deleted = True
+                existing_mask_number_obj.save()
                 AppointmentMaskNumber.objects.create(content_object=appointment, mask_number=mask_number,
                                          validity_up_to=updated_time_slot, is_deleted=False)
             else:
