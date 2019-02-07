@@ -184,13 +184,14 @@ def generate_mask_number(appointment):
         else:
 
             mask_number = str(response.text)
-            mask_number_instance = AppointmentMaskNumber.objects.filter(content_type=ContentType.objects.get_for_model(
-                appointment), object_id=appointment.id).first()
-            if mask_number_instance:
-                mask_number_instance.is_deleted = True
-                mask_number_instance.save()
+            # mask_number_instance = AppointmentMaskNumber.objects.filter(content_type=ContentType.objects.get_for_model(
+            #     appointment), object_id=appointment.id).first()
+            existing_mask_number_obj = appointment.mask_number.filter(is_deleted=False).first()
+            if existing_mask_number_obj:
+                existing_mask_number_obj.is_deleted = True
+                existing_mask_number_obj.save()
                 AppointmentMaskNumber.objects.create(content_object=appointment, mask_number=mask_number,
-                                         validity_up_to=updated_time_slot)
+                                         validity_up_to=updated_time_slot, is_deleted=False)
             else:
                 AppointmentMaskNumber.objects.create(content_object=appointment, mask_number=mask_number,
                                          validity_up_to=updated_time_slot)
