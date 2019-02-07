@@ -1305,8 +1305,7 @@ class DoctorAdmin(AutoComplete, ImportExportMixin, VersionAdmin, ActionAdmin, QC
             obj.qc_approved_at = datetime.datetime.now()
         if '_mark_in_progress' in request.POST:
             obj.data_status = QCModel.REOPENED
-        # if '_reopen' in request.POST:
-        #     obj.data_status = 4
+        obj.status_changed_by = request.user
 
         super().save_model(request, obj, form, change)
 
@@ -1321,7 +1320,8 @@ class DoctorAdmin(AutoComplete, ImportExportMixin, VersionAdmin, ActionAdmin, QC
         if (request.user.groups.filter(name=constants['QC_GROUP_NAME']).exists() or request.user.groups.filter(
                 name=constants['SUPER_QC_GROUP']).exists() or request.user.groups.filter(
                 name=constants['DOCTOR_SALES_GROUP']).exists() or request.user.groups.filter(
-                name=constants['DOCTOR_NETWORK_GROUP_NAME']).exists()) and obj.data_status in (1, 2, 3, 4):
+                name=constants['DOCTOR_NETWORK_GROUP_NAME']).exists() or request.user.groups.filter(
+                name=constants['WELCOME_CALLING_TEAM']).exists()) and obj.data_status in (QCModel.IN_PROGRESS, QCModel.SUBMITTED_FOR_QC, QCModel.QC_APPROVED, QCModel.REOPENED):
             return True
         return obj.created_by == request.user
 

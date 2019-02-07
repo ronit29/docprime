@@ -5,7 +5,7 @@ from django.db import models
 from django.utils.safestring import mark_safe
 from reversion.admin import VersionAdmin
 from django.db.models import Q
-from ondoc.authentication.models import GenericAdmin, User, AssociatedMerchant
+from ondoc.authentication.models import GenericAdmin, User, AssociatedMerchant, QCModel
 from ondoc.crm.admin.doctor import CreatedByFilter
 
 from ondoc.doctor.models import (HospitalNetworkManager, Hospital,
@@ -219,12 +219,13 @@ class HospitalNetworkAdmin(VersionAdmin, ActionAdmin, QCPemAdmin):
         if not obj.assigned_to:
             obj.assigned_to = request.user
         if '_submit_for_qc' in request.POST:
-            obj.data_status = 2
+            obj.data_status = QCModel.SUBMITTED_FOR_QC
         if '_qc_approve' in request.POST:
-            obj.data_status = 3
+            obj.data_status = QCModel.QC_APPROVED
             obj.qc_approved_at = datetime.datetime.now()
         if '_mark_in_progress' in request.POST:
-            obj.data_status = 1
+            obj.data_status = QCModel.REOPENED
+        obj.status_changed_by = request.user
 
         super().save_model(request, obj, form, change)
 

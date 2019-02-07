@@ -186,6 +186,15 @@ class QCModel(models.Model):
     class Meta:
         abstract = True
 
+    def save(self, *args, **kwargs):
+        if self.pk is not None:
+            orig = self.__class__.objects.get(pk=self.pk)
+            if orig.data_status != self.data_status:
+                StatusHistory.create(content_object=self)
+
+        super().save(*args, **kwargs)
+
+
 class CustomUserManager(BaseUserManager):
     """Define a model manager for User model with no username field."""
     use_in_migrations = True
@@ -1423,3 +1432,23 @@ class AssociatedMerchant(TimeStampedModel):
     class Meta:
         db_table = 'associated_merchant'
 
+
+
+class StatusHistory(TimeStampedModel):
+    content_type = models.ForeignKey(ContentType, on_delete=models.DO_NOTHING)
+    object_id = models.PositiveIntegerField()
+    content_object = GenericForeignKey()
+    status = models.PositiveSmallIntegerField(null=False)
+    user = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True)
+
+    @classmethod
+    def create(cls, *args, **kwargs):
+        obj = kwargs.get('content_object')
+        if not obj:
+            raise Exception('Function accept content_object in **kwargs')
+
+        content_type = ContentType.objects.get_for_model(obj)
+        cls(content_type=content_type, object_id=obj.id, status=obj.data_status, user=obj.status_changed_by).save()
+
+    class Meta:
+        db_table = 'status_history'
