@@ -6,10 +6,10 @@ from rest_framework import status
 from django.conf import settings
 import logging
 logger = logging.getLogger(__name__)
-from datetime import timedelta, datetime
+from datetime import timedelta, datetime, date
 from ondoc.integrations.models import IntegratorMapping, IntegratorProfileMapping
 from django.contrib.contenttypes.models import ContentType
-from ondoc.api.v1.utils import resolve_address
+from ondoc.api.v1.utils import resolve_address, aware_time_zone
 
 
 class Thyrocare(BaseIntegrator):
@@ -146,40 +146,78 @@ class Thyrocare(BaseIntegrator):
         url = "https://www.thyrocare.com/API_BETA/ORDER.svc/Postorderdata"
 
         response = requests.post(url, data=json.dumps(payload), headers=headers)
-        if response.status_code == status.HTTP_201_CREATED:
-            return response.json()
+        response = response.json()
+        if response.get('RES_ID') == 'RES0000':
+            return response
+        else:
+            logger.error("[ERROR] %s" % response.get('RESPONSE'))
 
         return None
 
     def prepare_data(self, tests, packages, lab_appointment):
-        patient_address = ""
+        profile = lab_appointment.profile
         if hasattr(lab_appointment, 'address') and lab_appointment.address:
             patient_address = resolve_address(lab_appointment.address)
+            pincode = lab_appointment.address["pincode"]
+        else:
+            patient_address = "Dummy Address(No address found for user)"
+            pincode = "122002"
+
+        order_id = "DP00{}".format(lab_appointment.id)
+        bendataxml = "<NewDataSet><Ben_details><Name>%s</Name><Age>%s</Age><Gender>%s</Gender></Ben_details></NewDataSet>" % (profile.name, self.calculate_age(profile), profile.gender)
 
         payload = {
             "api_key": settings.THYROCARE_API_KEY,
-            "orderid": lab_appointment.id,
+            "orderid": order_id,
             "address": patient_address,
-            "pincode": "122001",
-            "product": "TEST",
-            "mobile": lab_appointment.profile.phone_number,
-            "email": lab_appointment.profile.email,
+            "pincode": pincode,
+            "mobile": profile.phone_number if profile else "",
+            "email": profile.email if profile else "",
             "service_type": "H",
-            "order_by": lab_appointment.profile.name,
-            "rate": "400",
+            "order_by": profile.name if profile else "",
             "hc": "0",
-            "appt_date": "2019-02-06 05:00:00 AM",
+            "appt_date": aware_time_zone(lab_appointment.time_slot_start).strftime("%Y-%m-%d %I:%M:%S %p"),  # Need to change it to IST
             "reports": "N",
-            "ref_code": "119",
+            "ref_code": "7738943013",  # Fixed for Test Need to ask
             "pay_type": "POSTPAID",
             "bencount": "1",
-            "bendataxml": "<NewDataSet><Ben_details><Name>Mayank</Name><Age>30</Age><Gender>M</Gender></Ben_details></NewDataSet>"
+            "bendataxml": bendataxml,
+            "std": "91"
         }
 
+        product = list()
+        rate = 0
         if tests:
-            pass
+            for test in tests:
+                integrator_test = IntegratorMapping.objects.filter(test_id=test.id, integrator_class_name=Thyrocare.__name__, is_active=True).first()
+                if integrator_test:
+                    product.append(integrator_test.integrator_product_data["code"])
+                    rate += int(integrator_test.integrator_product_data["rate"]["b2c"])
+                else:
+                    logger.info("[ERROR] No tests data found in integrator.")
 
         if packages:
-            pass
+            for package in packages:
+                integrator_package = IntegratorProfileMapping.objects.filter(package_id=package.id, integrator_class_name=Thyrocare.__name__, is_active=True).first()
+                if integrator_package:
+                    product.append(integrator_package.integrator_package_name)
+                    rate += int(integrator_package.integrator_product_data["rate"]["b2c"])
+                else:
+                    logger.info("[ERROR] No package data found in integrator for.")
+
+        if product:
+            product_str = ",".join(product )
+            payload["product"] = product_str
+
+        payload["rate"] = rate
 
         return payload
+
+    def calculate_age(self, profile):
+        if not profile:
+            return 0
+        if not profile.dob:
+            return 0
+        dob = profile.dob
+        today = date.today()
+        return today.year - dob.year - ((today.month, today.day) < (dob.month, dob.day))

@@ -1,24 +1,15 @@
 from __future__ import absolute_import, unicode_literals
-
-
-from ondoc.account.models import Order
-
-from rest_framework import status
-from django.conf import settings
 from celery import task
-import requests
-import json
 import logging
-import datetime
-from ondoc.authentication.models import Address
-from ondoc.api.v1.utils import resolve_address
 from django.contrib.contenttypes.models import ContentType
+import json
+
 logger = logging.getLogger(__name__)
 
 @task(bind=True, max_retries=3)
 def push_lab_appointment_to_integrator(self, data):
     from ondoc.diagnostic.models import LabAppointment
-    from ondoc.integrations.models import IntegratorMapping, IntegratorProfileMapping
+    from ondoc.integrations.models import IntegratorMapping, IntegratorProfileMapping, IntegratorResponse
     from ondoc.integrations import service
     try:
         appointment_id = data.get('appointment_id', None)
@@ -53,10 +44,9 @@ def push_lab_appointment_to_integrator(self, data):
             raise Exception('[ERROR] Could not find any test and packages for the appointment id %d' % appointment.id)
 
         if packages:
-            integrator_mapping = IntegratorProfileMapping.objects.filter(content_type=lab_network_content_type, object_id=lab_network.id, test=packages[0])
+            integrator_mapping = IntegratorProfileMapping.objects.filter(content_type=lab_network_content_type, object_id=lab_network.id, test=packages[0]).first()
         elif tests:
-            integrator_mapping = IntegratorMapping.objects.filter(content_type=lab_network_content_type, object_id=lab_network.id, test=tests[0])
-
+            integrator_mapping = IntegratorMapping.objects.filter(content_type=lab_network_content_type, object_id=lab_network.id, test=tests[0]).first()
 
         integrator_obj = service.create_integrator_obj(integrator_mapping.integrator_class_name)
         integrator_response = integrator_obj.post_order(appointment, tests=tests, packages=packages)
@@ -66,6 +56,12 @@ def push_lab_appointment_to_integrator(self, data):
             print(countdown_time)
             self.retry([data], countdown=countdown_time)
 
+        # save integrator response
+        resp_data = integrator_response
+        IntegratorResponse(lead_id=resp_data['ORDERRESPONSE']['PostOrderDataResponse'][0]['LEAD_ID'],
+                            dp_order_id=resp_data['ORDER_NO'], integrator_order_id=resp_data['REF_ORDERID'],
+                            content_object=appointment, response_data=resp_data,
+                            integrator_class_name=integrator_mapping.integrator_class_name).save()
 
     except Exception as e:
         logger.error(str(e))
