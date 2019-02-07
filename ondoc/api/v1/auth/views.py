@@ -1062,7 +1062,7 @@ class TransactionViewSet(viewsets.GenericViewSet):
 
                 if success_in_process:
                     if processed_data.get("type") == "all":
-                        REDIRECT_URL = SUCCESS_REDIRECT_URL % order_obj.id
+                        REDIRECT_URL = (SUCCESS_REDIRECT_URL % order_obj.id) + "?payment_success=true"
                     elif processed_data.get("type") == "doctor":
                         REDIRECT_URL = OPD_REDIRECT_URL + "/" + str(processed_data.get("id","")) + "?payment_success=true"
                     elif processed_data.get("type") == "lab":
