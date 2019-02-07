@@ -61,9 +61,6 @@ class Banner(auth_model.TimeStampedModel):
 
     @staticmethod
     def get_all_banners(request):
-        parameters = request.query_params
-
-        now = timezone.now()
 
         queryset = Banner.objects.filter(enable=True).order_by('-priority')[:10]
         slider_locate = dict(Banner.slider_location)
