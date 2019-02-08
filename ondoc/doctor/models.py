@@ -48,7 +48,8 @@ import hashlib
 from django.contrib.contenttypes.fields import GenericRelation
 from django.contrib.contenttypes.fields import GenericForeignKey
 from django.contrib.contenttypes.models import ContentType
-from ondoc.matrix.tasks import push_appointment_to_matrix, push_onboarding_qcstatus_to_matrix
+from ondoc.matrix.tasks import push_appointment_to_matrix, push_onboarding_qcstatus_to_matrix, \
+    generate_appointment_masknumber
 # from ondoc.procedure.models import Procedure
 from ondoc.ratings_review import models as ratings_models
 from django.utils import timezone
@@ -1464,6 +1465,8 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
             try:
                 push_appointment_to_matrix.apply_async(({'type': 'OPD_APPOINTMENT', 'appointment_id': self.id,
                                                          'product_id': 5, 'sub_product_id': 2},), countdown=5)
+                generate_appointment_masknumber.apply_async(({'type': 'OPD_APPOINTMENT', 'appointment_id': self.id},),
+                                                            countdown=5)
             except Exception as e:
                 logger.error(str(e))
 
