@@ -1820,9 +1820,8 @@ class TestDetailsViewset(viewsets.GenericViewSet):
         for i in range(len(test_ids)):
             test_ids[i] = str(test_ids[i])
 
-        if params.get('lat'):
+        if params.get('lat') and params.get('long'):
             parameters['lat'] = params.get('lat')
-        if params.get('long'):
             parameters['long'] = params.get('long')
 
         parameters['ids'] = ",".join(test_ids)
