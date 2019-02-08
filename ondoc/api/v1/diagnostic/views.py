@@ -1743,6 +1743,7 @@ class TestDetailsViewset(viewsets.GenericViewSet):
 
     def retrieve(self, request, entity=None, *args, **kwargs):
         params = request.query_params
+        parameters = dict()
         if params.get('url'):
             test_ids = [entity.entity_id]
             lab_id = None
@@ -1819,7 +1820,11 @@ class TestDetailsViewset(viewsets.GenericViewSet):
         for i in range(len(test_ids)):
             test_ids[i] = str(test_ids[i])
 
-        parameters = dict()
+        if params.get('lat'):
+            parameters['lat'] = params.get('lat')
+        if params.get('long'):
+            parameters['long'] = params.get('long')
+
         parameters['ids'] = ",".join(test_ids)
 
         kwargs['parameters'] = parameters
