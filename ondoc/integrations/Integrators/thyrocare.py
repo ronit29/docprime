@@ -17,9 +17,7 @@ class Thyrocare(BaseIntegrator):
     # for getting thyrocare API Key
     @classmethod
     def thyrocare_auth(cls):
-        username = settings.THYROCARE_USERNAME
-        password = settings.THYROCARE_PASSWORD
-        url = 'https://www.thyrocare.com/api_beta/common.svc/%s/%s/portalorders/DSA/login' % (username, password)
+        url = '%s/common.svc/%s/%s/portalorders/DSA/login' % (settings.THYROCARE_BASE_URL, settings.THYROCARE_USERNAME, settings.THYROCARE_PASSWORD)
         response = requests.get(url)
         if response.status_code != status.HTTP_200_OK or not response.ok:
             logger.info("[ERROR] Thyrocare authentication failed.")
@@ -39,7 +37,7 @@ class Thyrocare(BaseIntegrator):
             logger.error("[ERROR] Not Authenticate")
             return None
 
-        url = 'https://www.thyrocare.com/API_BETA/master.svc/%s/%s/products' % (api_key, type)
+        url = '%s/master.svc/%s/%s/products' % (settings.THYROCARE_BASE_URL, api_key, type)
         product_data_response = requests.get(url)
 
         if product_data_response.status_code != status.HTTP_200_OK or not product_data_response.ok:
@@ -84,7 +82,7 @@ class Thyrocare(BaseIntegrator):
     def _get_appointment_slots(self, pincode, date, **kwargs):
         obj = TimeSlotExtraction()
 
-        url = 'https://www.thyrocare.com/API_BETA/ORDER.svc/%s/%s/GetAppointmentSlots' % (pincode, date)
+        url = '%s/ORDER.svc/%s/%s/GetAppointmentSlots' % (settings.THYROCARE_BASE_URL, pincode, date)
         response = requests.get(url)
         if response.status_code != status.HTTP_200_OK or not response.ok:
             logger.error("[ERROR] Thyrocare Time slot api failed.")
@@ -123,7 +121,7 @@ class Thyrocare(BaseIntegrator):
         return res_data
 
     def _get_is_user_area_serviceable(self, pincode):
-        url = "https://www.thyrocare.com/API_BETA/order.svc/%s/%s/PincodeAvailability" % (settings.THYROCARE_API_KEY, pincode)
+        url = "%s/order.svc/%s/%s/PincodeAvailability" % (settings.THYROCARE_BASE_URL, settings.THYROCARE_API_KEY, pincode)
         response = requests.get(url)
         if response.status_code != status.HTTP_200_OK or not response.ok:
             logger.error("[ERROR] Thyrocare pincode availability api failed")
@@ -143,7 +141,7 @@ class Thyrocare(BaseIntegrator):
         payload = self.prepare_data(tests, packages, lab_appointment)
 
         headers = {'Content-Type': "application/json"}
-        url = "https://www.thyrocare.com/API_BETA/ORDER.svc/Postorderdata"
+        url = "%s/ORDER.svc/Postorderdata" % (settings.THYROCARE_BASE_URL)
 
         response = requests.post(url, data=json.dumps(payload), headers=headers)
         response = response.json()
@@ -229,7 +227,7 @@ class Thyrocare(BaseIntegrator):
         result = dict()
 
         for format in formats:
-            url = "https://www.thyrocare.com/API_BETA/order.svc/%s/GETREPORTS/%s/%s/%s/Myreport" % (settings.THYROCARE_API_KEY, lead_id, format, mobile)
+            url = "%s/order.svc/%s/GETREPORTS/%s/%s/%s/Myreport" % (settings.THYROCARE_BASE_URL, settings.THYROCARE_API_KEY, lead_id, format, mobile)
             # url = "https://www.thyrocare.com/APIs/order.svc/sNhdlQjqvoD7zCbzf56sxppBJX3MmdWSAomi@RBhXRrVcGyko7hIzQ==/GETREPORTS/SP46592004/%s/8898881529/Myreport" %(format)
             response = requests.get(url)
             response = response.json()

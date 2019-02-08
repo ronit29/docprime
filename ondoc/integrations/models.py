@@ -24,11 +24,8 @@ class IntegratorMapping(TimeStampedModel):
 
     @classmethod
     def get_if_third_party_integration(cls, test_id=None, network_id=None):
-        if test_id:
-            mapping = cls.objects.filter(test__id=test_id, is_active=True).first()
-        elif network_id:
+        if network_id:
             mapping = cls.objects.filter(object_id=network_id, is_active=True).first()
-
         else:
             return None
 

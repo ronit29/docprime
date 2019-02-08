@@ -8,6 +8,7 @@ from django.db import connection, transaction
 from django.db.models import F, Func, Q, Count, Sum, Case, When, Value, IntegerField
 from django.utils import timezone
 import math
+import datetime
 import pytz
 import calendar
 from django.contrib.auth import get_user_model
@@ -30,7 +31,7 @@ from django.utils.dateparse import parse_datetime
 import hashlib
 from ondoc.authentication import models as auth_models
 import logging
-from datetime import datetime, timedelta
+from datetime import timedelta
 logger = logging.getLogger(__name__)
 
 User = get_user_model()
@@ -817,7 +818,7 @@ class TimeSlotExtraction(object):
         return whole_timing_data
 
     def get_timing_slots(self, date, is_thyrocare=False):
-        date = datetime.strptime(date, '%d-%m-%Y')
+        date = datetime.datetime.strptime(date, '%d-%m-%Y')
         day = date.weekday()
         whole_timing_data = OrderedDict()
         j = 0
@@ -866,7 +867,7 @@ class TimeSlotExtraction(object):
         tomorrow_min = None
         today_max = None
 
-        now = datetime.now()
+        now = datetime.datetime.now()
         curr_time = now.hour
         curr_minute = round(round(float(now.minute) / 60, 2) * 2) / 2
         curr_time += curr_minute
