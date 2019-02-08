@@ -345,6 +345,9 @@ def process_payout(payout_id):
         if not payout_data or payout_data.status == payout_data.PAID:
             raise Exception("Payment already done for this payout")
 
+
+        default_payment_mode = payout_data.get_default_payment_mode()
+
         appointment = payout_data.get_appointment()
         billed_to = payout_data.get_billed_to()
         merchant = payout_data.get_merchant()
@@ -389,6 +392,7 @@ def process_payout(payout_id):
                 curr_txn["pgtxId"] = txn.transaction_id
             curr_txn["refNo"] = payout_data.payout_ref_id
             curr_txn["bookingId"] = appointment.id
+            curr_txn["paymentType"] = payout_data.payment_mode if payout_data.payment_mode else default_payment_mode
             req_data["payload"].append(curr_txn)
             idx += 1
             if isinstance(txn, DummyTransactions) and txn.amount>0:
