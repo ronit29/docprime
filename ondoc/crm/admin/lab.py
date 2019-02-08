@@ -21,7 +21,7 @@ from django.utils.html import format_html_join
 import pytz
 
 from ondoc.account.models import Order, Invoice
-from ondoc.api.v1.utils import util_absolute_url, util_file_name
+from ondoc.api.v1.utils import util_absolute_url, util_file_name, utf_to_ist
 from ondoc.doctor.models import Hospital, CancellationReason
 from ondoc.diagnostic.models import (LabTiming, LabImage,
                                      LabManager, LabAccreditation, LabAward, LabCertification, AvailableLabTest,
@@ -31,7 +31,7 @@ from ondoc.diagnostic.models import (LabTiming, LabImage,
                                      TestParameter, ParameterLabTest, FrequentlyAddedTogetherTests, QuestionAnswer,
                                      LabReport, LabReportFile, LabTestCategoryMapping,
                                      LabTestRecommendedCategoryMapping)
-from ondoc.notification.models import EmailNotification
+from ondoc.notification.models import EmailNotification, NotificationAction
 from .common import *
 from ondoc.authentication.models import GenericAdmin, User, QCModel, GenericLabAdmin, AssociatedMerchant
 from ondoc.crm.admin.doctor import CustomDateInput, TimePickerWidget, CreatedByFilter, AutoComplete
@@ -894,11 +894,10 @@ class LabAppointmentAdmin(nested_admin.NestedModelAdmin):
     invoice_urls.short_description = 'Invoice(s)'
 
     def email_notification_timestamp(self, instance):
-        time_format = '%Y-%m-%d %H:%M:%S'
-        l = instance.email_notification.all().values_list('created_at', flat=True)
+        l = instance.email_notification.filter(notification_type=NotificationAction.LAB_REPORT_SEND_VIA_CRM).values_list('created_at', flat=True)
         result = []
-        for item in l:
-            formated_date = datetime.datetime.strftime(item, time_format)
+        for temp_item in l:
+            formated_date = utf_to_ist(temp_item)
             result.append(formated_date)
         return ", ".join(result)
     email_notification_timestamp.short_description = 'Report(s) sent at'
