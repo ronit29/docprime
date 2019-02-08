@@ -375,14 +375,13 @@ def process_payout(payout_id):
         req_data = { "payload" : [], "checkSum" : "" }
         req_data2 = { "payload" : [], "checkSum" : "" }
 
-
         idx = 0
         for txn in all_txn:
             
             curr_txn = OrderedDict()
             curr_txn["idx"] = idx
             curr_txn["orderNo"] = txn.order_no
-            curr_txn["orderId"] = order_data.id
+            curr_txn["orderId"] = txn.order.id
             curr_txn["txnAmount"] = str(txn.amount)
             curr_txn["settledAmount"] = str(payout_data.payable_amount)
             curr_txn["merchantCode"] = merchant.id
@@ -439,11 +438,13 @@ def request_payout(req_data, order_data):
             if result:
                 for res_txn in result:
                     success_payout = res_txn['status'] == "SUCCESSFULLY_INSERTED"
-                    return {"status":1,"response":resp_data}
+
+            if success_payout:
+                return {"status": 1, "response": resp_data}
             
     
     logger.error("payout failed for request data - " + str(req_data))
-    return {"status":0,"response":resp_data}
+    return {"status" : 0, "response" : resp_data}
 
 @task()
 def opd_send_otp_before_appointment(appointment_id, previous_appointment_date_time):
