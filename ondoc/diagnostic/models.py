@@ -4,9 +4,9 @@ from django.contrib.gis.db import models
 from django.contrib.staticfiles.templatetags.staticfiles import static
 from django.core.validators import MaxValueValidator, MinValueValidator, FileExtensionValidator
 from django.template.loader import render_to_string
-from hardcopy import bytestring_to_pdf
+# from hardcopy import bytestring_to_pdf
 
-from ondoc.account.models import MerchantPayout, ConsumerAccount, Order, UserReferred, Invoice
+from ondoc.account.models import MerchantPayout, ConsumerAccount, Order, UserReferred, MoneyPool, Invoice
 from ondoc.authentication.models import (TimeStampedModel, CreatedByModel, Image, Document, QCModel, UserProfile, User,
                                          UserPermission, GenericAdmin, LabUserPermission, GenericLabAdmin,
                                          BillingAccount, SPOCDetails)
@@ -17,7 +17,7 @@ from ondoc.notification import tasks as notification_tasks
 from ondoc.notification.labnotificationaction import LabNotificationAction
 from django.core.files.storage import get_storage_class
 from ondoc.api.v1.utils import AgreedPriceCalculate, DealPriceCalculate, TimeSlotExtraction, CouponsMixin, \
-    util_absolute_url, html_to_pdf
+    form_time_slot, util_absolute_url, html_to_pdf
 from ondoc.account import models as account_model
 from django.utils import timezone
 from datetime import timedelta
@@ -32,6 +32,7 @@ from io import BytesIO
 import datetime
 from ondoc.api.v1.utils import get_start_end_datetime, custom_form_datetime
 from ondoc.diagnostic import tasks
+from ondoc.authentication.models import UserProfile, Address
 from dateutil import tz
 from django.conf import settings
 import logging
@@ -1095,6 +1096,7 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin)
     merchant_payout = models.ForeignKey(MerchantPayout, related_name="lab_appointment", on_delete=models.SET_NULL, null=True)
     price_data = JSONField(blank=True, null=True)
     tests = models.ManyToManyField(LabTest, through='LabAppointmentTestMapping', through_fields=('appointment', 'test'))
+    money_pool = models.ForeignKey(MoneyPool, on_delete=models.SET_NULL, null=True)
 
     def get_tests_and_prices(self):
         test_price = []
@@ -1415,11 +1417,25 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin)
 
             if self.payment_type == OpdAppointment.PREPAID and account_model.ConsumerTransaction.valid_appointment_for_cancellation(
                     self.id, product_id):
-                cancel_amount = self.effective_price
-                consumer_account.credit_cancellation(self, account_model.Order.LAB_PRODUCT_ID, cancel_amount)
+
+                wallet_refund, cashback_refund = self.get_cancellation_breakup()
+
+                consumer_account.credit_cancellation(self, account_model.Order.LAB_PRODUCT_ID, wallet_refund, cashback_refund)
                 if refund_flag:
                     ctx_obj = consumer_account.debit_refund()
                     account_model.ConsumerRefund.initiate_refund(self.user, ctx_obj)
+
+    def get_cancellation_breakup(self):
+        wallet_refund = cashback_refund = 0
+        if self.money_pool:
+            wallet_refund, cashback_refund = self.money_pool.get_refund_breakup(self.effective_price)
+        elif self.price_data:
+            wallet_refund = self.price_data["wallet_amount"]
+            cashback_refund = self.price_data["cashback_amount"]
+        else:
+            wallet_refund = self.effective_price
+
+        return wallet_refund, cashback_refund
 
     def action_completed(self):
         self.status = self.COMPLETED
@@ -1557,6 +1573,105 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin)
                 return merchant.merchant
         return None
 
+    @classmethod
+    def get_price_details(cls, data):
+
+        deal_price_calculation = Case(When(custom_deal_price__isnull=True, then=F('computed_deal_price')),
+                                      When(custom_deal_price__isnull=False, then=F('custom_deal_price')))
+        agreed_price_calculation = Case(When(custom_agreed_price__isnull=True, then=F('computed_agreed_price')),
+                                        When(custom_agreed_price__isnull=False, then=F('custom_agreed_price')))
+        lab_test_queryset = AvailableLabTest.objects.filter(lab_pricing_group__labs=data["lab"],
+                                                            test__in=data['test_ids'])
+        temp_lab_test = lab_test_queryset.values('lab_pricing_group__labs').annotate(total_mrp=Sum("mrp"),
+                                                                                     total_deal_price=Sum(
+                                                                                         deal_price_calculation),
+                                                                                     total_agreed_price=Sum(
+                                                                                         agreed_price_calculation))
+        total_agreed = total_deal_price = total_mrp = effective_price = home_pickup_charges = 0
+        if temp_lab_test:
+            total_mrp = temp_lab_test[0].get("total_mrp", 0)
+            total_agreed = temp_lab_test[0].get("total_agreed_price", 0)
+            total_deal_price = temp_lab_test[0].get("total_deal_price", 0)
+            effective_price = total_deal_price
+            if data["is_home_pickup"] and data["lab"].is_home_collection_enabled:
+                effective_price += data["lab"].home_pickup_charges
+                home_pickup_charges = data["lab"].home_pickup_charges
+
+        coupon_discount, coupon_cashback, coupon_list = Coupon.get_total_deduction(data, effective_price)
+
+        if data.get("payment_type") in [OpdAppointment.COD, OpdAppointment.PREPAID]:
+            if coupon_discount >= effective_price:
+                effective_price = 0
+            else:
+                effective_price = effective_price - coupon_discount
+
+        return {
+            "deal_price" : total_deal_price,
+            "mrp" : total_mrp,
+            "fees" : total_agreed,
+            "effective_price" :effective_price,
+            "coupon_discount" : coupon_discount,
+            "coupon_cashback" : coupon_cashback,
+            "coupon_list" : coupon_list,
+            "home_pickup_charges" : home_pickup_charges
+        }
+
+    @classmethod
+    def create_fulfillment_data(cls, user, data, price_data):
+        from ondoc.api.v1.auth.serializers import AddressSerializer
+
+        lab_test_queryset = AvailableLabTest.objects.filter(lab_pricing_group__labs=data["lab"], test__in=data['test_ids'])
+        test_ids_list = list()
+        extra_details = list()
+        for obj in lab_test_queryset:
+            test_ids_list.append(obj.id)
+            extra_details.append({
+                "id": str(obj.test.id),
+                "name": str(obj.test.name),
+                "custom_deal_price": str(obj.custom_deal_price),
+                "computed_deal_price": str(obj.computed_deal_price),
+                "mrp": str(obj.mrp),
+                "computed_agreed_price": str(obj.computed_agreed_price),
+                "custom_agreed_price": str(obj.custom_agreed_price)
+            })
+
+        start_dt = form_time_slot(data["start_date"], data["start_time"])
+        profile_detail = {
+            "name": data["profile"].name,
+            "gender": data["profile"].gender,
+            "dob": str(data["profile"].dob),
+        }
+
+        fulfillment_data = {
+            "lab": data["lab"],
+            "user": user,
+            "profile": data["profile"],
+            "price": price_data.get("mrp"),
+            "agreed_price": price_data.get("fees"),
+            "deal_price": price_data.get("deal_price"),
+            "effective_price": price_data.get("effective_price"),
+            "home_pickup_charges": price_data.get("home_pickup_charges"),
+            "time_slot_start": start_dt,
+            "is_home_pickup": data["is_home_pickup"],
+            "profile_detail": profile_detail,
+            "status": LabAppointment.BOOKED,
+            "payment_type": data["payment_type"],
+            "lab_test": test_ids_list,
+            "extra_details": extra_details,
+            "coupon": price_data.get("coupon_list"),
+            "discount": int(price_data.get("coupon_discount")),
+            "cashback": int(price_data.get("coupon_cashback"))
+        }
+
+        if data.get("is_home_pickup") is True:
+            address = Address.objects.filter(pk=data.get("address").id).first()
+            address_serialzer = AddressSerializer(address)
+            fulfillment_data.update({
+                "address": address_serialzer.data,
+                "is_home_pickup": True
+            })
+        return fulfillment_data
+
     def __str__(self):
         return "{}, {}".format(self.profile.name if self.profile else "", self.lab.name)
 
@@ -1567,6 +1682,7 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin)
 class CommonTest(TimeStampedModel):
     test = models.ForeignKey(LabTest, on_delete=models.CASCADE, related_name='commontest')
     icon = models.ImageField(upload_to='diagnostic/common_test_icons', null=True)
+    priority = models.PositiveIntegerField(default=0)
 
     def __str__(self):
         return "{}-{}".format(self.test.name, self.id)
@@ -1575,7 +1691,7 @@ class CommonTest(TimeStampedModel):
 class CommonPackage(TimeStampedModel):
     package = models.ForeignKey(LabTest, on_delete=models.CASCADE, related_name='commonpackage')
     icon = models.ImageField(upload_to='diagnostic/common_package_icons', null=True)
-
+    priority = models.PositiveIntegerField(default=0)
     def __str__(self):
         return "{}-{}".format(self.package.name, self.id)
 
@@ -1590,6 +1706,7 @@ class CommonDiagnosticCondition(TimeStampedModel):
         through='DiagnosticConditionLabTest',
         through_fields=('diagnostic_condition', 'lab_test'),
     )
+    priority = models.PositiveIntegerField(default=0)
     # test = models.ManyToManyField(LabTest)
 
     def __str__(self):

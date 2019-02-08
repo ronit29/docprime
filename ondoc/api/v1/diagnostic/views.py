@@ -4,6 +4,7 @@ from ondoc.api.v1.diagnostic.serializers import CustomLabTestPackageSerializer
 from ondoc.authentication.backends import JWTAuthentication
 from ondoc.api.v1.diagnostic import serializers as diagnostic_serializer
 from ondoc.api.v1.auth.serializers import AddressSerializer
+from ondoc.cart.models import Cart
 from ondoc.common.models import UserConfig
 from ondoc.ratings_review import models as rating_models
 from ondoc.diagnostic.models import (LabTest, AvailableLabTest, Lab, LabAppointment, LabTiming, PromotedLab,
@@ -72,10 +73,10 @@ class SearchPageViewSet(viewsets.ReadOnlyModelViewSet):
         count = int(count)
         if count <= 0:
             count = 10
-        test_queryset = CommonTest.objects.select_related('test').filter(test__enable_for_retail=True, test__searchable=True)[:count]
-        conditions_queryset = CommonDiagnosticCondition.objects.prefetch_related('lab_test').all()
+        test_queryset = CommonTest.objects.select_related('test').filter(test__enable_for_retail=True, test__searchable=True).order_by('-priority')[:count]
+        conditions_queryset = CommonDiagnosticCondition.objects.prefetch_related('lab_test').all().order_by('-priority')[:count]
         lab_queryset = PromotedLab.objects.select_related('lab').filter(lab__is_live=True, lab__is_test_lab=False)
-        package_queryset = CommonPackage.objects.prefetch_related('package').filter(package__enable_for_retail=True, package__searchable=True)[:count]
+        package_queryset = CommonPackage.objects.prefetch_related('package').filter(package__enable_for_retail=True, package__searchable=True).order_by('-priority')[:count]
         recommended_package_qs = LabTestCategory.objects.prefetch_related('recommended_lab_tests__parameter').filter(is_live=True,
                                                                                                           show_on_recommended_screen=True,
                                                                                                           recommended_lab_tests__searchable=True,
@@ -191,7 +192,7 @@ class LabList(viewsets.ReadOnlyModelViewSet):
         max_distance = max_distance*1000 if max_distance is not None else 10000
         lab_tests_with_categories = LabTestCategoryMapping.objects.filter(parent_category__isnull=False).values_list(
             'lab_test', flat=True).distinct()
-        all_packages_in_network_labs = LabTest.objects.prefetch_related('test').filter(enable_for_retail=True,
+        all_packages_in_network_labs = LabTest.objects.prefetch_related('test', 'categories').filter(enable_for_retail=True,
                                                                                        searchable=True, is_package=True,
                                                                                        availablelabs__enabled=True,
                                                                                        availablelabs__lab_pricing_group__labs__is_live=True,
@@ -211,7 +212,7 @@ class LabList(viewsets.ReadOnlyModelViewSet):
                         partition_by=[F(
                             'availablelabs__lab_pricing_group__labs__network'), F('id')]))
 
-        all_packages_in_non_network_labs = LabTest.objects.prefetch_related('test').filter(enable_for_retail=True,
+        all_packages_in_non_network_labs = LabTest.objects.prefetch_related('test', 'categories').filter(enable_for_retail=True,
                                                                                            searchable=True,
                                                                                            is_package=True,
                                                                                            availablelabs__enabled=True,
@@ -1362,11 +1363,25 @@ class LabAppointmentView(mixins.CreateModelMixin,
         data = dict(request.data)
         if not data.get("is_home_pickup"):
             data.pop("address", None)
-        serializer = diagnostic_serializer.LabAppointmentCreateSerializer(data=data, context={'request': request})
-        serializer.is_valid(raise_exception=True)
-        appointment_data = self.form_lab_app_data(request, serializer.validated_data)
 
-        resp = self.create_order(request, appointment_data, account_models.Order.LAB_PRODUCT_ID, data.get("use_wallet"))
+        serializer = diagnostic_serializer.LabAppointmentCreateSerializer(data=data, context={'request': request, 'data' : request.data, 'use_duplicate' : True})
+        serializer.is_valid(raise_exception=True)
+        validated_data = serializer.validated_data
+
+        cart_item_id = validated_data.get('cart_item').id if validated_data.get('cart_item') else None
+
+        if validated_data.get("existing_cart_item"):
+            cart_item = validated_data.get("existing_cart_item")
+            cart_item.data = request.data
+            cart_item.save()
+        else:
+            cart_item, is_new = Cart.objects.update_or_create(id=cart_item_id, deleted_at__isnull=True, product_id=account_models.Order.LAB_PRODUCT_ID,
+                                                  user=request.user, defaults={"data": data})
+
+        if hasattr(request, 'agent') and request.agent:
+            resp = { 'is_agent': True , "status" : 1 }
+        else:
+            resp = account_models.Order.create_order(request, [cart_item], validated_data.get("use_wallet"))
 
         return Response(data=resp)
 

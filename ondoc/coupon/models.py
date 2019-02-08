@@ -79,9 +79,10 @@ class Coupon(auth_model.TimeStampedModel):
 
         return coupon_obj
 
-    def used_coupon_count(self, user):
+    def used_coupon_count(self, user, cart_item=None):
         from ondoc.doctor.models import OpdAppointment
         from ondoc.diagnostic.models import LabAppointment
+        from ondoc.cart.models import Cart
 
         if not user.is_authenticated:
             return 0
@@ -104,6 +105,8 @@ class Coupon(auth_model.TimeStampedModel):
                                                                LabAppointment.ACCEPTED,
                                                                LabAppointment.COMPLETED],
                                                    coupon=self).count()
+
+        count += Cart.objects.filter(user=user, deleted_at__isnull=True, data__coupon_code__contains=self.code).exclude(id=cart_item).count()
         return count
 
     def total_used_coupon_count(self):

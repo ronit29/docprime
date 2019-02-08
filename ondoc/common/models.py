@@ -58,6 +58,49 @@ class PaymentOptions(TimeStampedModel):
     priority = models.IntegerField(default=0, null=True)
     payment_gateway = models.TextField(blank=True, default='')
 
+    @classmethod
+    def filtered_payment_option(cls, order_obj):
+        from ondoc.coupon.models import Coupon
+        queryset = cls.objects.filter(is_enabled=True).order_by('-priority')
+
+        orders_to_check = []
+        if order_obj.orders.exists():
+            orders_to_check = order_obj.orders.all()
+        else:
+            orders_to_check = [order_obj]
+
+        used_coupon = []
+        for order in orders_to_check:
+            if "coupon" in order.action_data:
+                used_coupon.extend(order.action_data["coupon"])
+        used_coupon = list(set(used_coupon))
+
+        pg_specific_coupon = Coupon.objects.filter(id__in=used_coupon).exclude(payment_option__isnull=True).first()
+        if pg_specific_coupon:
+            queryset = queryset.filter(id=pg_specific_coupon.payment_option.id)
+
+        return cls.build_payment_option(queryset)
+
+    @classmethod
+    def build_payment_option(cls, queryset):
+        options = []
+        for data in queryset:
+            resp = {}
+            resp['name'] = data.name
+            resp['image'] = data.image.url
+            resp['description'] = data.description
+            resp['is_enabled'] = data.is_enabled
+            resp['action'] = data.action
+            resp['payment_gateway'] = data.payment_gateway
+            resp['id'] = data.id
+            resp['payment_gateway'] = data.payment_gateway
+            resp['is_selected'] = False
+            options.append(resp)
+
+        if options:
+            options[0]['is_selected'] = True
+        return options
+
     def __str__(self):
         return "{}".format(self.name)
 

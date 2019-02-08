@@ -6,7 +6,7 @@ from itertools import groupby
 
 import pytz
 from django.db.models import F
-from hardcopy import bytestring_to_pdf
+# from hardcopy import bytestring_to_pdf
 
 from ondoc.api.v1.utils import util_absolute_url, util_file_name, generate_short_url
 from ondoc.doctor.models import OpdAppointment

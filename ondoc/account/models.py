@@ -9,7 +9,8 @@ from django.db import transaction
 from django.db.models import Sum, Q, F, Max
 from datetime import datetime, timedelta
 from django.utils import timezone
-from ondoc.api.v1.utils import refund_curl_request, form_pg_refund_data
+from ondoc.api.v1.utils import refund_curl_request, form_pg_refund_data, opdappointment_transform, \
+    labappointment_transform, payment_details
 from django.conf import settings
 from rest_framework import status
 import hashlib
@@ -46,7 +47,7 @@ class Order(TimeStampedModel):
     DOCTOR_PRODUCT_ID = 1
     LAB_PRODUCT_ID = 2
     PRODUCT_IDS = [(DOCTOR_PRODUCT_ID, "Doctor Appointment"), (LAB_PRODUCT_ID, "LAB_PRODUCT_ID")]
-    product_id = models.SmallIntegerField(choices=PRODUCT_IDS)
+    product_id = models.SmallIntegerField(choices=PRODUCT_IDS, blank=True, null=True)
     reference_id = models.IntegerField(blank=True, null=True)
     action = models.PositiveSmallIntegerField(blank=True, null=True, choices=ACTION_CHOICES)
     action_data = JSONField(blank=True, null=True)
@@ -57,6 +58,9 @@ class Order(TimeStampedModel):
     error_status = models.CharField(max_length=250, verbose_name="Error", blank=True, null=True)
     is_viewable = models.BooleanField(verbose_name='Is Viewable', default=True)
     matrix_lead_id = models.PositiveIntegerField(null=True)
+    parent = models.ForeignKey('self', on_delete=models.CASCADE, related_name="orders", blank=True, null=True)
+    cart = models.ForeignKey('cart.Cart', on_delete=models.CASCADE, related_name="order", blank=True, null=True)
+    user = models.ForeignKey(User, on_delete=models.DO_NOTHING, blank=True, null=True)
 
     def __str__(self):
         return "{}".format(self.id)
@@ -159,22 +163,18 @@ class Order(TimeStampedModel):
                     "payment_status": Order.PAYMENT_ACCEPTED
                 }
 
-        # if order is done without PG transaction, then make an async task to create a dummy transaction and set it.
-        if not self.txn.first():
-            try:
-                transaction.on_commit(lambda: set_order_dummy_transaction.apply_async((self.id, appointment_data['user'].id,), countdown=5))
-            except Exception as e:
-                logger.error(str(e))
-
         if order_dict:
             self.update_order(order_dict)
+
+        wallet_amount = cashback_amount = 0
         # If payment is required and appointment is created successfully, debit consumer's account
         if appointment_obj and not payment_not_required:
             # debit consumer account and update appointment with price breakup
             wallet_amount, cashback_amount = consumer_account.debit_schedule(appointment_obj, self.product_id, amount)
             appointment_obj.price_data = {"wallet_amount": int(wallet_amount), "cashback_amount": int(cashback_amount)}
             appointment_obj.save()
-        return appointment_obj
+
+        return appointment_obj, wallet_amount, cashback_amount
 
     def update_order(self, data):
         self.reference_id = data.get("reference_id", self.reference_id)
@@ -257,6 +257,11 @@ class Order(TimeStampedModel):
     def getAppointment(self):
         from ondoc.doctor.models import OpdAppointment
         from ondoc.diagnostic.models import LabAppointment
+
+        if self.orders.exists():
+            completed_order = self.orders.filter(reference_id__isnull=False).first()
+            return completed_order.getAppointment() if completed_order else None
+
         if not self.reference_id:
             return None
 
@@ -266,13 +271,228 @@ class Order(TimeStampedModel):
             return OpdAppointment.objects.filter(id=self.reference_id).first()
         return None
 
+    def get_total_price(self):
+        if self.parent:
+            raise Exception("Cannot calculate price on a child order")
+
+        return ( self.amount or 0 ) + ( self.wallet_amount or 0 )
+
     def getTransactions(self):
+        # if trying to get txn on a child order, recurse for its parent instead
+        if self.parent:
+            return self.parent.getTransactions()
+
         all_txn = None
         if self.txn.exists():
             all_txn = self.txn.all()
         elif self.dummy_txn.exists():
             all_txn = self.dummy_txn.all()
         return all_txn
+
+    @classmethod
+    def get_total_payable_amount(cls, fulfillment_data):
+        from ondoc.doctor.models import OpdAppointment
+        payable_amount = 0
+        for app in fulfillment_data:
+            if app.get("payment_type") == OpdAppointment.PREPAID:
+                payable_amount += app.get('effective_price')
+        return payable_amount
+
+    @classmethod
+    def transfrom_cart_items(cls, request, cart_items):
+        fulfillment_data = []
+        for item in cart_items:
+            validated_data = item.validate(request)
+            fd = item.get_fulfillment_data(validated_data)
+            fd["cart_item_id"] = item.id
+            fulfillment_data.append(fd)
+        return fulfillment_data
+
+    @classmethod
+    @transaction.atomic()
+    def create_order(cls, request, cart_items, use_wallet=True):
+        from ondoc.doctor.models import OpdAppointment
+
+        fulfillment_data = cls.transfrom_cart_items(request, cart_items)
+
+        user = request.user
+        resp = {}
+        balance = 0
+        cashback_balance = 0
+
+        if use_wallet:
+            consumer_account = ConsumerAccount.objects.get_or_create(user=user)
+            consumer_account = ConsumerAccount.objects.select_for_update().get(user=user)
+            balance = consumer_account.balance
+            cashback_balance = consumer_account.cashback
+
+        total_balance = balance + cashback_balance
+        payable_amount = cls.get_total_payable_amount(fulfillment_data)
+
+
+        # create a Parent order to accumulate sub-orders
+        process_immediately = False
+        if total_balance >= payable_amount:
+            cashback_amount = min(cashback_balance, payable_amount)
+            wallet_amount = max(0, payable_amount - cashback_amount)
+            pg_order = cls.objects.create(
+                amount= 0,
+                wallet_amount= wallet_amount,
+                cashback_amount= cashback_amount,
+                payment_status= cls.PAYMENT_PENDING,
+                user=user,
+                product_id=1 # remove later
+            )
+            process_immediately = True
+        else:
+            amount_from_pg = max(0, payable_amount - total_balance)
+            required_amount = payable_amount
+            cashback_amount = min(required_amount, cashback_balance)
+            wallet_amount = 0
+            if cashback_amount < required_amount:
+                wallet_amount = min(balance, required_amount - cashback_amount)
+
+            pg_order = cls.objects.create(
+                amount= amount_from_pg,
+                wallet_amount= wallet_amount,
+                cashback_amount= cashback_amount,
+                payment_status= cls.PAYMENT_PENDING,
+                user=user,
+                product_id=1  # remove later
+            )
+
+        # building separate orders for all fulfillments
+        fulfillment_data = copy.deepcopy(fulfillment_data)
+        order_list = []
+        for appointment_detail in fulfillment_data:
+
+            product_id = Order.DOCTOR_PRODUCT_ID if appointment_detail.get('doctor') else Order.LAB_PRODUCT_ID
+            action = None
+            if product_id == cls.DOCTOR_PRODUCT_ID:
+                appointment_detail = opdappointment_transform(appointment_detail)
+                action = cls.OPD_APPOINTMENT_CREATE
+            elif product_id == cls.LAB_PRODUCT_ID:
+                appointment_detail = labappointment_transform(appointment_detail)
+                action = cls.LAB_APPOINTMENT_CREATE
+
+            if appointment_detail.get('payment_type') == OpdAppointment.PREPAID:
+                order = cls.objects.create(
+                    product_id=product_id,
+                    action=action,
+                    action_data=appointment_detail,
+                    payment_status=cls.PAYMENT_PENDING,
+                    parent=pg_order,
+                    cart_id=appointment_detail["cart_item_id"],
+                    user=user
+                )
+            elif appointment_detail.get('payment_type') == OpdAppointment.INSURANCE:
+                order = cls.Order.objects.create(
+                    product_id=product_id,
+                    action=action,
+                    action_data=appointment_detail,
+                    payment_status=cls.PAYMENT_PENDING,
+                    parent=pg_order,
+                    cart_id=appointment_detail["cart_item_id"],
+                    user=user
+                )
+
+            order_list.append(order)
+
+        if process_immediately:
+            appointment_ids = pg_order.process_pg_order()
+
+            resp["status"] = 1
+            resp["payment_required"] = False
+            resp["data"] = {
+                "orderId" : pg_order.id,
+                "type" : appointment_ids.get("type", "all"),
+                "id" : appointment_ids.get("id", None)
+            }
+            resp["appointments"] = appointment_ids
+
+        else:
+            resp["status"] = 1
+            resp['data'], resp["payment_required"] = payment_details(request, pg_order)
+
+        # raise Exception("ROLLBACK FOR TESTING")
+
+        return resp
+
+    @transaction.atomic()
+    def process_pg_order(self):
+        from ondoc.doctor.models import OpdAppointment
+        from ondoc.diagnostic.models import LabAppointment
+
+        orders_to_process = []
+        if self.orders.exists():
+            orders_to_process = self.orders.all()
+        else:
+            orders_to_process = [self]
+
+        total_cashback_used = total_wallet_used = 0
+        opd_appointment_ids = []
+        lab_appointment_ids = []
+
+        for order in orders_to_process:
+            try:
+                curr_app, curr_wallet, curr_cashback = order.process_order()
+
+                # appointment was not created - due to insufficient balance, do not process
+                if not curr_app:
+                    continue
+                if order.product_id == Order.DOCTOR_PRODUCT_ID:
+                    opd_appointment_ids.append(curr_app.id)
+                elif order.product_id == Order.LAB_PRODUCT_ID:
+                    lab_appointment_ids.append(curr_app.id)
+
+                total_cashback_used += curr_cashback
+                total_wallet_used += curr_wallet
+
+                # mark cart item delete after order process
+                if order.cart:
+                    order.cart.mark_delete()
+            except Exception as e:
+                logger.error(str(e))
+
+        if not opd_appointment_ids and not lab_appointment_ids:
+            raise Exception("Could not process entire order")
+
+        # if order is done without PG transaction, then make an async task to create a dummy transaction and set it.
+        if not self.getTransactions():
+            try:
+                transaction.on_commit(
+                    lambda: set_order_dummy_transaction.apply_async((self.id, self.get_user_id(),),
+                                                                    countdown=5))
+            except Exception as e:
+                logger.error(str(e))
+
+        money_pool = MoneyPool.objects.create(wallet=total_wallet_used, cashback=total_cashback_used, logs=[])
+
+        if opd_appointment_ids:
+            OpdAppointment.objects.filter(id__in=opd_appointment_ids).update(money_pool=money_pool)
+        if lab_appointment_ids:
+            LabAppointment.objects.filter(id__in=lab_appointment_ids).update(money_pool=money_pool)
+
+        resp = { "opd" : opd_appointment_ids , "lab" : lab_appointment_ids, "type" : "all", "id" : None }
+        # Handle backward compatibility, in case of single booking, return the booking id
+        if (len(opd_appointment_ids) + len(lab_appointment_ids)) == 1:
+            resp["type"] = "doctor" if len(opd_appointment_ids) > 0 else "lab"
+            resp["id"] = opd_appointment_ids[0] if len(opd_appointment_ids) > 0 else lab_appointment_ids[0]
+
+        return resp
+
+    def validate_user(self, user=None):
+        if not user:
+            return True
+        order_user_id = self.get_user_id()
+        return order_user_id == user.id
+
+    def get_user_id(self):
+        if self.user:
+            return self.user.id
+        if self.action_data and "user" in self.action_data:
+            return self.action_data["user"]
+        return None
 
     class Meta:
         db_table = "order"
@@ -461,6 +681,48 @@ class DummyTransactions(TimeStampedModel):
         db_table = "dummy_transaction"
 
 
+class MoneyPool(TimeStampedModel):
+    wallet = models.DecimalField(max_digits=10, decimal_places=2, default=0)
+    cashback = models.DecimalField(max_digits=10, decimal_places=2, default=0)
+    logs = JSONField(default=[])
+
+    @transaction.atomic()
+    def get_refund_breakup(self, amount):
+        # sanity if, pool is empty and refund is still required
+        if amount > (self.wallet + self.cashback):
+            raise Exception("Pool Balance insufficient")
+
+        wallet_refund = min(self.wallet, amount)
+        cashback_refund = min(self.cashback, amount - wallet_refund)
+
+        self.wallet -= wallet_refund
+        self.cashback -= cashback_refund
+        self.save()
+
+        return wallet_refund, cashback_refund
+
+    def save(self, *args, **kwargs):
+        database_instance = MoneyPool.objects.filter(id=self.id).first()
+        log = {
+            "initial" : { "wallet" : 0, "cashback": 0 },
+            "final": { "wallet": 0, "cashback": 0 },
+            "timestamp" : str(timezone.now())
+        }
+
+        log["final"]["wallet"] = int(self.wallet)
+        log["final"]["cashback"] = int(self.cashback)
+
+        if database_instance:
+            log["initial"]["wallet"] = int(database_instance.wallet)
+            log["initial"]["cashback"] = int(database_instance.cashback)
+
+        self.logs.append(log)
+        super().save(*args, **kwargs)
+
+    class Meta:
+        db_table = "money_pool"
+
+
 class ConsumerAccount(TimeStampedModel):
     user = models.OneToOneField(User, blank=True, null=True, on_delete=models.SET_NULL)
     balance = models.DecimalField(max_digits=10, decimal_places=2, default=0)
@@ -477,17 +739,9 @@ class ConsumerAccount(TimeStampedModel):
         ConsumerTransaction.objects.create(**consumer_tx_data)
         self.save()
 
-    def credit_cancellation(self, appointment_obj, product_id, amount):
-        wallet_refund_amount = amount
-        cashback_refund_amount = 0
-
-        price_data = appointment_obj.price_data
-        if price_data:
-            wallet_refund_amount = price_data["wallet_amount"]
-            cashback_refund_amount = price_data["cashback_amount"]
-
-        if wallet_refund_amount + cashback_refund_amount != int(amount):
-            raise Exception("Amount sanity check failed " + str(appointment_obj))
+    def credit_cancellation(self, appointment_obj, product_id, wallet_refund, cashback_refund):
+        wallet_refund_amount = wallet_refund
+        cashback_refund_amount = cashback_refund
 
         self.balance += wallet_refund_amount
         self.cashback += cashback_refund_amount

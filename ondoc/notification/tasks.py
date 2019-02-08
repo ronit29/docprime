@@ -225,7 +225,10 @@ def set_order_dummy_transaction(self, order_id, user_id):
         order_row = Order.objects.filter(id=order_id).first()
         user = User.objects.filter(id=user_id).first()
 
-        if order_row and user and order_row.reference_id:
+        if order_row and order_row.parent:
+            raise Exception("Cannot create dummy payout for a child order.")
+
+        if order_row and user:
             if order_row.getTransactions():
                 #print("dummy Transaction already set")
                 return
@@ -233,6 +236,8 @@ def set_order_dummy_transaction(self, order_id, user_id):
             appointment = order_row.getAppointment()
             if not appointment:
                 raise Exception("No Appointment found.")
+
+            total_price = order_row.get_total_price()
 
             token = settings.PG_DUMMY_TRANSACTION_TOKEN
             headers = {
@@ -250,9 +255,9 @@ def set_order_dummy_transaction(self, order_id, user_id):
                 "name": appointment.profile.name,
                 "txAmount": 0,
                 "couponCode": "",
-                "couponAmt": str(appointment.effective_price),
+                "couponAmt": str(total_price),
                 "paymentMode": "DC",
-                "AppointmentId": order_row.reference_id,
+                "AppointmentId": appointment.id,
                 "buCallbackSuccessUrl": "",
                 "buCallbackFailureUrl": ""
             }
@@ -267,9 +272,9 @@ def set_order_dummy_transaction(self, order_id, user_id):
                     tx_data['product_id'] = order_row.product_id
                     tx_data['order_no'] = resp_data.get('orderNo')
                     tx_data['order_id'] = order_row.id
-                    tx_data['reference_id'] = order_row.reference_id
+                    tx_data['reference_id'] = appointment.id
                     tx_data['type'] = DummyTransactions.CREDIT
-                    tx_data['amount'] = appointment.effective_price
+                    tx_data['amount'] = total_price
                     tx_data['payment_mode'] = "DC"
 
                     # tx_data['transaction_id'] = resp_data.get('orderNo')

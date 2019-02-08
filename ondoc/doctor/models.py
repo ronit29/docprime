@@ -20,7 +20,7 @@ from ondoc.authentication import models as auth_model
 from ondoc.authentication.models import SPOCDetails
 from ondoc.location import models as location_models
 from ondoc.account.models import Order, ConsumerAccount, ConsumerTransaction, PgTransaction, ConsumerRefund, \
-    MerchantPayout, UserReferred, Invoice
+    MerchantPayout, UserReferred, MoneyPool, Invoice
 from ondoc.notification.models import NotificationAction
 from ondoc.payout.models import Outstanding
 from ondoc.coupon.models import Coupon
@@ -32,7 +32,7 @@ from ondoc.notification import models as notification_models
 from ondoc.notification import tasks as notification_tasks
 from django.contrib.contenttypes.fields import GenericRelation
 from ondoc.api.v1.utils import get_start_end_datetime, custom_form_datetime, CouponsMixin, aware_time_zone, \
-    util_absolute_url, html_to_pdf
+    form_time_slot, util_absolute_url, html_to_pdf
 from ondoc.common.models import AppointmentHistory
 from functools import reduce
 from operator import or_
@@ -1285,6 +1285,7 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
 
     merchant_payout = models.ForeignKey(MerchantPayout, related_name="opd_appointment", on_delete=models.SET_NULL, null=True)
     price_data = JSONField(blank=True, null=True)
+    money_pool = models.ForeignKey(MoneyPool, on_delete=models.SET_NULL, null=True)
 
     def __str__(self):
         return self.profile.name + " (" + self.doctor.name + ")"
@@ -1387,12 +1388,24 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
             product_id = Order.DOCTOR_PRODUCT_ID
             if self.payment_type == self.PREPAID and ConsumerTransaction.valid_appointment_for_cancellation(self.id,
                                                                                                             product_id):
-                cancel_amount = self.effective_price
-                consumer_account.credit_cancellation(self, product_id, cancel_amount)
+                wallet_refund, cashback_refund = self.get_cancellation_breakup()
+                consumer_account.credit_cancellation(self, product_id, wallet_refund, cashback_refund)
 
                 if refund_flag:
                     ctx_obj = consumer_account.debit_refund()
                     ConsumerRefund.initiate_refund(self.user, ctx_obj)
+
+    def get_cancellation_breakup(self):
+        wallet_refund = cashback_refund = 0
+        if self.money_pool:
+            wallet_refund, cashback_refund = self.money_pool.get_refund_breakup(self.effective_price)
+        elif self.price_data:
+            wallet_refund = self.price_data["wallet_amount"]
+            cashback_refund = self.price_data["cashback_amount"]
+        else:
+            wallet_refund = self.effective_price
+
+        return wallet_refund, cashback_refund
 
     def action_completed(self):
         self.status = self.COMPLETED
@@ -1492,7 +1505,6 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
         # except Exception as e:
         #     logger.error("Error in auto cancel flow - " + str(e))
         print('all ops tasks completed')
-
 
     def save(self, *args, **kwargs):
         logger.warning("opd save started - " + str(self.id) + " timezone - " + str(timezone.now()))
@@ -1691,6 +1703,122 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
                 return merchant.merchant
         return None
 
+    @classmethod
+    def get_price_details(cls, data):
+
+        procedures = data.get('procedure_ids', [])
+        selected_hospital = data.get('hospital')
+        doctor = data.get('doctor')
+        time_slot_start = form_time_slot(data.get("start_date"), data.get("start_time"))
+
+        doctor_clinic_timing = DoctorClinicTiming.objects.filter(
+            doctor_clinic__doctor=data.get('doctor'),
+            doctor_clinic__hospital=data.get('hospital'),
+            doctor_clinic__doctor__is_live=True, doctor_clinic__hospital__is_live=True,
+            day=time_slot_start.weekday(), start__lte=data.get("start_time"),
+            end__gte=data.get("start_time")).first()
+
+        effective_price = 0
+        if not procedures:
+            if data.get("payment_type") == cls.INSURANCE:
+                effective_price = doctor_clinic_timing.deal_price
+            elif data.get("payment_type") in [cls.COD, cls.PREPAID]:
+                coupon_discount, coupon_cashback, coupon_list = Coupon.get_total_deduction(data,
+                                                                                           doctor_clinic_timing.deal_price)
+                if coupon_discount >= doctor_clinic_timing.deal_price:
+                    effective_price = 0
+                else:
+                    effective_price = doctor_clinic_timing.deal_price - coupon_discount
+            deal_price = doctor_clinic_timing.deal_price
+            mrp = doctor_clinic_timing.mrp
+            fees = doctor_clinic_timing.fees
+        else:
+            total_deal_price, total_agreed_price, total_mrp = cls.get_procedure_prices(procedures, doctor,
+                                                                                        selected_hospital,
+                                                                                        doctor_clinic_timing)
+            if data.get("payment_type") == cls.INSURANCE:
+                effective_price = total_deal_price
+            elif data.get("payment_type") in [cls.COD, cls.PREPAID]:
+                coupon_discount, coupon_cashback, coupon_list = Coupon.get_total_deduction(data, total_deal_price)
+                if coupon_discount >= total_deal_price:
+                    effective_price = 0
+                else:
+                    effective_price = total_deal_price - coupon_discount
+
+            deal_price = total_deal_price
+            mrp = total_mrp
+            fees = total_agreed_price
+
+        return {
+            "deal_price": deal_price,
+            "mrp": mrp,
+            "fees": fees,
+            "effective_price": effective_price,
+            "coupon_discount": coupon_discount,
+            "coupon_cashback": coupon_cashback,
+            "coupon_list": coupon_list,
+            "consultation" : {
+                "deal_price": doctor_clinic_timing.deal_price,
+                "mrp": doctor_clinic_timing.mrp
+            }
+        }
+
+    @classmethod
+    def create_fulfillment_data(cls, user, data, price_data):
+        procedures = data.get('procedure_ids', [])
+        selected_hospital = data.get('hospital')
+        doctor = data.get('doctor')
+        time_slot_start = form_time_slot(data.get("start_date"), data.get("start_time"))
+        profile_model = data.get("profile")
+        profile_detail = {
+            "name": profile_model.name,
+            "gender": profile_model.gender,
+            "dob": str(profile_model.dob)
+        }
+
+        extra_details = []
+        doctor_clinic = doctor.doctor_clinics.filter(hospital=selected_hospital).first()
+        doctor_clinic_procedures = doctor_clinic.doctorclinicprocedure_set.filter(procedure__in=procedures).order_by(
+            'procedure_id')
+        for doctor_clinic_procedure in doctor_clinic_procedures:
+            temp_extra = {'procedure_id': doctor_clinic_procedure.procedure.id,
+                          'procedure_name': doctor_clinic_procedure.procedure.name,
+                          'deal_price': doctor_clinic_procedure.deal_price,
+                          'agreed_price': doctor_clinic_procedure.agreed_price,
+                          'mrp': doctor_clinic_procedure.mrp}
+            extra_details.append(temp_extra)
+
+        return {
+            "doctor": data.get("doctor"),
+            "hospital": data.get("hospital"),
+            "profile": data.get("profile"),
+            "profile_detail": profile_detail,
+            "user": user,
+            "booked_by": user,
+            "fees": price_data.get("fees"),
+            "deal_price": price_data.get("deal_price"),
+            "effective_price": price_data.get("effective_price"),
+            "mrp": price_data.get("mrp"),
+            "extra_details": extra_details,
+            "time_slot_start": time_slot_start,
+            "payment_type": data.get("payment_type"),
+            "coupon": price_data.get("coupon_list"),
+            "discount": int(price_data.get("coupon_discount")),
+            "cashback": int(price_data.get("coupon_cashback"))
+        }
+
+    @staticmethod
+    def get_procedure_prices(procedures, doctor, selected_hospital, dct):
+        doctor_clinic = doctor.doctor_clinics.filter(hospital=selected_hospital).first()
+        doctor_clinic_procedures = doctor_clinic.doctorclinicprocedure_set.filter(procedure__in=procedures).order_by(
+            'procedure_id')
+        total_deal_price, total_agreed_price, total_mrp = 0, 0, 0
+        for doctor_clinic_procedure in doctor_clinic_procedures:
+            total_agreed_price += doctor_clinic_procedure.agreed_price
+            total_deal_price += doctor_clinic_procedure.deal_price
+            total_mrp += doctor_clinic_procedure.mrp
+        return total_deal_price + dct.deal_price, total_agreed_price + dct.fees, total_mrp + dct.mrp
+
     class Meta:
         db_table = "opd_appointment"
 
@@ -1708,6 +1836,20 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
                                 }
             prescriptions.append(prescription_dict)
         return prescriptions
+
+    @classmethod
+    def can_book_for_free(cls, request, validated_data, cart_item=None):
+        from ondoc.cart.models import Cart
+
+        price_data = cls.get_price_details(validated_data)
+        if price_data["deal_price"] > 0:
+            return True
+
+        user = request.user
+        free_appointment_count = cls.objects.filter(user=user, deal_price=0).exclude(status__in=[cls.COMPLETED,cls.CANCELLED]).count()
+        free_cart_count = Cart.get_free_opd_item_count(request, cart_item)
+
+        return (free_appointment_count + free_cart_count) < cls.MAX_FREE_BOOKINGS_ALLOWED
 
 class OpdAppointmentProcedureMapping(models.Model):
     opd_appointment = models.ForeignKey(OpdAppointment, on_delete=models.CASCADE, related_name='procedure_mappings')
