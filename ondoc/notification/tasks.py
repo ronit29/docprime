@@ -392,7 +392,7 @@ def process_payout(payout_id):
                 curr_txn["pgtxId"] = txn.transaction_id
             curr_txn["refNo"] = payout_data.payout_ref_id
             curr_txn["bookingId"] = appointment.id
-            curr_txn["paymentType"] = payout_data.payment_mode if payout_data.payment_mode else default_payment_mode
+            #curr_txn["paymentType"] = payout_data.payment_mode if payout_data.payment_mode else default_payment_mode
             req_data["payload"].append(curr_txn)
             idx += 1
             if isinstance(txn, DummyTransactions) and txn.amount>0:
@@ -434,8 +434,9 @@ def request_payout(req_data, order_data):
     resp_data = None
 
     response = requests.post(url, data=json.dumps(req_data), headers=headers)
+    resp_data = response.json()
+
     if response.status_code == status.HTTP_200_OK:
-        resp_data = response.json()
         if resp_data.get("ok") is not None and resp_data.get("ok") == '1':
             success_payout = False
             result = resp_data.get('result')
