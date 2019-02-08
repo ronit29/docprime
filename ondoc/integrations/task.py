@@ -2,8 +2,6 @@ from __future__ import absolute_import, unicode_literals
 from celery import task
 import logging
 from django.contrib.contenttypes.models import ContentType
-import json
-
 logger = logging.getLogger(__name__)
 
 
@@ -63,23 +61,23 @@ def push_lab_appointment_to_integrator(self, data):
                                                                 dp_order_id=resp_data['ORDER_NO'], integrator_order_id=resp_data['REF_ORDERID'],
                                                                 content_object=appointment, response_data=resp_data,
                                                                 integrator_class_name=integrator_mapping.integrator_class_name)
-        # # Uncomment when report response available
-        # if integrator_response:
-        #     fetch_reports_from_integrator(self, integrator_response)
+
+        if integrator_response:
+            fetch_reports_from_integrator(self, integrator_response)
 
     except Exception as e:
         logger.error(str(e))
 
 # To fetch test reports from integrator
 def fetch_reports_from_integrator(self, integrator_response):
+    from ondoc.integrations.models import IntegratorReport
     from ondoc.integrations import service
 
     integrator_obj = service.create_integrator_obj(integrator_response.integrator_class_name)
     report_response = integrator_obj.pull_reports(integrator_response)
 
     if report_response:
-        # Save Report to DB (Status field should be there)
-        pass
-    else:
-        pass
+        IntegratorReport.objects.create(integrator_response_id=integrator_response.id, pdf_url=report_response["pdf"],
+                                        xml_url=report_response["xml"])
 
+    return None

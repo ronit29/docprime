@@ -94,3 +94,10 @@ class IntegratorResponse(TimeStampedModel):
         db_table = 'integrator_response'
 
 
+class IntegratorReport(TimeStampedModel):
+    integrator_response = models.ForeignKey(IntegratorResponse, on_delete=models.CASCADE, null=False)
+    pdf_url = models.TextField(null=True, blank=True)
+    xml_url = models.TextField(null=True, blank=True)
+
+    class Meta:
+        db_table = 'integrator_report'

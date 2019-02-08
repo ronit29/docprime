@@ -224,15 +224,18 @@ class Thyrocare(BaseIntegrator):
 
     def _get_generated_report(self, integrator_response, **kwargs):
         lead_id = integrator_response.lead_id
-        format = 'xml'
         mobile = integrator_response.content_object.profile.phone_number
+        formats = ['pdf', 'xml']
+        result = dict()
 
-        url = "https://www.thyrocare.com/API_BETA/order.svc/%s/GETREPORTS/%s/%s/%s/Myreport" % (settings.THYROCARE_API_KEY, lead_id, format, mobile)
-        response = requests.get(url)
-        response = response.json()
-        if response.get('RES_ID') == 'RES0000':
-            return response
-        else:
-            logger.error("[ERROR] %s" % response.get('RESPONSE'))
+        for format in formats:
+            url = "https://www.thyrocare.com/API_BETA/order.svc/%s/GETREPORTS/%s/%s/%s/Myreport" % (settings.THYROCARE_API_KEY, lead_id, format, mobile)
+            # url = "https://www.thyrocare.com/APIs/order.svc/sNhdlQjqvoD7zCbzf56sxppBJX3MmdWSAomi@RBhXRrVcGyko7hIzQ==/GETREPORTS/SP46592004/%s/8898881529/Myreport" %(format)
+            response = requests.get(url)
+            response = response.json()
+            if response.get('RES_ID') == 'RES0000':
+                result[format] = response["URL"]
+            else:
+                logger.error("[ERROR] %s" % response.get('RESPONSE'))
 
-        return None
+        return result
