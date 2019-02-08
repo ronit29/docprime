@@ -48,8 +48,7 @@ import hashlib
 from django.contrib.contenttypes.fields import GenericRelation
 from django.contrib.contenttypes.fields import GenericForeignKey
 from django.contrib.contenttypes.models import ContentType
-from ondoc.matrix.tasks import push_appointment_to_matrix, push_onboarding_qcstatus_to_matrix, \
-    generate_appointment_masknumber
+from ondoc.matrix.tasks import push_appointment_to_matrix, push_onboarding_qcstatus_to_matrix
 # from ondoc.procedure.models import Procedure
 from ondoc.ratings_review import models as ratings_models
 from django.utils import timezone
@@ -1459,7 +1458,7 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
             return True
         return False
 
-    def after_commit_tasks(self, old_instance, push_to_matrix, push_for_mask_number):
+    def after_commit_tasks(self, old_instance, push_to_matrix):
         if push_to_matrix:
         # Push the appointment data to the matrix .
             try:
@@ -1468,12 +1467,12 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
 
             except Exception as e:
                 logger.error(str(e))
-        if push_for_mask_number:
-            try:
-                generate_appointment_masknumber.apply_async(({'type': 'OPD_APPOINTMENT', 'appointment_id': self.id},),
-                                                            countdown=5)
-            except Exception as e:
-                logger.error(str(e))
+        # if push_for_mask_number:
+        #     try:
+        #         generate_appointment_masknumber.apply_async(({'type': 'OPD_APPOINTMENT', 'appointment_id': self.id},),
+        #                                                     countdown=5)
+        #     except Exception as e:
+        #         logger.error(str(e))
         if self.is_to_send_notification(old_instance):
             try:
                 notification_tasks.send_opd_notifications_refactored.apply_async((self.id,), countdown=1)
@@ -1534,11 +1533,11 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
         else:
             push_to_matrix = True
 
-        push_for_mask_number = True
-        if database_instance and self.time_slot_start == database_instance.time_slot_start:
-            push_for_mask_number = False
-        else:
-            push_for_mask_number = True
+        # push_for_mask_number = True
+        # if database_instance and self.time_slot_start == database_instance.time_slot_start:
+        #     push_for_mask_number = False
+        # else:
+        #     push_for_mask_number = True
 
         try:
             # while completing appointment
@@ -1569,7 +1568,7 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
         if push_to_history:
             AppointmentHistory.create(content_object=self)
 
-        transaction.on_commit(lambda: self.after_commit_tasks(database_instance, push_to_matrix, push_for_mask_number))
+        transaction.on_commit(lambda: self.after_commit_tasks(database_instance, push_to_matrix))
 
     def save_merchant_payout(self):
         payout_data = {

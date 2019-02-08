@@ -45,8 +45,7 @@ from ondoc.insurance import models as insurance_model
 from django.contrib.contenttypes.fields import GenericRelation
 from django.contrib.contenttypes.fields import GenericForeignKey
 from django.contrib.contenttypes.models import ContentType
-from ondoc.matrix.tasks import push_appointment_to_matrix, push_onboarding_qcstatus_to_matrix, \
-    generate_appointment_masknumber
+from ondoc.matrix.tasks import push_appointment_to_matrix, push_onboarding_qcstatus_to_matrix
 from ondoc.location import models as location_models
 from ondoc.ratings_review import models as ratings_models
 from decimal import Decimal
@@ -1193,7 +1192,7 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin)
             return [admin.user for admin in self.lab.manageable_lab_admins.filter(is_disabled=False)
                     if admin.user]
 
-    def app_commit_tasks(self, old_instance, push_to_matrix, push_for_mask_number):
+    def app_commit_tasks(self, old_instance, push_to_matrix):
         if push_to_matrix:
             # Push the appointment data to the matrix
             try:
@@ -1203,12 +1202,12 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin)
             except Exception as e:
                 logger.error(str(e))
 
-        if push_for_mask_number:
-            try:
-                generate_appointment_masknumber.apply_async(({'type': 'LAB_APPOINTMENT', 'appointment_id': self.id},),
-                                                    countdown=5)
-            except Exception as e:
-                logger.error(str(e))
+        # if push_for_mask_number:
+        #     try:
+        #         generate_appointment_masknumber.apply_async(({'type': 'LAB_APPOINTMENT', 'appointment_id': self.id},),
+        #                                             countdown=5)
+        #     except Exception as e:
+        #         logger.error(str(e))
 
         if self.is_to_send_notification(old_instance):
             try:
@@ -1321,11 +1320,11 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin)
         else:
             push_to_matrix = False
 
-        push_for_mask_number = True
-        if self.time_slot_start != LabAppointment.objects.get(pk=self.id).time_slot_start:
-            push_for_mask_number = True
-        else:
-            push_for_mask_number = False
+        # push_for_mask_number = True
+        # if self.time_slot_start != LabAppointment.objects.get(pk=self.id).time_slot_start:
+        #     push_for_mask_number = True
+        # else:
+        #     push_for_mask_number = False
 
         # push_to_matrix = kwargs.get('push_again_to_matrix', True)
         # if 'push_again_to_matrix' in kwargs.keys():
@@ -1343,7 +1342,7 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin)
         if push_to_history:
             AppointmentHistory.create(content_object=self)
 
-        transaction.on_commit(lambda: self.app_commit_tasks(database_instance, push_to_matrix, push_for_mask_number))
+        transaction.on_commit(lambda: self.app_commit_tasks(database_instance, push_to_matrix))
 
     def save_merchant_payout(self):
         payout_amount = self.agreed_price
