@@ -345,6 +345,9 @@ def process_payout(payout_id):
         if not payout_data or payout_data.status == payout_data.PAID:
             raise Exception("Payment already done for this payout")
 
+
+        default_payment_mode = payout_data.get_default_payment_mode()
+
         appointment = payout_data.get_appointment()
         billed_to = payout_data.get_billed_to()
         merchant = payout_data.get_merchant()
@@ -375,14 +378,13 @@ def process_payout(payout_id):
         req_data = { "payload" : [], "checkSum" : "" }
         req_data2 = { "payload" : [], "checkSum" : "" }
 
-
         idx = 0
         for txn in all_txn:
             
             curr_txn = OrderedDict()
             curr_txn["idx"] = idx
             curr_txn["orderNo"] = txn.order_no
-            curr_txn["orderId"] = order_data.id
+            curr_txn["orderId"] = txn.order.id
             curr_txn["txnAmount"] = str(txn.amount)
             curr_txn["settledAmount"] = str(payout_data.payable_amount)
             curr_txn["merchantCode"] = merchant.id
@@ -390,6 +392,7 @@ def process_payout(payout_id):
                 curr_txn["pgtxId"] = txn.transaction_id
             curr_txn["refNo"] = payout_data.payout_ref_id
             curr_txn["bookingId"] = appointment.id
+            curr_txn["paymentType"] = payout_data.payment_mode if payout_data.payment_mode else default_payment_mode
             req_data["payload"].append(curr_txn)
             idx += 1
             if isinstance(txn, DummyTransactions) and txn.amount>0:
@@ -406,7 +409,7 @@ def process_payout(payout_id):
             payout_status = request_payout(req_data, order_data)
 
         if payout_status:
-            payout_data.api_response = json.dumps(payout_status.get("response"))
+            payout_data.api_response = payout_status.get("response")
             if payout_status.get("status"):
                 payout_data.payout_time = datetime.datetime.now()
                 payout_data.status = payout_data.PAID
@@ -431,19 +434,22 @@ def request_payout(req_data, order_data):
     resp_data = None
 
     response = requests.post(url, data=json.dumps(req_data), headers=headers)
+    resp_data = response.json()
+
     if response.status_code == status.HTTP_200_OK:
-        resp_data = response.json()
         if resp_data.get("ok") is not None and resp_data.get("ok") == '1':
             success_payout = False
             result = resp_data.get('result')
             if result:
                 for res_txn in result:
                     success_payout = res_txn['status'] == "SUCCESSFULLY_INSERTED"
-                    return {"status":1,"response":resp_data}
+
+            if success_payout:
+                return {"status": 1, "response": resp_data}
             
     
     logger.error("payout failed for request data - " + str(req_data))
-    return {"status":0,"response":resp_data}
+    return {"status" : 0, "response" : resp_data}
 
 @task()
 def opd_send_otp_before_appointment(appointment_id, previous_appointment_date_time):
