@@ -6,6 +6,7 @@ import json
 
 logger = logging.getLogger(__name__)
 
+
 @task(bind=True, max_retries=3)
 def push_lab_appointment_to_integrator(self, data):
     from ondoc.diagnostic.models import LabAppointment
@@ -58,10 +59,27 @@ def push_lab_appointment_to_integrator(self, data):
 
         # save integrator response
         resp_data = integrator_response
-        IntegratorResponse(lead_id=resp_data['ORDERRESPONSE']['PostOrderDataResponse'][0]['LEAD_ID'],
-                            dp_order_id=resp_data['ORDER_NO'], integrator_order_id=resp_data['REF_ORDERID'],
-                            content_object=appointment, response_data=resp_data,
-                            integrator_class_name=integrator_mapping.integrator_class_name).save()
+        integrator_response = IntegratorResponse.objects.create(lead_id=resp_data['ORDERRESPONSE']['PostOrderDataResponse'][0]['LEAD_ID'],
+                                                                dp_order_id=resp_data['ORDER_NO'], integrator_order_id=resp_data['REF_ORDERID'],
+                                                                content_object=appointment, response_data=resp_data,
+                                                                integrator_class_name=integrator_mapping.integrator_class_name)
+        # # Uncomment when report response available
+        # if integrator_response:
+        #     fetch_reports_from_integrator(self, integrator_response)
 
     except Exception as e:
         logger.error(str(e))
+
+# To fetch test reports from integrator
+def fetch_reports_from_integrator(self, integrator_response):
+    from ondoc.integrations import service
+
+    integrator_obj = service.create_integrator_obj(integrator_response.integrator_class_name)
+    report_response = integrator_obj.pull_reports(integrator_response)
+
+    if report_response:
+        # Save Report to DB (Status field should be there)
+        pass
+    else:
+        pass
+

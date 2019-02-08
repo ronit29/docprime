@@ -176,7 +176,7 @@ class Thyrocare(BaseIntegrator):
             "service_type": "H",
             "order_by": profile.name if profile else "",
             "hc": "0",
-            "appt_date": aware_time_zone(lab_appointment.time_slot_start).strftime("%Y-%m-%d %I:%M:%S %p"),  # Need to change it to IST
+            "appt_date": aware_time_zone(lab_appointment.time_slot_start).strftime("%Y-%m-%d %I:%M:%S %p"),
             "reports": "N",
             "ref_code": "7738943013",  # Fixed for Test Need to ask
             "pay_type": "POSTPAID",
@@ -221,3 +221,18 @@ class Thyrocare(BaseIntegrator):
         dob = profile.dob
         today = date.today()
         return today.year - dob.year - ((today.month, today.day) < (dob.month, dob.day))
+
+    def _get_generated_report(self, integrator_response, **kwargs):
+        lead_id = integrator_response.lead_id
+        format = 'xml'
+        mobile = integrator_response.content_object.profile.phone_number
+
+        url = "https://www.thyrocare.com/API_BETA/order.svc/%s/GETREPORTS/%s/%s/%s/Myreport" % (settings.THYROCARE_API_KEY, lead_id, format, mobile)
+        response = requests.get(url)
+        response = response.json()
+        if response.get('RES_ID') == 'RES0000':
+            return response
+        else:
+            logger.error("[ERROR] %s" % response.get('RESPONSE'))
+
+        return None

@@ -36,8 +36,13 @@ class BaseIntegrator(object):
     def list_orders(self):
         pass
 
-    def pull_reports(self):
-        pass
+    def pull_reports(self, integrator_response, **kwargs):
+        try:
+            patient_report = self._get_generated_report(integrator_response, **kwargs)
+            return patient_report
+        except Exception as e:
+            logger.error("[ERROR]" + self.__class__.__name__ + " report error." + str(e))
+
 
     def order_details(self):
         pass
