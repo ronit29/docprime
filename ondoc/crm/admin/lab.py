@@ -21,7 +21,7 @@ from django.utils.html import format_html_join
 import pytz
 
 from ondoc.account.models import Order, Invoice
-from ondoc.api.v1.utils import util_absolute_url, util_file_name, utf_to_ist
+from ondoc.api.v1.utils import util_absolute_url, util_file_name, datetime_to_formated_string
 from ondoc.doctor.models import Hospital, CancellationReason
 from ondoc.diagnostic.models import (LabTiming, LabImage,
                                      LabManager, LabAccreditation, LabAward, LabCertification, AvailableLabTest,
@@ -897,7 +897,7 @@ class LabAppointmentAdmin(nested_admin.NestedModelAdmin):
         l = instance.email_notification.filter(notification_type=NotificationAction.LAB_REPORT_SEND_VIA_CRM).values_list('created_at', flat=True)
         result = []
         for temp_item in l:
-            formated_date = utf_to_ist(temp_item)
+            formated_date = datetime_to_formated_string(temp_item)
             result.append(formated_date)
         return ", ".join(result)
     email_notification_timestamp.short_description = 'Report(s) sent at'
