@@ -1459,17 +1459,21 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
             return True
         return False
 
-    def after_commit_tasks(self, old_instance, push_to_matrix):
+    def after_commit_tasks(self, old_instance, push_to_matrix, push_for_mask_number):
         if push_to_matrix:
         # Push the appointment data to the matrix .
             try:
                 push_appointment_to_matrix.apply_async(({'type': 'OPD_APPOINTMENT', 'appointment_id': self.id,
                                                          'product_id': 5, 'sub_product_id': 2},), countdown=5)
+
+            except Exception as e:
+                logger.error(str(e))
+        if push_for_mask_number:
+            try:
                 generate_appointment_masknumber.apply_async(({'type': 'OPD_APPOINTMENT', 'appointment_id': self.id},),
                                                             countdown=5)
             except Exception as e:
                 logger.error(str(e))
-
         if self.is_to_send_notification(old_instance):
             try:
                 notification_tasks.send_opd_notifications_refactored.apply_async((self.id,), countdown=1)
@@ -1520,9 +1524,21 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
         # if not self.is_doctor_available():
         #     raise RestFrameworkValidationError("Doctor is on leave.")
 
-        push_to_matrix = kwargs.get('push_again_to_matrix', True)
-        if 'push_again_to_matrix' in kwargs.keys():
-            kwargs.pop('push_again_to_matrix')
+        # push_to_matrix = kwargs.get('push_again_to_matrix', True)
+        # if 'push_again_to_matrix' in kwargs.keys():
+        #     kwargs.pop('push_again_to_matrix')
+
+        push_to_matrix = True
+        if database_instance and self.status == database_instance.status:
+            push_to_matrix = False
+        else:
+            push_to_matrix = True
+
+        push_for_mask_number = True
+        if database_instance and self.time_slot_start == database_instance.time_slot_start:
+            push_for_mask_number = False
+        else:
+            push_for_mask_number = True
 
         try:
             # while completing appointment
@@ -1553,7 +1569,7 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
         if push_to_history:
             AppointmentHistory.create(content_object=self)
 
-        transaction.on_commit(lambda: self.after_commit_tasks(database_instance, push_to_matrix))
+        transaction.on_commit(lambda: self.after_commit_tasks(database_instance, push_to_matrix, push_for_mask_number))
 
     def save_merchant_payout(self):
         payout_data = {

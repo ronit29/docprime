@@ -1193,15 +1193,20 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin)
             return [admin.user for admin in self.lab.manageable_lab_admins.filter(is_disabled=False)
                     if admin.user]
 
-    def app_commit_tasks(self, old_instance, push_to_matrix):
+    def app_commit_tasks(self, old_instance, push_to_matrix, push_for_mask_number):
         if push_to_matrix:
             # Push the appointment data to the matrix
             try:
                 push_appointment_to_matrix.apply_async(
                     ({'type': 'LAB_APPOINTMENT', 'appointment_id': self.id, 'product_id': 5,
                       'sub_product_id': 2},), countdown=5)
+            except Exception as e:
+                logger.error(str(e))
+
+        if push_for_mask_number:
+            try:
                 generate_appointment_masknumber.apply_async(({'type': 'LAB_APPOINTMENT', 'appointment_id': self.id},),
-                                                            countdown=5)
+                                                    countdown=5)
             except Exception as e:
                 logger.error(str(e))
 
@@ -1310,9 +1315,21 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin)
         except Exception as e:
             logger.error("Error while saving payout mercahnt for lab- " + str(e))
 
-        push_to_matrix = kwargs.get('push_again_to_matrix', True)
-        if 'push_again_to_matrix' in kwargs.keys():
-            kwargs.pop('push_again_to_matrix')
+        push_to_matrix = True
+        if self.status != LabAppointment.objects.get(pk=self.id).status:
+            push_to_matrix = True
+        else:
+            push_to_matrix = False
+
+        push_for_mask_number = True
+        if self.time_slot_start != LabAppointment.objects.get(pk=self.id).time_slot_start:
+            push_for_mask_number = True
+        else:
+            push_for_mask_number = False
+
+        # push_to_matrix = kwargs.get('push_again_to_matrix', True)
+        # if 'push_again_to_matrix' in kwargs.keys():
+        #     kwargs.pop('push_again_to_matrix')
 
         # Pushing every status to the Appointment history
         push_to_history = False
@@ -1326,7 +1343,7 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin)
         if push_to_history:
             AppointmentHistory.create(content_object=self)
 
-        transaction.on_commit(lambda: self.app_commit_tasks(database_instance, push_to_matrix))
+        transaction.on_commit(lambda: self.app_commit_tasks(database_instance, push_to_matrix, push_for_mask_number))
 
     def save_merchant_payout(self):
         payout_amount = self.agreed_price

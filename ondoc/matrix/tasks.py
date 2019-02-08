@@ -293,7 +293,7 @@ def generate_appointment_masknumber(self, data):
             AppointmentMaskNumber(content_object=appointment, mask_number=mask_number,
                                                  validity_up_to=updated_time_slot, is_deleted=False).save()
     except Exception as e:
-        logger.error("Error in Celery. Failed pushing Appointment to the matrix- " + str(e))
+        logger.error("Error in Celery. Failed get mask number for appointment " + str(e))
 
 
 @task(bind=True, max_retries=2)
