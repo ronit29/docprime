@@ -1315,10 +1315,10 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin)
             logger.error("Error while saving payout mercahnt for lab- " + str(e))
 
         push_to_matrix = True
-        if self.status != LabAppointment.objects.get(pk=self.id).status:
-            push_to_matrix = True
-        else:
+        if database_instance and self.status == database_instance.status and self.time_slot_start == database_instance.time_slot_start:
             push_to_matrix = False
+        else:
+            push_to_matrix = True
 
         # push_for_mask_number = True
         # if self.time_slot_start != LabAppointment.objects.get(pk=self.id).time_slot_start:

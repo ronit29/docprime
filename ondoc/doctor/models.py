@@ -1528,7 +1528,7 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
         #     kwargs.pop('push_again_to_matrix')
 
         push_to_matrix = True
-        if database_instance and self.status == database_instance.status:
+        if database_instance and self.status == database_instance.status and self.time_slot_start == database_instance.time_slot_start:
             push_to_matrix = False
         else:
             push_to_matrix = True
