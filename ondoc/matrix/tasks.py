@@ -1,6 +1,7 @@
 from __future__ import absolute_import, unicode_literals
+from django.contrib.contenttypes.models import ContentType
+from django.urls import reverse
 from ondoc.account.models import Order
-
 from rest_framework import status
 from django.conf import settings
 from celery import task
@@ -11,6 +12,9 @@ import datetime
 from datetime import date
 from ondoc.authentication.models import Address
 from ondoc.api.v1.utils import resolve_address
+from django.apps import apps
+from ondoc.crm.constants import matrix_product_ids, matrix_subproduct_ids
+
 logger = logging.getLogger(__name__)
 
 
@@ -388,6 +392,116 @@ def push_order_to_matrix(self, data):
 
     except Exception as e:
         logger.error("Error in Celery. Failed pushing order to the matrix- " + str(e))
+
+
+@task(bind=True, max_retries=2)
+def create_or_update_lead_on_matrix(self, data):
+    try:
+        obj_id = data.get('obj_id', None)
+        obj_type = data.get('obj_type', None)
+        if not obj_id or not obj_type:
+            logger.error("CELERY ERROR: Incorrect values provided.")
+            raise ValueError()
+        product_id = matrix_product_ids.get('opd_products', 1)
+        sub_product_id = matrix_subproduct_ids.get(obj_type, 4)
+        ct = ContentType.objects.get(model=obj_type)
+        model_used = ct.model_class()
+        content_type = ContentType.objects.get_for_model(model_used)
+        exit_point_url = reverse('admin:{}_{}_change'.format(content_type.app_label, content_type.model),
+                                 kwargs={"object_id": obj_id})
+        obj = model_used.objects.filter(id=obj_id).first()
+        if not obj:
+            raise Exception("{} could not found against id - {}".format(obj_type, obj_id))
+
+        # TODO: SHASHANK_SINGH or ROHIT_P find details for mobile and gender
+        mobile = 0
+        gender = 0
+
+        request_data = {
+            'LeadSource': '',  # TODO: SHASHANK_SINGH or ROHIT_P what will be the lead source SIMRANJEET
+            'LeadID': obj.matrix_lead_id if hasattr(obj, 'matrix_lead_id') and obj.matrix_lead_id else 0,  # TODO: SHASHANK_SINGH or ROHIT_P what happens if 0 is passed will it update SIMRANJEET or ABRAR
+            'PrimaryNo': mobile,
+            'QcStatus': obj.data_status,  # TODO: SHASHANK_SINGH or ROHIT_P what are they expecting SIMRANJEET or ABRAR
+            'OnBoarding': obj.onboarding_status if hasattr(obj, 'onboarding_status') else 0,  # TODO: SHASHANK_SINGH or ROHIT_P if I don't have onboarding_status SIMRANJEET or ABRAR
+            'Gender': gender,  # TODO: SHASHANK_SINGH or ROHIT_P if I don't have gender SIMRANJEET or ABRAR
+            'ProductId': product_id,
+            'SubProductId': sub_product_id,
+            'Name': obj.name if hasattr(obj, 'name') and obj.name else '',
+            'ExitPointUrl': exit_point_url,
+        }
+        url = settings.MATRIX_API_URL
+        matrix_api_token = settings.MATRIX_API_TOKEN
+        response = requests.post(url, data=json.dumps(request_data), headers={'Authorization': matrix_api_token,
+                                                                              'Content-Type': 'application/json'})
+
+        if response.status_code != status.HTTP_200_OK or not response.ok:
+            logger.info("[ERROR] {} with ID {} could not be published to the matrix system".format(obj_type, obj_id))
+            logger.info("[ERROR] %s", response.reason)
+            countdown_time = (2 ** self.request.retries) * 60 * 10
+            logging.error("Lead creation on the Matrix System failed with response - " + str(response.content))
+            self.retry([data], countdown=countdown_time)
+        else:
+            resp_data = response.json()
+            if not resp_data.get('Id', None):
+                logger.error(json.dumps(request_data))
+                raise Exception("[ERROR] ID not received from the matrix while creating lead for {} with ID {}.")
+
+            # save the order with the matrix lead id.
+            if obj and hasattr(obj, 'matrix_lead_id') and not obj.matrix_lead_id:
+                obj.matrix_lead_id = resp_data.get('Id', None)
+                obj.matrix_lead_id = int(obj.matrix_lead_id)
+                obj.save()
+
+    except Exception as e:
+        logger.error("Error in Celery. Failed pushing order to the matrix- " + str(e))
+
+
+@task(bind=True, max_retries=3)
+def update_onboarding_qcstatus_to_matrix(self, data):
+    try:
+        obj_id = data.get('obj_id', None)
+        obj_type = data.get('obj_type', None)
+        if not obj_id or not obj_type:
+            logger.error("CELERY ERROR: Incorrect values provided.")
+            raise ValueError()
+        ct = ContentType.objects.get(model=obj_type)
+        model_used = ct.model_class()
+        content_type = ContentType.objects.get_for_model(model_used)
+        exit_point_url = reverse('admin:{}_{}_change'.format(content_type.app_label, content_type.model),
+                                 kwargs={"object_id": obj_id})
+        obj = model_used.objects.filter(id=obj_id).first()
+        if not obj:
+            raise Exception("{} could not found against id - {}".format(obj_type, obj_id))
+
+        request_data = {
+            "LeadID": obj.matrix_lead_id if hasattr(obj, 'matrix_lead_id') and obj.matrix_lead_id else 0,
+            "Comment": "",  # TODO: SHASHANK_SINGH or ROHIT_P find last reopen comments and what in other cases?
+            "NewJourneyURL": exit_point_url,
+            "AssignedUser": "",  # TODO: SHASHANK_SINGH or ROHIT_P find last user who submitted for QC in other cases?
+            "CRMStatusId": obj.data_status
+        }
+
+        url = settings.MATRIX_STATUS_UPDATE_API_URL
+        matrix_api_token = settings.MATRIX_API_TOKEN
+        response = requests.post(url, data=json.dumps(request_data), headers={'Authorization': matrix_api_token,
+                                                                              'Content-Type': 'application/json'})
+        if response.status_code != status.HTTP_200_OK or not response.ok:
+            logger.info("[ERROR] Status couldn't be updated for {} with ID {} to the matrix system".format(obj_type, obj_id))
+            logger.info("[ERROR] %s", response.reason)
+            countdown_time = (2 ** self.request.retries) * 60 * 10
+            logging.error("Update with status sync with the Matrix System failed with response - " + str(response.content))
+            self.retry([data], countdown=countdown_time)
+        # else:
+        #     resp_data = response.json()
+        #     if not resp_data.get('Id', None):
+        #         logger.error(json.dumps(request_data))
+        #         raise Exception("[ERROR] Id not recieved from the matrix while pushing doctor or lab lead.")
+        #     obj.matrix_lead_id = resp_data.get('Id', None)
+        #     obj.matrix_lead_id = int(obj.matrix_lead_id)
+        #     obj.save()
+    except Exception as e:
+        logger.error("Error in Celery. Failed to update status to the matrix - " + str(e))
+
 
 @task(bind=True, max_retries=2)
 def push_onboarding_qcstatus_to_matrix(self, data):

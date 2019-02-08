@@ -185,6 +185,7 @@ class HospitalForm(FormCleanMixin):
         return data
 
     def validate_qc(self):
+        # TODO: SHASHANK_SINGH or ROHIT_P must have a phone_number while submitting to QC it while
         qc_required = {'name': 'req', 'location': 'req', 'operational_since': 'req', 'parking': 'req',
                        'registration_number': 'req', 'building': 'req', 'locality': 'req', 'city': 'req',
                        'state': 'req',
@@ -198,14 +199,16 @@ class HospitalForm(FormCleanMixin):
         if self.instance.network and self.instance.network.data_status != QCModel.QC_APPROVED:
             raise forms.ValidationError("Hospital Network is not QC approved.")
 
-        for key,value in qc_required.items():
-            if value=='req' and not self.cleaned_data[key]:
-                raise forms.ValidationError(key+" is required for Quality Check")
-            if self.data.get(key+'_set-TOTAL_FORMS') and value=='count' and int(self.data[key+'_set-TOTAL_FORMS'])<=0:
-                raise forms.ValidationError("Atleast one entry of "+key+" is required for Quality Check")
-            if self.data.get(key+'-TOTAL_FORMS') and value == 'count' and int(self.data.get(key+'-TOTAL_FORMS')) <= 0:
-                raise forms.ValidationError("Atleast one entry of "+key+" is required for Quality Check")
-        if self.cleaned_data['network_type']==2 and not self.cleaned_data['network']:
+        for key, value in qc_required.items():
+            if value == 'req' and not self.cleaned_data[key]:
+                raise forms.ValidationError(key + " is required for Quality Check")
+            if self.data.get(key + '_set-TOTAL_FORMS') and value == 'count' and int(
+                    self.data[key + '_set-TOTAL_FORMS']) <= 0:
+                raise forms.ValidationError("Atleast one entry of " + key + " is required for Quality Check")
+            if self.data.get(key + '-TOTAL_FORMS') and value == 'count' and int(
+                    self.data.get(key + '-TOTAL_FORMS')) <= 0:
+                raise forms.ValidationError("Atleast one entry of " + key + " is required for Quality Check")
+        if self.cleaned_data['network_type'] == 2 and not self.cleaned_data['network']:
             raise forms.ValidationError("Network cannot be empty for Network Hospital")
 
     def clean(self):
