@@ -125,4 +125,4 @@ class AppointmentMaskNumber(TimeStampedModel):
     is_deleted = models.BooleanField(default=False)
 
     class Meta:
-        db_table = 'appointment_mast_number'
+        db_table = 'appointment_mask_number'
