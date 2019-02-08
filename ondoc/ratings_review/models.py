@@ -7,8 +7,15 @@ from django.contrib.contenttypes.fields import GenericForeignKey
 from django.contrib.contenttypes.models import ContentType
 
 import logging
-
 logger = logging.getLogger(__name__)
+
+
+class AppCompliments(auth_model.TimeStampedModel):
+    message = models.CharField(max_length=128, default=None)
+    rating_level = models.PositiveSmallIntegerField(default=None)
+
+    class Meta:
+        db_table = 'app_compliments'
 
 
 class ReviewCompliments(auth_model.TimeStampedModel):
@@ -60,3 +67,22 @@ class ReviewActions(auth_model.TimeStampedModel):
         db_table = 'review_action'
 
 
+class AppRatings(auth_model.TimeStampedModel):
+    CONSUMER = 1
+    PROVIDER = 2
+    APP_TYPE_CHOICES = [(CONSUMER, 'Consumer'), (PROVIDER, 'Provider')]
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
+    ratings = models.PositiveIntegerField(null=True)
+    review = models.CharField(max_length=5000, null=True, blank=True)
+    platform = models.CharField(max_length=64, null=True, blank=True)
+    app_name = models.CharField(max_length=64, null=True, blank=True)
+    app_version = models.CharField(max_length=64, null=True, blank=True)
+    device_id = models.CharField(max_length=64, null=True, blank=True)
+    brand = models.CharField(max_length=64, null=True, blank=True)
+    model = models.CharField(max_length=64, null=True, blank=True)
+    app_type = models.PositiveSmallIntegerField(choices=APP_TYPE_CHOICES, blank=True, null=True)
+    is_live = models.BooleanField(default=True)
+    compliment = models.ManyToManyField(AppCompliments, related_name='compliment_app')
+
+    class Meta:
+        db_table = 'app_ratings'

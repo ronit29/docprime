@@ -1,7 +1,7 @@
 from ondoc.diagnostic import models as lab_models
 from ondoc.ratings_review import models
 from django.db import transaction
-from ondoc.ratings_review.models import (RatingsReview, ReviewCompliments)
+from ondoc.ratings_review.models import (RatingsReview, ReviewCompliments, AppRatings, AppCompliments)
 from django.shortcuts import get_object_or_404
 from ondoc.doctor import models as doc_models
 from rest_framework.response import Response
@@ -12,6 +12,8 @@ from ondoc.api.v1.utils import IsConsumer, IsNotAgent
 from . import serializers
 from ondoc.api.v1.doctor import serializers as doc_serializers
 from ondoc.api.v1.diagnostic import serializers as lab_serializers
+import logging
+logger = logging.getLogger(__name__)
 
 
 class RatingsViewSet(viewsets.GenericViewSet):
@@ -69,9 +71,8 @@ class RatingsViewSet(viewsets.GenericViewSet):
                     content_data.is_rated = True
                     content_data.save()
 
-                # if valid_data.get('compliment'):
-                #     rating_review.compliment.add(*valid_data.get('compliment'))
             except Exception as e:
+                logger.error('Error Saving Appointment Rating ' + str(e))
                 return Response({'error': 'Something Went Wrong!'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
             return Response({'status': 'success', 'id': rating_review.id if rating_review else None})
         else:
@@ -148,7 +149,6 @@ class RatingsViewSet(viewsets.GenericViewSet):
         return Response(resp)
 
 
-
 class GetComplementViewSet(viewsets.GenericViewSet):
     authentication_classes = (JWTAuthentication,)
     permission_classes = (IsAuthenticated, IsConsumer)
@@ -160,3 +160,30 @@ class GetComplementViewSet(viewsets.GenericViewSet):
         return Response(body_serializer.data)
 
 
+class AppRatingsViewSet(viewsets.GenericViewSet):
+    authentication_classes = (JWTAuthentication,)
+    permission_classes = (IsAuthenticated, IsConsumer, IsNotAgent)
+
+    def get_queryset(self):
+        pass
+
+
+    def create(self, request):
+        serializer = serializers.AppRatingCreateBodySerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        valid_data = serializer.validated_data
+        user = request.user
+        try:
+            with transaction.atomic():
+                rating_obj = AppRatings(ratings=valid_data.get('rating'), review=valid_data.get('review'),
+                                        user=user, app_type=AppRatings.CONSUMER, brand=valid_data.get('brand'),
+                                        model=valid_data.get('model'), app_version=valid_data.get('app_version'),
+                                        app_name=valid_data.get('app_name'), platform=valid_data.get('platform'),
+                                        device_id=valid_data.get('device_id'))
+                if valid_data.get('compliment'):
+                    rating_obj.compliment.set(valid_data.get('compliment'), clear=True)
+                rating_obj.save()
+        except Exception as e:
+            logger.error('Error Saving App Rating ' + str(e))
+            return Response({'status': 'error'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        return Response({'status': "success", "rating": rating_obj.id})
