@@ -8,7 +8,7 @@ from ondoc.crm.constants import constants
 from dateutil import tz
 from django.conf import settings
 from django.utils.dateparse import parse_datetime
-from ondoc.authentication.models import Merchant, AssociatedMerchant
+from ondoc.authentication.models import Merchant, AssociatedMerchant, QCModel
 from ondoc.account.models import MerchantPayout
 from ondoc.common.models import Cities, MatrixCityMapping, PaymentOptions, Remark
 from import_export import resources, fields
@@ -104,19 +104,14 @@ class FormCleanMixin(forms.ModelForm):
     def clean(self):
         if (not self.request.user.is_superuser and not self.request.user.groups.filter(name=constants['SUPER_QC_GROUP']).exists()):
             # and (not '_reopen' in self.data and not self.request.user.groups.filter(name__in=[constants['QC_GROUP_NAME'], constants['WELCOME_CALLING_TEAM']]).exists()):
-            if self.instance.data_status == 3:
-                if '_mark_in_progress' in self.data and self.request.user.groups.filter(name=constants['WELCOME_CALLING_TEAM']).exists():
-                    pass
-                    # todo - condition to check if changing any other data except enabled and welcome_calling_done flag
-                    # if not 'enabled' in self.changed_data:
-                    #     raise forms.ValidationError("Cannot modify QC approved Data except enabled")
-                else:
+            if self.instance.data_status == QCModel.QC_APPROVED:
+                if not '_mark_in_progress' in self.data and self.request.user.groups.filter(name=constants['WELCOME_CALLING_TEAM']).exists():
                     raise forms.ValidationError("Cannot modify QC approved Data")
             if not self.request.user.groups.filter(name=constants['QC_GROUP_NAME']).exists():
-                if self.instance.data_status == 2:
+                if self.instance.data_status == QCModel.SUBMITTED_FOR_QC:
                     raise forms.ValidationError("Cannot update Data submitted for QC approval")
                 if not self.request.user.groups.filter(name=constants['DOCTOR_SALES_GROUP']).exists():
-                    if self.instance.data_status == 1 and self.instance.created_by and self.instance.created_by != self.request.user:
+                    if self.instance.data_status == QCModel.IN_PROGRESS and self.instance.created_by and self.instance.created_by != self.request.user:
                         raise forms.ValidationError("Cannot modify Data added by other users")
             if '_submit_for_qc' in self.data:
                 self.validate_qc()
@@ -150,7 +145,7 @@ class FormCleanMixin(forms.ModelForm):
             if '_mark_in_progress' in self.data:
                 if self.data.get('common-remark-content_type-object_id-INITIAL_FORMS', 0) == self.data.get('common-remark-content_type-object_id-TOTAL_FORMS', 1):
                     raise forms.ValidationError("Must add a remark with reopen status before rejecting.")
-                if self.instance.data_status == 3:
+                if self.instance.data_status == QCModel.QC_APPROVED:
                     if not self.request.user.groups.filter(name=constants['WELCOME_CALLING_TEAM']).exists():
                         raise forms.ValidationError("Cannot reject QC approved data")
             return super().clean()
