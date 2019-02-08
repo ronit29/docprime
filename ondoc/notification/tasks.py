@@ -409,7 +409,7 @@ def process_payout(payout_id):
             payout_status = request_payout(req_data, order_data)
 
         if payout_status:
-            payout_data.api_response = json.dumps(payout_status.get("response"))
+            payout_data.api_response = payout_status.get("response")
             if payout_status.get("status"):
                 payout_data.payout_time = datetime.datetime.now()
                 payout_data.status = payout_data.PAID
