@@ -392,7 +392,7 @@ def process_payout(payout_id):
                 curr_txn["pgtxId"] = txn.transaction_id
             curr_txn["refNo"] = payout_data.payout_ref_id
             curr_txn["bookingId"] = appointment.id
-            #curr_txn["paymentType"] = payout_data.payment_mode if payout_data.payment_mode else default_payment_mode
+            curr_txn["paymentType"] = payout_data.payment_mode if payout_data.payment_mode else default_payment_mode
             req_data["payload"].append(curr_txn)
             idx += 1
             if isinstance(txn, DummyTransactions) and txn.amount>0:
