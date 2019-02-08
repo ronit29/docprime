@@ -2,7 +2,7 @@ from django.contrib.gis import admin
 from django.contrib.auth.forms import UserChangeForm
 from django.contrib.auth.admin import UserAdmin
 from reversion.admin import VersionAdmin
-
+from django import forms
 from ondoc.authentication.models import (StaffProfile)
 
 
@@ -15,23 +15,27 @@ class StaffProfileInline(admin.TabularInline):
 
 class CustomUserChangeForm(UserChangeForm):
 
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        if self.instance.email is None:
-            self.instance.email = ''
-            kwargs['instance'] = self.instance
-            super(CustomUserChangeForm, self).__init__(*args, **kwargs)
+    # def __init__(self, *args, **kwargs):
+    #     super().__init__(*args, **kwargs)
+    #     if self.instance.email is None:
+    #         self.instance.email = ''
+    #         kwargs['instance'] = self.instance
+    #         super(CustomUserChangeForm, self).__init__(*args, **kwargs)
+    #
+    # def clean_email(self):
+    #     # if self.initial["email"] is None:
+    #     #     return ''
+    #     # return self.initial["email"]
+    #
+    #     email = self.cleaned_data['email']
+    #     if email is None:
+    #         return ''
+    #     return email
 
-    def clean_email(self):
-        # if self.initial["email"] is None:
-        #     return ''
-        # return self.initial["email"]
-
-        email = self.cleaned_data['email']
-        if email is None:
-            return ''
-        return email
-
+    def clean(self):
+        if self.cleaned_data.get('is_staff') and not self.data.get('staffprofile-0-employee_id'):
+            raise forms.ValidationError("Employee Code must be filled in staff profile.")
+        return super().clean()
 
 class CustomUserAdmin(UserAdmin,VersionAdmin):
     list_display = ('email',)
@@ -43,7 +47,7 @@ class CustomUserAdmin(UserAdmin,VersionAdmin):
     search_fields = ['email', 'phone_number']
     list_display = ('email','phone_number', 'is_active')
     list_select_related = ('staffprofile',)
-    # form = CustomUserChangeForm
+    form = CustomUserChangeForm
     def save_model(self, request, obj, form, change):
         if not obj.email:
             obj.email = None

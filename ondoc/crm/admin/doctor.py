@@ -1305,6 +1305,11 @@ class DoctorAdmin(AutoComplete, ImportExportMixin, VersionAdmin, ActionAdmin, QC
 
         super().save_model(request, obj, form, change)
 
+    def has_add_permission(self, request):
+        if request.user.groups.filter(name=constants['DOCTOR_NETWORK_GROUP_NAME']).exists() and not request.GET.get('LeadId'):
+            return False
+        return super().has_add_permission(request)
+
     def has_change_permission(self, request, obj=None):
         if not super().has_change_permission(request, obj):
             return False

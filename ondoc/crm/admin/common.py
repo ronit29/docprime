@@ -105,7 +105,8 @@ class FormCleanMixin(forms.ModelForm):
         if (not self.request.user.is_superuser and not self.request.user.groups.filter(name=constants['SUPER_QC_GROUP']).exists()):
             # and (not '_reopen' in self.data and not self.request.user.groups.filter(name__in=[constants['QC_GROUP_NAME'], constants['WELCOME_CALLING_TEAM']]).exists()):
             if self.instance.data_status == QCModel.QC_APPROVED:
-                if not '_mark_in_progress' in self.data and self.request.user.groups.filter(name=constants['WELCOME_CALLING_TEAM']).exists():
+                # allow welcome_calling_team to modify qc_approved data
+                if not self.request.user.groups.filter(name=constants['WELCOME_CALLING_TEAM']).exists():
                     raise forms.ValidationError("Cannot modify QC approved Data")
             if not self.request.user.groups.filter(name=constants['QC_GROUP_NAME']).exists():
                 if self.instance.data_status == QCModel.SUBMITTED_FOR_QC:
@@ -145,6 +146,11 @@ class FormCleanMixin(forms.ModelForm):
             if '_mark_in_progress' in self.data:
                 if self.data.get('common-remark-content_type-object_id-INITIAL_FORMS', 0) == self.data.get('common-remark-content_type-object_id-TOTAL_FORMS', 1):
                     raise forms.ValidationError("Must add a remark with reopen status before rejecting.")
+                else:
+                    last_remark_id = int(self.data.get('common-remark-content_type-object_id-TOTAL_FORMS', 1)) - 1
+                    last_remark_status = "common-remark-content_type-object_id-"+ str(last_remark_id) +"-status"
+                    if self.data.get(last_remark_status) != str(Remark.REOPEN):
+                        raise forms.ValidationError("Must add a remark with reopen status before rejecting.")
                 if self.instance.data_status == QCModel.QC_APPROVED:
                     if not self.request.user.groups.filter(name=constants['WELCOME_CALLING_TEAM']).exists():
                         raise forms.ValidationError("Cannot reject QC approved data")
