@@ -718,10 +718,9 @@ class LabAppointmentForm(forms.ModelForm):
             raise forms.ValidationError("Reason for Cancelled appointment should be set.")
 
         if cleaned_data.get('status') is LabAppointment.CANCELLED and cleaned_data.get(
-                'cancellation_reason') and 'others' in cleaned_data.get(
-                'cancellation_reason').name.lower() and not cleaned_data.get('cancellation_comments'):
+                'cancellation_reason', None) and cleaned_data.get('cancellation_reason').is_comment_needed and not cleaned_data.get('cancellation_comments'):
             raise forms.ValidationError(
-                "If Reason for Cancelled appointment is others it should be mentioned in cancellation comment.")
+                "Cancellation comments must be mentioned for selected cancellation reason.")
 
         if not lab.lab_pricing_group:
             raise forms.ValidationError("Lab is not in any lab pricing group.")
@@ -765,8 +764,8 @@ class LabReportInline(nested_admin.NestedTabularInline):
 class LabAppointmentAdmin(nested_admin.NestedModelAdmin):
     form = LabAppointmentForm
     list_display = (
-        'booking_id', 'get_profile', 'get_lab', 'status', 'reports_uploaded', 'time_slot_start', 'effective_price',
-        'created_at', 'updated_at', 'get_lab_test_name')
+        'booking_id', 'get_profile', 'get_lab', 'status', 'reports_uploaded', 'time_slot_start', 'effective_price', 'get_profile_email',
+        'get_profile_age', 'created_at', 'updated_at', 'get_lab_test_name')
     list_filter = ('status', )
     date_hierarchy = 'created_at'
 
@@ -780,6 +779,22 @@ class LabAppointmentAdmin(nested_admin.NestedModelAdmin):
     #     else:
     #         temp_autocomplete_fields = super().get_autocomplete_fields(request)
     #     return temp_autocomplete_fields
+
+    def get_profile_email(self, obj):
+        if not obj.profile:
+            return None
+        return obj.profile.email
+
+    get_profile_email.admin_order_field = 'profile'
+    get_profile_email.short_description = 'Profile Email'
+
+    def get_profile_age(self, obj):
+        if not obj.profile:
+            return None
+        return obj.profile.get_age()
+
+    get_profile_age.admin_order_field = 'profile'
+    get_profile_age.short_description = 'Profile Age'
 
     def get_profile(self, obj):
         if not obj.profile:

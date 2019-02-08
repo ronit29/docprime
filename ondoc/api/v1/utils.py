@@ -328,7 +328,10 @@ def payment_details(request, order):
     base_url = "https://{}".format(request.get_host())
     surl = base_url + '/api/v1/user/transaction/save'
     furl = base_url + '/api/v1/user/transaction/save'
-    # profile = UserProfile.objects.get(pk=order.action_data.get("profile"))
+    profile = user.get_default_profile()
+    profile_name = ""
+    if profile:
+        profile_name = profile.name
     pgdata = {
         'custId': user.id,
         'mobile': user.phone_number,
@@ -338,7 +341,7 @@ def payment_details(request, order):
         'furl': furl,
         'referenceId': "",
         'orderId': order.id,
-        'name': order.action_data.get("profile_detail").get("name"),
+        'name': profile_name,
         'txAmount': str(order.amount),
     }
     secret_key = client_key = ""
@@ -511,6 +514,7 @@ class CouponsMixin(object):
         user = kwargs.get("user")
         coupon_obj = kwargs.get("coupon_obj")
         profile = kwargs.get("profile")
+        cart_item = kwargs.get("cart_item")
 
         if coupon_obj:
             if coupon_obj.is_user_specific and not user.is_authenticated:
@@ -562,7 +566,12 @@ class CouponsMixin(object):
                         or (coupon_obj.age_end and (not user_age or coupon_obj.age_end < user_age)) ):
                     return {"is_valid": False, "used_count": None}
 
-            count = coupon_obj.used_coupon_count(user)
+                from ondoc.cart.models import Cart
+                payment_option_filter = Cart.get_pg_if_pgcoupon(user, cart_item)
+                if payment_option_filter and coupon_obj.payment_option and coupon_obj.payment_option.id != payment_option_filter.id:
+                    return {"is_valid": False, "used_count": 0}
+
+            count = coupon_obj.used_coupon_count(user, cart_item)
             total_used_count = coupon_obj.total_used_coupon_count()
 
             if coupon_obj.is_user_specific and user:
@@ -1065,8 +1074,8 @@ def create_payout_checksum(all_txn, product_id):
     checksum = secret_key + "|[" + checksum + "]|" + client_key
     checksum_hash = hashlib.sha256(str(checksum).encode())
     checksum_hash = checksum_hash.hexdigest()
-    print("checksum string - " + str(checksum) + "checksum hash - " + str(checksum_hash))
-    logger.error("checksum string - " + str(checksum) + "checksum hash - " + str(checksum_hash))
+    #print("checksum string - " + str(checksum) + "checksum hash - " + str(checksum_hash))
+    #logger.error("checksum string - " + str(checksum) + "checksum hash - " + str(checksum_hash))
     return checksum_hash
 
 def html_to_pdf(html_body, filename):
@@ -1104,3 +1113,8 @@ def util_file_name(filename):
         filename = os.path.basename(filename)
     return filename
 
+def format_iso_date(date_str):
+    date_field = date_str.find('T')
+    if date_field:
+        date_field = date_str[:date_field]
+    return date_field

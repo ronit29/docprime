@@ -6,12 +6,13 @@ from ondoc.api.v1.doctor.serializers import HospitalModelSerializer, Appointment
 from ondoc.api.v1.doctor.DoctorSearchByHospitalHelper import DoctorSearchByHospitalHelper
 from ondoc.api.v1.procedure.serializers import CommonProcedureCategorySerializer, ProcedureInSerializer, \
     ProcedureSerializer, DoctorClinicProcedureSerializer, CommonProcedureSerializer
+from ondoc.cart.models import Cart
 from ondoc.doctor import models
 from ondoc.authentication import models as auth_models
 from ondoc.diagnostic import models as lab_models
 from ondoc.notification import tasks as notification_tasks
 #from ondoc.doctor.models import Hospital, DoctorClinic,Doctor,  OpdAppointment
-from ondoc.doctor.models import DoctorClinic
+from ondoc.doctor.models import DoctorClinic, OpdAppointment
 from ondoc.notification.models import EmailNotification
 from django.utils.safestring import mark_safe
 from ondoc.coupon.models import Coupon
@@ -62,6 +63,7 @@ from django.contrib.staticfiles.templatetags.staticfiles import static
 from django.db.models import Avg
 from django.db.models import Count
 from ondoc.api.v1.auth import serializers as auth_serializers
+from copy import deepcopy
 
 logger = logging.getLogger(__name__)
 import random
@@ -109,7 +111,6 @@ class DoctorAppointmentsViewSet(OndocViewSet):
     def list(self, request):
         user = request.user
         queryset = self.get_pem_queryset(user)
-        queryset = queryset.distinct()
         if not queryset:
             return Response([])
         serializer = serializers.AppointmentFilterSerializer(data=request.query_params)
@@ -149,7 +150,7 @@ class DoctorAppointmentsViewSet(OndocViewSet):
 
         if date:
             queryset = queryset.filter(time_slot_start__date=date)
-
+        queryset = queryset.distinct('id', 'time_slot_start')
         queryset = paginate_queryset(queryset, request)
         serializer = serializers.DoctorAppointmentRetrieveSerializer(queryset, many=True, context={'request': request})
         return Response(serializer.data)
@@ -201,104 +202,33 @@ class DoctorAppointmentsViewSet(OndocViewSet):
         opd_appointment_serializer = serializers.DoctorAppointmentRetrieveSerializer(opd_appointment, context={'request': request})
         return Response(opd_appointment_serializer.data)
 
-    @staticmethod
-    def get_procedure_prices(procedures, doctor, selected_hospital, dct):
-        doctor_clinic = doctor.doctor_clinics.filter(hospital=selected_hospital).first()
-        doctor_clinic_procedures = doctor_clinic.doctorclinicprocedure_set.filter(procedure__in=procedures).order_by(
-            'procedure_id')
-        total_deal_price, total_agreed_price, total_mrp = 0, 0, 0
-        for doctor_clinic_procedure in doctor_clinic_procedures:
-            total_agreed_price += doctor_clinic_procedure.agreed_price
-            total_deal_price += doctor_clinic_procedure.deal_price
-            total_mrp += doctor_clinic_procedure.mrp
-        return total_deal_price + dct.deal_price, total_agreed_price + dct.fees, total_mrp + dct.mrp
 
     @transaction.atomic
     def create(self, request):
-        serializer = serializers.CreateAppointmentSerializer(data=request.data, context={'request': request})
+        serializer = serializers.CreateAppointmentSerializer(data=request.data, context={'request': request, 'data' : request.data, 'use_duplicate' : True})
         serializer.is_valid(raise_exception=True)
-        data = serializer.validated_data
-        procedures = data.get('procedure_ids', [])
-        # procedure_categories = data.get('procedure_category_ids', [])
-        selected_hospital = data.get('hospital')
-        doctor = data.get('doctor')
-        time_slot_start = form_time_slot(data.get("start_date"), data.get("start_time"))
-        doctor_clinic_timing = models.DoctorClinicTiming.objects.filter(
-            doctor_clinic__doctor=data.get('doctor'),
-            doctor_clinic__hospital=data.get('hospital'),
-            doctor_clinic__doctor__is_live=True, doctor_clinic__hospital__is_live=True,
-            day=time_slot_start.weekday(), start__lte=data.get("start_time"),
-            end__gte=data.get("start_time")).first()
-        profile_model = data.get("profile")
-        profile_detail = {
-            "name": profile_model.name,
-            "gender": profile_model.gender,
-            "dob": str(profile_model.dob)
-        }
+        validated_data = serializer.validated_data
 
-        extra_details = []
-        effective_price = 0
-        if not procedures:
-            if data.get("payment_type") == models.OpdAppointment.INSURANCE:
-                effective_price = doctor_clinic_timing.deal_price
-            elif data.get("payment_type") in [models.OpdAppointment.COD, models.OpdAppointment.PREPAID]:
-                coupon_discount, coupon_cashback, coupon_list = Coupon.get_total_deduction(data, doctor_clinic_timing.deal_price)
-                if coupon_discount >= doctor_clinic_timing.deal_price:
-                    effective_price = 0
-                else:
-                    effective_price = doctor_clinic_timing.deal_price - coupon_discount
-            deal_price = doctor_clinic_timing.deal_price
-            mrp = doctor_clinic_timing.mrp
-            fees = doctor_clinic_timing.fees
+        cart_item_id = validated_data.get('cart_item').id if validated_data.get('cart_item') else None
+        if not models.OpdAppointment.can_book_for_free(request, validated_data, cart_item_id):
+            return Response({'request_errors': {"code": "invalid",
+                                                "message": "Only {} active free bookings allowed per customer".format(
+                                                    models.OpdAppointment.MAX_FREE_BOOKINGS_ALLOWED)}},
+                            status=status.HTTP_400_BAD_REQUEST)
+
+        if validated_data.get("existing_cart_item"):
+            cart_item = validated_data.get("existing_cart_item")
+            cart_item.data = request.data
+            cart_item.save()
         else:
-            total_deal_price, total_agreed_price, total_mrp = self.get_procedure_prices(procedures, doctor,
-                                                                                        selected_hospital,
-                                                                                        doctor_clinic_timing)
-            if data.get("payment_type") == models.OpdAppointment.INSURANCE:
-                effective_price = total_deal_price
-            elif data.get("payment_type") in [models.OpdAppointment.COD, models.OpdAppointment.PREPAID]:
-                coupon_discount, coupon_cashback, coupon_list = Coupon.get_total_deduction(data, total_deal_price)
-                if coupon_discount >= total_deal_price:
-                    effective_price = 0
-                else:
-                    effective_price = total_deal_price - coupon_discount
-            deal_price = total_deal_price
-            mrp = total_mrp
-            fees = total_agreed_price
+            cart_item, is_new = Cart.objects.update_or_create(id=cart_item_id, deleted_at__isnull=True, product_id=account_models.Order.DOCTOR_PRODUCT_ID,
+                                                  user=request.user,defaults={"data": request.data})
 
-            doctor_clinic = doctor.doctor_clinics.filter(hospital=selected_hospital).first()
-            doctor_clinic_procedures = doctor_clinic.doctorclinicprocedure_set.filter(procedure__in=procedures).order_by('procedure_id')
-            for doctor_clinic_procedure in doctor_clinic_procedures:
-                temp_extra = {'procedure_id': doctor_clinic_procedure.procedure.id,
-                              'procedure_name': doctor_clinic_procedure.procedure.name,
-                              'deal_price': doctor_clinic_procedure.deal_price,
-                              'agreed_price': doctor_clinic_procedure.agreed_price,
-                              'mrp': doctor_clinic_procedure.mrp}
-                extra_details.append(temp_extra)
+        if hasattr(request, 'agent') and request.agent:
+            resp = { 'is_agent': True , "status" : 1 }
+        else:
+            resp = account_models.Order.create_order(request, [cart_item], validated_data.get("use_wallet"))
 
-        opd_data = {
-            "doctor": data.get("doctor"),
-            "hospital": data.get("hospital"),
-            "profile": data.get("profile"),
-            "profile_detail": profile_detail,
-            "user": request.user,
-            "booked_by": request.user,
-            "fees": fees,
-            "deal_price": deal_price,
-            "effective_price": effective_price,
-            "mrp": mrp,
-            "extra_details": extra_details,
-            "time_slot_start": time_slot_start,
-            "payment_type": data.get("payment_type"),
-            "coupon": coupon_list,
-            "discount": int(coupon_discount),
-            "cashback": int(coupon_cashback)
-        }
-
-        if opd_data.get("deal_price") == 0 and not self.can_book_for_free(request.user):
-            return Response({'request_errors': { "code" : "invalid", "message" : "Only 3 active free bookings allowed per customer" }}, status=status.HTTP_400_BAD_REQUEST)
-
-        resp = self.create_order(request, opd_data, account_models.Order.DOCTOR_PRODUCT_ID, data.get("use_wallet"))
         return Response(data=resp)
 
     def can_book_for_free(self, user):
@@ -902,8 +832,13 @@ class PrescriptionFileViewset(OndocViewSet):
         return Response(response)
 
     def prescription_permission(self, user, appointment):
-        return auth_models.GenericAdmin.objects.filter(user=user, hospital=appointment.hospital,  is_disabled=False,
-                                                       write_permission=True).exists()
+        return auth_models.GenericAdmin.objects.filter(Q(user=user, is_disabled=False),
+                                                       Q(
+                                                           Q(hospital=appointment.hospital)
+                                                            |
+                                                           Q(doctor=appointment.doctor)
+                                                       )
+                                                       ).exists()
 
 
 class SearchedItemsViewSet(viewsets.GenericViewSet):
@@ -953,16 +888,16 @@ class SearchedItemsViewSet(viewsets.GenericViewSet):
         count = int(count)
         if count <=0:
             count = 10
-        medical_conditions = models.CommonMedicalCondition.objects.select_related('condition').all().order_by("priority")[:count]
+        medical_conditions = models.CommonMedicalCondition.objects.select_related('condition').all().order_by("-priority")[:count]
         conditions_serializer = serializers.MedicalConditionSerializer(medical_conditions, many=True, context={'request': request})
 
-        common_specializations = models.CommonSpecialization.objects.select_related('specialization').all().order_by("priority")[:10]
+        common_specializations = models.CommonSpecialization.objects.select_related('specialization').all().order_by("-priority")[:10]
         specializations_serializer = serializers.CommonSpecializationsSerializer(common_specializations, many=True, context={'request': request})
 
-        common_procedure_categories = CommonProcedureCategory.objects.select_related('procedure_category').filter(procedure_category__is_live=True).all().order_by("priority")[:10]
+        common_procedure_categories = CommonProcedureCategory.objects.select_related('procedure_category').filter(procedure_category__is_live=True).all().order_by("-priority")[:10]
         common_procedure_categories_serializer = CommonProcedureCategorySerializer(common_procedure_categories, many=True)
 
-        common_procedures = CommonProcedure.objects.select_related('procedure').filter(procedure__is_enabled=True).all().order_by("priority")[:10]
+        common_procedures = CommonProcedure.objects.select_related('procedure').filter(procedure__is_enabled=True).all().order_by("-priority")[:10]
         common_procedures_serializer = CommonProcedureSerializer(common_procedures, many=True)
 
         return Response({"conditions": conditions_serializer.data, "specializations": specializations_serializer.data,
@@ -2108,9 +2043,12 @@ class OfflineCustomerViewSet(viewsets.GenericViewSet):
         phone_number = []
         patient_profile = OfflinePatientSerializer(appnt.user).data
         patient_name = appnt.user.name if hasattr(appnt.user, 'name') else None
+        patient_profile['phone_number'] = None
         if hasattr(appnt.user, 'patient_mobiles'):
             for mob in appnt.user.patient_mobiles.all():
                 phone_number.append({"phone_number": mob.phone_number, "is_default": mob.is_default})
+                if mob.is_default:
+                    patient_profile['phone_number'] = mob.phone_number
         patient_profile['patient_numbers'] = phone_number
 
         ret_obj = {}
@@ -2262,12 +2200,14 @@ class OfflineCustomerViewSet(viewsets.GenericViewSet):
             patient_dict[
                 'display_welcome_message'] = data.display_welcome_message if data.display_welcome_message else None
             patient_dict['error'] = data.error if data.error else None
-            phone_number = ''
+            patient_numbers = []
+            patient_dict['phone_number'] = None
             if hasattr(data, 'patient_mobiles'):
                 for mob in data.patient_mobiles.all():
+                    patient_numbers.append({"phone_number": mob.phone_number, "is_default": mob.is_default})
                     if mob.is_default:
-                        phone_number = mob.phone_number
-            patient_dict['patient_numbers'] = phone_number
+                        patient_dict['phone_number'] = mob.phone_number
+            patient_dict['patient_numbers'] = patient_numbers
             response.append(patient_dict)
         return Response(response)
 
@@ -2529,7 +2469,7 @@ class OfflineCustomerViewSet(viewsets.GenericViewSet):
                         if 'break' in update_obj and update_obj.get('break'):
                             resp.append(update_obj.get('obj'))
                             break
-
+                        old_appnt = deepcopy(appnt)
                         if data.get('patient'):
                             if not data.get('patient')['id'] in patient_ids:
                                 patient_data = self.create_patient(request, data['patient'], data['hospital'],
@@ -2541,7 +2481,7 @@ class OfflineCustomerViewSet(viewsets.GenericViewSet):
                                                                    data['doctor'])
                             patient = patient_data['patient']
                             if patient_data.get('sms_list'):
-                                patient_data['sms_list']['old_appointment'] = appnt
+                                patient_data['sms_list']['old_appointment'] = old_appnt
                                 sms_list.append(patient_data['sms_list'])
                             appnt.user = patient
                         else:
@@ -2552,7 +2492,7 @@ class OfflineCustomerViewSet(viewsets.GenericViewSet):
                                 if def_number:
                                     patient_data['sms_list'] = {'phone_number': def_number.phone_number,
                                                                 'name': patient.name,
-                                                                'old_appointment': appnt}
+                                                                'old_appointment': old_appnt}
                                     sms_list.append(patient_data['sms_list'])
 
                         if appnt.doctor.id != data.get('doctor').id or appnt.hospital.id != data.get('hospital').id:
@@ -2770,10 +2710,13 @@ class OfflineCustomerViewSet(viewsets.GenericViewSet):
                 patient_profile = OfflinePatientSerializer(app.user).data
                 is_docprime = False
                 patient_name = app.user.name if hasattr(app.user, 'name') else None
+                patient_profile['phone_number'] = None
                 if hasattr(app.user, 'patient_mobiles'):
                     for mob in app.user.patient_mobiles.all():
                         phone_number.append({"phone_number": mob.phone_number, "is_default": mob.is_default})
-                patient_profile['phone_numbers'] = phone_number
+                        if mob.is_default:
+                            patient_profile['phone_number'] = mob.phone_number
+                patient_profile['patient_numbers'] = phone_number
                 error_flag = app.error if app.error else False
                 error_message = app.error_message if app.error_message else ''
             else:
