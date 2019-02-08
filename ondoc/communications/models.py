@@ -582,7 +582,7 @@ class OpdNotification(Notification):
             "attachments": {},  # Updated later
             "screen": "appointment",
             "type": "doctor",
-            "email_banners": email_banners_html
+            "email_banners": email_banners_html if email_banners_html is not None else ""
         }
         return context
 
@@ -718,7 +718,7 @@ class LabNotification(Notification):
             "attachments": {},  # Updated later
             "screen": "appointment",
             "type": "lab",
-            "email_banners": email_banners_html
+            "email_banners": email_banners_html if email_banners_html is not None else ""
         }
         return context
 
