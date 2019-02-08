@@ -603,7 +603,7 @@ class LabBookingClosingManager(models.Manager):
                 if Lab.objects.filter(id=lab_id, network_id=settings.THYROCARE_NETWORK_ID).exists():
                     is_thyrocare = True
 
-            today_min, tomorrow_min, today_max = obj.initial_start_times(is_thyrocare=is_thyrocare, is_home_pickup=is_home_pickup, time_slots=resp_list)
+            today_min, tomorrow_min, today_max = obj.initial_start_time_slots(is_thyrocare=is_thyrocare, is_home_pickup=is_home_pickup, time_slots=resp_list, date=date)
             res_data = {
                 "time_slots": resp_list,
                 "today_min": today_min,
