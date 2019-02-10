@@ -218,6 +218,8 @@ class DoctorAppointmentsViewSet(OndocViewSet):
 
         if validated_data.get("existing_cart_item"):
             cart_item = validated_data.get("existing_cart_item")
+            cart_item.data = request.data
+            cart_item.save()
         else:
             cart_item, is_new = Cart.objects.update_or_create(id=cart_item_id, deleted_at__isnull=True, product_id=account_models.Order.DOCTOR_PRODUCT_ID,
                                                   user=request.user,defaults={"data": request.data})
@@ -886,16 +888,16 @@ class SearchedItemsViewSet(viewsets.GenericViewSet):
         count = int(count)
         if count <=0:
             count = 10
-        medical_conditions = models.CommonMedicalCondition.objects.select_related('condition').all().order_by("priority")[:count]
+        medical_conditions = models.CommonMedicalCondition.objects.select_related('condition').all().order_by("-priority")[:count]
         conditions_serializer = serializers.MedicalConditionSerializer(medical_conditions, many=True, context={'request': request})
 
-        common_specializations = models.CommonSpecialization.objects.select_related('specialization').all().order_by("priority")[:10]
+        common_specializations = models.CommonSpecialization.objects.select_related('specialization').all().order_by("-priority")[:10]
         specializations_serializer = serializers.CommonSpecializationsSerializer(common_specializations, many=True, context={'request': request})
 
-        common_procedure_categories = CommonProcedureCategory.objects.select_related('procedure_category').filter(procedure_category__is_live=True).all().order_by("priority")[:10]
+        common_procedure_categories = CommonProcedureCategory.objects.select_related('procedure_category').filter(procedure_category__is_live=True).all().order_by("-priority")[:10]
         common_procedure_categories_serializer = CommonProcedureCategorySerializer(common_procedure_categories, many=True)
 
-        common_procedures = CommonProcedure.objects.select_related('procedure').filter(procedure__is_enabled=True).all().order_by("priority")[:10]
+        common_procedures = CommonProcedure.objects.select_related('procedure').filter(procedure__is_enabled=True).all().order_by("-priority")[:10]
         common_procedures_serializer = CommonProcedureSerializer(common_procedures, many=True)
 
         return Response({"conditions": conditions_serializer.data, "specializations": specializations_serializer.data,

@@ -322,6 +322,20 @@ class MerchantAdmin(ImportExportMixin, VersionAdmin):
 class MerchantPayoutForm(forms.ModelForm):
     process_payout = forms.BooleanField(required=False)
 
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        payment_mode_options = []
+        instance = self.instance
+        merchant = instance.get_merchant()
+        if merchant and merchant.ifsc_code and self.fields.get('payment_mode'):
+            ifsc_code = merchant.ifsc_code
+            if ifsc_code.upper().startswith(MerchantPayout.INTRABANK_IDENTIFIER):
+                payment_mode_options = [(MerchantPayout.IFT,MerchantPayout.IFT)]
+            else:
+                payment_mode_options = [(MerchantPayout.NEFT, MerchantPayout.NEFT),
+                                        (MerchantPayout.IMPS, MerchantPayout.IMPS)]
+            self.fields.get('payment_mode').choices = payment_mode_options
+
     def clean(self):
         super().clean()
         if any(self.errors):
@@ -358,7 +372,7 @@ class MerchantPayoutForm(forms.ModelForm):
 class MerchantPayoutAdmin(VersionAdmin):
     form = MerchantPayoutForm
     model = MerchantPayout
-    fields = ['id', 'charged_amount', 'updated_at', 'created_at', 'payable_amount', 'status', 'payout_time', 'paid_to',
+    fields = ['id', 'payment_mode','charged_amount', 'updated_at', 'created_at', 'payable_amount', 'status', 'payout_time', 'paid_to',
               'appointment_id', 'get_billed_to', 'get_merchant', 'process_payout', 'type', 'utr_no', 'amount_paid']
     list_display = ('id', 'status', 'payable_amount', 'appointment_id', 'doc_lab_name')
     search_fields = ['name']
@@ -380,7 +394,7 @@ class MerchantPayoutAdmin(VersionAdmin):
         base = ['appointment_id', 'get_billed_to', 'get_merchant']
         editable_fields = ['payout_approved']
         if obj and obj.status == MerchantPayout.PENDING:
-            editable_fields += ['type', 'utr_no', 'amount_paid']
+            editable_fields += ['type', 'utr_no', 'amount_paid','payment_mode']
         readonly = [f.name for f in self.model._meta.fields if f.name not in editable_fields]
         return base + readonly
 

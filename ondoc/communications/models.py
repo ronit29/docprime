@@ -428,6 +428,7 @@ class EMAILNotification:
         email = receiver.get('email')
         notification_type = self.notification_type
         context = copy.deepcopy(context)
+        instance = context.get('instance', None)
         email_subject = render_to_string(template[0], context=context)
         html_body = render_to_string(template[1], context=context)
         if email and user and user.user_type == User.DOCTOR and notification_type in [
@@ -441,7 +442,8 @@ class EMAILNotification:
                 email_subject=email_subject,
                 cc=cc,
                 bcc=bcc,
-                attachments=attachments
+                attachments=attachments,
+                content_object = instance
             )
             message = {
                 "data": model_to_dict(email_noti),
@@ -458,7 +460,9 @@ class EMAILNotification:
                 email_subject=email_subject,
                 cc=cc,
                 bcc=bcc,
-                attachments=attachments
+                attachments=attachments,
+                content_object=instance
+
             )
             message = {
                 "data": model_to_dict(email_noti),
