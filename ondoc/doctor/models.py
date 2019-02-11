@@ -1467,12 +1467,7 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
 
             except Exception as e:
                 logger.error(str(e))
-        # if push_for_mask_number:
-        #     try:
-        #         generate_appointment_masknumber.apply_async(({'type': 'OPD_APPOINTMENT', 'appointment_id': self.id},),
-        #                                                     countdown=5)
-        #     except Exception as e:
-        #         logger.error(str(e))
+
         if self.is_to_send_notification(old_instance):
             try:
                 notification_tasks.send_opd_notifications_refactored.apply_async((self.id,), countdown=1)
@@ -1532,12 +1527,6 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
             push_to_matrix = False
         else:
             push_to_matrix = True
-
-        # push_for_mask_number = True
-        # if database_instance and self.time_slot_start == database_instance.time_slot_start:
-        #     push_for_mask_number = False
-        # else:
-        #     push_for_mask_number = True
 
         try:
             # while completing appointment

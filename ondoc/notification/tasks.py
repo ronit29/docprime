@@ -41,7 +41,15 @@ def send_lab_notifications_refactored(appointment_id):
             return
         if instance.status == lab_models.LabAppointment.COMPLETED:
             instance.generate_invoice()
-        generate_appointment_masknumber(({'type': 'LAB_APPOINTMENT', 'appointment_id': instance.id}))
+        counter = 1
+        is_masking_done = False
+        while counter < 3:
+            if is_masking_done:
+                break
+            else:
+                is_masking_done = generate_appointment_masknumber(
+                    ({'type': 'OPD_APPOINTMENT', 'appointment_id': instance.id}))
+        # generate_appointment_masknumber(({'type': 'LAB_APPOINTMENT', 'appointment_id': instance.id}))
         lab_notification = LabNotification(instance)
         lab_notification.send()
     except Exception as e:
@@ -121,7 +129,14 @@ def send_opd_notifications_refactored(appointment_id):
             return
         if instance.status == OpdAppointment.COMPLETED:
             instance.generate_invoice()
-        generate_appointment_masknumber(({'type': 'OPD_APPOINTMENT', 'appointment_id': instance.id}))
+        counter = 1
+        is_masking_done = False
+        while counter < 3:
+            if is_masking_done:
+                break
+            else:
+                is_masking_done = generate_appointment_masknumber(
+                    ({'type': 'OPD_APPOINTMENT', 'appointment_id': instance.id}))
         opd_notification = OpdNotification(instance)
         opd_notification.send()
     except Exception as e:
@@ -311,6 +326,8 @@ def generate_appointment_masknumber(data):
     from ondoc.diagnostic.models import LabAppointment
     appointment_type = data.get('type')
     try:
+        is_masking_done = False
+        is_maskable = True
         appointment_id = data.get('appointment_id', None)
         if not appointment_id:
             # logger.error("[CELERY ERROR: Incorrect values provided.]")
@@ -318,8 +335,18 @@ def generate_appointment_masknumber(data):
 
         if appointment_type == 'OPD_APPOINTMENT':
             appointment = OpdAppointment.objects.filter(id=appointment_id).first()
+            is_network_enabled_hospital = appointment.hospital
+            if is_network_enabled_hospital:
+                is_maskable = is_network_enabled_hospital.is_mask_number_required
+            else:
+                is_maskable = True
         elif data.get('type') == 'LAB_APPOINTMENT':
             appointment = LabAppointment.objects.filter(id=appointment_id).first()
+            is_network_enabled_lab = appointment.lab.network
+            if is_network_enabled_lab:
+                is_maskable = is_network_enabled_lab.is_mask_number_required
+            else:
+                is_maskable = True
         if not appointment:
             raise Exception("Appointment could not found against id - " + str(appointment_id))
 
@@ -329,36 +356,45 @@ def generate_appointment_masknumber(data):
         validity_up_to = int((time_slot + datetime.timedelta(days=1)).timestamp())
         if not phone_number:
             raise Exception("phone Number could not found against id - " + str(appointment_id))
-        request_data = {
-            "ExpirationDate": validity_up_to,
-            "FromId": appointment.id,
-            "ToNumber": phone_number
-        }
-        url = settings.MATRIX_NUMBER_MASKING
-        matrix_api_token = settings.MATRIX_API_TOKEN
-        response = requests.post(url, data=json.dumps(request_data), headers={'Authorization': matrix_api_token,
-                                                                              'Content-Type': 'application/json'})
+        if is_maskable:
+            request_data = {
+                "ExpirationDate": validity_up_to,
+                "FromId": appointment.id,
+                "ToNumber": phone_number
+            }
+            url = settings.MATRIX_NUMBER_MASKING
+            matrix_api_token = settings.MATRIX_API_TOKEN
+            response = requests.post(url, data=json.dumps(request_data), headers={'Authorization': matrix_api_token,
+                                                                                  'Content-Type': 'application/json'})
 
-        if response.status_code != status.HTTP_200_OK or not response.ok:
-            logger.info("[ERROR] Appointment could not be get Mask Number")
-            logger.info("[ERROR] %s", response.reason)
-            # countdown_time = (2 ** self.request.retries) * 60 * 10
-            # logging.error("Appointment sync with the Matrix System failed with response - " + str(response.content))
-            # print(countdown_time)
-            # self.retry([data], countdown=countdown_time)
+            if response.status_code != status.HTTP_200_OK or not response.ok:
+                logger.info("[ERROR] Appointment could not be get Mask Number")
+                logger.info("[ERROR] %s", response.reason)
+                # countdown_time = (2 ** self.request.retries) * 60 * 10
+                # logging.error("Appointment sync with the Matrix System failed with response - " + str(response.content))
+                # print(countdown_time)
+                # self.retry([data], countdown=countdown_time)
 
-        mask_number = response.json()
-        existing_mask_number_obj = appointment.mask_number.filter(is_deleted=False).first()
-        if existing_mask_number_obj:
-            existing_mask_number_obj.is_deleted = True
-            existing_mask_number_obj.save()
-            AppointmentMaskNumber(content_object=appointment, mask_number=mask_number,
-                                                 validity_up_to=updated_time_slot, is_deleted=False).save()
+            mask_number = response.json()
         else:
-            AppointmentMaskNumber(content_object=appointment, mask_number=mask_number,
-                                                 validity_up_to=updated_time_slot, is_deleted=False).save()
+            mask_number = phone_number
+        if mask_number:
+            existing_mask_number_obj = appointment.mask_number.filter(is_deleted=False).first()
+            if existing_mask_number_obj:
+                existing_mask_number_obj.is_deleted = True
+                existing_mask_number_obj.save()
+                AppointmentMaskNumber(content_object=appointment, mask_number=mask_number,
+                                                     validity_up_to=updated_time_slot, is_deleted=False).save()
+                is_masking_done = True
+            else:
+                AppointmentMaskNumber(content_object=appointment, mask_number=mask_number,
+                                                     validity_up_to=updated_time_slot, is_deleted=False).save()
+                is_masking_done = True
+        else:
+            raise Exception("Failed to generate Mask Number for the appointment - " + str(appointment_id))
     except Exception as e:
-        logger.error("Error in Celery. Failed get mask number for appointment " + str(e))
+        logger.error("Error in Celery. Failed to get mask number for appointment " + str(e))
+    return is_masking_done
 
 @task
 def send_appointment_reminder_message(number, patient_name, doctor, hospital_name, date):
