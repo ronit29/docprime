@@ -816,26 +816,9 @@ class LabList(viewsets.ReadOnlyModelViewSet):
         temp_var = dict()
         tests = dict()
         lab = dict()
-
-        # for test in LabTest.objects.filter(id__in=ids):
-        #         if test.categories.all():
-        #             selected_categories = test.get_all_categories_detail()
-        # if test_ids:
-        #     for test in LabTest.objects.filter(id__in=test_ids):
-        #         if test.categories.all():
-        #             selected_categories = test.get_all_categories_detail()
-        #             test[obj.id].append({"categories": selected_categories})
-
-
         for obj in labs:
             temp_var[obj.id] = obj
             tests[obj.id] = list()
-            # res = []
-            # for test in LabTest.objects.filter(id__in=test_ids):
-            #     if test.categories.all():
-            #         selected_categories = test.get_all_categories_detail()
-            #         res.append(selected_categories)
-
             if test_ids and obj.selected_group and obj.selected_group.selected_tests:
                 for test in obj.selected_group.selected_tests:
                     if test.custom_deal_price:

@@ -900,6 +900,15 @@ class LabTest(TimeStampedModel, SearchKey):
     class Meta:
         db_table = "lab_test"
 
+#
+#
+# class FrequentlyAddedTogetherTests(TimeStampedModel):
+#     test = models.ForeignKey(LabTest, related_name='base_test' ,null =True, blank =False, on_delete=models.CASCADE)
+#     booked_together_test = models.ForeignKey(LabTest, related_name='booked_together' ,null=True, blank=False, on_delete=models.CASCADE)
+#
+#     class Meta:
+#         db_table = "related_tests"
+
     def get_all_categories_detail(self):
         all_categories = self.categories.all()
         res = []
