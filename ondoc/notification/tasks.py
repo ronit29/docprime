@@ -48,7 +48,7 @@ def send_lab_notifications_refactored(appointment_id):
                 break
             else:
                 is_masking_done = generate_appointment_masknumber(
-                    ({'type': 'OPD_APPOINTMENT', 'appointment_id': instance.id}))
+                    ({'type': 'LAB_APPOINTMENT', 'appointment_id': instance.id}))
         # generate_appointment_masknumber(({'type': 'LAB_APPOINTMENT', 'appointment_id': instance.id}))
         lab_notification = LabNotification(instance)
         lab_notification.send()
