@@ -135,7 +135,7 @@ class GeoIPAddressURLViewSet(viewsets.GenericViewSet):
         default["city"] = None
 
         ip_address, is_routable = get_client_ip(request)
-        if ip_address.startswith('60'):
+        if False and ip_address.startswith('60'):
             ip_keys = ['HTTP_X_FORWARDED_FOR', 'X_FORWARDED_FOR',
             'HTTP_CLIENT_IP',
             'HTTP_X_REAL_IP',
