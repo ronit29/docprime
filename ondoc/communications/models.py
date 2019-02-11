@@ -699,6 +699,10 @@ class LabNotification(Notification):
             test['mrp'] = str(test['mrp'])
             test['deal_price'] = str(test['deal_price'])
             test['discount'] = str(test['discount'])
+        mask_number_instance = self.appointment.mask_number.filter(is_deleted=False).first()
+        mask_number = ''
+        if mask_number_instance:
+            mask_number = mask_number_instance.mask_number
         context = {
             "lab_name": lab_name,
             "patient_name": patient_name,
@@ -715,7 +719,8 @@ class LabNotification(Notification):
             "reports": report_file_links,
             "attachments": {},  # Updated later
             "screen": "appointment",
-            "type": "lab"
+            "type": "lab",
+            "mask_number": mask_number
         }
         return context
 
