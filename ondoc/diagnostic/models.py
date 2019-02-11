@@ -25,6 +25,7 @@ from django.db.models import F, Sum, When, Case, Q
 from django.db import transaction
 from django.contrib.postgres.fields import JSONField
 from ondoc.doctor.models import OpdAppointment
+from ondoc.notification.models import EmailNotification
 from ondoc.payout.models import Outstanding
 from ondoc.authentication import models as auth_model
 from django.core.files.uploadedfile import InMemoryUploadedFile, TemporaryUploadedFile
@@ -1097,6 +1098,7 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin)
     price_data = JSONField(blank=True, null=True)
     tests = models.ManyToManyField(LabTest, through='LabAppointmentTestMapping', through_fields=('appointment', 'test'))
     money_pool = models.ForeignKey(MoneyPool, on_delete=models.SET_NULL, null=True)
+    email_notification = GenericRelation(EmailNotification, related_name="lab_notification")
 
     def get_tests_and_prices(self):
         test_price = []
@@ -1682,6 +1684,7 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin)
 class CommonTest(TimeStampedModel):
     test = models.ForeignKey(LabTest, on_delete=models.CASCADE, related_name='commontest')
     icon = models.ImageField(upload_to='diagnostic/common_test_icons', null=True)
+    priority = models.PositiveIntegerField(default=0)
 
     def __str__(self):
         return "{}-{}".format(self.test.name, self.id)
@@ -1690,7 +1693,7 @@ class CommonTest(TimeStampedModel):
 class CommonPackage(TimeStampedModel):
     package = models.ForeignKey(LabTest, on_delete=models.CASCADE, related_name='commonpackage')
     icon = models.ImageField(upload_to='diagnostic/common_package_icons', null=True)
-
+    priority = models.PositiveIntegerField(default=0)
     def __str__(self):
         return "{}-{}".format(self.package.name, self.id)
 
@@ -1705,6 +1708,7 @@ class CommonDiagnosticCondition(TimeStampedModel):
         through='DiagnosticConditionLabTest',
         through_fields=('diagnostic_condition', 'lab_test'),
     )
+    priority = models.PositiveIntegerField(default=0)
     # test = models.ManyToManyField(LabTest)
 
     def __str__(self):
