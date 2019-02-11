@@ -800,7 +800,7 @@ class LabList(viewsets.ReadOnlyModelViewSet):
         if test_ids:
             group_queryset = LabPricingGroup.objects.prefetch_related(Prefetch(
                     "available_lab_tests",
-                    queryset=AvailableLabTest.objects.filter(test_id__in=test_ids).prefetch_related('test'),
+                    queryset=AvailableLabTest.objects.filter(test_id__in=test_ids).prefetch_related('test__categories'),
                     to_attr="selected_tests"
                 )).all()
 
