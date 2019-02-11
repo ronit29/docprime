@@ -163,13 +163,6 @@ class Order(TimeStampedModel):
                     "payment_status": Order.PAYMENT_ACCEPTED
                 }
 
-        # if order is done without PG transaction, then make an async task to create a dummy transaction and set it.
-        if not self.getTransactions():
-            try:
-                transaction.on_commit(lambda: set_order_dummy_transaction.apply_async((self.id, appointment_data['user'].id,), countdown=5))
-            except Exception as e:
-                logger.error(str(e))
-
         if order_dict:
             self.update_order(order_dict)
 
@@ -264,6 +257,11 @@ class Order(TimeStampedModel):
     def getAppointment(self):
         from ondoc.doctor.models import OpdAppointment
         from ondoc.diagnostic.models import LabAppointment
+
+        if self.orders.exists():
+            completed_order = self.orders.filter(reference_id__isnull=False).first()
+            return completed_order.getAppointment() if completed_order else None
+
         if not self.reference_id:
             return None
 
@@ -272,6 +270,12 @@ class Order(TimeStampedModel):
         elif self.product_id == self.DOCTOR_PRODUCT_ID:
             return OpdAppointment.objects.filter(id=self.reference_id).first()
         return None
+
+    def get_total_price(self):
+        if self.parent:
+            raise Exception("Cannot calculate price on a child order")
+
+        return ( self.amount or 0 ) + ( self.wallet_amount or 0 )
 
     def getTransactions(self):
         # if trying to get txn on a child order, recurse for its parent instead
@@ -452,6 +456,15 @@ class Order(TimeStampedModel):
 
         if not opd_appointment_ids and not lab_appointment_ids:
             raise Exception("Could not process entire order")
+
+        # if order is done without PG transaction, then make an async task to create a dummy transaction and set it.
+        if not self.getTransactions():
+            try:
+                transaction.on_commit(
+                    lambda: set_order_dummy_transaction.apply_async((self.id, self.get_user_id(),),
+                                                                    countdown=5))
+            except Exception as e:
+                logger.error(str(e))
 
         money_pool = MoneyPool.objects.create(wallet=total_wallet_used, cashback=total_cashback_used, logs=[])
 
@@ -1074,8 +1087,16 @@ class MerchantPayout(TimeStampedModel):
     PAID = 3
     AUTOMATIC = 1
     MANUAL = 2
+
+    NEFT = "NEFT"
+    IMPS = "IMPS"
+    IFT = "IFT"
+    INTRABANK_IDENTIFIER = "KKBK"
     STATUS_CHOICES = [(PENDING, 'Pending'), (ATTEMPTED, 'ATTEMPTED'), (PAID, 'Paid')]
+    PAYMENT_MODE_CHOICES = [(NEFT, 'NEFT'), (IMPS, 'IMPS'), (IFT, 'IFT')]    
     TYPE_CHOICES = [(AUTOMATIC, 'Automatic'), (MANUAL, 'Manual')]
+
+    payment_mode = models.CharField(max_length=100, blank=True, null=True, choices=PAYMENT_MODE_CHOICES)
     payout_ref_id = models.IntegerField(null=True, unique=True)
     charged_amount = models.DecimalField(max_digits=10, decimal_places=2)
     payable_amount = models.DecimalField(max_digits=10, decimal_places=2)
@@ -1138,6 +1159,19 @@ class MerchantPayout(TimeStampedModel):
         if appt and appt.get_billed_to:
             return appt.get_billed_to
         return ''
+
+    def get_default_payment_mode(self):
+        default_payment_mode = None
+        merchant = self.get_merchant()
+        if merchant and merchant.ifsc_code:
+            ifsc_code = merchant.ifsc_code
+            if ifsc_code.upper().startswith(self.INTRABANK_IDENTIFIER):
+                default_payment_mode = self.IFT
+            else:
+                default_payment_mode = MerchantPayout.NEFT
+
+        return default_payment_mode
+
 
 
     def get_merchant(self):

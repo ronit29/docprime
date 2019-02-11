@@ -265,24 +265,25 @@ class User(AbstractBaseUser, PermissionsMixin):
 
     @cached_property
     def full_name(self):
-        profile = self.get_default_profile
+        profile = self.get_default_profile()
         if profile and profile.name:
             return profile.name
         return ''
 
     @cached_property
     def get_default_email(self):
-        profile = self.get_default_profile
+        profile = self.get_default_profile()
         if profile and profile.email:
             return profile.email
         return ''
 
-    @cached_property
-    def get_default_profile(self):
-        user_profile = self.profiles.all().filter(is_default_user=True).first()
-        if user_profile:
-            return user_profile
-        return ''
+    # @cached_property
+    # def get_default_profile(self):
+    #     user_profile = self.profiles.all().filter(is_default_user=True).first()
+    #     if user_profile:
+    #         return user_profile
+    #     return ''
+        
         # self.profiles.filter(is_default=True).first()
 
     @cached_property
@@ -1116,10 +1117,10 @@ class UserSecretKey(TimeStampedModel):
 
 
 class AgentTokenManager(models.Manager):
-    def create_token(self, user, order_id):
+    def create_token(self, user):
         expiry_time = timezone.now() + timezone.timedelta(hours=AgentToken.expiry_duration)
         token = ''.join([random.choice(string.ascii_letters + string.digits) for n in range(10)])
-        return super().create(user=user, token=token, expiry_time=expiry_time, order_id=order_id)
+        return super().create(user=user, token=token, expiry_time=expiry_time)
 
 
 class AgentToken(TimeStampedModel):

@@ -52,7 +52,7 @@ class CartViewSet(viewsets.GenericViewSet):
         if not user.is_authenticated:
             return Response({"status": 0}, status.HTTP_401_UNAUTHORIZED)
 
-        cart_items = Cart.objects.filter(user=user, deleted_at__isnull=True)
+        cart_items = Cart.objects.filter(user=user, deleted_at__isnull=True).order_by("-updated_at")
         items = []
 
         for item in cart_items:
@@ -84,7 +84,7 @@ class CartViewSet(viewsets.GenericViewSet):
                     "actual_data": item.data
                 })
 
-        items = sorted(items, key=lambda x: 0 if x["valid"] else -1)
+        # items = sorted(items, key=lambda x: 0 if x["valid"] else -1)
 
         return Response({"cart_items" : items, "status": 1})
 
