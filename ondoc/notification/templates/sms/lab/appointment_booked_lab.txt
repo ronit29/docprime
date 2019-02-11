@@ -4,8 +4,8 @@ Please confirm the booking at the earliest by accepting the booking using docpri
 The booking details are as below :
 Booking ID : {{instance.id}}
 Patient Name : {{patient_name|capfirst}}
+Patient Contact Number : {{mask_number}}
 Lab Name : {{lab_name|capfirst}}
-Contact Number : {{mask_number}}
 Appointment Date and Time : {{instance.time_slot_start|date:"D jS F Y"}} || {{instance.time_slot_start|date:"h:i A"}}
 
 Please note that the test(s) needs to be done on Credit Basis.
