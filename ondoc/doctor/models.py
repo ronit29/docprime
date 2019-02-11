@@ -1851,6 +1851,17 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
 
         return (free_appointment_count + free_cart_count) < cls.MAX_FREE_BOOKINGS_ALLOWED
 
+    def trigger_created_event(self, visitor_info):
+        from ondoc.tracking.models import TrackingEvent
+        try:
+            event_data = TrackingEvent.build_event_data(self.user, TrackingEvent.DoctorAppointmentBooked, appointmentId=self.id)
+            if event_data and visitor_info:
+                TrackingEvent.save_event(event_name=event_data.get('event'), data=event_data, visit_id=visitor_info.get('visit_id'),
+                                         user=self.user, triggered_at=datetime.datetime.now())
+        except Exception as e:
+            logger.error("Could not save triggered event - " + str(e))
+
+
 class OpdAppointmentProcedureMapping(models.Model):
     opd_appointment = models.ForeignKey(OpdAppointment, on_delete=models.CASCADE, related_name='procedure_mappings')
     procedure = models.ForeignKey('procedure.Procedure', on_delete=models.CASCADE, related_name='opd_appointment_mappings')
