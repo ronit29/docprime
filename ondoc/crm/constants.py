@@ -28,11 +28,15 @@ constants = {
 }
 matrix_product_ids = {
     'opd_products': 1,
-    'lab_products': 4
+    'lab_products': 4,
+    'consumer': 5
 }
 matrix_subproduct_ids = {
     "chat": 1,
     "appointment": 2,
     "insurance": 3,
     "other_services": 4,
+    "doctor": 8,
+    "hospital": 7,
+    "hospitalnetwork": 6
 }

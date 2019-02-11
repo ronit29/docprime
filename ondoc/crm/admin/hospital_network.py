@@ -5,7 +5,7 @@ from django.db import models
 from django.utils.safestring import mark_safe
 from reversion.admin import VersionAdmin
 from django.db.models import Q
-from ondoc.authentication.models import GenericAdmin, User, AssociatedMerchant, QCModel
+from ondoc.authentication.models import GenericAdmin, User, AssociatedMerchant, QCModel, SPOCDetails
 from ondoc.crm.admin.doctor import CreatedByFilter
 
 from ondoc.doctor.models import (HospitalNetworkManager, Hospital,
@@ -16,6 +16,9 @@ from .common import *
 from ondoc.authentication.admin import SPOCDetailsInline
 import nested_admin
 from .common import AssociatedMerchantInline
+import logging
+logger = logging.getLogger(__name__)
+
 
 class HospitalNetworkCertificationInline(admin.TabularInline):
     model = HospitalNetworkCertification
@@ -25,6 +28,7 @@ class HospitalNetworkCertificationInline(admin.TabularInline):
 
     def get_queryset(self, request):
         return super().get_queryset(request).select_related('network')
+
 
 class HospitalNetworkAwardForm(forms.ModelForm):
     year = forms.ChoiceField(choices=award_year_choices_no_blank, required=True)
@@ -39,6 +43,7 @@ class HospitalNetworkAwardInline(admin.TabularInline):
 
     def get_queryset(self, request):
         return super().get_queryset(request).select_related('network')
+
 
 class HospitalNetworkAccreditationInline(admin.TabularInline):
     model = HospitalNetworkAccreditation
@@ -101,11 +106,14 @@ class HospitalNetworkForm(FormCleanMixin):
     operational_since = forms.ChoiceField(choices=hospital_operational_since_choices, required=False)
     about = forms.CharField(widget=forms.Textarea, required=False)
 
+
+
     def validate_qc(self):
         qc_required = {'name': 'req', 'operational_since': 'req', 'about': 'req', 'network_size': 'req',
                        'building': 'req', 'locality': 'req', 'city': 'req', 'state': 'req',
                        'country': 'req', 'pin_code': 'req', 'hospitalnetworkmanager': 'count',
-                       'hospitalnetworkhelpline': 'count', 'hospitalnetworkemail': 'count'}
+                       'hospitalnetworkhelpline': 'count', 'hospitalnetworkemail': 'count',
+                       'authentication-spocdetails-content_type-object_id': 'count'}
 
         # if self.instance.is_billing_enabled:
         #     qc_required.update({
@@ -119,6 +127,19 @@ class HospitalNetworkForm(FormCleanMixin):
                 raise forms.ValidationError("Atleast one entry of "+key+" is required for Quality Check")
             if self.data.get(key+'-TOTAL_FORMS') and value == 'count' and int(self.data.get(key+'-TOTAL_FORMS')) <= 0:
                 raise forms.ValidationError("Atleast one entry of "+key+" is required for Quality Check")
+
+        number_of_spocs = self.data.get('authentication-spocdetails-content_type-object_id-TOTAL_FORMS', '0')
+        try:
+            number_of_spocs = int(number_of_spocs)
+        except Exception as e:
+            logger.error("Something went wrong while counting SPOCs for hospital - " + str(e))
+            raise forms.ValidationError("Something went wrong while counting SPOCs.")
+        if number_of_spocs > 0:
+            if not any([self.data.get('authentication-spocdetails-content_type-object_id-{}-contact_type'.format(i),
+                                      0) == str(SPOCDetails.SPOC) and self.data.get(
+                'authentication-spocdetails-content_type-object_id-{}-number'.format(i)) for i in
+                        range(number_of_spocs)]):
+                raise forms.ValidationError("Must have Single Point Of Contact number.")
 
     def clean_operational_since(self):
         data = self.cleaned_data['operational_since']

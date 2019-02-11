@@ -112,7 +112,7 @@ class FormCleanMixin(forms.ModelForm):
                 if self.instance.data_status == QCModel.SUBMITTED_FOR_QC:
                     raise forms.ValidationError("Cannot update Data submitted for QC approval")
                 if not self.request.user.groups.filter(name=constants['DOCTOR_SALES_GROUP']).exists():
-                    if self.instance.data_status == QCModel.IN_PROGRESS and self.instance.created_by and self.instance.created_by != self.request.user:
+                    if self.instance.data_status in [QCModel.IN_PROGRESS, QCModel.REOPENED] and self.instance.created_by and self.instance.created_by != self.request.user:
                         raise forms.ValidationError("Cannot modify Data added by other users")
             if '_submit_for_qc' in self.data:
                 self.validate_qc()
@@ -144,11 +144,12 @@ class FormCleanMixin(forms.ModelForm):
                                 'Form') + ": " + self.instance.network.name)
 
             if '_mark_in_progress' in self.data:
-                if self.data.get('common-remark-content_type-object_id-INITIAL_FORMS', 0) == self.data.get('common-remark-content_type-object_id-TOTAL_FORMS', 1):
+                if self.data.get('common-remark-content_type-object_id-INITIAL_FORMS', 0) == self.data.get(
+                        'common-remark-content_type-object_id-TOTAL_FORMS', 1):
                     raise forms.ValidationError("Must add a remark with reopen status before rejecting.")
                 else:
                     last_remark_id = int(self.data.get('common-remark-content_type-object_id-TOTAL_FORMS', 1)) - 1
-                    last_remark_status = "common-remark-content_type-object_id-"+ str(last_remark_id) +"-status"
+                    last_remark_status = "common-remark-content_type-object_id-" + str(last_remark_id) + "-status"
                     if self.data.get(last_remark_status) != str(Remark.REOPEN):
                         raise forms.ValidationError("Must add a remark with reopen status before rejecting.")
                 if self.instance.data_status == QCModel.QC_APPROVED:

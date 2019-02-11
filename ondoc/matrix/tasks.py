@@ -10,7 +10,7 @@ import json
 import logging
 import datetime
 from datetime import date
-from ondoc.authentication.models import Address
+from ondoc.authentication.models import Address, SPOCDetails, QCModel
 from ondoc.api.v1.utils import resolve_address
 from django.apps import apps
 from ondoc.crm.constants import matrix_product_ids, matrix_subproduct_ids
@@ -396,6 +396,9 @@ def push_order_to_matrix(self, data):
 
 @task(bind=True, max_retries=2)
 def create_or_update_lead_on_matrix(self, data):
+    from ondoc.doctor.models import Doctor
+    from ondoc.doctor.models import Hospital
+    from ondoc.doctor.models import HospitalNetwork
     try:
         obj_id = data.get('obj_id', None)
         obj_type = data.get('obj_type', None)
@@ -403,8 +406,8 @@ def create_or_update_lead_on_matrix(self, data):
             logger.error("CELERY ERROR: Incorrect values provided.")
             raise ValueError()
         product_id = matrix_product_ids.get('opd_products', 1)
-        sub_product_id = matrix_subproduct_ids.get(obj_type, 4)
-        ct = ContentType.objects.get(model=obj_type)
+        sub_product_id = matrix_subproduct_ids.get(obj_type.lower(), 4)
+        ct = ContentType.objects.get(model=obj_type.lower())
         model_used = ct.model_class()
         content_type = ContentType.objects.get_for_model(model_used)
         exit_point_url = reverse('admin:{}_{}_change'.format(content_type.app_label, content_type.model),
@@ -413,21 +416,38 @@ def create_or_update_lead_on_matrix(self, data):
         if not obj:
             raise Exception("{} could not found against id - {}".format(obj_type, obj_id))
 
-        # TODO: SHASHANK_SINGH or ROHIT_P find details for mobile and gender
-        mobile = 0
+        mobile = ''
         gender = 0
-
+        if obj_type == Doctor.__name__:
+            if obj.gender and obj.gender == 'm':
+                gender = 1
+            elif obj.gender and obj.gender == 'f':
+                gender = 2
+        elif obj_type == Hospital.__name__:
+            spoc_details = SPOCDetails.objects.filter(content_object=obj, contact_type=SPOCDetails.SPOC).first()
+            if spoc_details:
+                mobile = str(spoc_details.std_code) if spoc_details.std_code else ''
+                mobile += str(spoc_details.number) if spoc_details.number else ''
+        elif obj_type == HospitalNetwork.__name__:
+            spoc_details = SPOCDetails.objects.filter(content_object=obj, contact_type=SPOCDetails.SPOC).first()
+            if spoc_details:
+                mobile = str(spoc_details.std_code) if spoc_details.std_code else ''
+                mobile += str(spoc_details.number) if spoc_details.number else ''
+        mobile = int(mobile)
+        if not mobile:
+            return
         request_data = {
-            'LeadSource': '',  # TODO: SHASHANK_SINGH or ROHIT_P what will be the lead source SIMRANJEET
-            'LeadID': obj.matrix_lead_id if hasattr(obj, 'matrix_lead_id') and obj.matrix_lead_id else 0,  # TODO: SHASHANK_SINGH or ROHIT_P what happens if 0 is passed will it update SIMRANJEET or ABRAR
+            'LeadSource': 'referral',
+            'LeadID': obj.matrix_lead_id if hasattr(obj, 'matrix_lead_id') and obj.matrix_lead_id else 0,
             'PrimaryNo': mobile,
-            'QcStatus': obj.data_status,  # TODO: SHASHANK_SINGH or ROHIT_P what are they expecting SIMRANJEET or ABRAR
-            'OnBoarding': obj.onboarding_status if hasattr(obj, 'onboarding_status') else 0,  # TODO: SHASHANK_SINGH or ROHIT_P if I don't have onboarding_status SIMRANJEET or ABRAR
-            'Gender': gender,  # TODO: SHASHANK_SINGH or ROHIT_P if I don't have gender SIMRANJEET or ABRAR
+            'QcStatus': obj.data_status,
+            'OnBoarding': obj.onboarding_status if hasattr(obj, 'onboarding_status') else 0,
+            'Gender': gender,
             'ProductId': product_id,
-            'SubProductId': sub_product_id,
+            'SubProductId': sub_product_id,  # TODO: SHASHANK_SINGH or ROHIT_P waiting for their response.
             'Name': obj.name if hasattr(obj, 'name') and obj.name else '',
             'ExitPointUrl': exit_point_url,
+            'CityId': 0  # TODO: SHASHANK_SINGH or ROHIT_P send city ID
         }
         url = settings.MATRIX_API_URL
         matrix_api_token = settings.MATRIX_API_TOKEN
@@ -464,7 +484,7 @@ def update_onboarding_qcstatus_to_matrix(self, data):
         if not obj_id or not obj_type:
             logger.error("CELERY ERROR: Incorrect values provided.")
             raise ValueError()
-        ct = ContentType.objects.get(model=obj_type)
+        ct = ContentType.objects.get(model=obj_type.lower())
         model_used = ct.model_class()
         content_type = ContentType.objects.get_for_model(model_used)
         exit_point_url = reverse('admin:{}_{}_change'.format(content_type.app_label, content_type.model),
@@ -473,11 +493,26 @@ def update_onboarding_qcstatus_to_matrix(self, data):
         if not obj:
             raise Exception("{} could not found against id - {}".format(obj_type, obj_id))
 
+        comment = ''
+        from ondoc.common.models import Remark
+        remark_obj = obj.remark.order_by('-created_at').first()
+        if remark_obj:
+            comment = remark_obj.content
+
+        assigned_user = ''
+        if data.get('assigned_matrix_user', None):
+            assigned_user = data.get('assigned_user')
+        else:
+            history_obj = obj.history.filter(status=QCModel.SUBMITTED_FOR_QC).order_by('-created_at').first()
+            if history_obj:
+                assigned_user = history_obj.user.staffprofile.employee_id if hasattr(history_obj.user,
+                                                                                     'staffprofile') and history_obj.user.staffprofile.employee_id else ''
+
         request_data = {
             "LeadID": obj.matrix_lead_id if hasattr(obj, 'matrix_lead_id') and obj.matrix_lead_id else 0,
-            "Comment": "",  # TODO: SHASHANK_SINGH or ROHIT_P find last reopen comments and what in other cases?
+            "Comment": comment,
             "NewJourneyURL": exit_point_url,
-            "AssignedUser": "",  # TODO: SHASHANK_SINGH or ROHIT_P find last user who submitted for QC in other cases?
+            "AssignedUser": assigned_user,
             "CRMStatusId": obj.data_status
         }
 
@@ -491,14 +526,11 @@ def update_onboarding_qcstatus_to_matrix(self, data):
             countdown_time = (2 ** self.request.retries) * 60 * 10
             logging.error("Update with status sync with the Matrix System failed with response - " + str(response.content))
             self.retry([data], countdown=countdown_time)
-        # else:
-        #     resp_data = response.json()
-        #     if not resp_data.get('Id', None):
-        #         logger.error(json.dumps(request_data))
-        #         raise Exception("[ERROR] Id not recieved from the matrix while pushing doctor or lab lead.")
-        #     obj.matrix_lead_id = resp_data.get('Id', None)
-        #     obj.matrix_lead_id = int(obj.matrix_lead_id)
-        #     obj.save()
+        else:
+            resp_data = response.json()
+            if not resp_data.get('IsSaved', False):
+                logger.error(json.dumps(request_data))
+                raise Exception("[ERROR] {} with ID {} not saved to matrix while updating status.")
     except Exception as e:
         logger.error("Error in Celery. Failed to update status to the matrix - " + str(e))
 

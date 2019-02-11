@@ -10,13 +10,14 @@ from .common import *
 from ondoc.crm.constants import constants
 from django.utils.safestring import mark_safe
 from django.contrib.admin import SimpleListFilter
-from ondoc.authentication.models import GenericAdmin, User, QCModel, DoctorNumber, AssociatedMerchant
+from ondoc.authentication.models import GenericAdmin, User, QCModel, DoctorNumber, AssociatedMerchant, SPOCDetails
 from ondoc.authentication.admin import SPOCDetailsInline
 from django import forms
 from ondoc.api.v1.utils import GenericAdminEntity
 import nested_admin
 from .common import AssociatedMerchantInline, RemarkInline
-
+import logging
+logger = logging.getLogger(__name__)
 
 class HospitalImageInline(admin.TabularInline):
     model = HospitalImage
@@ -185,11 +186,11 @@ class HospitalForm(FormCleanMixin):
         return data
 
     def validate_qc(self):
-        # TODO: SHASHANK_SINGH or ROHIT_P must have a phone_number while submitting to QC it while
         qc_required = {'name': 'req', 'location': 'req', 'operational_since': 'req', 'parking': 'req',
                        'registration_number': 'req', 'building': 'req', 'locality': 'req', 'city': 'req',
                        'state': 'req',
-                       'country': 'req', 'pin_code': 'req', 'hospital_type': 'req', 'network_type': 'req'}
+                       'country': 'req', 'pin_code': 'req', 'hospital_type': 'req', 'network_type': 'req',
+                       'authentication-spocdetails-content_type-object_id': 'count'}
 
         # if (not self.instance.network or not self.instance.network.is_billing_enabled) and self.instance.is_billing_enabled:
         #     qc_required.update({
@@ -210,6 +211,19 @@ class HospitalForm(FormCleanMixin):
                 raise forms.ValidationError("Atleast one entry of " + key + " is required for Quality Check")
         if self.cleaned_data['network_type'] == 2 and not self.cleaned_data['network']:
             raise forms.ValidationError("Network cannot be empty for Network Hospital")
+
+        number_of_spocs = self.data.get('authentication-spocdetails-content_type-object_id-TOTAL_FORMS', '0')
+        try:
+            number_of_spocs = int(number_of_spocs)
+        except Exception as e:
+            logger.error("Something went wrong while counting SPOCs for hospital - " + str(e))
+            raise forms.ValidationError("Something went wrong while counting SPOCs.")
+        if number_of_spocs > 0:
+            if not any([self.data.get('authentication-spocdetails-content_type-object_id-{}-contact_type'.format(i),
+                                      0) == str(SPOCDetails.SPOC) and self.data.get(
+                'authentication-spocdetails-content_type-object_id-{}-number'.format(i)) for i in
+                        range(number_of_spocs)]):
+                raise forms.ValidationError("Must have Single Point Of Contact number.")
 
     def clean(self):
         super().clean()
