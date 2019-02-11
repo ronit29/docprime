@@ -1334,7 +1334,6 @@ class DoctorListViewSet(viewsets.GenericViewSet):
             }
 
 
-
             # if object and object.top_content:
             #     specialization_content = object.top_content
             #     if specialization_content:
