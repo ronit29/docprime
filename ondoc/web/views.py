@@ -10,23 +10,50 @@ from django.contrib.auth import get_user_model
 from ipware import get_client_ip
 from django import forms
 import logging
+import urllib
+from django.shortcuts import redirect
 
 logger = logging.getLogger(__name__)
 
 User = get_user_model()
 
 def index(request):
-    if request.method == "POST":
-        form = OnlineLeadsForm(request.POST)
-        if form.is_valid():
-            model_instance = form.save(commit=False)
-            model_instance.save()
-            messages.success(request, 'Submission Successful')
-            return HttpResponseRedirect('/')
-    else:
-        form = OnlineLeadsForm()
-    return render(request, 'index.html', {'form': form})
+    # if request.method == "POST":
+    #     form = OnlineLeadsForm(request.POST)
+    #     if form.is_valid():
+    #         model_instance = form.save(commit=False)
+    #         model_instance.save()
+    #         messages.success(request, 'Submission Successful')
+    #         return HttpResponseRedirect('/')
+    # else:
+    #     form = OnlineLeadsForm()
+    #return render(request, 'index.html', {'form': form})
+    return render(request, 'blank.html')
 
+#@require_http_methods(["GET"])
+def redirect_to_app(request):
+    anroid_url = 'https://play.google.com/store/apps/details?id=com.docprime'
+    ios_url = 'https://itunes.apple.com/us/app/docprime-consult-online/id1449704799?ls=1&mt=8'
+    web_url = 'https://docprime.com'
+    os = request.user_agent.os.family
+    url = web_url
+    if os=='iOS':
+        url = ios_url
+    elif os=='Android':
+        url = anroid_url
+
+    separator = '?'
+    if '?' in url:
+        separator = '&'
+        
+    data = dict()
+    for k in request.GET.keys():
+        data[k] = request.GET.get(k)
+    params = urllib.parse.urlencode(data)
+    if params:
+        url = url+separator+params
+    
+    return redirect(url, permanent=False)
 
 def terms_page(request):
     return render(request, 'terms-of-use.html')
