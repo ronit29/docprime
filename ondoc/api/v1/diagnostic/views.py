@@ -800,7 +800,7 @@ class LabList(viewsets.ReadOnlyModelViewSet):
         if test_ids:
             group_queryset = LabPricingGroup.objects.prefetch_related(Prefetch(
                     "available_lab_tests",
-                    queryset=AvailableLabTest.objects.filter(test_id__in=test_ids).prefetch_related('test'),
+                    queryset=AvailableLabTest.objects.filter(test_id__in=test_ids).prefetch_related('test__categories'),
                     to_attr="selected_tests"
                 )).all()
 
@@ -816,7 +816,6 @@ class LabList(viewsets.ReadOnlyModelViewSet):
         temp_var = dict()
         tests = dict()
         lab = dict()
-
         for obj in labs:
             temp_var[obj.id] = obj
             tests[obj.id] = list()
@@ -826,8 +825,7 @@ class LabList(viewsets.ReadOnlyModelViewSet):
                         deal_price=test.custom_deal_price
                     else:
                         deal_price=test.computed_deal_price
-                    tests[obj.id].append({"id": test.test_id, "name": test.test.name, "deal_price": deal_price, "mrp": test.mrp,
-                                          "number_of_tests": test.test.number_of_tests})
+                    tests[obj.id].append({"id": test.test_id, "name": test.test.name, "deal_price": deal_price, "mrp": test.mrp, "number_of_tests": test.test.number_of_tests, 'categories': test.test.get_all_categories_detail()})
 
         # day_now = timezone.now().weekday()
         # days_array = [i for i in range(7)]
