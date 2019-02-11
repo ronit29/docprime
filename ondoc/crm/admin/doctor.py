@@ -198,6 +198,14 @@ class DoctorClinicInlineForm(forms.ModelForm):
         model = DoctorClinic
         fields = ('__all__')
 
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        if self and self.request and isinstance(self.request.GET, dict):
+            # http://127.0.0.1:8000/admin/doctor/hospital/add/?AgentId=9876
+            self.request_matrix_lead_id = self.request.GET.get('LeadId', None)
+            self.request_agent_lead_id = self.request.GET.get('AgentId', None)
+
+
 
 class DoctorClinicInline(nested_admin.NestedTabularInline):
     model = DoctorClinic
@@ -1285,6 +1293,9 @@ class DoctorAdmin(AutoComplete, ImportExportMixin, VersionAdmin, ActionAdmin, QC
     def save_model(self, request, obj, form, change):
         if obj and not obj.id and not obj.matrix_lead_id:
             obj.matrix_lead_id = form.request_matrix_lead_id if hasattr(form, 'request_matrix_lead_id') else None
+
+        obj.request_agent_lead_id = form.request_agent_lead_id if hasattr(form, 'request_agent_lead_id') else None
+
         if not request.user.is_member_of(constants['DOCTOR_SALES_GROUP']):
             if not obj.created_by:
                 obj.created_by = request.user

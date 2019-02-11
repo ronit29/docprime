@@ -48,7 +48,8 @@ import hashlib
 from django.contrib.contenttypes.fields import GenericRelation
 from django.contrib.contenttypes.fields import GenericForeignKey
 from django.contrib.contenttypes.models import ContentType
-from ondoc.matrix.tasks import push_appointment_to_matrix, push_onboarding_qcstatus_to_matrix, update_onboarding_qcstatus_to_matrix
+from ondoc.matrix.tasks import push_appointment_to_matrix, push_onboarding_qcstatus_to_matrix, \
+    update_onboarding_qcstatus_to_matrix, create_or_update_lead_on_matrix
 # from ondoc.procedure.models import Procedure
 from ondoc.ratings_review import models as ratings_models
 from django.utils import timezone
@@ -261,6 +262,7 @@ class Hospital(auth_model.TimeStampedModel, auth_model.CreatedByModel, auth_mode
             self.disabled_at = None
 
     def save(self, *args, **kwargs):
+        # TODO: SHASHANK_SINGH or ROHIT_P send agentID to task
         self.update_time_stamps()
         self.update_live_status()
         # build_url = True
@@ -274,7 +276,7 @@ class Hospital(auth_model.TimeStampedModel, auth_model.CreatedByModel, auth_mode
             hospital_obj = Hospital.objects.filter(pk=self.id).first()
             if hospital_obj and self.data_status != hospital_obj.data_status:
                 update_status_in_matrix = True
-            elif hospital_obj is None:  # TODO: SHASHANK_SINGH or ROHIT_P must have a phone_number or create lead while submitting to QC it while
+            elif hospital_obj is None:
                 push_to_matrix = True
         super(Hospital, self).save(*args, **kwargs)
         if self.is_appointment_manager:
@@ -290,7 +292,8 @@ class Hospital(auth_model.TimeStampedModel, auth_model.CreatedByModel, auth_mode
 
     def app_commit_tasks(self, push_to_matrix=False, update_status_in_matrix=False):
         if push_to_matrix:
-            pass  # TODO: SHASHANK_SINGH or ROHIT_P to create a lead
+            create_or_update_lead_on_matrix.apply_async(({'obj_type': self.__class__.__name__, 'obj_id': self.id}
+                                                         ,), countdown=5)
 
         if update_status_in_matrix:
             update_onboarding_qcstatus_to_matrix.apply_async(({'obj_type': self.__class__.__name__, 'obj_id': self.id}
@@ -466,6 +469,7 @@ class Doctor(auth_model.TimeStampedModel, auth_model.QCModel, SearchKey, auth_mo
     disable_comments = models.CharField(max_length=500, blank=True)
     disabled_by = models.ForeignKey(settings.AUTH_USER_MODEL, related_name="disabled_doctors", null=True, editable=False,
                                    on_delete=models.SET_NULL)
+    remark = GenericRelation(Remark)
 
     def __str__(self):
         return '{} ({})'.format(self.name, self.id)
@@ -548,29 +552,31 @@ class Doctor(auth_model.TimeStampedModel, auth_model.QCModel, SearchKey, auth_mo
     def save(self, *args, **kwargs):
         self.update_time_stamps()
         self.update_live_status()
-
+        request_agent_lead_id = obj.request_agent_lead_id if hasattr(obj, 'request_agent_lead_id') else None
         # On every update of onboarding status or Qcstatus push to matrix
         push_to_matrix = False
         update_status_in_matrix = False
         if self.id:
             doctor_obj = Doctor.objects.filter(pk=self.id).first()
-            if doctor_obj and (self.onboarding_status!=doctor_obj.onboarding_status or
-                  self.data_status !=doctor_obj.data_status):
-                # Push to matrix
-                push_to_matrix = True
+            if doctor_obj and (self.onboarding_status != doctor_obj.onboarding_status or
+                               self.data_status != doctor_obj.data_status):
                 update_status_in_matrix = True
-            elif doctor_obj is None:
-                update_status_in_matrix=True
+        else:
+            push_to_matrix = True
 
         super(Doctor, self).save(*args, **kwargs)
 
         transaction.on_commit(lambda: self.app_commit_tasks(push_to_matrix=push_to_matrix,
-                                                            update_status_in_matrix=update_status_in_matrix))
+                                                            update_status_in_matrix=update_status_in_matrix,
+                                                            request_agent_lead_id=request_agent_lead_id))
 
-    def app_commit_tasks(self, push_to_matrix=False, update_status_in_matrix=False):
+    def app_commit_tasks(self, push_to_matrix=False, update_status_in_matrix=False, request_agent_lead_id=None):
         if push_to_matrix:
-            push_onboarding_qcstatus_to_matrix.apply_async(({'obj_type': self.__class__.__name__, 'obj_id': self.id}
-                                                            ,), countdown=5)
+            # push_onboarding_qcstatus_to_matrix.apply_async(({'obj_type': self.__class__.__name__, 'obj_id': self.id}
+            #                                                 ,), countdown=5)
+            create_or_update_lead_on_matrix.apply_async(({'obj_type': self.__class__.__name__, 'obj_id': self.id,
+                                                          'request_agent_lead_id': request_agent_lead_id}
+                                                         ,), countdown=5)
 
         if update_status_in_matrix:
             update_onboarding_qcstatus_to_matrix.apply_async(({'obj_type': self.__class__.__name__, 'obj_id': self.id}
@@ -1095,15 +1101,17 @@ class HospitalNetwork(auth_model.TimeStampedModel, auth_model.CreatedByModel, au
     spoc_details = GenericRelation(auth_model.SPOCDetails)
     merchant = GenericRelation(auth_model.AssociatedMerchant)
     matrix_lead_id = models.BigIntegerField(blank=True, null=True, unique=True)
+    remark = GenericRelation(Remark)
 
     def save(self, *args, **kwargs):
+        # TODO: SHASHANK_SINGH or ROHIT_P send agentID to task
         push_to_matrix = False
         update_status_in_matrix = False
         if self.id:
             hospital_network_obj = HospitalNetwork.objects.filter(pk=self.id).first()
             if hospital_network_obj and self.data_status != hospital_network_obj.data_status:
                 update_status_in_matrix = True
-            elif hospital_network_obj is None:  # TODO: SHASHANK_SINGH or ROHIT_P must have a phone_number or create lead while submitting to QC it while
+            elif hospital_network_obj is None:
                 push_to_matrix = True
         super().save(*args, **kwargs)
         transaction.on_commit(lambda: self.app_commit_tasks(push_to_matrix=push_to_matrix,
@@ -1111,7 +1119,8 @@ class HospitalNetwork(auth_model.TimeStampedModel, auth_model.CreatedByModel, au
 
     def app_commit_tasks(self, push_to_matrix=False, update_status_in_matrix=False):
         if push_to_matrix:
-            pass  # TODO: SHASHANK_SINGH or ROHIT_P to create a lead
+            create_or_update_lead_on_matrix.apply_async(({'obj_type': self.__class__.__name__, 'obj_id': self.id}
+                                                         ,), countdown=5)
 
         if update_status_in_matrix:
             update_onboarding_qcstatus_to_matrix.apply_async(({'obj_type': self.__class__.__name__, 'obj_id': self.id}

@@ -14,7 +14,7 @@ import math
 import os
 import hashlib
 import random, string
-from django.contrib.contenttypes.fields import GenericForeignKey
+from django.contrib.contenttypes.fields import GenericForeignKey, GenericRelation
 from django.contrib.contenttypes.models import ContentType
 from django.utils.functional import cached_property
 from datetime import date, timedelta, datetime
@@ -183,6 +183,8 @@ class QCModel(models.Model):
     DATA_STATUS_CHOICES = [(IN_PROGRESS, "In Progress"), (SUBMITTED_FOR_QC, "Submitted For QC Check"), (QC_APPROVED, "QC approved"), (REOPENED, "Reopened")]
     data_status = models.PositiveSmallIntegerField(default=1, editable=False, choices=DATA_STATUS_CHOICES)
     qc_approved_at = models.DateTimeField(null=True, blank=True)
+    history = GenericRelation('authentication.StatusHistory')
+
     class Meta:
         abstract = True
 
