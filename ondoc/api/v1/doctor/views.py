@@ -1,3 +1,4 @@
+import operator
 from collections import defaultdict, OrderedDict
 from uuid import UUID
 from ondoc.api.v1.auth.serializers import UserProfileSerializer
@@ -555,7 +556,7 @@ class DoctorProfileUserViewSet(viewsets.GenericViewSet):
         return Response(status=status.HTTP_404_NOT_FOUND)
 
     @transaction.non_atomic_requests
-    def retrieve(self, request, pk, entity=None):
+    def retrieve(self, request, pk, entity=None, *args, **kwargs):
         serializer = serializers.DoctorDetailsRequestSerializer(data=request.query_params)
         serializer.is_valid(raise_exception=True)
         validated_data = serializer.validated_data
@@ -601,7 +602,6 @@ class DoctorProfileUserViewSet(viewsets.GenericViewSet):
         response_data = self.prepare_response(serializer.data, selected_hospital)
 
         if entity:
-
             response_data['url'] = entity.url
             if entity.breadcrumb:
                 breadcrumb = entity.breadcrumb
@@ -611,6 +611,27 @@ class DoctorProfileUserViewSet(viewsets.GenericViewSet):
             else:
                 breadcrumb = [{'url':'/', 'title': 'Home'}, {'title':'Dr. ' + doctor.name}]
                 response_data['breadcrumb'] = breadcrumb
+
+        if not doctor.enabled_for_online_booking:
+            parameters = dict()
+
+            doc = DoctorListViewSet()
+            general_specialization = []
+
+            for dps in doctor.doctorpracticespecializations.all():
+                general_specialization.append(dps.specialization)
+
+            general_specialization = sorted(general_specialization, key=operator.attrgetter('doctor_count'), reverse=True)
+            if general_specialization:
+                specialization_id = general_specialization[0].pk
+                parameters['specialization_ids'] = str(specialization_id)
+            if response_data.get('hospitals'):
+                hospital = response_data.get('hospitals')[0]
+                parameters['lat'] = hospital.get('lat')
+                parameters['long'] = hospital.get('long')
+            parameters['test_flag'] = 1
+            kwargs['parameters'] = parameters
+            response_data['doctors'] = doc.list(request, **kwargs)
 
         return Response(response_data)
 
@@ -1050,7 +1071,6 @@ class DoctorListViewSet(viewsets.GenericViewSet):
                     entity_data[data['entity_id']]['parent_url'] = spec_locality_url
                     entity_data[data['entity_id']]['location'] = data.get('location')
 
-
         title = ''
         description = ''
         seo = None
@@ -1317,6 +1337,16 @@ class DoctorListViewSet(viewsets.GenericViewSet):
             ratings = validated_data.get('ratings')
         if validated_data.get('reviews'):
             reviews = validated_data.get('reviews')
+
+        if parameters.get('test_flag') == 1:
+            response = list(response)[0:3]
+            return {"result": response, "count": result_count,
+                             'specializations': specializations, 'conditions': conditions, "seo": seo,
+                             "breadcrumb": breadcrumb, 'search_content': top_content,
+                             'procedures': procedures, 'procedure_categories': procedure_categories,
+                             'ratings': ratings, 'reviews': reviews, 'ratings_title': ratings_title,
+                             'bottom_content': bottom_content}
+
         return Response({"result": response, "count": result_count,
                          'specializations': specializations, 'conditions': conditions, "seo": seo,
                          "breadcrumb": breadcrumb, 'search_content': top_content,

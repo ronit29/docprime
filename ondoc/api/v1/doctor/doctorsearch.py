@@ -5,6 +5,7 @@ from django.db.models import F
 
 from ondoc.api.v1.doctor.serializers import DoctorProfileUserViewSerializer
 from ondoc.api.v1.procedure.serializers import DoctorClinicProcedureSerializer
+from ondoc.api.v1.ratings.serializers import RatingsGraphSerializer
 from ondoc.doctor import models
 from ondoc.api.v1.utils import clinic_convert_timings
 from ondoc.api.v1.doctor import serializers
@@ -453,6 +454,10 @@ class DoctorSearchHelper:
             search_coupon = Coupon.get_search_coupon(request.user)
             discounted_price = filtered_deal_price if not search_coupon else search_coupon.get_search_coupon_discounted_price(filtered_deal_price)
 
+            rating_graph = None
+            if doctor and doctor.rating:
+                rating_graph = RatingsGraphSerializer(doctor.rating.filter(is_live=True),
+                                                                context={"request": request}).data
             temp = {
                 "doctor_id": doctor.id,
                 "enabled_for_online_booking": doctor.enabled_for_online_booking,
@@ -484,6 +489,7 @@ class DoctorSearchHelper:
                 "hospitals": hospitals,
                 "thumbnail": (
                     request.build_absolute_uri(thumbnail) if thumbnail else None),
+                "rating_graph": rating_graph,
 
                 "schema": {
                     "name": doctor.get_display_name(),
