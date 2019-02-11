@@ -25,6 +25,7 @@ from django.db.models import F, Sum, When, Case, Q
 from django.db import transaction
 from django.contrib.postgres.fields import JSONField
 from ondoc.doctor.models import OpdAppointment
+from ondoc.notification.models import EmailNotification
 from ondoc.payout.models import Outstanding
 from ondoc.authentication import models as auth_model
 from django.core.files.uploadedfile import InMemoryUploadedFile, TemporaryUploadedFile
@@ -1100,6 +1101,7 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin)
     price_data = JSONField(blank=True, null=True)
     tests = models.ManyToManyField(LabTest, through='LabAppointmentTestMapping', through_fields=('appointment', 'test'))
     money_pool = models.ForeignKey(MoneyPool, on_delete=models.SET_NULL, null=True)
+    email_notification = GenericRelation(EmailNotification, related_name="lab_notification")
 
     def get_tests_and_prices(self):
         test_price = []
