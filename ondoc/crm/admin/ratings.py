@@ -106,6 +106,7 @@ class RatingsReviewAdmin(ImportExportMixin, admin.ModelAdmin):
     def get_form(self, request, obj=None, **kwargs):
         form = super(RatingsReviewAdmin, self).get_form(request, obj, **kwargs)
         form.base_fields['compliment'].widget = forms.CheckboxSelectMultiple()
+        form.base_fields['compliment'].queryset = form.base_fields['compliment'].queryset.filter(type=obj.appointment_type)
         return form
 
     def booking_id(self, instance):
@@ -126,9 +127,9 @@ class RatingsReviewAdmin(ImportExportMixin, admin.ModelAdmin):
             if instance.user:
                 login_object = JWTAuthentication.generate_token(instance.user)
                 token = login_object['token'] if login_object.get('token') else None
-                url = settings.CONSUMER_APP_DOMAIN + "/" + token.decode("utf-8")
+                url = settings.BASE_URL + "/user/myratings?id=" + str(instance.id) + "&token=" + token.decode("utf-8")
                 short_url = v1_utils.generate_short_url(url)
-                text = "Please Find the url to Update your Feedback "+ str(short_url)
+                text = "Please Find the url to Update your Feedback " + str(short_url)
                 try:
                     notification_tasks.send_rating_update_message.apply_async(
                         kwargs={'number': instance.user.phone_number, 'text': text},

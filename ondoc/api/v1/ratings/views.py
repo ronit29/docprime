@@ -15,6 +15,8 @@ from . import serializers
 from ondoc.api.v1.doctor import serializers as doc_serializers
 from ondoc.api.v1.diagnostic import serializers as lab_serializers
 from ondoc.authentication.models import User
+from django.contrib.contenttypes.models import ContentType
+
 
 class RatingsViewSet(viewsets.GenericViewSet):
     authentication_classes = (JWTAuthentication,)
@@ -125,12 +127,8 @@ class RatingsViewSet(viewsets.GenericViewSet):
         serializer = serializers.RatingUpdateBodySerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         valid_data = serializer.validated_data
-
-
         resp={}
-
         rating.ratings = valid_data.get('rating')
-
         if valid_data.get('compliment'):
             rating.compliment.set(valid_data.get('compliment'), clear=True)
         else:
@@ -139,7 +137,36 @@ class RatingsViewSet(viewsets.GenericViewSet):
         if valid_data.get('review'):
             rating.review = valid_data.get('review')
         rating.save()
-        return Response({'success': 'Sucessfully Updated'})
+        rating_obj = {}
+        address = ''
+        compliments_string= ''
+        c_list = []
+        cid_list = []
+        if rating.content_type == ContentType.objects.get_for_model(doc_models.Doctor):
+            name = rating.content_object.get_display_name()
+            appointment = doc_models.OpdAppointment.objects.select_related('hospital').filter(id=rating.appointment_id).first()
+            if appointment:
+                address = appointment.hospital.get_hos_address()
+        else:
+            name = rating.content_object.name
+            address = rating.content_object.get_lab_address()
+        for cm in rating.compliment.all():
+            c_list.append(cm.message)
+            cid_list.append(cm.id)
+        if c_list:
+            compliments_string = (', ').join(c_list)
+        rating_obj['id'] = rating.id
+        rating_obj['ratings'] = rating.ratings
+        rating_obj['address'] = address
+        rating_obj['review'] = rating.review
+        rating_obj['entity_name'] = name
+        rating_obj['date'] = rating.updated_at.strftime('%B %d, %Y')
+        rating_obj['compliments'] = compliments_string
+        rating_obj['compliments_list'] = cid_list
+        rating_obj['appointment_id'] = rating.appointment_id
+        rating_obj['appointment_type'] = rating.appointment_type
+        rating_obj['icon'] = request.build_absolute_uri(rating.content_object.get_thumbnail())
+        return Response(rating_obj)
 
 
     def unrated(self, request):
