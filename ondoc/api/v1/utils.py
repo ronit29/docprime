@@ -1089,3 +1089,9 @@ def format_iso_date(date_str):
     if date_field:
         date_field = date_str[:date_field]
     return date_field
+
+def datetime_to_formated_string(instance, time_format='%Y-%m-%d %H:%M:%S', to_zone = tz.gettz(settings.TIME_ZONE)):
+    instance = instance.astimezone(to_zone)
+    formated_date = datetime.datetime.strftime(instance, time_format)
+    return formated_date
+
