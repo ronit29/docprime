@@ -1,7 +1,7 @@
 
 from django.contrib.gis import admin
 
-from ondoc.common.models import PaymentOptions, UserConfig
+from ondoc.common.models import PaymentOptions, UserConfig, MatrixMappedState, MatrixMappedCity
 from ondoc.crm.admin.banner import BannerAdmin
 from ondoc.crm.admin.procedure import ProcedureCategoryAdmin, ProcedureAdmin
 from ondoc.doctor.models import (Doctor, Language, MedicalService, Specialization, College, Qualification, Hospital,
@@ -23,7 +23,7 @@ from ondoc.location.models import EntityUrls
 from ondoc.notification import models as notifcation_model
 from ondoc.procedure.models import Procedure, ProcedureCategory, CommonProcedureCategory, CommonProcedure
 from .common import Cities, CitiesAdmin, MatrixCityMapping, MatrixCityAdmin, MerchantAdmin, MerchantPayoutAdmin, \
-    PaymentOptionsAdmin
+    PaymentOptionsAdmin, MatrixMappedStateAdmin, MatrixMappedCityAdmin
 from .lead import HospitalLeadAdmin, DoctorLeadAdmin, SearchLeadAdmin
 from .doctor import (DoctorAdmin, MedicalServiceAdmin, SpecializationAdmin, QualificationAdmin, LanguageAdmin,
                      CollegeAdmin, MedicalConditionAdmin, HealthTipAdmin, DoctorClinicAdmin,
@@ -116,6 +116,8 @@ admin.site.register(LabTestCategory, LabTestCategoryAdmin)
 
 admin.site.register(HospitalLead, HospitalLeadAdmin)
 admin.site.register(Cities, CitiesAdmin)
+admin.site.register(MatrixMappedState, MatrixMappedStateAdmin)
+admin.site.register(MatrixMappedCity, MatrixMappedCityAdmin)
 admin.site.register(MatrixCityMapping, MatrixCityAdmin)
 admin.site.register(DoctorLead, DoctorLeadAdmin)
 admin.site.register(SearchLead, SearchLeadAdmin)

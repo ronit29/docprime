@@ -187,9 +187,8 @@ class HospitalForm(FormCleanMixin):
     def validate_qc(self):
         # TODO: SHASHANK_SINGH or ROHIT_P must have a phone_number while submitting to QC it while
         qc_required = {'name': 'req', 'location': 'req', 'operational_since': 'req', 'parking': 'req',
-                       'registration_number': 'req', 'building': 'req', 'locality': 'req', 'city': 'req',
-                       'state': 'req',
-                       'country': 'req', 'pin_code': 'req', 'hospital_type': 'req', 'network_type': 'req'}
+                       'registration_number': 'req', 'building': 'req', 'locality': 'req',
+                       'country': 'req', 'pin_code': 'req', 'hospital_type': 'req', 'network_type': 'req', 'matrix_city': 'req', 'matrix_state': 'req'}
 
         # if (not self.instance.network or not self.instance.network.is_billing_enabled) and self.instance.is_billing_enabled:
         #     qc_required.update({
@@ -210,6 +209,9 @@ class HospitalForm(FormCleanMixin):
                 raise forms.ValidationError("Atleast one entry of " + key + " is required for Quality Check")
         if self.cleaned_data['network_type'] == 2 and not self.cleaned_data['network']:
             raise forms.ValidationError("Network cannot be empty for Network Hospital")
+        if self.cleaned_data.get('matrix_city').state != self.cleaned_data.get('matrix_state'):
+            raise forms.ValidationError("City does not belong to selected state")
+
 
     def clean(self):
         super().clean()
@@ -247,7 +249,7 @@ class HospitalAdmin(admin.GeoModelAdmin, VersionAdmin, ActionAdmin, QCPemAdmin):
     list_filter = ('data_status', HospCityFilter, CreatedByFilter)
     readonly_fields = ('source', 'batch', 'associated_doctors', 'is_live', )
     exclude = (
-    'search_key', 'live_at', 'qc_approved_at', 'disabled_at', 'physical_agreement_signed_at', 'welcome_calling_done_at')
+    'search_key', 'live_at', 'qc_approved_at', 'disabled_at', 'physical_agreement_signed_at', 'welcome_calling_done_at', 'city', 'state', )
 
     def get_fields(self, request, obj=None):
         all_fields = super().get_fields(request, obj)
@@ -288,6 +290,8 @@ class HospitalAdmin(admin.GeoModelAdmin, VersionAdmin, ActionAdmin, QCPemAdmin):
             obj.data_status = QCModel.REOPENED
 
         obj.status_changed_by = request.user
+        obj.city = obj.matrix_city.name
+        obj.state = obj.matrix_state.name
 
         super().save_model(request, obj, form, change)
 

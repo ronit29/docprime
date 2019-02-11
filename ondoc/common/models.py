@@ -132,3 +132,24 @@ class Remark(auth_model.TimeStampedModel):
 
     class Meta:
         db_table = 'remark'
+
+
+class MatrixMappedState(models.Model):
+    name = models.CharField(max_length=48, db_index=True)
+
+    def __str__(self):
+        return "{}".format(self.name)
+
+    class Meta:
+        db_table = 'matrix_mapped_state'
+
+
+class MatrixMappedCity(models.Model):
+    name = models.CharField(max_length=48, db_index=True)
+    state = models.ForeignKey(MatrixMappedState, on_delete=models.SET_NULL, null=True, blank=True)
+
+    def __str__(self):
+        return "{}".format(self.name)
+
+    class Meta:
+        db_table = 'matrix_mapped_city'

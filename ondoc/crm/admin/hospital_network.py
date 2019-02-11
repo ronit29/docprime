@@ -103,9 +103,9 @@ class HospitalNetworkForm(FormCleanMixin):
 
     def validate_qc(self):
         qc_required = {'name': 'req', 'operational_since': 'req', 'about': 'req', 'network_size': 'req',
-                       'building': 'req', 'locality': 'req', 'city': 'req', 'state': 'req',
+                       'building': 'req', 'locality': 'req',
                        'country': 'req', 'pin_code': 'req', 'hospitalnetworkmanager': 'count',
-                       'hospitalnetworkhelpline': 'count', 'hospitalnetworkemail': 'count'}
+                       'hospitalnetworkhelpline': 'count', 'hospitalnetworkemail': 'count', 'matrix_city': 'req', 'matrix_state': 'req'}
 
         # if self.instance.is_billing_enabled:
         #     qc_required.update({
@@ -119,6 +119,8 @@ class HospitalNetworkForm(FormCleanMixin):
                 raise forms.ValidationError("Atleast one entry of "+key+" is required for Quality Check")
             if self.data.get(key+'-TOTAL_FORMS') and value == 'count' and int(self.data.get(key+'-TOTAL_FORMS')) <= 0:
                 raise forms.ValidationError("Atleast one entry of "+key+" is required for Quality Check")
+        if self.cleaned_data.get('matrix_city').state != self.cleaned_data.get('matrix_state'):
+            raise forms.ValidationError("City does not belong to selected state")
 
     def clean_operational_since(self):
         data = self.cleaned_data['operational_since']
@@ -180,7 +182,8 @@ class HospitalNetworkAdmin(VersionAdmin, ActionAdmin, QCPemAdmin):
     list_filter = ('data_status', CreatedByFilter)
     search_fields = ['name']
     readonly_fields = ('associated_hospitals',)
-    exclude = ('qc_approved_at', )
+    exclude = ('qc_approved_at', 'city', 'state', )
+    # autocomplete_fields = ['matrix_city']
     inlines = [
         HospitalNetworkManagerInline,
         HospitalNetworkHelplineInline,
@@ -226,6 +229,8 @@ class HospitalNetworkAdmin(VersionAdmin, ActionAdmin, QCPemAdmin):
         if '_mark_in_progress' in request.POST:
             obj.data_status = QCModel.REOPENED
         obj.status_changed_by = request.user
+        obj.city = obj.matrix_city.name
+        obj.state = obj.matrix_state.name
 
         super().save_model(request, obj, form, change)
 

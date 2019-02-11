@@ -10,7 +10,7 @@ from django.conf import settings
 from django.utils.dateparse import parse_datetime
 from ondoc.authentication.models import Merchant, AssociatedMerchant, QCModel
 from ondoc.account.models import MerchantPayout
-from ondoc.common.models import Cities, MatrixCityMapping, PaymentOptions, Remark
+from ondoc.common.models import Cities, MatrixCityMapping, PaymentOptions, Remark, MatrixMappedCity, MatrixMappedState
 from import_export import resources, fields
 from import_export.admin import ImportMixin, base_formats, ImportExportMixin, ImportExportModelAdmin
 from reversion.admin import VersionAdmin
@@ -499,3 +499,35 @@ class RemarkInline(GenericTabularInline, nested_admin.NestedTabularInline):
     #     if obj:
     #         editable_fields += ['content']
     #     return editable_fields
+
+
+class MatrixMappedStateResource(resources.ModelResource):
+    id = fields.Field(attribute='id', column_name='StateId')
+    name = fields.Field(attribute='name', column_name='State')
+
+    class Meta:
+        model = MatrixMappedState
+
+class MatrixMappedStateAdmin(ImportMixin, admin.ModelAdmin):
+    formats = (base_formats.XLS, base_formats.XLSX,)
+    list_display = ('name',)
+    resource_class = MatrixMappedStateResource
+
+
+
+class MatrixMappedCityResource(resources.ModelResource):
+    id = fields.Field(attribute='id', column_name='CityID')
+    state_id = fields.Field(attribute='state_id', column_name='StateId')
+    name = fields.Field(attribute='name', column_name='City')
+
+    class Meta:
+        model = MatrixMappedCity
+        fields = ('id', 'name', 'state_id')
+
+
+
+class MatrixMappedCityAdmin(ImportMixin, admin.ModelAdmin):
+    formats = (base_formats.XLS, base_formats.XLSX,)
+    list_display = ('name', 'state')
+    # search_fields = ['name']
+    resource_class = MatrixMappedCityResource
