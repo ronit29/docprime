@@ -335,6 +335,8 @@ def generate_appointment_masknumber(data):
 
         if appointment_type == 'OPD_APPOINTMENT':
             appointment = OpdAppointment.objects.filter(id=appointment_id).first()
+            if not appointment:
+                raise Exception("Appointment not found, could not get mask number")
             is_network_enabled_hospital = appointment.hospital
             if is_network_enabled_hospital:
                 is_maskable = is_network_enabled_hospital.is_mask_number_required
@@ -342,6 +344,8 @@ def generate_appointment_masknumber(data):
                 is_maskable = True
         elif data.get('type') == 'LAB_APPOINTMENT':
             appointment = LabAppointment.objects.filter(id=appointment_id).first()
+            if not appointment:
+                raise Exception("Appointment not found, could not get mask number")
             is_network_enabled_lab = appointment.lab.network
             if is_network_enabled_lab:
                 is_maskable = is_network_enabled_lab.is_mask_number_required
