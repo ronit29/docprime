@@ -632,6 +632,8 @@ class DoctorProfileUserViewSet(viewsets.GenericViewSet):
             parameters['test_flag'] = 1
             kwargs['parameters'] = parameters
             response_data['doctors'] = doc.list(request, **kwargs)
+        else:
+            response_data['doctors'] = None
 
         return Response(response_data)
 
