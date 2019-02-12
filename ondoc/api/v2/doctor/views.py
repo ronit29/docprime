@@ -16,6 +16,9 @@ from django.db.models import Q, Value, Case, When, F
 from django.contrib.auth import get_user_model
 from django.conf import settings
 import datetime, logging, re, random
+from ondoc.doctor import models
+from ondoc.api.v2.doctor import serializers as v2_serializers
+from django.utils import timezone
 
 User = get_user_model()
 logger = logging.getLogger(__name__)
@@ -181,4 +184,57 @@ class DoctorBillingViewSet(viewsets.GenericViewSet):
         return Response(entities)
 
 
+class OndocViewSet(mixins.CreateModelMixin,
+                   mixins.RetrieveModelMixin,
+                   mixins.UpdateModelMixin,
+                   mixins.ListModelMixin,
+                   viewsets.GenericViewSet):
+    pass
 
+
+class DoctorPermission(permissions.BasePermission):
+    message = 'Doctor is allowed to perform action only.'
+
+    def has_permission(self, request, view):
+        if request.user.user_type == User.DOCTOR:
+            return True
+        return False
+
+
+class DoctorBlockCalendarViewSet(OndocViewSet):
+
+    serializer_class = serializers.DoctorLeaveSerializer
+    authentication_classes = (JWTAuthentication, )
+    permission_classes = (IsAuthenticated, DoctorPermission,)
+    INTERVAL_MAPPING = {models.DoctorLeave.INTERVAL_MAPPING.get(key): key for key in
+                        models.DoctorLeave.INTERVAL_MAPPING.keys()}
+
+    @transaction.atomic
+    def create(self, request, *args, **kwargs):
+        if not hasattr(request.user, 'doctor') or not request.user.doctor:
+            return Response([])
+        serializer = serializers.DoctorBlockCalenderSerializer(data=request.data, context={"request": request})
+        serializer.is_valid(raise_exception=True)
+        validated_data = serializer.validated_data
+        doctor = validated_data.get("doctor_id").id
+        if not doctor:
+            doctor = request.user.doctor.id
+        start_time = validated_data.get("start_time")
+        if not start_time:
+            start_time = self.INTERVAL_MAPPING[validated_data.get("interval")][0]
+        end_time = validated_data.get("end_time")
+        if not end_time:
+            end_time = self.INTERVAL_MAPPING[validated_data.get("interval")][1]
+        doctor_leave_data = {
+            "doctor": doctor,
+            "hospital": validated_data.get("hospital_id"),
+            "start_time": start_time,
+            "end_time": end_time,
+            "start_date": validated_data.get("start_date"),
+            "end_date": validated_data.get("end_date")
+        }
+        doctor_leave_serializer = v2_serializers.DoctorLeaveSerializer(data=doctor_leave_data)
+        doctor_leave_serializer.is_valid(raise_exception=True)
+        # self.get_queryset().update(deleted_at=timezone.now())        Now user can apply more than one leave
+        doctor_leave_serializer.save()
+        return Response(doctor_leave_serializer.data)

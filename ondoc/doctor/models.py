@@ -1873,6 +1873,7 @@ class DoctorLeave(auth_model.TimeStampedModel):
         ("00:00:00", "23:59:59"): 'all',
     }
     doctor = models.ForeignKey(Doctor, related_name="leaves", on_delete=models.CASCADE)
+    hospital = models.ForeignKey(Hospital, on_delete=models.CASCADE, null=True)
     start_time = models.TimeField(blank=True, null=True)
     end_time = models.TimeField(blank=True, null=True)
     start_date = models.DateField(blank=True, null=True)
