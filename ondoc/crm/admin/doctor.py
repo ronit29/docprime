@@ -1055,7 +1055,7 @@ class DoctorAdmin(AutoComplete, ImportExportMixin, VersionAdmin, ActionAdmin, QC
         'get_onboard_link')
     date_hierarchy = 'created_at'
     list_filter = (
-        'data_status', 'onboarding_status', 'is_live', 'enabled', 'is_insurance_enabled', 'doctorpracticespecializations__specialization',
+        'data_status', 'welcome_calling_done', 'onboarding_status', 'is_live', 'enabled', 'is_insurance_enabled', 'doctorpracticespecializations__specialization',
         CityFilter, CreatedByFilter)
     form = DoctorForm
     inlines = [

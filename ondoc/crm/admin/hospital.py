@@ -261,7 +261,7 @@ class HospCityFilter(SimpleListFilter):
 
 
 class HospitalAdmin(admin.GeoModelAdmin, VersionAdmin, ActionAdmin, QCPemAdmin):
-    list_filter = ('data_status', HospCityFilter, CreatedByFilter)
+    list_filter = ('data_status', 'welcome_calling_done', HospCityFilter, CreatedByFilter)
     readonly_fields = ('source', 'batch', 'associated_doctors', 'is_live', )
     exclude = (
     'search_key', 'live_at', 'qc_approved_at', 'disabled_at', 'physical_agreement_signed_at', 'welcome_calling_done_at', 'city', 'state', )
