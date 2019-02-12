@@ -453,7 +453,7 @@ class DoctorSearchHelper:
             search_coupon = Coupon.get_search_coupon(request.user)
             discounted_price = filtered_deal_price if not search_coupon else search_coupon.get_search_coupon_discounted_price(filtered_deal_price)
             schema_specialization = None
-            schema_specialization = sorted_spec_list[0].get('name') if sorted_spec_list[0] and sorted_spec_list[0].get('name') else None
+            schema_specialization = sorted_spec_list[0].get('name') if sorted_spec_list and len(sorted_spec_list)>0 and sorted_spec_list[0].get('name') else None
             schema_type = None
             if schema_specialization == 'Dentist':
                 schema_type = 'Dentist'
