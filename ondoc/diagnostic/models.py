@@ -909,6 +909,18 @@ class LabTest(TimeStampedModel, SearchKey):
 #     class Meta:
 #         db_table = "related_tests"
 
+    def get_all_categories_detail(self):
+        all_categories = self.categories.all()
+        res = []
+        for item in all_categories:
+            if item.is_live == True:
+                resp = {}
+                resp['name'] = item.name
+                resp['id'] = item.id
+                res.append(resp)
+        return res
+
+
 
 class QuestionAnswer(TimeStampedModel):
     test_question = models.TextField(null=False, verbose_name='Question')
