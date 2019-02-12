@@ -49,6 +49,7 @@ def send_lab_notifications_refactored(appointment_id):
             else:
                 is_masking_done = generate_appointment_masknumber(
                     ({'type': 'LAB_APPOINTMENT', 'appointment_id': instance.id}))
+                counter = counter + 1
         # generate_appointment_masknumber(({'type': 'LAB_APPOINTMENT', 'appointment_id': instance.id}))
         lab_notification = LabNotification(instance)
         lab_notification.send()
@@ -330,8 +331,9 @@ def generate_appointment_masknumber(data):
     from ondoc.doctor.models import OpdAppointment
     from ondoc.diagnostic.models import LabAppointment
     appointment_type = data.get('type')
+    is_masking_done = False
     try:
-        is_masking_done = False
+        is_mask_number = True
         is_maskable = True
         appointment_id = data.get('appointment_id', None)
         if not appointment_id:
@@ -356,8 +358,6 @@ def generate_appointment_masknumber(data):
                 is_maskable = is_network_enabled_lab.is_mask_number_required
             else:
                 is_maskable = True
-        if not appointment:
-            raise Exception("Appointment could not found against id - " + str(appointment_id))
 
         phone_number = appointment.user.phone_number
         time_slot = appointment.time_slot_start
@@ -378,7 +378,7 @@ def generate_appointment_masknumber(data):
 
             if response.status_code != status.HTTP_200_OK or not response.ok:
                 logger.info("[ERROR] Appointment could not be get Mask Number")
-                logger.info("[ERROR] %s", response.reason)
+                logger.info("[ERROR] %s", response)
                 # countdown_time = (2 ** self.request.retries) * 60 * 10
                 # logging.error("Appointment sync with the Matrix System failed with response - " + str(response.content))
                 # print(countdown_time)
@@ -386,6 +386,7 @@ def generate_appointment_masknumber(data):
 
             mask_number = response.json()
         else:
+            is_mask_number = False
             mask_number = phone_number
         if mask_number:
             existing_mask_number_obj = appointment.mask_number.filter(is_deleted=False).first()
@@ -393,11 +394,13 @@ def generate_appointment_masknumber(data):
                 existing_mask_number_obj.is_deleted = True
                 existing_mask_number_obj.save()
                 AppointmentMaskNumber(content_object=appointment, mask_number=mask_number,
-                                                     validity_up_to=updated_time_slot, is_deleted=False).save()
+                                                     validity_up_to=updated_time_slot, is_mask_number=is_mask_number,
+                                                     is_deleted=False).save()
                 is_masking_done = True
             else:
                 AppointmentMaskNumber(content_object=appointment, mask_number=mask_number,
-                                                     validity_up_to=updated_time_slot, is_deleted=False).save()
+                                                     validity_up_to=updated_time_slot, is_mask_number=is_mask_number,
+                                                     is_deleted=False).save()
                 is_masking_done = True
         else:
             raise Exception("Failed to generate Mask Number for the appointment - " + str(appointment_id))

@@ -128,6 +128,7 @@ class AppointmentMaskNumber(TimeStampedModel):
     content_object = GenericForeignKey()
     mask_number = models.CharField(blank=True, null=True, max_length=20)
     validity_up_to = models.DateTimeField(null=True, blank=True)
+    is_mask_number = models.BooleanField(default=True)
     is_deleted = models.BooleanField(default=False)
 
     class Meta:
