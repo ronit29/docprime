@@ -1100,8 +1100,16 @@ class MerchantPayout(TimeStampedModel):
     PAID = 3
     AUTOMATIC = 1
     MANUAL = 2
+
+    NEFT = "NEFT"
+    IMPS = "IMPS"
+    IFT = "IFT"
+    INTRABANK_IDENTIFIER = "KKBK"
     STATUS_CHOICES = [(PENDING, 'Pending'), (ATTEMPTED, 'ATTEMPTED'), (PAID, 'Paid')]
+    PAYMENT_MODE_CHOICES = [(NEFT, 'NEFT'), (IMPS, 'IMPS'), (IFT, 'IFT')]    
     TYPE_CHOICES = [(AUTOMATIC, 'Automatic'), (MANUAL, 'Manual')]
+
+    payment_mode = models.CharField(max_length=100, blank=True, null=True, choices=PAYMENT_MODE_CHOICES)
     payout_ref_id = models.IntegerField(null=True, unique=True)
     charged_amount = models.DecimalField(max_digits=10, decimal_places=2)
     payable_amount = models.DecimalField(max_digits=10, decimal_places=2)
@@ -1164,6 +1172,19 @@ class MerchantPayout(TimeStampedModel):
         if appt and appt.get_billed_to:
             return appt.get_billed_to
         return ''
+
+    def get_default_payment_mode(self):
+        default_payment_mode = None
+        merchant = self.get_merchant()
+        if merchant and merchant.ifsc_code:
+            ifsc_code = merchant.ifsc_code
+            if ifsc_code.upper().startswith(self.INTRABANK_IDENTIFIER):
+                default_payment_mode = self.IFT
+            else:
+                default_payment_mode = MerchantPayout.NEFT
+
+        return default_payment_mode
+
 
 
     def get_merchant(self):
