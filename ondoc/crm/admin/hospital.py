@@ -211,8 +211,6 @@ class HospitalForm(FormCleanMixin):
                 raise forms.ValidationError("Atleast one entry of " + key + " is required for Quality Check")
         if self.cleaned_data['network_type'] == 2 and not self.cleaned_data['network']:
             raise forms.ValidationError("Network cannot be empty for Network Hospital")
-        if self.cleaned_data.get('matrix_city').state != self.cleaned_data.get('matrix_state'):
-            raise forms.ValidationError("City does not belong to selected state")
 
 
         number_of_spocs = self.data.get('authentication-spocdetails-content_type-object_id-TOTAL_FORMS', '0')
@@ -262,17 +260,25 @@ class HospCityFilter(SimpleListFilter):
 
 class HospitalAdmin(admin.GeoModelAdmin, VersionAdmin, ActionAdmin, QCPemAdmin):
     list_filter = ('data_status', 'welcome_calling_done', HospCityFilter, CreatedByFilter)
-    readonly_fields = ('source', 'batch', 'associated_doctors', 'is_live', )
+    readonly_fields = ('source', 'batch', 'associated_doctors', 'is_live', 'matrix_lead_id')
     exclude = (
     'search_key', 'live_at', 'qc_approved_at', 'disabled_at', 'physical_agreement_signed_at', 'welcome_calling_done_at', 'city', 'state', )
 
     def get_fields(self, request, obj=None):
         all_fields = super().get_fields(request, obj)
+        if not request.user.is_superuser and not request.user.groups.filter(name=constants['WELCOME_CALLING_TEAM']).exists():
+            if 'welcome_calling_done' in all_fields:
+                all_fields.remove('welcome_calling_done')
         if 'network' in all_fields:
             if 'add_network_link' in all_fields:
                 all_fields.remove('add_network_link')
             network_index = all_fields.index('network')
             all_fields.insert(network_index + 1, 'add_network_link')
+        # reorder welcome_calling_after any other field
+        # if 'additional_details' in all_fields and 'welcome_calling_done' in all_fields:
+        #     all_fields.remove('welcome_calling_done')
+        #     additional_details_index = all_fields.index('additional_details')
+        #     all_fields.insert(additional_details_index + 1, 'welcome_calling_done')
         return all_fields
 
     def associated_doctors(self, instance):

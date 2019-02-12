@@ -384,7 +384,7 @@ class College(auth_model.TimeStampedModel):
         db_table = "college"
 
 
-class Doctor(auth_model.TimeStampedModel, auth_model.QCModel, SearchKey, auth_model.WelcomeCallingDone):
+class Doctor(auth_model.TimeStampedModel, auth_model.QCModel, SearchKey):
     SOURCE_PRACTO = "pr"
     SOURCE_CRM = 'crm'
 
@@ -552,7 +552,7 @@ class Doctor(auth_model.TimeStampedModel, auth_model.QCModel, SearchKey, auth_mo
     def save(self, *args, **kwargs):
         self.update_time_stamps()
         self.update_live_status()
-        request_agent_lead_id = obj.request_agent_lead_id if hasattr(obj, 'request_agent_lead_id') else None
+        request_agent_lead_id = self.request_agent_lead_id if hasattr(self, 'request_agent_lead_id') else None
         # On every update of onboarding status or Qcstatus push to matrix
         push_to_matrix = False
         update_status_in_matrix = False
@@ -1077,7 +1077,7 @@ class DoctorEmail(auth_model.TimeStampedModel):
         unique_together = (("doctor", "email"),)
 
 
-class HospitalNetwork(auth_model.TimeStampedModel, auth_model.CreatedByModel, auth_model.QCModel):
+class HospitalNetwork(auth_model.TimeStampedModel, auth_model.CreatedByModel, auth_model.QCModel, auth_model.WelcomeCallingDone):
     name = models.CharField(max_length=100)
     operational_since = models.PositiveSmallIntegerField(blank=True, null=True, validators=[MinValueValidator(1900)])
     about = models.CharField(max_length=2000, blank=True)
@@ -1103,8 +1103,15 @@ class HospitalNetwork(auth_model.TimeStampedModel, auth_model.CreatedByModel, au
     matrix_lead_id = models.BigIntegerField(blank=True, null=True, unique=True)
     remark = GenericRelation(Remark)
 
+    def update_time_stamps(self):
+        if self.welcome_calling_done and not self.welcome_calling_done_at:
+            self.welcome_calling_done_at = timezone.now()
+        elif not self.welcome_calling_done and self.welcome_calling_done_at:
+            self.welcome_calling_done_at = None
+
     def save(self, *args, **kwargs):
         # TODO: SHASHANK_SINGH or ROHIT_P send agentID to task
+        self.update_time_stamps()
         push_to_matrix = False
         update_status_in_matrix = False
         if self.id:

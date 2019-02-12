@@ -21,7 +21,7 @@ from django.contrib.contenttypes.models import ContentType
 from import_export.admin import ImportExportMixin
 
 from ondoc.diagnostic.models import Lab, LabAppointment
-from ondoc.doctor.models import Hospital, Doctor, OpdAppointment
+from ondoc.doctor.models import Hospital, Doctor, OpdAppointment, HospitalNetwork
 from django.db.models import Q
 from django import forms
 
@@ -104,6 +104,12 @@ class FormCleanMixin(forms.ModelForm):
     def clean(self):
         if (not self.request.user.is_superuser and not self.request.user.groups.filter(name=constants['SUPER_QC_GROUP']).exists()):
             # and (not '_reopen' in self.data and not self.request.user.groups.filter(name__in=[constants['QC_GROUP_NAME'], constants['WELCOME_CALLING_TEAM']]).exists()):
+            if isinstance(self.instance, Hospital) or isinstance(self.instance, HospitalNetwork):
+                if self.cleaned_data.get('matrix_city') and hasattr(self.cleaned_data.get('matrix_city'), 'state'):
+                    if self.cleaned_data.get('matrix_city').state != self.cleaned_data.get('matrix_state'):
+                        raise forms.ValidationError("City does not belong to selected state")
+                else:
+                    raise forms.ValidationError("There is not state mapped with selected city")
             if self.instance.data_status == QCModel.QC_APPROVED:
                 # allow welcome_calling_team to modify qc_approved data
                 if not self.request.user.groups.filter(name=constants['WELCOME_CALLING_TEAM']).exists():
@@ -530,5 +536,5 @@ class MatrixMappedCityResource(resources.ModelResource):
 class MatrixMappedCityAdmin(ImportMixin, admin.ModelAdmin):
     formats = (base_formats.XLS, base_formats.XLSX,)
     list_display = ('name', 'state')
-    # search_fields = ['name']
+    search_fields = ['name']
     resource_class = MatrixMappedCityResource

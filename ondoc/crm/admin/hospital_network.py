@@ -127,8 +127,6 @@ class HospitalNetworkForm(FormCleanMixin):
                 raise forms.ValidationError("Atleast one entry of "+key+" is required for Quality Check")
             if self.data.get(key+'-TOTAL_FORMS') and value == 'count' and int(self.data.get(key+'-TOTAL_FORMS')) <= 0:
                 raise forms.ValidationError("Atleast one entry of "+key+" is required for Quality Check")
-        if self.cleaned_data.get('matrix_city').state != self.cleaned_data.get('matrix_state'):
-            raise forms.ValidationError("City does not belong to selected state")
 
         number_of_spocs = self.data.get('authentication-spocdetails-content_type-object_id-TOTAL_FORMS', '0')
         try:
@@ -199,11 +197,11 @@ class HospitalNetworkAdmin(VersionAdmin, ActionAdmin, QCPemAdmin):
     formfield_overrides = {
         models.BigIntegerField: {'widget': forms.TextInput},
     }
-    list_display = ('name', 'updated_at', 'data_status', 'list_created_by', 'list_assigned_to')
-    list_filter = ('data_status', CreatedByFilter)
+    list_display = ('name', 'welcome_calling_done', 'updated_at', 'data_status', 'list_created_by', 'list_assigned_to')
+    list_filter = ('data_status', 'welcome_calling_done', CreatedByFilter)
     search_fields = ['name']
     readonly_fields = ('associated_hospitals',)
-    exclude = ('qc_approved_at', 'city', 'state', )
+    exclude = ('qc_approved_at', 'city', 'state', 'welcome_calling_done_at')
     # autocomplete_fields = ['matrix_city']
     inlines = [
         HospitalNetworkManagerInline,
@@ -262,3 +260,10 @@ class HospitalNetworkAdmin(VersionAdmin, ActionAdmin, QCPemAdmin):
         if (not request.user.is_superuser) and (not request.user.groups.filter(name=constants['QC_GROUP_NAME']).exists()):
             form.base_fields['assigned_to'].disabled = True
         return form
+
+    def get_fields(self, request, obj=None):
+        all_fields = super().get_fields(request, obj)
+        if not request.user.is_superuser and not request.user.groups.filter(name=constants['WELCOME_CALLING_TEAM']).exists():
+            if 'welcome_calling_done' in all_fields:
+                all_fields.remove('welcome_calling_done')
+        return all_fields
