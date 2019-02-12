@@ -12,6 +12,7 @@ from fluent_comments.models import FluentComment
 
 from ondoc.api.v1.article.serializers import CommentAuthorSerializer
 from ondoc.comments.models import CustomComment
+from ondoc.seo.models import NewDynamic
 from .serializers import CommentSerializer
 from ondoc.articles import models as article_models
 from ondoc.articles.models import ArticleCategory, Article
@@ -93,8 +94,15 @@ class ArticleViewSet(viewsets.GenericViewSet):
             "description": description
         }
 
+        dynamic_content = NewDynamic.objects.filter(url__url=category_url, is_enabled=True).first()
+        top_content = None
+        bottom_content = None
+        if dynamic_content:
+            top_content = dynamic_content.top_content
+            bottom_content = dynamic_content.bottom_content
         return Response(
-            {'result': resp, 'seo': category_seo, 'category': category.name, 'total_articles': articles_count})
+            {'result': resp, 'seo': category_seo, 'category': category.name, 'total_articles': articles_count, 'search_content': top_content
+             , 'bottom_content': bottom_content})
 
     @transaction.non_atomic_requests
     def retrieve(self, request):
