@@ -35,9 +35,11 @@ class Order(TimeStampedModel):
     LAB_APPOINTMENT_CREATE = 4
     PAYMENT_ACCEPTED = 1
     PAYMENT_PENDING = 0
+    PAYMENT_FAILURE = 3
     PAYMENT_STATUS_CHOICES = (
         (PAYMENT_ACCEPTED, "Payment Accepted"),
         (PAYMENT_PENDING, "Payment Pending"),
+        (PAYMENT_FAILURE, "Payment Failure")
     )
     ACTION_CHOICES = (("", "Select"), (OPD_APPOINTMENT_RESCHEDULE, 'Opd Reschedule'),
                       (OPD_APPOINTMENT_CREATE, "Opd Create"),
@@ -457,6 +459,9 @@ class Order(TimeStampedModel):
         if not opd_appointment_ids and not lab_appointment_ids:
             raise Exception("Could not process entire order")
 
+        # mark order processed:
+        self.change_payment_status(Order.PAYMENT_ACCEPTED)
+
         # if order is done without PG transaction, then make an async task to create a dummy transaction and set it.
         if not self.getTransactions():
             try:
@@ -493,6 +498,14 @@ class Order(TimeStampedModel):
         if self.action_data and "user" in self.action_data:
             return self.action_data["user"]
         return None
+
+    @transaction.atomic()
+    def change_payment_status(self, status):
+        order_obj = Order.objects.select_for_update().get(id=self.id)
+        if order_obj.payment_status != Order.PAYMENT_ACCEPTED:
+            order_obj.payment_status = status
+            order_obj.save()
+        return order_obj
 
     class Meta:
         db_table = "order"
