@@ -1,3 +1,4 @@
+import operator
 from collections import defaultdict, OrderedDict
 from uuid import UUID
 from ondoc.api.v1.auth.serializers import UserProfileSerializer
@@ -6,12 +7,13 @@ from ondoc.api.v1.doctor.serializers import HospitalModelSerializer, Appointment
 from ondoc.api.v1.doctor.DoctorSearchByHospitalHelper import DoctorSearchByHospitalHelper
 from ondoc.api.v1.procedure.serializers import CommonProcedureCategorySerializer, ProcedureInSerializer, \
     ProcedureSerializer, DoctorClinicProcedureSerializer, CommonProcedureSerializer
+from ondoc.cart.models import Cart
 from ondoc.doctor import models
 from ondoc.authentication import models as auth_models
 from ondoc.diagnostic import models as lab_models
 from ondoc.notification import tasks as notification_tasks
 #from ondoc.doctor.models import Hospital, DoctorClinic,Doctor,  OpdAppointment
-from ondoc.doctor.models import DoctorClinic
+from ondoc.doctor.models import DoctorClinic, OpdAppointment
 from ondoc.notification.models import EmailNotification
 from django.utils.safestring import mark_safe
 from ondoc.coupon.models import Coupon
@@ -62,6 +64,7 @@ from django.contrib.staticfiles.templatetags.staticfiles import static
 from django.db.models import Avg
 from django.db.models import Count
 from ondoc.api.v1.auth import serializers as auth_serializers
+from copy import deepcopy
 
 logger = logging.getLogger(__name__)
 import random
@@ -109,7 +112,6 @@ class DoctorAppointmentsViewSet(OndocViewSet):
     def list(self, request):
         user = request.user
         queryset = self.get_pem_queryset(user)
-        queryset = queryset.distinct()
         if not queryset:
             return Response([])
         serializer = serializers.AppointmentFilterSerializer(data=request.query_params)
@@ -149,7 +151,7 @@ class DoctorAppointmentsViewSet(OndocViewSet):
 
         if date:
             queryset = queryset.filter(time_slot_start__date=date)
-
+        queryset = queryset.distinct('id', 'time_slot_start')
         queryset = paginate_queryset(queryset, request)
         serializer = serializers.DoctorAppointmentRetrieveSerializer(queryset, many=True, context={'request': request})
         return Response(serializer.data)
@@ -201,104 +203,33 @@ class DoctorAppointmentsViewSet(OndocViewSet):
         opd_appointment_serializer = serializers.DoctorAppointmentRetrieveSerializer(opd_appointment, context={'request': request})
         return Response(opd_appointment_serializer.data)
 
-    @staticmethod
-    def get_procedure_prices(procedures, doctor, selected_hospital, dct):
-        doctor_clinic = doctor.doctor_clinics.filter(hospital=selected_hospital).first()
-        doctor_clinic_procedures = doctor_clinic.doctorclinicprocedure_set.filter(procedure__in=procedures).order_by(
-            'procedure_id')
-        total_deal_price, total_agreed_price, total_mrp = 0, 0, 0
-        for doctor_clinic_procedure in doctor_clinic_procedures:
-            total_agreed_price += doctor_clinic_procedure.agreed_price
-            total_deal_price += doctor_clinic_procedure.deal_price
-            total_mrp += doctor_clinic_procedure.mrp
-        return total_deal_price + dct.deal_price, total_agreed_price + dct.fees, total_mrp + dct.mrp
 
     @transaction.atomic
     def create(self, request):
-        serializer = serializers.CreateAppointmentSerializer(data=request.data, context={'request': request})
+        serializer = serializers.CreateAppointmentSerializer(data=request.data, context={'request': request, 'data' : request.data, 'use_duplicate' : True})
         serializer.is_valid(raise_exception=True)
-        data = serializer.validated_data
-        procedures = data.get('procedure_ids', [])
-        # procedure_categories = data.get('procedure_category_ids', [])
-        selected_hospital = data.get('hospital')
-        doctor = data.get('doctor')
-        time_slot_start = form_time_slot(data.get("start_date"), data.get("start_time"))
-        doctor_clinic_timing = models.DoctorClinicTiming.objects.filter(
-            doctor_clinic__doctor=data.get('doctor'),
-            doctor_clinic__hospital=data.get('hospital'),
-            doctor_clinic__doctor__is_live=True, doctor_clinic__hospital__is_live=True,
-            day=time_slot_start.weekday(), start__lte=data.get("start_time"),
-            end__gte=data.get("start_time")).first()
-        profile_model = data.get("profile")
-        profile_detail = {
-            "name": profile_model.name,
-            "gender": profile_model.gender,
-            "dob": str(profile_model.dob)
-        }
+        validated_data = serializer.validated_data
 
-        extra_details = []
-        effective_price = 0
-        if not procedures:
-            if data.get("payment_type") == models.OpdAppointment.INSURANCE:
-                effective_price = doctor_clinic_timing.deal_price
-            elif data.get("payment_type") in [models.OpdAppointment.COD, models.OpdAppointment.PREPAID]:
-                coupon_discount, coupon_cashback, coupon_list = Coupon.get_total_deduction(data, doctor_clinic_timing.deal_price)
-                if coupon_discount >= doctor_clinic_timing.deal_price:
-                    effective_price = 0
-                else:
-                    effective_price = doctor_clinic_timing.deal_price - coupon_discount
-            deal_price = doctor_clinic_timing.deal_price
-            mrp = doctor_clinic_timing.mrp
-            fees = doctor_clinic_timing.fees
+        cart_item_id = validated_data.get('cart_item').id if validated_data.get('cart_item') else None
+        if not models.OpdAppointment.can_book_for_free(request, validated_data, cart_item_id):
+            return Response({'request_errors': {"code": "invalid",
+                                                "message": "Only {} active free bookings allowed per customer".format(
+                                                    models.OpdAppointment.MAX_FREE_BOOKINGS_ALLOWED)}},
+                            status=status.HTTP_400_BAD_REQUEST)
+
+        if validated_data.get("existing_cart_item"):
+            cart_item = validated_data.get("existing_cart_item")
+            cart_item.data = request.data
+            cart_item.save()
         else:
-            total_deal_price, total_agreed_price, total_mrp = self.get_procedure_prices(procedures, doctor,
-                                                                                        selected_hospital,
-                                                                                        doctor_clinic_timing)
-            if data.get("payment_type") == models.OpdAppointment.INSURANCE:
-                effective_price = total_deal_price
-            elif data.get("payment_type") in [models.OpdAppointment.COD, models.OpdAppointment.PREPAID]:
-                coupon_discount, coupon_cashback, coupon_list = Coupon.get_total_deduction(data, total_deal_price)
-                if coupon_discount >= total_deal_price:
-                    effective_price = 0
-                else:
-                    effective_price = total_deal_price - coupon_discount
-            deal_price = total_deal_price
-            mrp = total_mrp
-            fees = total_agreed_price
+            cart_item, is_new = Cart.objects.update_or_create(id=cart_item_id, deleted_at__isnull=True, product_id=account_models.Order.DOCTOR_PRODUCT_ID,
+                                                  user=request.user,defaults={"data": request.data})
 
-            doctor_clinic = doctor.doctor_clinics.filter(hospital=selected_hospital).first()
-            doctor_clinic_procedures = doctor_clinic.doctorclinicprocedure_set.filter(procedure__in=procedures).order_by('procedure_id')
-            for doctor_clinic_procedure in doctor_clinic_procedures:
-                temp_extra = {'procedure_id': doctor_clinic_procedure.procedure.id,
-                              'procedure_name': doctor_clinic_procedure.procedure.name,
-                              'deal_price': doctor_clinic_procedure.deal_price,
-                              'agreed_price': doctor_clinic_procedure.agreed_price,
-                              'mrp': doctor_clinic_procedure.mrp}
-                extra_details.append(temp_extra)
+        if hasattr(request, 'agent') and request.agent:
+            resp = { 'is_agent': True , "status" : 1 }
+        else:
+            resp = account_models.Order.create_order(request, [cart_item], validated_data.get("use_wallet"))
 
-        opd_data = {
-            "doctor": data.get("doctor"),
-            "hospital": data.get("hospital"),
-            "profile": data.get("profile"),
-            "profile_detail": profile_detail,
-            "user": request.user,
-            "booked_by": request.user,
-            "fees": fees,
-            "deal_price": deal_price,
-            "effective_price": effective_price,
-            "mrp": mrp,
-            "extra_details": extra_details,
-            "time_slot_start": time_slot_start,
-            "payment_type": data.get("payment_type"),
-            "coupon": coupon_list,
-            "discount": int(coupon_discount),
-            "cashback": int(coupon_cashback)
-        }
-
-        if opd_data.get("deal_price") == 0 and not self.can_book_for_free(request.user):
-            return Response({'request_errors': { "code" : "invalid", "message" : "Only 3 active free bookings allowed per customer" }}, status=status.HTTP_400_BAD_REQUEST)
-
-        resp = self.create_order(request, opd_data, account_models.Order.DOCTOR_PRODUCT_ID, data.get("use_wallet"))
         return Response(data=resp)
 
     def can_book_for_free(self, user):
@@ -625,7 +556,7 @@ class DoctorProfileUserViewSet(viewsets.GenericViewSet):
         return Response(status=status.HTTP_404_NOT_FOUND)
 
     @transaction.non_atomic_requests
-    def retrieve(self, request, pk, entity=None):
+    def retrieve(self, request, pk, entity=None, *args, **kwargs):
         serializer = serializers.DoctorDetailsRequestSerializer(data=request.query_params)
         serializer.is_valid(raise_exception=True)
         validated_data = serializer.validated_data
@@ -671,7 +602,6 @@ class DoctorProfileUserViewSet(viewsets.GenericViewSet):
         response_data = self.prepare_response(serializer.data, selected_hospital)
 
         if entity:
-
             response_data['url'] = entity.url
             if entity.breadcrumb:
                 breadcrumb = entity.breadcrumb
@@ -681,6 +611,29 @@ class DoctorProfileUserViewSet(viewsets.GenericViewSet):
             else:
                 breadcrumb = [{'url':'/', 'title': 'Home'}, {'title':'Dr. ' + doctor.name}]
                 response_data['breadcrumb'] = breadcrumb
+
+        if not doctor.enabled_for_online_booking:
+            parameters = dict()
+
+            doc = DoctorListViewSet()
+            general_specialization = []
+
+            for dps in doctor.doctorpracticespecializations.all():
+                general_specialization.append(dps.specialization)
+
+            general_specialization = sorted(general_specialization, key=operator.attrgetter('doctor_count'), reverse=True)
+            if general_specialization:
+                specialization_id = general_specialization[0].pk
+                parameters['specialization_ids'] = str(specialization_id)
+            if response_data.get('hospitals'):
+                hospital = response_data.get('hospitals')[0]
+                parameters['lat'] = hospital.get('lat')
+                parameters['long'] = hospital.get('long')
+            parameters['doctor_suggestions'] = 1
+            kwargs['parameters'] = parameters
+            response_data['doctors'] = doc.list(request, **kwargs)
+        else:
+            response_data['doctors'] = None
 
         return Response(response_data)
 
@@ -902,8 +855,13 @@ class PrescriptionFileViewset(OndocViewSet):
         return Response(response)
 
     def prescription_permission(self, user, appointment):
-        return auth_models.GenericAdmin.objects.filter(user=user, hospital=appointment.hospital,  is_disabled=False,
-                                                       write_permission=True).exists()
+        return auth_models.GenericAdmin.objects.filter(Q(user=user, is_disabled=False),
+                                                       Q(
+                                                           Q(hospital=appointment.hospital)
+                                                            |
+                                                           Q(doctor=appointment.doctor)
+                                                       )
+                                                       ).exists()
 
 
 class SearchedItemsViewSet(viewsets.GenericViewSet):
@@ -953,16 +911,16 @@ class SearchedItemsViewSet(viewsets.GenericViewSet):
         count = int(count)
         if count <=0:
             count = 10
-        medical_conditions = models.CommonMedicalCondition.objects.select_related('condition').all().order_by("priority")[:count]
+        medical_conditions = models.CommonMedicalCondition.objects.select_related('condition').all().order_by("-priority")[:count]
         conditions_serializer = serializers.MedicalConditionSerializer(medical_conditions, many=True, context={'request': request})
 
-        common_specializations = models.CommonSpecialization.objects.select_related('specialization').all().order_by("priority")[:10]
+        common_specializations = models.CommonSpecialization.objects.select_related('specialization').all().order_by("-priority")[:10]
         specializations_serializer = serializers.CommonSpecializationsSerializer(common_specializations, many=True, context={'request': request})
 
-        common_procedure_categories = CommonProcedureCategory.objects.select_related('procedure_category').filter(procedure_category__is_live=True).all().order_by("priority")[:10]
+        common_procedure_categories = CommonProcedureCategory.objects.select_related('procedure_category').filter(procedure_category__is_live=True).all().order_by("-priority")[:10]
         common_procedure_categories_serializer = CommonProcedureCategorySerializer(common_procedure_categories, many=True)
 
-        common_procedures = CommonProcedure.objects.select_related('procedure').filter(procedure__is_enabled=True).all().order_by("priority")[:10]
+        common_procedures = CommonProcedure.objects.select_related('procedure').filter(procedure__is_enabled=True).all().order_by("-priority")[:10]
         common_procedures_serializer = CommonProcedureSerializer(common_procedures, many=True)
 
         return Response({"conditions": conditions_serializer.data, "specializations": specializations_serializer.data,
@@ -1099,11 +1057,21 @@ class DoctorListViewSet(viewsets.GenericViewSet):
 
         entity_ids = [doctor_data['id'] for doctor_data in response]
 
-        id_url_dict = dict()
+        entity_data = dict()
         entity = EntityUrls.objects.filter(entity_id__in=entity_ids, sitemap_identifier='DOCTOR_PAGE',
-                                           is_valid=True).values('entity_id', 'url')
+                                           is_valid=True).values('entity_id', 'url', 'breadcrumb', 'location')
+        spec_locality_url = None
         for data in entity:
-            id_url_dict[data['entity_id']] = data['url']
+            entity_data[data['entity_id']] = dict()
+            entity_data[data['entity_id']]['url'] = data['url']
+            #id_url_dict[data['entity_id']] = data['url']
+            breadcrumb = data.get('breadcrumb')
+            if breadcrumb:
+                spec_locality_breadcrumb = breadcrumb[-1]
+                spec_locality_url = spec_locality_breadcrumb.get('url')
+                if not spec_locality_url.startswith('doctors') and spec_locality_url.endswith('sptlitcit'):
+                    entity_data[data['entity_id']]['parent_url'] = spec_locality_url
+                    entity_data[data['entity_id']]['location'] = data.get('location')
 
         title = ''
         description = ''
@@ -1276,22 +1244,22 @@ class DoctorListViewSet(viewsets.GenericViewSet):
                     if object.bottom_content:
                         bottom_content = object.bottom_content
 
-                if not top_content and specialization_id:
-                    specialization_content = models.PracticeSpecializationContent.objects.filter(
-                        specialization__id=specialization_id).first()
-                    if specialization_content:
-                        top_content = specialization_content.content
-
-                if top_content:
-                    top_content = str(top_content)
-                    top_content = top_content.replace('<location>', location)
-                    regex = re.compile(r'[\n\r\t]')
-                    top_content = regex.sub(" ", top_content)
-                if bottom_content:
-                    bottom_content = str(bottom_content)
-                    bottom_content = bottom_content.replace('<location>', location)
-                    regex = re.compile(r'[\n\r\t]')
-                    bottom_content = regex.sub(" ", bottom_content)
+                # if not top_content and specialization_id:
+                #     specialization_content = models.PracticeSpecializationContent.objects.filter(
+                #         specialization__id=specialization_id).first()
+                #     if specialization_content:
+                #         top_content = specialization_content.content
+                #
+                # if top_content:
+                #     top_content = str(top_content)
+                #     top_content = top_content.replace('<location>', location)
+                #     regex = re.compile(r'[\n\r\t]')
+                #     top_content = regex.sub(" ", top_content)
+                # if bottom_content:
+                #     bottom_content = str(bottom_content)
+                #     bottom_content = bottom_content.replace('<location>', location)
+                #     regex = re.compile(r'[\n\r\t]')
+                #     bottom_content = regex.sub(" ", bottom_content)
 
             seo = {
                 "title": title,
@@ -1323,7 +1291,6 @@ class DoctorListViewSet(viewsets.GenericViewSet):
             }
 
 
-
             # if object and object.top_content:
             #     specialization_content = object.top_content
             #     if specialization_content:
@@ -1344,17 +1311,42 @@ class DoctorListViewSet(viewsets.GenericViewSet):
             #             specialization_dynamic_content = content
 
         for resp in response:
-            if id_url_dict.get(resp['id']):
-                resp['url'] = id_url_dict[resp['id']]
-                resp['schema']['url'] = id_url_dict[resp['id']]
-            else:
-                resp['url'] = None
-                resp['schema']['url'] = None
+            resp['url'] = None
+            resp['schema']['url'] = None
+            resp['parent_url'] = None
+
+            doctor_entity = entity_data.get(resp['id'])
+            if doctor_entity:
+                if doctor_entity.get('url'):
+                    resp['url'] = doctor_entity.get('url')
+                    resp['schema']['url'] = request.build_absolute_uri(doctor_entity.get('url')) if doctor_entity.get('url') else None
+                    resp['new_schema']['url'] = request.build_absolute_uri(doctor_entity.get('url')) if doctor_entity.get(
+                        'url') else None
+                parent_location = doctor_entity.get('location')
+                parent_url = doctor_entity.get('parent_url')
+                if parent_location and parent_url:
+                    if resp.get('hospitals')[0] and resp.get('hospitals')[0].get("location"):
+                        hospital_location = Point(resp.get('hospitals')[0].get("location").get('long'),resp.get('hospitals')[0].get("location").get('lat'), srid=4326)
+                        if hospital_location.distance(parent_location)*100 < 1:
+                            resp['parent_url'] = parent_url
+
+
+        specializations = list(models.PracticeSpecialization.objects.filter(id__in=validated_data.get('specialization_ids',[])).values('id','name'));
+
+        if parameters.get('doctor_suggestions') == 1:
+            result = list()
+            for data in response:
+                if data.get('enabled_for_online_booking') == True and len(result)<3:
+                    result.append(data)
+                else:
+                    break
+            result = result if result else None
+            return {"result": result, "count": result_count,
+                             'specializations': specializations}
 
         validated_data.get('procedure_categories', [])
         procedures = list(Procedure.objects.filter(pk__in=validated_data.get('procedure_ids', [])).values('id', 'name'))
         procedure_categories = list(ProcedureCategory.objects.filter(pk__in=validated_data.get('procedure_category_ids', [])).values('id', 'name'))
-        specializations = list(models.PracticeSpecialization.objects.filter(id__in=validated_data.get('specialization_ids',[])).values('id','name'));
         conditions = list(models.MedicalCondition.objects.filter(id__in=validated_data.get('condition_ids',[])).values('id','name'));
         if validated_data.get('ratings'):
             ratings = validated_data.get('ratings')
@@ -1466,7 +1458,7 @@ class DoctorAvailabilityTimingViewSet(viewsets.ViewSet):
 
         for data in queryset:
             obj.form_time_slots(data.day, data.start, data.end, data.fees, True,
-                                data.deal_price, data.mrp, True)
+                                data.deal_price, data.mrp, True, on_call=data.type)
 
         timeslots = obj.get_timing_list()
         return Response({"timeslots": timeslots, "doctor_data": doctor_serializer.data,
@@ -2086,9 +2078,12 @@ class OfflineCustomerViewSet(viewsets.GenericViewSet):
         phone_number = []
         patient_profile = OfflinePatientSerializer(appnt.user).data
         patient_name = appnt.user.name if hasattr(appnt.user, 'name') else None
+        patient_profile['phone_number'] = None
         if hasattr(appnt.user, 'patient_mobiles'):
             for mob in appnt.user.patient_mobiles.all():
                 phone_number.append({"phone_number": mob.phone_number, "is_default": mob.is_default})
+                if mob.is_default:
+                    patient_profile['phone_number'] = mob.phone_number
         patient_profile['patient_numbers'] = phone_number
 
         ret_obj = {}
@@ -2195,7 +2190,9 @@ class OfflineCustomerViewSet(viewsets.GenericViewSet):
         serializer = serializers.GetOfflinePatientsSerializer(data=request.query_params)
         serializer.is_valid(raise_exception=True)
         valid_data = serializer.validated_data
-        queryset = models.OfflinePatients.objects.filter(Q(doctor__manageable_doctors__user=user,
+        queryset = models.OfflinePatients.objects.prefetch_related('patient_mobiles')\
+                                                 .select_related('doctor', 'hospital')\
+                                                 .filter(Q(doctor__manageable_doctors__user=user,
                                                            doctor__manageable_doctors__entity_type=GenericAdminEntity.DOCTOR,
                                                            doctor__manageable_doctors__is_disabled=False,
                                                            )
@@ -2215,11 +2212,39 @@ class OfflineCustomerViewSet(viewsets.GenericViewSet):
             admin_queryset = auth_models.GenericAdmin.objects.filter(user=request.user, updated_at__gte=valid_data.get('updated_at'))
             if not admin_queryset.exists():
                 queryset = queryset.filter(updated_at__gte=valid_data.get('updated_at'))
-        queryset = queryset.values('name', 'id', 'gender', 'doctor', 'hospital', 'age', 'dob', 'calculated_dob', 'updated_at',
-                                   'share_with_hospital', 'sms_notification', 'medical_history',
-                                   'referred_by', 'display_welcome_message', 'error'
-                                   ).distinct()
-        return Response(queryset)
+        # queryset = queryset.values('name', 'id', 'gender', 'doctor', 'hospital', 'age', 'dob', 'calculated_dob', 'updated_at',
+        #                            'share_with_hospital', 'sms_notification', 'medical_history',
+        #                            'referred_by', 'display_welcome_message', 'error'
+        #                            ).distinct()
+        response = []
+        for data in queryset.distinct().all():
+            patient_dict = {}
+            patient_dict['id'] = data.id
+            patient_dict['name'] = data.name if data.name else None
+            patient_dict['gender'] = data.gender if data.gender else None
+            patient_dict['doctor'] = data.doctor.id if data.doctor else None
+            patient_dict['hospital'] = data.hospital.id if data.hospital else None
+            patient_dict['age'] = data.age if data.age else None
+            patient_dict['dob'] = data.dob if data.dob else None
+            patient_dict['calculated_dob'] = data.calculated_dob if data.calculated_dob else None
+            patient_dict['updated_at'] = data.updated_at if data.updated_at else None
+            patient_dict['share_with_hospital'] = data.share_with_hospital if data.share_with_hospital else None
+            patient_dict['sms_notification'] = data.sms_notification if data.sms_notification else None
+            patient_dict['medical_history'] = data.medical_history if data.medical_history else None
+            patient_dict['referred_by'] = data.referred_by if data.referred_by else None
+            patient_dict[
+                'display_welcome_message'] = data.display_welcome_message if data.display_welcome_message else None
+            patient_dict['error'] = data.error if data.error else None
+            patient_numbers = []
+            patient_dict['phone_number'] = None
+            if hasattr(data, 'patient_mobiles'):
+                for mob in data.patient_mobiles.all():
+                    patient_numbers.append({"phone_number": mob.phone_number, "is_default": mob.is_default})
+                    if mob.is_default:
+                        patient_dict['phone_number'] = mob.phone_number
+            patient_dict['patient_numbers'] = patient_numbers
+            response.append(patient_dict)
+        return Response(response)
 
     @transaction.atomic
     def create_offline_patients(self, request):
@@ -2470,7 +2495,7 @@ class OfflineCustomerViewSet(viewsets.GenericViewSet):
                 found = False
                 for appnt in appntment_ids:
                     if id == appnt.id:
-                        patient = def_number = action_cancel = action_add = action_reschedule = None
+                        patient = def_number = action_cancel = action_add = action_reschedule = action_complete = None
                         found = True
 
                         self.validate_permissions(data, doc_pem_list, hosp_pem_list, clinic_queryset)
@@ -2479,23 +2504,21 @@ class OfflineCustomerViewSet(viewsets.GenericViewSet):
                         if 'break' in update_obj and update_obj.get('break'):
                             resp.append(update_obj.get('obj'))
                             break
-
+                        old_appnt = deepcopy(appnt)
                         if data.get('patient'):
                             if not data.get('patient')['id'] in patient_ids:
                                 patient_data = self.create_patient(request, data['patient'], data['hospital'],
                                                                    data['doctor'])
                                 patient_ids.append(patient_data['patient'].id)
-
+                                action_cancel = True
                             else:
                                 patient_data = self.update_patient(request, data['patient'], data['hospital'],
                                                                    data['doctor'])
-
                             patient = patient_data['patient']
                             if patient_data.get('sms_list'):
-                                patient_data['sms_list']['old_appointment'] = appnt
+                                patient_data['sms_list']['old_appointment'] = old_appnt
                                 sms_list.append(patient_data['sms_list'])
                             appnt.user = patient
-                            action_cancel = True
                         else:
                             patient = appnt.user
                             patient_data = {}
@@ -2504,18 +2527,20 @@ class OfflineCustomerViewSet(viewsets.GenericViewSet):
                                 if def_number:
                                     patient_data['sms_list'] = {'phone_number': def_number.phone_number,
                                                                 'name': patient.name,
-                                                                'old_appointment': appnt}
+                                                                'old_appointment': old_appnt}
                                     sms_list.append(patient_data['sms_list'])
 
                         if appnt.doctor.id != data.get('doctor').id or appnt.hospital.id != data.get('hospital').id:
                             action_cancel = True
-
+                        if not action_cancel and (data.get('time_slot_start') != appnt.time_slot_start):
+                            action_reschedule = True
+                        if data.get('status') == models.OfflineOPDAppointments.COMPLETED:
+                            action_complete = True
                         appnt.doctor = data.get('doctor')
                         appnt.hospital = data.get('hospital')
                         appnt.error = data.get('error', False)
                         appnt.error_message = data.get('error_message')
                         if data.get("time_slot_start"):
-                            action_reschedule = True
                             appnt.time_slot_start = data.get("time_slot_start")
                         if data.get('status'):
                             appnt.status = data.get('status')
@@ -2531,6 +2556,7 @@ class OfflineCustomerViewSet(viewsets.GenericViewSet):
                             patient_data['sms_list']['appointment'] = appnt
                             patient_data['sms_list']['action_cancel'] = action_cancel
                             patient_data['sms_list']['action_reschedule'] = action_reschedule
+                            patient_data['sms_list']['action_complete'] = action_complete
                         ret_obj = {}
                         ret_obj['id'] = appnt.id
                         ret_obj['patient_id'] = appnt.user.id
@@ -2719,10 +2745,13 @@ class OfflineCustomerViewSet(viewsets.GenericViewSet):
                 patient_profile = OfflinePatientSerializer(app.user).data
                 is_docprime = False
                 patient_name = app.user.name if hasattr(app.user, 'name') else None
+                patient_profile['phone_number'] = None
                 if hasattr(app.user, 'patient_mobiles'):
                     for mob in app.user.patient_mobiles.all():
                         phone_number.append({"phone_number": mob.phone_number, "is_default": mob.is_default})
-                patient_profile['phone_numbers'] = phone_number
+                        if mob.is_default:
+                            patient_profile['phone_number'] = mob.phone_number
+                patient_profile['patient_numbers'] = phone_number
                 error_flag = app.error if app.error else False
                 error_message = app.error_message if app.error_message else ''
             else:
@@ -2885,12 +2914,13 @@ class AppointmentMessageViewset(viewsets.GenericViewSet):
         if data.get('type') == serializers.AppointmentMessageSerializer.REMINDER:
             if phone_number:
                 try:
+                    time = aware_time_zone(appnt.time_slot_start)
                     notification_tasks.send_appointment_reminder_message.apply_async(
                         kwargs={'number': phone_number,
                                 'patient_name': patient_name,
                                 'doctor': appnt.doctor.name,
                                 'hospital_name': appnt.hospital.name,
-                                'date': appnt.time_slot_start.strftime("%B %d, %Y %H:%M")},
+                                'date': time.strftime("%B %d, %Y %H:%M")},
                         countdown=1)
 
                 except Exception as e:

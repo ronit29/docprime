@@ -20,8 +20,8 @@ from ondoc.authentication import models as auth_model
 from ondoc.authentication.models import SPOCDetails
 from ondoc.location import models as location_models
 from ondoc.account.models import Order, ConsumerAccount, ConsumerTransaction, PgTransaction, ConsumerRefund, \
-    MerchantPayout, UserReferred, Invoice
-from ondoc.notification.models import NotificationAction
+    MerchantPayout, UserReferred, MoneyPool, Invoice
+from ondoc.notification.models import NotificationAction, EmailNotification
 from ondoc.payout.models import Outstanding
 from ondoc.coupon.models import Coupon
 from ondoc.doctor.tasks import doc_app_auto_cancel
@@ -32,7 +32,7 @@ from ondoc.notification import models as notification_models
 from ondoc.notification import tasks as notification_tasks
 from django.contrib.contenttypes.fields import GenericRelation
 from ondoc.api.v1.utils import get_start_end_datetime, custom_form_datetime, CouponsMixin, aware_time_zone, \
-    util_absolute_url, html_to_pdf
+    form_time_slot, util_absolute_url, html_to_pdf
 from ondoc.common.models import AppointmentHistory
 from functools import reduce
 from operator import or_
@@ -132,6 +132,20 @@ class Hospital(auth_model.TimeStampedModel, auth_model.CreatedByModel, auth_mode
     NETWORK_HOSPITAL = 2
     NETWORK_CHOICES = [("", "Select"), (NON_NETWORK_HOSPITAL, "Non Network Hospital"), (NETWORK_HOSPITAL, "Network Hospital")]
     HOSPITAL_TYPE_CHOICES = (("", "Select"), (PRIVATE, 'Private'), (CLINIC, "Clinic"), (HOSPITAL, "Hospital"),)
+    INCORRECT_CONTACT_DETAILS = 1
+    MOU_AGREEMENT_NEEDED = 2
+    HOSPITAL_NOT_INTERESTED = 3
+    CHARGES_ISSUES = 4
+    DUPLICATE = 5
+    OTHERS = 9
+    WELCOME_CALLING = 1
+    ESCALATION = 2
+    DISABLED_REASONS_CHOICES = (
+        ("", "Select"), (INCORRECT_CONTACT_DETAILS, "Incorrect contact details"),
+        (MOU_AGREEMENT_NEEDED, "MoU agreement needed"), (HOSPITAL_NOT_INTERESTED, "Hospital not interested for tie-up"),
+        (CHARGES_ISSUES, "Issue in discount % / consultation charges"),
+        (DUPLICATE, "Duplicate"), (OTHERS, "Others (please specify)"))
+    DISABLED_AFTER_CHOICES = (("", "Select"), (WELCOME_CALLING, "Welcome Calling"), (ESCALATION, "Escalation"))
     name = models.CharField(max_length=200)
     location = models.PointField(geography=True, srid=4326, blank=True, null=True)
     location_error = models.PositiveIntegerField(blank=True, null=True)
@@ -164,7 +178,16 @@ class Hospital(auth_model.TimeStampedModel, auth_model.CreatedByModel, auth_mode
     enabled_for_online_booking = models.BooleanField(verbose_name='enabled_for_online_booking?', default=True)
     merchant = GenericRelation(auth_model.AssociatedMerchant)
     merchant_payout = GenericRelation(MerchantPayout)
-    pyhsical_aggrement_signed = models.BooleanField(default=False)
+    welcome_calling_done = models.BooleanField(default=False)
+    welcome_calling_done_at = models.DateTimeField(null=True, blank=True)
+    physical_agreement_signed = models.BooleanField(default=False)
+    physical_agreement_signed_at = models.DateTimeField(null=True, blank=True)
+    disabled_at = models.DateTimeField(null=True, blank=True)
+    disabled_after = models.PositiveIntegerField(null=True, blank=True, choices=DISABLED_AFTER_CHOICES)
+    disable_reason = models.PositiveIntegerField(null=True, blank=True, choices=DISABLED_REASONS_CHOICES)
+    disable_comments = models.CharField(max_length=500, blank=True)
+    disabled_by = models.ForeignKey(settings.AUTH_USER_MODEL, related_name="disabled_hospitals", null=True, editable=False,
+                                    on_delete=models.SET_NULL)
 
     def __str__(self):
         return self.name
@@ -210,32 +233,43 @@ class Hospital(auth_model.TimeStampedModel, auth_model.CreatedByModel, auth_mode
         return ", ".join(address_items)
 
     def update_live_status(self):
-
         if not self.is_live and ( self.data_status == self.QC_APPROVED and self.enabled == True):
-
             self.is_live = True
             if not self.live_at:
                 self.live_at = datetime.datetime.now()
         if self.is_live and (self.data_status != self.QC_APPROVED or self.enabled == False):
             self.is_live = False
 
+    def update_time_stamps(self):
+        if self.welcome_calling_done and not self.welcome_calling_done_at:
+            self.welcome_calling_done_at = timezone.now()
+        elif not self.welcome_calling_done and self.welcome_calling_done_at:
+            self.welcome_calling_done_at = None
+
+        if self.physical_agreement_signed and not self.physical_agreement_signed_at:
+            self.physical_agreement_signed_at = timezone.now()
+        elif not self.physical_agreement_signed and self.physical_agreement_signed_at:
+            self.physical_agreement_signed_at = None
+
+        if not self.enabled and not self.disabled_at:
+            self.disabled_at = timezone.now()
+        elif self.enabled and self.disabled_at:
+            self.disabled_at = None
 
     def save(self, *args, **kwargs):
+        self.update_time_stamps()
         self.update_live_status()
         # build_url = True
         # if self.is_live and self.id and self.location:
         #     if Hospital.objects.filter(location__distance_lte=(self.location, 0), id=self.id).exists():
         #         build_url = False
-
         super(Hospital, self).save(*args, **kwargs)
-
         if self.is_appointment_manager:
             auth_model.GenericAdmin.objects.filter(hospital=self, entity_type=auth_model.GenericAdmin.DOCTOR, permission_type=auth_model.GenericAdmin.APPOINTMENT)\
                 .update(is_disabled=True)
         else:
             auth_model.GenericAdmin.objects.filter(hospital=self, entity_type=auth_model.GenericAdmin.DOCTOR, permission_type=auth_model.GenericAdmin.APPOINTMENT)\
                 .update(is_disabled=False)
-
         # if build_url and self.location and self.is_live:
         #     ea = location_models.EntityLocationRelationship.create(latitude=self.location.y, longitude=self.location.x, content_object=self)
 
@@ -334,6 +368,23 @@ class Doctor(auth_model.TimeStampedModel, auth_model.QCModel, SearchKey):
     ONBOARDING_STATUS = [(NOT_ONBOARDED, "Not Onboarded"), (REQUEST_SENT, "Onboarding Request Sent"),
                          (ONBOARDED, "Onboarded")]
     GENDER_CHOICES = [("", "Select"), ("m", "Male"), ("f", "Female"), ("o", "Other")]
+    DOCTOR_NOT_ASSOCIATED = 1
+    DOCTOR_ONLY_FOR_IPD_SERVICES = 2
+    DOCTOR_AVAILABLE_ON_CALL = 3
+    INCORRECT_CONTACT_DETAILS = 4
+    MOU_AGREEMENT_NEEDED = 5
+    DOCTOR_NOT_INTERESTED_FOR_TIE_UP = 6
+    CHARGES_ISSUES = 7
+    DUPLICATE = 8
+    OTHERS = 9
+    DISABLE_REASON_CHOICES = (
+        ("", "Select"), (DOCTOR_NOT_ASSOCIATED, "Doctor not associated with the hospital anymore"),
+        (DOCTOR_ONLY_FOR_IPD_SERVICES, "Doctor only for IPD services"),
+        (DOCTOR_AVAILABLE_ON_CALL, "Doctor available only On-Call"),
+        (INCORRECT_CONTACT_DETAILS, "Incorrect contact details"), (MOU_AGREEMENT_NEEDED, "MoU agreement needed"),
+        (DOCTOR_NOT_INTERESTED_FOR_TIE_UP, "Doctor not interested for tie-up"),
+        (CHARGES_ISSUES, "Issue in discount % / consultation charges"),
+        (DUPLICATE, "Duplicate"), (OTHERS, "Others (please specify)"))
     name = models.CharField(max_length=200)
     gender = models.CharField(max_length=2, default=None, blank=True, null=True,
                               choices=GENDER_CHOICES)
@@ -386,6 +437,12 @@ class Doctor(auth_model.TimeStampedModel, auth_model.QCModel, SearchKey):
     merchant = GenericRelation(auth_model.AssociatedMerchant)
     merchant_payout = GenericRelation(MerchantPayout)
     search_score = models.FloatField(default=0, null=True, editable=False)
+    disabled_at = models.DateTimeField(null=True, blank=True)
+    disabled_after = models.PositiveIntegerField(null=True, blank=True, choices=Hospital.DISABLED_AFTER_CHOICES)
+    disable_reason = models.PositiveIntegerField(null=True, blank=True, choices=DISABLE_REASON_CHOICES)
+    disable_comments = models.CharField(max_length=500, blank=True)
+    disabled_by = models.ForeignKey(settings.AUTH_USER_MODEL, related_name="disabled_doctors", null=True, editable=False,
+                                   on_delete=models.SET_NULL)
 
     def __str__(self):
         return '{} ({})'.format(self.name, self.id)
@@ -459,7 +516,14 @@ class Doctor(auth_model.TimeStampedModel, auth_model.QCModel, SearchKey):
         if not self.onboarding_status == self.ONBOARDED:
             self.enabled_for_online_booking = False
 
+    def update_time_stamps(self):
+        if not self.enabled and not self.disabled_at:
+            self.disabled_at = timezone.now()
+        elif self.enabled and self.disabled_at:
+            self.disabled_at = None
+
     def save(self, *args, **kwargs):
+        self.update_time_stamps()
         self.update_live_status()
 
         # On every update of onboarding status or Qcstatus push to matrix
@@ -1221,6 +1285,8 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
 
     merchant_payout = models.ForeignKey(MerchantPayout, related_name="opd_appointment", on_delete=models.SET_NULL, null=True)
     price_data = JSONField(blank=True, null=True)
+    money_pool = models.ForeignKey(MoneyPool, on_delete=models.SET_NULL, null=True)
+    email_notification = GenericRelation(EmailNotification, related_name="enotification")
 
     def __str__(self):
         return self.profile.name + " (" + self.doctor.name + ")"
@@ -1248,12 +1314,23 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
     def get_invoice_objects(self):
         return Invoice.objects.filter(reference_id=self.id, product_id=Order.DOCTOR_PRODUCT_ID)
 
+    def get_cancellation_reason(self):
+        return CancellationReason.objects.filter(Q(type=Order.DOCTOR_PRODUCT_ID) | Q(type__isnull=True),
+                                                 visible_on_front_end=True)
+
+    def get_serialized_cancellation_reason(self):
+        res = []
+        for cr in self.get_cancellation_reason():
+            res.append({'id': cr.id, 'name': cr.name, 'is_comment_needed': cr.is_comment_needed})
+        return res
+
     def get_invoice_urls(self):
         invoices_urls = []
         if self.id:
             invoices = self.get_invoice_objects()
             for invoice in invoices:
-                invoices_urls.append(util_absolute_url(invoice.file.url))
+                if invoice.file:
+                    invoices_urls.append(util_absolute_url(invoice.file.url))
         return invoices_urls
 
     @classmethod
@@ -1312,12 +1389,24 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
             product_id = Order.DOCTOR_PRODUCT_ID
             if self.payment_type == self.PREPAID and ConsumerTransaction.valid_appointment_for_cancellation(self.id,
                                                                                                             product_id):
-                cancel_amount = self.effective_price
-                consumer_account.credit_cancellation(self, product_id, cancel_amount)
+                wallet_refund, cashback_refund = self.get_cancellation_breakup()
+                consumer_account.credit_cancellation(self, product_id, wallet_refund, cashback_refund)
 
                 if refund_flag:
                     ctx_obj = consumer_account.debit_refund()
                     ConsumerRefund.initiate_refund(self.user, ctx_obj)
+
+    def get_cancellation_breakup(self):
+        wallet_refund = cashback_refund = 0
+        if self.money_pool:
+            wallet_refund, cashback_refund = self.money_pool.get_refund_breakup(self.effective_price)
+        elif self.price_data:
+            wallet_refund = self.price_data["wallet_amount"]
+            cashback_refund = self.price_data["cashback_amount"]
+        else:
+            wallet_refund = self.effective_price
+
+        return wallet_refund, cashback_refund
 
     def action_completed(self):
         self.status = self.COMPLETED
@@ -1417,7 +1506,6 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
         # except Exception as e:
         #     logger.error("Error in auto cancel flow - " + str(e))
         print('all ops tasks completed')
-
 
     def save(self, *args, **kwargs):
         logger.warning("opd save started - " + str(self.id) + " timezone - " + str(timezone.now()))
@@ -1616,6 +1704,122 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
                 return merchant.merchant
         return None
 
+    @classmethod
+    def get_price_details(cls, data):
+
+        procedures = data.get('procedure_ids', [])
+        selected_hospital = data.get('hospital')
+        doctor = data.get('doctor')
+        time_slot_start = form_time_slot(data.get("start_date"), data.get("start_time"))
+
+        doctor_clinic_timing = DoctorClinicTiming.objects.filter(
+            doctor_clinic__doctor=data.get('doctor'),
+            doctor_clinic__hospital=data.get('hospital'),
+            doctor_clinic__doctor__is_live=True, doctor_clinic__hospital__is_live=True,
+            day=time_slot_start.weekday(), start__lte=data.get("start_time"),
+            end__gte=data.get("start_time")).first()
+
+        effective_price = 0
+        if not procedures:
+            if data.get("payment_type") == cls.INSURANCE:
+                effective_price = doctor_clinic_timing.deal_price
+            elif data.get("payment_type") in [cls.COD, cls.PREPAID]:
+                coupon_discount, coupon_cashback, coupon_list = Coupon.get_total_deduction(data,
+                                                                                           doctor_clinic_timing.deal_price)
+                if coupon_discount >= doctor_clinic_timing.deal_price:
+                    effective_price = 0
+                else:
+                    effective_price = doctor_clinic_timing.deal_price - coupon_discount
+            deal_price = doctor_clinic_timing.deal_price
+            mrp = doctor_clinic_timing.mrp
+            fees = doctor_clinic_timing.fees
+        else:
+            total_deal_price, total_agreed_price, total_mrp = cls.get_procedure_prices(procedures, doctor,
+                                                                                        selected_hospital,
+                                                                                        doctor_clinic_timing)
+            if data.get("payment_type") == cls.INSURANCE:
+                effective_price = total_deal_price
+            elif data.get("payment_type") in [cls.COD, cls.PREPAID]:
+                coupon_discount, coupon_cashback, coupon_list = Coupon.get_total_deduction(data, total_deal_price)
+                if coupon_discount >= total_deal_price:
+                    effective_price = 0
+                else:
+                    effective_price = total_deal_price - coupon_discount
+
+            deal_price = total_deal_price
+            mrp = total_mrp
+            fees = total_agreed_price
+
+        return {
+            "deal_price": deal_price,
+            "mrp": mrp,
+            "fees": fees,
+            "effective_price": effective_price,
+            "coupon_discount": coupon_discount,
+            "coupon_cashback": coupon_cashback,
+            "coupon_list": coupon_list,
+            "consultation" : {
+                "deal_price": doctor_clinic_timing.deal_price,
+                "mrp": doctor_clinic_timing.mrp
+            }
+        }
+
+    @classmethod
+    def create_fulfillment_data(cls, user, data, price_data):
+        procedures = data.get('procedure_ids', [])
+        selected_hospital = data.get('hospital')
+        doctor = data.get('doctor')
+        time_slot_start = form_time_slot(data.get("start_date"), data.get("start_time"))
+        profile_model = data.get("profile")
+        profile_detail = {
+            "name": profile_model.name,
+            "gender": profile_model.gender,
+            "dob": str(profile_model.dob)
+        }
+
+        extra_details = []
+        doctor_clinic = doctor.doctor_clinics.filter(hospital=selected_hospital).first()
+        doctor_clinic_procedures = doctor_clinic.doctorclinicprocedure_set.filter(procedure__in=procedures).order_by(
+            'procedure_id')
+        for doctor_clinic_procedure in doctor_clinic_procedures:
+            temp_extra = {'procedure_id': doctor_clinic_procedure.procedure.id,
+                          'procedure_name': doctor_clinic_procedure.procedure.name,
+                          'deal_price': doctor_clinic_procedure.deal_price,
+                          'agreed_price': doctor_clinic_procedure.agreed_price,
+                          'mrp': doctor_clinic_procedure.mrp}
+            extra_details.append(temp_extra)
+
+        return {
+            "doctor": data.get("doctor"),
+            "hospital": data.get("hospital"),
+            "profile": data.get("profile"),
+            "profile_detail": profile_detail,
+            "user": user,
+            "booked_by": user,
+            "fees": price_data.get("fees"),
+            "deal_price": price_data.get("deal_price"),
+            "effective_price": price_data.get("effective_price"),
+            "mrp": price_data.get("mrp"),
+            "extra_details": extra_details,
+            "time_slot_start": time_slot_start,
+            "payment_type": data.get("payment_type"),
+            "coupon": price_data.get("coupon_list"),
+            "discount": int(price_data.get("coupon_discount")),
+            "cashback": int(price_data.get("coupon_cashback"))
+        }
+
+    @staticmethod
+    def get_procedure_prices(procedures, doctor, selected_hospital, dct):
+        doctor_clinic = doctor.doctor_clinics.filter(hospital=selected_hospital).first()
+        doctor_clinic_procedures = doctor_clinic.doctorclinicprocedure_set.filter(procedure__in=procedures).order_by(
+            'procedure_id')
+        total_deal_price, total_agreed_price, total_mrp = 0, 0, 0
+        for doctor_clinic_procedure in doctor_clinic_procedures:
+            total_agreed_price += doctor_clinic_procedure.agreed_price
+            total_deal_price += doctor_clinic_procedure.deal_price
+            total_mrp += doctor_clinic_procedure.mrp
+        return total_deal_price + dct.deal_price, total_agreed_price + dct.fees, total_mrp + dct.mrp
+
     class Meta:
         db_table = "opd_appointment"
 
@@ -1633,6 +1837,20 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
                                 }
             prescriptions.append(prescription_dict)
         return prescriptions
+
+    @classmethod
+    def can_book_for_free(cls, request, validated_data, cart_item=None):
+        from ondoc.cart.models import Cart
+
+        price_data = cls.get_price_details(validated_data)
+        if price_data["deal_price"] > 0:
+            return True
+
+        user = request.user
+        free_appointment_count = cls.objects.filter(user=user, deal_price=0).exclude(status__in=[cls.COMPLETED,cls.CANCELLED]).count()
+        free_cart_count = Cart.get_free_opd_item_count(request, cart_item)
+
+        return (free_appointment_count + free_cart_count) < cls.MAX_FREE_BOOKINGS_ALLOWED
 
 class OpdAppointmentProcedureMapping(models.Model):
     opd_appointment = models.ForeignKey(OpdAppointment, on_delete=models.CASCADE, related_name='procedure_mappings')
@@ -2011,6 +2229,7 @@ class CancellationReason(auth_model.TimeStampedModel):
     type = models.PositiveSmallIntegerField(default=None, null=True, blank=True, choices=TYPE_CHOICES)
     visible_on_front_end = models.BooleanField(default=True)
     visible_on_admin = models.BooleanField(default=True)
+    is_comment_needed = models.BooleanField(default=False)
 
     class Meta:
         db_table = 'cancellation_reason'
@@ -2120,7 +2339,7 @@ class OfflineOPDAppointments(auth_model.TimeStampedModel):
         try:
             default_text = '''Dear %s, your appointment has been confirmed with %s at %s on %s.''' % (
                 sms_obj['name'], sms_obj['appointment'].doctor.get_display_name(), sms_obj['appointment'].hospital.name,
-                sms_obj['appointment'].time_slot_start.strftime("%B %d, %Y %H:%M"))
+                sms_obj['appointment'].time_slot_start.strftime("%B %d, %Y %I:%M %p"))
             notification_tasks.send_offline_appointment_message.apply_async(
                 kwargs={'number': sms_obj['phone_number'], 'text': default_text, 'type': 'Appointment ADD'},
                 countdown=1)
@@ -2130,24 +2349,33 @@ class OfflineOPDAppointments(auth_model.TimeStampedModel):
     @staticmethod
     def appointment_cancel_sms(sms_obj):
         try:
-            default_text = '''Dear %s, your appointment with %s at %s for %s has been cancelled. 
-                              In case of any query, please reach out to the clinic.''' % (
+            default_text = "Dear %s, your appointment with %s at %s for %s has been cancelled. In case of any query, please reach out to the clinic." % (
                               sms_obj['name'], sms_obj['old_appointment'].doctor.get_display_name(), sms_obj['old_appointment'].hospital.name,
-                              sms_obj['old_appointment'].time_slot_start.strftime("%B %d, %Y %H:%M"))
+                              sms_obj['old_appointment'].time_slot_start.strftime("%B %d, %Y %I:%M %p"))
             notification_tasks.send_offline_appointment_message.apply_async(
                 kwargs={'number': sms_obj['phone_number'], 'text': default_text, 'type': 'Appointment CANCEL'},
                 countdown=1)
         except Exception as e:
             logger.error("Failed to Push Offline Appointment Cancel Message SMS Task " + str(e))
 
+    @staticmethod
+    def appointment_complete_sms(sms_obj):
+        try:
+            default_text = "Dear %s, your appointment with %s at %s is complete. In case of any query, please reach out to the %s." % \
+                           (sms_obj['name'], sms_obj['appointment'].doctor.get_display_name(),
+                            sms_obj['appointment'].hospital.name, sms_obj['appointment'].hospital.name)
+            notification_tasks.send_offline_appointment_message.apply_async(
+                kwargs={'number': sms_obj['phone_number'], 'text': default_text, 'type': 'Appointment COMPLETE'},
+                countdown=1)
+        except Exception as e:
+            logger.error("Failed to Push Offline Appointment Cancel Message SMS Task " + str(e))
 
     @staticmethod
     def appointment_reschedule_sms(sms_obj):
         try:
-            default_text = '''Dear %s, your appointment with %s at %s has been rescheduled to %s. 
-                              In case of any query, please reach out to the clinic..''' % (
+            default_text = "Dear %s, your appointment with %s at %s has been rescheduled to %s. In case of any query, please reach out to the clinic." % (
                               sms_obj['name'], sms_obj['appointment'].doctor.get_display_name(), sms_obj['appointment'].hospital.name,
-                              sms_obj['appointment'].time_slot_start.strftime("%B %d, %Y %H:%M"))
+                              sms_obj['appointment'].time_slot_start.strftime("%B %d, %Y %I:%M %p"))
             notification_tasks.send_offline_appointment_message.apply_async(
                 kwargs={'number': sms_obj['phone_number'], 'text': default_text, 'type': 'Appointment RESCHEDULE'},
                 countdown=1)
@@ -2166,7 +2394,9 @@ class OfflineOPDAppointments(auth_model.TimeStampedModel):
     def after_commit_update_sms(sms_list):
         for sms_obj in sms_list:
             if sms_obj:
-                if sms_obj.get('action_cancel') and sms_obj['action_cancel']:
+                if sms_obj.get('action_complete') and sms_obj['action_complete']:
+                    OfflineOPDAppointments.appointment_complete_sms(sms_obj)
+                elif sms_obj.get('action_cancel') and sms_obj['action_cancel']:
                     OfflineOPDAppointments.appointment_cancel_sms(sms_obj)
                     OfflineOPDAppointments.appointment_add_sms(sms_obj)
                 elif sms_obj.get('action_reschedule') and sms_obj['action_reschedule']:

@@ -20,7 +20,7 @@ from rest_framework.authtoken.models import Token
 from django.db.models import F, Sum, Max, Q, Prefetch, Case, When, Count
 from django.forms.models import model_to_dict
 
-from ondoc.common.models import UserConfig
+from ondoc.common.models import UserConfig, PaymentOptions
 from ondoc.coupon.models import UserSpecificCoupon, Coupon
 from ondoc.lead.models import UserLead
 from ondoc.sms.api import send_otp
@@ -479,7 +479,7 @@ class UserAppointmentsViewSet(OndocViewSet):
             else:
                 combined_data.extend(v)
         combined_data.extend(status_six_data)
-        combined_data = combined_data[:80]
+        combined_data = combined_data[:200]
         return Response(combined_data)
 
     @transaction.non_atomic_requests
@@ -553,6 +553,8 @@ class UserAppointmentsViewSet(OndocViewSet):
         if validated_data.get('status'):
             if validated_data['status'] == LabAppointment.CANCELLED:
                 lab_appointment.cancellation_type = LabAppointment.PATIENT_CANCELLED
+                lab_appointment.cancellation_reason = validated_data.get('cancellation_reason', None)
+                lab_appointment.cancellation_comments = validated_data.get('cancellation_comment', '')
                 lab_appointment.action_cancelled(request.data.get('refund', 1))
                 resp = LabAppointmentRetrieveSerializer(lab_appointment, context={"request": request}).data
             elif validated_data.get('status') == LabAppointment.RESCHEDULED_PATIENT:
@@ -622,6 +624,8 @@ class UserAppointmentsViewSet(OndocViewSet):
             if validated_data['status'] == OpdAppointment.CANCELLED:
                 logger.warning("Starting to cancel for id - " + str(opd_appointment.id) + " timezone - " + str(timezone.now()))
                 opd_appointment.cancellation_type = OpdAppointment.PATIENT_CANCELLED
+                opd_appointment.cancellation_reason = validated_data.get('cancellation_reason', None)
+                opd_appointment.cancellation_comments = validated_data.get('cancellation_comment', '')
                 opd_appointment.action_cancelled(request.data.get("refund", 1))
                 logger.warning(
                     "Ending for id - " + str(opd_appointment.id) + " timezone - " + str(timezone.now()))
@@ -813,7 +817,8 @@ class UserAppointmentsViewSet(OndocViewSet):
 
     def lab_appointment_list(self, request, params):
         user = request.user
-        queryset = LabAppointment.objects.select_related('lab').filter(user=user)
+        queryset = LabAppointment.objects.select_related('lab', 'profile', 'user')\
+                                        .prefetch_related('lab__lab_image', 'lab__lab_documents', 'reports').filter(user=user)
         if queryset and params.get('profile_id'):
             queryset = queryset.filter(profile=params['profile_id'])
         range = params.get('range')
@@ -822,13 +827,13 @@ class UserAppointmentsViewSet(OndocViewSet):
                                        status__in=LabAppointment.ACTIVE_APPOINTMENT_STATUS).order_by('time_slot_start')
         else:
             queryset = queryset.order_by('-time_slot_start')
-        queryset = paginate_queryset(queryset, request, 40)
+        queryset = paginate_queryset(queryset, request, 100)
         serializer = LabAppointmentModelSerializer(queryset, many=True, context={"request": request})
         return serializer
 
     def doctor_appointment_list(self, request, params):
         user = request.user
-        queryset = OpdAppointment.objects.filter(user=user)
+        queryset = OpdAppointment.objects.select_related('profile', 'doctor', 'hospital', 'user').prefetch_related('doctor__images').filter(user=user)
 
         if not queryset:
             return Response([])
@@ -857,7 +862,7 @@ class UserAppointmentsViewSet(OndocViewSet):
         else:
             queryset = queryset.order_by('-time_slot_start')
 
-        queryset = paginate_queryset(queryset, request, 40)
+        queryset = paginate_queryset(queryset, request, 100)
         serializer = OpdAppointmentSerializer(queryset, many=True,context={"request": request})
         return serializer
 
@@ -1002,12 +1007,11 @@ class TransactionViewSet(viewsets.GenericViewSet):
 
     @transaction.atomic
     def save(self, request):
+        ERROR_REDIRECT_URL = settings.BASE_URL + "/cart?error_code=1&error_message=%s"
+        REDIRECT_URL = ERROR_REDIRECT_URL % "Error processing payment, please try again."
+        SUCCESS_REDIRECT_URL = settings.BASE_URL + "/order/summary/%s"
         LAB_REDIRECT_URL = settings.BASE_URL + "/lab/appointment"
         OPD_REDIRECT_URL = settings.BASE_URL + "/opd/appointment"
-        LAB_FAILURE_REDIRECT_URL = settings.BASE_URL + "/lab/%s/book?error_code=%s"
-        OPD_FAILURE_REDIRECT_URL = settings.BASE_URL + "/opd/doctor/%s/%s/bookdetails?error_code=%s"
-        ERROR_REDIRECT_URL = settings.BASE_URL + "/error?error_code=%s"
-        REDIRECT_URL = ERROR_REDIRECT_URL % ErrorCodeMapping.IVALID_APPOINTMENT_ORDER
 
         try:
             response = None
@@ -1025,7 +1029,8 @@ class TransactionViewSet(viewsets.GenericViewSet):
 
             # For testing only
             # response = request.data
-            appointment_obj = None
+            success_in_process = False
+            processed_data = {}
 
             try:
                 pg_resp_code = int(response.get('statusCode'))
@@ -1033,7 +1038,7 @@ class TransactionViewSet(viewsets.GenericViewSet):
                 logger.error("ValueError : statusCode is not type integer")
                 pg_resp_code = None
 
-            order_obj = Order.objects.select_for_update().filter(pk=response.get("orderId"), reference_id__isnull=True).first()
+            order_obj = Order.objects.select_for_update().filter(pk=response.get("orderId")).first()
             if pg_resp_code == 1 and order_obj:
                 response_data = None
                 resp_serializer = serializers.TransactionSerializer(data=response)
@@ -1048,58 +1053,29 @@ class TransactionViewSet(viewsets.GenericViewSet):
 
                         try:
                             if pg_tx_queryset:
-                                appointment_obj = order_obj.process_order()
+                                processed_data = order_obj.process_pg_order()
+                                success_in_process = True
                         except Exception as e:
-                            logger.error("Error in building appointment - " + str(e))
+                            logger.error("Error in processing order - " + str(e))
                 else:
                     logger.error("Invalid pg data - " + json.dumps(resp_serializer.errors))
+            elif order_obj:
+                try:
+                    order_obj.change_payment_status(Order.PAYMENT_FAILURE)
+                    self.send_failure_ops_email(order_obj)
+                except Exception as e:
+                    logger.error("Error sending payment failure email - " + str(e))
 
+            if success_in_process:
+                if processed_data.get("type") == "all":
+                    REDIRECT_URL = (SUCCESS_REDIRECT_URL % order_obj.id) + "?payment_success=true"
+                elif processed_data.get("type") == "doctor":
+                    REDIRECT_URL = OPD_REDIRECT_URL + "/" + str(processed_data.get("id","")) + "?payment_success=true"
+                elif processed_data.get("type") == "lab":
+                    REDIRECT_URL = LAB_REDIRECT_URL + "/" + str(processed_data.get("id","")) + "?payment_success=true"
 
-                if order_obj.product_id == account_models.Order.LAB_PRODUCT_ID:
-                    if appointment_obj:
-                        REDIRECT_URL = LAB_REDIRECT_URL + "/" + str(appointment_obj.id) + "?payment_success=true"
-                    elif order_obj:
-                        REDIRECT_URL = LAB_FAILURE_REDIRECT_URL % (
-                            order_obj.action_data.get("lab"), response.get('statusCode'))
-                elif order_obj.product_id == account_models.Order.DOCTOR_PRODUCT_ID:
-                    if appointment_obj:
-                        REDIRECT_URL = OPD_REDIRECT_URL + "/" + str(appointment_obj.id) + "?payment_success=true"
-                    elif order_obj:
-                        REDIRECT_URL = OPD_FAILURE_REDIRECT_URL % (order_obj.action_data.get("doctor"),
-                                                                   order_obj.action_data.get("hospital"),
-                                                                   response.get('statusCode'))
-            else:
-                if not order_obj:
-                    REDIRECT_URL = ERROR_REDIRECT_URL % ErrorCodeMapping.IVALID_APPOINTMENT_ORDER
-                else:
-                    if order_obj.product_id == account_models.Order.LAB_PRODUCT_ID:
-                        REDIRECT_URL = LAB_FAILURE_REDIRECT_URL % (
-                        order_obj.action_data.get("lab"), response.get('statusCode'))
-                    elif order_obj.product_id == account_models.Order.DOCTOR_PRODUCT_ID:
-                        REDIRECT_URL = OPD_FAILURE_REDIRECT_URL % (order_obj.action_data.get("doctor"),
-                                                                   order_obj.action_data.get("hospital"),
-                                                                   response.get('statusCode'))
         except Exception as e:
             logger.error("Error - " + str(e))
-
-        try:
-            # log redirects
-            log_data = { "url" : REDIRECT_URL }
-            if order_obj:
-                log_data["product_id"] = order_obj.product_id
-                log_data["order_id"] = order_obj.id
-            if appointment_obj:
-                log_data["appointment_id"] = appointment_obj.id
-            log_data['referer_data'] = { 'HTTP_USER_AGENT' : request.META['HTTP_USER_AGENT'], 'HTTP_HOST' : request.META['HTTP_HOST'] }
-            if request.user:
-                log_data['user'] = request.user.id
-            if hasattr(request, 'agent'):
-                log_data['is_agent'] = True
-            if response:
-                log_data['pg_data'] = response
-            OrderLog.objects.create(**log_data)
-        except Exception as e:
-            logger.error("Error in logging Order - " + str(e))
 
         try:
             if response and response.get("orderNo"):
@@ -1115,7 +1091,8 @@ class TransactionViewSet(viewsets.GenericViewSet):
 
     def form_pg_transaction_data(self, response, order_obj):
         data = dict()
-        user = get_object_or_404(User, pk=order_obj.action_data.get("user"))
+        user_id = order_obj.get_user_id()
+        user = get_object_or_404(User, pk=user_id)
         data['user'] = user
         data['product_id'] = order_obj.product_id
         data['order_no'] = response.get('orderNo')
@@ -1164,6 +1141,13 @@ class TransactionViewSet(viewsets.GenericViewSet):
 
         return amount, obj
 
+    def send_failure_ops_email(self, order_obj):
+        html_body = "Payment failed for user with " \
+                    "user id - {} and phone number - {}" \
+                    ", order id - {}.".format(order_obj.user.id, order_obj.user.phone_number, order_obj.id)
+
+        for email in settings.OPS_EMAIL_ID:
+            EmailNotification.publish_ops_email(email, html_body, 'Payment failure for order')
 
 class UserTransactionViewSet(viewsets.GenericViewSet):
     serializer_class = serializers.UserTransactionModelSerializer
@@ -1544,15 +1528,26 @@ class OrderViewSet(GenericViewSet):
     @transaction.non_atomic_requests
     def retrieve(self, request, pk):
         user = request.user
-        order_obj = Order.objects.filter(pk=pk, payment_status=Order.PAYMENT_PENDING, action_data__user=user.id).first()
+        params = request.query_params
+        from_app = params.get("from_app", False)
+        order_obj = Order.objects.filter(pk=pk, payment_status=Order.PAYMENT_PENDING).first()
+        if not order_obj.validate_user(user):
+            return Response({"status": 0}, status.HTTP_404_NOT_FOUND)
+
         resp = dict()
         resp["status"] = 0
 
         if not order_obj:
             return Response(resp)
 
+        # remove all cart_items => Workaround TODO: remove later
+        if from_app:
+            from ondoc.cart.models import Cart
+            Cart.remove_all(user)
+
         resp["status"] = 1
         resp['data'], resp["payment_required"] = utils.payment_details(request, order_obj)
+        resp['payment_options'] = PaymentOptions.filtered_payment_option(order_obj)
         return Response(resp)
 
 
@@ -1630,19 +1625,18 @@ class SendBookingUrlViewSet(GenericViewSet):
     authentication_classes = (JWTAuthentication,)
     permission_classes = (IsAuthenticated, )
 
-    def send_booking_url(self, request, order_id):
+    def send_booking_url(self, request):
         type = request.data.get('type')
-        agent_token = AgentToken.objects.create_token(user=request.user, order_id=order_id)
-        order = Order.objects.filter(pk=order_id).first()
-        if not order:
-            return Response({"status": 1})
-        profile_id = order.action_data.get('profile')
-        user_profile = UserProfile.objects.filter(pk=profile_id).first()
+        agent_token = AgentToken.objects.create_token(user=request.user)
+        user_profile = None
+
+        if request.user.is_authenticated:
+            user_profile = request.user.get_default_profile()
         if not user_profile:
             return Response({"status": 1})
-        booking_url = SmsNotification.send_booking_url(token=agent_token.token, order_id=order_id,
-                                                       phone_number=str(user_profile.phone_number))
-        EmailNotification.send_booking_url(token=agent_token.token, order_id=order_id, email=user_profile.email)
+
+        booking_url = SmsNotification.send_booking_url(token=agent_token.token, phone_number=str(user_profile.phone_number))
+        EmailNotification.send_booking_url(token=agent_token.token, email=user_profile.email)
 
         return Response({"status": 1})
 
@@ -1657,7 +1651,11 @@ class OrderDetailViewSet(GenericViewSet):
     def details(self, request, order_id):
         if not order_id:
             return Response(status=status.HTTP_400_BAD_REQUEST)
-        queryset = Order.objects.filter(id=order_id, action_data__user=request.user.id).first()
+
+        queryset = Order.objects.filter(id=order_id).first()
+        if not queryset.validate_user(request.user):
+            return Response({"status": 0}, status.HTTP_404_NOT_FOUND)
+
         if not queryset:
             return Response(status=status.HTTP_404_NOT_FOUND)
         resp = dict()
@@ -1680,6 +1678,42 @@ class OrderDetailViewSet(GenericViewSet):
             resp = serializer.data
 
         return Response(resp)
+
+    @transaction.non_atomic_requests
+    def summary(self, request, order_id):
+        from ondoc.api.v1.cart import serializers as cart_serializers
+
+        if not order_id:
+            return Response(status=status.HTTP_400_BAD_REQUEST)
+        order_data = Order.objects.filter(id=order_id).first()
+
+        if not order_data.validate_user(request.user):
+            return Response({"status": 0}, status.HTTP_404_NOT_FOUND)
+
+        if not order_data:
+            return Response(status=status.HTTP_404_NOT_FOUND)
+
+        processed_order_data = []
+        child_orders = order_data.orders.all()
+
+        class OrderCartItemMapper():
+            def __init__(self, order_obj):
+                self.data = order_obj.action_data
+                self.order = order_obj
+
+        for order in child_orders:
+            item = OrderCartItemMapper(order)
+            curr = {
+                "mrp" : order.action_data["mrp"] if "mrp" in order.action_data else order.action_data["agreed_price"],
+                "deal_price": order.action_data["deal_price"],
+                "effective_price": order.action_data["effective_price"],
+                "data" : cart_serializers.CartItemSerializer(item, context={"validated_data" : None}).data,
+                "booking_id" : order.reference_id,
+                "time_slot_start" : order.action_data["time_slot_start"]
+            }
+            processed_order_data.append(curr)
+
+        return Response({"data": processed_order_data})
 
 
 class UserTokenViewSet(GenericViewSet):

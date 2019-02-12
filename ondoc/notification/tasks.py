@@ -1,5 +1,6 @@
 from __future__ import absolute_import, unicode_literals
 
+import copy
 import datetime
 import json
 import math
@@ -224,7 +225,10 @@ def set_order_dummy_transaction(self, order_id, user_id):
         order_row = Order.objects.filter(id=order_id).first()
         user = User.objects.filter(id=user_id).first()
 
-        if order_row and user and order_row.reference_id:
+        if order_row and order_row.parent:
+            raise Exception("Cannot create dummy payout for a child order.")
+
+        if order_row and user:
             if order_row.getTransactions():
                 #print("dummy Transaction already set")
                 return
@@ -232,6 +236,8 @@ def set_order_dummy_transaction(self, order_id, user_id):
             appointment = order_row.getAppointment()
             if not appointment:
                 raise Exception("No Appointment found.")
+
+            total_price = order_row.get_total_price()
 
             token = settings.PG_DUMMY_TRANSACTION_TOKEN
             headers = {
@@ -249,9 +255,9 @@ def set_order_dummy_transaction(self, order_id, user_id):
                 "name": appointment.profile.name,
                 "txAmount": 0,
                 "couponCode": "",
-                "couponAmt": str(appointment.effective_price),
+                "couponAmt": str(total_price),
                 "paymentMode": "DC",
-                "AppointmentId": order_row.reference_id,
+                "AppointmentId": appointment.id,
                 "buCallbackSuccessUrl": "",
                 "buCallbackFailureUrl": ""
             }
@@ -266,9 +272,9 @@ def set_order_dummy_transaction(self, order_id, user_id):
                     tx_data['product_id'] = order_row.product_id
                     tx_data['order_no'] = resp_data.get('orderNo')
                     tx_data['order_id'] = order_row.id
-                    tx_data['reference_id'] = order_row.reference_id
+                    tx_data['reference_id'] = appointment.id
                     tx_data['type'] = DummyTransactions.CREDIT
-                    tx_data['amount'] = appointment.effective_price
+                    tx_data['amount'] = total_price
                     tx_data['payment_mode'] = "DC"
 
                     # tx_data['transaction_id'] = resp_data.get('orderNo')
@@ -329,9 +335,7 @@ def send_appointment_location_message(number, hospital_lat, hospital_long):
 @task()
 def process_payout(payout_id):
     from ondoc.account.models import MerchantPayout, Order
-    from ondoc.api.v1.utils import create_payout_checksum
     from ondoc.account.models import DummyTransactions
-
 
     try:
         if not payout_id:
@@ -340,6 +344,9 @@ def process_payout(payout_id):
         payout_data = MerchantPayout.objects.filter(id=payout_id).first()
         if not payout_data or payout_data.status == payout_data.PAID:
             raise Exception("Payment already done for this payout")
+
+
+        default_payment_mode = payout_data.get_default_payment_mode()
 
         appointment = payout_data.get_appointment()
         billed_to = payout_data.get_billed_to()
@@ -369,63 +376,80 @@ def process_payout(payout_id):
             raise Exception("No transactions found for given payout " + str(payout_data))
 
         req_data = { "payload" : [], "checkSum" : "" }
-
+        req_data2 = { "payload" : [], "checkSum" : "" }
 
         idx = 0
         for txn in all_txn:
-            transaction_amount = txn.amount
-
-            if isinstance(txn, DummyTransactions):
-                transaction_amount = 0
-
+            
             curr_txn = OrderedDict()
             curr_txn["idx"] = idx
             curr_txn["orderNo"] = txn.order_no
-            curr_txn["orderId"] = order_data.id
-            curr_txn["txnAmount"] = str(transaction_amount)
+            curr_txn["orderId"] = txn.order.id
+            curr_txn["txnAmount"] = str(txn.amount)
             curr_txn["settledAmount"] = str(payout_data.payable_amount)
             curr_txn["merchantCode"] = merchant.id
             if txn.transaction_id:
                 curr_txn["pgtxId"] = txn.transaction_id
             curr_txn["refNo"] = payout_data.payout_ref_id
             curr_txn["bookingId"] = appointment.id
+            curr_txn["paymentType"] = payout_data.payment_mode if payout_data.payment_mode else default_payment_mode
             req_data["payload"].append(curr_txn)
             idx += 1
+            if isinstance(txn, DummyTransactions) and txn.amount>0:
+                curr_txn2 = copy.deepcopy(curr_txn)
+                curr_txn2["txnAmount"] = str(0)
+                curr_txn2["idx"] = len(req_data2.get('payload'))
+                req_data2["payload"].append(curr_txn2)
 
-        req_data["checkSum"] = create_payout_checksum(req_data["payload"], order_data.product_id)
-        headers = {
-            "auth": settings.PG_REFUND_AUTH_TOKEN,
-            "Content-Type": "application/json"
-        }
-        url = settings.PG_SETTLEMENT_URL
+        payout_status = None
+        if len(req_data2.get('payload'))>0:
+            payout_status = request_payout(req_data2, order_data)
 
-        response = requests.post(url, data=json.dumps(req_data), headers=headers)
-        if response.status_code == status.HTTP_200_OK:
-            resp_data = response.json()
-            if resp_data.get("ok") is not None and resp_data.get("ok") == '1':
-                success_payout = False
-                result = resp_data.get('result')
-                if result:
-                    for res_txn in result:
-                        success_payout = res_txn['status'] == "SUCCESSFULLY_INSERTED"
+        if not payout_status or not payout_status.get('status'):
+            payout_status = request_payout(req_data, order_data)
 
-                if success_payout:
-                    payout_data.payout_time = datetime.datetime.now()
-                    payout_data.status = payout_data.PAID
-                    payout_data.api_response = json.dumps(resp_data)
-                    payout_data.save()
-                    #print("Payout processed")
-                    return
-                else:
-                    logger.error("payout failed for request data - " + str(req_data))                
+        if payout_status:
+            payout_data.api_response = payout_status.get("response")
+            if payout_status.get("status"):
+                payout_data.payout_time = datetime.datetime.now()
+                payout_data.status = payout_data.PAID
+            else:
+                payout_data.retry_count += 1
 
-        payout_data.retry_count += 1
-        payout_data.api_response = json.dumps(resp_data)
-        payout_data.save()
-        raise Exception("Retry on invalid Http response status - " + str(response.content))
+            payout_data.save()
+
 
     except Exception as e:
         logger.error("Error in processing payout - with exception - " + str(e))
+
+def request_payout(req_data, order_data):
+    from ondoc.api.v1.utils import create_payout_checksum
+
+    req_data["checkSum"] = create_payout_checksum(req_data["payload"], order_data.product_id)
+    headers = {
+        "auth": settings.PG_REFUND_AUTH_TOKEN,
+        "Content-Type": "application/json"
+    }
+    url = settings.PG_SETTLEMENT_URL
+    resp_data = None
+
+    response = requests.post(url, data=json.dumps(req_data), headers=headers)
+    resp_data = response.json()
+
+    if response.status_code == status.HTTP_200_OK:
+        if resp_data.get("ok") is not None and resp_data.get("ok") == '1':
+            success_payout = False
+            result = resp_data.get('result')
+            if result:
+                for res_txn in result:
+                    success_payout = res_txn['status'] == "SUCCESSFULLY_INSERTED"
+
+            if success_payout:
+                return {"status": 1, "response": resp_data}
+            
+    
+    logger.error("payout failed for request data - " + str(req_data))
+    return {"status" : 0, "response" : resp_data}
 
 @task()
 def opd_send_otp_before_appointment(appointment_id, previous_appointment_date_time):

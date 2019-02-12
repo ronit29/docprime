@@ -632,6 +632,7 @@ class DoctorEmailInline(nested_admin.NestedTabularInline):
 
 class DoctorForm(FormCleanMixin):
     additional_details = forms.CharField(widget=forms.Textarea, required=False)
+    disable_comments = forms.CharField(widget=forms.Textarea, required=False)
     raw_about = forms.CharField(widget=forms.Textarea, required=False)
     # primary_mobile = forms.CharField(required=True)
     # email = forms.EmailField(required=True)
@@ -673,6 +674,26 @@ class DoctorForm(FormCleanMixin):
         if data == '':
             return None
         return data
+
+    def clean(self):
+        super().clean()
+        if any(self.errors):
+            return
+        data = self.cleaned_data
+        is_enabled = data.get('enabled', None)
+        if is_enabled is None:
+            is_enabled = self.instance.enabled if self.instance else False
+        if is_enabled:
+            if any([data.get('disabled_after', None), data.get('disable_reason', None),
+                    data.get('disable_comments', None)]):
+                raise forms.ValidationError(
+                    "Cannot have disabled after/disabled reason/disable comments if doctor is enabled.")
+        else:
+            if not all([data.get('disabled_after', None), data.get('disable_reason', None)]):
+                raise forms.ValidationError("Must have disabled after/disable reason if doctor is not enabled.")
+            if data.get('disable_reason', None) and data.get('disable_reason', None) == Doctor.OTHERS and not data.get(
+                    'disable_comments', None):
+                raise forms.ValidationError("Must have disable comments if disable reason is others.")
 
 
 class CityFilter(SimpleListFilter):
@@ -988,6 +1009,13 @@ class DoctorAdmin(AutoComplete, ImportExportMixin, VersionAdmin, ActionAdmin, QC
     resource_class = DoctorResource
     change_list_template = 'superuser_import_export.html'
 
+    # fieldsets = ((None,{'fields':('name','gender','practicing_since','license','is_license_verified','signature','raw_about' \
+    #               ,'about',  'onboarding_url', 'get_onboard_link', 'additional_details')}),
+    #              (None,{'fields':('assigned_to',)}),
+    #               (None,{'fields':('enabled_for_online_booking','is_internal','is_test_doctor','is_insurance_enabled','is_retail_enabled', \
+    #                 'is_online_consultation_enabled','online_consultation_fees')}),
+    #                 (None,{'fields':('enabled','disabled_after','disable_reason','disable_comments','onboarding_status','assigned_to', \
+    #                  'matrix_lead_id','batch', 'is_gold', 'lead_url', 'registered','is_live')}))
     list_display = (
         'name', 'updated_at', 'data_status', 'onboarding_status', 'list_created_by', 'list_assigned_to', 'registered',
         'get_onboard_link')
@@ -1039,7 +1067,7 @@ class DoctorAdmin(AutoComplete, ImportExportMixin, VersionAdmin, ActionAdmin, QC
 
     def get_exclude(self, request, obj=None):
         exclude = ['source', 'user', 'created_by', 'is_phone_number_verified', 'is_email_verified', 'country_code', 'search_key', 'live_at',
-               'onboarded_at', 'qc_approved_at','enabled_for_online_booking_at']
+               'onboarded_at', 'qc_approved_at','enabled_for_online_booking_at', 'disabled_at']
 
         if request.user.is_member_of(constants['DOCTOR_SALES_GROUP']):
             exclude += ['source', 'batch', 'lead_url', 'registered', 'created_by', 'about', 'raw_about',
@@ -1220,6 +1248,10 @@ class DoctorAdmin(AutoComplete, ImportExportMixin, VersionAdmin, ActionAdmin, QC
                 obj.created_by = request.user
             if not obj.assigned_to:
                 obj.assigned_to = request.user
+        if not form.cleaned_data.get('enabled', False) and not obj.disabled_by:
+            obj.disabled_by = request.user
+        elif form.cleaned_data.get('enabled', False) and obj.disabled_by:
+            obj.disabled_by = None
         if '_submit_for_qc' in request.POST:
             obj.data_status = 2
         if '_qc_approve' in request.POST:
@@ -1321,10 +1353,9 @@ class DoctorOpdAppointmentForm(forms.ModelForm):
             raise forms.ValidationError("Reason for Cancelled appointment should be set.")
 
         if cleaned_data.get('status') is OpdAppointment.CANCELLED and cleaned_data.get(
-                'cancellation_reason') and 'others' in cleaned_data.get(
-                'cancellation_reason').name.lower() and not cleaned_data.get('cancellation_comments'):
+                'cancellation_reason') and cleaned_data.get('cancellation_reason').is_comment_needed and not cleaned_data.get('cancellation_comments'):
             raise forms.ValidationError(
-                "If Reason for Cancelled appointment is others it should be mentioned in cancellation comment.")
+                "Cancellation comments must be mentioned for selected cancellation reason.")
 
         if not DoctorClinicTiming.objects.filter(doctor_clinic__doctor=doctor,
                                                  doctor_clinic__hospital=hospital,
@@ -1352,7 +1383,7 @@ class DoctorOpdAppointmentForm(forms.ModelForm):
 
 class DoctorOpdAppointmentAdmin(admin.ModelAdmin):
     form = DoctorOpdAppointmentForm
-    list_display = ('booking_id', 'get_doctor', 'get_profile', 'status', 'time_slot_start', 'created_at', 'updated_at')
+    list_display = ('booking_id', 'get_doctor', 'get_profile', 'status', 'time_slot_start', 'effective_price', 'created_at', 'updated_at')
     list_filter = ('status', )
     date_hierarchy = 'created_at'
 
@@ -1578,6 +1609,8 @@ class DoctorOpdAppointmentAdmin(admin.ModelAdmin):
 
     @transaction.atomic
     def save_model(self, request, obj, form, change):
+        responsible_user = request.user
+        obj._responsible_user = responsible_user if responsible_user and not responsible_user.is_anonymous else None
         if obj:
             if obj.id:
                 opd_obj = OpdAppointment.objects.select_for_update().get(pk=obj.id)

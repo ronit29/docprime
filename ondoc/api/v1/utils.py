@@ -328,7 +328,10 @@ def payment_details(request, order):
     base_url = "https://{}".format(request.get_host())
     surl = base_url + '/api/v1/user/transaction/save'
     furl = base_url + '/api/v1/user/transaction/save'
-    # profile = UserProfile.objects.get(pk=order.action_data.get("profile"))
+    profile = user.get_default_profile()
+    profile_name = ""
+    if profile:
+        profile_name = profile.name
     pgdata = {
         'custId': user.id,
         'mobile': user.phone_number,
@@ -338,7 +341,7 @@ def payment_details(request, order):
         'furl': furl,
         'referenceId': "",
         'orderId': order.id,
-        'name': order.action_data.get("profile_detail").get("name"),
+        'name': profile_name,
         'txAmount': str(order.amount),
     }
     secret_key = client_key = ""
@@ -511,6 +514,7 @@ class CouponsMixin(object):
         user = kwargs.get("user")
         coupon_obj = kwargs.get("coupon_obj")
         profile = kwargs.get("profile")
+        cart_item = kwargs.get("cart_item")
 
         if coupon_obj:
             if coupon_obj.is_user_specific and not user.is_authenticated:
@@ -562,7 +566,12 @@ class CouponsMixin(object):
                         or (coupon_obj.age_end and (not user_age or coupon_obj.age_end < user_age)) ):
                     return {"is_valid": False, "used_count": None}
 
-            count = coupon_obj.used_coupon_count(user)
+                from ondoc.cart.models import Cart
+                payment_option_filter = Cart.get_pg_if_pgcoupon(user, cart_item)
+                if payment_option_filter and coupon_obj.payment_option and coupon_obj.payment_option.id != payment_option_filter.id:
+                    return {"is_valid": False, "used_count": 0}
+
+            count = coupon_obj.used_coupon_count(user, cart_item)
             total_used_count = coupon_obj.total_used_coupon_count()
 
             if coupon_obj.is_user_specific and user:
@@ -750,7 +759,7 @@ class TimeSlotExtraction(object):
             self.price_available[i] = dict()
 
     def form_time_slots(self, day, start, end, price=None, is_available=True,
-                        deal_price=None, mrp=None, is_doctor=False):
+                        deal_price=None, mrp=None, is_doctor=False, on_call=1):
         start = Decimal(str(start))
         end = Decimal(str(end))
         time_span = self.TIME_SPAN
@@ -774,6 +783,9 @@ class TimeSlotExtraction(object):
                     "mrp": mrp,
                     "deal_price": deal_price
                 })
+            price_available.update({
+                "on_call": bool(on_call==2)
+            })
             self.price_available[day][temp_start] = price_available
             temp_start += float_span
 
@@ -810,10 +822,10 @@ class TimeSlotExtraction(object):
             if 'mrp' in pa[k].keys() and 'deal_price' in pa[k].keys():
                 data_list.append({"value": k, "text": v, "price": pa[k]["price"],
                                   "mrp": pa[k]['mrp'], 'deal_price': pa[k]['deal_price'],
-                                  "is_available": pa[k]["is_available"]})
+                                  "is_available": pa[k]["is_available"], "on_call": pa[k].get("on_call", False)})
             else:
                 data_list.append({"value": k, "text": v, "price": pa[k]["price"],
-                                  "is_available": pa[k]["is_available"]})
+                                  "is_available": pa[k]["is_available"], "on_call": pa[k].get("on_call", False)})
         format_data = dict()
         format_data['type'] = 'AM' if day_time == self.MORNING else 'PM'
         format_data['title'] = day_time
@@ -900,7 +912,6 @@ def get_opd_pem_queryset(user, model):
                           'doctor__qualifications', 'doctor__qualifications__qualification',
                           'doctor__qualifications__specialization', 'doctor__qualifications__college',
                           'doctor__doctorpracticespecializations', 'doctor__doctorpracticespecializations__specialization') \
-        .filter(hospital__is_live=True, doctor__is_live=True) \
         .filter(
         Q(
             Q(doctor__manageable_doctors__user=user,
@@ -1034,8 +1045,8 @@ def create_payout_checksum(all_txn, product_id):
     checksum = secret_key + "|[" + checksum + "]|" + client_key
     checksum_hash = hashlib.sha256(str(checksum).encode())
     checksum_hash = checksum_hash.hexdigest()
-    print("checksum string - " + str(checksum) + "checksum hash - " + str(checksum_hash))
-    logger.error("checksum string - " + str(checksum) + "checksum hash - " + str(checksum_hash))
+    #print("checksum string - " + str(checksum) + "checksum hash - " + str(checksum_hash))
+    #logger.error("checksum string - " + str(checksum) + "checksum hash - " + str(checksum_hash))
     return checksum_hash
 
 def html_to_pdf(html_body, filename):
@@ -1072,4 +1083,15 @@ def util_file_name(filename):
     if filename:
         filename = os.path.basename(filename)
     return filename
+
+def format_iso_date(date_str):
+    date_field = date_str.find('T')
+    if date_field:
+        date_field = date_str[:date_field]
+    return date_field
+
+def datetime_to_formated_string(instance, time_format='%Y-%m-%d %H:%M:%S', to_zone = tz.gettz(settings.TIME_ZONE)):
+    instance = instance.astimezone(to_zone)
+    formated_date = datetime.datetime.strftime(instance, time_format)
+    return formated_date
 

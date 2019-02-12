@@ -1,5 +1,7 @@
 from rest_framework import serializers
 from rest_framework.fields import CharField
+
+from ondoc.cart.models import Cart
 from ondoc.diagnostic.models import (LabTest, AvailableLabTest, Lab, LabAppointment, LabTiming, PromotedLab,
                                      CommonTest, CommonDiagnosticCondition, LabImage, LabReportFile, CommonPackage,
                                      LabTestCategory, LabAppointmentTestMapping)
@@ -8,7 +10,7 @@ from ondoc.authentication.models import UserProfile, Address
 from ondoc.api.v1.doctor.serializers import CreateAppointmentSerializer, CommaSepratedToListField
 from ondoc.api.v1.auth.serializers import AddressSerializer, UserProfileSerializer
 from ondoc.api.v1.utils import form_time_slot, GenericAdminEntity, util_absolute_url
-from ondoc.doctor.models import OpdAppointment
+from ondoc.doctor.models import OpdAppointment, CancellationReason
 from ondoc.account.models import Order, Invoice
 from ondoc.coupon.models import Coupon, RandomGeneratedCoupon
 from django.db.models import Count, Sum, When, Case, Q, F, ExpressionWrapper, DateTimeField
@@ -603,12 +605,17 @@ class LabAppointmentCreateSerializer(serializers.Serializer):
     payment_type = serializers.IntegerField(default=OpdAppointment.PREPAID)
     coupon_code = serializers.ListField(child=serializers.CharField(), required=False, default=[])
     use_wallet = serializers.BooleanField(required=False)
+    cart_item = serializers.PrimaryKeyRelatedField(queryset=Cart.objects.all(), required=False, allow_null=True)
 
     def validate(self, data):
         MAX_APPOINTMENTS_ALLOWED = 10
         ACTIVE_APPOINTMENT_STATUS = [LabAppointment.BOOKED, LabAppointment.ACCEPTED,
                                      LabAppointment.RESCHEDULED_PATIENT, LabAppointment.RESCHEDULED_LAB]
+
         request = self.context.get("request")
+        unserialized_data = self.context.get("data")
+        cart_item_id = data.get('cart_item').id if data.get('cart_item') else None
+        use_duplicate = self.context.get("use_duplicate", False)
 
         if not utils.is_valid_testing_lab_data(request.user, data["lab"]):
             raise serializers.ValidationError("Both User and Lab should be for testing")
@@ -657,7 +664,7 @@ class LabAppointmentCreateSerializer(serializers.Serializer):
             if coupon_obj:
                 for coupon in coupon_obj:
                     obj = LabAppointment()
-                    if obj.validate_user_coupon(user=request.user, coupon_obj=coupon, profile=profile).get("is_valid"):
+                    if obj.validate_user_coupon(cart_item=cart_item_id, user=request.user, coupon_obj=coupon, profile=profile).get("is_valid"):
                         if not obj.validate_product_coupon(coupon_obj=coupon,
                                                            lab=data.get("lab"), test=data.get("test_ids"),
                                                            product_id=Order.LAB_PRODUCT_ID):
@@ -665,6 +672,24 @@ class LabAppointmentCreateSerializer(serializers.Serializer):
                     else:
                         raise serializers.ValidationError('Invalid coupon code - ' + str(coupon))
                 data["coupon_obj"] = list(coupon_obj)
+
+        
+        data["existing_cart_item"] = None
+        if unserialized_data:
+            is_valid, duplicate_cart_item = Cart.validate_duplicate(unserialized_data, request.user, Order.LAB_PRODUCT_ID, cart_item_id)
+            if not is_valid:
+                if use_duplicate and duplicate_cart_item:
+                    data["existing_cart_item"] = duplicate_cart_item
+                else:
+                    raise serializers.ValidationError("Item already exists in cart.")
+
+        time_slot_start = (form_time_slot(data.get('start_date'), data.get('start_time'))
+                           if not data.get("time_slot_start") else data.get("time_slot_start"))
+
+        if LabAppointment.objects.filter(profile=data.get("profile"), lab=data.get("lab"),
+                                         tests__in=data.get("test_ids"), time_slot_start=time_slot_start) \
+                .exclude(status__in=[LabAppointment.COMPLETED, LabAppointment.CANCELLED]).exists():
+            raise serializers.ValidationError("One active appointment for the selected date & time already exists. Please change the date & time of the appointment.")
 
         if 'use_wallet' in data and data['use_wallet'] is False:
             data['use_wallet'] = False
@@ -887,9 +912,13 @@ class LabAppointmentRetrieveSerializer(LabAppointmentModelSerializer):
     type = serializers.ReadOnlyField(default='lab')
     reports = serializers.SerializerMethodField()
     invoices = serializers.SerializerMethodField()
+    cancellation_reason = serializers.SerializerMethodField()
 
     def get_lab_test(self, obj):
         return LabAppointmentTestMappingSerializer(obj.test_mappings.all(), many=True).data
+
+    def get_cancellation_reason(self, obj):
+        return obj.get_serialized_cancellation_reason()
 
     def get_reports(self, obj):
         reports = []
@@ -922,7 +951,7 @@ class LabAppointmentRetrieveSerializer(LabAppointmentModelSerializer):
     class Meta:
         model = LabAppointment
         fields = ('id', 'type', 'lab_name', 'status', 'deal_price', 'effective_price', 'time_slot_start', 'time_slot_end','is_rated', 'rating_declined',
-                   'is_home_pickup', 'lab_thumbnail', 'lab_image', 'profile', 'allowed_action', 'lab_test', 'lab', 'otp', 'address', 'type', 'reports', 'invoices')
+                   'is_home_pickup', 'lab_thumbnail', 'lab_image', 'profile', 'allowed_action', 'lab_test', 'lab', 'otp', 'address', 'type', 'reports', 'invoices', 'cancellation_reason')
 
 
 class DoctorLabAppointmentRetrieveSerializer(LabAppointmentModelSerializer):
@@ -1010,12 +1039,17 @@ class LabEntitySerializer(serializers.ModelSerializer):
 
 class CustomPackageLabSerializer(LabModelSerializer):
     avg_rating = serializers.ReadOnlyField()
+    url = serializers.SerializerMethodField()
 
     class Meta:
         model = Lab
         fields = ('id', 'lat', 'long', 'lab_thumbnail', 'name', 'operational_since', 'locality', 'address',
                   'sublocality', 'city', 'state', 'country', 'always_open', 'about', 'home_pickup_charges',
-                  'is_home_collection_enabled', 'seo', 'breadcrumb', 'center_visit_enabled', 'avg_rating')
+                  'is_home_collection_enabled', 'seo', 'breadcrumb', 'center_visit_enabled', 'avg_rating', 'url')
+
+    def get_url(self, obj):
+        entity_url_dict = self.context.get('entity_url_dict', {})
+        return entity_url_dict.get(obj.id, [''])[0] if obj.id else ''
 
     # def get_avg_rating(self, obj):
     #     return obj.avg_rating
@@ -1026,24 +1060,33 @@ class CustomLabTestPackageSerializer(serializers.ModelSerializer):
     distance = serializers.SerializerMethodField()
     mrp = serializers.SerializerMethodField()
     price = serializers.SerializerMethodField()
-    lab_timings = serializers.SerializerMethodField()
-    lab_timings_data = serializers.SerializerMethodField()
+    lab_timing = serializers.SerializerMethodField()
+    lab_timing_data = serializers.SerializerMethodField()
+    next_lab_timing = serializers.SerializerMethodField()
+    next_lab_timing_data = serializers.SerializerMethodField()
     pickup_charges = serializers.SerializerMethodField()
     pickup_available = serializers.SerializerMethodField()
     distance_related_charges = serializers.SerializerMethodField()
+    categories = serializers.SerializerMethodField()
 
     class Meta:
         model = LabTest
-        fields = ('id', 'name', 'lab', 'mrp', 'distance', 'price', 'lab_timings', 'lab_timings_data',
-                  'test_type', 'is_package', 'number_of_tests', 'why', 'pre_test_info', 'is_package',
-                  'pickup_charges', 'pickup_available', 'distance_related_charges', 'url')
+        fields = ('id', 'name', 'lab', 'mrp', 'distance', 'price', 'lab_timing', 'lab_timing_data', 'next_lab_timing',
+                  'next_lab_timing_data', 'test_type', 'is_package', 'number_of_tests', 'why', 'pre_test_info', 'is_package',
+                  'pickup_charges', 'pickup_available', 'distance_related_charges', 'priority', 'show_details', 'categories', 'url')
 
     def get_lab(self, obj):
-        lab_data = self.context.get('lab_data')
+        lab_data = self.context.get('lab_data', {})
         request = self.context.get('request')
-        for data in lab_data:
-            if data.id == obj.lab:
-                return CustomPackageLabSerializer(data, context={'request': request}).data
+        entity_url_dict = self.context.get('entity_url_dict', {})
+        data = lab_data.get(obj.lab, None)
+        if data is not None:
+            return CustomPackageLabSerializer(data,
+                                              context={'entity_url_dict': entity_url_dict, 'request': request}).data
+        return None
+
+    def get_categories(self, obj):
+        return obj.get_all_categories_detail()
 
     def get_distance(self, obj):
         return int(obj.distance.m)
@@ -1054,59 +1097,116 @@ class CustomLabTestPackageSerializer(serializers.ModelSerializer):
     def get_price(self, obj):
         return str(obj.price)
 
-    def get_lab_timings(self, obj):
-        lab_data = self.context.get('lab_data', [])
-        for data in lab_data:
-            if data.id == obj.lab:
-                return data.lab_timings_today()[0]
+    def get_lab_timing(self, obj):
+        lab_data = self.context.get('lab_data', {})
+        data = lab_data.get(obj.lab, None)
+        if data is not None:
+            return data.lab_timings_today_and_next().get('lab_timing', '')
+        return ''
 
-    def get_lab_timings_data(self, obj):
-        lab_data = self.context.get('lab_data', [])
-        for data in lab_data:
-            if data.id == obj.lab:
-                return data.lab_timings_today()[1]
+    def get_lab_timing_data(self, obj):
+        lab_data = self.context.get('lab_data', {})
+        data = lab_data.get(obj.lab, None)
+        if data is not None:
+            return data.lab_timings_today_and_next().get('lab_timing_data', [])
+        return []
+
+    def get_next_lab_timing(self, obj):
+        lab_data = self.context.get('lab_data', {})
+        data = lab_data.get(obj.lab, None)
+        if data is not None:
+            return data.lab_timings_today_and_next().get('next_lab_timing_dict', {})
+        return {}
+
+    def get_next_lab_timing_data(self, obj):
+        lab_data = self.context.get('lab_data', {})
+        data = lab_data.get(obj.lab, None)
+        if data is not None:
+            return data.lab_timings_today_and_next().get('next_lab_timing_data_dict', {})
+        return {}
 
     def get_rating(self, obj):
-        lab_data = self.context.get('lab_data', [])
-        for data in lab_data:
-            if data.id == obj.lab:
-                return data.avg_rating
+        lab_data = self.context.get('lab_data', {})
+        data = lab_data.get(obj.lab, None)
+        if data is not None:
+            return data.avg_rating
+        return None
 
     def get_pickup_charges(self, obj):
-        lab_data = self.context.get('lab_data', [])
-        for data in lab_data:
-            if data.id == obj.lab and data.is_home_collection_enabled:
-                return data.home_pickup_charges
-            else:
-                return 0
+        lab_data = self.context.get('lab_data', {})
+        data = lab_data.get(obj.lab, None)
+        if data is not None and data.id == obj.lab and data.is_home_collection_enabled:
+            return data.home_pickup_charges
+        else:
+            return 0
 
     def get_pickup_available(self, obj):
         for temp_test in obj.test.all():
             if not temp_test.home_collection_possible:
                 return 0
-        lab_data = self.context.get('lab_data', [])
-        for data in lab_data:
-            if data.id == obj.lab:
-                return 1 if data.is_home_collection_enabled else 0
+        lab_data = self.context.get('lab_data', {})
+        data = lab_data.get(obj.lab, None)
+        if data is not None:
+            return 1 if data.is_home_collection_enabled else 0
         return 0
 
     def get_distance_related_charges(self, obj):
-        lab_data = self.context.get('lab_data', [])
-        for data in lab_data:
-            if data.id == obj.lab:
-                return 1 if bool(data.home_collection_charges.all()) else 0
+        lab_data = self.context.get('lab_data', {})
+        data = lab_data.get(obj.lab, None)
+        if data is not None:
+            return 1 if bool(data.home_collection_charges.all()) else 0
+        return 0
 
 
 class LabPackageListSerializer(serializers.Serializer):
     long = serializers.FloatField(default=77.071848)
     lat = serializers.FloatField(default=28.450367)
+    min_distance = serializers.IntegerField(required=False)
+    max_distance = serializers.IntegerField(required=False)
+    min_price = serializers.IntegerField(required=False)
+    max_price = serializers.IntegerField(required=False)
+    sort_on = serializers.CharField(required=False)
     category_ids = CommaSepratedToListField(required=False, max_length=500, typecast_to=int)
+    test_ids = CommaSepratedToListField(required=False, max_length=500, typecast_to=int)
+    min_age = serializers.IntegerField(required=False)
+    max_age = serializers.IntegerField(required=False)
+    gender = serializers.ChoiceField(choices=LabTest.GENDER_TYPE_CHOICES, required=False)
+    package_type = serializers.IntegerField(required=False)
 
     def validate_category_ids(self, attrs):
         try:
-            temp_attrs = [int(attr) for attr in attrs]
-            if LabTestCategory.objects.filter(is_live=True, is_package_category=True, id__in=temp_attrs).count() == len(temp_attrs):
+            attrs = set(attrs)
+            if LabTestCategory.objects.filter(is_live=True, is_package_category=True, id__in=attrs).count() == len(attrs):
                 return attrs
         except:
             raise serializers.ValidationError('Invalid Category IDs')
         raise serializers.ValidationError('Invalid Category IDs')
+
+    def validate_test_ids(self, attrs):
+        try:
+            attrs = set(attrs)
+            if LabTest.objects.filter(enable_for_retail=True, searchable=True, id__in=attrs).count() == len(attrs):
+                return attrs
+        except:
+            raise serializers.ValidationError('Invalid Test IDs')
+        raise serializers.ValidationError('Invalid Test IDs')
+
+
+class RecommendedPackageCategoryList(serializers.ModelSerializer):
+
+    tests = serializers.SerializerMethodField()
+
+    def get_tests(self, obj):
+        test_id = []
+        if obj:
+            for tst in obj.recommended_lab_tests.all():
+                temp_parameters = list(tst.parameter.all())
+                num_of_parameters = len(temp_parameters)
+                temp_parameters_names = [param.name for param in temp_parameters]
+                test_id.append({"id": tst.id, "name": tst.name, "num_of_parameters": num_of_parameters,
+                                "parameters": temp_parameters_names})
+        return test_id
+
+    class Meta:
+        model = LabTestCategory
+        fields = ('id', 'name', 'tests')

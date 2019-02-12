@@ -1,4 +1,4 @@
-from hardcopy import bytestring_to_pdf
+# from hardcopy import bytestring_to_pdf
 from rest_framework import mixins, viewsets, status
 from rest_framework.response import Response
 from django.contrib.gis.geos import Point, GEOSGeometry
@@ -885,24 +885,21 @@ class SearchLeadViewSet(viewsets.GenericViewSet):
 
 class GetPaymentOptionsViewSet(viewsets.GenericViewSet):
 
-    def list(self, request):
-        queryset = PaymentOptions.objects.filter(is_enabled=True).order_by('-priority')
-        options = []
-        first = True
-        for data in queryset:
-            resp = {}
-            resp['name'] = data.name
-            resp['image'] = data.image.url
-            resp['description'] = data.description
-            resp['is_enabled'] = data.is_enabled
-            resp['action'] = data.action
-            resp['payment_gateway'] = data.payment_gateway
+    def get_queryset(self):
+        return None
 
-            if first==True:
-                first = False
-                resp['is_selected'] = True
-            else:
-                resp['is_selected'] = False
-            options.append(resp)
+    def return_queryset(self, request):
+        
+        params = request.query_params
+        from_app = params.get("from_app", False)
+        if from_app:
+            queryset = PaymentOptions.objects.filter(is_enabled=True, payment_gateway__iexact="paytm").order_by('-priority')
+        else:
+            queryset = PaymentOptions.objects.filter(is_enabled=True).order_by('-priority')
+        return queryset
+
+    def list(self, request):
+        queryset = self.return_queryset(request)
+        options = PaymentOptions.build_payment_option(queryset)
 
         return Response(options)

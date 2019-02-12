@@ -43,10 +43,10 @@ SECRET_KEY = env('DJANGO_SECRET_KEY')
 JWT_AUTH = {
     'JWT_VERIFY': True,
     'JWT_VERIFY_EXPIRATION': True,
-    'JWT_EXPIRATION_DELTA': datetime.timedelta(days=7),
+    'JWT_EXPIRATION_DELTA': datetime.timedelta(days=365),
     'JWT_AUTH_HEADER_PREFIX': 'Token',
     'JWT_ALLOW_REFRESH': True,
-    'JWT_REFRESH_EXPIRATION_DELTA': datetime.timedelta(days=7),
+    'JWT_REFRESH_EXPIRATION_DELTA': datetime.timedelta(days=365),
 }
 
 # SECURITY WARNING: don't run with debug turned on in production!
@@ -107,6 +107,9 @@ THIRD_PARTY_APPS = (
     'nested_admin',
     'ipware',
     'django_user_agents',
+    'fluent_comments',
+    'threadedcomments',
+    'django_comments',
     'ddtrace.contrib.django',
 )
 
@@ -136,7 +139,10 @@ LOCAL_APPS = (
     'ondoc.procedure',
     'ondoc.elastic',
     'ondoc.banner',
-    'ondoc.ckedit'
+    'ondoc.cart',
+    'ondoc.ckedit',
+    'ondoc.screen',
+    'ondoc.comments'
 )
 
 INSTALLED_APPS = DJANGO_APPS + THIRD_PARTY_APPS + LOCAL_APPS
@@ -366,3 +372,10 @@ CONN_MAX_AGE=600
 AWS_ACCESS_KEY_ID = env('AWS_ACCESS_KEY_ID', default='')
 AWS_SECRET_ACCESS_KEY = env('AWS_SECRET_ACCESS_KEY', default='')
 PROVIDER_EMAIL = env('PROVIDER_EMAIL', default='')
+
+
+#comments Settings
+COMMENTS_APP = 'fluent_comments'
+SITE_ID = 1
+FLUENT_COMMENTS_REPLACE_ADMIN = False
+
