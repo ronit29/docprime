@@ -1059,6 +1059,12 @@ class TransactionViewSet(viewsets.GenericViewSet):
                             logger.error("Error in processing order - " + str(e))
                 else:
                     logger.error("Invalid pg data - " + json.dumps(resp_serializer.errors))
+            elif order_obj:
+                try:
+                    order_obj.change_payment_status(Order.PAYMENT_FAILURE)
+                    self.send_failure_ops_email(order_obj)
+                except Exception as e:
+                    logger.error("Error sending payment failure email - " + str(e))
 
             if success_in_process:
                 if processed_data.get("type") == "all":
@@ -1067,13 +1073,6 @@ class TransactionViewSet(viewsets.GenericViewSet):
                     REDIRECT_URL = OPD_REDIRECT_URL + "/" + str(processed_data.get("id","")) + "?payment_success=true"
                 elif processed_data.get("type") == "lab":
                     REDIRECT_URL = LAB_REDIRECT_URL + "/" + str(processed_data.get("id","")) + "?payment_success=true"
-            else:
-                if order_obj:
-                    try:
-                        order_obj.change_payment_status(Order.PAYMENT_FAILURE)
-                        self.send_failure_ops_email(order_obj)
-                    except Exception as e:
-                        logger.error("Error sending payment failure email - " + str(e))
 
         except Exception as e:
             logger.error("Error - " + str(e))
