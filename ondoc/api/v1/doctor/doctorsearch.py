@@ -452,7 +452,13 @@ class DoctorSearchHelper:
             from ondoc.coupon.models import Coupon
             search_coupon = Coupon.get_search_coupon(request.user)
             discounted_price = filtered_deal_price if not search_coupon else search_coupon.get_search_coupon_discounted_price(filtered_deal_price)
-
+            schema_specialization = None
+            schema_specialization = sorted_spec_list[0].get('name') if sorted_spec_list[0] and sorted_spec_list[0].get('name') else None
+            schema_type = None
+            if schema_specialization == 'Dentist':
+                schema_type = 'Dentist'
+            else:
+                schema_type = 'Physician'
             temp = {
                 "doctor_id": doctor.id,
                 "enabled_for_online_booking": doctor.enabled_for_online_booking,
@@ -526,11 +532,12 @@ class DoctorSearchHelper:
                     }
 
                 },
+
                 "new_schema": {
                     "@context": 'http://schema.org',
-                    "@type":  sorted_spec_list[0].get('name') if sorted_spec_list[0] and sorted_spec_list[0].get('name') else None,
+                    "@type": schema_type,
                     "currenciesAccepted": "INR",
-                    "MedicalSpeciality": [spec['name'] for spec in sorted_spec_list],
+                    "MedicalSpeciality": schema_specialization,
                     "name": doctor.get_display_name(),
                     "image": doctor.get_thumbnail() if doctor.get_thumbnail() else static(
                         'web/images/doc_placeholder.png'),
