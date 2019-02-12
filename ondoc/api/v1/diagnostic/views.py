@@ -4,6 +4,7 @@ from ondoc.api.v1.diagnostic.serializers import CustomLabTestPackageSerializer
 from ondoc.authentication.backends import JWTAuthentication
 from ondoc.api.v1.diagnostic import serializers as diagnostic_serializer
 from ondoc.api.v1.auth.serializers import AddressSerializer
+from ondoc.cart.models import Cart
 from ondoc.common.models import UserConfig
 from ondoc.ratings_review import models as rating_models
 from ondoc.diagnostic.models import (LabTest, AvailableLabTest, Lab, LabAppointment, LabTiming, PromotedLab,
@@ -72,10 +73,10 @@ class SearchPageViewSet(viewsets.ReadOnlyModelViewSet):
         count = int(count)
         if count <= 0:
             count = 10
-        test_queryset = CommonTest.objects.select_related('test').filter(test__enable_for_retail=True, test__searchable=True)[:count]
-        conditions_queryset = CommonDiagnosticCondition.objects.prefetch_related('lab_test').all()
+        test_queryset = CommonTest.objects.select_related('test').filter(test__enable_for_retail=True, test__searchable=True).order_by('-priority')[:count]
+        conditions_queryset = CommonDiagnosticCondition.objects.prefetch_related('lab_test').all().order_by('-priority')[:count]
         lab_queryset = PromotedLab.objects.select_related('lab').filter(lab__is_live=True, lab__is_test_lab=False)
-        package_queryset = CommonPackage.objects.prefetch_related('package').filter(package__enable_for_retail=True, package__searchable=True)[:count]
+        package_queryset = CommonPackage.objects.prefetch_related('package').filter(package__enable_for_retail=True, package__searchable=True).order_by('-priority')[:count]
         recommended_package_qs = LabTestCategory.objects.prefetch_related('recommended_lab_tests__parameter').filter(is_live=True,
                                                                                                           show_on_recommended_screen=True,
                                                                                                           recommended_lab_tests__searchable=True,
@@ -191,7 +192,7 @@ class LabList(viewsets.ReadOnlyModelViewSet):
         max_distance = max_distance*1000 if max_distance is not None else 10000
         lab_tests_with_categories = LabTestCategoryMapping.objects.filter(parent_category__isnull=False).values_list(
             'lab_test', flat=True).distinct()
-        all_packages_in_network_labs = LabTest.objects.prefetch_related('test').filter(enable_for_retail=True,
+        all_packages_in_network_labs = LabTest.objects.prefetch_related('test', 'categories').filter(enable_for_retail=True,
                                                                                        searchable=True, is_package=True,
                                                                                        availablelabs__enabled=True,
                                                                                        availablelabs__lab_pricing_group__labs__is_live=True,
@@ -211,7 +212,7 @@ class LabList(viewsets.ReadOnlyModelViewSet):
                         partition_by=[F(
                             'availablelabs__lab_pricing_group__labs__network'), F('id')]))
 
-        all_packages_in_non_network_labs = LabTest.objects.prefetch_related('test').filter(enable_for_retail=True,
+        all_packages_in_non_network_labs = LabTest.objects.prefetch_related('test', 'categories').filter(enable_for_retail=True,
                                                                                            searchable=True,
                                                                                            is_package=True,
                                                                                            availablelabs__enabled=True,
@@ -251,27 +252,27 @@ class LabList(viewsets.ReadOnlyModelViewSet):
         if min_distance:
             all_packages = filter(lambda x: x.distance >= min_distance, all_packages)
         if min_price:
-            all_packages = filter(lambda x: x.price >= min_price, all_packages)
+            all_packages = filter(lambda x: x.price >= min_price if x.price is not None else False, all_packages)
         if max_price:
-            all_packages = filter(lambda x: x.price <= max_price, all_packages)
+            all_packages = filter(lambda x: x.price <= max_price if x.price is not None else False, all_packages)
         if min_age and max_age:
-            all_packages = filter(lambda x: x.min_age <= max_age and x.max_age >= min_age, all_packages)
+            all_packages = filter(lambda x: (x.min_age <= max_age if x.min_age is not None else False) and (x.max_age >= min_age if x.max_age is not None else False), all_packages)
         elif max_age:
-            all_packages = filter(lambda x: x.min_age <= max_age, all_packages)
+            all_packages = filter(lambda x: x.min_age <= max_age if x.min_age is not None else False, all_packages)
         elif min_age:
-            all_packages = filter(lambda x: x.max_age >= min_age, all_packages)
+            all_packages = filter(lambda x: x.max_age >= min_age if x.max_age is not None else False, all_packages)
         if gender:
-            all_packages = filter(lambda x: x.gender_type in [gender, LabTest.ALL], all_packages)
+            all_packages = filter(lambda x: x.gender_type in [gender, LabTest.ALL] if x.gender_type is not None else False, all_packages)
         if package_type == 1:
             all_packages = filter(lambda x: x.home_collection_possible, all_packages)
         if package_type == 2:
             all_packages = filter(lambda x: not x.home_collection_possible, all_packages)
         if not sort_on:
-            all_packages = sorted(all_packages, key=operator.attrgetter('priority'), reverse=True)
+            all_packages = sorted(all_packages, key=lambda x: x.priority if hasattr(x, 'priority') and x.priority is not None else -float('inf'), reverse=True)
         elif sort_on == 'fees':
-            all_packages = sorted(all_packages, key=operator.attrgetter('price'))
+            all_packages = sorted(all_packages, key=lambda x: x.price if hasattr(x, 'price') and x.price is not None else -float('inf'))
         elif sort_on == 'distance':
-            all_packages = sorted(all_packages, key=operator.attrgetter('distance'))
+            all_packages = sorted(all_packages, key=lambda x: x.distance if hasattr(x, 'distance') and x.distance is not None else -float('inf'))
         lab_ids = [package.lab for package in all_packages]
         entity_url_qs = EntityUrls.objects.filter(entity_id__in=lab_ids, is_valid=True, url__isnull=False,
                                                   sitemap_identifier=EntityUrls.SitemapIdentifier.LAB_PAGE).values(
@@ -799,7 +800,7 @@ class LabList(viewsets.ReadOnlyModelViewSet):
         if test_ids:
             group_queryset = LabPricingGroup.objects.prefetch_related(Prefetch(
                     "available_lab_tests",
-                    queryset=AvailableLabTest.objects.filter(test_id__in=test_ids).prefetch_related('test'),
+                    queryset=AvailableLabTest.objects.filter(test_id__in=test_ids).prefetch_related('test__categories'),
                     to_attr="selected_tests"
                 )).all()
 
@@ -815,7 +816,6 @@ class LabList(viewsets.ReadOnlyModelViewSet):
         temp_var = dict()
         tests = dict()
         lab = dict()
-
         for obj in labs:
             temp_var[obj.id] = obj
             tests[obj.id] = list()
@@ -825,8 +825,7 @@ class LabList(viewsets.ReadOnlyModelViewSet):
                         deal_price=test.custom_deal_price
                     else:
                         deal_price=test.computed_deal_price
-                    tests[obj.id].append({"id": test.test_id, "name": test.test.name, "deal_price": deal_price, "mrp": test.mrp,
-                                          "number_of_tests": test.test.number_of_tests})
+                    tests[obj.id].append({"id": test.test_id, "name": test.test.name, "deal_price": deal_price, "mrp": test.mrp, "number_of_tests": test.test.number_of_tests, 'categories': test.test.get_all_categories_detail()})
 
         # day_now = timezone.now().weekday()
         # days_array = [i for i in range(7)]
@@ -1362,11 +1361,25 @@ class LabAppointmentView(mixins.CreateModelMixin,
         data = dict(request.data)
         if not data.get("is_home_pickup"):
             data.pop("address", None)
-        serializer = diagnostic_serializer.LabAppointmentCreateSerializer(data=data, context={'request': request})
-        serializer.is_valid(raise_exception=True)
-        appointment_data = self.form_lab_app_data(request, serializer.validated_data)
 
-        resp = self.create_order(request, appointment_data, account_models.Order.LAB_PRODUCT_ID, data.get("use_wallet"))
+        serializer = diagnostic_serializer.LabAppointmentCreateSerializer(data=data, context={'request': request, 'data' : request.data, 'use_duplicate' : True})
+        serializer.is_valid(raise_exception=True)
+        validated_data = serializer.validated_data
+
+        cart_item_id = validated_data.get('cart_item').id if validated_data.get('cart_item') else None
+
+        if validated_data.get("existing_cart_item"):
+            cart_item = validated_data.get("existing_cart_item")
+            cart_item.data = request.data
+            cart_item.save()
+        else:
+            cart_item, is_new = Cart.objects.update_or_create(id=cart_item_id, deleted_at__isnull=True, product_id=account_models.Order.LAB_PRODUCT_ID,
+                                                  user=request.user, defaults={"data": data})
+
+        if hasattr(request, 'agent') and request.agent:
+            resp = { 'is_agent': True , "status" : 1 }
+        else:
+            resp = account_models.Order.create_order(request, [cart_item], validated_data.get("use_wallet"))
 
         return Response(data=resp)
 

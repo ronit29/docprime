@@ -21,7 +21,7 @@ from django.utils.html import format_html_join
 import pytz
 
 from ondoc.account.models import Order, Invoice
-from ondoc.api.v1.utils import util_absolute_url, util_file_name
+from ondoc.api.v1.utils import util_absolute_url, util_file_name, datetime_to_formated_string
 from ondoc.doctor.models import Hospital, CancellationReason
 from ondoc.diagnostic.models import (LabTiming, LabImage,
                                      LabManager, LabAccreditation, LabAward, LabCertification, AvailableLabTest,
@@ -31,6 +31,7 @@ from ondoc.diagnostic.models import (LabTiming, LabImage,
                                      TestParameter, ParameterLabTest, FrequentlyAddedTogetherTests, QuestionAnswer,
                                      LabReport, LabReportFile, LabTestCategoryMapping,
                                      LabTestRecommendedCategoryMapping)
+from ondoc.notification.models import EmailNotification, NotificationAction
 from .common import *
 from ondoc.authentication.models import GenericAdmin, User, QCModel, GenericLabAdmin, AssociatedMerchant
 from ondoc.crm.admin.doctor import CustomDateInput, TimePickerWidget, CreatedByFilter, AutoComplete
@@ -718,10 +719,9 @@ class LabAppointmentForm(forms.ModelForm):
             raise forms.ValidationError("Reason for Cancelled appointment should be set.")
 
         if cleaned_data.get('status') is LabAppointment.CANCELLED and cleaned_data.get(
-                'cancellation_reason') and 'others' in cleaned_data.get(
-                'cancellation_reason').name.lower() and not cleaned_data.get('cancellation_comments'):
+                'cancellation_reason', None) and cleaned_data.get('cancellation_reason').is_comment_needed and not cleaned_data.get('cancellation_comments'):
             raise forms.ValidationError(
-                "If Reason for Cancelled appointment is others it should be mentioned in cancellation comment.")
+                "Cancellation comments must be mentioned for selected cancellation reason.")
 
         if not lab.lab_pricing_group:
             raise forms.ValidationError("Lab is not in any lab pricing group.")
@@ -765,8 +765,8 @@ class LabReportInline(nested_admin.NestedTabularInline):
 class LabAppointmentAdmin(nested_admin.NestedModelAdmin):
     form = LabAppointmentForm
     list_display = (
-        'booking_id', 'get_profile', 'get_lab', 'status', 'reports_uploaded', 'time_slot_start', 'effective_price',
-        'created_at', 'updated_at', 'get_lab_test_name')
+        'booking_id', 'get_profile', 'get_lab', 'status', 'reports_uploaded', 'time_slot_start', 'effective_price', 'get_profile_email',
+        'get_profile_age', 'created_at', 'updated_at', 'get_lab_test_name')
     list_filter = ('status', )
     date_hierarchy = 'created_at'
 
@@ -780,6 +780,22 @@ class LabAppointmentAdmin(nested_admin.NestedModelAdmin):
     #     else:
     #         temp_autocomplete_fields = super().get_autocomplete_fields(request)
     #     return temp_autocomplete_fields
+
+    def get_profile_email(self, obj):
+        if not obj.profile:
+            return None
+        return obj.profile.email
+
+    get_profile_email.admin_order_field = 'profile'
+    get_profile_email.short_description = 'Profile Email'
+
+    def get_profile_age(self, obj):
+        if not obj.profile:
+            return None
+        return obj.profile.get_age()
+
+    get_profile_age.admin_order_field = 'profile'
+    get_profile_age.short_description = 'Profile Age'
 
     def get_profile(self, obj):
         if not obj.profile:
@@ -823,7 +839,7 @@ class LabAppointmentAdmin(nested_admin.NestedModelAdmin):
                     'get_lab_test', 'price', 'agreed_price',
                     'deal_price', 'effective_price', 'start_date', 'start_time', 'otp', 'payment_status',
                     'payment_type', 'insurance', 'is_home_pickup', 'address', 'outstanding',
-                    'send_email_sms_report', 'invoice_urls', 'reports_uploaded'
+                    'send_email_sms_report', 'invoice_urls', 'reports_uploaded', 'email_notification_timestamp'
                     )
         elif request.user.groups.filter(name=constants['LAB_APPOINTMENT_MANAGEMENT_TEAM']).exists():
             return ('booking_id', 'order_id',  'lab_id', 'lab_name', 'get_lab_test', 'lab_contact_details',
@@ -832,21 +848,21 @@ class LabAppointmentAdmin(nested_admin.NestedModelAdmin):
                     'deal_price', 'effective_price', 'payment_status', 'payment_type', 'insurance', 'is_home_pickup',
                     'get_pickup_address', 'get_lab_address', 'outstanding', 'otp', 'status', 'cancel_type',
                     'cancellation_reason', 'cancellation_comments', 'start_date', 'start_time',
-                    'send_email_sms_report', 'invoice_urls', 'reports_uploaded'
+                    'send_email_sms_report', 'invoice_urls', 'reports_uploaded', 'email_notification_timestamp'
                     )
         else:
             return ()
 
     def get_readonly_fields(self, request, obj=None):
         if request.user.is_superuser:
-            read_only =  ['booking_id', 'order_id', 'lab_id', 'lab_contact_details', 'get_lab_test', 'invoice_urls', 'reports_uploaded']
+            read_only =  ['booking_id', 'order_id', 'lab_id', 'lab_contact_details', 'get_lab_test', 'invoice_urls', 'reports_uploaded', 'email_notification_timestamp']
         elif request.user.groups.filter(name=constants['LAB_APPOINTMENT_MANAGEMENT_TEAM']).exists():
             read_only = ['booking_id', 'order_id', 'lab_name', 'lab_id', 'get_lab_test', 'invoice_urls',
                     'lab_contact_details', 'used_profile_name', 'used_profile_number',
                     'default_profile_name', 'default_profile_number', 'user_number', 'user_id', 'price', 'agreed_price',
                     'deal_price', 'effective_price', 'payment_status', 'otp',
                     'payment_type', 'insurance', 'is_home_pickup', 'get_pickup_address', 'get_lab_address',
-                         'outstanding', 'reports_uploaded']
+                         'outstanding', 'reports_uploaded', 'email_notification_timestamp']
         else:
             read_only = []
 
@@ -876,6 +892,15 @@ class LabAppointmentAdmin(nested_admin.NestedModelAdmin):
                                                                              util_file_name(invoice))
         return mark_safe(invoices_urls)
     invoice_urls.short_description = 'Invoice(s)'
+
+    def email_notification_timestamp(self, instance):
+        l = instance.email_notification.filter(notification_type=NotificationAction.LAB_REPORT_SEND_VIA_CRM).values_list('created_at', flat=True)
+        result = []
+        for temp_item in l:
+            formated_date = datetime_to_formated_string(temp_item)
+            result.append(formated_date)
+        return ", ".join(result)
+    email_notification_timestamp.short_description = 'Report(s) sent at'
 
     def order_id(self, obj):
         if obj and obj.id:
@@ -1301,4 +1326,3 @@ class CommonPackageAdmin(VersionAdmin):
         form = super(CommonPackageAdmin, self).get_form(request, obj=obj, **kwargs)
         form.base_fields['package'].queryset = LabTest.objects.filter(is_package=True)
         return form
-
