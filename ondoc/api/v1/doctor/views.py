@@ -629,7 +629,7 @@ class DoctorProfileUserViewSet(viewsets.GenericViewSet):
                 hospital = response_data.get('hospitals')[0]
                 parameters['lat'] = hospital.get('lat')
                 parameters['long'] = hospital.get('long')
-            parameters['test_flag'] = 1
+            parameters['doctor_suggestions'] = 1
             kwargs['parameters'] = parameters
             response_data['doctors'] = doc.list(request, **kwargs)
         else:
@@ -1331,25 +1331,22 @@ class DoctorListViewSet(viewsets.GenericViewSet):
                             resp['parent_url'] = parent_url
 
 
+        specializations = list(models.PracticeSpecialization.objects.filter(id__in=validated_data.get('specialization_ids',[])).values('id','name'));
+
+
+        if parameters.get('doctor_suggestions') == 1:
+            response = list(response)[0:3]
+            return {"result": response, "count": result_count,
+                             'specializations': specializations}
+
         validated_data.get('procedure_categories', [])
         procedures = list(Procedure.objects.filter(pk__in=validated_data.get('procedure_ids', [])).values('id', 'name'))
         procedure_categories = list(ProcedureCategory.objects.filter(pk__in=validated_data.get('procedure_category_ids', [])).values('id', 'name'))
-        specializations = list(models.PracticeSpecialization.objects.filter(id__in=validated_data.get('specialization_ids',[])).values('id','name'));
         conditions = list(models.MedicalCondition.objects.filter(id__in=validated_data.get('condition_ids',[])).values('id','name'));
         if validated_data.get('ratings'):
             ratings = validated_data.get('ratings')
         if validated_data.get('reviews'):
             reviews = validated_data.get('reviews')
-
-        if parameters.get('test_flag') == 1:
-            response = list(response)[0:3]
-            return {"result": response, "count": result_count,
-                             'specializations': specializations, 'conditions': conditions, "seo": seo,
-                             "breadcrumb": breadcrumb, 'search_content': top_content,
-                             'procedures': procedures, 'procedure_categories': procedure_categories,
-                             'ratings': ratings, 'reviews': reviews, 'ratings_title': ratings_title,
-                             'bottom_content': bottom_content}
-
         return Response({"result": response, "count": result_count,
                          'specializations': specializations, 'conditions': conditions, "seo": seo,
                          "breadcrumb": breadcrumb, 'search_content': top_content,
