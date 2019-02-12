@@ -130,7 +130,7 @@ class RatingsReviewAdmin(ImportExportMixin, admin.ModelAdmin):
                 agent_token = AgentToken.objects.create_token(user=instance.user)
                 # login_object = JWTAuthentication.generate_token(instance.user)
                 token = agent_token.token if agent_token.token else None
-                url = settings.BASE_URL + "/user/myratings?id=" + str(instance.id) + "&token=" + token
+                url = settings.BASE_URL + "/myratings?id=" + str(instance.id) + "&token=" + token
                 short_url = v1_utils.generate_short_url(url)
                 text = "Please Find the url to Update your Feedback " + str(short_url)
                 try:
