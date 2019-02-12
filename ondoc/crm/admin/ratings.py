@@ -2,6 +2,8 @@ from django.contrib import admin
 from django.contrib.contenttypes.models import ContentType
 from django.utils.safestring import mark_safe
 from import_export import fields, resources
+
+from ondoc.authentication.models import AgentToken
 from ondoc.ratings_review.models import ReviewActions, RatingsReview
 from ondoc.diagnostic.models import LabAppointment, Lab
 from ondoc.doctor.models import OpdAppointment, Doctor
@@ -125,9 +127,10 @@ class RatingsReviewAdmin(ImportExportMixin, admin.ModelAdmin):
         from ondoc.authentication.backends import JWTAuthentication
         if instance:
             if instance.user:
-                login_object = JWTAuthentication.generate_token(instance.user)
-                token = login_object['token'] if login_object.get('token') else None
-                url = settings.BASE_URL + "/user/myratings?id=" + str(instance.id) + "&token=" + token.decode("utf-8")
+                agent_token = AgentToken.objects.create_token(user=instance.user)
+                # login_object = JWTAuthentication.generate_token(instance.user)
+                token = agent_token.token if agent_token.token else None
+                url = settings.BASE_URL + "/user/myratings?id=" + str(instance.id) + "&token=" + token
                 short_url = v1_utils.generate_short_url(url)
                 text = "Please Find the url to Update your Feedback " + str(short_url)
                 try:
