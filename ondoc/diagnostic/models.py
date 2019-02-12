@@ -938,7 +938,7 @@ class LabTest(TimeStampedModel, SearchKey):
         else:
             if not existings_urls.filter(is_valid=True).exists():
                 eu = existings_urls.first()
-                eu.is_valid = False
+                eu.is_valid = True
                 eu.save()
                 existings_urls.filter(~Q(id=eu.id)).update(is_valid=False)
 
