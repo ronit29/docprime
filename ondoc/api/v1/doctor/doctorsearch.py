@@ -439,7 +439,7 @@ class DoctorSearchHelper:
             general_specialization = sorted(general_specialization, key=operator.attrgetter('doctor_count'), reverse=True)
             for spec in general_specialization:
                 if str(spec.id) in specialization_ids:
-                    searched_spec_list.append({'name':spec.name})
+                    searched_spec_list.append({'name': spec.name})
                 else:    
                     doctor_spec_list.append({'name':spec.name})
 
@@ -453,6 +453,13 @@ class DoctorSearchHelper:
             from ondoc.coupon.models import Coupon
             search_coupon = Coupon.get_search_coupon(request.user)
             discounted_price = filtered_deal_price if not search_coupon else search_coupon.get_search_coupon_discounted_price(filtered_deal_price)
+            schema_specialization = None
+            schema_specialization = sorted_spec_list[0].get('name') if sorted_spec_list[0] and sorted_spec_list[0].get('name') else None
+            schema_type = None
+            if schema_specialization == 'Dentist':
+                schema_type = 'Dentist'
+            else:
+                schema_type = 'Physician'
 
             rating_graph = None
             if doctor and doctor.rating:
@@ -513,12 +520,69 @@ class DoctorSearchHelper:
                             'geoMidpoint': {
                                 '@type': 'GeoCoordinates',
                                 'latitude': doctor_clinic.hospital.location.y if doctor_clinic and
-                                                                                 getattr(doctor_clinic, 'hospital', None) and getattr(doctor_clinic.hospital, 'location', None) else None,
+                                                                                 getattr(doctor_clinic, 'hospital',
+                                                                                         None) and getattr(
+                                    doctor_clinic.hospital, 'location', None) else None,
                                 'longitude': doctor_clinic.hospital.location.x if doctor_clinic and
-                                                                                  getattr(doctor_clinic, 'hospital', None) and getattr(doctor_clinic.hospital, 'location', None) else None,
+                                                                                  getattr(doctor_clinic, 'hospital',
+                                                                                          None) and getattr(
+                                    doctor_clinic.hospital, 'location', None) else None,
                             }
                         }
                     }
+
+                },
+
+                "new_schema": {
+                    "@context": 'http://schema.org',
+                    "@type": schema_type,
+                    "currenciesAccepted": "INR",
+                    "MedicalSpeciality": schema_specialization,
+                    "name": doctor.get_display_name(),
+                    "image": doctor.get_thumbnail() if doctor.get_thumbnail() else static(
+                        'web/images/doc_placeholder.png'),
+                    "url": None,
+                    "address": {
+                        "@type": 'PostalAddress',
+                        "addressLocality": doctor_clinic.hospital.locality if doctor_clinic and getattr(doctor_clinic, 'hospital', None) else '',
+                        "addressRegion": doctor_clinic.hospital.city if doctor_clinic and getattr(doctor_clinic, 'hospital', None) else '',
+                        # "postalCode": doctor_clinic.hospital.pin_code if doctor_clinic and getattr(doctor_clinic, 'hospital', None) else '',
+                        # "streetAddress": doctor_clinic.hospital.get_hos_address() if doctor_clinic and getattr(doctor_clinic, 'hospital', None) else '',
+                    },
+                    # "description": doctor.about,
+                    "priceRange": min_price["deal_price"],
+                    # 'openingHours': opening_hours,
+                    'location': {
+                        '@type': 'Place',
+                        'geo': {
+                            # '@type': 'GeoCircle',
+                            # 'geoMidpoint': {
+                                '@type': 'GeoCoordinates',
+                                'latitude': doctor_clinic.hospital.location.y if doctor_clinic and
+                                                                                 getattr(doctor_clinic, 'hospital', None) and getattr(doctor_clinic.hospital, 'location', None) else None,
+                                'longitude': doctor_clinic.hospital.location.x if doctor_clinic and
+                                                                                  getattr(doctor_clinic, 'hospital', None) and getattr(doctor_clinic.hospital, 'location', None) else None,
+
+                        }
+                    },
+                    "branchOf": [
+                        {
+                            "@type": "MedicalClinic",
+                            "name": doctor_clinic.hospital.name,
+                            "priceRange": min_price["deal_price"],
+                            "image": doctor_clinic.hospital.get_thumbnail() if doctor_clinic.hospital.get_thumbnail() else None,
+                            "address":
+                                {
+                                    "@type": 'PostalAddress',
+                                    "addressLocality": doctor_clinic.hospital.locality if doctor_clinic and getattr(
+                                        doctor_clinic, 'hospital', None) else '',
+                                    "addressRegion": doctor_clinic.hospital.city if doctor_clinic and getattr(
+                                        doctor_clinic, 'hospital', None) else '',
+
+                                }
+
+                        }
+                    ]
 
                 }
             }
