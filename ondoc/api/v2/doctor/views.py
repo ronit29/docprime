@@ -216,9 +216,8 @@ class DoctorBlockCalendarViewSet(OndocViewSet):
         serializer = serializers.DoctorBlockCalenderSerializer(data=request.data, context={"request": request})
         serializer.is_valid(raise_exception=True)
         validated_data = serializer.validated_data
-        doctor = validated_data.get("doctor_id").id
-        if not doctor:
-            doctor = request.user.doctor.id
+        doctor_id = validated_data.get("doctor_id").id if validated_data.get("doctor_id") else request.user.doctor.id
+        hospital_id = validated_data.get("hopsital_id").id if validated_data.get("hospital_id") else None
         start_time = validated_data.get("start_time")
         if not start_time:
             start_time = self.INTERVAL_MAPPING[validated_data.get("interval")][0]
@@ -226,8 +225,8 @@ class DoctorBlockCalendarViewSet(OndocViewSet):
         if not end_time:
             end_time = self.INTERVAL_MAPPING[validated_data.get("interval")][1]
         doctor_leave_data = {
-            "doctor": doctor,
-            "hospital": validated_data.get("hospital_id"),
+            "doctor": doctor_id,
+            "hospital": hospital_id,
             "start_time": start_time,
             "end_time": end_time,
             "start_date": validated_data.get("start_date"),
