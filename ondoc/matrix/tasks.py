@@ -424,15 +424,14 @@ def create_or_update_lead_on_matrix(self, data):
             elif obj.gender and obj.gender == 'f':
                 gender = 2
         elif obj_type == Hospital.__name__:
-            spoc_details = SPOCDetails.objects.filter(content_object=obj, contact_type=SPOCDetails.SPOC).first()
+            spoc_details = obj.spoc_details.filter(contact_type=SPOCDetails.SPOC).first()
             if spoc_details:
                 mobile = str(spoc_details.std_code) if spoc_details.std_code else ''
                 mobile += str(spoc_details.number) if spoc_details.number else ''
         elif obj_type == HospitalNetwork.__name__:
-            spoc_details = SPOCDetails.objects.filter(content_object=obj, contact_type=SPOCDetails.SPOC).first()
+            spoc_details = obj.hospitalnetworkmanager_set.filter(contact_type=2).first()
             if spoc_details:
-                mobile = str(spoc_details.std_code) if spoc_details.std_code else ''
-                mobile += str(spoc_details.number) if spoc_details.number else ''
+                mobile += str(spoc_details.number) if hasattr(spoc_details, 'number') and spoc_details.number else ''
         mobile = int(mobile)
         if not mobile:
             return
@@ -444,10 +443,10 @@ def create_or_update_lead_on_matrix(self, data):
             'OnBoarding': obj.onboarding_status if hasattr(obj, 'onboarding_status') else 0,
             'Gender': gender,
             'ProductId': product_id,
-            'SubProductId': sub_product_id,  # TODO: SHASHANK_SINGH or ROHIT_P waiting for their response.
+            'SubProductId': sub_product_id,
             'Name': obj.name if hasattr(obj, 'name') and obj.name else '',
             'ExitPointUrl': exit_point_url,
-            'CityId': 0  # TODO: SHASHANK_SINGH or ROHIT_P send city ID
+            'CityId': obj.matrix_city.id if hasattr(obj, 'matrix_city') and obj.matrix_city.id else 0
         }
         url = settings.MATRIX_API_URL
         matrix_api_token = settings.MATRIX_API_TOKEN

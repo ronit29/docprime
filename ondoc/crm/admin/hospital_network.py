@@ -113,7 +113,7 @@ class HospitalNetworkForm(FormCleanMixin):
                        'building': 'req', 'locality': 'req',
                        'country': 'req', 'pin_code': 'req', 'hospitalnetworkmanager': 'count',
                        'hospitalnetworkhelpline': 'count', 'hospitalnetworkemail': 'count',
-                       'matrix_city': 'req', 'matrix_state': 'req', 'authentication-spocdetails-content_type-object_id': 'count'}
+                       'matrix_city': 'req', 'matrix_state': 'req', 'hospitalnetworkmanager_set': 'count'}
 
         # if self.instance.is_billing_enabled:
         #     qc_required.update({
@@ -128,16 +128,16 @@ class HospitalNetworkForm(FormCleanMixin):
             if self.data.get(key+'-TOTAL_FORMS') and value == 'count' and int(self.data.get(key+'-TOTAL_FORMS')) <= 0:
                 raise forms.ValidationError("Atleast one entry of "+key+" is required for Quality Check")
 
-        number_of_spocs = self.data.get('authentication-spocdetails-content_type-object_id-TOTAL_FORMS', '0')
+        number_of_spocs = self.data.get('hospitalnetworkmanager_set-TOTAL_FORMS', '0')
         try:
             number_of_spocs = int(number_of_spocs)
         except Exception as e:
             logger.error("Something went wrong while counting SPOCs for hospital - " + str(e))
             raise forms.ValidationError("Something went wrong while counting SPOCs.")
         if number_of_spocs > 0:
-            if not any([self.data.get('authentication-spocdetails-content_type-object_id-{}-contact_type'.format(i),
-                                      0) == str(SPOCDetails.SPOC) and self.data.get(
-                'authentication-spocdetails-content_type-object_id-{}-number'.format(i)) for i in
+            if not any([self.data.get('hospitalnetworkmanager_set-{}-contact_type'.format(i),
+                                      0) == str(2) and self.data.get(
+                'hospitalnetworkmanager_set-{}-number'.format(i)) for i in
                         range(number_of_spocs)]):
                 raise forms.ValidationError("Must have Single Point Of Contact number.")
 
