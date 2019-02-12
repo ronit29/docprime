@@ -6,6 +6,7 @@ from django.contrib.contenttypes.models import ContentType
 from ondoc.authentication.models import TimeStampedModel
 # from ondoc.doctor.models import OpdAppointment
 # from ondoc.diagnostic.models import LabAppointment
+from ondoc.authentication.models import User
 
 
 class Cities(models.Model):
@@ -34,6 +35,7 @@ class AppointmentHistory(TimeStampedModel):
     object_id = models.PositiveIntegerField()
     content_object = GenericForeignKey()
     status = models.PositiveSmallIntegerField(null=False)
+    user = models.ForeignKey(User, null=True, default=None, on_delete=models.CASCADE)
 
     @classmethod
     def create(cls, *args, **kwargs):
@@ -41,8 +43,12 @@ class AppointmentHistory(TimeStampedModel):
         if not obj:
             raise Exception('Function accept content_object in **kwargs')
 
+        user = None
+        if hasattr(obj, "_responsible_user"):
+            user = obj._responsible_user
+
         content_type = ContentType.objects.get_for_model(obj)
-        cls(content_type=content_type, object_id=obj.id, status=obj.status).save()
+        cls(content_type=content_type, object_id=obj.id, status=obj.status, user=user).save()
 
 
     class Meta:
