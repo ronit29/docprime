@@ -22,7 +22,7 @@ logger = logging.getLogger(__name__)
 
 
 class DoctorBillingViewSet(viewsets.GenericViewSet):
-    #
+    
     authentication_classes = (JWTAuthentication,)
     permission_classes = (IsAuthenticated, v1_utils.IsDoctor)
 
@@ -183,8 +183,8 @@ class DoctorBillingViewSet(viewsets.GenericViewSet):
 
 class DoctorProfileView(viewsets.GenericViewSet):
 
-    # authentication_classes = (JWTAuthentication, )
-    # permission_classes = (IsAuthenticated, v1_utils.IsDoctor)
+    authentication_classes = (JWTAuthentication, )
+    permission_classes = (IsAuthenticated, v1_utils.IsDoctor)
 
     def get_queryset(self):
         return doc_models.models.OpdAppointment.objects.none()
