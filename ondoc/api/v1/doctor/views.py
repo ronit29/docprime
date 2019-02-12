@@ -1333,10 +1333,15 @@ class DoctorListViewSet(viewsets.GenericViewSet):
 
         specializations = list(models.PracticeSpecialization.objects.filter(id__in=validated_data.get('specialization_ids',[])).values('id','name'));
 
-
         if parameters.get('doctor_suggestions') == 1:
-            response = list(response)[0:3]
-            return {"result": response, "count": result_count,
+            result = list()
+            for data in response:
+                if data.get('enabled_for_online_booking') == True and len(result)<3:
+                    result.append(data)
+                else:
+                    break
+            result = result if result else None
+            return {"result": result, "count": result_count,
                              'specializations': specializations}
 
         validated_data.get('procedure_categories', [])
