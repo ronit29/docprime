@@ -904,21 +904,24 @@ class LabTest(TimeStampedModel, SearchKey):
 
     def save(self, *args, **kwargs):
 
-        if not self.url:
-            self.url = slugify(self.name)+'-'+self.URL_SUFFIX
+        url = slugify(self.url)
+        #self.url = slugify(self.url)
 
-        generated_url = self.generate_url(self.url)
-        if generated_url!=self.url:
-            self.url = generated_url
+        if not url:
+            url = slugify(self.name)+'-'+self.URL_SUFFIX
+
+        generated_url = self.generate_url(url)
+        if generated_url!=url:
+            url = generated_url
 
         super().save(*args, **kwargs)
         
-        self.create_url()
+        self.create_url(url)
 
 
     def generate_url(self, url):
 
-        duplicate_urls = EntityUrls.objects.filter(~Q(entity_id=self.id), url__iexact=self.url, sitemap_identifier=LabTest.LAB_TEST_SITEMAP_IDENTIFIER)
+        duplicate_urls = EntityUrls.objects.filter(~Q(entity_id=self.id), url__iexact=url, sitemap_identifier=LabTest.LAB_TEST_SITEMAP_IDENTIFIER)
         if duplicate_urls.exists():
             url = url.rstrip(self.URL_SUFFIX)
             url = url.rstrip('-')
@@ -927,20 +930,21 @@ class LabTest(TimeStampedModel, SearchKey):
         return url
 
 
-    def create_url(self):
+    def create_url(self, url):
 
-        existings_urls = EntityUrls.objects.filter(url__iexact=self.url, \
+        existings_urls = EntityUrls.objects.filter(url__iexact=url, \
             sitemap_identifier=LabTest.LAB_TEST_SITEMAP_IDENTIFIER, entity_id=self.id).all()
 
         if not existings_urls.exists():
-            url_entry = EntityUrls.objects.create(url=self.url, entity_id=self.id, sitemap_identifier=self.LAB_TEST_SITEMAP_IDENTIFIER,\
+            url_entry = EntityUrls.objects.create(url=url, entity_id=self.id, sitemap_identifier=self.LAB_TEST_SITEMAP_IDENTIFIER,\
                 is_valid=True, url_type='PAGEURL', entity_type='LabTest')
+            EntityUrls.objects.filter(entity_id=self.id).filter(~Q(id=url_entry.id)).update(is_valid=False)
         else:
             if not existings_urls.filter(is_valid=True).exists():
                 eu = existings_urls.first()
                 eu.is_valid = True
                 eu.save()
-                existings_urls.filter(~Q(id=eu.id)).update(is_valid=False)
+                EntityUrls.objects.filter(entity_id=self.id).filter(~Q(id=eu.id)).update(is_valid=False)
 
     class Meta:
         db_table = "lab_test"
