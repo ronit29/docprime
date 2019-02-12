@@ -888,16 +888,16 @@ class SearchedItemsViewSet(viewsets.GenericViewSet):
         count = int(count)
         if count <=0:
             count = 10
-        medical_conditions = models.CommonMedicalCondition.objects.select_related('condition').all().order_by("priority")[:count]
+        medical_conditions = models.CommonMedicalCondition.objects.select_related('condition').all().order_by("-priority")[:count]
         conditions_serializer = serializers.MedicalConditionSerializer(medical_conditions, many=True, context={'request': request})
 
-        common_specializations = models.CommonSpecialization.objects.select_related('specialization').all().order_by("priority")[:10]
+        common_specializations = models.CommonSpecialization.objects.select_related('specialization').all().order_by("-priority")[:10]
         specializations_serializer = serializers.CommonSpecializationsSerializer(common_specializations, many=True, context={'request': request})
 
-        common_procedure_categories = CommonProcedureCategory.objects.select_related('procedure_category').filter(procedure_category__is_live=True).all().order_by("priority")[:10]
+        common_procedure_categories = CommonProcedureCategory.objects.select_related('procedure_category').filter(procedure_category__is_live=True).all().order_by("-priority")[:10]
         common_procedure_categories_serializer = CommonProcedureCategorySerializer(common_procedure_categories, many=True)
 
-        common_procedures = CommonProcedure.objects.select_related('procedure').filter(procedure__is_enabled=True).all().order_by("priority")[:10]
+        common_procedures = CommonProcedure.objects.select_related('procedure').filter(procedure__is_enabled=True).all().order_by("-priority")[:10]
         common_procedures_serializer = CommonProcedureSerializer(common_procedures, many=True)
 
         return Response({"conditions": conditions_serializer.data, "specializations": specializations_serializer.data,
@@ -1222,22 +1222,22 @@ class DoctorListViewSet(viewsets.GenericViewSet):
                     if object.bottom_content:
                         bottom_content = object.bottom_content
 
-                if not top_content and specialization_id:
-                    specialization_content = models.PracticeSpecializationContent.objects.filter(
-                        specialization__id=specialization_id).first()
-                    if specialization_content:
-                        top_content = specialization_content.content
-
-                if top_content:
-                    top_content = str(top_content)
-                    top_content = top_content.replace('<location>', location)
-                    regex = re.compile(r'[\n\r\t]')
-                    top_content = regex.sub(" ", top_content)
-                if bottom_content:
-                    bottom_content = str(bottom_content)
-                    bottom_content = bottom_content.replace('<location>', location)
-                    regex = re.compile(r'[\n\r\t]')
-                    bottom_content = regex.sub(" ", bottom_content)
+                # if not top_content and specialization_id:
+                #     specialization_content = models.PracticeSpecializationContent.objects.filter(
+                #         specialization__id=specialization_id).first()
+                #     if specialization_content:
+                #         top_content = specialization_content.content
+                #
+                # if top_content:
+                #     top_content = str(top_content)
+                #     top_content = top_content.replace('<location>', location)
+                #     regex = re.compile(r'[\n\r\t]')
+                #     top_content = regex.sub(" ", top_content)
+                # if bottom_content:
+                #     bottom_content = str(bottom_content)
+                #     bottom_content = bottom_content.replace('<location>', location)
+                #     regex = re.compile(r'[\n\r\t]')
+                #     bottom_content = regex.sub(" ", bottom_content)
 
             seo = {
                 "title": title,

@@ -1062,7 +1062,7 @@ class TransactionViewSet(viewsets.GenericViewSet):
 
                 if success_in_process:
                     if processed_data.get("type") == "all":
-                        REDIRECT_URL = SUCCESS_REDIRECT_URL % order_obj.id
+                        REDIRECT_URL = (SUCCESS_REDIRECT_URL % order_obj.id) + "?payment_success=true"
                     elif processed_data.get("type") == "doctor":
                         REDIRECT_URL = OPD_REDIRECT_URL + "/" + str(processed_data.get("id","")) + "?payment_success=true"
                     elif processed_data.get("type") == "lab":
@@ -1612,19 +1612,18 @@ class SendBookingUrlViewSet(GenericViewSet):
     authentication_classes = (JWTAuthentication,)
     permission_classes = (IsAuthenticated, )
 
-    def send_booking_url(self, request, order_id):
+    def send_booking_url(self, request):
         type = request.data.get('type')
-        agent_token = AgentToken.objects.create_token(user=request.user, order_id=order_id)
-        order = Order.objects.filter(pk=order_id).first()
-        if not order:
-            return Response({"status": 1})
-        profile_id = order.action_data.get('profile')
-        user_profile = UserProfile.objects.filter(pk=profile_id).first()
+        agent_token = AgentToken.objects.create_token(user=request.user)
+        user_profile = None
+
+        if request.user.is_authenticated:
+            user_profile = request.user.get_default_profile()
         if not user_profile:
             return Response({"status": 1})
-        booking_url = SmsNotification.send_booking_url(token=agent_token.token, order_id=order_id,
-                                                       phone_number=str(user_profile.phone_number))
-        EmailNotification.send_booking_url(token=agent_token.token, order_id=order_id, email=user_profile.email)
+
+        booking_url = SmsNotification.send_booking_url(token=agent_token.token, phone_number=str(user_profile.phone_number))
+        EmailNotification.send_booking_url(token=agent_token.token, email=user_profile.email)
 
         return Response({"status": 1})
 
