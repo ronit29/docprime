@@ -1830,6 +1830,15 @@ class TestDetailsViewset(viewsets.GenericViewSet):
         kwargs['test_flag'] = 1
 
         result['labs'] = lab.search(request, **kwargs)
+        seo = dict()
+        if entity:
+            seo['description'] = None
+            if queryset:
+                seo['title'] = queryset[0].name + ' Test: Types, Procedure & Normal Range of Results'
+        else:
+            seo = None
+
+        result['seo'] = seo
         final_result.append(result)
 
         return Response(final_result)
