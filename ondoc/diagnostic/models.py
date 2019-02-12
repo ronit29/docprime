@@ -695,7 +695,7 @@ class LabTestCategoryMapping(models.Model):
 
 class LabTest(TimeStampedModel, SearchKey):
     LAB_TEST_SITEMAP_IDENTIFIER = 'LAB_TEST'
-    URL_SUFFIX = 'ltpp'
+    URL_SUFFIX = 'tpp'
     RADIOLOGY = 1
     PATHOLOGY = 2
     OTHER = 3
