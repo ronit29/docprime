@@ -1222,22 +1222,22 @@ class DoctorListViewSet(viewsets.GenericViewSet):
                     if object.bottom_content:
                         bottom_content = object.bottom_content
 
-                if not top_content and specialization_id:
-                    specialization_content = models.PracticeSpecializationContent.objects.filter(
-                        specialization__id=specialization_id).first()
-                    if specialization_content:
-                        top_content = specialization_content.content
-
-                if top_content:
-                    top_content = str(top_content)
-                    top_content = top_content.replace('<location>', location)
-                    regex = re.compile(r'[\n\r\t]')
-                    top_content = regex.sub(" ", top_content)
-                if bottom_content:
-                    bottom_content = str(bottom_content)
-                    bottom_content = bottom_content.replace('<location>', location)
-                    regex = re.compile(r'[\n\r\t]')
-                    bottom_content = regex.sub(" ", bottom_content)
+                # if not top_content and specialization_id:
+                #     specialization_content = models.PracticeSpecializationContent.objects.filter(
+                #         specialization__id=specialization_id).first()
+                #     if specialization_content:
+                #         top_content = specialization_content.content
+                #
+                # if top_content:
+                #     top_content = str(top_content)
+                #     top_content = top_content.replace('<location>', location)
+                #     regex = re.compile(r'[\n\r\t]')
+                #     top_content = regex.sub(" ", top_content)
+                # if bottom_content:
+                #     bottom_content = str(bottom_content)
+                #     bottom_content = bottom_content.replace('<location>', location)
+                #     regex = re.compile(r'[\n\r\t]')
+                #     bottom_content = regex.sub(" ", bottom_content)
 
             seo = {
                 "title": title,
