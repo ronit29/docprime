@@ -47,10 +47,9 @@ def send_lab_notifications_refactored(appointment_id):
             if is_masking_done:
                 break
             else:
-                is_masking_done = generate_appointment_masknumber(
-                    ({'type': 'LAB_APPOINTMENT', 'appointment_id': instance.id}))
                 counter = counter + 1
-        # generate_appointment_masknumber(({'type': 'LAB_APPOINTMENT', 'appointment_id': instance.id}))
+                is_masking_done = generate_appointment_masknumber(
+                    ({'type': 'LAB_APPOINTMENT', 'appointment': instance}))
         lab_notification = LabNotification(instance)
         lab_notification.send()
     except Exception as e:
@@ -136,8 +135,9 @@ def send_opd_notifications_refactored(appointment_id):
             if is_masking_done:
                 break
             else:
+                counter = counter + 1
                 is_masking_done = generate_appointment_masknumber(
-                    ({'type': 'OPD_APPOINTMENT', 'appointment_id': instance.id}))
+                    ({'type': 'OPD_APPOINTMENT', 'appointment': instance}))
         opd_notification = OpdNotification(instance)
         opd_notification.send()
     except Exception as e:
@@ -335,24 +335,18 @@ def generate_appointment_masknumber(data):
     try:
         is_mask_number = True
         is_maskable = True
-        appointment_id = data.get('appointment_id', None)
-        if not appointment_id:
+        appointment = data.get('appointment', None)
+        if not appointment:
             # logger.error("[CELERY ERROR: Incorrect values provided.]")
-            raise Exception("Appointment id not found, could not get mask number")
+            raise Exception("Appointment not found, could not get mask number")
 
         if appointment_type == 'OPD_APPOINTMENT':
-            appointment = OpdAppointment.objects.filter(id=appointment_id).first()
-            if not appointment:
-                raise Exception("Appointment not found, could not get mask number")
             is_network_enabled_hospital = appointment.hospital
             if is_network_enabled_hospital:
                 is_maskable = is_network_enabled_hospital.is_mask_number_required
             else:
                 is_maskable = True
         elif data.get('type') == 'LAB_APPOINTMENT':
-            appointment = LabAppointment.objects.filter(id=appointment_id).first()
-            if not appointment:
-                raise Exception("Appointment not found, could not get mask number")
             is_network_enabled_lab = appointment.lab.network
             if is_network_enabled_lab:
                 is_maskable = is_network_enabled_lab.is_mask_number_required
@@ -364,7 +358,7 @@ def generate_appointment_masknumber(data):
         updated_time_slot = time_slot + datetime.timedelta(days=1)
         validity_up_to = int((time_slot + datetime.timedelta(days=1)).timestamp())
         if not phone_number:
-            raise Exception("phone Number could not found against id - " + str(appointment_id))
+            raise Exception("phone Number could not found against appointment id - " + str(appointment.id))
         if is_maskable:
             request_data = {
                 "ExpirationDate": validity_up_to,
@@ -403,7 +397,7 @@ def generate_appointment_masknumber(data):
                                                      is_deleted=False).save()
                 is_masking_done = True
         else:
-            raise Exception("Failed to generate Mask Number for the appointment - " + str(appointment_id))
+            raise Exception("Failed to generate Mask Number for the appointment - " + str(appointment.id))
     except Exception as e:
         logger.error("Error in Celery. Failed to get mask number for appointment " + str(e))
     return is_masking_done
