@@ -1275,7 +1275,10 @@ class DoctorAdmin(AutoComplete, ImportExportMixin, VersionAdmin, ActionAdmin, QC
 
     def save_model(self, request, obj, form, change):
         if obj and not obj.id and not obj.matrix_lead_id:
-            obj.matrix_lead_id = form.request_matrix_lead_id if hasattr(form, 'request_matrix_lead_id') else None
+            try:
+                obj.matrix_lead_id = int(form.request_matrix_lead_id) if hasattr(form, 'request_matrix_lead_id') else None
+            except Exception as e:
+                logger.error("Invalid Matrix ID received from Matrix - " + str(e))
 
         obj.request_agent_lead_id = form.request_agent_lead_id if hasattr(form, 'request_agent_lead_id') else None
 
