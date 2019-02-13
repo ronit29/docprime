@@ -1944,6 +1944,7 @@ class TestDetailsViewset(viewsets.GenericViewSet):
             parameters['long'] = params.get('long')
 
         parameters['ids'] = ",".join(test_ids)
+        parameters['max_distance'] = 15000
 
         kwargs['parameters'] = parameters
         kwargs['test_flag'] = 1
