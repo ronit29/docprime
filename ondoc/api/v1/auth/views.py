@@ -1061,8 +1061,9 @@ class TransactionViewSet(viewsets.GenericViewSet):
                     logger.error("Invalid pg data - " + json.dumps(resp_serializer.errors))
             elif order_obj:
                 try:
-                    order_obj.change_payment_status(Order.PAYMENT_FAILURE)
-                    self.send_failure_ops_email(order_obj)
+                    has_changed = order_obj.change_payment_status(Order.PAYMENT_FAILURE)
+                    if has_changed:
+                        self.send_failure_ops_email(order_obj)
                 except Exception as e:
                     logger.error("Error sending payment failure email - " + str(e))
 
