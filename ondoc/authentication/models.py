@@ -1127,10 +1127,10 @@ class UserSecretKey(TimeStampedModel):
 
 
 class AgentTokenManager(models.Manager):
-    def create_token(self, user, order_id):
+    def create_token(self, user):
         expiry_time = timezone.now() + timezone.timedelta(hours=AgentToken.expiry_duration)
         token = ''.join([random.choice(string.ascii_letters + string.digits) for n in range(10)])
-        return super().create(user=user, token=token, expiry_time=expiry_time, order_id=order_id)
+        return super().create(user=user, token=token, expiry_time=expiry_time)
 
 
 class AgentToken(TimeStampedModel):

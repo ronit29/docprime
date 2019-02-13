@@ -37,9 +37,11 @@ class Order(TimeStampedModel):
     LAB_APPOINTMENT_CREATE = 4
     PAYMENT_ACCEPTED = 1
     PAYMENT_PENDING = 0
+    PAYMENT_FAILURE = 3
     PAYMENT_STATUS_CHOICES = (
         (PAYMENT_ACCEPTED, "Payment Accepted"),
         (PAYMENT_PENDING, "Payment Pending"),
+        (PAYMENT_FAILURE, "Payment Failure")
     )
     ACTION_CHOICES = (("", "Select"), (OPD_APPOINTMENT_RESCHEDULE, 'Opd Reschedule'),
                       (OPD_APPOINTMENT_CREATE, "Opd Create"),
@@ -459,6 +461,9 @@ class Order(TimeStampedModel):
         if not opd_appointment_ids and not lab_appointment_ids:
             raise Exception("Could not process entire order")
 
+        # mark order processed:
+        self.change_payment_status(Order.PAYMENT_ACCEPTED)
+
         # if order is done without PG transaction, then make an async task to create a dummy transaction and set it.
         if not self.getTransactions():
             try:
@@ -495,6 +500,14 @@ class Order(TimeStampedModel):
         if self.action_data and "user" in self.action_data:
             return self.action_data["user"]
         return None
+
+    @transaction.atomic()
+    def change_payment_status(self, status):
+        order_obj = Order.objects.select_for_update().get(id=self.id)
+        if order_obj.payment_status != Order.PAYMENT_ACCEPTED:
+            order_obj.payment_status = status
+            order_obj.save()
+        return order_obj
 
     class Meta:
         db_table = "order"
@@ -1117,8 +1130,16 @@ class MerchantPayout(TimeStampedModel):
     PAID = 3
     AUTOMATIC = 1
     MANUAL = 2
+
+    NEFT = "NEFT"
+    IMPS = "IMPS"
+    IFT = "IFT"
+    INTRABANK_IDENTIFIER = "KKBK"
     STATUS_CHOICES = [(PENDING, 'Pending'), (ATTEMPTED, 'ATTEMPTED'), (PAID, 'Paid')]
+    PAYMENT_MODE_CHOICES = [(NEFT, 'NEFT'), (IMPS, 'IMPS'), (IFT, 'IFT')]    
     TYPE_CHOICES = [(AUTOMATIC, 'Automatic'), (MANUAL, 'Manual')]
+
+    payment_mode = models.CharField(max_length=100, blank=True, null=True, choices=PAYMENT_MODE_CHOICES)
     payout_ref_id = models.IntegerField(null=True, unique=True)
     charged_amount = models.DecimalField(max_digits=10, decimal_places=2)
     payable_amount = models.DecimalField(max_digits=10, decimal_places=2)
@@ -1181,6 +1202,19 @@ class MerchantPayout(TimeStampedModel):
         if appt and appt.get_billed_to:
             return appt.get_billed_to
         return ''
+
+    def get_default_payment_mode(self):
+        default_payment_mode = None
+        merchant = self.get_merchant()
+        if merchant and merchant.ifsc_code:
+            ifsc_code = merchant.ifsc_code
+            if ifsc_code.upper().startswith(self.INTRABANK_IDENTIFIER):
+                default_payment_mode = self.IFT
+            else:
+                default_payment_mode = MerchantPayout.NEFT
+
+        return default_payment_mode
+
 
 
     def get_merchant(self):
