@@ -785,6 +785,7 @@ class LabTestCategory(auth_model.TimeStampedModel, SearchKey):
     is_live = models.BooleanField(default=False)
     is_package_category = models.BooleanField(verbose_name='Is this a test package category?')
     show_on_recommended_screen = models.BooleanField(default=False)
+    priority = models.PositiveIntegerField(default=0)
 
     def __str__(self):
         return self.name
