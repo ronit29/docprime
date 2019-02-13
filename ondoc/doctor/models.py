@@ -33,7 +33,7 @@ from ondoc.notification import tasks as notification_tasks
 from django.contrib.contenttypes.fields import GenericRelation
 from ondoc.api.v1.utils import get_start_end_datetime, custom_form_datetime, CouponsMixin, aware_time_zone, \
     form_time_slot, util_absolute_url, html_to_pdf
-from ondoc.common.models import AppointmentHistory
+from ondoc.common.models import AppointmentHistory, QRCode
 from functools import reduce
 from operator import or_
 import logging
@@ -443,6 +443,7 @@ class Doctor(auth_model.TimeStampedModel, auth_model.QCModel, SearchKey):
     disable_comments = models.CharField(max_length=500, blank=True)
     disabled_by = models.ForeignKey(settings.AUTH_USER_MODEL, related_name="disabled_doctors", null=True, editable=False,
                                    on_delete=models.SET_NULL)
+    qr_code = GenericRelation(QRCode, related_name="qrcode")
 
     def __str__(self):
         return '{} ({})'.format(self.name, self.id)

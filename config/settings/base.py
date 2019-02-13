@@ -111,6 +111,7 @@ THIRD_PARTY_APPS = (
     'threadedcomments',
     'django_comments',
     'ddtrace.contrib.django',
+    'qr_code'
 )
 
 LOCAL_APPS = (

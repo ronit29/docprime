@@ -1,4 +1,5 @@
 from django.contrib.postgres.fields import JSONField
+from django.core.validators import FileExtensionValidator
 from django.db import models
 from django.contrib.contenttypes.fields import GenericForeignKey
 from django.contrib.contenttypes.models import ContentType
@@ -114,3 +115,15 @@ class UserConfig(TimeStampedModel):
 
     class Meta:
         db_table = 'user_config'
+
+
+class QRCode(TimeStampedModel):
+    content_type = models.ForeignKey(ContentType, on_delete=models.CASCADE, null=True)
+    object_id = models.PositiveIntegerField(null=True)
+    content_object = GenericForeignKey()
+    name = models.FileField(upload_to='qrcode', validators=[
+        FileExtensionValidator(allowed_extensions=['pdf', 'jfif', 'jpg', 'jpeg', 'png'])])
+    # name = models.ImageField(upload_to='qrcode', blank=True, null=True)
+
+    class Meta:
+        db_table = 'qr_code'
