@@ -5,6 +5,8 @@ from ondoc.diagnostic.models import CommonTest
 from ondoc.diagnostic.models import CommonPackage
 from ondoc.banner.models import Banner
 from ondoc.common.models import PaymentOptions
+from ondoc.tracking.models import TrackingEvent
+from ondoc.ratings_review.models import AppRatings
 from ondoc.api.v1.doctor.serializers import CommonSpecializationsSerializer
 from ondoc.api.v1.diagnostic.serializers import CommonTestSerializer
 from ondoc.api.v1.diagnostic.serializers import CommonPackageSerializer
@@ -28,6 +30,7 @@ class ScreenViewSet(viewsets.GenericViewSet):
 
         package_queryset = CommonPackage.objects.prefetch_related('package').filter(package__enable_for_retail=True)[:grid_size-1]
         package_serializer = CommonPackageSerializer(package_queryset, many=True, context={'request': request})
+
 
         grid_list = [
             {
@@ -87,7 +90,28 @@ class ScreenViewSet(viewsets.GenericViewSet):
                     "grid_list": grid_list,
                     },
                 "banner": banner,
-                "payment_options": payment_options
+                "payment_options": payment_options,
+                "ask_for_app_rating": self.ask_for_app_rating(request)
         }
 
         return Response(resp)
+
+    def ask_for_app_rating(self, request, *args, **kwargs):
+
+        if request.user.is_authenticated:
+            user = request.user
+        else:
+            return False
+        opd_app = user.get_unrated_opd_appointment()
+        lab_app = user.get_unrated_lab_appointment()
+        if opd_app or lab_app:
+            return False
+
+        if AppRatings.objects.filter(user=user, app_type=AppRatings.CONSUMER).exists():
+            return False
+
+        user_tracking = TrackingEvent.objects.filter(user=user, data__Category="DocprimeApp", data__event="AppLaunch")
+        if user_tracking.exists() and user_tracking.count() % 3 == 0:
+            return True
+        else:
+            return False
