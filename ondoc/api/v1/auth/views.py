@@ -1061,6 +1061,12 @@ class TransactionViewSet(viewsets.GenericViewSet):
                     logger.error("Invalid pg data - " + json.dumps(resp_serializer.errors))
             elif order_obj:
                 try:
+                    if response and response.get("orderNo") and response.get("orderId"):
+                        send_pg_acknowledge.apply_async((response.get("orderId"), response.get("orderNo"),), countdown=1)
+                except Exception as e:
+                    logger.error("Error in sending pg acknowledge - " + str(e))
+
+                try:
                     has_changed = order_obj.change_payment_status(Order.PAYMENT_FAILURE)
                     if has_changed:
                         self.send_failure_ops_email(order_obj)
