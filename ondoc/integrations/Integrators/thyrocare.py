@@ -161,7 +161,7 @@ class Thyrocare(BaseIntegrator):
             patient_address = "Dummy Address(No address found for user)"
             pincode = "122002"
 
-        order_id = "DP00{}".format(lab_appointment.id)
+        order_id = "DP{}".format(lab_appointment.id)
         bendataxml = "<NewDataSet><Ben_details><Name>%s</Name><Age>%s</Age><Gender>%s</Gender></Ben_details></NewDataSet>" % (profile.name, self.calculate_age(profile), profile.gender)
 
         payload = {

@@ -62,13 +62,14 @@ def push_lab_appointment_to_integrator(self, data):
                                                                 content_object=appointment, response_data=resp_data,
                                                                 integrator_class_name=integrator_mapping.integrator_class_name)
 
-        if integrator_response:
-            fetch_reports_from_integrator(self, integrator_response)
+        # if integrator_response:
+        #     fetch_reports_from_integrator(self, integrator_response)
 
     except Exception as e:
         logger.error(str(e))
 
 # To fetch test reports from integrator
+# # Need run this as a cron job
 def fetch_reports_from_integrator(self, integrator_response):
     from ondoc.integrations.models import IntegratorReport
     from ondoc.integrations import service
