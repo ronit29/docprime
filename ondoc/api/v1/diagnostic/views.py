@@ -1950,12 +1950,11 @@ class TestDetailsViewset(viewsets.GenericViewSet):
 
         result['labs'] = lab.search(request, **kwargs)
         seo = dict()
-        if entity:
-            seo['description'] = None
-            if queryset:
-                seo['title'] = queryset[0].name + ' Test: Types, Procedure & Normal Range of Results'
+        seo['description'] = None
+        if queryset:
+            seo['title'] = queryset[0].name + ' Test: Types, Procedure & Normal Range of Results'
         else:
-            seo = None
+            seo['title'] = None
 
         result['seo'] = seo
         final_result.append(result)
