@@ -4,7 +4,7 @@ from django.contrib.gis.db import models
 from django.contrib.staticfiles.templatetags.staticfiles import static
 from django.core.validators import MaxValueValidator, MinValueValidator, FileExtensionValidator
 from django.template.loader import render_to_string
-# from hardcopy import bytestring_to_pdf
+from hardcopy import bytestring_to_pdf
 
 from ondoc.account.models import MerchantPayout, ConsumerAccount, Order, UserReferred, MoneyPool, Invoice
 from ondoc.authentication.models import (TimeStampedModel, CreatedByModel, Image, Document, QCModel, UserProfile, User,
@@ -12,6 +12,7 @@ from ondoc.authentication.models import (TimeStampedModel, CreatedByModel, Image
                                          BillingAccount, SPOCDetails)
 from ondoc.doctor.models import Hospital, SearchKey, CancellationReason
 from ondoc.coupon.models import Coupon
+from ondoc.location.models import EntityUrls
 from ondoc.notification import models as notification_models
 from ondoc.notification import tasks as notification_tasks
 from ondoc.notification.labnotificationaction import LabNotificationAction
@@ -53,6 +54,7 @@ from decimal import Decimal
 from ondoc.common.models import AppointmentHistory
 import reversion
 from decimal import Decimal
+from django.utils.text import slugify
 
 logger = logging.getLogger(__name__)
 
@@ -825,6 +827,8 @@ class LabTestRecommendedCategoryMapping(models.Model):
 
 
 class LabTest(TimeStampedModel, SearchKey):
+    LAB_TEST_SITEMAP_IDENTIFIER = 'LAB_TEST'
+    URL_SUFFIX = 'tpp'
     RADIOLOGY = 1
     PATHOLOGY = 2
     OTHER = 3
@@ -872,6 +876,7 @@ class LabTest(TimeStampedModel, SearchKey):
                                         through=LabTestCategoryMapping,
                                         through_fields=('lab_test', 'parent_category'),
                                         related_name='lab_tests')
+    url = models.CharField(max_length=500, blank=True)
     min_age = models.PositiveSmallIntegerField(default=None, blank=True, null=True, validators=[MaxValueValidator(120), MinValueValidator(1)])
     max_age = models.PositiveSmallIntegerField(default=None, blank=True, null=True, validators=[MaxValueValidator(120), MinValueValidator(1)])
     MALE = 1
@@ -897,6 +902,50 @@ class LabTest(TimeStampedModel, SearchKey):
 
     def __str__(self):
         return '{} ({})'.format(self.name, "PACKAGE" if self.is_package else "TEST")
+
+    def save(self, *args, **kwargs):
+
+        url = slugify(self.url)
+        #self.url = slugify(self.url)
+
+        if not url:
+            url = slugify(self.name)+'-'+self.URL_SUFFIX
+
+        generated_url = self.generate_url(url)
+        if generated_url!=url:
+            url = generated_url
+
+        super().save(*args, **kwargs)
+        
+        self.create_url(url)
+
+
+    def generate_url(self, url):
+
+        duplicate_urls = EntityUrls.objects.filter(~Q(entity_id=self.id), url__iexact=url, sitemap_identifier=LabTest.LAB_TEST_SITEMAP_IDENTIFIER)
+        if duplicate_urls.exists():
+            url = url.rstrip(self.URL_SUFFIX)
+            url = url.rstrip('-')
+            url = url+'-'+str(id)+'-'+self.URL_SUFFIX
+
+        return url
+
+
+    def create_url(self, url):
+
+        existings_urls = EntityUrls.objects.filter(url__iexact=url, \
+            sitemap_identifier=LabTest.LAB_TEST_SITEMAP_IDENTIFIER, entity_id=self.id).all()
+
+        if not existings_urls.exists():
+            url_entry = EntityUrls.objects.create(url=url, entity_id=self.id, sitemap_identifier=self.LAB_TEST_SITEMAP_IDENTIFIER,\
+                is_valid=True, url_type='PAGEURL', entity_type='LabTest')
+            EntityUrls.objects.filter(entity_id=self.id).filter(~Q(id=url_entry.id)).update(is_valid=False)
+        else:
+            if not existings_urls.filter(is_valid=True).exists():
+                eu = existings_urls.first()
+                eu.is_valid = True
+                eu.save()
+                EntityUrls.objects.filter(entity_id=self.id).filter(~Q(id=eu.id)).update(is_valid=False)
 
     class Meta:
         db_table = "lab_test"
