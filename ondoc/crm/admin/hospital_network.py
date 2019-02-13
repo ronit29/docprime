@@ -202,7 +202,7 @@ class HospitalNetworkAdmin(VersionAdmin, ActionAdmin, QCPemAdmin):
     search_fields = ['name']
     readonly_fields = ('associated_hospitals',)
     exclude = ('qc_approved_at', 'city', 'state', 'welcome_calling_done_at')
-    # autocomplete_fields = ['matrix_city']
+    autocomplete_fields = ['matrix_city', 'matrix_state']
     inlines = [
         HospitalNetworkManagerInline,
         HospitalNetworkHelplineInline,
