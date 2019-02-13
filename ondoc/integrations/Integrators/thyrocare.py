@@ -59,7 +59,7 @@ class Thyrocare(BaseIntegrator):
                     IntegratorMapping(integrator_product_data=result_obj, integrator_test_name=result_obj['name'],
                                       integrator_class_name=Thyrocare.__name__,
                                       service_type=IntegratorMapping.ServiceType.LabTest, object_id=obj_id,
-                                      content_type=ContentType.objects.get(model='labtest')).save()
+                                      content_type=ContentType.objects.get(model='labnetwork')).save()
             else:
                 try:
                     IntegratorProfileMapping.objects.get(integrator_package_name=result_obj['name'], object_id=obj_id)
@@ -67,7 +67,7 @@ class Thyrocare(BaseIntegrator):
                     IntegratorProfileMapping(integrator_product_data=result_obj, integrator_package_name=result_obj['name'],
                                              integrator_class_name=Thyrocare.__name__,
                                              service_type=IntegratorProfileMapping.ServiceType.LabTest, object_id=obj_id,
-                                             content_type=ContentType.objects.get(model='labtest')).save()
+                                             content_type=ContentType.objects.get(model='labnetwork')).save()
 
     @classmethod
     def thyrocare_product_data(cls, obj_id, type):

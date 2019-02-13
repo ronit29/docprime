@@ -142,7 +142,7 @@ LOCAL_APPS = (
     'ondoc.cart',
     'ondoc.ckedit',
     'ondoc.screen',
-    'ondoc.comments'
+    'ondoc.comments',
     'ondoc.integrations'
 )
 
