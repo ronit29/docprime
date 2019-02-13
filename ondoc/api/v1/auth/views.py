@@ -57,6 +57,8 @@ import jwt
 from decimal import Decimal
 from ondoc.web.models import ContactUs
 from ondoc.notification.tasks import send_pg_acknowledge
+import re
+
 
 logger = logging.getLogger(__name__)
 User = get_user_model()
@@ -329,6 +331,9 @@ class UserProfileViewSet(mixins.CreateModelMixin, mixins.ListModelMixin,
             })
             first_profile = True
 
+        if not bool(re.match(r"^[a-zA-Z ]+$", request.data.get('name'))):
+            return Response({"error": "Invalid Name"}, status=status.HTTP_400_BAD_REQUEST)
+
         if request.data.get('age'):
             try:
                 age = int(request.data.get("age"))
@@ -373,6 +378,10 @@ class UserProfileViewSet(mixins.CreateModelMixin, mixins.ListModelMixin,
         #         return Response({"error": "Invalid Age"}, status=status.HTTP_400_BAD_REQUEST)
 
         obj = self.get_object()
+
+        if not bool(re.match(r"^[a-zA-Z ]+$", data.get('name'))):
+            return Response({"error": "Invalid Name"}, status=status.HTTP_400_BAD_REQUEST)
+        
         if data.get("name") and UserProfile.objects.exclude(id=obj.id).filter(name=data['name'],
                                                                               user=request.user).exists():
             return Response({
