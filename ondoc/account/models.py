@@ -502,10 +502,12 @@ class Order(TimeStampedModel):
     @transaction.atomic()
     def change_payment_status(self, status):
         order_obj = Order.objects.select_for_update().get(id=self.id)
-        if order_obj.payment_status != Order.PAYMENT_ACCEPTED:
-            order_obj.payment_status = status
-            order_obj.save()
-        return order_obj
+        if status == order_obj.payment_status or order_obj.payment_status == Order.PAYMENT_ACCEPTED:
+            return False
+
+        order_obj.payment_status = status
+        order_obj.save()
+        return True
 
     class Meta:
         db_table = "order"
