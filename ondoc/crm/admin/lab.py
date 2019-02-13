@@ -1011,6 +1011,8 @@ class LabAppointmentAdmin(nested_admin.NestedModelAdmin):
 
     @transaction.atomic
     def save_model(self, request, obj, form, change):
+        responsible_user = request.user
+        obj._responsible_user = responsible_user if responsible_user and not responsible_user.is_anonymous else None
         if obj:
             lab_app_obj = None
             if obj.id:
