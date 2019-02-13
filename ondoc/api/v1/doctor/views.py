@@ -1,3 +1,4 @@
+import operator
 from collections import defaultdict, OrderedDict
 from uuid import UUID
 from ondoc.api.v1.auth.serializers import UserProfileSerializer
@@ -555,7 +556,7 @@ class DoctorProfileUserViewSet(viewsets.GenericViewSet):
         return Response(status=status.HTTP_404_NOT_FOUND)
 
     @transaction.non_atomic_requests
-    def retrieve(self, request, pk, entity=None):
+    def retrieve(self, request, pk, entity=None, *args, **kwargs):
         serializer = serializers.DoctorDetailsRequestSerializer(data=request.query_params)
         serializer.is_valid(raise_exception=True)
         validated_data = serializer.validated_data
@@ -601,7 +602,6 @@ class DoctorProfileUserViewSet(viewsets.GenericViewSet):
         response_data = self.prepare_response(serializer.data, selected_hospital)
 
         if entity:
-
             response_data['url'] = entity.url
             if entity.breadcrumb:
                 breadcrumb = entity.breadcrumb
@@ -611,6 +611,29 @@ class DoctorProfileUserViewSet(viewsets.GenericViewSet):
             else:
                 breadcrumb = [{'url':'/', 'title': 'Home'}, {'title':'Dr. ' + doctor.name}]
                 response_data['breadcrumb'] = breadcrumb
+
+        if not doctor.enabled_for_online_booking:
+            parameters = dict()
+
+            doc = DoctorListViewSet()
+            general_specialization = []
+
+            for dps in doctor.doctorpracticespecializations.all():
+                general_specialization.append(dps.specialization)
+
+            general_specialization = sorted(general_specialization, key=operator.attrgetter('doctor_count'), reverse=True)
+            if general_specialization:
+                specialization_id = general_specialization[0].pk
+                parameters['specialization_ids'] = str(specialization_id)
+            if response_data.get('hospitals'):
+                hospital = response_data.get('hospitals')[0]
+                parameters['lat'] = hospital.get('lat')
+                parameters['long'] = hospital.get('long')
+            parameters['doctor_suggestions'] = 1
+            kwargs['parameters'] = parameters
+            response_data['doctors'] = doc.list(request, **kwargs)
+        else:
+            response_data['doctors'] = None
 
         return Response(response_data)
 
@@ -1050,7 +1073,6 @@ class DoctorListViewSet(viewsets.GenericViewSet):
                     entity_data[data['entity_id']]['parent_url'] = spec_locality_url
                     entity_data[data['entity_id']]['location'] = data.get('location')
 
-
         title = ''
         description = ''
         seo = None
@@ -1222,22 +1244,22 @@ class DoctorListViewSet(viewsets.GenericViewSet):
                     if object.bottom_content:
                         bottom_content = object.bottom_content
 
-                if not top_content and specialization_id:
-                    specialization_content = models.PracticeSpecializationContent.objects.filter(
-                        specialization__id=specialization_id).first()
-                    if specialization_content:
-                        top_content = specialization_content.content
-
-                if top_content:
-                    top_content = str(top_content)
-                    top_content = top_content.replace('<location>', location)
-                    regex = re.compile(r'[\n\r\t]')
-                    top_content = regex.sub(" ", top_content)
-                if bottom_content:
-                    bottom_content = str(bottom_content)
-                    bottom_content = bottom_content.replace('<location>', location)
-                    regex = re.compile(r'[\n\r\t]')
-                    bottom_content = regex.sub(" ", bottom_content)
+                # if not top_content and specialization_id:
+                #     specialization_content = models.PracticeSpecializationContent.objects.filter(
+                #         specialization__id=specialization_id).first()
+                #     if specialization_content:
+                #         top_content = specialization_content.content
+                #
+                # if top_content:
+                #     top_content = str(top_content)
+                #     top_content = top_content.replace('<location>', location)
+                #     regex = re.compile(r'[\n\r\t]')
+                #     top_content = regex.sub(" ", top_content)
+                # if bottom_content:
+                #     bottom_content = str(bottom_content)
+                #     bottom_content = bottom_content.replace('<location>', location)
+                #     regex = re.compile(r'[\n\r\t]')
+                #     bottom_content = regex.sub(" ", bottom_content)
 
             seo = {
                 "title": title,
@@ -1269,7 +1291,6 @@ class DoctorListViewSet(viewsets.GenericViewSet):
             }
 
 
-
             # if object and object.top_content:
             #     specialization_content = object.top_content
             #     if specialization_content:
@@ -1298,7 +1319,9 @@ class DoctorListViewSet(viewsets.GenericViewSet):
             if doctor_entity:
                 if doctor_entity.get('url'):
                     resp['url'] = doctor_entity.get('url')
-                    resp['schema']['url'] = doctor_entity.get('url')
+                    resp['schema']['url'] = request.build_absolute_uri(doctor_entity.get('url')) if doctor_entity.get('url') else None
+                    resp['new_schema']['url'] = request.build_absolute_uri(doctor_entity.get('url')) if doctor_entity.get(
+                        'url') else None
                 parent_location = doctor_entity.get('location')
                 parent_url = doctor_entity.get('parent_url')
                 if parent_location and parent_url:
@@ -1308,10 +1331,22 @@ class DoctorListViewSet(viewsets.GenericViewSet):
                             resp['parent_url'] = parent_url
 
 
+        specializations = list(models.PracticeSpecialization.objects.filter(id__in=validated_data.get('specialization_ids',[])).values('id','name'));
+
+        if parameters.get('doctor_suggestions') == 1:
+            result = list()
+            for data in response:
+                if data.get('enabled_for_online_booking') == True and len(result)<3:
+                    result.append(data)
+                else:
+                    break
+            result = result if result else None
+            return {"result": result, "count": result_count,
+                             'specializations': specializations}
+
         validated_data.get('procedure_categories', [])
         procedures = list(Procedure.objects.filter(pk__in=validated_data.get('procedure_ids', [])).values('id', 'name'))
         procedure_categories = list(ProcedureCategory.objects.filter(pk__in=validated_data.get('procedure_category_ids', [])).values('id', 'name'))
-        specializations = list(models.PracticeSpecialization.objects.filter(id__in=validated_data.get('specialization_ids',[])).values('id','name'));
         conditions = list(models.MedicalCondition.objects.filter(id__in=validated_data.get('condition_ids',[])).values('id','name'));
         if validated_data.get('ratings'):
             ratings = validated_data.get('ratings')

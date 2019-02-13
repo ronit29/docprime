@@ -191,17 +191,21 @@ class LabList(viewsets.ReadOnlyModelViewSet):
         point_string = 'POINT(' + str(long) + ' ' + str(lat) + ')'
         pnt = GEOSGeometry(point_string, srid=4326)
         max_distance = max_distance*1000 if max_distance is not None else 10000
+        min_distance = min_distance*1000 if min_distance is not None else 0
         lab_tests_with_categories = LabTestCategoryMapping.objects.filter(parent_category__isnull=False).values_list(
             'lab_test', flat=True).distinct()
-        all_packages_in_network_labs = LabTest.objects.prefetch_related('test', 'categories').filter(enable_for_retail=True,
-                                                                                       searchable=True, is_package=True,
-                                                                                       availablelabs__enabled=True,
-                                                                                       availablelabs__lab_pricing_group__labs__is_live=True,
-                                                                                       availablelabs__lab_pricing_group__labs__network__isnull=False,
-                                                                                       availablelabs__lab_pricing_group__labs__location__dwithin=(
-                                                                                           Point(float(long),
-                                                                                                 float(lat)),
-                                                                                           D(m=max_distance))).annotate(
+        all_packages_in_network_labs = LabTest.objects.prefetch_related('test', Prefetch('categories',
+                                                                                         queryset=LabTestCategory.objects.filter().order_by(
+                                                                                             '-priority'))).filter(
+            enable_for_retail=True,
+            searchable=True, is_package=True,
+            availablelabs__enabled=True,
+            availablelabs__lab_pricing_group__labs__is_live=True,
+            availablelabs__lab_pricing_group__labs__network__isnull=False,
+            availablelabs__lab_pricing_group__labs__location__dwithin=(
+                Point(float(long),
+                      float(lat)),
+                D(m=max_distance))).annotate(
             distance=Distance('availablelabs__lab_pricing_group__labs__location', pnt)).annotate(
             lab=F('availablelabs__lab_pricing_group__labs'), mrp=F('availablelabs__mrp'),
             price=Case(
@@ -213,18 +217,21 @@ class LabList(viewsets.ReadOnlyModelViewSet):
                         partition_by=[F(
                             'availablelabs__lab_pricing_group__labs__network'), F('id')]))
 
-        all_packages_in_non_network_labs = LabTest.objects.prefetch_related('test', 'categories').filter(enable_for_retail=True,
-                                                                                           searchable=True,
-                                                                                           is_package=True,
-                                                                                           availablelabs__enabled=True,
-                                                                                           availablelabs__lab_pricing_group__labs__is_live=True,
-                                                                                           availablelabs__lab_pricing_group__labs__enabled=True,
-                                                                                           availablelabs__lab_pricing_group__labs__network__isnull=True,
-                                                                                           availablelabs__lab_pricing_group__labs__location__dwithin=(
-                                                                                               Point(float(long),
-                                                                                                     float(lat)),
-                                                                                               D(
-                                                                                                   m=max_distance))).annotate(
+        all_packages_in_non_network_labs = LabTest.objects.prefetch_related('test', Prefetch('categories',
+                                                                                             queryset=LabTestCategory.objects.filter().order_by(
+                                                                                                 '-priority'))).filter(
+            enable_for_retail=True,
+            searchable=True,
+            is_package=True,
+            availablelabs__enabled=True,
+            availablelabs__lab_pricing_group__labs__is_live=True,
+            availablelabs__lab_pricing_group__labs__enabled=True,
+            availablelabs__lab_pricing_group__labs__network__isnull=True,
+            availablelabs__lab_pricing_group__labs__location__dwithin=(
+                Point(float(long),
+                      float(lat)),
+                D(
+                    m=max_distance))).annotate(
             distance=Distance('availablelabs__lab_pricing_group__labs__location', pnt)).annotate(
             lab=F('availablelabs__lab_pricing_group__labs'), mrp=F('availablelabs__mrp'),
             price=Case(
@@ -251,7 +258,7 @@ class LabList(viewsets.ReadOnlyModelViewSet):
         all_packages.extend([package for package in all_packages_in_non_network_labs])
         all_packages = filter(lambda x: x, all_packages)
         if min_distance:
-            all_packages = filter(lambda x: x.distance >= min_distance, all_packages)
+            all_packages = filter(lambda x: x.distance.m >= min_distance if x.distance is not None and x.distance.m is not None else False, all_packages)
         if min_price:
             all_packages = filter(lambda x: x.price >= min_price if x.price is not None else False, all_packages)
         if max_price:
@@ -801,7 +808,7 @@ class LabList(viewsets.ReadOnlyModelViewSet):
         if test_ids:
             group_queryset = LabPricingGroup.objects.prefetch_related(Prefetch(
                     "available_lab_tests",
-                    queryset=AvailableLabTest.objects.filter(test_id__in=test_ids).prefetch_related('test'),
+                    queryset=AvailableLabTest.objects.filter(test_id__in=test_ids).prefetch_related('test__categories'),
                     to_attr="selected_tests"
                 )).all()
 
@@ -817,7 +824,6 @@ class LabList(viewsets.ReadOnlyModelViewSet):
         temp_var = dict()
         tests = dict()
         lab = dict()
-
         for obj in labs:
             temp_var[obj.id] = obj
             tests[obj.id] = list()
@@ -827,8 +833,7 @@ class LabList(viewsets.ReadOnlyModelViewSet):
                         deal_price=test.custom_deal_price
                     else:
                         deal_price=test.computed_deal_price
-                    tests[obj.id].append({"id": test.test_id, "name": test.test.name, "deal_price": deal_price, "mrp": test.mrp,
-                                          "number_of_tests": test.test.number_of_tests})
+                    tests[obj.id].append({"id": test.test_id, "name": test.test.name, "deal_price": deal_price, "mrp": test.mrp, "number_of_tests": test.test.number_of_tests, 'categories': test.test.get_all_categories_detail()})
 
         # day_now = timezone.now().weekday()
         # days_array = [i for i in range(7)]

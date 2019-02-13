@@ -1092,15 +1092,7 @@ class CustomLabTestPackageSerializer(serializers.ModelSerializer):
         return None
 
     def get_categories(self, obj):
-        queryset = obj.categories.all()
-        res = []
-        for data in queryset:
-            resp = {}
-            resp['id'] = data.id
-            resp['name'] = data.name
-            res.append(resp)
-
-        return res
+        return obj.get_all_categories_detail()
 
     def get_distance(self, obj):
         return int(obj.distance.m)

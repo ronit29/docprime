@@ -409,7 +409,7 @@ def process_payout(payout_id):
             payout_status = request_payout(req_data, order_data)
 
         if payout_status:
-            payout_data.api_response = json.dumps(payout_status.get("response"))
+            payout_data.api_response = payout_status.get("response")
             if payout_status.get("status"):
                 payout_data.payout_time = datetime.datetime.now()
                 payout_data.status = payout_data.PAID
@@ -434,8 +434,9 @@ def request_payout(req_data, order_data):
     resp_data = None
 
     response = requests.post(url, data=json.dumps(req_data), headers=headers)
+    resp_data = response.json()
+
     if response.status_code == status.HTTP_200_OK:
-        resp_data = response.json()
         if resp_data.get("ok") is not None and resp_data.get("ok") == '1':
             success_payout = False
             result = resp_data.get('result')

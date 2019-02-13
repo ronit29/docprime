@@ -25,6 +25,7 @@ from django.db.models import F, Sum, When, Case, Q
 from django.db import transaction
 from django.contrib.postgres.fields import JSONField
 from ondoc.doctor.models import OpdAppointment
+from ondoc.notification.models import EmailNotification
 from ondoc.payout.models import Outstanding
 from ondoc.authentication import models as auth_model
 from django.core.files.uploadedfile import InMemoryUploadedFile, TemporaryUploadedFile
@@ -828,6 +829,7 @@ class LabTestCategory(auth_model.TimeStampedModel, SearchKey):
     is_live = models.BooleanField(default=False)
     is_package_category = models.BooleanField(verbose_name='Is this a test package category?')
     show_on_recommended_screen = models.BooleanField(default=False)
+    priority = models.PositiveIntegerField(default=0)
 
     def __str__(self):
         return self.name
@@ -951,6 +953,18 @@ class LabTest(TimeStampedModel, SearchKey):
 #
 #     class Meta:
 #         db_table = "related_tests"
+
+    def get_all_categories_detail(self):
+        all_categories = self.categories.all()
+        res = []
+        for item in all_categories:
+            if item.is_live == True:
+                resp = {}
+                resp['name'] = item.name
+                resp['id'] = item.id
+                res.append(resp)
+        return res
+
 
 
 class QuestionAnswer(TimeStampedModel):
@@ -1144,6 +1158,7 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin)
     price_data = JSONField(blank=True, null=True)
     tests = models.ManyToManyField(LabTest, through='LabAppointmentTestMapping', through_fields=('appointment', 'test'))
     money_pool = models.ForeignKey(MoneyPool, on_delete=models.SET_NULL, null=True)
+    email_notification = GenericRelation(EmailNotification, related_name="lab_notification")
 
     def get_tests_and_prices(self):
         test_price = []

@@ -1059,14 +1059,27 @@ class TransactionViewSet(viewsets.GenericViewSet):
                             logger.error("Error in processing order - " + str(e))
                 else:
                     logger.error("Invalid pg data - " + json.dumps(resp_serializer.errors))
+            elif order_obj:
+                try:
+                    if response and response.get("orderNo") and response.get("orderId"):
+                        send_pg_acknowledge.apply_async((response.get("orderId"), response.get("orderNo"),), countdown=1)
+                except Exception as e:
+                    logger.error("Error in sending pg acknowledge - " + str(e))
 
-                if success_in_process:
-                    if processed_data.get("type") == "all":
-                        REDIRECT_URL = (SUCCESS_REDIRECT_URL % order_obj.id) + "?payment_success=true"
-                    elif processed_data.get("type") == "doctor":
-                        REDIRECT_URL = OPD_REDIRECT_URL + "/" + str(processed_data.get("id","")) + "?payment_success=true"
-                    elif processed_data.get("type") == "lab":
-                        REDIRECT_URL = LAB_REDIRECT_URL + "/" + str(processed_data.get("id","")) + "?payment_success=true"
+                try:
+                    has_changed = order_obj.change_payment_status(Order.PAYMENT_FAILURE)
+                    if has_changed:
+                        self.send_failure_ops_email(order_obj)
+                except Exception as e:
+                    logger.error("Error sending payment failure email - " + str(e))
+
+            if success_in_process:
+                if processed_data.get("type") == "all":
+                    REDIRECT_URL = (SUCCESS_REDIRECT_URL % order_obj.id) + "?payment_success=true"
+                elif processed_data.get("type") == "doctor":
+                    REDIRECT_URL = OPD_REDIRECT_URL + "/" + str(processed_data.get("id","")) + "?payment_success=true"
+                elif processed_data.get("type") == "lab":
+                    REDIRECT_URL = LAB_REDIRECT_URL + "/" + str(processed_data.get("id","")) + "?payment_success=true"
 
         except Exception as e:
             logger.error("Error - " + str(e))
@@ -1135,6 +1148,13 @@ class TransactionViewSet(viewsets.GenericViewSet):
 
         return amount, obj
 
+    def send_failure_ops_email(self, order_obj):
+        html_body = "Payment failed for user with " \
+                    "user id - {} and phone number - {}" \
+                    ", order id - {}.".format(order_obj.user.id, order_obj.user.phone_number, order_obj.id)
+
+        for email in settings.OPS_EMAIL_ID:
+            EmailNotification.publish_ops_email(email, html_body, 'Payment failure for order')
 
 class UserTransactionViewSet(viewsets.GenericViewSet):
     serializer_class = serializers.UserTransactionModelSerializer
