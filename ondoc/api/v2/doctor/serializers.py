@@ -21,8 +21,9 @@ class DoctorBlockCalenderSerializer(serializers.Serializer):
     def validate(self, attrs):
         doctor = attrs.get("doctor_id")
         hospital = attrs.get("hospital_id")
-        if doctor and hospital and (hospital not in doctor.hospitals):
+        if doctor and hospital and (hospital not in doctor.hospitals.all()):
             raise serializers.ValidationError("incorrect hospital id or doctor id")
+        return attrs
 
 
 class DoctorProfileSerializer(serializers.ModelSerializer):

@@ -329,7 +329,7 @@ class DoctorBlockCalendarViewSet(viewsets.GenericViewSet):
         serializer.is_valid(raise_exception=True)
         validated_data = serializer.validated_data
         doctor_id = validated_data.get("doctor_id").id if validated_data.get("doctor_id") else request.user.doctor.id
-        hospital_id = validated_data.get("hopsital_id").id if validated_data.get("hospital_id") else None
+        hospital_id = validated_data.get("hospital_id").id if validated_data.get("hospital_id") else None
         start_time = validated_data.get("start_time")
         if not start_time:
             start_time = self.INTERVAL_MAPPING[validated_data.get("interval")][0]
