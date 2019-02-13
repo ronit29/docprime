@@ -4,7 +4,7 @@ from django.contrib.contenttypes.models import ContentType
 from django.db.models import Q
 
 from ondoc.banner.models import Banner
-from ondoc.common.models import PaymentOptions, UserConfig, Remark
+from ondoc.common.models import PaymentOptions, UserConfig, Remark, MatrixMappedCity, MatrixMappedState
 from ondoc.coupon.models import Coupon, UserSpecificCoupon
 from ondoc.crm.constants import constants
 from ondoc.doctor.models import (Doctor, Hospital, DoctorClinicTiming, DoctorClinic,
@@ -127,6 +127,15 @@ class Command(BaseCommand):
 
             group.permissions.add(*permissions)
 
+        content_types = ContentType.objects.get_for_models(MatrixMappedCity, MatrixMappedState)
+        for cl, ct in content_types.items():
+            permissions = Permission.objects.filter(
+                Q(content_type=ct),
+                Q(codename='change_' + ct.model))
+
+            group.permissions.add(*permissions)
+
+
         # setup permissions for qc team
         group, created = Group.objects.get_or_create(name=constants['QC_GROUP_NAME'])
         group.permissions.clear()
@@ -213,6 +222,14 @@ class Command(BaseCommand):
 
             group.permissions.add(*permissions)
 
+        content_types = ContentType.objects.get_for_models(MatrixMappedCity, MatrixMappedState)
+        for cl, ct in content_types.items():
+            permissions = Permission.objects.filter(
+                Q(content_type=ct),
+                Q(codename='change_' + ct.model))
+
+            group.permissions.add(*permissions)
+
         # setup permissions for super qc team
         group, created = Group.objects.get_or_create(name=constants['SUPER_QC_GROUP'])
         group.permissions.clear()
@@ -262,7 +279,7 @@ class Command(BaseCommand):
             HospitalCertification, HospitalNetworkManager, HospitalNetworkHelpline,
             HospitalNetworkEmail, HospitalNetworkAccreditation, HospitalNetworkAward,
             HospitalNetworkCertification, DoctorPracticeSpecialization, HospitalNetworkDocument, CompetitorInfo,
-            CompetitorMonthlyVisit, SPOCDetails, GenericAdmin, GenericLabAdmin, DoctorClinicProcedure, AssociatedMerchant)
+            CompetitorMonthlyVisit, SPOCDetails, GenericAdmin, GenericLabAdmin, DoctorClinicProcedure, AssociatedMerchant, MatrixMappedState, MatrixMappedCity)
 
         for cl, ct in content_types.items():
             permissions = Permission.objects.filter(
@@ -502,6 +519,14 @@ class Command(BaseCommand):
             permissions = Permission.objects.filter(
                 Q(content_type=ct),
                 Q(codename='add_' + ct.model) |
+                Q(codename='change_' + ct.model))
+
+            group.permissions.add(*permissions)
+
+        content_types = ContentType.objects.get_for_models(MatrixMappedCity, MatrixMappedState)
+        for cl, ct in content_types.items():
+            permissions = Permission.objects.filter(
+                Q(content_type=ct),
                 Q(codename='change_' + ct.model))
 
             group.permissions.add(*permissions)

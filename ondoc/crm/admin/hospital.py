@@ -389,6 +389,7 @@ class HospitalAdmin(admin.GeoModelAdmin, VersionAdmin, ActionAdmin, QCPemAdmin):
     list_display = ('name', 'updated_at', 'data_status', 'welcome_calling_done', 'doctor_count', 'list_created_by', 'list_assigned_to')
     form = HospitalForm
     search_fields = ['name']
+    autocomplete_fields = ['matrix_city', 'matrix_state']
     inlines = [
         # HospitalNetworkMappingInline,
         HospitalSpecialityInline,

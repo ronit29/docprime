@@ -518,7 +518,14 @@ class MatrixMappedStateResource(resources.ModelResource):
 class MatrixMappedStateAdmin(ImportMixin, admin.ModelAdmin):
     formats = (base_formats.XLS, base_formats.XLSX,)
     list_display = ('name',)
+    readonly_fields = ('name',)
+    search_fields = ['name']
     resource_class = MatrixMappedStateResource
+
+    def get_readonly_fields(self, request, obj=None):
+        if not request.user.is_superuser and not request.user.groups.filter(name=constants['SUPER_QC_GROUP']).exists():
+            return super().get_readonly_fields(request, obj)
+        return ()
 
 
 
@@ -536,5 +543,11 @@ class MatrixMappedCityResource(resources.ModelResource):
 class MatrixMappedCityAdmin(ImportMixin, admin.ModelAdmin):
     formats = (base_formats.XLS, base_formats.XLSX,)
     list_display = ('name', 'state')
+    readonly_fields = ('name', 'state', )
     search_fields = ['name']
     resource_class = MatrixMappedCityResource
+
+    def get_readonly_fields(self, request, obj=None):
+        if not request.user.is_superuser and not request.user.groups.filter(name=constants['SUPER_QC_GROUP']).exists():
+            return super().get_readonly_fields(request, obj)
+        return ()
