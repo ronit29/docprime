@@ -1016,6 +1016,7 @@ class LabAppointmentAdmin(nested_admin.NestedModelAdmin):
         if obj:
             lab_app_obj = None
             if obj.id:
+                obj._source = AppointmentHistory.CRM
                 lab_app_obj = LabAppointment.objects.select_for_update().filter(pk=obj.id).first()
             # date = datetime.datetime.strptime(request.POST['start_date'], '%Y-%m-%d')
             # time = datetime.datetime.strptime(request.POST['start_time'], '%H:%M').time()

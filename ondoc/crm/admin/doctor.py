@@ -1613,6 +1613,7 @@ class DoctorOpdAppointmentAdmin(admin.ModelAdmin):
         obj._responsible_user = responsible_user if responsible_user and not responsible_user.is_anonymous else None
         if obj:
             if obj.id:
+                obj._source = AppointmentHistory.CRM
                 opd_obj = OpdAppointment.objects.select_for_update().get(pk=obj.id)
             if request.POST.get('start_date') and request.POST.get('start_time'):
                 date_time_field = request.POST['start_date'] + " " + request.POST['start_time']

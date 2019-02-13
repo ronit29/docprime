@@ -5,6 +5,7 @@ from django.db.models import Q, Avg, Count, Max, F, ExpressionWrapper, DateTimeF
 from collections import defaultdict, OrderedDict
 from ondoc.api.v1.procedure.serializers import DoctorClinicProcedureSerializer, OpdAppointmentProcedureMappingSerializer
 from ondoc.cart.models import Cart
+from ondoc.common.models import AppointmentHistory
 from ondoc.doctor.models import (OpdAppointment, Doctor, Hospital, DoctorHospital, DoctorClinicTiming,
                                  DoctorAssociation,
                                  DoctorAward, DoctorDocument, DoctorEmail, DoctorExperience, DoctorImage,
@@ -375,6 +376,7 @@ class UpdateStatusSerializer(serializers.Serializer):
     cancellation_reason = serializers.PrimaryKeyRelatedField(
         queryset=CancellationReason.objects.filter(visible_on_front_end=True), required=False)
     cancellation_comment = serializers.CharField(required=False, allow_blank=True)
+    source = serializers.ChoiceField(choices=AppointmentHistory.SOURCE_CHOICES, required=True)
 
 
 class DoctorImageSerializer(serializers.ModelSerializer):
