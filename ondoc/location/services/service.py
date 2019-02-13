@@ -47,7 +47,7 @@ class SearchedDoctorData():
         for latlong in latitudelongitude:
             search_keywords = latlong
             result = SearchedDoctorData.searched_google_data(search_keywords)
-            search_keywords = 'Doctors in ' + str(search_keywords[0]) + ', ' + str(search_keywords[1])
+            search_keywords = 'Doctor Clinic in ' + str(search_keywords[0]) + ', ' + str(search_keywords[1])
             print(search_keywords + ' ' + result)
         return 'success'
 
@@ -56,14 +56,17 @@ class SearchedDoctorData():
     def run_google_search(search_keywords, next_token):
         if next_token:
             time.sleep(1)
-        params = {'location':str(search_keywords[0]) + ',' + str(search_keywords[1]), 'radius':1000,'type':'doctor', 'key': settings.REVERSE_GEOCODING_API_KEY}
+        params = {'query':'doctor clinic','location':str(search_keywords[0]) + ',' + str(search_keywords[1]), 'radius':1000, 'key': settings.REVERSE_GEOCODING_API_KEY}
         results = {}
         if next_token:
             params['pagetoken'] = next_token
 
+        # response = requests.get(
+        #         'https://maps.googleapis.com/maps/api/place/nearbysearch/json',
+        #         params=params)
         response = requests.get(
-                'https://maps.googleapis.com/maps/api/place/nearbysearch/json',
-                params=params)
+            'https://maps.googleapis.com/maps/api/place/textsearch/json',
+            params=params)
 
         if response.status_code != status.HTTP_200_OK or not response.ok:
             print('failure  status_code: ' + str(response.status_code) + ', reason: ' + str(response.reason))
@@ -167,7 +170,7 @@ class SearchedDoctorData():
 
     @staticmethod
     def searched_google_data(location):
-        search_keywords = 'Doctors in ' + str(location[0]) + ', ' + str(location[1])
+        search_keywords = 'Doctor Clinic in ' + str(location[0]) + ', ' + str(location[1])
         google_data = GoogleSearches.objects.filter(search_keywords=search_keywords).first()
         count = 0
         page = 1
