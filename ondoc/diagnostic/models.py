@@ -787,6 +787,7 @@ class LabTestCategory(auth_model.TimeStampedModel, SearchKey):
     is_live = models.BooleanField(default=False)
     is_package_category = models.BooleanField(verbose_name='Is this a test package category?')
     show_on_recommended_screen = models.BooleanField(default=False)
+    priority = models.PositiveIntegerField(default=0)
 
     def __str__(self):
         return self.name
@@ -1734,6 +1735,16 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin)
                 "is_home_pickup": True
             })
         return fulfillment_data
+
+    def trigger_created_event(self, visitor_info):
+        from ondoc.tracking.models import TrackingEvent
+        try:
+            event_data = TrackingEvent.build_event_data(self.user, TrackingEvent.LabAppointmentBooked, appointmentId=self.id)
+            if event_data and visitor_info:
+                TrackingEvent.save_event(event_name=event_data.get('event'), data=event_data, visit_id=visitor_info.get('visit_id'),
+                                         user=self.user, triggered_at=datetime.datetime.now())
+        except Exception as e:
+            logger.error("Could not save triggered event - " + str(e))
 
     def __str__(self):
         return "{}, {}".format(self.profile.name if self.profile else "", self.lab.name)
