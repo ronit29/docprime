@@ -414,8 +414,6 @@ class Doctor(auth_model.TimeStampedModel, auth_model.QCModel, SearchKey):
     is_internal = models.BooleanField(verbose_name='Is Staff Doctor', default=False)
     is_test_doctor = models.BooleanField(verbose_name='Is Test Doctor', default=False)
     is_license_verified = models.BooleanField(default=False, blank=True)
-
-    # doctor_admins = models.ForeignKey(auth_model.GenericAdmin, related_query_name='manageable_doctors')
     hospitals = models.ManyToManyField(
         Hospital,
         through='DoctorClinic',
@@ -443,6 +441,7 @@ class Doctor(auth_model.TimeStampedModel, auth_model.QCModel, SearchKey):
     disable_comments = models.CharField(max_length=500, blank=True)
     disabled_by = models.ForeignKey(settings.AUTH_USER_MODEL, related_name="disabled_doctors", null=True, editable=False,
                                    on_delete=models.SET_NULL)
+    avg_rating = models.DecimalField(max_digits=5, decimal_places=2, null=True, editable=False)
 
     def __str__(self):
         return '{} ({})'.format(self.name, self.id)
@@ -543,6 +542,19 @@ class Doctor(auth_model.TimeStampedModel, auth_model.QCModel, SearchKey):
         if push_to_matrix:
             push_onboarding_qcstatus_to_matrix.apply_async(({'obj_type': self.__class__.__name__, 'obj_id': self.id}
                                                             ,), countdown=5)
+    @classmethod
+    def update_avg_rating(cls):
+        doctor = Doctor.objects.filter(rating__isnull=False).distinct()
+        with transaction.atomic():
+            for doc in doctor:
+                avg_doc = doc.rating.all().aggregate(avg_rating=Avg('ratings'))
+                if avg_doc:
+                    doc.avg_rating = round(avg_doc.get('avg_rating'), 1)
+                    try:
+                        doc.save()
+                    except Exception as e:
+                        logger.error('Error Updating avg ratings ' + str(e))
+
 
     class Meta:
         db_table = "doctor"

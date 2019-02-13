@@ -21,7 +21,7 @@ from ondoc.api.v1.utils import AgreedPriceCalculate, DealPriceCalculate, TimeSlo
 from ondoc.account import models as account_model
 from django.utils import timezone
 from datetime import timedelta
-from django.db.models import F, Sum, When, Case, Q
+from django.db.models import F, Sum, When, Case, Q, Avg
 from django.db import transaction
 from django.contrib.postgres.fields import JSONField
 from ondoc.doctor.models import OpdAppointment
@@ -214,6 +214,7 @@ class Lab(TimeStampedModel, CreatedByModel, QCModel, SearchKey):
     order_priority = models.PositiveIntegerField(blank=True, null=True, default=0)
     merchant = GenericRelation(auth_model.AssociatedMerchant)
     merchant_payout = GenericRelation(account_model.MerchantPayout)
+    avg_rating = models.DecimalField(max_digits=5, decimal_places=2, null=True, editable=False)
 
     def __str__(self):
         return self.name
@@ -447,6 +448,19 @@ class Lab(TimeStampedModel, CreatedByModel, QCModel, SearchKey):
         if not result:
             result.extend(list(self.labmanager_set.filter(contact_type=LabManager.OWNER)))
         return result
+
+    @classmethod
+    def update_avg_rating(cls):
+        labs = Lab.objects.filter(rating__isnull=False).distinct()
+        with transaction.atomic():
+            for lb in labs:
+                avg_lb = lb.rating.all().aggregate(avg_rating=Avg('ratings'))
+                if avg_lb:
+                    lb.avg_rating = round(avg_lb.get('avg_rating'), 1)
+                    try:
+                        lb.save()
+                    except Exception as e:
+                        logger.error('Error Updating avg ratings ' + str(e))
 
 
 class LabCertification(TimeStampedModel):
