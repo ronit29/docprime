@@ -1655,6 +1655,8 @@ class DoctorOpdAppointmentAdmin(admin.ModelAdmin):
 
     @transaction.atomic
     def save_model(self, request, obj, form, change):
+        responsible_user = request.user
+        obj._responsible_user = responsible_user if responsible_user and not responsible_user.is_anonymous else None
         if obj:
             if obj.id:
                 opd_obj = OpdAppointment.objects.select_for_update().get(pk=obj.id)

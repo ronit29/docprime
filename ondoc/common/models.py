@@ -6,6 +6,7 @@ from django.contrib.contenttypes.models import ContentType
 from ondoc.authentication.models import TimeStampedModel
 # from ondoc.doctor.models import OpdAppointment
 # from ondoc.diagnostic.models import LabAppointment
+from ondoc.authentication.models import User
 from ondoc.authentication import models as auth_model
 
 
@@ -35,6 +36,7 @@ class AppointmentHistory(TimeStampedModel):
     object_id = models.PositiveIntegerField()
     content_object = GenericForeignKey()
     status = models.PositiveSmallIntegerField(null=False)
+    user = models.ForeignKey(User, null=True, default=None, on_delete=models.CASCADE)
 
     @classmethod
     def create(cls, *args, **kwargs):
@@ -42,8 +44,12 @@ class AppointmentHistory(TimeStampedModel):
         if not obj:
             raise Exception('Function accept content_object in **kwargs')
 
+        user = None
+        if hasattr(obj, "_responsible_user"):
+            user = obj._responsible_user
+
         content_type = ContentType.objects.get_for_model(obj)
-        cls(content_type=content_type, object_id=obj.id, status=obj.status).save()
+        cls(content_type=content_type, object_id=obj.id, status=obj.status, user=user).save()
 
 
     class Meta:
@@ -115,6 +121,19 @@ class UserConfig(TimeStampedModel):
 
     class Meta:
         db_table = 'user_config'
+
+
+class AppointmentMaskNumber(TimeStampedModel):
+    content_type = models.ForeignKey(ContentType, on_delete=models.CASCADE)
+    object_id = models.PositiveIntegerField()
+    content_object = GenericForeignKey()
+    mask_number = models.CharField(blank=True, null=True, max_length=20)
+    validity_up_to = models.DateTimeField(null=True, blank=True)
+    is_mask_number = models.BooleanField(default=True)
+    is_deleted = models.BooleanField(default=False)
+
+    class Meta:
+        db_table = 'appointment_mask_number'
 
 
 class Remark(auth_model.TimeStampedModel):

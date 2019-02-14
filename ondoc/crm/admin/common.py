@@ -12,7 +12,7 @@ from ondoc.authentication.models import Merchant, AssociatedMerchant, QCModel
 from ondoc.account.models import MerchantPayout
 from ondoc.common.models import Cities, MatrixCityMapping, PaymentOptions, Remark, MatrixMappedCity, MatrixMappedState
 from import_export import resources, fields
-from import_export.admin import ImportMixin, base_formats, ImportExportMixin, ImportExportModelAdmin
+from import_export.admin import ImportMixin, base_formats, ImportExportMixin, ImportExportModelAdmin, ExportMixin
 from reversion.admin import VersionAdmin
 import nested_admin
 from django.urls import reverse
@@ -376,7 +376,17 @@ class MerchantPayoutForm(forms.ModelForm):
         return self.cleaned_data
 
 
-class MerchantPayoutAdmin(VersionAdmin):
+class MerchantPayoutResource(resources.ModelResource):
+
+    class Meta:
+        model = MerchantPayout
+        fields = ('id', 'payment_mode', 'payout_ref_id', 'charged_amount', 'payable_amount', 'payout_approved',
+                  'status', 'payout_time', 'api_response', 'retry_count', 'paid_to', 'utr_no', 'type', 'amount_paid',
+                  'content_type', 'object_id')
+
+
+class MerchantPayoutAdmin(ExportMixin, VersionAdmin):
+    resource_class = MerchantPayoutResource
     form = MerchantPayoutForm
     model = MerchantPayout
     fields = ['id', 'payment_mode','charged_amount', 'updated_at', 'created_at', 'payable_amount', 'status', 'payout_time', 'paid_to',
@@ -386,7 +396,7 @@ class MerchantPayoutAdmin(VersionAdmin):
     list_filter = ['status']
 
     def get_queryset(self, request):
-        return super().get_queryset(request).order_by('-id').prefetch_related('lab_appointment__lab',
+        return super().get_queryset(request).filter(payable_amount__gt=0).order_by('-id').prefetch_related('lab_appointment__lab',
                                                                              'opd_appointment__doctor')
 
     def get_search_results(self, request, queryset, search_term):

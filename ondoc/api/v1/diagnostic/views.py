@@ -18,7 +18,7 @@ from ondoc.coupon.models import Coupon
 from ondoc.doctor import models as doctor_model
 from ondoc.api.v1 import insurance as insurance_utility
 from ondoc.api.v1.utils import form_time_slot, IsConsumer, labappointment_transform, IsDoctor, payment_details, \
-    aware_time_zone, get_lab_search_details, TimeSlotExtraction, RawSql
+    aware_time_zone, get_lab_search_details, TimeSlotExtraction, RawSql, util_absolute_url
 from ondoc.api.pagination import paginate_queryset
 
 from rest_framework import viewsets, mixins
@@ -98,6 +98,7 @@ class SearchPageViewSet(viewsets.ReadOnlyModelViewSet):
         temp_data['common_package'] = package_serializer.data
         temp_data['preferred_labs'] = lab_serializer.data
         temp_data['common_conditions'] = condition_serializer.data
+
         return Response(temp_data)
 
 
@@ -190,17 +191,21 @@ class LabList(viewsets.ReadOnlyModelViewSet):
         point_string = 'POINT(' + str(long) + ' ' + str(lat) + ')'
         pnt = GEOSGeometry(point_string, srid=4326)
         max_distance = max_distance*1000 if max_distance is not None else 10000
+        min_distance = min_distance*1000 if min_distance is not None else 0
         lab_tests_with_categories = LabTestCategoryMapping.objects.filter(parent_category__isnull=False).values_list(
             'lab_test', flat=True).distinct()
-        all_packages_in_network_labs = LabTest.objects.prefetch_related('test', 'categories').filter(enable_for_retail=True,
-                                                                                       searchable=True, is_package=True,
-                                                                                       availablelabs__enabled=True,
-                                                                                       availablelabs__lab_pricing_group__labs__is_live=True,
-                                                                                       availablelabs__lab_pricing_group__labs__network__isnull=False,
-                                                                                       availablelabs__lab_pricing_group__labs__location__dwithin=(
-                                                                                           Point(float(long),
-                                                                                                 float(lat)),
-                                                                                           D(m=max_distance))).annotate(
+        all_packages_in_network_labs = LabTest.objects.prefetch_related('test', Prefetch('categories',
+                                                                                         queryset=LabTestCategory.objects.filter().order_by(
+                                                                                             '-priority'))).filter(
+            enable_for_retail=True,
+            searchable=True, is_package=True,
+            availablelabs__enabled=True,
+            availablelabs__lab_pricing_group__labs__is_live=True,
+            availablelabs__lab_pricing_group__labs__network__isnull=False,
+            availablelabs__lab_pricing_group__labs__location__dwithin=(
+                Point(float(long),
+                      float(lat)),
+                D(m=max_distance))).annotate(
             distance=Distance('availablelabs__lab_pricing_group__labs__location', pnt)).annotate(
             lab=F('availablelabs__lab_pricing_group__labs'), mrp=F('availablelabs__mrp'),
             price=Case(
@@ -212,18 +217,21 @@ class LabList(viewsets.ReadOnlyModelViewSet):
                         partition_by=[F(
                             'availablelabs__lab_pricing_group__labs__network'), F('id')]))
 
-        all_packages_in_non_network_labs = LabTest.objects.prefetch_related('test', 'categories').filter(enable_for_retail=True,
-                                                                                           searchable=True,
-                                                                                           is_package=True,
-                                                                                           availablelabs__enabled=True,
-                                                                                           availablelabs__lab_pricing_group__labs__is_live=True,
-                                                                                           availablelabs__lab_pricing_group__labs__enabled=True,
-                                                                                           availablelabs__lab_pricing_group__labs__network__isnull=True,
-                                                                                           availablelabs__lab_pricing_group__labs__location__dwithin=(
-                                                                                               Point(float(long),
-                                                                                                     float(lat)),
-                                                                                               D(
-                                                                                                   m=max_distance))).annotate(
+        all_packages_in_non_network_labs = LabTest.objects.prefetch_related('test', Prefetch('categories',
+                                                                                             queryset=LabTestCategory.objects.filter().order_by(
+                                                                                                 '-priority'))).filter(
+            enable_for_retail=True,
+            searchable=True,
+            is_package=True,
+            availablelabs__enabled=True,
+            availablelabs__lab_pricing_group__labs__is_live=True,
+            availablelabs__lab_pricing_group__labs__enabled=True,
+            availablelabs__lab_pricing_group__labs__network__isnull=True,
+            availablelabs__lab_pricing_group__labs__location__dwithin=(
+                Point(float(long),
+                      float(lat)),
+                D(
+                    m=max_distance))).annotate(
             distance=Distance('availablelabs__lab_pricing_group__labs__location', pnt)).annotate(
             lab=F('availablelabs__lab_pricing_group__labs'), mrp=F('availablelabs__mrp'),
             price=Case(
@@ -250,7 +258,7 @@ class LabList(viewsets.ReadOnlyModelViewSet):
         all_packages.extend([package for package in all_packages_in_non_network_labs])
         all_packages = filter(lambda x: x, all_packages)
         if min_distance:
-            all_packages = filter(lambda x: x.distance >= min_distance, all_packages)
+            all_packages = filter(lambda x: x.distance.m >= min_distance if x.distance is not None and x.distance.m is not None else False, all_packages)
         if min_price:
             all_packages = filter(lambda x: x.price >= min_price if x.price is not None else False, all_packages)
         if max_price:
@@ -417,7 +425,7 @@ class LabList(viewsets.ReadOnlyModelViewSet):
 
         test_ids = parameters.get('ids',[])
 
-        tests = list(LabTest.objects.filter(id__in=test_ids, enable_for_retail=True).values('id', 'name', 'hide_price', 'show_details'))
+        tests = list(LabTest.objects.filter(id__in=test_ids, enable_for_retail=True).values('id', 'name', 'hide_price', 'show_details', 'url'))
         seo = None
         breadcrumb = None
         location = None
@@ -539,7 +547,7 @@ class LabList(viewsets.ReadOnlyModelViewSet):
 
         test_ids = parameters.get('ids', [])
 
-        tests = list(LabTest.objects.filter(id__in=test_ids).values('id', 'name', 'hide_price', 'show_details','test_type'))
+        tests = list(LabTest.objects.filter(id__in=test_ids).values('id', 'name', 'hide_price', 'show_details','test_type', 'url'))
         seo = None
         breadcrumb = None
         location = None
@@ -579,6 +587,13 @@ class LabList(viewsets.ReadOnlyModelViewSet):
                         'name': sublocality,
                         'url': parameters.get('url')
                     }]
+
+        if kwargs.get('test_flag') == 1:
+            result = list(result)
+            return {"result": result[0:3] if len(result)>0 else result,
+                             "count": count, 'tests': tests,
+                             "seo": seo, 'breadcrumb': breadcrumb}
+
 
         return Response({"result": result,
                          "count": count, 'tests': tests,
@@ -816,6 +831,7 @@ class LabList(viewsets.ReadOnlyModelViewSet):
         temp_var = dict()
         tests = dict()
         lab = dict()
+
         for obj in labs:
             temp_var[obj.id] = obj
             tests[obj.id] = list()
@@ -825,7 +841,7 @@ class LabList(viewsets.ReadOnlyModelViewSet):
                         deal_price=test.custom_deal_price
                     else:
                         deal_price=test.computed_deal_price
-                    tests[obj.id].append({"id": test.test_id, "name": test.test.name, "deal_price": deal_price, "mrp": test.mrp, "number_of_tests": test.test.number_of_tests, 'categories': test.test.get_all_categories_detail()})
+                    tests[obj.id].append({"id": test.test_id, "name": test.test.name, "deal_price": deal_price, "mrp": test.mrp, "number_of_tests": test.test.number_of_tests, 'categories': test.test.get_all_categories_detail(), "url": test.test.url})
 
         # day_now = timezone.now().weekday()
         # days_array = [i for i in range(7)]
@@ -845,8 +861,9 @@ class LabList(viewsets.ReadOnlyModelViewSet):
                 row['address'] = lab_obj.city
             else:
                 row['address'] = ""
+            row['lab_thumbnail'] = util_absolute_url(lab_obj.get_thumbnail()) if lab_obj.get_thumbnail() else None
 
-            row['lab_thumbnail'] = self.request.build_absolute_uri(lab_obj.get_thumbnail()) if lab_obj.get_thumbnail() else None
+            # row['lab_thumbnail'] = self.request.build_absolute_uri(lab_obj.get_thumbnail()) if lab_obj.get_thumbnail() else None
 
             row['home_pickup_charges'] = lab_obj.home_pickup_charges
             row['is_home_collection_enabled'] = lab_obj.is_home_collection_enabled
@@ -1216,7 +1233,8 @@ class LabList(viewsets.ReadOnlyModelViewSet):
                         deal_price=test.custom_deal_price
                     else:
                         deal_price=test.computed_deal_price
-                    tests[obj.id].append({"id": test.test_id, "name": test.test.name, "deal_price": deal_price, "mrp": test.mrp})
+                    tests[obj.id].append({"id": test.test_id, "name": test.test.name, "deal_price": deal_price, "mrp": test.mrp,
+                                          "url":test.test.url, "show_details": test.test.show_details})
         # day_now = timezone.now().weekday()
         # days_array = [i for i in range(7)]
         # rotated_days_array = days_array[day_now:] + days_array[:day_now]
@@ -1821,22 +1839,57 @@ class TestDetailsViewset(viewsets.GenericViewSet):
     def get_queryset(self):
         return None
 
-    def retrieve(self, request):
-        params = request.query_params
-        try:
-            test_ids = params.get('test_ids', None)
-            if test_ids:
-                test_ids = [int(x) for x in test_ids.split(',')]
-                test_ids = set(test_ids)
-            lab_id = params.get('lab_id', None)
-            if lab_id:
-                try:
-                    lab_id = int(lab_id)
-                except:
-                    return Response([], status=status.HTTP_400_BAD_REQUEST)
+    def retrieve_test_by_url(self, request):
 
-        except:
-            return Response([], status=status.HTTP_400_BAD_REQUEST)
+        url = request.GET.get('url')
+        if not url:
+            return Response(status=status.HTTP_404_NOT_FOUND)
+
+        url = url.lower()
+        entity = EntityUrls.objects.filter(url=url, sitemap_identifier=LabTest.LAB_TEST_SITEMAP_IDENTIFIER).order_by(
+            '-is_valid')
+        if len(entity) > 0:
+            entity = entity[0]
+            if not entity.is_valid:
+                valid_entity_url_qs = EntityUrls.objects.filter(
+                    sitemap_identifier=LabTest.LAB_TEST_SITEMAP_IDENTIFIER, entity_id=entity.entity_id,
+                    is_valid='t')
+                if valid_entity_url_qs.exists():
+                    corrected_url = valid_entity_url_qs[0].url
+                    return Response(status=status.HTTP_301_MOVED_PERMANENTLY, data={'url': corrected_url})
+                else:
+                    return Response(status=status.HTTP_404_NOT_FOUND)
+
+            # entity_id = entity.entity_id
+            response = self.retrieve(request, entity)
+            return response
+        else:
+            return Response(status=status.HTTP_404_NOT_FOUND)
+
+    def retrieve(self, request, entity=None, *args, **kwargs):
+        params = request.query_params
+        parameters = dict()
+        if params.get('url'):
+            test_ids = [entity.entity_id]
+            lab_id = None
+
+        else:
+            try:
+                test_ids = params.get('test_ids', None)
+                if test_ids:
+                    test_ids = [int(x) for x in test_ids.split(',')]
+                    test_ids = set(test_ids)
+                lab_id = params.get('lab_id', None)
+                if lab_id:
+                    try:
+                        lab_id = int(lab_id)
+                    except:
+                        return Response([], status=status.HTTP_400_BAD_REQUEST)
+
+            except:
+                return Response([], status=status.HTTP_400_BAD_REQUEST)
+
+
         queryset = LabTest.objects.prefetch_related('labtests__parameter', 'faq',
                                                     'base_test__booked_together_test', 'availablelabs',
                                                     'availablelabs__lab_pricing_group',
@@ -1854,6 +1907,7 @@ class TestDetailsViewset(viewsets.GenericViewSet):
             result['about_test'] = {'title': 'About the test', 'value': data.about_test}
             result['preparations'] = {'title': 'Preparations', 'value': data.preparations}
             result['why_get_tested'] = {'title': 'Why get tested?', 'value': data.why}
+            result['url'] = data.url
             info=[]
             for lab_test in data.labtests.all():
                 name = lab_test.parameter.name
@@ -1866,7 +1920,8 @@ class TestDetailsViewset(viewsets.GenericViewSet):
                 result['faqs'].append({'title': 'Frequently asked questions','value':{'test_question': qa.test_question, 'test_answer': qa.test_answer}})
 
             booked_together=[]
-            fbts = data.frequently_booked_together.filter(availablelabs__enabled=True,
+            if lab_id:
+                fbts = data.frequently_booked_together.filter(availablelabs__enabled=True,
                                                           availablelabs__lab_pricing_group__labs__id=lab_id).distinct()
             if lab_id:
                for fbt in fbts:
@@ -1884,7 +1939,34 @@ class TestDetailsViewset(viewsets.GenericViewSet):
 
             result['frequently_booked_together'] = {'title': 'Frequently booked together', 'value': booked_together}
             result['show_details'] = data.show_details
-            final_result.append(result)
+
+        lab = LabList()
+        test_ids = list(test_ids)
+
+        for i in range(len(test_ids)):
+            test_ids[i] = str(test_ids[i])
+
+        if params.get('lat') and params.get('long'):
+            parameters['lat'] = params.get('lat')
+            parameters['long'] = params.get('long')
+
+        parameters['ids'] = ",".join(test_ids)
+        parameters['max_distance'] = 15
+        parameters['min_distance'] = 0
+
+        kwargs['parameters'] = parameters
+        kwargs['test_flag'] = 1
+
+        result['labs'] = lab.search(request, **kwargs)
+        seo = dict()
+        seo['description'] = None
+        if queryset:
+            seo['title'] = queryset[0].name + ' Test: Types, Procedure & Normal Range of Results'
+        else:
+            seo['title'] = None
+
+        result['seo'] = seo
+        final_result.append(result)
 
         return Response(final_result)
 
