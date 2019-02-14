@@ -454,15 +454,11 @@ class Lab(TimeStampedModel, CreatedByModel, QCModel, SearchKey):
     @classmethod
     def update_avg_rating(cls):
         labs = Lab.objects.filter(rating__isnull=False).distinct()
-        with transaction.atomic():
-            for lb in labs:
-                avg_lb = lb.rating.all().aggregate(avg_rating=Avg('ratings'))
-                if avg_lb:
-                    lb.avg_rating = round(avg_lb.get('avg_rating'), 1)
-                    try:
-                        lb.save()
-                    except Exception as e:
-                        logger.error('Error Updating avg ratings ' + str(e))
+        for lb in labs:
+            avg_lb = lb.rating.all().aggregate(avg_rating=Avg('ratings'))
+            if avg_lb:
+                lb.avg_rating = round(avg_lb.get('avg_rating'), 1)
+                lb.save()
 
 
 class LabCertification(TimeStampedModel):

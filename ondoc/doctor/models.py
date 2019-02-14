@@ -546,16 +546,11 @@ class Doctor(auth_model.TimeStampedModel, auth_model.QCModel, SearchKey):
     @classmethod
     def update_avg_rating(cls):
         doctor = Doctor.objects.filter(rating__isnull=False).distinct()
-        with transaction.atomic():
-            for doc in doctor:
-                avg_doc = doc.rating.all().aggregate(avg_rating=Avg('ratings'))
-                if avg_doc:
-                    doc.avg_rating = round(avg_doc.get('avg_rating'), 1)
-                    try:
-                        doc.save()
-                    except Exception as e:
-                        logger.error('Error Updating avg ratings ' + str(e))
-
+        for doc in doctor:
+            avg_doc = doc.rating.all().aggregate(avg_rating=Avg('ratings'))
+            if avg_doc:
+                doc.avg_rating = round(avg_doc.get('avg_rating'), 1)
+                doc.save()
 
     class Meta:
         db_table = "doctor"
