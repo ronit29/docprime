@@ -114,6 +114,11 @@ class Command(BaseCommand):
                     "where ea.order=%s and (select count(*) from entity_address where parent_id=ea.id and " \
                     "centroid is not null)>0",[current_order]).execute()
 
-            current_order -=1
+            current_order -= 1
 
+        RawSql('''update entity_address e set centroid = ( select
+                st_setsrid(st_point(cl.longitude, cl.latitude),4326)::geography as city_centroid
+                from  city_lat_long cl where e.alternative_value  = cl.city ) where e.id in (select ea.id 
+                        from entity_address ea inner join city_lat_long cll 
+                    on lower(ea.alternative_value)  = lower(cll.city))''', []).execute()
 

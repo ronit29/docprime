@@ -2066,3 +2066,12 @@ class DefaultRating(TimeStampedModel):
         indexes = [
             models.Index(fields=['url']),
         ]
+
+
+class CityLatLong(TimeStampedModel):
+    city = models.TextField()
+    latitude = models.DecimalField(null=True, max_digits=10, decimal_places=8)
+    longitude = models.DecimalField(null=True, max_digits=10, decimal_places=8)
+
+    class Meta:
+        db_table = 'city_lat_long'
