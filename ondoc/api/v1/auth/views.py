@@ -1162,7 +1162,7 @@ class TransactionViewSet(viewsets.GenericViewSet):
                     "user id - {} and phone number - {}" \
                     ", order id - {}.".format(order_obj.user.id, order_obj.user.phone_number, order_obj.id)
 
-        for email in settings.OPS_EMAIL_ID:
+        for email in settings.ORDER_FAILURE_EMAIL_ID:
             EmailNotification.publish_ops_email(email, html_body, 'Payment failure for order')
 
 class UserTransactionViewSet(viewsets.GenericViewSet):
