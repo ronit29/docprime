@@ -83,47 +83,10 @@ class RatingsViewSet(viewsets.GenericViewSet):
         else:
             return Response({'error': 'Object Not Found'}, status=status.HTTP_400_BAD_REQUEST)
 
-    def list(self, request):
-        serializer = serializers.RatingListBodySerializerdata(data=request.query_params)
-        serializer.is_valid(raise_exception=True)
-        valid_data = serializer.validated_data
-        if valid_data.get('content_type') == RatingsReview.OPD:
-            queryset = self.get_queryset().exclude(Q(review='') | Q(review=None))\
-                                          .filter(doc_ratings__id=valid_data.get('object_id'))\
-                                          .order_by('-updated_at')
-            graph_queryset = self.get_queryset().filter(doc_ratings__id=valid_data.get('object_id'))
-            appointment = doc_models.OpdAppointment.objects.select_related('profile').filter(doctor_id=valid_data.get('object_id')).all()
-        else:
-            lab = lab_models.Lab.objects.filter(id=valid_data.get('object_id')).first()
-            if lab and lab.network:
-                queryset = self.get_queryset().exclude(Q(review='') | Q(review=None)) \
-                    .filter(lab_ratings__network=lab.network) \
-                    .order_by('-updated_at')
-                graph_queryset = self.get_queryset().filter(lab_ratings__network=lab.network)
-                appointment = lab_models.LabAppointment.objects.select_related('profile').filter(lab__network=lab.network).all()
-            else:
-                queryset = self.get_queryset().exclude(Q(review='') | Q(review=None))\
-                                              .filter(lab_ratings__id=valid_data.get('object_id'))\
-                                              .order_by('-updated_at')
-                graph_queryset = self.get_queryset().filter(lab_ratings__id=valid_data.get('object_id'))
-                appointment = lab_models.LabAppointment.objects.select_related('profile').filter(lab_id=valid_data.get('object_id')).all()
-        # queryset = paginate_queryset(queryset, request)
-        if len(queryset):
-                body_serializer = serializers.RatingsModelSerializer(queryset, many=True, context={'request': request,
-                                                                                                   'app': appointment})
-                graph_serializer = serializers.RatingsGraphSerializer(graph_queryset,
-                                                                      context={'request': request})
-        else:
-            return Response({'error': 'Invalid Object'}, status=status.HTTP_404_NOT_FOUND)
-        return Response({'rating': body_serializer.data,
-                         'rating_graph': graph_serializer.data})
-
-
     def retrieve(self,request, pk):
         rating = get_object_or_404(RatingsReview, pk=pk)
         body_serializer = serializers.RatingsModelSerializer(rating, context={'request': request})
         return Response(body_serializer.data)
-
 
     def update(self, request, pk):
         rating = get_object_or_404(models.RatingsReview, pk=pk)
@@ -234,3 +197,46 @@ class AppRatingsViewSet(viewsets.GenericViewSet):
             logger.error('Error Saving App Rating ' + str(e))
             return Response({'status': 'error'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
         return Response({'status': "success", "rating": rating_obj.id})
+
+
+class ListRatingViewSet(viewsets.GenericViewSet):
+
+    def get_queryset(self):
+        return RatingsReview.objects.prefetch_related('compliment').filter(is_live=True,
+                                                                           moderation_status__in=[RatingsReview.PENDING,
+                                                                                                  RatingsReview.APPROVED])
+
+    def list(self, request):
+        serializer = serializers.RatingListBodySerializerdata(data=request.query_params)
+        serializer.is_valid(raise_exception=True)
+        valid_data = serializer.validated_data
+        if valid_data.get('content_type') == RatingsReview.OPD:
+            queryset = self.get_queryset().exclude(Q(review='') | Q(review=None))\
+                                          .filter(doc_ratings__id=valid_data.get('object_id'))\
+                                          .order_by('-updated_at')
+            graph_queryset = self.get_queryset().filter(doc_ratings__id=valid_data.get('object_id'))
+            appointment = doc_models.OpdAppointment.objects.select_related('profile').filter(doctor_id=valid_data.get('object_id')).all()
+        else:
+            lab = lab_models.Lab.objects.filter(id=valid_data.get('object_id')).first()
+            if lab and lab.network:
+                queryset = self.get_queryset().exclude(Q(review='') | Q(review=None)) \
+                    .filter(lab_ratings__network=lab.network) \
+                    .order_by('-updated_at')
+                graph_queryset = self.get_queryset().filter(lab_ratings__network=lab.network)
+                appointment = lab_models.LabAppointment.objects.select_related('profile').filter(lab__network=lab.network).all()
+            else:
+                queryset = self.get_queryset().exclude(Q(review='') | Q(review=None))\
+                                              .filter(lab_ratings__id=valid_data.get('object_id'))\
+                                              .order_by('-updated_at')
+                graph_queryset = self.get_queryset().filter(lab_ratings__id=valid_data.get('object_id'))
+                appointment = lab_models.LabAppointment.objects.select_related('profile').filter(lab_id=valid_data.get('object_id')).all()
+        # queryset = paginate_queryset(queryset, request)
+        if len(queryset):
+                body_serializer = serializers.RatingsModelSerializer(queryset, many=True, context={'request': request,
+                                                                                                   'app': appointment})
+                graph_serializer = serializers.RatingsGraphSerializer(graph_queryset,
+                                                                      context={'request': request})
+        else:
+            return Response({'error': 'Invalid Object'}, status=status.HTTP_404_NOT_FOUND)
+        return Response({'rating': body_serializer.data,
+                         'rating_graph': graph_serializer.data})
