@@ -43,7 +43,7 @@ def push_lab_appointment_to_integrator(self, data):
             raise Exception('[ERROR] Could not find any test and packages for the appointment id %d' % appointment.id)
 
         if packages:
-            integrator_mapping = IntegratorProfileMapping.objects.filter(content_type=lab_network_content_type, object_id=lab_network.id, test=packages[0]).first()
+            integrator_mapping = IntegratorProfileMapping.objects.filter(content_type=lab_network_content_type, object_id=lab_network.id, package=packages[0]).first()
         elif tests:
             integrator_mapping = IntegratorMapping.objects.filter(content_type=lab_network_content_type, object_id=lab_network.id, test=tests[0]).first()
 
