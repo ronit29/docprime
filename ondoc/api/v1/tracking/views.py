@@ -40,6 +40,7 @@ class EventCreateViewSet(GenericViewSet):
                     track_models.TrackingEvent.save_event(event_name=event_name, data=data, visit_id=visit_id, user=user, triggered_at=triggered_at)
                     resp['success'] = "Event Saved Successfully!"
                 except Exception as e:
+                    logger.error("Error saving event - " + str(e))
                     resp['error'] = "Error Processing Event Data!"
 
                 visit = track_models.TrackingVisit.objects.get(pk=visit_id)
