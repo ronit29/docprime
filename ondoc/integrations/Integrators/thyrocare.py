@@ -7,7 +7,7 @@ from django.conf import settings
 import logging
 logger = logging.getLogger(__name__)
 from datetime import timedelta, datetime, date
-from ondoc.integrations.models import IntegratorMapping, IntegratorProfileMapping
+from ondoc.integrations.models import IntegratorMapping, IntegratorProfileMapping, IntegratorResponse, IntegratorReport
 from django.contrib.contenttypes.models import ContentType
 from ondoc.api.v1.utils import resolve_address, aware_time_zone
 
@@ -220,20 +220,34 @@ class Thyrocare(BaseIntegrator):
         today = date.today()
         return today.year - dob.year - ((today.month, today.day) < (dob.month, dob.day))
 
-    def _get_generated_report(self, integrator_response, **kwargs):
-        lead_id = integrator_response.lead_id
-        mobile = integrator_response.content_object.profile.phone_number
+    @classmethod
+    def get_generated_report(cls):
+        integrator_bookings = IntegratorResponse.objects.filter(integrator_class_name=Thyrocare.__name__, report_received=False)
         formats = ['pdf', 'xml']
-        result = dict()
+        for booking in integrator_bookings:
+            lead_id = booking.lead_id
+            mobile = booking.content_object.profile.phone_number
+            result = dict()
 
-        for format in formats:
-            url = "%s/order.svc/%s/GETREPORTS/%s/%s/%s/Myreport" % (settings.THYROCARE_BASE_URL, settings.THYROCARE_API_KEY, lead_id, format, mobile)
-            # url = "https://www.thyrocare.com/APIs/order.svc/sNhdlQjqvoD7zCbzf56sxppBJX3MmdWSAomi@RBhXRrVcGyko7hIzQ==/GETREPORTS/SP46592004/%s/8898881529/Myreport" %(format)
-            response = requests.get(url)
-            response = response.json()
-            if response.get('RES_ID') == 'RES0000':
-                result[format] = response["URL"]
-            else:
-                logger.error("[ERROR] %s" % response.get('RESPONSE'))
+            for format in formats:
+                url = "%s/order.svc/%s/GETREPORTS/%s/%s/%s/Myreport" % (settings.THYROCARE_BASE_URL, settings.THYROCARE_API_KEY, lead_id, format, mobile)
+                # url = "https://www.thyrocare.com/APIs/order.svc/sNhdlQjqvoD7zCbzf56sxppBJX3MmdWSAomi@RBhXRrVcGyko7hIzQ==/GETREPORTS/SP46592004/%s/8898881529/Myreport" %(format)
+                response = requests.get(url)
+                response = response.json()
+                if response.get('RES_ID') == 'RES0000':
+                    result[format] = response["URL"]
+                else:
+                    logger.error("[ERROR] %s" % response.get('RESPONSE'))
 
-        return result
+            if result:
+                cls.save_reports(booking, result)
+
+    @classmethod
+    def save_reports(cls, integrator_response, result):
+        # Save reports URL
+        report = IntegratorReport.objects.get_or_create(integrator_response_id=integrator_response.id, pdf_url=result["pdf"], xml_url=result["xml"])
+
+        # Update integrator response when both type of report present
+        if report.pdf_url && report.xml_url:
+            IntegratorResponse.objects.filter(pk=integrator_response.pk).update(report_received=True)
+

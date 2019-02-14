@@ -79,13 +79,14 @@ class IntegratorProfileMapping(TimeStampedModel):
 
 class IntegratorResponse(TimeStampedModel):
     content_type = models.ForeignKey(ContentType, on_delete=models.DO_NOTHING) # model id
-    object_id = models.PositiveIntegerField() # object ID
+    object_id = models.PositiveIntegerField()
     content_object = GenericForeignKey()
     integrator_class_name = models.CharField(max_length=40, null=False, blank=False)
     lead_id = models.CharField(max_length=40, null=True, blank=True)
     dp_order_id = models.CharField(max_length=40, null=True, blank=True)
     integrator_order_id = models.CharField(max_length=40, null=True, blank=True)
     response_data = JSONField(blank=True, null=True)
+    report_received = models.BooleanField(default=False)
 
     class Meta:
         db_table = 'integrator_response'
