@@ -72,11 +72,16 @@ def prepare_and_hit(self, data):
     if appointment.profile:
         p_email = appointment.profile.email
 
+    mask_number_instance = appointment.mask_number.filter(is_deleted=False, is_mask_number=True).first()
+    mask_number = ''
+    if mask_number_instance:
+        mask_number = mask_number_instance.mask_number
+
     appointment_details = {
         'AppointmentStatus': appointment.status,
         'Age': calculate_age(appointment),
         'Email': p_email,
-        'VirtualNo': '',
+        'VirtualNo': mask_number,
         'OTP': '',
         'KYC': kyc,
         'Location': location,
