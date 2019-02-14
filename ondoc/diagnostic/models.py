@@ -877,7 +877,8 @@ class LabTest(TimeStampedModel, SearchKey):
                                         through=LabTestCategoryMapping,
                                         through_fields=('lab_test', 'parent_category'),
                                         related_name='lab_tests')
-    url = models.CharField(max_length=500, blank=True)
+    url = models.CharField(max_length=500, blank=True, editable=False)
+    custom_url = models.CharField(max_length=500, blank=True)
     min_age = models.PositiveSmallIntegerField(default=None, blank=True, null=True, validators=[MaxValueValidator(120), MinValueValidator(1)])
     max_age = models.PositiveSmallIntegerField(default=None, blank=True, null=True, validators=[MaxValueValidator(120), MinValueValidator(1)])
     MALE = 1
@@ -906,7 +907,7 @@ class LabTest(TimeStampedModel, SearchKey):
 
     def save(self, *args, **kwargs):
 
-        url = slugify(self.url)
+        url = slugify(self.custom_url)
         #self.url = slugify(self.url)
 
         if not url:
@@ -916,6 +917,8 @@ class LabTest(TimeStampedModel, SearchKey):
         if generated_url!=url:
             url = generated_url
 
+
+        self.url = url
         super().save(*args, **kwargs)
         
         self.create_url(url)
@@ -1763,7 +1766,7 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin)
             event_data = TrackingEvent.build_event_data(self.user, TrackingEvent.LabAppointmentBooked, appointmentId=self.id)
             if event_data and visitor_info:
                 TrackingEvent.save_event(event_name=event_data.get('event'), data=event_data, visit_id=visitor_info.get('visit_id'),
-                                         user=self.user, triggered_at=datetime.datetime.now())
+                                         user=self.user, triggered_at=datetime.datetime.utcnow())
         except Exception as e:
             logger.error("Could not save triggered event - " + str(e))
 

@@ -528,12 +528,13 @@ class DoctorSearchHelper:
                 "new_schema": {
                     "@context": 'http://schema.org',
                     "@type": schema_type,
-                    "currenciesAccepted": "INR",
-                    "MedicalSpeciality": schema_specialization,
                     "name": doctor.get_display_name(),
                     "image": doctor.get_thumbnail() if doctor.get_thumbnail() else static(
                         'web/images/doc_placeholder.png'),
                     "url": None,
+                    "medicalSpecialty": [schema_specialization],
+                    "currenciesAccepted": "INR",
+                    "priceRange": min_price["deal_price"],
                     "address": {
                         "@type": 'PostalAddress',
                         "addressLocality": doctor_clinic.hospital.locality if doctor_clinic and getattr(doctor_clinic, 'hospital', None) else '',
@@ -541,14 +542,9 @@ class DoctorSearchHelper:
                         # "postalCode": doctor_clinic.hospital.pin_code if doctor_clinic and getattr(doctor_clinic, 'hospital', None) else '',
                         # "streetAddress": doctor_clinic.hospital.get_hos_address() if doctor_clinic and getattr(doctor_clinic, 'hospital', None) else '',
                     },
-                    # "description": doctor.about,
-                    "priceRange": min_price["deal_price"],
-                    # 'openingHours': opening_hours,
-                    'location': {
+                     'location': {
                         '@type': 'Place',
                         'geo': {
-                            # '@type': 'GeoCircle',
-                            # 'geoMidpoint': {
                                 '@type': 'GeoCoordinates',
                                 'latitude': doctor_clinic.hospital.location.y if doctor_clinic and
                                                                                  getattr(doctor_clinic, 'hospital', None) and getattr(doctor_clinic.hospital, 'location', None) else None,
