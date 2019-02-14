@@ -33,7 +33,7 @@ from ondoc.diagnostic.models import (Lab, LabTiming, LabImage, GenericLabAdmin,
                                      CommonDiagnosticCondition, DiagnosticConditionLabTest, HomePickupCharges,
                                      TestParameter, ParameterLabTest, LabTestPackage, LabReportFile, LabReport,
                                      CommonPackage, LabTestCategory, LabTestCategoryMapping,
-                                     LabTestRecommendedCategoryMapping, QuestionAnswer)
+                                     LabTestRecommendedCategoryMapping, QuestionAnswer, FrequentlyAddedTogetherTests)
 
 from ondoc.procedure.models import Procedure, ProcedureCategory, CommonProcedureCategory, DoctorClinicProcedure, \
     ProcedureCategoryMapping, ProcedureToCategoryMapping, CommonProcedure
@@ -473,7 +473,7 @@ class Command(BaseCommand):
         group, created = Group.objects.get_or_create(name=constants['PRODUCT_TEAM'])
         group.permissions.clear()
 
-        content_types = ContentType.objects.get_for_models(LabTestRecommendedCategoryMapping, Banner, UserConfig, NewDynamic, QuestionAnswer)
+        content_types = ContentType.objects.get_for_models(LabTestRecommendedCategoryMapping, Banner, UserConfig, NewDynamic, QuestionAnswer, FrequentlyAddedTogetherTests)
         for cl, ct in content_types.items():
             permissions = Permission.objects.filter(
                 Q(content_type=ct),
