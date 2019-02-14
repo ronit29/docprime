@@ -30,8 +30,12 @@ class EventCreateViewSet(GenericViewSet):
                 data.pop('userAgent', None)
                 triggered_at = data.get('triggered_at', None)
                 data.pop('created_at', None)
+
                 if triggered_at:
+                    if len(str(triggered_at)) >= 13:
+                        triggered_at = triggered_at/1000
                     triggered_at = datetime.datetime.fromtimestamp(triggered_at)
+
                 try:
                     user = None
                     if request.user.is_authenticated:
