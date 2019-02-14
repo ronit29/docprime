@@ -68,7 +68,7 @@ class TrackingEvent(auth_models.TimeStampedModel):
         visit_id = kwargs.get('visit_id', None)
         user = kwargs.get('user', None)
         triggered_at = kwargs.get('triggered_at', None)
-        if event_name and data and visit_id and user:
+        if event_name and visit_id:
             event = cls(name=event_name, data=data, visit_id=visit_id, user=user, triggered_at=triggered_at)
             event.save()
             return event

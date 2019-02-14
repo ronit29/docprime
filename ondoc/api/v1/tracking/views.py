@@ -37,8 +37,7 @@ class EventCreateViewSet(GenericViewSet):
                     if request.user.is_authenticated:
                         user = request.user
 
-                    event = track_models.TrackingEvent.save_event(event_name=event_name, data=data, visit_id=visit_id, user=user, triggered_at=triggered_at)
-                    event.save()
+                    track_models.TrackingEvent.save_event(event_name=event_name, data=data, visit_id=visit_id, user=user, triggered_at=triggered_at)
                     resp['success'] = "Event Saved Successfully!"
                 except Exception as e:
                     resp['error'] = "Error Processing Event Data!"
