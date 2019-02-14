@@ -511,7 +511,7 @@ class UserAppointmentsViewSet(OndocViewSet):
         if validated_data.get('source', None):
             source = validated_data.get('source')
         if request.user and hasattr(request.user, 'user_type'):
-            responsible_user = responsible_user
+            responsible_user = request.user
             if not source:
                 if request.user.user_type == User.DOCTOR:
                     source = AppointmentHistory.DOC_APP
