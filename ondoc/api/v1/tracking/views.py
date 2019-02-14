@@ -28,14 +28,19 @@ class EventCreateViewSet(GenericViewSet):
             if event_name:
                 userAgent = data.get('userAgent', None)
                 data.pop('userAgent', None)
+                triggered_at = data.get('triggered_at', None)
+                data.pop('created_at', None)
+                if triggered_at:
+                    triggered_at = datetime.datetime.fromtimestamp(triggered_at)
                 try:
                     user = None
                     if request.user.is_authenticated:
                         user = request.user
-                    event = track_models.TrackingEvent(name=event_name, data=data, visit_id=visit_id, user=user)
-                    event.save()
+
+                    track_models.TrackingEvent.save_event(event_name=event_name, data=data, visit_id=visit_id, user=user, triggered_at=triggered_at)
                     resp['success'] = "Event Saved Successfully!"
                 except Exception as e:
+                    logger.error("Error saving event - " + str(e))
                     resp['error'] = "Error Processing Event Data!"
 
                 visit = track_models.TrackingVisit.objects.get(pk=visit_id)
@@ -85,6 +90,7 @@ class EventCreateViewSet(GenericViewSet):
             return Response(status=status.HTTP_400_BAD_REQUEST, data=resp)
         else:
             return Response(status=status.HTTP_200_OK, data=resp)
+
 
     def get_visit(self, request):
 

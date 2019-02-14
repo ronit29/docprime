@@ -33,7 +33,7 @@ from ondoc.notification import tasks as notification_tasks
 from django.contrib.contenttypes.fields import GenericRelation
 from ondoc.api.v1.utils import get_start_end_datetime, custom_form_datetime, CouponsMixin, aware_time_zone, \
     form_time_slot, util_absolute_url, html_to_pdf
-from ondoc.common.models import AppointmentHistory
+from ondoc.common.models import AppointmentHistory, AppointmentMaskNumber
 from functools import reduce
 from operator import or_
 import logging
@@ -188,6 +188,7 @@ class Hospital(auth_model.TimeStampedModel, auth_model.CreatedByModel, auth_mode
     disable_comments = models.CharField(max_length=500, blank=True)
     disabled_by = models.ForeignKey(settings.AUTH_USER_MODEL, related_name="disabled_hospitals", null=True, editable=False,
                                     on_delete=models.SET_NULL)
+    is_mask_number_required = models.BooleanField(default=True)
 
     def __str__(self):
         return self.name
@@ -1298,6 +1299,7 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
     merchant_payout = models.ForeignKey(MerchantPayout, related_name="opd_appointment", on_delete=models.SET_NULL, null=True)
     price_data = JSONField(blank=True, null=True)
     money_pool = models.ForeignKey(MoneyPool, on_delete=models.SET_NULL, null=True)
+    mask_number = GenericRelation(AppointmentMaskNumber)
     email_notification = GenericRelation(EmailNotification, related_name="enotification")
 
     def __str__(self):
@@ -1475,6 +1477,7 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
             try:
                 push_appointment_to_matrix.apply_async(({'type': 'OPD_APPOINTMENT', 'appointment_id': self.id,
                                                          'product_id': 5, 'sub_product_id': 2},), countdown=5)
+
             except Exception as e:
                 logger.error(str(e))
 
@@ -1528,9 +1531,15 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
         # if not self.is_doctor_available():
         #     raise RestFrameworkValidationError("Doctor is on leave.")
 
-        push_to_matrix = kwargs.get('push_again_to_matrix', True)
-        if 'push_again_to_matrix' in kwargs.keys():
-            kwargs.pop('push_again_to_matrix')
+        # push_to_matrix = kwargs.get('push_again_to_matrix', True)
+        # if 'push_again_to_matrix' in kwargs.keys():
+        #     kwargs.pop('push_again_to_matrix')
+
+        push_to_matrix = True
+        if database_instance and self.status == database_instance.status and self.time_slot_start == database_instance.time_slot_start:
+            push_to_matrix = False
+        else:
+            push_to_matrix = True
 
         try:
             # while completing appointment
@@ -1863,6 +1872,17 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
         free_cart_count = Cart.get_free_opd_item_count(request, cart_item)
 
         return (free_appointment_count + free_cart_count) < cls.MAX_FREE_BOOKINGS_ALLOWED
+
+    def trigger_created_event(self, visitor_info):
+        from ondoc.tracking.models import TrackingEvent
+        try:
+            event_data = TrackingEvent.build_event_data(self.user, TrackingEvent.DoctorAppointmentBooked, appointmentId=self.id)
+            if event_data and visitor_info:
+                TrackingEvent.save_event(event_name=event_data.get('event'), data=event_data, visit_id=visitor_info.get('visit_id'),
+                                         user=self.user, triggered_at=datetime.datetime.utcnow())
+        except Exception as e:
+            logger.error("Could not save triggered event - " + str(e))
+
 
 class OpdAppointmentProcedureMapping(models.Model):
     opd_appointment = models.ForeignKey(OpdAppointment, on_delete=models.CASCADE, related_name='procedure_mappings')

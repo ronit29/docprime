@@ -4,7 +4,7 @@ from django.contrib.gis.db import models
 from django.contrib.staticfiles.templatetags.staticfiles import static
 from django.core.validators import MaxValueValidator, MinValueValidator, FileExtensionValidator
 from django.template.loader import render_to_string
-# from hardcopy import bytestring_to_pdf
+from hardcopy import bytestring_to_pdf
 
 from ondoc.account.models import MerchantPayout, ConsumerAccount, Order, UserReferred, MoneyPool, Invoice
 from ondoc.authentication.models import (TimeStampedModel, CreatedByModel, Image, Document, QCModel, UserProfile, User,
@@ -12,6 +12,7 @@ from ondoc.authentication.models import (TimeStampedModel, CreatedByModel, Image
                                          BillingAccount, SPOCDetails)
 from ondoc.doctor.models import Hospital, SearchKey, CancellationReason
 from ondoc.coupon.models import Coupon
+from ondoc.location.models import EntityUrls
 from ondoc.notification import models as notification_models
 from ondoc.notification import tasks as notification_tasks
 from ondoc.notification.labnotificationaction import LabNotificationAction
@@ -50,9 +51,10 @@ from ondoc.matrix.tasks import push_appointment_to_matrix, push_onboarding_qcsta
 from ondoc.location import models as location_models
 from ondoc.ratings_review import models as ratings_models
 from decimal import Decimal
-from ondoc.common.models import AppointmentHistory
+from ondoc.common.models import AppointmentHistory, AppointmentMaskNumber
 import reversion
 from decimal import Decimal
+from django.utils.text import slugify
 
 logger = logging.getLogger(__name__)
 
@@ -644,6 +646,7 @@ class LabNetwork(TimeStampedModel, CreatedByModel, QCModel):
     spoc_details = GenericRelation(auth_model.SPOCDetails)
     merchant = GenericRelation(auth_model.AssociatedMerchant)
     merchant_payout = GenericRelation(account_model.MerchantPayout)
+    is_mask_number_required = models.BooleanField(default=True)
 
     def all_associated_labs(self):
         if self.id:
@@ -799,6 +802,7 @@ class LabTestCategory(auth_model.TimeStampedModel, SearchKey):
     is_live = models.BooleanField(default=False)
     is_package_category = models.BooleanField(verbose_name='Is this a test package category?')
     show_on_recommended_screen = models.BooleanField(default=False)
+    priority = models.PositiveIntegerField(default=0)
 
     def __str__(self):
         return self.name
@@ -838,6 +842,8 @@ class LabTestRecommendedCategoryMapping(models.Model):
 
 
 class LabTest(TimeStampedModel, SearchKey):
+    LAB_TEST_SITEMAP_IDENTIFIER = 'LAB_TEST'
+    URL_SUFFIX = 'tpp'
     RADIOLOGY = 1
     PATHOLOGY = 2
     OTHER = 3
@@ -885,6 +891,8 @@ class LabTest(TimeStampedModel, SearchKey):
                                         through=LabTestCategoryMapping,
                                         through_fields=('lab_test', 'parent_category'),
                                         related_name='lab_tests')
+    url = models.CharField(max_length=500, blank=True, editable=False)
+    custom_url = models.CharField(max_length=500, blank=True)
     min_age = models.PositiveSmallIntegerField(default=None, blank=True, null=True, validators=[MaxValueValidator(120), MinValueValidator(1)])
     max_age = models.PositiveSmallIntegerField(default=None, blank=True, null=True, validators=[MaxValueValidator(120), MinValueValidator(1)])
     MALE = 1
@@ -910,6 +918,52 @@ class LabTest(TimeStampedModel, SearchKey):
 
     def __str__(self):
         return '{} ({})'.format(self.name, "PACKAGE" if self.is_package else "TEST")
+
+    def save(self, *args, **kwargs):
+
+        url = slugify(self.custom_url)
+        #self.url = slugify(self.url)
+
+        if not url:
+            url = slugify(self.name)+'-'+self.URL_SUFFIX
+
+        generated_url = self.generate_url(url)
+        if generated_url!=url:
+            url = generated_url
+
+
+        self.url = url
+        super().save(*args, **kwargs)
+        
+        self.create_url(url)
+
+
+    def generate_url(self, url):
+
+        duplicate_urls = EntityUrls.objects.filter(~Q(entity_id=self.id), url__iexact=url, sitemap_identifier=LabTest.LAB_TEST_SITEMAP_IDENTIFIER)
+        if duplicate_urls.exists():
+            url = url.rstrip(self.URL_SUFFIX)
+            url = url.rstrip('-')
+            url = url+'-'+str(id)+'-'+self.URL_SUFFIX
+
+        return url
+
+
+    def create_url(self, url):
+
+        existings_urls = EntityUrls.objects.filter(url__iexact=url, \
+            sitemap_identifier=LabTest.LAB_TEST_SITEMAP_IDENTIFIER, entity_id=self.id).all()
+
+        if not existings_urls.exists():
+            url_entry = EntityUrls.objects.create(url=url, entity_id=self.id, sitemap_identifier=self.LAB_TEST_SITEMAP_IDENTIFIER,\
+                is_valid=True, url_type='PAGEURL', entity_type='LabTest')
+            EntityUrls.objects.filter(entity_id=self.id).filter(~Q(id=url_entry.id)).update(is_valid=False)
+        else:
+            if not existings_urls.filter(is_valid=True).exists():
+                eu = existings_urls.first()
+                eu.is_valid = True
+                eu.save()
+                EntityUrls.objects.filter(entity_id=self.id).filter(~Q(id=eu.id)).update(is_valid=False)
 
     class Meta:
         db_table = "lab_test"
@@ -1124,6 +1178,7 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin)
     price_data = JSONField(blank=True, null=True)
     tests = models.ManyToManyField(LabTest, through='LabAppointmentTestMapping', through_fields=('appointment', 'test'))
     money_pool = models.ForeignKey(MoneyPool, on_delete=models.SET_NULL, null=True)
+    mask_number = GenericRelation(AppointmentMaskNumber)
     email_notification = GenericRelation(EmailNotification, related_name="lab_notification")
 
     def get_tests_and_prices(self):
@@ -1227,6 +1282,13 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin)
                       'sub_product_id': 2},), countdown=5)
             except Exception as e:
                 logger.error(str(e))
+
+        # if push_for_mask_number:
+        #     try:
+        #         generate_appointment_masknumber.apply_async(({'type': 'LAB_APPOINTMENT', 'appointment_id': self.id},),
+        #                                             countdown=5)
+        #     except Exception as e:
+        #         logger.error(str(e))
 
         if self.is_to_send_notification(old_instance):
             try:
@@ -1333,9 +1395,21 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin)
         except Exception as e:
             logger.error("Error while saving payout mercahnt for lab- " + str(e))
 
-        push_to_matrix = kwargs.get('push_again_to_matrix', True)
-        if 'push_again_to_matrix' in kwargs.keys():
-            kwargs.pop('push_again_to_matrix')
+        push_to_matrix = True
+        if database_instance and self.status == database_instance.status and self.time_slot_start == database_instance.time_slot_start:
+            push_to_matrix = False
+        else:
+            push_to_matrix = True
+
+        # push_for_mask_number = True
+        # if self.time_slot_start != LabAppointment.objects.get(pk=self.id).time_slot_start:
+        #     push_for_mask_number = True
+        # else:
+        #     push_for_mask_number = False
+
+        # push_to_matrix = kwargs.get('push_again_to_matrix', True)
+        # if 'push_again_to_matrix' in kwargs.keys():
+        #     kwargs.pop('push_again_to_matrix')
 
         # Pushing every status to the Appointment history
         push_to_history = False
@@ -1699,6 +1773,16 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin)
                 "is_home_pickup": True
             })
         return fulfillment_data
+
+    def trigger_created_event(self, visitor_info):
+        from ondoc.tracking.models import TrackingEvent
+        try:
+            event_data = TrackingEvent.build_event_data(self.user, TrackingEvent.LabAppointmentBooked, appointmentId=self.id)
+            if event_data and visitor_info:
+                TrackingEvent.save_event(event_name=event_data.get('event'), data=event_data, visit_id=visitor_info.get('visit_id'),
+                                         user=self.user, triggered_at=datetime.datetime.utcnow())
+        except Exception as e:
+            logger.error("Could not save triggered event - " + str(e))
 
     def __str__(self):
         return "{}, {}".format(self.profile.name if self.profile else "", self.lab.name)
