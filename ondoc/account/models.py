@@ -63,6 +63,7 @@ class Order(TimeStampedModel):
     parent = models.ForeignKey('self', on_delete=models.CASCADE, related_name="orders", blank=True, null=True)
     cart = models.ForeignKey('cart.Cart', on_delete=models.CASCADE, related_name="order", blank=True, null=True)
     user = models.ForeignKey(User, on_delete=models.DO_NOTHING, blank=True, null=True)
+    visitor_info = JSONField(blank=True, null=True)
 
     def __str__(self):
         return "{}".format(self.id)
@@ -331,6 +332,15 @@ class Order(TimeStampedModel):
         total_balance = balance + cashback_balance
         payable_amount = cls.get_total_payable_amount(fulfillment_data)
 
+        # utility to fetch and save visitor info for an parent order
+        visitor_info = None
+        try:
+            from ondoc.api.v1.tracking.views import EventCreateViewSet
+            event_api = EventCreateViewSet()
+            visitor_id, visit_id = event_api.get_visit(request)
+            visitor_info = { "visitor_id": visitor_id, "visit_id": visit_id }
+        except Exception as e:
+            logger.log("Could not fecth visitor info - " + str(e))
 
         # create a Parent order to accumulate sub-orders
         process_immediately = False
@@ -343,7 +353,8 @@ class Order(TimeStampedModel):
                 cashback_amount= cashback_amount,
                 payment_status= cls.PAYMENT_PENDING,
                 user=user,
-                product_id=1 # remove later
+                product_id=1, # remove later
+                visitor_info=visitor_info
             )
             process_immediately = True
         else:
@@ -360,7 +371,8 @@ class Order(TimeStampedModel):
                 cashback_amount= cashback_amount,
                 payment_status= cls.PAYMENT_PENDING,
                 user=user,
-                product_id=1  # remove later
+                product_id=1,  # remove later
+                visitor_info=visitor_info
             )
 
         # building separate orders for all fulfillments
@@ -449,6 +461,9 @@ class Order(TimeStampedModel):
 
                 total_cashback_used += curr_cashback
                 total_wallet_used += curr_wallet
+
+                # trigger event for new appointment creation
+                curr_app.trigger_created_event(self.visitor_info)
 
                 # mark cart item delete after order process
                 if order.cart:
