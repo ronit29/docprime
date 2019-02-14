@@ -84,6 +84,7 @@ class RatingsReviewResource(resources.ModelResource):
 
 
 class RatingsReviewForm(forms.ModelForm):
+    send_update_text = forms.CharField(initial='Please Find the url to Update your Feedback!', required=False)
     send_update_sms = forms.BooleanField(required=False)
 
 
@@ -94,7 +95,7 @@ class RatingsReviewAdmin(ImportExportMixin, admin.ModelAdmin):
     list_display = (['name', 'booking_id', 'appointment_type', 'ratings', 'moderation_status', 'updated_at'])
     readonly_fields = ['user', 'name', 'booking_id', 'appointment_type']
     fields = ('user', 'ratings', 'review', 'name', 'booking_id', 'appointment_type', 'compliment',
-              'moderation_status', 'moderation_comments', 'send_update_sms')
+              'moderation_status', 'moderation_comments', 'send_update_text', 'send_update_sms')
     list_filter = ('appointment_type', 'moderation_status', 'ratings')
     # form = RatingsReviewForm
 
@@ -123,7 +124,7 @@ class RatingsReviewAdmin(ImportExportMixin, admin.ModelAdmin):
             return response
         return ''
 
-    def send_update_sms(self, instance):
+    def send_update_sms(self, instance, msg):
         from ondoc.authentication.backends import JWTAuthentication
         if instance:
             if instance.user:
@@ -132,10 +133,11 @@ class RatingsReviewAdmin(ImportExportMixin, admin.ModelAdmin):
                 token = agent_token.token if agent_token.token else None
                 url = settings.BASE_URL + "/myratings?id=" + str(instance.id) + "&token=" + token
                 short_url = v1_utils.generate_short_url(url)
-                text = "Please Find the url to Update your Feedback " + str(short_url)
+                text = msg if msg else "Please Find the url to Update your Feedback "
+                final_text = str(text) + ' ' + str(short_url)
                 try:
                     notification_tasks.send_rating_update_message.apply_async(
-                        kwargs={'number': instance.user.phone_number, 'text': text},
+                        kwargs={'number': instance.user.phone_number, 'text': final_text},
                         countdown=1)
                 except Exception as e:
                     logger.error("Failed to send User Rating update message  " + str(e))
@@ -155,7 +157,8 @@ class RatingsReviewAdmin(ImportExportMixin, admin.ModelAdmin):
 
     def save_model(self, request, obj, form, change):
         if form.cleaned_data.get('send_update_sms'):
-            self.send_update_sms(obj)
+            text = form.cleaned_data['send_update_text'] if form.cleaned_data.get('send_update_text') else None
+            self.send_update_sms(obj, text)
         super().save_model(request, obj, form, change)
 
         # if instance.appoitnment_type:
