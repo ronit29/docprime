@@ -21,6 +21,7 @@ from django.db import transaction
 import logging
 from dal import autocomplete
 from ondoc.api.v1.utils import GenericAdminEntity, util_absolute_url, util_file_name
+from ondoc.common.models import AppointmentHistory
 from ondoc.procedure.models import DoctorClinicProcedure, Procedure
 
 logger = logging.getLogger(__name__)
