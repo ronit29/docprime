@@ -532,7 +532,7 @@ class DoctorSearchHelper:
                     "image": doctor.get_thumbnail() if doctor.get_thumbnail() else static(
                         'web/images/doc_placeholder.png'),
                     "url": None,
-                    "medicalspeciality": [schema_specialization],
+                    "medicalSpecialty": [schema_specialization],
                     "currenciesAccepted": "INR",
                     "priceRange": min_price["deal_price"],
                     "address": {
