@@ -376,7 +376,7 @@ class UpdateStatusSerializer(serializers.Serializer):
     cancellation_reason = serializers.PrimaryKeyRelatedField(
         queryset=CancellationReason.objects.filter(visible_on_front_end=True), required=False)
     cancellation_comment = serializers.CharField(required=False, allow_blank=True)
-    source = serializers.ChoiceField(choices=AppointmentHistory.SOURCE_CHOICES, required=True)
+    source = serializers.ChoiceField(choices=AppointmentHistory.SOURCE_CHOICES, required=False)
 
 
 class DoctorImageSerializer(serializers.ModelSerializer):
