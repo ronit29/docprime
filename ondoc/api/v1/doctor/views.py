@@ -625,7 +625,7 @@ class DoctorProfileUserViewSet(viewsets.GenericViewSet):
             if general_specialization:
                 specialization_id = general_specialization[0].pk
                 parameters['specialization_ids'] = str(specialization_id)
-            if response_data.get('hospitals'):
+            if specialization_id and response_data.get('hospitals'):
                 hospital = response_data.get('hospitals')[0]
                 parameters['lat'] = hospital.get('lat')
                 parameters['long'] = hospital.get('long')
