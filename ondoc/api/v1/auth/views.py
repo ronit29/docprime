@@ -57,6 +57,8 @@ import jwt
 from decimal import Decimal
 from ondoc.web.models import ContactUs
 from ondoc.notification.tasks import send_pg_acknowledge
+import re
+
 
 logger = logging.getLogger(__name__)
 User = get_user_model()
@@ -329,6 +331,9 @@ class UserProfileViewSet(mixins.CreateModelMixin, mixins.ListModelMixin,
             })
             first_profile = True
 
+        if not bool(re.match(r"^[a-zA-Z ]+$", request.data.get('name'))):
+            return Response({"error": "Invalid Name"}, status=status.HTTP_400_BAD_REQUEST)
+
         if request.data.get('age'):
             try:
                 age = int(request.data.get("age"))
@@ -373,6 +378,10 @@ class UserProfileViewSet(mixins.CreateModelMixin, mixins.ListModelMixin,
         #         return Response({"error": "Invalid Age"}, status=status.HTTP_400_BAD_REQUEST)
 
         obj = self.get_object()
+
+        if not bool(re.match(r"^[a-zA-Z ]+$", data.get('name'))):
+            return Response({"error": "Invalid Name"}, status=status.HTTP_400_BAD_REQUEST)
+        
         if data.get("name") and UserProfile.objects.exclude(id=obj.id).filter(name=data['name'],
                                                                               user=request.user).exists():
             return Response({
@@ -1061,8 +1070,15 @@ class TransactionViewSet(viewsets.GenericViewSet):
                     logger.error("Invalid pg data - " + json.dumps(resp_serializer.errors))
             elif order_obj:
                 try:
-                    order_obj.change_payment_status(Order.PAYMENT_FAILURE)
-                    self.send_failure_ops_email(order_obj)
+                    if response and response.get("orderNo") and response.get("orderId"):
+                        send_pg_acknowledge.apply_async((response.get("orderId"), response.get("orderNo"),), countdown=1)
+                except Exception as e:
+                    logger.error("Error in sending pg acknowledge - " + str(e))
+
+                try:
+                    has_changed = order_obj.change_payment_status(Order.PAYMENT_FAILURE)
+                    if has_changed:
+                        self.send_failure_ops_email(order_obj)
                 except Exception as e:
                     logger.error("Error sending payment failure email - " + str(e))
 
@@ -1146,7 +1162,7 @@ class TransactionViewSet(viewsets.GenericViewSet):
                     "user id - {} and phone number - {}" \
                     ", order id - {}.".format(order_obj.user.id, order_obj.user.phone_number, order_obj.id)
 
-        for email in settings.OPS_EMAIL_ID:
+        for email in settings.ORDER_FAILURE_EMAIL_ID:
             EmailNotification.publish_ops_email(email, html_body, 'Payment failure for order')
 
 class UserTransactionViewSet(viewsets.GenericViewSet):

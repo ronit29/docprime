@@ -77,8 +77,7 @@ class ScreenViewSet(viewsets.GenericViewSet):
         params = request.query_params
         from_app = params.get("from_app", False)
         if from_app:
-            queryset = PaymentOptions.objects.filter(is_enabled=True, payment_gateway__iexact="paytm").order_by(
-                '-priority')
+            queryset = PaymentOptions.objects.filter(is_enabled=True).order_by('-priority')
         else:
             queryset = PaymentOptions.objects.filter(is_enabled=True).order_by('-priority')
         payment_options = PaymentOptions.build_payment_option(queryset)
