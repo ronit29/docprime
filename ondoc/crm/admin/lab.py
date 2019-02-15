@@ -1236,7 +1236,7 @@ class LabTestAdmin(PackageAutoCompleteView, ImportExportMixin, VersionAdmin):
     search_fields = ['name']
     list_filter = ('is_package', 'enable_for_ppc', 'enable_for_retail')
     exclude = ['search_key']
-    readonly_fields = ['get_active_url',]
+    readonly_fields = ['url',]
 
     def get_fields(self, request, obj=None):
         fields = super().get_fields(request, obj)
@@ -1252,13 +1252,13 @@ class LabTestAdmin(PackageAutoCompleteView, ImportExportMixin, VersionAdmin):
             inline_instance.append(ParameterLabTestInline(self.model, self.admin_site))
         return inline_instance
 
-    def get_active_url(self, obj=None):
-        if obj:
-            active_urls = EntityUrls.objects.filter(entity_id=obj.id, is_valid=True).first()
-            if active_urls:
-                return active_urls.url
+    # def get_active_url(self, obj=None):
+    #     if obj:
+    #         active_urls = EntityUrls.objects.filter(entity_id=obj.id, is_valid=True).first()
+    #         if active_urls:
+    #             return active_urls.url
 
-        return ''
+    #     return ''
 
 class LabTestTypeAdmin(VersionAdmin):
     search_fields = ['name']

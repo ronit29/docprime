@@ -455,6 +455,7 @@ class DoctorSearchHelper:
             schema_specialization = None
             schema_specialization = sorted_spec_list[0].get('name') if sorted_spec_list and len(sorted_spec_list)>0 and sorted_spec_list[0].get('name') else None
             schema_type = None
+            new_schema = OrderedDict()
             if schema_specialization == 'Dentist':
                 schema_type = 'Dentist'
             else:
@@ -523,60 +524,65 @@ class DoctorSearchHelper:
                         }
                     }
 
-                },
+                }
 
-                "new_schema": {
-                    "@context": 'http://schema.org',
-                    "@type": schema_type,
-                    "currenciesAccepted": "INR",
-                    "MedicalSpeciality": schema_specialization,
-                    "name": doctor.get_display_name(),
-                    "image": doctor.get_thumbnail() if doctor.get_thumbnail() else static(
-                        'web/images/doc_placeholder.png'),
-                    "url": None,
-                    "address": {
-                        "@type": 'PostalAddress',
-                        "addressLocality": doctor_clinic.hospital.locality if doctor_clinic and getattr(doctor_clinic, 'hospital', None) else '',
-                        "addressRegion": doctor_clinic.hospital.city if doctor_clinic and getattr(doctor_clinic, 'hospital', None) else '',
-                        # "postalCode": doctor_clinic.hospital.pin_code if doctor_clinic and getattr(doctor_clinic, 'hospital', None) else '',
-                        # "streetAddress": doctor_clinic.hospital.get_hos_address() if doctor_clinic and getattr(doctor_clinic, 'hospital', None) else '',
-                    },
-                    # "description": doctor.about,
+            }
+
+
+            new_schema["@context"] = 'http://schema.org'
+            new_schema["@type"] = schema_type
+            new_schema["name"] = doctor.get_display_name()
+            new_schema["image"] = doctor.get_thumbnail() if doctor.get_thumbnail() else static(
+                'web/images/doc_placeholder.png')
+            new_schema["url"] = None
+            new_schema["medicalSpecialty"] = [schema_specialization]
+            new_schema["currenciesAccepted"] = "INR"
+            new_schema["priceRange"] = min_price["deal_price"]
+            new_schema["address"] = {
+                                        "@type": 'PostalAddress',
+                                        "addressLocality": doctor_clinic.hospital.locality if doctor_clinic and getattr(
+                                            doctor_clinic, 'hospital', None) else '',
+                                        "addressRegion": doctor_clinic.hospital.city if doctor_clinic and getattr(
+                                            doctor_clinic, 'hospital', None) else '',
+                                        # "postalCode": doctor_clinic.hospital.pin_code if doctor_clinic and getattr(doctor_clinic, 'hospital', None) else '',
+                                        # "streetAddress": doctor_clinic.hospital.get_hos_address() if doctor_clinic and getattr(doctor_clinic, 'hospital', None) else '',
+                                    }
+            new_schema['location'] = {
+                                         '@type': 'Place',
+                                         'geo': {
+                                             '@type': 'GeoCoordinates',
+                                             'latitude': doctor_clinic.hospital.location.y if doctor_clinic and
+                                                                                              getattr(doctor_clinic,
+                                                                                                      'hospital',
+                                                                                                      None) and getattr(
+                                                 doctor_clinic.hospital, 'location', None) else None,
+                                             'longitude': doctor_clinic.hospital.location.x if doctor_clinic and
+                                                                                               getattr(doctor_clinic,
+                                                                                                       'hospital',
+                                                                                                       None) and getattr(
+                                                 doctor_clinic.hospital, 'location', None) else None,
+
+                                         }
+                                     }
+            new_schema["branchOf"] = [
+                {
+                    "@type": "MedicalClinic",
+                    "name": doctor_clinic.hospital.name,
                     "priceRange": min_price["deal_price"],
-                    # 'openingHours': opening_hours,
-                    'location': {
-                        '@type': 'Place',
-                        'geo': {
-                            # '@type': 'GeoCircle',
-                            # 'geoMidpoint': {
-                                '@type': 'GeoCoordinates',
-                                'latitude': doctor_clinic.hospital.location.y if doctor_clinic and
-                                                                                 getattr(doctor_clinic, 'hospital', None) and getattr(doctor_clinic.hospital, 'location', None) else None,
-                                'longitude': doctor_clinic.hospital.location.x if doctor_clinic and
-                                                                                  getattr(doctor_clinic, 'hospital', None) and getattr(doctor_clinic.hospital, 'location', None) else None,
-
-                        }
-                    },
-                    "branchOf": [
+                    "image": doctor_clinic.hospital.get_thumbnail() if doctor_clinic.hospital.get_thumbnail() else None,
+                    "address":
                         {
-                            "@type": "MedicalClinic",
-                            "name": doctor_clinic.hospital.name,
-                            "priceRange": min_price["deal_price"],
-                            "image": doctor_clinic.hospital.get_thumbnail() if doctor_clinic.hospital.get_thumbnail() else None,
-                            "address":
-                                {
-                                    "@type": 'PostalAddress',
-                                    "addressLocality": doctor_clinic.hospital.locality if doctor_clinic and getattr(
-                                        doctor_clinic, 'hospital', None) else '',
-                                    "addressRegion": doctor_clinic.hospital.city if doctor_clinic and getattr(
-                                        doctor_clinic, 'hospital', None) else '',
-
-                                }
+                            "@type": 'PostalAddress',
+                            "addressLocality": doctor_clinic.hospital.locality if doctor_clinic and getattr(
+                                doctor_clinic, 'hospital', None) else '',
+                            "addressRegion": doctor_clinic.hospital.city if doctor_clinic and getattr(
+                                doctor_clinic, 'hospital', None) else '',
 
                         }
-                    ]
 
                 }
-            }
+            ]
+
+            temp['new_schema'] = new_schema
             response.append(temp)
         return response
