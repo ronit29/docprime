@@ -51,7 +51,7 @@ from ondoc.matrix.tasks import push_appointment_to_matrix, push_onboarding_qcsta
 from ondoc.location import models as location_models
 from ondoc.ratings_review import models as ratings_models
 from decimal import Decimal
-from ondoc.common.models import AppointmentHistory
+from ondoc.common.models import AppointmentHistory, AppointmentMaskNumber
 import reversion
 from decimal import Decimal
 from django.utils.text import slugify
@@ -632,6 +632,7 @@ class LabNetwork(TimeStampedModel, CreatedByModel, QCModel):
     spoc_details = GenericRelation(auth_model.SPOCDetails)
     merchant = GenericRelation(auth_model.AssociatedMerchant)
     merchant_payout = GenericRelation(account_model.MerchantPayout)
+    is_mask_number_required = models.BooleanField(default=True)
 
     def all_associated_labs(self):
         if self.id:
@@ -876,7 +877,8 @@ class LabTest(TimeStampedModel, SearchKey):
                                         through=LabTestCategoryMapping,
                                         through_fields=('lab_test', 'parent_category'),
                                         related_name='lab_tests')
-    url = models.CharField(max_length=500, blank=True)
+    url = models.CharField(max_length=500, blank=True, editable=False)
+    custom_url = models.CharField(max_length=500, blank=True)
     min_age = models.PositiveSmallIntegerField(default=None, blank=True, null=True, validators=[MaxValueValidator(120), MinValueValidator(1)])
     max_age = models.PositiveSmallIntegerField(default=None, blank=True, null=True, validators=[MaxValueValidator(120), MinValueValidator(1)])
     MALE = 1
@@ -905,7 +907,7 @@ class LabTest(TimeStampedModel, SearchKey):
 
     def save(self, *args, **kwargs):
 
-        url = slugify(self.url)
+        url = slugify(self.custom_url)
         #self.url = slugify(self.url)
 
         if not url:
@@ -915,6 +917,8 @@ class LabTest(TimeStampedModel, SearchKey):
         if generated_url!=url:
             url = generated_url
 
+
+        self.url = url
         super().save(*args, **kwargs)
         
         self.create_url(url)
@@ -1160,6 +1164,7 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin)
     price_data = JSONField(blank=True, null=True)
     tests = models.ManyToManyField(LabTest, through='LabAppointmentTestMapping', through_fields=('appointment', 'test'))
     money_pool = models.ForeignKey(MoneyPool, on_delete=models.SET_NULL, null=True)
+    mask_number = GenericRelation(AppointmentMaskNumber)
     email_notification = GenericRelation(EmailNotification, related_name="lab_notification")
 
     def get_tests_and_prices(self):
@@ -1263,6 +1268,13 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin)
                       'sub_product_id': 2},), countdown=5)
             except Exception as e:
                 logger.error(str(e))
+
+        # if push_for_mask_number:
+        #     try:
+        #         generate_appointment_masknumber.apply_async(({'type': 'LAB_APPOINTMENT', 'appointment_id': self.id},),
+        #                                             countdown=5)
+        #     except Exception as e:
+        #         logger.error(str(e))
 
         if self.is_to_send_notification(old_instance):
             try:
@@ -1369,9 +1381,21 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin)
         except Exception as e:
             logger.error("Error while saving payout mercahnt for lab- " + str(e))
 
-        push_to_matrix = kwargs.get('push_again_to_matrix', True)
-        if 'push_again_to_matrix' in kwargs.keys():
-            kwargs.pop('push_again_to_matrix')
+        push_to_matrix = True
+        if database_instance and self.status == database_instance.status and self.time_slot_start == database_instance.time_slot_start:
+            push_to_matrix = False
+        else:
+            push_to_matrix = True
+
+        # push_for_mask_number = True
+        # if self.time_slot_start != LabAppointment.objects.get(pk=self.id).time_slot_start:
+        #     push_for_mask_number = True
+        # else:
+        #     push_for_mask_number = False
+
+        # push_to_matrix = kwargs.get('push_again_to_matrix', True)
+        # if 'push_again_to_matrix' in kwargs.keys():
+        #     kwargs.pop('push_again_to_matrix')
 
         # Pushing every status to the Appointment history
         push_to_history = False
@@ -1742,7 +1766,7 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin)
             event_data = TrackingEvent.build_event_data(self.user, TrackingEvent.LabAppointmentBooked, appointmentId=self.id)
             if event_data and visitor_info:
                 TrackingEvent.save_event(event_name=event_data.get('event'), data=event_data, visit_id=visitor_info.get('visit_id'),
-                                         user=self.user, triggered_at=datetime.datetime.now())
+                                         user=self.user, triggered_at=datetime.datetime.utcnow())
         except Exception as e:
             logger.error("Could not save triggered event - " + str(e))
 
