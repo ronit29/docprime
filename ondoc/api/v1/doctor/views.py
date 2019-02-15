@@ -622,6 +622,7 @@ class DoctorProfileUserViewSet(viewsets.GenericViewSet):
                 general_specialization.append(dps.specialization)
 
             general_specialization = sorted(general_specialization, key=operator.attrgetter('doctor_count'), reverse=True)
+            specialization_id = ''
             if general_specialization:
                 specialization_id = general_specialization[0].pk
                 parameters['specialization_ids'] = str(specialization_id)
@@ -633,13 +634,12 @@ class DoctorProfileUserViewSet(viewsets.GenericViewSet):
             kwargs['parameters'] = parameters
             response_data['doctors'] = doc.list(request, **kwargs)
             if response_data.get('doctors'):
-                response_data['doctors']['doctors_url'] = request.build_absolute_uri('/opd/searchresults?specializations=%s&lat=%s&long=%s' % (str(specialization_id), hospital.get('lat'), hospital.get('long')))
+                response_data['doctors']['doctors_url'] = '/opd/searchresults?specializations=%s&lat=%s&long=%s' % (str(specialization_id), hospital.get('lat'), hospital.get('long'))
             else:
                 response_data['doctors']['doctors_url'] = None
 
         else:
             response_data['doctors'] = None
-            response_data['doctors_url'] = None
 
         return Response(response_data)
 
