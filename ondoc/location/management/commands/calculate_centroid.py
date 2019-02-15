@@ -120,5 +120,5 @@ class Command(BaseCommand):
                 st_setsrid(st_point(cl.longitude, cl.latitude),4326)::geography as city_centroid
                 from  city_lat_long cl where lower(e.alternative_value)  = lower(cl.city) ) where e.id in (select ea.id 
                         from entity_address ea inner join city_lat_long cll 
-                    on lower(ea.alternative_value)  = lower(cll.city))''', []).execute()
+                    on lower(ea.alternative_value)  = lower(cll.city) and ea.type = 'LOCALITY' )''', []).execute()
 
