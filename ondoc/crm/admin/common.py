@@ -128,7 +128,7 @@ class FormCleanMixin(forms.ModelForm):
                 #             raise forms.ValidationError(
                 #                 "Cannot submit for QC without submitting associated Hospitals: " + h.hospital.name)
                 if hasattr(self.instance, 'network') and self.instance.network is not None:
-                    if self.instance.network.data_status < 2:
+                    if self.instance.network.data_status in [QCModel.IN_PROGRESS, QCModel.REOPENED]:
                         class_name = self.instance.network.__class__.__name__
                         raise forms.ValidationError(
                             "Cannot submit for QC without submitting associated " + class_name.rstrip(
@@ -143,7 +143,7 @@ class FormCleanMixin(forms.ModelForm):
                 #             raise forms.ValidationError(
                 #                 "Cannot approve QC check without approving associated Hospitals: " + h.hospital.name)
                 if hasattr(self.instance, 'network') and self.instance.network is not None:
-                    if self.instance.network.data_status < 3:
+                    if self.instance.network.data_status in [QCModel.IN_PROGRESS, QCModel.REOPENED, QCModel.SUBMITTED_FOR_QC]:
                         class_name = self.instance.network.__class__.__name__
                         raise forms.ValidationError(
                             "Cannot approve QC check without approving associated" + class_name.rstrip(

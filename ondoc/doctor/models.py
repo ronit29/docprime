@@ -139,12 +139,14 @@ class Hospital(auth_model.TimeStampedModel, auth_model.CreatedByModel, auth_mode
     CHARGES_ISSUES = 4
     DUPLICATE = 5
     OTHERS = 9
+    PHONE_RINGING_BUT_COULD_NOT_CONNECT = 10
     WELCOME_CALLING = 1
     ESCALATION = 2
     DISABLED_REASONS_CHOICES = (
         ("", "Select"), (INCORRECT_CONTACT_DETAILS, "Incorrect contact details"),
         (MOU_AGREEMENT_NEEDED, "MoU agreement needed"), (HOSPITAL_NOT_INTERESTED, "Hospital not interested for tie-up"),
         (CHARGES_ISSUES, "Issue in discount % / consultation charges"),
+        (PHONE_RINGING_BUT_COULD_NOT_CONNECT, "Phone ringing but could not connect"),
         (DUPLICATE, "Duplicate"), (OTHERS, "Others (please specify)"))
     DISABLED_AFTER_CHOICES = (("", "Select"), (WELCOME_CALLING, "Welcome Calling"), (ESCALATION, "Escalation"))
     name = models.CharField(max_length=200)
@@ -403,6 +405,7 @@ class Doctor(auth_model.TimeStampedModel, auth_model.QCModel, SearchKey):
     CHARGES_ISSUES = 7
     DUPLICATE = 8
     OTHERS = 9
+    PHONE_RINGING_BUT_COULD_NOT_CONNECT = 10
     DISABLE_REASON_CHOICES = (
         ("", "Select"), (DOCTOR_NOT_ASSOCIATED, "Doctor not associated with the hospital anymore"),
         (DOCTOR_ONLY_FOR_IPD_SERVICES, "Doctor only for IPD services"),
@@ -410,7 +413,8 @@ class Doctor(auth_model.TimeStampedModel, auth_model.QCModel, SearchKey):
         (INCORRECT_CONTACT_DETAILS, "Incorrect contact details"), (MOU_AGREEMENT_NEEDED, "MoU agreement needed"),
         (DOCTOR_NOT_INTERESTED_FOR_TIE_UP, "Doctor not interested for tie-up"),
         (CHARGES_ISSUES, "Issue in discount % / consultation charges"),
-        (DUPLICATE, "Duplicate"), (OTHERS, "Others (please specify)"))
+        (PHONE_RINGING_BUT_COULD_NOT_CONNECT, "Phone ringing but could not connect"), (DUPLICATE, "Duplicate"),
+        (OTHERS, "Others (please specify)"))
     name = models.CharField(max_length=200)
     gender = models.CharField(max_length=2, default=None, blank=True, null=True,
                               choices=GENDER_CHOICES)

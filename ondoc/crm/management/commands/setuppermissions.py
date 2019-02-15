@@ -514,7 +514,16 @@ class Command(BaseCommand):
         group, created = Group.objects.get_or_create(name=constants['WELCOME_CALLING_TEAM'])
         group.permissions.clear()
 
-        content_types = ContentType.objects.get_for_models(Doctor, Remark, Hospital, HospitalNetwork)
+        content_types = ContentType.objects.get_for_models( Doctor, Remark, Hospital, HospitalNetwork,
+                                                            DoctorClinic, DoctorClinicTiming,
+                                                            DoctorQualification, DoctorLanguage, DoctorAward, DoctorAssociation,
+                                                            DoctorExperience, DoctorMedicalService, DoctorImage, DoctorDocument,
+                                                            DoctorMobile, DoctorEmail, HospitalSpeciality, DoctorNumber,
+                                                            HospitalAward, HospitalAccreditation, HospitalImage, HospitalDocument,
+                                                            HospitalCertification, HospitalNetworkManager, HospitalNetworkHelpline,
+                                                            HospitalNetworkEmail, HospitalNetworkAccreditation, HospitalNetworkAward,
+                                                            HospitalNetworkCertification, DoctorPracticeSpecialization, HospitalNetworkDocument, CompetitorInfo,
+                                                            CompetitorMonthlyVisit, SPOCDetails, GenericAdmin, GenericLabAdmin, DoctorClinicProcedure, AssociatedMerchant)
         for cl, ct in content_types.items():
             permissions = Permission.objects.filter(
                 Q(content_type=ct),

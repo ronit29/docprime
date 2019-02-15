@@ -262,9 +262,9 @@ class HospCityFilter(SimpleListFilter):
 
 class HospitalAdmin(admin.GeoModelAdmin, VersionAdmin, ActionAdmin, QCPemAdmin):
     list_filter = ('data_status', 'welcome_calling_done', HospCityFilter, CreatedByFilter)
-    readonly_fields = ('source', 'batch', 'associated_doctors', 'is_live', 'matrix_lead_id')
+    readonly_fields = ('source', 'batch', 'associated_doctors', 'is_live', 'matrix_lead_id', 'city', 'state', )
     exclude = (
-    'search_key', 'live_at', 'qc_approved_at', 'disabled_at', 'physical_agreement_signed_at', 'welcome_calling_done_at', 'city', 'state', )
+    'search_key', 'live_at', 'qc_approved_at', 'disabled_at', 'physical_agreement_signed_at', 'welcome_calling_done_at', )
 
     def get_fields(self, request, obj=None):
         all_fields = super().get_fields(request, obj)
@@ -351,7 +351,7 @@ class HospitalAdmin(admin.GeoModelAdmin, VersionAdmin, ActionAdmin, QCPemAdmin):
         form.request = request
         network_field = form.base_fields.get('network')
         if network_field:
-            network_field.queryset = HospitalNetwork.objects.filter(Q(data_status=2) | Q(data_status=3) | Q(created_by=request.user))
+            network_field.queryset = HospitalNetwork.objects.filter(Q(data_status=QCModel.SUBMITTED_FOR_QC) | Q(data_status=QCModel.QC_APPROVED) | Q(created_by=request.user))
             network_field.widget.can_add_related = False
         form.base_fields['assigned_to'].queryset = User.objects.filter(user_type=User.STAFF)
         if (not request.user.is_superuser) and (not request.user.groups.filter(name=constants['QC_GROUP_NAME']).exists()):
