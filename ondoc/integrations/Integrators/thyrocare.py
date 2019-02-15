@@ -54,22 +54,13 @@ class Thyrocare(BaseIntegrator):
             return None
 
         for result_obj in result_array:
+            defaults = {'integrator_product_data': result_obj, 'service_type': IntegratorMapping.ServiceType.LabTest,
+                        'integrator_class_name': Thyrocare.__name__, 'content_type': ContentType.objects.get(model='labnetwork')}
+
             if type == 'TESTS':
-                try:
-                    IntegratorMapping.objects.get(integrator_test_name=result_obj['name'], object_id=obj_id)
-                except IntegratorMapping.DoesNotExist:
-                    IntegratorMapping(integrator_product_data=result_obj, integrator_test_name=result_obj['name'],
-                                      integrator_class_name=Thyrocare.__name__,
-                                      service_type=IntegratorMapping.ServiceType.LabTest, object_id=obj_id,
-                                      content_type=ContentType.objects.get(model='labnetwork')).save()
+                IntegratorMapping.objects.update_or_create(integrator_test_name=result_obj['name'], object_id=obj_id, defaults=defaults)
             else:
-                try:
-                    IntegratorProfileMapping.objects.get(integrator_package_name=result_obj['name'], object_id=obj_id)
-                except IntegratorProfileMapping.DoesNotExist:
-                    IntegratorProfileMapping(integrator_product_data=result_obj, integrator_package_name=result_obj['name'],
-                                             integrator_class_name=Thyrocare.__name__,
-                                             service_type=IntegratorProfileMapping.ServiceType.LabTest, object_id=obj_id,
-                                             content_type=ContentType.objects.get(model='labnetwork')).save()
+                IntegratorProfileMapping.objects.update_or_create(integrator_package_name=result_obj['name'], object_id=obj_id, defaults=defaults)
 
     @classmethod
     def thyrocare_product_data(cls, obj_id, type):
@@ -250,4 +241,5 @@ class Thyrocare(BaseIntegrator):
         # Update integrator response when both type of report present
         if report.pdf_url and report.xml_url:
             IntegratorResponse.objects.filter(pk=integrator_response.pk).update(report_received=True)
+
 
