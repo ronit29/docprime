@@ -626,7 +626,7 @@ class DoctorProfileUserViewSet(viewsets.GenericViewSet):
 
         if not doctor.enabled_for_online_booking:
             parameters = dict()
-
+            specialization_id = ''
             doc = DoctorListViewSet()
             general_specialization = []
 
@@ -634,20 +634,23 @@ class DoctorProfileUserViewSet(viewsets.GenericViewSet):
                 general_specialization.append(dps.specialization)
 
             general_specialization = sorted(general_specialization, key=operator.attrgetter('doctor_count'), reverse=True)
-            if general_specialization:
+            if general_specialization and response_data.get('hospitals'):
                 specialization_id = general_specialization[0].pk
-                parameters['specialization_ids'] = str(specialization_id)
-            if response_data.get('hospitals'):
                 hospital = response_data.get('hospitals')[0]
+
+                parameters['specialization_ids'] = str(specialization_id)                
                 parameters['lat'] = hospital.get('lat')
                 parameters['long'] = hospital.get('long')
-            parameters['doctor_suggestions'] = 1
-            kwargs['parameters'] = parameters
-            response_data['doctors'] = doc.list(request, **kwargs)
-            response_data['doctors_url'] = request.build_absolute_uri('/opd/searchresults?specializations=%s&lat=%s&long=%s' % (str(specialization_id), hospital.get('lat'), hospital.get('long')))
+                parameters['doctor_suggestions'] = 1
+                
+                kwargs['parameters'] = parameters
+                response_data['doctors'] = doc.list(request, **kwargs)
+                if response_data.get('doctors'):
+                    response_data['doctors']['doctors_url'] = '/opd/searchresults?specializations=%s&lat=%s&long=%s' % (str(specialization_id), hospital.get('lat'), hospital.get('long'))
+                else:
+                    response_data['doctors']['doctors_url'] = None
         else:
             response_data['doctors'] = None
-            response_data['doctors_url'] = None
 
         return Response(response_data)
 
