@@ -11,19 +11,28 @@ User = get_user_model()
 
 class DoctorBlockCalenderSerializer(serializers.Serializer):
     INTERVAL_CHOICES = tuple([value for value in doc_models.DoctorLeave.INTERVAL_MAPPING.values()])
-    interval = serializers.ChoiceField(choices=INTERVAL_CHOICES)
+    interval = serializers.ChoiceField(required=False, choices=INTERVAL_CHOICES)
     start_date = serializers.DateField()
-    start_time = serializers.TimeField()
+    start_time = serializers.TimeField(required=False)
     end_date = serializers.DateField()
-    end_time = serializers.TimeField()
+    end_time = serializers.TimeField(required=False)
     doctor_id = serializers.PrimaryKeyRelatedField(required=False, queryset=doc_models.Doctor.objects.all())
     hospital_id = serializers.PrimaryKeyRelatedField(required=False, queryset=doc_models.Hospital.objects.all())
 
     def validate(self, attrs):
         doctor = attrs.get("doctor_id")
         hospital = attrs.get("hospital_id")
+        interval = attrs.get("interval")
+        start_time = attrs.get("start_time")
+        end_time = attrs.get("end_time")
         if doctor and hospital and (hospital not in doctor.hospitals.all()):
             raise serializers.ValidationError("incorrect hospital id or doctor id")
+        if start_time and not end_time:
+            raise serializers.ValidationError("end time is required with start time")
+        if not start_time and end_time:
+            raise serializers.ValidationError("start time is required with end time")
+        if not interval and not (start_time and end_time):
+            raise serializers.ValidationError("neither interval nor start time,end time found")
         return attrs
 
 
