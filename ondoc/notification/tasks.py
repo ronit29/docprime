@@ -695,7 +695,8 @@ def refund_completed_sms_task(obj_id):
                 consumer_transaction_id=instance.consumer_transaction_id,
                 refund_state__in=[ConsumerRefund.PENDING, ConsumerRefund.REQUESTED]).count() > 1:
             return
-        context = {'amount': instance.consumer_transaction.amount}
+
+        context = {'amount': instance.consumer_transaction.amount, 'ctrnx_id': instance.consumer_transaction_id}
         receivers = instance.user.get_phone_number_for_communication()
         sms_notification = SMSNotification(NotificationAction.REFUND_COMPLETED, context)
         sms_notification.send(receivers)
