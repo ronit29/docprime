@@ -6,6 +6,7 @@ from ondoc.diagnostic.models import CommonPackage
 from ondoc.banner.models import Banner
 from ondoc.common.models import PaymentOptions
 from ondoc.tracking.models import TrackingEvent
+from ondoc.common.models import UserConfig
 from ondoc.ratings_review.models import AppRatings
 from ondoc.api.v1.doctor.serializers import CommonSpecializationsSerializer
 from ondoc.api.v1.diagnostic.serializers import CommonTestSerializer
@@ -97,7 +98,13 @@ class ScreenViewSet(viewsets.GenericViewSet):
 
     def ask_for_app_rating(self, request, *args, **kwargs):
 
-        APP_RATING_FREQUENCY = 3
+        app_rating_key = UserConfig.objects.filter(key="APP_RATING_FREQUENCY").values_list('data', flat=True)
+        DEFAULT_APP_RATING_FREQUENCY = 5
+        if app_rating_key.exists() and len(app_rating_key) == 1 and type(app_rating_key[0]) == int:
+                APP_RATING_FREQUENCY = app_rating_key[0]
+        else:
+                APP_RATING_FREQUENCY = DEFAULT_APP_RATING_FREQUENCY
+
         if request.user.is_authenticated:
             user = request.user
         else:
