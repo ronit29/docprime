@@ -537,23 +537,25 @@ def push_onboarding_qcstatus_to_matrix(self, data):
 def push_non_bookable_doctor_lead_to_matrix(self, nb_doc_lead_id):
     from ondoc.web.models import NonBookableDoctorLead
     obj = NonBookableDoctorLead.objects.filter(id= nb_doc_lead_id).first()
-    if obj:
-        exit_point_url = ""
-        if obj.doctor and obj.doctor.id and obj.hospital and obj.hospital.id:
-            exit_point_url = "%s/opd/doctor/%d?hospital_id=%d" % (settings.CONSUMER_APP_DOMAIN, obj.doctor.id, obj.hospital.id)
+    if not obj:
+        raise Exception('Could not get non bookable doctor for the id ', nb_doc_lead_id)
 
-        request_data = {
-            'ExitPointUrl': exit_point_url,
-            'LeadSource': obj.source,
-            'PrimaryNo': int(obj.from_mobile),
-            'Name': obj.name if obj.name else 'not applicable',
-            'ProductId': 5,
-            'SubProductId': 2,
-            'AppointmentDetails': {
-                'ProviderName': obj.doctor.name if obj.doctor else '',
-                'ProviderAddress': obj.hospital.get_hos_address() if obj.hospital else ''
-            }
+    exit_point_url = ""
+    if obj.doctor and obj.doctor.id and obj.hospital and obj.hospital.id:
+        exit_point_url = "%s/opd/doctor/%d?hospital_id=%d" % (settings.CONSUMER_APP_DOMAIN, obj.doctor.id, obj.hospital.id)
+
+    request_data = {
+        'ExitPointUrl': exit_point_url,
+        'LeadSource': obj.source,
+        'PrimaryNo': int(obj.from_mobile),
+        'Name': obj.name if obj.name else 'not applicable',
+        'ProductId': 5,
+        'SubProductId': 2,
+        'AppointmentDetails': {
+            'ProviderName': obj.doctor.name if obj.doctor else '',
+            'ProviderAddress': obj.hospital.get_hos_address() if obj.hospital else ''
         }
+    }
 
     url = settings.MATRIX_API_URL
     matrix_api_token = settings.MATRIX_API_TOKEN
