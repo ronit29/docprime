@@ -13,11 +13,10 @@ from rest_framework.permissions import IsAuthenticated
 from ondoc.authentication.backends import JWTAuthentication
 from django.db import transaction
 from django.db.models import Q, Value, Case, When, F
+from ondoc.procedure.models import Procedure
 from django.contrib.auth import get_user_model
 from django.conf import settings
 import datetime, logging, re, random
-from ondoc.doctor import models
-from ondoc.api.v2.doctor import serializers as v2_serializers
 from django.utils import timezone
 
 User = get_user_model()
@@ -318,8 +317,8 @@ class DoctorBlockCalendarViewSet(viewsets.GenericViewSet):
     serializer_class = serializers.DoctorLeaveSerializer
     authentication_classes = (JWTAuthentication, )
     permission_classes = (IsAuthenticated, DoctorPermission,)
-    INTERVAL_MAPPING = {models.DoctorLeave.INTERVAL_MAPPING.get(key): key for key in
-                        models.DoctorLeave.INTERVAL_MAPPING.keys()}
+    INTERVAL_MAPPING = {doc_models.DoctorLeave.INTERVAL_MAPPING.get(key): key for key in
+                        doc_models.DoctorLeave.INTERVAL_MAPPING.keys()}
 
     @transaction.atomic
     def create(self, request, *args, **kwargs):
@@ -344,8 +343,54 @@ class DoctorBlockCalendarViewSet(viewsets.GenericViewSet):
             "start_date": validated_data.get("start_date"),
             "end_date": validated_data.get("end_date")
         }
-        doctor_leave_serializer = v2_serializers.DoctorLeaveSerializer(data=doctor_leave_data)
+        doctor_leave_serializer = serializers.DoctorLeaveSerializer(data=doctor_leave_data)
         doctor_leave_serializer.is_valid(raise_exception=True)
         # self.get_queryset().update(deleted_at=timezone.now())        Now user can apply more than one leave
         doctor_leave_serializer.save()
         return Response(doctor_leave_serializer.data)
+
+
+class DoctorAddViweset(viewsets.GenericViewSet):
+
+    authentication_classes = (JWTAuthentication,)
+    permission_classes = (IsAuthenticated, DoctorPermission,)
+
+    def add(self, request, *args, **kwargs):
+        serializer = serializers.DoctorAddSerializer(data=request.data, context={"request": request})
+        return
+
+
+class DoctorDataViewset(viewsets.GenericViewSet):
+
+    # authentication_classes = (JWTAuthentication,)
+    # permission_classes = (IsAuthenticated, DoctorPermission,)
+
+    def get_practice_specializations(self, request, *args, **kwargs):
+        qs = doc_models.PracticeSpecialization.objects.all()
+        serializer = serializers.PracticeSpecializationSerializer(qs, many=True)
+        return Response(serializer.data)
+
+    def get_doctor_qualifications(self, request, *args, **kwargs):
+        qs = doc_models.Qualification.objects.all()
+        serializer = serializers.QualificationSerializer(qs, many=True)
+        return Response(serializer.data)
+
+    def get_languages(self, request, *args, **kwargs):
+        qs = doc_models.Language.objects.all()
+        serializer = serializers.LanguageSerializer(qs, many=True)
+        return Response(serializer.data)
+
+    def get_doctor_medical_services(self, request, *args, **kwargs):
+        qs = doc_models.MedicalService.objects.all()
+        serializer = serializers.MedicalServiceSerializer(qs, many=True)
+        return Response(serializer.data)
+
+    def get_procedures(self, request, *args, **kwargs):
+        qs = Procedure.objects.filter(is_enabled=True)
+        serializer = serializers.ProcedureSerializer(qs, many=True)
+        return Response(serializer.data)
+
+    def get_specializations(self, request, *args, **kwargs):
+        qs = doc_models.Specialization.objects.all()
+        serializer = serializers.SpecializationSerializer(qs, many=True)
+        return Response(serializer.data)
