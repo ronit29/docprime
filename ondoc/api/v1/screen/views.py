@@ -110,7 +110,7 @@ class ScreenViewSet(viewsets.GenericViewSet):
         if AppRatings.objects.filter(user=user, app_type=AppRatings.CONSUMER).exists():
             return False
 
-        user_tracking = TrackingEvent.objects.filter(user=user, data__Category="DocprimeApp", data__event="AppLaunch")
+        user_tracking = TrackingEvent.objects.filter(user=user, data__Category="DocprimeApp", data__Action="AppLaunch")
         if user_tracking.exists() and user_tracking.count() % APP_RATING_FREQUENCY == 0:
             return True
         else:
