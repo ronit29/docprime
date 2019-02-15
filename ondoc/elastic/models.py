@@ -1,6 +1,5 @@
 from django.db import models
 from ondoc.authentication.models import TimeStampedModel
-from .tasks import fetch_and_upload_json
 from django.core.validators import FileExtensionValidator
 
 from django.contrib.postgres.fields import JSONField
@@ -23,10 +22,10 @@ class DemoElastic(TimeStampedModel):
     primary_index_mapping_data = JSONField(default={})
     secondary_index_mapping_data = JSONField(default={})
 
+    # active = models.BooleanField(default=False)
+
     def save(self, *args, **kwargs):
         super(DemoElastic, self).save(*args, **kwargs)
-
-        # fetch_and_upload_json.apply_async(({'id': self.id}, ), countdown=5)
 
     class Meta:
         db_table = "demo_elastic"
