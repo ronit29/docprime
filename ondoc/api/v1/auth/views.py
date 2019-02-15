@@ -517,8 +517,8 @@ class UserAppointmentsViewSet(OndocViewSet):
         query_input_serializer.is_valid(raise_exception=True)
         source = ''
         responsible_user = None
-        if query_input_serializer.get('source', None):
-            source = query_input_serializer.get('source')
+        if query_input_serializer.validated_data.get('source', None):
+            source = query_input_serializer.validated_data.get('source')
         if request.user and hasattr(request.user, 'user_type'):
             responsible_user = request.user
             if not source:
