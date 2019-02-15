@@ -51,7 +51,7 @@ from ondoc.matrix.tasks import push_appointment_to_matrix, push_onboarding_qcsta
 from ondoc.location import models as location_models
 from ondoc.ratings_review import models as ratings_models
 from decimal import Decimal
-from ondoc.common.models import AppointmentHistory, AppointmentMaskNumber
+from ondoc.common.models import AppointmentHistory, AppointmentMaskNumber, Remark
 import reversion
 from decimal import Decimal
 from django.utils.text import slugify
@@ -216,6 +216,7 @@ class Lab(TimeStampedModel, CreatedByModel, QCModel, SearchKey):
     order_priority = models.PositiveIntegerField(blank=True, null=True, default=0)
     merchant = GenericRelation(auth_model.AssociatedMerchant)
     merchant_payout = GenericRelation(account_model.MerchantPayout)
+    remark = GenericRelation(Remark)
 
     def __str__(self):
         return self.name
@@ -633,6 +634,7 @@ class LabNetwork(TimeStampedModel, CreatedByModel, QCModel):
     merchant = GenericRelation(auth_model.AssociatedMerchant)
     merchant_payout = GenericRelation(account_model.MerchantPayout)
     is_mask_number_required = models.BooleanField(default=True)
+    remark = GenericRelation(Remark)
 
     def all_associated_labs(self):
         if self.id:
