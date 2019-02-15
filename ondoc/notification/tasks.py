@@ -688,8 +688,6 @@ def refund_completed_sms_task(obj_id):
     from ondoc.account.models import ConsumerRefund
     from ondoc.communications.models import SMSNotification
     from ondoc.notification.models import NotificationAction
-    from ondoc.authentication.models import UserProfile
-    from ondoc.communications.models import unique_phone_numbers
     try:
         # check if any more obj incomplete status
         instance = ConsumerRefund.objects.filter(id=obj_id).first()
@@ -709,18 +707,11 @@ def refund_completed_sms_task(obj_id):
 def refund_breakup_sms_task(obj_id):
     from ondoc.account.models import ConsumerTransaction
     from ondoc.communications.models import SMSNotification
-    from ondoc.authentication.models import UserProfile
-    from ondoc.communications.models import unique_phone_numbers
     try:
         instance = ConsumerTransaction.objects.filter(id=obj_id).first()
         if not instance or not instance.user:
             return
-        amount_breakup = []
-        for consumer_refund in instance.consumerrefund_set.all():
-            if consumer_refund.pg_transaction:
-                amount_breakup.append(
-                    {'name': consumer_refund.pg_transaction.bank_name, 'amount': consumer_refund.refund_amount})
-        context = {'amount': instance.amount, 'amount_breakup': amount_breakup}
+        context = {'amount': instance.amount, 'ctrnx_id': instance.id}
         receivers = instance.user.get_phone_number_for_communication()
         sms_notification = SMSNotification(NotificationAction.REFUND_BREAKUP, context)
         sms_notification.send(receivers)
