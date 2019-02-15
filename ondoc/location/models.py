@@ -265,6 +265,8 @@ class EntityAddress(TimeStampedModel):
             or not parent_entity.type or not parent_entity.type.startswith('LOCALITY')):
             use_in_url = False
 
+        if name in ('[no name]', 'Unnamed Road'):
+            use_in_url = False
         # if use_in_url and parent_entity and parent_entity.use_in_url \
         #     and parent_entity.type and parent_entity.type.startswith('SUBLOCALITY'):
         #     use_in_url = False
@@ -591,7 +593,7 @@ class EntityUrls(TimeStampedModel):
     url = models.CharField(blank=False, null=True, max_length=2000, db_index=True)
     url_type = models.CharField(max_length=24, choices=UrlType.as_choices(), null=True)
     entity_type = models.CharField(max_length=24, null=True)
-    extras = JSONField()
+    extras = JSONField(null=True)
     breadcrumb = JSONField(null=True)
     entity_id = models.PositiveIntegerField(null=True, default=None)
     is_valid = models.BooleanField(default=True)

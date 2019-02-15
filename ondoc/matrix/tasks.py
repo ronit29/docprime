@@ -1,6 +1,6 @@
 from __future__ import absolute_import, unicode_literals
 from ondoc.account.models import Order
-
+from django.contrib.contenttypes.models import ContentType
 from rest_framework import status
 from django.conf import settings
 from celery import task
@@ -11,6 +11,8 @@ import datetime
 from datetime import date
 from ondoc.authentication.models import Address
 from ondoc.api.v1.utils import resolve_address
+from ondoc.common.models import AppointmentMaskNumber
+
 logger = logging.getLogger(__name__)
 
 
@@ -70,11 +72,16 @@ def prepare_and_hit(self, data):
     if appointment.profile:
         p_email = appointment.profile.email
 
+    mask_number_instance = appointment.mask_number.filter(is_deleted=False, is_mask_number=True).first()
+    mask_number = ''
+    if mask_number_instance:
+        mask_number = mask_number_instance.mask_number
+
     appointment_details = {
         'AppointmentStatus': appointment.status,
         'Age': calculate_age(appointment),
         'Email': p_email,
-        'VirtualNo': '',
+        'VirtualNo': mask_number,
         'OTP': '',
         'KYC': kyc,
         'Location': location,
@@ -160,7 +167,6 @@ def prepare_and_hit(self, data):
     else:
         logger.info("[ERROR] Appointment could not be published to the matrix system")
 
-
 def calculate_age(appointment):
     if not appointment.profile:
         return 0
@@ -237,6 +243,62 @@ def push_appointment_to_matrix(self, data):
 
     except Exception as e:
         logger.error("Error in Celery. Failed pushing Appointment to the matrix- " + str(e))
+
+
+# @task(bind=True, max_retries=2)
+# def generate_appointment_masknumber(self, data):
+#     from ondoc.doctor.models import OpdAppointment
+#     from ondoc.diagnostic.models import LabAppointment
+#     appointment_type = data.get('type')
+#     try:
+#         appointment_id = data.get('appointment_id', None)
+#         if not appointment_id:
+#             # logger.error("[CELERY ERROR: Incorrect values provided.]")
+#             raise Exception("Appointment id not found, could not get mask number")
+#
+#         if appointment_type == 'OPD_APPOINTMENT':
+#             appointment = OpdAppointment.objects.filter(id=appointment_id).first()
+#         elif data.get('type') == 'LAB_APPOINTMENT':
+#             appointment = LabAppointment.objects.filter(id=appointment_id).first()
+#         if not appointment:
+#             raise Exception("Appointment could not found against id - " + str(appointment_id))
+#
+#         phone_number = appointment.user.phone_number
+#         time_slot = appointment.time_slot_start
+#         updated_time_slot = time_slot + datetime.timedelta(days=1)
+#         validity_up_to = int((time_slot + datetime.timedelta(days=1)).timestamp())
+#         if not phone_number:
+#             raise Exception("phone Number could not found against id - " + str(appointment_id))
+#         request_data = {
+#             "ExpirationDate": validity_up_to,
+#             "FromId": appointment.id,
+#             "ToNumber": phone_number
+#         }
+#         url = settings.MATRIX_NUMBER_MASKING
+#         matrix_api_token = settings.MATRIX_API_TOKEN
+#         response = requests.post(url, data=json.dumps(request_data), headers={'Authorization': matrix_api_token,
+#                                                                               'Content-Type': 'application/json'})
+#
+#         if response.status_code != status.HTTP_200_OK or not response.ok:
+#             logger.info("[ERROR] Appointment could not be get Mask Number")
+#             logger.info("[ERROR] %s", response.reason)
+#             countdown_time = (2 ** self.request.retries) * 60 * 10
+#             logging.error("Appointment sync with the Matrix System failed with response - " + str(response.content))
+#             print(countdown_time)
+#             self.retry([data], countdown=countdown_time)
+#
+#         mask_number = response.json()
+#         existing_mask_number_obj = appointment.mask_number.filter(is_deleted=False).first()
+#         if existing_mask_number_obj:
+#             existing_mask_number_obj.is_deleted = True
+#             existing_mask_number_obj.save()
+#             AppointmentMaskNumber(content_object=appointment, mask_number=mask_number,
+#                                                  validity_up_to=updated_time_slot, is_deleted=False).save()
+#         else:
+#             AppointmentMaskNumber(content_object=appointment, mask_number=mask_number,
+#                                                  validity_up_to=updated_time_slot, is_deleted=False).save()
+#     except Exception as e:
+#         logger.error("Error in Celery. Failed get mask number for appointment " + str(e))
 
 
 @task(bind=True, max_retries=2)
