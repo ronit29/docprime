@@ -1,6 +1,6 @@
 Hi,
 
-The refund of Rs {{amount}}{% if booking_id %} for your booking id ‘{{booking_id}}’{% endif %} has been successfully credited in your account/wallet{% if reference_id %} with reference id {{reference_id}}{% endif %}.
+The refund of Rs {{amount}}{% if booking_id %} for your booking id ‘{{booking_id}}’{% endif %} has been successfully credited in your account{% if reference_id %} with reference id {{reference_id}}{% endif %}.
 
 Please call us on 1800-123-9419 in case of any assistance.
 
