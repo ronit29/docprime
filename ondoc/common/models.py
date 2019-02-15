@@ -120,3 +120,16 @@ class UserConfig(TimeStampedModel):
 
     class Meta:
         db_table = 'user_config'
+
+
+class AppointmentMaskNumber(TimeStampedModel):
+    content_type = models.ForeignKey(ContentType, on_delete=models.CASCADE)
+    object_id = models.PositiveIntegerField()
+    content_object = GenericForeignKey()
+    mask_number = models.CharField(blank=True, null=True, max_length=20)
+    validity_up_to = models.DateTimeField(null=True, blank=True)
+    is_mask_number = models.BooleanField(default=True)
+    is_deleted = models.BooleanField(default=False)
+
+    class Meta:
+        db_table = 'appointment_mask_number'

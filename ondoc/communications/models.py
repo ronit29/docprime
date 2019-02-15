@@ -582,6 +582,10 @@ class OpdNotification(Notification):
         procedures = self.appointment.get_procedures()
         est = pytz.timezone(settings.TIME_ZONE)
         time_slot_start = self.appointment.time_slot_start.astimezone(est)
+        mask_number_instance = self.appointment.mask_number.filter(is_deleted=False).first()
+        mask_number=''
+        if mask_number_instance:
+            mask_number = mask_number_instance.mask_number
         email_banners_html = UserConfig.objects.filter(key__iexact="email_banners") \
                     .annotate(html_code=KeyTransform('html_code', 'data')).values_list('html_code', flat=True).first()
         token = AgentToken.objects.create_token(user=self.appointment.user)
@@ -603,6 +607,7 @@ class OpdNotification(Notification):
             "attachments": {},  # Updated later
             "screen": "appointment",
             "type": "doctor",
+            "mask_number": mask_number,
             "email_banners": email_banners_html if email_banners_html is not None else "",
             "opd_appointment_bypass_url": generate_short_url(opd_appointment_bypass_url),
             "reschdule_appointment_bypass_url": generate_short_url(reschdule_appointment_bypass_url)
@@ -640,7 +645,7 @@ class OpdNotification(Notification):
         notification_type = self.notification_type
         if not instance or not instance.user:
             return receivers
-        
+
         doctor_spocs = instance.hospital.get_spocs_for_communication() if instance.hospital else []
         spocs_to_be_communicated = []
         if notification_type in [NotificationAction.APPOINTMENT_ACCEPTED,
@@ -726,6 +731,10 @@ class LabNotification(Notification):
             test['mrp'] = str(test['mrp'])
             test['deal_price'] = str(test['deal_price'])
             test['discount'] = str(test['discount'])
+        mask_number_instance = self.appointment.mask_number.filter(is_deleted=False).first()
+        mask_number = ''
+        if mask_number_instance:
+            mask_number = mask_number_instance.mask_number
         context = {
             "lab_name": lab_name,
             "patient_name": patient_name,
@@ -743,6 +752,7 @@ class LabNotification(Notification):
             "attachments": {},  # Updated later
             "screen": "appointment",
             "type": "lab",
+            "mask_number": mask_number,
             "email_banners": email_banners_html if email_banners_html is not None else ""
         }
         return context
