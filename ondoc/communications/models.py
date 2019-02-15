@@ -23,7 +23,7 @@ from django.utils import timezone
 from weasyprint import HTML
 
 from ondoc.account.models import Invoice, Order
-from ondoc.authentication.models import UserProfile, GenericAdmin, NotificationEndpoint
+from ondoc.authentication.models import UserProfile, GenericAdmin, NotificationEndpoint, AgentToken
 
 from ondoc.notification.models import NotificationAction, SmsNotification, EmailNotification, AppNotification, \
     PushNotification
@@ -278,6 +278,12 @@ class SMSNotification:
             body_template = "sms/refund_completed.txt"
         elif notification_type == NotificationAction.REFUND_BREAKUP:
             body_template = "sms/refund_breakup.txt"
+        elif notification_type == NotificationAction.OPD_CONFIRMATION_CHECK_AFTER_APPOINTMENT:
+            body_template = "sms/appointment_confirmation_check.txt"
+        elif notification_type == NotificationAction.OPD_CONFIRMATION_SECOND_CHECK_AFTER_APPOINTMENT:
+            body_template = "sms/appointment_confirmation_second_check.txt"
+        elif notification_type == NotificationAction.OPD_FEEDBACK_AFTER_APPOINTMENT:
+            body_template = "sms/appointment_feedback.txt"
         return body_template
 
     def trigger(self, receiver, template, context):
@@ -578,6 +584,9 @@ class OpdNotification(Notification):
         time_slot_start = self.appointment.time_slot_start.astimezone(est)
         email_banners_html = UserConfig.objects.filter(key__iexact="email_banners") \
                     .annotate(html_code=KeyTransform('html_code', 'data')).values_list('html_code', flat=True).first()
+        token = AgentToken.objects.create_token(user=self.appointment.user)
+        opd_appointment_bypass_url = settings.BASE_URL + "/opd/appointment/{}?token={}&login=bypass".format(self.appointment.id, token)
+        reschdule_appointment_bypass_url = settings.BASE_URL + "/opd/doctor/{}/{}/book?reschedule={}&login=bypass".format(self.appointment.doctor.id, self.appointment.hospital.id, self.appointment.id, token)
         context = {
             "doctor_name": doctor_name,
             "patient_name": patient_name,
@@ -594,7 +603,9 @@ class OpdNotification(Notification):
             "attachments": {},  # Updated later
             "screen": "appointment",
             "type": "doctor",
-            "email_banners": email_banners_html if email_banners_html is not None else ""
+            "email_banners": email_banners_html if email_banners_html is not None else "",
+            "opd_appointment_bypass_url": generate_short_url(opd_appointment_bypass_url),
+            "reschdule_appointment_bypass_url": generate_short_url(reschdule_appointment_bypass_url)
         }
         return context
 
@@ -606,7 +617,9 @@ class OpdNotification(Notification):
         if notification_type == NotificationAction.DOCTOR_INVOICE:
             email_notification = EMAILNotification(notification_type, context)
             email_notification.send(all_receivers.get('email_receivers', []))
-        elif notification_type == NotificationAction.OPD_OTP_BEFORE_APPOINTMENT:
+        elif notification_type == NotificationAction.OPD_OTP_BEFORE_APPOINTMENT or \
+                notification_type == NotificationAction.OPD_CONFIRMATION_CHECK_AFTER_APPOINTMENT or \
+                notification_type == NotificationAction.OPD_FEEDBACK_AFTER_APPOINTMENT:
             sms_notification = SMSNotification(notification_type, context)
             sms_notification.send(all_receivers.get('sms_receivers', []))
         else:

@@ -472,6 +472,29 @@ def opd_send_otp_before_appointment(appointment_id, previous_appointment_date_ti
         logger.error(str(e))
 
 @task()
+def opd_send_after_appointment_confirmation(appointment_id, previous_appointment_date_time, second=False):
+    from ondoc.doctor.models import OpdAppointment
+    from ondoc.communications.models import OpdNotification
+    try:
+        instance = OpdAppointment.objects.filter(id=appointment_id).first()
+        if not instance or \
+                not instance.user or \
+                str(math.floor(instance.time_slot_start.timestamp())) != previous_appointment_date_time:
+            return
+        if instance.status == OpdAppointment.ACCEPTED:
+            if not second:
+                opd_notification = OpdNotification(instance, NotificationAction.OPD_CONFIRMATION_CHECK_AFTER_APPOINTMENT)
+            else:
+                opd_notification = OpdNotification(instance, NotificationAction.OPD_CONFIRMATION_SECOND_CHECK_AFTER_APPOINTMENT)
+            opd_notification.send()
+        if instance.status == OpdAppointment.COMPLETED and not instance.is_rated:
+            opd_notification = OpdNotification(instance, NotificationAction.OPD_FEEDBACK_AFTER_APPOINTMENT)
+            opd_notification.send()
+    except Exception as e:
+        logger.error(str(e))
+
+
+@task()
 def lab_send_otp_before_appointment(appointment_id, previous_appointment_date_time):
     from ondoc.diagnostic.models import LabAppointment
     from ondoc.communications.models import LabNotification
