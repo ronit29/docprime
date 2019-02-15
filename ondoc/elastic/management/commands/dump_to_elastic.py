@@ -1,26 +1,18 @@
 from __future__ import absolute_import, unicode_literals
 from django.core.management.base import BaseCommand
-from django.core.files.uploadedfile import InMemoryUploadedFile
 import requests
-from celery import task
 import logging
 import uuid
-import datetime
+import hashlib
 import json
 from rest_framework import status
-from ondoc.api.v1.utils import RawSql
-from io import StringIO, BytesIO
 from ondoc.elastic import models as elastic_models
 logger = logging.getLogger(__name__)
-from django.core.files.uploadedfile import TemporaryUploadedFile
-from django.template.defaultfilters import slugify
-from django.core.files.storage import default_storage
-import os
 from django.db import connection, transaction
+import hashlib
 import psycopg2
 from decimal import Decimal
-from django.conf import settings
-from pymongo import MongoClient
+
 
 def dump_to_elastic():
 
@@ -33,13 +25,13 @@ def dump_to_elastic():
             'Content-Type': 'application/json',
         }
 
-        elastic_url = settings.ES_URL
-        elastic_alias = settings.ES_ALIAS
-        primary_index = settings.ES_PRIMARY_INDEX
-        secondary_index_a = settings.ES_SECONDARY_INDEX_A
-        secondary_index_b = settings.ES_SECONDARY_INDEX_B
-        primary_index_mapping_data = settings.ES_PRIMARY_INDEX_MAPPING_DATA
-        secondary_index_mapping_data = settings.ES_SECONDARY_INDEX_MAPPING_DATA
+        elastic_url = obj.elastic_url
+        elastic_alias = obj.elastic_alias
+        primary_index = obj.primary_index
+        secondary_index_a = obj.secondary_index_a
+        secondary_index_b = obj.secondary_index_b
+        primary_index_mapping_data = obj.primary_index_mapping_data
+        secondary_index_mapping_data = obj.secondary_index_mapping_data
 
         params = (
             ('format', 'json'),
@@ -55,6 +47,8 @@ def dump_to_elastic():
             raise Exception('Invalid Response received while fetching current index.')
 
         currently_used_index = response[0].get('index')
+        if not currently_used_index:
+            raise Exception('Invalid json received while fetching the index.')
 
         # Decide which index to use for dumping the data to elastic.
         if secondary_index_a == currently_used_index:
@@ -67,15 +61,11 @@ def dump_to_elastic():
         # Delete the primary index.
         response = requests.delete(elastic_url + '/' + primary_index, headers=headers)
         if response.status_code != status.HTTP_200_OK or not response.ok:
-            pass
-            # raise Exception('Could not delete the primary index.')
 
-        # Delete the index or empty the index for new use.
-        deleteResponse = requests.delete(elastic_url + '/' + destination)
-
-        if deleteResponse.status_code != status.HTTP_200_OK or not deleteResponse.ok:
-            # raise Exception('Could not delete the destination index.')
-            pass
+            if response.status_code == status.HTTP_404_NOT_FOUND and response.reason.lower() == "Not found".lower():
+                pass
+            else:
+                raise Exception('Could not delete the primary index.')
 
         # create the primary index for dumping the data.
         createIndex = requests.put(elastic_url + '/' + primary_index, headers=headers, data=json.dumps(primary_index_mapping_data))
@@ -91,57 +81,62 @@ def dump_to_elastic():
                 return str(obj)
             raise TypeError("Object of type '%s' is not JSON serializable" % type(obj).__name__)
 
-        batch_size = 10000
+        batch_size = 1
         with transaction.atomic():
             with connection.connection.cursor(name='elasticdata', cursor_factory=psycopg2.extras.RealDictCursor) as cursor:
                 cursor.itersize = batch_size
                 cursor.execute(query)
-                counter = 0
                 response_list = list()
+                attempted = 0
+                hashlib_obj = hashlib.sha1()
                 for row in cursor:
+                    attempted = attempted + 1
+                    json_format_row = json.dumps(row) + row.get('name', uuid.uuid4())
+                    hashlib_obj.update(json_format_row.encode('utf-8'))
+
                     document_dict = {
                         "_index": primary_index,
                         "_type": "entity",
-                        "_id": str(uuid.uuid4())
+                        "_id": hashlib_obj.hexdigest()
                     }
+
                     response_list.append({'index': document_dict})
                     response_list.append(row)
                     if len(response_list) >= batch_size:
                         response_list = json.loads(json.dumps(response_list, default=default))
-                        requests.post(elastic_url + '_bulk', headers=headers, data=json.dumps(response_list))
-
-                        count_response = requests.get(elastic_url + '/' + primary_index + '/_count')
-                        if count_response.status_code != status.HTTP_200_OK or not count_response.ok:
-                            raise Exception('Could not get the count of dumped documents.')
-
-                        count_response = count_response.json()
-
-                        if count_response.get('count') != batch_size:
-                            logger.error('Could not dump all the records. Attempeted %d : Dumped %s' % (batch_size, count_response))
+                        data = '\n'.join(json.dumps(d) for d in response_list) + '\n'
+                        dump_headers = {"Content-Type": "application/x-ndjson"}
+                        requests.post(elastic_url + '/_bulk', headers=dump_headers, data=data)
 
                         response_list = list()
-                        counter+=1
+
 
                 # write all remaining records
                 if len(response_list) > 0:
                     response_list = json.loads(json.dumps(response_list, default=default))
                     data = '\n'.join(json.dumps(d) for d in response_list) + '\n'
-                    headers = {"Content-Type": "application/x-ndjson"}
-                    dump_response = requests.post(elastic_url + '/_bulk', headers=headers, data=data)
+                    dump_headers = {"Content-Type": "application/x-ndjson"}
+                    dump_response = requests.post(elastic_url + '/_bulk', headers=dump_headers, data=data)
                     if dump_response.status_code != status.HTTP_200_OK or not dump_response.ok:
                         raise Exception('Dump unsuccessfull')
 
-                    count_response = requests.get(elastic_url + '/' + primary_index + '/_count')
-                    if count_response.status_code != status.HTTP_200_OK or not count_response.ok:
-                        raise Exception('Could not get the count of dumped documents.')
+        # Delete the index or empty the index for new use.
+        deleteResponse = requests.delete(elastic_url + '/' + destination)
+        if deleteResponse.status_code != status.HTTP_200_OK or not deleteResponse.ok:
+            if deleteResponse.status_code == status.HTTP_404_NOT_FOUND and deleteResponse.reason.lower() == "Not found".lower():
+                pass
+            else:
+                raise Exception('Could not delete the destination index.')
 
-                    count_response = count_response.json()
+        # create the destination index for dumping the data.
+        createDestinationIndex = requests.put(elastic_url + '/' + destination, headers=headers, data=json.dumps(secondary_index_mapping_data))
+        if createDestinationIndex.status_code != status.HTTP_200_OK or not createDestinationIndex.ok:
+            raise Exception('Could not create the destination index. ', destination)
 
-                    if count_response.get('count') != int(len(response_list)/2):
-                        raise Exception('Could not dump all the records. Attempeted %d : Dumped %s' % (batch_size, count_response))
-
-        data = {"source":{"index":primary_index},"dest":{"index":destination}}
+        data = {"source": {"index": primary_index}, "dest": {"index": destination}}
         response = requests.post(elastic_url + '/_reindex', headers={'Content-Type': 'application/json'}, data=json.dumps(data))
+        if response.status_code != status.HTTP_200_OK or not response.ok:
+            raise Exception('Could not switch the ')
 
         aliasData = {
             "actions": [
@@ -158,6 +153,8 @@ def dump_to_elastic():
         }
 
         response = requests.post(elastic_url + '/_aliases', headers={'Content-Type': 'application/json'}, data=json.dumps(aliasData))
+        if response.status_code != status.HTTP_200_OK or not response.ok:
+            raise Exception('Could not switch the latest index to the live aliases. ', aliasData)
 
         print("Sync to elastic successfull.")
 
