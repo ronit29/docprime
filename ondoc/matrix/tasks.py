@@ -536,47 +536,50 @@ def push_onboarding_qcstatus_to_matrix(self, data):
 @task(bind=True, max_retries=2)
 def push_non_bookable_doctor_lead_to_matrix(self, nb_doc_lead_id):
     from ondoc.web.models import NonBookableDoctorLead
-    obj = NonBookableDoctorLead.objects.filter(id= nb_doc_lead_id).first()
-    if not obj:
-        raise Exception('Could not get non bookable doctor for the id ', nb_doc_lead_id)
+    try:
+        obj = NonBookableDoctorLead.objects.filter(id= nb_doc_lead_id).first()
+        if not obj:
+            raise Exception('Could not get non bookable doctor for the id ', nb_doc_lead_id)
 
-    exit_point_url = ""
-    if obj.doctor and obj.doctor.id and obj.hospital and obj.hospital.id:
-        exit_point_url = "%s/opd/doctor/%d?hospital_id=%d" % (settings.CONSUMER_APP_DOMAIN, obj.doctor.id, obj.hospital.id)
+        exit_point_url = ""
+        if obj.doctor and obj.doctor.id and obj.hospital and obj.hospital.id:
+            exit_point_url = "%s/opd/doctor/%d?hospital_id=%d" % (settings.CONSUMER_APP_DOMAIN, obj.doctor.id, obj.hospital.id)
 
-    request_data = {
-        'ExitPointUrl': exit_point_url,
-        'LeadSource': obj.source,
-        'PrimaryNo': int(obj.from_mobile),
-        'Name': obj.name if obj.name else 'not applicable',
-        'ProductId': 5,
-        'SubProductId': 2,
-        'AppointmentDetails': {
-            'ProviderName': obj.doctor.name if obj.doctor else '',
-            'ProviderAddress': obj.hospital.get_hos_address() if obj.hospital else ''
+        request_data = {
+            'ExitPointUrl': exit_point_url,
+            'LeadSource': obj.source,
+            'PrimaryNo': int(obj.from_mobile),
+            'Name': obj.name if obj.name else 'not applicable',
+            'ProductId': 5,
+            'SubProductId': 2,
+            'AppointmentDetails': {
+                'ProviderName': obj.doctor.name if obj.doctor else '',
+                'ProviderAddress': obj.hospital.get_hos_address() if obj.hospital else ''
+            }
         }
-    }
 
-    url = settings.MATRIX_API_URL
-    matrix_api_token = settings.MATRIX_API_TOKEN
-    response = requests.post(url, data=json.dumps(request_data), headers={'Authorization': matrix_api_token,
-                                                                          'Content-Type': 'application/json'})
+        url = settings.MATRIX_API_URL
+        matrix_api_token = settings.MATRIX_API_TOKEN
+        response = requests.post(url, data=json.dumps(request_data), headers={'Authorization': matrix_api_token,
+                                                                              'Content-Type': 'application/json'})
 
-    if response.status_code != status.HTTP_200_OK or not response.ok:
-        logger.info("[ERROR] NB Doctor Lead could not be published to the matrix system")
-        logger.info("[ERROR] %s", response.reason)
-        countdown_time = (2 ** self.request.retries) * 60 * 10
-        logging.error("Lead sync with the Matrix System failed with response - " + str(response.content))
-        print(countdown_time)
-        self.retry(obj.id, countdown=countdown_time)
-    else:
-        resp_data = response.json()
-        # logger.error(response.text)
-        if not resp_data.get('Id', None):
-            logger.error(json.dumps(request_data))
-            raise Exception("[ERROR] Id not received from the matrix while pushing NB doctor lead.")
+        if response.status_code != status.HTTP_200_OK or not response.ok:
+            logger.info("[ERROR] NB Doctor Lead could not be published to the matrix system")
+            logger.info("[ERROR] %s", response.reason)
+            countdown_time = (2 ** self.request.retries) * 60 * 10
+            logging.error("Lead sync with the Matrix System failed with response - " + str(response.content))
+            print(countdown_time)
+            self.retry(obj.id, countdown=countdown_time)
+        else:
+            resp_data = response.json()
+            # logger.error(response.text)
+            if not resp_data.get('Id', None):
+                logger.error(json.dumps(request_data))
+                raise Exception("[ERROR] Id not received from the matrix while pushing NB doctor lead.")
 
-        # save the order with the matrix lead id.
-        obj.matrix_lead_id = resp_data.get('Id', None)
-        obj.matrix_lead_id = int(obj.matrix_lead_id)
-        obj.save()
+            # save the order with the matrix lead id.
+            obj.matrix_lead_id = resp_data.get('Id', None)
+            obj.matrix_lead_id = int(obj.matrix_lead_id)
+            obj.save()
+    except Exception as e:
+        logger.error("Error while pushing the non bookable doctor lead to matrix. ", str(e))
