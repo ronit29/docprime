@@ -835,13 +835,29 @@ class LabList(viewsets.ReadOnlyModelViewSet):
         for obj in labs:
             temp_var[obj.id] = obj
             tests[obj.id] = list()
+            ret_data = list()
+
             if test_ids and obj.selected_group and obj.selected_group.selected_tests:
                 for test in obj.selected_group.selected_tests:
                     if test.custom_deal_price:
                         deal_price=test.custom_deal_price
                     else:
                         deal_price=test.computed_deal_price
-                    tests[obj.id].append({"id": test.test_id, "name": test.test.name, "deal_price": deal_price, "mrp": test.mrp, "number_of_tests": test.test.number_of_tests, 'categories': test.test.get_all_categories_detail(), "url": test.test.url})
+                    if test.test.is_package:
+                        packages_test = test.test.packages.all()
+                        for t_obj in packages_test:
+                            # param_list = t_obj.lab_test.labtests.all().values_list("parameter__name", flat=True)
+                            param_objs = t_obj.lab_test.labtests.all()
+                            param_list = list()
+                            for obj in param_objs:
+                                param_list.append(obj.parameter.name)
+                            ret_data.append({
+                                "parameters": param_list
+                            })
+                        return ret_data
+
+                    tests[obj.id].append({"id": test.test_id, "name": test.test.name, "deal_price": deal_price, "mrp": test.mrp, "number_of_tests": test.test.number_of_tests, 'categories': test.test.get_all_categories_detail(), "url": test.test.url,
+                                          "parameters": ret_data})
 
         # day_now = timezone.now().weekday()
         # days_array = [i for i in range(7)]
