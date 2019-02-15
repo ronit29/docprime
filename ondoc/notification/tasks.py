@@ -716,7 +716,7 @@ def refund_breakup_sms_task(obj_id):
         if not instance or not instance.user:
             return
         amount_breakup = []
-        for consumer_refund in instance.pg_refund.all():
+        for consumer_refund in instance.consumerrefund_set.all():
             if consumer_refund.pg_transaction:
                 amount_breakup.append(
                     {'name': consumer_refund.pg_transaction.bank_name, 'amount': consumer_refund.refund_amount})
