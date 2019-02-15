@@ -601,6 +601,18 @@ class DoctorProfileUserViewSet(viewsets.GenericViewSet):
 
         response_data = self.prepare_response(serializer.data, selected_hospital)
 
+        if not doctor.about:
+            about_doctor = doctor.name
+
+        '''<Dr. Pallavi Chalasani> is a proficient <Gynecologist, Obstetrician and an Infertility Specialist> with an experience of <11 years>. <She> is located in <Hyderabad, Andhra Pradesh>.
+<Dr. Pallavi Chalasani> practices at the <Rainbow Children’s Hospital and Birthright by Rainbow in Hyderabad, Telangana>. The <hospital> is situated at <Hydernagar, Opposite to Chermas, Nizampet, Hyderabad>. <Dr. Pallavi Chalasani> is an esteemed member of <Federation of Obstetric and Gynaecological Societies of India (FOGSI)>.
+<she> pursued <her> <Bachelor of Medicine and Surgery (MBBS)> in the year <2008> from <Pondicherry Institute of Medical Sciences>. <She> completed <her> <Masters of Science in Gynecology and Obstetrics from Jawaharlal Nehru Medical College, Belgaum> in the year <2012>.  <She> has also done <her> <Masters of Science in Gynecology and Obstetrics from Jawaharlal Nehru Medical College, Belgaum> in the year <2012>.
+
+<Dr. Akash A Saraogi> is an experienced, skilled, and awarded doctor in <his> field of specialization. <Dr. Akash A Saraogi> has been awarded with <Sir Walter Mercer Medal – FRCS Gold Medal>, <Sir John Charnley Gold Medal>, <Sir John Carnley Award>, <Topper Award>.
+
+<He> has worked at <TNMC> from <2009-2010>,  at <Sir J J Group of Hospitals> from <2011-2014>, at <Sir J J Group of Hospitals> from <2014-2014>, at < Sir J J Group of Hospitals> from <2014-2015>, at <Wrightington Hospital> from <2015-2018>.'''
+
+
         if entity:
             response_data['url'] = entity.url
             if entity.breadcrumb:
