@@ -5,7 +5,6 @@ from django.db.models import Q, Avg, Count, Max, F, ExpressionWrapper, DateTimeF
 from collections import defaultdict, OrderedDict
 from ondoc.api.v1.procedure.serializers import DoctorClinicProcedureSerializer, OpdAppointmentProcedureMappingSerializer
 from ondoc.cart.models import Cart
-from ondoc.common.models import AppointmentHistory
 from ondoc.doctor.models import (OpdAppointment, Doctor, Hospital, DoctorHospital, DoctorClinicTiming,
                                  DoctorAssociation,
                                  DoctorAward, DoctorDocument, DoctorEmail, DoctorExperience, DoctorImage,
