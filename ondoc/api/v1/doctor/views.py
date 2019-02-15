@@ -614,7 +614,7 @@ class DoctorProfileUserViewSet(viewsets.GenericViewSet):
 
         if not doctor.enabled_for_online_booking:
             parameters = dict()
-
+            specialization_id = ''
             doc = DoctorListViewSet()
             general_specialization = []
 
@@ -629,17 +629,15 @@ class DoctorProfileUserViewSet(viewsets.GenericViewSet):
                 hospital = response_data.get('hospitals')[0]
                 parameters['lat'] = hospital.get('lat')
                 parameters['long'] = hospital.get('long')
-            parameters['doctor_suggestions'] = 1
-            kwargs['parameters'] = parameters
-            response_data['doctors'] = doc.list(request, **kwargs)
-            if response_data.get('doctors'):
-                response_data['doctors']['doctors_url'] = request.build_absolute_uri('/opd/searchresults?specializations=%s&lat=%s&long=%s' % (str(specialization_id), hospital.get('lat'), hospital.get('long')))
-            else:
-                response_data['doctors']['doctors_url'] = None
-
+                parameters['doctor_suggestions'] = 1
+                kwargs['parameters'] = parameters
+                response_data['doctors'] = doc.list(request, **kwargs)
+                if response_data.get('doctors'):
+                    response_data['doctors']['doctors_url'] = '/opd/searchresults?specializations=%s&lat=%s&long=%s' % (str(specialization_id), hospital.get('lat'), hospital.get('long'))
+                else:
+                    response_data['doctors']['doctors_url'] = None
         else:
             response_data['doctors'] = None
-            response_data['doctors_url'] = None
 
         return Response(response_data)
 
