@@ -632,8 +632,10 @@ class DoctorProfileUserViewSet(viewsets.GenericViewSet):
             parameters['doctor_suggestions'] = 1
             kwargs['parameters'] = parameters
             response_data['doctors'] = doc.list(request, **kwargs)
+            response_data['doctors_url'] = request.build_absolute_uri('/opd/searchresults?specializations=%s&lat=%s&long=%s' % (str(specialization_id), hospital.get('lat'), hospital.get('long')))
         else:
             response_data['doctors'] = None
+            response_data['doctors_url'] = None
 
         return Response(response_data)
 
