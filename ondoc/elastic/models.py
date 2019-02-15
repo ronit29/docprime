@@ -22,7 +22,7 @@ class DemoElastic(TimeStampedModel):
     primary_index_mapping_data = JSONField(default={})
     secondary_index_mapping_data = JSONField(default={})
 
-    # active = models.BooleanField(default=False)
+    active = models.BooleanField(default=False)
 
     def save(self, *args, **kwargs):
         super(DemoElastic, self).save(*args, **kwargs)

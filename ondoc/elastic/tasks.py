@@ -32,7 +32,7 @@ def dump_to_elastic():
         primary_index_mapping_data = obj.primary_index_mapping_data
         secondary_index_mapping_data = obj.secondary_index_mapping_data
 
-        if not elastic_url or not elastic_alias or not primary_index or not secondary_index_a or not secondary_index_b \
+        if not obj.active or not elastic_url or not elastic_alias or not primary_index or not secondary_index_a or not secondary_index_b \
                 or not primary_index_mapping_data or not secondary_index_mapping_data:
             raise Exception("Necessary vales of the elastic configuration is not set.")
 
