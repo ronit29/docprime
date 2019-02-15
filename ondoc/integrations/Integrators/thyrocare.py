@@ -6,7 +6,7 @@ from rest_framework import status
 from django.conf import settings
 import logging
 logger = logging.getLogger(__name__)
-from datetime import timedelta, datetime, date
+from datetime import datetime, date
 from ondoc.integrations.models import IntegratorMapping, IntegratorProfileMapping, IntegratorResponse, IntegratorReport
 from django.contrib.contenttypes.models import ContentType
 from ondoc.api.v1.utils import resolve_address, aware_time_zone
@@ -248,6 +248,6 @@ class Thyrocare(BaseIntegrator):
         report = IntegratorReport.objects.get_or_create(integrator_response_id=integrator_response.id, pdf_url=result["pdf"], xml_url=result["xml"])
 
         # Update integrator response when both type of report present
-        if report.pdf_url && report.xml_url:
+        if report.pdf_url and report.xml_url:
             IntegratorResponse.objects.filter(pk=integrator_response.pk).update(report_received=True)
 
