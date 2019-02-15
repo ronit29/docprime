@@ -98,6 +98,7 @@ class ScreenViewSet(viewsets.GenericViewSet):
 
     def ask_for_app_rating(self, request, *args, **kwargs):
 
+        APP_RATING_FREQUENCY = 3
         if request.user.is_authenticated:
             user = request.user
         else:
@@ -111,7 +112,7 @@ class ScreenViewSet(viewsets.GenericViewSet):
             return False
 
         user_tracking = TrackingEvent.objects.filter(user=user, data__Category="DocprimeApp", data__event="AppLaunch")
-        if user_tracking.exists() and user_tracking.count() % 3 == 0:
+        if user_tracking.exists() and user_tracking.count() % APP_RATING_FREQUENCY == 0:
             return True
         else:
             return False
