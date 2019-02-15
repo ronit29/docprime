@@ -349,7 +349,6 @@ DEFAULT_FROM_EMAIL = "support@docprime.com"
 API_ENABLED = env('API_ENABLED', default=False)
 SEND_THROUGH_NODEJS_ENABLED = env.bool('SEND_THROUGH_NODEJS_ENABLED', default=False)
 
-
 #Config for AWS S3 bucket
 #MEDIA_URL = '/media/'
 #AWS_ACCESS_KEY_ID = env('AWS_ACCESS_KEY_ID')

@@ -62,7 +62,7 @@ def dump_to_elastic():
         response = requests.delete(elastic_url + '/' + primary_index, headers=headers)
         if response.status_code != status.HTTP_200_OK or not response.ok:
 
-            if response.status_code == status.HTTP_404_NOT_FOUND and response.reason.lower() == "Not found".lower():
+            if response.status_code == status.HTTP_404_NOT_FOUND and response.json().get('error', {}).get('type', "") == "index_not_found_exception".lower():
                 pass
             else:
                 raise Exception('Could not delete the primary index.')
@@ -106,10 +106,11 @@ def dump_to_elastic():
                         response_list = json.loads(json.dumps(response_list, default=default))
                         data = '\n'.join(json.dumps(d) for d in response_list) + '\n'
                         dump_headers = {"Content-Type": "application/x-ndjson"}
-                        requests.post(elastic_url + '/_bulk', headers=dump_headers, data=data)
+                        dump_response = requests.post(elastic_url + '/_bulk', headers=dump_headers, data=data)
+                        if dump_response.status_code != status.HTTP_200_OK or not dump_response.ok:
+                            raise Exception('Dump unsuccessfull')
 
                         response_list = list()
-
 
                 # write all remaining records
                 if len(response_list) > 0:
@@ -123,7 +124,7 @@ def dump_to_elastic():
         # Delete the index or empty the index for new use.
         deleteResponse = requests.delete(elastic_url + '/' + destination)
         if deleteResponse.status_code != status.HTTP_200_OK or not deleteResponse.ok:
-            if deleteResponse.status_code == status.HTTP_404_NOT_FOUND and deleteResponse.reason.lower() == "Not found".lower():
+            if deleteResponse.status_code == status.HTTP_404_NOT_FOUND and deleteResponse.json().get('error', {}).get('type', "") == "index_not_found_exception".lower():
                 pass
             else:
                 raise Exception('Could not delete the destination index.')
