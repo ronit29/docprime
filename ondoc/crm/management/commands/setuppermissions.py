@@ -510,25 +510,88 @@ class Command(BaseCommand):
 
             group.permissions.add(*permissions)
 
-
         group, created = Group.objects.get_or_create(name=constants['WELCOME_CALLING_TEAM'])
         group.permissions.clear()
 
-        content_types = ContentType.objects.get_for_models( Doctor, Remark, Hospital, HospitalNetwork,
-                                                            DoctorClinic, DoctorClinicTiming,
-                                                            DoctorQualification, DoctorLanguage, DoctorAward, DoctorAssociation,
-                                                            DoctorExperience, DoctorMedicalService, DoctorImage, DoctorDocument,
-                                                            DoctorMobile, DoctorEmail, HospitalSpeciality, DoctorNumber,
-                                                            HospitalAward, HospitalAccreditation, HospitalImage, HospitalDocument,
-                                                            HospitalCertification, HospitalNetworkManager, HospitalNetworkHelpline,
-                                                            HospitalNetworkEmail, HospitalNetworkAccreditation, HospitalNetworkAward,
-                                                            HospitalNetworkCertification, DoctorPracticeSpecialization, HospitalNetworkDocument, CompetitorInfo,
-                                                            CompetitorMonthlyVisit, SPOCDetails, GenericAdmin, GenericLabAdmin, DoctorClinicProcedure, AssociatedMerchant)
+        content_types = ContentType.objects.get_for_models(Doctor, Hospital, HospitalNetwork)
+        for cl, ct in content_types.items():
+            permissions = Permission.objects.filter(
+                Q(content_type=ct), Q(codename='change_' + ct.model))
+            group.permissions.add(*permissions)
+
+        content_types = ContentType.objects.get_for_models(Lab, LabNetwork)
+        for cl, ct in content_types.items():
+            permissions = Permission.objects.filter(
+                Q(content_type=ct), Q(codename='change_' + ct.model))
+            group.permissions.add(*permissions)
+
+        content_types = ContentType.objects.get_for_models(Merchant,
+                                                           Qualification, Specialization, Language, MedicalService,
+                                                           College, SpecializationDepartment,
+                                                           SpecializationField,
+                                                           SpecializationDepartmentMapping, UploadDoctorData, Remark
+                                                           )
+
         for cl, ct in content_types.items():
             permissions = Permission.objects.filter(
                 Q(content_type=ct),
                 Q(codename='add_' + ct.model) |
                 Q(codename='change_' + ct.model))
+            group.permissions.add(*permissions)
+
+        content_types = ContentType.objects.get_for_models(LabTest, LabTestType, LabService, TestParameter)
+
+        for cl, ct in content_types.items():
+            permissions = Permission.objects.filter(
+                Q(content_type=ct),
+                Q(codename='add_' + ct.model) |
+                Q(codename='change_' + ct.model))
+            group.permissions.add(*permissions)
+
+        content_types = ContentType.objects.get_for_models(ParameterLabTest, LabTestPackage)
+
+        for cl, ct in content_types.items():
+            permissions = Permission.objects.filter(
+                Q(content_type=ct),
+                Q(codename='add_' + ct.model) |
+                Q(codename='change_' + ct.model) |
+                Q(codename='delete_' + ct.model)
+            )
+            group.permissions.add(*permissions)
+
+        content_types = ContentType.objects.get_for_models(
+            DoctorClinic, DoctorClinicTiming, GenericAdmin, GenericLabAdmin,
+            DoctorQualification, DoctorLanguage, DoctorAward, DoctorAssociation,
+            DoctorExperience, DoctorMedicalService, DoctorImage, DoctorDocument,
+            DoctorMobile, DoctorEmail, HospitalSpeciality, DoctorNumber,
+            HospitalAward, HospitalAccreditation, HospitalImage, HospitalDocument,
+            HospitalCertification, HospitalNetworkManager, HospitalNetworkHelpline,
+            HospitalNetworkEmail, HospitalNetworkAccreditation, HospitalNetworkAward,
+            HospitalNetworkCertification, DoctorPracticeSpecialization, HospitalNetworkDocument, CompetitorInfo,
+            CompetitorMonthlyVisit, SPOCDetails, DoctorClinicProcedure, AssociatedMerchant)
+
+        for cl, ct in content_types.items():
+            permissions = Permission.objects.filter(
+                Q(content_type=ct),
+                Q(codename='add_' + ct.model) |
+                Q(codename='change_' + ct.model) |
+                Q(codename='delete_' + ct.model))
+
+            group.permissions.add(*permissions)
+
+        content_types = ContentType.objects.get_for_models(LabTiming, LabImage,
+                                                           LabManager, LabAccreditation, LabAward, LabCertification,
+                                                           LabNetworkCertification, LabNetworkAward, HomePickupCharges,
+                                                           LabNetworkAccreditation, LabNetworkEmail, LabNetworkHelpline,
+                                                           LabNetworkManager, LabService, LabDoctorAvailability,
+                                                           LabDoctor, LabDocument, LabNetworkDocument)
+
+        for cl, ct in content_types.items():
+            permissions = Permission.objects.filter(
+                Q(content_type=ct),
+                Q(codename='add_' + ct.model) |
+                Q(codename='change_' + ct.model) |
+                Q(codename='delete_' + ct.model))
 
             group.permissions.add(*permissions)
 
@@ -540,9 +603,7 @@ class Command(BaseCommand):
 
             group.permissions.add(*permissions)
 
-
         self.stdout.write('Successfully created groups and permissions')
-
         self.setup_comment_group()
 
     def create_about_doctor_group(self):

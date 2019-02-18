@@ -472,7 +472,7 @@ def create_or_update_lead_on_matrix(self, data):
         if not obj:
             raise Exception("{} could not found against id - {}".format(obj_type, obj_id))
 
-        mobile = ''
+        mobile = '0'
         gender = 0
         if obj_type == Doctor.__name__:
             if obj.gender and obj.gender == 'm':
@@ -585,7 +585,7 @@ def update_onboarding_qcstatus_to_matrix(self, data):
             resp_data = response.json()
             if not resp_data.get('IsSaved', False):
                 logger.error(json.dumps(request_data))
-                raise Exception("[ERROR] {} with ID {} not saved to matrix while updating status.")
+                raise Exception("[ERROR] {} with ID {} not saved to matrix while updating status.".format(obj_type, obj_id))
     except Exception as e:
         logger.error("Error in Celery. Failed to update status to the matrix - " + str(e))
 
