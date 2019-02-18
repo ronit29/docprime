@@ -843,26 +843,19 @@ class LabList(viewsets.ReadOnlyModelViewSet):
                         deal_price=test.custom_deal_price
                     else:
                         deal_price=test.computed_deal_price
-                    if test.test.is_package:
-                        packages_test = test.test.packages.all()
-                        for t_obj in packages_test:
-                            # param_list = t_obj.lab_test.labtests.all().values_list("parameter__name", flat=True)
-                            param_objs = t_obj.lab_test.labtests.all()
-                            param_list = list()
-                            for obj in param_objs:
-                                param_list.append(obj.parameter.name)
-                            ret_data.append({
-                                "parameters": param_list
-                            })
-                        return ret_data
+                    # for sample in test.test.parameter.all():
+                    #     param_list = list()
+                    #     param_list.append({'parameters': sample})
+                    #     ret_data.append({"parameters": param_list})
+                    #     return ret_data
 
                     tests[obj.id].append({"id": test.test_id, "name": test.test.name, "deal_price": deal_price, "mrp": test.mrp, "number_of_tests": test.test.number_of_tests, 'categories': test.test.get_all_categories_detail(), "url": test.test.url,
-                                          "parameters": ret_data})
+                                          "parameters": test.test.parameter.all(), "count": test.test.parameter.all().count()})
 
         # day_now = timezone.now().weekday()
         # days_array = [i for i in range(7)]
         # rotated_days_array = days_array[day_now:] + days_array[:day_now]
-        #lab_network = dict()
+        #lab_network = dict(
         for row in queryset:
 
             # lab_timing = list()
