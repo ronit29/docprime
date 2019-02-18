@@ -58,6 +58,7 @@ from decimal import Decimal
 from ondoc.web.models import ContactUs
 from ondoc.notification.tasks import send_pg_acknowledge
 import re
+from ondoc.matrix.tasks import push_order_to_matrix
 
 
 logger = logging.getLogger(__name__)
@@ -1161,6 +1162,10 @@ class TransactionViewSet(viewsets.GenericViewSet):
         html_body = "Payment failed for user with " \
                     "user id - {} and phone number - {}" \
                     ", order id - {}.".format(order_obj.user.id, order_obj.user.phone_number, order_obj.id)
+
+        # Push the order failure case to matrix.
+
+        push_order_to_matrix.apply_async(({'order_id': order_obj.id},), countdown=5)
 
         for email in settings.ORDER_FAILURE_EMAIL_ID:
             EmailNotification.publish_ops_email(email, html_body, 'Payment failure for order')

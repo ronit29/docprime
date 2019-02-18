@@ -389,7 +389,7 @@ def push_order_to_matrix(self, data):
             logger.error("[CELERY ERROR: Incorrect values provided.]")
             raise ValueError()
 
-        order_obj = Order.objects.get(id=order_id)
+        order_obj = Order.objects.filter(id=order_id).first()
 
         if not order_obj:
             raise Exception("Order could not found against id - " + str(order_id))
@@ -397,19 +397,12 @@ def push_order_to_matrix(self, data):
         appointment_details = order_obj.appointment_details()
         request_data = {
             'LeadSource': 'DocPrime',
-            'HospitalName': appointment_details.get('hospital_name'),
             'Name': appointment_details.get('profile_name', ''),
             'BookedBy': appointment_details.get('user_number', None),
             'LeadID': order_obj.matrix_lead_id if order_obj.matrix_lead_id else 0,
             'PrimaryNo': appointment_details.get('user_number',None),
             'ProductId': 5,
             'SubProductId': 4,
-            'AppointmentDetails': {
-                'OrderID': appointment_details.get('order_id', 0),
-                'ProviderName': appointment_details.get('doctor_name', '') if appointment_details.get('doctor_name') else appointment_details.get('lab_name'),
-                'BookingDateTime': int(data.get('created_at')),
-                'AppointmentDateTime': int(data.get('timeslot')),
-            }
         }
 
         #logger.error(json.dumps(request_data))
