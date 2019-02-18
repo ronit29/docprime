@@ -106,14 +106,13 @@ class HospitalNetworkForm(FormCleanMixin):
     operational_since = forms.ChoiceField(choices=hospital_operational_since_choices, required=False)
     about = forms.CharField(widget=forms.Textarea, required=False)
 
-
-
     def validate_qc(self):
         qc_required = {'name': 'req', 'operational_since': 'req', 'about': 'req', 'network_size': 'req',
                        'building': 'req', 'locality': 'req',
                        'country': 'req', 'pin_code': 'req', 'hospitalnetworkmanager': 'count',
                        'hospitalnetworkhelpline': 'count', 'hospitalnetworkemail': 'count',
-                       'matrix_city': 'req', 'matrix_state': 'req', 'hospitalnetworkmanager_set': 'count'}
+                       'matrix_city': 'req', 'matrix_state': 'req', 'hospitalnetworkmanager_set': 'count',
+                       'matrix_lead_id': 'req'}
 
         # if self.instance.is_billing_enabled:
         #     qc_required.update({
