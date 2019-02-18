@@ -70,6 +70,7 @@ class RatingsViewSet(viewsets.GenericViewSet):
                     rating_review = RatingsReview(user=request.user, ratings=valid_data.get('rating'),
                                                   appointment_type=valid_data.get('appointment_type'),
                                                   appointment_id=valid_data.get('appointment_id'),
+
                                                   # review=valid_data.get('review'),
                                                   content_object=content_obj)
                     rating_review.save()
@@ -100,8 +101,7 @@ class RatingsViewSet(viewsets.GenericViewSet):
         else:
             rating.compliment.set("")
 
-        if valid_data.get('review'):
-            rating.review = valid_data.get('review')
+        rating.review = valid_data.get('review')
         rating.save()
         rating_obj = {}
         address = ''
