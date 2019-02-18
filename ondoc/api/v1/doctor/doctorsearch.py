@@ -178,7 +178,7 @@ class DoctorSearchHelper:
                                              or self.query_params.get('sort_on')=='distance'):
             return ' enabled_for_online_booking DESC, distance, priority desc ', ' rnk=1 '
 
-        bucket_size=2000
+        bucket_size=5000
 
         if self.count_of_procedure:
             order_by_field = ' distance, total_price '
