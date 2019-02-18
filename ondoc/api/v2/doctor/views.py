@@ -320,10 +320,58 @@ class DoctorBlockCalendarViewSet(viewsets.GenericViewSet):
     INTERVAL_MAPPING = {doc_models.DoctorLeave.INTERVAL_MAPPING.get(key): key for key in
                         doc_models.DoctorLeave.INTERVAL_MAPPING.keys()}
 
+    def get_queryset(self):
+        user = self.request.user
+        return doc_models.DoctorLeave.objects.filter(Q(deleted_at__isnull=True), Q(
+                                                   Q(doctor__manageable_doctors__user=user,
+                                                     doctor__manageable_doctors__entity_type=v1_utils.GenericAdminEntity.DOCTOR,
+                                                     doctor__manageable_doctors__is_disabled=False,
+                                                     doctor__manageable_doctors__hospital__isnull=True)
+                                                   |
+                                                   Q(doctor__manageable_doctors__user=user,
+                                                     doctor__manageable_doctors__entity_type=v1_utils.GenericAdminEntity.DOCTOR,
+                                                     doctor__manageable_doctors__is_disabled=False,
+                                                     doctor__manageable_doctors__hospital__isnull=False,
+                                                     doctor__manageable_doctors__hospital=F('hospital'))
+                                                   |
+                                                   Q(hospital__manageable_hospitals__user=user,
+                                                     hospital__manageable_hospitals__is_disabled=False,
+                                                     hospital__manageable_hospitals__entity_type=v1_utils.GenericAdminEntity.HOSPITAL)
+                                                   )
+                                                  |
+                                                  Q(
+                                                      Q(doctor__manageable_doctors__user=user,
+                                                        doctor__manageable_doctors__super_user_permission=True,
+                                                        doctor__manageable_doctors__is_disabled=False,
+                                                        doctor__manageable_doctors__entity_type=v1_utils.GenericAdminEntity.DOCTOR)
+                                                      |
+                                                      Q(hospital__manageable_hospitals__user=user,
+                                                        hospital__manageable_hospitals__is_disabled=False,
+                                                        hospital__manageable_hospitals__entity_type=v1_utils.GenericAdminEntity.HOSPITAL,
+                                                        hospital__manageable_hospitals__super_user_permission=True)
+                                                   )
+                                                  ).distinct()
+
+    @transaction.non_atomic_requests
+    def list(self, request, *args, **kwargs):
+        serializer = serializers.DoctorLeaveValidateQuerySerializer(data=request.query_params)
+        serializer.is_valid(raise_exception=True)
+        validated_data = serializer.validated_data
+        doctor_id = validated_data.get('doctor_id')
+        hospital_id = validated_data.get('hospital_id')
+        queryset = self.get_queryset()
+        if doctor_id and hospital_id:
+            queryset= queryset.filter(doctor_id=doctor_id, hospital_id=hospital_id)
+        elif doctor_id and not hospital_id:
+            queryset = queryset.filter(doctor_id=doctor_id)
+        elif hospital_id and not doctor_id:
+            queryset = queryset.filter(hospital_id=hospital_id)
+        serializer = serializers.DoctorLeaveSerializer(queryset, many=True)
+        return Response(serializer.data)
+
+
     @transaction.atomic
     def create(self, request, *args, **kwargs):
-        if not hasattr(request.user, 'doctor') or not request.user.doctor:
-            return Response([])
         serializer = serializers.DoctorBlockCalenderSerializer(data=request.data, context={"request": request})
         serializer.is_valid(raise_exception=True)
         validated_data = serializer.validated_data

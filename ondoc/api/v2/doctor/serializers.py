@@ -72,6 +72,11 @@ class DoctorProfileSerializer(serializers.ModelSerializer):
             'experiences', 'associations', 'awards', 'appointments', 'hospitals', 'thumbnail', 'signature', 'is_live')
 
 
+class DoctorLeaveValidateQuerySerializer(serializers.Serializer):
+    doctor_id = serializers.PrimaryKeyRelatedField(required=False, queryset=doc_models.Doctor.objects.all())
+    hospital_id = serializers.PrimaryKeyRelatedField(required=False, queryset=doc_models.Hospital.objects.all())
+
+
 class DoctorLeaveSerializer(serializers.ModelSerializer):
     interval = serializers.CharField(read_only=True)
     start_time = serializers.TimeField(write_only=True)
