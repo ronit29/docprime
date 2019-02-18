@@ -653,7 +653,7 @@ class DoctorProfileUserViewSet(viewsets.GenericViewSet):
                 about_doctor += '.'
                 if doctor.gender in ('m', 'f') and hospital_obj and hospital_obj.city and hospital_obj.state:
                     if hospital_obj.city:
-                        about_doctor += person + ' is located in ' + hospital_obj.city
+                        about_doctor += ' ' + person + ' is located in ' + hospital_obj.city
                     if hospital_obj.state:
                         about_doctor += ' ' + hospital_obj.state
                     about_doctor += '. '
@@ -707,7 +707,7 @@ class DoctorProfileUserViewSet(viewsets.GenericViewSet):
                    if data.get('hospital') and data.get('start_year') and data.get('end_year'):
                         exp_list.append('at ' + data.get('hospital') + ' from ' + str(data.get('start_year')) + '-' + str(data.get('end_year')))
                 about_doctor += ', '.join(exp_list)
-            response_data['about_doctor'] = about_doctor
+            response_data['about'] = about_doctor
         if entity:
             response_data['url'] = entity.url
             if entity.breadcrumb:
