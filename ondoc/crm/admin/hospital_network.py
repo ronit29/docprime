@@ -214,6 +214,7 @@ class HospitalNetworkAdmin(VersionAdmin, ActionAdmin, QCPemAdmin):
         GenericAdminInline,
         SPOCDetailsInline,
         AssociatedMerchantInline,
+        RemarkInline
     ]
 
     def associated_hospitals(self, instance):
