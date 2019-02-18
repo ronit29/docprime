@@ -4,7 +4,7 @@ We would like to know your valuable feedback for your recently completed appoint
 
 Please rate your experience to help us improve our services.
 
-{{opd_appointment_bypass_url}}
+{{opd_appointment_feedback_url}}
 
 Thanks,
 Team Docprime.com
