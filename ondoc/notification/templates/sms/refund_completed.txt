@@ -1,7 +1,9 @@
 Hi,
 
-The refund of Rs {{amount}}{% if booking_id %} for your booking id ‘{{booking_id}}’{% endif %} has been successfully credited in your account/wallet{% if reference_id %} with reference id {{reference_id}}{% endif %}.
-
+The refund of Rs {{amount}}{% if booking_id %} for your booking id ‘{{booking_id}}’{% endif %} has been successfully credited in your account{% if reference_id %} with reference id {{reference_id}}{% endif %}.
+{% if ctrnx_id %}
+The transaction ID for this refund is : DPRF{{ctrnx_id}}
+{% endif %}
 Please call us on 1800-123-9419 in case of any assistance.
 
 Do visit docprime.com again to avail the best offers on labs and doctor consultations.
