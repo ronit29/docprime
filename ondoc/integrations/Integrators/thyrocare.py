@@ -1,3 +1,4 @@
+from django.core.files.uploadedfile import TemporaryUploadedFile, InMemoryUploadedFile
 from ondoc.api.v1.utils import TimeSlotExtraction
 from .baseIntegrator import BaseIntegrator
 import requests
@@ -8,6 +9,7 @@ import logging
 logger = logging.getLogger(__name__)
 from datetime import datetime, date
 from ondoc.integrations.models import IntegratorMapping, IntegratorProfileMapping, IntegratorResponse, IntegratorReport
+from ondoc.diagnostic.models import LabReport, LabReportFile
 from django.contrib.contenttypes.models import ContentType
 from ondoc.api.v1.utils import resolve_address, aware_time_zone
 
@@ -236,10 +238,41 @@ class Thyrocare(BaseIntegrator):
     @classmethod
     def save_reports(cls, integrator_response, result):
         # Save reports URL
-        report = IntegratorReport.objects.get_or_create(integrator_response_id=integrator_response.id, pdf_url=result["pdf"], xml_url=result["xml"])
+        obj, created = IntegratorReport.objects.get_or_create(integrator_response_id=integrator_response.id, pdf_url=result["pdf"], xml_url=result["xml"])
 
         # Update integrator response when both type of report present
-        if report.pdf_url and report.xml_url:
+        if obj.pdf_url and obj.xml_url:
             IntegratorResponse.objects.filter(pk=integrator_response.pk).update(report_received=True)
+            cls.upload_report(obj)
 
+
+    @classmethod
+    def upload_report(cls, report):
+        formats = ['pdf', 'xml']
+        for format in formats:
+            if format == 'pdf':
+                report_url = report.pdf_url
+            else:
+                report_url = report.xml_url
+
+            request = requests.get(report_url, stream=True)
+            filename = "appointment_%s_report.%s" % (report.integrator_response.object_id, format)
+            lf = TemporaryUploadedFile(filename, 'byte', 1000, 'utf-8')
+
+            for block in request.iter_content(1024 * 8):
+
+                # If no more file then stop
+                if not block:
+                    break
+
+                # Write image block to temporary file
+                lf.write(block)
+
+            lf.seek(0)
+            lf.content_type = "application/%s" % format
+            in_memory_file = InMemoryUploadedFile(lf, None, filename, lf.content_type, lf.tell(), None)
+
+            lab_report, created = LabReport.objects.update_or_create(appointment_id=report.integrator_response.object_id)
+            if lab_report:
+                LabReportFile.objects.create(report_id=lab_report.id, name=in_memory_file)
 
