@@ -13,7 +13,7 @@ from ondoc.authentication import models as auth_models
 from ondoc.diagnostic import models as lab_models
 from ondoc.notification import tasks as notification_tasks
 #from ondoc.doctor.models import Hospital, DoctorClinic,Doctor,  OpdAppointment
-from ondoc.doctor.models import DoctorClinic, OpdAppointment
+from ondoc.doctor.models import DoctorClinic, OpdAppointment, DoctorAssociation, DoctorQualification
 from ondoc.notification.models import EmailNotification
 from django.utils.safestring import mark_safe
 from ondoc.coupon.models import Coupon
@@ -573,7 +573,9 @@ class DoctorProfileUserViewSet(viewsets.GenericViewSet):
                                     'qualifications__college',
                                     'doctorpracticespecializations__specialization',
                                     'images',
-                                    'rating'
+                                    'rating',
+                                    'associations',
+                                    'awards'
                                     )
                   .filter(pk=pk).first())
         # if not doctor or not is_valid_testing_data(request.user, doctor):
@@ -601,18 +603,111 @@ class DoctorProfileUserViewSet(viewsets.GenericViewSet):
 
         response_data = self.prepare_response(serializer.data, selected_hospital)
 
+        general_specialization = []
+        hospital = None
+
+        if not doctor.enabled_for_online_booking or not doctor.about:
+            for dps in doctor.doctorpracticespecializations.all():
+                general_specialization.append(dps.specialization)
+
+            general_specialization = sorted(general_specialization, key=operator.attrgetter('doctor_count'), reverse=True)
+            hospital = response_data.get('hospitals')[0]
+
         if not doctor.about:
-            about_doctor = doctor.name
+            about_doctor = None
+            person = None
+            person_pronoun = None
+            doctor_assoc_list = list()
+            members = None
+            awards = list()
+            hospital_obj = None
+            specializations = list()
+            if doctor.gender == 'f':
+                person = 'She'
+                person_pronoun = 'her'
+            elif doctor.gender == 'm':
+                person = 'He'
+                person_pronoun = 'his'
+            doc_spec = None
+            startswith = None
+            doc_clinics_obj = doctor.doctor_clinics.all().filter(hospital_id=hospital.get('hospital_id'))
+            if doc_clinics_obj:
+                hospital_obj = doc_clinics_obj[0].hospital
+            if doctor.name:
+                about_doctor = doctor.name
+                if len(general_specialization) == 1:
+                    about_doctor += ' is a proficient ' + general_specialization[0].name
+                elif len(general_specialization)>1:
+                    for data in general_specialization:
+                        specializations.append(data.name)
+                    doc_spec = ', '.join(specializations[:-1])
+                    if specializations[-1].startswith('a') or specializations[-1].startswith('e') or\
+                            specializations[-1].startswith('i') or specializations[-1].startswith('o') or \
+                            specializations[-1].startswith('u'):
+                        startswith = 'a'
+                    else:
+                        startswith = 'an'
+                    about_doctor += ' is a proficient ' + doc_spec + ' and ' + startswith + ' ' + specializations[-1]
+                if doctor.experience_years() and doctor.experience_years() > 0:
+                    about_doctor += ' with an experience of ' + str(doctor.experience_years()) + ' years'
+                about_doctor += '.'
+                if doctor.gender in ('m', 'f') and hospital_obj and hospital_obj.city and hospital_obj.state:
+                    if hospital_obj.city:
+                        about_doctor += person + ' is located in ' + hospital_obj.city
+                    if hospital_obj.state:
+                        about_doctor += ' ' + hospital_obj.state
+                    about_doctor += '. '
 
-        '''<Dr. Pallavi Chalasani> is a proficient <Gynecologist, Obstetrician and an Infertility Specialist> with an experience of <11 years>. <She> is located in <Hyderabad, Andhra Pradesh>.
-<Dr. Pallavi Chalasani> practices at the <Rainbow Children’s Hospital and Birthright by Rainbow in Hyderabad, Telangana>. The <hospital> is situated at <Hydernagar, Opposite to Chermas, Nizampet, Hyderabad>. <Dr. Pallavi Chalasani> is an esteemed member of <Federation of Obstetric and Gynaecological Societies of India (FOGSI)>.
-<she> pursued <her> <Bachelor of Medicine and Surgery (MBBS)> in the year <2008> from <Pondicherry Institute of Medical Sciences>. <She> completed <her> <Masters of Science in Gynecology and Obstetrics from Jawaharlal Nehru Medical College, Belgaum> in the year <2012>.  <She> has also done <her> <Masters of Science in Gynecology and Obstetrics from Jawaharlal Nehru Medical College, Belgaum> in the year <2012>.
+            if doctor.name and hospital and hospital_obj and hospital_obj.city and hospital_obj.state:
+                about_doctor += doctor.name
+                if hospital_obj.city:
+                    about_doctor += ' practices at the ' + hospital.get('hospital_name') + ' in ' + hospital_obj.city
+                if hospital_obj.state:
+                    about_doctor += ' ' + hospital_obj.state + '. '
+                else:
+                    about_doctor += '. '
 
-<Dr. Akash A Saraogi> is an experienced, skilled, and awarded doctor in <his> field of specialization. <Dr. Akash A Saraogi> has been awarded with <Sir Walter Mercer Medal – FRCS Gold Medal>, <Sir John Charnley Gold Medal>, <Sir John Carnley Award>, <Topper Award>.
+                if hospital and hospital.get('hospital_name') and hospital.get('address'):
+                    about_doctor += 'The ' + hospital.get('hospital_name') + ' is situated at ' + hospital.get('address') + '. '
 
-<He> has worked at <TNMC> from <2009-2010>,  at <Sir J J Group of Hospitals> from <2011-2014>, at <Sir J J Group of Hospitals> from <2014-2014>, at < Sir J J Group of Hospitals> from <2014-2015>, at <Wrightington Hospital> from <2015-2018>.'''
+                doctor_assoc = doctor.associations.all()
+                if doctor_assoc:
+                    for data in doctor_assoc:
+                        doctor_assoc_list.append(data.name)
 
+                members = 'and'.join(doctor_assoc_list)
+                if members:
+                    about_doctor += doctor.name + ' is an esteemed member of ' + members + '.\n'
 
+                doctor_qual = doctor.qualifications.all()
+
+                count = 0
+                for data in doctor_qual:
+                    if count>2:
+                        count =2
+                    qual_str = [' pursued ', ' completed ', ' has also done ']
+                    if data.qualification and data.qualification.name and data.college and data.college.name:
+                        about_doctor += person + qual_str[count] + person_pronoun + ' ' + data.qualification.name + ' in the year ' \
+                                        + str(data.passing_year) + ' from ' + data.college.name + '. '
+                        count = count + 1
+                about_doctor += doctor.name + ' is an experienced, skilled, and awarded doctor in ' + person_pronoun + ' field of specialization. '
+                doc_awards_obj = doctor.awards.all()
+                for data in doc_awards_obj:
+                    awards.append(data.name)
+
+                if awards:
+                    doc_awards = ','.join(awards)
+                    about_doctor += doctor.name + ' has been awarded with ' + doc_awards + '. '
+
+            doc_experience_details = response_data.get('experiences')
+            if doc_experience_details:
+                about_doctor += person + ' has worked '
+                exp_list = list()
+                for data in doc_experience_details:
+                   if data.get('hospital') and data.get('start_year') and data.get('end_year'):
+                        exp_list.append('at ' + data.get('hospital') + ' from ' + str(data.get('start_year')) + '-' + str(data.get('end_year')))
+                about_doctor += ', '.join(exp_list)
+            response_data['about_doctor'] = about_doctor
         if entity:
             response_data['url'] = entity.url
             if entity.breadcrumb:
@@ -628,15 +723,9 @@ class DoctorProfileUserViewSet(viewsets.GenericViewSet):
             parameters = dict()
             specialization_id = ''
             doc = DoctorListViewSet()
-            general_specialization = []
 
-            for dps in doctor.doctorpracticespecializations.all():
-                general_specialization.append(dps.specialization)
-
-            general_specialization = sorted(general_specialization, key=operator.attrgetter('doctor_count'), reverse=True)
             if general_specialization and response_data.get('hospitals'):
                 specialization_id = general_specialization[0].pk
-                hospital = response_data.get('hospitals')[0]
 
                 parameters['specialization_ids'] = str(specialization_id)                
                 parameters['lat'] = hospital.get('lat')
