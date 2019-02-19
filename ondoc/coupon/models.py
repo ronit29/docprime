@@ -40,6 +40,8 @@ class Coupon(auth_model.TimeStampedModel):
     lab = models.ForeignKey("diagnostic.Lab", on_delete=models.CASCADE, blank=True, null=True)
     test = models.ManyToManyField("diagnostic.LabTest", blank=True)
     test_categories = models.ManyToManyField("diagnostic.LabTestCategory", blank=True)
+    doctors = models.ManyToManyField("doctor.Doctor", blank=True)
+    hospitals = models.ManyToManyField("doctor.Hospital", blank=True)
     specializations = models.ManyToManyField("doctor.PracticeSpecialization", blank=True)
     procedures = models.ManyToManyField("procedure.Procedure", blank=True)
     procedure_categories = models.ManyToManyField("procedure.ProcedureCategory", blank=True)

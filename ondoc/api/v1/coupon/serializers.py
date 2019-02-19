@@ -18,33 +18,23 @@ class ProductIDSerializer(serializers.Serializer):
     product_id = serializers.ChoiceField(required=False, choices=Order.PRODUCT_IDS)
     lab_id = serializers.PrimaryKeyRelatedField(required=False, queryset=Lab.objects.filter(is_live=True))
     test_ids = CommaSepratedToListField(required=False)
-    # test_categories_ids = CommaSepratedToListField(required=False)
     procedures_ids = CommaSepratedToListField(required=False)
-    # procedure_categories_ids = CommaSepratedToListField(required=False)
     doctor_id = serializers.PrimaryKeyRelatedField(required=False,
                                                    queryset=Doctor.objects.filter(is_live=True, enabled=True))
     hospital_id = serializers.PrimaryKeyRelatedField(required=False,
                                                    queryset=Hospital.objects.filter(is_live=True, enabled=True))
-    # specialization_ids = serializers.PrimaryKeyRelatedField(required=False,
-    #                                                queryset=PracticeSpecialization.objects.all())
     deal_price = serializers.DecimalField(max_digits=10, decimal_places=2, required=False)
     coupon_code = serializers.CharField(required=False)
     profile_id = serializers.PrimaryKeyRelatedField(required=False, queryset=UserProfile.objects.all())
-    # gender = serializers.ChoiceField(required=False, choices=UserProfile.GENDER_CHOICES)
-    # age_range = CommaSepratedToListField(required=False, max_length=2, min_length=2)
-    # cities = serializers.CharField(required=False)
     cart_item = serializers.PrimaryKeyRelatedField(queryset=Cart.objects.all(), required=False, allow_null=True)
     show_all = serializers.BooleanField(required=False)
 
     def validate(self, attrs):
-        # age_range = attrs.get("age_range")
         product_id = attrs.get("product_id")
         lab = attrs.get("lab_id")
         doctor = attrs.get("doctor_id")
         test_ids = attrs.get("test_ids")
         procedures_ids = attrs.get("procedures_ids")
-        # if age_range and age_range[0] > age_range[1]:
-        #     raise serializers.ValidationError("Invalid Age Range")
         if product_id:
             if product_id == Order.DOCTOR_PRODUCT_ID and lab:
                 raise serializers.ValidationError("Invalid product id for lab")
@@ -102,10 +92,10 @@ class UserSpecificCouponSerializer(CouponListSerializer):
         codes = attrs.get("coupon_code")
         deal_price=attrs.get("deal_price")
         lab = attrs.get("lab")
-        tests = attrs.get("tests")
+        tests = attrs.get("tests", [])
         doctor = attrs.get("doctor")
         hospital = attrs.get("hospital")
-        procedures = attrs.get("procedures")
+        procedures = attrs.get("procedures", [])
         product_id = attrs.get("product_id")
 
         if product_id:
@@ -128,8 +118,10 @@ class UserSpecificCouponSerializer(CouponListSerializer):
                 coupons_data = Coupon.objects.filter(id__in=random_coupons.values_list('coupon', flat=True))
         if coupons_data:
             coupons_data = Coupon.objects.filter(code__in=codes) | coupons_data
-        else:
+        elif Coupon.objects.filter(code__in=codes).exists():
             coupons_data = Coupon.objects.filter(code__in=codes)
+        else:
+            raise serializers.ValidationError("Unknown Coupon Code")
         attrs["coupons_data"] = coupons_data
 
         if deal_price:
@@ -162,12 +154,19 @@ class UserSpecificCouponSerializer(CouponListSerializer):
                                                        product_id=Order.LAB_PRODUCT_ID):
                         raise serializers.ValidationError('Invalid coupon code - ' + str(coupon))
 
-        if doctor:
-            for coupon in coupons_data:
-                obj = OpdAppointment()
-                if not obj.validate_product_coupon(coupon_obj=coupon,
-                                                   doctor=doctor, hospital=hospital, procedures=procedures,
-                                                   product_id=Order.DOCTOR_PRODUCT_ID):
-                    raise serializers.ValidationError('Invalid coupon code - ' + str(coupon))
+        if (doctor or hospital) and not(doctor and hospital):
+            raise serializers.ValidationError("either doctor or hospital is missing")
+        else:
+            if (procedures and not Doctor.objects.filter(id=doctor.id, doctor_clinics__hospital=hospital, doctor_clinics__doctor_clinic_procedures__procedure__in=procedures).exists()):
+                raise serializers.ValidationError("wrong combination of doctor, hospital and procedures")
+            elif not procedures and not Doctor.objects.filter(id=doctor.id, doctor_clinics__hospital=hospital).exists():
+                raise serializers.ValidationError("wrong combination of doctor and hospital")
+            else:
+                for coupon in coupons_data:
+                    obj = OpdAppointment()
+                    if not obj.validate_product_coupon(coupon_obj=coupon,
+                                                       doctor=doctor, hospital=hospital, procedures=procedures,
+                                                       product_id=Order.DOCTOR_PRODUCT_ID):
+                        raise serializers.ValidationError('Invalid coupon code - ' + str(coupon))
 
         return attrs

@@ -607,7 +607,7 @@ class CouponsMixin(object):
         hospital = kwargs.get("hospital")
         procedures = kwargs.get("procedures", [])
 
-        if coupon_obj.lab and coupon_obj.lab != lab:
+        if coupon_obj.lab and (not lab or coupon_obj.lab != lab):
             return False
 
         if coupon_obj.lab_network and (not lab or lab.network!=coupon_obj.lab_network):
@@ -639,6 +639,12 @@ class CouponsMixin(object):
                 return False
             if (hospital and re.search(hospital.city, coupon_obj.cities, re.IGNORECASE)) or not hospital:
                 return False
+
+        if coupon_obj.doctors.exists() and (not doctor or doctor not in coupon_obj.doctors.all()):
+            return False
+
+        if coupon_obj.hospitals.exists() and (not hospital or hospital not in coupon_obj.hospitals.all()):
+            return False
 
         if coupon_obj.procedures.exists():
             if procedures:

@@ -147,8 +147,8 @@ class ProcedureCategoryMapping(models.Model):
 
 
 class DoctorClinicProcedure(auth_model.TimeStampedModel):
-    procedure = models.ForeignKey(Procedure, on_delete=models.CASCADE)
-    doctor_clinic = models.ForeignKey(DoctorClinic, on_delete=models.CASCADE)
+    procedure = models.ForeignKey(Procedure, on_delete=models.CASCADE, related_name="doctor_clinics_from_procedure")
+    doctor_clinic = models.ForeignKey(DoctorClinic, on_delete=models.CASCADE, related_name="procedures_from_doctor_clinic")
     mrp = models.IntegerField(default=0)
     agreed_price = models.IntegerField(default=0)
     deal_price = models.IntegerField(default=0)
