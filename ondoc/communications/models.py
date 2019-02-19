@@ -591,7 +591,7 @@ class OpdNotification(Notification):
         token = AgentToken.objects.create_token(user=self.appointment.user)
         opd_appointment_complete_url = settings.BASE_URL + "/opd/appointment/{}?token={}&complete=true".format(self.appointment.id, token)
         opd_appointment_feedback_url = settings.BASE_URL + "/opd/appointment/{}?token={}".format(self.appointment.id, token)
-        reschdule_appointment_bypass_url = settings.BASE_URL + "/opd/doctor/{}/{}/book?reschedule={}&login=bypass".format(self.appointment.doctor.id, self.appointment.hospital.id, self.appointment.id, token)
+        reschdule_appointment_bypass_url = settings.BASE_URL + "/opd/doctor/{}/{}/book?reschedule={}&token={}".format(self.appointment.doctor.id, self.appointment.hospital.id, self.appointment.id, token)
         context = {
             "doctor_name": doctor_name,
             "patient_name": patient_name,
