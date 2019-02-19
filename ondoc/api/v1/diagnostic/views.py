@@ -194,7 +194,7 @@ class LabList(viewsets.ReadOnlyModelViewSet):
         min_distance = min_distance*1000 if min_distance is not None else 0
         lab_tests_with_categories = LabTestCategoryMapping.objects.filter(parent_category__isnull=False).values_list(
             'lab_test', flat=True).distinct()
-        all_packages_in_network_labs = LabTest.objects.prefetch_related('test', Prefetch('categories',
+        all_packages_in_network_labs = LabTest.objects.prefetch_related('test','test__recommended_categories','test__parameter', Prefetch('categories',
                                                                                          queryset=LabTestCategory.objects.filter().order_by(
                                                                                              '-priority'))).filter(
             enable_for_retail=True,
@@ -292,9 +292,11 @@ class LabList(viewsets.ReadOnlyModelViewSet):
         lab_data = Lab.objects.prefetch_related('rating', 'lab_documents', 'lab_timings', 'network',
                                                 'home_collection_charges').annotate(
             avg_rating=Avg('rating__ratings')).in_bulk(lab_ids)
+        category_detail = LabTest.objects.filter(is_package=True).prefetch_related('test__recommended_categories', 'test__parameter').first().\
+            test.values('recommended_categories__name').annotate(dcount=Count('parameter')).all()
         serializer = CustomLabTestPackageSerializer(all_packages, many=True,
                                                     context={'entity_url_dict': entity_url_dict, 'lab_data': lab_data,
-                                                             'request': request})
+                                                             'request': request, 'category_detail': category_detail})
         category_queryset = LabTestCategory.objects.filter(is_package_category=True, is_live=True)
         category_result = []
         for category in category_queryset:
@@ -835,13 +837,22 @@ class LabList(viewsets.ReadOnlyModelViewSet):
         for obj in labs:
             temp_var[obj.id] = obj
             tests[obj.id] = list()
+            res = []
             if test_ids and obj.selected_group and obj.selected_group.selected_tests:
                 for test in obj.selected_group.selected_tests:
                     if test.custom_deal_price:
                         deal_price=test.custom_deal_price
                     else:
                         deal_price=test.computed_deal_price
-                    tests[obj.id].append({"id": test.test_id, "name": test.test.name, "deal_price": deal_price, "mrp": test.mrp, "number_of_tests": test.test.number_of_tests, 'categories': test.test.get_all_categories_detail(), "url": test.test.url})
+                    if test.test:
+                        lab_test_obj = test.test
+                        for cal in lab_test_obj.test.all().values('recommended_categories__name').distinct().annotate(dcount=Count('parameter')).all():
+                            if not cal.get('recommended_categories__name') == None:
+                                category = cal.get('recommended_categories__name')
+                                count = cal.get('dcount')
+                                res.append({'category': category, 'count': count})
+                    tests[obj.id].append({"id": test.test_id, "name": test.test.name, "deal_price": deal_price, "mrp": test.mrp, "number_of_tests": test.test.number_of_tests, 'categories': test.test.get_all_categories_detail(),
+                                          "url": test.test.url, "category_details": res})
 
         # day_now = timezone.now().weekday()
         # days_array = [i for i in range(7)]

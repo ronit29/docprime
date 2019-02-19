@@ -1068,12 +1068,14 @@ class CustomLabTestPackageSerializer(serializers.ModelSerializer):
     pickup_available = serializers.SerializerMethodField()
     distance_related_charges = serializers.SerializerMethodField()
     categories = serializers.SerializerMethodField()
+    category_details = serializers.SerializerMethodField()
 
     class Meta:
         model = LabTest
         fields = ('id', 'name', 'lab', 'mrp', 'distance', 'price', 'lab_timing', 'lab_timing_data', 'next_lab_timing',
                   'next_lab_timing_data', 'test_type', 'is_package', 'number_of_tests', 'why', 'pre_test_info', 'is_package',
-                  'pickup_charges', 'pickup_available', 'distance_related_charges', 'priority', 'show_details', 'categories', 'url')
+                  'pickup_charges', 'pickup_available', 'distance_related_charges', 'priority', 'show_details', 'categories', 'url',
+                  'category_details')
 
     def get_lab(self, obj):
         lab_data = self.context.get('lab_data', {})
@@ -1087,6 +1089,29 @@ class CustomLabTestPackageSerializer(serializers.ModelSerializer):
 
     def get_categories(self, obj):
         return obj.get_all_categories_detail()
+
+    def get_category_details(self, obj):
+        category_details = self.context.get('category_detail', [])
+        data = category_details.get('recommended_category__name', None)
+
+
+
+
+
+
+
+
+
+        # test_id = []
+        # if obj:
+        #     res = []
+        #     for tst in obj.prefetch_related('test__recommended_categories', 'test__parameter').test.all().values('recommended_categories__name').distinct().\
+        #             annotate(dcount=Count('parameter')).all():
+        #         if not tst.get('recommended_categories__name') == None:
+        #             category = tst.get('recommended_categories__name')
+        #             count = tst.get('dcount')
+        #             res.append({'category': category, 'count': count})
+        #     test_id.append(res)
 
     def get_distance(self, obj):
         return int(obj.distance.m)
