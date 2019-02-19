@@ -112,7 +112,7 @@ class HospitalNetworkForm(FormCleanMixin):
                        'country': 'req', 'pin_code': 'req', 'hospitalnetworkmanager': 'count',
                        'hospitalnetworkhelpline': 'count', 'hospitalnetworkemail': 'count',
                        'matrix_city': 'req', 'matrix_state': 'req', 'hospitalnetworkmanager_set': 'count',
-                       'matrix_lead_id': 'req'}
+                       'matrix_lead_id': 'value_req'}
 
         # if self.instance.is_billing_enabled:
         #     qc_required.update({
@@ -126,6 +126,9 @@ class HospitalNetworkForm(FormCleanMixin):
                 raise forms.ValidationError("Atleast one entry of "+key+" is required for Quality Check")
             if self.data.get(key+'-TOTAL_FORMS') and value == 'count' and int(self.data.get(key+'-TOTAL_FORMS')) <= 0:
                 raise forms.ValidationError("Atleast one entry of "+key+" is required for Quality Check")
+            if key == 'matrix_lead_id':
+                if hasattr(self.instance, 'matrix_lead_id') and not self.instance.matrix_lead_id:
+                    raise forms.ValidationError("Matrix lead id is required for Quality Check")
 
         number_of_spocs = self.data.get('hospitalnetworkmanager_set-TOTAL_FORMS', '0')
         try:
@@ -199,7 +202,6 @@ class HospitalNetworkAdmin(VersionAdmin, ActionAdmin, QCPemAdmin):
     list_display = ('name', 'welcome_calling_done', 'updated_at', 'data_status', 'list_created_by', 'list_assigned_to')
     list_filter = ('data_status', 'welcome_calling_done', CreatedByFilter)
     search_fields = ['name']
-    readonly_fields = ('associated_hospitals', 'city', 'state', )
     exclude = ('qc_approved_at', 'welcome_calling_done_at', )
     autocomplete_fields = ['matrix_city', 'matrix_state']
     inlines = [
@@ -225,6 +227,12 @@ class HospitalNetworkAdmin(VersionAdmin, ActionAdmin, QCPemAdmin):
             return mark_safe(html)
         else:
             return ''
+
+    def get_readonly_fields(self, request, obj=None):
+        readonly_fields = ('associated_hospitals', 'city', 'state', 'matrix_lead_id',)
+        if request.user.is_member_of(constants['SUPER_QC_GROUP']) or request.user.is_superuser:
+            readonly_fields.remove('matrix_lead_id')
+        return readonly_fields
 
     def get_queryset(self, request):
         qs = super().get_queryset(request)

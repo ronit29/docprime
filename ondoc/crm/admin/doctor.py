@@ -678,7 +678,7 @@ class DoctorForm(FormCleanMixin):
                        # 'practicing_since': 'req',
                        'emails': 'count',
                        'doctor_clinics': 'count', 'languages': 'count',
-                       'doctorpracticespecializations': 'count', 'matrix_lead_id': 'req'}
+                       'doctorpracticespecializations': 'count', 'matrix_lead_id': 'value_req'}
 
         # Q(hospital__is_billing_enabled=False, doctor=self.instance) &&
         # (network is null or network billing is false)
@@ -701,7 +701,9 @@ class DoctorForm(FormCleanMixin):
                         all_hospital_ids.append(int(self.data[key + '-{}-hospital'.format(indx)]))
                     if not Hospital.objects.filter(pk__in=all_hospital_ids, is_live=True).count():
                         raise forms.ValidationError("Atleast one entry of " + key + " should be live for Quality Check")
-
+            if key == 'matrix_lead_id':
+                if hasattr(self.instance, 'matrix_lead_id') and not self.instance.matrix_lead_id:
+                    raise forms.ValidationError("Matrix lead id is required for Quality Check")
 
     def clean_practicing_since(self):
         data = self.cleaned_data['practicing_since']

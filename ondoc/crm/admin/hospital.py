@@ -190,7 +190,7 @@ class HospitalForm(FormCleanMixin):
                        'registration_number': 'req', 'building': 'req', 'locality': 'req',
                        'country': 'req', 'pin_code': 'req', 'hospital_type': 'req', 'network_type': 'req',
                        'matrix_city': 'req', 'matrix_state': 'req',
-                       'authentication-spocdetails-content_type-object_id': 'count', 'matrix_lead_id': 'req'}
+                       'authentication-spocdetails-content_type-object_id': 'count', 'matrix_lead_id': 'value_req'}
 
         # if (not self.instance.network or not self.instance.network.is_billing_enabled) and self.instance.is_billing_enabled:
         #     qc_required.update({
@@ -209,6 +209,9 @@ class HospitalForm(FormCleanMixin):
             if self.data.get(key + '-TOTAL_FORMS') and value == 'count' and int(
                     self.data.get(key + '-TOTAL_FORMS')) <= 0:
                 raise forms.ValidationError("Atleast one entry of " + key + " is required for Quality Check")
+            if key == 'matrix_lead_id':
+                if hasattr(self.instance, 'matrix_lead_id') and not self.instance.matrix_lead_id:
+                    raise forms.ValidationError("Matrix lead id is required for Quality Check")
         if self.cleaned_data['network_type'] == 2 and not self.cleaned_data['network']:
             raise forms.ValidationError("Network cannot be empty for Network Hospital")
 
