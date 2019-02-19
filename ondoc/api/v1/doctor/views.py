@@ -567,7 +567,7 @@ class DoctorProfileUserViewSet(viewsets.GenericViewSet):
         doctor = (models.Doctor.objects
                   .prefetch_related('languages__language',
                                     'doctor_clinics__hospital',
-                                    'doctor_clinics__doctorclinicprocedure_set__procedure__parent_categories_mapping',
+                                    'doctor_clinics__procedures_from_doctor_clinic__procedure__parent_categories_mapping',
                                     'qualifications__qualification',
                                     'qualifications__specialization',
                                     'qualifications__college',
@@ -1054,7 +1054,7 @@ class DoctorListViewSet(viewsets.GenericViewSet):
                                                 "doctor_clinics__hospital",
                                                 "doctorpracticespecializations", "doctorpracticespecializations__specialization",
                                                 "images",
-                                                "doctor_clinics__doctorclinicprocedure_set__procedure__parent_categories_mapping",
+                                                "doctor_clinics__procedures_from_doctor_clinic__procedure__parent_categories_mapping",
                                                 "qualifications__qualification","qualifications__college",
                                                 "qualifications__specialization").order_by(preserved)
 
@@ -1399,7 +1399,7 @@ class DoctorListViewSet(viewsets.GenericViewSet):
         #                                         "doctorpracticespecializations",
         #                                         "doctorpracticespecializations__specialization",
         #                                         "images",
-        #                                         "doctor_clinics__doctorclinicprocedure_set__procedure__parent_categories_mapping")
+        #                                         "doctor_clinics__procedures_from_doctor_clinic__procedure__parent_categories_mapping")
 
         result = doctor_search_helper.prepare_search_response(doctor_search_result, doctor_ids, request)
 
