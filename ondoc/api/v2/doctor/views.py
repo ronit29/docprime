@@ -322,7 +322,8 @@ class DoctorBlockCalendarViewSet(viewsets.GenericViewSet):
 
     def get_queryset(self):
         user = self.request.user
-        return doc_models.DoctorLeave.objects.filter(Q(deleted_at__isnull=True), Q(
+        return doc_models.DoctorLeave.objects.select_related('doctor', 'hospital')\
+                                             .filter(Q(deleted_at__isnull=True), Q(
                                                    Q(doctor__manageable_doctors__user=user,
                                                      doctor__manageable_doctors__entity_type=v1_utils.GenericAdminEntity.DOCTOR,
                                                      doctor__manageable_doctors__is_disabled=False,

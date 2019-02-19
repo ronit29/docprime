@@ -85,6 +85,8 @@ class DoctorLeaveSerializer(serializers.ModelSerializer):
     leave_end_time = serializers.FloatField(read_only=True, source='end_time_in_float')
     doctor_id = serializers.IntegerField(read_only=True)
     hospital_id = serializers.IntegerField(read_only=True)
+    doctor_name = serializers.ReadOnlyField(source='doctor.get_display_name')
+    hospital_name = serializers.ReadOnlyField(source='hospital.name')
 
     class Meta:
         model = doc_models.DoctorLeave
