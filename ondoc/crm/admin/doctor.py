@@ -701,9 +701,9 @@ class DoctorForm(FormCleanMixin):
                         all_hospital_ids.append(int(self.data[key + '-{}-hospital'.format(indx)]))
                     if not Hospital.objects.filter(pk__in=all_hospital_ids, is_live=True).count():
                         raise forms.ValidationError("Atleast one entry of " + key + " should be live for Quality Check")
-            if key == 'matrix_lead_id':
-                if hasattr(self.instance, 'matrix_lead_id') and not self.instance.matrix_lead_id:
-                    raise forms.ValidationError("Matrix lead id is required for Quality Check")
+            if value == 'value_req':
+                if hasattr(self.instance, key) and not getattr(self.instance, key):
+                    raise forms.ValidationError(key + " is required for Quality Check")
 
     def clean_practicing_since(self):
         data = self.cleaned_data['practicing_since']

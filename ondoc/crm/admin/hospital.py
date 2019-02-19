@@ -209,9 +209,9 @@ class HospitalForm(FormCleanMixin):
             if self.data.get(key + '-TOTAL_FORMS') and value == 'count' and int(
                     self.data.get(key + '-TOTAL_FORMS')) <= 0:
                 raise forms.ValidationError("Atleast one entry of " + key + " is required for Quality Check")
-            if key == 'matrix_lead_id':
-                if hasattr(self.instance, 'matrix_lead_id') and not self.instance.matrix_lead_id:
-                    raise forms.ValidationError("Matrix lead id is required for Quality Check")
+            if value == 'value_req':
+                if hasattr(self.instance, key) and not getattr(self.instance, key):
+                    raise forms.ValidationError(key + " is required for Quality Check")
         if self.cleaned_data['network_type'] == 2 and not self.cleaned_data['network']:
             raise forms.ValidationError("Network cannot be empty for Network Hospital")
 
