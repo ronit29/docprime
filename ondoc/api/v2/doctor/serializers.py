@@ -16,7 +16,7 @@ class DoctorBlockCalenderSerializer(serializers.Serializer):
     start_time = serializers.TimeField(required=False)
     end_date = serializers.DateField()
     end_time = serializers.TimeField(required=False)
-    doctor_id = serializers.PrimaryKeyRelatedField(required=False, queryset=doc_models.Doctor.objects.all())
+    doctor_id = serializers.PrimaryKeyRelatedField(queryset=doc_models.Doctor.objects.all())
     hospital_id = serializers.PrimaryKeyRelatedField(required=False, queryset=doc_models.Hospital.objects.all())
 
     def validate(self, attrs):

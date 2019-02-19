@@ -370,29 +370,39 @@ class DoctorBlockCalendarViewSet(viewsets.GenericViewSet):
         serializer = serializers.DoctorLeaveSerializer(queryset, many=True)
         return Response(serializer.data)
 
+    def create_leave_data(self, hospital_id, validated_data, start_time, end_time):
+        return {
+                    "doctor": validated_data.get('doctor_id').id,
+                    "hospital": hospital_id,
+                    "start_time": start_time,
+                    "end_time": end_time,
+                    "start_date": validated_data.get("start_date"),
+                    "end_date": validated_data.get("end_date")
+                }
 
     @transaction.atomic
     def create(self, request, *args, **kwargs):
+        doctor_leave_data = []
         serializer = serializers.DoctorBlockCalenderSerializer(data=request.data, context={"request": request})
         serializer.is_valid(raise_exception=True)
         validated_data = serializer.validated_data
-        doctor_id = validated_data.get("doctor_id").id if validated_data.get("doctor_id") else request.user.doctor.id
+
         hospital_id = validated_data.get("hospital_id").id if validated_data.get("hospital_id") else None
         start_time = validated_data.get("start_time")
+        end_time = validated_data.get("end_time")
+
         if not start_time:
             start_time = self.INTERVAL_MAPPING[validated_data.get("interval")][0]
-        end_time = validated_data.get("end_time")
         if not end_time:
             end_time = self.INTERVAL_MAPPING[validated_data.get("interval")][1]
-        doctor_leave_data = {
-            "doctor": doctor_id,
-            "hospital": hospital_id,
-            "start_time": start_time,
-            "end_time": end_time,
-            "start_date": validated_data.get("start_date"),
-            "end_date": validated_data.get("end_date")
-        }
-        doctor_leave_serializer = serializers.DoctorLeaveSerializer(data=doctor_leave_data)
+        if not hospital_id:
+            assoc_hospitals = validated_data.get('doctor_id').hospitals.all()
+            for hospital in assoc_hospitals:
+                doctor_leave_data.append(self.create_leave_data(hospital.id, validated_data, start_time, end_time))
+        else:
+            doctor_leave_data.append(self.create_leave_data(hospital_id, validated_data, start_time, end_time))
+
+        doctor_leave_serializer = serializers.DoctorLeaveSerializer(data=doctor_leave_data, many=True)
         doctor_leave_serializer.is_valid(raise_exception=True)
         # self.get_queryset().update(deleted_at=timezone.now())        Now user can apply more than one leave
         doctor_leave_serializer.save()
