@@ -1545,7 +1545,10 @@ class OrderViewSet(GenericViewSet):
     def retrieve(self, request, pk):
         user = request.user
         params = request.query_params
+
         from_app = params.get("from_app", False)
+        app_version = params.get("app_version", "1.0")
+
         order_obj = Order.objects.filter(pk=pk, payment_status=Order.PAYMENT_PENDING).first()
         if not order_obj.validate_user(user):
             return Response({"status": 0}, status.HTTP_404_NOT_FOUND)
@@ -1557,7 +1560,7 @@ class OrderViewSet(GenericViewSet):
             return Response(resp)
 
         # remove all cart_items => Workaround TODO: remove later
-        if from_app:
+        if from_app and app_version and app_version <= "1.0":
             from ondoc.cart.models import Cart
             Cart.remove_all(user)
 
