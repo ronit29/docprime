@@ -292,11 +292,9 @@ class LabList(viewsets.ReadOnlyModelViewSet):
         lab_data = Lab.objects.prefetch_related('rating', 'lab_documents', 'lab_timings', 'network',
                                                 'home_collection_charges').annotate(
             avg_rating=Avg('rating__ratings')).in_bulk(lab_ids)
-        category_detail = LabTest.objects.filter(is_package=True).prefetch_related('test__recommended_categories', 'test__parameter').first().\
-            test.values('recommended_categories__name').annotate(dcount=Count('parameter')).all()
         serializer = CustomLabTestPackageSerializer(all_packages, many=True,
                                                     context={'entity_url_dict': entity_url_dict, 'lab_data': lab_data,
-                                                             'request': request, 'category_detail': category_detail})
+                                                             'request': request})
         category_queryset = LabTestCategory.objects.filter(is_package_category=True, is_live=True)
         category_result = []
         for category in category_queryset:

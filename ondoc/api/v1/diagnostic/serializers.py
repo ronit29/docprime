@@ -1091,27 +1091,17 @@ class CustomLabTestPackageSerializer(serializers.ModelSerializer):
         return obj.get_all_categories_detail()
 
     def get_category_details(self, obj):
-        category_details = self.context.get('category_detail', [])
-        data = category_details.get('recommended_category__name', None)
-
-
-
-
-
-
-
-
-
-        # test_id = []
-        # if obj:
-        #     res = []
-        #     for tst in obj.prefetch_related('test__recommended_categories', 'test__parameter').test.all().values('recommended_categories__name').distinct().\
-        #             annotate(dcount=Count('parameter')).all():
-        #         if not tst.get('recommended_categories__name') == None:
-        #             category = tst.get('recommended_categories__name')
-        #             count = tst.get('dcount')
-        #             res.append({'category': category, 'count': count})
-        #     test_id.append(res)
+        test_id = []
+        if obj:
+            res = []
+            for tst in obj.test.all().values('recommended_categories__name').distinct().\
+                    annotate(dcount=Count('parameter')).all():
+                if not tst.get('recommended_categories__name') == None:
+                    category = tst.get('recommended_categories__name')
+                    count = tst.get('dcount')
+                    res.append({'category': category, 'count': count})
+            test_id.append(res)
+        return test_id
 
     def get_distance(self, obj):
         return int(obj.distance.m)
