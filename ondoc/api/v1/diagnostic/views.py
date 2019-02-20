@@ -836,6 +836,7 @@ class LabList(viewsets.ReadOnlyModelViewSet):
             temp_var[obj.id] = obj
             tests[obj.id] = list()
             res = []
+            ret_data = list()
             if test_ids and obj.selected_group and obj.selected_group.selected_tests:
                 for test in obj.selected_group.selected_tests:
                     if test.custom_deal_price:
@@ -850,12 +851,17 @@ class LabList(viewsets.ReadOnlyModelViewSet):
                                 count = cal.get('dcount')
                                 res.append({'category': category, 'count': count})
                     tests[obj.id].append({"id": test.test_id, "name": test.test.name, "deal_price": deal_price, "mrp": test.mrp, "number_of_tests": test.test.number_of_tests, 'categories': test.test.get_all_categories_detail(),
-                                          "url": test.test.url, "category_details": res})
+                                          "url": test.test.url, "category_details": res, "parameters": test.test.parameter.all(), "count": test.test.parameter.all().count()})
+                    # for sample in test.test.parameter.all():
+                    #     param_list = list()
+                    #     param_list.append({'parameters': sample})
+                    #     ret_data.append({"parameters": param_list})
+                    #     return ret_data
 
         # day_now = timezone.now().weekday()
         # days_array = [i for i in range(7)]
         # rotated_days_array = days_array[day_now:] + days_array[:day_now]
-        #lab_network = dict()
+        #lab_network = dict(
         for row in queryset:
 
             # lab_timing = list()

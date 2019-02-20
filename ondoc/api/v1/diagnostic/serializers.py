@@ -1069,13 +1069,14 @@ class CustomLabTestPackageSerializer(serializers.ModelSerializer):
     distance_related_charges = serializers.SerializerMethodField()
     categories = serializers.SerializerMethodField()
     category_details = serializers.SerializerMethodField()
+    tests = serializers.SerializerMethodField()
 
     class Meta:
         model = LabTest
         fields = ('id', 'name', 'lab', 'mrp', 'distance', 'price', 'lab_timing', 'lab_timing_data', 'next_lab_timing',
                   'next_lab_timing_data', 'test_type', 'is_package', 'number_of_tests', 'why', 'pre_test_info', 'is_package',
                   'pickup_charges', 'pickup_available', 'distance_related_charges', 'priority', 'show_details', 'categories', 'url',
-                  'category_details')
+                  'category_details', 'tests')
 
     def get_lab(self, obj):
         lab_data = self.context.get('lab_data', {})
@@ -1086,6 +1087,19 @@ class CustomLabTestPackageSerializer(serializers.ModelSerializer):
             return CustomPackageLabSerializer(data,
                                               context={'entity_url_dict': entity_url_dict, 'request': request}).data
         return None
+
+    def get_tests(self, obj):
+        ret_data = list()
+        if obj.is_package == True:
+            if obj.parameter.all():
+                param_list = list()
+                for par_obj in obj.parameter.all():
+                    name = par_obj.name
+                    id = par_obj.id
+                    param_list.append({'name': name, 'id': id})
+                ret_data.append({'parameters': param_list, 'count': obj.parameter.all().count()})
+
+        return ret_data
 
     def get_categories(self, obj):
         return obj.get_all_categories_detail()
