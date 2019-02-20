@@ -656,7 +656,7 @@ class DoctorProfileUserViewSet(viewsets.GenericViewSet):
                         about_doctor += ' ' + person + ' is located in ' + hospital_obj.city
                     if hospital_obj.state:
                         about_doctor += ' ' + hospital_obj.state
-                    about_doctor += '. '
+                    about_doctor += '.\n '
 
             if doctor.name and hospital and hospital_obj and hospital_obj.city and hospital_obj.state:
                 about_doctor += doctor.name
@@ -690,7 +690,7 @@ class DoctorProfileUserViewSet(viewsets.GenericViewSet):
                         about_doctor += person + qual_str[count] + person_pronoun + ' ' + data.qualification.name + ' in the year ' \
                                         + str(data.passing_year) + ' from ' + data.college.name + '. '
                         count = count + 1
-                about_doctor += doctor.name + ' is an experienced, skilled, and awarded doctor in ' + person_pronoun + ' field of specialization. '
+                about_doctor += '\n' + doctor.name + ' is an experienced, skilled, and awarded doctor in ' + person_pronoun + ' field of specialization. '
                 doc_awards_obj = doctor.awards.all()
                 for data in doc_awards_obj:
                     awards.append(data.name)
@@ -701,13 +701,18 @@ class DoctorProfileUserViewSet(viewsets.GenericViewSet):
 
             doc_experience_details = response_data.get('experiences')
             if doc_experience_details:
-                about_doctor += person + ' has worked '
-                exp_list = list()
-                for data in doc_experience_details:
-                   if data.get('hospital') and data.get('start_year') and data.get('end_year'):
-                        exp_list.append('at ' + data.get('hospital') + ' from ' + str(data.get('start_year')) + '-' + str(data.get('end_year')))
-                about_doctor += ', '.join(exp_list)
-            response_data['about'] = about_doctor
+                if doc_experience_details[0].get('hospital') and doc_experience_details[0].get('start_year') and doc_experience_details[0].get('end_year'):
+                    about_doctor += '\n' + person + ' worked at ' + doc_experience_details[0].get('hospital') + ' from ' + str(doc_experience_details[0].get('start_year')) + ' to ' + str(doc_experience_details[0].get('end_year')) +', '
+                if len(doc_experience_details)>1:
+                    exp_list = list()
+                    for data in doc_experience_details[1:-1]:
+                       if data.get('hospital') and data.get('start_year') and data.get('end_year'):
+                            exp_list.append(' from ' + str(data.get('start_year')) + ' to ' + str(data.get('end_year')) + ' with ' + data.get('hospital') )
+                    about_doctor += ','.join(exp_list)
+                    if doc_experience_details[-1] and doc_experience_details[-1].get('hospital') and doc_experience_details[-1].get('start_year') and doc_experience_details[-1].get('end_year'):
+                        about_doctor += ' and from ' + str(doc_experience_details[-1].get('start_year')) + ' to ' + str(doc_experience_details[-1].get('end_year')) + ' at ' + doc_experience_details[-1].get('hospital')
+
+                    response_data['about'] = about_doctor
         if entity:
             response_data['url'] = entity.url
             if entity.breadcrumb:
