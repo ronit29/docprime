@@ -702,14 +702,14 @@ class DoctorProfileUserViewSet(viewsets.GenericViewSet):
             doc_experience_details = response_data.get('experiences')
             if doc_experience_details:
                 if doc_experience_details[0].get('hospital') and doc_experience_details[0].get('start_year') and doc_experience_details[0].get('end_year'):
-                    about_doctor += '\n' + person + ' worked at ' + doc_experience_details[0].get('hospital') + ' from ' + str(doc_experience_details[0].get('start_year')) + ' to ' + str(doc_experience_details[0].get('end_year')) +', '
+                    about_doctor += '\n' + person + ' worked at ' + doc_experience_details[0].get('hospital') + ' from ' + str(doc_experience_details[0].get('start_year')) + ' to ' + str(doc_experience_details[0].get('end_year'))
                 if len(doc_experience_details)>1:
                     exp_list = list()
                     for data in doc_experience_details[1:-1]:
                        if data.get('hospital') and data.get('start_year') and data.get('end_year'):
                             exp_list.append(' from ' + str(data.get('start_year')) + ' to ' + str(data.get('end_year')) + ' with ' + data.get('hospital') )
                     if exp_list:
-                        about_doctor += ','.join(exp_list)
+                        about_doctor += ', '+','.join(exp_list)
                     if doc_experience_details[-1] and doc_experience_details[-1].get('hospital') and doc_experience_details[-1].get('start_year') and doc_experience_details[-1].get('end_year'):
                         about_doctor += ' and from ' + str(doc_experience_details[-1].get('start_year')) + ' to ' + str(doc_experience_details[-1].get('end_year')) + ' at ' + doc_experience_details[-1].get('hospital')
 
