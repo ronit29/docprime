@@ -479,6 +479,7 @@ class DoctorSearchHelper:
                 "experience_years": doctor.experience_years(),
                 #"experiences": serializers.DoctorExperienceSerializer(doctor.experiences.all(), many=True).data,
                 "qualifications": serializers.DoctorQualificationSerializer(doctor.qualifications.all(), many=True).data,
+                "average rating": doctor.avg_rating if doctor.avg_rating else doctor.get_avg_rating().get('avg_rating'),
                 # "general_specialization": serializers.DoctorPracticeSpecializationSerializer(
                 #     doctor.doctorpracticespecializations.all(),
                 #     many=True).data,
