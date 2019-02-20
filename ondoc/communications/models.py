@@ -626,6 +626,7 @@ class OpdNotification(Notification):
             email_notification.send(all_receivers.get('email_receivers', []))
         elif notification_type == NotificationAction.OPD_OTP_BEFORE_APPOINTMENT or \
                 notification_type == NotificationAction.OPD_CONFIRMATION_CHECK_AFTER_APPOINTMENT or \
+                notification_type == NotificationAction.OPD_CONFIRMATION_SECOND_CHECK_AFTER_APPOINTMENT or \
                 notification_type == NotificationAction.OPD_FEEDBACK_AFTER_APPOINTMENT:
             sms_notification = SMSNotification(notification_type, context)
             sms_notification.send(all_receivers.get('sms_receivers', []))
@@ -654,7 +655,10 @@ class OpdNotification(Notification):
                                  NotificationAction.APPOINTMENT_RESCHEDULED_BY_DOCTOR,
                                  NotificationAction.PRESCRIPTION_UPLOADED,
                                  NotificationAction.DOCTOR_INVOICE,
-                                 NotificationAction.OPD_OTP_BEFORE_APPOINTMENT]:
+                                 NotificationAction.OPD_OTP_BEFORE_APPOINTMENT,
+                                 NotificationAction.OPD_CONFIRMATION_CHECK_AFTER_APPOINTMENT,
+                                 NotificationAction.OPD_CONFIRMATION_SECOND_CHECK_AFTER_APPOINTMENT,
+                                 NotificationAction.OPD_FEEDBACK_AFTER_APPOINTMENT]:
             receivers.append(instance.user)
         elif notification_type in [NotificationAction.APPOINTMENT_RESCHEDULED_BY_PATIENT,
                                    NotificationAction.APPOINTMENT_BOOKED,
