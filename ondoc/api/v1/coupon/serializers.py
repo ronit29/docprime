@@ -157,7 +157,7 @@ class UserSpecificCouponSerializer(CouponListSerializer):
         if (doctor or hospital) and not(doctor and hospital):
             raise serializers.ValidationError("either doctor or hospital is missing")
         else:
-            if (procedures and not Doctor.objects.filter(id=doctor.id, doctor_clinics__hospital=hospital, doctor_clinics__doctor_clinic_procedures__procedure__in=procedures).exists()):
+            if (procedures and not Doctor.objects.filter(id=doctor.id, doctor_clinics__hospital=hospital, doctor_clinics__procedures_from_doctor_clinic__procedure__in=procedures).exists()):
                 raise serializers.ValidationError("wrong combination of doctor, hospital and procedures")
             elif not procedures and not Doctor.objects.filter(id=doctor.id, doctor_clinics__hospital=hospital).exists():
                 raise serializers.ValidationError("wrong combination of doctor and hospital")
