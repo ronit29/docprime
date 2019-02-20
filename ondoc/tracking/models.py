@@ -4,7 +4,7 @@ import uuid
 from ondoc.authentication import models as auth_models
 from django.contrib.postgres.fields import JSONField
 from django.conf import settings
-
+import datetime
 
 class TrackingVisitor(auth_models.TimeStampedModel):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
@@ -67,7 +67,7 @@ class TrackingEvent(auth_models.TimeStampedModel):
         event_name = kwargs.get('event_name', None)
         visit_id = kwargs.get('visit_id', None)
         user = kwargs.get('user', None)
-        triggered_at = kwargs.get('triggered_at', None)
+        triggered_at = kwargs.get('triggered_at', datetime.datetime.utcnow())
         if event_name and visit_id:
             event = cls(name=event_name, data=data, visit_id=visit_id, user=user, triggered_at=triggered_at)
             event.save()
