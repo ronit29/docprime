@@ -216,6 +216,7 @@ class Lab(TimeStampedModel, CreatedByModel, QCModel, SearchKey):
     order_priority = models.PositiveIntegerField(blank=True, null=True, default=0)
     merchant = GenericRelation(auth_model.AssociatedMerchant)
     merchant_payout = GenericRelation(account_model.MerchantPayout)
+    lab_priority = models.PositiveIntegerField(blank=True, null=True, default=1)
 
     def __str__(self):
         return self.name

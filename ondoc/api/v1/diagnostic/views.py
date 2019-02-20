@@ -206,7 +206,7 @@ class LabList(viewsets.ReadOnlyModelViewSet):
                 Point(float(long),
                       float(lat)),
                 D(m=max_distance))). annotate(
-            priority_score=F('availablelabs__lab_pricing_group__labs__order_priority') * F('priority')).annotate(
+            priority_score=F('availablelabs__lab_pricing_group__labs__lab_priority') * F('priority')).annotate(
             distance=Distance('availablelabs__lab_pricing_group__labs__location', pnt)).annotate(
             lab=F('availablelabs__lab_pricing_group__labs'), mrp=F('availablelabs__mrp'),
             price=Case(
@@ -233,7 +233,7 @@ class LabList(viewsets.ReadOnlyModelViewSet):
                       float(lat)),
                 D(
                     m=max_distance))).annotate(
-            priority_score=F('availablelabs__lab_pricing_group__labs__order_priority') * F('priority')).annotate(
+            priority_score=F('availablelabs__lab_pricing_group__labs__lab_priority') * F('priority')).annotate(
             distance=Distance('availablelabs__lab_pricing_group__labs__location', pnt)).annotate(
             lab=F('availablelabs__lab_pricing_group__labs'), mrp=F('availablelabs__mrp'),
             price=Case(
