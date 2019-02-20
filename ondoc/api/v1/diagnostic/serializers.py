@@ -1119,8 +1119,8 @@ class CustomLabTestPackageSerializer(serializers.ModelSerializer):
                 if not tst.get('recommended_categories__name') == None:
                     category = tst.get('recommended_categories__name')
                     count = tst.get('dcount')
-                    res.append({'category': category, 'count': count})
-            test_id.append(res)
+                    test_id.append({'category': category, 'count': count})
+            # test_id.append(res)
         return test_id
 
     def get_distance(self, obj):
