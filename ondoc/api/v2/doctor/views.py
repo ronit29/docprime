@@ -5,6 +5,7 @@ from ondoc.authentication import models as auth_models
 from django.utils.safestring import mark_safe
 from . import serializers
 from ondoc.api.v1 import utils as v1_utils
+from ondoc.sms.api import send_otp
 from django.shortcuts import get_object_or_404
 from rest_framework import viewsets
 from rest_framework.response import Response
@@ -421,8 +422,8 @@ class DoctorAddViweset(viewsets.GenericViewSet):
 
 class DoctorDataViewset(viewsets.GenericViewSet):
 
-    # authentication_classes = (JWTAuthentication,)
-    # permission_classes = (IsAuthenticated, DoctorPermission,)
+    authentication_classes = (JWTAuthentication,)
+    permission_classes = (IsAuthenticated, DoctorPermission,)
 
     def get_practice_specializations(self, request, *args, **kwargs):
         qs = doc_models.PracticeSpecialization.objects.all()
@@ -453,3 +454,43 @@ class DoctorDataViewset(viewsets.GenericViewSet):
         qs = doc_models.Specialization.objects.all()
         serializer = serializers.SpecializationSerializer(qs, many=True)
         return Response(serializer.data)
+
+
+class ProviderSignupOtpViewset(viewsets.GenericViewSet):
+
+    def otp_generate(self, request, *args, **kwargs):
+        response = {'opt_generated': False}
+        serializer = serializers.ProviderSignupLeadOtpSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        valid_data = serializer.validated_data
+        if valid_data['phone_number']:
+            phone_number = valid_data['phone_number']
+            retry_send = request.query_params.get('retry', False)
+            send_otp("OTP for login is {}", phone_number, retry_send)
+            response = {'opt_generated': True}
+        return Response(response)
+
+    def otp_verification(self, request, *args, **kwargs):
+        serializer = serializers.ProviderSignupOtpVerificationSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        valid_data = serializer.validated_data
+        phone_number = valid_data['phone_number']
+        user = User.objects.filter(phone_number=phone_number, user_type=User.DOCTOR).first()
+
+        if not user:
+            user = User.objects.create(phone_number=phone_number, is_phone_number_verified=True,
+                                       user_type=User.DOCTOR)
+
+        auth_models.GenericAdmin.update_user_admin(phone_number)
+        auth_models.GenericLabAdmin.update_user_lab_admin(phone_number)
+        # self.update_live_status(phone_number)
+
+        token_object = JWTAuthentication.generate_token(user)
+        auth_models.OtpVerifications.objects.filter(phone_number=phone_number).update(is_expired=True)
+
+        response = {
+            "login": 1,
+            "token": token_object['token'],
+            "expiration_time": token_object['payload']['exp']
+        }
+        return Response(response)

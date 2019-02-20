@@ -1,6 +1,5 @@
 from django.urls import path
 from . import views
-
 urlpatterns = [
     path('billing_entities', views.DoctorBillingViewSet.as_view({'get': 'list'}), name='billing_entities'),
     path('profile', views.DoctorProfileView.as_view({'get': 'retrieve'}), name='doctor-profile'),
@@ -12,5 +11,8 @@ urlpatterns = [
     path('languages', views.DoctorDataViewset.as_view({'get': 'get_languages'}), name='get-languages'),
     path('medical-services', views.DoctorDataViewset.as_view({'get': 'get_doctor_medical_services'}), name='get-doctor-medical-services'),
     path('procedures', views.DoctorDataViewset.as_view({'get': 'get_procedures'}), name='get-procedures'),
-    path('specializations', views.DoctorDataViewset.as_view({'get': 'get_specializations'}), name='get-specializations')
+    path('specializations', views.DoctorDataViewset.as_view({'get': 'get_specializations'}), name='get-specializations'),
+    path('otp-generate', views.ProviderSignupOtpViewset.as_view({'post': 'otp_generate'}), name='otp-generate'),
+    path('otp-verification', views.ProviderSignupOtpViewset.as_view({'post': 'otp_verification'}), name='otp-verification')
 ]
+

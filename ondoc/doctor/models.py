@@ -2465,3 +2465,22 @@ class UploadDoctorData(auth_model.TimeStampedModel):
             super().save(*args, **kwargs)
             upload_doctor_data.apply_async((self.id,), countdown=1)
 
+
+class ProviderSignupLead(auth_model.TimeStampedModel):
+    DOCTOR = 1
+    HOSPITAL_ADMIN = 2
+    TYPE_CHOICES = ((DOCTOR, "Doctor"), (HOSPITAL_ADMIN, "Hospital Admin"),)
+
+    user = models.ForeignKey(auth_model.User, on_delete=models.CASCADE)
+    name = models.CharField(max_length=200)
+    phone_number = models.BigIntegerField()
+    email = models.EmailField()
+    type = models.IntegerField(choices=TYPE_CHOICES)
+    is_docprime = models.BooleanField(default=False)
+
+    def __str__(self):
+        return self.name
+
+    class Meta:
+        db_table = "provider_signup_lead"
+

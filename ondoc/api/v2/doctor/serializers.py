@@ -2,6 +2,9 @@ from rest_framework import serializers
 from django.contrib.auth import get_user_model
 import logging
 from django.conf import settings
+from ondoc.authentication.models import (OtpVerifications, User, UserProfile, Notification, NotificationEndpoint,
+                                         DoctorNumber, Address, GenericAdmin, UserSecretKey,
+                                         UserPermission, Address, GenericAdmin, GenericLabAdmin)
 from ondoc.doctor import models as doc_models
 from ondoc.procedure.models import Procedure
 from ondoc.api.v1.doctor import serializers as v1_serializers
@@ -128,3 +131,35 @@ class SpecializationSerializer(serializers.ModelSerializer):
     class Meta:
         model = doc_models.Specialization
         fields = '__all__'
+
+
+class ProviderSignupLeadOtpSerializer(serializers.Serializer):
+    phone_number = serializers.IntegerField(min_value=5000000000,max_value=9999999999)
+
+    def validate(self, attrs):
+        admin_exists = lab_admin_exists = False
+        if GenericAdmin.objects.filter(phone_number=attrs['phone_number'], is_disabled=False).exists():
+            admin_exists = True
+        if GenericLabAdmin.objects.filter(phone_number=attrs['phone_number'], is_disabled=False).exists():
+            lab_admin_exists = True
+        if admin_exists or lab_admin_exists:
+            raise serializers.ValidationError("admin for this phone number already exists")
+        return attrs
+
+
+class ProviderSignupOtpVerificationSerializer(serializers.Serializer):
+    phone_number = serializers.IntegerField(min_value=5000000000,max_value=9999999999)
+    otp = serializers.IntegerField(min_value=100000,max_value=999999)
+
+    def validate(self, attrs):
+        if not OtpVerifications.objects.filter(phone_number=attrs['phone_number'], code=attrs['otp'],
+                                               is_expired=False).exists():
+            raise serializers.ValidationError("Invalid OTP")
+        admin_exists = lab_admin_exists = False
+        if GenericAdmin.objects.filter(phone_number=attrs['phone_number'], is_disabled=False).exists():
+            admin_exists = True
+        if GenericLabAdmin.objects.filter(phone_number=attrs['phone_number'], is_disabled=False).exists():
+            lab_admin_exists = True
+        if admin_exists or lab_admin_exists:
+            raise serializers.ValidationError("admin for this phone number already exists")
+        return attrs
