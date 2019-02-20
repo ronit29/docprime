@@ -616,7 +616,7 @@ class DoctorProfileUserViewSet(viewsets.GenericViewSet):
         if not doctor.about:
             about_doctor = None
             person = None
-            person_pronoun = None
+            his_her = None
             doctor_assoc_list = list()
             members = None
             awards = list()
@@ -624,10 +624,10 @@ class DoctorProfileUserViewSet(viewsets.GenericViewSet):
             specializations = list()
             if doctor.gender == 'f':
                 person = 'She'
-                person_pronoun = 'her'
+                his_her = 'her'
             elif doctor.gender == 'm':
                 person = 'He'
-                person_pronoun = 'his'
+                his_her = 'his'
             doc_spec = None
             startswith = None
             doc_clinics_obj = doctor.doctor_clinics.all().filter(hospital_id=hospital.get('hospital_id'))
@@ -674,26 +674,26 @@ class DoctorProfileUserViewSet(viewsets.GenericViewSet):
                 if doctor_assoc:
                     for data in doctor_assoc:
                         doctor_assoc_list.append(data.name)
-
-                members = 'and'.join(doctor_assoc_list)
+                    members = 'and'.join(doctor_assoc_list)
                 if members:
                     about_doctor += doctor.name + ' is an esteemed member of ' + members + '.\n'
 
                 doctor_qual = doctor.qualifications.all()
-
-                count = 0
-                for data in doctor_qual:
-                    if count>2:
-                        count =2
-                    qual_str = [' pursued ', ' completed ', ' has also done ']
-                    if data.qualification and data.qualification.name and data.college and data.college.name:
-                        about_doctor += person + qual_str[count] + person_pronoun + ' ' + data.qualification.name + ' in the year ' \
-                                        + str(data.passing_year) + ' from ' + data.college.name + '. '
-                        count = count + 1
-                about_doctor += '\n' + doctor.name + ' is an experienced, skilled, and awarded doctor in ' + person_pronoun + ' field of specialization. '
+                if doctor_qual:
+                    count = 0
+                    for data in doctor_qual:
+                        if count>2:
+                            count =2
+                        qual_str = [' pursued ', ' completed ', ' has also done ']
+                        if data.qualification and data.qualification.name and data.college and data.college.name:
+                            about_doctor += person + qual_str[count] + his_her + ' ' + data.qualification.name + ' in the year ' \
+                                            + str(data.passing_year) + ' from ' + data.college.name + '. '
+                            count = count + 1
+                about_doctor += '\n' + doctor.name + ' is an experienced, skilled, and awarded doctor in ' + his_her + ' field of specialization. '
                 doc_awards_obj = doctor.awards.all()
-                for data in doc_awards_obj:
-                    awards.append(data.name)
+                if doc_awards_obj:
+                    for data in doc_awards_obj:
+                        awards.append(data.name)
 
                 if awards:
                     doc_awards = ','.join(awards)
@@ -708,7 +708,8 @@ class DoctorProfileUserViewSet(viewsets.GenericViewSet):
                     for data in doc_experience_details[1:-1]:
                        if data.get('hospital') and data.get('start_year') and data.get('end_year'):
                             exp_list.append(' from ' + str(data.get('start_year')) + ' to ' + str(data.get('end_year')) + ' with ' + data.get('hospital') )
-                    about_doctor += ','.join(exp_list)
+                    if exp_list:
+                        about_doctor += ','.join(exp_list)
                     if doc_experience_details[-1] and doc_experience_details[-1].get('hospital') and doc_experience_details[-1].get('start_year') and doc_experience_details[-1].get('end_year'):
                         about_doctor += ' and from ' + str(doc_experience_details[-1].get('start_year')) + ' to ' + str(doc_experience_details[-1].get('end_year')) + ' at ' + doc_experience_details[-1].get('hospital')
 

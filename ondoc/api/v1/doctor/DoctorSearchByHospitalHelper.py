@@ -244,7 +244,7 @@ class DoctorSearchByHospitalHelper:
                            "ROW_NUMBER () OVER (ORDER BY {order_by_field}) order_rank " \
                            "FROM (SELECT " \
                            " *, {rank_part} " \
-                           "FROM (SELECT city, locality, hospital_name, name, deal_price, mrp, distance, procedure_deal_price," \
+                           "FROM (SELECT city, building, locality, hospital_name, name, deal_price, mrp, distance, procedure_deal_price," \
                            "is_live, is_license_verified, " \
                            "doctor_id, practicing_since, doctor_clinic_id, doctor_clinic_timing_id, procedure_id," \
                            "enabled_for_online_booking, is_license_verified, priority, " \
@@ -309,7 +309,7 @@ class DoctorSearchByHospitalHelper:
 
             query_string = "SELECT * ," \
                            " ROW_NUMBER () OVER (ORDER BY {order_by_field}) order_rank " \
-                           "FROM (select d.name, h.name hospital_name, d.is_license_verified, dct.mrp, dct.deal_price, " \
+                           "FROM (select d.name, h.building, h.name hospital_name, d.is_license_verified, dct.mrp, dct.deal_price, " \
                            " h.sublocality, h.locality, h.city, " \
                            "{rank_part}, " \
                            "St_distance(St_setsrid(St_point((%(longitude)s), (%(latitude)s)), 4326), h.location) distance, " \
@@ -388,6 +388,34 @@ class DoctorSearchByHospitalHelper:
                 # return doctor_hospital.deal_price
         return None
 
+    def get_hos_address(self,result):
+        address = []
+
+        if result.get('building'):
+            address.append(self.ad_str(result.get('building')))
+        if result.get('sublocality'):
+            address.append(self.ad_str(result.get('sublocality')))
+        if result.get('locality'):
+            address.append(self.ad_str(result.get('locality')))
+        if result.get('city'):
+            address.append(self.ad_str(result.get('locality')))
+        # if self.state:
+        #     address.append(self.ad_str(self.state))
+        # if self.country:
+        #     address.append(self.ad_str(self.country))
+        result = []
+        ad_uinq = set()
+        for ad in address:
+            ad_lc = ad.lower()
+            if ad_lc not in ad_uinq:
+                ad_uinq.add(ad_lc)
+                result.append(ad)
+
+        return ", ".join(result)
+
+    def ad_str(self, string):
+        return str(string).strip().replace(',', '')
+
     def prepare_search_response(self, doctor_search_result, doctor_ids, request):
         entity_ids = doctor_ids
 
@@ -431,7 +459,8 @@ class DoctorSearchByHospitalHelper:
             existing = hospital_card.get(result['hospital_id'])
             if not existing:
                 h_data = {}
-                h_data['address'] = ", ".join([result["locality"], result["city"]])
+                h_data['address'] = self.get_hos_address(result)
+                # h_data['address'] = ", ".join([result["locality"], result["city"]])
                 h_data['hospital_id'] = result["hospital_id"]
                 h_data['doctors'] = []
                 h_data['hospital_name'] = result["hospital_name"]
