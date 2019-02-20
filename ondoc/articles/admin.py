@@ -1,4 +1,3 @@
-import nested_admin
 from django.contrib.gis import admin
 from .models import Article, ArticleImage, ArticleCategory, ArticleLinkedUrl, LinkedArticle, ArticleContentBox
 from reversion.admin import VersionAdmin
@@ -6,7 +5,6 @@ from django.contrib.admin import ModelAdmin, TabularInline
 from django.utils.safestring import mark_safe
 from django import forms
 from django.conf import settings
-
 
 class ArticleForm(forms.ModelForm):
     body = forms.CharField(widget=forms.Textarea, required=False)
@@ -96,3 +94,15 @@ admin.site.register(Article, ArticleAdmin)
 admin.site.register(ArticleImage, ArticleImageAdmin)
 admin.site.register(ArticleCategory)
 admin.site.register(ArticleContentBox)
+
+# class FluentCommentsInline(TabularInline):
+#     model = Comment
+#     can_delete = True
+#     verbose_name = "Reply"
+
+
+
+#admin.site.register(FluentComment, FluentCommentsAdmin)
+
+
+

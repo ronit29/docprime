@@ -178,7 +178,7 @@ class DoctorSearchHelper:
                                              or self.query_params.get('sort_on')=='distance'):
             return ' enabled_for_online_booking DESC, distance, priority desc ', ' rnk=1 '
 
-        bucket_size=2000
+        bucket_size=5000
 
         if self.count_of_procedure:
             order_by_field = ' distance, total_price '
@@ -421,7 +421,8 @@ class DoctorSearchHelper:
                     "mrp": min_price["mrp"],
                     "discounted_fees": min_price["deal_price"],
                     "timings": clinic_convert_timings(doctor_clinic.availability.all(), is_day_human_readable=False),
-                    "procedure_categories": final_result
+                    "procedure_categories": final_result,
+                    "location": {'lat': doctor_clinic.hospital.location.y, 'long': doctor_clinic.hospital.location.x}
                 }]
 
             thumbnail = doctor.get_thumbnail()
@@ -436,8 +437,8 @@ class DoctorSearchHelper:
 
             general_specialization = sorted(general_specialization, key=operator.attrgetter('doctor_count'), reverse=True)
             for spec in general_specialization:
-                if spec.id in specialization_ids:
-                    searched_spec_list.append({'name':spec.name})
+                if str(spec.id) in specialization_ids:
+                    searched_spec_list.append({'name': spec.name})
                 else:    
                     doctor_spec_list.append({'name':spec.name})
 
@@ -448,6 +449,17 @@ class DoctorSearchHelper:
                 opening_hours = '%.2f-%.2f' % (doctor_clinic.availability.all()[0].start,
                                                    doctor_clinic.availability.all()[0].end),
 
+            from ondoc.coupon.models import Coupon
+            search_coupon = Coupon.get_search_coupon(request.user)
+            discounted_price = filtered_deal_price if not search_coupon else search_coupon.get_search_coupon_discounted_price(filtered_deal_price)
+            schema_specialization = None
+            schema_specialization = sorted_spec_list[0].get('name') if sorted_spec_list and len(sorted_spec_list)>0 and sorted_spec_list[0].get('name') else None
+            schema_type = None
+            new_schema = OrderedDict()
+            if schema_specialization == 'Dentist':
+                schema_type = 'Dentist'
+            else:
+                schema_type = 'Physician'
             temp = {
                 "doctor_id": doctor.id,
                 "enabled_for_online_booking": doctor.enabled_for_online_booking,
@@ -461,6 +473,7 @@ class DoctorSearchHelper:
                 "is_gold": is_gold,
                 # "fees": filtered_fees,*********show mrp here
                 "discounted_fees": filtered_deal_price,
+                "discounted_price": discounted_price,
                 # "discounted_fees": filtered_fees, **********deal_price
                 "practicing_since": doctor.practicing_since,
                 "experience_years": doctor.experience_years(),
@@ -478,7 +491,6 @@ class DoctorSearchHelper:
                 "hospitals": hospitals,
                 "thumbnail": (
                     request.build_absolute_uri(thumbnail) if thumbnail else None),
-
                 "schema": {
                     "name": doctor.get_display_name(),
                     "image": doctor.get_thumbnail() if doctor.get_thumbnail() else static('web/images/doc_placeholder.png'),
@@ -501,14 +513,76 @@ class DoctorSearchHelper:
                             'geoMidpoint': {
                                 '@type': 'GeoCoordinates',
                                 'latitude': doctor_clinic.hospital.location.y if doctor_clinic and
-                                                                                 getattr(doctor_clinic, 'hospital', None) and getattr(doctor_clinic.hospital, 'location', None) else None,
+                                                                                 getattr(doctor_clinic, 'hospital',
+                                                                                         None) and getattr(
+                                    doctor_clinic.hospital, 'location', None) else None,
                                 'longitude': doctor_clinic.hospital.location.x if doctor_clinic and
-                                                                                  getattr(doctor_clinic, 'hospital', None) and getattr(doctor_clinic.hospital, 'location', None) else None,
+                                                                                  getattr(doctor_clinic, 'hospital',
+                                                                                          None) and getattr(
+                                    doctor_clinic.hospital, 'location', None) else None,
                             }
                         }
                     }
 
                 }
+
             }
+
+
+            new_schema["@context"] = 'http://schema.org'
+            new_schema["@type"] = schema_type
+            new_schema["name"] = doctor.get_display_name()
+            new_schema["image"] = doctor.get_thumbnail() if doctor.get_thumbnail() else static(
+                'web/images/doc_placeholder.png')
+            new_schema["url"] = None
+            new_schema["medicalSpecialty"] = [schema_specialization]
+            new_schema["currenciesAccepted"] = "INR"
+            new_schema["priceRange"] = min_price["deal_price"]
+            new_schema["address"] = {
+                                        "@type": 'PostalAddress',
+                                        "addressLocality": doctor_clinic.hospital.locality if doctor_clinic and getattr(
+                                            doctor_clinic, 'hospital', None) else '',
+                                        "addressRegion": doctor_clinic.hospital.city if doctor_clinic and getattr(
+                                            doctor_clinic, 'hospital', None) else '',
+                                        # "postalCode": doctor_clinic.hospital.pin_code if doctor_clinic and getattr(doctor_clinic, 'hospital', None) else '',
+                                        # "streetAddress": doctor_clinic.hospital.get_hos_address() if doctor_clinic and getattr(doctor_clinic, 'hospital', None) else '',
+                                    }
+            new_schema['location'] = {
+                                         '@type': 'Place',
+                                         'geo': {
+                                             '@type': 'GeoCoordinates',
+                                             'latitude': doctor_clinic.hospital.location.y if doctor_clinic and
+                                                                                              getattr(doctor_clinic,
+                                                                                                      'hospital',
+                                                                                                      None) and getattr(
+                                                 doctor_clinic.hospital, 'location', None) else None,
+                                             'longitude': doctor_clinic.hospital.location.x if doctor_clinic and
+                                                                                               getattr(doctor_clinic,
+                                                                                                       'hospital',
+                                                                                                       None) and getattr(
+                                                 doctor_clinic.hospital, 'location', None) else None,
+
+                                         }
+                                     }
+            new_schema["branchOf"] = [
+                {
+                    "@type": "MedicalClinic",
+                    "name": doctor_clinic.hospital.name,
+                    "priceRange": min_price["deal_price"],
+                    "image": doctor_clinic.hospital.get_thumbnail() if doctor_clinic.hospital.get_thumbnail() else None,
+                    "address":
+                        {
+                            "@type": 'PostalAddress',
+                            "addressLocality": doctor_clinic.hospital.locality if doctor_clinic and getattr(
+                                doctor_clinic, 'hospital', None) else '',
+                            "addressRegion": doctor_clinic.hospital.city if doctor_clinic and getattr(
+                                doctor_clinic, 'hospital', None) else '',
+
+                        }
+
+                }
+            ]
+
+            temp['new_schema'] = new_schema
             response.append(temp)
         return response

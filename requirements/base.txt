@@ -33,4 +33,7 @@ pymongo==3.7.2
 django-hardcopy
 ddtrace
 setproctitle
+django-fluent-comments
+django-threadedcomments
+django-contrib-comments
 geoip2

@@ -1,6 +1,7 @@
 We have received a reschedule request for the appointment of {{patient_name|capfirst}} with Dr. {{doctor_name|capfirst}} at {{instance.hospital.name|capfirst}}.
 Booking ID : {{instance.id}}
 Patient Name : {{patient_name|capfirst}}
+Patient Contact No: {{mask_number}}
 Doctor Name : Dr. {{doctor_name|capfirst}}
 Requested Date and Time : {{instance.time_slot_start|date:"D jS F Y"}} || {{instance.time_slot_start|date:"h:i A"}}
 

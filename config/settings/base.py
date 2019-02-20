@@ -107,6 +107,9 @@ THIRD_PARTY_APPS = (
     'nested_admin',
     'ipware',
     'django_user_agents',
+    'fluent_comments',
+    'threadedcomments',
+    'django_comments',
     'ddtrace.contrib.django',
 )
 
@@ -136,7 +139,10 @@ LOCAL_APPS = (
     'ondoc.procedure',
     'ondoc.elastic',
     'ondoc.banner',
-    'ondoc.ckedit'
+    'ondoc.cart',
+    'ondoc.ckedit',
+    'ondoc.screen',
+    'ondoc.comments'
 )
 
 INSTALLED_APPS = DJANGO_APPS + THIRD_PARTY_APPS + LOCAL_APPS
@@ -319,6 +325,7 @@ REFUND_INACTIVE_TIME = 24  # In hours
 AUTO_CANCEL_OPD_DELAY = 3000  # In min
 AUTO_CANCEL_LAB_DELAY = 30  # In min
 OPS_EMAIL_ID = env.list('OPS_EMAIL_ID')
+ORDER_FAILURE_EMAIL_ID = env.list('ORDER_FAILURE_EMAIL_ID')
 AUTO_REFUND = env.bool('AUTO_REFUND')
 HARD_CODED_OTP = '357237'
 MAX_DIST_USER = 50  # In KM
@@ -366,3 +373,10 @@ CONN_MAX_AGE=600
 AWS_ACCESS_KEY_ID = env('AWS_ACCESS_KEY_ID', default='')
 AWS_SECRET_ACCESS_KEY = env('AWS_SECRET_ACCESS_KEY', default='')
 PROVIDER_EMAIL = env('PROVIDER_EMAIL', default='')
+
+
+#comments Settings
+COMMENTS_APP = 'fluent_comments'
+SITE_ID = 1
+FLUENT_COMMENTS_REPLACE_ADMIN = False
+

@@ -2,6 +2,7 @@ We have received a reschedule request for the appointment of {{patient_name|capf
 Booking ID : {{instance.id}}
 Requested Date and Time : {{instance.time_slot_start|date:"D jS F Y"}} || {{instance.time_slot_start|date:"h:i A"}}
 Patient Name : {{patient_name|capfirst}}
+Patient Contact Number : {{mask_number}}
 Lab Name : {{lab_name|capfirst}}
 
 Please confirm the same by using docprime provider app.

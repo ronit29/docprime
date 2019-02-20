@@ -12,7 +12,7 @@ from ondoc.authentication.models import Merchant, AssociatedMerchant
 from ondoc.account.models import MerchantPayout
 from ondoc.common.models import Cities, MatrixCityMapping, PaymentOptions
 from import_export import resources, fields
-from import_export.admin import ImportMixin, base_formats, ImportExportMixin, ImportExportModelAdmin
+from import_export.admin import ImportMixin, base_formats, ImportExportMixin, ImportExportModelAdmin, ExportMixin
 from reversion.admin import VersionAdmin
 import nested_admin
 from django.urls import reverse
@@ -311,6 +311,20 @@ class MerchantAdmin(ImportExportMixin, VersionAdmin):
 class MerchantPayoutForm(forms.ModelForm):
     process_payout = forms.BooleanField(required=False)
 
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        payment_mode_options = []
+        instance = self.instance
+        merchant = instance.get_merchant()
+        if merchant and merchant.ifsc_code and self.fields.get('payment_mode'):
+            ifsc_code = merchant.ifsc_code
+            if ifsc_code.upper().startswith(MerchantPayout.INTRABANK_IDENTIFIER):
+                payment_mode_options = [(MerchantPayout.IFT,MerchantPayout.IFT)]
+            else:
+                payment_mode_options = [(MerchantPayout.NEFT, MerchantPayout.NEFT),
+                                        (MerchantPayout.IMPS, MerchantPayout.IMPS)]
+            self.fields.get('payment_mode').choices = payment_mode_options
+
     def clean(self):
         super().clean()
         if any(self.errors):
@@ -344,17 +358,27 @@ class MerchantPayoutForm(forms.ModelForm):
         return self.cleaned_data
 
 
-class MerchantPayoutAdmin(VersionAdmin):
+class MerchantPayoutResource(resources.ModelResource):
+
+    class Meta:
+        model = MerchantPayout
+        fields = ('id', 'payment_mode', 'payout_ref_id', 'charged_amount', 'payable_amount', 'payout_approved',
+                  'status', 'payout_time', 'api_response', 'retry_count', 'paid_to', 'utr_no', 'type', 'amount_paid',
+                  'content_type', 'object_id')
+
+
+class MerchantPayoutAdmin(ExportMixin, VersionAdmin):
+    resource_class = MerchantPayoutResource
     form = MerchantPayoutForm
     model = MerchantPayout
-    fields = ['id', 'charged_amount', 'updated_at', 'created_at', 'payable_amount', 'status', 'payout_time', 'paid_to',
+    fields = ['id', 'payment_mode','charged_amount', 'updated_at', 'created_at', 'payable_amount', 'status', 'payout_time', 'paid_to',
               'appointment_id', 'get_billed_to', 'get_merchant', 'process_payout', 'type', 'utr_no', 'amount_paid']
     list_display = ('id', 'status', 'payable_amount', 'appointment_id', 'doc_lab_name')
     search_fields = ['name']
     list_filter = ['status']
 
     def get_queryset(self, request):
-        return super().get_queryset(request).order_by('-id').prefetch_related('lab_appointment__lab',
+        return super().get_queryset(request).filter(payable_amount__gt=0).order_by('-id').prefetch_related('lab_appointment__lab',
                                                                              'opd_appointment__doctor')
 
     def get_search_results(self, request, queryset, search_term):
@@ -369,7 +393,7 @@ class MerchantPayoutAdmin(VersionAdmin):
         base = ['appointment_id', 'get_billed_to', 'get_merchant']
         editable_fields = ['payout_approved']
         if obj and obj.status == MerchantPayout.PENDING:
-            editable_fields += ['type', 'utr_no', 'amount_paid']
+            editable_fields += ['type', 'utr_no', 'amount_paid','payment_mode']
         readonly = [f.name for f in self.model._meta.fields if f.name not in editable_fields]
         return base + readonly
 

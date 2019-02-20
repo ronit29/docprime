@@ -4,13 +4,15 @@ from rest_framework.fields import CharField
 from django.db.models import Q, Avg, Count, Max, F, ExpressionWrapper, DateTimeField
 from collections import defaultdict, OrderedDict
 from ondoc.api.v1.procedure.serializers import DoctorClinicProcedureSerializer, OpdAppointmentProcedureMappingSerializer
+from ondoc.cart.models import Cart
 from ondoc.doctor.models import (OpdAppointment, Doctor, Hospital, DoctorHospital, DoctorClinicTiming,
                                  DoctorAssociation,
                                  DoctorAward, DoctorDocument, DoctorEmail, DoctorExperience, DoctorImage,
                                  DoctorLanguage, DoctorMedicalService, DoctorMobile, DoctorQualification, DoctorLeave,
                                  Prescription, PrescriptionFile, Specialization, DoctorSearchResult, HealthTip,
-                                 CommonMedicalCondition,CommonSpecialization,
-                                 DoctorPracticeSpecialization, DoctorClinic, OfflineOPDAppointments, OfflinePatients)
+                                 CommonMedicalCondition, CommonSpecialization,
+                                 DoctorPracticeSpecialization, DoctorClinic, OfflineOPDAppointments, OfflinePatients,
+                                 CancellationReason)
 from ondoc.diagnostic import models as lab_models
 from ondoc.authentication.models import UserProfile, DoctorNumber, GenericAdmin, GenericLabAdmin
 from django.db.models import Avg
@@ -183,23 +185,20 @@ class CreateAppointmentSerializer(serializers.Serializer):
     coupon_code = serializers.ListField(child=serializers.CharField(), required=False, default=[])
     procedure_ids = serializers.ListField(child=serializers.PrimaryKeyRelatedField(queryset=Procedure.objects.filter()), required=False)
     use_wallet = serializers.BooleanField(required=False)
+    cart_item = serializers.PrimaryKeyRelatedField(queryset=Cart.objects.all(), required=False, allow_null=True)
     # procedure_category_ids = serializers.ListField(child=serializers.PrimaryKeyRelatedField(queryset=ProcedureCategory.objects.filter(is_live=True)), required=False, default=[])
     # time_slot_end = serializers.DateTimeField()
 
     def validate(self, data):
-        # procedures = data.get('procedure_ids', [])
-        # procedure_categories = data.get('procedure_ids', [])
-        # procedure_category_ids = [procedure.id for procedure in procedures]
-        # if procedures and procedure_categories:
-        #     for procedure in procedures:
-        #         if not procedure.categories.filter(pk__in=procedure_category_ids).count():
-        #             raise serializers.ValidationError("Procedure is not in given categories.")
 
         ACTIVE_APPOINTMENT_STATUS = [OpdAppointment.BOOKED, OpdAppointment.ACCEPTED,
                                      OpdAppointment.RESCHEDULED_PATIENT, OpdAppointment.RESCHEDULED_DOCTOR]
         MAX_APPOINTMENTS_ALLOWED = 10
         MAX_FUTURE_DAY = 40
         request = self.context.get("request")
+        unserialized_data = self.context.get("data")
+        cart_item_id = data.get('cart_item').id if data.get('cart_item') else None
+        use_duplicate = self.context.get("use_duplicate", False)
         time_slot_start = (form_time_slot(data.get('start_date'), data.get('start_time'))
                            if not data.get("time_slot_start") else data.get("time_slot_start"))
 
@@ -288,11 +287,10 @@ class CreateAppointmentSerializer(serializers.Serializer):
                 coupon_obj = Coupon.objects.filter(code__in=coupon_codes)
 
             if coupon_obj:
-            # if len(coupon_code) == len(coupon_obj):
                 for coupon in coupon_obj:
                     profile = data.get("profile")
                     obj = OpdAppointment()
-                    if obj.validate_user_coupon(user=request.user, coupon_obj=coupon, profile=profile).get("is_valid"):
+                    if obj.validate_user_coupon(cart_item=cart_item_id, user=request.user, coupon_obj=coupon, profile=profile).get("is_valid"):
                         if not obj.validate_product_coupon(coupon_obj=coupon,
                                                            doctor=data.get("doctor"), hospital=data.get("hospital"),
                                                            procedures=data.get("procedure_ids"),
@@ -302,7 +300,20 @@ class CreateAppointmentSerializer(serializers.Serializer):
                         raise serializers.ValidationError('Invalid coupon code - ' + str(coupon))
                 data["coupon_obj"] = list(coupon_obj)
 
+        data["existing_cart_item"] = None
+        if unserialized_data:
+            is_valid, duplicate_cart_item = Cart.validate_duplicate(unserialized_data, request.user, Order.DOCTOR_PRODUCT_ID, cart_item_id)
+            if not is_valid:
+                if use_duplicate and duplicate_cart_item:
+                    data["existing_cart_item"] = duplicate_cart_item
+                else:
+                    raise serializers.ValidationError("Item already exists in cart.")
 
+        if OpdAppointment.objects.filter(profile=data.get("profile"), doctor=data.get("doctor"),
+                                         hospital=data.get("hospital"), procedures__in=data.get("procedure_ids", []),
+                                         time_slot_start=time_slot_start) \
+                .exclude(status__in=[OpdAppointment.COMPLETED, OpdAppointment.CANCELLED]).exists():
+            raise serializers.ValidationError("Appointment for the selected date & time already exists. Please change the date & time of the appointment.")
 
         if 'use_wallet' in data and data['use_wallet'] is False:
             data['use_wallet'] = False
@@ -362,6 +373,9 @@ class UpdateStatusSerializer(serializers.Serializer):
     start_date = serializers.DateTimeField(required=False)
     # start_date = serializers.CharField(required=False)
     start_time = serializers.FloatField(required=False)
+    cancellation_reason = serializers.PrimaryKeyRelatedField(
+        queryset=CancellationReason.objects.filter(visible_on_front_end=True), required=False)
+    cancellation_comment = serializers.CharField(required=False, allow_blank=True)
 
 
 class DoctorImageSerializer(serializers.ModelSerializer):
@@ -1109,12 +1123,14 @@ class AppointmentRetrieveSerializer(OpdAppointmentSerializer):
     doctor = AppointmentRetrieveDoctorSerializer()
     procedures = serializers.SerializerMethodField()
     invoices = serializers.SerializerMethodField()
+    cancellation_reason = serializers.SerializerMethodField()
 
     class Meta:
         model = OpdAppointment
         fields = ('id', 'patient_image', 'patient_name', 'type', 'profile', 'otp', 'is_rated', 'rating_declined',
                   'allowed_action', 'effective_price', 'deal_price', 'status', 'time_slot_start', 'time_slot_end',
-                  'doctor', 'hospital', 'allowed_action', 'doctor_thumbnail', 'patient_thumbnail', 'procedures', 'mrp', 'invoices')
+                  'doctor', 'hospital', 'allowed_action', 'doctor_thumbnail', 'patient_thumbnail', 'procedures', 'mrp',
+                  'invoices', 'cancellation_reason')
 
     def get_procedures(self, obj):
         if obj:
@@ -1123,6 +1139,9 @@ class AppointmentRetrieveSerializer(OpdAppointmentSerializer):
 
     def get_invoices(self, obj):
         return obj.get_invoice_urls()
+
+    def get_cancellation_reason(self, obj):
+        return obj.get_serialized_cancellation_reason()
 
 
 class DoctorAppointmentRetrieveSerializer(OpdAppointmentSerializer):
