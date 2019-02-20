@@ -258,8 +258,13 @@ class AvailableLabTestPackageSerializer(serializers.ModelSerializer):
         if obj.test.is_package:
             packages_test = obj.test.packages.all()
             for t_obj in packages_test:
+                rec_dict = dict()
                 # param_list = t_obj.lab_test.labtests.all().values_list("parameter__name", flat=True)
                 param_objs = t_obj.lab_test.labtests.all()
+                rec_obj = t_obj.lab_test.recommended_categories.all()
+                # category = [cat.name for cat in rec_obj]
+                for cat in rec_obj:
+                    rec_dict['category'] = cat.name
                 param_list = list()
                 for obj in param_objs:
                     param_list.append(obj.parameter.name)
@@ -268,7 +273,8 @@ class AvailableLabTestPackageSerializer(serializers.ModelSerializer):
                     "why": t_obj.lab_test.why,
                     "pre_test_info": t_obj.lab_test.pre_test_info,
                     "expected_tat": t_obj.lab_test.expected_tat,
-                    "parameters": param_list
+                    "parameters": param_list,
+                    "category": rec_dict.get('category')
                 })
         return ret_data
 
