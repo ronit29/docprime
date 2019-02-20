@@ -255,7 +255,7 @@ class DoctorSearchByHospitalHelper:
                            "St_distance(St_setsrid(St_point((%(longitude)s), (%(latitude)s)), 4326), h.location) AS distance, " \
                            "dcp.deal_price AS procedure_deal_price, " \
                            "dct.deal_price, dct.mrp, d.is_live, " \
-                           "h.locality, h.city, h.name hospital_name, d.name, " \
+                           "h.locality, h.city,h.building, h.name hospital_name, d.name, " \
                            "d.id AS doctor_id, practicing_since, " \
                            "d.enabled_for_online_booking and dc.enabled_for_online_booking and h.enabled_for_online_booking as enabled_for_online_booking, d.is_license_verified, dc.priority, " \
                            "dc.id AS doctor_clinic_id,  dct.id AS doctor_clinic_timing_id, dcp.id AS doctor_clinic_procedure_id, " \
