@@ -1725,7 +1725,8 @@ class OrderDetailViewSet(GenericViewSet):
                 "effective_price": order.action_data["effective_price"],
                 "data" : cart_serializers.CartItemSerializer(item, context={"validated_data" : None}).data,
                 "booking_id" : order.reference_id,
-                "time_slot_start" : order.action_data["time_slot_start"]
+                "time_slot_start" : order.action_data["time_slot_start"],
+                "payment_type" : order.action_data["payment_type"]
             }
             processed_order_data.append(curr)
 
