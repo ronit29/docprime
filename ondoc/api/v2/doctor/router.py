@@ -12,7 +12,7 @@ urlpatterns = [
     path('medical-services', views.DoctorDataViewset.as_view({'get': 'get_doctor_medical_services'}), name='get-doctor-medical-services'),
     path('procedures', views.DoctorDataViewset.as_view({'get': 'get_procedures'}), name='get-procedures'),
     path('specializations', views.DoctorDataViewset.as_view({'get': 'get_specializations'}), name='get-specializations'),
-    path('otp-generate', views.ProviderSignupOtpViewset.as_view({'post': 'otp_generate'}), name='otp-generate'),
-    path('otp-verification', views.ProviderSignupOtpViewset.as_view({'post': 'otp_verification'}), name='otp-verification')
+    path('signup-otp', views.ProviderSignupOtpViewset.as_view({'post': 'otp_generate'}), name='otp-generate'),
+    path('signup-verification', views.ProviderSignupOtpViewset.as_view({'post': 'otp_verification'}), name='otp-verification')
 ]
 
