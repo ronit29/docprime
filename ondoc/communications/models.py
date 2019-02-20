@@ -588,10 +588,10 @@ class OpdNotification(Notification):
             mask_number = mask_number_instance.mask_number
         email_banners_html = UserConfig.objects.filter(key__iexact="email_banners") \
                     .annotate(html_code=KeyTransform('html_code', 'data')).values_list('html_code', flat=True).first()
-        token = AgentToken.objects.create_token(user=self.appointment.user)
-        opd_appointment_complete_url = settings.BASE_URL + "/opd/appointment/{}?token={}&complete=true".format(self.appointment.id, token)
-        opd_appointment_feedback_url = settings.BASE_URL + "/opd/appointment/{}?token={}".format(self.appointment.id, token)
-        reschdule_appointment_bypass_url = settings.BASE_URL + "/opd/doctor/{}/{}/book?reschedule={}&token={}".format(self.appointment.doctor.id, self.appointment.hospital.id, self.appointment.id, token)
+        auth_token = AgentToken.objects.create_token(user=self.appointment.user)
+        opd_appointment_complete_url = settings.BASE_URL + "/opd/appointment/{}?token={}&complete=true".format(self.appointment.id, auth_token.token)
+        opd_appointment_feedback_url = settings.BASE_URL + "/opd/appointment/{}?token={}".format(self.appointment.id, auth_token.token)
+        reschdule_appointment_bypass_url = settings.BASE_URL + "/opd/doctor/{}/{}/book?reschedule={}&token={}".format(self.appointment.doctor.id, self.appointment.hospital.id, self.appointment.id, auth_token.token)
         context = {
             "doctor_name": doctor_name,
             "patient_name": patient_name,
