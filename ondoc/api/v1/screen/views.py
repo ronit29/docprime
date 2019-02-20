@@ -5,6 +5,9 @@ from ondoc.diagnostic.models import CommonTest
 from ondoc.diagnostic.models import CommonPackage
 from ondoc.banner.models import Banner
 from ondoc.common.models import PaymentOptions
+from ondoc.tracking.models import TrackingEvent
+from ondoc.common.models import UserConfig
+from ondoc.ratings_review.models import AppRatings
 from ondoc.api.v1.doctor.serializers import CommonSpecializationsSerializer
 from ondoc.api.v1.diagnostic.serializers import CommonTestSerializer
 from ondoc.api.v1.diagnostic.serializers import CommonPackageSerializer
@@ -28,6 +31,7 @@ class ScreenViewSet(viewsets.GenericViewSet):
 
         package_queryset = CommonPackage.objects.prefetch_related('package').filter(package__enable_for_retail=True)[:grid_size-1]
         package_serializer = CommonPackageSerializer(package_queryset, many=True, context={'request': request})
+
 
         grid_list = [
             {
@@ -86,7 +90,35 @@ class ScreenViewSet(viewsets.GenericViewSet):
                     "grid_list": grid_list,
                     },
                 "banner": banner,
-                "payment_options": payment_options
+                "payment_options": payment_options,
+                "ask_for_app_rating": self.ask_for_app_rating(request)
         }
 
         return Response(resp)
+
+    def ask_for_app_rating(self, request, *args, **kwargs):
+
+        app_rating_key = UserConfig.objects.filter(key="APP_RATING_FREQUENCY").values_list('data', flat=True)
+        DEFAULT_APP_RATING_FREQUENCY = 5
+        if app_rating_key.exists() and len(app_rating_key) == 1 and type(app_rating_key[0]) == int:
+                APP_RATING_FREQUENCY = app_rating_key[0]
+        else:
+                APP_RATING_FREQUENCY = DEFAULT_APP_RATING_FREQUENCY
+
+        if request.user.is_authenticated:
+            user = request.user
+        else:
+            return False
+        opd_app = user.get_unrated_opd_appointment()
+        lab_app = user.get_unrated_lab_appointment()
+        if opd_app or lab_app:
+            return False
+
+        if AppRatings.objects.filter(user=user, app_type=AppRatings.CONSUMER).exists():
+            return False
+
+        user_tracking = TrackingEvent.objects.filter(user=user, data__Category="DocprimeApp", data__Action="AppLaunch")
+        if user_tracking.exists() and user_tracking.count() % APP_RATING_FREQUENCY == 0:
+            return True
+        else:
+            return False

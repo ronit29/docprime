@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from ondoc.ratings_review.models import (RatingsReview, ReviewCompliments)
+from ondoc.ratings_review.models import (RatingsReview, ReviewCompliments, AppCompliments, AppRatings)
 from ondoc.doctor import models as doc_models
 from ondoc.diagnostic import models as lab_models
 from django.db.models import Q
@@ -42,6 +42,13 @@ class RatingPromptCloseBodySerializer(serializers.Serializer):
 class RatingListBodySerializerdata(serializers.Serializer):
     content_type = serializers.ChoiceField(choices=RatingsReview.APPOINTMENT_TYPE_CHOICES)
     object_id = serializers.IntegerField()
+
+    def validate(self, attrs):
+        if attrs.get('content_type') == RatingsReview.OPD and not doc_models.Doctor.objects.filter(id=attrs.get('object_id')).exists():
+            raise serializers.ValidationError('Doctor Not Found')
+        elif attrs.get('content_type') == RatingsReview.LAB and not lab_models.Lab.objects.filter(id=attrs.get('object_id')).exists():
+            raise serializers.ValidationError('Lab Not Found')
+        return attrs
 
 
 class RatingsGraphSerializer(serializers.Serializer):
@@ -164,3 +171,14 @@ class RatingUpdateBodySerializer(serializers.Serializer):
         return attrs
 
 
+class AppRatingCreateBodySerializer(serializers.Serializer):
+    rating = serializers.IntegerField(max_value=5)
+    review = serializers.CharField(max_length=5000, allow_blank=True, required=False)
+    platform = serializers.CharField(max_length=5000, allow_blank=True, required=False)
+    app_version = serializers.CharField(max_length=5000, allow_blank=True, required=False)
+    app_name = serializers.CharField(max_length=5000, allow_blank=True, required=False)
+    device_id = serializers.CharField(max_length=5000, allow_blank=True, required=False)
+    brand = serializers.CharField(max_length=5000, allow_blank=True, required=False)
+    model = serializers.CharField(max_length=5000, allow_blank=True, required=False)
+    compliment = serializers.ListField(child=serializers.PrimaryKeyRelatedField(queryset=AppCompliments.objects.all()),
+                                       allow_empty=True, required=False)
