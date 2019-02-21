@@ -1833,6 +1833,7 @@ class UserRatingViewSet(GenericViewSet):
                 rating_obj['address'] = address
                 rating_obj['review'] = obj.review
                 rating_obj['entity_name'] = name
+                rating_obj['entity_id'] = obj.object_id
                 rating_obj['date'] = obj.updated_at.strftime('%b %d, %Y')
                 rating_obj['compliments'] = compliments_string
                 rating_obj['compliments_list'] = cid_list
