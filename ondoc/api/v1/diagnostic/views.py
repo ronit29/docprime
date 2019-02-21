@@ -1858,7 +1858,7 @@ class TestDetailsViewset(viewsets.GenericViewSet):
             for lab_test in data.labtests.all():
                 name = lab_test.parameter.name
                 info.append(name)
-            result['test_may_include'] = {'title': 'This test may include', 'value': info}
+            result['test_may_include'] = {'title': 'This test includes', 'value': info}
             pack_list = []
             if data.is_package == True:
                 for ptest in data.test.all():
@@ -1868,7 +1868,7 @@ class TestDetailsViewset(viewsets.GenericViewSet):
                         resp['id'] = ptest.id
                         resp['parameters'] = ptest.parameter.values_list('name', flat=True)
                         pack_list.append(resp)
-            result['this_package_will_include'] = {'title': 'This package will include', 'Tests': pack_list}
+            result['this_package_will_include'] = {'title': 'This package includes', 'Tests': pack_list}
 
             queryset1 = data.faq.all()
             result['faqs'] = []
