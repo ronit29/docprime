@@ -1114,6 +1114,9 @@ class CustomLabTestPackageSerializer(serializers.ModelSerializer):
         test_id = []
         if obj:
             res = []
+            for i_obj in obj.categories.all():
+                icon = i_obj.icon.url if i_obj.icon and i_obj.icon.url else None
+                test_id.append({'icon': icon})
             for tst in obj.test.all().values('recommended_categories__name').distinct().\
                     annotate(dcount=Count('parameter')).all():
                 if not tst.get('recommended_categories__name') == None:

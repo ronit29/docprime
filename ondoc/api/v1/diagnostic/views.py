@@ -850,6 +850,9 @@ class LabList(viewsets.ReadOnlyModelViewSet):
                                 category = cal.get('recommended_categories__name')
                                 count = cal.get('dcount')
                                 res.append({'category': category, 'count': count})
+                        for i_obj in lab_test_obj.categories.all():
+                            icon = i_obj.icon.url if i_obj.icon and i_obj.icon.url else None
+                            res.append(({'icon': icon}))
                     tests[obj.id].append({"id": test.test_id, "name": test.test.name, "deal_price": deal_price, "mrp": test.mrp, "number_of_tests": test.test.number_of_tests, 'categories': test.test.get_all_categories_detail(),
                                           "url": test.test.url, "category_details": res, "parameters": test.test.parameter.all(), "count": test.test.parameter.all().count()})
                     # for sample in test.test.parameter.all():
