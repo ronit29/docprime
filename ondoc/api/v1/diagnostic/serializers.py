@@ -51,7 +51,7 @@ class LabListSerializer(serializers.ModelSerializer):
 class LabTestSerializer(serializers.ModelSerializer):
     class Meta:
         model = LabTest
-        fields = ('id', 'name', 'pre_test_info', 'why', 'show_details')
+        fields = ('id', 'name', 'pre_test_info', 'why', 'show_details', 'url')
         # fields = ('id', 'account_name', 'users', 'created')
 
 
@@ -389,6 +389,7 @@ class CommonTestSerializer(serializers.ModelSerializer):
     show_details = serializers.ReadOnlyField(source='test.show_details')
     icon = serializers.SerializerMethodField
     test_type = serializers.ReadOnlyField(source='test.test_type')
+    url = serializers.ReadOnlyField(source='test.url')
 
     def get_icon(self, obj):
         request = self.context.get('request')
@@ -396,7 +397,7 @@ class CommonTestSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = CommonTest
-        fields = ('id', 'name', 'icon', 'show_details', 'test_type')
+        fields = ('id', 'name', 'icon', 'show_details', 'test_type', 'url')
 
 
 class CommonPackageSerializer(serializers.ModelSerializer):
@@ -1067,12 +1068,16 @@ class CustomLabTestPackageSerializer(serializers.ModelSerializer):
     pickup_available = serializers.SerializerMethodField()
     distance_related_charges = serializers.SerializerMethodField()
     categories = serializers.SerializerMethodField()
+    priority_score = serializers.SerializerMethodField()
 
     class Meta:
         model = LabTest
         fields = ('id', 'name', 'lab', 'mrp', 'distance', 'price', 'lab_timing', 'lab_timing_data', 'next_lab_timing',
                   'next_lab_timing_data', 'test_type', 'is_package', 'number_of_tests', 'why', 'pre_test_info', 'is_package',
-                  'pickup_charges', 'pickup_available', 'distance_related_charges', 'priority', 'show_details', 'categories')
+                  'pickup_charges', 'pickup_available', 'distance_related_charges', 'priority', 'show_details', 'categories', 'url', 'priority_score')
+
+    def get_priority_score(self, obj):
+        return int(obj.priority_score)
 
     def get_lab(self, obj):
         lab_data = self.context.get('lab_data', {})
