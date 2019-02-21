@@ -2063,12 +2063,15 @@ class LabReportFile(auth_model.TimeStampedModel, auth_model.Document):
 
 class LabTestGroup(auth_model.TimeStampedModel):
     TEST_TYPE_CHOICES = LabTest.TEST_TYPE_CHOICES
-    name = models.CharField(max_length=200)
-    tests = models.ManyToManyField(LabTest)
-    type = models.PositiveSmallIntegerField(choices=TEST_TYPE_CHOICES)
+    name = models.CharField(max_length=200, null=False, blank=False)
+    # tests = models.ManyToManyField(LabTest)
+    type = models.PositiveSmallIntegerField(choices=TEST_TYPE_CHOICES, null=True, blank=True)
 
     class Meta:
         db_table = 'lab_test_group'
+
+    def __str__(self):
+        return "{}".format(self.name)
 
 
 class LabAppointmentTestMapping(models.Model):
@@ -2085,3 +2088,27 @@ class LabAppointmentTestMapping(models.Model):
 
     class Meta:
         db_table = 'lab_appointment_test_mapping'
+
+
+class LabTestGroupTiming(TimeStampedModel):
+    TIME_CHOICES = LabTiming.TIME_CHOICES
+
+    lab = models.ForeignKey(Lab, on_delete=models.CASCADE, null=True, blank=True)
+    lab_test_group = models.ForeignKey(LabTestGroup, on_delete=models.CASCADE, null=False)
+    day = models.PositiveSmallIntegerField(blank=False, null=False,
+                                           choices=[(0, "Monday"), (1, "Tuesday"), (2, "Wednesday"), (3, "Thursday"),
+                                                    (4, "Friday"), (5, "Saturday"), (6, "Sunday")])
+    start = models.DecimalField(max_digits=3, decimal_places=1, choices=TIME_CHOICES)
+    end = models.DecimalField(max_digits=3, decimal_places=1, choices=TIME_CHOICES)
+    for_home_pickup = models.BooleanField(default=False)
+
+    class Meta:
+        db_table = "lab_test_group_timing"
+
+
+class LabTestGroupMapping(TimeStampedModel):
+    test = models.ForeignKey(LabTest, on_delete=models.CASCADE, null=False)
+    lab_test_group = models.ForeignKey(LabTestGroup, on_delete=models.CASCADE, null=False)
+
+    class Meta:
+        db_table = "lab_test_group_mapping"
