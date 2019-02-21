@@ -107,16 +107,20 @@ class EventCreateViewSet(GenericViewSet):
             visitor_id = data.get('visitor_id')
 
             if visitor_id:
-                try:
-                    track_models.TrackingVisitor.objects.create(id=visitor_id)
-                except IntegrityError as e:
-                    pass
+                ex_visitor = track_models.TrackingVisitor.objects.filter(id=visitor_id).first()
+                if not ex_visitor:
+                    try:
+                        track_models.TrackingVisitor.objects.create(id=visitor_id)
+                    except IntegrityError as e:
+                        pass
 
             if visit_id:
-                try:
-                    track_models.TrackingVisit.objects.create(id=visit_id, visitor_id=visitor_id, ip_address=client_ip)
-                except IntegrityError as e:
-                    pass
+                ex_visit = track_models.TrackingVisit.objects.filter(id=visit_id).first()                
+                if not ex_visit:
+                    try:
+                        track_models.TrackingVisit.objects.create(id=visit_id, visitor_id=visitor_id, ip_address=client_ip)
+                    except IntegrityError as e:
+                        pass
 
         return (visitor_id, visit_id)
 
