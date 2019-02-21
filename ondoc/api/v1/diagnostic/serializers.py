@@ -1230,6 +1230,7 @@ class LabPackageListSerializer(serializers.Serializer):
 class RecommendedPackageCategoryList(serializers.ModelSerializer):
 
     tests = serializers.SerializerMethodField()
+    icon = serializers.SerializerMethodField()
 
     def get_tests(self, obj):
         test_id = []
@@ -1242,6 +1243,15 @@ class RecommendedPackageCategoryList(serializers.ModelSerializer):
                                 "parameters": temp_parameters_names})
         return test_id
 
+    def get_icon(self, obj):
+        test_id = []
+        if obj:
+            if obj.icon:
+                icon = obj.icon.url
+                test_id.append({'image_url': icon})
+        return test_id
+
+
     class Meta:
         model = LabTestCategory
-        fields = ('id', 'name', 'tests')
+        fields = ('id', 'name', 'tests', 'icon')
