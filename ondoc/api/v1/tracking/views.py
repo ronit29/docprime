@@ -27,67 +27,71 @@ class EventCreateViewSet(GenericViewSet):
         data = request.data
         data.pop('visitor_info', None)
 
-        if data and isinstance(data, dict) and data.get('event'):
+        if not visitor_id or not visit_id:
+            logger.error("Couldn't save event, Couldn't create visit/visitor - " + visit_id + " / " + visitor_id)
+            resp['error'] = "Couldn't create visit/visitor"
 
-            event_name = data.get('event')
-            userAgent = data.get('userAgent', None)
-            data.pop('userAgent', None)
-            triggered_at = data.get('triggered_at', None)
-            data.pop('created_at', None)
+        if not data or not isinstance(data, dict) or not data.get('event'):
+            resp['error'] = "Invalid Data"
+            logger.error("Couldn't save event - " + str(data) + " For visit - " + visit_id)
+            resp['error'] = "Invalid Data"
 
-            if triggered_at:
-                if len(str(triggered_at)) >= 13:
-                    triggered_at = triggered_at/1000
-                triggered_at = datetime.datetime.fromtimestamp(triggered_at)
 
-            try:
-                user = None
-                if request.user.is_authenticated:
-                    user = request.user
+        event_name = data.get('event')
+        userAgent = data.get('userAgent', None)
+        data.pop('userAgent', None)
+        triggered_at = data.get('triggered_at', None)
+        data.pop('created_at', None)
 
-                track_models.TrackingEvent.save_event(event_name=event_name, data=data, visit_id=visit_id, user=user, triggered_at=triggered_at)
-                resp['success'] = "Event Saved Successfully!"
-            except Exception as e:
-                logger.error("Error saving event - " + str(e))
-                resp['error'] = "Error Processing Event Data!"
+        if triggered_at:
+            if len(str(triggered_at)) >= 13:
+                triggered_at = triggered_at/1000
+            triggered_at = datetime.datetime.fromtimestamp(triggered_at)
 
-            visit = track_models.TrackingVisit.objects.get(pk=visit_id)
-            modify_visit = False
-            if event_name == 'utm-events':
-                if not visit.data:
-                    ud = {}
-                    ud['utm_campaign'] = data.get('utm_campaign')
-                    ud['utm_medium'] = data.get('utm_medium')
-                    ud['utm_source'] = data.get('utm_source')
-                    ud['utm_term'] = data.get('utm_term')
-                    ud['source'] = data.get('source')
-                    ud['referrer'] = data.get('referrer')
-                    visit.data = ud
-                    modify_visit = True
-            elif event_name == 'visitor-info':
-                visitor = track_models.TrackingVisitor.objects.get(pk=visitor_id)
-                if not visitor.device_info:
-                    ud = {}
-                    ud['Device'] = data.get('device')
-                    ud['Mobile'] = data.get('mobile')
-                    ud['platform'] = data.get('platform')
-                    visitor.device_info = ud
-                    visitor.save()
-            elif event_name == "change-location":
-                if not visit.location:
-                    visit.location = data.get('location', {})
-                    modify_visit = True
+        try:
+            user = None
+            if request.user.is_authenticated:
+                user = request.user
 
-            if not visit.user_agent and userAgent:
-                visit.user_agent = userAgent
+            track_models.TrackingEvent.save_event(event_name=event_name, data=data, visit_id=visit_id, user=user, triggered_at=triggered_at)
+            resp['success'] = "Event Saved Successfully!"
+        except Exception as e:
+            logger.error("Error saving event - " + str(e))
+            resp['error'] = "Error Processing Event Data!"
+
+        visit = track_models.TrackingVisit.objects.get(pk=visit_id)
+        modify_visit = False
+        if event_name == 'utm-events':
+            if not visit.data:
+                ud = {}
+                ud['utm_campaign'] = data.get('utm_campaign')
+                ud['utm_medium'] = data.get('utm_medium')
+                ud['utm_source'] = data.get('utm_source')
+                ud['utm_term'] = data.get('utm_term')
+                ud['source'] = data.get('source')
+                ud['referrer'] = data.get('referrer')
+                visit.data = ud
+                modify_visit = True
+        elif event_name == 'visitor-info':
+            visitor = track_models.TrackingVisitor.objects.get(pk=visitor_id)
+            if not visitor.device_info:
+                ud = {}
+                ud['Device'] = data.get('device')
+                ud['Mobile'] = data.get('mobile')
+                ud['platform'] = data.get('platform')
+                visitor.device_info = ud
+                visitor.save()
+        elif event_name == "change-location":
+            if not visit.location:
+                visit.location = data.get('location', {})
                 modify_visit = True
 
-            if modify_visit:
-                visit.save()
+        if not visit.user_agent and userAgent:
+            visit.user_agent = userAgent
+            modify_visit = True
 
-        else:
-            resp['error'] = "Invalid Data"
-            logger.error("Couldn't save event - " + str(visit_id))
+        if modify_visit:
+            visit.save()
 
 
         if "error" in resp:
