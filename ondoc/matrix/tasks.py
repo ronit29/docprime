@@ -489,9 +489,13 @@ def create_or_update_lead_on_matrix(self, data):
                 mobile = str(spoc_details.std_code) if spoc_details.std_code else ''
                 mobile += str(spoc_details.number) if spoc_details.number else ''
         elif obj_type == HospitalNetwork.__name__:
-            spoc_details = obj.hospitalnetworkmanager_set.filter(contact_type=2).first()
+            spoc_details = obj.spoc_details.filter(contact_type=SPOCDetails.SPOC).first()
             if spoc_details:
-                mobile += str(spoc_details.number) if hasattr(spoc_details, 'number') and spoc_details.number else ''
+                mobile = str(spoc_details.std_code) if spoc_details.std_code else ''
+                mobile += str(spoc_details.number) if spoc_details.number else ''
+            # spoc_details = obj.hospitalnetworkmanager_set.filter(contact_type=2).first()
+            # if spoc_details:
+            #     mobile += str(spoc_details.number) if hasattr(spoc_details, 'number') and spoc_details.number else ''
         mobile = int(mobile)
         if not mobile:
             return
