@@ -851,7 +851,7 @@ class LabList(viewsets.ReadOnlyModelViewSet):
                                 count = cal.get('dcount')
                                 res.append({'category': category, 'count': count})
                     tests[obj.id].append({"id": test.test_id, "name": test.test.name, "deal_price": deal_price, "mrp": test.mrp, "number_of_tests": test.test.number_of_tests, 'categories': test.test.get_all_categories_detail(),
-                                          "url": test.test.url, "category_details": res, "parameters": test.test.parameter.all(), "count": test.test.parameter.all().count()})
+                                          "url": test.test.url, "category_details": res, "parameters": test.test.parameter.all().values_list('name', flat=True), "count": test.test.parameter.all().count()})
                     # for sample in test.test.parameter.all():
                     #     param_list = list()
                     #     param_list.append({'parameters': sample})
