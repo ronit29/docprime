@@ -85,7 +85,7 @@ class EventCreateViewSet(GenericViewSet):
 
         else:
             resp['error'] = "Invalid Data"
-            logger.error("Could'nt save event - " + str(visit_id))
+            logger.error("Couldn't save event - " + str(visit_id))
 
 
         if "error" in resp:
