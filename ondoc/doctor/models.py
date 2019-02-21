@@ -1864,10 +1864,11 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
     def trigger_created_event(self, visitor_info):
         from ondoc.tracking.models import TrackingEvent
         try:
-            event_data = TrackingEvent.build_event_data(self.user, TrackingEvent.DoctorAppointmentBooked, appointmentId=self.id)
-            if event_data and visitor_info:
-                TrackingEvent.save_event(event_name=event_data.get('event'), data=event_data, visit_id=visitor_info.get('visit_id'),
-                                         user=self.user, triggered_at=datetime.datetime.utcnow())
+            with transaction.atomic():
+                event_data = TrackingEvent.build_event_data(self.user, TrackingEvent.DoctorAppointmentBooked, appointmentId=self.id)
+                if event_data and visitor_info:
+                    TrackingEvent.save_event(event_name=event_data.get('event'), data=event_data, visit_id=visitor_info.get('visit_id'),
+                                             user=self.user, triggered_at=datetime.datetime.utcnow())
         except Exception as e:
             logger.error("Could not save triggered event - " + str(e))
 
@@ -1893,6 +1894,7 @@ class DoctorLeave(auth_model.TimeStampedModel):
         ("00:00:00", "23:59:59"): 'all',
     }
     doctor = models.ForeignKey(Doctor, related_name="leaves", on_delete=models.CASCADE)
+    hospital = models.ForeignKey(Hospital, on_delete=models.CASCADE, null=True)
     start_time = models.TimeField(blank=True, null=True)
     end_time = models.TimeField(blank=True, null=True)
     start_date = models.DateField(blank=True, null=True)
