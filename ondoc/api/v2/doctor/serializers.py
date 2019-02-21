@@ -93,36 +93,35 @@ class DoctorLeaveSerializer(serializers.ModelSerializer):
         exclude = ('created_at', 'updated_at', 'deleted_at')
 
 
-class DoctorAddSerializer(serializers.Serializer):
-    name = serializers.CharField(max_length=200)
-    gender = serializers.ChoiceField(required=False, choices=doc_models.Doctor.GENDER_CHOICES)
-    practicing_since = serializers.IntegerField()
-
-
 class PracticeSpecializationSerializer(serializers.ModelSerializer):
     class Meta:
         model = doc_models.PracticeSpecialization
         fields = '__all__'
+
 
 class QualificationSerializer(serializers.ModelSerializer):
     class Meta:
         model = doc_models.Qualification
         fields = '__all__'
 
+
 class LanguageSerializer(serializers.ModelSerializer):
     class Meta:
         model = doc_models.Language
         fields = '__all__'
+
 
 class MedicalServiceSerializer(serializers.ModelSerializer):
     class Meta:
         model = doc_models.MedicalService
         fields = '__all__'
 
+
 class ProcedureSerializer(serializers.ModelSerializer):
     class Meta:
         model = Procedure
         fields = '__all__'
+
 
 class SpecializationSerializer(serializers.ModelSerializer):
     class Meta:

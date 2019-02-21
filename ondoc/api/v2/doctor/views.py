@@ -409,20 +409,10 @@ class DoctorBlockCalendarViewSet(viewsets.GenericViewSet):
         return Response(doctor_leave_serializer.data)
 
 
-class DoctorAddViweset(viewsets.GenericViewSet):
+class DoctorDataViewset(viewsets.GenericViewSet):
 
     authentication_classes = (JWTAuthentication,)
     permission_classes = (IsAuthenticated, DoctorPermission,)
-
-    def add(self, request, *args, **kwargs):
-        serializer = serializers.DoctorAddSerializer(data=request.data, context={"request": request})
-        return
-
-
-class DoctorDataViewset(viewsets.GenericViewSet):
-
-    # authentication_classes = (JWTAuthentication,)
-    # permission_classes = (IsAuthenticated, DoctorPermission,)
 
     def get_practice_specializations(self, request, *args, **kwargs):
         qs = doc_models.PracticeSpecialization.objects.all()
