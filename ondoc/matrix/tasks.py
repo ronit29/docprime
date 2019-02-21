@@ -471,7 +471,9 @@ def create_or_update_lead_on_matrix(self, data):
         if not obj:
             raise Exception("{} could not found against id - {}".format(obj_type, obj_id))
 
-        mobile = '0'
+        mobile = data.get('request_matrix_phone_number', '0')
+        if mobile is None:
+            mobile = '0'
         gender = 0
         if obj_type == Doctor.__name__:
             if obj.gender and obj.gender == 'm':
@@ -505,8 +507,16 @@ def create_or_update_lead_on_matrix(self, data):
         }
         url = settings.MATRIX_API_URL
         matrix_api_token = settings.MATRIX_API_TOKEN
+        logger.error("Matrix URL - ")
+        logger.error(url)
+        logger.error("Payload - ")
+        logger.error(json.dumps(request_data))
+
         response = requests.post(url, data=json.dumps(request_data), headers={'Authorization': matrix_api_token,
-                                                                              'Content-Type': 'application/json'})
+                                                                             'Content-Type': 'application/json'})
+
+        logger.error("Matrix lead create response -")
+        logger.error(json.dumps(response.json()))
 
         if response.status_code != status.HTTP_200_OK or not response.ok:
             logger.info("[ERROR] {} with ID {} could not be published to the matrix system".format(obj_type, obj_id))
@@ -571,8 +581,18 @@ def update_onboarding_qcstatus_to_matrix(self, data):
 
         url = settings.MATRIX_STATUS_UPDATE_API_URL
         matrix_api_token = settings.MATRIX_API_TOKEN
+
+        logger.error("Matrix URL - ")
+        logger.error(url)
+        logger.error("Payload - ")
+        logger.error(json.dumps(request_data))
+
         response = requests.post(url, data=json.dumps(request_data), headers={'Authorization': matrix_api_token,
                                                                               'Content-Type': 'application/json'})
+
+        logger.error("Matrix status update response -")
+        logger.error(json.dumps(response.json()))
+
         if response.status_code != status.HTTP_200_OK or not response.ok:
             logger.info("[ERROR] Status couldn't be updated for {} with ID {} to the matrix system".format(obj_type, obj_id))
             logger.info("[ERROR] %s", response.reason)
@@ -602,6 +622,10 @@ def push_onboarding_qcstatus_to_matrix(self, data):
 
         product_id = 0
         gender = 0
+        obj = None
+        mobile = None
+        exit_point_url = None
+
         if obj_type == 'Lab':
             obj = Lab.objects.get(id=obj_id)
             mobile = obj.primary_mobile

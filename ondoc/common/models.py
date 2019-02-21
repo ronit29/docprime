@@ -161,6 +161,7 @@ class MatrixMappedState(models.Model):
 
     class Meta:
         db_table = 'matrix_mapped_state'
+        verbose_name_plural = "Matrix Mapped States"
 
 
 class MatrixMappedCity(models.Model):
@@ -172,3 +173,4 @@ class MatrixMappedCity(models.Model):
 
     class Meta:
         db_table = 'matrix_mapped_city'
+        verbose_name_plural = "Matrix Mapped Cities"

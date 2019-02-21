@@ -1,3 +1,4 @@
+from dal import autocomplete
 from django.contrib.contenttypes.admin import GenericTabularInline
 from django.contrib.gis import admin
 from reversion.admin import VersionAdmin
@@ -173,6 +174,12 @@ class HospitalForm(FormCleanMixin):
 
     operational_since = forms.ChoiceField(required=False, choices=hospital_operational_since_choices)
 
+    class Meta:
+        widgets = {
+            'matrix_state': autocomplete.ModelSelect2(url='matrix-state-autocomplete'),
+            'matrix_city': autocomplete.ModelSelect2(url='matrix-city-autocomplete', forward=['matrix_state'])
+        }
+
     def clean_location(self):
         data = self.cleaned_data['location']
         # if data == '':
@@ -245,8 +252,8 @@ class HospitalForm(FormCleanMixin):
             if data.get('disable_reason', None) and data.get('disable_reason', None) == Hospital.OTHERS and not data.get(
                     'disable_comments', None):
                 raise forms.ValidationError("Must have disable comments if disable reason is others.")
-        if '_mark_in_progress' in self.data and data.get('enabled'):
-            raise forms.ValidationError("Must be disabled before rejecting.")
+        # if '_mark_in_progress' in self.data and data.get('enabled'):
+        #     raise forms.ValidationError("Must be disabled before rejecting.")
 
 
 class HospCityFilter(SimpleListFilter):
@@ -392,7 +399,7 @@ class HospitalAdmin(admin.GeoModelAdmin, VersionAdmin, ActionAdmin, QCPemAdmin):
     list_display = ('name', 'updated_at', 'data_status', 'welcome_calling_done', 'doctor_count', 'list_created_by', 'list_assigned_to')
     form = HospitalForm
     search_fields = ['name']
-    autocomplete_fields = ['matrix_city', 'matrix_state']
+    # autocomplete_fields = ['matrix_city', 'matrix_state']
     inlines = [
         # HospitalNetworkMappingInline,
         HospitalSpecialityInline,

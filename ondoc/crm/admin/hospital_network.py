@@ -106,6 +106,12 @@ class HospitalNetworkForm(FormCleanMixin):
     operational_since = forms.ChoiceField(choices=hospital_operational_since_choices, required=False)
     about = forms.CharField(widget=forms.Textarea, required=False)
 
+    class Meta:
+        widgets = {
+            'matrix_state': autocomplete.ModelSelect2(url='matrix-state-autocomplete'),
+            'matrix_city': autocomplete.ModelSelect2(url='matrix-city-autocomplete', forward=['matrix_state'])
+        }
+
     def validate_qc(self):
         qc_required = {'name': 'req', 'operational_since': 'req', 'about': 'req', 'network_size': 'req',
                        'building': 'req', 'locality': 'req',
@@ -203,7 +209,7 @@ class HospitalNetworkAdmin(VersionAdmin, ActionAdmin, QCPemAdmin):
     list_filter = ('data_status', 'welcome_calling_done', CreatedByFilter)
     search_fields = ['name']
     exclude = ('qc_approved_at', 'welcome_calling_done_at', )
-    autocomplete_fields = ['matrix_city', 'matrix_state']
+    # autocomplete_fields = ['matrix_city', 'matrix_state']
     inlines = [
         HospitalNetworkManagerInline,
         HospitalNetworkHelplineInline,

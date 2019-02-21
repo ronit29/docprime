@@ -1,3 +1,4 @@
+from dal import autocomplete
 from django.contrib.contenttypes.admin import GenericTabularInline
 from django.contrib.gis import admin
 import datetime
@@ -561,3 +562,28 @@ class MatrixMappedCityAdmin(ImportMixin, admin.ModelAdmin):
         if not request.user.is_superuser and not request.user.groups.filter(name=constants['SUPER_QC_GROUP']).exists():
             return super().get_readonly_fields(request, obj)
         return ()
+
+class MatrixStateAutocomplete(autocomplete.Select2QuerySetView):
+
+        def get_queryset(self):
+            queryset = MatrixMappedState.objects.all()
+
+            if self.q:
+                queryset = queryset.filter(name__istartswith=self.q)
+
+            return queryset
+
+
+class MatrixCityAutocomplete(autocomplete.Select2QuerySetView):
+
+    def get_queryset(self):
+        queryset = MatrixMappedCity.objects.none()
+        matrix_state = self.forwarded.get('matrix_state', None)
+
+        if matrix_state:
+            queryset = MatrixMappedCity.objects.filter(state_id=matrix_state)
+        if self.q:
+            queryset = queryset.filter(name__istartswith=self.q)
+
+        return queryset
+
