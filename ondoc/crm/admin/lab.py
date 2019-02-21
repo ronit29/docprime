@@ -22,6 +22,7 @@ import pytz
 
 from ondoc.account.models import Order, Invoice
 from ondoc.api.v1.utils import util_absolute_url, util_file_name, datetime_to_formated_string
+from ondoc.common.models import AppointmentHistory
 from ondoc.doctor.models import Hospital, CancellationReason
 from ondoc.diagnostic.models import (LabTiming, LabImage,
                                      LabManager, LabAccreditation, LabAward, LabCertification, AvailableLabTest,
@@ -1016,6 +1017,7 @@ class LabAppointmentAdmin(nested_admin.NestedModelAdmin):
         if obj:
             lab_app_obj = None
             if obj.id:
+                obj._source = AppointmentHistory.CRM
                 lab_app_obj = LabAppointment.objects.select_for_update().filter(pk=obj.id).first()
             # date = datetime.datetime.strptime(request.POST['start_date'], '%Y-%m-%d')
             # time = datetime.datetime.strptime(request.POST['start_time'], '%H:%M').time()
