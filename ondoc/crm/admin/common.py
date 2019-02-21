@@ -134,8 +134,18 @@ class FormCleanMixin(forms.ModelForm):
                         raise forms.ValidationError(
                             "Cannot submit for QC without submitting associated " + class_name.rstrip(
                                 'Form') + ": " + self.instance.network.name)
-                if hasattr(self.instance, 'mobiles') and not self.instance.mobiles.filter(is_primary=True).count() == 1:
-                    raise forms.ValidationError("Doctor must have atleast and atmost one primary mobile number.")
+                if hasattr(self.instance, 'mobiles'):
+                    mobile_error = True
+                    mobile_count = int(self.data.get('mobiles-TOTAL_FORMS', 0))
+                    for count in range(mobile_count):
+                        if self.data.get('mobiles-' + str(count) + '-DELETE'):
+                            continue
+                        mobile_error = False if self.data.get('mobiles-' + str(count) + '-is_primary') else True
+                        if not mobile_error:
+                            break
+                    if mobile_error:
+                        raise forms.ValidationError("Doctor must have atleast and atmost one primary mobile number.")
+
             if '_qc_approve' in self.data:
                 self.validate_qc()
                 # if hasattr(self.instance, 'doctor_clinics') and self.instance.doctor_clinics is not None:
