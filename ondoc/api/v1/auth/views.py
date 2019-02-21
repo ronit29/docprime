@@ -20,7 +20,7 @@ from rest_framework.authtoken.models import Token
 from django.db.models import F, Sum, Max, Q, Prefetch, Case, When, Count
 from django.forms.models import model_to_dict
 
-from ondoc.common.models import UserConfig, PaymentOptions
+from ondoc.common.models import UserConfig, PaymentOptions, AppointmentHistory
 from ondoc.coupon.models import UserSpecificCoupon, Coupon
 from ondoc.lead.models import UserLead
 from ondoc.sms.api import send_otp
@@ -516,10 +516,23 @@ class UserAppointmentsViewSet(OndocViewSet):
         validated_data = serializer.validated_data
         query_input_serializer = serializers.AppointmentqueryRetrieveSerializer(data=request.query_params)
         query_input_serializer.is_valid(raise_exception=True)
+        source = ''
+        responsible_user = None
+        if query_input_serializer.validated_data.get('source', None):
+            source = query_input_serializer.validated_data.get('source')
+        if request.user and hasattr(request.user, 'user_type'):
+            responsible_user = request.user
+            if not source:
+                if request.user.user_type == User.DOCTOR:
+                    source = AppointmentHistory.DOC_APP
+                elif request.user.user_type == User.CONSUMER:
+                    source = AppointmentHistory.CONSUMER_APP
         appointment_type = query_input_serializer.validated_data.get('type')
         if appointment_type == 'lab':
             # lab_appointment = get_object_or_404(LabAppointment, pk=pk)
             lab_appointment = LabAppointment.objects.select_for_update().filter(pk=pk).first()
+            lab_appointment._source = source
+            lab_appointment._responsible_user = responsible_user
             resp = dict()
             if not lab_appointment:
                 resp["status"] = 0
@@ -540,6 +553,8 @@ class UserAppointmentsViewSet(OndocViewSet):
         elif appointment_type == 'doctor':
             # opd_appointment = get_object_or_404(OpdAppointment, pk=pk)
             opd_appointment = OpdAppointment.objects.select_for_update().filter(pk=pk).first()
+            opd_appointment._source = source
+            opd_appointment._responsible_user = responsible_user
             resp = dict()
             if not opd_appointment:
                 resp["status"] = 0
@@ -1550,7 +1565,10 @@ class OrderViewSet(GenericViewSet):
     def retrieve(self, request, pk):
         user = request.user
         params = request.query_params
+
         from_app = params.get("from_app", False)
+        app_version = params.get("app_version", "1.0")
+
         order_obj = Order.objects.filter(pk=pk, payment_status=Order.PAYMENT_PENDING).first()
         if not order_obj.validate_user(user):
             return Response({"status": 0}, status.HTTP_404_NOT_FOUND)
@@ -1562,7 +1580,7 @@ class OrderViewSet(GenericViewSet):
             return Response(resp)
 
         # remove all cart_items => Workaround TODO: remove later
-        if from_app:
+        if from_app and app_version and app_version <= "1.0":
             from ondoc.cart.models import Cart
             Cart.remove_all(user)
 
