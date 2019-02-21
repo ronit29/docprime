@@ -969,8 +969,9 @@ class LabTest(TimeStampedModel, SearchKey):
         for item in all_categories:
             if item.is_live == True:
                 resp = {}
-                resp['name'] = item.name
-                resp['id'] = item.id
+                resp['name'] = item.name if item.name else None
+                resp['id'] = item.id if item.id else None
+                resp['icon'] = item.icon.url if item.icon and item.icon.url else None
                 res.append(resp)
         return res
 
