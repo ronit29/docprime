@@ -136,18 +136,18 @@ class HospitalNetworkForm(FormCleanMixin):
                 if hasattr(self.instance, key) and not getattr(self.instance, key):
                     raise forms.ValidationError(key + " is required for Quality Check")
 
-        number_of_spocs = self.data.get('hospitalnetworkmanager_set-TOTAL_FORMS', '0')
-        try:
-            number_of_spocs = int(number_of_spocs)
-        except Exception as e:
-            logger.error("Something went wrong while counting SPOCs for hospital - " + str(e))
-            raise forms.ValidationError("Something went wrong while counting SPOCs.")
-        if number_of_spocs > 0:
-            if not any([self.data.get('hospitalnetworkmanager_set-{}-contact_type'.format(i),
-                                      0) == str(2) and self.data.get(
-                'hospitalnetworkmanager_set-{}-number'.format(i)) for i in
-                        range(number_of_spocs)]):
-                raise forms.ValidationError("Must have Single Point Of Contact number.")
+        # number_of_spocs = self.data.get('hospitalnetworkmanager_set-TOTAL_FORMS', '0')
+        # try:
+        #     number_of_spocs = int(number_of_spocs)
+        # except Exception as e:
+        #     logger.error("Something went wrong while counting SPOCs for hospital - " + str(e))
+        #     raise forms.ValidationError("Something went wrong while counting SPOCs.")
+        # if number_of_spocs > 0:
+        #     if not any([self.data.get('hospitalnetworkmanager_set-{}-contact_type'.format(i),
+        #                               0) == str(2) and self.data.get(
+        #         'hospitalnetworkmanager_set-{}-number'.format(i)) for i in
+        #                 range(number_of_spocs)]):
+        #         raise forms.ValidationError("Must have Single Point Of Contact number.")
 
     def clean_operational_since(self):
         data = self.cleaned_data['operational_since']

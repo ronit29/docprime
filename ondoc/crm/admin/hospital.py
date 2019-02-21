@@ -222,7 +222,6 @@ class HospitalForm(FormCleanMixin):
         if self.cleaned_data['network_type'] == 2 and not self.cleaned_data['network']:
             raise forms.ValidationError("Network cannot be empty for Network Hospital")
 
-
         number_of_spocs = self.data.get('authentication-spocdetails-content_type-object_id-TOTAL_FORMS', '0')
         try:
             number_of_spocs = int(number_of_spocs)
