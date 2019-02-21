@@ -196,7 +196,7 @@ class DoctorSearchHelper:
             else:
                 order_by_field = " floor(distance/{bucket_size}) ASC, distance, total_price ASC".format(bucket_size=str(bucket_size))
                 rank_by = "rnk=1"
-            order_by_field = "{}, {} ".format(' enabled_for_online_booking DESC ' ,order_by_field)
+            order_by_field = "{}, {} ".format(' enabled_for_online_booking DESC, welcome_calling_done DESC ' ,order_by_field)
         else:
             if self.query_params.get('sort_on'):
                 if self.query_params.get('sort_on') == 'experience':
@@ -209,10 +209,10 @@ class DoctorSearchHelper:
                     order_by_field = " distance ASC, deal_price ASC, priority desc "
                     rank_by = " rnk=1 "
             else:
-                order_by_field = ' floor(distance/{bucket_size}) ASC, welcome_calling_done desc, is_license_verified DESC, search_score desc '.format(bucket_size=str(bucket_size))
+                order_by_field = ' floor(distance/{bucket_size}) ASC, is_license_verified DESC, search_score desc '.format(bucket_size=str(bucket_size))
                 rank_by = "rnk=1"
 
-            order_by_field = "{}, {} ".format(' enabled_for_online_booking DESC ', order_by_field)
+            order_by_field = "{}, {} ".format(' enabled_for_online_booking DESC, welcome_calling_done DESC ', order_by_field)
 
         return order_by_field, rank_by
 
@@ -246,8 +246,7 @@ class DoctorSearchHelper:
                 rank_part = " Row_number() OVER( partition BY doctor_id " \
                             "ORDER BY total_price ASC, distance) rnk " \
 
-            query_string = "SELECT doctor_id, hospital_id, doctor_clinic_id, doctor_clinic_timing_id," \
-                           "row_number() over(partition by welcome_calling_done ORDER BY {order_by_field} ) as welcome_rank " \
+            query_string = "SELECT doctor_id, hospital_id, doctor_clinic_id, doctor_clinic_timing_id " \
                            "FROM (SELECT total_price, " \
                            " {rank_part} ," \
                            " distance, enabled_for_online_booking, is_license_verified, welcome_calling_done, priority " \
@@ -297,8 +296,7 @@ class DoctorSearchHelper:
                 rank_part = " Row_number() OVER( partition BY d.id  ORDER BY " \
                             "dct.deal_price, St_distance(St_setsrid(St_point((%(longitude)s), (%(latitude)s)), 4326 ), h.location) ASC) rnk " \
 
-            query_string = "SELECT x.doctor_id, x.hospital_id, doctor_clinic_id, doctor_clinic_timing_id, " \
-             " row_number() over(partition by welcome_calling_done ORDER BY {order_by_field} ) as welcome_rank " \
+            query_string = "SELECT x.doctor_id, x.hospital_id, doctor_clinic_id, doctor_clinic_timing_id " \
             "FROM (select {rank_part}, " \
             "St_distance(St_setsrid(St_point((%(longitude)s), (%(latitude)s)), 4326), h.location) distance, " \
             "d.id as doctor_id, " \
@@ -316,7 +314,7 @@ class DoctorSearchHelper:
             "and St_dwithin(St_setsrid(St_point((%(longitude)s), (%(latitude)s)), 4326 ), h.location, (%(max_distance)s)) " \
             "{min_dist_cond}" \
             " )x " \
-            "where {rank_by} ".format(rank_part=rank_part, sp_cond=sp_cond, \
+            "where {rank_by} ORDER BY {order_by_field}".format(rank_part=rank_part, sp_cond=sp_cond, \
                 filtering_params=filtering_params.get('string'), \
                 min_dist_cond=min_dist_cond, order_by_field=order_by_field, \
                 rank_by = rank_by)
