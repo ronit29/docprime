@@ -112,7 +112,8 @@ class EventCreateViewSet(GenericViewSet):
                 ex_visitor = track_models.TrackingVisitor.objects.filter(id=visitor_id).first()
                 if not ex_visitor:
                     try:
-                        track_models.TrackingVisitor.objects.create(id=visitor_id)
+                        with transaction.atomic():
+                            track_models.TrackingVisitor.objects.create(id=visitor_id)
                     except IntegrityError as e:
                         pass
 
@@ -120,7 +121,8 @@ class EventCreateViewSet(GenericViewSet):
                 ex_visit = track_models.TrackingVisit.objects.filter(id=visit_id).first()                
                 if not ex_visit:
                     try:
-                        track_models.TrackingVisit.objects.create(id=visit_id, visitor_id=visitor_id, ip_address=client_ip)
+                        with transaction.atomic():
+                            track_models.TrackingVisit.objects.create(id=visit_id, visitor_id=visitor_id, ip_address=client_ip)
                     except IntegrityError as e:
                         pass
 
