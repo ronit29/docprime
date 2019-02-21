@@ -4,7 +4,7 @@ from django.contrib.gis.db import models
 from django.contrib.staticfiles.templatetags.staticfiles import static
 from django.core.validators import MaxValueValidator, MinValueValidator, FileExtensionValidator
 from django.template.loader import render_to_string
-from hardcopy import bytestring_to_pdf
+# from hardcopy import bytestring_to_pdf
 
 from ondoc.account.models import MerchantPayout, ConsumerAccount, Order, UserReferred, MoneyPool, Invoice
 from ondoc.authentication.models import (TimeStampedModel, CreatedByModel, Image, Document, QCModel, UserProfile, User,
@@ -1763,10 +1763,11 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin)
     def trigger_created_event(self, visitor_info):
         from ondoc.tracking.models import TrackingEvent
         try:
-            event_data = TrackingEvent.build_event_data(self.user, TrackingEvent.LabAppointmentBooked, appointmentId=self.id)
-            if event_data and visitor_info:
-                TrackingEvent.save_event(event_name=event_data.get('event'), data=event_data, visit_id=visitor_info.get('visit_id'),
-                                         user=self.user, triggered_at=datetime.datetime.utcnow())
+            with transaction.atomic():
+                event_data = TrackingEvent.build_event_data(self.user, TrackingEvent.LabAppointmentBooked, appointmentId=self.id)
+                if event_data and visitor_info:
+                    TrackingEvent.save_event(event_name=event_data.get('event'), data=event_data, visit_id=visitor_info.get('visit_id'),
+                                             user=self.user, triggered_at=datetime.datetime.utcnow())
         except Exception as e:
             logger.error("Could not save triggered event - " + str(e))
 
