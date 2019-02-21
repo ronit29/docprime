@@ -13,12 +13,14 @@ from ondoc.api.v1.utils import get_time_delta_in_minutes, aware_time_zone
 from ipware import get_client_ip
 from uuid import UUID
 from django.db import IntegrityError
+from django.db import transaction
 
 #from django.utils import timezone
 
 
 class EventCreateViewSet(GenericViewSet):
 
+    @transaction.non_atomic_requests
     def create(self, request):
         visitor_id, visit_id = self.get_visit(request)
         resp = {}
