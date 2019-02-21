@@ -99,7 +99,7 @@ class EventCreateViewSet(GenericViewSet):
         else:
             return Response(status=status.HTTP_200_OK, data=resp)
 
-
+    @transaction.non_atomic_requests
     def get_visit(self, request):
 
         #cookie = request.get_signed_cookie('visit', None)
