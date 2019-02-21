@@ -27,14 +27,14 @@ class EventCreateViewSet(GenericViewSet):
         data = request.data
         data.pop('visitor_info', None)
 
+        error_message = ""
         if not visitor_id or not visit_id:
-            logger.error("Couldn't save event, Couldn't create visit/visitor - " + visit_id + " / " + visitor_id)
-            resp['error'] = "Couldn't create visit/visitor"
+            error_message = "Couldn't save event, Couldn't create visit/visitor - " + str(visit_id) + " / " + str(visitor_id)
+            raise Exception(error_message)
 
         if not data or not isinstance(data, dict) or not data.get('event'):
-            resp['error'] = "Invalid Data"
-            logger.error("Couldn't save event - " + str(data) + " For visit - " + visit_id)
-            resp['error'] = "Invalid Data"
+            error_message = "Couldn't save event - " + str(data) + " For visit - " + str(visit_id)
+            raise Exception(error_message)
 
 
         event_name = data.get('event')
