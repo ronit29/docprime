@@ -4,6 +4,7 @@ Please confirm the booking at the earliest by accepting the booking using docpri
 The booking details are as below :
 Booking ID : {{instance.id}}
 Patient Name : {{patient_name|capfirst}}
+Patient Contact No: {{mask_number}}
 Doctor Name : Dr. {{doctor_name|capfirst}}
 Appointment Date and Time : {{instance.time_slot_start|date:"D jS F Y"}} || {{instance.time_slot_start|date:"h:i A"}}
 

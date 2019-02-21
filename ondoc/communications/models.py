@@ -568,6 +568,10 @@ class OpdNotification(Notification):
         procedures = self.appointment.get_procedures()
         est = pytz.timezone(settings.TIME_ZONE)
         time_slot_start = self.appointment.time_slot_start.astimezone(est)
+        mask_number_instance = self.appointment.mask_number.filter(is_deleted=False).first()
+        mask_number=''
+        if mask_number_instance:
+            mask_number = mask_number_instance.mask_number
         email_banners_html = UserConfig.objects.filter(key__iexact="email_banners") \
                     .annotate(html_code=KeyTransform('html_code', 'data')).values_list('html_code', flat=True).first()
         context = {
@@ -586,6 +590,7 @@ class OpdNotification(Notification):
             "attachments": {},  # Updated later
             "screen": "appointment",
             "type": "doctor",
+            "mask_number": mask_number,
             "email_banners": email_banners_html if email_banners_html is not None else ""
         }
         return context
@@ -705,6 +710,10 @@ class LabNotification(Notification):
             test['mrp'] = str(test['mrp'])
             test['deal_price'] = str(test['deal_price'])
             test['discount'] = str(test['discount'])
+        mask_number_instance = self.appointment.mask_number.filter(is_deleted=False).first()
+        mask_number = ''
+        if mask_number_instance:
+            mask_number = mask_number_instance.mask_number
         context = {
             "lab_name": lab_name,
             "patient_name": patient_name,
@@ -722,6 +731,7 @@ class LabNotification(Notification):
             "attachments": {},  # Updated later
             "screen": "appointment",
             "type": "lab",
+            "mask_number": mask_number,
             "email_banners": email_banners_html if email_banners_html is not None else ""
         }
         return context
