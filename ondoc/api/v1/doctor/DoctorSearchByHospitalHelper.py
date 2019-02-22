@@ -398,7 +398,7 @@ class DoctorSearchByHospitalHelper:
         if result.get('locality'):
             address.append(self.ad_str(result.get('locality')))
         if result.get('city'):
-            address.append(self.ad_str(result.get('locality')))
+            address.append(self.ad_str(result.get('city')))
         # if self.state:
         #     address.append(self.ad_str(self.state))
         # if self.country:
