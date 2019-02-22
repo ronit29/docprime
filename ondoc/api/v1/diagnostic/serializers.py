@@ -104,9 +104,10 @@ class LabModelSerializer(serializers.ModelSerializer):
         if self.parent:
             return None
         app = LabAppointment.objects.select_related('profile').filter(lab_id=obj.id).all()
-        # rating_queryset = obj.rating.prefetch_related('compliment').exclude(Q(review='') | Q(review=None)).filter(is_live=True).order_by('-updated_at')
+        if obj.network:
+            app = LabAppointment.objects.select_related('profile').filter(lab__network=obj.network).all()
         query = self.context.get('rating_queryset')
-        rating_queryset = query.exclude(Q(review='') | Q(review=None)).order_by('-updated_at')
+        rating_queryset = query.exclude(Q(review='') | Q(review=None)).order_by('-ratings', '-updated_at')
         reviews = rating_serializer.RatingsModelSerializer(rating_queryset, many=True, context={'app': app})
         return reviews.data[:5]
 
@@ -1068,12 +1069,16 @@ class CustomLabTestPackageSerializer(serializers.ModelSerializer):
     pickup_available = serializers.SerializerMethodField()
     distance_related_charges = serializers.SerializerMethodField()
     categories = serializers.SerializerMethodField()
+    priority_score = serializers.SerializerMethodField()
 
     class Meta:
         model = LabTest
         fields = ('id', 'name', 'lab', 'mrp', 'distance', 'price', 'lab_timing', 'lab_timing_data', 'next_lab_timing',
                   'next_lab_timing_data', 'test_type', 'is_package', 'number_of_tests', 'why', 'pre_test_info', 'is_package',
-                  'pickup_charges', 'pickup_available', 'distance_related_charges', 'priority', 'show_details', 'categories', 'url')
+                  'pickup_charges', 'pickup_available', 'distance_related_charges', 'priority', 'show_details', 'categories', 'url', 'priority_score')
+
+    def get_priority_score(self, obj):
+        return int(obj.priority_score)
 
     def get_lab(self, obj):
         lab_data = self.context.get('lab_data', {})
