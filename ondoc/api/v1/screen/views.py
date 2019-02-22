@@ -28,7 +28,7 @@ class ScreenViewSet(viewsets.GenericViewSet):
         app_version = params.get("app_version", "1.0")
         if UserConfig.objects.filter(key="app_update").exists():
             app_update = UserConfig.objects.filter(key="app_update").values_list('data', flat=True).first()
-            if app_update
+            if app_update:
                 force_update = app_update.get("force_update", "")
                 update = app_update.get("update", "")
 
