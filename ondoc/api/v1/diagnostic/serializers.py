@@ -1081,12 +1081,28 @@ class CustomLabTestPackageSerializer(serializers.ModelSerializer):
     class Meta:
         model = LabTest
         fields = ('id', 'name', 'lab', 'mrp', 'distance', 'price', 'lab_timing', 'lab_timing_data', 'next_lab_timing',
-                  'next_lab_timing_data', 'test_type', 'is_package', 'number_of_tests', 'why', 'pre_test_info', 'is_package',
-                  'pickup_charges', 'pickup_available', 'distance_related_charges', 'priority', 'show_details', 'categories', 'url', 'priority_score',
-                  'category_details', 'tests')
+                  'next_lab_timing_data', 'test_type', 'is_package', 'number_of_tests', 'why', 'pre_test_info',
+                  'is_package', 'pickup_charges', 'pickup_available', 'distance_related_charges', 'priority',
+                  'show_details', 'categories', 'url', 'priority_score', 'category_details', 'tests')
 
     def get_priority_score(self, obj):
         return int(obj.priority_score)
+
+    def get_tests(self, obj):
+        return_data = list()
+        for temp_test in obj.test.all():
+            parameter_count = len(temp_test.parameter.all()) or 1
+            name = temp_test.name
+            test_id = temp_test.id
+            return_data.append({'id': test_id, 'name': name, 'parameter_count': parameter_count})
+        return return_data
+
+    def get_categories(self, obj):
+        return obj.get_all_categories_detail()
+
+    def get_category_details(self, obj):
+        category_data = self.context.get('category_data', {})
+        return category_data.get(obj.id, [])
 
     def get_lab(self, obj):
         lab_data = self.context.get('lab_data', {})
@@ -1097,38 +1113,6 @@ class CustomLabTestPackageSerializer(serializers.ModelSerializer):
             return CustomPackageLabSerializer(data,
                                               context={'entity_url_dict': entity_url_dict, 'request': request}).data
         return None
-
-    def get_tests(self, obj):
-        ret_data = list()
-        if obj.is_package == True:
-            if obj.parameter.all():
-                param_list = list()
-                for par_obj in obj.parameter.all():
-                    name = par_obj.name
-                    id = par_obj.id
-                    param_list.append({'name': name, 'id': id})
-                ret_data.append({'parameters': param_list, 'count': obj.parameter.all().count()})
-
-        return ret_data
-
-    def get_categories(self, obj):
-        return obj.get_all_categories_detail()
-
-    def get_category_details(self, obj):
-        test_id = []
-        if obj:
-            res = []
-            for i_obj in obj.categories.all():
-                icon = i_obj.icon.url if i_obj.icon and i_obj.icon.url else None
-                test_id.append({'icon': icon})
-            for tst in obj.test.all().values('recommended_categories__name').distinct().\
-                    annotate(dcount=Count('parameter')).all():
-                if not tst.get('recommended_categories__name') == None:
-                    category = tst.get('recommended_categories__name')
-                    count = tst.get('dcount')
-                    test_id.append({'category': category, 'count': count})
-            # test_id.append(res)
-        return test_id
 
     def get_distance(self, obj):
         return int(obj.distance.m)
@@ -1251,13 +1235,10 @@ class RecommendedPackageCategoryList(serializers.ModelSerializer):
         return test_id
 
     def get_icon(self, obj):
-        test_id = []
-        if obj:
-            if obj.icon:
-                icon = obj.icon.url
-                test_id.append({'image_url': icon})
-        return test_id
-
+        request = self.context.get('request')
+        if not request:
+            return None
+        return request.build_absolute_uri(obj.icon.url) if obj.icon and obj.icon.url else None
 
     class Meta:
         model = LabTestCategory

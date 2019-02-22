@@ -53,7 +53,7 @@ from . import serializers
 import copy
 import re
 import datetime
-from collections import OrderedDict
+from collections import OrderedDict, defaultdict
 import random
 from django.contrib.auth import get_user_model
 from ondoc.matrix.tasks import push_order_to_matrix
@@ -85,7 +85,7 @@ class SearchPageViewSet(viewsets.ReadOnlyModelViewSet):
         package_serializer = diagnostic_serializer.CommonPackageSerializer(package_queryset, many=True, context={'request': request})
         lab_serializer = diagnostic_serializer.PromotedLabsSerializer(lab_queryset, many=True)
         condition_serializer = diagnostic_serializer.CommonConditionsSerializer(conditions_queryset, many=True)
-        recommended_package = diagnostic_serializer.RecommendedPackageCategoryList(recommended_package_qs, many=True)
+        recommended_package = diagnostic_serializer.RecommendedPackageCategoryList(recommended_package_qs, many=True, context={'request': request})
         temp_data = dict()
         user_config = UserConfig.objects.filter(key='package_adviser_filters').first()
         advisor_filter = []
@@ -194,9 +194,8 @@ class LabList(viewsets.ReadOnlyModelViewSet):
         min_distance = min_distance*1000 if min_distance is not None else 0
         lab_tests_with_categories = LabTestCategoryMapping.objects.filter(parent_category__isnull=False).values_list(
             'lab_test', flat=True).distinct()
-        all_packages_in_network_labs = LabTest.objects.prefetch_related('test','test__recommended_categories','test__parameter', Prefetch('categories',
-                                                                                         queryset=LabTestCategory.objects.filter().order_by(
-                                                                                             '-priority'))).filter(
+        all_packages_in_network_labs = LabTest.objects.prefetch_related('test', 'test__recommended_categories',
+                                                                        'test__parameter', 'categories').filter(
             enable_for_retail=True,
             searchable=True, is_package=True,
             availablelabs__enabled=True,
@@ -218,9 +217,8 @@ class LabList(viewsets.ReadOnlyModelViewSet):
                         partition_by=[F(
                             'availablelabs__lab_pricing_group__labs__network'), F('id')]))
 
-        all_packages_in_non_network_labs = LabTest.objects.prefetch_related('test', Prefetch('categories',
-                                                                                             queryset=LabTestCategory.objects.filter().order_by(
-                                                                                                 '-priority'))).filter(
+        all_packages_in_non_network_labs = LabTest.objects.prefetch_related('test', 'test__recommended_categories',
+                                                                            'test__parameter', 'categories').filter(
             enable_for_retail=True,
             searchable=True,
             is_package=True,
@@ -294,9 +292,39 @@ class LabList(viewsets.ReadOnlyModelViewSet):
         lab_data = Lab.objects.prefetch_related('rating', 'lab_documents', 'lab_timings', 'network',
                                                 'home_collection_charges').annotate(
             avg_rating=Avg('rating__ratings')).in_bulk(lab_ids)
+        category_data = {}
+        test_package_ids = set([package.id for package in all_packages])
+        test_package_queryset = LabTest.objects.prefetch_related('test__recommended_categories', 'test__parameter').filter(id__in=test_package_ids)
+        for temp_package in test_package_queryset:
+            single_test_data = {}
+            for temp_test in temp_package.test.all():
+                add_test_name = True
+                for temp_category in temp_test.recommended_categories.all():
+                    add_test_name = False
+                    name = temp_category.name
+                    category_id = temp_category.id
+                    test_id = None
+                    parameter_count = len(temp_test.parameter.all()) or 1
+                    if single_test_data.get((category_id, test_id)):
+                        single_test_data[(category_id, test_id)]['parameter_count'] += single_test_data[(category_id, test_id)]['parameter_count']
+                    else:
+                        single_test_data[(category_id, test_id)] = {'name': name,
+                                                                    'category_id': category_id,
+                                                                    'test_id': test_id,
+                                                                    'parameter_count': parameter_count}
+                if add_test_name:
+                    category_id = None
+                    test_id = temp_test.id
+                    name = temp_test.name
+                    parameter_count = len(temp_test.parameter.all()) or 1
+                    single_test_data[(category_id, test_id)] = {'name': name,
+                                                                'category_id': category_id,
+                                                                'test_id': test_id,
+                                                                'parameter_count': parameter_count}
+            category_data[temp_package.id] = list(single_test_data.values())
         serializer = CustomLabTestPackageSerializer(all_packages, many=True,
                                                     context={'entity_url_dict': entity_url_dict, 'lab_data': lab_data,
-                                                             'request': request})
+                                                             'request': request, 'category_data': category_data})
         category_queryset = LabTestCategory.objects.filter(is_package_category=True, is_live=True)
         category_result = []
         for category in category_queryset:
@@ -549,7 +577,9 @@ class LabList(viewsets.ReadOnlyModelViewSet):
 
         test_ids = parameters.get('ids', [])
 
-        tests = list(LabTest.objects.filter(id__in=test_ids).values('id', 'name', 'hide_price', 'show_details','test_type', 'url'))
+        tests = list(
+            LabTest.objects.filter(id__in=test_ids).values('id', 'name', 'hide_price', 'show_details', 'test_type',
+                                                           'url', 'is_package'))
         seo = None
         breadcrumb = None
         location = None
@@ -856,7 +886,7 @@ class LabList(viewsets.ReadOnlyModelViewSet):
                             icon = i_obj.icon.url if i_obj.icon and i_obj.icon.url else None
                             res.append({'icon': icon})
                     tests[obj.id].append({"id": test.test_id, "name": test.test.name, "deal_price": deal_price, "mrp": test.mrp, "number_of_tests": test.test.number_of_tests, 'categories': test.test.get_all_categories_detail(),
-                                          "url": test.test.url, "category_details": res, "parameters": test.test.parameter.all().values_list('name', flat=True), "count": test.test.parameter.all().count()})
+                                          "url": test.test.url, "category_details": res, "parameters": [x.name for x in test.test.parameter.all()], "count": len([x for x in test.test.parameter.all()]), "is_package":test.test.is_package})
                     # for sample in test.test.parameter.all():
                     #     param_list = list()
                     #     param_list.append({'parameters': sample})
@@ -1940,9 +1970,9 @@ class TestDetailsViewset(viewsets.GenericViewSet):
                         resp = {}
                         resp['name'] = ptest.name
                         resp['id'] = ptest.id
-                        resp['parameters'] = ptest.parameter.values_list('name', flat=True)
+                        resp['parameters'] = [t_param.name for t_param in ptest.parameter.all()]
                         pack_list.append(resp)
-            result['this_package_will_include'] = {'title': 'This package includes', 'Tests': pack_list}
+            result['this_package_will_include'] = {'title': 'This package includes', 'tests': pack_list}
 
             queryset1 = data.faq.all()
             result['faqs'] = []
