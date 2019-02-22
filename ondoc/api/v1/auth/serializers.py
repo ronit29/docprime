@@ -161,7 +161,7 @@ class UserProfileSerializer(serializers.ModelSerializer):
     gender = serializers.ChoiceField(choices=GENDER_CHOICES)
     email = serializers.EmailField(required=False, allow_null=True, allow_blank=True)
     profile_image = serializers.SerializerMethodField()
-
+    dob = serializers.DateField(allow_null=True, required=False)
 
     class Meta:
         model = UserProfile
