@@ -31,7 +31,7 @@ from ondoc.diagnostic.models import (LabTiming, LabImage,
                                      LabAppointment, HomePickupCharges,
                                      TestParameter, ParameterLabTest, FrequentlyAddedTogetherTests, QuestionAnswer,
                                      LabReport, LabReportFile, LabTestCategoryMapping,
-                                     LabTestRecommendedCategoryMapping)
+                                     LabTestRecommendedCategoryMapping, LabTestGroupTiming, LabTestGroupMapping)
 from ondoc.notification.models import EmailNotification, NotificationAction
 from .common import *
 from ondoc.authentication.models import GenericAdmin, User, QCModel, GenericLabAdmin, AssociatedMerchant
@@ -116,6 +116,7 @@ class LabTimingInline(admin.TabularInline):
 
 # class LabImageForm(forms.ModelForm):
 #     name = forms.FileField(required=False, widget=forms.FileInput(attrs={'accept':'image/x-png,image/jpeg'}))
+
 
 class LabImageInline(admin.TabularInline):
     model = LabImage
@@ -342,6 +343,7 @@ class LabForm(FormCleanMixin):
     primary_mobile = forms.CharField(required=True)
     primary_email = forms.EmailField(required=True)
     city = forms.CharField(required=True)
+    lab_priority = forms.IntegerField(required=True)
     operational_since = forms.ChoiceField(required=False, choices=hospital_operational_since_choices)
     home_pickup_charges = forms.DecimalField(required=False, initial=0)
     # onboarding_status = forms.ChoiceField(disabled=True, required=False, choices=Lab.ONBOARDING_STATUS)
@@ -486,6 +488,23 @@ class LabResource(resources.ModelResource):
         return status
 
 
+class LabTestGroupTimingForm(forms.ModelForm):
+    def clean(self):
+        cleaned_data = super().clean()
+        start = cleaned_data.get("start")
+        end = cleaned_data.get("end")
+        if start and end and start>=end:
+            raise forms.ValidationError("Start time should be less than end time")
+
+
+class LabTestGroupTimingInline(admin.TabularInline):
+    model = LabTestGroupTiming
+    form = LabTestGroupTimingForm
+    extra = 0
+    can_delete = True
+    show_change_link = False
+
+
 class LabAdmin(ImportExportMixin, admin.GeoModelAdmin, VersionAdmin, ActionAdmin, QCPemAdmin):
     change_list_template = 'superuser_import_export.html'
     resource_class = LabResource
@@ -504,7 +523,7 @@ class LabAdmin(ImportExportMixin, admin.GeoModelAdmin, VersionAdmin, ActionAdmin
     inlines = [LabDoctorInline, LabServiceInline, LabDoctorAvailabilityInline, LabCertificationInline, LabAwardInline,
                LabAccreditationInline,
                LabManagerInline, LabTimingInline, LabImageInline, LabDocumentInline, HomePickupChargesInline,
-               GenericLabAdminInline, AssociatedMerchantInline]
+               GenericLabAdminInline, AssociatedMerchantInline, LabTestGroupTimingInline]
     autocomplete_fields = ['lab_pricing_group', ]
 
     map_width = 200
@@ -571,7 +590,7 @@ class LabAdmin(ImportExportMixin, admin.GeoModelAdmin, VersionAdmin, ActionAdmin
         # check for errors
         errors = []
         required = ['name', 'about', 'license', 'primary_email', 'primary_mobile', 'operational_since', 'parking',
-                    'network_type', 'location', 'building', 'city', 'state', 'country', 'pin_code', 'agreed_rate_list', 'lab_priority']
+                    'network_type', 'location', 'building', 'city', 'state', 'country', 'pin_code', 'agreed_rate_list']
         if lab_obj.is_ppc_pathology_enabled or lab_obj.is_ppc_radiology_enabled:
             required += ['ppc_rate_list']
         for req in required:
@@ -1093,6 +1112,7 @@ class FrequentlyBookedTogetherTestInLine(admin.StackedInline):
     fields = ['original_test', 'booked_together_test']
     extra = 0
 
+
 class TestPackageFormSet(forms.BaseInlineFormSet):
     def clean(self):
         super().clean()
@@ -1313,6 +1333,7 @@ class AvailableLabTestAdmin(VersionAdmin):
     list_display = ['test', 'lab_pricing_group', 'get_type', 'mrp', 'computed_agreed_price',
                     'custom_agreed_price', 'computed_deal_price', 'custom_deal_price', 'enabled']
     search_fields = ['test__name', 'lab_pricing_group__group_name', 'lab_pricing_group__labs__name']
+    # autocomplete_fields = ['test']
 
 
 class DiagnosticConditionLabTestInline(admin.TabularInline):
@@ -1338,3 +1359,28 @@ class CommonPackageAdmin(VersionAdmin):
         form = super(CommonPackageAdmin, self).get_form(request, obj=obj, **kwargs)
         form.base_fields['package'].queryset = LabTest.objects.filter(is_package=True)
         return form
+
+
+class LabTestGroupAdmin(admin.ModelAdmin):
+    search_fields = ['name']
+    list_display = ['name']
+
+
+class LabTestGroupResource(resources.ModelResource):
+    test = fields.Field(attribute='test_id', column_name='test')
+    lab_test_group = fields.Field(attribute='lab_test_group_id', column_name='group')
+
+    class Meta:
+        model = LabTestGroupMapping
+        fields = ('id')
+
+    def before_save_instance(self, instance, using_transactions, dry_run):
+        super().before_save_instance(instance, using_transactions, dry_run)
+
+
+class LabTestGroupMappingAdmin(ImportMixin, admin.ModelAdmin):
+    resource_class = LabTestGroupResource
+    formats = (base_formats.XLS, base_formats.XLSX)
+    list_display = ['test', 'lab_test_group']
+    search_fields = ['test__name', 'lab_test_group__name']
+
