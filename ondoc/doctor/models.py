@@ -550,8 +550,8 @@ class Doctor(auth_model.TimeStampedModel, auth_model.QCModel, SearchKey):
         content_type = ContentType.objects.get_for_model(Doctor)
         if content_type:
             cid = content_type.id
-        query = '''UPDATE doctor d set avg_rating = (select avg(ratings) from ratings_review where content_type_id={} and object_id=d.id) '''.format(cid)
-        cursor.execute(query)
+            query = '''UPDATE doctor d set avg_rating = (select avg(ratings) from ratings_review where content_type_id={} and object_id=d.id) '''.format(cid)
+            cursor.execute(query)
 
     class Meta:
         db_table = "doctor"
