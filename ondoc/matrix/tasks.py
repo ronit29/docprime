@@ -85,6 +85,7 @@ def prepare_and_hit(self, data):
         'OTP': '',
         'KYC': kyc,
         'Location': location,
+        'PaymentType': appointment.payment_type,
         'PaymentStatus': 300,
         'OrderID': order.id if order else 0,
         'DocPrimeBookingID': appointment.id,
