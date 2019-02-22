@@ -1052,7 +1052,7 @@ class DoctorProfileUserViewSerializer(DoctorProfileSerializer):
         data = obj.doctor_clinics.all()
         result_for_a_doctor = OrderedDict()
         for doctor_clinic in data:
-            all_doctor_clinic_procedures = list(doctor_clinic.doctorclinicprocedure_set.all())
+            all_doctor_clinic_procedures = list(doctor_clinic.procedures_from_doctor_clinic.all())
             selected_procedures_data = get_included_doctor_clinic_procedure(all_doctor_clinic_procedures,
                                                                             selected_procedure_ids)
             other_procedures_data = get_included_doctor_clinic_procedure(all_doctor_clinic_procedures,

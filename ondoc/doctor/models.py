@@ -1814,7 +1814,7 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
 
         extra_details = []
         doctor_clinic = doctor.doctor_clinics.filter(hospital=selected_hospital).first()
-        doctor_clinic_procedures = doctor_clinic.doctorclinicprocedure_set.filter(procedure__in=procedures).order_by(
+        doctor_clinic_procedures = doctor_clinic.procedures_from_doctor_clinic.filter(procedure__in=procedures).order_by(
             'procedure_id')
         for doctor_clinic_procedure in doctor_clinic_procedures:
             temp_extra = {'procedure_id': doctor_clinic_procedure.procedure.id,
@@ -1846,7 +1846,7 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
     @staticmethod
     def get_procedure_prices(procedures, doctor, selected_hospital, dct):
         doctor_clinic = doctor.doctor_clinics.filter(hospital=selected_hospital).first()
-        doctor_clinic_procedures = doctor_clinic.doctorclinicprocedure_set.filter(procedure__in=procedures).order_by(
+        doctor_clinic_procedures = doctor_clinic.procedures_from_doctor_clinic.filter(procedure__in=procedures).order_by(
             'procedure_id')
         total_deal_price, total_agreed_price, total_mrp = 0, 0, 0
         for doctor_clinic_procedure in doctor_clinic_procedures:
