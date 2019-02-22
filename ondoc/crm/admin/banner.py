@@ -34,6 +34,22 @@ class BannerForm(forms.ModelForm):
             if not cleaned_data.get('start_date') < cleaned_data.get('end_date'):
                 raise forms.ValidationError('End date is invalid')
 
+        if cleaned_data.get('latitude'):
+            if not cleaned_data.get('longitude'):
+                raise forms.ValidationError('Longitude is required')
+            if not cleaned_data.get('radius'):
+                raise forms.ValidationError('Radius is required')
+        elif cleaned_data.get('longitude'):
+            if not cleaned_data.get('latitude'):
+                raise forms.ValidationError('Latitude is required')
+            if not cleaned_data.get('radius'):
+                raise forms.ValidationError('Radius is required')
+        elif cleaned_data.get('radius'):
+            if not cleaned_data.get('latitude'):
+                raise forms.ValidationError('Latitude is required')
+            if not cleaned_data.get('longitude'):
+                raise forms.ValidationError('Longitude is required')
+
 
 class BannerAdmin(admin.ModelAdmin):
 
