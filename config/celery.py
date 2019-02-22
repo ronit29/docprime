@@ -6,7 +6,7 @@ import raven
 import os
 from django.conf import settings
 from raven.contrib.celery import register_signal, register_logger_signal
-from ondoc.account.tasks import refund_status_update, consumer_refund_update
+from ondoc.account.tasks import refund_status_update, consumer_refund_update, dump_to_elastic
 from celery.schedules import crontab
 from ondoc.doctor.tasks import save_avg_rating
 # from ondoc.doctor.services.update_search_score import DoctorSearchScore
@@ -55,12 +55,10 @@ app.autodiscover_tasks()
 
 @app.on_after_configure.connect
 def setup_periodic_tasks(sender, **kwargs):
-    from ondoc.elastic.tasks import dump_to_elastic
     polling_time = float(settings.PG_REFUND_STATUS_POLL_TIME) * float(60.0)
-    sync_elastic_polling_time = float(settings.SYNC_ELASTIC) * float(60.0)
     sender.add_periodic_task(polling_time, consumer_refund_update.s(), name='Refund and update consumer account balance')
 
-    elastic_sync_cron_schedule = crontab(hour=19, minute=30)
+    elastic_sync_cron_schedule = crontab(hour=19, minute=00)
 
     sender.add_periodic_task(elastic_sync_cron_schedule, dump_to_elastic.s(), name='Sync Elastic')
     sender.add_periodic_task(crontab(hour=18, minute=30), save_avg_rating.s(), name='Update Lab and Doctor Average Rating')
