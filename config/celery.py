@@ -58,7 +58,7 @@ def setup_periodic_tasks(sender, **kwargs):
     sync_elastic_polling_time = float(settings.SYNC_ELASTIC) * float(60.0)
     sender.add_periodic_task(polling_time, consumer_refund_update.s(), name='Refund and update consumer account balance')
 
-    elastic_sync_cron_schedule = crontab(hour=1)
+    elastic_sync_cron_schedule = crontab(hour=14)
 
     sender.add_periodic_task(elastic_sync_cron_schedule, dump_to_elastic.s(), name='Sync Elastic')
     # doctor_search_score_creation_time = float(settings.CREATE_DOCTOR_SEARCH_SCORE) * float(3600.0)
