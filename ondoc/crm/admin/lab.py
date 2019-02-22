@@ -1363,8 +1363,21 @@ class LabTestGroupAdmin(admin.ModelAdmin):
     list_display = ['name']
 
 
-class LabTestGroupMappingAdmin(admin.ModelAdmin):
-    model = LabTestGroupMapping
+class LabTestGroupResource(resources.ModelResource):
+    test = fields.Field(attribute='test_id', column_name='test')
+    lab_test_group = fields.Field(attribute='lab_test_group_id', column_name='group')
+
+    class Meta:
+        model = LabTestGroupMapping
+        fields = ('id')
+
+    def before_save_instance(self, instance, using_transactions, dry_run):
+        super().before_save_instance(instance, using_transactions, dry_run)
+
+
+class LabTestGroupMappingAdmin(ImportMixin, admin.ModelAdmin):
+    resource_class = LabTestGroupResource
+    formats = (base_formats.XLS, base_formats.XLSX)
     list_display = ['test', 'lab_test_group']
     search_fields = ['test__name', 'lab_test_group__name']
-    # autocomplete_fields = ['lab_test_group', 'test']
+
