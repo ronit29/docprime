@@ -1039,7 +1039,7 @@ class LabEntitySerializer(serializers.ModelSerializer):
 
 
 class CustomPackageLabSerializer(LabModelSerializer):
-    avg_rating = serializers.ReadOnlyField()
+    # avg_rating = serializers.ReadOnlyField()
     url = serializers.SerializerMethodField()
 
     class Meta:

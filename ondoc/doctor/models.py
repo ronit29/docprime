@@ -477,7 +477,8 @@ class Doctor(auth_model.TimeStampedModel, auth_model.QCModel, SearchKey):
          return self.rating.all()
 
     def get_avg_rating(self):
-        return self.rating.filter(is_live=True).aggregate(avg_rating=Avg('ratings'))
+        # return self.rating.filter(is_live=True).aggregate(avg_rating=Avg('ratings'))
+        return self.avg_rating
 
     def get_rating_count(self):
         count = 0
