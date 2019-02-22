@@ -27,9 +27,10 @@ class ScreenViewSet(viewsets.GenericViewSet):
         from_app = params.get("from_app", False)
         app_version = params.get("app_version", "1.0")
         if UserConfig.objects.filter(key="app_update").exists():
-            app_update = UserConfig.objects.filter(key="app_update").values_list('data', flat=True)[0]
-            force_update = app_update.get("force_update", "")
-            update = app_update.get("update", "")
+            app_update = UserConfig.objects.filter(key="app_update").values_list('data', flat=True).first()
+            if app_update
+                force_update = app_update.get("force_update", "")
+                update = app_update.get("update", "")
 
         common_specializations = CommonSpecialization.objects.select_related(
             'specialization').all().order_by("priority")[:grid_size-1]
