@@ -628,8 +628,8 @@ class DoctorProfileUserViewSet(viewsets.GenericViewSet):
                 hospital = response_data.get('hospitals')[0]
 
                 parameters['specialization_ids'] = str(specialization_id)                
-                parameters['lat'] = hospital.get('lat')
-                parameters['long'] = hospital.get('long')
+                parameters['latitude'] = hospital.get('lat')
+                parameters['longitude'] = hospital.get('long')
                 parameters['doctor_suggestions'] = 1
                 
                 kwargs['parameters'] = parameters
