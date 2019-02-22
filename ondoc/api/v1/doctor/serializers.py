@@ -658,6 +658,8 @@ class DoctorLeaveSerializer(serializers.ModelSerializer):
     end_time = serializers.TimeField(write_only=True)
     leave_start_time = serializers.FloatField(read_only=True, source='start_time_in_float')
     leave_end_time = serializers.FloatField(read_only=True, source='end_time_in_float')
+    doctor_name = serializers.CharField(read_only=True, source='doctor.name')
+    hospital_name = serializers.CharField(read_only=True, source='hospital.name', allow_null=True)
 
     class Meta:
         model = DoctorLeave
