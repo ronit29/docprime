@@ -157,12 +157,13 @@ class Coupon(auth_model.TimeStampedModel):
                 if remaining_deal_price > 0:
                     if coupon.is_user_specific and coupon.test.exists() and coupon.type == Coupon.LAB:
                         curr_discount = obj.get_applicable_tests_with_total_price(coupon_obj=coupon, test_ids=data['test_ids'], lab=data["lab"]).get("total_price")
-                    elif coupon.is_user_specific and coupon.procedures.exists() and coupon.type == Coupon.DOCTOR \
-                            and data.get("doctor") and data.get("hospital"):
-                        curr_discount = obj.get_applicable_procedures_with_total_price(coupon_obj=coupon,
+                    elif coupon.procedures.exists() and coupon.type == Coupon.DOCTOR and data.get("doctor") and data.get("hospital"):
+                        procedures_deal_price = obj.get_applicable_procedures_with_total_price(coupon_obj=coupon,
                                                                                        procedures=data['procedures'],
                                                                                        doctor=data["doctor"],
                                                                                        hospital=data["hospital"]).get("total_price")
+                        procedures_deal_price = min(remaining_deal_price, procedures_deal_price)
+                        curr_discount = obj.get_discount(coupon, procedures_deal_price)
                     else:
                         curr_discount = obj.get_discount(coupon, remaining_deal_price)
                     coupon_discount += curr_discount
@@ -173,12 +174,13 @@ class Coupon(auth_model.TimeStampedModel):
                 if remaining_deal_price > 0:
                     if coupon.is_user_specific and coupon.test.exists() and coupon.type == Coupon.LAB:
                         curr_cashback = obj.get_applicable_tests_with_total_price(coupon_obj=coupon, test_ids=data['test_ids'], lab=data["lab"]).get("total_price")
-                    elif coupon.is_user_specific and coupon.procedures.exists() and coupon.type == Coupon.DOCTOR \
-                            and data.get("doctor") and data.get("hospital"):
-                        curr_cashback = obj.get_applicable_procedures_with_total_price(coupon_obj=coupon,
+                    elif coupon.procedures.exists() and coupon.type == Coupon.DOCTOR and data.get("doctor") and data.get("hospital"):
+                        procedures_deal_price = obj.get_applicable_procedures_with_total_price(coupon_obj=coupon,
                                                                                        procedures=data['procedures'],
                                                                                        doctor=data["doctor"],
                                                                                        hospital=data["hospital"]).get("total_price")
+                        procedures_deal_price = min(remaining_deal_price, procedures_deal_price)
+                        curr_cashback = obj.get_discount(coupon, procedures_deal_price)
                     else:
                         curr_cashback = obj.get_discount(coupon, remaining_deal_price)
                     coupon_cashback += curr_cashback
