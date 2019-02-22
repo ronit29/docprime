@@ -7,9 +7,12 @@ Patient Name : {{patient_name|capfirst}}
 Patient Contact No: {{mask_number}}
 Doctor Name : Dr. {{doctor_name|capfirst}}
 Appointment Date and Time : {{instance.time_slot_start|date:"D jS F Y"}} || {{instance.time_slot_start|date:"h:i A"}}
-
+{% if instance.payment_type == 2 %}
+Please collect Rs {{instance.effective_price}} from the customer at the time of appointment.
+{% else %}
 Please note that the consultation needs to be done on Credit Basis.
 Please do not ask for consultation fees from the customer.
+{% endif %}
 
 Thanks
 Team docprime
