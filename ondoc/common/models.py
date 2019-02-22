@@ -31,11 +31,17 @@ class MatrixCityMapping(models.Model):
 
 
 class AppointmentHistory(TimeStampedModel):
+    CRM = "crm"
+    WEB = "web"
+    DOC_APP = "d_app"
+    CONSUMER_APP = "c_app"
+    SOURCE_CHOICES = ((CONSUMER_APP, "Consumer App"), (CRM, "CRM"), (WEB, "Web"), (DOC_APP, "Doctor App"))
     content_type = models.ForeignKey(ContentType, on_delete=models.DO_NOTHING)
     object_id = models.PositiveIntegerField()
     content_object = GenericForeignKey()
     status = models.PositiveSmallIntegerField(null=False)
     user = models.ForeignKey(User, null=True, default=None, on_delete=models.CASCADE)
+    source = models.CharField(max_length=10, blank=True, choices=SOURCE_CHOICES, default='')
 
     @classmethod
     def create(cls, *args, **kwargs):
@@ -44,11 +50,14 @@ class AppointmentHistory(TimeStampedModel):
             raise Exception('Function accept content_object in **kwargs')
 
         user = None
+        source = ''
         if hasattr(obj, "_responsible_user"):
             user = obj._responsible_user
+        if hasattr(obj, "_source"):
+            source = obj._source
 
         content_type = ContentType.objects.get_for_model(obj)
-        cls(content_type=content_type, object_id=obj.id, status=obj.status, user=user).save()
+        cls(content_type=content_type, object_id=obj.id, status=obj.status, user=user, source=source).save()
 
 
     class Meta:
