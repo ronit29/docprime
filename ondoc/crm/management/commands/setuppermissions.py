@@ -33,7 +33,8 @@ from ondoc.diagnostic.models import (Lab, LabTiming, LabImage, GenericLabAdmin,
                                      CommonDiagnosticCondition, DiagnosticConditionLabTest, HomePickupCharges,
                                      TestParameter, ParameterLabTest, LabTestPackage, LabReportFile, LabReport,
                                      CommonPackage, LabTestCategory, LabTestCategoryMapping,
-                                     LabTestRecommendedCategoryMapping, QuestionAnswer, FrequentlyAddedTogetherTests)
+                                     LabTestRecommendedCategoryMapping, QuestionAnswer, FrequentlyAddedTogetherTests,
+                                     LabTestGroup, LabTestGroupMapping)
 
 from ondoc.procedure.models import Procedure, ProcedureCategory, CommonProcedureCategory, DoctorClinicProcedure, \
     ProcedureCategoryMapping, ProcedureToCategoryMapping, CommonProcedure
@@ -138,7 +139,7 @@ class Command(BaseCommand):
                 Q(content_type=ct), Q(codename='change_' + ct.model))
             group.permissions.add(*permissions)
 
-        content_types = ContentType.objects.get_for_models(Lab, LabNetwork)
+        content_types = ContentType.objects.get_for_models(Lab, LabNetwork, LabTestGroup, LabTestGroupMapping)
         for cl, ct in content_types.items():
             permissions = Permission.objects.filter(
                 Q(content_type=ct), Q(codename='change_' + ct.model))
