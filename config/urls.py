@@ -28,8 +28,7 @@ additional_urls = [
     # path('auth/', include('ondoc.authentication.urls')),
     # path('diagnostic/', include('ondoc.diagnostic.urls')),
     path('api/', include('ondoc.api.urls')),
-    path('', include('ondoc.articles.urls')),
-    url(r'^admin/statuscheck/', include('celerybeat_status.urls'))
+    path('', include('ondoc.articles.urls'))
     ]
 
 if not settings.API_ENABLED:
