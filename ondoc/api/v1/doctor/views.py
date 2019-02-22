@@ -2107,6 +2107,8 @@ class OfflineCustomerViewSet(viewsets.GenericViewSet):
         ret_obj['hospital_name'] = appnt.hospital.name
         ret_obj['time_slot_start'] = appnt.time_slot_start
         ret_obj['status'] = appnt.status
+        ret_obj['mrp'] = appnt.mrp
+        ret_obj['payment_type'] = appnt.payment_type
         ret_obj['hospital'] = HospitalModelSerializer(appnt.hospital).data
         ret_obj['doctor'] = AppointmentRetrieveDoctorSerializer(appnt.doctor).data
         ret_obj['is_docprime'] = False
@@ -2800,6 +2802,8 @@ class OfflineCustomerViewSet(viewsets.GenericViewSet):
             ret_obj['hospital_name'] = app.hospital.name
             ret_obj['time_slot_start'] = app.time_slot_start
             ret_obj['status'] = app.status
+            ret_obj['mrp'] = app.mrp or None
+            ret_obj['payment_type'] = app.payment_type or None
             ret_obj['billing_status'] = billing_status
             ret_obj['profile'] = patient_profile
             ret_obj['permission_type'] = app.pem_type
