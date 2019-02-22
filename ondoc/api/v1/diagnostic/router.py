@@ -48,5 +48,6 @@ urlpatterns = [
     path('appointment/complete', DoctorLabAppointmentsNoAuthViewSet.as_view({'post': 'complete'}),
          name='appointment-complete'),
     path('test/details', TestDetailsViewset.as_view({'get': 'retrieve'}), name='test-details'),
+    path('test/details_by_url', TestDetailsViewset.as_view({'get': 'retrieve_test_by_url'}), name='test-details-by-url'),
     path('test/category', LabTestCategoryListViewSet.as_view({'get': 'list'}), name='test-category'),
 ]
