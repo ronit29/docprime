@@ -454,12 +454,13 @@ class Lab(TimeStampedModel, CreatedByModel, QCModel, SearchKey):
 
     @classmethod
     def update_avg_rating(cls):
-        labs = Lab.objects.filter(rating__isnull=False).distinct()
-        for lb in labs:
-            avg_lb = lb.rating.all().aggregate(avg_rating=Avg('ratings'))
-            if avg_lb:
-                lb.avg_rating = round(avg_lb.get('avg_rating'), 1)
-                lb.save()
+        from django.db import connection
+        cursor = connection.cursor()
+        content_type = ContentType.objects.get_for_model(Lab)
+        if content_type:
+            cid = content_type.id
+            query = '''UPDATE lab l set avg_rating = (select avg(ratings) from ratings_review where content_type_id={} and object_id=l.id) '''.format(cid)
+            cursor.execute(query)
 
 
 class LabCertification(TimeStampedModel):
