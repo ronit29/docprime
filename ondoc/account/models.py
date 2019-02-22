@@ -336,9 +336,10 @@ class Order(TimeStampedModel):
         visitor_info = None
         try:
             from ondoc.api.v1.tracking.views import EventCreateViewSet
-            event_api = EventCreateViewSet()
-            visitor_id, visit_id = event_api.get_visit(request)
-            visitor_info = { "visitor_id": visitor_id, "visit_id": visit_id }
+            with transaction.atomic():
+                event_api = EventCreateViewSet()
+                visitor_id, visit_id = event_api.get_visit(request)
+                visitor_info = { "visitor_id": visitor_id, "visit_id": visit_id }
         except Exception as e:
             logger.log("Could not fecth visitor info - " + str(e))
 

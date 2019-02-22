@@ -22,6 +22,7 @@ import pytz
 
 from ondoc.account.models import Order, Invoice
 from ondoc.api.v1.utils import util_absolute_url, util_file_name, datetime_to_formated_string
+from ondoc.common.models import AppointmentHistory
 from ondoc.doctor.models import Hospital, CancellationReason
 from ondoc.diagnostic.models import (LabTiming, LabImage,
                                      LabManager, LabAccreditation, LabAward, LabCertification, AvailableLabTest,
@@ -342,6 +343,7 @@ class LabForm(FormCleanMixin):
     primary_mobile = forms.CharField(required=True)
     primary_email = forms.EmailField(required=True)
     city = forms.CharField(required=True)
+    lab_priority = forms.IntegerField(required=True)
     operational_since = forms.ChoiceField(required=False, choices=hospital_operational_since_choices)
     home_pickup_charges = forms.DecimalField(required=False, initial=0)
     # onboarding_status = forms.ChoiceField(disabled=True, required=False, choices=Lab.ONBOARDING_STATUS)
@@ -1034,6 +1036,7 @@ class LabAppointmentAdmin(nested_admin.NestedModelAdmin):
         if obj:
             lab_app_obj = None
             if obj.id:
+                obj._source = AppointmentHistory.CRM
                 lab_app_obj = LabAppointment.objects.select_for_update().filter(pk=obj.id).first()
             # date = datetime.datetime.strptime(request.POST['start_date'], '%Y-%m-%d')
             # time = datetime.datetime.strptime(request.POST['start_time'], '%H:%M').time()
