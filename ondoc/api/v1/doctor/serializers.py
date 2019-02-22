@@ -1140,6 +1140,12 @@ class DoctorAppointmentRetrieveSerializer(OpdAppointmentSerializer):
     profile = UserProfileSerializer()
     hospital = HospitalModelSerializer()
     doctor = AppointmentRetrieveDoctorSerializer()
+    mask_data = serializers.SerializerMethodField()
+
+    def get_mask_data(self):
+        mask_number = self.mask_number.first()
+        if mask_number:
+            return mask_number.build_data()
 
     class Meta:
         model = OpdAppointment

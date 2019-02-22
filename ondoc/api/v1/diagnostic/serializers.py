@@ -913,6 +913,12 @@ class LabAppointmentRetrieveSerializer(LabAppointmentModelSerializer):
     reports = serializers.SerializerMethodField()
     invoices = serializers.SerializerMethodField()
     cancellation_reason = serializers.SerializerMethodField()
+    mask_data = serializers.SerializerMethodField()
+
+    def get_mask_data(self):
+        mask_number = self.mask_number.first()
+        if mask_number:
+            return mask_number.build_data()
 
     def get_lab_test(self, obj):
         return LabAppointmentTestMappingSerializer(obj.test_mappings.all(), many=True).data
