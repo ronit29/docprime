@@ -476,9 +476,7 @@ def create_or_update_lead_on_matrix(self, data):
         if not obj:
             raise Exception("{} could not found against id - {}".format(obj_type, obj_id))
 
-        mobile = data.get('request_matrix_phone_number', '0')
-        if mobile is None:
-            mobile = '0'
+        mobile = '0'
         gender = 0
         if obj_type == Doctor.__name__:
             if obj.gender and obj.gender == 'm':

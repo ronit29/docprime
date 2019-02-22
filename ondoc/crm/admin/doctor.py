@@ -672,7 +672,6 @@ class DoctorForm(FormCleanMixin):
             # http://127.0.0.1:8000/admin/doctor/doctor/add/?Lead_id=1234&AgentId=9876
             self.request_matrix_lead_id = self.request.GET.get('LeadId', None)
             self.request_agent_lead_id = self.request.GET.get('AgentId', None)
-            self.request_matrix_phone_number = self.request.GET.get('PhoneNumber', None)
 
     def validate_qc(self):
         qc_required = {'name': 'req', 'gender': 'req',
@@ -1280,7 +1279,6 @@ class DoctorAdmin(AutoComplete, ImportExportMixin, VersionAdmin, ActionAdmin, QC
         if obj and not obj.id and not obj.matrix_lead_id:
             try:
                 obj.matrix_lead_id = int(form.request_matrix_lead_id) if hasattr(form, 'request_matrix_lead_id') else None
-                obj.request_matrix_phone_number = int(form.request_matrix_phone_number) if hasattr(form, 'request_matrix_phone_number') else None
             except Exception as e:
                 logger.error("Invalid Matrix ID received from Matrix - " + str(e))
 
@@ -1307,7 +1305,7 @@ class DoctorAdmin(AutoComplete, ImportExportMixin, VersionAdmin, ActionAdmin, QC
         super().save_model(request, obj, form, change)
 
     def has_add_permission(self, request):
-        if request.user.groups.filter(name=constants['DOCTOR_NETWORK_GROUP_NAME']).exists() and (not request.GET.get('LeadId') or not request.GET.get('PhoneNumber')):
+        if request.user.groups.filter(name=constants['DOCTOR_NETWORK_GROUP_NAME']).exists() and not request.GET.get('LeadId'):
             return False
         return super().has_add_permission(request)
 
