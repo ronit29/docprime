@@ -640,6 +640,12 @@ class CouponsMixin(object):
             if (hospital and re.search(hospital.city, coupon_obj.cities, re.IGNORECASE)) or not hospital:
                 return False
 
+        if coupon_obj.doctors.exists() and (not doctor or doctor not in coupon_obj.doctors.all()):
+            return False
+
+        if coupon_obj.hospitals.exists() and (not hospital or hospital not in coupon_obj.hospitals.all()):
+            return False
+
         if coupon_obj.procedures.exists():
             if procedures:
                 procedure_count = coupon_obj.procedures.filter(id__in=[proc.id for proc in procedures]).count()

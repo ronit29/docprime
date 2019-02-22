@@ -590,6 +590,7 @@ class OpdNotification(Notification):
             "attachments": {},  # Updated later
             "screen": "appointment",
             "type": "doctor",
+            "cod_amount": int(self.appointment.mrp),
             "mask_number": mask_number,
             "email_banners": email_banners_html if email_banners_html is not None else ""
         }

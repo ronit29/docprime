@@ -292,8 +292,7 @@ class LabList(viewsets.ReadOnlyModelViewSet):
             entity_url_dict.setdefault(item.get('lab_id'), [])
             entity_url_dict[item.get('lab_id')].append(item.get('url'))
         lab_data = Lab.objects.prefetch_related('rating', 'lab_documents', 'lab_timings', 'network',
-                                                'home_collection_charges').annotate(
-            avg_rating=Avg('rating__ratings')).in_bulk(lab_ids)
+                                                'home_collection_charges').in_bulk(lab_ids)
         serializer = CustomLabTestPackageSerializer(all_packages, many=True,
                                                     context={'entity_url_dict': entity_url_dict, 'lab_data': lab_data,
                                                              'request': request})
@@ -1587,9 +1586,9 @@ class LabAppointmentView(mixins.CreateModelMixin,
                 #                                          order.product_id,
                 #                                          EmailNotification.OPS_PAYMENT_NOTIFICATION)
 
-                push_order_to_matrix.apply_async(
-                    ({'order_id': order.id, 'created_at': int(order.created_at.timestamp()),
-                      'timeslot': int(appointment_details['time_slot_start'].timestamp())},), countdown=5)
+                # push_order_to_matrix.apply_async(
+                #     ({'order_id': order.id, 'created_at': int(order.created_at.timestamp()),
+                #       'timeslot': int(appointment_details['time_slot_start'].timestamp())},), countdown=5)
             except:
                 pass
         else:
