@@ -1564,6 +1564,9 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
         transaction.on_commit(lambda: self.after_commit_tasks(database_instance, push_to_matrix))
 
     def save_merchant_payout(self):
+        if self.payment_type in [OpdAppointment.COD]:
+            raise Exception("Cannot create payout for COD appointments")
+
         payout_data = {
             "charged_amount" : self.effective_price,
             "payable_amount" : self.fees,

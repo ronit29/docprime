@@ -1413,6 +1413,9 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin)
         transaction.on_commit(lambda: self.app_commit_tasks(database_instance, push_to_matrix))
 
     def save_merchant_payout(self):
+        if self.payment_type in [OpdAppointment.COD]:
+            raise Exception("Cannot create payout for COD appointments")
+
         payout_amount = self.agreed_price
         if self.is_home_pickup:
             payout_amount += self.home_pickup_charges
