@@ -20,17 +20,17 @@ class ScreenViewSet(viewsets.GenericViewSet):
         show_search_header = True
         show_footer = True
         grid_size = 6
-        force_update = ""
-        update = ""
+        force_update_version = ""
+        update_version = ""
 
         params = request.query_params
         from_app = params.get("from_app", False)
         app_version = params.get("app_version", "1.0")
         if UserConfig.objects.filter(key="app_update").exists():
             app_update = UserConfig.objects.filter(key="app_update").values_list('data', flat=True).first()
-            if app_update
-                force_update = app_update.get("force_update", "")
-                update = app_update.get("update", "")
+            if app_update:
+                force_update_version = app_update.get("force_update_version", "")
+                update_version = app_update.get("update_version", "")
 
         common_specializations = CommonSpecialization.objects.select_related(
             'specialization').all().order_by("priority")[:grid_size-1]
@@ -102,8 +102,8 @@ class ScreenViewSet(viewsets.GenericViewSet):
                     },
                 "banner": banner,
                 "payment_options": payment_options,
-                "app_force_update": app_version < force_update,
-                "app_update": app_version < update,
+                "app_force_update": app_version < force_update_version,
+                "app_update": app_version < update_version,
                 "ask_for_app_rating": self.ask_for_app_rating(request)
         }
 
