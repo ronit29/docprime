@@ -545,12 +545,13 @@ class Doctor(auth_model.TimeStampedModel, auth_model.QCModel, SearchKey):
                                                             ,), countdown=5)
     @classmethod
     def update_avg_rating(cls):
-        doctor = Doctor.objects.filter(rating__isnull=False).distinct()
-        for doc in doctor:
-            avg_doc = doc.rating.all().aggregate(avg_rating=Avg('ratings'))
-            if avg_doc:
-                doc.avg_rating = round(avg_doc.get('avg_rating'), 1)
-                doc.save()
+        from django.db import connection
+        cursor = connection.cursor()
+        content_type = ContentType.objects.get_for_model(Doctor)
+        if content_type:
+            cid = content_type.id
+        query = '''UPDATE doctor d set avg_rating = (select avg(ratings) from ratings_review where content_type_id={} and object_id=d.id) '''.format(cid)
+        cursor.execute(query)
 
     class Meta:
         db_table = "doctor"
