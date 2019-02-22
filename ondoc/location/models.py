@@ -265,6 +265,8 @@ class EntityAddress(TimeStampedModel):
             or not parent_entity.type or not parent_entity.type.startswith('LOCALITY')):
             use_in_url = False
 
+        if name in ('[no name]', 'Unnamed Road'):
+            use_in_url = False
         # if use_in_url and parent_entity and parent_entity.use_in_url \
         #     and parent_entity.type and parent_entity.type.startswith('SUBLOCALITY'):
         #     use_in_url = False
@@ -2066,3 +2068,12 @@ class DefaultRating(TimeStampedModel):
         indexes = [
             models.Index(fields=['url']),
         ]
+
+
+class CityLatLong(TimeStampedModel):
+    city = models.TextField()
+    latitude = models.DecimalField(null=True, max_digits=10, decimal_places=8)
+    longitude = models.DecimalField(null=True, max_digits=10, decimal_places=8)
+
+    class Meta:
+        db_table = 'city_lat_long'

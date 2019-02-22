@@ -477,7 +477,7 @@ class Doctor(auth_model.TimeStampedModel, auth_model.QCModel, SearchKey):
          return self.rating.all()
 
     def get_avg_rating(self):
-        return self.rating.all().aggregate(avg_rating=Avg('ratings'))
+        return self.rating.filter(is_live=True).aggregate(avg_rating=Avg('ratings'))
 
     def get_rating_count(self):
         count = 0
@@ -1871,10 +1871,11 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
     def trigger_created_event(self, visitor_info):
         from ondoc.tracking.models import TrackingEvent
         try:
-            event_data = TrackingEvent.build_event_data(self.user, TrackingEvent.DoctorAppointmentBooked, appointmentId=self.id)
-            if event_data and visitor_info:
-                TrackingEvent.save_event(event_name=event_data.get('event'), data=event_data, visit_id=visitor_info.get('visit_id'),
-                                         user=self.user, triggered_at=datetime.datetime.utcnow())
+            with transaction.atomic():
+                event_data = TrackingEvent.build_event_data(self.user, TrackingEvent.DoctorAppointmentBooked, appointmentId=self.id)
+                if event_data and visitor_info:
+                    TrackingEvent.save_event(event_name=event_data.get('event'), data=event_data, visit_id=visitor_info.get('visit_id'),
+                                             user=self.user, triggered_at=datetime.datetime.utcnow())
         except Exception as e:
             logger.error("Could not save triggered event - " + str(e))
 

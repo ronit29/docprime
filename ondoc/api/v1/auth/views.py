@@ -57,8 +57,10 @@ import jwt
 from decimal import Decimal
 from ondoc.web.models import ContactUs
 from ondoc.notification.tasks import send_pg_acknowledge
+
 from ondoc.ratings_review import models as rate_models
 from django.contrib.contenttypes.models import ContentType
+
 import re
 
 
@@ -1547,7 +1549,10 @@ class OrderViewSet(GenericViewSet):
     def retrieve(self, request, pk):
         user = request.user
         params = request.query_params
+
         from_app = params.get("from_app", False)
+        app_version = params.get("app_version", "1.0")
+
         order_obj = Order.objects.filter(pk=pk, payment_status=Order.PAYMENT_PENDING).first()
         if not order_obj.validate_user(user):
             return Response({"status": 0}, status.HTTP_404_NOT_FOUND)
@@ -1559,7 +1564,7 @@ class OrderViewSet(GenericViewSet):
             return Response(resp)
 
         # remove all cart_items => Workaround TODO: remove later
-        if from_app:
+        if from_app and app_version and app_version <= "1.0":
             from ondoc.cart.models import Cart
             Cart.remove_all(user)
 
@@ -1831,7 +1836,8 @@ class UserRatingViewSet(GenericViewSet):
                 rating_obj['address'] = address
                 rating_obj['review'] = obj.review
                 rating_obj['entity_name'] = name
-                rating_obj['date'] = obj.updated_at.strftime('%B %d, %Y')
+                rating_obj['entity_id'] = obj.object_id
+                rating_obj['date'] = obj.updated_at.strftime('%b %d, %Y')
                 rating_obj['compliments'] = compliments_string
                 rating_obj['compliments_list'] = cid_list
                 rating_obj['appointment_id'] = obj.appointment_id
