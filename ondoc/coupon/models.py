@@ -155,8 +155,10 @@ class Coupon(auth_model.TimeStampedModel):
 
             for coupon in discount_coupon_list:
                 if remaining_deal_price > 0:
-                    if coupon.is_user_specific and coupon.test.exists() and coupon.type == Coupon.LAB:
-                        curr_discount = obj.get_applicable_tests_with_total_price(coupon_obj=coupon, test_ids=data['test_ids'], lab=data["lab"]).get("total_price")
+                    if coupon.test.exists() and coupon.type == Coupon.LAB:
+                        tests_deal_price = obj.get_applicable_tests_with_total_price(coupon_obj=coupon, test_ids=data['test_ids'], lab=data["lab"]).get("total_price")
+                        tests_deal_price = min(remaining_deal_price, tests_deal_price)
+                        curr_discount = obj.get_discount(coupon, tests_deal_price)
                     elif coupon.procedures.exists() and coupon.type == Coupon.DOCTOR and data.get("doctor") and data.get("hospital"):
                         procedures_deal_price = obj.get_applicable_procedures_with_total_price(coupon_obj=coupon,
                                                                                        procedures=data['procedures'],
@@ -172,8 +174,10 @@ class Coupon(auth_model.TimeStampedModel):
 
             for coupon in cashback_coupon_list:
                 if remaining_deal_price > 0:
-                    if coupon.is_user_specific and coupon.test.exists() and coupon.type == Coupon.LAB:
-                        curr_cashback = obj.get_applicable_tests_with_total_price(coupon_obj=coupon, test_ids=data['test_ids'], lab=data["lab"]).get("total_price")
+                    if coupon.test.exists() and coupon.type == Coupon.LAB:
+                        tests_deal_price = obj.get_applicable_tests_with_total_price(coupon_obj=coupon, test_ids=data['test_ids'], lab=data["lab"]).get("total_price")
+                        tests_deal_price = min(remaining_deal_price, tests_deal_price)
+                        curr_cashback = obj.get_discount(coupon, tests_deal_price)
                     elif coupon.procedures.exists() and coupon.type == Coupon.DOCTOR and data.get("doctor") and data.get("hospital"):
                         procedures_deal_price = obj.get_applicable_procedures_with_total_price(coupon_obj=coupon,
                                                                                        procedures=data['procedures'],

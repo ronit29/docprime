@@ -292,8 +292,7 @@ class LabList(viewsets.ReadOnlyModelViewSet):
             entity_url_dict.setdefault(item.get('lab_id'), [])
             entity_url_dict[item.get('lab_id')].append(item.get('url'))
         lab_data = Lab.objects.prefetch_related('rating', 'lab_documents', 'lab_timings', 'network',
-                                                'home_collection_charges').annotate(
-            avg_rating=Avg('rating__ratings')).in_bulk(lab_ids)
+                                                'home_collection_charges').in_bulk(lab_ids)
         serializer = CustomLabTestPackageSerializer(all_packages, many=True,
                                                     context={'entity_url_dict': entity_url_dict, 'lab_data': lab_data,
                                                              'request': request})
@@ -1023,7 +1022,11 @@ class LabList(viewsets.ReadOnlyModelViewSet):
         #     entity = entity.first()
         rating_queryset = lab_obj.rating.filter(is_live=True)
         if lab_obj.network:
-            rating_queryset = rating_models.RatingsReview.objects.prefetch_related('compliment').filter(is_live=True, lab_ratings__network=lab_obj.network)
+            rating_queryset = rating_models.RatingsReview.objects.prefetch_related('compliment')\
+                                                                 .filter(is_live=True,
+                                                                         moderation_status__in=[rating_models.RatingsReview.PENDING,
+                                                                                                rating_models.RatingsReview.APPROVED],
+                                                                         lab_ratings__network=lab_obj.network)
         lab_serializer = diagnostic_serializer.LabModelSerializer(lab_obj, context={"request": request,
                                                                                     "entity": entity,
                                                                                     "rating_queryset": rating_queryset})
