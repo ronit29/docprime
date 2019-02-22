@@ -1142,8 +1142,8 @@ class DoctorAppointmentRetrieveSerializer(OpdAppointmentSerializer):
     doctor = AppointmentRetrieveDoctorSerializer()
     mask_data = serializers.SerializerMethodField()
 
-    def get_mask_data(self):
-        mask_number = self.mask_number.first()
+    def get_mask_data(self, obj):
+        mask_number = obj.mask_number.first()
         if mask_number:
             return mask_number.build_data()
         return None
