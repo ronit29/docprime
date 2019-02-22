@@ -713,7 +713,7 @@ class DoctorProfileUserViewSet(viewsets.GenericViewSet):
                     if doc_experience_details[-1] and doc_experience_details[-1].get('hospital') and doc_experience_details[-1].get('start_year') and doc_experience_details[-1].get('end_year'):
                         about_doctor += ' and from ' + str(doc_experience_details[-1].get('start_year')) + ' to ' + str(doc_experience_details[-1].get('end_year')) + ' at ' + doc_experience_details[-1].get('hospital')
 
-                    response_data['about'] = about_doctor
+            response_data['about'] = about_doctor
         if entity:
             response_data['url'] = entity.url
             if entity.breadcrumb:
