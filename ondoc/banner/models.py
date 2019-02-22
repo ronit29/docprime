@@ -1,4 +1,5 @@
 from django.contrib.gis.db import models
+from django.contrib.gis.geos import Point
 from django.contrib.postgres.fields import JSONField
 
 from ondoc.authentication import models as auth_model
@@ -42,6 +43,7 @@ class Banner(auth_model.TimeStampedModel):
     event_name = models.CharField(max_length=1000)
     latitude = models.FloatField(null=True, blank=True)
     longitude = models.FloatField(null=True, blank=True)
+    radius = models.FloatField(null=True, blank=True, default=0)
     show_in_app = models.BooleanField(default=True)
     app_screen = models.CharField(max_length=1000, null=True, blank=True)
     app_params = JSONField(null=True, blank=True)
@@ -65,12 +67,14 @@ class Banner(auth_model.TimeStampedModel):
         queryset = Banner.objects.filter(enable=True).order_by('-priority')[:10]
         slider_locate = dict(Banner.slider_location)
         final_result = []
-
         for data in queryset:
             resp = dict()
             resp['title'] = data.title
             resp['id'] = data.id
             resp['slider_location'] = slider_locate[data.slider_locate]
+            resp['latitude'] = data.latitude
+            resp['longitude'] = data.longitude
+            resp['radius'] = data.radius
             resp['start_date'] = data.start_date
             resp['end_date'] = data.end_date
             resp['priority'] = data.priority
