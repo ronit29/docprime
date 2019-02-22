@@ -15,7 +15,7 @@ class Thyrocare(BaseIntegrator):
     def thyrocare_auth(cls):
         username = settings.THYROCARE_USERNAME
         password = settings.THYROCARE_PASSWORD
-        url = 'https://www.thyrocare.com/api_beta/common.svc/%s/%s/portalorders/DSA/login' % (username, password)
+        url = '%s/common.svc/%s/%s/portalorders/DSA/login' % (settings.THYROCARE_BASE_URL, username, password)
         response = requests.get(url)
         if response.status_code != status.HTTP_200_OK or not response.ok:
             logger.info("[ERROR] Thyrocare authentication failed.")
@@ -35,7 +35,7 @@ class Thyrocare(BaseIntegrator):
             logger.error("[ERROR] Not Authenticate")
             return None
 
-        url = 'https://www.thyrocare.com/API_BETA/master.svc/%s/%s/products' % (api_key, type)
+        url = '%s/master.svc/%s/%s/products' % (settings.THYROCARE_BASE_URL, api_key, type)
         product_data_response = requests.get(url)
 
         if product_data_response.status_code != status.HTTP_200_OK or not product_data_response.ok:
@@ -78,7 +78,7 @@ class Thyrocare(BaseIntegrator):
         cls.thyrocare_data(obj_id, type)
 
     def _get_appointment_slots(self, pincode, date):
-        url = 'https://www.thyrocare.com/API_BETA/ORDER.svc/%s/%s/GetAppointmentSlots' % (pincode, date)
+        url = '%s/ORDER.svc/%s/%s/GetAppointmentSlots' % (settings.THYROCARE_BASE_URL, pincode, date)
         response = requests.get(url)
         if response.status_code != status.HTTP_200_OK or not response.ok:
             logger.error("[ERROR] Thyrocare Time slot api failed.")
@@ -88,7 +88,7 @@ class Thyrocare(BaseIntegrator):
         return resp_data
 
     def _get_is_user_area_serviceable(self, pincode):
-        url = "https://www.thyrocare.com/API_BETA/order.svc/%s/%s/PincodeAvailability" % (settings.THYROCARE_API_KEY, pincode)
+        url = "%s/order.svc/%s/%s/PincodeAvailability" % (settings.THYROCARE_BASE_URL, settings.THYROCARE_API_KEY, pincode)
         response = requests.get(url)
         if response.status_code != status.HTTP_200_OK or not response.ok:
             logger.error("[ERROR] Thyrocare pincode availability api failed")
@@ -104,7 +104,7 @@ class Thyrocare(BaseIntegrator):
         # Need to update when thyrocare API works. Static value for now
         payload = { 'Api_key': settings.THYROCARE_API_KEY, 'orderid': '4301', 'address': 'c-19/13', 'pincode': '122001', 'product': 'TESTS', 'Std': '', 'phone_no': '', 'mobile': '9460746448', 'email':'mayankgupta@docprime.com', 'Tsp': '', 'service_type': 'H', 'order_by': 'Mayank', 'rate': '180', 'hc': '20', 'appt_date': '2019-02-01 05:00 PM', 'reports': 'N', 'ref_code':'', 'pay_type':'Prepaid', 'Geo_loction':'', 'bencount':'1', 'bendataxml': '<NewDataSet><Ben_details><Name>Mayank</Name><Age>30</Age><Gender>M</Gender></Ben_details></NewDataSet>'}
         headers = { 'Content-Type': "application/json" }
-        url = "https://www.thyrocare.com/API_BETA/ORDER.svc/Postorderdata"
+        url = "%s/ORDER.svc/Postorderdata" % (settings.THYROCARE_BASE_URL)
 
         response = requests.post(url, data=json.dumps(payload), headers=headers)
         if response.status_code == status.HTTP_201_CREATED:
