@@ -1,30 +1,32 @@
 from uuid import UUID
 from ondoc.doctor import models as doc_models
+from ondoc.diagnostic import models as lab_models
 from ondoc.authentication import models as auth_models
 from django.utils.safestring import mark_safe
 from . import serializers
 from ondoc.api.v1 import utils as v1_utils
 from django.shortcuts import get_object_or_404
 from rest_framework import viewsets
-from rest_framework import mixins
 from rest_framework.response import Response
 from rest_framework import status, permissions
 from rest_framework.permissions import IsAuthenticated
 from ondoc.authentication.backends import JWTAuthentication
 from django.db import transaction
 from django.db.models import Q, Value, Case, When, F
+from ondoc.procedure.models import Procedure
 from django.contrib.auth import get_user_model
 from django.conf import settings
 import datetime, logging, re, random
+from django.utils import timezone
 
 User = get_user_model()
 logger = logging.getLogger(__name__)
 
 
 class DoctorBillingViewSet(viewsets.GenericViewSet):
-    #
-    # authentication_classes = (JWTAuthentication,)
-    # permission_classes = (IsAuthenticated, v1_utils.IsDoctor)
+    
+    authentication_classes = (JWTAuthentication,)
+    permission_classes = (IsAuthenticated, v1_utils.IsDoctor)
 
     def get_queryset(self):
         return auth_models.GenericAdmin.objects.none()
@@ -181,4 +183,263 @@ class DoctorBillingViewSet(viewsets.GenericViewSet):
         return Response(entities)
 
 
+class DoctorProfileView(viewsets.GenericViewSet):
 
+    authentication_classes = (JWTAuthentication, )
+    permission_classes = (IsAuthenticated, v1_utils.IsDoctor)
+
+    def get_queryset(self):
+        return doc_models.models.OpdAppointment.objects.none()
+
+    @transaction.non_atomic_requests
+    def retrieve(self, request):
+        from django.contrib.staticfiles.templatetags.staticfiles import static
+        response = dict()
+        response['is_super_user'] = False
+        response['is_super_user_lab'] = False
+        resp_data = None
+        today = datetime.date.today()
+        queryset = doc_models.OpdAppointment.objects.filter(doctor__is_live=True, hospital__is_live=True).filter(
+            (Q(
+                 Q(doctor__manageable_doctors__user=request.user,
+                   doctor__manageable_doctors__hospital=F('hospital'),
+                   doctor__manageable_doctors__is_disabled=False)
+                 |
+                 Q(doctor__manageable_doctors__user=request.user,
+                   doctor__manageable_doctors__hospital__isnull=True,
+                   doctor__manageable_doctors__is_disabled=False,
+                   )
+                 |
+                 Q(hospital__manageable_hospitals__doctor__isnull=True,
+                   hospital__manageable_hospitals__user=request.user,
+                   hospital__manageable_hospitals__is_disabled=False)
+             )
+            |
+            Q(
+                Q(doctor__manageable_doctors__user=request.user,
+                  doctor__manageable_doctors__super_user_permission=True,
+                  doctor__manageable_doctors__is_disabled=False,
+                  doctor__manageable_doctors__entity_type=v1_utils.GenericAdminEntity.DOCTOR, ) |
+                Q(hospital__manageable_hospitals__user=request.user,
+                  hospital__manageable_hospitals__super_user_permission=True,
+                  hospital__manageable_hospitals__is_disabled=False,
+                  hospital__manageable_hospitals__entity_type=v1_utils.GenericAdminEntity.HOSPITAL)
+            )),
+            Q(status=doc_models.OpdAppointment.ACCEPTED,
+              time_slot_start__date=today)
+            )\
+            .distinct().count()
+        lab_appointment_count = lab_models.LabAppointment.objects.filter(lab__manageable_lab_admins__user=request.user,
+                                                                         lab__manageable_lab_admins__is_disabled=False,
+                                                                         status=lab_models.LabAppointment.ACCEPTED,
+                                                                         time_slot_start__date=today)\
+                                                                 .distinct().count()
+        doctor_mobile = auth_models.DoctorNumber.objects.select_related('doctor', 'hospital')\
+                                                        .prefetch_related('doctor__images', 'doctor__qualifications',
+                                                                          'doctor__qualifications__qualification',
+                                                                          'doctor__doctor_clinics', 'doctor__languages',
+                                                                          'doctor__awards', 'doctor__medical_services',
+                                                                          'doctor__associations', 'doctor__experiences',
+                                                                          'doctor__mobiles', 'doctor__emails', 'hospital__spoc_details',
+                                                                          'doctor__qualifications__specialization',
+                                                                          'doctor__qualifications__college', 'doctor__doctorpracticespecializations',
+                                                                          'doctor__doctorpracticespecializations__specialization')\
+                                                        .filter(phone_number=request.user.phone_number, doctor__is_live=True)
+        if len(doctor_mobile):
+            doc_list = [doc.doctor for doc in doctor_mobile]
+            doc_serializer = serializers.DoctorProfileSerializer(doc_list, many=True, context={"request": request})
+            resp_data = doc_serializer.data
+        else:
+            doctor = request.user.doctor if hasattr(request.user, 'doctor') else None
+            if doctor and doctor.is_live:
+                doc_serializer = serializers.DoctorProfileSerializer(doctor, many=False,
+                                                                     context={"request": request})
+                resp_data = doc_serializer.data
+
+        if not resp_data:
+            response['profiles'] = []
+            response["is_doc"] = False
+            response["name"] = 'Admin'
+            admin_image_url = static('doctor_images/no_image.png')
+            admin_image = ''
+            if admin_image_url:
+                admin_image = request.build_absolute_uri(admin_image_url)
+            response["thumbnail"] = admin_image
+        else:
+            response["is_doc"] = True
+            response["profiles"] = resp_data
+
+        response["count"] = queryset
+        response['lab_appointment_count'] = lab_appointment_count
+
+        # Check access_type START
+        user = request.user
+        OPD_ONLY = 1
+        LAB_ONLY = 2
+        OPD_AND_LAB = 3
+
+        generic_admin = auth_models.GenericAdmin.objects.filter(user=user,
+                                                is_disabled=False)
+        generic_lab_admin = auth_models.GenericLabAdmin.objects.filter(user=user,
+                                                                is_disabled=False)
+        opd_admin = len(generic_admin)
+        lab_admin = len(generic_lab_admin)
+        if opd_admin and lab_admin:
+            response["access_type"] = OPD_AND_LAB
+        elif opd_admin and not lab_admin:
+            response["access_type"] = OPD_ONLY
+        elif lab_admin:
+            response["access_type"] = LAB_ONLY
+        # Check access_type END
+
+        for opd in generic_admin:
+            if opd.super_user_permission:
+                response['is_super_user'] = True
+                break
+        for opd in generic_lab_admin:
+            if opd.super_user_permission:
+                response['is_super_user_lab'] = True
+                break
+        return Response(response)
+
+
+class DoctorPermission(permissions.BasePermission):
+    message = 'Doctor is allowed to perform action only.'
+
+    def has_permission(self, request, view):
+        if request.user.user_type == User.DOCTOR:
+            return True
+        return False
+
+
+class DoctorBlockCalendarViewSet(viewsets.GenericViewSet):
+
+    serializer_class = serializers.DoctorLeaveSerializer
+    authentication_classes = (JWTAuthentication, )
+    permission_classes = (IsAuthenticated, DoctorPermission,)
+    INTERVAL_MAPPING = {doc_models.DoctorLeave.INTERVAL_MAPPING.get(key): key for key in
+                        doc_models.DoctorLeave.INTERVAL_MAPPING.keys()}
+
+    def get_queryset(self):
+        user = self.request.user
+        return doc_models.DoctorLeave.objects.select_related('doctor', 'hospital')\
+                                             .filter(Q(deleted_at__isnull=True), Q(
+                                                   Q(doctor__manageable_doctors__user=user,
+                                                     doctor__manageable_doctors__entity_type=v1_utils.GenericAdminEntity.DOCTOR,
+                                                     doctor__manageable_doctors__is_disabled=False,
+                                                     doctor__manageable_doctors__hospital__isnull=True)
+                                                   |
+                                                   Q(doctor__manageable_doctors__user=user,
+                                                     doctor__manageable_doctors__entity_type=v1_utils.GenericAdminEntity.DOCTOR,
+                                                     doctor__manageable_doctors__is_disabled=False,
+                                                     doctor__manageable_doctors__hospital__isnull=False,
+                                                     doctor__manageable_doctors__hospital=F('hospital'))
+                                                   |
+                                                   Q(hospital__manageable_hospitals__user=user,
+                                                     hospital__manageable_hospitals__is_disabled=False,
+                                                     hospital__manageable_hospitals__entity_type=v1_utils.GenericAdminEntity.HOSPITAL)
+                                                   )
+                                                  |
+                                                  Q(
+                                                      Q(doctor__manageable_doctors__user=user,
+                                                        doctor__manageable_doctors__super_user_permission=True,
+                                                        doctor__manageable_doctors__is_disabled=False,
+                                                        doctor__manageable_doctors__entity_type=v1_utils.GenericAdminEntity.DOCTOR)
+                                                      |
+                                                      Q(hospital__manageable_hospitals__user=user,
+                                                        hospital__manageable_hospitals__is_disabled=False,
+                                                        hospital__manageable_hospitals__entity_type=v1_utils.GenericAdminEntity.HOSPITAL,
+                                                        hospital__manageable_hospitals__super_user_permission=True)
+                                                   )
+                                                  ).distinct()
+
+    @transaction.non_atomic_requests
+    def list(self, request, *args, **kwargs):
+        serializer = serializers.DoctorLeaveValidateQuerySerializer(data=request.query_params)
+        serializer.is_valid(raise_exception=True)
+        validated_data = serializer.validated_data
+        doctor_id = validated_data.get('doctor_id')
+        hospital_id = validated_data.get('hospital_id')
+        queryset = self.get_queryset()
+        if doctor_id and hospital_id:
+            queryset= queryset.filter(doctor_id=doctor_id, hospital_id=hospital_id)
+        elif doctor_id and not hospital_id:
+            queryset = queryset.filter(doctor_id=doctor_id)
+        elif hospital_id and not doctor_id:
+            queryset = queryset.filter(hospital_id=hospital_id)
+        serializer = serializers.DoctorLeaveSerializer(queryset, many=True)
+        return Response(serializer.data)
+
+    def create_leave_data(self, hospital_id, validated_data, start_time, end_time):
+        return {
+                    "doctor": validated_data.get('doctor_id').id,
+                    "hospital": hospital_id,
+                    "start_time": start_time,
+                    "end_time": end_time,
+                    "start_date": validated_data.get("start_date"),
+                    "end_date": validated_data.get("end_date")
+                }
+
+    @transaction.atomic
+    def create(self, request, *args, **kwargs):
+        doctor_leave_data = []
+        serializer = serializers.DoctorBlockCalenderSerializer(data=request.data, context={"request": request})
+        serializer.is_valid(raise_exception=True)
+        validated_data = serializer.validated_data
+
+        hospital_id = validated_data.get("hospital_id").id if validated_data.get("hospital_id") else None
+        start_time = validated_data.get("start_time")
+        end_time = validated_data.get("end_time")
+
+        if not start_time:
+            start_time = self.INTERVAL_MAPPING[validated_data.get("interval")][0]
+        if not end_time:
+            end_time = self.INTERVAL_MAPPING[validated_data.get("interval")][1]
+        if not hospital_id:
+            assoc_hospitals = validated_data.get('doctor_id').hospitals.all()
+            for hospital in assoc_hospitals:
+                doctor_leave_data.append(self.create_leave_data(hospital.id, validated_data, start_time, end_time))
+        else:
+            doctor_leave_data.append(self.create_leave_data(hospital_id, validated_data, start_time, end_time))
+
+        doctor_leave_serializer = serializers.DoctorLeaveSerializer(data=doctor_leave_data, many=True)
+        doctor_leave_serializer.is_valid(raise_exception=True)
+        # self.get_queryset().update(deleted_at=timezone.now())        Now user can apply more than one leave
+        doctor_leave_serializer.save()
+        return Response(doctor_leave_serializer.data)
+
+
+class DoctorDataViewset(viewsets.GenericViewSet):
+
+    authentication_classes = (JWTAuthentication,)
+    permission_classes = (IsAuthenticated, DoctorPermission,)
+
+    def get_practice_specializations(self, request, *args, **kwargs):
+        qs = doc_models.PracticeSpecialization.objects.all()
+        serializer = serializers.PracticeSpecializationSerializer(qs, many=True)
+        return Response(serializer.data)
+
+    def get_doctor_qualifications(self, request, *args, **kwargs):
+        qs = doc_models.Qualification.objects.all()
+        serializer = serializers.QualificationSerializer(qs, many=True)
+        return Response(serializer.data)
+
+    def get_languages(self, request, *args, **kwargs):
+        qs = doc_models.Language.objects.all()
+        serializer = serializers.LanguageSerializer(qs, many=True)
+        return Response(serializer.data)
+
+    def get_doctor_medical_services(self, request, *args, **kwargs):
+        qs = doc_models.MedicalService.objects.all()
+        serializer = serializers.MedicalServiceSerializer(qs, many=True)
+        return Response(serializer.data)
+
+    def get_procedures(self, request, *args, **kwargs):
+        qs = Procedure.objects.filter(is_enabled=True)
+        serializer = serializers.ProcedureSerializer(qs, many=True)
+        return Response(serializer.data)
+
+    def get_specializations(self, request, *args, **kwargs):
+        qs = doc_models.Specialization.objects.all()
+        serializer = serializers.SpecializationSerializer(qs, many=True)
+        return Response(serializer.data)

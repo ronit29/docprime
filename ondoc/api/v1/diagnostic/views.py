@@ -205,7 +205,8 @@ class LabList(viewsets.ReadOnlyModelViewSet):
             availablelabs__lab_pricing_group__labs__location__dwithin=(
                 Point(float(long),
                       float(lat)),
-                D(m=max_distance))).annotate(
+                D(m=max_distance))). annotate(
+            priority_score=F('availablelabs__lab_pricing_group__labs__lab_priority') * F('priority')).annotate(
             distance=Distance('availablelabs__lab_pricing_group__labs__location', pnt)).annotate(
             lab=F('availablelabs__lab_pricing_group__labs'), mrp=F('availablelabs__mrp'),
             price=Case(
@@ -232,6 +233,7 @@ class LabList(viewsets.ReadOnlyModelViewSet):
                       float(lat)),
                 D(
                     m=max_distance))).annotate(
+            priority_score=F('availablelabs__lab_pricing_group__labs__lab_priority') * F('priority')).annotate(
             distance=Distance('availablelabs__lab_pricing_group__labs__location', pnt)).annotate(
             lab=F('availablelabs__lab_pricing_group__labs'), mrp=F('availablelabs__mrp'),
             price=Case(
@@ -276,7 +278,7 @@ class LabList(viewsets.ReadOnlyModelViewSet):
         if package_type == 2:
             all_packages = filter(lambda x: not x.home_collection_possible, all_packages)
         if not sort_on:
-            all_packages = sorted(all_packages, key=lambda x: x.priority if hasattr(x, 'priority') and x.priority is not None else -float('inf'), reverse=True)
+            all_packages = sorted(all_packages, key=lambda x: x.priority_score if hasattr(x, 'priority_score') and x.priority_score is not None else -float('inf'), reverse=True)
         elif sort_on == 'fees':
             all_packages = sorted(all_packages, key=lambda x: x.price if hasattr(x, 'price') and x.price is not None else -float('inf'))
         elif sort_on == 'distance':

@@ -10,7 +10,7 @@ from ondoc.doctor.models import (Doctor, Language, MedicalService, Specializatio
                                  DoctorClinic, DoctorMapping, DoctorImage, OpdAppointment, CompetitorInfo,
                                  SpecializationDepartment, SpecializationField, PracticeSpecialization,
                                  VisitReason, CancellationReason, PracticeSpecializationContent, OfflinePatients, OfflineOPDAppointments,
-                                 DoctorMobileOtp, UploadDoctorData)
+                                 DoctorMobileOtp, UploadDoctorData, DoctorLeave)
 
 from ondoc.diagnostic.models import (Lab, LabNetwork, LabTest, LabTestType,LabService,
                                       AvailableLabTest, LabAppointment, CommonTest, CommonDiagnosticCondition, LabPricingGroup,
@@ -64,6 +64,8 @@ from ondoc.seo.models import SeoLabNetwork
 from ondoc.elastic.models import DemoElastic
 from .elastic import DemoElasticAdmin
 from ondoc.banner.models import Banner
+from .integrations import IntegratorMapping, IntegratorMappingAdmin
+from .integrations import IntegratorProfileMapping, IntegratorProfileMappingAdmin
 
 # Admin Site config
 admin.site.site_header = 'Ondoc CRM'
@@ -98,6 +100,7 @@ admin.site.register(MedicalCondition, MedicalConditionAdmin)
 admin.site.register(HealthTip, HealthTipAdmin)
 admin.site.register(OfflinePatients, OfflinePatientAdmin)
 admin.site.register(OfflineOPDAppointments)
+admin.site.register(DoctorLeave)
 
 admin.site.register(College, CollegeAdmin)
 admin.site.register(HospitalNetwork, HospitalNetworkAdmin)
@@ -162,3 +165,6 @@ admin.site.register(EntityUrls, EntityUrlsAdmin)
 admin.site.register(PaymentOptions, PaymentOptionsAdmin)
 admin.site.register(UserConfig)
 admin.site.register(UploadDoctorData, UploadDoctorDataAdmin)
+
+admin.site.register(IntegratorMapping, IntegratorMappingAdmin)
+admin.site.register(IntegratorProfileMapping, IntegratorProfileMappingAdmin)

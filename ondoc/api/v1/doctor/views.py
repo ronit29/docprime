@@ -24,6 +24,7 @@ from ondoc.procedure.models import Procedure, ProcedureCategory, CommonProcedure
     get_selected_and_other_procedures, CommonProcedure
 from ondoc.seo.models import NewDynamic
 from . import serializers
+from ondoc.api.v2.doctor import serializers as v2_serializers
 from ondoc.api.pagination import paginate_queryset, paginate_raw_query
 from ondoc.api.v1.utils import convert_timings, form_time_slot, IsDoctor, payment_details, aware_time_zone, \
     TimeSlotExtraction, GenericAdminEntity, get_opd_pem_queryset, offline_form_time_slots
@@ -1455,7 +1456,7 @@ class DoctorAvailabilityTimingViewSet(viewsets.ViewSet):
                                                      "qualifications__specialization")
                            .filter(pk=validated_data.get('doctor_id').id))
         doctor_serializer = serializers.DoctorTimeSlotSerializer(doctor_queryset, many=True)
-        doctor_leave_serializer = serializers.DoctorLeaveSerializer(
+        doctor_leave_serializer = v2_serializers.DoctorLeaveSerializer(
             models.DoctorLeave.objects.filter(doctor=validated_data.get("doctor_id"), deleted_at__isnull=True), many=True)
 
         timeslots = dict()
@@ -2663,7 +2664,7 @@ class OfflineCustomerViewSet(viewsets.GenericViewSet):
                 queryset = models.DoctorClinicTiming.objects.filter(doctor_clinic__doctor=validated_data.get('doctor_id'),
                                                                     doctor_clinic__hospital=validated_data.get(
                                                                         'hospital_id')).order_by("start")
-                doctor_leave_serializer = serializers.DoctorLeaveSerializer(
+                doctor_leave_serializer = v2_serializers.DoctorLeaveSerializer(
                     models.DoctorLeave.objects.filter(doctor=validated_data.get("doctor_id"), deleted_at__isnull=True),
                     many=True)
 
