@@ -133,34 +133,35 @@ class UserSpecificCouponSerializer(CouponListSerializer):
         if not random_coupons and not (coupons_data.exists() and len(coupons_data) == len(set(attrs.get("coupon_code")))):
             raise serializers.ValidationError("Invalid Coupon Codes")
 
-        if lab and not tests:
-            raise serializers.ValidationError("tests also required with lab")
-        elif not lab and tests:
-            raise serializers.ValidationError("lab also required with tests")
-        elif not (lab or tests) and coupons_data.filter(Q(lab_network__isnull=False) | Q(lab__isnull=False) | Q(test__isnull=False)):
-            raise serializers.ValidationError("no lab and test data given for lab specific coupon")
-        elif (lab and tests):
-            tests_qs = AvailableLabTest.objects.filter(lab_pricing_group__labs=attrs["lab"],
-                                                       enabled=True,
-                                                       test__in=attrs["tests"])
-            if len(tests_qs) != len(tests):
-                raise serializers.ValidationError('Invalid tests for given lab')
+        if product_id == Order.LAB_PRODUCT_ID:
+            if lab and not tests:
+                raise serializers.ValidationError("tests also required with lab")
+            elif not lab and tests:
+                raise serializers.ValidationError("lab also required with tests")
+            elif not (lab or tests) and coupons_data.filter(Q(lab_network__isnull=False) | Q(lab__isnull=False) | Q(test__isnull=False)):
+                raise serializers.ValidationError("no lab and test data given for lab specific coupon")
+            elif (lab and tests):
+                tests_qs = AvailableLabTest.objects.filter(lab_pricing_group__labs=attrs["lab"],
+                                                           enabled=True,
+                                                           test__in=attrs["tests"])
+                if len(tests_qs) != len(tests):
+                    raise serializers.ValidationError('Invalid tests for given lab')
 
-            if coupons_data.filter(Q(lab_network__isnull=False) | Q(lab__isnull=False) | Q(test__isnull=False)):
-                for coupon in coupons_data:
-                    obj = LabAppointment()
-                    if not obj.validate_product_coupon(coupon_obj=coupon,
-                                                       lab=lab, test=tests,
-                                                       product_id=Order.LAB_PRODUCT_ID):
-                        raise serializers.ValidationError('Invalid coupon code - ' + str(coupon))
+                if coupons_data.filter(Q(lab_network__isnull=False) | Q(lab__isnull=False) | Q(test__isnull=False)):
+                    for coupon in coupons_data:
+                        obj = LabAppointment()
+                        if not obj.validate_product_coupon(coupon_obj=coupon,
+                                                           lab=lab, test=tests,
+                                                           product_id=Order.LAB_PRODUCT_ID):
+                            raise serializers.ValidationError('Invalid coupon code - ' + str(coupon))
 
-        if (doctor or hospital) and not(doctor and hospital):
-            raise serializers.ValidationError("either doctor or hospital is missing")
-        else:
-            if (procedures and not Doctor.objects.filter(id=doctor.id, doctor_clinics__hospital=hospital, doctor_clinics__procedures_from_doctor_clinic__procedure__in=procedures).exists()):
-                raise serializers.ValidationError("wrong combination of doctor, hospital and procedures")
-            elif not procedures and not Doctor.objects.filter(id=doctor.id, doctor_clinics__hospital=hospital).exists():
+        elif product_id == Order.DOCTOR_PRODUCT_ID:
+            if doctor and hospital and not Doctor.objects.filter(id=doctor.id, doctor_clinics__hospital=hospital).exists():
                 raise serializers.ValidationError("wrong combination of doctor and hospital")
+            elif doctor and hospital and procedures and \
+                not Doctor.objects.filter(id=doctor.id, doctor_clinics__hospital=hospital,
+                                          doctor_clinics__procedures_from_doctor_clinic__procedure__in=procedures).exists():
+                    raise serializers.ValidationError("wrong combination of doctor, hospital and procedures")
             else:
                 for coupon in coupons_data:
                     obj = OpdAppointment()

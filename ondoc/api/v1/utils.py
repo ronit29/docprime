@@ -607,7 +607,7 @@ class CouponsMixin(object):
         hospital = kwargs.get("hospital")
         procedures = kwargs.get("procedures", [])
 
-        if coupon_obj.lab and (not lab or coupon_obj.lab != lab):
+        if coupon_obj.lab and coupon_obj.lab != lab:
             return False
 
         if coupon_obj.lab_network and (not lab or lab.network!=coupon_obj.lab_network):
