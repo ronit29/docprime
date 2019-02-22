@@ -1122,7 +1122,7 @@ class AppointmentRetrieveSerializer(OpdAppointmentSerializer):
         fields = ('id', 'patient_image', 'patient_name', 'type', 'profile', 'otp', 'is_rated', 'rating_declined',
                   'allowed_action', 'effective_price', 'deal_price', 'status', 'time_slot_start', 'time_slot_end',
                   'doctor', 'hospital', 'allowed_action', 'doctor_thumbnail', 'patient_thumbnail', 'procedures', 'mrp',
-                  'invoices', 'cancellation_reason')
+                  'invoices', 'cancellation_reason', 'payment_type')
 
     def get_procedures(self, obj):
         if obj:
@@ -1140,13 +1140,20 @@ class DoctorAppointmentRetrieveSerializer(OpdAppointmentSerializer):
     profile = UserProfileSerializer()
     hospital = HospitalModelSerializer()
     doctor = AppointmentRetrieveDoctorSerializer()
+    mask_data = serializers.SerializerMethodField()
+
+    def get_mask_data(self, obj):
+        mask_number = obj.mask_number.first()
+        if mask_number:
+            return mask_number.build_data()
+        return None
 
     class Meta:
         model = OpdAppointment
         fields = ('id', 'patient_image', 'patient_name', 'type', 'profile', 'allowed_action', 'effective_price',
                   'deal_price', 'status', 'time_slot_start', 'time_slot_end',
                   'doctor', 'hospital', 'allowed_action', 'doctor_thumbnail', 'patient_thumbnail',
-                  'display_name')
+                  'display_name', 'mask_data', 'payment_type', 'mrp')
 
 
 class HealthTipSerializer(serializers.ModelSerializer):

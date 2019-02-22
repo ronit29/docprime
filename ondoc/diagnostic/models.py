@@ -4,7 +4,7 @@ from django.contrib.gis.db import models
 from django.contrib.staticfiles.templatetags.staticfiles import static
 from django.core.validators import MaxValueValidator, MinValueValidator, FileExtensionValidator
 from django.template.loader import render_to_string
-from hardcopy import bytestring_to_pdf
+# from hardcopy import bytestring_to_pdf
 
 from ondoc.account.models import MerchantPayout, ConsumerAccount, Order, UserReferred, MoneyPool, Invoice
 from ondoc.authentication.models import (TimeStampedModel, CreatedByModel, Image, Document, QCModel, UserProfile, User,
@@ -1369,7 +1369,7 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin)
             # while completing appointment
             if database_instance and database_instance.status != self.status and self.status == self.COMPLETED:
                 # add a merchant_payout entry
-                if self.merchant_payout is None:
+                if self.merchant_payout is None and self.payment_type not in [OpdAppointment.COD]:
                     self.save_merchant_payout()
                 # credit cashback if any
                 if self.cashback is not None and self.cashback > 0:
@@ -1687,11 +1687,15 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin)
 
         coupon_discount, coupon_cashback, coupon_list = Coupon.get_total_deduction(data, effective_price)
 
-        if data.get("payment_type") in [OpdAppointment.COD, OpdAppointment.PREPAID]:
+        if data.get("payment_type") in [OpdAppointment.PREPAID]:
             if coupon_discount >= effective_price:
                 effective_price = 0
             else:
                 effective_price = effective_price - coupon_discount
+
+        if data.get("payment_type") in [OpdAppointment.COD]:
+            effective_price = 0
+            coupon_discount, coupon_cashback, coupon_list = 0, 0, []
 
         return {
             "deal_price" : total_deal_price,
