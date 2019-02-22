@@ -1023,7 +1023,11 @@ class LabList(viewsets.ReadOnlyModelViewSet):
         #     entity = entity.first()
         rating_queryset = lab_obj.rating.filter(is_live=True)
         if lab_obj.network:
-            rating_queryset = rating_models.RatingsReview.objects.prefetch_related('compliment').filter(is_live=True, lab_ratings__network=lab_obj.network)
+            rating_queryset = rating_models.RatingsReview.objects.prefetch_related('compliment')\
+                                                                 .filter(is_live=True,
+                                                                         moderation_status__in=[rating_models.RatingsReview.PENDING,
+                                                                                                rating_models.RatingsReview.APPROVED],
+                                                                         lab_ratings__network=lab_obj.network)
         lab_serializer = diagnostic_serializer.LabModelSerializer(lab_obj, context={"request": request,
                                                                                     "entity": entity,
                                                                                     "rating_queryset": rating_queryset})

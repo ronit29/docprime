@@ -57,6 +57,7 @@ from django import forms
 from decimal import Decimal
 from .common import AssociatedMerchantInline
 from ondoc.sms import api
+from ondoc.ratings_review import models as rating_models
 
 class AutoComplete:
     def autocomplete_view(self, request):
@@ -1442,7 +1443,7 @@ class DoctorOpdAppointmentAdmin(admin.ModelAdmin):
             return ('booking_id', 'doctor', 'doctor_id', 'doctor_details', 'hospital', 'hospital_details', 'kyc',
                     'contact_details', 'profile', 'profile_detail', 'user', 'booked_by', 'procedures_details',
                     'fees', 'effective_price', 'mrp', 'deal_price', 'payment_status', 'status', 'cancel_type',
-                    'cancellation_reason', 'cancellation_comments',
+                    'cancellation_reason', 'cancellation_comments', 'ratings',
                     'start_date', 'start_time', 'payment_type', 'otp', 'insurance', 'outstanding', 'invoice_urls')
         elif request.user.groups.filter(name=constants['OPD_APPOINTMENT_MANAGEMENT_TEAM']).exists():
             return ('booking_id', 'doctor_name', 'doctor_id', 'doctor_details', 'hospital_name', 'hospital_details',
@@ -1458,7 +1459,8 @@ class DoctorOpdAppointmentAdmin(admin.ModelAdmin):
 
     def get_readonly_fields(self, request, obj=None):
         if request.user.is_superuser and request.user.is_staff:
-            return 'booking_id', 'doctor_id', 'doctor_details', 'contact_details', 'hospital_details', 'kyc', 'procedures_details', 'invoice_urls'
+            return ('booking_id', 'doctor_id', 'doctor_details', 'contact_details', 'hospital_details', 'kyc',
+                    'procedures_details', 'invoice_urls', 'ratings')
         elif request.user.groups.filter(name=constants['OPD_APPOINTMENT_MANAGEMENT_TEAM']).exists():
             return ('booking_id', 'doctor_name', 'doctor_id', 'doctor_details', 'hospital_name',
                     'hospital_details', 'kyc', 'contact_details',
@@ -1468,6 +1470,19 @@ class DoctorOpdAppointmentAdmin(admin.ModelAdmin):
                     'admin_information', 'otp', 'insurance', 'outstanding', 'procedures_details','invoice_urls')
         else:
             return ('invoice_urls')
+
+    def ratings(self, obj):
+        rating_queryset = rating_models.RatingsReview.objects.filter(appointment_id=obj.id).first()
+        if rating_queryset:
+            review = rating_queryset.review if rating_queryset.review else ''
+            url = '/admin/ratings_review/ratingsreview/%s/change' % (rating_queryset.id)
+            response = mark_safe('''<p>Ratings: %s</p><p>Review: %s</p><p>Status: <b>%s</b></p><p><a href="%s" target="_blank">Link</a></p>'''
+                                 % (rating_queryset.ratings, review,
+                                    dict(rating_models.RatingsReview.MODERATION_TYPE_CHOICES)[rating_queryset.moderation_status],
+                                    url))
+            return response
+        return ''
+
 
     def invoice_urls(self, instance):
         invoices_urls = ''

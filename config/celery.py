@@ -1,12 +1,14 @@
 from __future__ import absolute_import, unicode_literals
 import environ
 import celery
+from celery.schedules import crontab
 import raven
 import os
 from django.conf import settings
 from raven.contrib.celery import register_signal, register_logger_signal
 from ondoc.account.tasks import refund_status_update, consumer_refund_update
 from celery.schedules import crontab
+from ondoc.doctor.tasks import save_avg_rating
 # from ondoc.doctor.services.update_search_score import DoctorSearchScore
 
 
@@ -61,5 +63,6 @@ def setup_periodic_tasks(sender, **kwargs):
     elastic_sync_cron_schedule = crontab(hour=19, minute=30)
 
     sender.add_periodic_task(elastic_sync_cron_schedule, dump_to_elastic.s(), name='Sync Elastic')
+    sender.add_periodic_task(crontab(hour=18, minute=30), save_avg_rating.s(), name='Update Lab and Doctor Average Rating')
     # doctor_search_score_creation_time = float(settings.CREATE_DOCTOR_SEARCH_SCORE) * float(3600.0)
     # sender.add_periodic_task(doctor_search_score_creation_time, create_search_score.s(), name='Doctor search score updaed')
