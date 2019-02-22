@@ -385,6 +385,9 @@ def push_signup_lead_to_matrix(self, data):
 @task(bind=True, max_retries=2)
 def push_order_to_matrix(self, data):
     try:
+        if not data:
+            raise Exception('Data not received for the task.')
+
         order_id = data.get('order_id', None)
         if not order_id:
             logger.error("[CELERY ERROR: Incorrect values provided.]")
@@ -396,6 +399,9 @@ def push_order_to_matrix(self, data):
             raise Exception("Order could not found against id - " + str(order_id))
 
         appointment_details = order_obj.appointment_details()
+        if not appointment_details:
+            raise Exception('Appointment details not found for order.')
+
         request_data = {
             'LeadSource': 'DocPrime',
             'Name': appointment_details.get('profile_name', ''),
@@ -423,6 +429,8 @@ def push_order_to_matrix(self, data):
             self.retry([data], countdown=countdown_time)
         else:
             resp_data = response.json()
+            if not resp_data:
+                raise Exception('Data received from matrix is null or empty.')
             #logger.error(response.text)
 
             if not resp_data.get('Id', None):
