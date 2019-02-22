@@ -216,7 +216,7 @@ class Lab(TimeStampedModel, CreatedByModel, QCModel, SearchKey):
     order_priority = models.PositiveIntegerField(blank=True, null=True, default=0)
     merchant = GenericRelation(auth_model.AssociatedMerchant)
     merchant_payout = GenericRelation(account_model.MerchantPayout)
-    lab_priority = models.PositiveIntegerField(blank=True, null=True, default=1)
+    lab_priority = models.PositiveIntegerField(blank=False, null=False, default=1)
 
     def __str__(self):
         return self.name
@@ -871,7 +871,7 @@ class LabTest(TimeStampedModel, SearchKey):
     about_test = models.TextField(blank=True, verbose_name='About the test')
     show_details = models.BooleanField(default=False)
     preparations = models.TextField(blank=True, verbose_name='Preparations for the test')
-    priority = models.IntegerField(default=0, null=True)
+    priority = models.IntegerField(default=1, null=False, blank=False)
     hide_price = models.BooleanField(default=False)
     searchable = models.BooleanField(default=True)
     categories = models.ManyToManyField(LabTestCategory,
