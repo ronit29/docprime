@@ -341,6 +341,7 @@ class LabForm(FormCleanMixin):
     primary_mobile = forms.CharField(required=True)
     primary_email = forms.EmailField(required=True)
     city = forms.CharField(required=True)
+    lab_priority = forms.CharField(required=True)
     operational_since = forms.ChoiceField(required=False, choices=hospital_operational_since_choices)
     home_pickup_charges = forms.DecimalField(required=False, initial=0)
     # onboarding_status = forms.ChoiceField(disabled=True, required=False, choices=Lab.ONBOARDING_STATUS)
@@ -570,7 +571,7 @@ class LabAdmin(ImportExportMixin, admin.GeoModelAdmin, VersionAdmin, ActionAdmin
         # check for errors
         errors = []
         required = ['name', 'about', 'license', 'primary_email', 'primary_mobile', 'operational_since', 'parking',
-                    'network_type', 'location', 'building', 'city', 'state', 'country', 'pin_code', 'agreed_rate_list', 'lab_priority']
+                    'network_type', 'location', 'building', 'city', 'state', 'country', 'pin_code', 'agreed_rate_list']
         if lab_obj.is_ppc_pathology_enabled or lab_obj.is_ppc_radiology_enabled:
             required += ['ppc_rate_list']
         for req in required:
