@@ -26,6 +26,7 @@
            }
         }
 
+
     </style>
 
 </head>
@@ -158,7 +159,11 @@
                         Amount Paid
                     </td>
                     <td style="border: 1px solid black;text-align: center;">
+                        {% if instance.payment_type == 2 %}
+                        {{cod_amount}}
+                        {% else %}
                         {{instance.effective_price}}
+                        {% endif %}
                     </td>
                 </tr>
                 </tbody>
