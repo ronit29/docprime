@@ -641,9 +641,9 @@ class DoctorProfileUserViewSet(viewsets.GenericViewSet):
                     for data in general_specialization:
                         specializations.append(data.name)
                     doc_spec = ', '.join(specializations[:-1])
-                    if specializations[-1].startswith('a') or specializations[-1].startswith('e') or\
-                            specializations[-1].startswith('i') or specializations[-1].startswith('o') or \
-                            specializations[-1].startswith('u'):
+                    if specializations[-1].lower().startswith('a') or specializations[-1].lower().startswith('e') or\
+                            specializations[-1].lower().startswith('i') or specializations[-1].lower().startswith('o') or \
+                            specializations[-1].lower().startswith('u'):
                         startswith = 'an'
                     else:
                         startswith = 'a'
