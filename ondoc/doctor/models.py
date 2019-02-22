@@ -1564,6 +1564,9 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
         transaction.on_commit(lambda: self.after_commit_tasks(database_instance, push_to_matrix))
 
     def save_merchant_payout(self):
+        if self.payment_type in [OpdAppointment.COD]:
+            raise Exception("Cannot create payout for COD appointments")
+
         payout_data = {
             "charged_amount" : self.effective_price,
             "payable_amount" : self.fees,
@@ -1676,9 +1679,9 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
         procedures = []
         if self.payment_type == OpdAppointment.COD:
             procedures.insert(0, {"name": "Consultation", "mrp": self.mrp,
-                                  "deal_price": self.deal_price,
-                                  "agreed_price": self.fees,
-                                  "discount": self.fees - self.deal_price})
+                                  "deal_price": self.mrp,
+                                  "agreed_price": self.mrp,
+                                  "discount": 0})
         else:
             procedure_mappings = self.procedure_mappings.select_related("procedure").all()
             procedures = [{"name": mapping.procedure.name, "mrp": mapping.mrp, "deal_price": mapping.deal_price,

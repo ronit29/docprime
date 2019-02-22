@@ -236,7 +236,12 @@
                                     {% endif %}
                                 </td>
                                 <td style="border: 1px solid black;text-align: center;color:#3f3f3f;font-size:16px;font-weight:500;">
+                                    {% if instance.payment_type == 2 %}
+                                    {{cod_amount}}
+                                    {% else %}
                                     {{instance.effective_price}}
+                                    {% endif %}
+
                                 </td>
                             </tr>
                             </tbody>
