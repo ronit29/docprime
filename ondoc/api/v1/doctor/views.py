@@ -2749,6 +2749,8 @@ class OfflineCustomerViewSet(viewsets.GenericViewSet):
             phone_number = []
             allowed_actions = []
             payout_amount = billing_status = None
+            mrp = None
+            payment_type = None
             if instance == OFFLINE:
                 patient_profile = OfflinePatientSerializer(app.user).data
                 is_docprime = False
@@ -2765,6 +2767,8 @@ class OfflineCustomerViewSet(viewsets.GenericViewSet):
             else:
                 is_docprime = True
                 effective_price = app.effective_price
+                mrp = app.mrp
+                payment_type = app.payment_type
                 deal_price = app.deal_price
                 allowed_actions = app.allowed_action(User.DOCTOR, request)
                 # phone_number.append({"phone_number": app.user.phone_number, "is_default": True})
@@ -2803,8 +2807,8 @@ class OfflineCustomerViewSet(viewsets.GenericViewSet):
             ret_obj['hospital_name'] = app.hospital.name
             ret_obj['time_slot_start'] = app.time_slot_start
             ret_obj['status'] = app.status
-            ret_obj['mrp'] = app.mrp or None
-            ret_obj['payment_type'] = app.payment_type or None
+            ret_obj['mrp'] = mrp
+            ret_obj['payment_type'] = payment_type
             ret_obj['billing_status'] = billing_status
             ret_obj['profile'] = patient_profile
             ret_obj['permission_type'] = app.pem_type
