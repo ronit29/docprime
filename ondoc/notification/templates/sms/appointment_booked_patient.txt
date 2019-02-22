@@ -14,7 +14,7 @@ Clinic Address : {{instance.hospital.get_hos_address}}
 Appointment Date and Time : {{instance.time_slot_start|date:"D jS F Y"}} || {{instance.time_slot_start|date:"h:i A"}}
 Helpline Toll Free Number : 1800-123-9419
 {% if instance.payment_type == 2 %}
-Please pay Rs {{instance.effective_price}} at the center at the time of appointment.
+Please pay Rs {{cod_amount}} at the center at the time of appointment.
 {% endif %}
 You will receive a confirmation email and sms once the booking is confirmed by the doctor.
 

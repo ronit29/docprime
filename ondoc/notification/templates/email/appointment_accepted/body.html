@@ -63,7 +63,7 @@
                     <td style="color: #3f3f3f; font-size: 16px; font-weight: 500;">
                         Hi<br/>The appointment for {{patient_name|capfirst}} with Dr {{doctor_name|capfirst}} on
                         {{instance.time_slot_start|date:"D jS F Y"}} at {{instance.time_slot_start|date:"h:i A"}} has
-                        been confirmed.{% if instance.payment_type == 2 %} Please pay Rs {{instance.effective_price}} at the clinic.{% endif %}
+                        been confirmed.{% if instance.payment_type == 2 %} Please pay Rs {{cod_amount}} at the clinic.{% endif %}
                     </td>
                 </tr>
                 </tbody>
