@@ -1146,13 +1146,14 @@ class DoctorAppointmentRetrieveSerializer(OpdAppointmentSerializer):
         mask_number = self.mask_number.first()
         if mask_number:
             return mask_number.build_data()
+        return None
 
     class Meta:
         model = OpdAppointment
         fields = ('id', 'patient_image', 'patient_name', 'type', 'profile', 'allowed_action', 'effective_price',
                   'deal_price', 'status', 'time_slot_start', 'time_slot_end',
                   'doctor', 'hospital', 'allowed_action', 'doctor_thumbnail', 'patient_thumbnail',
-                  'display_name')
+                  'display_name', 'mask_data')
 
 
 class HealthTipSerializer(serializers.ModelSerializer):

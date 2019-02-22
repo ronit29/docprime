@@ -919,6 +919,7 @@ class LabAppointmentRetrieveSerializer(LabAppointmentModelSerializer):
         mask_number = self.mask_number.first()
         if mask_number:
             return mask_number.build_data()
+        return None
 
     def get_lab_test(self, obj):
         return LabAppointmentTestMappingSerializer(obj.test_mappings.all(), many=True).data
@@ -957,7 +958,7 @@ class LabAppointmentRetrieveSerializer(LabAppointmentModelSerializer):
     class Meta:
         model = LabAppointment
         fields = ('id', 'type', 'lab_name', 'status', 'deal_price', 'effective_price', 'time_slot_start', 'time_slot_end','is_rated', 'rating_declined',
-                   'is_home_pickup', 'lab_thumbnail', 'lab_image', 'profile', 'allowed_action', 'lab_test', 'lab', 'otp', 'address', 'type', 'reports', 'invoices', 'cancellation_reason')
+                   'is_home_pickup', 'lab_thumbnail', 'lab_image', 'profile', 'allowed_action', 'lab_test', 'lab', 'otp', 'address', 'type', 'reports', 'invoices', 'cancellation_reason', 'mask_data')
 
 
 class DoctorLabAppointmentRetrieveSerializer(LabAppointmentModelSerializer):
