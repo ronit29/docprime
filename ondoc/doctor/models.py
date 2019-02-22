@@ -545,6 +545,9 @@ class Doctor(auth_model.TimeStampedModel, auth_model.QCModel, SearchKey):
             push_onboarding_qcstatus_to_matrix.apply_async(({'obj_type': self.__class__.__name__, 'obj_id': self.id}
                                                             ,), countdown=5)
 
+    def enabled_for_cod(self):
+        return True
+
     class Meta:
         db_table = "doctor"
 
