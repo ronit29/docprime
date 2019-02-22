@@ -644,28 +644,21 @@ class DoctorProfileUserViewSet(viewsets.GenericViewSet):
                     if specializations[-1].startswith('a') or specializations[-1].startswith('e') or\
                             specializations[-1].startswith('i') or specializations[-1].startswith('o') or \
                             specializations[-1].startswith('u'):
-                        startswith = 'a'
-                    else:
                         startswith = 'an'
+                    else:
+                        startswith = 'a'
                     about_doctor += ' is a proficient ' + doc_spec + ' and ' + startswith + ' ' + specializations[-1]
                 if doctor.experience_years() and doctor.experience_years() > 0:
                     about_doctor += ' with an experience of ' + str(doctor.experience_years()) + ' years'
                 about_doctor += '.'
-                if doctor.gender in ('m', 'f') and hospital_obj and hospital_obj.city and hospital_obj.state:
+                if doctor.gender in ('m', 'f') and hospital_obj and hospital_obj.city:
                     if hospital_obj.city:
-                        about_doctor += ' ' + person + ' is located in ' + hospital_obj.city
-                    if hospital_obj.state:
-                        about_doctor += ' ' + hospital_obj.state
-                    about_doctor += '.\n '
+                        about_doctor += ' ' + person + ' is located in ' + hospital_obj.city + '.\n '
 
             if doctor.name and hospital and hospital_obj and hospital_obj.city and hospital_obj.state:
                 about_doctor += doctor.name
                 if hospital_obj.city:
-                    about_doctor += ' practices at the ' + hospital.get('hospital_name') + ' in ' + hospital_obj.city
-                if hospital_obj.state:
-                    about_doctor += ' ' + hospital_obj.state + '. '
-                else:
-                    about_doctor += '. '
+                    about_doctor += ' practices at the ' + hospital.get('hospital_name') + ' in ' + hospital_obj.city + '. '
 
                 if hospital and hospital.get('hospital_name') and hospital.get('address'):
                     about_doctor += 'The ' + hospital.get('hospital_name') + ' is situated at ' + hospital.get('address') + '. '
