@@ -22,7 +22,7 @@ from ondoc.api.v1.utils import AgreedPriceCalculate, DealPriceCalculate, TimeSlo
 from ondoc.account import models as account_model
 from django.utils import timezone
 from datetime import timedelta
-from django.db.models import F, Sum, When, Case, Q
+from django.db.models import F, Sum, When, Case, Q, Avg
 from django.db import transaction
 from django.contrib.postgres.fields import JSONField
 from ondoc.doctor.models import OpdAppointment
@@ -216,6 +216,7 @@ class Lab(TimeStampedModel, CreatedByModel, QCModel, SearchKey):
     order_priority = models.PositiveIntegerField(blank=True, null=True, default=0)
     merchant = GenericRelation(auth_model.AssociatedMerchant)
     merchant_payout = GenericRelation(account_model.MerchantPayout)
+    avg_rating = models.DecimalField(max_digits=5, decimal_places=2, null=True, editable=False)
     lab_priority = models.PositiveIntegerField(blank=False, null=False, default=1)
 
     def __str__(self):
@@ -450,6 +451,16 @@ class Lab(TimeStampedModel, CreatedByModel, QCModel, SearchKey):
         if not result:
             result.extend(list(self.labmanager_set.filter(contact_type=LabManager.OWNER)))
         return result
+
+    @classmethod
+    def update_avg_rating(cls):
+        from django.db import connection
+        cursor = connection.cursor()
+        content_type = ContentType.objects.get_for_model(Lab)
+        if content_type:
+            cid = content_type.id
+            query = '''UPDATE lab l set avg_rating = (select avg(ratings) from ratings_review where content_type_id={} and object_id=l.id) '''.format(cid)
+            cursor.execute(query)
 
 
 class LabCertification(TimeStampedModel):
@@ -1413,6 +1424,9 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin)
         transaction.on_commit(lambda: self.app_commit_tasks(database_instance, push_to_matrix))
 
     def save_merchant_payout(self):
+        if self.payment_type in [OpdAppointment.COD]:
+            raise Exception("Cannot create payout for COD appointments")
+
         payout_amount = self.agreed_price
         if self.is_home_pickup:
             payout_amount += self.home_pickup_charges

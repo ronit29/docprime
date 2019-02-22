@@ -403,6 +403,16 @@ def generate_appointment_masknumber(data):
     return is_masking_done
 
 @task
+def send_rating_update_message(number, text):
+    data = {}
+    data['phone_number'] = number
+    data['text'] = mark_safe(text)
+    try:
+        notification_models.SmsNotification.send_rating_link(data)
+    except Exception as e:
+        logger.error("Error sending rating update sms")
+
+@task
 def send_appointment_reminder_message(number, patient_name, doctor, hospital_name, date):
     data = {}
     data['phone_number'] = number
