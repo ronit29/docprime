@@ -159,7 +159,7 @@ class Coupon(auth_model.TimeStampedModel):
                         tests_deal_price = obj.get_applicable_tests_with_total_price(coupon_obj=coupon, test_ids=data['test_ids'], lab=data["lab"]).get("total_price")
                         tests_deal_price = min(remaining_deal_price, tests_deal_price)
                         curr_discount = obj.get_discount(coupon, tests_deal_price)
-                    elif coupon.procedures.exists() and coupon.type == Coupon.DOCTOR and data.get("doctor") and data.get("hospital"):
+                    elif coupon.procedures.exists() and coupon.type == Coupon.DOCTOR and data.get("doctor") and data.get("hospital") and data.get("procedures"):
                         procedures_deal_price = obj.get_applicable_procedures_with_total_price(coupon_obj=coupon,
                                                                                        procedures=data['procedures'],
                                                                                        doctor=data["doctor"],
@@ -178,7 +178,7 @@ class Coupon(auth_model.TimeStampedModel):
                         tests_deal_price = obj.get_applicable_tests_with_total_price(coupon_obj=coupon, test_ids=data['test_ids'], lab=data["lab"]).get("total_price")
                         tests_deal_price = min(remaining_deal_price, tests_deal_price)
                         curr_cashback = obj.get_discount(coupon, tests_deal_price)
-                    elif coupon.procedures.exists() and coupon.type == Coupon.DOCTOR and data.get("doctor") and data.get("hospital"):
+                    elif coupon.procedures.exists() and coupon.type == Coupon.DOCTOR and data.get("doctor") and data.get("hospital") and data.get("procedures"):
                         procedures_deal_price = obj.get_applicable_procedures_with_total_price(coupon_obj=coupon,
                                                                                        procedures=data['procedures'],
                                                                                        doctor=data["doctor"],
