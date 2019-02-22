@@ -16,4 +16,4 @@ class IntegratorProfileMappingAdmin(admin.ModelAdmin):
     list_display = ('integrator_class_name', 'integrator_package_name', 'is_active',)
     fields = ('package', 'integrator_package_name', 'is_active',)
     readonly_fields = ('integrator_package_name',)
-    autocomplete_fields = ['package']
+    # autocomplete_fields = ['package']
