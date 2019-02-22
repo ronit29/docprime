@@ -2113,6 +2113,7 @@ class OfflineCustomerViewSet(viewsets.GenericViewSet):
         ret_obj['hospital'] = HospitalModelSerializer(appnt.hospital).data
         ret_obj['doctor'] = AppointmentRetrieveDoctorSerializer(appnt.doctor).data
         ret_obj['is_docprime'] = False
+        ret_obj['mask_data'] = None
         ret_obj['type'] = 'doctor'
         return ret_obj
 
@@ -2749,6 +2750,7 @@ class OfflineCustomerViewSet(viewsets.GenericViewSet):
             phone_number = []
             allowed_actions = []
             payout_amount = billing_status = None
+            mask_data = None
             mrp = None
             payment_type = None
             if instance == OFFLINE:
@@ -2770,6 +2772,9 @@ class OfflineCustomerViewSet(viewsets.GenericViewSet):
                 mrp = app.mrp
                 payment_type = app.payment_type
                 deal_price = app.deal_price
+                mask_number = app.mask_number.first()
+                if mask_number:
+                    mask_data = mask_number.build_data()
                 allowed_actions = app.allowed_action(User.DOCTOR, request)
                 # phone_number.append({"phone_number": app.user.phone_number, "is_default": True})
                 patient_profile = auth_serializers.UserProfileSerializer(app.profile, context={'request': request}).data
@@ -2808,6 +2813,7 @@ class OfflineCustomerViewSet(viewsets.GenericViewSet):
             ret_obj['time_slot_start'] = app.time_slot_start
             ret_obj['status'] = app.status
             ret_obj['mrp'] = mrp
+            ret_obj['mask_data'] = mask_data
             ret_obj['payment_type'] = payment_type
             ret_obj['billing_status'] = billing_status
             ret_obj['profile'] = patient_profile
@@ -2821,10 +2827,6 @@ class OfflineCustomerViewSet(viewsets.GenericViewSet):
             ret_obj['type'] = 'doctor'
             ret_obj['prescriptions'] = prescription
             final_result.append(ret_obj)
-            # if group.get(app.time_slot_start.strftime("%B %d, %Y")):
-            #     group[app.time_slot_start.strftime("%B %d, %Y")].append(ret_obj)
-            # else:
-            #     group[app.time_slot_start.strftime("%B %d, %Y")] = [ret_obj]
         return Response(final_result)
 
 
