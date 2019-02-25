@@ -172,8 +172,9 @@ class Order(TimeStampedModel):
         wallet_amount = cashback_amount = 0
         # If payment is required and appointment is created successfully, debit consumer's account
         if appointment_obj and not payment_not_required:
-            # debit consumer account and update appointment with price breakup
             wallet_amount, cashback_amount = consumer_account.debit_schedule(appointment_obj, self.product_id, amount)
+        # update appointment with price breakup
+        if appointment_obj:
             appointment_obj.price_data = {"wallet_amount": int(wallet_amount), "cashback_amount": int(cashback_amount)}
             appointment_obj.save()
 
@@ -402,6 +403,16 @@ class Order(TimeStampedModel):
                 )
             elif appointment_detail.get('payment_type') == OpdAppointment.INSURANCE:
                 order = cls.Order.objects.create(
+                    product_id=product_id,
+                    action=action,
+                    action_data=appointment_detail,
+                    payment_status=cls.PAYMENT_PENDING,
+                    parent=pg_order,
+                    cart_id=appointment_detail["cart_item_id"],
+                    user=user
+                )
+            elif appointment_detail.get('payment_type') == OpdAppointment.COD:
+                order = cls.objects.create(
                     product_id=product_id,
                     action=action,
                     action_data=appointment_detail,

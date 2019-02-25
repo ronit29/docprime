@@ -57,7 +57,12 @@ import jwt
 from decimal import Decimal
 from ondoc.web.models import ContactUs
 from ondoc.notification.tasks import send_pg_acknowledge
+
+from ondoc.ratings_review import models as rate_models
+from django.contrib.contenttypes.models import ContentType
+
 import re
+from ondoc.matrix.tasks import push_order_to_matrix
 
 
 logger = logging.getLogger(__name__)
@@ -1181,6 +1186,10 @@ class TransactionViewSet(viewsets.GenericViewSet):
                     "user id - {} and phone number - {}" \
                     ", order id - {}.".format(order_obj.user.id, order_obj.user.phone_number, order_obj.id)
 
+        # Push the order failure case to matrix.
+
+        push_order_to_matrix.apply_async(({'order_id': order_obj.id},), countdown=5)
+
         for email in settings.ORDER_FAILURE_EMAIL_ID:
             EmailNotification.publish_ops_email(email, html_body, 'Payment failure for order')
 
@@ -1747,7 +1756,8 @@ class OrderDetailViewSet(GenericViewSet):
                 "effective_price": order.action_data["effective_price"],
                 "data" : cart_serializers.CartItemSerializer(item, context={"validated_data" : None}).data,
                 "booking_id" : order.reference_id,
-                "time_slot_start" : order.action_data["time_slot_start"]
+                "time_slot_start" : order.action_data["time_slot_start"],
+                "payment_type" : order.action_data["payment_type"]
             }
             processed_order_data.append(curr)
 
@@ -1809,5 +1819,55 @@ class UserLeadViewSet(GenericViewSet):
             resp['status'] = "success"
 
 
+        return Response(resp)
+
+
+class UserRatingViewSet(GenericViewSet):
+
+    authentication_classes = (JWTAuthentication, )
+    permission_classes = (IsAuthenticated, IsConsumer )
+
+    def get_queryset(self):
+        return None
+
+    def list_ratings(self,request):
+        resp = []
+        user = request.user
+        queryset = rate_models.RatingsReview.objects.select_related('content_type')\
+                                                    .prefetch_related('content_object', 'compliment')\
+                                                    .filter(user=user).order_by('-updated_at')
+        if len(queryset):
+            for obj in queryset:
+                compliments_string = ''
+                address = ''
+                c_list = []
+                cid_list = []
+                if obj.content_type == ContentType.objects.get_for_model(Doctor):
+                    name = obj.content_object.get_display_name()
+                    appointment = OpdAppointment.objects.select_related('hospital').filter(id=obj.appointment_id).first()
+                    if appointment:
+                        address = appointment.hospital.get_hos_address()
+                else:
+                    name = obj.content_object.name
+                    address = obj.content_object.get_lab_address()
+                for cm in obj.compliment.all():
+                    c_list.append(cm.message)
+                    cid_list.append(cm.id)
+                if c_list:
+                    compliments_string = (', ').join(c_list)
+                rating_obj = {}
+                rating_obj['id'] = obj.id
+                rating_obj['ratings'] = obj.ratings
+                rating_obj['address'] = address
+                rating_obj['review'] = obj.review
+                rating_obj['entity_name'] = name
+                rating_obj['entity_id'] = obj.object_id
+                rating_obj['date'] = obj.updated_at.strftime('%b %d, %Y')
+                rating_obj['compliments'] = compliments_string
+                rating_obj['compliments_list'] = cid_list
+                rating_obj['appointment_id'] = obj.appointment_id
+                rating_obj['appointment_type'] = obj.appointment_type
+                rating_obj['icon'] = request.build_absolute_uri(obj.content_object.get_thumbnail())
+                resp.append(rating_obj)
         return Response(resp)
 

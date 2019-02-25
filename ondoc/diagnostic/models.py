@@ -4,7 +4,7 @@ from django.contrib.gis.db import models
 from django.contrib.staticfiles.templatetags.staticfiles import static
 from django.core.validators import MaxValueValidator, MinValueValidator, FileExtensionValidator
 from django.template.loader import render_to_string
-from hardcopy import bytestring_to_pdf
+# from hardcopy import bytestring_to_pdf
 
 from ondoc.account.models import MerchantPayout, ConsumerAccount, Order, UserReferred, MoneyPool, Invoice
 from ondoc.authentication.models import (TimeStampedModel, CreatedByModel, Image, Document, QCModel, UserProfile, User,
@@ -22,7 +22,7 @@ from ondoc.api.v1.utils import AgreedPriceCalculate, DealPriceCalculate, TimeSlo
 from ondoc.account import models as account_model
 from django.utils import timezone
 from datetime import timedelta
-from django.db.models import F, Sum, When, Case, Q
+from django.db.models import F, Sum, When, Case, Q, Avg
 from django.db import transaction
 from django.contrib.postgres.fields import JSONField
 from ondoc.doctor.models import OpdAppointment
@@ -216,6 +216,7 @@ class Lab(TimeStampedModel, CreatedByModel, QCModel, SearchKey):
     order_priority = models.PositiveIntegerField(blank=True, null=True, default=0)
     merchant = GenericRelation(auth_model.AssociatedMerchant)
     merchant_payout = GenericRelation(account_model.MerchantPayout)
+    avg_rating = models.DecimalField(max_digits=5, decimal_places=2, null=True, editable=False)
     lab_priority = models.PositiveIntegerField(blank=False, null=False, default=1)
 
     def __str__(self):
@@ -450,6 +451,16 @@ class Lab(TimeStampedModel, CreatedByModel, QCModel, SearchKey):
         if not result:
             result.extend(list(self.labmanager_set.filter(contact_type=LabManager.OWNER)))
         return result
+
+    @classmethod
+    def update_avg_rating(cls):
+        from django.db import connection
+        cursor = connection.cursor()
+        content_type = ContentType.objects.get_for_model(Lab)
+        if content_type:
+            cid = content_type.id
+            query = '''UPDATE lab l set avg_rating = (select avg(ratings) from ratings_review where content_type_id={} and object_id=l.id) '''.format(cid)
+            cursor.execute(query)
 
 
 class LabCertification(TimeStampedModel):
@@ -1370,7 +1381,7 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin)
             # while completing appointment
             if database_instance and database_instance.status != self.status and self.status == self.COMPLETED:
                 # add a merchant_payout entry
-                if self.merchant_payout is None:
+                if self.merchant_payout is None and self.payment_type not in [OpdAppointment.COD]:
                     self.save_merchant_payout()
                 # credit cashback if any
                 if self.cashback is not None and self.cashback > 0:
@@ -1413,6 +1424,9 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin)
         transaction.on_commit(lambda: self.app_commit_tasks(database_instance, push_to_matrix))
 
     def save_merchant_payout(self):
+        if self.payment_type in [OpdAppointment.COD]:
+            raise Exception("Cannot create payout for COD appointments")
+
         payout_amount = self.agreed_price
         if self.is_home_pickup:
             payout_amount += self.home_pickup_charges
@@ -1688,11 +1702,15 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin)
 
         coupon_discount, coupon_cashback, coupon_list = Coupon.get_total_deduction(data, effective_price)
 
-        if data.get("payment_type") in [OpdAppointment.COD, OpdAppointment.PREPAID]:
+        if data.get("payment_type") in [OpdAppointment.PREPAID]:
             if coupon_discount >= effective_price:
                 effective_price = 0
             else:
                 effective_price = effective_price - coupon_discount
+
+        if data.get("payment_type") in [OpdAppointment.COD]:
+            effective_price = 0
+            coupon_discount, coupon_cashback, coupon_list = 0, 0, []
 
         return {
             "deal_price" : total_deal_price,
