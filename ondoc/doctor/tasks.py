@@ -43,4 +43,4 @@ def update_prices():
     Doctor.update_all_deal_price()
     AvailableLabTest.update_all_deal_price()
     print('prices updated')
-    return True
+    return 'success'
