@@ -1034,7 +1034,6 @@ class TransactionViewSet(viewsets.GenericViewSet):
     serializer_class = serializers.TransactionSerializer
     queryset = PgTransaction.objects.none()
 
-    @transaction.atomic
     def save(self, request):
         ERROR_REDIRECT_URL = settings.BASE_URL + "/cart?error_code=1&error_message=%s"
         REDIRECT_URL = ERROR_REDIRECT_URL % "Error processing payment, please try again."
@@ -1075,15 +1074,18 @@ class TransactionViewSet(viewsets.GenericViewSet):
                     response_data = self.form_pg_transaction_data(resp_serializer.validated_data, order_obj)
                     if PgTransaction.is_valid_hash(response, product_id=order_obj.product_id):
                         pg_tx_queryset = None
+
                         try:
-                            pg_tx_queryset = PgTransaction.objects.create(**response_data)
+                            with transaction.atomic():
+                                pg_tx_queryset = PgTransaction.objects.create(**response_data)
                         except Exception as e:
                             logger.error("Error in saving PG Transaction Data - " + str(e))
 
                         try:
-                            if pg_tx_queryset:
-                                processed_data = order_obj.process_pg_order()
-                                success_in_process = True
+                            with transaction.atomic():
+                                if pg_tx_queryset:
+                                    processed_data = order_obj.process_pg_order()
+                                    success_in_process = True
                         except Exception as e:
                             logger.error("Error in processing order - " + str(e))
                 else:
