@@ -23,6 +23,7 @@ from dal import autocomplete
 from ondoc.api.v1.utils import GenericAdminEntity, util_absolute_url, util_file_name
 from ondoc.common.models import AppointmentHistory
 from ondoc.procedure.models import DoctorClinicProcedure, Procedure
+from safedelete.admin import SafeDeleteAdmin, highlight_deleted
 
 logger = logging.getLogger(__name__)
 
@@ -1010,7 +1011,7 @@ class CompetitorMonthlyVisitsInline(ReadOnlyInline):
     verbose_name_plural = 'Monthly Visits through Competitor Info'
 
 
-class DoctorAdmin(AutoComplete, ImportExportMixin, VersionAdmin, ActionAdmin, QCPemAdmin, nested_admin.NestedModelAdmin):
+class DoctorAdmin(AutoComplete, ImportExportMixin, VersionAdmin, ActionAdmin, QCPemAdmin, nested_admin.NestedModelAdmin, SafeDeleteAdmin):
     # class DoctorAdmin(nested_admin.NestedModelAdmin):
     resource_class = DoctorResource
     change_list_template = 'superuser_import_export.html'
@@ -1022,13 +1023,13 @@ class DoctorAdmin(AutoComplete, ImportExportMixin, VersionAdmin, ActionAdmin, QC
     #                 'is_online_consultation_enabled','online_consultation_fees')}),
     #                 (None,{'fields':('enabled','disabled_after','disable_reason','disable_comments','onboarding_status','assigned_to', \
     #                  'matrix_lead_id','batch', 'is_gold', 'lead_url', 'registered','is_live')}))
-    list_display = (
+    list_display = (highlight_deleted,
         'name', 'updated_at', 'data_status', 'onboarding_status', 'list_created_by', 'list_assigned_to', 'registered',
-        'get_onboard_link')
+        'get_onboard_link') + SafeDeleteAdmin.list_display
     date_hierarchy = 'created_at'
     list_filter = (
         'data_status', 'onboarding_status', 'is_live', 'enabled', 'is_insurance_enabled', 'doctorpracticespecializations__specialization',
-        CityFilter, CreatedByFilter)
+        CityFilter, CreatedByFilter) + SafeDeleteAdmin.list_filter
     form = DoctorForm
     inlines = [
         CompetitorInfoInline,

@@ -18,6 +18,8 @@ from django.contrib.contenttypes.fields import GenericForeignKey
 from django.contrib.contenttypes.models import ContentType
 from django.utils.functional import cached_property
 from datetime import date, timedelta, datetime
+from safedelete import SOFT_DELETE
+from safedelete.models import SafeDeleteModel
 
 
 class Image(models.Model):
@@ -1421,4 +1423,14 @@ class AssociatedMerchant(TimeStampedModel):
 
     class Meta:
         db_table = 'associated_merchant'
+
+
+class SoftDelete(SafeDeleteModel):
+    _safedelete_policy = SOFT_DELETE
+
+    class Meta:
+        abstract = True
+
+
+
 

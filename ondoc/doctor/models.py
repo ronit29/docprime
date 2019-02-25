@@ -57,7 +57,7 @@ import reversion
 from ondoc.doctor import models as doctor_models
 from django.db.models import Count
 from ondoc.api.v1.utils import RawSql
-
+from safedelete import SOFT_DELETE
 logger = logging.getLogger(__name__)
 
 
@@ -359,7 +359,8 @@ class College(auth_model.TimeStampedModel):
         db_table = "college"
 
 
-class Doctor(auth_model.TimeStampedModel, auth_model.QCModel, SearchKey):
+class Doctor(auth_model.TimeStampedModel, auth_model.QCModel, SearchKey, auth_model.SoftDelete):
+    _safedelete_policy = SOFT_DELETE
     SOURCE_PRACTO = "pr"
     SOURCE_CRM = 'crm'
 
