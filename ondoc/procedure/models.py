@@ -147,8 +147,8 @@ class ProcedureCategoryMapping(models.Model):
 
 
 class DoctorClinicProcedure(auth_model.TimeStampedModel):
-    procedure = models.ForeignKey(Procedure, on_delete=models.CASCADE)
-    doctor_clinic = models.ForeignKey(DoctorClinic, on_delete=models.CASCADE)
+    procedure = models.ForeignKey(Procedure, on_delete=models.CASCADE, related_name="doctor_clinics_from_procedure")
+    doctor_clinic = models.ForeignKey(DoctorClinic, on_delete=models.CASCADE, related_name="procedures_from_doctor_clinic")
     mrp = models.IntegerField(default=0)
     agreed_price = models.IntegerField(default=0)
     deal_price = models.IntegerField(default=0)
@@ -221,7 +221,7 @@ def get_selected_and_other_procedures(category_ids, procedure_ids, doctor=None, 
             all_procedures_under_doctor = []
             for doctor_clinic in all_clinics_of_doctor:
                 all_procedures_under_doctor.extend(
-                    doctor_clinic.doctorclinicprocedure_set.filter(procedure__is_enabled=True).values_list(
+                    doctor_clinic.procedures_from_doctor_clinic.filter(procedure__is_enabled=True).values_list(
                         'procedure_id', flat=True))
             all_procedures_under_doctor = set(all_procedures_under_doctor)
             selected_procedure_ids = ProcedureCategory.objects.select_related('preferred_procedure').filter(
@@ -234,7 +234,7 @@ def get_selected_and_other_procedures(category_ids, procedure_ids, doctor=None, 
             all_procedures_under_doctor = []
             for doctor_clinic in all_clinics_of_doctor:
                 all_procedures_under_doctor.extend(
-                    doctor_clinic.doctorclinicprocedure_set.filter(procedure__is_enabled=True).values_list('procedure_id',
+                    doctor_clinic.procedures_from_doctor_clinic.filter(procedure__is_enabled=True).values_list('procedure_id',
                                                                                                         flat=True))
             all_procedures_under_doctor = set(all_procedures_under_doctor)
             selected_procedure_ids = procedure_ids
@@ -246,7 +246,7 @@ def get_selected_and_other_procedures(category_ids, procedure_ids, doctor=None, 
             all_procedures_under_doctor = []
             for doctor_clinic in all_clinics_of_doctor:
                 all_procedures_under_doctor.extend(
-                    doctor_clinic.doctorclinicprocedure_set.filter(procedure__is_enabled=True).values_list(
+                    doctor_clinic.procedures_from_doctor_clinic.filter(procedure__is_enabled=True).values_list(
                         'procedure_id', flat=True))
             all_procedures_under_doctor = set(all_procedures_under_doctor)
             selected_procedure_ids = set(selected_procedure_ids)
@@ -256,7 +256,7 @@ def get_selected_and_other_procedures(category_ids, procedure_ids, doctor=None, 
             all_procedures_under_doctor = []
             for doctor_clinic in all_clinics_of_doctor:
                 all_procedures_under_doctor.extend(
-                    doctor_clinic.doctorclinicprocedure_set.filter(procedure__is_enabled=True).values_list('procedure_id', flat=True))
+                    doctor_clinic.procedures_from_doctor_clinic.filter(procedure__is_enabled=True).values_list('procedure_id', flat=True))
             all_procedures_under_doctor = set(all_procedures_under_doctor)
             selected_procedure_ids = []
             selected_procedure_ids = set(selected_procedure_ids)

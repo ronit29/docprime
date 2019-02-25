@@ -290,8 +290,7 @@ class LabList(viewsets.ReadOnlyModelViewSet):
             entity_url_dict.setdefault(item.get('lab_id'), [])
             entity_url_dict[item.get('lab_id')].append(item.get('url'))
         lab_data = Lab.objects.prefetch_related('rating', 'lab_documents', 'lab_timings', 'network',
-                                                'home_collection_charges').annotate(
-            avg_rating=Avg('rating__ratings')).in_bulk(lab_ids)
+                                                'home_collection_charges').in_bulk(lab_ids)
         category_data = {}
         test_package_ids = set([package.id for package in all_packages])
         test_package_queryset = LabTest.objects.prefetch_related('test__recommended_categories', 'test__parameter').filter(id__in=test_package_ids)
@@ -577,9 +576,7 @@ class LabList(viewsets.ReadOnlyModelViewSet):
 
         test_ids = parameters.get('ids', [])
 
-        tests = list(
-            LabTest.objects.filter(id__in=test_ids).values('id', 'name', 'hide_price', 'show_details', 'test_type',
-                                                           'url', 'is_package'))
+        tests = list(LabTest.objects.filter(id__in=test_ids).values('id', 'name', 'hide_price', 'show_details','test_type', 'url'))
         seo = None
         breadcrumb = None
         location = None
@@ -867,36 +864,18 @@ class LabList(viewsets.ReadOnlyModelViewSet):
         for obj in labs:
             temp_var[obj.id] = obj
             tests[obj.id] = list()
-            res = []
-            ret_data = list()
             if test_ids and obj.selected_group and obj.selected_group.selected_tests:
                 for test in obj.selected_group.selected_tests:
                     if test.custom_deal_price:
                         deal_price=test.custom_deal_price
                     else:
                         deal_price=test.computed_deal_price
-                    if test.test:
-                        lab_test_obj = test.test
-                        for cal in lab_test_obj.test.all().values('recommended_categories__name').distinct().annotate(dcount=Count('parameter')).all():
-                            if not cal.get('recommended_categories__name') == None:
-                                category = cal.get('recommended_categories__name')
-                                count = cal.get('dcount')
-                                res.append({'category': category, 'count': count})
-                        for i_obj in lab_test_obj.categories.all():
-                            icon = i_obj.icon.url if i_obj.icon and i_obj.icon.url else None
-                            res.append({'icon': icon})
-                    tests[obj.id].append({"id": test.test_id, "name": test.test.name, "deal_price": deal_price, "mrp": test.mrp, "number_of_tests": test.test.number_of_tests, 'categories': test.test.get_all_categories_detail(),
-                                          "url": test.test.url, "category_details": res, "parameters": [x.name for x in test.test.parameter.all()], "count": len([x for x in test.test.parameter.all()]), "is_package":test.test.is_package})
-                    # for sample in test.test.parameter.all():
-                    #     param_list = list()
-                    #     param_list.append({'parameters': sample})
-                    #     ret_data.append({"parameters": param_list})
-                    #     return ret_data
+                    tests[obj.id].append({"id": test.test_id, "name": test.test.name, "deal_price": deal_price, "mrp": test.mrp, "number_of_tests": test.test.number_of_tests, 'categories': test.test.get_all_categories_detail(), "url": test.test.url})
 
         # day_now = timezone.now().weekday()
         # days_array = [i for i in range(7)]
         # rotated_days_array = days_array[day_now:] + days_array[:day_now]
-        #lab_network = dict(
+        #lab_network = dict()
         for row in queryset:
 
             # lab_timing = list()
@@ -1071,7 +1050,11 @@ class LabList(viewsets.ReadOnlyModelViewSet):
         #     entity = entity.first()
         rating_queryset = lab_obj.rating.filter(is_live=True)
         if lab_obj.network:
-            rating_queryset = rating_models.RatingsReview.objects.prefetch_related('compliment').filter(is_live=True, lab_ratings__network=lab_obj.network)
+            rating_queryset = rating_models.RatingsReview.objects.prefetch_related('compliment')\
+                                                                 .filter(is_live=True,
+                                                                         moderation_status__in=[rating_models.RatingsReview.PENDING,
+                                                                                                rating_models.RatingsReview.APPROVED],
+                                                                         lab_ratings__network=lab_obj.network)
         lab_serializer = diagnostic_serializer.LabModelSerializer(lab_obj, context={"request": request,
                                                                                     "entity": entity,
                                                                                     "rating_queryset": rating_queryset})
@@ -1631,9 +1614,9 @@ class LabAppointmentView(mixins.CreateModelMixin,
                 #                                          order.product_id,
                 #                                          EmailNotification.OPS_PAYMENT_NOTIFICATION)
 
-                push_order_to_matrix.apply_async(
-                    ({'order_id': order.id, 'created_at': int(order.created_at.timestamp()),
-                      'timeslot': int(appointment_details['time_slot_start'].timestamp())},), countdown=5)
+                # push_order_to_matrix.apply_async(
+                #     ({'order_id': order.id, 'created_at': int(order.created_at.timestamp()),
+                #       'timeslot': int(appointment_details['time_slot_start'].timestamp())},), countdown=5)
             except:
                 pass
         else:
