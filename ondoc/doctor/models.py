@@ -1312,7 +1312,7 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
                 allowed = [self.RESCHEDULED_PATIENT, self.CANCELLED]
         elif user_type == auth_model.User.CONSUMER and current_datetime > self.time_slot_start:
             if self.status == self.ACCEPTED:
-                allowed = [self.COMPLETED]
+                allowed = [self.RESCHEDULED_PATIENT, self.COMPLETED]
 
         return allowed
 
