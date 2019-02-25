@@ -555,7 +555,7 @@ class Doctor(auth_model.TimeStampedModel, auth_model.QCModel, SearchKey):
             cursor.execute(query)
 
     def enabled_for_cod(self):
-        return True
+        return False
 
     class Meta:
         db_table = "doctor"
