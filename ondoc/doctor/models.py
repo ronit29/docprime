@@ -447,6 +447,15 @@ class Doctor(auth_model.TimeStampedModel, auth_model.QCModel, SearchKey):
     def __str__(self):
         return '{} ({})'.format(self.name, self.id)
 
+    def update_deal_price(self):        
+        # will update only this doctor prices and will be called on save    
+        pass
+
+    @classmethod
+    def update_all_deal_price(cls):
+        # will update all doctors prices 
+        pass
+
     def get_display_name(self):
         return "Dr. {}".format(self.name.title()) if self.name else None
 

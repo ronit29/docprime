@@ -40,5 +40,6 @@ def save_avg_rating():
 def update_prices():
     from ondoc.doctor.models import Doctor
     from ondoc.diagnostic.models import Lab
+    Doctor.update_all_deal_price()
     print('prices updated')
     return "hello"
