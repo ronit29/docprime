@@ -94,7 +94,8 @@ class PaymentOptions(TimeStampedModel):
         if pg_specific_coupon:
             allowed_options = queryset.filter(id=pg_specific_coupon.payment_option.id)
             not_allowed = queryset.filter(~models.Q(id=pg_specific_coupon.payment_option.id))
-            invalid_reason = "PG COUPON APPLIED"
+            invalid_reason = "Below payment modes are not applicable as you have used the coupon " + pg_specific_coupon.code + ". " \
+                             "Please remove the coupon to pay with the options listed below."
         else:
             allowed_options = queryset
             not_allowed = []
