@@ -1,18 +1,19 @@
 # from __future__ import absolute_import, unicode_literals
-# from celery import task
+# from django.core.management.base import BaseCommand
 # import requests
+# import logging
 # import uuid
+# import hashlib
 # import json
 # from rest_framework import status
 # from ondoc.elastic import models as elastic_models
-# import logging
 # logger = logging.getLogger(__name__)
 # from django.db import connection, transaction
 # import hashlib
 # import psycopg2
 # from decimal import Decimal
 #
-# @task()
+#
 # def dump_to_elastic():
 #
 #     try:
@@ -164,3 +165,9 @@
 #
 #     except Exception as e:
 #         logger.error("Error in syncing process of elastic - " + str(e))
+#
+#
+# class Command(BaseCommand):
+#
+#     def handle(self, **options):
+#         dump_to_elastic()

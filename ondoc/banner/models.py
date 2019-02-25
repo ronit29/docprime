@@ -64,7 +64,7 @@ class Banner(auth_model.TimeStampedModel):
     @staticmethod
     def get_all_banners(request):
 
-        queryset = Banner.objects.filter(enable=True).order_by('-priority')[:10]
+        queryset = Banner.objects.filter(enable=True).order_by('-priority')[:100]
         slider_locate = dict(Banner.slider_location)
         final_result = []
         for data in queryset:

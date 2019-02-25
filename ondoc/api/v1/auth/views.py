@@ -62,6 +62,7 @@ from ondoc.ratings_review import models as rate_models
 from django.contrib.contenttypes.models import ContentType
 
 import re
+from ondoc.matrix.tasks import push_order_to_matrix
 
 
 logger = logging.getLogger(__name__)
@@ -1181,6 +1182,10 @@ class TransactionViewSet(viewsets.GenericViewSet):
                     "user id - {} and phone number - {}" \
                     ", order id - {}.".format(order_obj.user.id, order_obj.user.phone_number, order_obj.id)
 
+        # Push the order failure case to matrix.
+
+        push_order_to_matrix.apply_async(({'order_id': order_obj.id},), countdown=5)
+
         for email in settings.ORDER_FAILURE_EMAIL_ID:
             EmailNotification.publish_ops_email(email, html_body, 'Payment failure for order')
 
@@ -1747,7 +1752,8 @@ class OrderDetailViewSet(GenericViewSet):
                 "effective_price": order.action_data["effective_price"],
                 "data" : cart_serializers.CartItemSerializer(item, context={"validated_data" : None}).data,
                 "booking_id" : order.reference_id,
-                "time_slot_start" : order.action_data["time_slot_start"]
+                "time_slot_start" : order.action_data["time_slot_start"],
+                "payment_type" : order.action_data["payment_type"]
             }
             processed_order_data.append(curr)
 

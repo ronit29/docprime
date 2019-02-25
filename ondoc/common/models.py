@@ -140,5 +140,12 @@ class AppointmentMaskNumber(TimeStampedModel):
     is_mask_number = models.BooleanField(default=True)
     is_deleted = models.BooleanField(default=False)
 
+    def build_data(self):
+        data = {}
+        data['appointment_id'] = self.object_id
+        data['mask_number'] = self.mask_number
+        data['validity_up_to'] = self.validity_up_to
+        return data
+
     class Meta:
         db_table = 'appointment_mask_number'
