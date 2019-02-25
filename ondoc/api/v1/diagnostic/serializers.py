@@ -262,10 +262,11 @@ class AvailableLabTestPackageSerializer(serializers.ModelSerializer):
                 rec_dict = dict()
                 # param_list = t_obj.lab_test.labtests.all().values_list("parameter__name", flat=True)
                 param_objs = t_obj.lab_test.labtests.all()
+                rec_dict['category'] = []
                 rec_obj = t_obj.lab_test.recommended_categories.all()
                 # category = [cat.name for cat in rec_obj]
                 for cat in rec_obj:
-                    rec_dict['category'] = cat.name
+                    rec_dict['category'].append(cat.name)
                 param_list = list()
                 for obj in param_objs:
                     param_list.append(obj.parameter.name)
