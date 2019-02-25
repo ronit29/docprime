@@ -349,15 +349,14 @@ class WHTSAPPNotification:
         elif notification_type == NotificationAction.APPOINTMENT_BOOKED and user and user.user_type == User.CONSUMER:
             body_template = "appointment_booked_patient"
 
-            # data.append(self.context.get('patient_name'))
-            # data.append(self.context.get('doctor_name'))
-            # data.append(datetime.strftime(self.context.get('instance').time_slot_start, '%d-%m-%Y'))
-            # data.append(datetime.strftime(self.context.get('instance').time_slot_start, '%H:%M'))
-            # data.append(self.context.get('instance').id)
-            # data.append(self.context.get('patient_name'))
-            # data.append(self.context.get('doctor_name'))
-            # data.append(self.context.get('instance').hospital.name)
-            # data.append(self.context.get('instance').hospital.get_hos_address())
+            data.append(self.context.get('patient_name'))
+            data.append(self.context.get('doctor_name'))
+            data.append(self.context.get('instance').id)
+            data.append(self.context.get('patient_name'))
+            data.append(self.context.get('doctor_name'))
+            data.append(self.context.get('instance').hospital.name)
+            data.append(self.context.get('instance').hospital.get_hos_address())
+            data.append(datetime.strftime(self.context.get('instance').time_slot_start, '%d-%m-%Y %H:%M'))
 
         elif notification_type == NotificationAction.APPOINTMENT_BOOKED and (not user or user.user_type == User.DOCTOR):
             body_template = "appointment_booked_doctor"
@@ -374,8 +373,21 @@ class WHTSAPPNotification:
             data.append(self.context.get('instance').hospital.name)
             data.append(self.context.get('instance').hospital.get_hos_address())
 
-        # elif notification_type == NotificationAction.APPOINTMENT_RESCHEDULED_BY_PATIENT and user and user.user_type == User.CONSUMER:
-        #     body_template = "appointment_rescheduled_patient_initiated_to_patient"
+        elif notification_type == NotificationAction.APPOINTMENT_RESCHEDULED_BY_PATIENT and user and user.user_type == User.CONSUMER:
+            body_template = "opd_appointment_rescheduled_patient_initiated_to_patient"
+
+            data.append(self.context.get('patient_name'))
+            data.append(self.context.get('doctor_name'))
+            data.append(self.context.get('instance').hospital.name)
+            data.append(datetime.strftime(self.context.get('instance').time_slot_start, '%d-%m-%Y'))
+            data.append(datetime.strftime(self.context.get('instance').time_slot_start, '%H:%M'))
+            data.append(self.context.get('instance').id)
+            data.append(self.context.get('patient_name'))
+            data.append(self.context.get('instance').profile.phone_number)
+            data.append(self.context.get('doctor_name'))
+            data.append(self.context.get('instance').hospital.name)
+            data.append(self.context.get('instance').hospital.get_hos_address())
+
         elif notification_type == NotificationAction.APPOINTMENT_RESCHEDULED_BY_PATIENT and (not user or user.user_type == User.DOCTOR):
             body_template = "appointment_rescheduled_patient_initiated_to_doctor"
 
@@ -407,7 +419,17 @@ class WHTSAPPNotification:
 
 
         elif notification_type == NotificationAction.APPOINTMENT_CANCELLED and user and user.user_type == User.CONSUMER:
-            body_template = "appointment_cancelled_patient"
+            body_template = "opd_appointment_cancellation_patient"
+
+            data.append(self.context.get('patient_name'))
+            data.append(self.context.get('doctor_name'))
+            data.append(datetime.strftime(self.context.get('instance').time_slot_start, '%d-%m-%Y'))
+            data.append(datetime.strftime(self.context.get('instance').time_slot_start, '%%H:%M'))
+            data.append(self.context.get('instance').id)
+            data.append(self.context.get('patient_name'))
+            data.append(self.context.get('doctor_name'))
+
+
         elif notification_type == NotificationAction.PRESCRIPTION_UPLOADED:
             body_template = "prescription_uploaded"
 
@@ -489,7 +511,20 @@ class WHTSAPPNotification:
 
 
         elif notification_type == NotificationAction.LAB_APPOINTMENT_CANCELLED and user and user.user_type == User.CONSUMER:
-            body_template = "sms/lab/appointment_cancelled_patient.txt"
+            body_template = "lab_appointment_cancellation_patient"
+
+            data.append(self.context.get('patient_name'))
+            data.append(datetime.strftime(self.context.get('instance').time_slot_start, '%d-%m-%Y %H:%M'))
+            data.append(self.context.get('lab_name'))
+            data.append(self.context.get('lab_name'))
+            data.append(self.context.get('instance').id)
+            data.append(self.context.get('patient_name'))
+            data.append(self.context.get('lab_name'))
+            data.append(datetime.strftime(self.context.get('instance').time_slot_start, '%d-%m-%Y %H:%M'))
+            # TODO: not implemented yet. So just setting generic text.
+            data.append('Paid amount')
+
+
         elif notification_type == NotificationAction.LAB_APPOINTMENT_CANCELLED and (not user or user.user_type == User.DOCTOR):
             body_template = "appointment_cancelled_lab"
 
