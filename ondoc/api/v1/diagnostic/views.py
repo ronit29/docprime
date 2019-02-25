@@ -303,6 +303,7 @@ class LabList(viewsets.ReadOnlyModelViewSet):
                     name = temp_category.name
                     category_id = temp_category.id
                     test_id = None
+                    url = util_absolute_url(temp_category.icon.url) if temp_category.icon else None
                     parameter_count = len(temp_test.parameter.all()) or 1
                     if single_test_data.get((category_id, test_id)):
                         single_test_data[(category_id, test_id)]['parameter_count'] += single_test_data[(category_id, test_id)]['parameter_count']
@@ -310,16 +311,19 @@ class LabList(viewsets.ReadOnlyModelViewSet):
                         single_test_data[(category_id, test_id)] = {'name': name,
                                                                     'category_id': category_id,
                                                                     'test_id': test_id,
-                                                                    'parameter_count': parameter_count}
+                                                                    'parameter_count': parameter_count,
+                                                                    'url': url}
                 if add_test_name:
                     category_id = None
                     test_id = temp_test.id
                     name = temp_test.name
                     parameter_count = len(temp_test.parameter.all()) or 1
+                    url = None
                     single_test_data[(category_id, test_id)] = {'name': name,
                                                                 'category_id': category_id,
                                                                 'test_id': test_id,
-                                                                'parameter_count': parameter_count}
+                                                                'parameter_count': parameter_count,
+                                                                'url': url}
             category_data[temp_package.id] = list(single_test_data.values())
         serializer = CustomLabTestPackageSerializer(all_packages, many=True,
                                                     context={'entity_url_dict': entity_url_dict, 'lab_data': lab_data,
