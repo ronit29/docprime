@@ -205,7 +205,8 @@ class LabList(viewsets.ReadOnlyModelViewSet):
             availablelabs__lab_pricing_group__labs__location__dwithin=(
                 Point(float(long),
                       float(lat)),
-                D(m=max_distance))).annotate(
+                D(m=max_distance))). annotate(
+            priority_score=F('availablelabs__lab_pricing_group__labs__lab_priority') * F('priority')).annotate(
             distance=Distance('availablelabs__lab_pricing_group__labs__location', pnt)).annotate(
             lab=F('availablelabs__lab_pricing_group__labs'), mrp=F('availablelabs__mrp'),
             price=Case(
@@ -232,6 +233,7 @@ class LabList(viewsets.ReadOnlyModelViewSet):
                       float(lat)),
                 D(
                     m=max_distance))).annotate(
+            priority_score=F('availablelabs__lab_pricing_group__labs__lab_priority') * F('priority')).annotate(
             distance=Distance('availablelabs__lab_pricing_group__labs__location', pnt)).annotate(
             lab=F('availablelabs__lab_pricing_group__labs'), mrp=F('availablelabs__mrp'),
             price=Case(
@@ -276,7 +278,7 @@ class LabList(viewsets.ReadOnlyModelViewSet):
         if package_type == 2:
             all_packages = filter(lambda x: not x.home_collection_possible, all_packages)
         if not sort_on:
-            all_packages = sorted(all_packages, key=lambda x: x.priority if hasattr(x, 'priority') and x.priority is not None else -float('inf'), reverse=True)
+            all_packages = sorted(all_packages, key=lambda x: x.priority_score if hasattr(x, 'priority_score') and x.priority_score is not None else -float('inf'), reverse=True)
         elif sort_on == 'fees':
             all_packages = sorted(all_packages, key=lambda x: x.price if hasattr(x, 'price') and x.price is not None else -float('inf'))
         elif sort_on == 'distance':
@@ -290,8 +292,7 @@ class LabList(viewsets.ReadOnlyModelViewSet):
             entity_url_dict.setdefault(item.get('lab_id'), [])
             entity_url_dict[item.get('lab_id')].append(item.get('url'))
         lab_data = Lab.objects.prefetch_related('rating', 'lab_documents', 'lab_timings', 'network',
-                                                'home_collection_charges').annotate(
-            avg_rating=Avg('rating__ratings')).in_bulk(lab_ids)
+                                                'home_collection_charges').in_bulk(lab_ids)
         serializer = CustomLabTestPackageSerializer(all_packages, many=True,
                                                     context={'entity_url_dict': entity_url_dict, 'lab_data': lab_data,
                                                              'request': request})
@@ -1021,7 +1022,11 @@ class LabList(viewsets.ReadOnlyModelViewSet):
         #     entity = entity.first()
         rating_queryset = lab_obj.rating.filter(is_live=True)
         if lab_obj.network:
-            rating_queryset = rating_models.RatingsReview.objects.prefetch_related('compliment').filter(is_live=True, lab_ratings__network=lab_obj.network)
+            rating_queryset = rating_models.RatingsReview.objects.prefetch_related('compliment')\
+                                                                 .filter(is_live=True,
+                                                                         moderation_status__in=[rating_models.RatingsReview.PENDING,
+                                                                                                rating_models.RatingsReview.APPROVED],
+                                                                         lab_ratings__network=lab_obj.network)
         lab_serializer = diagnostic_serializer.LabModelSerializer(lab_obj, context={"request": request,
                                                                                     "entity": entity,
                                                                                     "rating_queryset": rating_queryset})
@@ -1581,9 +1586,9 @@ class LabAppointmentView(mixins.CreateModelMixin,
                 #                                          order.product_id,
                 #                                          EmailNotification.OPS_PAYMENT_NOTIFICATION)
 
-                push_order_to_matrix.apply_async(
-                    ({'order_id': order.id, 'created_at': int(order.created_at.timestamp()),
-                      'timeslot': int(appointment_details['time_slot_start'].timestamp())},), countdown=5)
+                # push_order_to_matrix.apply_async(
+                #     ({'order_id': order.id, 'created_at': int(order.created_at.timestamp()),
+                #       'timeslot': int(appointment_details['time_slot_start'].timestamp())},), countdown=5)
             except:
                 pass
         else:

@@ -2,6 +2,7 @@ from rest_framework import serializers
 from ondoc.authentication.models import (OtpVerifications, User, UserProfile, Notification, NotificationEndpoint,
                                          DoctorNumber, Address, GenericAdmin, UserSecretKey,
                                          UserPermission, Address, GenericAdmin, GenericLabAdmin)
+from ondoc.common.models import AppointmentHistory
 from ondoc.doctor.models import DoctorMobile
 from ondoc.diagnostic.models import AvailableLabTest
 from ondoc.account.models import ConsumerAccount, Order, ConsumerTransaction
@@ -245,6 +246,7 @@ class AddressSerializer(serializers.ModelSerializer):
 
 class AppointmentqueryRetrieveSerializer(serializers.Serializer):
     type = serializers.CharField(required=True)
+    source = serializers.ChoiceField(choices=AppointmentHistory.SOURCE_CHOICES, required=False)
     completed = serializers.BooleanField(required=False)
 
 

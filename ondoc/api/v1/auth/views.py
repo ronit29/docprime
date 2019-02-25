@@ -20,7 +20,7 @@ from rest_framework.authtoken.models import Token
 from django.db.models import F, Sum, Max, Q, Prefetch, Case, When, Count
 from django.forms.models import model_to_dict
 
-from ondoc.common.models import UserConfig, PaymentOptions
+from ondoc.common.models import UserConfig, PaymentOptions, AppointmentHistory
 from ondoc.coupon.models import UserSpecificCoupon, Coupon
 from ondoc.lead.models import UserLead
 from ondoc.sms.api import send_otp
@@ -57,7 +57,12 @@ import jwt
 from decimal import Decimal
 from ondoc.web.models import ContactUs
 from ondoc.notification.tasks import send_pg_acknowledge
+
+from ondoc.ratings_review import models as rate_models
+from django.contrib.contenttypes.models import ContentType
+
 import re
+from ondoc.matrix.tasks import push_order_to_matrix
 
 
 logger = logging.getLogger(__name__)
@@ -515,10 +520,23 @@ class UserAppointmentsViewSet(OndocViewSet):
         validated_data = serializer.validated_data
         query_input_serializer = serializers.AppointmentqueryRetrieveSerializer(data=request.query_params)
         query_input_serializer.is_valid(raise_exception=True)
+        source = ''
+        responsible_user = None
+        if query_input_serializer.validated_data.get('source', None):
+            source = query_input_serializer.validated_data.get('source')
+        if request.user and hasattr(request.user, 'user_type'):
+            responsible_user = request.user
+            if not source:
+                if request.user.user_type == User.DOCTOR:
+                    source = AppointmentHistory.DOC_APP
+                elif request.user.user_type == User.CONSUMER:
+                    source = AppointmentHistory.CONSUMER_APP
         appointment_type = query_input_serializer.validated_data.get('type')
         if appointment_type == 'lab':
             # lab_appointment = get_object_or_404(LabAppointment, pk=pk)
             lab_appointment = LabAppointment.objects.select_for_update().filter(pk=pk).first()
+            lab_appointment._source = source
+            lab_appointment._responsible_user = responsible_user
             resp = dict()
             if not lab_appointment:
                 resp["status"] = 0
@@ -539,6 +557,8 @@ class UserAppointmentsViewSet(OndocViewSet):
         elif appointment_type == 'doctor':
             # opd_appointment = get_object_or_404(OpdAppointment, pk=pk)
             opd_appointment = OpdAppointment.objects.select_for_update().filter(pk=pk).first()
+            opd_appointment._source = source
+            opd_appointment._responsible_user = responsible_user
             resp = dict()
             if not opd_appointment:
                 resp["status"] = 0
@@ -1165,6 +1185,10 @@ class TransactionViewSet(viewsets.GenericViewSet):
                     "user id - {} and phone number - {}" \
                     ", order id - {}.".format(order_obj.user.id, order_obj.user.phone_number, order_obj.id)
 
+        # Push the order failure case to matrix.
+
+        push_order_to_matrix.apply_async(({'order_id': order_obj.id},), countdown=5)
+
         for email in settings.ORDER_FAILURE_EMAIL_ID:
             EmailNotification.publish_ops_email(email, html_body, 'Payment failure for order')
 
@@ -1548,7 +1572,10 @@ class OrderViewSet(GenericViewSet):
     def retrieve(self, request, pk):
         user = request.user
         params = request.query_params
+
         from_app = params.get("from_app", False)
+        app_version = params.get("app_version", "1.0")
+
         order_obj = Order.objects.filter(pk=pk, payment_status=Order.PAYMENT_PENDING).first()
         if not order_obj.validate_user(user):
             return Response({"status": 0}, status.HTTP_404_NOT_FOUND)
@@ -1560,13 +1587,13 @@ class OrderViewSet(GenericViewSet):
             return Response(resp)
 
         # remove all cart_items => Workaround TODO: remove later
-        if from_app:
+        if from_app and app_version and app_version <= "1.0":
             from ondoc.cart.models import Cart
             Cart.remove_all(user)
 
         resp["status"] = 1
         resp['data'], resp["payment_required"] = utils.payment_details(request, order_obj)
-        resp['payment_options'] = PaymentOptions.filtered_payment_option(order_obj)
+        resp['payment_options'], resp['invalid_payment_options'], resp['invalid_reason'] = PaymentOptions.filtered_payment_option(order_obj)
         return Response(resp)
 
 
@@ -1728,7 +1755,8 @@ class OrderDetailViewSet(GenericViewSet):
                 "effective_price": order.action_data["effective_price"],
                 "data" : cart_serializers.CartItemSerializer(item, context={"validated_data" : None}).data,
                 "booking_id" : order.reference_id,
-                "time_slot_start" : order.action_data["time_slot_start"]
+                "time_slot_start" : order.action_data["time_slot_start"],
+                "payment_type" : order.action_data["payment_type"]
             }
             processed_order_data.append(curr)
 
@@ -1790,5 +1818,55 @@ class UserLeadViewSet(GenericViewSet):
             resp['status'] = "success"
 
 
+        return Response(resp)
+
+
+class UserRatingViewSet(GenericViewSet):
+
+    authentication_classes = (JWTAuthentication, )
+    permission_classes = (IsAuthenticated, IsConsumer )
+
+    def get_queryset(self):
+        return None
+
+    def list_ratings(self,request):
+        resp = []
+        user = request.user
+        queryset = rate_models.RatingsReview.objects.select_related('content_type')\
+                                                    .prefetch_related('content_object', 'compliment')\
+                                                    .filter(user=user).order_by('-updated_at')
+        if len(queryset):
+            for obj in queryset:
+                compliments_string = ''
+                address = ''
+                c_list = []
+                cid_list = []
+                if obj.content_type == ContentType.objects.get_for_model(Doctor):
+                    name = obj.content_object.get_display_name()
+                    appointment = OpdAppointment.objects.select_related('hospital').filter(id=obj.appointment_id).first()
+                    if appointment:
+                        address = appointment.hospital.get_hos_address()
+                else:
+                    name = obj.content_object.name
+                    address = obj.content_object.get_lab_address()
+                for cm in obj.compliment.all():
+                    c_list.append(cm.message)
+                    cid_list.append(cm.id)
+                if c_list:
+                    compliments_string = (', ').join(c_list)
+                rating_obj = {}
+                rating_obj['id'] = obj.id
+                rating_obj['ratings'] = obj.ratings
+                rating_obj['address'] = address
+                rating_obj['review'] = obj.review
+                rating_obj['entity_name'] = name
+                rating_obj['entity_id'] = obj.object_id
+                rating_obj['date'] = obj.updated_at.strftime('%b %d, %Y')
+                rating_obj['compliments'] = compliments_string
+                rating_obj['compliments_list'] = cid_list
+                rating_obj['appointment_id'] = obj.appointment_id
+                rating_obj['appointment_type'] = obj.appointment_type
+                rating_obj['icon'] = request.build_absolute_uri(obj.content_object.get_thumbnail())
+                resp.append(rating_obj)
         return Response(resp)
 

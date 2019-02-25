@@ -403,6 +403,16 @@ def generate_appointment_masknumber(data):
     return is_masking_done
 
 @task
+def send_rating_update_message(number, text):
+    data = {}
+    data['phone_number'] = number
+    data['text'] = mark_safe(text)
+    try:
+        notification_models.SmsNotification.send_rating_link(data)
+    except Exception as e:
+        logger.error("Error sending rating update sms")
+
+@task
 def send_appointment_reminder_message(number, patient_name, doctor, hospital_name, date):
     data = {}
     data['phone_number'] = number
@@ -430,6 +440,7 @@ def send_appointment_location_message(number, hospital_lat, hospital_long):
 def process_payout(payout_id):
     from ondoc.account.models import MerchantPayout, Order
     from ondoc.account.models import DummyTransactions
+    from ondoc.doctor.models import OpdAppointment
 
     try:
         if not payout_id:
@@ -449,6 +460,9 @@ def process_payout(payout_id):
 
         if not appointment or not billed_to or not merchant:
             raise Exception("Insufficient Data " + str(payout_data))
+
+        if appointment.payment_type in [OpdAppointment.COD]:
+            raise Exception("Cannot process payout for COD appointments")
 
         if not merchant.verified_by_finance or not merchant.enabled:
             raise Exception("Merchant is not verified or is not enabled. " + str(payout_data))
