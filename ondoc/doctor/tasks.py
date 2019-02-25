@@ -41,6 +41,5 @@ def update_prices():
     from ondoc.doctor.models import Doctor
     from ondoc.diagnostic.models import AvailableLabTest
     Doctor.update_all_deal_price()
-    AvailableLabTest.update_all_deal_price()
-    print('prices updated')
+    AvailableLabTest.update_all_deal_price()    
     return 'success'
