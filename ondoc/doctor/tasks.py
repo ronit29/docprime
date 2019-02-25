@@ -42,4 +42,4 @@ def update_prices():
     from ondoc.diagnostic.models import Lab
     Doctor.update_all_deal_price()
     print('prices updated')
-    return "hello"
+    return True
