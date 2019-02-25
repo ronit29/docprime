@@ -1052,8 +1052,6 @@ class AvailableLabTest(TimeStampedModel):
         if deal_price:
            self.computed_deal_price = deepcopy(deal_price[0].get('computed_deal_price'))
 
-        return True
-
     @classmethod
     def update_all_deal_price(cls):
         # will update all lab prices
