@@ -1,5 +1,5 @@
 from django.contrib import admin
-from ondoc.banner.models import Banner
+from ondoc.banner.models import Banner, SliderLocation
 from django import forms
 
 
@@ -49,11 +49,20 @@ class BannerForm(forms.ModelForm):
                 raise forms.ValidationError('Latitude is required')
             if not cleaned_data.get('longitude'):
                 raise forms.ValidationError('Longitude is required')
+        # if cleaned_data.slider_locate:
+        #     cleaned_data.exclude('slider_locate',)
+
 
 
 class BannerAdmin(admin.ModelAdmin):
 
     model = Banner
     form = BannerForm
-    list_display = ['title', 'priority', 'slider_locate', 'start_date', 'end_date']
-    readonly_fields = ['event_name']
+    list_display = ['title', 'priority', 'location', 'start_date', 'end_date']
+    readonly_fields = ['event_name', 'slider_locate']
+    # exclude = ['slider_locate']
+
+class SliderLocationAdmin(admin.ModelAdmin):
+
+    model = SliderLocation
+    list_display = ['name']

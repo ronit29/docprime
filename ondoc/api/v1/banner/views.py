@@ -40,7 +40,7 @@ class BannerListViewSet(viewsets.GenericViewSet):
 
                 else:
                     res.append(banner_obj)
-            else:
+            elif not (banner_obj.get('latitude') and banner_obj.get('longitude') and banner_obj.get('radius')):
                 res.append(banner_obj)
 
         return Response(res)

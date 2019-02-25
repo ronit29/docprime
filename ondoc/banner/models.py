@@ -13,6 +13,20 @@ from django.http import QueryDict
 from django.utils import timezone
 
 
+
+
+
+
+class SliderLocation(models.Model):
+    name = models.CharField(max_length=1000, null=True, default='Home_Page')
+
+    def __str__(self):
+        return self.name
+
+    class Meta:
+        db_table = 'slider_location'
+
+
 class Banner(auth_model.TimeStampedModel):
     TEST = 1
     PROCEDURES = 2
@@ -27,14 +41,14 @@ class Banner(auth_model.TimeStampedModel):
     PACKAGE = 4
     PROCEDURE = 5
     OFFERS_PAGE = 6
-
     slider_location = [(HOME_PAGE, 'home_page'), (DOCTOR_RESULT, 'doctor_search_page'), (LAB_RESULT, 'lab_search_page'), (PROCEDURE, 'procedure_search_page'), (PACKAGE, 'package_search_page'),
                        (OFFERS_PAGE, 'offers_page')]
+    location = models.ForeignKey(SliderLocation, on_delete=models.CASCADE, null=True, blank=True)
     title = models.CharField(max_length=500)
     image = models.ImageField('Banner image', upload_to='banner/images')
     url = models.URLField(max_length=10000, null=True, blank=True)
     priority = models.PositiveIntegerField(blank=True, null=True, default=0)
-    slider_locate = models.SmallIntegerField(choices=slider_location)
+    slider_locate = models.SmallIntegerField(choices=slider_location, default=1, null=True, blank=True) # Do not use
     slider_action = models.SmallIntegerField(choices=slider_choice, null=True, blank=True)
     object_id = models.PositiveIntegerField(null=True, blank=True)
     start_date = models.DateTimeField(null=True, blank=True)
@@ -53,25 +67,30 @@ class Banner(auth_model.TimeStampedModel):
         return self.title
 
     def save(self, force_insert=False, force_update=False, using=None, update_fields=None):
-        slider_locate_choices = dict(self.slider_location)
+        # slider_locate_choices = dict(self.location.name)
         # self.event_name = self.title+'_'+ str(slider_locate[self.slider_locate])
-        self.event_name = '_'.join(self.title.lower().split())\
-                          + '_' \
-                          + '_'.join(
-            str(slider_locate_choices[self.slider_locate]).lower().split())
-        super().save(force_insert, force_update, using, update_fields)
+        if self.location:
+            self.event_name = '_'.join(self.title.lower().split())\
+                              + '_' \
+                              + '_'.join(
+                self.location.name.lower().split())
+            super().save(force_insert, force_update, using, update_fields)
+        else:
+            super().save(force_insert, force_update, using, update_fields)
+
 
     @staticmethod
     def get_all_banners(request):
 
         queryset = Banner.objects.filter(enable=True).order_by('-priority')[:100]
-        slider_locate = dict(Banner.slider_location)
+        # slider_locate = dict(Banner.slider_location)
         final_result = []
         for data in queryset:
             resp = dict()
             resp['title'] = data.title
             resp['id'] = data.id
-            resp['slider_location'] = slider_locate[data.slider_locate]
+            # resp['slider_location'] = slider_locate[data.slider_locate]
+            resp['slider_location'] = data.location
             resp['latitude'] = data.latitude
             resp['longitude'] = data.longitude
             resp['radius'] = data.radius
