@@ -1012,13 +1012,15 @@ class LabList(viewsets.ReadOnlyModelViewSet):
                 entity = entity[0]
 
         test_ids = (request.query_params.get("test_ids").split(",") if request.query_params.get('test_ids') else [])
-        queryset = AvailableLabTest.objects.select_related().prefetch_related('test__labtests__parameter', 'test__packages__lab_test', 'test__packages__lab_test__labtests__parameter')\
-                                                            .filter(lab_pricing_group__labs__id=lab_id,
-                                                                    lab_pricing_group__labs__is_test_lab=False,
-                                                                    lab_pricing_group__labs__is_live=True,
-                                                                    enabled=True,
-                                                                    test__enable_for_retail=True,
-                                                                    test__in=test_ids)
+        queryset = AvailableLabTest.objects.prefetch_related('test__labtests__parameter',
+                                                             'test__packages__lab_test__recommended_categories',
+                                                             'test__packages__lab_test__labtests__parameter').filter(
+            lab_pricing_group__labs__id=lab_id,
+            lab_pricing_group__labs__is_test_lab=False,
+            lab_pricing_group__labs__is_live=True,
+            enabled=True,
+            test__enable_for_retail=True,
+            test__in=test_ids)
 
         test_serializer = diagnostic_serializer.AvailableLabTestPackageSerializer(queryset, many=True,
                                                                            context={"lab": lab_obj})
@@ -1960,7 +1962,8 @@ class TestDetailsViewset(viewsets.GenericViewSet):
             queryset1 = data.faq.all()
             result['faqs'] = []
             for qa in queryset1:
-                result['faqs'].append({'title': 'Frequently asked questions','value':{'test_question': qa.test_question, 'test_answer': qa.test_answer}})
+                result['faqs'].append({'title': 'Frequently asked questions',
+                                       'value': {'test_question': qa.test_question, 'test_answer': qa.test_answer}})
 
             booked_together=[]
             if lab_id:

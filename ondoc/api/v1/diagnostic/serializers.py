@@ -266,7 +266,8 @@ class AvailableLabTestPackageSerializer(serializers.ModelSerializer):
                 rec_obj = t_obj.lab_test.recommended_categories.all()
                 # category = [cat.name for cat in rec_obj]
                 for cat in rec_obj:
-                    rec_dict['category'].append(cat.name)
+                    rec_dict['category'].append(
+                        {'name': cat.name, 'icon': util_absolute_url(cat.icon.url) if cat.icon else None})
                 param_list = list()
                 for obj in param_objs:
                     param_list.append(obj.parameter.name)
