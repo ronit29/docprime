@@ -247,6 +247,7 @@ class AddressSerializer(serializers.ModelSerializer):
 class AppointmentqueryRetrieveSerializer(serializers.Serializer):
     type = serializers.CharField(required=True)
     source = serializers.ChoiceField(choices=AppointmentHistory.SOURCE_CHOICES, required=False)
+    completed = serializers.BooleanField(required=False)
 
 
 class ConsumerAccountModelSerializer(serializers.ModelSerializer):

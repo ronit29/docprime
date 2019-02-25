@@ -728,6 +728,9 @@ class UserAppointmentsViewSet(OndocViewSet):
                             "message": "No time slot available for the give day and time."
                         }
 
+            if validated_data['status'] == OpdAppointment.COMPLETED:
+                opd_appointment.action_completed()
+                resp = AppointmentRetrieveSerializer(opd_appointment, context={"request": request}).data
             return resp
 
     def get_appointment_coupon_price(self, discounted_price, effective_price):
