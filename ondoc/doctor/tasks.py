@@ -34,3 +34,11 @@ def save_avg_rating():
     from ondoc.diagnostic.models import Lab
     Doctor.update_avg_rating()
     Lab.update_avg_rating()
+
+
+@task()
+def update_prices():
+    from ondoc.doctor.models import Doctor
+    from ondoc.diagnostic.models import Lab
+    print('prices updated')
+    return "hello"
