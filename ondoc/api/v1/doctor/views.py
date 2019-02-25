@@ -2108,7 +2108,7 @@ class OfflineCustomerViewSet(viewsets.GenericViewSet):
         ret_obj['hospital_name'] = appnt.hospital.name
         ret_obj['time_slot_start'] = appnt.time_slot_start
         ret_obj['status'] = appnt.status
-        ret_obj['mrp'] = appnt.mrp
+        # ret_obj['mrp'] = appnt.mrp
         ret_obj['payment_type'] = appnt.payment_type
         ret_obj['hospital'] = HospitalModelSerializer(appnt.hospital).data
         ret_obj['doctor'] = AppointmentRetrieveDoctorSerializer(appnt.doctor).data
