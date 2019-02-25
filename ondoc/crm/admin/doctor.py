@@ -1,3 +1,5 @@
+import base64
+
 from django.forms.utils import ErrorList
 from reversion.admin import VersionAdmin
 from django.core.exceptions import FieldDoesNotExist, MultipleObjectsReturned
@@ -670,7 +672,11 @@ class DoctorForm(FormCleanMixin):
         super().__init__(*args, **kwargs)
         if self and self.request and isinstance(self.request.GET, dict):
             # http://127.0.0.1:8000/admin/doctor/doctor/add/?Lead_id=1234&AgentId=9876
-            self.request_matrix_lead_id = self.request.GET.get('LeadId', None)
+            try:
+                requested_leadId = self.request.GET.get('LeadId', None)
+                self.request_matrix_lead_id = base64.b64decode(requested_leadId).decode()
+            except Exception as e:
+                logger.error("Invalid Matrix Lead ID received from Matrix - " + str(e))
             self.request_agent_lead_id = self.request.GET.get('AgentId', None)
 
     def validate_qc(self):
@@ -1305,8 +1311,17 @@ class DoctorAdmin(AutoComplete, ImportExportMixin, VersionAdmin, ActionAdmin, QC
         super().save_model(request, obj, form, change)
 
     def has_add_permission(self, request):
-        if request.user.groups.filter(name=constants['DOCTOR_NETWORK_GROUP_NAME']).exists() and not request.GET.get('LeadId'):
-            return False
+        if request.user.groups.filter(name=constants['DOCTOR_NETWORK_GROUP_NAME']).exists():
+            requested_leadId = request.GET.get('LeadId')
+            if not requested_leadId:
+                return False
+            else:
+                try:
+                    matrix_lead_id = base64.b64decode(requested_leadId).decode()
+                    matrix_lead_id = int(matrix_lead_id)
+                except Exception as e:
+                    logger.error("Invalid Matrix Lead ID received from Matrix - " + str(e))
+                    return False
         return super().has_add_permission(request)
 
     def has_change_permission(self, request, obj=None):
