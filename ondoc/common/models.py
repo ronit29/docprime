@@ -92,9 +92,15 @@ class PaymentOptions(TimeStampedModel):
 
         pg_specific_coupon = Coupon.objects.filter(id__in=used_coupon).exclude(payment_option__isnull=True).first()
         if pg_specific_coupon:
-            queryset = queryset.filter(id=pg_specific_coupon.payment_option.id)
+            allowed_options = queryset.filter(id=pg_specific_coupon.payment_option.id)
+            not_allowed = queryset.filter(~models.Q(id=pg_specific_coupon.payment_option.id))
+            invalid_reason = "PG COUPON APPLIED"
+        else:
+            allowed_options = queryset
+            not_allowed = []
+            invalid_reason = ""
 
-        return cls.build_payment_option(queryset)
+        return cls.build_payment_option(allowed_options), cls.build_payment_option(not_allowed), invalid_reason
 
     @classmethod
     def build_payment_option(cls, queryset):

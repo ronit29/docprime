@@ -1590,7 +1590,7 @@ class OrderViewSet(GenericViewSet):
 
         resp["status"] = 1
         resp['data'], resp["payment_required"] = utils.payment_details(request, order_obj)
-        resp['payment_options'] = PaymentOptions.filtered_payment_option(order_obj)
+        resp['payment_options'], resp['invalid_payment_options'], resp['invalid_reason'] = PaymentOptions.filtered_payment_option(order_obj)
         return Response(resp)
 
 
