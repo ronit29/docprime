@@ -1206,6 +1206,16 @@ class LabPackageListSerializer(serializers.Serializer):
     max_age = serializers.IntegerField(required=False)
     gender = serializers.ChoiceField(choices=LabTest.GENDER_TYPE_CHOICES, required=False)
     package_type = serializers.IntegerField(required=False)
+    package_ids = CommaSepratedToListField(required=False, max_length=500, typecast_to=int)
+
+    def validate_package_ids(self, attrs):
+        try:
+            attrs = set(attrs)
+            if LabTest.objects.filter(searchable=True, enable_for_retail=True, id__in=attrs).count() == len(attrs):
+                return attrs
+        except:
+            raise serializers.ValidationError('Invalid Package IDs')
+        raise serializers.ValidationError('Invalid Package IDs')
 
     def validate_category_ids(self, attrs):
         try:
