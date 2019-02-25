@@ -398,16 +398,21 @@ def push_order_to_matrix(self, data):
         if not order_obj:
             raise Exception("Order could not found against id - " + str(order_id))
 
-        appointment_details = order_obj.appointment_details()
-        if not appointment_details:
-            raise Exception('Appointment details not found for order.')
+        if order_obj.parent:
+            raise Exception("should not push child order in case of payment failure - " + str(order_id))
+
+        phone_number = order_obj.user.phone_number
+        name = order_obj.user.full_name
+        # appointment_details = order_obj.appointment_details()
+        # if not appointment_details:
+        #     raise Exception('Appointment details not found for order.')
 
         request_data = {
             'LeadSource': 'DocPrime',
-            'Name': appointment_details.get('profile_name', ''),
-            'BookedBy': appointment_details.get('user_number', None),
+            'Name': name,
+            'BookedBy': phone_number,
             'LeadID': order_obj.matrix_lead_id if order_obj.matrix_lead_id else 0,
-            'PrimaryNo': appointment_details.get('user_number',None),
+            'PrimaryNo': phone_number,
             'ProductId': 5,
             'SubProductId': 4,
         }
