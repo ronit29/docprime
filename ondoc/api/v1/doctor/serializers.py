@@ -941,14 +941,13 @@ class DoctorProfileUserViewSerializer(DoctorProfileSerializer):
             title +=  ' - '+', '.join(doc_spec_list)
             description += ' is ' + ', '.join(doc_spec_list)
         if sublocality and locality:
-            title += ' in ' + sublocality + " " + locality + ' - Consult Online'
+            # title += ' in ' + sublocality + " " + locality + ' - Consult Online'
             description += ' in ' + sublocality + " " + locality
         elif locality:
-            title += ' in ' + locality + ' - Consult Online'
+            # title += ' in ' + locality + ' - Consult Online'
             description += ' in ' + locality
 
-        else:
-            title += ' - Consult Online'
+        title += ' | Book Appointment Online'
 
         hospital = []
         for hospital_name in clinics:
