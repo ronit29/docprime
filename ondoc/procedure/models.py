@@ -11,6 +11,8 @@ class IpdProcedure(auth_model.TimeStampedModel, SearchKey):
     is_live = models.BooleanField(default=False)
     features = models.ManyToManyField(Feature, through='IpdProcedureFeatureMapping',
                                       through_fields=('ipd_procedure', 'feature'), related_name='of_ipd_procedures')
+    min_price = models.DecimalField(max_digits=12, decimal_places=2)
+    max_price = models.DecimalField(max_digits=12, decimal_places=2)
 
     def __str__(self):
         return '{}'.format(self.name)
