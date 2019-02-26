@@ -568,7 +568,7 @@ class WHTSAPPNotification:
                 payload=kwargs.get('payload', {})
             )
             message = {
-                "data": model_to_dict(whtsapp_noti),
+                "data": whtsapp_noti.payload,
                 "type": "social_message"
             }
             message = json.dumps(message)
@@ -582,7 +582,7 @@ class WHTSAPPNotification:
                 payload=kwargs.get('payload', {})
             )
             message = {
-                "data": model_to_dict(whtsapp_noti),
+                "data": whtsapp_noti.payload,
                 "type": "social_message"
             }
             message = json.dumps(message)
