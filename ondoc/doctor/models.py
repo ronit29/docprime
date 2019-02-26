@@ -447,6 +447,23 @@ class Doctor(auth_model.TimeStampedModel, auth_model.QCModel, SearchKey, auth_mo
     def __str__(self):
         return '{} ({})'.format(self.name, self.id)
 
+    def update_deal_price(self):        
+        # will update only this doctor prices and will be called on save    
+        query = '''update doctor_clinic_timing set 
+                   deal_price = least(greatest(floor(case when fees > 0 then least(fees*1.5, .8*mrp) 
+                   else .8*mrp end /5)*5, fees), mrp) where doctor_clinic_id in (select id from doctor_clinic where doctor_id= %s) '''
+
+        update_doctor_deal_price = RawSql(query, [self.pk]).execute()
+
+    @classmethod
+    def update_all_deal_price(cls):
+        # will update all doctors prices
+        query = '''update doctor_clinic_timing set 
+            deal_price = least(greatest(floor(case when fees > 0 then least(fees*1.5, .8*mrp) else .8*mrp end /5)*5, fees), mrp) '''
+
+        update_all_doctor_deal_price = RawSql(query, []).execute()
+
+
     def get_display_name(self):
         return "Dr. {}".format(self.name.title()) if self.name else None
 
@@ -526,6 +543,7 @@ class Doctor(auth_model.TimeStampedModel, auth_model.QCModel, SearchKey, auth_mo
     def save(self, *args, **kwargs):
         self.update_time_stamps()
         self.update_live_status()
+        self.update_deal_price()
 
         # On every update of onboarding status or Qcstatus push to matrix
         push_to_matrix = False
@@ -1329,6 +1347,11 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
         elif user_type == auth_model.User.CONSUMER and current_datetime <= self.time_slot_start:
             if self.status in (self.BOOKED, self.ACCEPTED, self.RESCHEDULED_DOCTOR, self.RESCHEDULED_PATIENT):
                 allowed = [self.RESCHEDULED_PATIENT, self.CANCELLED]
+        elif user_type == auth_model.User.CONSUMER and current_datetime > self.time_slot_start:
+            if self.status in [self.BOOKED, self.RESCHEDULED_DOCTOR, self.RESCHEDULED_PATIENT, self.ACCEPTED]:
+                allowed = [self.RESCHEDULED_PATIENT]
+            if self.status == self.ACCEPTED:
+                allowed.append(self.COMPLETED)
 
         return allowed
 
@@ -1500,12 +1523,12 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
             notification_models.EmailNotification.ops_notification_alert(self, email_list=settings.OPS_EMAIL_ID,
                                                                          product=Order.DOCTOR_PRODUCT_ID,
                                                                          alert_type=notification_models.EmailNotification.OPS_APPOINTMENT_NOTIFICATION)
-        if self.status == self.COMPLETED and not self.is_rated:
-            try:
-                notification_tasks.send_opd_rating_message.apply_async(
-                    kwargs={'appointment_id': self.id, 'type': 'opd'}, countdown=int(settings.RATING_SMS_NOTIF))
-            except Exception as e:
-                logger.error(str(e))
+        # if self.status == self.COMPLETED and not self.is_rated:
+        #     try:
+        #         notification_tasks.send_opd_rating_message.apply_async(
+        #             kwargs={'appointment_id': self.id, 'type': 'opd'}, countdown=int(settings.RATING_SMS_NOTIF))
+        #     except Exception as e:
+        #         logger.error(str(e))
 
         if old_instance and old_instance.status != self.ACCEPTED and self.status == self.ACCEPTED:
             try:
@@ -1513,6 +1536,14 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
                     (self.id, str(math.floor(self.time_slot_start.timestamp()))),
                     eta=self.time_slot_start - datetime.timedelta(
                         minutes=settings.TIME_BEFORE_APPOINTMENT_TO_SEND_OTP), )
+                notification_tasks.opd_send_after_appointment_confirmation.apply_async(
+                    (self.id, str(math.floor(self.time_slot_start.timestamp()))),
+                    eta=self.time_slot_start + datetime.timedelta(
+                        minutes=settings.TIME_AFTER_APPOINTMENT_TO_SEND_CONFIRMATION), )
+                notification_tasks.opd_send_after_appointment_confirmation.apply_async(
+                    (self.id, str(math.floor(self.time_slot_start.timestamp())), True),
+                    eta=self.time_slot_start + datetime.timedelta(
+                        minutes=settings.TIME_AFTER_APPOINTMENT_TO_SEND_SECOND_CONFIRMATION), )
                 # notification_tasks.opd_send_otp_before_appointment(self.id, self.time_slot_start)
             except Exception as e:
                 logger.error(str(e))

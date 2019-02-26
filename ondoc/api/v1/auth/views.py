@@ -346,6 +346,9 @@ class UserProfileViewSet(mixins.CreateModelMixin, mixins.ListModelMixin,
                 data['dob'] = data['dob'].date()
             except:
                 return Response({"error": "Invalid Age"}, status=status.HTTP_400_BAD_REQUEST)
+        elif request.data.get('dob'):
+            dob = request.data.get('dob')
+            data['dob'] = dob
         else:
             # return Response({'age': {'code': 'required', 'message': 'This field is required.'}},
             #                 status=status.HTTP_400_BAD_REQUEST)
@@ -356,6 +359,7 @@ class UserProfileViewSet(mixins.CreateModelMixin, mixins.ListModelMixin,
             data['phone_number'] = request.user.phone_number
         serializer = serializers.UserProfileSerializer(data=data, context= {'request':request})
         serializer.is_valid(raise_exception=True)
+        serializer.validated_data
         if UserProfile.objects.filter(name__iexact=data['name'], user=request.user).exists():
             # return Response({
             #     "request_errors": {"code": "invalid",
@@ -724,6 +728,9 @@ class UserAppointmentsViewSet(OndocViewSet):
                             "message": "No time slot available for the give day and time."
                         }
 
+            if validated_data['status'] == OpdAppointment.COMPLETED:
+                opd_appointment.action_completed()
+                resp = AppointmentRetrieveSerializer(opd_appointment, context={"request": request}).data
             return resp
 
     def get_appointment_coupon_price(self, discounted_price, effective_price):

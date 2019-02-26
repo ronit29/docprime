@@ -46,7 +46,7 @@ class DoctorSearchHelper:
 
         if self.query_params.get('hospital_id') is not None:
             filtering_params.append(
-                "hospital_id=(%(hospital_id)s)")
+                "h.id=(%(hospital_id)s)")
             params['hospital_id'] = str(self.query_params.get("hospital_id"))
 
         if len(condition_ids)>0:
@@ -196,7 +196,7 @@ class DoctorSearchHelper:
             else:
                 order_by_field = " floor(distance/{bucket_size}) ASC, distance, total_price ASC".format(bucket_size=str(bucket_size))
                 rank_by = "rnk=1"
-            order_by_field = "{}, {} ".format(' enabled_for_online_booking DESC ' ,order_by_field)
+            order_by_field = "{}, {} ".format(' enabled_for_online_booking DESC, welcome_calling_done DESC ' ,order_by_field)
         else:
             if self.query_params.get('sort_on'):
                 if self.query_params.get('sort_on') == 'experience':
@@ -212,7 +212,7 @@ class DoctorSearchHelper:
                 order_by_field = ' floor(distance/{bucket_size}) ASC, is_license_verified DESC, search_score desc '.format(bucket_size=str(bucket_size))
                 rank_by = "rnk=1"
 
-            order_by_field = "{}, {} ".format(' enabled_for_online_booking DESC ', order_by_field)
+            order_by_field = "{}, {} ".format(' enabled_for_online_booking DESC, welcome_calling_done DESC ', order_by_field)
 
         return order_by_field, rank_by
 
@@ -249,17 +249,17 @@ class DoctorSearchHelper:
             query_string = "SELECT doctor_id, hospital_id, doctor_clinic_id, doctor_clinic_timing_id " \
                            "FROM (SELECT total_price, " \
                            " {rank_part} ," \
-                           " distance, enabled_for_online_booking, is_license_verified, priority " \
+                           " distance, enabled_for_online_booking, is_license_verified, welcome_calling_done, priority " \
                            "procedure_deal_price, doctor_id, practicing_since, doctor_clinic_id, doctor_clinic_timing_id, " \
                            "procedure_id, doctor_clinic_deal_price, hospital_id " \
                            "FROM (SELECT distance, procedure_deal_price, doctor_id, practicing_since, doctor_clinic_id, doctor_clinic_timing_id, procedure_id," \
-                           "enabled_for_online_booking, is_license_verified, priority, " \
+                           "enabled_for_online_booking, is_license_verified, welcome_calling_done, priority, " \
                            "doctor_clinic_deal_price, hospital_id , count_per_clinic, sum_per_clinic, sum_per_clinic+doctor_clinic_deal_price as total_price FROM " \
                            "(SELECT " \
                            "COUNT(procedure_id) OVER (PARTITION BY dct.id) AS count_per_clinic, " \
                            "SUM(dcp.deal_price) OVER (PARTITION BY dct.id) AS sum_per_clinic, " \
                            "St_distance(St_setsrid(St_point((%(longitude)s), (%(latitude)s)), 4326), h.location) AS distance, " \
-                           "dcp.deal_price AS procedure_deal_price, " \
+                           "dcp.deal_price AS procedure_deal_price, h.welcome_calling_done,  " \
                            "d.id AS doctor_id, practicing_since, " \
                            "d.enabled_for_online_booking and dc.enabled_for_online_booking and h.enabled_for_online_booking as enabled_for_online_booking, d.is_license_verified, dc.priority, " \
                            "dc.id AS doctor_clinic_id,  dct.id AS doctor_clinic_timing_id, dcp.id AS doctor_clinic_procedure_id, " \
@@ -303,7 +303,7 @@ class DoctorSearchHelper:
             "dc.id as doctor_clinic_id,  " \
             "dct.id as doctor_clinic_timing_id,practicing_since, " \
             "d.enabled_for_online_booking and dc.enabled_for_online_booking and h.enabled_for_online_booking as enabled_for_online_booking, " \
-            "is_license_verified, priority,deal_price, " \
+            "is_license_verified, priority,deal_price, h.welcome_calling_done, " \
             "dc.hospital_id as hospital_id, d.search_score FROM doctor d " \
             "INNER JOIN doctor_clinic dc ON d.id = dc.doctor_id and dc.enabled=true and d.is_live=true " \
             "and d.is_test_doctor is False and d.is_internal is False " \
@@ -410,6 +410,7 @@ class DoctorSearchHelper:
 
                 hospitals = [{
                     "enabled_for_online_booking": enable_online_booking,
+                    "welcome_calling_done": doctor_clinic.hospital.welcome_calling_done,
                     "hospital_name": doctor_clinic.hospital.name,
                     "address": ", ".join(
                         [value for value in [doctor_clinic.hospital.sublocality, doctor_clinic.hospital.locality] if
@@ -479,6 +480,7 @@ class DoctorSearchHelper:
                 "experience_years": doctor.experience_years(),
                 #"experiences": serializers.DoctorExperienceSerializer(doctor.experiences.all(), many=True).data,
                 "qualifications": serializers.DoctorQualificationSerializer(doctor.qualifications.all(), many=True).data,
+                "average rating": doctor.avg_rating,
                 # "general_specialization": serializers.DoctorPracticeSpecializationSerializer(
                 #     doctor.doctorpracticespecializations.all(),
                 #     many=True).data,
