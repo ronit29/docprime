@@ -306,7 +306,7 @@ class LabList(viewsets.ReadOnlyModelViewSet):
                     icon_url = util_absolute_url(temp_category.icon.url) if temp_category.icon else None
                     parameter_count = len(temp_test.parameter.all()) or 1
                     if single_test_data.get((category_id, test_id)):
-                        single_test_data[(category_id, test_id)]['parameter_count'] += single_test_data[(category_id, test_id)]['parameter_count']
+                        single_test_data[(category_id, test_id)]['parameter_count'] += parameter_count
                     else:
                         single_test_data[(category_id, test_id)] = {'name': name,
                                                                     'category_id': category_id,
