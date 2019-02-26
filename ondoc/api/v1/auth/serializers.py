@@ -161,7 +161,7 @@ class UserProfileSerializer(serializers.ModelSerializer):
     gender = serializers.ChoiceField(choices=GENDER_CHOICES)
     email = serializers.EmailField(required=False, allow_null=True, allow_blank=True)
     profile_image = serializers.SerializerMethodField()
-
+    dob = serializers.DateField(allow_null=True, required=False)
 
     class Meta:
         model = UserProfile
@@ -247,6 +247,7 @@ class AddressSerializer(serializers.ModelSerializer):
 class AppointmentqueryRetrieveSerializer(serializers.Serializer):
     type = serializers.CharField(required=True)
     source = serializers.ChoiceField(choices=AppointmentHistory.SOURCE_CHOICES, required=False)
+    completed = serializers.BooleanField(required=False)
 
 
 class ConsumerAccountModelSerializer(serializers.ModelSerializer):

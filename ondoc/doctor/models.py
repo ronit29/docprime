@@ -555,7 +555,7 @@ class Doctor(auth_model.TimeStampedModel, auth_model.QCModel, SearchKey):
             cursor.execute(query)
 
     def enabled_for_cod(self):
-        return True
+        return False
 
     class Meta:
         db_table = "doctor"
@@ -1322,6 +1322,11 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
         elif user_type == auth_model.User.CONSUMER and current_datetime <= self.time_slot_start:
             if self.status in (self.BOOKED, self.ACCEPTED, self.RESCHEDULED_DOCTOR, self.RESCHEDULED_PATIENT):
                 allowed = [self.RESCHEDULED_PATIENT, self.CANCELLED]
+        elif user_type == auth_model.User.CONSUMER and current_datetime > self.time_slot_start:
+            if self.status in [self.BOOKED, self.RESCHEDULED_DOCTOR, self.RESCHEDULED_PATIENT, self.ACCEPTED]:
+                allowed = [self.RESCHEDULED_PATIENT]
+            if self.status == self.ACCEPTED:
+                allowed.append(self.COMPLETED)
 
         return allowed
 
@@ -1493,12 +1498,12 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
             notification_models.EmailNotification.ops_notification_alert(self, email_list=settings.OPS_EMAIL_ID,
                                                                          product=Order.DOCTOR_PRODUCT_ID,
                                                                          alert_type=notification_models.EmailNotification.OPS_APPOINTMENT_NOTIFICATION)
-        if self.status == self.COMPLETED and not self.is_rated:
-            try:
-                notification_tasks.send_opd_rating_message.apply_async(
-                    kwargs={'appointment_id': self.id, 'type': 'opd'}, countdown=int(settings.RATING_SMS_NOTIF))
-            except Exception as e:
-                logger.error(str(e))
+        # if self.status == self.COMPLETED and not self.is_rated:
+        #     try:
+        #         notification_tasks.send_opd_rating_message.apply_async(
+        #             kwargs={'appointment_id': self.id, 'type': 'opd'}, countdown=int(settings.RATING_SMS_NOTIF))
+        #     except Exception as e:
+        #         logger.error(str(e))
 
         if old_instance and old_instance.status != self.ACCEPTED and self.status == self.ACCEPTED:
             try:
@@ -1506,6 +1511,14 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
                     (self.id, str(math.floor(self.time_slot_start.timestamp()))),
                     eta=self.time_slot_start - datetime.timedelta(
                         minutes=settings.TIME_BEFORE_APPOINTMENT_TO_SEND_OTP), )
+                notification_tasks.opd_send_after_appointment_confirmation.apply_async(
+                    (self.id, str(math.floor(self.time_slot_start.timestamp()))),
+                    eta=self.time_slot_start + datetime.timedelta(
+                        minutes=settings.TIME_AFTER_APPOINTMENT_TO_SEND_CONFIRMATION), )
+                notification_tasks.opd_send_after_appointment_confirmation.apply_async(
+                    (self.id, str(math.floor(self.time_slot_start.timestamp())), True),
+                    eta=self.time_slot_start + datetime.timedelta(
+                        minutes=settings.TIME_AFTER_APPOINTMENT_TO_SEND_SECOND_CONFIRMATION), )
                 # notification_tasks.opd_send_otp_before_appointment(self.id, self.time_slot_start)
             except Exception as e:
                 logger.error(str(e))
