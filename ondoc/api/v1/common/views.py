@@ -903,3 +903,23 @@ class GetPaymentOptionsViewSet(viewsets.GenericViewSet):
         options = PaymentOptions.build_payment_option(queryset)
 
         return Response(options)
+
+
+class GetSearchUrlViewSet(viewsets.GenericViewSet):
+
+    def search_url(self, request):
+        params = request.query_params
+        specialization_ids = params.get("specialization", '')
+        test_ids = params.get("test", '')
+        lat = params.get("lat", 28.459497) # if no lat long then default to gurgaon
+        long = params.get("long", 77.026638)
+
+        opd_search_url = "%s/opd/searchresults?specializations=%s" \
+                         "&lat=%s&long=%s&min_fees=0&max_fees=3000&min_distance=0&max_distance=15" \
+                         % (settings.BASE_URL, specialization_ids, lat, long)
+
+        lab_search_url = "%s/lab/searchresults?test_ids=%s" \
+                         "&min_distance=0&lat=%s&long=%s&min_price=0&max_price=20000&max_distance=15" \
+                         % (settings.BASE_URL, test_ids, lat, long)
+
+        return Response({"opd_search_url": opd_search_url, "lab_search_url": lab_search_url})
