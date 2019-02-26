@@ -1095,6 +1095,7 @@ class DoctorListViewSet(viewsets.GenericViewSet):
             sublocality = ''
             specializations = ''
             breadcrumb_locality_url = None
+            doctors_url = None
 
             if validated_data.get('locality_value'):
                 locality = validated_data.get('locality_value')
@@ -1184,6 +1185,11 @@ class DoctorListViewSet(viewsets.GenericViewSet):
             description += '.'
 
             breadcrumb = validated_data.get('breadcrumb')
+            if breadcrumb:
+                for data in breadcrumb:
+                    if data.get('url') and not data.get('url').startswith('doctors') and data.get('url').endswith('sptcit'):
+                        doctors_url = data.get('url')
+
             if breadcrumb:
                 breadcrumb = [{'url': '/', 'title': 'Home'}] + breadcrumb
             else:
@@ -1363,7 +1369,7 @@ class DoctorListViewSet(viewsets.GenericViewSet):
                          "breadcrumb": breadcrumb, 'search_content': top_content,
                          'procedures': procedures, 'procedure_categories': procedure_categories,
                          'ratings':ratings, 'reviews': reviews, 'ratings_title': ratings_title,
-                         'bottom_content': bottom_content})
+                         'bottom_content': bottom_content, 'doctors_url':doctors_url})
 
     @transaction.non_atomic_requests
     def search_by_hospital(self, request):
