@@ -272,6 +272,16 @@ class User(AbstractBaseUser, PermissionsMixin):
         #     return self.staffprofile.name
         # return str(self.phone_number)
 
+    def get_phone_number_for_communication(self):
+        from ondoc.communications.models import unique_phone_numbers
+        receivers = []
+        default_user_profile = self.profiles.filter(is_default_user=True).first()
+        if default_user_profile and default_user_profile.phone_number:
+            receivers.append({'user': self, 'phone_number': default_user_profile.phone_number})
+        receivers.append({'user': self, 'phone_number': self.phone_number})
+        receivers = unique_phone_numbers(receivers)
+        return receivers
+
     def get_full_name(self):
         return self.full_name
 

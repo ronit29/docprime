@@ -88,6 +88,7 @@ def prepare_and_hit(self, data):
         'OTP': '',
         'KYC': kyc,
         'Location': location,
+        'PaymentType': appointment.payment_type,
         'PaymentStatus': 300,
         'OrderID': order.id if order else 0,
         'DocPrimeBookingID': appointment.id,
@@ -387,32 +388,36 @@ def push_signup_lead_to_matrix(self, data):
 @task(bind=True, max_retries=2)
 def push_order_to_matrix(self, data):
     try:
+        if not data:
+            raise Exception('Data not received for the task.')
+
         order_id = data.get('order_id', None)
         if not order_id:
             logger.error("[CELERY ERROR: Incorrect values provided.]")
             raise ValueError()
 
-        order_obj = Order.objects.get(id=order_id)
+        order_obj = Order.objects.filter(id=order_id).first()
 
         if not order_obj:
             raise Exception("Order could not found against id - " + str(order_id))
 
-        appointment_details = order_obj.appointment_details()
+        if order_obj.parent:
+            raise Exception("should not push child order in case of payment failure - " + str(order_id))
+
+        phone_number = order_obj.user.phone_number
+        name = order_obj.user.full_name
+        # appointment_details = order_obj.appointment_details()
+        # if not appointment_details:
+        #     raise Exception('Appointment details not found for order.')
+
         request_data = {
             'LeadSource': 'DocPrime',
-            'HospitalName': appointment_details.get('hospital_name'),
-            'Name': appointment_details.get('profile_name', ''),
-            'BookedBy': appointment_details.get('user_number', None),
+            'Name': name,
+            'BookedBy': phone_number,
             'LeadID': order_obj.matrix_lead_id if order_obj.matrix_lead_id else 0,
-            'PrimaryNo': appointment_details.get('user_number',None),
+            'PrimaryNo': phone_number,
             'ProductId': 5,
             'SubProductId': 4,
-            'AppointmentDetails': {
-                'OrderID': appointment_details.get('order_id', 0),
-                'ProviderName': appointment_details.get('doctor_name', '') if appointment_details.get('doctor_name') else appointment_details.get('lab_name'),
-                'BookingDateTime': int(data.get('created_at')),
-                'AppointmentDateTime': int(data.get('timeslot')),
-            }
         }
 
         #logger.error(json.dumps(request_data))
@@ -432,6 +437,8 @@ def push_order_to_matrix(self, data):
             self.retry([data], countdown=countdown_time)
         else:
             resp_data = response.json()
+            if not resp_data:
+                raise Exception('Data received from matrix is null or empty.')
             #logger.error(response.text)
 
             if not resp_data.get('Id', None):
@@ -698,7 +705,7 @@ def push_onboarding_qcstatus_to_matrix(self, data):
             obj.save()
 
     except Exception as e:
-        logger.error("Error in Celery. Failed pushing order to the matrix- " + str(e))
+        logger.error("Error in Celery. Failed pushing qc status to the matrix- " + str(e))
 
 
 @task(bind=True, max_retries=2)

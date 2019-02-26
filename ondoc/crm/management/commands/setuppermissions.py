@@ -40,6 +40,7 @@ from ondoc.procedure.models import Procedure, ProcedureCategory, CommonProcedure
 from ondoc.reports import models as report_models
 
 from ondoc.diagnostic.models import LabPricing
+from ondoc.integrations.models import IntegratorMapping, IntegratorProfileMapping
 
 from ondoc.web.models import Career, OnlineLead
 from ondoc.ratings_review import models as rating_models
@@ -509,6 +510,20 @@ class Command(BaseCommand):
                 Q(codename='change_' + ct.model))
 
             group.permissions.add(*permissions)
+
+        # Create integration group
+        group, created = Group.objects.get_or_create(name=constants['INTEGRATION_MANAGEMENT_TEAM'])
+        group.permissions.clear()
+
+        content_types = ContentType.objects.get_for_models(IntegratorMapping, IntegratorProfileMapping, LabTest, LabNetwork)
+
+        for cl, ct in content_types.items():
+            permissions = Permission.objects.filter(
+                Q(content_type=ct),
+                Q(codename='change_' + ct.model))
+
+            group.permissions.add(*permissions)
+
 
         group, created = Group.objects.get_or_create(name=constants['WELCOME_CALLING_TEAM'])
         group.permissions.clear()
