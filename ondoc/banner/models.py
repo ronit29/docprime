@@ -57,7 +57,7 @@ class Banner(auth_model.TimeStampedModel):
     event_name = models.CharField(max_length=1000)
     latitude = models.FloatField(null=True, blank=True)
     longitude = models.FloatField(null=True, blank=True)
-    radius = models.FloatField(null=True, blank=True, default=0)
+    radius = models.FloatField(null=True, blank=True)
     show_in_app = models.BooleanField(default=True)
     app_screen = models.CharField(max_length=1000, null=True, blank=True)
     app_params = JSONField(null=True, blank=True)
@@ -69,11 +69,12 @@ class Banner(auth_model.TimeStampedModel):
     def save(self, force_insert=False, force_update=False, using=None, update_fields=None):
         # slider_locate_choices = dict(self.location.name)
         # self.event_name = self.title+'_'+ str(slider_locate[self.slider_locate])
-        if self.location:
+        if self.location.name:
             self.event_name = '_'.join(self.title.lower().split())\
                               + '_' \
                               + '_'.join(
                 self.location.name.lower().split())
+            # self.slider_locate = self.location.name
             super().save(force_insert, force_update, using, update_fields)
         else:
             super().save(force_insert, force_update, using, update_fields)
@@ -90,7 +91,7 @@ class Banner(auth_model.TimeStampedModel):
             resp['title'] = data.title
             resp['id'] = data.id
             # resp['slider_location'] = slider_locate[data.slider_locate]
-            resp['slider_location'] = data.location
+            resp['slider_location'] = data.location.name if data.location and data.location.name else None
             resp['latitude'] = data.latitude
             resp['longitude'] = data.longitude
             resp['radius'] = data.radius
