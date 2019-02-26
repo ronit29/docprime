@@ -230,13 +230,12 @@ class ListRatingViewSet(viewsets.GenericViewSet):
                                               .order_by('-updated_at')
                 graph_queryset = self.get_queryset().filter(lab_ratings__id=valid_data.get('object_id'))
                 appointment = lab_models.LabAppointment.objects.select_related('profile').filter(lab_id=valid_data.get('object_id')).all()
-        # queryset = paginate_queryset(queryset, request)
-        if len(queryset):
-                body_serializer = serializers.RatingsModelSerializer(queryset, many=True, context={'request': request,
-                                                                                                   'app': appointment})
-                graph_serializer = serializers.RatingsGraphSerializer(graph_queryset,
-                                                                      context={'request': request})
-        else:
-            return Response({'error': 'Invalid Object'}, status=status.HTTP_404_NOT_FOUND)
+        queryset = paginate_queryset(queryset, request)
+        body_serializer = serializers.RatingsModelSerializer(queryset, many=True, context={'request': request,
+                                                                                           'app': appointment})
+        graph_serializer = serializers.RatingsGraphSerializer(graph_queryset,
+                                                              context={'request': request})
+
         return Response({'rating': body_serializer.data,
                          'rating_graph': graph_serializer.data})
+

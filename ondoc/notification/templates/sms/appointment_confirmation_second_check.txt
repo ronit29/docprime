@@ -1,0 +1,8 @@
+Dear {{patient_name|capfirst}},
+
+We still await your confirmation.
+
+Please click {{opd_appointment_complete_url}} if your appointment with Dr. {{doctor_name|capfirst}} on {{instance.time_slot_start|date:"D jS F Y"}} is completed or click {{reschdule_appointment_bypass_url}} to reschedule the appointment.
+
+Thanks,
+Team Docprime.com
