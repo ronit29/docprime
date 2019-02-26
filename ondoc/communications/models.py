@@ -23,7 +23,7 @@ from django.utils import timezone
 from weasyprint import HTML
 
 from ondoc.account.models import Invoice, Order
-from ondoc.authentication.models import UserProfile, GenericAdmin, NotificationEndpoint
+from ondoc.authentication.models import UserProfile, GenericAdmin, NotificationEndpoint, AgentToken
 
 from ondoc.notification.models import NotificationAction, SmsNotification, EmailNotification, AppNotification, \
     PushNotification, WhtsappNotification
@@ -70,6 +70,8 @@ def get_lab_manager_email_and_number(managers):
 
 def unique_emails(list_):
     """Function accepts list of dictionaries and returns list of unique dictionaries"""
+    if not list_:
+        return list_
     temp = set()
 
     for item in list_:
@@ -81,6 +83,8 @@ def unique_emails(list_):
 
 def unique_phone_numbers(list_):
     """Function accepts list of dictionaries and returns list of unique dictionaries"""
+    if not list_:
+        return list_
     temp = set()
 
     for item in list_:
@@ -270,6 +274,16 @@ class SMSNotification:
                 temp_short_url = generate_short_url(report)
                 lab_reports.append(temp_short_url)
             self.context['lab_reports'] = lab_reports
+        elif notification_type == NotificationAction.REFUND_COMPLETED:
+            body_template = "sms/refund_completed.txt"
+        elif notification_type == NotificationAction.REFUND_BREAKUP:
+            body_template = "sms/refund_breakup.txt"
+        elif notification_type == NotificationAction.OPD_CONFIRMATION_CHECK_AFTER_APPOINTMENT:
+            body_template = "sms/appointment_confirmation_check.txt"
+        elif notification_type == NotificationAction.OPD_CONFIRMATION_SECOND_CHECK_AFTER_APPOINTMENT:
+            body_template = "sms/appointment_confirmation_second_check.txt"
+        elif notification_type == NotificationAction.OPD_FEEDBACK_AFTER_APPOINTMENT:
+            body_template = "sms/appointment_feedback.txt"
         return body_template
 
     def trigger(self, receiver, template, context):
@@ -878,6 +892,11 @@ class OpdNotification(Notification):
             mask_number = mask_number_instance.mask_number
         email_banners_html = UserConfig.objects.filter(key__iexact="email_banners") \
                     .annotate(html_code=KeyTransform('html_code', 'data')).values_list('html_code', flat=True).first()
+        auth_token = AgentToken.objects.create_token(user=self.appointment.user)
+        booking_url = settings.BASE_URL + '/sms/booking?token={}'.format(auth_token.token)
+        opd_appointment_complete_url = booking_url + "&callbackurl=opd/appointment/{}?complete=true".format(self.appointment.id)
+        opd_appointment_feedback_url = booking_url + "&callbackurl=opd/appointment/{}".format(self.appointment.id)
+        reschdule_appointment_bypass_url = booking_url + "&callbackurl=opd/doctor/{}/{}/book?reschedule={}".format(self.appointment.doctor.id, self.appointment.hospital.id, self.appointment.id)
         context = {
             "doctor_name": doctor_name,
             "patient_name": patient_name,
@@ -894,8 +913,12 @@ class OpdNotification(Notification):
             "attachments": {},  # Updated later
             "screen": "appointment",
             "type": "doctor",
+            "cod_amount": int(self.appointment.mrp),
             "mask_number": mask_number,
-            "email_banners": email_banners_html if email_banners_html is not None else ""
+            "email_banners": email_banners_html if email_banners_html is not None else "",
+            "opd_appointment_complete_url": generate_short_url(opd_appointment_complete_url),
+            "opd_appointment_feedback_url": generate_short_url(opd_appointment_feedback_url),
+            "reschdule_appointment_bypass_url": generate_short_url(reschdule_appointment_bypass_url)
         }
         return context
 
@@ -907,7 +930,10 @@ class OpdNotification(Notification):
         if notification_type == NotificationAction.DOCTOR_INVOICE:
             email_notification = EMAILNotification(notification_type, context)
             email_notification.send(all_receivers.get('email_receivers', []))
-        elif notification_type == NotificationAction.OPD_OTP_BEFORE_APPOINTMENT:
+        elif notification_type == NotificationAction.OPD_OTP_BEFORE_APPOINTMENT or \
+                notification_type == NotificationAction.OPD_CONFIRMATION_CHECK_AFTER_APPOINTMENT or \
+                notification_type == NotificationAction.OPD_CONFIRMATION_SECOND_CHECK_AFTER_APPOINTMENT or \
+                notification_type == NotificationAction.OPD_FEEDBACK_AFTER_APPOINTMENT:
             sms_notification = SMSNotification(notification_type, context)
             sms_notification.send(all_receivers.get('sms_receivers', []))
         else:
@@ -930,14 +956,17 @@ class OpdNotification(Notification):
         notification_type = self.notification_type
         if not instance or not instance.user:
             return receivers
-        
+
         doctor_spocs = instance.hospital.get_spocs_for_communication() if instance.hospital else []
         spocs_to_be_communicated = []
         if notification_type in [NotificationAction.APPOINTMENT_ACCEPTED,
                                  NotificationAction.APPOINTMENT_RESCHEDULED_BY_DOCTOR,
                                  NotificationAction.PRESCRIPTION_UPLOADED,
                                  NotificationAction.DOCTOR_INVOICE,
-                                 NotificationAction.OPD_OTP_BEFORE_APPOINTMENT]:
+                                 NotificationAction.OPD_OTP_BEFORE_APPOINTMENT,
+                                 NotificationAction.OPD_CONFIRMATION_CHECK_AFTER_APPOINTMENT,
+                                 NotificationAction.OPD_CONFIRMATION_SECOND_CHECK_AFTER_APPOINTMENT,
+                                 NotificationAction.OPD_FEEDBACK_AFTER_APPOINTMENT]:
             receivers.append(instance.user)
         elif notification_type in [NotificationAction.APPOINTMENT_RESCHEDULED_BY_PATIENT,
                                    NotificationAction.APPOINTMENT_BOOKED,
