@@ -537,7 +537,7 @@ def push_onboarding_qcstatus_to_matrix(self, data):
             obj.save()
 
     except Exception as e:
-        logger.error("Error in Celery. Failed pushing order to the matrix- " + str(e))
+        logger.error("Error in Celery. Failed pushing qc status to the matrix- " + str(e))
 
 
 @task(bind=True, max_retries=2)
