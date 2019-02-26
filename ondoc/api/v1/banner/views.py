@@ -30,16 +30,12 @@ class BannerListViewSet(viewsets.GenericViewSet):
                         return Response({'msg': 'Invalid Lat Long'}, status=status.HTTP_400_BAD_REQUEST)
 
                     distance = pnt1.distance(pnt2)*100  # Distance in kilo-metres
-                    if distance > radius:
-                        continue
-                    else:
+                    if distance <= radius:
                         res.append(banner_obj)
                 else:
                     res.append(banner_obj)
-            elif (banner_obj.get('latitude') and banner_obj.get('longitude') and banner_obj.get('radius')) or \
-                    (banner_obj.get('latitude') and banner_obj.get('longitude') and banner_obj.get('radius') == 0):
+            elif not banner_obj.get('latitude'):
                 res.append(banner_obj)
-            else:
-                res.append(banner_obj)
+
         return Response(res)
 
