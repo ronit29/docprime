@@ -424,7 +424,7 @@ class WHTSAPPNotification:
             data.append(self.context.get('patient_name'))
             data.append(self.context.get('doctor_name'))
             data.append(datetime.strftime(self.context.get('instance').time_slot_start, '%d-%m-%Y'))
-            data.append(datetime.strftime(self.context.get('instance').time_slot_start, '%%H:%M'))
+            data.append(datetime.strftime(self.context.get('instance').time_slot_start, '%H:%M'))
             data.append(self.context.get('instance').id)
             data.append(self.context.get('patient_name'))
             data.append(self.context.get('doctor_name'))
