@@ -385,7 +385,7 @@ class DoctorSearchHelper:
             if not doctor_clinic:
                 hospitals = []
             else:
-                all_doctor_clinic_procedures = list(doctor_clinic.doctorclinicprocedure_set.all())
+                all_doctor_clinic_procedures = list(doctor_clinic.procedures_from_doctor_clinic.all())
                 selected_procedures_data = get_included_doctor_clinic_procedure(all_doctor_clinic_procedures,
                                                                                 selected_procedure_ids)
                 other_procedures_data = get_included_doctor_clinic_procedure(all_doctor_clinic_procedures,
