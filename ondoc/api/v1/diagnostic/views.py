@@ -319,13 +319,17 @@ class LabList(viewsets.ReadOnlyModelViewSet):
 
         top_content = None
         bottom_content = None
-        dynamic = NewDynamic.objects.filter(url__url='full-body-checkup-health-packages', is_enabled=True).first()
-        if dynamic:
-            top_content = dynamic.top_content
-            bottom_content = dynamic.bottom_content
+        title = None
+        description = None
+        dynamic = NewDynamic.objects.filter(url__url='full-body-checkup-health-packages', is_enabled=True)
+        for x in dynamic:
+            top_content = x.top_content if x.top_content else None
+            bottom_content = x.bottom_content if x.bottom_content else None
+            title = x.meta_title if x.meta_title else None
+            description = x.meta_description if x.meta_description else None
         return Response({'result': result, 'categories': category_result, 'count': len(all_packages),
                          'categories_count': len(category_result), 'bottom_content': bottom_content,
-                         'search_content': top_content})
+                         'search_content': top_content, 'title': title, 'description': description})
 
 
     @transaction.non_atomic_requests
