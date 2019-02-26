@@ -22,14 +22,14 @@ class BannerListViewSet(viewsets.GenericViewSet):
                 if banner_obj.get('latitude') and banner_obj.get('longitude') and banner_obj.get('radius'):
                     latitude = banner_obj.get('latitude')
                     longitude = banner_obj.get('longitude')
-                    radius = banner_obj.get('radius') * 1000  # Radius in metres
+                    radius = banner_obj.get('radius')  # Radius in kilo-metres
                     pnt1 = Point(float(longitude), float(latitude))
                     try:
                         pnt2 = Point(float(long), float(lat))
                     except:
                         return Response({'msg': 'Invalid Lat Long'}, status=status.HTTP_400_BAD_REQUEST)
 
-                    distance = pnt1.distance(pnt2)*100  # Distance in metres
+                    distance = pnt1.distance(pnt2)*100  # Distance in kilo-metres
                     if distance > radius:
                         continue
                     else:
