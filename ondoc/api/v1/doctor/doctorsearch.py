@@ -46,7 +46,7 @@ class DoctorSearchHelper:
 
         if self.query_params.get('hospital_id') is not None:
             filtering_params.append(
-                "hospital_id=(%(hospital_id)s)")
+                "h.id=(%(hospital_id)s)")
             params['hospital_id'] = str(self.query_params.get("hospital_id"))
 
         if len(condition_ids)>0:
