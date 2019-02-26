@@ -1,0 +1,11 @@
+Hi,
+
+We have initiated the refund of Rs {{amount}}{% if booking_id %} for your booking id ‘{{booking_id}}’{% endif %}.
+{% if ctrnx_id %}
+The transaction ID for this refund is : DPRF{{ctrnx_id}}
+{% endif %}
+The amount should reflect in your account within 5-7 working days.
+
+Please call us on 1800-123-9419 in case of any assistance.
+
+Thanks for choosing docprime.com
