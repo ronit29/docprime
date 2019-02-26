@@ -11,11 +11,14 @@ class IpdProcedure(auth_model.TimeStampedModel, SearchKey):
     is_live = models.BooleanField(default=False)
     features = models.ManyToManyField(Feature, through='IpdProcedureFeatureMapping',
                                       through_fields=('ipd_procedure', 'feature'), related_name='of_ipd_procedures')
-    min_price = models.DecimalField(max_digits=12, decimal_places=2)
-    max_price = models.DecimalField(max_digits=12, decimal_places=2)
+    min_price = models.DecimalField(max_digits=12, decimal_places=2, null=True, blank=True)
+    max_price = models.DecimalField(max_digits=12, decimal_places=2, null=True, blank=True)
 
     def __str__(self):
         return '{}'.format(self.name)
+
+    class Meta:
+        db_table = "ipd_procedure"
 
 
 class IpdProcedureFeatureMapping(models.Model):
@@ -36,9 +39,6 @@ class IpdProcedureFeatureMapping(models.Model):
 class DoctorClinicIpdProcedure(auth_model.TimeStampedModel):
     ipd_procedure = models.ForeignKey(IpdProcedure, on_delete=models.CASCADE, related_name="doctor_clinic_ipd_mappings")
     doctor_clinic = models.ForeignKey(DoctorClinic, on_delete=models.CASCADE, related_name="ipd_procedure_clinic_mappings")
-    mrp = models.IntegerField(default=0)
-    agreed_price = models.IntegerField(default=0)
-    deal_price = models.IntegerField(default=0)
 
     def __str__(self):
         return '{} in {}'.format(str(self.ipd_procedure), str(self.doctor_clinic))
