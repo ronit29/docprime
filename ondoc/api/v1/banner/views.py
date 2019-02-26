@@ -15,10 +15,8 @@ class BannerListViewSet(viewsets.GenericViewSet):
         parameters = request.query_params
         lat = parameters.get('lat', None)
         long = parameters.get('long', None)
-        final_result = None
         banners = Banner.get_all_banners(request)
-        res1 = []
-        res2 = []
+        res = []
         for banner_obj in banners:
             if lat and long:
                 if banner_obj.get('latitude') and banner_obj.get('longitude') and banner_obj.get('radius'):
@@ -33,21 +31,15 @@ class BannerListViewSet(viewsets.GenericViewSet):
 
                     distance = pnt1.distance(pnt2)*100  # Distance in metres
                     if distance > radius:
-
                         continue
-
                     else:
-                        res1.append(banner_obj)
-
+                        res.append(banner_obj)
                 else:
-                    res2.append(banner_obj)
-
+                    res.append(banner_obj)
             elif (banner_obj.get('latitude') and banner_obj.get('longitude') and banner_obj.get('radius')) or \
                     (banner_obj.get('latitude') and banner_obj.get('longitude') and banner_obj.get('radius') == 0):
-                res1.append(banner_obj)
-
+                res.append(banner_obj)
             else:
-                res2.append(banner_obj)
-
-        return Response({'location_banners': res1, 'non_location_banners': res2})
+                res.append(banner_obj)
+        return Response(res)
 
