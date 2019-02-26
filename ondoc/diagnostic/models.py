@@ -801,7 +801,8 @@ class LabTestCategory(auth_model.TimeStampedModel, SearchKey):
     is_package_category = models.BooleanField(verbose_name='Is this a test package category?')
     show_on_recommended_screen = models.BooleanField(default=False)
     priority = models.PositiveIntegerField(default=0)
-    icon = models.ImageField(upload_to='test/image', null=True)
+    icon = models.ImageField(upload_to='test/image', null=True, blank=True)
+
     def __str__(self):
         return self.name
 
