@@ -618,6 +618,7 @@ class DoctorProfileUserViewSet(viewsets.GenericViewSet):
             specialization_id = ''
             doc = DoctorListViewSet()
             general_specialization = []
+            doctors_url = None
 
             for dps in doctor.doctorpracticespecializations.all():
                 general_specialization.append(dps.specialization)
@@ -635,7 +636,14 @@ class DoctorProfileUserViewSet(viewsets.GenericViewSet):
                 kwargs['parameters'] = parameters
                 response_data['doctors'] = doc.list(request, **kwargs)
                 if response_data.get('doctors'):
-                    response_data['doctors']['doctors_url'] = '/opd/searchresults?specializations=%s&lat=%s&long=%s' % (str(specialization_id), hospital.get('lat'), hospital.get('long'))
+                    breadcrumb = entity.breadcrumb
+                    if breadcrumb:
+                        for data in breadcrumb:
+                            if data.get('url') and not data.get('url').startswith('doctors') and data.get('url').endswith('sptcit'):
+                                doctors_url = data.get('url')
+                    response_data['doctors']['doctors_url'] = doctors_url
+
+                    # response_data['doctors']['doctors_url'] = '/opd/searchresults?specializations=%s&lat=%s&long=%s' % (str(specialization_id), hospital.get('lat'), hospital.get('long'))
                 else:
                     response_data['doctors']['doctors_url'] = None
         else:
@@ -1095,7 +1103,6 @@ class DoctorListViewSet(viewsets.GenericViewSet):
             sublocality = ''
             specializations = ''
             breadcrumb_locality_url = None
-            doctors_url = None
 
             if validated_data.get('locality_value'):
                 locality = validated_data.get('locality_value')
@@ -1185,10 +1192,6 @@ class DoctorListViewSet(viewsets.GenericViewSet):
             description += '.'
 
             breadcrumb = validated_data.get('breadcrumb')
-            if breadcrumb:
-                for data in breadcrumb:
-                    if data.get('url') and not data.get('url').startswith('doctors') and data.get('url').endswith('sptcit'):
-                        doctors_url = data.get('url')
 
             if breadcrumb:
                 breadcrumb = [{'url': '/', 'title': 'Home'}] + breadcrumb
@@ -1369,7 +1372,7 @@ class DoctorListViewSet(viewsets.GenericViewSet):
                          "breadcrumb": breadcrumb, 'search_content': top_content,
                          'procedures': procedures, 'procedure_categories': procedure_categories,
                          'ratings':ratings, 'reviews': reviews, 'ratings_title': ratings_title,
-                         'bottom_content': bottom_content, 'doctors_url':doctors_url})
+                         'bottom_content': bottom_content})
 
     @transaction.non_atomic_requests
     def search_by_hospital(self, request):
