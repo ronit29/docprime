@@ -16,6 +16,8 @@ from django import forms
 from ondoc.api.v1.utils import GenericAdminEntity
 import nested_admin
 from .common import AssociatedMerchantInline
+from django.contrib import messages
+from django.http import HttpResponseRedirect
 
 
 class HospitalImageInline(admin.TabularInline):
@@ -320,6 +322,25 @@ class HospitalAdmin(admin.GeoModelAdmin, VersionAdmin, ActionAdmin, QCPemAdmin):
         else:
             return ''
 
+    def delete_view(self, request, object_id, extra_context=None):
+        obj = self.model.objects.filter(id=object_id).first()
+        if not obj:
+            pass
+        elif obj.enabled == False:
+            pass
+        else:
+            messages.set_level(request, messages.ERROR)
+            content_type = ContentType.objects.get_for_model(obj)
+            messages.error(request, '{} should be disable before delete'.format(content_type.model))
+            return HttpResponseRedirect(reverse('admin:{}_{}_change'.format(content_type.app_label,
+                                                                            content_type.model), args=[object_id]))
+        return super().delete_view(request, object_id, extra_context)
+
+    def get_actions(self, request):
+        actions = super().get_actions(request)
+        if 'delete_selected' in actions:
+            del actions['delete_selected']
+        return actions
 
     list_display = ('name', 'updated_at', 'data_status', 'doctor_count', 'list_created_by', 'list_assigned_to')
     form = HospitalForm

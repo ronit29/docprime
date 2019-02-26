@@ -124,7 +124,7 @@ class MedicalService(auth_model.TimeStampedModel, UniqueNameModel):
         db_table = "medical_service"
 
 
-class Hospital(auth_model.TimeStampedModel, auth_model.CreatedByModel, auth_model.QCModel, SearchKey):
+class Hospital(auth_model.TimeStampedModel, auth_model.CreatedByModel, auth_model.QCModel, SearchKey, auth_model.SoftDelete):
     PRIVATE = 1
     CLINIC = 2
     HOSPITAL = 3
@@ -360,7 +360,6 @@ class College(auth_model.TimeStampedModel):
 
 
 class Doctor(auth_model.TimeStampedModel, auth_model.QCModel, SearchKey, auth_model.SoftDelete):
-    _safedelete_policy = SOFT_DELETE
     SOURCE_PRACTO = "pr"
     SOURCE_CRM = 'crm'
 
@@ -540,6 +539,13 @@ class Doctor(auth_model.TimeStampedModel, auth_model.QCModel, SearchKey, auth_mo
         super(Doctor, self).save(*args, **kwargs)
 
         transaction.on_commit(lambda: self.app_commit_tasks(push_to_matrix))
+
+    # def delete(self, *args, **kwargs):
+    #     if self.is_live:
+    #         raise ValidationError('Before delete doctor should be disabled')
+    #     else:
+    #         super().delete(*args, **kwargs)
+
 
     def app_commit_tasks(self, push_to_matrix):
         if push_to_matrix:

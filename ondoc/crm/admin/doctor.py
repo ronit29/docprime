@@ -24,6 +24,8 @@ from ondoc.api.v1.utils import GenericAdminEntity, util_absolute_url, util_file_
 from ondoc.common.models import AppointmentHistory
 from ondoc.procedure.models import DoctorClinicProcedure, Procedure
 from safedelete.admin import SafeDeleteAdmin, highlight_deleted
+from django.contrib import messages
+from django.http import HttpResponseRedirect
 
 logger = logging.getLogger(__name__)
 
@@ -1023,13 +1025,37 @@ class DoctorAdmin(AutoComplete, ImportExportMixin, VersionAdmin, ActionAdmin, QC
     #                 'is_online_consultation_enabled','online_consultation_fees')}),
     #                 (None,{'fields':('enabled','disabled_after','disable_reason','disable_comments','onboarding_status','assigned_to', \
     #                  'matrix_lead_id','batch', 'is_gold', 'lead_url', 'registered','is_live')}))
-    list_display = (highlight_deleted,
+    list_display = (
         'name', 'updated_at', 'data_status', 'onboarding_status', 'list_created_by', 'list_assigned_to', 'registered',
-        'get_onboard_link') + SafeDeleteAdmin.list_display
+        'get_onboard_link')
     date_hierarchy = 'created_at'
     list_filter = (
         'data_status', 'onboarding_status', 'is_live', 'enabled', 'is_insurance_enabled', 'doctorpracticespecializations__specialization',
-        CityFilter, CreatedByFilter) + SafeDeleteAdmin.list_filter
+        CityFilter, CreatedByFilter)
+
+    def has_delete_permission(self, request, obj=None):
+        return super().has_delete_permission(request, obj)
+
+    def delete_view(self, request, object_id, extra_context=None):
+        obj = self.model.objects.filter(id=object_id).first()
+        if not obj:
+            pass
+        elif obj.enabled == False:
+            pass
+        else:
+            messages.set_level(request, messages.ERROR)
+            content_type = ContentType.objects.get_for_model(obj)
+            messages.error(request, '{} should be disable before delete'.format(content_type.model))
+            return HttpResponseRedirect(reverse('admin:{}_{}_change'.format(content_type.app_label,
+                                                                            content_type.model), args=[object_id]))
+        return super().delete_view(request, object_id, extra_context)
+
+    def get_actions(self, request):
+        actions = super().get_actions(request)
+        if 'delete_selected' in actions:
+            del actions['delete_selected']
+        return actions
+
     form = DoctorForm
     inlines = [
         CompetitorInfoInline,
