@@ -705,14 +705,14 @@ class DoctorProfileUserViewSet(viewsets.GenericViewSet):
                             about_doctor += person + qual_str[count] + his_her + ' ' + data.qualification.name + ' in the year ' \
                                             + str(data.passing_year) + ' from ' + data.college.name + '. '
                             count = count + 1
-                about_doctor += '<br><br>' + doctor.name + ' is an experienced, skilled, and awarded doctor in ' + his_her + ' field of specialization. '
+                about_doctor += '<br><br>' + doctor.name + ' is an experienced, skilled and awarded doctor in ' + his_her + ' field of specialization. '
                 doc_awards_obj = doctor.awards.all()
                 if doc_awards_obj:
                     for data in doc_awards_obj:
                         awards.append(data.name)
 
                 if awards:
-                    doc_awards = ','.join(awards)
+                    doc_awards = ', '.join(awards)
                     about_doctor += doctor.name + ' has been awarded with ' + doc_awards + '. '
 
             doc_experience_details = response_data.get('experiences')
