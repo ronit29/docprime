@@ -355,7 +355,7 @@ class WHTSAPPNotification:
             data.append(datetime.strftime(self.context.get('instance').time_slot_start, '%H:%M'))
             data.append(self.context.get('instance').id)
             data.append(self.context.get('patient_name'))
-            data.append(self.context.get('mask_number'))
+            data.append(self.context.get('mask_number', 'NA'))
             data.append(self.context.get('doctor_name'))
             data.append(datetime.strftime(self.context.get('instance').time_slot_start, '%d-%m-%Y'))
             data.append(datetime.strftime(self.context.get('instance').time_slot_start, '%H:%M'))
@@ -393,14 +393,10 @@ class WHTSAPPNotification:
             data.append(self.context.get('patient_name'))
             data.append(self.context.get('doctor_name'))
             data.append(self.context.get('instance').hospital.name)
-            data.append(datetime.strftime(self.context.get('instance').time_slot_start, '%d-%m-%Y'))
-            data.append(datetime.strftime(self.context.get('instance').time_slot_start, '%H:%M'))
             data.append(self.context.get('instance').id)
             data.append(self.context.get('patient_name'))
-            data.append(self.context.get('instance').profile.phone_number)
             data.append(self.context.get('doctor_name'))
-            data.append(self.context.get('instance').hospital.name)
-            data.append(self.context.get('instance').hospital.get_hos_address())
+            data.append(datetime.strftime(self.context.get('instance').time_slot_start, '%d-%m-%Y %H:%M'))
 
         elif notification_type == NotificationAction.APPOINTMENT_RESCHEDULED_BY_PATIENT and (not user or user.user_type == User.DOCTOR):
             body_template = "appointment_rescheduled_patient_initiated_to_doctor"
@@ -424,13 +420,12 @@ class WHTSAPPNotification:
             body_template = "appointment_cancelled_doctor"
 
             data.append(self.context.get('doctor_name'))
+            data.append(datetime.strftime(self.context.get('instance').time_slot_start, '%H:%M'))
             data.append(datetime.strftime(self.context.get('instance').time_slot_start, '%d-%m-%Y'))
-            data.append(datetime.strftime(self.context.get('instance').time_slot_start, '%H:%M'))
-            data.append(datetime.strftime(self.context.get('instance').time_slot_start, '%H:%M'))
+            data.append(self.context.get('instance').hospital.name)
             data.append(self.context.get('instance').id)
             data.append(self.context.get('patient_name'))
             data.append(self.context.get('doctor_name'))
-
 
         elif notification_type == NotificationAction.APPOINTMENT_CANCELLED and user and user.user_type == User.CONSUMER:
             body_template = "opd_appointment_cancellation_patient"
@@ -442,7 +437,6 @@ class WHTSAPPNotification:
             data.append(self.context.get('instance').id)
             data.append(self.context.get('patient_name'))
             data.append(self.context.get('doctor_name'))
-
 
         elif notification_type == NotificationAction.PRESCRIPTION_UPLOADED:
             body_template = "prescription_uploaded"
@@ -462,7 +456,12 @@ class WHTSAPPNotification:
             data.append(self.context.get('instance').id)
             data.append(self.context.get('patient_name'))
             data.append(self.context.get('lab_name'))
-            data.append(self.context.get('pickup_address'))
+
+            pickup_address = 'NA'
+            if self.context.get('pickup_address'):
+                pickup_address = self.context.get('pickup_address')
+
+            data.append(pickup_address)
             data.append(datetime.strftime(self.context.get('instance').time_slot_start, '%d-%m-%Y %H:%M'))
 
         elif notification_type == NotificationAction.LAB_APPOINTMENT_BOOKED and user and user.user_type == User.CONSUMER:
@@ -475,9 +474,12 @@ class WHTSAPPNotification:
             data.append(self.context.get('instance').id)
             data.append(self.context.get('patient_name'))
             data.append(self.context.get('lab_name'))
-            data.append(self.context.get('pickup_address'))
-            data.append(datetime.strftime(self.context.get('instance').time_slot_start, '%d-%m-%Y %H:%M'))
+            pickup_address = 'NA'
+            if self.context.get('pickup_address'):
+                pickup_address = self.context.get('pickup_address')
 
+            data.append(pickup_address)
+            data.append(datetime.strftime(self.context.get('instance').time_slot_start, '%d-%m-%Y %H:%M'))
 
         elif notification_type == NotificationAction.LAB_APPOINTMENT_BOOKED and (not user or user.user_type == User.DOCTOR):
             body_template = "appointment_booked_lab"
@@ -492,8 +494,6 @@ class WHTSAPPNotification:
             data.append(self.context.get('lab_name'))
             data.append(datetime.strftime(self.context.get('instance').time_slot_start, '%d-%m-%Y %H:%M'))
 
-
-
         elif notification_type == NotificationAction.LAB_APPOINTMENT_RESCHEDULED_BY_PATIENT and user and user.user_type == User.CONSUMER:
             body_template = "appointment_rescheduled_patient_initiated_to_patient"
 
@@ -503,7 +503,6 @@ class WHTSAPPNotification:
             data.append(datetime.strftime(self.context.get('instance').time_slot_start, '%d-%m-%Y %H:%M'))
             data.append(self.context.get('patient_name'))
             data.append(self.context.get('lab_name'))
-
 
         elif notification_type == NotificationAction.LAB_APPOINTMENT_RESCHEDULED_BY_PATIENT and (not user or user.user_type == User.DOCTOR):
             body_template = "appointment_rescheduled_patient_initiated_to_lab"
@@ -523,7 +522,6 @@ class WHTSAPPNotification:
             data.append(self.context.get('lab_name'))
             data.append(datetime.strftime(self.context.get('instance').time_slot_start, '%d-%m-%Y %H:%M'))
 
-
         elif notification_type == NotificationAction.LAB_APPOINTMENT_CANCELLED and user and user.user_type == User.CONSUMER:
             body_template = "lab_appointment_cancellation_patient"
 
@@ -538,10 +536,8 @@ class WHTSAPPNotification:
             # TODO: not implemented yet. So just setting generic text.
             data.append('Paid amount')
 
-
         elif notification_type == NotificationAction.LAB_APPOINTMENT_CANCELLED and (not user or user.user_type == User.DOCTOR):
             body_template = "appointment_cancelled_lab"
-
 
             data.append(self.context.get('patient_name'))
             data.append(self.context.get('lab_name'))
@@ -550,7 +546,6 @@ class WHTSAPPNotification:
             data.append(self.context.get('instance').id)
             data.append(self.context.get('patient_name'))
             data.append(self.context.get('lab_name'))
-
 
         elif notification_type == NotificationAction.LAB_REPORT_UPLOADED:
             body_template = "lab_report_uploaded"
