@@ -727,6 +727,8 @@ class DoctorListSerializer(serializers.Serializer):
     max_distance = serializers.IntegerField(required=False, allow_null=True)
     min_distance = serializers.IntegerField(required=False, allow_null=True)
     hospital_id = serializers.IntegerField(required=False, allow_null=True)
+    locality = serializers.CharField(required=False)
+    city = serializers.CharField(required=False)
 
     def validate_procedure_ids(self, attrs):
         try:
