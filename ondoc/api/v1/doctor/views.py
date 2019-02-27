@@ -688,6 +688,7 @@ class DoctorProfileUserViewSet(viewsets.GenericViewSet):
 
                 doctor_qual = doctor.qualifications.all()
                 if doctor_qual:
+                    about_doctor += '<br>'
                     count = 0
                     for data in doctor_qual:
                         if count>2:
