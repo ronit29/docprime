@@ -22,7 +22,8 @@ from ondoc.doctor.models import (Doctor, Hospital, DoctorClinicTiming, DoctorCli
                                  SpecializationField,
                                  MedicalConditionSpecialization, CompetitorInfo, CompetitorMonthlyVisit,
                                  SpecializationDepartmentMapping, CancellationReason, UploadDoctorData,
-                                 HospitalServiceMapping)
+                                 HospitalServiceMapping, HealthInsuranceProviderHospitalMapping,
+                                 HealthInsuranceProvider)
 
 from ondoc.diagnostic.models import (Lab, LabTiming, LabImage, GenericLabAdmin,
                                      LabManager, LabAccreditation, LabAward, LabCertification,
@@ -479,7 +480,8 @@ class Command(BaseCommand):
         content_types = ContentType.objects.get_for_models(LabTestRecommendedCategoryMapping, Banner, SliderLocation, UserConfig,
                                                            NewDynamic, QuestionAnswer, FrequentlyAddedTogetherTests,
                                                            IpdProcedureFeatureMapping, HospitalServiceMapping,
-                                                           DoctorClinic, DoctorClinicIpdProcedure)
+                                                           DoctorClinic, DoctorClinicIpdProcedure,
+                                                           HealthInsuranceProviderHospitalMapping)
         for cl, ct in content_types.items():
             permissions = Permission.objects.filter(
                 Q(content_type=ct),
@@ -489,7 +491,8 @@ class Command(BaseCommand):
 
             group.permissions.add(*permissions)
 
-        content_types = ContentType.objects.get_for_models(PaymentOptions, EntityUrls, IpdProcedure, Feature, Service, Doctor)
+        content_types = ContentType.objects.get_for_models(PaymentOptions, EntityUrls, IpdProcedure, Feature, Service, Doctor,
+                                                           HealthInsuranceProvider)
 
         for cl, ct in content_types.items():
             permissions = Permission.objects.filter(

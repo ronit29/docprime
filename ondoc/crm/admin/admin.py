@@ -4,14 +4,15 @@ from django.contrib.gis import admin
 from ondoc.common.models import PaymentOptions, UserConfig, Feature, Service
 from ondoc.crm.admin.banner import BannerAdmin, SliderLocationAdmin
 from ondoc.crm.admin.procedure import ProcedureCategoryAdmin, ProcedureAdmin, IpdProcedureAdmin, FeatureAdmin, \
-    ServiceAdmin
+    ServiceAdmin, HealthInsuranceProviderAdmin
 from ondoc.doctor.models import (Doctor, Language, MedicalService, Specialization, College, Qualification, Hospital,
                                  HospitalNetwork, DoctorOnboardingToken, OpdAppointment,
                                  MedicalCondition, AboutDoctor, HealthTip, CommonMedicalCondition, CommonSpecialization,
                                  DoctorClinic, DoctorMapping, DoctorImage, OpdAppointment, CompetitorInfo,
                                  SpecializationDepartment, SpecializationField, PracticeSpecialization,
-                                 VisitReason, CancellationReason, PracticeSpecializationContent, OfflinePatients, OfflineOPDAppointments,
-                                 DoctorMobileOtp, UploadDoctorData, DoctorLeave)
+                                 VisitReason, CancellationReason, PracticeSpecializationContent, OfflinePatients,
+                                 OfflineOPDAppointments,
+                                 DoctorMobileOtp, UploadDoctorData, DoctorLeave, HealthInsuranceProvider)
 
 from ondoc.diagnostic.models import (Lab, LabNetwork, LabTest, LabTestType,LabService,
                                       AvailableLabTest, LabAppointment, CommonTest, CommonDiagnosticCondition, LabPricingGroup,
@@ -174,3 +175,4 @@ admin.site.register(IntegratorProfileMapping, IntegratorProfileMappingAdmin)
 admin.site.register(IpdProcedure, IpdProcedureAdmin)
 admin.site.register(Feature, FeatureAdmin)
 admin.site.register(Service, ServiceAdmin)
+admin.site.register(HealthInsuranceProvider, HealthInsuranceProviderAdmin)

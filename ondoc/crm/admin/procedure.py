@@ -85,6 +85,11 @@ class FeatureAdmin(VersionAdmin):
     search_fields = ['name']
 
 
+class HealthInsuranceProviderAdmin(VersionAdmin):
+    model = Feature
+    search_fields = ['name']
+
+
 class ServiceAdmin(VersionAdmin):
     model = Service
     search_fields = ['name']

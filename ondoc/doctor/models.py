@@ -191,6 +191,10 @@ class Hospital(auth_model.TimeStampedModel, auth_model.CreatedByModel, auth_mode
     is_mask_number_required = models.BooleanField(default=True)
     service = models.ManyToManyField(Service, through='HospitalServiceMapping', through_fields=('hospital', 'service'),
                                      related_name='of_hospitals')
+    health_insurance_providers = models.ManyToManyField('HealthInsuranceProvider',
+                                                        through='HealthInsuranceProviderHospitalMapping',
+                                                        through_fields=('hospital', 'provider'),
+                                                        related_name='available_in_hospital')
 
     def __str__(self):
         return self.name
@@ -2539,3 +2543,26 @@ class UploadDoctorData(auth_model.TimeStampedModel):
             super().save(*args, **kwargs)
             upload_doctor_data.apply_async((self.id,), countdown=1)
 
+
+class HealthInsuranceProvider(auth_model.TimeStampedModel):
+    name = models.CharField(max_length=100)
+
+    class Meta:
+        db_table = 'health_insurance_provider'
+
+    def __str__(self):
+        return self.name
+
+
+class HealthInsuranceProviderHospitalMapping(models.Model):
+    hospital = models.ForeignKey(Hospital, on_delete=models.CASCADE,
+                                 related_name='provider_mappings')
+    provider = models.ForeignKey(HealthInsuranceProvider, on_delete=models.CASCADE,
+                                related_name='hospital_provider_mappings')
+
+    def __str__(self):
+        return '{} - {}'.format(self.hospital.name, self.provider.name)
+
+    class Meta:
+        db_table = "hospital__health_insurance_provider_mapping"
+        unique_together = (('hospital', 'provider'),)
