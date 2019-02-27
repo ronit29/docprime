@@ -668,7 +668,7 @@ class DoctorProfileUserViewSet(viewsets.GenericViewSet):
                 about_doctor += '.'
                 if doctor.gender in ('m', 'f') and hospital_obj and hospital_obj.city:
                     if hospital_obj.city:
-                        about_doctor += ' ' + person + ' is located in ' + hospital_obj.city + '.<br> '
+                        about_doctor += ' ' + person + ' is located in ' + hospital_obj.city + '.<br><br> '
 
             if doctor.name and hospital and hospital_obj and hospital_obj.city and hospital_obj.state:
                 about_doctor += doctor.name
@@ -684,11 +684,11 @@ class DoctorProfileUserViewSet(viewsets.GenericViewSet):
                         doctor_assoc_list.append(data.name)
                     members = 'and'.join(doctor_assoc_list)
                 if members:
-                    about_doctor += doctor.name + ' is an esteemed member of ' + members + '.<br>'
+                    about_doctor += doctor.name + ' is an esteemed member of ' + members + '.'
 
                 doctor_qual = doctor.qualifications.all()
                 if doctor_qual:
-                    about_doctor += '<br>'
+                    about_doctor += '<br><br>'
                     count = 0
                     for data in doctor_qual:
                         if count>2:
@@ -698,7 +698,7 @@ class DoctorProfileUserViewSet(viewsets.GenericViewSet):
                             about_doctor += person + qual_str[count] + his_her + ' ' + data.qualification.name + ' in the year ' \
                                             + str(data.passing_year) + ' from ' + data.college.name + '. '
                             count = count + 1
-                about_doctor += '<br>' + doctor.name + ' is an experienced, skilled, and awarded doctor in ' + his_her + ' field of specialization. '
+                about_doctor += '<br><br>' + doctor.name + ' is an experienced, skilled, and awarded doctor in ' + his_her + ' field of specialization. '
                 doc_awards_obj = doctor.awards.all()
                 if doc_awards_obj:
                     for data in doc_awards_obj:
@@ -711,7 +711,7 @@ class DoctorProfileUserViewSet(viewsets.GenericViewSet):
             doc_experience_details = response_data.get('experiences')
             if doc_experience_details:
                 if doc_experience_details[0].get('hospital') and doc_experience_details[0].get('start_year') and doc_experience_details[0].get('end_year'):
-                    about_doctor += '<br>' + person + ' worked at ' + doc_experience_details[0].get('hospital') + ' from ' + str(doc_experience_details[0].get('start_year')) + ' to ' + str(doc_experience_details[0].get('end_year'))
+                    about_doctor += '<br><br>' + person + ' worked at ' + doc_experience_details[0].get('hospital') + ' from ' + str(doc_experience_details[0].get('start_year')) + ' to ' + str(doc_experience_details[0].get('end_year'))
                 if len(doc_experience_details)>1:
                     exp_list = list()
                     for data in doc_experience_details[1:-1]:
