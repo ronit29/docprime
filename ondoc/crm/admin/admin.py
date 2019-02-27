@@ -2,7 +2,7 @@
 from django.contrib.gis import admin
 
 from ondoc.common.models import PaymentOptions, UserConfig, Feature, Service
-from ondoc.crm.admin.banner import BannerAdmin
+from ondoc.crm.admin.banner import BannerAdmin, SliderLocationAdmin
 from ondoc.crm.admin.procedure import ProcedureCategoryAdmin, ProcedureAdmin, IpdProcedureAdmin, FeatureAdmin, \
     ServiceAdmin
 from ondoc.doctor.models import (Doctor, Language, MedicalService, Specialization, College, Qualification, Hospital,
@@ -64,7 +64,7 @@ from ondoc.seo.models import SeoSpecialization
 from ondoc.seo.models import SeoLabNetwork
 from ondoc.elastic.models import DemoElastic
 from .elastic import DemoElasticAdmin
-from ondoc.banner.models import Banner
+from ondoc.banner.models import Banner, SliderLocation
 from .integrations import IntegratorMapping, IntegratorMappingAdmin
 from .integrations import IntegratorProfileMapping, IntegratorProfileMappingAdmin
 
@@ -168,7 +168,7 @@ admin.site.register(EntityUrls, EntityUrlsAdmin)
 admin.site.register(PaymentOptions, PaymentOptionsAdmin)
 admin.site.register(UserConfig)
 admin.site.register(UploadDoctorData, UploadDoctorDataAdmin)
-
+admin.site.register(SliderLocation, SliderLocationAdmin)
 admin.site.register(IntegratorMapping, IntegratorMappingAdmin)
 admin.site.register(IntegratorProfileMapping, IntegratorProfileMappingAdmin)
 admin.site.register(IpdProcedure, IpdProcedureAdmin)

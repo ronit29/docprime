@@ -3,7 +3,7 @@ from django.contrib.auth.models import Group, Permission
 from django.contrib.contenttypes.models import ContentType
 from django.db.models import Q
 
-from ondoc.banner.models import Banner
+from ondoc.banner.models import Banner, SliderLocation
 from ondoc.common.models import PaymentOptions, UserConfig, Feature, Service
 from ondoc.coupon.models import Coupon, UserSpecificCoupon
 from ondoc.crm.constants import constants
@@ -476,7 +476,7 @@ class Command(BaseCommand):
         group, created = Group.objects.get_or_create(name=constants['PRODUCT_TEAM'])
         group.permissions.clear()
 
-        content_types = ContentType.objects.get_for_models(LabTestRecommendedCategoryMapping, Banner, UserConfig,
+        content_types = ContentType.objects.get_for_models(LabTestRecommendedCategoryMapping, Banner, SliderLocation, UserConfig,
                                                            NewDynamic, QuestionAnswer, FrequentlyAddedTogetherTests,
                                                            IpdProcedureFeatureMapping, HospitalServiceMapping,
                                                            DoctorClinic, DoctorClinicIpdProcedure)

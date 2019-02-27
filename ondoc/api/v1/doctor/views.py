@@ -586,6 +586,8 @@ class DoctorProfileUserViewSet(viewsets.GenericViewSet):
             entity = EntityUrls.objects.filter(entity_id=pk, sitemap_identifier=EntityUrls.SitemapIdentifier.DOCTOR_PAGE, is_valid='t')
             if len(entity) > 0:
                 entity = entity[0]
+            else:
+                entity = None    
 
         selected_procedure_ids, other_procedure_ids = get_selected_and_other_procedures(category_ids, procedure_ids,
                                                                                         doctor, all=True)
@@ -618,6 +620,7 @@ class DoctorProfileUserViewSet(viewsets.GenericViewSet):
             specialization_id = ''
             doc = DoctorListViewSet()
             general_specialization = []
+            doctors_url = None
 
             for dps in doctor.doctorpracticespecializations.all():
                 general_specialization.append(dps.specialization)
@@ -635,7 +638,14 @@ class DoctorProfileUserViewSet(viewsets.GenericViewSet):
                 kwargs['parameters'] = parameters
                 response_data['doctors'] = doc.list(request, **kwargs)
                 if response_data.get('doctors'):
-                    response_data['doctors']['doctors_url'] = '/opd/searchresults?specializations=%s&lat=%s&long=%s' % (str(specialization_id), hospital.get('lat'), hospital.get('long'))
+                    breadcrumb = entity.breadcrumb if entity else None
+                    if breadcrumb:
+                        for data in breadcrumb:
+                            if data.get('url') and not data.get('url').startswith('doctors') and data.get('url').endswith('sptcit'):
+                                doctors_url = data.get('url')
+                    response_data['doctors']['doctors_url'] = doctors_url
+
+                    # response_data['doctors']['doctors_url'] = '/opd/searchresults?specializations=%s&lat=%s&long=%s' % (str(specialization_id), hospital.get('lat'), hospital.get('long'))
                 else:
                     response_data['doctors']['doctors_url'] = None
         else:
@@ -1184,6 +1194,7 @@ class DoctorListViewSet(viewsets.GenericViewSet):
             description += '.'
 
             breadcrumb = validated_data.get('breadcrumb')
+
             if breadcrumb:
                 breadcrumb = [{'url': '/', 'title': 'Home'}] + breadcrumb
             else:
@@ -2109,7 +2120,7 @@ class OfflineCustomerViewSet(viewsets.GenericViewSet):
         ret_obj['time_slot_start'] = appnt.time_slot_start
         ret_obj['status'] = appnt.status
         # ret_obj['mrp'] = appnt.mrp
-        ret_obj['payment_type'] = appnt.payment_type
+        # ret_obj['payment_type'] = appnt.payment_type
         ret_obj['hospital'] = HospitalModelSerializer(appnt.hospital).data
         ret_obj['doctor'] = AppointmentRetrieveDoctorSerializer(appnt.doctor).data
         ret_obj['is_docprime'] = False
