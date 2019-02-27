@@ -64,6 +64,7 @@ class Thyrocare(BaseIntegrator):
             else:
                 IntegratorProfileMapping.objects.update_or_create(integrator_package_name=result_obj['name'], object_id=obj_id, defaults=defaults)
 
+
     @classmethod
     def thyrocare_product_data(cls, obj_id, type):
         cls.thyrocare_data(obj_id, type)
@@ -71,6 +72,7 @@ class Thyrocare(BaseIntegrator):
     @classmethod
     def thyrocare_profile_data(cls, obj_id, type):
         cls.thyrocare_data(obj_id, type)
+
 
     def _get_appointment_slots(self, pincode, date, **kwargs):
         obj = TimeSlotExtraction()
@@ -127,8 +129,6 @@ class Thyrocare(BaseIntegrator):
         return True if resp_data['status'] == 'Y' else False
 
     def _post_order_details(self, lab_appointment, **kwargs):
-        # Need to update when thyrocare API works. Static value for now
-
         tests = kwargs.get('tests', None)
         packages = kwargs.get('packages', None)
         payload = self.prepare_data(tests, packages, lab_appointment)
@@ -151,7 +151,7 @@ class Thyrocare(BaseIntegrator):
             patient_address = resolve_address(lab_appointment.address)
             pincode = lab_appointment.address["pincode"]
         else:
-            patient_address = "Dummy Address(No address found for user)"
+            patient_address = "Address not available"
             pincode = "122002"
 
         order_id = "DP{}".format(lab_appointment.id)
@@ -224,7 +224,6 @@ class Thyrocare(BaseIntegrator):
 
             for format in formats:
                 url = "%s/order.svc/%s/GETREPORTS/%s/%s/%s/Myreport" % (settings.THYROCARE_BASE_URL, settings.THYROCARE_API_KEY, lead_id, format, mobile)
-                # url = "https://www.thyrocare.com/APIs/order.svc/sNhdlQjqvoD7zCbzf56sxppBJX3MmdWSAomi@RBhXRrVcGyko7hIzQ==/GETREPORTS/SP46592004/%s/8898881529/Myreport" %(format)
                 response = requests.get(url)
                 response = response.json()
                 if response.get('RES_ID') == 'RES0000':
@@ -278,4 +277,3 @@ class Thyrocare(BaseIntegrator):
                     LabReportFile.objects.create(report_id=lab_report.id, name=in_memory_file)
         except Exception as e:
             logger.error(str(e))
-

@@ -21,6 +21,7 @@ from django.db import transaction
 import logging
 from dal import autocomplete
 from ondoc.api.v1.utils import GenericAdminEntity, util_absolute_url, util_file_name
+from ondoc.common.models import AppointmentHistory
 from ondoc.procedure.models import DoctorClinicProcedure, Procedure
 
 logger = logging.getLogger(__name__)
@@ -56,6 +57,7 @@ from django import forms
 from decimal import Decimal
 from .common import AssociatedMerchantInline
 from ondoc.sms import api
+from ondoc.ratings_review import models as rating_models
 
 class AutoComplete:
     def autocomplete_view(self, request):
@@ -681,16 +683,20 @@ class DoctorForm(FormCleanMixin):
             return
         data = self.cleaned_data
         is_enabled = data.get('enabled', None)
+        enabled_for_online_booking = data.get('enabled_for_online_booking', None)
         if is_enabled is None:
             is_enabled = self.instance.enabled if self.instance else False
-        if is_enabled:
+        if enabled_for_online_booking is None:
+            enabled_for_online_booking = self.instance.enabled_for_online_booking if self.instance else False
+        if is_enabled and enabled_for_online_booking:
             if any([data.get('disabled_after', None), data.get('disable_reason', None),
                     data.get('disable_comments', None)]):
                 raise forms.ValidationError(
-                    "Cannot have disabled after/disabled reason/disable comments if doctor is enabled.")
-        else:
+                    "Cannot have disabled after/disabled reason/disable comments if doctor is enabled or not enabled for online booking.")
+        elif not is_enabled or not enabled_for_online_booking:
             if not all([data.get('disabled_after', None), data.get('disable_reason', None)]):
-                raise forms.ValidationError("Must have disabled after/disable reason if doctor is not enabled.")
+                raise forms.ValidationError(
+                    "Must have disabled after/disable reason if doctor is not enabled or not enabled for online booking.")
             if data.get('disable_reason', None) and data.get('disable_reason', None) == Doctor.OTHERS and not data.get(
                     'disable_comments', None):
                 raise forms.ValidationError("Must have disable comments if disable reason is others.")
@@ -1437,8 +1443,8 @@ class DoctorOpdAppointmentAdmin(admin.ModelAdmin):
             return ('booking_id', 'doctor', 'doctor_id', 'doctor_details', 'hospital', 'hospital_details', 'kyc',
                     'contact_details', 'profile', 'profile_detail', 'user', 'booked_by', 'procedures_details',
                     'fees', 'effective_price', 'mrp', 'deal_price', 'payment_status', 'status', 'cancel_type',
-                    'cancellation_reason', 'cancellation_comments',
-                    'start_date', 'start_time', 'payment_type', 'otp', 'insurance', 'outstanding', 'invoice_urls')
+                    'cancellation_reason', 'cancellation_comments', 'ratings',
+                    'start_date', 'start_time', 'payment_type', 'otp', 'insurance', 'outstanding', 'invoice_urls', 'payment_type')
         elif request.user.groups.filter(name=constants['OPD_APPOINTMENT_MANAGEMENT_TEAM']).exists():
             return ('booking_id', 'doctor_name', 'doctor_id', 'doctor_details', 'hospital_name', 'hospital_details',
                     'kyc', 'contact_details', 'used_profile_name',
@@ -1447,22 +1453,36 @@ class DoctorOpdAppointmentAdmin(admin.ModelAdmin):
                     'fees', 'effective_price', 'mrp', 'deal_price', 'payment_status',
                     'payment_type', 'admin_information', 'otp', 'insurance', 'outstanding',
                     'status', 'cancel_type', 'cancellation_reason', 'cancellation_comments',
-                    'start_date', 'start_time', 'invoice_urls')
+                    'start_date', 'start_time', 'invoice_urls', 'payment_type')
         else:
             return ()
 
     def get_readonly_fields(self, request, obj=None):
         if request.user.is_superuser and request.user.is_staff:
-            return 'booking_id', 'doctor_id', 'doctor_details', 'contact_details', 'hospital_details', 'kyc', 'procedures_details', 'invoice_urls'
+            return ('booking_id', 'doctor_id', 'doctor_details', 'contact_details', 'hospital_details', 'kyc',
+                    'procedures_details', 'invoice_urls', 'ratings', 'payment_type')
         elif request.user.groups.filter(name=constants['OPD_APPOINTMENT_MANAGEMENT_TEAM']).exists():
             return ('booking_id', 'doctor_name', 'doctor_id', 'doctor_details', 'hospital_name',
                     'hospital_details', 'kyc', 'contact_details',
                     'used_profile_name', 'used_profile_number', 'default_profile_name',
                     'default_profile_number', 'user_id', 'user_number', 'booked_by',
                     'fees', 'effective_price', 'mrp', 'deal_price', 'payment_status', 'payment_type',
-                    'admin_information', 'otp', 'insurance', 'outstanding', 'procedures_details','invoice_urls')
+                    'admin_information', 'otp', 'insurance', 'outstanding', 'procedures_details','invoice_urls', 'payment_type')
         else:
             return ('invoice_urls')
+
+    def ratings(self, obj):
+        rating_queryset = rating_models.RatingsReview.objects.filter(appointment_id=obj.id).first()
+        if rating_queryset:
+            review = rating_queryset.review if rating_queryset.review else ''
+            url = '/admin/ratings_review/ratingsreview/%s/change' % (rating_queryset.id)
+            response = mark_safe('''<p>Ratings: %s</p><p>Review: %s</p><p>Status: <b>%s</b></p><p><a href="%s" target="_blank">Link</a></p>'''
+                                 % (rating_queryset.ratings, review,
+                                    dict(rating_models.RatingsReview.MODERATION_TYPE_CHOICES)[rating_queryset.moderation_status],
+                                    url))
+            return response
+        return ''
+
 
     def invoice_urls(self, instance):
         invoices_urls = ''
@@ -1613,6 +1633,7 @@ class DoctorOpdAppointmentAdmin(admin.ModelAdmin):
         obj._responsible_user = responsible_user if responsible_user and not responsible_user.is_anonymous else None
         if obj:
             if obj.id:
+                obj._source = AppointmentHistory.CRM
                 opd_obj = OpdAppointment.objects.select_for_update().get(pk=obj.id)
             if request.POST.get('start_date') and request.POST.get('start_time'):
                 date_time_field = request.POST['start_date'] + " " + request.POST['start_time']

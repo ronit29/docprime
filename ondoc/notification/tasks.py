@@ -403,6 +403,16 @@ def generate_appointment_masknumber(data):
     return is_masking_done
 
 @task
+def send_rating_update_message(number, text):
+    data = {}
+    data['phone_number'] = number
+    data['text'] = mark_safe(text)
+    try:
+        notification_models.SmsNotification.send_rating_link(data)
+    except Exception as e:
+        logger.error("Error sending rating update sms")
+
+@task
 def send_appointment_reminder_message(number, patient_name, doctor, hospital_name, date):
     data = {}
     data['phone_number'] = number
@@ -430,6 +440,7 @@ def send_appointment_location_message(number, hospital_lat, hospital_long):
 def process_payout(payout_id):
     from ondoc.account.models import MerchantPayout, Order
     from ondoc.account.models import DummyTransactions
+    from ondoc.doctor.models import OpdAppointment
 
     try:
         if not payout_id:
@@ -449,6 +460,9 @@ def process_payout(payout_id):
 
         if not appointment or not billed_to or not merchant:
             raise Exception("Insufficient Data " + str(payout_data))
+
+        if appointment.payment_type in [OpdAppointment.COD]:
+            raise Exception("Cannot process payout for COD appointments")
 
         if not merchant.verified_by_finance or not merchant.enabled:
             raise Exception("Merchant is not verified or is not enabled. " + str(payout_data))
@@ -566,6 +580,29 @@ def opd_send_otp_before_appointment(appointment_id, previous_appointment_date_ti
         logger.error(str(e))
 
 @task()
+def opd_send_after_appointment_confirmation(appointment_id, previous_appointment_date_time, second=False):
+    from ondoc.doctor.models import OpdAppointment
+    from ondoc.communications.models import OpdNotification
+    try:
+        instance = OpdAppointment.objects.filter(id=appointment_id).first()
+        if not instance or \
+                not instance.user or \
+                str(math.floor(instance.time_slot_start.timestamp())) != previous_appointment_date_time:
+            return
+        if instance.status == OpdAppointment.ACCEPTED:
+            if not second:
+                opd_notification = OpdNotification(instance, NotificationAction.OPD_CONFIRMATION_CHECK_AFTER_APPOINTMENT)
+            else:
+                opd_notification = OpdNotification(instance, NotificationAction.OPD_CONFIRMATION_SECOND_CHECK_AFTER_APPOINTMENT)
+            opd_notification.send()
+        if instance.status == OpdAppointment.COMPLETED and not instance.is_rated:
+            opd_notification = OpdNotification(instance, NotificationAction.OPD_FEEDBACK_AFTER_APPOINTMENT)
+            opd_notification.send()
+    except Exception as e:
+        logger.error(str(e))
+
+
+@task()
 def lab_send_otp_before_appointment(appointment_id, previous_appointment_date_time):
     from ondoc.diagnostic.models import LabAppointment
     from ondoc.communications.models import LabNotification
@@ -656,3 +693,42 @@ def send_pg_acknowledge(order_id=None, order_no=None):
 
     except Exception as e:
         logger.error("Error in sending pg acknowledge - " + str(e))
+
+
+
+
+@task()
+def refund_completed_sms_task(obj_id):
+    from ondoc.account.models import ConsumerRefund
+    from ondoc.communications.models import SMSNotification
+    from ondoc.notification.models import NotificationAction
+    try:
+        # check if any more obj incomplete status
+        instance = ConsumerRefund.objects.filter(id=obj_id).first()
+        if not instance or not instance.user or ConsumerRefund.objects.filter(
+                consumer_transaction_id=instance.consumer_transaction_id,
+                refund_state__in=[ConsumerRefund.PENDING, ConsumerRefund.REQUESTED]).count() > 1:
+            return
+
+        context = {'amount': instance.consumer_transaction.amount, 'ctrnx_id': instance.consumer_transaction_id}
+        receivers = instance.user.get_phone_number_for_communication()
+        sms_notification = SMSNotification(NotificationAction.REFUND_COMPLETED, context)
+        sms_notification.send(receivers)
+    except Exception as e:
+        logger.error(str(e))
+
+
+@task()
+def refund_breakup_sms_task(obj_id):
+    from ondoc.account.models import ConsumerTransaction
+    from ondoc.communications.models import SMSNotification
+    try:
+        instance = ConsumerTransaction.objects.filter(id=obj_id).first()
+        if not instance or not instance.user:
+            return
+        context = {'amount': instance.amount, 'ctrnx_id': instance.id}
+        receivers = instance.user.get_phone_number_for_communication()
+        sms_notification = SMSNotification(NotificationAction.REFUND_BREAKUP, context)
+        sms_notification.send(receivers)
+    except Exception as e:
+        logger.error(str(e))

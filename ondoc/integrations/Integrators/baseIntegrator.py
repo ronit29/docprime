@@ -43,9 +43,3 @@ class BaseIntegrator(object):
         except Exception as e:
             logger.error("[ERROR]" + self.__class__.__name__ + " report error." + str(e))
 
-
-    def order_details(self):
-        pass
-
-    def get_pricing(self):
-        pass
