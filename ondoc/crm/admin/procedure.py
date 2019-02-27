@@ -68,10 +68,9 @@ class FeatureInline(AutoComplete, TabularInline):
     fk_name = 'ipd_procedure'
     extra = 0
     can_delete = True
-    autocomplete_fields = ['ipd_procedure']
+    autocomplete_fields = ['feature']
     verbose_name = "IPD Procedure"
     verbose_name_plural = "IPD Procedures"
-    # formset = ProcedureToParentCategoryInlineFormset
 
 
 class IpdProcedureAdmin(VersionAdmin):
