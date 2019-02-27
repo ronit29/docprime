@@ -167,3 +167,14 @@ class Feature(TimeStampedModel):
 
     def __str__(self):
         return self.name
+
+
+class Service(TimeStampedModel):
+    icon = models.ImageField('Service image', upload_to='service/images')
+    name = models.CharField(max_length=100)
+
+    class Meta:
+        db_table = 'service'
+
+    def __str__(self):
+        return self.name

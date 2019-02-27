@@ -1,7 +1,7 @@
 from django.contrib.admin import TabularInline
 from reversion.admin import VersionAdmin
 
-from ondoc.common.models import Feature
+from ondoc.common.models import Feature, Service
 from ondoc.crm.admin.doctor import AutoComplete
 from ondoc.procedure.models import Procedure, ProcedureCategory, ProcedureCategoryMapping, ProcedureToCategoryMapping, \
     IpdProcedure, IpdProcedureFeatureMapping
@@ -83,6 +83,11 @@ class IpdProcedureAdmin(VersionAdmin):
 
 class FeatureAdmin(VersionAdmin):
     model = Feature
+    search_fields = ['name']
+
+
+class ServiceAdmin(VersionAdmin):
+    model = Service
     search_fields = ['name']
 
 

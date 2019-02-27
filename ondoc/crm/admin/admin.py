@@ -1,9 +1,10 @@
 
 from django.contrib.gis import admin
 
-from ondoc.common.models import PaymentOptions, UserConfig, Feature
+from ondoc.common.models import PaymentOptions, UserConfig, Feature, Service
 from ondoc.crm.admin.banner import BannerAdmin
-from ondoc.crm.admin.procedure import ProcedureCategoryAdmin, ProcedureAdmin, IpdProcedureAdmin, FeatureAdmin
+from ondoc.crm.admin.procedure import ProcedureCategoryAdmin, ProcedureAdmin, IpdProcedureAdmin, FeatureAdmin, \
+    ServiceAdmin
 from ondoc.doctor.models import (Doctor, Language, MedicalService, Specialization, College, Qualification, Hospital,
                                  HospitalNetwork, DoctorOnboardingToken, OpdAppointment,
                                  MedicalCondition, AboutDoctor, HealthTip, CommonMedicalCondition, CommonSpecialization,
@@ -172,3 +173,4 @@ admin.site.register(IntegratorMapping, IntegratorMappingAdmin)
 admin.site.register(IntegratorProfileMapping, IntegratorProfileMappingAdmin)
 admin.site.register(IpdProcedure, IpdProcedureAdmin)
 admin.site.register(Feature, FeatureAdmin)
+admin.site.register(Service, ServiceAdmin)
