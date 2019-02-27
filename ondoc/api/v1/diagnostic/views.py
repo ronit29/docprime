@@ -1711,9 +1711,7 @@ class LabTimingListView(mixins.ListModelMixin,
 
         resp_data = LabTiming.timing_manager.lab_booking_slots(lab__id=lab, lab__is_live=True, for_home_pickup=for_home_pickup)
         global_leave_serializer = v2_serializers.GlobalNonBookableSerializer(
-            GlobalNonBookable.objects.filter(deleted_at__isnull=True, booking_type=GlobalNonBookable.LAB)
-        )
-        resp_data['global_leaves'] = global_leave_serializer.data
+            GlobalNonBookable.objects.filter(deleted_at__isnull=True, booking_type=GlobalNonBookable.LAB), many=True)
         # for agent do not set any time limitations
         if hasattr(request, "agent") and request.agent:
             resp_data = {
@@ -1722,6 +1720,7 @@ class LabTimingListView(mixins.ListModelMixin,
                 "tomorrow_min": None,
                 "today_max": None
             }
+        resp_data['global_leaves'] = global_leave_serializer.data
         return Response(resp_data)
 
 
