@@ -627,7 +627,7 @@ class DoctorProfileUserViewSet(viewsets.GenericViewSet):
                             doc_in_hos_enabled_online_booking = True
                             break
 
-                hospital = hospitals[0]
+                hospital = response_data.get('hospitals')[0]
             for dps in doctor.doctorpracticespecializations.all():
                 general_specialization.append(dps.specialization)
 
