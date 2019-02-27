@@ -652,7 +652,7 @@ class DoctorProfileUserViewSet(viewsets.GenericViewSet):
             doc_spec = None
             startswith = None
             if doctor.name:
-                about_doctor = doctor.name
+                about_doctor = 'Dr. ' + doctor.name
                 if len(general_specialization) == 1:
                     about_doctor += ' is a proficient ' + general_specialization[0].name
                 elif len(general_specialization)>1:
@@ -674,7 +674,7 @@ class DoctorProfileUserViewSet(viewsets.GenericViewSet):
                         about_doctor += ' ' + person + ' is located in ' + hospital_obj.city + '.<br><br> '
 
             if doctor.name and hospital and hospital_obj and hospital_obj.city and hospital_obj.state:
-                about_doctor += doctor.name
+                about_doctor += 'Dr. ' + doctor.name
                 if hospital_obj.city:
                     about_doctor += ' practices at the ' + hospital.get('hospital_name') + ' in ' + hospital_obj.city + '. '
 
@@ -707,7 +707,7 @@ class DoctorProfileUserViewSet(viewsets.GenericViewSet):
                             about_doctor += person + qual_str[count] + his_her + ' ' + data.qualification.name + ' in the year ' \
                                             + str(data.passing_year) + ' from ' + data.college.name + '. '
                             count = count + 1
-                about_doctor += '<br><br>' + doctor.name + ' is an experienced, skilled and awarded doctor in ' + his_her + ' field of specialization. '
+                about_doctor += '<br><br>' + 'Dr. ' + doctor.name + ' is an experienced, skilled and awarded doctor in ' + his_her + ' field of specialization. '
                 doc_awards_obj = doctor.awards.all()
                 if doc_awards_obj:
                     for data in doc_awards_obj:
