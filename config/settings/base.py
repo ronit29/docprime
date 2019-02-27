@@ -143,8 +143,7 @@ LOCAL_APPS = (
     'ondoc.ckedit',
     'ondoc.integrations',
     'ondoc.screen',
-    'ondoc.comments',
-    'ondoc.integrations'
+    'ondoc.comments'
 )
 
 INSTALLED_APPS = DJANGO_APPS + THIRD_PARTY_APPS + LOCAL_APPS
@@ -348,6 +347,7 @@ THYROCARE_API_KEY=env('THYROCARE_API_KEY')
 NO_OF_WEEKS_FOR_TIME_SLOTS=env('NO_OF_WEEKS_FOR_TIME_SLOTS')
 SYNC_ELASTIC = 24
 THYROCARE_BASE_URL=env('THYROCARE_BASE_URL')
+THYROCARE_REF_CODE=env('THYROCARE_REF_CODE')
 
 ANYMAIL = {
     "MAILGUN_API_KEY": env('MAILGUN_API_KEY', default=None),

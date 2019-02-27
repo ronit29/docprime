@@ -169,8 +169,8 @@ class Thyrocare(BaseIntegrator):
             "hc": "0",
             "appt_date": aware_time_zone(lab_appointment.time_slot_start).strftime("%Y-%m-%d %I:%M:%S %p"),
             "reports": "N",
-            "ref_code": "7738943013",  # Fixed for Test Need to ask
-            "pay_type": "POSTPAID",
+            "ref_code": settings.THYROCARE_REF_CODE,
+            "pay_type": "PREPAID",
             "bencount": "1",
             "bendataxml": bendataxml,
             "std": "91"

@@ -1747,7 +1747,7 @@ class LabTimingListView(mixins.ListModelMixin,
         # for agent do not set any time limitations
         if hasattr(request, "agent") and request.agent:
             resp_data = {
-                "time_slots" : resp_data["time_slots"],
+                "time_slots": resp_data["time_slots"],
                 "today_min": None,
                 "tomorrow_min": None,
                 "today_max": None

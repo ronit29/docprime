@@ -13,7 +13,6 @@ def push_lab_appointment_to_integrator(self, data):
     try:
         appointment_id = data.get('appointment_id', None)
         if not appointment_id:
-            # logger.error("[CELERY ERROR: Incorrect values provided.]")
             raise Exception("Appointment id not found, could not push to Matrix")
 
         appointment = LabAppointment.objects.filter(pk=appointment_id).first()
