@@ -688,7 +688,7 @@ class DoctorProfileUserViewSet(viewsets.GenericViewSet):
                         if len(doctor_assoc_list) == 1:
                             members = doctor_assoc_list[0]
                         elif len(doctor_assoc_list) > 1:
-                            members = ','.join(doctor_assoc_list[:-1])
+                            members = ', '.join(doctor_assoc_list[:-1])
                             members += members + ' and ' + doctor_assoc_list[-1]
                     about_doctor += doctor.name + ' is an esteemed member of ' + members + '.'
 
