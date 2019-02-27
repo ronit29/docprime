@@ -682,7 +682,7 @@ class DoctorProfileUserViewSet(viewsets.GenericViewSet):
                 if doctor_assoc:
                     for data in doctor_assoc:
                         doctor_assoc_list.append(data.name)
-                    members = 'and'.join(doctor_assoc_list)
+                    members =  ' and '.join(doctor_assoc_list)
                 if members:
                     about_doctor += doctor.name + ' is an esteemed member of ' + members + '.'
 
