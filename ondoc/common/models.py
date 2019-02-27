@@ -156,3 +156,18 @@ class AppointmentMaskNumber(TimeStampedModel):
 
     class Meta:
         db_table = 'appointment_mask_number'
+
+
+class GlobalNonBookable(TimeStampedModel):
+    DOCTOR = "doctor"
+    LAB = "lab"
+    BOOKING_TYPE_CHOICES = ((DOCTOR, "Doctor Clinic"), (LAB, "Lab"))
+    booking_type = models.CharField(max_length=20, blank=True, choices=BOOKING_TYPE_CHOICES, default='')
+    start_date = models.DateField(null=False)
+    end_date = models.DateField(null=False)
+    start_time = models.TimeField(null=False)
+    end_time = models.TimeField(null=False)
+    deleted_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        db_table = 'global_non_bookable_timing'

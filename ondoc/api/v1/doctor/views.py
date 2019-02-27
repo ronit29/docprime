@@ -8,6 +8,7 @@ from ondoc.api.v1.doctor.DoctorSearchByHospitalHelper import DoctorSearchByHospi
 from ondoc.api.v1.procedure.serializers import CommonProcedureCategorySerializer, ProcedureInSerializer, \
     ProcedureSerializer, DoctorClinicProcedureSerializer, CommonProcedureSerializer
 from ondoc.cart.models import Cart
+from ondoc.common.models import GlobalNonBookable
 from ondoc.doctor import models
 from ondoc.authentication import models as auth_models
 from ondoc.diagnostic import models as lab_models
@@ -1469,6 +1470,8 @@ class DoctorAvailabilityTimingViewSet(viewsets.ViewSet):
         doctor_serializer = serializers.DoctorTimeSlotSerializer(doctor_queryset, many=True)
         doctor_leave_serializer = v2_serializers.DoctorLeaveSerializer(
             models.DoctorLeave.objects.filter(doctor=validated_data.get("doctor_id"), deleted_at__isnull=True), many=True)
+        global_leave_serializer = v2_serializers.GlobalNonBookableSerializer(
+            GlobalNonBookable.objects.filter(deleted_at__isnull=True, booking_type=GlobalNonBookable.DOCTOR), many=True)
 
         timeslots = dict()
         obj = TimeSlotExtraction()
@@ -1479,7 +1482,7 @@ class DoctorAvailabilityTimingViewSet(viewsets.ViewSet):
 
         timeslots = obj.get_timing_list()
         return Response({"timeslots": timeslots, "doctor_data": doctor_serializer.data,
-                         "doctor_leaves": doctor_leave_serializer.data})
+                         "doctor_leaves": doctor_leave_serializer.data, "global_leaves": global_leave_serializer.data})
 
 
 class HealthTipView(viewsets.GenericViewSet):

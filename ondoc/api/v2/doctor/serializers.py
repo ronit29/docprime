@@ -3,6 +3,7 @@ from django.contrib.auth import get_user_model
 import logging
 from django.conf import settings
 from ondoc.doctor import models as doc_models
+from ondoc.common.models import GlobalNonBookable
 from ondoc.procedure.models import Procedure
 from ondoc.api.v1.doctor import serializers as v1_serializers
 logger = logging.getLogger(__name__)
@@ -91,6 +92,18 @@ class DoctorLeaveSerializer(serializers.ModelSerializer):
     class Meta:
         model = doc_models.DoctorLeave
         exclude = ('created_at', 'updated_at', 'deleted_at')
+
+
+class GlobalNonBookableSerializer(serializers.ModelSerializer):
+    start_date = serializers.DateField(read_only=True)
+    end_date = serializers.DateField(read_only=True)
+    start_time = serializers.TimeField(read_only=True)
+    end_time = serializers.TimeField(read_only=True)
+
+    class Meta:
+        model = GlobalNonBookable
+        exclude = ('booking_type', 'created_at', 'updated_at', 'deleted_at')
+
 
 
 class PracticeSpecializationSerializer(serializers.ModelSerializer):

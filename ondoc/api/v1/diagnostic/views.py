@@ -5,7 +5,7 @@ from ondoc.authentication.backends import JWTAuthentication
 from ondoc.api.v1.diagnostic import serializers as diagnostic_serializer
 from ondoc.api.v1.auth.serializers import AddressSerializer
 from ondoc.cart.models import Cart
-from ondoc.common.models import UserConfig
+from ondoc.common.models import UserConfig, GlobalNonBookable
 from ondoc.ratings_review import models as rating_models
 from ondoc.diagnostic.models import (LabTest, AvailableLabTest, Lab, LabAppointment, LabTiming, PromotedLab,
                                      CommonDiagnosticCondition, CommonTest, CommonPackage,
@@ -62,6 +62,7 @@ from django.contrib.gis.measure import D
 from django.db.models.expressions import Window
 from django.db.models.functions import RowNumber
 from django.db.models import Avg
+from ondoc.api.v2.doctor import serializers as v2_serializers
 User = get_user_model()
 
 
@@ -1709,7 +1710,10 @@ class LabTimingListView(mixins.ListModelMixin,
         lab = params.get('lab')
 
         resp_data = LabTiming.timing_manager.lab_booking_slots(lab__id=lab, lab__is_live=True, for_home_pickup=for_home_pickup)
-
+        global_leave_serializer = v2_serializers.GlobalNonBookableSerializer(
+            GlobalNonBookable.objects.filter(deleted_at__isnull=True, booking_type=GlobalNonBookable.LAB)
+        )
+        resp_data['global_leaves'] = global_leave_serializer.data
         # for agent do not set any time limitations
         if hasattr(request, "agent") and request.agent:
             resp_data = {
