@@ -4,8 +4,9 @@ from reversion.admin import VersionAdmin
 from django.db.models import Q
 import datetime
 from ondoc.crm.admin.doctor import CreatedByFilter
-from ondoc.doctor.models import (HospitalImage, HospitalDocument, HospitalAward,Doctor,
-    HospitalAccreditation, HospitalCertification, HospitalSpeciality, HospitalNetwork, Hospital)
+from ondoc.doctor.models import (HospitalImage, HospitalDocument, HospitalAward, Doctor,
+                                 HospitalAccreditation, HospitalCertification, HospitalSpeciality, HospitalNetwork,
+                                 Hospital, HospitalServiceMapping, HealthInsuranceProviderHospitalMapping)
 from .common import *
 from ondoc.crm.constants import constants
 from django.utils.safestring import mark_safe
@@ -72,6 +73,24 @@ class HospitalSpecialityInline(admin.TabularInline):
     extra = 0
     can_delete = True
     show_change_link = False
+
+
+class HospitalServiceInline(admin.TabularInline):
+    model = HospitalServiceMapping
+    fk_name = 'hospital'
+    extra = 0
+    can_delete = True
+    show_change_link = False
+    autocomplete_fields = ['service']
+
+
+class HospitalHealthInsuranceProviderInline(admin.TabularInline):
+    model = HealthInsuranceProviderHospitalMapping
+    fk_name = 'hospital'
+    extra = 0
+    can_delete = True
+    show_change_link = False
+    autocomplete_fields = ['provider']
 
 
 # class HospitalNetworkMappingInline(admin.TabularInline):
@@ -326,6 +345,8 @@ class HospitalAdmin(admin.GeoModelAdmin, VersionAdmin, ActionAdmin, QCPemAdmin):
     search_fields = ['name']
     inlines = [
         # HospitalNetworkMappingInline,
+        HospitalServiceInline,
+        HospitalHealthInsuranceProviderInline,
         HospitalSpecialityInline,
         HospitalAwardInline,
         HospitalAccreditationInline,

@@ -1,16 +1,18 @@
 
 from django.contrib.gis import admin
 
-from ondoc.common.models import PaymentOptions, UserConfig
+from ondoc.common.models import PaymentOptions, UserConfig, Feature, Service
 from ondoc.crm.admin.banner import BannerAdmin, SliderLocationAdmin
-from ondoc.crm.admin.procedure import ProcedureCategoryAdmin, ProcedureAdmin
+from ondoc.crm.admin.procedure import ProcedureCategoryAdmin, ProcedureAdmin, IpdProcedureAdmin, FeatureAdmin, \
+    ServiceAdmin, HealthInsuranceProviderAdmin
 from ondoc.doctor.models import (Doctor, Language, MedicalService, Specialization, College, Qualification, Hospital,
                                  HospitalNetwork, DoctorOnboardingToken, OpdAppointment,
                                  MedicalCondition, AboutDoctor, HealthTip, CommonMedicalCondition, CommonSpecialization,
                                  DoctorClinic, DoctorMapping, DoctorImage, OpdAppointment, CompetitorInfo,
                                  SpecializationDepartment, SpecializationField, PracticeSpecialization,
-                                 VisitReason, CancellationReason, PracticeSpecializationContent, OfflinePatients, OfflineOPDAppointments,
-                                 DoctorMobileOtp, UploadDoctorData, DoctorLeave)
+                                 VisitReason, CancellationReason, PracticeSpecializationContent, OfflinePatients,
+                                 OfflineOPDAppointments,
+                                 DoctorMobileOtp, UploadDoctorData, DoctorLeave, HealthInsuranceProvider)
 
 from ondoc.diagnostic.models import (Lab, LabNetwork, LabTest, LabTestType,LabService,
                                       AvailableLabTest, LabAppointment, CommonTest, CommonDiagnosticCondition, LabPricingGroup,
@@ -21,7 +23,7 @@ from ondoc.account.models import ConsumerAccount, MerchantPayout
 from ondoc.location.admin import EntityUrlsAdmin
 from ondoc.location.models import EntityUrls
 from ondoc.notification import models as notifcation_model
-from ondoc.procedure.models import Procedure, ProcedureCategory, CommonProcedureCategory, CommonProcedure
+from ondoc.procedure.models import Procedure, ProcedureCategory, CommonProcedureCategory, CommonProcedure, IpdProcedure
 from .common import Cities, CitiesAdmin, MatrixCityMapping, MatrixCityAdmin, MerchantAdmin, MerchantPayoutAdmin, \
     PaymentOptionsAdmin
 from .lead import HospitalLeadAdmin, DoctorLeadAdmin, SearchLeadAdmin
@@ -170,3 +172,7 @@ admin.site.register(UploadDoctorData, UploadDoctorDataAdmin)
 admin.site.register(SliderLocation, SliderLocationAdmin)
 admin.site.register(IntegratorMapping, IntegratorMappingAdmin)
 admin.site.register(IntegratorProfileMapping, IntegratorProfileMappingAdmin)
+admin.site.register(IpdProcedure, IpdProcedureAdmin)
+admin.site.register(Feature, FeatureAdmin)
+admin.site.register(Service, ServiceAdmin)
+admin.site.register(HealthInsuranceProvider, HealthInsuranceProviderAdmin)
