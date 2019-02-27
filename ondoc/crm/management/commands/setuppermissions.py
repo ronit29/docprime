@@ -39,7 +39,7 @@ from ondoc.diagnostic.models import (Lab, LabTiming, LabImage, GenericLabAdmin,
 
 from ondoc.procedure.models import Procedure, ProcedureCategory, CommonProcedureCategory, DoctorClinicProcedure, \
     ProcedureCategoryMapping, ProcedureToCategoryMapping, CommonProcedure, IpdProcedure, IpdProcedureFeatureMapping, \
-    DoctorClinicIpdProcedure
+    DoctorClinicIpdProcedure, CommonIpdProcedure
 from ondoc.reports import models as report_models
 
 from ondoc.diagnostic.models import LabPricing
@@ -481,7 +481,7 @@ class Command(BaseCommand):
                                                            NewDynamic, QuestionAnswer, FrequentlyAddedTogetherTests,
                                                            IpdProcedureFeatureMapping, HospitalServiceMapping,
                                                            DoctorClinic, DoctorClinicIpdProcedure,
-                                                           HealthInsuranceProviderHospitalMapping)
+                                                           HealthInsuranceProviderHospitalMapping, CommonIpdProcedure)
         for cl, ct in content_types.items():
             permissions = Permission.objects.filter(
                 Q(content_type=ct),

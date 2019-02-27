@@ -8,7 +8,7 @@ from collections import deque, OrderedDict
 class IpdProcedure(auth_model.TimeStampedModel, SearchKey):
     name = models.CharField(max_length=500, unique=True)
     details = models.TextField(blank=True)
-    is_live = models.BooleanField(default=False)
+    is_enabled = models.BooleanField(default=False)
     features = models.ManyToManyField(Feature, through='IpdProcedureFeatureMapping',
                                       through_fields=('ipd_procedure', 'feature'), related_name='of_ipd_procedures')
 
@@ -213,6 +213,17 @@ class CommonProcedure(auth_model.TimeStampedModel):
 
     class Meta:
         db_table = "common_procedure"
+
+
+class CommonIpdProcedure(auth_model.TimeStampedModel):
+    ipd_procedure = models.ForeignKey(IpdProcedure, on_delete=models.CASCADE)
+    priority = models.PositiveIntegerField(default=0)
+
+    def __str__(self):
+        return "{}".format(self.ipd_procedure.name)
+
+    class Meta:
+        db_table = "common_ipd_procedure"
 
 
 class CommonProcedureCategory(auth_model.TimeStampedModel):

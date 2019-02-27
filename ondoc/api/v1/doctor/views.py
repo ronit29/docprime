@@ -6,7 +6,7 @@ from ondoc.api.v1.doctor.serializers import HospitalModelSerializer, Appointment
     OfflinePatientSerializer
 from ondoc.api.v1.doctor.DoctorSearchByHospitalHelper import DoctorSearchByHospitalHelper
 from ondoc.api.v1.procedure.serializers import CommonProcedureCategorySerializer, ProcedureInSerializer, \
-    ProcedureSerializer, DoctorClinicProcedureSerializer, CommonProcedureSerializer
+    ProcedureSerializer, DoctorClinicProcedureSerializer, CommonProcedureSerializer, CommonIpdProcedureSerializer
 from ondoc.cart.models import Cart
 from ondoc.doctor import models
 from ondoc.authentication import models as auth_models
@@ -21,7 +21,7 @@ from ondoc.api.v1.diagnostic import serializers as diagnostic_serializer
 from ondoc.account import models as account_models
 from ondoc.location.models import EntityUrls, EntityAddress, DefaultRating
 from ondoc.procedure.models import Procedure, ProcedureCategory, CommonProcedureCategory, ProcedureToCategoryMapping, \
-    get_selected_and_other_procedures, CommonProcedure
+    get_selected_and_other_procedures, CommonProcedure, CommonIpdProcedure
 from ondoc.seo.models import NewDynamic
 from . import serializers
 from ondoc.api.v2.doctor import serializers as v2_serializers
@@ -925,23 +925,35 @@ class SearchedItemsViewSet(viewsets.GenericViewSet):
     def common_conditions(self, request):
         count = request.query_params.get('count', 10)
         count = int(count)
-        if count <=0:
+        if count <= 0:
             count = 10
-        medical_conditions = models.CommonMedicalCondition.objects.select_related('condition').all().order_by("-priority")[:count]
-        conditions_serializer = serializers.MedicalConditionSerializer(medical_conditions, many=True, context={'request': request})
+        medical_conditions = models.CommonMedicalCondition.objects.select_related('condition').all().order_by(
+            "-priority")[:count]
+        conditions_serializer = serializers.MedicalConditionSerializer(medical_conditions, many=True,
+                                                                       context={'request': request})
 
-        common_specializations = models.CommonSpecialization.objects.select_related('specialization').all().order_by("-priority")[:10]
-        specializations_serializer = serializers.CommonSpecializationsSerializer(common_specializations, many=True, context={'request': request})
+        common_specializations = models.CommonSpecialization.objects.select_related('specialization').all().order_by(
+            "-priority")[:10]
+        specializations_serializer = serializers.CommonSpecializationsSerializer(common_specializations, many=True,
+                                                                                 context={'request': request})
 
-        common_procedure_categories = CommonProcedureCategory.objects.select_related('procedure_category').filter(procedure_category__is_live=True).all().order_by("-priority")[:10]
-        common_procedure_categories_serializer = CommonProcedureCategorySerializer(common_procedure_categories, many=True)
+        common_procedure_categories = CommonProcedureCategory.objects.select_related('procedure_category').filter(
+            procedure_category__is_live=True).all().order_by("-priority")[:10]
+        common_procedure_categories_serializer = CommonProcedureCategorySerializer(common_procedure_categories,
+                                                                                   many=True)
 
-        common_procedures = CommonProcedure.objects.select_related('procedure').filter(procedure__is_enabled=True).all().order_by("-priority")[:10]
+        common_procedures = CommonProcedure.objects.select_related('procedure').filter(
+            procedure__is_enabled=True).all().order_by("-priority")[:10]
         common_procedures_serializer = CommonProcedureSerializer(common_procedures, many=True)
+
+        common_ipd_procedures = CommonIpdProcedure.objects.select_related('ipd_procedure').filter(
+            ipd_procedure__is_enabled=True).all().order_by("-priority")[:10]
+        common_ipd_procedures_serializer = CommonIpdProcedureSerializer(common_ipd_procedures, many=True)
 
         return Response({"conditions": conditions_serializer.data, "specializations": specializations_serializer.data,
                          "procedure_categories": common_procedure_categories_serializer.data,
-                         "procedures": common_procedures_serializer.data})
+                         "procedures": common_procedures_serializer.data,
+                         "ipd_procedures": common_ipd_procedures_serializer.data})
 
 
 class DoctorListViewSet(viewsets.GenericViewSet):
