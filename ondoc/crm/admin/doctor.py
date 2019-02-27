@@ -1013,7 +1013,7 @@ class CompetitorMonthlyVisitsInline(ReadOnlyInline):
     verbose_name_plural = 'Monthly Visits through Competitor Info'
 
 
-class DoctorAdmin(AutoComplete, ImportExportMixin, VersionAdmin, ActionAdmin, QCPemAdmin, nested_admin.NestedModelAdmin, SafeDeleteAdmin):
+class DoctorAdmin(AutoComplete, ImportExportMixin, VersionAdmin, ActionAdmin, QCPemAdmin, nested_admin.NestedModelAdmin):
     # class DoctorAdmin(nested_admin.NestedModelAdmin):
     resource_class = DoctorResource
     change_list_template = 'superuser_import_export.html'
