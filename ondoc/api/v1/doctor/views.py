@@ -613,6 +613,14 @@ class DoctorProfileUserViewSet(viewsets.GenericViewSet):
                     if data.get('enabled_for_online_booking') == True:
                         doc_in_hos_enabled_online_booking = True
                         break
+
+                if doc_in_hos_enabled_online_booking == False:
+                    doctor_clinic_obj = doctor.doctor_clinics.all().filter(doctor_id=doctor.id)
+                    for doctor_clinic in doctor_clinic_obj:
+                        if doctor_clinic.enabled_for_online_booking == True:
+                            doc_in_hos_enabled_online_booking = True
+                            break
+
                 hospital = response_data.get('hospitals')[0]
             for dps in doctor.doctorpracticespecializations.all():
                 general_specialization.append(dps.specialization)
