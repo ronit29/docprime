@@ -609,33 +609,41 @@ class DoctorProfileUserViewSet(viewsets.GenericViewSet):
         general_specialization = []
         hospital = None
         doc_in_hos_enabled_online_booking = False
-        hospitals = None
         hospital_ids = None
 
-        if (not doctor.enabled_for_online_booking and not doctor.enabled) or not doctor.about:
-            if response_data and response_data.get('hospitals'):
+        if response_data and response_data.get('hospitals'):
+            hospital = response_data.get('hospitals')[0]
 
-                hospital_ids = [data.get('hospital_id') for data in response_data.get('hospitals')]
-                hospitals = doctor.hospitals.filter(id__in=hospital_ids)
-
-                for data in hospitals:
-                    if data.enabled_for_online_booking == True or data.enabled == True:
-                        doc_in_hos_enabled_online_booking = True
-                        break
-
-                if doc_in_hos_enabled_online_booking == False:
-                    doctor_clinic_obj = doctor.doctor_clinics.filter(hospital_id__in=hospital_ids, doctor_id=doctor.id)
-                    for doctor_clinic in doctor_clinic_obj:
-                        if doctor_clinic.enabled_for_online_booking == True or doctor_clinic.enabled == True:
-                            doc_in_hos_enabled_online_booking = True
-                            break
-
-                hospital = response_data.get('hospitals')[0]
-            for dps in doctor.doctorpracticespecializations.all():
-                general_specialization.append(dps.specialization)
-
+        for dps in doctor.doctorpracticespecializations.all():
+            general_specialization.append(dps.specialization)
+        if general_specialization:
             general_specialization = sorted(general_specialization, key=operator.attrgetter('doctor_count'),
                                             reverse=True)
+
+        # if not doctor.enabled_for_online_booking and not doctor.enabled or not doctor.about:
+        #
+        #
+        #         hospital_ids = [data.get('hospital_id') for data in response_data.get('hospitals')]
+        #         hospitals = doctor.hospitals.filter(id__in=hospital_ids)
+        #
+        #         for data in hospitals:
+        #             if data.enabled_for_online_booking == True or data.enabled == True:
+        #                 doc_in_hos_enabled_online_booking = True
+        #                 break
+        #
+        #         if doc_in_hos_enabled_online_booking == False:
+        #             doctor_clinic_obj = doctor.doctor_clinics.filter(hospital_id__in=hospital_ids, doctor_id=doctor.id)
+        #             for doctor_clinic in doctor_clinic_obj:
+        #                 if doctor_clinic.enabled_for_online_booking == True or doctor_clinic.enabled == True:
+        #                     doc_in_hos_enabled_online_booking = True
+        #                     break
+        #
+        #         hospital = response_data.get('hospitals')[0]
+        #     for dps in doctor.doctorpracticespecializations.all():
+        #         general_specialization.append(dps.specialization)
+        #
+        #     general_specialization = sorted(general_specialization, key=operator.attrgetter('doctor_count'),
+        #                                     reverse=True)
 
         if not doctor.about:
             about_doctor = None
@@ -658,7 +666,7 @@ class DoctorProfileUserViewSet(viewsets.GenericViewSet):
                 doc_clinics_obj = doctor.doctor_clinics.all().filter(hospital_id=hospital.get('hospital_id'), doctor_id=doctor.id)
                 if doc_clinics_obj:
                     hospital_obj = doc_clinics_obj[0].hospital
-            if doctor.name:
+            if doctor.name and general_specialization:
                 about_doctor = 'Dr. ' + doctor.name
                 if len(general_specialization) == 1:
                     about_doctor += ' is a proficient ' + general_specialization[0].name
@@ -754,13 +762,20 @@ class DoctorProfileUserViewSet(viewsets.GenericViewSet):
                 breadcrumb = [{'url':'/', 'title': 'Home'}, {'title':'Dr. ' + doctor.name}]
                 response_data['breadcrumb'] = breadcrumb
 
-        if not doctor.enabled_for_online_booking and not doctor.enabled and not doc_in_hos_enabled_online_booking:
+        if not doc_in_hos_enabled_online_booking and response_data.get('hospitals'):
+            hospital_ids = [data.get('hospital_id') for data in response_data.get('hospitals')]
+            doctor_clinic_obj = doctor.doctor_clinics.filter(hospital_id__in=hospital_ids, doctor_id=doctor.id)
+            for data in doctor_clinic_obj:
+                if doctor.enabled_for_online_booking==True and doctor.enabled==True and data.enabled_for_online_booking == True or data.enabled == True and data.hospital.enabled == True and data.hospital.enabled_for_online_booking==True:
+                    doc_in_hos_enabled_online_booking = True
+                    break
+
             parameters = dict()
             specialization_id = ''
             doc = DoctorListViewSet()
             doctors_url = None
 
-            if general_specialization and response_data.get('hospitals'):
+            if general_specialization and not doc_in_hos_enabled_online_booking:
                 specialization_id = general_specialization[0].pk
 
                 parameters['specialization_ids'] = str(specialization_id)                
