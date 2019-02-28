@@ -572,10 +572,10 @@ class DoctorProfileUserViewSet(viewsets.GenericViewSet):
             about_doctor += '.'
             if doctor.gender in ('m', 'f') and hospital_obj and hospital_obj.city:
                 if hospital_obj.city:
-                    about_doctor += ' ' + person + ' is located in ' + hospital_obj.city + '.<br><br> '
+                    about_doctor += ' ' + person + ' is located in ' + hospital_obj.city + '. '
 
         if doctor.name and hospital and hospital_obj and hospital_obj.city and hospital_obj.state:
-            about_doctor += 'Dr. ' + doctor.name
+            about_doctor += '<br><br>Dr. ' + doctor.name
             if hospital_obj.city:
                 about_doctor += ' practices at the ' + hospital.get('hospital_name') + ' in ' + hospital_obj.city + '. '
 
