@@ -218,6 +218,7 @@ class Lab(TimeStampedModel, CreatedByModel, QCModel, SearchKey):
     merchant_payout = GenericRelation(account_model.MerchantPayout)
     avg_rating = models.DecimalField(max_digits=5, decimal_places=2, null=True, editable=False)
     lab_priority = models.PositiveIntegerField(blank=False, null=False, default=1)
+    open_for_communication = models.BooleanField(default=True)
 
     def __str__(self):
         return self.name
@@ -645,7 +646,7 @@ class LabNetwork(TimeStampedModel, CreatedByModel, QCModel):
     merchant = GenericRelation(auth_model.AssociatedMerchant)
     merchant_payout = GenericRelation(account_model.MerchantPayout)
     is_mask_number_required = models.BooleanField(default=True)
-    open_for_email = models.BooleanField(default=True)
+    open_for_communication = models.BooleanField(default=True)
 
     def all_associated_labs(self):
         if self.id:
