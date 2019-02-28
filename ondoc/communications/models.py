@@ -445,9 +445,23 @@ class EMAILNotification:
         notification_type = self.notification_type
         context = copy.deepcopy(context)
         instance = context.get('instance', None)
+
+        receiver_user = receiver.get('user')
+        send_without_email = False
+        if (instance.__class__.__name__ == LabAppointment.__name__) and (not receiver_user or receiver_user.user_type == User.DOCTOR):
+            if instance.lab.network and not instance.lab.network.open_for_email:
+                email = None
+                send_without_email = True
+
+
+        if (instance.__class__.__name__ == OpdAppointment.__name__) and (not receiver_user or receiver_user.user_type == User.DOCTOR):
+            if instance.hospital.network and not instance.hospital.network.open_for_email:
+                email = None
+                send_without_email = True
+
         email_subject = render_to_string(template[0], context=context)
         html_body = render_to_string(template[1], context=context)
-        if email and user and user.user_type == User.DOCTOR and notification_type in [
+        if (email or send_without_email) and user and user.user_type == User.DOCTOR and notification_type in [
             NotificationAction.LAB_APPOINTMENT_CANCELLED,
             NotificationAction.LAB_APPOINTMENT_BOOKED,
             NotificationAction.LAB_APPOINTMENT_RESCHEDULED_BY_PATIENT]:
@@ -467,7 +481,7 @@ class EMAILNotification:
             }
             message = json.dumps(message)
             publish_message(message)
-        elif email:
+        elif (email or send_without_email):
             email_noti = EmailNotification.objects.create(
                 user=user,
                 email=email,

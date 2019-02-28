@@ -1109,6 +1109,7 @@ class HospitalNetwork(auth_model.TimeStampedModel, auth_model.CreatedByModel, au
     billing_merchant = GenericRelation(auth_model.BillingAccount)
     spoc_details = GenericRelation(auth_model.SPOCDetails)
     merchant = GenericRelation(auth_model.AssociatedMerchant)
+    open_for_email = models.BooleanField(default=True)
 
     def __str__(self):
         return self.name
