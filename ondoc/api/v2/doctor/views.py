@@ -459,27 +459,24 @@ class DoctorDataViewset(viewsets.GenericViewSet):
 class ProviderSignupOtpViewset(viewsets.GenericViewSet):
 
     def otp_generate(self, request, *args, **kwargs):
-        response = {'opt_generated': False}
-        serializer = serializers.ProviderSignupLeadOtpSerializer(data=request.data)
+        serializer = serializers.GenerateOtpSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         valid_data = serializer.validated_data
-        if valid_data['phone_number']:
-            phone_number = valid_data['phone_number']
-            retry_send = request.query_params.get('retry', False)
-            send_otp("OTP for login is {}", phone_number, retry_send)
-            response = {'opt_generated': True}
+        phone_number = valid_data.get('phone_number')
+        retry_send = request.query_params.get('retry', False)
+        send_otp("OTP for login is {}", phone_number, retry_send)
+        response = {'otp_generated': True}
         return Response(response)
 
     def otp_verification(self, request, *args, **kwargs):
-        serializer = serializers.ProviderSignupOtpVerificationSerializer(data=request.data)
+        serializer = serializers.OtpVerificationSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         valid_data = serializer.validated_data
-        phone_number = valid_data['phone_number']
+        phone_number = valid_data.get('phone_number')
         user = User.objects.filter(phone_number=phone_number, user_type=User.DOCTOR).first()
 
         if not user:
-            user = User.objects.create(phone_number=phone_number, is_phone_number_verified=True,
-                                       user_type=User.DOCTOR)
+            user = User.objects.create(phone_number=phone_number, is_phone_number_verified=True, user_type=User.DOCTOR)
 
         auth_models.GenericAdmin.update_user_admin(phone_number)
         auth_models.GenericLabAdmin.update_user_lab_admin(phone_number)
@@ -494,3 +491,34 @@ class ProviderSignupOtpViewset(viewsets.GenericViewSet):
             "expiration_time": token_object['payload']['exp']
         }
         return Response(response)
+
+
+class ProviderSignupDataViewset(viewsets.GenericViewSet):
+    authentication_classes = (JWTAuthentication,)
+    permission_classes = (IsAuthenticated, DoctorPermission,)
+
+    def create(self, request, *args, **kwargs):
+        serializer = serializers.ProviderSignupLeadDataSerializer(data=request.data, context={'request':request})
+        serializer.is_valid(raise_exception=True)
+        valid_data = serializer.validated_data
+        valid_data['user'] = request.user
+        try:
+            doc_models.ProviderSignupLead.objects.create(**valid_data)
+            return Response({"status": 1, "message": "signup lead data added"})
+        except Exception as e:
+            logger.error('Error creating signup lead: ' + str(e))
+            return Response({"status": 0, "message": "Error creating signup lead: " + str(e)})
+
+    def consent_is_docprime(self, request, *args, **kwargs):
+        serializer = serializers.ConsentIsDocprimeSerializer(data=request.data, context={'request':request})
+        serializer.is_valid(raise_exception=True)
+        valid_data = serializer.validated_data
+        user = request.user
+        is_docprime = valid_data.get("is_docprime")
+        try:
+            doc_models.ProviderSignupLead.objects.filter(user=user).update(is_docprime=is_docprime)
+            return Response({"status":1, "message":"consent updated"})
+        except Exception as e:
+            logger.error('Error updating consent: ' + str(e))
+            return Response({"status": 0, "message": "Error updating consent - " + str(e)})
+

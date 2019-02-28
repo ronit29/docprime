@@ -146,6 +146,9 @@ class Hospital(auth_model.TimeStampedModel, auth_model.CreatedByModel, auth_mode
         (CHARGES_ISSUES, "Issue in discount % / consultation charges"),
         (DUPLICATE, "Duplicate"), (OTHERS, "Others (please specify)"))
     DISABLED_AFTER_CHOICES = (("", "Select"), (WELCOME_CALLING, "Welcome Calling"), (ESCALATION, "Escalation"))
+    AGENT = 1
+    PROVIDER = 2
+    SOURCE_TYPE_CHOICES = ((AGENT, "Agent"), (PROVIDER, "Provider"))
     name = models.CharField(max_length=200)
     location = models.PointField(geography=True, srid=4326, blank=True, null=True)
     location_error = models.PositiveIntegerField(blank=True, null=True)
@@ -189,6 +192,7 @@ class Hospital(auth_model.TimeStampedModel, auth_model.CreatedByModel, auth_mode
     disabled_by = models.ForeignKey(settings.AUTH_USER_MODEL, related_name="disabled_hospitals", null=True, editable=False,
                                     on_delete=models.SET_NULL)
     is_mask_number_required = models.BooleanField(default=True)
+    source_type = models.IntegerField(choices=SOURCE_TYPE_CHOICES, default=None, null=True, editable=False)
 
     def __str__(self):
         return self.name
@@ -386,6 +390,9 @@ class Doctor(auth_model.TimeStampedModel, auth_model.QCModel, SearchKey):
         (DOCTOR_NOT_INTERESTED_FOR_TIE_UP, "Doctor not interested for tie-up"),
         (CHARGES_ISSUES, "Issue in discount % / consultation charges"),
         (DUPLICATE, "Duplicate"), (OTHERS, "Others (please specify)"))
+    AGENT = 1
+    PROVIDER = 2
+    SOURCE_TYPE_CHOICES = ((AGENT, "Agent"), (PROVIDER, "Provider"))
     name = models.CharField(max_length=200)
     gender = models.CharField(max_length=2, default=None, blank=True, null=True,
                               choices=GENDER_CHOICES)
@@ -444,6 +451,7 @@ class Doctor(auth_model.TimeStampedModel, auth_model.QCModel, SearchKey):
     disable_comments = models.CharField(max_length=500, blank=True)
     disabled_by = models.ForeignKey(settings.AUTH_USER_MODEL, related_name="disabled_doctors", null=True, editable=False,
                                    on_delete=models.SET_NULL)
+    source_type = models.IntegerField(choices=SOURCE_TYPE_CHOICES, default=None, null=True, editable=False)
 
     def __str__(self):
         return '{} ({})'.format(self.name, self.id)
@@ -2473,10 +2481,11 @@ class ProviderSignupLead(auth_model.TimeStampedModel):
 
     user = models.ForeignKey(auth_model.User, on_delete=models.CASCADE)
     name = models.CharField(max_length=200)
-    phone_number = models.BigIntegerField()
+    phone_number = models.BigIntegerField(unique=True)
     email = models.EmailField()
     type = models.IntegerField(choices=TYPE_CHOICES)
-    is_docprime = models.BooleanField(default=False)
+    # TODO - blank=true to be added or not?
+    is_docprime = models.NullBooleanField(null=True)
 
     def __str__(self):
         return self.name

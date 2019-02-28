@@ -12,7 +12,9 @@ urlpatterns = [
     path('medical-services', views.DoctorDataViewset.as_view({'get': 'get_doctor_medical_services'}), name='get-doctor-medical-services'),
     path('procedures', views.DoctorDataViewset.as_view({'get': 'get_procedures'}), name='get-procedures'),
     path('specializations', views.DoctorDataViewset.as_view({'get': 'get_specializations'}), name='get-specializations'),
-    path('signup-otp', views.ProviderSignupOtpViewset.as_view({'post': 'otp_generate'}), name='otp-generate'),
-    path('signup-verification', views.ProviderSignupOtpViewset.as_view({'post': 'otp_verification'}), name='otp-verification')
+    path('provider-signup/otp', views.ProviderSignupOtpViewset.as_view({'post': 'otp_generate'}), name='otp-generate'),
+    path('provider-signup/otp-verification', views.ProviderSignupOtpViewset.as_view({'post': 'otp_verification'}), name='otp-verification'),
+    path('provider-signup/add', views.ProviderSignupDataViewset.as_view({'post': 'create'}), name='create-provider-signup'),
+    path('provider-signup/consent', views.ProviderSignupDataViewset.as_view({'post': 'consent_is_docprime'}), name='consent-is-docprime')
 ]
 

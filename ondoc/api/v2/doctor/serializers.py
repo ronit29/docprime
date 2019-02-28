@@ -8,6 +8,8 @@ from ondoc.authentication.models import (OtpVerifications, User, UserProfile, No
 from ondoc.doctor import models as doc_models
 from ondoc.procedure.models import Procedure
 from ondoc.api.v1.doctor import serializers as v1_serializers
+from dateutil.relativedelta import relativedelta
+from django.utils import timezone
 logger = logging.getLogger(__name__)
 User = get_user_model()
 
@@ -96,36 +98,35 @@ class DoctorLeaveSerializer(serializers.ModelSerializer):
         exclude = ('created_at', 'updated_at', 'deleted_at')
 
 
-class DoctorAddSerializer(serializers.Serializer):
-    name = serializers.CharField(max_length=200)
-    gender = serializers.ChoiceField(required=False, choices=doc_models.Doctor.GENDER_CHOICES)
-    practicing_since = serializers.IntegerField()
-
-
 class PracticeSpecializationSerializer(serializers.ModelSerializer):
     class Meta:
         model = doc_models.PracticeSpecialization
         fields = '__all__'
+
 
 class QualificationSerializer(serializers.ModelSerializer):
     class Meta:
         model = doc_models.Qualification
         fields = '__all__'
 
+
 class LanguageSerializer(serializers.ModelSerializer):
     class Meta:
         model = doc_models.Language
         fields = '__all__'
+
 
 class MedicalServiceSerializer(serializers.ModelSerializer):
     class Meta:
         model = doc_models.MedicalService
         fields = '__all__'
 
+
 class ProcedureSerializer(serializers.ModelSerializer):
     class Meta:
         model = Procedure
         fields = '__all__'
+
 
 class SpecializationSerializer(serializers.ModelSerializer):
     class Meta:
@@ -133,7 +134,7 @@ class SpecializationSerializer(serializers.ModelSerializer):
         fields = '__all__'
 
 
-class ProviderSignupLeadOtpSerializer(serializers.Serializer):
+class GenerateOtpSerializer(serializers.Serializer):
     phone_number = serializers.IntegerField(min_value=5000000000,max_value=9999999999)
 
     def validate(self, attrs):
@@ -147,13 +148,13 @@ class ProviderSignupLeadOtpSerializer(serializers.Serializer):
         return attrs
 
 
-class ProviderSignupOtpVerificationSerializer(serializers.Serializer):
-    phone_number = serializers.IntegerField(min_value=5000000000,max_value=9999999999)
+class OtpVerificationSerializer(serializers.Serializer):
+    phone_number = serializers.IntegerField(min_value=5000000000, max_value=9999999999)
     otp = serializers.IntegerField(min_value=100000,max_value=999999)
 
     def validate(self, attrs):
-        if not OtpVerifications.objects.filter(phone_number=attrs['phone_number'], code=attrs['otp'],
-                                               is_expired=False).exists():
+        if not OtpVerifications.objects.filter(phone_number=attrs['phone_number'], code=attrs['otp'], is_expired=False,
+                   created_at__gte=timezone.now() - relativedelta(minutes=OtpVerifications.OTP_EXPIRY_TIME)).exists():
             raise serializers.ValidationError("Invalid OTP")
         admin_exists = lab_admin_exists = False
         if GenericAdmin.objects.filter(phone_number=attrs['phone_number'], is_disabled=False).exists():
@@ -163,3 +164,36 @@ class ProviderSignupOtpVerificationSerializer(serializers.Serializer):
         if admin_exists or lab_admin_exists:
             raise serializers.ValidationError("admin for this phone number already exists")
         return attrs
+
+
+class ProviderSignupLeadDataSerializer(serializers.Serializer):
+    name = serializers.CharField(max_length=200)
+    phone_number = serializers.IntegerField(min_value=5000000000, max_value=9999999999)
+    email = serializers.EmailField()
+    type = serializers.ChoiceField(choices=doc_models.ProviderSignupLead.TYPE_CHOICES)
+
+    def validate(self, attrs):
+        user = self.context.get('request').user if self.context.get('request') else None
+        phone_number = attrs.get("phone_number")
+        type = attrs.get("type")
+        if doc_models.ProviderSignupLead.objects.filter(phone_number=phone_number).exists():
+            raise serializers.ValidationError("Provider with this phone number already exists")
+        if int(user.phone_number) != int(phone_number):
+            raise serializers.ValidationError("user and phone number mismatch")
+        # if type == doc_models.ProviderSignupLead.DOCTOR and doc_models.Doctor.objects.filter(user=user).exists():
+        #     raise serializers.ValidationError("Doctor for the user already exists")
+        # if type == doc_models.ProviderSignupLead.HOSPITAL_ADMIN and GenericAdmin.objects.filter(user=user).exists():
+        #     raise serializers.ValidationError("Generic Admin for the user already exists")
+        return attrs
+
+
+class ConsentIsDocprimeSerializer(serializers.Serializer):
+    is_docprime = serializers.BooleanField()
+
+    def validate(self, attrs):
+        user = self.context.get('request').user if self.context.get('request') else None
+        if not (user and doc_models.ProviderSignupLead.objects.filter(user=user).exists()):
+            raise serializers.ValidationError("Provider not found")
+        return attrs
+
+
