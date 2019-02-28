@@ -620,7 +620,7 @@ class DoctorProfileUserViewSet(viewsets.GenericViewSet):
         doctor_clinics = doctor.doctor_clinics.all()
         if len(doctor_clinics)>0 and doctor.enabled_for_online_booking:
             for dc in doctor_clinics:
-                if dc.enabled and dc.enabled_for_online_booking and dc.hospital.enabled_for_online_booking:
+                if dc.enabled and dc.enabled_for_online_booking and dc.hospital.enabled_for_online_booking and dc.hospital.is_live:
                     enabled_for_online_booking = True
 
         if not enabled_for_online_booking:
