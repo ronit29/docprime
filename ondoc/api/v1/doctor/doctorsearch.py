@@ -56,12 +56,6 @@ class DoctorSearchHelper:
 
         # " gs.id IN({})".format(",".join(specialization_ids))
 
-        if self.query_params.get("is_available"):
-            query_str = "((dl.start_date is NULL OR dl.end_date is NULL) " \
-                        "OR (current_date > dl.start_date and current_date > dl.end_date) " \
-                        "OR (current_date < dl.start_date and current_date < dl.end_date))"
-            filtering_params.append(query_str)
-
         counter=1
         if len(specialization_ids) > 0 and len(procedure_ids)==0 and len(procedure_category_ids)==0:
             sp_str = 'gs.id IN('
@@ -128,6 +122,9 @@ class DoctorSearchHelper:
         if self.query_params.get("is_available"):
             current_time = datetime.now()
             current_hour = round(float(current_time.hour) + (float(current_time.minute)*1/60), 2) + .75
+            query_str = "((dl.start_date is NULL OR dl.end_date is NULL) OR" \
+                        " (current_date NOT BETWEEN dl.start_date AND dl.end_date))"
+            filtering_params.append(query_str)
             filtering_params.append(
                 'dct.day=(%(current_time)s) and dct.end>=(%(current_hour)s)')
             params['current_time'] = str(current_time.weekday())
