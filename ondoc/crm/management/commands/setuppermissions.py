@@ -139,7 +139,7 @@ class Command(BaseCommand):
                 Q(content_type=ct), Q(codename='change_' + ct.model))
             group.permissions.add(*permissions)
 
-        content_types = ContentType.objects.get_for_models(Lab, LabNetwork, LabTestGroup, LabTestGroupMapping, LabTestGroupTiming)
+        content_types = ContentType.objects.get_for_models(Lab, LabNetwork)
         for cl, ct in content_types.items():
             permissions = Permission.objects.filter(
                 Q(content_type=ct), Q(codename='change_' + ct.model))
@@ -159,7 +159,8 @@ class Command(BaseCommand):
                 Q(codename='change_' + ct.model))
             group.permissions.add(*permissions)
 
-        content_types = ContentType.objects.get_for_models(LabTest, LabTestType, LabService, TestParameter)
+        content_types = ContentType.objects.get_for_models(LabTest, LabTestType, LabService, TestParameter, LabTestGroup,
+                                                           LabTestGroupMapping, LabTestGroupTiming)
 
         for cl, ct in content_types.items():
             permissions = Permission.objects.filter(
