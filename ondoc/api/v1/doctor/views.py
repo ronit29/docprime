@@ -615,7 +615,15 @@ class DoctorProfileUserViewSet(viewsets.GenericViewSet):
                 breadcrumb = [{'url':'/', 'title': 'Home'}, {'title':'Dr. ' + doctor.name}]
                 response_data['breadcrumb'] = breadcrumb
 
-        if not doctor.enabled_for_online_booking:
+
+        enabled_for_online_booking = False
+        doctor_clinics = doctor.doctor_clinics.all()
+        if len(doctor_clinics)>0 and doctor.enabled_for_online_booking:
+            for dc in doctor_clinics:
+                if dc.enabled and dc.enabled_for_online_booking and dc.hospital.enabled_for_online_booking:
+                    enabled_for_online_booking = True
+
+        if not enabled_for_online_booking:
             parameters = dict()
             specialization_id = ''
             doc = DoctorListViewSet()
