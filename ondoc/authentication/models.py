@@ -1387,6 +1387,17 @@ class Merchant(TimeStampedModel):
     SAVINGS = 1
     CURRENT = 2
 
+    #pg merchant creation codes
+    NOT_INITIATED = 0
+    INITIATED = 1
+    INPROCESS = 2
+    COMPLETE = 3
+    FAILURE = 4
+    CREATION_STATUS_CHOICES = ((NOT_INITIATED, 'Not Initiated'),
+        (INITIATED,'Initiated'),(INPROCESS, 'In Progress'),
+         (COMPLETE, 'Complete'), (FAILURE, 'Failure')
+        )
+
     beneficiary_name = models.CharField(max_length=128, null=True)
     account_number = models.CharField(max_length=50, null=True, default=None, blank=True)
     ifsc_code = models.CharField(max_length=128, null=True)
@@ -1412,7 +1423,8 @@ class Merchant(TimeStampedModel):
     country = models.CharField(max_length=200, null=False, blank= True)
     email = models.CharField(max_length=200, null=False, blank= True)
     mobile = models.CharField(max_length=200, null=False, blank= True)
-
+    pg_status = models.PositiveIntegerField(choices=CREATION_STATUS_CHOICES, default=NOT_INITIATED, editable=False)
+    api_response = JSONField(blank=True, null=True, editable=False)
 
     class Meta:
         db_table = 'merchant'
@@ -1420,6 +1432,15 @@ class Merchant(TimeStampedModel):
     def __str__(self):
         return self.beneficiary_name+"("+self.account_number+")-("+str(self.id)+")"
 
+    def save(self, *args, **kwargs):
+        if self.verified_by_finance and not self.pg_status == self.COMPLETE:
+            self.create_in_pg()
+
+    def create_in_pg(self):
+        pass
+
+    def update_status_from_pg(self):
+        pass 
 
 class AssociatedMerchant(TimeStampedModel):
 
