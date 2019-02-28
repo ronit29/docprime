@@ -1103,14 +1103,22 @@ def datetime_to_formated_string(instance, time_format='%Y-%m-%d %H:%M:%S', to_zo
 
 def payout_checksum(request_payload):
 
-    secretkey = settings.PG_SECRET_KEY_P2
-    accesskey = settings.PG_CLIENT_KEY_P2
+    # secretkey = settings.PG_SECRET_KEY_P2
+    # accesskey = settings.PG_CLIENT_KEY_P2
+
+    accesskey = 'b7YPL09/78LKpo9l'
+    secretkey = 'aY678ikloPL'
 
     checksum = ""
 
     curr = ''
-    for k in request_payload.keys():
-        if str(request_payload[k]) and request_payload[k] is not None and request_payload[k] is not "":
+    # keylist = request_payload.keys()
+    # keylist.sort()
+    #for key in keylist:
+
+    keylist = sorted(request_payload)
+    for k in keylist:
+        if request_payload[k] is not None and request_payload[k] is not "":
             curr = curr + k + '=' + str(request_payload[k]) + ';'
 
     checksum += curr

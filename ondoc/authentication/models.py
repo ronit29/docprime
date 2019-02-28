@@ -1438,12 +1438,13 @@ class Merchant(TimeStampedModel):
 
     def save(self, *args, **kwargs):
         if self.verified_by_finance and not self.pg_status == self.COMPLETE:
-            self.create_in_pg()
+            pass
+        self.create_in_pg()
         return super().save(*args, **kwargs)
 
     def create_in_pg(self):
-        request_payload = OrderedDict()
-        request_payload["Bene_Code"] = self.id
+        request_payload = dict()
+        request_payload["Bene_Code"] = str(self.id)
         request_payload["Bene Name"] = self.beneficiary_name
         request_payload["Bene Add 1"] = self.merchant_add_1
         request_payload["Bene Add 2"] = self.merchant_add_2
@@ -1461,16 +1462,19 @@ class Merchant(TimeStampedModel):
         request_payload["IFSC"] = self.ifsc_code
         request_payload["Bene_A/c No"] = self.account_number
         request_payload["Bene Bank"] = None
-        request_payload["PaymentType"] = self.type
-        request_payload["isBulk"] = 1
+        request_payload["PaymentType"] = None
+        request_payload["isBulk"] = "0"
 
         from ondoc.api.v1.utils import payout_checksum
         checksum_response = payout_checksum(request_payload)
         request_payload["hash"] = checksum_response
-        url = settings.NODAL_BENEFICIARY_API
+        #url = settings.NODAL_BENEFICIARY_API
+        url = 'http://pgqa.docprime.com/pg/insertNodalBeneData'
 
-        nodal_beneficiary_api_token = settings.NODAL_BENEFICIARY_TOKEN
-        response = requests.post(url, data=json.dumps(request_payload), headers={'Authorization': nodal_beneficiary_api_token,
+        #nodal_beneficiary_api_token = settings.NODAL_BENEFICIARY_TOKEN
+        nodal_beneficiary_api_token = 'gFH8gPXbCWaW8WqUefINBDRj0SDQA'
+
+        response = requests.post(url, data=json.dumps(request_payload), headers={'auth': nodal_beneficiary_api_token,
                                                                               'Content-Type': 'application/json'})
 
 
