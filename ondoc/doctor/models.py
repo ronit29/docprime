@@ -33,7 +33,7 @@ from ondoc.notification import tasks as notification_tasks
 from django.contrib.contenttypes.fields import GenericRelation
 from ondoc.api.v1.utils import get_start_end_datetime, custom_form_datetime, CouponsMixin, aware_time_zone, \
     form_time_slot, util_absolute_url, html_to_pdf
-from ondoc.common.models import AppointmentHistory, AppointmentMaskNumber
+from ondoc.common.models import AppointmentHistory, AppointmentMaskNumber, Service
 from functools import reduce
 from operator import or_
 import logging
@@ -189,6 +189,12 @@ class Hospital(auth_model.TimeStampedModel, auth_model.CreatedByModel, auth_mode
     disabled_by = models.ForeignKey(settings.AUTH_USER_MODEL, related_name="disabled_hospitals", null=True, editable=False,
                                     on_delete=models.SET_NULL)
     is_mask_number_required = models.BooleanField(default=True)
+    service = models.ManyToManyField(Service, through='HospitalServiceMapping', through_fields=('hospital', 'service'),
+                                     related_name='of_hospitals')
+    health_insurance_providers = models.ManyToManyField('HealthInsuranceProvider',
+                                                        through='HealthInsuranceProviderHospitalMapping',
+                                                        through_fields=('hospital', 'provider'),
+                                                        related_name='available_in_hospital')
 
     def __str__(self):
         return self.name
@@ -280,6 +286,20 @@ class Hospital(auth_model.TimeStampedModel, auth_model.CreatedByModel, auth_mode
         if not result:
             result.extend(list(self.spoc_details.filter(contact_type=SPOCDetails.OWNER)))
         return result
+
+
+class HospitalServiceMapping(models.Model):
+    hospital = models.ForeignKey(Hospital, on_delete=models.CASCADE,
+                                 related_name='service_mappings')
+    service = models.ForeignKey(Service, on_delete=models.CASCADE,
+                                related_name='hospital_service_mappings')
+
+    def __str__(self):
+        return '{} - {}'.format(self.hospital.name, self.service.name)
+
+    class Meta:
+        db_table = "hospital_service_mapping"
+        unique_together = (('hospital', 'service'),)
 
 
 class HospitalAward(auth_model.TimeStampedModel):
@@ -2523,3 +2543,26 @@ class UploadDoctorData(auth_model.TimeStampedModel):
             super().save(*args, **kwargs)
             upload_doctor_data.apply_async((self.id,), countdown=1)
 
+
+class HealthInsuranceProvider(auth_model.TimeStampedModel):
+    name = models.CharField(max_length=100)
+
+    class Meta:
+        db_table = 'health_insurance_provider'
+
+    def __str__(self):
+        return self.name
+
+
+class HealthInsuranceProviderHospitalMapping(models.Model):
+    hospital = models.ForeignKey(Hospital, on_delete=models.CASCADE,
+                                 related_name='provider_mappings')
+    provider = models.ForeignKey(HealthInsuranceProvider, on_delete=models.CASCADE,
+                                related_name='hospital_provider_mappings')
+
+    def __str__(self):
+        return '{} - {}'.format(self.hospital.name, self.provider.name)
+
+    class Meta:
+        db_table = "hospital__health_insurance_provider_mapping"
+        unique_together = (('hospital', 'provider'),)
