@@ -68,6 +68,7 @@ from .elastic import DemoElasticAdmin
 from ondoc.banner.models import Banner, SliderLocation
 from .integrations import IntegratorMapping, IntegratorMappingAdmin
 from .integrations import IntegratorProfileMapping, IntegratorProfileMappingAdmin
+from .integrations import IntegratorReport, IntegratorReportAdmin
 
 # Admin Site config
 admin.site.site_header = 'Ondoc CRM'
@@ -176,3 +177,4 @@ admin.site.register(IpdProcedure, IpdProcedureAdmin)
 admin.site.register(Feature, FeatureAdmin)
 admin.site.register(Service, ServiceAdmin)
 admin.site.register(HealthInsuranceProvider, HealthInsuranceProviderAdmin)
+admin.site.register(IntegratorReport, IntegratorReportAdmin)
