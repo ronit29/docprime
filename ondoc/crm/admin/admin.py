@@ -1,27 +1,29 @@
 
 from django.contrib.gis import admin
 
-from ondoc.common.models import PaymentOptions, UserConfig
-from ondoc.crm.admin.banner import BannerAdmin
-from ondoc.crm.admin.procedure import ProcedureCategoryAdmin, ProcedureAdmin
+from ondoc.common.models import PaymentOptions, UserConfig, Feature, Service
+from ondoc.crm.admin.banner import BannerAdmin, SliderLocationAdmin
+from ondoc.crm.admin.procedure import ProcedureCategoryAdmin, ProcedureAdmin, IpdProcedureAdmin, FeatureAdmin, \
+    ServiceAdmin, HealthInsuranceProviderAdmin
 from ondoc.doctor.models import (Doctor, Language, MedicalService, Specialization, College, Qualification, Hospital,
                                  HospitalNetwork, DoctorOnboardingToken, OpdAppointment,
                                  MedicalCondition, AboutDoctor, HealthTip, CommonMedicalCondition, CommonSpecialization,
                                  DoctorClinic, DoctorMapping, DoctorImage, OpdAppointment, CompetitorInfo,
                                  SpecializationDepartment, SpecializationField, PracticeSpecialization,
-                                 VisitReason, CancellationReason, PracticeSpecializationContent, OfflinePatients, OfflineOPDAppointments,
-                                 DoctorMobileOtp, UploadDoctorData)
+                                 VisitReason, CancellationReason, PracticeSpecializationContent, OfflinePatients,
+                                 OfflineOPDAppointments,
+                                 DoctorMobileOtp, UploadDoctorData, DoctorLeave, HealthInsuranceProvider)
 
 from ondoc.diagnostic.models import (Lab, LabNetwork, LabTest, LabTestType,LabService,
                                       AvailableLabTest, LabAppointment, CommonTest, CommonDiagnosticCondition, LabPricingGroup,
-                                     TestParameter, CommonPackage, LabTestCategory)
+                                     TestParameter, CommonPackage, LabTestCategory, LabTestGroup, LabTestGroupMapping)
 from ondoc.coupon.models import Coupon, UserSpecificCoupon, RandomGeneratedCoupon
 from ondoc.lead.models import HospitalLead, DoctorLead, SearchLead
 from ondoc.account.models import ConsumerAccount, MerchantPayout
 from ondoc.location.admin import EntityUrlsAdmin
 from ondoc.location.models import EntityUrls
 from ondoc.notification import models as notifcation_model
-from ondoc.procedure.models import Procedure, ProcedureCategory, CommonProcedureCategory, CommonProcedure
+from ondoc.procedure.models import Procedure, ProcedureCategory, CommonProcedureCategory, CommonProcedure, IpdProcedure
 from .common import Cities, CitiesAdmin, MatrixCityMapping, MatrixCityAdmin, MerchantAdmin, MerchantPayoutAdmin, \
     PaymentOptionsAdmin
 from .lead import HospitalLeadAdmin, DoctorLeadAdmin, SearchLeadAdmin
@@ -36,7 +38,7 @@ from .hospital import HospitalAdmin
 from .user import CustomUserAdmin
 from .hospital_network import HospitalNetworkAdmin
 from .lab import LabAdmin, LabTestAdmin, LabTestTypeAdmin, AvailableLabTestAdmin, CommonDiagnosticConditionAdmin, \
-    LabAppointmentAdmin, CommonTestAdmin, TestParameterAdmin, CommonPackageAdmin, LabTestCategoryAdmin
+    LabAppointmentAdmin, CommonTestAdmin, TestParameterAdmin, CommonPackageAdmin, LabTestCategoryAdmin, LabTestGroupAdmin, LabTestGroupMappingAdmin
 from .lab_network import LabNetworkAdmin
 from .notification import (EmailNotificationAdmin, SmsNotificationAdmin,
                            PushNotificationAdmin, AppNotificationAdmin)
@@ -63,7 +65,9 @@ from ondoc.seo.models import SeoSpecialization
 from ondoc.seo.models import SeoLabNetwork
 from ondoc.elastic.models import DemoElastic
 from .elastic import DemoElasticAdmin
-from ondoc.banner.models import Banner
+from ondoc.banner.models import Banner, SliderLocation
+from .integrations import IntegratorMapping, IntegratorMappingAdmin
+from .integrations import IntegratorProfileMapping, IntegratorProfileMappingAdmin
 
 # Admin Site config
 admin.site.site_header = 'Ondoc CRM'
@@ -98,6 +102,7 @@ admin.site.register(MedicalCondition, MedicalConditionAdmin)
 admin.site.register(HealthTip, HealthTipAdmin)
 admin.site.register(OfflinePatients, OfflinePatientAdmin)
 admin.site.register(OfflineOPDAppointments)
+admin.site.register(DoctorLeave)
 
 admin.site.register(College, CollegeAdmin)
 admin.site.register(HospitalNetwork, HospitalNetworkAdmin)
@@ -112,6 +117,8 @@ admin.site.register(LabTestType, LabTestTypeAdmin)
 #admin.site.register(LabTestSubType, LabSubTestTypeAdmin)
 admin.site.register(AvailableLabTest, AvailableLabTestAdmin)
 admin.site.register(LabTestCategory, LabTestCategoryAdmin)
+admin.site.register(LabTestGroup, LabTestGroupAdmin)
+admin.site.register(LabTestGroupMapping, LabTestGroupMappingAdmin)
 
 
 admin.site.register(HospitalLead, HospitalLeadAdmin)
@@ -162,3 +169,10 @@ admin.site.register(EntityUrls, EntityUrlsAdmin)
 admin.site.register(PaymentOptions, PaymentOptionsAdmin)
 admin.site.register(UserConfig)
 admin.site.register(UploadDoctorData, UploadDoctorDataAdmin)
+admin.site.register(SliderLocation, SliderLocationAdmin)
+admin.site.register(IntegratorMapping, IntegratorMappingAdmin)
+admin.site.register(IntegratorProfileMapping, IntegratorProfileMappingAdmin)
+admin.site.register(IpdProcedure, IpdProcedureAdmin)
+admin.site.register(Feature, FeatureAdmin)
+admin.site.register(Service, ServiceAdmin)
+admin.site.register(HealthInsuranceProvider, HealthInsuranceProviderAdmin)

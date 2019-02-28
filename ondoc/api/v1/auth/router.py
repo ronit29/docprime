@@ -5,7 +5,7 @@ from .views import (LoginOTP, UserViewset, NotificationEndpointViewSet,
                     HospitalDoctorAppointmentPermissionViewSet, HospitalDoctorBillingPermissionViewSet,
                     OrderViewSet, ConsumerAccountRefundViewSet, RefreshJSONWebToken, OnlineLeadViewSet, UserLabViewSet,
                     OrderDetailViewSet, UserTokenViewSet, SendBookingUrlViewSet, ContactUsViewSet, CareerViewSet,
-                    DoctorNumberAutocomplete, UserLeadViewSet, ReferralViewSet)
+                    DoctorNumberAutocomplete, UserLeadViewSet, ReferralViewSet, UserRatingViewSet)
 
 urlpatterns = [
     path('api-token-refresh', RefreshJSONWebToken.as_view({'post':'refresh'}), name='token-refresh'),
@@ -57,7 +57,8 @@ urlpatterns = [
     path('contactus', ContactUsViewSet.as_view({'post': 'create'}), name='create-contact-us'),
     path('docnumber-autocomplete', DoctorNumberAutocomplete.as_view(), name='docnumber-autocomplete'),
     path('referral', ReferralViewSet.as_view({'get': 'retrieve'}), name='referral'),
-    path('referral/<str:code>', ReferralViewSet.as_view({'get': 'retrieve_by_code'}), name='retrieve_by_code')
+    path('referral/<str:code>', ReferralViewSet.as_view({'get': 'retrieve_by_code'}), name='retrieve_by_code'),
+    path('myratings', UserRatingViewSet.as_view({'get': 'list_ratings'}), name='list_ratings')
 
     # path('test/', PathologyTestList.as_view({'get': 'list'}), name='test-list'),
     # path('test/<int:id>/', PathologyTestList.as_view({'get': 'retrieve'}), name='test-detail'),

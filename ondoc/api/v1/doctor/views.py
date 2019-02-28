@@ -24,6 +24,7 @@ from ondoc.procedure.models import Procedure, ProcedureCategory, CommonProcedure
     get_selected_and_other_procedures, CommonProcedure
 from ondoc.seo.models import NewDynamic
 from . import serializers
+from ondoc.api.v2.doctor import serializers as v2_serializers
 from ondoc.api.pagination import paginate_queryset, paginate_raw_query
 from ondoc.api.v1.utils import convert_timings, form_time_slot, IsDoctor, payment_details, aware_time_zone, \
     TimeSlotExtraction, GenericAdminEntity, get_opd_pem_queryset, offline_form_time_slots
@@ -334,9 +335,9 @@ class DoctorAppointmentsViewSet(OndocViewSet):
                 # EmailNotification.ops_notification_alert(ops_email_data, settings.OPS_EMAIL_ID,
                 #                                          order.product_id,
                 #                                          EmailNotification.OPS_PAYMENT_NOTIFICATION)
-                push_order_to_matrix.apply_async(
-                    ({'order_id': order.id, 'created_at': int(order.created_at.timestamp()),
-                      'timeslot': int(appointment_details['time_slot_start'].timestamp())},), countdown=5)
+                # push_order_to_matrix.apply_async(
+                #     ({'order_id': order.id, 'created_at': int(order.created_at.timestamp()),
+                #       'timeslot': int(appointment_details['time_slot_start'].timestamp())},), countdown=5)
 
             except:
                 pass
@@ -567,7 +568,7 @@ class DoctorProfileUserViewSet(viewsets.GenericViewSet):
         doctor = (models.Doctor.objects
                   .prefetch_related('languages__language',
                                     'doctor_clinics__hospital',
-                                    'doctor_clinics__doctorclinicprocedure_set__procedure__parent_categories_mapping',
+                                    'doctor_clinics__procedures_from_doctor_clinic__procedure__parent_categories_mapping',
                                     'qualifications__qualification',
                                     'qualifications__specialization',
                                     'qualifications__college',
@@ -587,6 +588,8 @@ class DoctorProfileUserViewSet(viewsets.GenericViewSet):
             entity = EntityUrls.objects.filter(entity_id=pk, sitemap_identifier=EntityUrls.SitemapIdentifier.DOCTOR_PAGE, is_valid='t')
             if len(entity) > 0:
                 entity = entity[0]
+            else:
+                entity = None    
 
         selected_procedure_ids, other_procedure_ids = get_selected_and_other_procedures(category_ids, procedure_ids,
                                                                                         doctor, all=True)
@@ -722,9 +725,16 @@ class DoctorProfileUserViewSet(viewsets.GenericViewSet):
             parameters = dict()
             specialization_id = ''
             doc = DoctorListViewSet()
+            general_specialization = []
+            doctors_url = None
 
+            for dps in doctor.doctorpracticespecializations.all():
+                general_specialization.append(dps.specialization)
+
+            general_specialization = sorted(general_specialization, key=operator.attrgetter('doctor_count'), reverse=True)
             if general_specialization and response_data.get('hospitals'):
                 specialization_id = general_specialization[0].pk
+                hospital = response_data.get('hospitals')[0]
 
                 parameters['specialization_ids'] = str(specialization_id)                
                 parameters['latitude'] = hospital.get('lat')
@@ -734,7 +744,14 @@ class DoctorProfileUserViewSet(viewsets.GenericViewSet):
                 kwargs['parameters'] = parameters
                 response_data['doctors'] = doc.list(request, **kwargs)
                 if response_data.get('doctors'):
-                    response_data['doctors']['doctors_url'] = '/opd/searchresults?specializations=%s&lat=%s&long=%s' % (str(specialization_id), hospital.get('lat'), hospital.get('long'))
+                    breadcrumb = entity.breadcrumb if entity else None
+                    if breadcrumb:
+                        for data in breadcrumb:
+                            if data.get('url') and not data.get('url').startswith('doctors') and data.get('url').endswith('sptcit'):
+                                doctors_url = data.get('url')
+                    response_data['doctors']['doctors_url'] = doctors_url
+
+                    # response_data['doctors']['doctors_url'] = '/opd/searchresults?specializations=%s&lat=%s&long=%s' % (str(specialization_id), hospital.get('lat'), hospital.get('long'))
                 else:
                     response_data['doctors']['doctors_url'] = None
         else:
@@ -1154,7 +1171,7 @@ class DoctorListViewSet(viewsets.GenericViewSet):
                                                 "doctor_clinics__hospital",
                                                 "doctorpracticespecializations", "doctorpracticespecializations__specialization",
                                                 "images",
-                                                "doctor_clinics__doctorclinicprocedure_set__procedure__parent_categories_mapping",
+                                                "doctor_clinics__procedures_from_doctor_clinic__procedure__parent_categories_mapping",
                                                 "qualifications__qualification","qualifications__college",
                                                 "qualifications__specialization").order_by(preserved)
 
@@ -1283,6 +1300,7 @@ class DoctorListViewSet(viewsets.GenericViewSet):
             description += '.'
 
             breadcrumb = validated_data.get('breadcrumb')
+
             if breadcrumb:
                 breadcrumb = [{'url': '/', 'title': 'Home'}] + breadcrumb
             else:
@@ -1499,7 +1517,7 @@ class DoctorListViewSet(viewsets.GenericViewSet):
         #                                         "doctorpracticespecializations",
         #                                         "doctorpracticespecializations__specialization",
         #                                         "images",
-        #                                         "doctor_clinics__doctorclinicprocedure_set__procedure__parent_categories_mapping")
+        #                                         "doctor_clinics__procedures_from_doctor_clinic__procedure__parent_categories_mapping")
 
         result = doctor_search_helper.prepare_search_response(doctor_search_result, doctor_ids, request)
 
@@ -1555,7 +1573,7 @@ class DoctorAvailabilityTimingViewSet(viewsets.ViewSet):
                                                      "qualifications__specialization")
                            .filter(pk=validated_data.get('doctor_id').id))
         doctor_serializer = serializers.DoctorTimeSlotSerializer(doctor_queryset, many=True)
-        doctor_leave_serializer = serializers.DoctorLeaveSerializer(
+        doctor_leave_serializer = v2_serializers.DoctorLeaveSerializer(
             models.DoctorLeave.objects.filter(doctor=validated_data.get("doctor_id"), deleted_at__isnull=True), many=True)
 
         timeslots = dict()
@@ -2207,9 +2225,12 @@ class OfflineCustomerViewSet(viewsets.GenericViewSet):
         ret_obj['hospital_name'] = appnt.hospital.name
         ret_obj['time_slot_start'] = appnt.time_slot_start
         ret_obj['status'] = appnt.status
+        # ret_obj['mrp'] = appnt.mrp
+        # ret_obj['payment_type'] = appnt.payment_type
         ret_obj['hospital'] = HospitalModelSerializer(appnt.hospital).data
         ret_obj['doctor'] = AppointmentRetrieveDoctorSerializer(appnt.doctor).data
         ret_obj['is_docprime'] = False
+        ret_obj['mask_data'] = None
         ret_obj['type'] = 'doctor'
         return ret_obj
 
@@ -2763,7 +2784,7 @@ class OfflineCustomerViewSet(viewsets.GenericViewSet):
                 queryset = models.DoctorClinicTiming.objects.filter(doctor_clinic__doctor=validated_data.get('doctor_id'),
                                                                     doctor_clinic__hospital=validated_data.get(
                                                                         'hospital_id')).order_by("start")
-                doctor_leave_serializer = serializers.DoctorLeaveSerializer(
+                doctor_leave_serializer = v2_serializers.DoctorLeaveSerializer(
                     models.DoctorLeave.objects.filter(doctor=validated_data.get("doctor_id"), deleted_at__isnull=True),
                     many=True)
 
@@ -2846,6 +2867,9 @@ class OfflineCustomerViewSet(viewsets.GenericViewSet):
             phone_number = []
             allowed_actions = []
             payout_amount = billing_status = None
+            mask_data = None
+            mrp = None
+            payment_type = None
             if instance == OFFLINE:
                 patient_profile = OfflinePatientSerializer(app.user).data
                 is_docprime = False
@@ -2862,7 +2886,12 @@ class OfflineCustomerViewSet(viewsets.GenericViewSet):
             else:
                 is_docprime = True
                 effective_price = app.effective_price
+                mrp = app.mrp
+                payment_type = app.payment_type
                 deal_price = app.deal_price
+                mask_number = app.mask_number.first()
+                if mask_number:
+                    mask_data = mask_number.build_data()
                 allowed_actions = app.allowed_action(User.DOCTOR, request)
                 # phone_number.append({"phone_number": app.user.phone_number, "is_default": True})
                 patient_profile = auth_serializers.UserProfileSerializer(app.profile, context={'request': request}).data
@@ -2900,6 +2929,9 @@ class OfflineCustomerViewSet(viewsets.GenericViewSet):
             ret_obj['hospital_name'] = app.hospital.name
             ret_obj['time_slot_start'] = app.time_slot_start
             ret_obj['status'] = app.status
+            ret_obj['mrp'] = mrp
+            ret_obj['mask_data'] = mask_data
+            ret_obj['payment_type'] = payment_type
             ret_obj['billing_status'] = billing_status
             ret_obj['profile'] = patient_profile
             ret_obj['permission_type'] = app.pem_type
@@ -2912,10 +2944,6 @@ class OfflineCustomerViewSet(viewsets.GenericViewSet):
             ret_obj['type'] = 'doctor'
             ret_obj['prescriptions'] = prescription
             final_result.append(ret_obj)
-            # if group.get(app.time_slot_start.strftime("%B %d, %Y")):
-            #     group[app.time_slot_start.strftime("%B %d, %Y")].append(ret_obj)
-            # else:
-            #     group[app.time_slot_start.strftime("%B %d, %Y")] = [ret_obj]
         return Response(final_result)
 
 

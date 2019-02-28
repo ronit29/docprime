@@ -31,11 +31,17 @@ class MatrixCityMapping(models.Model):
 
 
 class AppointmentHistory(TimeStampedModel):
+    CRM = "crm"
+    WEB = "web"
+    DOC_APP = "d_app"
+    CONSUMER_APP = "c_app"
+    SOURCE_CHOICES = ((CONSUMER_APP, "Consumer App"), (CRM, "CRM"), (WEB, "Web"), (DOC_APP, "Doctor App"))
     content_type = models.ForeignKey(ContentType, on_delete=models.DO_NOTHING)
     object_id = models.PositiveIntegerField()
     content_object = GenericForeignKey()
     status = models.PositiveSmallIntegerField(null=False)
     user = models.ForeignKey(User, null=True, default=None, on_delete=models.CASCADE)
+    source = models.CharField(max_length=10, blank=True, choices=SOURCE_CHOICES, default='')
 
     @classmethod
     def create(cls, *args, **kwargs):
@@ -44,11 +50,14 @@ class AppointmentHistory(TimeStampedModel):
             raise Exception('Function accept content_object in **kwargs')
 
         user = None
+        source = ''
         if hasattr(obj, "_responsible_user"):
             user = obj._responsible_user
+        if hasattr(obj, "_source"):
+            source = obj._source
 
         content_type = ContentType.objects.get_for_model(obj)
-        cls(content_type=content_type, object_id=obj.id, status=obj.status, user=user).save()
+        cls(content_type=content_type, object_id=obj.id, status=obj.status, user=user, source=source).save()
 
 
     class Meta:
@@ -83,9 +92,16 @@ class PaymentOptions(TimeStampedModel):
 
         pg_specific_coupon = Coupon.objects.filter(id__in=used_coupon).exclude(payment_option__isnull=True).first()
         if pg_specific_coupon:
-            queryset = queryset.filter(id=pg_specific_coupon.payment_option.id)
+            allowed_options = queryset.filter(id=pg_specific_coupon.payment_option.id)
+            not_allowed = queryset.filter(~models.Q(id=pg_specific_coupon.payment_option.id))
+            invalid_reason = "Below payment modes are not applicable as you have used the coupon " + pg_specific_coupon.code + ". " \
+                             "Please remove the coupon to pay with the options listed below."
+        else:
+            allowed_options = queryset
+            not_allowed = []
+            invalid_reason = ""
 
-        return cls.build_payment_option(queryset)
+        return cls.build_payment_option(allowed_options), cls.build_payment_option(not_allowed), invalid_reason
 
     @classmethod
     def build_payment_option(cls, queryset):
@@ -131,5 +147,34 @@ class AppointmentMaskNumber(TimeStampedModel):
     is_mask_number = models.BooleanField(default=True)
     is_deleted = models.BooleanField(default=False)
 
+    def build_data(self):
+        data = {}
+        data['appointment_id'] = self.object_id
+        data['mask_number'] = self.mask_number
+        data['validity_up_to'] = self.validity_up_to
+        return data
+
     class Meta:
         db_table = 'appointment_mask_number'
+
+
+class Feature(TimeStampedModel):
+    icon = models.ImageField('Feature image', upload_to='feature/images')
+    name = models.CharField(max_length=100)
+
+    class Meta:
+        db_table = 'feature'
+
+    def __str__(self):
+        return self.name
+
+
+class Service(TimeStampedModel):
+    icon = models.ImageField('Service image', upload_to='service/images')
+    name = models.CharField(max_length=100)
+
+    class Meta:
+        db_table = 'service'
+
+    def __str__(self):
+        return self.name

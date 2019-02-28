@@ -441,7 +441,7 @@ class DoctorSearchByHospitalHelper:
 
         if len(category_ids)>0 or len(procedure_ids)>0:
             doctor_clinic_ids = [data.get("doctor_clinic_id") for data in doctor_search_result]
-            doctor_clinics = DoctorClinic.objects.filter(id__in=doctor_clinic_ids).prefetch_related('hospital','doctorclinicprocedure_set__procedure__parent_categories_mapping')
+            doctor_clinics = DoctorClinic.objects.filter(id__in=doctor_clinic_ids).prefetch_related('hospital','procedures_from_doctor_clinic__procedure__parent_categories_mapping')
             doctor_clinic_mapping = dict()
             for dc in doctor_clinics:
                 doctor_clinic_mapping[dc.id] = dc
@@ -469,7 +469,7 @@ class DoctorSearchByHospitalHelper:
 
                 if len(category_ids)>0 or len(procedure_ids)>0:
 
-                    all_doctor_clinic_procedures = list(doctor_clinic_mapping[result["doctor_clinic_id"]].doctorclinicprocedure_set.all())
+                    all_doctor_clinic_procedures = list(doctor_clinic_mapping[result["doctor_clinic_id"]].procedures_from_doctor_clinic.all())
                     selected_procedures_data = get_included_doctor_clinic_procedure(all_doctor_clinic_procedures,
                                                                                     selected_procedure_ids)
                     other_procedures_data = get_included_doctor_clinic_procedure(all_doctor_clinic_procedures,
@@ -536,7 +536,7 @@ class DoctorSearchByHospitalHelper:
             if not doctor_clinic:
                 hospitals = []
             else:
-                all_doctor_clinic_procedures = list(doctor_clinic.doctorclinicprocedure_set.all())
+                all_doctor_clinic_procedures = list(doctor_clinic.procedures_from_doctor_clinic.all())
                 selected_procedures_data = get_included_doctor_clinic_procedure(all_doctor_clinic_procedures,
                                                                                 selected_procedure_ids)
                 other_procedures_data = get_included_doctor_clinic_procedure(all_doctor_clinic_procedures,

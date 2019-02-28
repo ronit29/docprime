@@ -124,16 +124,20 @@ class ApplicableCouponsViewSet(viewsets.GenericViewSet):
                 coupons = coupons.filter(cities__isnull=True)
 
             if hospital:
+                coupons = coupons.filter(Q(hospitals__isnull=True) | Q(hospitals=hospital))
                 coupons = coupons.filter(Q(cities__isnull=True) | Q(cities__icontains=hospital.city))
             else:
+                coupons = coupons.filter(hospitals__isnull=True)
                 coupons = coupons.filter(cities__isnull=True)
 
             if doctor:
+                coupons = coupons.filter(Q(doctors__isnull=True) | Q(doctors=doctor))
                 coupons = coupons.filter(Q(specializations__isnull=True)
                                          | Q(specializations__in=
                                            doctor.doctorpracticespecializations.values_list('specialization', flat=True))
                                          )
             else:
+                coupons = coupons.filter(doctors__isnull=True)
                 coupons = coupons.filter(specializations__isnull=True)
 
             if procedures:
