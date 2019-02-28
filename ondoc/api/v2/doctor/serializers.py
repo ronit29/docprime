@@ -144,7 +144,7 @@ class GenerateOtpSerializer(serializers.Serializer):
         if GenericLabAdmin.objects.filter(phone_number=attrs['phone_number'], is_disabled=False).exists():
             lab_admin_exists = True
         if admin_exists or lab_admin_exists:
-            raise serializers.ValidationError("admin for this phone number already exists")
+            raise serializers.ValidationError("Phone number already registered. Please try logging in.")
         return attrs
 
 
@@ -197,3 +197,24 @@ class ConsentIsDocprimeSerializer(serializers.Serializer):
         return attrs
 
 
+class CreateDoctorSerializer(serializers.Serializer):
+    hospital_id = serializers.PrimaryKeyRelatedField(queryset=doc_models.Hospital.objects.all())
+    name = serializers.CharField(max_length=200)
+
+
+class BulkCreateDoctorSerializer(serializers.Serializer):
+    name = serializers.CharField(max_length=200)
+
+
+class CreateHospitalSerializer(serializers.Serializer):
+    name = serializers.CharField(max_length=200)
+    city = serializers.CharField(max_length=20)
+    country = serializers.CharField(max_length=20)
+    doctors = serializers.ListField(child=BulkCreateDoctorSerializer(many=False), allow_empty=True, required=False)
+
+
+class CreateGenericAdminSerializer(serializers.Serializer):
+    hospital_id = serializers.PrimaryKeyRelatedField(queryset=doc_models.Hospital.objects.all())
+    phone_number = serializers.IntegerField(min_value=5555555555, max_value=9999999999)
+    permission_type = serializers.ChoiceField(choices=GenericAdmin.type_choices)
+    name = serializers.CharField(max_length=200, required=False)
