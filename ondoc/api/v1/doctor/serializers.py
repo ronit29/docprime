@@ -1535,15 +1535,27 @@ class IpdProcedureDetailSerializer(serializers.ModelSerializer):
 class TopHospitalForIpdProcedureSerializer(serializers.ModelSerializer):
     count_of_insurance_provider = serializers.IntegerField()
     distance = serializers.SerializerMethodField()
+    certifications = serializers.SerializerMethodField()
+    images = serializers.SerializerMethodField()
 
     class Meta:
         model = Hospital
-        fields = ('id', 'name', 'distance',
-                  # 'logo', 'address',
-                  'count_of_insurance_provider')
+        fields = ('id', 'name', 'distance', 'certifications', 'images', 'bed_count',
+                  # 'logo', 'address', ''
+                  'count_of_insurance_provider', 'multi_speciality')
 
     def get_distance(self, obj):
-        return int(obj.distance.m) if obj.distance else None
+        return int(obj.distance.m) if hasattr(obj, 'distance') and obj.distance else None
+
+    def get_certifications(self, obj):
+        certification_objs = obj.hospitalcertification_set.all()
+        names = [x.name for x in certification_objs]
+        return names
+
+    def get_images(self, obj):
+        request = self.context.get('request')
+        return [request.build_absolute_uri(img.name.url) for img in obj.hospitalimage_set.all()]
+
 
 
 class HospitalRequestSerializer(serializers.Serializer):
