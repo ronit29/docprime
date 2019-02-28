@@ -56,6 +56,12 @@ class DoctorSearchHelper:
 
         # " gs.id IN({})".format(",".join(specialization_ids))
 
+        if self.query_params.get("is_available"):
+            query_str = "((dl.start_date is NULL OR dl.end_date is NULL) " \
+                        "OR (current_date > dl.start_date and current_date > dl.end_date) " \
+                        "OR (current_date < dl.start_date and current_date < dl.end_date))"
+            filtering_params.append(query_str)
+
         counter=1
         if len(specialization_ids) > 0 and len(procedure_ids)==0 and len(procedure_category_ids)==0:
             sp_str = 'gs.id IN('
@@ -288,7 +294,8 @@ class DoctorSearchHelper:
 
             if len(specialization_ids)>0 or len(condition_ids)>0:
                 sp_cond = " LEFT JOIN doctor_practice_specialization ds on ds.doctor_id = d.id " \
-                       " LEFT JOIN practice_specialization gs on ds.specialization_id = gs.id "
+                       " LEFT JOIN practice_specialization gs on ds.specialization_id = gs.id " \
+                          " LEFT JOIN doctor_leave dl on dl.doctor_id = d.id "
             if min_distance>0:
                 min_dist_cond = " and St_dwithin(St_setsrid(St_point((%(longitude)s), (%(latitude)s)), 4326 ), h.location, (%(min_distance)s)) = false "
 
