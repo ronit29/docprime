@@ -654,9 +654,10 @@ class DoctorProfileUserViewSet(viewsets.GenericViewSet):
                 his_her = 'his'
             doc_spec = None
             startswith = None
-            doc_clinics_obj = doctor.doctor_clinics.all().filter(hospital_id=hospital.get('hospital_id'), doctor_id=doctor.id)
-            if doc_clinics_obj:
-                hospital_obj = doc_clinics_obj[0].hospital
+            if hospital:
+                doc_clinics_obj = doctor.doctor_clinics.all().filter(hospital_id=hospital.get('hospital_id'), doctor_id=doctor.id)
+                if doc_clinics_obj:
+                    hospital_obj = doc_clinics_obj[0].hospital
             if doctor.name:
                 about_doctor = 'Dr. ' + doctor.name
                 if len(general_specialization) == 1:
