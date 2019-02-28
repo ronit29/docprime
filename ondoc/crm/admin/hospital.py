@@ -4,8 +4,9 @@ from reversion.admin import VersionAdmin
 from django.db.models import Q
 import datetime
 from ondoc.crm.admin.doctor import CreatedByFilter
-from ondoc.doctor.models import (HospitalImage, HospitalDocument, HospitalAward,Doctor,
-    HospitalAccreditation, HospitalCertification, HospitalSpeciality, HospitalNetwork, Hospital)
+from ondoc.doctor.models import (HospitalImage, HospitalDocument, HospitalAward, Doctor,
+                                 HospitalAccreditation, HospitalCertification, HospitalSpeciality, HospitalNetwork,
+                                 Hospital, HospitalServiceMapping, HealthInsuranceProviderHospitalMapping)
 from .common import *
 from ondoc.crm.constants import constants
 from django.utils.safestring import mark_safe
@@ -74,6 +75,24 @@ class HospitalSpecialityInline(admin.TabularInline):
     extra = 0
     can_delete = True
     show_change_link = False
+
+
+class HospitalServiceInline(admin.TabularInline):
+    model = HospitalServiceMapping
+    fk_name = 'hospital'
+    extra = 0
+    can_delete = True
+    show_change_link = False
+    autocomplete_fields = ['service']
+
+
+class HospitalHealthInsuranceProviderInline(admin.TabularInline):
+    model = HealthInsuranceProviderHospitalMapping
+    fk_name = 'hospital'
+    extra = 0
+    can_delete = True
+    show_change_link = False
+    autocomplete_fields = ['provider']
 
 
 # class HospitalNetworkMappingInline(admin.TabularInline):
@@ -215,14 +234,21 @@ class HospitalForm(FormCleanMixin):
         if any(self.errors):
             return
         data = self.cleaned_data
-        if data.get('enabled', False):
+        is_enabled = data.get('enabled', None)
+        enabled_for_online_booking = data.get('enabled_for_online_booking', None)
+        if is_enabled is None:
+            is_enabled = self.instance.enabled if self.instance else False
+        if enabled_for_online_booking is None:
+            enabled_for_online_booking = self.instance.enabled_for_online_booking if self.instance else False
+
+        if is_enabled and enabled_for_online_booking:
             if any([data.get('disabled_after', None), data.get('disable_reason', None),
                     data.get('disable_comments', None)]):
                 raise forms.ValidationError(
-                    "Cannot have disabled after/disabled reason/disable comments if hospital is enabled.")
-        else:
+                    "Cannot have disabled after/disabled reason/disable comments if hospital is enabled or not enabled for online booking.")
+        elif not is_enabled or not enabled_for_online_booking:
             if not all([data.get('disabled_after', None), data.get('disable_reason', None)]):
-                raise forms.ValidationError("Must have disabled after/disable reason if hospital is not enabled.")
+                raise forms.ValidationError("Must have disabled after/disable reason if hospital is not enabled or not enabled for online booking.")
             if data.get('disable_reason', None) and data.get('disable_reason', None) == Hospital.OTHERS and not data.get(
                     'disable_comments', None):
                 raise forms.ValidationError("Must have disable comments if disable reason is others.")
@@ -347,6 +373,8 @@ class HospitalAdmin(admin.GeoModelAdmin, VersionAdmin, ActionAdmin, QCPemAdmin):
     search_fields = ['name']
     inlines = [
         # HospitalNetworkMappingInline,
+        HospitalServiceInline,
+        HospitalHealthInsuranceProviderInline,
         HospitalSpecialityInline,
         HospitalAwardInline,
         HospitalAccreditationInline,
