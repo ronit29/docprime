@@ -5,6 +5,7 @@ from django.db.models import Q, Avg, Count, Max, F, ExpressionWrapper, DateTimeF
 from collections import defaultdict, OrderedDict
 from ondoc.api.v1.procedure.serializers import DoctorClinicProcedureSerializer, OpdAppointmentProcedureMappingSerializer
 from ondoc.cart.models import Cart
+from ondoc.common.models import Feature
 from ondoc.doctor.models import (OpdAppointment, Doctor, Hospital, DoctorHospital, DoctorClinicTiming,
                                  DoctorAssociation,
                                  DoctorAward, DoctorDocument, DoctorEmail, DoctorExperience, DoctorImage,
@@ -40,7 +41,8 @@ from django.conf import settings
 from ondoc.authentication import models as auth_models
 from ondoc.location.models import EntityUrls, EntityAddress
 from ondoc.procedure.models import DoctorClinicProcedure, Procedure, ProcedureCategory, \
-    get_included_doctor_clinic_procedure, get_procedure_categories_with_procedures
+    get_included_doctor_clinic_procedure, get_procedure_categories_with_procedures, IpdProcedure, \
+    IpdProcedureFeatureMapping
 from ondoc.seo.models import NewDynamic
 from ondoc.ratings_review import models as rate_models
 
@@ -1506,3 +1508,44 @@ class AppointmentMessageSerializer(serializers.Serializer):
             raise serializers.ValidationError('Appointment Id Not Found')
         attrs['appointment'] = query.first()
         return attrs
+
+
+class IpdProcedureFeatureSerializer(serializers.ModelSerializer):
+    name = serializers.CharField(source='feature.name')
+    icon = serializers.SerializerMethodField()
+
+    class Meta:
+        model = IpdProcedureFeatureMapping
+        fields = ('name', 'value', 'icon')
+
+    def get_icon(self, obj):
+        request = self.context.get('request')
+        photo_url = obj.feature.icon.url if obj.feature and obj.feature.icon else None
+        return request.build_absolute_uri(photo_url)
+
+
+class IpdProcedureDetailSerializer(serializers.ModelSerializer):
+    features = IpdProcedureFeatureSerializer(source='feature_mappings', read_only=True, many=True)
+
+    class Meta:
+        model = IpdProcedure
+        fields = ('id', 'name', 'details', 'is_enabled', 'features')
+
+
+class TopHospitalForIpdProcedureSerializer(serializers.ModelSerializer):
+    count_of_insurance_provider = serializers.IntegerField()
+    distance = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Hospital
+        fields = ('id', 'name', 'distance',
+                  # 'logo', 'address',
+                  'count_of_insurance_provider')
+
+    def get_distance(self, obj):
+        return int(obj.distance.m) if obj.distance else None
+
+
+class HospitalRequestSerializer(serializers.Serializer):
+    long = serializers.FloatField(default=77.071848)
+    lat = serializers.FloatField(default=28.450367)

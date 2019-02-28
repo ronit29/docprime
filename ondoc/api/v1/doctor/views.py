@@ -1,6 +1,9 @@
 import operator
 from collections import defaultdict, OrderedDict
 from uuid import UUID
+
+from django.contrib.gis.db.models.functions import Distance
+
 from ondoc.api.v1.auth.serializers import UserProfileSerializer
 from ondoc.api.v1.doctor.serializers import HospitalModelSerializer, AppointmentRetrieveDoctorSerializer, \
     OfflinePatientSerializer
@@ -13,7 +16,7 @@ from ondoc.authentication import models as auth_models
 from ondoc.diagnostic import models as lab_models
 from ondoc.notification import tasks as notification_tasks
 #from ondoc.doctor.models import Hospital, DoctorClinic,Doctor,  OpdAppointment
-from ondoc.doctor.models import DoctorClinic, OpdAppointment
+from ondoc.doctor.models import DoctorClinic, OpdAppointment, Doctor, Hospital
 from ondoc.notification.models import EmailNotification
 from django.utils.safestring import mark_safe
 from ondoc.coupon.models import Coupon
@@ -21,7 +24,7 @@ from ondoc.api.v1.diagnostic import serializers as diagnostic_serializer
 from ondoc.account import models as account_models
 from ondoc.location.models import EntityUrls, EntityAddress, DefaultRating
 from ondoc.procedure.models import Procedure, ProcedureCategory, CommonProcedureCategory, ProcedureToCategoryMapping, \
-    get_selected_and_other_procedures, CommonProcedure, CommonIpdProcedure
+    get_selected_and_other_procedures, CommonProcedure, CommonIpdProcedure, IpdProcedure, DoctorClinicIpdProcedure
 from ondoc.seo.models import NewDynamic
 from . import serializers
 from ondoc.api.v2.doctor import serializers as v2_serializers
@@ -2991,3 +2994,40 @@ class AppointmentMessageViewset(viewsets.GenericViewSet):
         if not 'message' in obj:
             obj['message'] = "Message Sent Successfully"
         return Response(obj)
+
+class HospitalViewSet(viewsets.GenericViewSet):
+
+    def list(self, request, ipd_pk, count=None):
+        serializer = serializers.HospitalRequestSerializer(data=request.query_params)
+        serializer.is_valid(raise_exception=True)
+        validated_data = serializer.validated_data
+        lat = validated_data.get('lat')
+        long = validated_data.get('long')
+        point_string = 'POINT(' + str(long) + ' ' + str(lat) + ')'
+        pnt = GEOSGeometry(point_string, srid=4326)
+        hospital_queryset = Hospital.objects.filter(hospital_doctors__enabled=True,
+                                                    hospital_doctors__ipd_procedure_clinic_mappings__enabled=True,
+                                                    hospital_doctors__ipd_procedure_clinic_mappings__ipd_procedure_id=ipd_pk).annotate(
+            distance=Distance('location', pnt)).annotate(
+            count_of_insurance_provider=Count('health_insurance_providers')).distinct()
+        if count:
+            hospital_queryset = hospital_queryset[:2]
+        top_hospital_serializer = serializers.TopHospitalForIpdProcedureSerializer(hospital_queryset, many=True,
+                                                                                   context={'request': request})
+        return Response(top_hospital_serializer.data)
+
+
+class IpdProcedureViewSet(viewsets.GenericViewSet):
+
+    def ipd_procedure_detail(self, request, pk):
+        ipd_procedure = IpdProcedure.objects.prefetch_related('feature_mappings__feature').filter(is_enabled=True, id=pk).first()
+        if ipd_procedure is None:
+            return Response(status=status.HTTP_400_BAD_REQUEST)
+
+        ipd_procedure_serializer = serializers.IpdProcedureDetailSerializer(ipd_procedure, context={'request': request})
+        # queryset = DoctorClinicIpdProcedure.objects.filter(ipd_procedure_id=pk, enabled=True)
+        # Doctor.objects.filter(doctor_clinics__)
+        hospital_view_set = HospitalViewSet()
+        hospital_result = hospital_view_set.list(request, pk, 2)
+        return Response(
+            {'about': ipd_procedure_serializer.data, 'hospitals': hospital_result.data, 'doctors': []})
