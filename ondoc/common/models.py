@@ -159,6 +159,12 @@ class AppointmentMaskNumber(TimeStampedModel):
 
 
 class GlobalNonBookable(TimeStampedModel):
+    INTERVAL_MAPPING = {
+        ("00:00:00", "14:00:00"): 'morning',
+        ("14:00:00", "23:59:59"): 'evening',
+        ("00:00:00", "23:59:59"): 'all',
+    }
+
     DOCTOR = "doctor"
     LAB = "lab"
     BOOKING_TYPE_CHOICES = ((DOCTOR, "Doctor Clinic"), (LAB, "Lab"))
@@ -169,8 +175,22 @@ class GlobalNonBookable(TimeStampedModel):
     end_time = models.TimeField(null=False)
     deleted_at = models.DateTimeField(null=True, blank=True)
 
+    def start_time_in_float(self):
+        start_time = self.start_time
+        start_time = round(float(start_time.hour) + (float(start_time.minute) * 1 / 60), 2)
+        return start_time
+
+    def end_time_in_float(self):
+        end_time = self.end_time
+        end_time = round(float(end_time.hour) + (float(end_time.minute) * 1 / 60), 2)
+        return end_time
+
     class Meta:
         db_table = 'global_non_bookable_timing'
+
+    @property
+    def interval(self):
+        return self.INTERVAL_MAPPING.get((str(self.start_time), str(self.end_time)))
 
 
 class Feature(TimeStampedModel):

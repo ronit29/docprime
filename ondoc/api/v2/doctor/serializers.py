@@ -95,10 +95,11 @@ class DoctorLeaveSerializer(serializers.ModelSerializer):
 
 
 class GlobalNonBookableSerializer(serializers.ModelSerializer):
+    interval = serializers.CharField(read_only=True)
     start_date = serializers.DateField(read_only=True)
     end_date = serializers.DateField(read_only=True)
-    start_time = serializers.TimeField(read_only=True)
-    end_time = serializers.TimeField(read_only=True)
+    start_time = serializers.FloatField(read_only=True, source='start_time_in_float')
+    end_time = serializers.FloatField(read_only=True, source='end_time_in_float')
 
     class Meta:
         model = GlobalNonBookable
