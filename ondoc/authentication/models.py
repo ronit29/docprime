@@ -1437,6 +1437,41 @@ class Merchant(TimeStampedModel):
             self.create_in_pg()
 
     def create_in_pg(self):
+        request_data = {
+            "Bene_Code": "45recjhgf886",
+            "Bene Name": "Max Life insurance Co. Ltd",
+            "Bene Add 1": "Building No.3 Third Floor",
+            "Bene Add 2": "Unit No. 1 Nesco IT Park ",
+            "Bene Add 3": "Western Express Highway",
+            "Bene Add 4": "Goregaon (East) ",
+            "Bene Add 5": "null",
+            "Bene_City": "delhi",
+            "Bene_Pin": "121888",
+            "State": "MH",
+            "Country": "IN",
+            "Bene_Email": "kotakpayment@policybazaar.com",
+            "Bene_Mobile": null,
+            "Bene_Tel": null,
+            "Bene_Fax": null,
+            "IFSC": "KTK666",
+            "Bene_A/c No": "97987665353552",
+            "Bene Bank": "kotak",
+            "PaymentType": "NEFT",
+        “isBulk”:”1”,
+
+        }
+
+        # logger.error(json.dumps(request_data))
+
+        url = settings.NODAL_BENEFICIARY_API
+        matrix_api_token = settings.MATRIX_API_TOKEN
+        response = requests.post(url, data=json.dumps(request_data), headers={'Authorization': matrix_api_token,
+                                                                              'Content-Type': 'application/json'})
+
+        if response.status_code != status.HTTP_200_OK or not response.ok:
+            logger.info("[ERROR] Appointment could not be published to the matrix system")
+            logger.info("[ERROR] %s", response.reason)
+
         pass
 
     def update_status_from_pg(self):
