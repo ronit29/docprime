@@ -18,6 +18,10 @@ from django.contrib.contenttypes.fields import GenericForeignKey
 from django.contrib.contenttypes.models import ContentType
 from django.utils.functional import cached_property
 from datetime import date, timedelta, datetime
+import requests
+import json
+from rest_framework import status
+from collections import OrderedDict
 
 
 class Image(models.Model):
@@ -1435,47 +1439,55 @@ class Merchant(TimeStampedModel):
     def save(self, *args, **kwargs):
         if self.verified_by_finance and not self.pg_status == self.COMPLETE:
             self.create_in_pg()
+        return super().save(*args, **kwargs)
 
     def create_in_pg(self):
-        request_data = {
-            "Bene_Code": "45recjhgf886",
-            "Bene Name": "Max Life insurance Co. Ltd",
-            "Bene Add 1": "Building No.3 Third Floor",
-            "Bene Add 2": "Unit No. 1 Nesco IT Park ",
-            "Bene Add 3": "Western Express Highway",
-            "Bene Add 4": "Goregaon (East) ",
-            "Bene Add 5": "null",
-            "Bene_City": "delhi",
-            "Bene_Pin": "121888",
-            "State": "MH",
-            "Country": "IN",
-            "Bene_Email": "kotakpayment@policybazaar.com",
-            "Bene_Mobile": null,
-            "Bene_Tel": null,
-            "Bene_Fax": null,
-            "IFSC": "KTK666",
-            "Bene_A/c No": "97987665353552",
-            "Bene Bank": "kotak",
-            "PaymentType": "NEFT",
-        “isBulk”:”1”,
+        request_payload = OrderedDict()
+        request_payload["Bene_Code"] = self.id
+        request_payload["Bene Name"] = self.beneficiary_name
+        request_payload["Bene Add 1"] = self.merchant_add_1
+        request_payload["Bene Add 2"] = self.merchant_add_2
+        request_payload["Bene Add 3"] = self.merchant_add_3
+        request_payload["Bene Add 4"] = self.merchant_add_4
+        request_payload["Bene Add 5"] = None
+        request_payload["Bene_City"] = self.city
+        request_payload["Bene_Pin"] = self.pin
+        request_payload["State"] = self.state
+        request_payload["Country"] = self.country
+        request_payload["Bene_Email"] = self.email
+        request_payload["Bene_Mobile"] = self.mobile
+        request_payload["Bene_Tel"] = None
+        request_payload["Bene_Fax"] = None
+        request_payload["IFSC"] = self.ifsc_code
+        request_payload["Bene_A/c No"] = self.account_number
+        request_payload["Bene Bank"] = None
+        request_payload["PaymentType"] = self.type
+        request_payload["isBulk"] = 1
 
-        }
-
-        # logger.error(json.dumps(request_data))
-
+        from ondoc.api.v1.utils import payout_checksum
+        checksum_response = payout_checksum(request_payload)
+        request_payload["hash"] = checksum_response
         url = settings.NODAL_BENEFICIARY_API
-        matrix_api_token = settings.MATRIX_API_TOKEN
-        response = requests.post(url, data=json.dumps(request_data), headers={'Authorization': matrix_api_token,
+
+        nodal_beneficiary_api_token = settings.NODAL_BENEFICIARY_TOKEN
+        response = requests.post(url, data=json.dumps(request_payload), headers={'Authorization': nodal_beneficiary_api_token,
                                                                               'Content-Type': 'application/json'})
 
-        if response.status_code != status.HTTP_200_OK or not response.ok:
-            logger.info("[ERROR] Appointment could not be published to the matrix system")
-            logger.info("[ERROR] %s", response.reason)
 
-        pass
+        #response = requests.post(url, data=json.dumps(req_data), headers=headers)
+        if response.status_code == status.HTTP_200_OK:
+            resp_data = response.json()
+            print(resp_data)
+
+        #json.loads(response.text).get('responseError')[0]
+        # if response.status_code != status.HTTP_200_OK or not response.ok or (response.text and json.loads(response.text).get('responseError') and json.loads(response.text).get('responseError')[0].get('errorCode')):
+        #     response_error = response
+        #     return response_error
+        # return response
 
     def update_status_from_pg(self):
         pass 
+
 
 class AssociatedMerchant(TimeStampedModel):
 
