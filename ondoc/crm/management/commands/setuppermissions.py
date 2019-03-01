@@ -43,7 +43,7 @@ from ondoc.procedure.models import Procedure, ProcedureCategory, CommonProcedure
 from ondoc.reports import models as report_models
 
 from ondoc.diagnostic.models import LabPricing
-from ondoc.integrations.models import IntegratorMapping, IntegratorProfileMapping
+from ondoc.integrations.models import IntegratorMapping, IntegratorProfileMapping, IntegratorReport
 
 from ondoc.web.models import Career, OnlineLead
 from ondoc.ratings_review import models as rating_models
@@ -506,7 +506,8 @@ class Command(BaseCommand):
         group, created = Group.objects.get_or_create(name=constants['INTEGRATION_MANAGEMENT_TEAM'])
         group.permissions.clear()
 
-        content_types = ContentType.objects.get_for_models(IntegratorMapping, IntegratorProfileMapping, LabTest, LabNetwork)
+        content_types = ContentType.objects.get_for_models(IntegratorMapping, IntegratorProfileMapping, LabTest, LabNetwork,
+                                                           IntegratorReport)
 
         for cl, ct in content_types.items():
             permissions = Permission.objects.filter(
