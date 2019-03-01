@@ -940,11 +940,13 @@ class HospitalDocument(auth_model.TimeStampedModel, auth_model.Document):
     ADDRESS = 2
     GST = 3
     CHEQUE = 5
+    LOGO = 6
     COI = 8
     EMAIL_CONFIRMATION = 9
     CHOICES = [(PAN, "PAN Card"), (ADDRESS, "Address Proof"), (GST, "GST Certificate"),
                (CHEQUE, "Cancel Cheque Copy"), (COI, "COI/Company Registration"),
-               (EMAIL_CONFIRMATION, "Email Confirmation")]
+               (EMAIL_CONFIRMATION, "Email Confirmation"),
+               (LOGO, "Logo")]
 
     hospital = models.ForeignKey(Hospital, related_name="hospital_documents", on_delete=models.CASCADE)
     document_type = models.PositiveSmallIntegerField(choices=CHOICES, default=ADDRESS)
@@ -1123,11 +1125,13 @@ class HospitalNetworkDocument(auth_model.TimeStampedModel, auth_model.Document):
     ADDRESS = 2
     GST = 3
     CHEQUE = 5
+    LOGO = 6
     COI = 8
     EMAIL_CONFIRMATION = 9
     CHOICES = [(PAN, "PAN Card"), (ADDRESS, "Address Proof"), (GST, "GST Certificate"),
                (CHEQUE, "Cancel Cheque Copy"),(COI, "COI/Company Registration"),
-               (EMAIL_CONFIRMATION, "Email Confirmation")]
+               (EMAIL_CONFIRMATION, "Email Confirmation"),
+               (LOGO, "Logo")]
 
     hospital_network = models.ForeignKey(HospitalNetwork, related_name="hospital_network_documents", on_delete=models.CASCADE)
     document_type = models.PositiveSmallIntegerField(choices=CHOICES)
