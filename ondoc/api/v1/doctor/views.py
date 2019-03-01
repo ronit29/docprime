@@ -13,7 +13,7 @@ from ondoc.authentication import models as auth_models
 from ondoc.diagnostic import models as lab_models
 from ondoc.notification import tasks as notification_tasks
 #from ondoc.doctor.models import Hospital, DoctorClinic,Doctor,  OpdAppointment
-from ondoc.doctor.models import DoctorClinic, OpdAppointment
+from ondoc.doctor.models import DoctorClinic, OpdAppointment, ProviderSignupLead, Doctor
 from ondoc.notification.models import EmailNotification
 from django.utils.safestring import mark_safe
 from ondoc.coupon.models import Coupon
@@ -490,6 +490,17 @@ class DoctorProfileView(viewsets.GenericViewSet):
         generic_super_user_lab_admin=generic_lab_admin.filter(super_user_permission=True)
         if generic_super_user_lab_admin.exists():
             resp_data['is_super_user_lab'] = True
+
+        provider_signup_lead = ProviderSignupLead.objects.filter(user=user).first()
+        if provider_signup_lead:
+            consent = provider_signup_lead.is_docprime
+            resp_data['consent'] = consent
+            resp_data['source'] = Doctor.PROVIDER
+            resp_data['role_type'] = provider_signup_lead.type
+            resp_data['phone_number'] = provider_signup_lead.phone_number
+            resp_data['email'] = provider_signup_lead.email
+            resp_data['name'] = provider_signup_lead.name
+
         return Response(resp_data)
 
 
