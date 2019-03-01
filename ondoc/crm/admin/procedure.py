@@ -1,7 +1,10 @@
 from django.contrib.admin import TabularInline
 from reversion.admin import VersionAdmin
+
+from ondoc.common.models import Feature, Service
 from ondoc.crm.admin.doctor import AutoComplete
-from ondoc.procedure.models import Procedure, ProcedureCategory, ProcedureCategoryMapping, ProcedureToCategoryMapping
+from ondoc.procedure.models import Procedure, ProcedureCategory, ProcedureCategoryMapping, ProcedureToCategoryMapping, \
+    IpdProcedure, IpdProcedureFeatureMapping
 from django import forms
 
 
@@ -58,6 +61,38 @@ class ProcedureToParentCategoryInlineFormset(forms.BaseInlineFormSet):
         if any([category.related_parent_category.count() for category in
                 all_parent_categories]):  # PROCEDURE_category_SAME_level
             raise forms.ValidationError("Procedure and Category can't be on same level.")
+
+
+class FeatureInline(AutoComplete, TabularInline):
+    model = IpdProcedureFeatureMapping
+    fk_name = 'ipd_procedure'
+    extra = 0
+    can_delete = True
+    autocomplete_fields = ['feature']
+    verbose_name = "IPD Procedure"
+    verbose_name_plural = "IPD Procedures"
+
+
+class IpdProcedureAdmin(VersionAdmin):
+    model = IpdProcedure
+    search_fields = ['search_key']
+    exclude = ['search_key']
+    inlines = [FeatureInline]
+
+
+class FeatureAdmin(VersionAdmin):
+    model = Feature
+    search_fields = ['name']
+
+
+class HealthInsuranceProviderAdmin(VersionAdmin):
+    model = Feature
+    search_fields = ['name']
+
+
+class ServiceAdmin(VersionAdmin):
+    model = Service
+    search_fields = ['name']
 
 
 class ParentCategoryInline(AutoComplete, TabularInline):

@@ -32,12 +32,16 @@ class EventCreateViewSet(GenericViewSet):
             error_message = "Couldn't save event, Couldn't create visit/visitor - " + str(visit_id) + " / " + str(visitor_id)
             raise Exception(error_message)
 
-        if not data or not isinstance(data, dict) or not data.get('event'):
-            error_message = "Couldn't save event - " + str(data) + " For visit - " + str(visit_id)
+        if not data or not isinstance(data, dict):
+            error_message = "Couldn't save event without data - " + str(data) + " For visit/visitor - " + str(visit_id) + " / " + str(visitor_id)
             raise Exception(error_message)
 
+        event_name = data.get('event', None) or data.get('Action', None)
 
-        event_name = data.get('event')
+        if not event_name:
+            error_message = "Couldn't save anonymous event - " + str(data) + " For visit/visitor - " + str(visit_id) + " / " + str(visitor_id)
+            raise Exception(error_message)
+
         userAgent = data.get('userAgent', None)
         data.pop('userAgent', None)
         triggered_at = data.get('triggered_at', None)

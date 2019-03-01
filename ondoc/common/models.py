@@ -92,9 +92,16 @@ class PaymentOptions(TimeStampedModel):
 
         pg_specific_coupon = Coupon.objects.filter(id__in=used_coupon).exclude(payment_option__isnull=True).first()
         if pg_specific_coupon:
-            queryset = queryset.filter(id=pg_specific_coupon.payment_option.id)
+            allowed_options = queryset.filter(id=pg_specific_coupon.payment_option.id)
+            not_allowed = queryset.filter(~models.Q(id=pg_specific_coupon.payment_option.id))
+            invalid_reason = "Below payment modes are not applicable as you have used the coupon " + pg_specific_coupon.code + ". " \
+                             "Please remove the coupon to pay with the options listed below."
+        else:
+            allowed_options = queryset
+            not_allowed = []
+            invalid_reason = ""
 
-        return cls.build_payment_option(queryset)
+        return cls.build_payment_option(allowed_options), cls.build_payment_option(not_allowed), invalid_reason
 
     @classmethod
     def build_payment_option(cls, queryset):
@@ -149,3 +156,25 @@ class AppointmentMaskNumber(TimeStampedModel):
 
     class Meta:
         db_table = 'appointment_mask_number'
+
+
+class Feature(TimeStampedModel):
+    icon = models.ImageField('Feature image', upload_to='feature/images')
+    name = models.CharField(max_length=100)
+
+    class Meta:
+        db_table = 'feature'
+
+    def __str__(self):
+        return self.name
+
+
+class Service(TimeStampedModel):
+    icon = models.ImageField('Service image', upload_to='service/images')
+    name = models.CharField(max_length=100)
+
+    class Meta:
+        db_table = 'service'
+
+    def __str__(self):
+        return self.name

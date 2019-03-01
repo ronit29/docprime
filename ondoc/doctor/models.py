@@ -33,7 +33,7 @@ from ondoc.notification import tasks as notification_tasks
 from django.contrib.contenttypes.fields import GenericRelation
 from ondoc.api.v1.utils import get_start_end_datetime, custom_form_datetime, CouponsMixin, aware_time_zone, \
     form_time_slot, util_absolute_url, html_to_pdf
-from ondoc.common.models import AppointmentHistory, AppointmentMaskNumber
+from ondoc.common.models import AppointmentHistory, AppointmentMaskNumber, Service
 from functools import reduce
 from operator import or_
 import logging
@@ -189,6 +189,12 @@ class Hospital(auth_model.TimeStampedModel, auth_model.CreatedByModel, auth_mode
     disabled_by = models.ForeignKey(settings.AUTH_USER_MODEL, related_name="disabled_hospitals", null=True, editable=False,
                                     on_delete=models.SET_NULL)
     is_mask_number_required = models.BooleanField(default=True)
+    service = models.ManyToManyField(Service, through='HospitalServiceMapping', through_fields=('hospital', 'service'),
+                                     related_name='of_hospitals')
+    health_insurance_providers = models.ManyToManyField('HealthInsuranceProvider',
+                                                        through='HealthInsuranceProviderHospitalMapping',
+                                                        through_fields=('hospital', 'provider'),
+                                                        related_name='available_in_hospital')
 
     def __str__(self):
         return self.name
@@ -280,6 +286,20 @@ class Hospital(auth_model.TimeStampedModel, auth_model.CreatedByModel, auth_mode
         if not result:
             result.extend(list(self.spoc_details.filter(contact_type=SPOCDetails.OWNER)))
         return result
+
+
+class HospitalServiceMapping(models.Model):
+    hospital = models.ForeignKey(Hospital, on_delete=models.CASCADE,
+                                 related_name='service_mappings')
+    service = models.ForeignKey(Service, on_delete=models.CASCADE,
+                                related_name='hospital_service_mappings')
+
+    def __str__(self):
+        return '{} - {}'.format(self.hospital.name, self.service.name)
+
+    class Meta:
+        db_table = "hospital_service_mapping"
+        unique_together = (('hospital', 'service'),)
 
 
 class HospitalAward(auth_model.TimeStampedModel):
@@ -447,6 +467,23 @@ class Doctor(auth_model.TimeStampedModel, auth_model.QCModel, SearchKey):
     def __str__(self):
         return '{} ({})'.format(self.name, self.id)
 
+    def update_deal_price(self):        
+        # will update only this doctor prices and will be called on save    
+        query = '''update doctor_clinic_timing set 
+                   deal_price = least(greatest(floor(case when fees > 0 then least(fees*1.5, .8*mrp) 
+                   else .8*mrp end /5)*5, fees), mrp) where doctor_clinic_id in (select id from doctor_clinic where doctor_id= %s) '''
+
+        update_doctor_deal_price = RawSql(query, [self.pk]).execute()
+
+    @classmethod
+    def update_all_deal_price(cls):
+        # will update all doctors prices
+        query = '''update doctor_clinic_timing set 
+            deal_price = least(greatest(floor(case when fees > 0 then least(fees*1.5, .8*mrp) else .8*mrp end /5)*5, fees), mrp) '''
+
+        update_all_doctor_deal_price = RawSql(query, []).execute()
+
+
     def get_display_name(self):
         return "Dr. {}".format(self.name.title()) if self.name else None
 
@@ -526,6 +563,7 @@ class Doctor(auth_model.TimeStampedModel, auth_model.QCModel, SearchKey):
     def save(self, *args, **kwargs):
         self.update_time_stamps()
         self.update_live_status()
+        self.update_deal_price()
 
         # On every update of onboarding status or Qcstatus push to matrix
         push_to_matrix = False
@@ -1322,6 +1360,11 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
         elif user_type == auth_model.User.CONSUMER and current_datetime <= self.time_slot_start:
             if self.status in (self.BOOKED, self.ACCEPTED, self.RESCHEDULED_DOCTOR, self.RESCHEDULED_PATIENT):
                 allowed = [self.RESCHEDULED_PATIENT, self.CANCELLED]
+        elif user_type == auth_model.User.CONSUMER and current_datetime > self.time_slot_start:
+            if self.status in [self.BOOKED, self.RESCHEDULED_DOCTOR, self.RESCHEDULED_PATIENT, self.ACCEPTED]:
+                allowed = [self.RESCHEDULED_PATIENT]
+            if self.status == self.ACCEPTED:
+                allowed.append(self.COMPLETED)
 
         return allowed
 
@@ -1493,12 +1536,12 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
             notification_models.EmailNotification.ops_notification_alert(self, email_list=settings.OPS_EMAIL_ID,
                                                                          product=Order.DOCTOR_PRODUCT_ID,
                                                                          alert_type=notification_models.EmailNotification.OPS_APPOINTMENT_NOTIFICATION)
-        if self.status == self.COMPLETED and not self.is_rated:
-            try:
-                notification_tasks.send_opd_rating_message.apply_async(
-                    kwargs={'appointment_id': self.id, 'type': 'opd'}, countdown=int(settings.RATING_SMS_NOTIF))
-            except Exception as e:
-                logger.error(str(e))
+        # if self.status == self.COMPLETED and not self.is_rated:
+        #     try:
+        #         notification_tasks.send_opd_rating_message.apply_async(
+        #             kwargs={'appointment_id': self.id, 'type': 'opd'}, countdown=int(settings.RATING_SMS_NOTIF))
+        #     except Exception as e:
+        #         logger.error(str(e))
 
         if old_instance and old_instance.status != self.ACCEPTED and self.status == self.ACCEPTED:
             try:
@@ -1506,6 +1549,14 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
                     (self.id, str(math.floor(self.time_slot_start.timestamp()))),
                     eta=self.time_slot_start - datetime.timedelta(
                         minutes=settings.TIME_BEFORE_APPOINTMENT_TO_SEND_OTP), )
+                notification_tasks.opd_send_after_appointment_confirmation.apply_async(
+                    (self.id, str(math.floor(self.time_slot_start.timestamp()))),
+                    eta=self.time_slot_start + datetime.timedelta(
+                        minutes=settings.TIME_AFTER_APPOINTMENT_TO_SEND_CONFIRMATION), )
+                notification_tasks.opd_send_after_appointment_confirmation.apply_async(
+                    (self.id, str(math.floor(self.time_slot_start.timestamp())), True),
+                    eta=self.time_slot_start + datetime.timedelta(
+                        minutes=settings.TIME_AFTER_APPOINTMENT_TO_SEND_SECOND_CONFIRMATION), )
                 # notification_tasks.opd_send_otp_before_appointment(self.id, self.time_slot_start)
             except Exception as e:
                 logger.error(str(e))
@@ -2492,3 +2543,26 @@ class UploadDoctorData(auth_model.TimeStampedModel):
             super().save(*args, **kwargs)
             upload_doctor_data.apply_async((self.id,), countdown=1)
 
+
+class HealthInsuranceProvider(auth_model.TimeStampedModel):
+    name = models.CharField(max_length=100)
+
+    class Meta:
+        db_table = 'health_insurance_provider'
+
+    def __str__(self):
+        return self.name
+
+
+class HealthInsuranceProviderHospitalMapping(models.Model):
+    hospital = models.ForeignKey(Hospital, on_delete=models.CASCADE,
+                                 related_name='provider_mappings')
+    provider = models.ForeignKey(HealthInsuranceProvider, on_delete=models.CASCADE,
+                                related_name='hospital_provider_mappings')
+
+    def __str__(self):
+        return '{} - {}'.format(self.hospital.name, self.provider.name)
+
+    class Meta:
+        db_table = "hospital__health_insurance_provider_mapping"
+        unique_together = (('hospital', 'provider'),)

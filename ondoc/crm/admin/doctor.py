@@ -22,7 +22,7 @@ import logging
 from dal import autocomplete
 from ondoc.api.v1.utils import GenericAdminEntity, util_absolute_url, util_file_name
 from ondoc.common.models import AppointmentHistory
-from ondoc.procedure.models import DoctorClinicProcedure, Procedure
+from ondoc.procedure.models import DoctorClinicProcedure, Procedure, DoctorClinicIpdProcedure
 
 logger = logging.getLogger(__name__)
 
@@ -170,6 +170,7 @@ class DoctorClinicTimingFormSet(forms.BaseInlineFormSet):
                 else:
                     raise forms.ValidationError("Duplicate records not allowed.")
 
+
 class DoctorClinicProcedureInline(nested_admin.NestedTabularInline):
     model = DoctorClinicProcedure
     extra = 0
@@ -178,6 +179,16 @@ class DoctorClinicProcedureInline(nested_admin.NestedTabularInline):
     verbose_name = 'Procedure'
     verbose_name_plural = 'Procedures'
     autocomplete_fields = ['procedure']
+
+
+class DoctorClinicIpdProcedureInline(nested_admin.NestedTabularInline):
+    model = DoctorClinicIpdProcedure
+    extra = 0
+    can_delete = True
+    show_change_link = False
+    verbose_name = 'IPD Procedure'
+    verbose_name_plural = 'IPD Procedures'
+    autocomplete_fields = ['ipd_procedure']
 
 
 class DoctorClinicTimingInline(nested_admin.NestedTabularInline):
@@ -209,7 +220,7 @@ class DoctorClinicInline(nested_admin.NestedTabularInline):
     formset = DoctorClinicFormSet
     show_change_link = False
     # autocomplete_fields = ['hospital']
-    inlines = [DoctorClinicTimingInline, DoctorClinicProcedureInline, AssociatedMerchantInline]
+    inlines = [DoctorClinicTimingInline, DoctorClinicProcedureInline, DoctorClinicIpdProcedureInline, AssociatedMerchantInline]
 
     def get_queryset(self, request):
         return super(DoctorClinicInline, self).get_queryset(request).select_related('hospital')
