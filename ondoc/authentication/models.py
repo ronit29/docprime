@@ -1440,9 +1440,12 @@ class Merchant(TimeStampedModel):
         if self.verified_by_finance and not self.pg_status == self.COMPLETE:
             pass
         self.create_in_pg()
-        return super().save(*args, **kwargs)
 
-    def create_in_pg(self):
+        kwargs.get('is_to_save', True):
+            super().save(*args, **kwargs)
+
+    def create_in_pg(self, *args, **kwargs):
+        resp_data = None
         request_payload = dict()
         request_payload["Bene_Code"] = str(self.id)
         request_payload["Bene Name"] = self.beneficiary_name
@@ -1468,29 +1471,37 @@ class Merchant(TimeStampedModel):
         from ondoc.api.v1.utils import payout_checksum
         checksum_response = payout_checksum(request_payload)
         request_payload["hash"] = checksum_response
-        #url = settings.NODAL_BENEFICIARY_API
-        url = 'http://pgqa.docprime.com/pg/insertNodalBeneData'
+        url = settings.NODAL_BENEFICIARY_API
+        # url = 'http://pgqa.docprime.com/pg/insertNodalBeneData'
 
-        #nodal_beneficiary_api_token = settings.NODAL_BENEFICIARY_TOKEN
-        nodal_beneficiary_api_token = 'gFH8gPXbCWaW8WqUefINBDRj0SDQA'
+        nodal_beneficiary_api_token = settings.NODAL_BENEFICIARY_TOKEN
+        # nodal_beneficiary_api_token = 'gFH8gPXbCWaW8WqUefINBDRj0SDQA'
 
         response = requests.post(url, data=json.dumps(request_payload), headers={'auth': nodal_beneficiary_api_token,
                                                                               'Content-Type': 'application/json'})
 
-
-        #response = requests.post(url, data=json.dumps(req_data), headers=headers)
         if response.status_code == status.HTTP_200_OK:
             resp_data = response.json()
+            if resp_data.get('StatusCode') and resp_data.get('StatusCode') == 1:
+                self.pg_status = resp_data.get('StatusCode')
+                kwargs['pg_status'] = self.pg_status
+                self.save(is_to_save=False)
             print(resp_data)
 
-        #json.loads(response.text).get('responseError')[0]
-        # if response.status_code != status.HTTP_200_OK or not response.ok or (response.text and json.loads(response.text).get('responseError') and json.loads(response.text).get('responseError')[0].get('errorCode')):
-        #     response_error = response
-        #     return response_error
-        # return response
+    @classmethod
+    def update_status_from_pg(cls):
+        merchant = Merchant.objects.all()
+        for data in merchant:
+            resp_data = None
+            request_payload = {"beneCode": str(data.id)}
+            url = settings.BENE_STATUS_API
+            bene_status_token = settings.BENE_STATUS_TOKEN
+            response = requests.post(url, data=json.dumps(request_payload), headers={'auth': bene_status_token,
+                                                                                     'Content-Type': 'application/json'})
+            if response.status_code == status.HTTP_200_OK:
+                resp_data = response.json()
 
-    def update_status_from_pg(self):
-        pass 
+            return resp_data
 
 
 class AssociatedMerchant(TimeStampedModel):
