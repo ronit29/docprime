@@ -3153,7 +3153,7 @@ class HospitalViewSet(viewsets.GenericViewSet):
         pnt = GEOSGeometry(point_string, srid=4326)
         hospital_queryset = Hospital.objects.prefetch_related('hospitalcertification_set',
                                                               'hospitalspeciality_set').filter(
-            # is_live=True,  TODO: SHASHANK_SINGH remove this and add order by '-priority'
+            # is_live=True,  TODO: SHASHANK_SINGH add order by '-priority'
             hospital_doctors__enabled=True,
             hospital_doctors__ipd_procedure_clinic_mappings__enabled=True,
             # location__dwithin=(  TODO: SHASHANK_SINGH remove this

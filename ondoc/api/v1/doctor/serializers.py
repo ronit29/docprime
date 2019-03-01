@@ -1541,8 +1541,8 @@ class TopHospitalForIpdProcedureSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Hospital
-        fields = ('id', 'name', 'distance', 'certifications',
-                  # 'bed_count', 'logo', 'rating',
+        fields = ('id', 'name', 'distance', 'certifications', 'bed_count',
+                  #  'logo', 'rating',
                   # TODO: SHASHANK_SINGH
                   'count_of_insurance_provider', 'multi_speciality', 'address')
 
@@ -1572,8 +1572,8 @@ class HospitalDetailIpdProcedureSerializer(TopHospitalForIpdProcedureSerializer)
 
     class Meta:
         model = Hospital
-        fields = ('id', 'name', 'distance', 'certifications',
-                  # 'bed_count', 'logo', 'rating',
+        fields = ('id', 'name', 'distance', 'certifications', 'bed_count',
+                  # , 'logo', 'rating',
                   # TODO: SHASHANK_SINGH Test this if above serializer has changed
                   'multi_speciality', 'address',
                   # New fields in this serializer
