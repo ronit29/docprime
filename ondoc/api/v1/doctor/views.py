@@ -549,7 +549,7 @@ class DoctorProfileUserViewSet(viewsets.GenericViewSet):
         doc_spec = None
         startswith = None
         if hospital:
-            doc_clinics_obj = doctor.doctor_clinics.all()
+            doc_clinics_obj = doctor.doctor_clinics.filter(hospital_id=hospital.get('hospital_id'), doctor_id=doctor.id, hospital__is_live=True)
             if doc_clinics_obj:
                 hospital_obj = doc_clinics_obj[0].hospital
         if doctor.name and general_specialization:
@@ -625,7 +625,7 @@ class DoctorProfileUserViewSet(viewsets.GenericViewSet):
         if doc_experience_details:
             if doc_experience_details[0].get('hospital') and doc_experience_details[0].get('start_year') and \
                     doc_experience_details[0].get('end_year'):
-                about_doctor += '<br><br>' + person + ' worked at ' + doc_experience_details[0].get(
+                about_doctor += '<br><br>' + person + ' has worked at ' + doc_experience_details[0].get(
                     'hospital') + ' from ' + str(doc_experience_details[0].get('start_year')) + ' to ' + str(
                     doc_experience_details[0].get('end_year'))
             if len(doc_experience_details) > 1:
