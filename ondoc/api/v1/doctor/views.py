@@ -625,7 +625,7 @@ class DoctorProfileUserViewSet(viewsets.GenericViewSet):
         if doc_experience_details:
             if doc_experience_details[0].get('hospital') and doc_experience_details[0].get('start_year') and \
                     doc_experience_details[0].get('end_year'):
-                about_doctor += '<br><br>' + person + ' has worked at ' + doc_experience_details[0].get(
+                about_doctor += '<br><br>' + person + ' worked at ' + doc_experience_details[0].get(
                     'hospital') + ' from ' + str(doc_experience_details[0].get('start_year')) + ' to ' + str(
                     doc_experience_details[0].get('end_year'))
             if len(doc_experience_details) > 1:
