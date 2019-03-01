@@ -4,7 +4,7 @@ from django.contrib.gis import admin
 from ondoc.common.models import PaymentOptions, UserConfig, Feature, Service
 from ondoc.crm.admin.banner import BannerAdmin, SliderLocationAdmin
 from ondoc.crm.admin.procedure import ProcedureCategoryAdmin, ProcedureAdmin, IpdProcedureAdmin, FeatureAdmin, \
-    ServiceAdmin, HealthInsuranceProviderAdmin
+    ServiceAdmin, HealthInsuranceProviderAdmin, IpdProcedureCategoryAdmin
 from ondoc.doctor.models import (Doctor, Language, MedicalService, Specialization, College, Qualification, Hospital,
                                  HospitalNetwork, DoctorOnboardingToken, OpdAppointment,
                                  MedicalCondition, AboutDoctor, HealthTip, CommonMedicalCondition, CommonSpecialization,
@@ -24,7 +24,7 @@ from ondoc.location.admin import EntityUrlsAdmin
 from ondoc.location.models import EntityUrls
 from ondoc.notification import models as notifcation_model
 from ondoc.procedure.models import Procedure, ProcedureCategory, CommonProcedureCategory, CommonProcedure, IpdProcedure, \
-    CommonIpdProcedure
+    IpdProcedureCategory, CommonIpdProcedure
 from .common import Cities, CitiesAdmin, MatrixCityMapping, MatrixCityAdmin, MerchantAdmin, MerchantPayoutAdmin, \
     PaymentOptionsAdmin
 from .lead import HospitalLeadAdmin, DoctorLeadAdmin, SearchLeadAdmin
@@ -177,4 +177,5 @@ admin.site.register(IpdProcedure, IpdProcedureAdmin)
 admin.site.register(Feature, FeatureAdmin)
 admin.site.register(Service, ServiceAdmin)
 admin.site.register(HealthInsuranceProvider, HealthInsuranceProviderAdmin)
+admin.site.register(IpdProcedureCategory, IpdProcedureCategoryAdmin)
 admin.site.register(CommonIpdProcedure)

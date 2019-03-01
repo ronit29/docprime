@@ -195,6 +195,7 @@ class Hospital(auth_model.TimeStampedModel, auth_model.CreatedByModel, auth_mode
                                                         through='HealthInsuranceProviderHospitalMapping',
                                                         through_fields=('hospital', 'provider'),
                                                         related_name='available_in_hospital')
+    bed_count = models.PositiveIntegerField(null=True, blank=True, default=None)
 
     def __str__(self):
         return self.name
