@@ -30,7 +30,7 @@ from ondoc.authentication.models import (OtpVerifications, NotificationEndpoint,
                                          AgentToken, DoctorNumber)
 from ondoc.notification.models import SmsNotification, EmailNotification
 from ondoc.account.models import PgTransaction, ConsumerAccount, ConsumerTransaction, Order, ConsumerRefund, OrderLog, \
-    UserReferrals, UserReferred
+    UserReferrals, UserReferred, PgLogs
 from django.contrib.auth import get_user_model
 from django.shortcuts import get_object_or_404
 from ondoc.api.pagination import paginate_queryset
@@ -1041,7 +1041,7 @@ class TransactionViewSet(viewsets.GenericViewSet):
     serializer_class = serializers.TransactionSerializer
     queryset = PgTransaction.objects.none()
 
-    @transaction.atomic
+    @transaction.atomic()
     def save(self, request):
         ERROR_REDIRECT_URL = settings.BASE_URL + "/cart?error_code=1&error_message=%s"
         REDIRECT_URL = ERROR_REDIRECT_URL % "Error processing payment, please try again."
@@ -1051,6 +1051,7 @@ class TransactionViewSet(viewsets.GenericViewSet):
 
         try:
             response = None
+            coded_response = None
             data = request.data
             # Commenting below for testing
             try:
@@ -1062,6 +1063,12 @@ class TransactionViewSet(viewsets.GenericViewSet):
                 response = json.loads(decoded_response)
             except Exception as e:
                 logger.error("Cannot decode pg data - " + str(e))
+
+            # log pg data
+            try:
+                PgLogs.objects.create(decoded_response=response, coded_response=coded_response)
+            except Exception as e:
+                logger.error("Cannot log pg response - " + str(e))
 
             # For testing only
             # response = request.data
@@ -1082,13 +1089,15 @@ class TransactionViewSet(viewsets.GenericViewSet):
                     response_data = self.form_pg_transaction_data(resp_serializer.validated_data, order_obj)
                     if PgTransaction.is_valid_hash(response, product_id=order_obj.product_id):
                         pg_tx_queryset = None
+
                         try:
-                            pg_tx_queryset = PgTransaction.objects.create(**response_data)
+                            with transaction.atomic():
+                                pg_tx_queryset = PgTransaction.objects.create(**response_data)
                         except Exception as e:
                             logger.error("Error in saving PG Transaction Data - " + str(e))
 
                         try:
-                            if pg_tx_queryset:
+                            with transaction.atomic():
                                 processed_data = order_obj.process_pg_order()
                                 success_in_process = True
                         except Exception as e:
