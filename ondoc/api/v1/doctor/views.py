@@ -3218,3 +3218,9 @@ class IpdProcedureViewSet(viewsets.GenericViewSet):
         hospital_result = hospital_view_set.list(request, pk, 2)
         return Response(
             {'about': ipd_procedure_serializer.data, 'hospitals': hospital_result.data, 'doctors': []})
+
+    def create_lead(self, request):
+        serializer = serializers.IpdProcedureLeadSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        obj_created = serializer.save()
+        return Response(serializers.IpdProcedureLeadSerializer(obj_created).data)

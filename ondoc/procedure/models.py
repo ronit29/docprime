@@ -1,7 +1,9 @@
+from django.core.validators import MaxValueValidator, MinValueValidator
 from django.db import models
 from ondoc.authentication import models as auth_model
+from ondoc.authentication.models import User, UserProfile
 from ondoc.common.models import Feature
-from ondoc.doctor.models import DoctorClinic, SearchKey
+from ondoc.doctor.models import DoctorClinic, SearchKey, Hospital
 from collections import deque, OrderedDict
 
 
@@ -66,6 +68,21 @@ class IpdProcedureCategoryMapping(models.Model):
     class Meta:
         db_table = "ipd_procedure_category_mapping"
         unique_together = (('ipd_procedure', 'category'),)
+
+
+class IpdProcedureLead(auth_model.TimeStampedModel):
+    ipd_procedure = models.ForeignKey(IpdProcedure, on_delete=models.SET_NULL, null=True, blank=True)
+    hospital = models.ForeignKey(Hospital, on_delete=models.SET_NULL, null=True, blank=True)
+    user = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True)
+    name = models.CharField(max_length=100, blank=False, null=True, default=None)
+    phone_number = models.BigIntegerField(blank=True, null=True,
+                                          validators=[MaxValueValidator(9999999999), MinValueValidator(1000000000)])
+    email = models.CharField(max_length=256, blank=False, null=True, default=None)
+    gender = models.CharField(max_length=2, default=None, blank=True, null=True, choices=UserProfile.GENDER_CHOICES)
+    age = models.PositiveIntegerField(blank=True, null=True)
+
+    class Meta:
+        db_table = "ipd_procedure_lead"
 
 
 class ProcedureCategory(auth_model.TimeStampedModel, SearchKey):

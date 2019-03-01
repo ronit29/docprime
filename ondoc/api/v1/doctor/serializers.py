@@ -42,7 +42,7 @@ from ondoc.authentication import models as auth_models
 from ondoc.location.models import EntityUrls, EntityAddress
 from ondoc.procedure.models import DoctorClinicProcedure, Procedure, ProcedureCategory, \
     get_included_doctor_clinic_procedure, get_procedure_categories_with_procedures, IpdProcedure, \
-    IpdProcedureFeatureMapping
+    IpdProcedureFeatureMapping, IpdProcedureLead, DoctorClinicIpdProcedure
 from ondoc.seo.models import NewDynamic
 from ondoc.ratings_review import models as rate_models
 
@@ -1620,3 +1620,25 @@ class HospitalRequestSerializer(serializers.Serializer):
         except:
             raise serializers.ValidationError('Invalid Health Insurance Provider IDs')
         raise serializers.ValidationError('Invalid Health Insurance Provider IDs')
+
+
+class IpdProcedureLeadSerializer(serializers.ModelSerializer):
+    ipd_procedure = serializers.PrimaryKeyRelatedField(queryset=IpdProcedure.objects.filter(is_enabled=True))
+    hospital = serializers.PrimaryKeyRelatedField(queryset=Hospital.objects.filter(is_live=True))
+    name = serializers.CharField(max_length=100)
+    phone_number = serializers.IntegerField(min_value=1000000000, max_value=9999999999)
+    email = serializers.EmailField(max_length=256)
+    gender = serializers.ChoiceField(choices=UserProfile.GENDER_CHOICES)
+    age = serializers.IntegerField(min_value=1, max_value=120)
+
+    class Meta:
+        model = IpdProcedureLead
+        fields = '__all__'
+
+    def validate(self, attrs):
+        ipd_procedure = attrs.get('ipd_procedure')
+        hospital = attrs.get('hospital')
+        if not DoctorClinicIpdProcedure.objects.filter(enabled=True, ipd_procedure=ipd_procedure,
+                                                       doctor_clinic__hospital=hospital):
+            raise serializers.ValidationError('IPD procedure is not available in the hospital.')
+        return super().validate(attrs)
