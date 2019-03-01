@@ -90,6 +90,14 @@ class IntegratorResponse(TimeStampedModel):
     class Meta:
         db_table = 'integrator_response'
 
+    # @classmethod
+    # def get_order_summary(cls):
+    #     integrator_responses = IntegratorResponse.objects.all()
+    #     for integrator_response from integrator_responses:
+    #         integrator_obj =
+
+
+
 
 class IntegratorReport(TimeStampedModel):
     integrator_response = models.ForeignKey(IntegratorResponse, on_delete=models.CASCADE, null=False)

@@ -64,7 +64,6 @@ class Thyrocare(BaseIntegrator):
             else:
                 IntegratorProfileMapping.objects.update_or_create(integrator_package_name=result_obj['name'], object_id=obj_id, defaults=defaults)
 
-
     @classmethod
     def thyrocare_product_data(cls, obj_id, type):
         cls.thyrocare_data(obj_id, type)
@@ -72,7 +71,6 @@ class Thyrocare(BaseIntegrator):
     @classmethod
     def thyrocare_profile_data(cls, obj_id, type):
         cls.thyrocare_data(obj_id, type)
-
 
     def _get_appointment_slots(self, pincode, date, **kwargs):
         obj = TimeSlotExtraction()
@@ -154,7 +152,7 @@ class Thyrocare(BaseIntegrator):
             patient_address = "Address not available"
             pincode = "122002"
 
-        order_id = "DP{}".format(lab_appointment.id)
+        order_id = "DP00{}".format(lab_appointment.id)
         bendataxml = "<NewDataSet><Ben_details><Name>%s</Name><Age>%s</Age><Gender>%s</Gender></Ben_details></NewDataSet>" % (profile.name, self.calculate_age(profile), profile.gender)
 
         payload = {
@@ -244,7 +242,6 @@ class Thyrocare(BaseIntegrator):
             cls.upload_report(obj)
             IntegratorResponse.objects.filter(pk=integrator_response.pk).update(report_received=True)
 
-
     @classmethod
     def upload_report(cls, report):
         formats = ['pdf', 'xml']
@@ -277,3 +274,25 @@ class Thyrocare(BaseIntegrator):
                     LabReportFile.objects.create(report_id=lab_report.id, name=in_memory_file)
         except Exception as e:
             logger.error(str(e))
+
+    def cancel_order(self, appointment, integrator_response):
+        url = "%s/ORDER.svc/cancelledorder" % (settings.THYROCARE_BASE_URL)
+        payload = {
+            "UserId": 2147,
+            "OrderNo": integrator_response.dp_order_id,
+            "VisitId": integrator_response.dp_order_id,
+            "BTechId": 0,
+            "Status": 2,
+            "RemarksId": 67,
+            "ReasonId": 173,
+            "Others": appointment.cancellation_comments,
+            "AppointmentDate": "",
+            "AppointmentSlot": ""
+        }
+        headers = {'Content-Type': "application/json"}
+        response = requests.post(url, data=json.dumps(payload), headers=headers)
+        response = response.json()
+        if response.get('RES_ID') == 'RES0000':
+            return response
+        else:
+            logger.error("[ERROR] %s" % response.get('RESPONSE'))

@@ -24,6 +24,7 @@ class BaseIntegrator(object):
 
         return {}
 
+    # This method is use to post orders to respective integrator.
     def post_order(self, lab_appointment, **kwargs):
         try:
             order_detail = self._post_order_details(lab_appointment, **kwargs)
@@ -33,9 +34,7 @@ class BaseIntegrator(object):
 
         return None
 
-    def list_orders(self):
-        pass
-
+    # This method is use to get reports from respective integrator.
     def pull_reports(self, integrator_response, **kwargs):
         try:
             patient_report = self._get_generated_report(integrator_response, **kwargs)
@@ -43,3 +42,14 @@ class BaseIntegrator(object):
         except Exception as e:
             logger.error("[ERROR]" + self.__class__.__name__ + " report error." + str(e))
 
+    # This method is use to cancel an order to respective integrator.
+    def cancel_order(self, appointment, integrator_response):
+        try:
+            order = self._cancel_order(appointment, integrator_response, **kwargs)
+            return order
+        except Exception as e:
+            logger.error("[ERROR]" + self.__class__.__name__ + " cancel order error." + str(e))
+
+    # This method is use to check order status at respective integrator.
+    def get_order_status(self, integrator_response):
+        pass
