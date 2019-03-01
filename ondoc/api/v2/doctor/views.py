@@ -512,6 +512,34 @@ class ProviderSignupDataViewset(viewsets.GenericViewSet):
             logger.error('Error updating consent: ' + str(e))
             return Response({"status": 0, "message": "Error updating consent - " + str(e)})
 
+    def doctors_and_doctor_clinics_serializer(self, hospital, doctors):
+        doc_obj_list = list()
+        doctor_clinic_obj_list = list()
+        for doctor in doctors:
+            doc_obj_list.append(doc_models.Doctor(**doctor, enabled=False,
+                                                  source_type=doc_models.Hospital.PROVIDER))
+        doctor_objects = doc_models.Doctor.objects.bulk_create(doc_obj_list)
+        doctor_model_serializer = serializers.DoctorModelSerializer(doctor_objects, many=True)
+        for doctor in doctor_objects:
+            doctor_clinic_obj_list.append(doc_models.DoctorClinic(doctor=doctor, hospital=hospital,
+                                                                  enabled=False))
+        doctor_clinic_objects = doc_models.DoctorClinic.objects.bulk_create(doctor_clinic_obj_list)
+        doctor_clinic_model_serializer = serializers.DoctorClinicModelSerializer(doctor_clinic_objects,
+                                                                                 many=True)
+        return (doctor_model_serializer, doctor_clinic_model_serializer)
+
+    def generic_admins_serializer(self, hospital, generic_admins):
+        generic_admin_obj_list = list()
+        for generic_admin in generic_admins:
+            generic_admin_obj_list.append(auth_models.GenericAdmin(**generic_admin,
+                                                                   source_type=auth_models.GenericAdmin.APP,
+                                                                   entity_type=auth_models.GenericAdmin.HOSPITAL,
+                                                                   write_permission=True))
+        generic_admin_objects = auth_models.GenericAdmin.objects.bulk_create(generic_admin_obj_list)
+        generic_admin_model_serializer = serializers.GenericAdminModelSerializer(generic_admin_objects,
+                                                                                 many=True)
+        return generic_admin_model_serializer
+
     def create_hospital(self, request, *args, **kwargs):
         serializer = serializers.CreateHospitalSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
@@ -520,37 +548,39 @@ class ProviderSignupDataViewset(viewsets.GenericViewSet):
         valid_data['enabled_for_online_booking'] = False
         valid_data['is_mask_number_required'] = False
         valid_data['source_type'] = doc_models.Hospital.PROVIDER
-        doctors = valid_data.pop('doctors') if valid_data.get('doctors') else None
+        doctors = valid_data.pop('doctors') if valid_data.get('doctors') else []
+        generic_admins = valid_data.pop('generic_admins') if valid_data.get('generic_admins') else []
+        doctor_model_serializer = None
+        doctor_clinic_model_serializer = None
+        generic_admin_model_serializer = None
         try:
             hospital = doc_models.Hospital.objects.create(**valid_data)
-            if doctors:
-                doc_obj_list = list()
-                doctor_clinic_obj_list = list()
-                for doctor in doctors:
-                    doc_obj_list.append(doc_models.Doctor(**doctor, source_type=doc_models.Hospital.PROVIDER))
-                doctor_objects = doc_models.Doctor.objects.bulk_create(doc_obj_list) # DOCTOR OBJECTS
-                for doctor in doctor_objects:
-                    doctor_clinic_obj_list.append(doc_models.DoctorClinic(doctor=doctor, hospital=hospital,
-                                                                          enabled=False))
-                doc_models.DoctorClinic.objects.bulk_create(doctor_clinic_obj_list)
+            hospital_model_serializer = serializers.HospitalModelSerializer(hospital, many=False)
             auth_models.GenericAdmin.objects.create(user=request.user, phone_number=request.user.phone_number,
                                                     hospital_id=hospital.id, super_user_permission=True)
-            return Response({"status": 1, "message": "Hospital added"})
+            if doctors:
+                doctor_model_serializer, doctor_clinic_model_serializer = self.doctors_and_doctor_clinics_serializer(hospital,
+                                                                                                               doctors)
+            if generic_admins:
+                generic_admin_model_serializer = self.generic_admins_serializer(hospital, generic_admins)
+            return Response({"status": 1, "hospital": hospital_model_serializer.data,
+                     "doctors": doctor_model_serializer.data if doctor_model_serializer else None,
+                     "doctor_clinics": doctor_clinic_model_serializer.data if doctor_clinic_model_serializer else None,
+                     "generic_admins": generic_admin_model_serializer.data if generic_admin_model_serializer else None})
         except Exception as e:
-            logger.error('Error creating Hospital: '+ str(e))
+            logger.error('Error creating Hospital: ' + str(e))
             return Response({"status": 0, "message": "Error creating Hospital - " + str(e)})
 
     def create_doctor(self, request, *args, **kwargs):
-        serializer = serializers.CreateDoctorSerializer(data=request.data, context={'request': request})
+        serializer = serializers.CreateDoctorSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         valid_data = serializer.validated_data
-        valid_data['enabled'] = False
-        valid_data['source_type'] = doc_models.Doctor.PROVIDER
+        hospital = valid_data.get('hospital_id')
+        doctors = valid_data.get("doctors", [])
         try:
-            hospital = valid_data.pop('hospital_id')
-            doctor = doc_models.Doctor.objects.create(**valid_data)
-            doc_models.DoctorClinic.objects.create(doctor=doctor, hospital=hospital, enabled=False)
-            return Response({"status": 1, "message": "Doctor and Doctor Clinic added"})
+            doctor_model_serializer, doctor_clinic_model_serializer = self.doctors_and_doctor_clinics_serializer(hospital, doctors)
+            return Response({"status": 1, "doctors": doctor_model_serializer.data,
+                             "doctor_clinics": doctor_clinic_model_serializer.data})
         except Exception as e:
             logger.error('Error adding Doctor or Doctor Clinic ' + str(e))
             return Response({"status": 0, "message": "Error adding Doctor or Doctor Clinic - " + str(e)})
@@ -559,12 +589,11 @@ class ProviderSignupDataViewset(viewsets.GenericViewSet):
         serializer = serializers.CreateGenericAdminSerializer(data=request.data, context={'request': request})
         serializer.is_valid(raise_exception=True)
         valid_data = serializer.validated_data
-        valid_data['source_type'] = auth_models.GenericAdmin.APP
-        valid_data['entity_type'] = auth_models.GenericAdmin.HOSPITAL
-        valid_data['write_permission'] = True
+        hospital = valid_data.get('hospital_id')
+        generic_admins = valid_data.get("generic_admins", [])
         try:
-            auth_models.GenericAdmin.objects.create(**valid_data)
-            return Response({"status": 1, "message": "Generic Admin added"})
+            generic_admin_model_serializer = self.generic_admins_serializer(hospital, generic_admins)
+            return Response({"status": 1, "generic_admins": generic_admin_model_serializer.data})
         except Exception as e:
             logger.error('Error adding Generic Admin ' + str(e))
             return Response({"status": 0, "message": "Error adding Generic Admin - " + str(e)})
