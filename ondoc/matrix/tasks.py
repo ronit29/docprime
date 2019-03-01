@@ -132,6 +132,7 @@ def prepare_and_hit(self, data):
                                                               'Content-Type': 'application/json'})
 
     if response.status_code != status.HTTP_200_OK or not response.ok:
+        logger.error(json.dumps(request_data))
         logger.info("[ERROR] Appointment could not be published to the matrix system")
         logger.info("[ERROR] %s", response.reason)
 
@@ -343,6 +344,7 @@ def push_signup_lead_to_matrix(self, data):
                                                                               'Content-Type': 'application/json'})
 
         if response.status_code != status.HTTP_200_OK or not response.ok:
+            logger.error(json.dumps(request_data))
             logger.info("[ERROR] Lead could not be published to the matrix system")
             logger.info("[ERROR] %s", response.reason)
 
@@ -425,6 +427,7 @@ def push_order_to_matrix(self, data):
                                                                               'Content-Type': 'application/json'})
 
         if response.status_code != status.HTTP_200_OK or not response.ok:
+            logger.error(json.dumps(request_data))
             logger.info("[ERROR] Order could not be published to the matrix system")
             logger.info("[ERROR] %s", response.reason)
 
@@ -516,6 +519,7 @@ def push_onboarding_qcstatus_to_matrix(self, data):
                                                                               'Content-Type': 'application/json'})
 
         if response.status_code != status.HTTP_200_OK or not response.ok:
+            logger.error(json.dumps(request_data))
             logger.info("[ERROR] Order could not be published to the matrix system")
             logger.info("[ERROR] %s", response.reason)
 
@@ -571,6 +575,7 @@ def push_non_bookable_doctor_lead_to_matrix(self, nb_doc_lead_id):
                                                                               'Content-Type': 'application/json'})
 
         if response.status_code != status.HTTP_200_OK or not response.ok:
+            logger.error(json.dumps(request_data))
             logger.info("[ERROR] NB Doctor Lead could not be published to the matrix system")
             logger.info("[ERROR] %s", response.reason)
             countdown_time = (2 ** self.request.retries) * 60 * 10
