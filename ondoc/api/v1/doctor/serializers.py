@@ -1567,6 +1567,8 @@ class HospitalDetailIpdProcedureSerializer(TopHospitalForIpdProcedureSerializer)
     about = serializers.SerializerMethodField()
     services = serializers.SerializerMethodField()
     images = serializers.SerializerMethodField()
+    ipd_procedure_categories = serializers.SerializerMethodField()
+    other_network_hospitals = serializers.SerializerMethodField()
 
     class Meta:
         model = Hospital
@@ -1575,8 +1577,8 @@ class HospitalDetailIpdProcedureSerializer(TopHospitalForIpdProcedureSerializer)
                   # TODO: SHASHANK_SINGH Test this if above serializer has changed
                   'multi_speciality', 'address',
                   # New fields in this serializer
-                  'lat', 'long', 'about', 'services', 'images',
-                  # 'ipd_procedures', 'doctors' (with count), 'rating_graph', 'network_hospitals'
+                  'lat', 'long', 'about', 'services', 'images', 'ipd_procedure_categories', 'other_network_hospitals',
+                  #  'doctors' (with count), 'rating_graph',
                   )
 
     def get_lat(self, obj):
@@ -1603,6 +1605,38 @@ class HospitalDetailIpdProcedureSerializer(TopHospitalForIpdProcedureSerializer)
         # TODO: SHASHANK_SINGH Thumbnail to be added or not
         return [{'original': request.build_absolute_uri(img.name.url), "thumbnail": None} for img in
                 obj.hospitalimage_set.all() if img.name]
+
+    def get_ipd_procedure_categories(self, obj):
+        result = {}
+        queryset = IpdProcedure.objects.prefetch_related('ipd_category_mappings__category').filter(
+            doctor_clinic_ipd_mappings__enabled=True,
+            # doctor_clinic_ipd_mappings__doctor_clinic__doctor__is_live=True,
+            doctor_clinic_ipd_mappings__doctor_clinic__enabled=True,
+            doctor_clinic_ipd_mappings__doctor_clinic__hospital=obj,
+            is_enabled=True).distinct()
+        for ipd_procedure in queryset:
+            for category_mapping in ipd_procedure.ipd_category_mappings.all():
+                if category_mapping.category.id in result:
+                    result[category_mapping.category.id]['ipd_procedures'].append(
+                        {'id': ipd_procedure.id, 'name': ipd_procedure.name})
+                else:
+                    result[category_mapping.category.id] = {'id': category_mapping.category.id,
+                                                            'name': category_mapping.category.name,
+                                                            'ipd_procedures': [
+                                                                {'id': ipd_procedure.id, 'name': ipd_procedure.name}]}
+        return list(result.values())
+
+    def get_other_network_hospitals(self, obj):
+        result = []
+        if not obj.network:
+            return result
+        for temp_hospital in obj.network.assoc_hospitals.all():
+            if not temp_hospital.id == obj.id:
+                result.append(
+                    {'id': temp_hospital.id, 'name': temp_hospital.name, 'address': temp_hospital.get_hos_address(),
+                     'lat': temp_hospital.location.y if temp_hospital.location else None,
+                     'long': temp_hospital.location.x if temp_hospital.location else None})
+        return result
 
 
 class HospitalRequestSerializer(serializers.Serializer):
