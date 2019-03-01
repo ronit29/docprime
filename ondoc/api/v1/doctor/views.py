@@ -734,7 +734,7 @@ class DoctorProfileUserViewSet(viewsets.GenericViewSet):
         if not doctor.about:
             about_doctor = self.construct_about_doctor(doctor, response_data, general_specialization, hospital)
             if about_doctor:
-                response_data['about'] = '<p>' + about_doctor + '</p>'
+                response_data['about_web'] = '<p>' + about_doctor + '</p>'
 
         else:
             response_data['about'] ='<p>' +  doctor.about + '</p>'
