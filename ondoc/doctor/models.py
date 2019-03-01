@@ -203,6 +203,12 @@ class Hospital(auth_model.TimeStampedModel, auth_model.CreatedByModel, auth_mode
     class Meta:
         db_table = "hospital"
 
+    def open_for_communications(self):
+        if (self.network and self.network.open_for_communication) or (not self.network and self.open_for_communication):
+            return True
+
+        return False
+
     def get_thumbnail(self):
         return None
         # return static("hospital_images/hospital_default.png")

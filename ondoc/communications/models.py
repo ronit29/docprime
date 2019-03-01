@@ -298,13 +298,11 @@ class SMSNotification:
 
         # Hospital and labs which has the flag open to communication, send notificaiton to them only.
         if (instance.__class__.__name__ == LabAppointment.__name__) and (not receiver_user or receiver_user.user_type == User.DOCTOR):
-            if (instance.lab.network and not instance.lab.network.open_for_communication) or \
-                    (not instance.lab.network and not instance.lab.open_for_communication):
+            if not instance.lab.open_for_communications():
                 return
 
         if (instance.__class__.__name__ == OpdAppointment.__name__) and (not receiver_user or receiver_user.user_type == User.DOCTOR):
-            if (instance.hospital.network and not instance.hospital.network.open_for_communication) or \
-                    (not instance.hospital.network and not instance.hospital.open_for_communication):
+            if instance.hospital and not instance.hospital.open_for_communications():
                 return
 
         if phone_number and user and user.user_type == User.DOCTOR and notification_type in [
@@ -466,14 +464,12 @@ class EMAILNotification:
         # Hospital and labs which has the flag open to communication, send notificaiton to them only.
         send_without_email = False
         if (instance.__class__.__name__ == LabAppointment.__name__) and (not receiver_user or receiver_user.user_type == User.DOCTOR):
-            if (instance.lab.network and not instance.lab.network.open_for_communication) or \
-                    (not instance.lab.network and not instance.lab.open_for_communication):
+            if not instance.lab.open_for_communications():
                 email = None
                 send_without_email = True
 
         if (instance.__class__.__name__ == OpdAppointment.__name__) and (not receiver_user or receiver_user.user_type == User.DOCTOR):
-            if (instance.hospital.network and not instance.hospital.network.open_for_communication) or \
-                    (not instance.hospital.network and not instance.hospital.open_for_communication):
+            if instance.hospital and not instance.hospital.open_for_communications():
                 email = None
                 send_without_email = True
 
