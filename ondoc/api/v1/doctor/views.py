@@ -764,6 +764,7 @@ class DoctorProfileUserViewSet(viewsets.GenericViewSet):
             specialization_id = ''
             doc = DoctorListViewSet()
             doctors_url = None
+            spec_breadcrumb = None
 
             if general_specialization and hospital:
                 specialization_id = general_specialization[0].pk
@@ -778,9 +779,9 @@ class DoctorProfileUserViewSet(viewsets.GenericViewSet):
                 if response_data.get('doctors'):
                     breadcrumb = entity.breadcrumb if entity else None
                     if breadcrumb:
-                        for data in breadcrumb:
-                            if data.get('url') and not data.get('url').startswith('doctors') and data.get('url').endswith('sptcit'):
-                                doctors_url = data.get('url')
+                        spec_breadcrumb = breadcrumb[-1]
+                        if spec_breadcrumb and spec_breadcrumb.get('url') and not spec_breadcrumb.get('url').startswith('doctors') and spec_breadcrumb.get('url').endswith('sptlitcit'):
+                                doctors_url = spec_breadcrumb.get('url')
                     response_data['doctors']['doctors_url'] = doctors_url
 
                     # response_data['doctors']['doctors_url'] = '/opd/searchresults?specializations=%s&lat=%s&long=%s' % (str(specialization_id), hospital.get('lat'), hospital.get('long'))

@@ -195,6 +195,7 @@ class Hospital(auth_model.TimeStampedModel, auth_model.CreatedByModel, auth_mode
                                                         through='HealthInsuranceProviderHospitalMapping',
                                                         through_fields=('hospital', 'provider'),
                                                         related_name='available_in_hospital')
+    bed_count = models.PositiveIntegerField(null=True, blank=True, default=None)
 
     def __str__(self):
         return self.name
@@ -577,13 +578,6 @@ class Doctor(auth_model.TimeStampedModel, auth_model.QCModel, SearchKey, auth_mo
         super(Doctor, self).save(*args, **kwargs)
 
         transaction.on_commit(lambda: self.app_commit_tasks(push_to_matrix))
-
-    # def delete(self, *args, **kwargs):
-    #     if self.is_live:
-    #         raise ValidationError('Before delete doctor should be disabled')
-    #     else:
-    #         super().delete(*args, **kwargs)
-
 
     def app_commit_tasks(self, push_to_matrix):
         if push_to_matrix:
