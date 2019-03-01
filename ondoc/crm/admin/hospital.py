@@ -350,13 +350,21 @@ class HospitalAdmin(admin.GeoModelAdmin, VersionAdmin, ActionAdmin, QCPemAdmin):
 
     def delete_view(self, request, object_id, extra_context=None):
         obj = self.model.objects.filter(id=object_id).first()
+        opd_appointment = OpdAppointment.objects.filter(hospital_id=object_id).first()
+        content_type = ContentType.objects.get_for_model(obj)
+        if opd_appointment:
+            messages.set_level(request, messages.ERROR)
+            # content_type = ContentType.objects.get_for_model(obj)
+            messages.error(request, '{} could not deleted, as {} is present in appointment history'.format(content_type.model, content_type.model))
+            return HttpResponseRedirect(reverse('admin:{}_{}_change'.format(content_type.app_label,
+                                                                     content_type.model), args=[object_id]))
         if not obj:
             pass
         elif obj.enabled == False:
             pass
         else:
             messages.set_level(request, messages.ERROR)
-            content_type = ContentType.objects.get_for_model(obj)
+            # content_type = ContentType.objects.get_for_model(obj)
             messages.error(request, '{} should be disable before delete'.format(content_type.model))
             return HttpResponseRedirect(reverse('admin:{}_{}_change'.format(content_type.app_label,
                                                                             content_type.model), args=[object_id]))

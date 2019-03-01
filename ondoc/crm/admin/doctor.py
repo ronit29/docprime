@@ -1053,7 +1053,7 @@ class DoctorAdmin(AutoComplete, ImportExportMixin, VersionAdmin, ActionAdmin, QC
         if opd_appointment:
             messages.set_level(request, messages.ERROR)
             # content_type = ContentType.objects.get_for_model(obj)
-            messages.error(request, '{} could not deleted,as {} is present in appointment history'.format(content_type.model).format(content_type.model))
+            messages.error(request, '{} could not deleted, as {} is present in appointment history'.format(content_type.model, content_type.model))
             return HttpResponseRedirect(reverse('admin:{}_{}_change'.format(content_type.app_label,
                                                                      content_type.model), args=[object_id]))
         if not obj:
