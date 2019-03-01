@@ -578,13 +578,6 @@ class Doctor(auth_model.TimeStampedModel, auth_model.QCModel, SearchKey, auth_mo
 
         transaction.on_commit(lambda: self.app_commit_tasks(push_to_matrix))
 
-    # def delete(self, *args, **kwargs):
-    #     if self.is_live:
-    #         raise ValidationError('Before delete doctor should be disabled')
-    #     else:
-    #         super().delete(*args, **kwargs)
-
-
     def app_commit_tasks(self, push_to_matrix):
         if push_to_matrix:
             push_onboarding_qcstatus_to_matrix.apply_async(({'obj_type': self.__class__.__name__, 'obj_id': self.id}
