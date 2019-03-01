@@ -214,8 +214,7 @@ class BulkCreateGenericAdminSerializer(serializers.Serializer):
 
 class CreateGenericAdminSerializer(serializers.Serializer):
     hospital_id = serializers.PrimaryKeyRelatedField(queryset=doc_models.Hospital.objects.all())
-    generic_admins = serializers.ListField(child=BulkCreateGenericAdminSerializer(many=False),
-                                           allow_empty=True, required=False)
+    generic_admins = serializers.ListField(child=BulkCreateGenericAdminSerializer(many=False))
 
 
 class CreateHospitalSerializer(serializers.Serializer):
@@ -249,4 +248,3 @@ class GenericAdminModelSerializer(serializers.ModelSerializer):
     class Meta:
         model = GenericAdmin
         fields = ('phone_number', 'permission_type', 'name')
-

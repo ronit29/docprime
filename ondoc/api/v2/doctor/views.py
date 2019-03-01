@@ -512,7 +512,7 @@ class ProviderSignupDataViewset(viewsets.GenericViewSet):
             logger.error('Error updating consent: ' + str(e))
             return Response({"status": 0, "message": "Error updating consent - " + str(e)})
 
-    def doctors_and_doctor_clinics_serializer(self, hospital, doctors):
+    def bulk_create_doctors_and_doctor_clinics(self, hospital, doctors):
         doc_obj_list = list()
         doctor_clinic_obj_list = list()
         for doctor in doctors:
@@ -526,19 +526,19 @@ class ProviderSignupDataViewset(viewsets.GenericViewSet):
         doctor_clinic_objects = doc_models.DoctorClinic.objects.bulk_create(doctor_clinic_obj_list)
         doctor_clinic_model_serializer = serializers.DoctorClinicModelSerializer(doctor_clinic_objects,
                                                                                  many=True)
-        return (doctor_model_serializer, doctor_clinic_model_serializer)
+        return (doctor_model_serializer.data, doctor_clinic_model_serializer.data)
 
-    def generic_admins_serializer(self, hospital, generic_admins):
+    def bulk_create_generic_admins(self, hospital, generic_admins):
         generic_admin_obj_list = list()
         for generic_admin in generic_admins:
-            generic_admin_obj_list.append(auth_models.GenericAdmin(**generic_admin,
+            generic_admin_obj_list.append(auth_models.GenericAdmin(**generic_admin, hospital=hospital,
                                                                    source_type=auth_models.GenericAdmin.APP,
                                                                    entity_type=auth_models.GenericAdmin.HOSPITAL,
                                                                    write_permission=True))
         generic_admin_objects = auth_models.GenericAdmin.objects.bulk_create(generic_admin_obj_list)
         generic_admin_model_serializer = serializers.GenericAdminModelSerializer(generic_admin_objects,
                                                                                  many=True)
-        return generic_admin_model_serializer
+        return generic_admin_model_serializer.data
 
     def create_hospital(self, request, *args, **kwargs):
         serializer = serializers.CreateHospitalSerializer(data=request.data)
@@ -550,23 +550,22 @@ class ProviderSignupDataViewset(viewsets.GenericViewSet):
         valid_data['source_type'] = doc_models.Hospital.PROVIDER
         doctors = valid_data.pop('doctors') if valid_data.get('doctors') else []
         generic_admins = valid_data.pop('generic_admins') if valid_data.get('generic_admins') else []
-        doctor_model_serializer = None
-        doctor_clinic_model_serializer = None
-        generic_admin_model_serializer = None
+        doctors_data = None
+        doctor_clinics_data = None
+        generic_admins_data = None
         try:
             hospital = doc_models.Hospital.objects.create(**valid_data)
             hospital_model_serializer = serializers.HospitalModelSerializer(hospital, many=False)
             auth_models.GenericAdmin.objects.create(user=request.user, phone_number=request.user.phone_number,
                                                     hospital_id=hospital.id, super_user_permission=True)
             if doctors:
-                doctor_model_serializer, doctor_clinic_model_serializer = self.doctors_and_doctor_clinics_serializer(hospital,
-                                                                                                               doctors)
+                doctors_data, doctor_clinics_data = self.bulk_create_doctors_and_doctor_clinics(hospital, doctors)
             if generic_admins:
-                generic_admin_model_serializer = self.generic_admins_serializer(hospital, generic_admins)
+                generic_admins_data = self.bulk_create_generic_admins(hospital, generic_admins)
             return Response({"status": 1, "hospital": hospital_model_serializer.data,
-                     "doctors": doctor_model_serializer.data if doctor_model_serializer else None,
-                     "doctor_clinics": doctor_clinic_model_serializer.data if doctor_clinic_model_serializer else None,
-                     "generic_admins": generic_admin_model_serializer.data if generic_admin_model_serializer else None})
+                             "doctors": doctors_data if doctors else None,
+                             "doctor_clinics": doctor_clinics_data if doctors else None,
+                             "generic_admins": generic_admins_data if generic_admins else None})
         except Exception as e:
             logger.error('Error creating Hospital: ' + str(e))
             return Response({"status": 0, "message": "Error creating Hospital - " + str(e)})
@@ -578,9 +577,9 @@ class ProviderSignupDataViewset(viewsets.GenericViewSet):
         hospital = valid_data.get('hospital_id')
         doctors = valid_data.get("doctors", [])
         try:
-            doctor_model_serializer, doctor_clinic_model_serializer = self.doctors_and_doctor_clinics_serializer(hospital, doctors)
-            return Response({"status": 1, "doctors": doctor_model_serializer.data,
-                             "doctor_clinics": doctor_clinic_model_serializer.data})
+            doctors_data, doctor_clinics_data = self.bulk_create_doctors_and_doctor_clinics(hospital, doctors)
+            return Response({"status": 1, "doctors": doctors_data,
+                             "doctor_clinics": doctor_clinics_data})
         except Exception as e:
             logger.error('Error adding Doctor or Doctor Clinic ' + str(e))
             return Response({"status": 0, "message": "Error adding Doctor or Doctor Clinic - " + str(e)})
@@ -592,8 +591,8 @@ class ProviderSignupDataViewset(viewsets.GenericViewSet):
         hospital = valid_data.get('hospital_id')
         generic_admins = valid_data.get("generic_admins", [])
         try:
-            generic_admin_model_serializer = self.generic_admins_serializer(hospital, generic_admins)
-            return Response({"status": 1, "generic_admins": generic_admin_model_serializer.data})
+            generic_admins_data = self.bulk_create_generic_admins(hospital, generic_admins)
+            return Response({"status": 1, "generic_admins": generic_admins_data})
         except Exception as e:
             logger.error('Error adding Generic Admin ' + str(e))
             return Response({"status": 0, "message": "Error adding Generic Admin - " + str(e)})
