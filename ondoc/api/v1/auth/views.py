@@ -1315,11 +1315,15 @@ class HospitalDoctorAppointmentPermissionViewSet(GenericViewSet):
         doc_hosp_queryset = (DoctorClinic.objects
                              .select_related('doctor', 'hospital')
                              .prefetch_related('doctor__manageable_doctors', 'hospital__manageable_hospitals')
-                             .filter(doctor__is_live=True, hospital__is_live=True)
+                             .filter(Q(doctor__is_live=True, hospital__is_live=True) |
+                                     Q(doctor__source_type=Doctor.PROVIDER, hospital__source_type=Hospital.PROVIDER))
                              .annotate(doctor_gender=F('doctor__gender'),
                                        hospital_building=F('hospital__building'),
                                        hospital_name=F('hospital__name'),
-                                       doctor_name=F('doctor__name')
+                                       doctor_name=F('doctor__name'),
+                                       doctor_source_type=F('doctor__source_type'),
+                                       hospital_source_type=F('hospital__source_type'),
+                                       online_consultation_fees=F('doctor__online_consultation_fees')
                                        )
                              .filter(
                                     Q(
@@ -1349,7 +1353,8 @@ class HospitalDoctorAppointmentPermissionViewSet(GenericViewSet):
                                               hospital__manageable_hospitals__is_disabled=False,
                                               hospital__manageable_hospitals__entity_type=GenericAdminEntity.HOSPITAL)
                                     ))
-                             .values('hospital', 'doctor', 'hospital_name', 'doctor_name', 'doctor_gender').distinct('hospital', 'doctor')
+                             .values('hospital', 'doctor', 'hospital_name', 'doctor_name', 'doctor_gender',
+                                     'doctor_source_type', 'hospital_source_type', 'online_consultation_fees').distinct('hospital', 'doctor')
                              )
 
         # all_docs = [doc_hosp_queryset
