@@ -3,6 +3,7 @@ from collections import defaultdict, OrderedDict
 from uuid import UUID
 
 from django.contrib.gis.db.models.functions import Distance
+from django.contrib.gis.measure import D
 
 from ondoc.api.v1.auth.serializers import UserProfileSerializer
 from ondoc.api.v1.doctor.serializers import HospitalModelSerializer, AppointmentRetrieveDoctorSerializer, \
@@ -16,7 +17,7 @@ from ondoc.authentication import models as auth_models
 from ondoc.diagnostic import models as lab_models
 from ondoc.notification import tasks as notification_tasks
 #from ondoc.doctor.models import Hospital, DoctorClinic,Doctor,  OpdAppointment
-from ondoc.doctor.models import DoctorClinic, OpdAppointment, Doctor, Hospital
+from ondoc.doctor.models import DoctorClinic, OpdAppointment, Doctor, Hospital, HealthInsuranceProvider
 from ondoc.notification.models import EmailNotification
 from django.utils.safestring import mark_safe
 from ondoc.coupon.models import Coupon
@@ -2995,6 +2996,7 @@ class AppointmentMessageViewset(viewsets.GenericViewSet):
             obj['message'] = "Message Sent Successfully"
         return Response(obj)
 
+
 class HospitalViewSet(viewsets.GenericViewSet):
 
     def list(self, request, ipd_pk, count=None):
@@ -3003,18 +3005,66 @@ class HospitalViewSet(viewsets.GenericViewSet):
         validated_data = serializer.validated_data
         lat = validated_data.get('lat')
         long = validated_data.get('long')
+        # TODO: SHASHANK_SINGH Add min_distance, max_distance filter
+        min_distance = validated_data.get('min_distance')
+        max_distance = validated_data.get('max_distance')
+        max_distance = max_distance * 1000 if max_distance is not None else 10000
+        min_distance = min_distance * 1000 if min_distance is not None else 0
+        provider_ids = validated_data.get('provider_ids')
+        hospital_ids = None
         point_string = 'POINT(' + str(long) + ' ' + str(lat) + ')'
         pnt = GEOSGeometry(point_string, srid=4326)
-        hospital_queryset = Hospital.objects.filter(hospital_doctors__enabled=True,
-                                                    hospital_doctors__ipd_procedure_clinic_mappings__enabled=True,
-                                                    hospital_doctors__ipd_procedure_clinic_mappings__ipd_procedure_id=ipd_pk).annotate(
+        hospital_queryset = Hospital.objects.prefetch_related('hospitalcertification_set',
+                                                              'hospitalspeciality_set').filter(
+            # is_live=True,  TODO: SHASHANK_SINGH remove this and add order by '-priority'
+            hospital_doctors__enabled=True,
+            hospital_doctors__ipd_procedure_clinic_mappings__enabled=True,
+            # location__dwithin=(  TODO: SHASHANK_SINGH remove this
+            #     Point(float(long),
+            #           float(lat)),
+            #     D(m=max_distance)),
+            hospital_doctors__ipd_procedure_clinic_mappings__ipd_procedure_id=ipd_pk).annotate(
             distance=Distance('location', pnt)).annotate(
             count_of_insurance_provider=Count('health_insurance_providers')).distinct()
+        # if min_distance: TODO: SHASHANK_SINGH remove this
+        #     hospital_queryset = filter(lambda
+        #                               x: x.distance.m >= min_distance if x.distance is not None and x.distance.m is not None else False,
+        #                           hospital_queryset)
+
+        # if provider_ids:
+        #     # TODO: SHASHANK_SINGH to be asked AND or OR
+        #     hospital_ids = Hospital.objects.filter(
+        #         # is_live=True,  TODO: SHASHANK_SINGH remove this
+        #         health_insurance_providers__id__in=provider_ids).annotate(
+        #         provider_count=Count(F('health_insurance_providers'))).filter(
+        #         provider_count=len(provider_ids)).distinct().values_list('id', flat=True)
+        #     hospital_ids = Hospital.objects.filter(
+        #         # is_live=True,  TODO: SHASHANK_SINGH remove this
+        #         health_insurance_providers__id__in=provider_ids).distinct().values_list('id', flat=True)
+        if hospital_ids:
+            hospital_queryset = [x for x in hospital_queryset if x.id in hospital_ids]
+        else:
+            hospital_queryset = list(hospital_queryset)
+        result_count = len(hospital_queryset)
         if count:
-            hospital_queryset = hospital_queryset[:2]
+            hospital_queryset = hospital_queryset[:count]
         top_hospital_serializer = serializers.TopHospitalForIpdProcedureSerializer(hospital_queryset, many=True,
                                                                                    context={'request': request})
-        return Response(top_hospital_serializer.data)
+        return Response({'count': result_count, 'result': top_hospital_serializer.data,
+                         'health_insurance_providers': [{'id': x.id, 'name': x.name} for x in
+                                                        HealthInsuranceProvider.objects.all()]})
+
+    def retrive(self, request, pk):
+        hospital_obj = Hospital.objects.prefetch_related('service', 'network', 'hospitalimage_set',
+                                                         'hospitalcertification_set',
+                                                         'hospitalspeciality_set').filter(id=pk,
+                                                                                          # is_live=True,  TODO: SHASHANK_SINGH remove this and add order by '-priority'
+                                                                                          ).first()
+        if not hospital_obj:
+            return Response(status=status.HTTP_400_BAD_REQUEST)
+
+        return Response(
+            serializers.HospitalDetailIpdProcedureSerializer(hospital_obj, context={'request': request}).data)
 
 
 class IpdProcedureViewSet(viewsets.GenericViewSet):

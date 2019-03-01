@@ -13,7 +13,7 @@ from ondoc.doctor.models import (OpdAppointment, Doctor, Hospital, DoctorHospita
                                  Prescription, PrescriptionFile, Specialization, DoctorSearchResult, HealthTip,
                                  CommonMedicalCondition, CommonSpecialization,
                                  DoctorPracticeSpecialization, DoctorClinic, OfflineOPDAppointments, OfflinePatients,
-                                 CancellationReason)
+                                 CancellationReason, HealthInsuranceProvider)
 from ondoc.diagnostic import models as lab_models
 from ondoc.authentication.models import UserProfile, DoctorNumber, GenericAdmin, GenericLabAdmin
 from django.db.models import Avg
@@ -1536,13 +1536,15 @@ class TopHospitalForIpdProcedureSerializer(serializers.ModelSerializer):
     count_of_insurance_provider = serializers.IntegerField()
     distance = serializers.SerializerMethodField()
     certifications = serializers.SerializerMethodField()
-    images = serializers.SerializerMethodField()
+    multi_speciality = serializers.SerializerMethodField()
+    address = serializers.SerializerMethodField()
 
     class Meta:
         model = Hospital
-        fields = ('id', 'name', 'distance', 'certifications', 'images', 'bed_count',
-                  # 'logo', 'address', ''
-                  'count_of_insurance_provider', 'multi_speciality')
+        fields = ('id', 'name', 'distance', 'certifications',
+                  # 'bed_count', 'logo', 'rating',
+                  # TODO: SHASHANK_SINGH
+                  'count_of_insurance_provider', 'multi_speciality', 'address')
 
     def get_distance(self, obj):
         return int(obj.distance.m) if hasattr(obj, 'distance') and obj.distance else None
@@ -1552,12 +1554,69 @@ class TopHospitalForIpdProcedureSerializer(serializers.ModelSerializer):
         names = [x.name for x in certification_objs]
         return names
 
+    def get_multi_speciality(self, obj):
+        return len(obj.hospitalspeciality_set.all()) > 1
+
+    def get_address(self, obj):
+        return obj.get_hos_address()
+
+
+class HospitalDetailIpdProcedureSerializer(TopHospitalForIpdProcedureSerializer):
+    lat = serializers.SerializerMethodField()
+    long = serializers.SerializerMethodField()
+    about = serializers.SerializerMethodField()
+    services = serializers.SerializerMethodField()
+    images = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Hospital
+        fields = ('id', 'name', 'distance', 'certifications',
+                  # 'bed_count', 'logo', 'rating',
+                  # TODO: SHASHANK_SINGH Test this if above serializer has changed
+                  'multi_speciality', 'address',
+                  # New fields in this serializer
+                  'lat', 'long', 'about', 'services', 'images',
+                  # 'ipd_procedures', 'doctors' (with count), 'rating_graph', 'network_hospitals'
+                  )
+
+    def get_lat(self, obj):
+        if obj.location:
+            return obj.location.y
+        return None
+
+    def get_long(self, obj):
+        if obj.location:
+            return obj.location.x
+        return None
+
+    def get_about(self, obj):
+        if obj.network:
+            return obj.network.about
+        return ''
+
+    def get_services(self, obj):
+        request = self.context.get('request')
+        return [{'icon': request.build_absolute_uri(x.icon.url), 'name': x.name} for x in obj.service.all() if x.icon]
+
     def get_images(self, obj):
         request = self.context.get('request')
-        return [request.build_absolute_uri(img.name.url) for img in obj.hospitalimage_set.all()]
-
+        # TODO: SHASHANK_SINGH Thumbnail to be added or not
+        return [{'original': request.build_absolute_uri(img.name.url), "thumbnail": None} for img in
+                obj.hospitalimage_set.all() if img.name]
 
 
 class HospitalRequestSerializer(serializers.Serializer):
     long = serializers.FloatField(default=77.071848)
     lat = serializers.FloatField(default=28.450367)
+    min_distance = serializers.IntegerField(required=False)
+    max_distance = serializers.IntegerField(required=False)
+    provider_ids = CommaSepratedToListField(required=False, max_length=500, typecast_to=int)
+
+    def validate_provider_ids(self, attrs):
+        try:
+            attrs = set(attrs)
+            if HealthInsuranceProvider.objects.filter(id__in=attrs).count() == len(attrs):
+                return attrs
+        except:
+            raise serializers.ValidationError('Invalid Health Insurance Provider IDs')
+        raise serializers.ValidationError('Invalid Health Insurance Provider IDs')
