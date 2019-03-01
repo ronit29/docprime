@@ -1439,10 +1439,19 @@ class Merchant(TimeStampedModel):
     def save(self, *args, **kwargs):
         if self.verified_by_finance and not self.pg_status == self.COMPLETE:
             pass
-        self.create_in_pg()
-
-        kwargs.get('is_to_save', True):
+        if kwargs.get('flag') == 1 and kwargs.get('pg_status') == 1:
+            del kwargs['flag']
+            self.pg_status = kwargs.get('pg_status')
+            del kwargs['pg_status']
             super().save(*args, **kwargs)
+
+        elif kwargs.get('flag') == 1:
+            pass
+
+        else:
+            super().save(*args, **kwargs)
+            # self.create_in_pg()
+            self.update_status_from_pg()
 
     def create_in_pg(self, *args, **kwargs):
         resp_data = None
@@ -1483,25 +1492,25 @@ class Merchant(TimeStampedModel):
         if response.status_code == status.HTTP_200_OK:
             resp_data = response.json()
             if resp_data.get('StatusCode') and resp_data.get('StatusCode') == 1:
-                self.pg_status = resp_data.get('StatusCode')
-                kwargs['pg_status'] = self.pg_status
-                self.save(is_to_save=False)
+                kwargs['pg_status'] = resp_data.get('StatusCode')
+            kwargs['flag'] = 1
+            self.save(**kwargs)
             print(resp_data)
 
-    @classmethod
-    def update_status_from_pg(cls):
+    # @classmethod
+    def update_status_from_pg(self):
         merchant = Merchant.objects.all()
         for data in merchant:
             resp_data = None
-            request_payload = {"beneCode": str(data.id)}
+            request_payload = {"beneCode": str(data.pk)}
             url = settings.BENE_STATUS_API
             bene_status_token = settings.BENE_STATUS_TOKEN
             response = requests.post(url, data=json.dumps(request_payload), headers={'auth': bene_status_token,
                                                                                      'Content-Type': 'application/json'})
             if response.status_code == status.HTTP_200_OK:
                 resp_data = response.json()
-
-            return resp_data
+                if resp_data.get('statusCode'):
+                    data.update(pg_status = resp_data.get('statusCode'))
 
 
 class AssociatedMerchant(TimeStampedModel):
