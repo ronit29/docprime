@@ -9,7 +9,7 @@ from raven.contrib.celery import register_signal, register_logger_signal
 from ondoc.account.tasks import refund_status_update, consumer_refund_update, dump_to_elastic
 from celery.schedules import crontab
 from ondoc.doctor.tasks import save_avg_rating, update_prices
-from ondoc.integrations.tasks import integrator_order_summary
+from ondoc.integrations.task import integrator_order_summary
 # from ondoc.doctor.services.update_search_score import DoctorSearchScore
 
 

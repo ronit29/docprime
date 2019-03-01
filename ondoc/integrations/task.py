@@ -1,12 +1,13 @@
 from __future__ import absolute_import, unicode_literals
 from celery import task
 import logging
-from django.contrib.contenttypes.models import ContentType
+
 logger = logging.getLogger(__name__)
 
 
 @task(bind=True, max_retries=3)
 def push_lab_appointment_to_integrator(self, data):
+    from django.contrib.contenttypes.models import ContentType
     from ondoc.diagnostic.models import LabAppointment
     from ondoc.integrations.models import IntegratorMapping, IntegratorProfileMapping, IntegratorResponse
     from ondoc.integrations import service
