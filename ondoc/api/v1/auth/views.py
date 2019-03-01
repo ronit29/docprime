@@ -1041,6 +1041,7 @@ class TransactionViewSet(viewsets.GenericViewSet):
     serializer_class = serializers.TransactionSerializer
     queryset = PgTransaction.objects.none()
 
+    @transaction.atomic()
     def save(self, request):
         ERROR_REDIRECT_URL = settings.BASE_URL + "/cart?error_code=1&error_message=%s"
         REDIRECT_URL = ERROR_REDIRECT_URL % "Error processing payment, please try again."
@@ -1097,9 +1098,8 @@ class TransactionViewSet(viewsets.GenericViewSet):
 
                         try:
                             with transaction.atomic():
-                                if pg_tx_queryset:
-                                    processed_data = order_obj.process_pg_order()
-                                    success_in_process = True
+                                processed_data = order_obj.process_pg_order()
+                                success_in_process = True
                         except Exception as e:
                             logger.error("Error in processing order - " + str(e))
                 else:
