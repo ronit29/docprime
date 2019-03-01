@@ -1510,7 +1510,8 @@ class Merchant(TimeStampedModel):
             if response.status_code == status.HTTP_200_OK:
                 resp_data = response.json()
                 if resp_data.get('statusCode'):
-                    data.update(pg_status = resp_data.get('statusCode'))
+                    data.replace(data.pg_status, resp_data.get('statusCode'))
+                    # data.update(pg_status=resp_data.get('statusCode'))
 
 
 class AssociatedMerchant(TimeStampedModel):
