@@ -597,19 +597,20 @@ class DoctorProfileUserViewSet(viewsets.GenericViewSet):
                         members += members + ' and ' + doctor_assoc_list[-1]
                 about_doctor += doctor.name + ' is an esteemed member of ' + members + '.'
 
-            doctor_qual = doctor.qualifications.all()
-            if doctor_qual:
-                about_doctor += '<br><br>'
-                count = 0
-                for data in doctor_qual:
-                    if count > 2:
-                        count = 2
-                    qual_str = [' pursued ', ' completed ', ' has also done ']
-                    if data.qualification and data.qualification.name and data.college and data.college.name:
-                        about_doctor += person + qual_str[
-                            count] + his_her + ' ' + data.qualification.name + ' in the year ' \
-                                        + str(data.passing_year) + ' from ' + data.college.name + '. '
-                        count = count + 1
+        doctor_qual = doctor.qualifications.all()
+        if doctor_qual:
+            about_doctor += '<br><br>'
+            count = 0
+            for data in doctor_qual:
+                if count > 2:
+                    count = 2
+                qual_str = [' pursued ', ' completed ', ' has also done ']
+                if data.qualification and data.qualification.name and data.college and data.college.name:
+                    about_doctor += person + qual_str[
+                        count] + his_her + ' ' + data.qualification.name + ' in the year ' \
+                                    + str(data.passing_year) + ' from ' + data.college.name + '. '
+                    count = count + 1
+        if doctor.name:
             about_doctor += '<br><br>' + 'Dr. ' + doctor.name + ' is an experienced, skilled and awarded doctor in ' + his_her + ' field of specialization. '
             doc_awards_obj = doctor.awards.all()
             if doc_awards_obj:
@@ -784,6 +785,8 @@ class DoctorProfileUserViewSet(viewsets.GenericViewSet):
                     # response_data['doctors']['doctors_url'] = '/opd/searchresults?specializations=%s&lat=%s&long=%s' % (str(specialization_id), hospital.get('lat'), hospital.get('long'))
                 else:
                     response_data['doctors']['doctors_url'] = None
+            else:
+                response_data['doctors'] = None
         else:
             response_data['doctors'] = None
 
