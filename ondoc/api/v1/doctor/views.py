@@ -721,6 +721,7 @@ class DoctorProfileUserViewSet(viewsets.GenericViewSet):
 
         general_specialization = []
         hospital = None
+        response_data['about_web'] = None
 
         if response_data and response_data.get('hospitals'):
             hospital = response_data.get('hospitals')[0]
