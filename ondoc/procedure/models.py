@@ -47,6 +47,27 @@ class DoctorClinicIpdProcedure(auth_model.TimeStampedModel):
         unique_together = ('ipd_procedure', 'doctor_clinic')
 
 
+class IpdProcedureCategory(auth_model.TimeStampedModel, SearchKey):
+    name = models.CharField(max_length=500)
+
+    def __str__(self):
+        return self.name
+
+
+class IpdProcedureCategoryMapping(models.Model):
+    ipd_procedure = models.ForeignKey(IpdProcedure, on_delete=models.CASCADE,
+                                      related_name='ipd_category_mappings')
+    category = models.ForeignKey(IpdProcedureCategory, on_delete=models.CASCADE,
+                                 related_name='ipd_procedures_mappings')
+
+    def __str__(self):
+        return '{} - {}'.format(self.ipd_procedure.name, self.category.name)
+
+    class Meta:
+        db_table = "ipd_procedure_category_mapping"
+        unique_together = (('ipd_procedure', 'category'),)
+
+
 class ProcedureCategory(auth_model.TimeStampedModel, SearchKey):
     parents = models.ManyToManyField('self', symmetrical=False, through='ProcedureCategoryMapping',
                                      through_fields=('child_category', 'parent_category'), related_name='children')
