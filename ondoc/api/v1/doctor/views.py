@@ -751,6 +751,7 @@ class DoctorProfileUserViewSet(viewsets.GenericViewSet):
                 response_data['breadcrumb'] = breadcrumb
 
         enabled_for_online_booking = False
+        response_data['doctors'] = None
         doctor_clinics = doctor.doctor_clinics.all()
         if len(doctor_clinics)>0 and doctor.enabled_for_online_booking:
             for dc in doctor_clinics:
@@ -785,10 +786,6 @@ class DoctorProfileUserViewSet(viewsets.GenericViewSet):
                     # response_data['doctors']['doctors_url'] = '/opd/searchresults?specializations=%s&lat=%s&long=%s' % (str(specialization_id), hospital.get('lat'), hospital.get('long'))
                 else:
                     response_data['doctors']['doctors_url'] = None
-            else:
-                response_data['doctors'] = None
-        else:
-            response_data['doctors'] = None
 
         return Response(response_data)
 
