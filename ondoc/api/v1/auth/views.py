@@ -30,7 +30,7 @@ from ondoc.authentication.models import (OtpVerifications, NotificationEndpoint,
                                          AgentToken, DoctorNumber)
 from ondoc.notification.models import SmsNotification, EmailNotification
 from ondoc.account.models import PgTransaction, ConsumerAccount, ConsumerTransaction, Order, ConsumerRefund, OrderLog, \
-    UserReferrals, UserReferred
+    UserReferrals, UserReferred, PgLogs
 from django.contrib.auth import get_user_model
 from django.shortcuts import get_object_or_404
 from ondoc.api.pagination import paginate_queryset
@@ -1043,6 +1043,7 @@ class TransactionViewSet(viewsets.GenericViewSet):
 
         try:
             response = None
+            coded_response = None
             data = request.data
             # Commenting below for testing
             try:
@@ -1054,6 +1055,12 @@ class TransactionViewSet(viewsets.GenericViewSet):
                 response = json.loads(decoded_response)
             except Exception as e:
                 logger.error("Cannot decode pg data - " + str(e))
+
+            # log pg data
+            try:
+                PgLogs.objects.create(decoded_response=response, coded_response=coded_response)
+            except Exception as e:
+                logger.error("Cannot log pg response - " + str(e))
 
             # For testing only
             # response = request.data
