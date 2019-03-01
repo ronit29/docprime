@@ -346,19 +346,27 @@ class WHTSAPPNotification:
         data = []
         if notification_type == NotificationAction.APPOINTMENT_ACCEPTED or \
                 notification_type == NotificationAction.OPD_OTP_BEFORE_APPOINTMENT:
-            body_template = "appointment_booked_doctor"
+            body_template = "appointment_accepted_opd_patient"
 
             data.append(self.context.get('patient_name'))
             data.append(self.context.get('doctor_name'))
-            data.append(self.context.get('instance').hospital.name)
-            data.append(datetime.strftime(self.context.get('instance').time_slot_start, '%d-%m-%Y'))
-            data.append(datetime.strftime(self.context.get('instance').time_slot_start, '%H:%M'))
+            data.append(self.context.get('instance').otp)
             data.append(self.context.get('instance').id)
             data.append(self.context.get('patient_name'))
-            data.append(self.context.get('mask_number', 'NA'))
             data.append(self.context.get('doctor_name'))
-            data.append(datetime.strftime(self.context.get('instance').time_slot_start, '%d-%m-%Y'))
-            data.append(datetime.strftime(self.context.get('instance').time_slot_start, '%H:%M'))
+            if self.context.get('instance').payment_type == 2:
+                data.append('Amount To Be Paid :Rs ' + str(self.context.get('cod_amount')))
+            else:
+                data.append('Amount Paid : Rs ' + str(self.context.get('instance').effective_price))
+
+            data.append(self.context.get('instance').hospital.name)
+            data.append(self.context.get('instance').hospital.get_hos_address())
+
+            data.append(datetime.strftime(self.context.get('instance').time_slot_start, '%d-%m-%Y %H:%M'))
+
+            if self.context.get('instance').payment_type == 2:
+                data.append('Please pay Rs {cod_amount} at the center at the time of appointment.'.
+                            format(cod_amount=str(self.context.get('code_amount'))))
 
         elif notification_type == NotificationAction.APPOINTMENT_BOOKED and user and user.user_type == User.CONSUMER:
             body_template = "opd_appointment_booking_patient"
@@ -552,6 +560,16 @@ class WHTSAPPNotification:
 
             data.append(self.context.get('lab_name'))
             data.append(self.context.get('patient_name'))
+
+        elif notification_type == NotificationAction.OPD_FEEDBACK_AFTER_APPOINTMENT:
+            body_template = "opd_after_completion"
+
+            data.append(self.context.get('patient_name'))
+            data.append(self.context.get('doctor_name'))
+            data.append(self.context.get('opd_appointment_feedback_url'))
+
+        elif notification_type == NotificationAction.REFUND_BREAKUP:
+            body_template = "appointment_refund_breakup"
 
         # elif notification_type == NotificationAction.LAB_REPORT_SEND_VIA_CRM:
         #     body_template = "sms/lab/lab_report_send_crm.txt"
@@ -931,6 +949,10 @@ class OpdNotification(Notification):
                 notification_type == NotificationAction.OPD_FEEDBACK_AFTER_APPOINTMENT:
             sms_notification = SMSNotification(notification_type, context)
             sms_notification.send(all_receivers.get('sms_receivers', []))
+
+            whtsapp_notification = WHTSAPPNotification(notification_type, context)
+            whtsapp_notification.send(all_receivers.get('sms_receivers', []))
+
         else:
             email_notification = EMAILNotification(notification_type, context)
             sms_notification = SMSNotification(notification_type, context)
@@ -1077,6 +1099,9 @@ class LabNotification(Notification):
         elif notification_type == NotificationAction.LAB_OTP_BEFORE_APPOINTMENT:
             sms_notification = SMSNotification(notification_type, context)
             sms_notification.send(all_receivers.get('sms_receivers', []))
+            whtsapp_notification = WHTSAPPNotification(notification_type, context)
+            whtsapp_notification.send(all_receivers.get('sms_receivers', []))
+
         elif notification_type == NotificationAction.LAB_REPORT_SEND_VIA_CRM:
             email_notification = EMAILNotification(notification_type, context)
             sms_notification = SMSNotification(notification_type, context)
