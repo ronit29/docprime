@@ -1498,7 +1498,7 @@ class Merchant(TimeStampedModel):
             print(resp_data)
 
     # @classmethod
-    def update_status_from_pg(self):
+    def update_status_from_pg(self, *args, **kwargs):
         merchant = Merchant.objects.all()
         for data in merchant:
             resp_data = None
@@ -1510,8 +1510,9 @@ class Merchant(TimeStampedModel):
             if response.status_code == status.HTTP_200_OK:
                 resp_data = response.json()
                 if resp_data.get('statusCode'):
-                    data.replace(data.pg_status, resp_data.get('statusCode'))
-                    # data.update(pg_status=resp_data.get('statusCode'))
+                    kwargs['pg_status'] = resp_data.get('statusCode')
+                kwargs['flag'] = 1
+                self.save(**kwargs)
 
 
 class AssociatedMerchant(TimeStampedModel):
