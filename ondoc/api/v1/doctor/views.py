@@ -574,10 +574,10 @@ class DoctorProfileUserViewSet(viewsets.GenericViewSet):
                 if hospital_obj.city:
                     about_doctor += ' ' + person + ' is located in ' + hospital_obj.city + '. '
 
-        if doctor.name and hospital and hospital_obj and hospital_obj.city and hospital_obj.state:
+        if doctor.name and hospital and  hospital_obj and hospital_obj.city and hospital_obj.state:
             about_doctor += '<br><br>Dr. ' + doctor.name
             if hospital_obj.city:
-                about_doctor += ' practices at the ' + hospital.get('hospital_name') + ' in ' + hospital_obj.city + '. '
+                about_doctor += ' practices at the ' + hospital_obj.name + ' in ' + hospital_obj.city + '. '
 
             if hospital and hospital.get('hospital_name') and hospital.get('address'):
                 about_doctor += 'The ' + hospital.get('hospital_name') + ' is situated at ' + hospital.get(
