@@ -29,6 +29,7 @@ def prepare_and_hit(self, data):
     appointment_type = ''
     kyc = 0
     location = ''
+    booking_url = ''
 
     if task_data.get('type') == 'OPD_APPOINTMENT':
         booking_url = '%s/admin/doctor/opdappointment/%s/change' % (settings.ADMIN_BASE_URL, appointment.id)
@@ -97,7 +98,7 @@ def prepare_and_hit(self, data):
         'HomePickupAddress': home_pickup_address,
         'PatientName': appointment.profile_detail.get("name", ''),
         'PatientAddress': patient_address,
-        'ProviderName': getattr(appointment, 'doctor').name if task_data.get('type') == 'OPD_APPOINTMENT' else getattr(appointment, 'lab').name,
+        'ProviderName': getattr(appointment, 'doctor').name + " - " + appointment.hospital.name if task_data.get('type') == 'OPD_APPOINTMENT' else getattr(appointment, 'lab').name,
         'ServiceName': service_name,
         'InsuranceCover': 0,
         'MobileList': data.get('mobile_list'),
