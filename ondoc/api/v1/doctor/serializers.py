@@ -13,7 +13,7 @@ from ondoc.doctor.models import (OpdAppointment, Doctor, Hospital, DoctorHospita
                                  Prescription, PrescriptionFile, Specialization, DoctorSearchResult, HealthTip,
                                  CommonMedicalCondition, CommonSpecialization,
                                  DoctorPracticeSpecialization, DoctorClinic, OfflineOPDAppointments, OfflinePatients,
-                                 CancellationReason, HealthInsuranceProvider)
+                                 CancellationReason, HealthInsuranceProvider, HospitalDocument, HospitalNetworkDocument)
 from ondoc.diagnostic import models as lab_models
 from ondoc.authentication.models import UserProfile, DoctorNumber, GenericAdmin, GenericLabAdmin
 from django.db.models import Avg
@@ -1538,11 +1538,12 @@ class TopHospitalForIpdProcedureSerializer(serializers.ModelSerializer):
     certifications = serializers.SerializerMethodField()
     multi_speciality = serializers.SerializerMethodField()
     address = serializers.SerializerMethodField()
+    logo = serializers.SerializerMethodField()
 
     class Meta:
         model = Hospital
-        fields = ('id', 'name', 'distance', 'certifications', 'bed_count',
-                  #  'logo', 'rating',
+        fields = ('id', 'name', 'distance', 'certifications', 'bed_count', 'logo',
+                  #   'rating',
                   # TODO: SHASHANK_SINGH
                   'count_of_insurance_provider', 'multi_speciality', 'address')
 
@@ -1560,6 +1561,18 @@ class TopHospitalForIpdProcedureSerializer(serializers.ModelSerializer):
     def get_address(self, obj):
         return obj.get_hos_address()
 
+    def get_logo(self, obj):
+        request = self.context.get('request')
+        if obj.network:
+            for document in obj.network.hospital_network_documents.all():
+                if document.document_type == HospitalNetworkDocument.LOGO:
+                    return request.build_absolute_uri(document.name.url) if document.name else None
+        else:
+            for document in obj.hospital_documents.all():
+                if document.document_type == HospitalDocument.LOGO:
+                    return request.build_absolute_uri(document.name.url) if document.name else None
+        return None
+
 
 class HospitalDetailIpdProcedureSerializer(TopHospitalForIpdProcedureSerializer):
     lat = serializers.SerializerMethodField()
@@ -1569,16 +1582,18 @@ class HospitalDetailIpdProcedureSerializer(TopHospitalForIpdProcedureSerializer)
     images = serializers.SerializerMethodField()
     ipd_procedure_categories = serializers.SerializerMethodField()
     other_network_hospitals = serializers.SerializerMethodField()
+    doctors = serializers.SerializerMethodField()
 
     class Meta:
         model = Hospital
-        fields = ('id', 'name', 'distance', 'certifications', 'bed_count',
-                  # , 'logo', 'rating',
+        fields = ('id', 'name', 'distance', 'certifications', 'bed_count', 'logo',
+                  # ,  'rating',
                   # TODO: SHASHANK_SINGH Test this if above serializer has changed
                   'multi_speciality', 'address',
                   # New fields in this serializer
                   'lat', 'long', 'about', 'services', 'images', 'ipd_procedure_categories', 'other_network_hospitals',
-                  #  'doctors' (with count), 'rating_graph',
+                  'doctors',
+                  # 'rating_graph',
                   )
 
     def get_lat(self, obj):
@@ -1594,6 +1609,7 @@ class HospitalDetailIpdProcedureSerializer(TopHospitalForIpdProcedureSerializer)
     def get_about(self, obj):
         if obj.network:
             return obj.network.about
+        # TODO: SHASHANK_SINGH about per hospital
         return ''
 
     def get_services(self, obj):
@@ -1637,6 +1653,12 @@ class HospitalDetailIpdProcedureSerializer(TopHospitalForIpdProcedureSerializer)
                      'lat': temp_hospital.location.y if temp_hospital.location else None,
                      'long': temp_hospital.location.x if temp_hospital.location else None})
         return result
+
+    def get_doctors(self, obj):
+        from ondoc.api.v1.doctor.views import DoctorListViewSet
+        request = self.context.get('request')
+        doctor_list_viewset = DoctorListViewSet()
+        return doctor_list_viewset.search_by_hospital(request, hospital_id=obj.id, sort_on='experience').data
 
 
 class HospitalRequestSerializer(serializers.Serializer):

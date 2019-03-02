@@ -1531,11 +1531,15 @@ class DoctorListViewSet(viewsets.GenericViewSet):
                          'bottom_content': bottom_content})
 
     @transaction.non_atomic_requests
-    def search_by_hospital(self, request):
+    def search_by_hospital(self, request, hospital_id=None, sort_on=None):
         parameters = request.query_params
         serializer = serializers.DoctorListSerializer(data=parameters, context={"request": request})
         serializer.is_valid(raise_exception=True)
         validated_data = serializer.validated_data
+        if 'hospital_id' not in validated_data and hospital_id:
+            validated_data['hospital_id'] = hospital_id
+        if 'sort_on' not in validated_data and sort_on:
+            validated_data['sort_on'] = sort_on
         specialization_dynamic_content = ''
         doctor_search_helper = DoctorSearchByHospitalHelper(validated_data)
         # if not validated_data.get("search_id"):
@@ -3153,6 +3157,8 @@ class HospitalViewSet(viewsets.GenericViewSet):
         point_string = 'POINT(' + str(long) + ' ' + str(lat) + ')'
         pnt = GEOSGeometry(point_string, srid=4326)
         hospital_queryset = Hospital.objects.prefetch_related('hospitalcertification_set',
+                                                              'hospital_documents',
+                                                              'network__hospital_network_documents',
                                                               'hospitalspeciality_set').filter(
             # is_live=True,  TODO: SHASHANK_SINGH add order by '-priority'
             hospital_doctors__enabled=True,
@@ -3194,10 +3200,10 @@ class HospitalViewSet(viewsets.GenericViewSet):
 
     def retrive(self, request, pk):
         hospital_obj = Hospital.objects.prefetch_related('service', 'network', 'hospitalimage_set',
+                                                         'hospital_documents',
+                                                         'network__hospital_network_documents',
                                                          'hospitalcertification_set',
-                                                         'hospitalspeciality_set').filter(id=pk,
-                                                                                          # is_live=True,  TODO: SHASHANK_SINGH remove this and add order by '-priority'
-                                                                                          ).first()
+                                                         'hospitalspeciality_set').filter(id=pk, is_live=True).first()
         if not hospital_obj:
             return Response(status=status.HTTP_400_BAD_REQUEST)
 
