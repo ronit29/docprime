@@ -102,6 +102,10 @@ class Order(TimeStampedModel):
         from ondoc.api.v1.doctor.serializers import OpdAppTransactionModelSerializer
         from ondoc.api.v1.diagnostic.serializers import LabAppTransactionModelSerializer
 
+        # skip if order already processed
+        if self.reference_id:
+            raise Exception("Order already processed - " + str(self.id))
+
         # Initial validations for appointment data
         appointment_data = self.action_data
         # Check if payment is required at all, only when payment is required we debit consumer's account
@@ -1314,3 +1318,13 @@ class UserReferred(TimeStampedModel):
     class Meta:
         db_table = "user_referred"
 
+
+class PgLogs(TimeStampedModel):
+    decoded_response = JSONField(blank=True, null=True)
+    coded_response = models.TextField(blank=True, null=True)
+
+    def __str__(self):
+        return "{}".format(self.id)
+
+    class Meta:
+        db_table = "pg_log"
