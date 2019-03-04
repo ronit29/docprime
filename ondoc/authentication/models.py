@@ -20,6 +20,7 @@ from django.utils.functional import cached_property
 from datetime import date, timedelta, datetime
 from safedelete import SOFT_DELETE
 from safedelete.models import SafeDeleteModel
+import reversion
 
 
 class Image(models.Model):
@@ -396,6 +397,7 @@ class CreatedByModel(models.Model):
         abstract = True
 
 
+@reversion.register()
 class UserProfile(TimeStampedModel):
     MALE = 'm'
     FEMALE = 'f'

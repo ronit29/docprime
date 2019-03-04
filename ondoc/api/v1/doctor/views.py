@@ -224,7 +224,7 @@ class DoctorAppointmentsViewSet(OndocViewSet):
             cart_item.save()
         else:
             cart_item, is_new = Cart.objects.update_or_create(id=cart_item_id, deleted_at__isnull=True, product_id=account_models.Order.DOCTOR_PRODUCT_ID,
-                                                              user=request.user,defaults={"data": request.data})
+                                                  user=request.user,defaults={"data": request.data})
 
         if hasattr(request, 'agent') and request.agent:
             resp = { 'is_agent': True , "status" : 1 }

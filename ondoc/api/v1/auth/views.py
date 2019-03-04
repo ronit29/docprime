@@ -305,6 +305,30 @@ class NotificationViewSet(GenericViewSet):
         return Response(serializer.data)
 
 
+class WhatsappOptinViewSet(GenericViewSet):
+
+    def update(self, request, *args, **kwargs):
+        phone_number = request.data.get('phone_number')
+        optin = request.data.get('optin')
+        source = request.data.get('source')
+
+        if optin not in [True, False]:
+            return Response(status=status.HTTP_400_BAD_REQUEST, data={'error': 'optin must be boolean field.'})
+
+        if not phone_number:
+            return Response(status=status.HTTP_400_BAD_REQUEST, data={'error': 'phone_number is required.'})
+
+        user_profile_obj = UserProfile.objects.filter(phone_number=phone_number).first()
+        if not user_profile_obj:
+            return Response(status=status.HTTP_400_BAD_REQUEST, data={'error': 'could not find the userprofile with number %s' % str(phone_number)})
+
+        if source == 'WHATSPP_SERVICE' and optin is False:
+            user_profile_obj.whatsapp_optin = optin
+            user_profile_obj.whatsapp_is_declined = True
+
+        return Response()
+
+
 class UserProfileViewSet(mixins.CreateModelMixin, mixins.ListModelMixin,
                          mixins.RetrieveModelMixin, mixins.UpdateModelMixin,
                          GenericViewSet):
