@@ -319,6 +319,12 @@ class UserProfileViewSet(mixins.CreateModelMixin, mixins.ListModelMixin,
         queryset = UserProfile.objects.filter(user=request.user)
         return queryset
 
+    def list(self, request, *args, **kwargs):
+        qs = self.get_queryset()
+
+        serializer = [serializers.UserProfileSerializer(q, context= {'request':request}).data for q in qs]
+        return Response(data=serializer)
+
     def create(self, request, *args, **kwargs):
         queryset = self.get_queryset()
         data = {}
