@@ -8,8 +8,7 @@ from django.conf import settings
 import logging
 logger = logging.getLogger(__name__)
 from datetime import datetime, date
-from ondoc.integrations.models import IntegratorMapping, IntegratorProfileMapping, IntegratorResponse, IntegratorReport
-from ondoc.diagnostic.models import LabReport, LabReportFile
+from ondoc.diagnostic.models import LabReport, LabReportFile, LabAppointment
 from django.contrib.contenttypes.models import ContentType
 from ondoc.api.v1.utils import resolve_address, aware_time_zone
 
@@ -32,6 +31,7 @@ class Thyrocare(BaseIntegrator):
 
     @classmethod
     def thyrocare_data(cls, obj_id, type):
+        from ondoc.integrations.models import IntegratorMapping, IntegratorProfileMapping
         response = cls.thyrocare_auth()
         api_key = response.get('api_key')
 
@@ -132,7 +132,7 @@ class Thyrocare(BaseIntegrator):
         payload = self.prepare_data(tests, packages, lab_appointment)
 
         headers = {'Content-Type': "application/json"}
-        url = "%s/ORDER.svc/Postorderdata" % (settings.THYROCARE_BASE_URL)
+        url = "%s/ORDER.svc/Postorderdata" % settings.THYROCARE_BASE_URL
 
         response = requests.post(url, data=json.dumps(payload), headers=headers)
         response = response.json()
@@ -144,6 +144,8 @@ class Thyrocare(BaseIntegrator):
         return None
 
     def prepare_data(self, tests, packages, lab_appointment):
+        from ondoc.integrations.models import IntegratorProfileMapping, IntegratorMapping
+
         profile = lab_appointment.profile
         if hasattr(lab_appointment, 'address') and lab_appointment.address:
             patient_address = resolve_address(lab_appointment.address)
@@ -213,6 +215,8 @@ class Thyrocare(BaseIntegrator):
 
     @classmethod
     def get_generated_report(cls):
+        from ondoc.integrations.models import IntegratorResponse
+
         integrator_bookings = IntegratorResponse.objects.filter(integrator_class_name=Thyrocare.__name__, report_received=False)
         formats = ['pdf', 'xml']
         for booking in integrator_bookings:
@@ -234,6 +238,8 @@ class Thyrocare(BaseIntegrator):
 
     @classmethod
     def save_reports(cls, integrator_response, result):
+        from ondoc.integrations.models import IntegratorResponse, IntegratorReport
+
         # Save reports URL
         obj, created = IntegratorReport.objects.get_or_create(integrator_response_id=integrator_response.id, pdf_url=result["pdf"], xml_url=result["xml"])
 
@@ -276,7 +282,7 @@ class Thyrocare(BaseIntegrator):
             logger.error(str(e))
 
     def cancel_order(self, appointment, integrator_response):
-        url = "%s/ORDER.svc/cancelledorder" % (settings.THYROCARE_BASE_URL)
+        url = "%s/ORDER.svc/cancelledorder" % settings.THYROCARE_BASE_URL
         payload = {
             "UserId": 2147,
             "OrderNo": integrator_response.dp_order_id,
@@ -294,5 +300,27 @@ class Thyrocare(BaseIntegrator):
         response = response.json()
         if response.get('RES_ID') == 'RES0000':
             return response
+        else:
+            logger.error("[ERROR] %s" % response.get('RESPONSE'))
+
+    def order_summary(self, integrator_response):
+        url = "%s/order.svc/%s/%s/%s/all/OrderSummary" % (settings.THYROCARE_BASE_URL, settings.THYROCARE_API_KEY,
+                                                          integrator_response.dp_order_id, integrator_response.response_data['MOBILE'])
+        response = requests.get(url)
+        response = response.json()
+        if response.get('RES_ID') == 'RES0000':
+            dp_appointment = LabAppointment.filter(id=integrator_response.object_id).first()
+            thyrocare_appointment_time = response['LEADHISORY_MASTER']['APPOINT_ON']['DATE']
+            dp_appointment_time = dp_appointment.time_slot_start
+            print(thyrocare_appointment_time)
+            print(dp_appointment_time)
+            if response['BEN_MASTER']['STATUS'] == 'YET TO ASSIGN':
+                pass
+            elif response['BEN_MASTER']['STATUS'] == 'ASSIGNED':
+                pass
+            elif response['BEN_MASTER']['STATUS'] == 'CANCELLED':
+                pass
+
+            return True
         else:
             logger.error("[ERROR] %s" % response.get('RESPONSE'))

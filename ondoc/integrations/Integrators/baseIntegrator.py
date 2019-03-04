@@ -51,5 +51,9 @@ class BaseIntegrator(object):
             logger.error("[ERROR]" + self.__class__.__name__ + " cancel order error." + str(e))
 
     # This method is use to check order status at respective integrator.
-    def get_order_status(self, integrator_response):
-        pass
+    def get_order_summary(self, integrator_response):
+        try:
+            order_summary = self._order_summary(integrator_response, **kwargs)
+            return order_summary
+        except Exception as e:
+            logger.error("[ERROR]" + self.__class__.__name__ + " order summary error." + str(e))

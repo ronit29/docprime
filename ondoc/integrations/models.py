@@ -1,3 +1,4 @@
+from ondoc.integrations import service
 from django.db import models
 from django.contrib.contenttypes.fields import GenericForeignKey
 from django.contrib.contenttypes.models import ContentType
@@ -7,6 +8,8 @@ from ondoc.common.helper import Choices
 from django.contrib.postgres.fields import JSONField
 
 # Create your models here.
+
+
 class IntegratorMapping(TimeStampedModel):
     class ServiceType(Choices):
         LabTest = 'LABTEST'
@@ -90,13 +93,14 @@ class IntegratorResponse(TimeStampedModel):
     class Meta:
         db_table = 'integrator_response'
 
-    # @classmethod
-    # def get_order_summary(cls):
-    #     integrator_responses = IntegratorResponse.objects.all()
-    #     for integrator_response from integrator_responses:
-    #         integrator_obj =
-
-
+    @classmethod
+    def get_order_summary(cls):
+        integrator_responses = IntegratorResponse.objects.all()
+        for integrator_response in integrator_responses:
+            integrator_obj = service.create_integrator_obj(integrator_response.integrator_class_name)
+            response = integrator_obj.get_order_summary(integrator_response)
+            if response:
+                return True
 
 
 class IntegratorReport(TimeStampedModel):
