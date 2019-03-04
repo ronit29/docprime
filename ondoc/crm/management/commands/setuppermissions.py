@@ -227,6 +227,12 @@ class Command(BaseCommand):
                 Q(content_type=ct), Q(codename='change_' + ct.model))
             group.permissions.add(*permissions)
 
+        content_types = ContentType.objects.get_for_models(Doctor, Hospital)
+        for cl, ct in content_types.items():
+            permissions = Permission.objects.filter(
+                Q(content_type=ct), Q(codename='delete_' + ct.model))
+            group.permissions.add(*permissions)
+
 
         content_types = ContentType.objects.get_for_models(
             Qualification, Specialization, Language, MedicalService, College, LabTest,
