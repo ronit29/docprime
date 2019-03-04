@@ -1439,7 +1439,7 @@ class Merchant(TimeStampedModel):
     def save(self, *args, **kwargs):
         if self.verified_by_finance and not self.pg_status == self.COMPLETE:
             pass
-        if kwargs.get('flag') == 1 and kwargs.get('pg_status') == 1:
+        if kwargs.get('flag') == 1 and kwargs.get('pg_status'):
             del kwargs['flag']
             self.pg_status = kwargs.get('pg_status')
             del kwargs['pg_status']
