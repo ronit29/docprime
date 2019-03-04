@@ -5,7 +5,7 @@ from django.db import models
 from django.utils.safestring import mark_safe
 from reversion.admin import VersionAdmin
 from django.db.models import Q
-from ondoc.authentication.models import GenericAdmin, User, AssociatedMerchant
+from ondoc.authentication.models import GenericAdmin, User, AssociatedMerchant, QCModel, SPOCDetails
 from ondoc.crm.admin.doctor import CreatedByFilter
 
 from ondoc.doctor.models import (HospitalNetworkManager, Hospital,
@@ -16,6 +16,9 @@ from .common import *
 from ondoc.authentication.admin import SPOCDetailsInline
 import nested_admin
 from .common import AssociatedMerchantInline
+import logging
+logger = logging.getLogger(__name__)
+
 
 class HospitalNetworkCertificationInline(admin.TabularInline):
     model = HospitalNetworkCertification
@@ -25,6 +28,7 @@ class HospitalNetworkCertificationInline(admin.TabularInline):
 
     def get_queryset(self, request):
         return super().get_queryset(request).select_related('network')
+
 
 class HospitalNetworkAwardForm(forms.ModelForm):
     year = forms.ChoiceField(choices=award_year_choices_no_blank, required=True)
@@ -39,6 +43,7 @@ class HospitalNetworkAwardInline(admin.TabularInline):
 
     def get_queryset(self, request):
         return super().get_queryset(request).select_related('network')
+
 
 class HospitalNetworkAccreditationInline(admin.TabularInline):
     model = HospitalNetworkAccreditation
@@ -101,11 +106,19 @@ class HospitalNetworkForm(FormCleanMixin):
     operational_since = forms.ChoiceField(choices=hospital_operational_since_choices, required=False)
     about = forms.CharField(widget=forms.Textarea, required=False)
 
+    class Meta:
+        widgets = {
+            'matrix_state': autocomplete.ModelSelect2(url='matrix-state-autocomplete'),
+            'matrix_city': autocomplete.ModelSelect2(url='matrix-city-autocomplete', forward=['matrix_state'])
+        }
+
     def validate_qc(self):
         qc_required = {'name': 'req', 'operational_since': 'req', 'about': 'req', 'network_size': 'req',
-                       'building': 'req', 'locality': 'req', 'city': 'req', 'state': 'req',
+                       'building': 'req', 'locality': 'req',
                        'country': 'req', 'pin_code': 'req', 'hospitalnetworkmanager': 'count',
-                       'hospitalnetworkhelpline': 'count', 'hospitalnetworkemail': 'count'}
+                       'hospitalnetworkhelpline': 'count', 'hospitalnetworkemail': 'count',
+                       'matrix_city': 'req', 'matrix_state': 'req', 'hospitalnetworkmanager_set': 'count',
+                       'matrix_lead_id': 'value_req'}
 
         # if self.instance.is_billing_enabled:
         #     qc_required.update({
@@ -119,6 +132,22 @@ class HospitalNetworkForm(FormCleanMixin):
                 raise forms.ValidationError("Atleast one entry of "+key+" is required for Quality Check")
             if self.data.get(key+'-TOTAL_FORMS') and value == 'count' and int(self.data.get(key+'-TOTAL_FORMS')) <= 0:
                 raise forms.ValidationError("Atleast one entry of "+key+" is required for Quality Check")
+            if value == 'value_req':
+                if hasattr(self.instance, key) and not getattr(self.instance, key):
+                    raise forms.ValidationError(key + " is required for Quality Check")
+
+        # number_of_spocs = self.data.get('hospitalnetworkmanager_set-TOTAL_FORMS', '0')
+        # try:
+        #     number_of_spocs = int(number_of_spocs)
+        # except Exception as e:
+        #     logger.error("Something went wrong while counting SPOCs for hospital - " + str(e))
+        #     raise forms.ValidationError("Something went wrong while counting SPOCs.")
+        # if number_of_spocs > 0:
+        #     if not any([self.data.get('hospitalnetworkmanager_set-{}-contact_type'.format(i),
+        #                               0) == str(2) and self.data.get(
+        #         'hospitalnetworkmanager_set-{}-number'.format(i)) for i in
+        #                 range(number_of_spocs)]):
+        #         raise forms.ValidationError("Must have Single Point Of Contact number.")
 
     def clean_operational_since(self):
         data = self.cleaned_data['operational_since']
@@ -176,11 +205,11 @@ class HospitalNetworkAdmin(VersionAdmin, ActionAdmin, QCPemAdmin):
     formfield_overrides = {
         models.BigIntegerField: {'widget': forms.TextInput},
     }
-    list_display = ('name', 'updated_at', 'data_status', 'list_created_by', 'list_assigned_to')
-    list_filter = ('data_status', CreatedByFilter)
+    list_display = ('name', 'welcome_calling_done', 'updated_at', 'data_status', 'list_created_by', 'list_assigned_to')
+    list_filter = ('data_status', 'welcome_calling_done', CreatedByFilter)
     search_fields = ['name']
-    readonly_fields = ('associated_hospitals',)
-    exclude = ('qc_approved_at', )
+    exclude = ('qc_approved_at', 'welcome_calling_done_at', )
+    # autocomplete_fields = ['matrix_city', 'matrix_state']
     inlines = [
         HospitalNetworkManagerInline,
         HospitalNetworkHelplineInline,
@@ -192,6 +221,7 @@ class HospitalNetworkAdmin(VersionAdmin, ActionAdmin, QCPemAdmin):
         GenericAdminInline,
         SPOCDetailsInline,
         AssociatedMerchantInline,
+        RemarkInline
     ]
 
     def associated_hospitals(self, instance):
@@ -203,6 +233,12 @@ class HospitalNetworkAdmin(VersionAdmin, ActionAdmin, QCPemAdmin):
             return mark_safe(html)
         else:
             return ''
+
+    def get_readonly_fields(self, request, obj=None):
+        readonly_fields = ('associated_hospitals', 'city', 'state', 'matrix_lead_id',)
+        if request.user.is_member_of(constants['SUPER_QC_GROUP']) or request.user.is_superuser:
+            readonly_fields.remove('matrix_lead_id')
+        return readonly_fields
 
     def get_queryset(self, request):
         qs = super().get_queryset(request)
@@ -219,12 +255,15 @@ class HospitalNetworkAdmin(VersionAdmin, ActionAdmin, QCPemAdmin):
         if not obj.assigned_to:
             obj.assigned_to = request.user
         if '_submit_for_qc' in request.POST:
-            obj.data_status = 2
+            obj.data_status = QCModel.SUBMITTED_FOR_QC
         if '_qc_approve' in request.POST:
-            obj.data_status = 3
+            obj.data_status = QCModel.QC_APPROVED
             obj.qc_approved_at = datetime.datetime.now()
         if '_mark_in_progress' in request.POST:
-            obj.data_status = 1
+            obj.data_status = QCModel.REOPENED
+        obj.status_changed_by = request.user
+        obj.city = obj.matrix_city.name
+        obj.state = obj.matrix_state.name
 
         super().save_model(request, obj, form, change)
 
@@ -235,3 +274,10 @@ class HospitalNetworkAdmin(VersionAdmin, ActionAdmin, QCPemAdmin):
         if (not request.user.is_superuser) and (not request.user.groups.filter(name=constants['QC_GROUP_NAME']).exists()):
             form.base_fields['assigned_to'].disabled = True
         return form
+
+    def get_fields(self, request, obj=None):
+        all_fields = super().get_fields(request, obj)
+        if not request.user.is_superuser and not request.user.groups.filter(name=constants['WELCOME_CALLING_TEAM']).exists():
+            if 'welcome_calling_done' in all_fields:
+                all_fields.remove('welcome_calling_done')
+        return all_fields
