@@ -571,6 +571,17 @@ class WHTSAPPNotification:
         elif notification_type == NotificationAction.REFUND_BREAKUP:
             body_template = "appointment_refund_breakup"
 
+            data.append(self.context.get('amount'))
+            if self.context.get('booking_id'):
+                data.append('for you booking id %d' % self.context.get('instance').id)
+            else:
+                data.append('.')
+
+            if self.context.get('ctrnx_id'):
+                data.append('The transaction ID for this refund is : DPRF%s' % str(self.context.get('ctrnx_id')))
+            else:
+                data.append(' ')
+
         # elif notification_type == NotificationAction.LAB_REPORT_SEND_VIA_CRM:
         #     body_template = "sms/lab/lab_report_send_crm.txt"
         #     lab_reports = []
@@ -621,7 +632,13 @@ class WHTSAPPNotification:
         if not context:
             return
         for receiver in receivers:
-            template, data = self.get_template_and_data(receiver.get('user'))
+            receiver_user = receiver.get('user')
+
+            instance = self.context.get('instance')
+            if receiver_user.user_type == User.CONSUMER and not instance.profile.whatsapp_optin:
+                continue
+
+            template, data = self.get_template_and_data(receiver_user)
 
             undesired_params = list(filter(lambda param: not param, data))
             if not template:
