@@ -333,6 +333,7 @@ class UserProfileViewSet(mixins.CreateModelMixin, mixins.ListModelMixin,
         # data['age'] = request.data.get('age')
         data['email'] = request.data.get('email')
         data['phone_number'] = request.data.get('phone_number')
+        data['whatsapp_optin'] = request.data.get('whatsapp_optin')
         data['user'] = request.user.id
         first_profile = False
 

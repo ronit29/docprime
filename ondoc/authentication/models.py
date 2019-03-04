@@ -411,8 +411,8 @@ class UserProfile(TimeStampedModel):
     dob = models.DateField(blank=True, null=True)
     
     profile_image = models.ImageField(upload_to='users/images', height_field=None, width_field=None, blank=True, null=True)
-    whatsapp_optin = models.NullBooleanField(default=None)
-    whatsapp_is_declined = models.BooleanField(default=False)
+    whatsapp_optin = models.NullBooleanField(default=None) # optin check of the whatsapp
+    whatsapp_is_declined = models.BooleanField(default=False) # flag to whether show whatsapp pop up or not.
 
     def __str__(self):
         return "{}-{}".format(self.name, self.id)

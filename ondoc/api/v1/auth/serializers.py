@@ -162,8 +162,8 @@ class UserProfileSerializer(serializers.ModelSerializer):
     email = serializers.EmailField(required=False, allow_null=True, allow_blank=True)
     profile_image = serializers.SerializerMethodField()
     dob = serializers.DateField(allow_null=True, required=False)
-    whatsapp_optin = serializers.NullBooleanField()
-    whatsapp_is_declined = serializers.BooleanField()
+    whatsapp_optin = serializers.NullBooleanField(required=False)
+    whatsapp_is_declined = serializers.BooleanField(required=False)
 
     class Meta:
         model = UserProfile
