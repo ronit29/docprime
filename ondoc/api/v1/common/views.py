@@ -915,12 +915,12 @@ class GetSearchUrlViewSet(viewsets.GenericViewSet):
         long = params.get("long", 77.0759)
 
         opd_search_url = "%s/opd/searchresults?specializations=%s" \
-                         "&lat=%s&long=%s&min_fees=0&max_fees=3000&min_distance=0&max_distance=15" \
+                         "&lat=%s&long=%s" \
                          % (settings.BASE_URL, specialization_ids, lat, long)
         tiny_opd_search_url = generate_short_url(opd_search_url)
 
         lab_search_url = "%s/lab/searchresults?test_ids=%s" \
-                         "&min_distance=0&lat=%s&long=%s&min_price=0&max_price=20000&max_distance=15" \
+                         "&lat=%s&long=%s" \
                          % (settings.BASE_URL, test_ids, lat, long)
         tiny_lab_search_url = generate_short_url(lab_search_url)
 
