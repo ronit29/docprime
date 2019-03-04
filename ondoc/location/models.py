@@ -169,6 +169,9 @@ class GeocodingResults(TimeStampedModel):
 
             resp_data = response.json()
 
+            if resp_data.get('error_message'):
+                print(resp_data)
+
             if resp_data.get('status', None) == 'OK' and isinstance(resp_data.get('results'), list) and \
                     len(resp_data.get('results')) > 0:
                 geo_result = GeocodingResults(value=json.dumps(resp_data), latitude=kwargs.get('latitude'), longitude= kwargs.get('longitude')).save()
