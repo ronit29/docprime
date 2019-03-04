@@ -8,7 +8,7 @@ from ondoc.api.v1.common.serializers import SearchLeadSerializer
 from django.utils.dateparse import parse_datetime
 from weasyprint import HTML
 from django.http import HttpResponse
-from ondoc.api.v1.utils import html_to_pdf
+from ondoc.api.v1.utils import html_to_pdf, generate_short_url
 from ondoc.diagnostic.models import Lab
 from ondoc.doctor.models import (Doctor, DoctorPracticeSpecialization, PracticeSpecialization, DoctorMobile, Qualification,
                                  Specialization, College, DoctorQualification, DoctorExperience, DoctorAward,
@@ -911,15 +911,17 @@ class GetSearchUrlViewSet(viewsets.GenericViewSet):
         params = request.query_params
         specialization_ids = params.get("specialization", '')
         test_ids = params.get("test", '')
-        lat = params.get("lat", 28.459497) # if no lat long then default to gurgaon
-        long = params.get("long", 77.026638)
+        lat = params.get("lat", 28.4485)  # if no lat long then default to gurgaon
+        long = params.get("long", 77.0759)
 
         opd_search_url = "%s/opd/searchresults?specializations=%s" \
                          "&lat=%s&long=%s&min_fees=0&max_fees=3000&min_distance=0&max_distance=15" \
                          % (settings.BASE_URL, specialization_ids, lat, long)
+        tiny_opd_search_url = generate_short_url(opd_search_url)
 
         lab_search_url = "%s/lab/searchresults?test_ids=%s" \
                          "&min_distance=0&lat=%s&long=%s&min_price=0&max_price=20000&max_distance=15" \
                          % (settings.BASE_URL, test_ids, lat, long)
+        tiny_lab_search_url = generate_short_url(lab_search_url)
 
-        return Response({"opd_search_url": opd_search_url, "lab_search_url": lab_search_url})
+        return Response({"opd_search_url": tiny_opd_search_url, "lab_search_url": tiny_lab_search_url})
