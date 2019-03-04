@@ -18,6 +18,8 @@ from django.contrib.contenttypes.fields import GenericForeignKey
 from django.contrib.contenttypes.models import ContentType
 from django.utils.functional import cached_property
 from datetime import date, timedelta, datetime
+from safedelete import SOFT_DELETE
+from safedelete.models import SafeDeleteModel
 
 
 class Image(models.Model):
@@ -259,6 +261,16 @@ class User(AbstractBaseUser, PermissionsMixin):
         # if self.user_type==1 and hasattr(self, 'staffprofile'):
         #     return self.staffprofile.name
         # return str(self.phone_number)
+
+    def get_phone_number_for_communication(self):
+        from ondoc.communications.models import unique_phone_numbers
+        receivers = []
+        default_user_profile = self.profiles.filter(is_default_user=True).first()
+        if default_user_profile and default_user_profile.phone_number:
+            receivers.append({'user': self, 'phone_number': default_user_profile.phone_number})
+        receivers.append({'user': self, 'phone_number': self.phone_number})
+        receivers = unique_phone_numbers(receivers)
+        return receivers
 
     def get_full_name(self):
         return self.full_name
@@ -1421,4 +1433,14 @@ class AssociatedMerchant(TimeStampedModel):
 
     class Meta:
         db_table = 'associated_merchant'
+
+
+class SoftDelete(SafeDeleteModel):
+    _safedelete_policy = SOFT_DELETE
+
+    class Meta:
+        abstract = True
+
+
+
 

@@ -22,7 +22,9 @@ import logging
 from dal import autocomplete
 from ondoc.api.v1.utils import GenericAdminEntity, util_absolute_url, util_file_name
 from ondoc.common.models import AppointmentHistory
-from ondoc.procedure.models import DoctorClinicProcedure, Procedure
+from django.contrib import messages
+from django.http import HttpResponseRedirect
+from ondoc.procedure.models import DoctorClinicProcedure, Procedure, DoctorClinicIpdProcedure
 
 logger = logging.getLogger(__name__)
 
@@ -57,6 +59,7 @@ from django import forms
 from decimal import Decimal
 from .common import AssociatedMerchantInline
 from ondoc.sms import api
+from ondoc.ratings_review import models as rating_models
 
 class AutoComplete:
     def autocomplete_view(self, request):
@@ -169,6 +172,7 @@ class DoctorClinicTimingFormSet(forms.BaseInlineFormSet):
                 else:
                     raise forms.ValidationError("Duplicate records not allowed.")
 
+
 class DoctorClinicProcedureInline(nested_admin.NestedTabularInline):
     model = DoctorClinicProcedure
     extra = 0
@@ -177,6 +181,16 @@ class DoctorClinicProcedureInline(nested_admin.NestedTabularInline):
     verbose_name = 'Procedure'
     verbose_name_plural = 'Procedures'
     autocomplete_fields = ['procedure']
+
+
+class DoctorClinicIpdProcedureInline(nested_admin.NestedTabularInline):
+    model = DoctorClinicIpdProcedure
+    extra = 0
+    can_delete = True
+    show_change_link = False
+    verbose_name = 'IPD Procedure'
+    verbose_name_plural = 'IPD Procedures'
+    autocomplete_fields = ['ipd_procedure']
 
 
 class DoctorClinicTimingInline(nested_admin.NestedTabularInline):
@@ -208,7 +222,7 @@ class DoctorClinicInline(nested_admin.NestedTabularInline):
     formset = DoctorClinicFormSet
     show_change_link = False
     # autocomplete_fields = ['hospital']
-    inlines = [DoctorClinicTimingInline, DoctorClinicProcedureInline, AssociatedMerchantInline]
+    inlines = [DoctorClinicTimingInline, DoctorClinicProcedureInline, DoctorClinicIpdProcedureInline, AssociatedMerchantInline]
 
     def get_queryset(self, request):
         return super(DoctorClinicInline, self).get_queryset(request).select_related('hospital')
@@ -1028,6 +1042,36 @@ class DoctorAdmin(AutoComplete, ImportExportMixin, VersionAdmin, ActionAdmin, QC
     list_filter = (
         'data_status', 'onboarding_status', 'is_live', 'enabled', 'is_insurance_enabled', 'doctorpracticespecializations__specialization',
         CityFilter, CreatedByFilter)
+
+    def has_delete_permission(self, request, obj=None):
+        return super().has_delete_permission(request, obj)
+
+    def delete_view(self, request, object_id, extra_context=None):
+        obj = self.model.objects.filter(id=object_id).first()
+        opd_appointment = OpdAppointment.objects.filter(doctor_id=object_id).first()
+        content_type = ContentType.objects.get_for_model(obj)
+        if opd_appointment:
+            messages.set_level(request, messages.ERROR)
+            messages.error(request, '{} could not deleted, as {} is present in appointment history'.format(content_type.model, content_type.model))
+            return HttpResponseRedirect(reverse('admin:{}_{}_change'.format(content_type.app_label,
+                                                                     content_type.model), args=[object_id]))
+        if not obj:
+            pass
+        elif obj.enabled == False:
+            pass
+        else:
+            messages.set_level(request, messages.ERROR)
+            messages.error(request, '{} should be disable before delete'.format(content_type.model))
+            return HttpResponseRedirect(reverse('admin:{}_{}_change'.format(content_type.app_label,
+                                                                            content_type.model), args=[object_id]))
+        return super().delete_view(request, object_id, extra_context)
+
+    def get_actions(self, request):
+        actions = super().get_actions(request)
+        if 'delete_selected' in actions:
+            del actions['delete_selected']
+        return actions
+
     form = DoctorForm
     inlines = [
         CompetitorInfoInline,
@@ -1442,8 +1486,8 @@ class DoctorOpdAppointmentAdmin(admin.ModelAdmin):
             return ('booking_id', 'doctor', 'doctor_id', 'doctor_details', 'hospital', 'hospital_details', 'kyc',
                     'contact_details', 'profile', 'profile_detail', 'user', 'booked_by', 'procedures_details',
                     'fees', 'effective_price', 'mrp', 'deal_price', 'payment_status', 'status', 'cancel_type',
-                    'cancellation_reason', 'cancellation_comments',
-                    'start_date', 'start_time', 'payment_type', 'otp', 'insurance', 'outstanding', 'invoice_urls')
+                    'cancellation_reason', 'cancellation_comments', 'ratings',
+                    'start_date', 'start_time', 'payment_type', 'otp', 'insurance', 'outstanding', 'invoice_urls', 'payment_type')
         elif request.user.groups.filter(name=constants['OPD_APPOINTMENT_MANAGEMENT_TEAM']).exists():
             return ('booking_id', 'doctor_name', 'doctor_id', 'doctor_details', 'hospital_name', 'hospital_details',
                     'kyc', 'contact_details', 'used_profile_name',
@@ -1452,22 +1496,36 @@ class DoctorOpdAppointmentAdmin(admin.ModelAdmin):
                     'fees', 'effective_price', 'mrp', 'deal_price', 'payment_status',
                     'payment_type', 'admin_information', 'otp', 'insurance', 'outstanding',
                     'status', 'cancel_type', 'cancellation_reason', 'cancellation_comments',
-                    'start_date', 'start_time', 'invoice_urls')
+                    'start_date', 'start_time', 'invoice_urls', 'payment_type')
         else:
             return ()
 
     def get_readonly_fields(self, request, obj=None):
         if request.user.is_superuser and request.user.is_staff:
-            return 'booking_id', 'doctor_id', 'doctor_details', 'contact_details', 'hospital_details', 'kyc', 'procedures_details', 'invoice_urls'
+            return ('booking_id', 'doctor_id', 'doctor_details', 'contact_details', 'hospital_details', 'kyc',
+                    'procedures_details', 'invoice_urls', 'ratings', 'payment_type')
         elif request.user.groups.filter(name=constants['OPD_APPOINTMENT_MANAGEMENT_TEAM']).exists():
             return ('booking_id', 'doctor_name', 'doctor_id', 'doctor_details', 'hospital_name',
                     'hospital_details', 'kyc', 'contact_details',
                     'used_profile_name', 'used_profile_number', 'default_profile_name',
                     'default_profile_number', 'user_id', 'user_number', 'booked_by',
                     'fees', 'effective_price', 'mrp', 'deal_price', 'payment_status', 'payment_type',
-                    'admin_information', 'otp', 'insurance', 'outstanding', 'procedures_details','invoice_urls')
+                    'admin_information', 'otp', 'insurance', 'outstanding', 'procedures_details','invoice_urls', 'payment_type')
         else:
             return ('invoice_urls')
+
+    def ratings(self, obj):
+        rating_queryset = rating_models.RatingsReview.objects.filter(appointment_id=obj.id).first()
+        if rating_queryset:
+            review = rating_queryset.review if rating_queryset.review else ''
+            url = '/admin/ratings_review/ratingsreview/%s/change' % (rating_queryset.id)
+            response = mark_safe('''<p>Ratings: %s</p><p>Review: %s</p><p>Status: <b>%s</b></p><p><a href="%s" target="_blank">Link</a></p>'''
+                                 % (rating_queryset.ratings, review,
+                                    dict(rating_models.RatingsReview.MODERATION_TYPE_CHOICES)[rating_queryset.moderation_status],
+                                    url))
+            return response
+        return ''
+
 
     def invoice_urls(self, instance):
         invoices_urls = ''

@@ -30,7 +30,7 @@ from ondoc.authentication.models import (OtpVerifications, NotificationEndpoint,
                                          AgentToken, DoctorNumber)
 from ondoc.notification.models import SmsNotification, EmailNotification
 from ondoc.account.models import PgTransaction, ConsumerAccount, ConsumerTransaction, Order, ConsumerRefund, OrderLog, \
-    UserReferrals, UserReferred
+    UserReferrals, UserReferred, PgLogs
 from django.contrib.auth import get_user_model
 from django.shortcuts import get_object_or_404
 from ondoc.api.pagination import paginate_queryset
@@ -57,7 +57,12 @@ import jwt
 from decimal import Decimal
 from ondoc.web.models import ContactUs
 from ondoc.notification.tasks import send_pg_acknowledge
+
+from ondoc.ratings_review import models as rate_models
+from django.contrib.contenttypes.models import ContentType
+
 import re
+from ondoc.matrix.tasks import push_order_to_matrix
 
 
 logger = logging.getLogger(__name__)
@@ -341,6 +346,9 @@ class UserProfileViewSet(mixins.CreateModelMixin, mixins.ListModelMixin,
                 data['dob'] = data['dob'].date()
             except:
                 return Response({"error": "Invalid Age"}, status=status.HTTP_400_BAD_REQUEST)
+        elif request.data.get('dob'):
+            dob = request.data.get('dob')
+            data['dob'] = dob
         else:
             # return Response({'age': {'code': 'required', 'message': 'This field is required.'}},
             #                 status=status.HTTP_400_BAD_REQUEST)
@@ -351,6 +359,7 @@ class UserProfileViewSet(mixins.CreateModelMixin, mixins.ListModelMixin,
             data['phone_number'] = request.user.phone_number
         serializer = serializers.UserProfileSerializer(data=data, context= {'request':request})
         serializer.is_valid(raise_exception=True)
+        serializer.validated_data
         if UserProfile.objects.filter(name__iexact=data['name'], user=request.user).exists():
             # return Response({
             #     "request_errors": {"code": "invalid",
@@ -719,6 +728,9 @@ class UserAppointmentsViewSet(OndocViewSet):
                             "message": "No time slot available for the give day and time."
                         }
 
+            if validated_data['status'] == OpdAppointment.COMPLETED:
+                opd_appointment.action_completed()
+                resp = AppointmentRetrieveSerializer(opd_appointment, context={"request": request}).data
             return resp
 
     def get_appointment_coupon_price(self, discounted_price, effective_price):
@@ -1029,7 +1041,7 @@ class TransactionViewSet(viewsets.GenericViewSet):
     serializer_class = serializers.TransactionSerializer
     queryset = PgTransaction.objects.none()
 
-    @transaction.atomic
+    @transaction.atomic()
     def save(self, request):
         ERROR_REDIRECT_URL = settings.BASE_URL + "/cart?error_code=1&error_message=%s"
         REDIRECT_URL = ERROR_REDIRECT_URL % "Error processing payment, please try again."
@@ -1039,6 +1051,7 @@ class TransactionViewSet(viewsets.GenericViewSet):
 
         try:
             response = None
+            coded_response = None
             data = request.data
             # Commenting below for testing
             try:
@@ -1050,6 +1063,12 @@ class TransactionViewSet(viewsets.GenericViewSet):
                 response = json.loads(decoded_response)
             except Exception as e:
                 logger.error("Cannot decode pg data - " + str(e))
+
+            # log pg data
+            try:
+                PgLogs.objects.create(decoded_response=response, coded_response=coded_response)
+            except Exception as e:
+                logger.error("Cannot log pg response - " + str(e))
 
             # For testing only
             # response = request.data
@@ -1070,13 +1089,15 @@ class TransactionViewSet(viewsets.GenericViewSet):
                     response_data = self.form_pg_transaction_data(resp_serializer.validated_data, order_obj)
                     if PgTransaction.is_valid_hash(response, product_id=order_obj.product_id):
                         pg_tx_queryset = None
+
                         try:
-                            pg_tx_queryset = PgTransaction.objects.create(**response_data)
+                            with transaction.atomic():
+                                pg_tx_queryset = PgTransaction.objects.create(**response_data)
                         except Exception as e:
                             logger.error("Error in saving PG Transaction Data - " + str(e))
 
                         try:
-                            if pg_tx_queryset:
+                            with transaction.atomic():
                                 processed_data = order_obj.process_pg_order()
                                 success_in_process = True
                         except Exception as e:
@@ -1176,6 +1197,10 @@ class TransactionViewSet(viewsets.GenericViewSet):
         html_body = "Payment failed for user with " \
                     "user id - {} and phone number - {}" \
                     ", order id - {}.".format(order_obj.user.id, order_obj.user.phone_number, order_obj.id)
+
+        # Push the order failure case to matrix.
+
+        push_order_to_matrix.apply_async(({'order_id': order_obj.id},), countdown=5)
 
         for email in settings.ORDER_FAILURE_EMAIL_ID:
             EmailNotification.publish_ops_email(email, html_body, 'Payment failure for order')
@@ -1581,7 +1606,7 @@ class OrderViewSet(GenericViewSet):
 
         resp["status"] = 1
         resp['data'], resp["payment_required"] = utils.payment_details(request, order_obj)
-        resp['payment_options'] = PaymentOptions.filtered_payment_option(order_obj)
+        resp['payment_options'], resp['invalid_payment_options'], resp['invalid_reason'] = PaymentOptions.filtered_payment_option(order_obj)
         return Response(resp)
 
 
@@ -1743,7 +1768,8 @@ class OrderDetailViewSet(GenericViewSet):
                 "effective_price": order.action_data["effective_price"],
                 "data" : cart_serializers.CartItemSerializer(item, context={"validated_data" : None}).data,
                 "booking_id" : order.reference_id,
-                "time_slot_start" : order.action_data["time_slot_start"]
+                "time_slot_start" : order.action_data["time_slot_start"],
+                "payment_type" : order.action_data["payment_type"]
             }
             processed_order_data.append(curr)
 
@@ -1805,5 +1831,55 @@ class UserLeadViewSet(GenericViewSet):
             resp['status'] = "success"
 
 
+        return Response(resp)
+
+
+class UserRatingViewSet(GenericViewSet):
+
+    authentication_classes = (JWTAuthentication, )
+    permission_classes = (IsAuthenticated, IsConsumer )
+
+    def get_queryset(self):
+        return None
+
+    def list_ratings(self,request):
+        resp = []
+        user = request.user
+        queryset = rate_models.RatingsReview.objects.select_related('content_type')\
+                                                    .prefetch_related('content_object', 'compliment')\
+                                                    .filter(user=user).order_by('-updated_at')
+        if len(queryset):
+            for obj in queryset:
+                compliments_string = ''
+                address = ''
+                c_list = []
+                cid_list = []
+                if obj.content_type == ContentType.objects.get_for_model(Doctor):
+                    name = obj.content_object.get_display_name()
+                    appointment = OpdAppointment.objects.select_related('hospital').filter(id=obj.appointment_id).first()
+                    if appointment:
+                        address = appointment.hospital.get_hos_address()
+                else:
+                    name = obj.content_object.name
+                    address = obj.content_object.get_lab_address()
+                for cm in obj.compliment.all():
+                    c_list.append(cm.message)
+                    cid_list.append(cm.id)
+                if c_list:
+                    compliments_string = (', ').join(c_list)
+                rating_obj = {}
+                rating_obj['id'] = obj.id
+                rating_obj['ratings'] = obj.ratings
+                rating_obj['address'] = address
+                rating_obj['review'] = obj.review
+                rating_obj['entity_name'] = name
+                rating_obj['entity_id'] = obj.object_id
+                rating_obj['date'] = obj.updated_at.strftime('%b %d, %Y')
+                rating_obj['compliments'] = compliments_string
+                rating_obj['compliments_list'] = cid_list
+                rating_obj['appointment_id'] = obj.appointment_id
+                rating_obj['appointment_type'] = obj.appointment_type
+                rating_obj['icon'] = request.build_absolute_uri(obj.content_object.get_thumbnail())
+                resp.append(rating_obj)
         return Response(resp)
 
