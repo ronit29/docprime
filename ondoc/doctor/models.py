@@ -33,7 +33,7 @@ from ondoc.notification import tasks as notification_tasks
 from django.contrib.contenttypes.fields import GenericRelation
 from ondoc.api.v1.utils import get_start_end_datetime, custom_form_datetime, CouponsMixin, aware_time_zone, \
     form_time_slot, util_absolute_url, html_to_pdf
-from ondoc.common.models import AppointmentHistory, AppointmentMaskNumber
+from ondoc.common.models import AppointmentHistory, AppointmentMaskNumber, Service
 from functools import reduce
 from operator import or_
 import logging
@@ -57,7 +57,7 @@ import reversion
 from ondoc.doctor import models as doctor_models
 from django.db.models import Count
 from ondoc.api.v1.utils import RawSql
-
+from safedelete import SOFT_DELETE
 logger = logging.getLogger(__name__)
 
 
@@ -124,7 +124,7 @@ class MedicalService(auth_model.TimeStampedModel, UniqueNameModel):
         db_table = "medical_service"
 
 
-class Hospital(auth_model.TimeStampedModel, auth_model.CreatedByModel, auth_model.QCModel, SearchKey):
+class Hospital(auth_model.TimeStampedModel, auth_model.CreatedByModel, auth_model.QCModel, SearchKey, auth_model.SoftDelete):
     PRIVATE = 1
     CLINIC = 2
     HOSPITAL = 3
@@ -189,6 +189,13 @@ class Hospital(auth_model.TimeStampedModel, auth_model.CreatedByModel, auth_mode
     disabled_by = models.ForeignKey(settings.AUTH_USER_MODEL, related_name="disabled_hospitals", null=True, editable=False,
                                     on_delete=models.SET_NULL)
     is_mask_number_required = models.BooleanField(default=True)
+    service = models.ManyToManyField(Service, through='HospitalServiceMapping', through_fields=('hospital', 'service'),
+                                     related_name='of_hospitals')
+    health_insurance_providers = models.ManyToManyField('HealthInsuranceProvider',
+                                                        through='HealthInsuranceProviderHospitalMapping',
+                                                        through_fields=('hospital', 'provider'),
+                                                        related_name='available_in_hospital')
+    bed_count = models.PositiveIntegerField(null=True, blank=True, default=None)
 
     def __str__(self):
         return self.name
@@ -282,6 +289,20 @@ class Hospital(auth_model.TimeStampedModel, auth_model.CreatedByModel, auth_mode
         return result
 
 
+class HospitalServiceMapping(models.Model):
+    hospital = models.ForeignKey(Hospital, on_delete=models.CASCADE,
+                                 related_name='service_mappings')
+    service = models.ForeignKey(Service, on_delete=models.CASCADE,
+                                related_name='hospital_service_mappings')
+
+    def __str__(self):
+        return '{} - {}'.format(self.hospital.name, self.service.name)
+
+    class Meta:
+        db_table = "hospital_service_mapping"
+        unique_together = (('hospital', 'service'),)
+
+
 class HospitalAward(auth_model.TimeStampedModel):
     hospital = models.ForeignKey(Hospital, on_delete=models.CASCADE)
     name = models.CharField(max_length=200)
@@ -359,7 +380,7 @@ class College(auth_model.TimeStampedModel):
         db_table = "college"
 
 
-class Doctor(auth_model.TimeStampedModel, auth_model.QCModel, SearchKey):
+class Doctor(auth_model.TimeStampedModel, auth_model.QCModel, SearchKey, auth_model.SoftDelete):
     SOURCE_PRACTO = "pr"
     SOURCE_CRM = 'crm'
 
@@ -447,6 +468,23 @@ class Doctor(auth_model.TimeStampedModel, auth_model.QCModel, SearchKey):
     def __str__(self):
         return '{} ({})'.format(self.name, self.id)
 
+    def update_deal_price(self):        
+        # will update only this doctor prices and will be called on save    
+        query = '''update doctor_clinic_timing set 
+                   deal_price = least(greatest(floor(case when fees > 0 then least(fees*1.5, .8*mrp) 
+                   else .8*mrp end /5)*5, fees), mrp) where doctor_clinic_id in (select id from doctor_clinic where doctor_id= %s) '''
+
+        update_doctor_deal_price = RawSql(query, [self.pk]).execute()
+
+    @classmethod
+    def update_all_deal_price(cls):
+        # will update all doctors prices
+        query = '''update doctor_clinic_timing set 
+            deal_price = least(greatest(floor(case when fees > 0 then least(fees*1.5, .8*mrp) else .8*mrp end /5)*5, fees), mrp) '''
+
+        update_all_doctor_deal_price = RawSql(query, []).execute()
+
+
     def get_display_name(self):
         return "Dr. {}".format(self.name.title()) if self.name else None
 
@@ -526,6 +564,7 @@ class Doctor(auth_model.TimeStampedModel, auth_model.QCModel, SearchKey):
     def save(self, *args, **kwargs):
         self.update_time_stamps()
         self.update_live_status()
+        self.update_deal_price()
 
         # On every update of onboarding status or Qcstatus push to matrix
         push_to_matrix = False
@@ -2505,3 +2544,26 @@ class UploadDoctorData(auth_model.TimeStampedModel):
             super().save(*args, **kwargs)
             upload_doctor_data.apply_async((self.id,), countdown=1)
 
+
+class HealthInsuranceProvider(auth_model.TimeStampedModel):
+    name = models.CharField(max_length=100)
+
+    class Meta:
+        db_table = 'health_insurance_provider'
+
+    def __str__(self):
+        return self.name
+
+
+class HealthInsuranceProviderHospitalMapping(models.Model):
+    hospital = models.ForeignKey(Hospital, on_delete=models.CASCADE,
+                                 related_name='provider_mappings')
+    provider = models.ForeignKey(HealthInsuranceProvider, on_delete=models.CASCADE,
+                                related_name='hospital_provider_mappings')
+
+    def __str__(self):
+        return '{} - {}'.format(self.hospital.name, self.provider.name)
+
+    class Meta:
+        db_table = "hospital__health_insurance_provider_mapping"
+        unique_together = (('hospital', 'provider'),)
