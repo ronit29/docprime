@@ -1624,7 +1624,9 @@ class DoctorAvailabilityTimingViewSet(viewsets.ViewSet):
             models.DoctorLeave.objects.filter(doctor=validated_data.get("doctor_id"), deleted_at__isnull=True), many=True)
         global_leave_serializer = v2_serializers.GlobalNonBookableSerializer(
             GlobalNonBookable.objects.filter(deleted_at__isnull=True, booking_type=GlobalNonBookable.DOCTOR), many=True)
-
+        total_leaves = dict()
+        total_leaves['global'] = global_leave_serializer.data
+        total_leaves['doctor'] = doctor_leave_serializer.data
         timeslots = dict()
         obj = TimeSlotExtraction()
 
@@ -1632,9 +1634,10 @@ class DoctorAvailabilityTimingViewSet(viewsets.ViewSet):
             obj.form_time_slots(data.day, data.start, data.end, data.fees, True,
                                 data.deal_price, data.mrp, True, on_call=data.type)
 
-        timeslots = obj.get_timing_list()
-        return Response({"timeslots": timeslots, "doctor_data": doctor_serializer.data,
-                         "doctor_leaves": doctor_leave_serializer.data, "global_leaves": global_leave_serializer.data})
+        date = datetime.datetime.today().strftime('%Y-%m-%d')
+        # timeslots = obj.get_timing_list()
+        timeslots = obj.get_timing_slots(date, total_leaves)
+        return Response({"timeslots": timeslots, "doctor_data": doctor_serializer.data})
 
 
 class HealthTipView(viewsets.GenericViewSet):

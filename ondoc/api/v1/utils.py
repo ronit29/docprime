@@ -822,6 +822,72 @@ class TimeSlotExtraction(object):
 
         return whole_timing_data
 
+    def get_timing_slots(self, date, leaves, is_thyrocare=False):
+        date = datetime.datetime.strptime(date, '%Y-%m-%d')
+        day = date.weekday()
+        whole_timing_data = OrderedDict()
+        total_leave_list = self.get_leave_list(leaves)
+        j = 0
+        if is_thyrocare:
+            self.get_slots(date, day, j, whole_timing_data, total_leave_list)
+        else:
+            for k in range(int(settings.NO_OF_WEEKS_FOR_TIME_SLOTS)):
+                for i in range(7):
+                    if k == 0:
+                        if i >= day:
+                            self.get_slots(date, i, j, whole_timing_data, total_leave_list)
+                            j = j + 1
+                    else:
+                        self.get_slots(date, i, j, whole_timing_data, total_leave_list)
+                        j = j + 1
+        return whole_timing_data
+
+    def get_slots(self, date, i, j, whole_timing_data, total_leave_list):
+        converted_date = (date + datetime.timedelta(days=j))
+        if converted_date in total_leave_list:
+            converted_date = str(converted_date)
+            whole_timing_data[converted_date] = list()
+        else:
+            # converted_date = (date + datetime.timedelta(days=j)).strftime('%d-%m-%Y')
+            converted_date = str(converted_date)
+            whole_timing_data[converted_date] = list()
+            pa = self.price_available[i]
+            if self.timing[i].get('timing'):
+                whole_timing_data[converted_date].append(
+                    self.format_data(self.timing[i]['timing'][self.MORNING], self.MORNING, pa))
+                whole_timing_data[converted_date].append(
+                    self.format_data(self.timing[i]['timing'][self.EVENING], self.EVENING, pa))
+
+    def get_leave_list(self, leaves):
+        total_leaves = list()
+        doctor_leaves = leaves.get('doctor')
+        global_leaves = leaves.get('global')
+        for dl in doctor_leaves:
+            start_date = dl.get('start_date')
+            end_date = dl.get('end_date')
+            if start_date == end_date:
+                total_leaves.append(start_date)
+            else:
+                delta = datetime.strptime(end_date, '%d-%m-%Y') - datetime.strptime(start_date, '%d-%m-%Y')
+                for i in range(delta.days + 1):
+                    total_leaves.append(datetime.datetime.strptime(start_date, '%Y-%m-%d') + datetime.timedelta(i))
+                    print(datetime.datetime.strptime(start_date, '%Y-%m-%d') + datetime.timedelta(i))
+        for gl in global_leaves:
+            start_date = gl.get('start_date')
+            end_date = gl.get('end_date')
+            if start_date == end_date:
+                total_leaves.append(start_date)
+            else:
+                delta = datetime.datetime.strptime(end_date, '%Y-%m-%d') - datetime.datetime.strptime(start_date, '%Y-%m-%d')
+                for i in range(delta.days + 1):
+                    total_leaves.append(datetime.datetime.strptime(start_date, '%Y-%m-%d') + datetime.timedelta(i))
+                    print(datetime.datetime.strptime(start_date, '%Y-%m-%d') + datetime.timedelta(i))
+        my_leave_set = set(total_leaves)
+        final_leaves = list(my_leave_set)
+        return final_leaves
+
+
+
     def format_data(self, data, day_time, pa):
         data_list = list()
         for k, v in data.items():
