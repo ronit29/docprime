@@ -898,6 +898,7 @@ class DoctorImageAdmin(admin.ModelAdmin):
     readonly_fields = ('original_image', 'cropped_img', 'crop_image', 'doctor',)
     fields = ('original_image', 'cropped_img', 'crop_image', 'doctor')
     list_filter = ('doctor__data_status', CroppedImageNullFilter)
+    search_fields = ['doctor__id', 'doctor__name']
 
     def has_change_permission(self, request, obj=None):
         if not super().has_change_permission(request, obj):
