@@ -576,9 +576,10 @@ class DoctorProfileUserViewSet(viewsets.GenericViewSet):
 
         if doctor.name and hospital and  hospital_obj and hospital_obj.city and hospital_obj.state:
             if not about_doctor:
-                about_doctor = ''
-            about_doctor += '<br><br>Dr. ' + doctor.name
-            if hospital_obj.city:
+                about_doctor = 'Dr. ' + doctor.name
+            else:
+                about_doctor += '<br><br>Dr. ' + doctor.name
+            if hospital_obj.city and hospital_obj.name:
                 about_doctor += ' practices at the ' + hospital_obj.name + ' in ' + hospital_obj.city + '. '
 
             if hospital and hospital.get('hospital_name') and hospital.get('address'):
@@ -603,7 +604,8 @@ class DoctorProfileUserViewSet(viewsets.GenericViewSet):
         if doctor_qual:
             if not about_doctor:
                 about_doctor = ''
-            about_doctor += '<br><br>'
+            else:
+                about_doctor += '<br><br>'
             count = 0
             for data in doctor_qual:
                 if count > 2:
@@ -617,7 +619,9 @@ class DoctorProfileUserViewSet(viewsets.GenericViewSet):
         if doctor.name:
             if not about_doctor:
                 about_doctor = ''
-            about_doctor += '<br><br>' + 'Dr. ' + doctor.name + ' is an experienced, skilled and awarded doctor in ' + his_her + ' field of specialization. '
+            else:
+                about_doctor += '<br><br>'
+            about_doctor += 'Dr. ' + doctor.name + ' is an experienced, skilled and awarded doctor in ' + his_her + ' field of specialization. '
             doc_awards_obj = doctor.awards.all()
             if doc_awards_obj:
                 for data in doc_awards_obj:
@@ -631,15 +635,15 @@ class DoctorProfileUserViewSet(viewsets.GenericViewSet):
         if doc_experience_details:
             if not about_doctor:
                 about_doctor = ''
+            else:
+                about_doctor += '<br><br>'
             if doc_experience_details[0].get('hospital') and doc_experience_details[0].get('start_year') and \
                     doc_experience_details[0].get('end_year'):
-                about_doctor += '<br><br>' + person + ' worked at ' + doc_experience_details[0].get(
+                about_doctor += person + ' worked at ' + doc_experience_details[0].get(
                     'hospital') + ' from ' + str(doc_experience_details[0].get('start_year')) + ' to ' + str(
                     doc_experience_details[0].get('end_year'))
             if len(doc_experience_details) > 1:
                 exp_list = list()
-                if not about_doctor:
-                    about_doctor = ''
                 for data in doc_experience_details[1:-1]:
                     if data.get('hospital') and data.get('start_year') and data.get('end_year'):
                         exp_list.append(' from ' + str(data.get('start_year')) + ' to ' + str(
