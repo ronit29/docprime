@@ -235,7 +235,13 @@ class Hospital(auth_model.TimeStampedModel, auth_model.CreatedByModel, auth_mode
 
     @classmethod
     def update_avg_rating(cls):
-        pass
+        from django.db import connection
+        cursor = connection.cursor()
+        content_type = ContentType.objects.get_for_model(Hospital)
+        if content_type:
+            cid = content_type.id
+            query = """update hospital h set avg_rating=(select avg(ratings) from ratings_review rr left join opd_appointment oa on rr.appointment_id = oa.id where appointment_type = 2 group by hospital_id having oa.hospital_id = h.id)"""
+            cursor.execute(query)
 
     def ad_str(self, string):
         return str(string).strip().replace(',', '')
