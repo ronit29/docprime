@@ -262,24 +262,25 @@ class HospitalForm(FormCleanMixin):
         if any(self.errors):
             return
         data = self.cleaned_data
-        is_enabled = data.get('enabled', None)
-        enabled_for_online_booking = data.get('enabled_for_online_booking', None)
-        if is_enabled is None:
-            is_enabled = self.instance.enabled if self.instance else False
-        if enabled_for_online_booking is None:
-            enabled_for_online_booking = self.instance.enabled_for_online_booking if self.instance else False
+        if self.instance and self.instance.id and self.instance.data_status == QCModel.QC_APPROVED:
+            is_enabled = data.get('enabled', None)
+            enabled_for_online_booking = data.get('enabled_for_online_booking', None)
+            if is_enabled is None:
+                is_enabled = self.instance.enabled if self.instance else False
+            if enabled_for_online_booking is None:
+                enabled_for_online_booking = self.instance.enabled_for_online_booking if self.instance else False
 
-        if is_enabled and enabled_for_online_booking:
-            if any([data.get('disabled_after', None), data.get('disable_reason', None),
-                    data.get('disable_comments', None)]):
-                raise forms.ValidationError(
-                    "Cannot have disabled after/disabled reason/disable comments if hospital is enabled or not enabled for online booking.")
-        elif not is_enabled or not enabled_for_online_booking:
-            if not all([data.get('disabled_after', None), data.get('disable_reason', None)]):
-                raise forms.ValidationError("Must have disabled after/disable reason if hospital is not enabled or not enabled for online booking.")
-            if data.get('disable_reason', None) and data.get('disable_reason', None) == Hospital.OTHERS and not data.get(
-                    'disable_comments', None):
-                raise forms.ValidationError("Must have disable comments if disable reason is others.")
+            if is_enabled and enabled_for_online_booking:
+                if any([data.get('disabled_after', None), data.get('disable_reason', None),
+                        data.get('disable_comments', None)]):
+                    raise forms.ValidationError(
+                        "Cannot have disabled after/disabled reason/disable comments if hospital is enabled or not enabled for online booking.")
+            elif not is_enabled or not enabled_for_online_booking:
+                if not all([data.get('disabled_after', None), data.get('disable_reason', None)]):
+                    raise forms.ValidationError("Must have disabled after/disable reason if hospital is not enabled or not enabled for online booking.")
+                if data.get('disable_reason', None) and data.get('disable_reason', None) == Hospital.OTHERS and not data.get(
+                        'disable_comments', None):
+                    raise forms.ValidationError("Must have disable comments if disable reason is others.")
         # if '_mark_in_progress' in self.data and data.get('enabled'):
         #     raise forms.ValidationError("Must be disabled before rejecting.")
 
