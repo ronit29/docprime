@@ -508,8 +508,8 @@ def create_or_update_lead_on_matrix(self, data):
             # if spoc_details:
             #     mobile += str(spoc_details.number) if hasattr(spoc_details, 'number') and spoc_details.number else ''
         mobile = int(mobile)
-        if not mobile:
-            return
+        # if not mobile:
+        #     return
         request_data = {
             'LeadSource': 'referral',
             'LeadID': obj.matrix_lead_id if hasattr(obj, 'matrix_lead_id') and obj.matrix_lead_id else 0,
