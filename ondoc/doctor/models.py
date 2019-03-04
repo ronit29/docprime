@@ -199,7 +199,8 @@ class Hospital(auth_model.TimeStampedModel, auth_model.CreatedByModel, auth_mode
     health_insurance_providers = models.ManyToManyField('HealthInsuranceProvider',
                                                         through='HealthInsuranceProviderHospitalMapping',
                                                         through_fields=('hospital', 'provider'),
-    open_for_communication = models.BooleanField(default=True)                                                    related_name='available_in_hospital')
+                                                        related_name='available_in_hospital')
+    open_for_communication = models.BooleanField(default=True)
     bed_count = models.PositiveIntegerField(null=True, blank=True, default=None)
 
     remark = GenericRelation(Remark)
