@@ -322,9 +322,10 @@ class WhatsappOptinViewSet(GenericViewSet):
         if not user_profile_obj:
             return Response(status=status.HTTP_400_BAD_REQUEST, data={'error': 'could not find the userprofile with number %s' % str(phone_number)})
 
-        if source == 'WHATSPP_SERVICE' and optin is False:
+        if source == 'WHATSAPP_SERVICE' and optin is False:
             user_profile_obj.whatsapp_optin = optin
             user_profile_obj.whatsapp_is_declined = True
+            user_profile_obj.save()
 
         return Response()
 
