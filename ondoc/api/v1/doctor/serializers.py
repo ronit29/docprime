@@ -4,6 +4,7 @@ from rest_framework.fields import CharField
 from django.db.models import Q, Avg, Count, Max, F, ExpressionWrapper, DateTimeField
 from collections import defaultdict, OrderedDict
 from ondoc.api.v1.procedure.serializers import DoctorClinicProcedureSerializer, OpdAppointmentProcedureMappingSerializer
+from ondoc.api.v1.ratings.serializers import RatingsGraphSerializer
 from ondoc.cart.models import Cart
 from ondoc.common.models import Feature
 from ondoc.doctor.models import (OpdAppointment, Doctor, Hospital, DoctorHospital, DoctorClinicTiming,
@@ -1542,9 +1543,7 @@ class TopHospitalForIpdProcedureSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Hospital
-        fields = ('id', 'name', 'distance', 'certifications', 'bed_count', 'logo',
-                  #   'rating',
-                  # TODO: SHASHANK_SINGH
+        fields = ('id', 'name', 'distance', 'certifications', 'bed_count', 'logo', 'avg_rating',
                   'count_of_insurance_provider', 'multi_speciality', 'address')
 
     def get_distance(self, obj):
@@ -1583,17 +1582,14 @@ class HospitalDetailIpdProcedureSerializer(TopHospitalForIpdProcedureSerializer)
     ipd_procedure_categories = serializers.SerializerMethodField()
     other_network_hospitals = serializers.SerializerMethodField()
     doctors = serializers.SerializerMethodField()
+    rating_graph = serializers.SerializerMethodField()
 
     class Meta:
         model = Hospital
-        fields = ('id', 'name', 'distance', 'certifications', 'bed_count', 'logo',
-                  # ,  'rating',
-                  # TODO: SHASHANK_SINGH Test this if above serializer has changed
+        fields = ('id', 'name', 'distance', 'certifications', 'bed_count', 'logo', 'avg_rating',
                   'multi_speciality', 'address',
-                  # New fields in this serializer
                   'lat', 'long', 'about', 'services', 'images', 'ipd_procedure_categories', 'other_network_hospitals',
-                  'doctors',
-                  # 'rating_graph',
+                  'doctors', 'rating_graph',
                   )
 
     def get_lat(self, obj):
@@ -1626,7 +1622,7 @@ class HospitalDetailIpdProcedureSerializer(TopHospitalForIpdProcedureSerializer)
         result = {}
         queryset = IpdProcedure.objects.prefetch_related('ipd_category_mappings__category').filter(
             doctor_clinic_ipd_mappings__enabled=True,
-            # doctor_clinic_ipd_mappings__doctor_clinic__doctor__is_live=True,
+            doctor_clinic_ipd_mappings__doctor_clinic__doctor__is_live=True,
             doctor_clinic_ipd_mappings__doctor_clinic__enabled=True,
             doctor_clinic_ipd_mappings__doctor_clinic__hospital=obj,
             is_enabled=True).distinct()
@@ -1655,10 +1651,22 @@ class HospitalDetailIpdProcedureSerializer(TopHospitalForIpdProcedureSerializer)
         return result
 
     def get_doctors(self, obj):
-        from ondoc.api.v1.doctor.views import DoctorListViewSet
-        request = self.context.get('request')
-        doctor_list_viewset = DoctorListViewSet()
-        return doctor_list_viewset.search_by_hospital(request, hospital_id=obj.id, sort_on='experience').data
+        # from ondoc.api.v1.doctor.views import DoctorListViewSet
+        # request = self.context.get('request')
+        # doctor_list_viewset = DoctorListViewSet()
+        # return doctor_list_viewset.search_by_hospital(request, hospital_id=obj.id, sort_on='experience').data
+        pass
+
+    def get_rating_graph(self, obj):
+        from ondoc.ratings_review.models import RatingsReview
+        queryset = RatingsReview.objects.prefetch_related('compliment') \
+            .filter(is_live=True,
+                    moderation_status__in=[RatingsReview.PENDING,
+                                           RatingsReview.APPROVED],
+                    appointment_id__in=OpdAppointment.objects.filter(hospital=obj).values_list('id', flat=True),
+                    appointment_type=RatingsReview.OPD)
+        return RatingsGraphSerializer(queryset, context={'request': self.context.get('request')}).data
+        # OpdAppointment.objects.filter(hospital=obj)
 
 
 class HospitalRequestSerializer(serializers.Serializer):

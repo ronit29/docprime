@@ -196,6 +196,7 @@ class Hospital(auth_model.TimeStampedModel, auth_model.CreatedByModel, auth_mode
                                                         through_fields=('hospital', 'provider'),
                                                         related_name='available_in_hospital')
     bed_count = models.PositiveIntegerField(null=True, blank=True, default=None)
+    avg_rating = models.DecimalField(max_digits=5, decimal_places=2, null=True, editable=False)
 
     def __str__(self):
         return self.name
@@ -231,6 +232,10 @@ class Hospital(auth_model.TimeStampedModel, auth_model.CreatedByModel, auth_mode
                 result.append(ad)
 
         return ", ".join(result)
+
+    @classmethod
+    def update_avg_rating(cls):
+        pass
 
     def ad_str(self, string):
         return str(string).strip().replace(',', '')
