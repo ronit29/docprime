@@ -4,7 +4,7 @@ from reversion.admin import VersionAdmin
 from ondoc.common.models import Feature, Service
 from ondoc.crm.admin.doctor import AutoComplete
 from ondoc.procedure.models import Procedure, ProcedureCategory, ProcedureCategoryMapping, ProcedureToCategoryMapping, \
-    IpdProcedure, IpdProcedureFeatureMapping
+    IpdProcedure, IpdProcedureFeatureMapping, IpdProcedureCategoryMapping, IpdProcedureCategory
 from django import forms
 
 
@@ -69,19 +69,36 @@ class FeatureInline(AutoComplete, TabularInline):
     extra = 0
     can_delete = True
     autocomplete_fields = ['feature']
-    verbose_name = "IPD Procedure"
-    verbose_name_plural = "IPD Procedures"
+    verbose_name = "IPD Procedure Feature"
+    verbose_name_plural = "IPD Procedure Features"
+
+
+class IpdCategoryInline(AutoComplete, TabularInline):
+    model = IpdProcedureCategoryMapping
+    fk_name = 'ipd_procedure'
+    extra = 0
+    max_num = 1
+    can_delete = True
+    autocomplete_fields = ['category']
+    verbose_name = "IPD Procedure Category"
+    verbose_name_plural = "IPD Procedure Categories"
 
 
 class IpdProcedureAdmin(VersionAdmin):
     model = IpdProcedure
     search_fields = ['search_key']
     exclude = ['search_key']
-    inlines = [FeatureInline]
+    inlines = [IpdCategoryInline, FeatureInline]
 
 
 class FeatureAdmin(VersionAdmin):
     model = Feature
+    search_fields = ['name']
+
+
+class IpdProcedureCategoryAdmin(VersionAdmin):
+    model = IpdProcedureCategory
+    exclude = ['search_key']
     search_fields = ['name']
 
 
