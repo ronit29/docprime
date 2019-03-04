@@ -18,6 +18,9 @@ from django.contrib.contenttypes.fields import GenericForeignKey
 from django.contrib.contenttypes.models import ContentType
 from django.utils.functional import cached_property
 from datetime import date, timedelta, datetime
+from safedelete import SOFT_DELETE
+from safedelete.models import SafeDeleteModel
+import reversion
 
 
 class Image(models.Model):
@@ -394,6 +397,7 @@ class CreatedByModel(models.Model):
         abstract = True
 
 
+@reversion.register()
 class UserProfile(TimeStampedModel):
     MALE = 'm'
     FEMALE = 'f'
@@ -409,6 +413,8 @@ class UserProfile(TimeStampedModel):
     dob = models.DateField(blank=True, null=True)
     
     profile_image = models.ImageField(upload_to='users/images', height_field=None, width_field=None, blank=True, null=True)
+    whatsapp_optin = models.NullBooleanField(default=None) # optin check of the whatsapp
+    whatsapp_is_declined = models.BooleanField(default=False) # flag to whether show whatsapp pop up or not.
 
     def __str__(self):
         return "{}-{}".format(self.name, self.id)
@@ -1431,4 +1437,14 @@ class AssociatedMerchant(TimeStampedModel):
 
     class Meta:
         db_table = 'associated_merchant'
+
+
+class SoftDelete(SafeDeleteModel):
+    _safedelete_policy = SOFT_DELETE
+
+    class Meta:
+        abstract = True
+
+
+
 

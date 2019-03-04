@@ -186,6 +186,7 @@ class CreateAppointmentSerializer(serializers.Serializer):
     procedure_ids = serializers.ListField(child=serializers.PrimaryKeyRelatedField(queryset=Procedure.objects.filter()), required=False)
     use_wallet = serializers.BooleanField(required=False)
     cart_item = serializers.PrimaryKeyRelatedField(queryset=Cart.objects.all(), required=False, allow_null=True)
+    whatsapp_optin = serializers.BooleanField(required=False)
     # procedure_category_ids = serializers.ListField(child=serializers.PrimaryKeyRelatedField(queryset=ProcedureCategory.objects.filter(is_live=True)), required=False, default=[])
     # time_slot_end = serializers.DateTimeField()
 
@@ -941,14 +942,13 @@ class DoctorProfileUserViewSerializer(DoctorProfileSerializer):
             title +=  ' - '+', '.join(doc_spec_list)
             description += ' is ' + ', '.join(doc_spec_list)
         if sublocality and locality:
-            title += ' in ' + sublocality + " " + locality + ' - Consult Online'
+            # title += ' in ' + sublocality + " " + locality + ' - Consult Online'
             description += ' in ' + sublocality + " " + locality
         elif locality:
-            title += ' in ' + locality + ' - Consult Online'
+            # title += ' in ' + locality + ' - Consult Online'
             description += ' in ' + locality
 
-        else:
-            title += ' - Consult Online'
+        title += ' | Book Appointment Online'
 
         hospital = []
         for hospital_name in clinics:
