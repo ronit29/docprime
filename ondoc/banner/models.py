@@ -104,7 +104,7 @@ class Banner(auth_model.TimeStampedModel):
             resp['event_name'] = data.event_name
             if data.url:
                 path = urlparse(data.url).path
-                params = urlparse(data.url).params+'?'
+                params = urlparse(data.url).params
                 query = urlparse(data.url).query
                 if path:
                     resp['url'] = path + params + query
