@@ -1,5 +1,6 @@
 from django.db import models
 from ondoc.authentication import models as auth_model
+from ondoc.common.models import PaymentOptions
 from django.core.validators import MaxValueValidator, MinValueValidator
 import datetime
 from django.utils.crypto import get_random_string
@@ -39,6 +40,8 @@ class Coupon(auth_model.TimeStampedModel):
     lab = models.ForeignKey("diagnostic.Lab", on_delete=models.CASCADE, blank=True, null=True)
     test = models.ManyToManyField("diagnostic.LabTest", blank=True)
     test_categories = models.ManyToManyField("diagnostic.LabTestCategory", blank=True)
+    doctors = models.ManyToManyField("doctor.Doctor", blank=True)
+    hospitals = models.ManyToManyField("doctor.Hospital", blank=True)
     specializations = models.ManyToManyField("doctor.PracticeSpecialization", blank=True)
     procedures = models.ManyToManyField("procedure.Procedure", blank=True)
     procedure_categories = models.ManyToManyField("procedure.ProcedureCategory", blank=True)
@@ -48,6 +51,7 @@ class Coupon(auth_model.TimeStampedModel):
     is_visible = models.BooleanField(default=True)
     new_user_constraint = models.BooleanField(default=False)
     coupon_type = models.IntegerField(choices=COUPON_TYPE_CHOICES, default=DISCOUNT)
+    payment_option = models.ForeignKey(PaymentOptions, on_delete=models.SET_NULL, blank=True, null=True)
 
     def save(self, *args, **kwargs):
         if not self.id:
@@ -58,9 +62,29 @@ class Coupon(auth_model.TimeStampedModel):
             self.age_start = 0
         return super().save(*args, **kwargs)
 
-    def used_coupon_count(self, user):
+    def get_search_coupon_discounted_price(self, deal_price):
+        from ondoc.api.v1.utils import CouponsMixin
+        mixin_obj = CouponsMixin()
+        discount = mixin_obj.get_discount(self, deal_price)
+        return max(0, deal_price - discount)
+
+    @classmethod
+    def get_search_coupon(cls, user):
+        coupon_obj = cls.objects.filter(code="WELCOME").first()
+        used_count = 0
+
+        if coupon_obj and user.is_authenticated:
+            used_count = coupon_obj.used_coupon_count(user)
+
+        if coupon_obj and used_count >= coupon_obj.count:
+            coupon_obj = None
+
+        return coupon_obj
+
+    def used_coupon_count(self, user, cart_item=None):
         from ondoc.doctor.models import OpdAppointment
         from ondoc.diagnostic.models import LabAppointment
+        from ondoc.cart.models import Cart
 
         if not user.is_authenticated:
             return 0
@@ -83,6 +107,8 @@ class Coupon(auth_model.TimeStampedModel):
                                                                LabAppointment.ACCEPTED,
                                                                LabAppointment.COMPLETED],
                                                    coupon=self).count()
+
+        count += Cart.objects.filter(user=user, deleted_at__isnull=True, data__coupon_code__contains=self.code).exclude(id=cart_item).count()
         return count
 
     def total_used_coupon_count(self):
@@ -129,8 +155,17 @@ class Coupon(auth_model.TimeStampedModel):
 
             for coupon in discount_coupon_list:
                 if remaining_deal_price > 0:
-                    if coupon.is_user_specific and coupon.test.exists() and coupon.type == Coupon.LAB:
-                        curr_discount = obj.get_applicable_tests_with_total_price(coupon_obj=coupon, test_ids=data['test_ids'], lab=data["lab"]).get("total_price")
+                    if coupon.test.exists() and coupon.type == Coupon.LAB:
+                        tests_deal_price = obj.get_applicable_tests_with_total_price(coupon_obj=coupon, test_ids=data['test_ids'], lab=data["lab"]).get("total_price")
+                        tests_deal_price = min(remaining_deal_price, tests_deal_price)
+                        curr_discount = obj.get_discount(coupon, tests_deal_price)
+                    elif coupon.procedures.exists() and coupon.type == Coupon.DOCTOR and data.get("doctor") and data.get("hospital") and data.get("procedures"):
+                        procedures_deal_price = obj.get_applicable_procedures_with_total_price(coupon_obj=coupon,
+                                                                                       procedures=data['procedures'],
+                                                                                       doctor=data["doctor"],
+                                                                                       hospital=data["hospital"]).get("total_price")
+                        procedures_deal_price = min(remaining_deal_price, procedures_deal_price)
+                        curr_discount = obj.get_discount(coupon, procedures_deal_price)
                     else:
                         curr_discount = obj.get_discount(coupon, remaining_deal_price)
                     coupon_discount += curr_discount
@@ -139,8 +174,17 @@ class Coupon(auth_model.TimeStampedModel):
 
             for coupon in cashback_coupon_list:
                 if remaining_deal_price > 0:
-                    if coupon.is_user_specific and coupon.test.exists() and coupon.type == Coupon.LAB:
-                        curr_cashback = obj.get_applicable_tests_with_total_price(coupon_obj=coupon, test_ids=data['test_ids'], lab=data["lab"]).get("total_price")
+                    if coupon.test.exists() and coupon.type == Coupon.LAB:
+                        tests_deal_price = obj.get_applicable_tests_with_total_price(coupon_obj=coupon, test_ids=data['test_ids'], lab=data["lab"]).get("total_price")
+                        tests_deal_price = min(remaining_deal_price, tests_deal_price)
+                        curr_cashback = obj.get_discount(coupon, tests_deal_price)
+                    elif coupon.procedures.exists() and coupon.type == Coupon.DOCTOR and data.get("doctor") and data.get("hospital") and data.get("procedures"):
+                        procedures_deal_price = obj.get_applicable_procedures_with_total_price(coupon_obj=coupon,
+                                                                                       procedures=data['procedures'],
+                                                                                       doctor=data["doctor"],
+                                                                                       hospital=data["hospital"]).get("total_price")
+                        procedures_deal_price = min(remaining_deal_price, procedures_deal_price)
+                        curr_cashback = obj.get_discount(coupon, procedures_deal_price)
                     else:
                         curr_cashback = obj.get_discount(coupon, remaining_deal_price)
                     coupon_cashback += curr_cashback
@@ -161,6 +205,7 @@ class UserSpecificCoupon(auth_model.TimeStampedModel):
     coupon = models.ForeignKey(Coupon, on_delete=models.CASCADE, null=False, related_name="user_specific_coupon")
     phone_number = models.CharField(max_length=10, blank=False, null=False)
     user = models.ForeignKey(auth_model.User, on_delete=models.SET_NULL, null=True, blank=True)
+    count = models.PositiveIntegerField(default=1)
 
     def __str__(self):
         return self.coupon.code

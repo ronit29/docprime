@@ -5,7 +5,7 @@ from collections import defaultdict
 from operator import itemgetter
 from itertools import groupby
 from django.db import connection, transaction
-from django.db.models import F, Func, Q, Count, Sum
+from django.db.models import F, Func, Q, Count, Sum, Case, When, Value, IntegerField
 from django.utils import timezone
 import math
 import datetime
@@ -14,6 +14,7 @@ import calendar
 from django.contrib.auth import get_user_model
 from django.contrib.gis.geos import GEOSGeometry
 from ondoc.account.tasks import refund_curl_task
+from ondoc.coupon.models import UserSpecificCoupon
 from ondoc.crm.constants import constants
 import copy
 import requests
@@ -28,6 +29,7 @@ from collections import OrderedDict
 import datetime
 from django.utils.dateparse import parse_datetime
 import hashlib
+from ondoc.authentication import models as auth_models
 import logging
 logger = logging.getLogger(__name__)
 
@@ -326,7 +328,10 @@ def payment_details(request, order):
     base_url = "https://{}".format(request.get_host())
     surl = base_url + '/api/v1/user/transaction/save'
     furl = base_url + '/api/v1/user/transaction/save'
-    # profile = UserProfile.objects.get(pk=order.action_data.get("profile"))
+    profile = user.get_default_profile()
+    profile_name = ""
+    if profile:
+        profile_name = profile.name
     pgdata = {
         'custId': user.id,
         'mobile': user.phone_number,
@@ -336,7 +341,7 @@ def payment_details(request, order):
         'furl': furl,
         'referenceId': "",
         'orderId': order.id,
-        'name': order.action_data.get("profile_detail").get("name"),
+        'name': profile_name,
         'txAmount': str(order.amount),
     }
     secret_key = client_key = ""
@@ -509,6 +514,7 @@ class CouponsMixin(object):
         user = kwargs.get("user")
         coupon_obj = kwargs.get("coupon_obj")
         profile = kwargs.get("profile")
+        cart_item = kwargs.get("cart_item")
 
         if coupon_obj:
             if coupon_obj.is_user_specific and not user.is_authenticated:
@@ -560,8 +566,18 @@ class CouponsMixin(object):
                         or (coupon_obj.age_end and (not user_age or coupon_obj.age_end < user_age)) ):
                     return {"is_valid": False, "used_count": None}
 
-            count = coupon_obj.used_coupon_count(user)
+                from ondoc.cart.models import Cart
+                payment_option_filter = Cart.get_pg_if_pgcoupon(user, cart_item)
+                if payment_option_filter and coupon_obj.payment_option and coupon_obj.payment_option.id != payment_option_filter.id:
+                    return {"is_valid": False, "used_count": 0}
+
+            count = coupon_obj.used_coupon_count(user, cart_item)
             total_used_count = coupon_obj.total_used_coupon_count()
+
+            if coupon_obj.is_user_specific and user:
+                user_specefic = UserSpecificCoupon.objects.filter(user=user, coupon=coupon_obj).first()
+                if user_specefic and count >= user_specefic.count:
+                    return {"is_valid": False, "used_count": count}
 
             if (coupon_obj.count is None or count < coupon_obj.count) and (coupon_obj.total_count is None or total_used_count < coupon_obj.total_count):
                 return {"is_valid": True, "used_count": count}
@@ -623,6 +639,12 @@ class CouponsMixin(object):
                 return False
             if (hospital and re.search(hospital.city, coupon_obj.cities, re.IGNORECASE)) or not hospital:
                 return False
+
+        if coupon_obj.doctors.exists() and (not doctor or doctor not in coupon_obj.doctors.all()):
+            return False
+
+        if coupon_obj.hospitals.exists() and (not hospital or hospital not in coupon_obj.hospitals.all()):
+            return False
 
         if coupon_obj.procedures.exists():
             if procedures:
@@ -743,7 +765,7 @@ class TimeSlotExtraction(object):
             self.price_available[i] = dict()
 
     def form_time_slots(self, day, start, end, price=None, is_available=True,
-                        deal_price=None, mrp=None, is_doctor=False):
+                        deal_price=None, mrp=None, is_doctor=False, on_call=1):
         start = Decimal(str(start))
         end = Decimal(str(end))
         time_span = self.TIME_SPAN
@@ -767,6 +789,9 @@ class TimeSlotExtraction(object):
                     "mrp": mrp,
                     "deal_price": deal_price
                 })
+            price_available.update({
+                "on_call": bool(on_call==2)
+            })
             self.price_available[day][temp_start] = price_available
             temp_start += float_span
 
@@ -781,24 +806,8 @@ class TimeSlotExtraction(object):
             return self.EVENING  #, pm
 
     def form_time_string(self, time, am_pm=''):
-
-        day_time_hour = int(time)
-        day_time_min = (time - day_time_hour) * 60
-
-        if day_time_hour > 12:
-            day_time_hour -= 12
-
-        day_time_hour_str = str(int(day_time_hour))
-        if int(day_time_hour) < 10:
-            day_time_hour_str = '0' + str(int(day_time_hour))
-
-        day_time_min_str = str(int(day_time_min))
-        if int(day_time_min) < 10:
-            day_time_min_str = '0' + str(int(day_time_min))
-
-        time_str = day_time_hour_str + ":" + day_time_min_str  # + " " + am_pm
-
-        return time_str
+        time = form_dc_time(time, am_pm)
+        return time
 
     def get_timing_list(self):
         whole_timing_data = dict()
@@ -819,10 +828,10 @@ class TimeSlotExtraction(object):
             if 'mrp' in pa[k].keys() and 'deal_price' in pa[k].keys():
                 data_list.append({"value": k, "text": v, "price": pa[k]["price"],
                                   "mrp": pa[k]['mrp'], 'deal_price': pa[k]['deal_price'],
-                                  "is_available": pa[k]["is_available"]})
+                                  "is_available": pa[k]["is_available"], "on_call": pa[k].get("on_call", False)})
             else:
                 data_list.append({"value": k, "text": v, "price": pa[k]["price"],
-                                  "is_available": pa[k]["is_available"]})
+                                  "is_available": pa[k]["is_available"], "on_call": pa[k].get("on_call", False)})
         format_data = dict()
         format_data['type'] = 'AM' if day_time == self.MORNING else 'PM'
         format_data['title'] = day_time
@@ -895,6 +904,125 @@ class GenericAdminEntity():
     EntityChoices = [(DOCTOR, 'Doctor'), (HOSPITAL, 'Hospital'), (LAB, 'Lab')]
 
 
+def get_opd_pem_queryset(user, model):
+
+    # super_user_query = '''CASE WHEN ((SELECT COUNT(id) FROM generic_admin WHERE user_id=%s AND hospital_id=hospital.id AND
+    #                                   super_user_permission=true AND is_disabled=false) > 0) THEN 1  ELSE 0 END'''
+    # appoint_query = '''CASE WHEN ((SELECT COUNT(id) FROM generic_admin WHERE user_id=%s AND hospital_id=hospital.id AND
+    #                              super_user_permission=false AND is_disabled=false AND permission_type=1) > 0) THEN 1  ELSE 0 END'''
+    # billing_query = '''CASE WHEN ((SELECT COUNT(id) FROM generic_admin WHERE user_id=%s AND hospital_id=hospital.id AND
+    #                                super_user_permission=false AND is_disabled=false AND permission_type=2) > 0) THEN 1  ELSE 0 END'''
+    queryset = model.objects \
+        .select_related('doctor', 'hospital', 'user') \
+        .prefetch_related('doctor__manageable_doctors', 'hospital__manageable_hospitals', 'doctor__images',
+                          'doctor__qualifications', 'doctor__qualifications__qualification',
+                          'doctor__qualifications__specialization', 'doctor__qualifications__college',
+                          'doctor__doctorpracticespecializations', 'doctor__doctorpracticespecializations__specialization') \
+        .filter(
+        Q(
+            Q(doctor__manageable_doctors__user=user,
+              doctor__manageable_doctors__hospital=F('hospital'),
+              doctor__manageable_doctors__is_disabled=False,) |
+            Q(doctor__manageable_doctors__user=user,
+              doctor__manageable_doctors__hospital__isnull=True,
+              doctor__manageable_doctors__is_disabled=False,
+             )
+             |
+            Q(hospital__manageable_hospitals__doctor__isnull=True,
+              hospital__manageable_hospitals__user=user,
+              hospital__manageable_hospitals__is_disabled=False,
+              )
+        ) |
+        Q(
+            Q(doctor__manageable_doctors__user=user,
+              doctor__manageable_doctors__super_user_permission=True,
+              doctor__manageable_doctors__is_disabled=False,
+              doctor__manageable_doctors__entity_type=GenericAdminEntity.DOCTOR, ) |
+            Q(hospital__manageable_hospitals__user=user,
+              hospital__manageable_hospitals__super_user_permission=True,
+              hospital__manageable_hospitals__is_disabled=False,
+              hospital__manageable_hospitals__entity_type=GenericAdminEntity.HOSPITAL)
+        ))\
+    .annotate(pem_type=Case(When(Q(hospital__manageable_hospitals__user=user) &
+                                   Q(hospital__manageable_hospitals__super_user_permission=True) &
+                                   Q(hospital__manageable_hospitals__is_disabled=False), then=Value(3)),
+                              When(Q(hospital__manageable_hospitals__user=user) &
+                                   Q(hospital__manageable_hospitals__super_user_permission=False) &
+                                   Q(hospital__manageable_hospitals__permission_type=auth_models.GenericAdmin.BILLINNG) &
+                                   ~Q(hospital__manageable_hospitals__permission_type=auth_models.GenericAdmin.APPOINTMENT) &
+                                   Q(hospital__manageable_hospitals__is_disabled=False), then=Value(2)),
+                              When(Q(hospital__manageable_hospitals__user=user) &
+                                   Q(hospital__manageable_hospitals__super_user_permission=False) &
+                                   Q(hospital__manageable_hospitals__permission_type=auth_models.GenericAdmin.BILLINNG) &
+                                   Q(hospital__manageable_hospitals__permission_type=auth_models.GenericAdmin.APPOINTMENT) &
+                                   Q(hospital__manageable_hospitals__is_disabled=False), then=Value(3)),
+                              default=Value(1),
+                              output_field=IntegerField()
+                              )
+              )
+    # .extra(select={'super_user': super_user_query, 'appointment_pem': appoint_query, 'billing_pem': billing_query}, params=(user_id, user_id, user_id))
+    return queryset
+
+
+def offline_get_day_slot(time):
+    am = 'AM'
+    pm = 'PM'
+    if time < 12:
+        return am
+    elif time < 16:
+        return pm
+    else:
+        return pm
+
+
+def form_dc_time(time, am_pm):
+    day_time_hour = int(time)
+    day_time_min = (time - day_time_hour) * 60
+
+    if day_time_hour > 12:
+        day_time_hour -= 12
+
+    day_time_hour_str = str(int(day_time_hour))
+    if int(day_time_hour) < 10:
+        day_time_hour_str = '0' + str(int(day_time_hour))
+
+    day_time_min_str = str(int(day_time_min))
+    if int(day_time_min) < 10:
+        day_time_min_str = '0' + str(int(day_time_min))
+
+    time_str = day_time_hour_str + ":" + day_time_min_str + " " + am_pm
+
+    return time_str
+
+
+def offline_form_time_slots(data, timing, is_available=True, is_doctor=True):
+    start = Decimal(str(data['start']))
+    end = Decimal(str(data['end']))
+    time_span = TimeSlotExtraction.TIME_SPAN
+    day = data.get('day')
+
+    float_span = (Decimal(time_span) / Decimal(60))
+    if isinstance(timing[day], dict) and not timing[day].get('timing'):
+        timing[day] = []
+    temp_start = start
+    while temp_start <= end:
+        am_pm = offline_get_day_slot(temp_start)
+        time_str = form_dc_time(temp_start, am_pm)
+        timing[day].append({'text': time_str,
+                                      'value': temp_start,
+                                      'mrp': data['fees'],
+                                      'deal_price':data['deal_price']}
+                                     )
+        price_available_obj = {"price": data['fees'], "is_available": is_available}
+        if is_doctor:
+            price_available_obj.update({
+                "mrp": data.get('mrp'),
+                "deal_price": data.get('deal_price')
+            })
+        # price_available[day][temp_start] = price_available_obj
+        temp_start += float_span
+    return timing
+
 def create_payout_checksum(all_txn, product_id):
     from ondoc.account.models import Order
 
@@ -923,10 +1051,9 @@ def create_payout_checksum(all_txn, product_id):
     checksum = secret_key + "|[" + checksum + "]|" + client_key
     checksum_hash = hashlib.sha256(str(checksum).encode())
     checksum_hash = checksum_hash.hexdigest()
-    print("checksum string - " + str(checksum) + "checksum hash - " + str(checksum_hash))
-    logger.error("checksum string - " + str(checksum) + "checksum hash - " + str(checksum_hash))
+    #print("checksum string - " + str(checksum) + "checksum hash - " + str(checksum_hash))
+    #logger.error("checksum string - " + str(checksum) + "checksum hash - " + str(checksum_hash))
     return checksum_hash
-
 
 def html_to_pdf(html_body, filename):
     file = None
@@ -962,3 +1089,15 @@ def util_file_name(filename):
     if filename:
         filename = os.path.basename(filename)
     return filename
+
+def format_iso_date(date_str):
+    date_field = date_str.find('T')
+    if date_field:
+        date_field = date_str[:date_field]
+    return date_field
+
+def datetime_to_formated_string(instance, time_format='%Y-%m-%d %H:%M:%S', to_zone = tz.gettz(settings.TIME_ZONE)):
+    instance = instance.astimezone(to_zone)
+    formated_date = datetime.datetime.strftime(instance, time_format)
+    return formated_date
+

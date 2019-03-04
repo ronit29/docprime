@@ -1,6 +1,6 @@
 from __future__ import absolute_import, unicode_literals
 from ondoc.account.models import Order
-
+from django.contrib.contenttypes.models import ContentType
 from rest_framework import status
 from django.conf import settings
 from celery import task
@@ -8,8 +8,11 @@ import requests
 import json
 import logging
 import datetime
+from datetime import date
 from ondoc.authentication.models import Address
 from ondoc.api.v1.utils import resolve_address
+from ondoc.common.models import AppointmentMaskNumber
+
 logger = logging.getLogger(__name__)
 
 
@@ -26,6 +29,7 @@ def prepare_and_hit(self, data):
     appointment_type = ''
     kyc = 0
     location = ''
+    booking_url = ''
 
     if task_data.get('type') == 'OPD_APPOINTMENT':
         booking_url = '%s/admin/doctor/opdappointment/%s/change' % (settings.ADMIN_BASE_URL, appointment.id)
@@ -65,10 +69,24 @@ def prepare_and_hit(self, data):
     except Exception as e:
         pass
 
+    p_email = ''
+    if appointment.profile:
+        p_email = appointment.profile.email
+
+    mask_number_instance = appointment.mask_number.filter(is_deleted=False, is_mask_number=True).first()
+    mask_number = ''
+    if mask_number_instance:
+        mask_number = mask_number_instance.mask_number
+
     appointment_details = {
         'AppointmentStatus': appointment.status,
+        'Age': calculate_age(appointment),
+        'Email': p_email,
+        'VirtualNo': mask_number,
+        'OTP': '',
         'KYC': kyc,
         'Location': location,
+        'PaymentType': appointment.payment_type,
         'PaymentStatus': 300,
         'OrderID': order.id if order else 0,
         'DocPrimeBookingID': appointment.id,
@@ -80,7 +98,7 @@ def prepare_and_hit(self, data):
         'HomePickupAddress': home_pickup_address,
         'PatientName': appointment.profile_detail.get("name", ''),
         'PatientAddress': patient_address,
-        'ProviderName': getattr(appointment, 'doctor').name if task_data.get('type') == 'OPD_APPOINTMENT' else getattr(appointment, 'lab').name,
+        'ProviderName': getattr(appointment, 'doctor').name + " - " + appointment.hospital.name if task_data.get('type') == 'OPD_APPOINTMENT' else getattr(appointment, 'lab').name,
         'ServiceName': service_name,
         'InsuranceCover': 0,
         'MobileList': data.get('mobile_list'),
@@ -115,6 +133,7 @@ def prepare_and_hit(self, data):
                                                               'Content-Type': 'application/json'})
 
     if response.status_code != status.HTTP_200_OK or not response.ok:
+        logger.error(json.dumps(request_data))
         logger.info("[ERROR] Appointment could not be published to the matrix system")
         logger.info("[ERROR] %s", response.reason)
 
@@ -126,6 +145,7 @@ def prepare_and_hit(self, data):
     resp_data = response.json()
 
     if not resp_data.get('Id', None):
+        logger.error(json.dumps(request_data))
         raise Exception("[ERROR] Id not recieved from the matrix while pushing appointment lead.")
 
     # save the appointment with the matrix lead id.
@@ -149,6 +169,15 @@ def prepare_and_hit(self, data):
         pass
     else:
         logger.info("[ERROR] Appointment could not be published to the matrix system")
+
+def calculate_age(appointment):
+    if not appointment.profile:
+        return 0
+    if not appointment.profile.dob:
+        return 0
+    dob = appointment.profile.dob
+    today = date.today()
+    return today.year - dob.year - ((today.month, today.day) < (dob.month, dob.day))
 
 
 @task(bind=True, max_retries=2)
@@ -219,6 +248,62 @@ def push_appointment_to_matrix(self, data):
         logger.error("Error in Celery. Failed pushing Appointment to the matrix- " + str(e))
 
 
+# @task(bind=True, max_retries=2)
+# def generate_appointment_masknumber(self, data):
+#     from ondoc.doctor.models import OpdAppointment
+#     from ondoc.diagnostic.models import LabAppointment
+#     appointment_type = data.get('type')
+#     try:
+#         appointment_id = data.get('appointment_id', None)
+#         if not appointment_id:
+#             # logger.error("[CELERY ERROR: Incorrect values provided.]")
+#             raise Exception("Appointment id not found, could not get mask number")
+#
+#         if appointment_type == 'OPD_APPOINTMENT':
+#             appointment = OpdAppointment.objects.filter(id=appointment_id).first()
+#         elif data.get('type') == 'LAB_APPOINTMENT':
+#             appointment = LabAppointment.objects.filter(id=appointment_id).first()
+#         if not appointment:
+#             raise Exception("Appointment could not found against id - " + str(appointment_id))
+#
+#         phone_number = appointment.user.phone_number
+#         time_slot = appointment.time_slot_start
+#         updated_time_slot = time_slot + datetime.timedelta(days=1)
+#         validity_up_to = int((time_slot + datetime.timedelta(days=1)).timestamp())
+#         if not phone_number:
+#             raise Exception("phone Number could not found against id - " + str(appointment_id))
+#         request_data = {
+#             "ExpirationDate": validity_up_to,
+#             "FromId": appointment.id,
+#             "ToNumber": phone_number
+#         }
+#         url = settings.MATRIX_NUMBER_MASKING
+#         matrix_api_token = settings.MATRIX_API_TOKEN
+#         response = requests.post(url, data=json.dumps(request_data), headers={'Authorization': matrix_api_token,
+#                                                                               'Content-Type': 'application/json'})
+#
+#         if response.status_code != status.HTTP_200_OK or not response.ok:
+#             logger.info("[ERROR] Appointment could not be get Mask Number")
+#             logger.info("[ERROR] %s", response.reason)
+#             countdown_time = (2 ** self.request.retries) * 60 * 10
+#             logging.error("Appointment sync with the Matrix System failed with response - " + str(response.content))
+#             print(countdown_time)
+#             self.retry([data], countdown=countdown_time)
+#
+#         mask_number = response.json()
+#         existing_mask_number_obj = appointment.mask_number.filter(is_deleted=False).first()
+#         if existing_mask_number_obj:
+#             existing_mask_number_obj.is_deleted = True
+#             existing_mask_number_obj.save()
+#             AppointmentMaskNumber(content_object=appointment, mask_number=mask_number,
+#                                                  validity_up_to=updated_time_slot, is_deleted=False).save()
+#         else:
+#             AppointmentMaskNumber(content_object=appointment, mask_number=mask_number,
+#                                                  validity_up_to=updated_time_slot, is_deleted=False).save()
+#     except Exception as e:
+#         logger.error("Error in Celery. Failed get mask number for appointment " + str(e))
+
+
 @task(bind=True, max_retries=2)
 def push_signup_lead_to_matrix(self, data):
     try:
@@ -260,6 +345,7 @@ def push_signup_lead_to_matrix(self, data):
                                                                               'Content-Type': 'application/json'})
 
         if response.status_code != status.HTTP_200_OK or not response.ok:
+            logger.error(json.dumps(request_data))
             logger.info("[ERROR] Lead could not be published to the matrix system")
             logger.info("[ERROR] %s", response.reason)
 
@@ -274,6 +360,7 @@ def push_signup_lead_to_matrix(self, data):
         # save the appointment with the matrix lead id.
 
         if not resp_data.get('Id', None):
+            logger.error(json.dumps(request_data))
             raise Exception("[ERROR] Id not recieved from the matrix while pushing online lead.")
 
         online_lead_obj.matrix_lead_id = resp_data.get('Id', None)
@@ -301,32 +388,36 @@ def push_signup_lead_to_matrix(self, data):
 @task(bind=True, max_retries=2)
 def push_order_to_matrix(self, data):
     try:
+        if not data:
+            raise Exception('Data not received for the task.')
+
         order_id = data.get('order_id', None)
         if not order_id:
             logger.error("[CELERY ERROR: Incorrect values provided.]")
             raise ValueError()
 
-        order_obj = Order.objects.get(id=order_id)
+        order_obj = Order.objects.filter(id=order_id).first()
 
         if not order_obj:
             raise Exception("Order could not found against id - " + str(order_id))
 
-        appointment_details = order_obj.appointment_details()
+        if order_obj.parent:
+            raise Exception("should not push child order in case of payment failure - " + str(order_id))
+
+        phone_number = order_obj.user.phone_number
+        name = order_obj.user.full_name
+        # appointment_details = order_obj.appointment_details()
+        # if not appointment_details:
+        #     raise Exception('Appointment details not found for order.')
+
         request_data = {
             'LeadSource': 'DocPrime',
-            'HospitalName': appointment_details.get('hospital_name'),
-            'Name': appointment_details.get('profile_name', ''),
-            'BookedBy': appointment_details.get('user_number', None),
+            'Name': name,
+            'BookedBy': phone_number,
             'LeadID': order_obj.matrix_lead_id if order_obj.matrix_lead_id else 0,
-            'PrimaryNo': appointment_details.get('user_number',None),
+            'PrimaryNo': phone_number,
             'ProductId': 5,
             'SubProductId': 4,
-            'AppointmentDetails': {
-                'OrderID': appointment_details.get('order_id', 0),
-                'ProviderName': appointment_details.get('doctor_name', '') if appointment_details.get('doctor_name') else appointment_details.get('lab_name'),
-                'BookingDateTime': int(data.get('created_at')),
-                'AppointmentDateTime': int(data.get('timeslot')),
-            }
         }
 
         #logger.error(json.dumps(request_data))
@@ -337,6 +428,7 @@ def push_order_to_matrix(self, data):
                                                                               'Content-Type': 'application/json'})
 
         if response.status_code != status.HTTP_200_OK or not response.ok:
+            logger.error(json.dumps(request_data))
             logger.info("[ERROR] Order could not be published to the matrix system")
             logger.info("[ERROR] %s", response.reason)
 
@@ -346,9 +438,12 @@ def push_order_to_matrix(self, data):
             self.retry([data], countdown=countdown_time)
         else:
             resp_data = response.json()
+            if not resp_data:
+                raise Exception('Data received from matrix is null or empty.')
             #logger.error(response.text)
 
             if not resp_data.get('Id', None):
+                logger.error(json.dumps(request_data))
                 raise Exception("[ERROR] Id not recieved from the matrix while pushing order to matrix.")
 
             # save the order with the matrix lead id.
@@ -425,6 +520,7 @@ def push_onboarding_qcstatus_to_matrix(self, data):
                                                                               'Content-Type': 'application/json'})
 
         if response.status_code != status.HTTP_200_OK or not response.ok:
+            logger.error(json.dumps(request_data))
             logger.info("[ERROR] Order could not be published to the matrix system")
             logger.info("[ERROR] %s", response.reason)
 
@@ -437,6 +533,7 @@ def push_onboarding_qcstatus_to_matrix(self, data):
             #logger.error(response.text)
 
             if not resp_data.get('Id', None):
+                logger.error(json.dumps(request_data))
                 raise Exception("[ERROR] Id not recieved from the matrix while pushing doctor or lab lead.")
 
             # save the order with the matrix lead id.
@@ -445,14 +542,17 @@ def push_onboarding_qcstatus_to_matrix(self, data):
             obj.save()
 
     except Exception as e:
-        logger.error("Error in Celery. Failed pushing order to the matrix- " + str(e))
+        logger.error("Error in Celery. Failed pushing qc status to the matrix- " + str(e))
 
 
 @task(bind=True, max_retries=2)
 def push_non_bookable_doctor_lead_to_matrix(self, nb_doc_lead_id):
     from ondoc.web.models import NonBookableDoctorLead
-    obj = NonBookableDoctorLead.objects.filter(id= nb_doc_lead_id).first()
-    if obj:
+    try:
+        obj = NonBookableDoctorLead.objects.filter(id= nb_doc_lead_id).first()
+        if not obj:
+            raise Exception('Could not get non bookable doctor for the id ', nb_doc_lead_id)
+
         exit_point_url = ""
         if obj.doctor and obj.doctor.id and obj.hospital and obj.hospital.id:
             exit_point_url = "%s/opd/doctor/%d?hospital_id=%d" % (settings.CONSUMER_APP_DOMAIN, obj.doctor.id, obj.hospital.id)
@@ -470,25 +570,29 @@ def push_non_bookable_doctor_lead_to_matrix(self, nb_doc_lead_id):
             }
         }
 
-    url = settings.MATRIX_API_URL
-    matrix_api_token = settings.MATRIX_API_TOKEN
-    response = requests.post(url, data=json.dumps(request_data), headers={'Authorization': matrix_api_token,
-                                                                          'Content-Type': 'application/json'})
+        url = settings.MATRIX_API_URL
+        matrix_api_token = settings.MATRIX_API_TOKEN
+        response = requests.post(url, data=json.dumps(request_data), headers={'Authorization': matrix_api_token,
+                                                                              'Content-Type': 'application/json'})
 
-    if response.status_code != status.HTTP_200_OK or not response.ok:
-        logger.info("[ERROR] NB Doctor Lead could not be published to the matrix system")
-        logger.info("[ERROR] %s", response.reason)
-        countdown_time = (2 ** self.request.retries) * 60 * 10
-        logging.error("Lead sync with the Matrix System failed with response - " + str(response.content))
-        print(countdown_time)
-        self.retry(obj.id, countdown=countdown_time)
-    else:
-        resp_data = response.json()
-        # logger.error(response.text)
-        if not resp_data.get('Id', None):
-            raise Exception("[ERROR] Id not received from the matrix while pushing NB doctor lead.")
+        if response.status_code != status.HTTP_200_OK or not response.ok:
+            logger.error(json.dumps(request_data))
+            logger.info("[ERROR] NB Doctor Lead could not be published to the matrix system")
+            logger.info("[ERROR] %s", response.reason)
+            countdown_time = (2 ** self.request.retries) * 60 * 10
+            logging.error("Lead sync with the Matrix System failed with response - " + str(response.content))
+            print(countdown_time)
+            self.retry(obj.id, countdown=countdown_time)
+        else:
+            resp_data = response.json()
+            # logger.error(response.text)
+            if not resp_data.get('Id', None):
+                logger.error(json.dumps(request_data))
+                raise Exception("[ERROR] Id not received from the matrix while pushing NB doctor lead.")
 
-        # save the order with the matrix lead id.
-        obj.matrix_lead_id = resp_data.get('Id', None)
-        obj.matrix_lead_id = int(obj.matrix_lead_id)
-        obj.save()
+            # save the order with the matrix lead id.
+            obj.matrix_lead_id = resp_data.get('Id', None)
+            obj.matrix_lead_id = int(obj.matrix_lead_id)
+            obj.save()
+    except Exception as e:
+        logger.error("Error while pushing the non bookable doctor lead to matrix. ", str(e))

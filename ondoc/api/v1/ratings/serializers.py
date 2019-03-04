@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from ondoc.ratings_review.models import (RatingsReview, ReviewCompliments)
+from ondoc.ratings_review.models import (RatingsReview, ReviewCompliments, AppCompliments, AppRatings)
 from ondoc.doctor import models as doc_models
 from ondoc.diagnostic import models as lab_models
 from django.db.models import Q
@@ -43,6 +43,13 @@ class RatingListBodySerializerdata(serializers.Serializer):
     content_type = serializers.ChoiceField(choices=RatingsReview.APPOINTMENT_TYPE_CHOICES)
     object_id = serializers.IntegerField()
 
+    def validate(self, attrs):
+        if attrs.get('content_type') == RatingsReview.OPD and not doc_models.Doctor.objects.filter(id=attrs.get('object_id')).exists():
+            raise serializers.ValidationError('Doctor Not Found')
+        elif attrs.get('content_type') == RatingsReview.LAB and not lab_models.Lab.objects.filter(id=attrs.get('object_id')).exists():
+            raise serializers.ValidationError('Lab Not Found')
+        return attrs
+
 
 class RatingsGraphSerializer(serializers.Serializer):
     rating_count = serializers.SerializerMethodField()
@@ -56,21 +63,22 @@ class RatingsGraphSerializer(serializers.Serializer):
         response = []
         comp_count = {}
         request = self.context.get('request')
-        for rate in obj.filter(compliment__rating_level__in=[4, 5]):
+        for rate in obj:
             for cmlmnt in rate.compliment.all():
-                r = {'id': cmlmnt.id,
-                     'message': cmlmnt.message,
-                     'level': cmlmnt.rating_level,
-                     'icon': cmlmnt.icon.url if cmlmnt.icon else None}
-                if comp_count.get(r['id']):
-                    comp_count[r['id']]['count'] += 1
+                if cmlmnt.rating_level == 4 or cmlmnt.rating_level == 5:
+                    r = {'id': cmlmnt.id,
+                         'message': cmlmnt.message,
+                         'level': cmlmnt.rating_level,
+                         'icon': cmlmnt.icon.url if cmlmnt.icon else None}
+                    if comp_count.get(r['id']):
+                        comp_count[r['id']]['count'] += 1
 
-                else:
-                    comp_count[r['id']] = r
-                    comp_count[r['id']]['count'] = 1
-                    comp_count[r['id']]['icon'] = request.build_absolute_uri(r['icon']) if r.get(
-                        'icon') is not None else None
-                    comp.append(comp_count[r['id']])
+                    else:
+                        comp_count[r['id']] = r
+                        comp_count[r['id']]['count'] = 1
+                        comp_count[r['id']]['icon'] = request.build_absolute_uri(r['icon']) if r.get(
+                            'icon') is not None else None
+                        comp.append(comp_count[r['id']])
         temp = {}
         for x in comp:
             if temp.get(x['message']):
@@ -94,7 +102,7 @@ class RatingsGraphSerializer(serializers.Serializer):
                  3: {'count': 0, 'percent': 0},
                  4: {'count': 0, 'percent': 0},
                  5: {'count': 0, 'percent': 0}}
-        total = obj.count()
+        total = len(obj)
         if total:
             for rate in obj:
                 star_data[rate.ratings]['count'] += 1
@@ -163,3 +171,14 @@ class RatingUpdateBodySerializer(serializers.Serializer):
         return attrs
 
 
+class AppRatingCreateBodySerializer(serializers.Serializer):
+    rating = serializers.IntegerField(max_value=5)
+    review = serializers.CharField(max_length=5000, allow_blank=True, required=False)
+    platform = serializers.CharField(max_length=5000, allow_blank=True, required=False)
+    app_version = serializers.CharField(max_length=5000, allow_blank=True, required=False)
+    app_name = serializers.CharField(max_length=5000, allow_blank=True, required=False)
+    device_id = serializers.CharField(max_length=5000, allow_blank=True, required=False)
+    brand = serializers.CharField(max_length=5000, allow_blank=True, required=False)
+    model = serializers.CharField(max_length=5000, allow_blank=True, required=False)
+    compliment = serializers.ListField(child=serializers.PrimaryKeyRelatedField(queryset=AppCompliments.objects.all()),
+                                       allow_empty=True, required=False)

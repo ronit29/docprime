@@ -5,7 +5,6 @@ from django.conf import settings
 from ipware import get_client_ip
 import requests
 import logging
-from django.contrib.gis.geos import Point
 from django.db import transaction
 from random import randint
 import geoip2.webservice
@@ -131,11 +130,29 @@ class GeoIPAddressURLViewSet(viewsets.GenericViewSet):
     def get_geoip_data(self, request):
 
         default = dict()
-        default["latitude"] = self.DELHI_CENTRE_LAT
-        default["longitude"] = self.DELHI_CENTRE_LONG
-        default["city"] = 'Delhi'
+        default["latitude"] = None
+        default["longitude"] = None
+        default["city"] = None
 
         ip_address, is_routable = get_client_ip(request)
+        if False and ip_address.startswith('60'):
+            ip_keys = ['HTTP_X_FORWARDED_FOR', 'X_FORWARDED_FOR',
+            'HTTP_CLIENT_IP',
+            'HTTP_X_REAL_IP',
+            'HTTP_X_FORWARDED',
+            'HTTP_X_CLUSTER_CLIENT_IP',
+            'HTTP_FORWARDED_FOR',
+            'HTTP_FORWARDED',
+            'HTTP_VIA',
+            'REMOTE_ADDR']
+            results = []
+            for key in ip_keys:
+                value = request.META.get(key, request.META.get(key.replace('_', '-'), '')).strip()
+                x = dict()
+                x[key] = value
+                results.append(x)
+            logger.error(results)
+
         if not ip_address or not is_routable:
             return Response(default)
 

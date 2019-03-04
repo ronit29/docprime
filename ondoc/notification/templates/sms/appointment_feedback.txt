@@ -1,0 +1,10 @@
+Dear {{patient_name|capfirst}},
+
+We would like to know your valuable feedback for your recently completed appointment with with Dr. {{doctor_name|capfirst}}.
+
+Please rate your experience to help us improve our services.
+
+{{opd_appointment_feedback_url}}
+
+Thanks,
+Team Docprime.com

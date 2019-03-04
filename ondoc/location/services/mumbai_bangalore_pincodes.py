@@ -1,4 +1,4 @@
-specializations = ['Doctors']
+specializations = ['Doctors', 'Clinics']
 
 # specializations = ['Doctors','Dentist', 'General Physician', 'Pediatrician', 'Orthopedist', 'Obstetrician & Gynecologist', 'Ophthalmologist', \
 #                    'Dermatologist', 'General Surgeon', 'ENT Doctor', 'Cardiologist', 'Urologist', 'Gastroenterologist', 'Endocrinologist']

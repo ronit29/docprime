@@ -1,4 +1,7 @@
 import json
+
+from django.contrib.contenttypes.fields import GenericForeignKey
+from django.contrib.contenttypes.models import ContentType
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.db import models
 from django.contrib.postgres.fields import JSONField, ArrayField
@@ -48,6 +51,12 @@ class NotificationAction:
 
     OPD_OTP_BEFORE_APPOINTMENT = 30
     LAB_OTP_BEFORE_APPOINTMENT = 31
+    OPD_CONFIRMATION_CHECK_AFTER_APPOINTMENT = 32
+    OPD_CONFIRMATION_SECOND_CHECK_AFTER_APPOINTMENT = 33
+    OPD_FEEDBACK_AFTER_APPOINTMENT = 34
+
+    REFUND_BREAKUP = 40
+    REFUND_COMPLETED = 42
 
     CASHBACK_CREDITED = 55
 
@@ -72,7 +81,10 @@ class NotificationAction:
         (RECEIPT, "Receipt"),
         (DOCTOR_INVOICE, "Doctor Invoice"),
         (LAB_INVOICE, "Lab Invoice"),
-        (CASHBACK_CREDITED, "Cashback Credited")
+        (CASHBACK_CREDITED, "Cashback Credited"),
+
+        (REFUND_BREAKUP, 'Refund break up'),
+        (REFUND_COMPLETED, 'Refund Completed')
     )
 
     OPD_APPOINTMENT = "opd_appointment"
@@ -446,6 +458,9 @@ class EmailNotification(TimeStampedModel, EmailNotificationOpdMixin, EmailNotifi
     cc = ArrayField(models.EmailField(), default=[], blank=[])
     bcc = ArrayField(models.EmailField(), default=[], blank=[])
     attachments = JSONField(default=[], blank=[])
+    content_type = models.ForeignKey(ContentType, on_delete=models.CASCADE, null=True)
+    object_id = models.PositiveIntegerField(null=True)
+    content_object = GenericForeignKey()
 
     class Meta:
         db_table = "email_notification"
@@ -601,7 +616,7 @@ class EmailNotification(TimeStampedModel, EmailNotificationOpdMixin, EmailNotifi
             publish_message(message)
 
     @classmethod
-    def send_booking_url(cls, token, order_id, email):
+    def send_booking_url(cls, token, email):
         booking_url = "{}/agent/booking?token={}".format(settings.CONSUMER_APP_DOMAIN, token)
         html_body = "Your booking url is - {} . Please pay to confirm".format(booking_url)
         email_subject = "Booking Url"
@@ -727,7 +742,7 @@ class SmsNotification(TimeStampedModel, SmsNotificationOpdMixin, SmsNotification
             publish_message(message)
 
     @classmethod
-    def send_booking_url(cls, token, order_id, phone_number):
+    def send_booking_url(cls, token, phone_number):
         booking_url = "{}/agent/booking?token={}".format(settings.CONSUMER_APP_DOMAIN, token)
         html_body = "Your booking url is - {} . Please pay to confirm".format(booking_url)
         if phone_number:

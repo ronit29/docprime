@@ -14,131 +14,98 @@ from ondoc.api.v1.utils import get_time_delta_in_minutes, aware_time_zone
 from ipware import get_client_ip
 from uuid import UUID
 from django.conf import settings
+from django.db import IntegrityError
+from django.db import transaction
 
 #from django.utils import timezone
 
 
 class EventCreateViewSet(GenericViewSet):
 
+    @transaction.non_atomic_requests
     def create(self, request):
         visitor_id, visit_id = self.get_visit(request)
         resp = {}
         data = request.data
         data.pop('visitor_info', None)
-        if data and isinstance(data, dict):
-            event_name = data.get('event')
-            if event_name:
-                userAgent = data.get('userAgent', None)
-                data.pop('userAgent', None)
-                try:
-                    user = None
-                    if request.user.is_authenticated:
-                        user = request.user
-                    event = track_models.TrackingEvent(name=event_name, data=data, visit_id=visit_id, user=user)
-                    event.save()
 
-                    # will be replaced once node API ready
-                    if settings.MONGO_STORE:
-                        requestUserId = request.user.id if request.user.is_authenticated else ""  # todo - need to check if blank will not be stored in mongodb
-                        mongo_data = data
-                        eventJson = {"id":event.id, "name":event_name, "visitId":visit_id, "userId":requestUserId}
-                        removable_keys = ['UAID', 'event', 'Action', 'Tracker', 'addToGA']
-                        for key in removable_keys:
-                            if key in mongo_data:
-                                del mongo_data[key]
-                        eventJson.update(mongo_data)
-                        # settings.MONGODB.tracking_event.insert_one(eventJson)
-                        mongo_event = track_mongo_models.TrackingEvent(**eventJson)
-                        mongo_event.save()
+        error_message = ""
+        if not visitor_id or not visit_id:
+            error_message = "Couldn't save event, Couldn't create visit/visitor - " + str(visit_id) + " / " + str(visitor_id)
+            raise Exception(error_message)
+
+        if not data or not isinstance(data, dict):
+            error_message = "Couldn't save event without data - " + str(data) + " For visit/visitor - " + str(visit_id) + " / " + str(visitor_id)
+            raise Exception(error_message)
+
+        event_name = data.get('event', None) or data.get('Action', None)
+
+        if not event_name:
+            error_message = "Couldn't save anonymous event - " + str(data) + " For visit/visitor - " + str(visit_id) + " / " + str(visitor_id)
+            raise Exception(error_message)
+
+        userAgent = data.get('userAgent', None)
+        data.pop('userAgent', None)
+        triggered_at = data.get('triggered_at', None)
+        data.pop('created_at', None)
+
+        if triggered_at:
+            if len(str(triggered_at)) >= 13:
+                triggered_at = triggered_at/1000
+            triggered_at = datetime.datetime.fromtimestamp(triggered_at)
+
+        try:
+            user = None
+            if request.user.is_authenticated:
+                user = request.user
+
+            track_models.TrackingEvent.save_event(event_name=event_name, data=data, visit_id=visit_id, user=user, triggered_at=triggered_at)
+            resp['success'] = "Event Saved Successfully!"
+        except Exception as e:
+            logger.error("Error saving event - " + str(e))
+            resp['error'] = "Error Processing Event Data!"
+
+        visit = track_models.TrackingVisit.objects.get(pk=visit_id)
+        modify_visit = False
+        if event_name == 'utm-events':
+            if not visit.data:
+                ud = {}
+                ud['utm_campaign'] = data.get('utm_campaign')
+                ud['utm_medium'] = data.get('utm_medium')
+                ud['utm_source'] = data.get('utm_source')
+                ud['utm_term'] = data.get('utm_term')
+                ud['source'] = data.get('source')
+                ud['referrer'] = data.get('referrer')
+                visit.data = ud
+                modify_visit = True
+        elif event_name == 'visitor-info':
+            visitor = track_models.TrackingVisitor.objects.get(pk=visitor_id)
+            if not visitor.device_info:
+                ud = {}
+                ud['Device'] = data.get('device')
+                ud['Mobile'] = data.get('mobile')
+                ud['platform'] = data.get('platform')
+                visitor.device_info = ud
+                visitor.save()
+        elif event_name == "change-location":
+            if not visit.location:
+                visit.location = data.get('location', {})
+                modify_visit = True
+
+        if not visit.user_agent and userAgent:
+            visit.user_agent = userAgent
+            modify_visit = True
+
+        if modify_visit:
+            visit.save()
 
 
-                    resp['success'] = "Event Saved Successfully!"
-                except Exception as e:
-                    resp['error'] = "Error Processing Event Data!"
-
-                visit = track_models.TrackingVisit.objects.get(pk=visit_id)
-                modify_visit = False
-
-                if settings.MONGO_STORE:
-                    # mongo_visit = settings.MONGODB.tracking_visit.find_one({"_id": visit_id})
-                    mongo_visit = track_mongo_models.TrackingVisit.objects.filter(id=visit_id).first()
-                    modify_mongo_visit = False
-
-                if event_name == 'utm-events':
-                    ud = {}
-                    ud['utm_campaign'] = data.get('utm_campaign')
-                    ud['utm_medium'] = data.get('utm_medium')
-                    ud['utm_source'] = data.get('utm_source')
-                    ud['utm_term'] = data.get('utm_term')
-                    ud['source'] = data.get('source')
-                    ud['referrer'] = data.get('referrer')
-                    if not visit.data:
-                        visit.data = ud
-                        modify_visit = True
-                    if settings.MONGO_STORE:
-                        if not mongo_visit.__dict__.get('data'):
-                            modify_mongo_visit = True
-
-                elif event_name == 'visitor-info':
-                    visitor = track_models.TrackingVisitor.objects.get(pk=visitor_id)
-                    ud = {}
-                    ud['Device'] = data.get('device')
-                    ud['Mobile'] = data.get('mobile')
-                    ud['platform'] = data.get('platform')
-                    if not visitor.device_info:
-                        visitor.device_info = ud
-                        visitor.save()
-                    if settings.MONGO_STORE:
-                        # mongo_visitor = settings.MONGODB.tracking_visitor.find_one({"_id": visitor_id})
-                        mongo_visitor = track_mongo_models.TrackingVisitor.objects.filter(id=visitor_id).first()
-                        # if not mongo_visitor.get('device_info'):
-                        if not mongo_visitor.__dict__.get('device_info'):
-                            # settings.MONGODB.tracking_visitor.update_one({"_id": visitor_id}, {"$set": {"device_info": ud}})
-                            # mongo_visitor = track_mongo_models.TrackingVisitor(id=visitor_id, device_info=ud)
-                            mongo_visitor.deviceInfo = ud
-                            mongo_visitor.save()
-
-                elif event_name == "change-location":
-                    if not visit.location:
-                        visit.location = data.get('location', {})
-                        modify_visit = True
-                    if settings.MONGO_STORE:
-                        if not mongo_visit.__dict__.get('location'):
-                            modify_mongo_visit = True
-
-                if not visit.user_agent and userAgent:
-                    visit.user_agent = userAgent
-                    modify_visit = True
-                if settings.MONGO_STORE:
-                    if not mongo_visit.__dict__.get('user_agent') and userAgent:
-                        modify_mongo_visit = True
-
-                if modify_visit:
-                    visit.save()
-                if settings.MONGO_STORE:
-                    if modify_mongo_visit:
-                        # visitJson = {"data": visit.data, "location": visit.location, "userAgent": visit.user_agent, "ipAddress": visit.ip_address}
-                        # settings.MONGODB.tracking_visit.update_one({"visitorId": visitor_id}, { "$set": visitJson})
-                        mongo_visit.visitor_id = visitor_id
-                        mongo_visit.data = visit.data
-                        mongo_visit.location = visit.location
-                        mongo_visit.userAgent = visit.user_agent
-                        mongo_visit.ip_address = visit.ip_address
-
-            else:
-                resp['error'] = "Event name not Found!"
-        else:
-            resp['error'] = "Invalid Data"
-
-        #cookie = self.get_cookie(visitor_id, visit_id)
-        # response = JsonResponse(resp)
-        #response.set_signed_cookie('visit', value=cookie, max_age=365*24*60*60, path='/')
-        # return response
         if "error" in resp:
             return Response(status=status.HTTP_400_BAD_REQUEST, data=resp)
         else:
             return Response(status=status.HTTP_200_OK, data=resp)
 
+    @transaction.non_atomic_requests
     def get_visit(self, request):
 
         #cookie = request.get_signed_cookie('visit', None)
@@ -150,22 +117,24 @@ class EventCreateViewSet(GenericViewSet):
         if data:
             visit_id = data.get('visit_id')
             visitor_id = data.get('visitor_id')
-            if visitor_id:
-                track_models.TrackingVisitor.objects.get_or_create(id=visitor_id)
 
-                if settings.MONGO_STORE:
-                    # visitorQuery = {"_id": visitor_id}
-                    # mongo_visitor = settings.MONGODB.tracking_visitor.find_one(visitorQuery)
-                    mongo_visitor = track_mongo_models.TrackingVisitor.objects.filter(id=visitor_id)
-                    # if not mongo_visitor:
-                    if mongo_visitor.count() == 0:
-                        # settings.MONGODB.tracking_visitor.insert_one(visitorQuery)
-                        mongo_visitor = track_mongo_models.TrackingVisitor(id=visitor_id)
-                        mongo_visitor.save()
+            if visitor_id:
+                ex_visitor = track_models.TrackingVisitor.objects.filter(id=visitor_id).first()
+                if not ex_visitor:
+                    try:
+                        with transaction.atomic():
+                            track_models.TrackingVisitor.objects.create(id=visitor_id)
+                    except IntegrityError as e:
+                        pass
 
             if visit_id:
-                track_models.TrackingVisit.objects.get_or_create(id=visit_id,
-                    defaults={'visitor_id': visitor_id, 'ip_address': client_ip})
+                ex_visit = track_models.TrackingVisit.objects.filter(id=visit_id).first()                
+                if not ex_visit:
+                    try:
+                        with transaction.atomic():
+                            track_models.TrackingVisit.objects.create(id=visit_id, visitor_id=visitor_id, ip_address=client_ip)
+                    except IntegrityError as e:
+                        pass
 
                 if settings.MONGO_STORE:
                     # visitQuery = {"_id": visit_id}
@@ -180,44 +149,6 @@ class EventCreateViewSet(GenericViewSet):
 
         return (visitor_id, visit_id)
 
-        visitor_id = None
-        visit_id = None
-        last_visit_time = None
-        visit_expired = False
-
-        if cookie:
-            cookie = json.loads(cookie)
-
-            visitor_id = cookie.get('visitor_id', None)
-            visit_id = cookie.get('visit_id', None)
-            last_visit_time = cookie.get('last_visit_time', None)
-
-        if not visitor_id:
-            print('visitor not found')
-            visitor = track_models.TrackingVisitor.create_visitor()
-            visitor_id = visitor.id
-
-            # if settings.MONGO_STORE:
-            #     settings.MONGODB.tracking_visitor.insert_one({"_id": visitor_id, "device_info": {"Device": null, "Mobile": null, "platform": null}})
-
-        if last_visit_time:
-            get_time_diff = get_time_delta_in_minutes(last_visit_time)
-            # if not get_time_diff:
-            #     print('error')
-            if int(get_time_diff) > 30:
-                visit_expired = True
-        else:
-            visit_expired = True
-
-        if not visit_id or visit_expired:
-            client_ip, is_routable = get_client_ip(request)
-            visit = track_models.TrackingVisit.create_visit(visitor_id, client_ip)
-            visit_id = visit.id
-
-            # if settings.MONGO_STORE:
-            #     settings.MONGODB.tracking_visit.insert_one({"_id": visit_id, "visitorId": visitor_id, "clientId": client_ip})
-
-        return (visitor_id, visit_id)
 
     def get_cookie(self, visitor_id, visit_id):
 

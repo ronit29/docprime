@@ -1,15 +1,13 @@
 Hi,
 
-Please find report(s) link(s) for the test(s) booked against the booking Id - {{instance.id}}.
+Please find reports for the test(s) booked against the booking Id - {{instance.id}}.
 The booking details are as below :
 
 Patient : {{patient_name|capfirst}}
 Lab : {{lab_name|capfirst}}
 Appointment Date and Time : {{instance.time_slot_start|date:"D jS F Y"}} || {{instance.time_slot_start|date:"h:i A"}}
-{% if instance.test_mappings.all %}
-Test(s) Booked :
-{% for test in instance.test_mappings.all %}{{test.test.name|capfirst}}{% if not forloop.last %}, {% endif %}{% endfor %}{% endif %}
 
+Click the link given below to view your reports
 {% if reports %}
 Link(s):
 {% for report in lab_reports %}
@@ -20,8 +18,4 @@ Link(s):
 If you wish to get your reports reviewed by our in-house doctors, please send an email to customercare@docprime.com or call us at 1800-123-9419.
 
 Pending reports, if any, will be shared once received from the lab.
-Thank you for choosing docprime.com.
-
-Regards,
-Customer Services Team
-docprime.com
+Thank you for choosing docprime.com

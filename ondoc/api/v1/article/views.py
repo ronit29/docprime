@@ -1,15 +1,24 @@
 from collections import defaultdict
-
-from ondoc.articles import models as article_models
+from django.contrib.contenttypes.models import ContentType
+from django.db import transaction
 from rest_framework import mixins, viewsets, status
 from rest_framework.permissions import IsAuthenticated
 from django.shortcuts import get_object_or_404
 from rest_framework.response import Response
+from datetime import datetime
+from django.conf import settings
 
-from ondoc.articles.models import ArticleCategory
+from fluent_comments.models import FluentComment
+
+from ondoc.api.v1.article.serializers import CommentAuthorSerializer
+from ondoc.comments.models import CustomComment
+from ondoc.seo.models import NewDynamic
+from .serializers import CommentSerializer
+from ondoc.articles import models as article_models
+from ondoc.articles.models import ArticleCategory, Article
 from . import serializers
 from ondoc.api.pagination import paginate_queryset
-from django.db import transaction
+from ondoc.authentication.models import User
 from ondoc.api.v1.utils import RawSql
 
 
@@ -85,8 +94,15 @@ class ArticleViewSet(viewsets.GenericViewSet):
             "description": description
         }
 
+        dynamic_content = NewDynamic.objects.filter(url__url=category_url, is_enabled=True).first()
+        top_content = None
+        bottom_content = None
+        if dynamic_content:
+            top_content = dynamic_content.top_content
+            bottom_content = dynamic_content.bottom_content
         return Response(
-            {'result': resp, 'seo': category_seo, 'category': category.name, 'total_articles': articles_count})
+            {'result': resp, 'seo': category_seo, 'category': category.name, 'total_articles': articles_count, 'search_content': top_content
+             , 'bottom_content': bottom_content})
 
     @transaction.non_atomic_requests
     def retrieve(self, request):
@@ -96,7 +112,6 @@ class ArticleViewSet(viewsets.GenericViewSet):
         article_url = serializer.validated_data.get('url')
         queryset = self.get_queryset().filter(url=article_url)
 
-
         if not preview:
             queryset = queryset.filter(is_published=True)
         if queryset.exists():
@@ -105,3 +120,93 @@ class ArticleViewSet(viewsets.GenericViewSet):
             return Response(response)
         else:
             return Response({"error": "Not Found"}, status=status.HTTP_404_NOT_FOUND)
+
+
+class CommentViewSet(viewsets.ModelViewSet):
+    queryset = FluentComment.objects.filter(is_public=True)
+    serializer_class = CommentSerializer
+
+    def create(self, request, *args, **kwargs):
+        user = None
+        if request.user.is_authenticated:
+            user = request.user
+
+        data = self.request.data
+        #user = self.request.user
+        parent_id = None
+        comment = data['comment']
+        if comment:
+            user_name = data['name']
+            user_email = data['email']
+
+            article_id = data['article']
+
+            if user and user.user_type == User.CONSUMER:
+                user_name = user.full_name
+                user_email = user.get_default_email
+
+            if not user_name:
+                user_name = 'Anonymous'
+
+            if 'parent' in data:
+                parent_id = data['parent']
+
+            # article_parent_obj = Article.objects.filter(id=parent).first()
+            # if article_parent_obj:
+            #     parent = article_parent_obj
+            parent = None
+            article = None
+            if parent_id:
+                parent = FluentComment.objects.filter(id=parent_id).first()
+            if parent:
+                article = parent.content_object
+                    #Article.objects.filter(id=parent.object_pk).first()
+            elif article_id:
+                article = Article.objects.filter(id=article_id).first()
+            if not article:
+                return Response(status=status.HTTP_404_NOT_FOUND, data={'error': 'article not found'})
+                ##raise error
+
+            submit_date = datetime.now()
+            content_type = ContentType.objects.get(model="article").pk
+            comment = FluentComment.objects.create(object_pk=article.id,
+                                   comment=comment,
+                                   content_type_id=content_type,
+                                   site_id=settings.SITE_ID, parent_id=parent.id if parent else None, user_name=user_name,
+                                   user_email=user_email, user=user, is_public=False)
+
+            # if parent:
+            #     article_id = parent
+            # elif article:
+            #     article_id = article
+            #
+            # if article or parent:
+            #     article_obj = Article.objects.filter(id=article_id).first()
+            #     custom_comment = CustomComment.objects.create(author=article_obj.author, comment=comment)
+
+            serializer = CommentSerializer(comment, context={'request': request})
+
+            response = {}
+            response['status'] = 1
+            response['message'] = 'Comment posted successfully'
+            response['comment'] = serializer.data
+
+            return Response(response)
+
+        else:
+            return Response(status=status.HTTP_404_NOT_FOUND, data={'error': 'comment not found'})
+
+    def list(self, request):
+        data = request.GET
+        article = data.get('article')
+        article = article_models.Article.objects.filter(id=article).first()
+        if article:
+            comments = self.queryset.filter(object_pk=article.id)
+
+            serializer = CommentSerializer(comments, many=True, context={'request': request})
+            return Response(serializer.data)
+
+
+
+
+

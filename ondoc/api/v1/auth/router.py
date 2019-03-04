@@ -5,7 +5,7 @@ from .views import (LoginOTP, UserViewset, NotificationEndpointViewSet,
                     HospitalDoctorAppointmentPermissionViewSet, HospitalDoctorBillingPermissionViewSet,
                     OrderViewSet, ConsumerAccountRefundViewSet, RefreshJSONWebToken, OnlineLeadViewSet, UserLabViewSet,
                     OrderDetailViewSet, UserTokenViewSet, SendBookingUrlViewSet, ContactUsViewSet, CareerViewSet,
-                    DoctorNumberAutocomplete, UserLeadViewSet, ReferralViewSet)
+                    DoctorNumberAutocomplete, UserLeadViewSet, ReferralViewSet, UserRatingViewSet)
 
 urlpatterns = [
     path('api-token-refresh', RefreshJSONWebToken.as_view({'post':'refresh'}), name='token-refresh'),
@@ -49,14 +49,16 @@ urlpatterns = [
     path('onlinelead/create', OnlineLeadViewSet.as_view({"post": "create"}), name='doctor-signup'),
     path('userlead/create', UserLeadViewSet.as_view({"post": "create"}), name='user-signup'),
     path('manageablelabs', UserLabViewSet.as_view({"get": "list"}), name='user-manageable-labs'),
-    path('order/<int:order_id>/send', SendBookingUrlViewSet.as_view({"post": "send_booking_url"}), name='send-booking-url'),
+    path('order/send', SendBookingUrlViewSet.as_view({"post": "send_booking_url"}), name='send-booking-url'),
     path('order/<int:order_id>', OrderDetailViewSet.as_view({"get": "details"}), name='extract-order-detail'),
+    path('order/summary/<int:order_id>', OrderDetailViewSet.as_view({"get": "summary"}), name='extract-order-summary'),
     path('token/exchange', UserTokenViewSet.as_view({"get": "details"}), name='create-user-token'),
     path('careers/upload', CareerViewSet.as_view({"post":"upload"}), name='careers-resume-upload'),
     path('contactus', ContactUsViewSet.as_view({'post': 'create'}), name='create-contact-us'),
     path('docnumber-autocomplete', DoctorNumberAutocomplete.as_view(), name='docnumber-autocomplete'),
     path('referral', ReferralViewSet.as_view({'get': 'retrieve'}), name='referral'),
-    path('referral/<str:code>', ReferralViewSet.as_view({'get': 'retrieve_by_code'}), name='retrieve_by_code')
+    path('referral/<str:code>', ReferralViewSet.as_view({'get': 'retrieve_by_code'}), name='retrieve_by_code'),
+    path('myratings', UserRatingViewSet.as_view({'get': 'list_ratings'}), name='list_ratings')
 
     # path('test/', PathologyTestList.as_view({'get': 'list'}), name='test-list'),
     # path('test/<int:id>/', PathologyTestList.as_view({'get': 'retrieve'}), name='test-detail'),
