@@ -687,12 +687,13 @@ class DoctorForm(FormCleanMixin):
         super().__init__(*args, **kwargs)
         if self and self.request and isinstance(self.request.GET, dict):
             # http://127.0.0.1:8000/admin/doctor/doctor/add/?Lead_id=1234&AgentId=9876
-            try:
-                requested_leadId = self.request.GET.get('LeadId', None)
-                self.request_matrix_lead_id = base64.b64decode(requested_leadId).decode()
-            except Exception as e:
-                logger.error("Invalid Matrix Lead ID received from Matrix - " + str(e))
-            self.request_agent_lead_id = self.request.GET.get('AgentId', None)
+            if hasattr(self.instance, 'id') and not self.instance.id:
+                try:
+                    requested_leadId = self.request.GET.get('LeadId', None)
+                    self.request_matrix_lead_id = base64.b64decode(requested_leadId).decode()
+                except Exception as e:
+                    logger.error("Invalid Matrix Lead ID received from Matrix - " + str(e))
+                self.request_agent_lead_id = self.request.GET.get('AgentId', None)
 
     def validate_qc(self):
         qc_required = {'name': 'req', 'gender': 'req',
