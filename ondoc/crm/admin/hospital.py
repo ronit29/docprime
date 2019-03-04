@@ -5,8 +5,9 @@ from reversion.admin import VersionAdmin
 from django.db.models import Q
 import datetime
 from ondoc.crm.admin.doctor import CreatedByFilter
-from ondoc.doctor.models import (HospitalImage, HospitalDocument, HospitalAward,Doctor,
-    HospitalAccreditation, HospitalCertification, HospitalSpeciality, HospitalNetwork, Hospital)
+from ondoc.doctor.models import (HospitalImage, HospitalDocument, HospitalAward, Doctor,
+                                 HospitalAccreditation, HospitalCertification, HospitalSpeciality, HospitalNetwork,
+                                 Hospital, HospitalServiceMapping, HealthInsuranceProviderHospitalMapping)
 from .common import *
 from ondoc.crm.constants import constants
 from django.utils.safestring import mark_safe
@@ -17,6 +18,9 @@ from django import forms
 from ondoc.api.v1.utils import GenericAdminEntity
 import nested_admin
 from .common import AssociatedMerchantInline, RemarkInline
+from django.contrib import messages
+from django.http import HttpResponseRedirect
+
 import logging
 logger = logging.getLogger(__name__)
 
@@ -74,6 +78,24 @@ class HospitalSpecialityInline(admin.TabularInline):
     extra = 0
     can_delete = True
     show_change_link = False
+
+
+class HospitalServiceInline(admin.TabularInline):
+    model = HospitalServiceMapping
+    fk_name = 'hospital'
+    extra = 0
+    can_delete = True
+    show_change_link = False
+    autocomplete_fields = ['service']
+
+
+class HospitalHealthInsuranceProviderInline(admin.TabularInline):
+    model = HealthInsuranceProviderHospitalMapping
+    fk_name = 'hospital'
+    extra = 0
+    can_delete = True
+    show_change_link = False
+    autocomplete_fields = ['provider']
 
 
 # class HospitalNetworkMappingInline(admin.TabularInline):
@@ -240,14 +262,21 @@ class HospitalForm(FormCleanMixin):
         if any(self.errors):
             return
         data = self.cleaned_data
-        if data.get('enabled', False):
+        is_enabled = data.get('enabled', None)
+        enabled_for_online_booking = data.get('enabled_for_online_booking', None)
+        if is_enabled is None:
+            is_enabled = self.instance.enabled if self.instance else False
+        if enabled_for_online_booking is None:
+            enabled_for_online_booking = self.instance.enabled_for_online_booking if self.instance else False
+
+        if is_enabled and enabled_for_online_booking:
             if any([data.get('disabled_after', None), data.get('disable_reason', None),
                     data.get('disable_comments', None)]):
                 raise forms.ValidationError(
-                    "Cannot have disabled after/disabled reason/disable comments if hospital is enabled.")
-        else:
+                    "Cannot have disabled after/disabled reason/disable comments if hospital is enabled or not enabled for online booking.")
+        elif not is_enabled or not enabled_for_online_booking:
             if not all([data.get('disabled_after', None), data.get('disable_reason', None)]):
-                raise forms.ValidationError("Must have disabled after/disable reason if hospital is not enabled.")
+                raise forms.ValidationError("Must have disabled after/disable reason if hospital is not enabled or not enabled for online booking.")
             if data.get('disable_reason', None) and data.get('disable_reason', None) == Hospital.OTHERS and not data.get(
                     'disable_comments', None):
                 raise forms.ValidationError("Must have disable comments if disable reason is others.")
@@ -377,6 +406,32 @@ class HospitalAdmin(admin.GeoModelAdmin, VersionAdmin, ActionAdmin, QCPemAdmin):
         else:
             return ''
 
+    def delete_view(self, request, object_id, extra_context=None):
+        obj = self.model.objects.filter(id=object_id).first()
+        opd_appointment = OpdAppointment.objects.filter(hospital_id=object_id).first()
+        content_type = ContentType.objects.get_for_model(obj)
+        if opd_appointment:
+            messages.set_level(request, messages.ERROR)
+            messages.error(request, '{} could not deleted, as {} is present in appointment history'.format(content_type.model, content_type.model))
+            return HttpResponseRedirect(reverse('admin:{}_{}_change'.format(content_type.app_label,
+                                                                     content_type.model), args=[object_id]))
+        if not obj:
+            pass
+        elif obj.enabled == False:
+            pass
+        else:
+            messages.set_level(request, messages.ERROR)
+            messages.error(request, '{} should be disable before delete'.format(content_type.model))
+            return HttpResponseRedirect(reverse('admin:{}_{}_change'.format(content_type.app_label,
+                                                                            content_type.model), args=[object_id]))
+        return super().delete_view(request, object_id, extra_context)
+
+    def get_actions(self, request):
+        actions = super().get_actions(request)
+        if 'delete_selected' in actions:
+            del actions['delete_selected']
+        return actions
+
     def get_readonly_fields(self, *args, **kwargs):
         read_only = super().get_readonly_fields(*args, **kwargs)
         if args:
@@ -401,6 +456,8 @@ class HospitalAdmin(admin.GeoModelAdmin, VersionAdmin, ActionAdmin, QCPemAdmin):
     # autocomplete_fields = ['matrix_city', 'matrix_state']
     inlines = [
         # HospitalNetworkMappingInline,
+        HospitalServiceInline,
+        HospitalHealthInsuranceProviderInline,
         HospitalSpecialityInline,
         HospitalAwardInline,
         HospitalAccreditationInline,

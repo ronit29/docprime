@@ -18,7 +18,7 @@ from ondoc.notification import tasks as notification_tasks
 from ondoc.notification.labnotificationaction import LabNotificationAction
 from django.core.files.storage import get_storage_class
 from ondoc.api.v1.utils import AgreedPriceCalculate, DealPriceCalculate, TimeSlotExtraction, CouponsMixin, \
-    form_time_slot, util_absolute_url, html_to_pdf
+    form_time_slot, util_absolute_url, html_to_pdf, RawSql
 from ondoc.account import models as account_model
 from django.utils import timezone
 from datetime import timedelta
@@ -803,6 +803,7 @@ class LabTestCategory(auth_model.TimeStampedModel, SearchKey):
     is_package_category = models.BooleanField(verbose_name='Is this a test package category?')
     show_on_recommended_screen = models.BooleanField(default=False)
     priority = models.PositiveIntegerField(default=0)
+    icon = models.ImageField(upload_to='test/image', null=True, blank=True)
 
     def __str__(self):
         return self.name
@@ -983,8 +984,9 @@ class LabTest(TimeStampedModel, SearchKey):
         for item in all_categories:
             if item.is_live == True:
                 resp = {}
-                resp['name'] = item.name
-                resp['id'] = item.id
+                resp['name'] = item.name if item.name else None
+                resp['id'] = item.id if item.id else None
+                resp['icon'] = item.icon.url if item.icon and item.icon.url else None
                 res.append(resp)
         return res
 
@@ -1036,6 +1038,36 @@ class AvailableLabTest(TimeStampedModel):
     rating = GenericRelation(ratings_models.RatingsReview)
 
 
+    def update_deal_price(self):
+        # will update only this available lab test prices and will be called on save
+        # query = '''update available_lab_test set computed_deal_price = least(greatest( floor(GREATEST
+        #         ((case when custom_agreed_price is not null
+        #         then custom_agreed_price else computed_agreed_price end)*1.2,mrp*.8)/5)*5,case when custom_agreed_price
+        #         is not null then custom_agreed_price
+        #         else computed_agreed_price end), mrp) where id = %s '''
+
+        query = '''update available_lab_test set computed_deal_price = 
+                   least(greatest(floor(least((case when custom_agreed_price is not null 
+                   then custom_agreed_price else computed_agreed_price end)*1.5, mrp*.8)/5)*5, case when custom_agreed_price
+                   is not null then custom_agreed_price else computed_agreed_price end), mrp)
+                   where enabled=true and id=%s ''' 
+
+        update_available_lab_test_deal_price = RawSql(query, [self.pk]).execute()
+        # deal_price = RawSql(query, [self.pk]).fetch_all()
+        # if deal_price:
+        #    self.computed_deal_price = deepcopy(deal_price[0].get('computed_deal_price'))
+
+    @classmethod
+    def update_all_deal_price(cls):
+        # will update all lab prices
+        query = '''update available_lab_test set computed_deal_price = 
+                least(greatest(floor(least((case when custom_agreed_price is not null 
+                then custom_agreed_price else computed_agreed_price end)*1.5, mrp*.8)/5)*5, case when custom_agreed_price
+                is not null then custom_agreed_price else computed_agreed_price end), mrp)
+                where enabled=true'''
+
+        update_all_available_lab_test_deal_price = RawSql(query, []).execute()
+
     def get_testid(self):
         return self.test.id
 
@@ -1047,8 +1079,9 @@ class AvailableLabTest(TimeStampedModel):
             self.computed_agreed_price = self.get_computed_agreed_price()
             # self.computed_deal_price = self.get_computed_deal_price()
             self.computed_deal_price = self.computed_agreed_price
-
         super(AvailableLabTest, self).save(*args, **kwargs)
+        self.update_deal_price()
+
 
     def get_computed_deal_price(self):
         if self.test.test_type == LabTest.RADIOLOGY:

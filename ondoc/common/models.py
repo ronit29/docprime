@@ -159,6 +159,27 @@ class AppointmentMaskNumber(TimeStampedModel):
         db_table = 'appointment_mask_number'
 
 
+class Feature(TimeStampedModel):
+    icon = models.ImageField('Feature image', upload_to='feature/images')
+    name = models.CharField(max_length=100)
+
+    class Meta:
+        db_table = 'feature'
+
+    def __str__(self):
+        return self.name
+
+
+class Service(TimeStampedModel):
+    icon = models.ImageField('Service image', upload_to='service/images')
+    name = models.CharField(max_length=100)
+
+    class Meta:
+        db_table = 'service'
+
+    def __str__(self):
+        return self.name
+
 class Remark(auth_model.TimeStampedModel):
     FEEDBACK = 1
     REOPEN = 2

@@ -24,7 +24,9 @@ import logging
 from dal import autocomplete
 from ondoc.api.v1.utils import GenericAdminEntity, util_absolute_url, util_file_name
 from ondoc.common.models import AppointmentHistory
-from ondoc.procedure.models import DoctorClinicProcedure, Procedure
+from django.contrib import messages
+from django.http import HttpResponseRedirect
+from ondoc.procedure.models import DoctorClinicProcedure, Procedure, DoctorClinicIpdProcedure
 
 logger = logging.getLogger(__name__)
 
@@ -182,6 +184,16 @@ class DoctorClinicProcedureInline(nested_admin.NestedTabularInline):
     autocomplete_fields = ['procedure']
 
 
+class DoctorClinicIpdProcedureInline(nested_admin.NestedTabularInline):
+    model = DoctorClinicIpdProcedure
+    extra = 0
+    can_delete = True
+    show_change_link = False
+    verbose_name = 'IPD Procedure'
+    verbose_name_plural = 'IPD Procedures'
+    autocomplete_fields = ['ipd_procedure']
+
+
 class DoctorClinicTimingInline(nested_admin.NestedTabularInline):
     model = DoctorClinicTiming
     form = DoctorClinicTimingForm
@@ -219,7 +231,7 @@ class DoctorClinicInline(nested_admin.NestedTabularInline):
     formset = DoctorClinicFormSet
     show_change_link = False
     # autocomplete_fields = ['hospital']
-    inlines = [DoctorClinicTimingInline, DoctorClinicProcedureInline, AssociatedMerchantInline]
+    inlines = [DoctorClinicTimingInline, DoctorClinicProcedureInline, DoctorClinicIpdProcedureInline, AssociatedMerchantInline]
     fields = ['hospital', 'add_hospital_link', 'followup_duration', 'followup_charges', 'enabled_for_online_booking', 'enabled', 'priority']
 
     def get_readonly_fields(self, *args, **kwargs):
@@ -685,7 +697,7 @@ class DoctorForm(FormCleanMixin):
         qc_required = {'name': 'req', 'gender': 'req',
                        # 'practicing_since': 'req',
                        'emails': 'count',
-                       'doctor_clinics': 'count',
+                       'doctor_clinics': 'count', 'languages': 'count',
                        'doctorpracticespecializations': 'count', 'matrix_lead_id': 'value_req'}
 
         # Q(hospital__is_billing_enabled=False, doctor=self.instance) &&
@@ -1073,6 +1085,36 @@ class DoctorAdmin(AutoComplete, ImportExportMixin, VersionAdmin, ActionAdmin, QC
     list_filter = (
         'data_status', 'onboarding_status', 'is_live', 'enabled', 'is_insurance_enabled', 'doctorpracticespecializations__specialization',
         CityFilter, CreatedByFilter)
+
+    def has_delete_permission(self, request, obj=None):
+        return super().has_delete_permission(request, obj)
+
+    def delete_view(self, request, object_id, extra_context=None):
+        obj = self.model.objects.filter(id=object_id).first()
+        opd_appointment = OpdAppointment.objects.filter(doctor_id=object_id).first()
+        content_type = ContentType.objects.get_for_model(obj)
+        if opd_appointment:
+            messages.set_level(request, messages.ERROR)
+            messages.error(request, '{} could not deleted, as {} is present in appointment history'.format(content_type.model, content_type.model))
+            return HttpResponseRedirect(reverse('admin:{}_{}_change'.format(content_type.app_label,
+                                                                     content_type.model), args=[object_id]))
+        if not obj:
+            pass
+        elif obj.enabled == False:
+            pass
+        else:
+            messages.set_level(request, messages.ERROR)
+            messages.error(request, '{} should be disable before delete'.format(content_type.model))
+            return HttpResponseRedirect(reverse('admin:{}_{}_change'.format(content_type.app_label,
+                                                                            content_type.model), args=[object_id]))
+        return super().delete_view(request, object_id, extra_context)
+
+    def get_actions(self, request):
+        actions = super().get_actions(request)
+        if 'delete_selected' in actions:
+            del actions['delete_selected']
+        return actions
+
     form = DoctorForm
     inlines = [
         CompetitorInfoInline,
@@ -1106,7 +1148,7 @@ class DoctorAdmin(AutoComplete, ImportExportMixin, VersionAdmin, ActionAdmin, QC
     #                                                                                   'doctor_clinics__availability',
     #                                                                                   'documents')
     #exclude = ('source','batch','lead_url','registered')
-
+    
     def get_queryset(self, request):
         qs = super().get_queryset(request)
         if request.user.is_member_of(constants['DOCTOR_SALES_GROUP']):

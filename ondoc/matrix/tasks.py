@@ -32,6 +32,7 @@ def prepare_and_hit(self, data):
     appointment_type = ''
     kyc = 0
     location = ''
+    booking_url = ''
 
     if task_data.get('type') == 'OPD_APPOINTMENT':
         booking_url = '%s/admin/doctor/opdappointment/%s/change' % (settings.ADMIN_BASE_URL, appointment.id)
@@ -100,7 +101,7 @@ def prepare_and_hit(self, data):
         'HomePickupAddress': home_pickup_address,
         'PatientName': appointment.profile_detail.get("name", ''),
         'PatientAddress': patient_address,
-        'ProviderName': getattr(appointment, 'doctor').name if task_data.get('type') == 'OPD_APPOINTMENT' else getattr(appointment, 'lab').name,
+        'ProviderName': getattr(appointment, 'doctor').name + " - " + appointment.hospital.name if task_data.get('type') == 'OPD_APPOINTMENT' else getattr(appointment, 'lab').name,
         'ServiceName': service_name,
         'InsuranceCover': 0,
         'MobileList': data.get('mobile_list'),
@@ -135,6 +136,7 @@ def prepare_and_hit(self, data):
                                                               'Content-Type': 'application/json'})
 
     if response.status_code != status.HTTP_200_OK or not response.ok:
+        logger.error(json.dumps(request_data))
         logger.info("[ERROR] Appointment could not be published to the matrix system")
         logger.info("[ERROR] %s", response.reason)
 
@@ -346,6 +348,7 @@ def push_signup_lead_to_matrix(self, data):
                                                                               'Content-Type': 'application/json'})
 
         if response.status_code != status.HTTP_200_OK or not response.ok:
+            logger.error(json.dumps(request_data))
             logger.info("[ERROR] Lead could not be published to the matrix system")
             logger.info("[ERROR] %s", response.reason)
 
@@ -428,6 +431,7 @@ def push_order_to_matrix(self, data):
                                                                               'Content-Type': 'application/json'})
 
         if response.status_code != status.HTTP_200_OK or not response.ok:
+            logger.error(json.dumps(request_data))
             logger.info("[ERROR] Order could not be published to the matrix system")
             logger.info("[ERROR] %s", response.reason)
 
@@ -684,6 +688,7 @@ def push_onboarding_qcstatus_to_matrix(self, data):
                                                                               'Content-Type': 'application/json'})
 
         if response.status_code != status.HTTP_200_OK or not response.ok:
+            logger.error(json.dumps(request_data))
             logger.info("[ERROR] Order could not be published to the matrix system")
             logger.info("[ERROR] %s", response.reason)
 
@@ -739,6 +744,7 @@ def push_non_bookable_doctor_lead_to_matrix(self, nb_doc_lead_id):
                                                                               'Content-Type': 'application/json'})
 
         if response.status_code != status.HTTP_200_OK or not response.ok:
+            logger.error(json.dumps(request_data))
             logger.info("[ERROR] NB Doctor Lead could not be published to the matrix system")
             logger.info("[ERROR] %s", response.reason)
             countdown_time = (2 ** self.request.retries) * 60 * 10
