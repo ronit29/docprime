@@ -181,6 +181,11 @@ def consumer_refund_update():
     ConsumerRefund.request_pending_refunds()
     ConsumerRefund.update_refund_status()
 
+@task()
+def update_ben_status_from_pg():
+    from ondoc.authentication.models import Merchant
+    Merchant.update_status_from_pg()
+    return "success"
 
 @task(bind=True)
 def refund_status_update(self):

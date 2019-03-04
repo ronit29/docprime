@@ -9,7 +9,7 @@ from raven.contrib.celery import register_signal, register_logger_signal
 from ondoc.account.tasks import refund_status_update, consumer_refund_update, dump_to_elastic
 from celery.schedules import crontab
 from ondoc.doctor.tasks import save_avg_rating, update_prices
-from ondoc.authentication.tasks import update_ben_status_from_pg
+from ondoc.account.tasks import update_ben_status_from_pg
 # from ondoc.doctor.services.update_search_score import DoctorSearchScore
 
 
@@ -66,6 +66,6 @@ def setup_periodic_tasks(sender, **kwargs):
     sender.add_periodic_task(crontab(hour=18, minute=30), save_avg_rating.s(), name='Update Lab and Doctor Average Rating')
     sender.add_periodic_task(crontab(hour=19, minute=30), update_prices.s(), name='Update Lab and Doctor Prices')
     sender.add_periodic_task(update_ben_status_time, update_ben_status_from_pg.s(), name='Update Ben Status from pg ')
-    
+
     # doctor_search_score_creation_time = float(settings.CREATE_DOCTOR_SEARCH_SCORE) * float(3600.0)
     # sender.add_periodic_task(doctor_search_score_creation_time, create_search_score.s(), name='Doctor search score updaed')
