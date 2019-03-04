@@ -5,6 +5,9 @@ from django.conf import settings
 from ondoc.doctor import models as doc_models
 from ondoc.procedure.models import Procedure
 from ondoc.api.v1.doctor import serializers as v1_serializers
+from ondoc.diagnostic.models import LabAppointment
+from ondoc.api.v1.diagnostic import serializers as v1_diagnostic_serailizers
+
 logger = logging.getLogger(__name__)
 User = get_user_model()
 
@@ -127,3 +130,36 @@ class SpecializationSerializer(serializers.ModelSerializer):
     class Meta:
         model = doc_models.Specialization
         fields = '__all__'
+
+
+class OpdAppointmentFuture(v1_serializers.OpdAppointmentSerializer):
+    address = serializers.SerializerMethodField()
+    provider_id = serializers.IntegerField(source='doctor.id')
+    name = serializers.ReadOnlyField(source='doctor.name')
+
+    class Meta:
+        model = doc_models.OpdAppointment
+        fields = ('id', 'provider_id', 'name', 'hospital_name', 'patient_name', 'type',
+                  'status', 'time_slot_start', 'time_slot_end', 'patient_thumbnail', 'address')
+
+    def get_address(self, obj):
+        return obj.hospital.get_hos_address()
+
+
+class LabAppointmentFuture(v1_diagnostic_serailizers.LabAppointmentModelSerializer):
+    address = serializers.SerializerMethodField()
+    provider_id = serializers.IntegerField(source='lab.id')
+    name = serializers.ReadOnlyField(source='lab.name')
+    hospital_name = serializers.SerializerMethodField()
+
+    class Meta:
+        model = LabAppointment
+        fields = ('id', 'provider_id', 'name', 'hospital_name', 'patient_name', 'type',
+                  'status', 'time_slot_start', 'time_slot_end', 'patient_thumbnail', 'address')
+
+    def get_address(self, obj):
+        return obj.lab.get_lab_address()
+
+    def get_hospital_name(self, obj):
+        return None
+

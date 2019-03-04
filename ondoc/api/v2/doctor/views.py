@@ -19,8 +19,12 @@ from django.conf import settings
 import datetime, logging, re, random
 from django.utils import timezone
 
+from ondoc.diagnostic.models import LabAppointment
+from ondoc.doctor.models import OpdAppointment
+
 User = get_user_model()
 logger = logging.getLogger(__name__)
+
 
 
 class DoctorBillingViewSet(viewsets.GenericViewSet):
@@ -443,3 +447,28 @@ class DoctorDataViewset(viewsets.GenericViewSet):
         qs = doc_models.Specialization.objects.all()
         serializer = serializers.SpecializationSerializer(qs, many=True)
         return Response(serializer.data)
+
+
+class AppointmentViewSet(viewsets.GenericViewSet):
+    authentication_classes = (JWTAuthentication,)
+    permission_classes = (IsAuthenticated,)
+
+    def upcoming_appointments(self, request):
+        # ti = datetime.datetime.now().strftime('%Y-%m-%d %H:%M')
+        ti = timezone.now()
+        user_id = request.user.id
+        user_id = 2300
+        response_appointment = OpdAppointment.objects.filter(time_slot_start__gte=ti, user_id=user_id).exclude(
+            status__in=[OpdAppointment.CANCELLED, OpdAppointment.COMPLETED]).select_related('doctor', 'hospital',
+                                                                                            'profile')
+
+        appointment_serializer = serializers.OpdAppointmentFuture(response_appointment, many=True)
+
+        lab_response = LabAppointment.objects.filter(time_slot_start__gte=ti, user_id=user_id).exclude(
+            status__in=[LabAppointment.CANCELLED, LabAppointment.COMPLETED]).prefetch_related('tests', 'lab', 'profile')
+
+        lab_serializer = serializers.LabAppointmentFuture(lab_response, many=True)
+        return Response(appointment_serializer.data + lab_serializer.data)
+
+    def get_queryset(self):
+        return OpdAppointment.objects.none()
