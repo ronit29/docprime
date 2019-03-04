@@ -24,7 +24,10 @@ class EventCreateViewSet(GenericViewSet):
 
     @transaction.non_atomic_requests
     def create(self, request):
-        visitor_id, visit_id = self.get_visit(request)
+        visitor_id, visit_id = self.get_visit(request, track_models.TrackingVisit, track_models.TrackingVisitor)
+        if settings.MONGO_STORE:
+            self.get_visit(request, track_mongo_models.TrackingVisit, track_mongo_models.TrackingVisitor)
+
         resp = {}
         data = request.data
         data.pop('visitor_info', None)
@@ -60,12 +63,28 @@ class EventCreateViewSet(GenericViewSet):
                 user = request.user
 
             track_models.TrackingEvent.save_event(event_name=event_name, data=data, visit_id=visit_id, user=user, triggered_at=triggered_at)
+            if settings.MONGO_STORE:
+                track_mongo_models.TrackingEvent.save_event(visitor_id=visitor_id, event_name=event_name, data=data,
+                                                            visit_id=visit_id, user=user, triggered_at=triggered_at)
             resp['success'] = "Event Saved Successfully!"
         except Exception as e:
             logger.error("Error saving event - " + str(e))
             resp['error'] = "Error Processing Event Data!"
 
-        visit = track_models.TrackingVisit.objects.get(pk=visit_id)
+
+        self.modify_visit( event_name, visit_id, visitor_id, data, userAgent, track_models.TrackingVisit, track_models.TrackingVisitor)
+        if settings.MONGO_STORE:
+            self.modify_visit(event_name, visit_id, visitor_id, data, userAgent, track_mongo_models.TrackingVisit, track_mongo_models.TrackingVisitor)
+
+
+        if "error" in resp:
+            return Response(status=status.HTTP_400_BAD_REQUEST, data=resp)
+        else:
+            return Response(status=status.HTTP_200_OK, data=resp)
+
+    @transaction.non_atomic_requests
+    def modify_visit(self, event_name, visit_id, visitor_id, data, userAgent, VISIT_MODEL, VISITOR_MODEL):
+        visit = VISIT_MODEL.objects.get(id=visit_id)
         modify_visit = False
         if event_name == 'utm-events':
             if not visit.data:
@@ -79,7 +98,7 @@ class EventCreateViewSet(GenericViewSet):
                 visit.data = ud
                 modify_visit = True
         elif event_name == 'visitor-info':
-            visitor = track_models.TrackingVisitor.objects.get(pk=visitor_id)
+            visitor = VISITOR_MODEL.objects.get(id=visitor_id)
             if not visitor.device_info:
                 ud = {}
                 ud['Device'] = data.get('device')
@@ -99,16 +118,14 @@ class EventCreateViewSet(GenericViewSet):
         if modify_visit:
             visit.save()
 
-
-        if "error" in resp:
-            return Response(status=status.HTTP_400_BAD_REQUEST, data=resp)
-        else:
-            return Response(status=status.HTTP_200_OK, data=resp)
-
     @transaction.non_atomic_requests
-    def get_visit(self, request):
+    def get_visit(self, request, VISIT_MODEL=None, VISITOR_MODEL=None):
 
-        #cookie = request.get_signed_cookie('visit', None)
+        if not VISIT_MODEL:
+            VISIT_MODEL = track_models.TrackingVisitor
+        if not VISITOR_MODEL:
+            VISITOR_MODEL = track_models.TrackingVisitor
+
         visit_id = None
         visitor_id = None
 
@@ -119,36 +136,25 @@ class EventCreateViewSet(GenericViewSet):
             visitor_id = data.get('visitor_id')
 
             if visitor_id:
-                ex_visitor = track_models.TrackingVisitor.objects.filter(id=visitor_id).first()
+                ex_visitor = VISITOR_MODEL.objects.filter(id=visitor_id).first()
                 if not ex_visitor:
                     try:
                         with transaction.atomic():
-                            track_models.TrackingVisitor.objects.create(id=visitor_id)
+                            VISITOR_MODEL.objects.create(id=visitor_id)
                     except IntegrityError as e:
                         pass
 
             if visit_id:
-                ex_visit = track_models.TrackingVisit.objects.filter(id=visit_id).first()                
+                ex_visit = VISIT_MODEL.objects.filter(id=visit_id).first()
                 if not ex_visit:
                     try:
                         with transaction.atomic():
-                            track_models.TrackingVisit.objects.create(id=visit_id, visitor_id=visitor_id, ip_address=client_ip)
+                            VISIT_MODEL.objects.create(id=visit_id, visitor_id=visitor_id, ip_address=client_ip)
                     except IntegrityError as e:
                         pass
 
-                if settings.MONGO_STORE:
-                    # visitQuery = {"_id": visit_id}
-                    # mongo_visit = settings.MONGODB.tracking_visit.find_one(visitQuery)
-                    mongo_visit = track_mongo_models.TrackingVisit.objects.filter(id=visit_id)
-                    # if not mongo_visit:
-                    if mongo_visit.count() == 0:
-                        # visitQuery.update({'visitorId': visitor_id, 'ipAddress': client_ip})
-                        # settings.MONGODB.tracking_visit.insert_one(visitQuery)
-                        mongo_visit = track_mongo_models.TrackingVisit(id=visit_id, visitor_id=visitor_id, ip_address=client_ip)
-                        mongo_visit.save()
 
         return (visitor_id, visit_id)
-
 
     def get_cookie(self, visitor_id, visit_id):
 
