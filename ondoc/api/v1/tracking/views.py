@@ -24,10 +24,7 @@ class EventCreateViewSet(GenericViewSet):
 
     @transaction.non_atomic_requests
     def create(self, request):
-        visitor_id, visit_id = self.get_visit(request, track_models.TrackingVisit, track_models.TrackingVisitor)
-        if settings.MONGO_STORE:
-            self.get_visit(request, track_mongo_models.TrackingVisit, track_mongo_models.TrackingVisitor)
-
+        visitor_id, visit_id = self.get_visit(request)
         resp = {}
         data = request.data
         data.pop('visitor_info', None)
@@ -119,13 +116,9 @@ class EventCreateViewSet(GenericViewSet):
             visit.save()
 
     @transaction.non_atomic_requests
-    def get_visit(self, request, VISIT_MODEL=None, VISITOR_MODEL=None):
+    def get_visit(self, request):
 
-        if not VISIT_MODEL:
-            VISIT_MODEL = track_models.TrackingVisitor
-        if not VISITOR_MODEL:
-            VISITOR_MODEL = track_models.TrackingVisitor
-
+        #cookie = request.get_signed_cookie('visit', None)
         visit_id = None
         visitor_id = None
 
@@ -136,23 +129,44 @@ class EventCreateViewSet(GenericViewSet):
             visitor_id = data.get('visitor_id')
 
             if visitor_id:
-                ex_visitor = VISITOR_MODEL.objects.filter(id=visitor_id).first()
+                ex_visitor = track_models.TrackingVisitor.objects.filter(id=visitor_id).first()
                 if not ex_visitor:
                     try:
                         with transaction.atomic():
-                            VISITOR_MODEL.objects.create(id=visitor_id)
+                            ex_visitor = track_models.TrackingVisitor(id=visitor_id)
+                            ex_visitor.save()
                     except IntegrityError as e:
                         pass
 
+                if settings.MONGO_STORE:
+                    mongo_visitor = track_mongo_models.TrackingVisitor.objects.filter(id=visitor_id).first()
+                    if not mongo_visitor:
+                        try:
+                            with transaction.atomic():
+                                track_mongo_models.TrackingVisitor.objects.create(id=visitor_id,
+                                                                                  created_at=ex_visitor.created_at, updated_at=ex_visitor.updated_at)
+                        except IntegrityError as e:
+                            pass
+
             if visit_id:
-                ex_visit = VISIT_MODEL.objects.filter(id=visit_id).first()
+                ex_visit = track_models.TrackingVisit.objects.filter(id=visit_id).first()
                 if not ex_visit:
                     try:
                         with transaction.atomic():
-                            VISIT_MODEL.objects.create(id=visit_id, visitor_id=visitor_id, ip_address=client_ip)
+                            ex_visit = track_models.TrackingVisit(id=visit_id, visitor_id=visitor_id, ip_address=client_ip)
+                            ex_visit.save()
                     except IntegrityError as e:
                         pass
 
+                if settings.MONGO_STORE:
+                    mongo_visit = track_mongo_models.TrackingVisit.objects.filter(id=visit_id).first()
+                    if not mongo_visit:
+                        try:
+                            with transaction.atomic():
+                                track_mongo_models.TrackingVisit.objects.create(id=visit_id, visitor_id=visitor_id, ip_address=client_ip,
+                                                                                created_at=ex_visit.created_at, updated_at=ex_visit.updated_at)
+                        except IntegrityError as e:
+                            pass
 
         return (visitor_id, visit_id)
 
