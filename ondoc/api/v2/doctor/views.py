@@ -469,8 +469,8 @@ class ProviderSignupOtpViewset(viewsets.GenericViewSet):
         if not user:
             user = User.objects.create(phone_number=phone_number, is_phone_number_verified=True, user_type=User.DOCTOR)
 
-        auth_models.GenericAdmin.update_user_admin(phone_number)
-        auth_models.GenericLabAdmin.update_user_lab_admin(phone_number)
+        # auth_models.GenericAdmin.update_user_admin(phone_number)
+        # auth_models.GenericLabAdmin.update_user_lab_admin(phone_number)
         # self.update_live_status(phone_number)
 
         token_object = JWTAuthentication.generate_token(user)
@@ -687,10 +687,12 @@ class ProviderSignupDataViewset(viewsets.GenericViewSet):
         hospital_generic_admins_data = None
         try:
             hospital = doc_models.Hospital.objects.create(name=valid_data.get('name'), city=valid_data.get('city'),
-                                                          country=valid_data.get('country'))
+                                                          country=valid_data.get('country'),
+                                                          source_type=doc_models.Hospital.PROVIDER)
             hospital_model_serializer = serializers.HospitalModelSerializer(hospital, many=False)
             auth_models.GenericAdmin.objects.create(user=request.user, phone_number=request.user.phone_number,
-                                                    hospital=hospital, super_user_permission=True)
+                                                    hospital=hospital, super_user_permission=True,
+                                                    entity_type=auth_models.GenericAdmin.HOSPITAL)
             if contact_number:
                 auth_models.SPOCDetails.objects.create(name=valid_data.get('name'), number=contact_number,
                                                        contact_type=auth_models.SPOCDetails.OTHER,

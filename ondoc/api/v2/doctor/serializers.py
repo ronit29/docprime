@@ -249,13 +249,13 @@ class CreateHospitalSerializer(serializers.Serializer):
 class DoctorModelSerializer(serializers.ModelSerializer):
     class Meta:
         model = doc_models.Doctor
-        fields = ('id', 'name', 'online_consultation_fees')
+        fields = ('id', 'name', 'online_consultation_fees', 'source_type')
 
 
 class HospitalModelSerializer(serializers.ModelSerializer):
     class Meta:
         model = doc_models.Hospital
-        fields = ('id', 'name', 'city', 'country')
+        fields = ('id', 'name', 'city', 'country', 'source_type')
 
 
 class DoctorClinicModelSerializer(serializers.ModelSerializer):
@@ -273,4 +273,4 @@ class DoctorMobileModelSerializer(serializers.ModelSerializer):
 class GenericAdminModelSerializer(serializers.ModelSerializer):
     class Meta:
         model = GenericAdmin
-        fields = ('id', 'phone_number', 'permission_type', 'name', 'doctor', 'hospital', 'super_user_permission')
+        fields = ('id', 'phone_number', 'permission_type', 'name', 'doctor', 'hospital', 'super_user_permission', 'entity_type')
