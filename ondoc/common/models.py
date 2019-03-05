@@ -7,6 +7,7 @@ from ondoc.authentication.models import TimeStampedModel
 # from ondoc.doctor.models import OpdAppointment
 # from ondoc.diagnostic.models import LabAppointment
 from ondoc.authentication.models import User
+from ondoc.authentication import models as auth_model
 
 
 class Cities(models.Model):
@@ -178,3 +179,42 @@ class Service(TimeStampedModel):
 
     def __str__(self):
         return self.name
+
+class Remark(auth_model.TimeStampedModel):
+    FEEDBACK = 1
+    REOPEN = 2
+    OTHER = 3
+    STATUS_CHOICES = [("", "Select"), (FEEDBACK, "Feedback"), (REOPEN, "Reopen"), (OTHER, "Other")]
+
+    content_type = models.ForeignKey(ContentType, on_delete=models.DO_NOTHING)
+    object_id = models.PositiveIntegerField()
+    content_object = GenericForeignKey()
+    user = models.ForeignKey(auth_model.User, on_delete=models.SET_NULL, null=True, blank=True)
+    content = models.TextField()
+    status = models.PositiveSmallIntegerField(default=0, choices=STATUS_CHOICES)
+
+    class Meta:
+        db_table = 'remark'
+
+
+class MatrixMappedState(models.Model):
+    name = models.CharField(max_length=48, db_index=True)
+
+    def __str__(self):
+        return "{}".format(self.name)
+
+    class Meta:
+        db_table = 'matrix_mapped_state'
+        verbose_name_plural = "Matrix Mapped States"
+
+
+class MatrixMappedCity(models.Model):
+    name = models.CharField(max_length=48, db_index=True)
+    state = models.ForeignKey(MatrixMappedState, on_delete=models.SET_NULL, null=True, blank=True)
+
+    def __str__(self):
+        return "{}".format(self.name)
+
+    class Meta:
+        db_table = 'matrix_mapped_city'
+        verbose_name_plural = "Matrix Mapped Cities"
