@@ -63,7 +63,7 @@ def prepare_and_hit(self, data):
     if task_data.get('type') == 'LAB_APPOINTMENT':
         service_name = ','.join([test_obj.test.name for test_obj in appointment.test_mappings.all()])  # DONE SHASHANK_SINGH CHANGE 13
 
-    order = data.get('order')
+    order_id = data.get('order_id')
 
     dob_value = ''
     try:
@@ -91,7 +91,7 @@ def prepare_and_hit(self, data):
         'Location': location,
         'PaymentType': appointment.payment_type,
         'PaymentStatus': 300,
-        'OrderID': order.id if order else 0,
+        'OrderID': order_id if order_id else 0,
         'DocPrimeBookingID': appointment.id,
         'BookingDateTime': int(appointment.created_at.timestamp()),
         'AppointmentDateTime': int(appointment.time_slot_start.timestamp()),
@@ -243,7 +243,7 @@ def push_appointment_to_matrix(self, data):
 
         # Preparing the data and now pushing the data to the matrix system.
         if appointment:
-            prepare_and_hit(self, {'appointment': appointment, 'mobile_list': mobile_list, 'task_data': data, 'order': appointment_order})
+            prepare_and_hit(self, {'appointment': appointment, 'mobile_list': mobile_list, 'task_data': data, 'order_id': appointment_order.id})
         else:
             logger.error("Appointment not found for the appointment id ", appointment_id)
 

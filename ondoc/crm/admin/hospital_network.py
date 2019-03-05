@@ -236,9 +236,10 @@ class HospitalNetworkAdmin(VersionAdmin, ActionAdmin, QCPemAdmin):
 
     def get_readonly_fields(self, request, obj=None):
         readonly_fields = ('associated_hospitals', 'city', 'state', 'matrix_lead_id',)
+        list_readonly = list(readonly_fields)
         if request.user.is_member_of(constants['SUPER_QC_GROUP']) or request.user.is_superuser:
-            readonly_fields.remove('matrix_lead_id')
-        return readonly_fields
+            list_readonly.remove('matrix_lead_id')
+        return tuple(list_readonly)
 
     def get_queryset(self, request):
         qs = super().get_queryset(request)

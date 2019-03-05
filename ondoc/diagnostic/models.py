@@ -218,6 +218,7 @@ class Lab(TimeStampedModel, CreatedByModel, QCModel, SearchKey):
     merchant_payout = GenericRelation(account_model.MerchantPayout)
     avg_rating = models.DecimalField(max_digits=5, decimal_places=2, null=True, editable=False)
     lab_priority = models.PositiveIntegerField(blank=False, null=False, default=1)
+    open_for_communication = models.BooleanField(default=True)
     remark = GenericRelation(Remark)
 
     def __str__(self):
@@ -225,6 +226,12 @@ class Lab(TimeStampedModel, CreatedByModel, QCModel, SearchKey):
 
     class Meta:
         db_table = "lab"
+
+    def open_for_communications(self):
+        if (self.network and self.network.open_for_communication) or (not self.network and self.open_for_communication):
+            return True
+
+        return False
 
     def convert_min(self, min):
         min_str = str(min)
@@ -646,6 +653,7 @@ class LabNetwork(TimeStampedModel, CreatedByModel, QCModel):
     merchant = GenericRelation(auth_model.AssociatedMerchant)
     merchant_payout = GenericRelation(account_model.MerchantPayout)
     is_mask_number_required = models.BooleanField(default=True)
+    open_for_communication = models.BooleanField(default=True)
     remark = GenericRelation(Remark)
 
     def all_associated_labs(self):
