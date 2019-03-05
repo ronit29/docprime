@@ -381,6 +381,8 @@ class WHTSAPPNotification:
             if self.context.get('instance').payment_type == 2:
                 data.append('Please pay Rs {cod_amount} at the center at the time of appointment.'.
                             format(cod_amount=str(self.context.get('code_amount'))))
+            else:
+                data.append(" ")
 
         elif notification_type == NotificationAction.APPOINTMENT_BOOKED and user and user.user_type == User.CONSUMER:
             body_template = "opd_appointment_booking_patient"
