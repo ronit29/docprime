@@ -498,7 +498,7 @@ class ProviderSignupDataViewset(viewsets.GenericViewSet):
             return Response({"status": 1, "message": "signup lead data added"})
         except Exception as e:
             logger.error('Error creating signup lead: ' + str(e))
-            return Response({"status": 0, "message": "Error creating signup lead: " + str(e)})
+            return Response({"status": 0, "message": "Error creating signup lead: " + str(e)}, status.HTTP_400_BAD_REQUEST)
 
     def consent_is_docprime(self, request, *args, **kwargs):
         serializer = serializers.ConsentIsDocprimeSerializer(data=request.data, context={'request':request})
@@ -511,7 +511,7 @@ class ProviderSignupDataViewset(viewsets.GenericViewSet):
             return Response({"status":1, "message":"consent updated"})
         except Exception as e:
             logger.error('Error updating consent: ' + str(e))
-            return Response({"status": 0, "message": "Error updating consent - " + str(e)})
+            return Response({"status": 0, "message": "Error updating consent - " + str(e)}, status.HTTP_400_BAD_REQUEST)
 
     def bulk_create_doctors(self, doctor_details):
         doc_obj_list = list()
@@ -555,21 +555,21 @@ class ProviderSignupDataViewset(viewsets.GenericViewSet):
                 phone_number = details.get('phone_number')
                 if details.get('is_superuser'):
                     generic_admin_obj_list.append(auth_models.GenericAdmin(doctor=doctor, hospital=hospital,
-                                                                           number=phone_number,
+                                                                           phone_number=phone_number,
                                                                            source_type=auth_models.GenericAdmin.APP,
                                                                            entity_type=auth_models.GenericAdmin.DOCTOR,
                                                                            super_user_permission=True))
                     continue
                 if details.get('is_appointment'):
                     generic_admin_obj_list.append(auth_models.GenericAdmin(doctor=doctor, hospital=hospital,
-                                                                           number=phone_number,
+                                                                           phone_number=phone_number,
                                                                            source_type=auth_models.GenericAdmin.APP,
                                                                            entity_type=auth_models.GenericAdmin.DOCTOR,
                                                                            permission_type=auth_models.GenericAdmin.APPOINTMENT,
                                                                            write_permission=True))
                 if details.get('is_billing'):
                     generic_admin_obj_list.append(auth_models.GenericAdmin(doctor=doctor, hospital=hospital,
-                                                                           number=phone_number,
+                                                                           phone_number=phone_number,
                                                                            source_type=auth_models.GenericAdmin.APP,
                                                                            entity_type=auth_models.GenericAdmin.DOCTOR,
                                                                            permission_type=auth_models.GenericAdmin.BILLINNG,
@@ -707,7 +707,7 @@ class ProviderSignupDataViewset(viewsets.GenericViewSet):
                              "hospital_generic_admins": hospital_generic_admins_data if hospital_generic_admins_data else None})
         except Exception as e:
             logger.error('Error creating Hospital: ' + str(e))
-            return Response({"status": 0, "message": "Error creating Hospital - " + str(e)})
+            return Response({"status": 0, "message": "Error creating Hospital - " + str(e)}, status.HTTP_400_BAD_REQUEST)
 
     def create_doctor(self, request, *args, **kwargs):
         serializer = serializers.CreateDoctorSerializer(data=request.data)
@@ -725,7 +725,7 @@ class ProviderSignupDataViewset(viewsets.GenericViewSet):
                              "doctors_mobile": doctors_mobile_data if doctors_mobile_data else None,})
         except Exception as e:
             logger.error('Error adding Doctors ' + str(e))
-            return Response({"status": 0, "message": "Error adding Doctors - " + str(e)})
+            return Response({"status": 0, "message": "Error adding Doctors - " + str(e)}, status.HTTP_400_BAD_REQUEST)
 
     def create_staffs(self, request, *args, **kwargs):
         serializer = serializers.CreateGenericAdminSerializer(data=request.data, context={'request': request})
@@ -739,4 +739,4 @@ class ProviderSignupDataViewset(viewsets.GenericViewSet):
             return Response({"status": 1, "staffs": hospital_generic_admins_data})
         except Exception as e:
             logger.error('Error adding Staffs ' + str(e))
-            return Response({"status": 0, "message": "Error adding Staffs - " + str(e)})
+            return Response({"status": 0, "message": "Error adding Staffs - " + str(e)}, status.HTTP_400_BAD_REQUEST)
