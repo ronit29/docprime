@@ -1505,24 +1505,27 @@ class DoctorListViewSet(viewsets.GenericViewSet):
                             resp['parent_url'] = parent_url
 
         specializations = list(models.PracticeSpecialization.objects.filter(id__in=validated_data.get('specialization_ids',[])).values('id','name'));
-        if validated_data.get('city'):
-            if specializations:
-                specialization_name = specializations[0].get('name')
-                if not validated_data.get('locality'):
-                    url = slugify(specialization_name + '-in-' + validated_data.get('city') + '-sptcit')
+        if validated_data.get('url'):
+            canonical_url = validated_data.get('url')
+        else:
+            if validated_data.get('city'):
+                if specializations:
+                    specialization_name = specializations[0].get('name')
+                    if not validated_data.get('locality'):
+                        url = slugify(specialization_name + '-in-' + validated_data.get('city') + '-sptcit')
+                    else:
+                        url = slugify(specialization_name + '-in-' + validated_data.get('locality') + '-' +
+                                                validated_data.get('city') + '-sptlitcit')
                 else:
-                    url = slugify(specialization_name + '-in-' + validated_data.get('locality') + '-' +
-                                            validated_data.get('city') + '-sptlitcit')
-            else:
-                if not validated_data.get('locality'):
-                    url = slugify('doctors' + '-in-' + validated_data.get('city') + '-sptcit')
-                else:
-                    url = slugify('doctors' + '-in-' + validated_data.get('locality') + '-' +
-                                            validated_data.get('city') + '-sptlitcit')
+                    if not validated_data.get('locality'):
+                        url = slugify('doctors' + '-in-' + validated_data.get('city') + '-sptcit')
+                    else:
+                        url = slugify('doctors' + '-in-' + validated_data.get('locality') + '-' +
+                                                validated_data.get('city') + '-sptlitcit')
 
-            entity = EntityUrls.objects.filter(url=url, url_type='SEARCHURL', entity_type='Doctor', is_valid=True)
-            if entity:
-                canonical_url = entity[0].url
+                entity = EntityUrls.objects.filter(url=url, url_type='SEARCHURL', entity_type='Doctor', is_valid=True)
+                if entity:
+                    canonical_url = entity[0].url
 
         if parameters.get('doctor_suggestions') == 1:
             result = list()
