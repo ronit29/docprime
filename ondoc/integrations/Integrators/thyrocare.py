@@ -7,7 +7,7 @@ from rest_framework import status
 from django.conf import settings
 import logging
 logger = logging.getLogger(__name__)
-from datetime import datetime, date
+from datetime import datetime, date, timedelta
 from ondoc.diagnostic.models import LabReport, LabReportFile, LabAppointment
 from django.contrib.contenttypes.models import ContentType
 from ondoc.api.v1.utils import resolve_address, aware_time_zone
@@ -290,8 +290,8 @@ class Thyrocare(BaseIntegrator):
             "BTechId": 0,
             "Status": 2,
             "RemarksId": 67,
-            "ReasonId": 173,
-            "Others": appointment.cancellation_comments,
+            "ReasonId": 172,  # Not interested
+            "Others": appointment.cancellation_reason.name + " " + appointment.cancellation_comments,
             "AppointmentDate": "",
             "AppointmentSlot": ""
         }
@@ -304,23 +304,33 @@ class Thyrocare(BaseIntegrator):
             logger.error("[ERROR] %s" % response.get('RESPONSE'))
 
     def order_summary(self, integrator_response):
-        url = "%s/order.svc/%s/%s/%s/all/OrderSummary" % (settings.THYROCARE_BASE_URL, settings.THYROCARE_API_KEY,
-                                                          integrator_response.dp_order_id, integrator_response.response_data['MOBILE'])
-        response = requests.get(url)
-        response = response.json()
-        if response.get('RES_ID') == 'RES0000':
-            dp_appointment = LabAppointment.filter(id=integrator_response.object_id).first()
-            thyrocare_appointment_time = response['LEADHISORY_MASTER']['APPOINT_ON']['DATE']
-            dp_appointment_time = dp_appointment.time_slot_start
-            print(thyrocare_appointment_time)
-            print(dp_appointment_time)
-            if response['BEN_MASTER']['STATUS'] == 'YET TO ASSIGN':
-                pass
-            elif response['BEN_MASTER']['STATUS'] == 'ASSIGNED':
-                pass
-            elif response['BEN_MASTER']['STATUS'] == 'CANCELLED':
-                pass
+        dp_appointment = LabAppointment.objects.filter(id=integrator_response.object_id).first()
+        if dp_appointment.status != LabAppointment.CANCELLED or dp_appointment.status != LabAppointment.COMPLETED or \
+                                            (dp_appointment.time_slot_start + timedelta(days=1) < datetime.now()):
 
-            return True
-        else:
-            logger.error("[ERROR] %s" % response.get('RESPONSE'))
+            url = "%s/order.svc/%s/%s/%s/all/OrderSummary" % (settings.THYROCARE_BASE_URL, settings.THYROCARE_API_KEY,
+                                                              integrator_response.dp_order_id,
+                                                              integrator_response.response_data['MOBILE'])
+            response = requests.get(url)
+            response = response.json()
+            if response.get('RES_ID') == 'RES0000':
+                thyrocare_appointment_time = response['LEADHISORY_MASTER'][0]['APPOINT_ON'][0]['DATE'].strftime("%d-%m-%Y")
+                dp_appointment_time = dp_appointment.time_slot_start.strftime("%d-%m-%Y")
+                if thyrocare_appointment_time == dp_appointment_time:
+                    dp_appointment.update(time_slot_start=thyrocare_appointment_time, status=3)
+
+                # check integrator order status and update docprime booking
+                if response['BEN_MASTER'][0]['STATUS'].upper() == 'YET TO ASSIGN':
+                    pass
+                elif response['BEN_MASTER'][0]['STATUS'].upper() == 'DELIVERY' or 'REPORTED' or 'SERVICED' or 'CREDITED':
+                    if not dp_appointment.status == 5:
+                        dp_appointment.update(status=5)
+                elif response['BEN_MASTER'][0]['STATUS'].upper() == 'DONE':
+                    pass
+                elif response['BEN_MASTER'][0]['STATUS'].upper() == 'CANCELLED' or 'REJECTED':
+                    if not dp_appointment.status == 6:
+                        dp_appointment.update(status=6, cancellation_type=2)
+
+                return True
+            else:
+                print("[ERROR] %s %s" % (integrator_response.id, response.get('RESPONSE')))
