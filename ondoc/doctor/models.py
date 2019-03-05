@@ -733,7 +733,7 @@ class Doctor(auth_model.TimeStampedModel, auth_model.QCModel, SearchKey, auth_mo
         doctor_image.putalpha(mask)
         output = ImageOps.fit(doctor_image, mask.size, centering=(1, 1))
         output.putalpha(mask)
-        output.save('output.png')
+        # output.save('output.png')
         canvas = Image.new('RGB', (992, 1620))
         canvas.paste(template, (0,0))
         # doctor_image = doctor_image.resize((200, 200), Image.ANTIALIAS)
