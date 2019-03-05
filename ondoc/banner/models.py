@@ -83,7 +83,7 @@ class Banner(auth_model.TimeStampedModel):
     @staticmethod
     def get_all_banners(request):
 
-        queryset = Banner.objects.filter(enable=True).order_by('-priority')[:100]
+        queryset = Banner.objects.filter(enable=True, start_date__lte=timezone.now(), end_date__gte=timezone.now()).order_by('-priority')[:100]
         # slider_locate = dict(Banner.slider_location)
         final_result = []
         for data in queryset:
@@ -104,7 +104,7 @@ class Banner(auth_model.TimeStampedModel):
             resp['event_name'] = data.event_name
             if data.url:
                 path = urlparse(data.url).path
-                params = urlparse(data.url).params
+                params = urlparse(data.url).params + '?'
                 query = urlparse(data.url).query
                 if path:
                     resp['url'] = path + params + query
