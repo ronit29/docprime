@@ -204,6 +204,13 @@ class CreateAppointmentSerializer(serializers.Serializer):
 
         time_slot_end = None
 
+        doctor_clinic = data.get('doctor').doctor_clinics.filter(hospital=data.get('hospital'), enabled=True).first()
+        if not doctor_clinic:
+            raise serializers.ValidationError("Doctor Hospital not related.")
+        if not data.get('doctor').enabled_for_online_booking or \
+                not data.get('hospital').enabled_for_online_booking or not doctor_clinic.enabled_for_online_booking:
+            raise serializers.ValidationError("Online booking not enabled")
+
         if OpdAppointment.objects.filter(profile=data.get("profile"), doctor=data.get("doctor"),
                                          hospital=data.get("hospital"), time_slot_start=time_slot_start) \
                                 .exclude(status__in=[OpdAppointment.COMPLETED, OpdAppointment.CANCELLED]).exists():
