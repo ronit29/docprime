@@ -1499,7 +1499,7 @@ class Merchant(TimeStampedModel):
                                                                                      'Content-Type': 'application/json'})
             if response.status_code == status.HTTP_200_OK:
                 resp_data = response.json()
-                if resp_data.get('statusCode'):
+                if resp_data.get('statusCode') and resp_data.get('statusCode') in (1, 2, 3):
                     data.pg_status = resp_data.get('statusCode')
                     data.save()
 
