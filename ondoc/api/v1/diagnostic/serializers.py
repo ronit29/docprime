@@ -351,7 +351,7 @@ class LabAppointmentTestMappingSerializer(serializers.ModelSerializer):
     class Meta:
         model = LabAppointmentTestMapping
         fields = ('test_id', 'mrp', 'test', 'agreed_price', 'deal_price',
-                  # 'enabled',  # SHASHANK_SINGH Ask Arun Sir
+                  # 'enabled',
                   'is_home_collection_enabled')
 
 
@@ -933,7 +933,7 @@ class UpdateStatusSerializer(serializers.Serializer):
 class LabAppointmentRetrieveSerializer(LabAppointmentModelSerializer):
     profile = UserProfileSerializer()
     lab = LabModelSerializer()
-    # lab_test = AvailableLabTestSerializer(many=True)  # SHASHANK_SINGH CHANGE 17
+    # lab_test = AvailableLabTestSerializer(many=True)
     lab_test = serializers.SerializerMethodField()
     address = serializers.SerializerMethodField()
     type = serializers.ReadOnlyField(default='lab')
