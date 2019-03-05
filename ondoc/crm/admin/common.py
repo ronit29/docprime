@@ -119,7 +119,7 @@ class FormCleanMixin(forms.ModelForm):
                 if self.instance.data_status == QCModel.SUBMITTED_FOR_QC:
                     raise forms.ValidationError("Cannot update Data submitted for QC approval")
                 if not self.request.user.groups.filter(name=constants['DOCTOR_SALES_GROUP']).exists():
-                    if self.instance.data_status in [QCModel.IN_PROGRESS, QCModel.REOPENED] and self.instance.created_by and self.instance.created_by != self.request.user:
+                    if self.instance.data_status in [QCModel.IN_PROGRESS, QCModel.REOPENED] and self.instance.created_by and self.instance.created_by.groups.filter(name=constants['DOCTOR_NETWORK_GROUP_NAME']).exists() and self.instance.created_by != self.request.user:
                         raise forms.ValidationError("Cannot modify Data added by other users")
             if '_submit_for_qc' in self.data:
                 self.validate_qc()
