@@ -433,13 +433,12 @@ class LabList(viewsets.ReadOnlyModelViewSet):
                 included_test_count=Count('test')).filter(included_test_count=len(test_ids))
 
         if category_ids:
-            all_packages_in_non_network_labs = all_packages_in_labs.filter(
+            all_packages_in_labs = all_packages_in_labs.filter(
                 categories__id__in=category_ids).annotate(category_count=Count(F('categories'))).filter(
                 category_count=len(category_ids))
 
         all_packages_in_labs = all_packages_in_labs.distinct()
         all_packages = [package for package in all_packages_in_labs if package.rank == 1]
-        all_packages.extend([package for package in all_packages_in_labs])
         all_packages = filter(lambda x: x, all_packages)
         if min_distance:
             all_packages = filter(lambda x: x.distance.m >= min_distance if x.distance is not None and x.distance.m is not None else False, all_packages)
