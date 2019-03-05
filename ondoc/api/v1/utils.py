@@ -844,6 +844,8 @@ class TimeSlotExtraction(object):
 
     def get_slots(self, date, i, j, whole_timing_data, total_leave_list):
         converted_date = (date + datetime.timedelta(days=j))
+        format_date = converted_date
+
         if converted_date in total_leave_list:
             converted_date = str(converted_date)
             whole_timing_data[converted_date] = list()
@@ -852,11 +854,13 @@ class TimeSlotExtraction(object):
             converted_date = str(converted_date)
             whole_timing_data[converted_date] = list()
             pa = self.price_available[i]
+            current_hour = datetime.datetime.now().hour
+
             if self.timing[i].get('timing'):
                 whole_timing_data[converted_date].append(
-                    self.format_data(self.timing[i]['timing'][self.MORNING], self.MORNING, pa))
+                    self.format_data(self.timing[i]['timing'][self.MORNING], self.MORNING, pa, format_date))
                 whole_timing_data[converted_date].append(
-                    self.format_data(self.timing[i]['timing'][self.EVENING], self.EVENING, pa))
+                    self.format_data(self.timing[i]['timing'][self.EVENING], self.EVENING, pa, format_date))
 
     def get_leave_list(self, leaves):
         total_leaves = list()
@@ -888,16 +892,35 @@ class TimeSlotExtraction(object):
 
 
 
-    def format_data(self, data, day_time, pa):
+    def format_data(self, data, day_time, pa, date):
+        current_date_time = datetime.datetime.now()
+        if current_date_time.date() == date.date():
+            booking_minimum_time = current_date_time + datetime.timedelta(hours=1)
+            booking_minimum_time = booking_minimum_time.strftime('%H.%M')
         data_list = list()
         for k, v in data.items():
-            if 'mrp' in pa[k].keys() and 'deal_price' in pa[k].keys():
-                data_list.append({"value": k, "text": v, "price": pa[k]["price"],
-                                  "mrp": pa[k]['mrp'], 'deal_price': pa[k]['deal_price'],
-                                  "is_available": pa[k]["is_available"], "on_call": pa[k].get("on_call", False)})
+            if pa[k].get('on_call') == False:
+                if current_date_time.date() == date.date():
+                    if k >= float(booking_minimum_time):
+                        if 'mrp' in pa[k].keys() and 'deal_price' in pa[k].keys():
+                                data_list.append({"value": k, "text": v, "price": pa[k]["price"],
+                                                  "mrp": pa[k]['mrp'], 'deal_price': pa[k]['deal_price'],
+                                                  "is_available": pa[k]["is_available"], "on_call": pa[k].get("on_call", False)})
+                        else:
+                            data_list.append({"value": k, "text": v, "price": pa[k]["price"],
+                                            "is_available": pa[k]["is_available"], "on_call": pa[k].get("on_call", False)})
+                    else:
+                        pass
+                else:
+                    if 'mrp' in pa[k].keys() and 'deal_price' in pa[k].keys():
+                        data_list.append({"value": k, "text": v, "price": pa[k]["price"],
+                                          "mrp": pa[k]['mrp'], 'deal_price': pa[k]['deal_price'],
+                                          "is_available": pa[k]["is_available"], "on_call": pa[k].get("on_call", False)})
+                    else:
+                        data_list.append({"value": k, "text": v, "price": pa[k]["price"],
+                                          "is_available": pa[k]["is_available"], "on_call": pa[k].get("on_call", False)})
             else:
-                data_list.append({"value": k, "text": v, "price": pa[k]["price"],
-                                  "is_available": pa[k]["is_available"], "on_call": pa[k].get("on_call", False)})
+                pass
         format_data = dict()
         format_data['type'] = 'AM' if day_time == self.MORNING else 'PM'
         format_data['title'] = day_time
