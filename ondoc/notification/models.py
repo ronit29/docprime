@@ -51,6 +51,12 @@ class NotificationAction:
 
     OPD_OTP_BEFORE_APPOINTMENT = 30
     LAB_OTP_BEFORE_APPOINTMENT = 31
+    OPD_CONFIRMATION_CHECK_AFTER_APPOINTMENT = 32
+    OPD_CONFIRMATION_SECOND_CHECK_AFTER_APPOINTMENT = 33
+    OPD_FEEDBACK_AFTER_APPOINTMENT = 34
+
+    REFUND_BREAKUP = 40
+    REFUND_COMPLETED = 42
 
     CASHBACK_CREDITED = 55
 
@@ -75,7 +81,10 @@ class NotificationAction:
         (RECEIPT, "Receipt"),
         (DOCTOR_INVOICE, "Doctor Invoice"),
         (LAB_INVOICE, "Lab Invoice"),
-        (CASHBACK_CREDITED, "Cashback Credited")
+        (CASHBACK_CREDITED, "Cashback Credited"),
+
+        (REFUND_BREAKUP, 'Refund break up'),
+        (REFUND_COMPLETED, 'Refund Completed')
     )
 
     OPD_APPOINTMENT = "opd_appointment"
@@ -442,7 +451,7 @@ class EmailNotification(TimeStampedModel, EmailNotificationOpdMixin, EmailNotifi
     user = models.ForeignKey(User, on_delete=models.CASCADE, null=True, blank=True)
     content = models.TextField()
     email_subject = models.TextField(blank=True, null=True)
-    email = models.EmailField()
+    email = models.EmailField(null=True)
     viewed_at = models.DateTimeField(blank=True, null=True)
     read_at = models.DateTimeField(blank=True, null=True)
     notification_type = models.PositiveIntegerField(choices=NotificationAction.NOTIFICATION_TYPE_CHOICES)

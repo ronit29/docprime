@@ -23,5 +23,21 @@ constants = {
     'LAB_TEST_TEAM' : 'lab_test_team',
     'MERCHANT_TEAM': 'merchant_team',
     'COMMENT_TEAM': 'comment_team',
-    'PRODUCT_TEAM': 'product_team'
+    'PRODUCT_TEAM': 'product_team',
+    'INTEGRATION_MANAGEMENT_TEAM': 'integration_management_team',
+    'WELCOME_CALLING_TEAM': 'welcome_calling_team'
+}
+matrix_product_ids = {
+    'opd_products': 1,
+    'lab_products': 4,
+    'consumer': 5
+}
+matrix_subproduct_ids = {
+    "chat": 1,
+    "appointment": 2,
+    "insurance": 3,
+    "other_services": 4,
+    "doctor": 8,
+    "hospital": 7,
+    "hospitalnetwork": 6
 }

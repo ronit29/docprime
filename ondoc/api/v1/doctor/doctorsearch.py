@@ -46,7 +46,7 @@ class DoctorSearchHelper:
 
         if self.query_params.get('hospital_id') is not None:
             filtering_params.append(
-                "hospital_id=(%(hospital_id)s)")
+                "h.id=(%(hospital_id)s)")
             params['hospital_id'] = str(self.query_params.get("hospital_id"))
 
         if len(condition_ids)>0:
@@ -196,7 +196,7 @@ class DoctorSearchHelper:
             else:
                 order_by_field = " floor(distance/{bucket_size}) ASC, distance, total_price ASC".format(bucket_size=str(bucket_size))
                 rank_by = "rnk=1"
-            order_by_field = "{}, {} ".format(' enabled_for_online_booking DESC ' ,order_by_field)
+            order_by_field = "{}, {} ".format(' enabled_for_online_booking DESC ', order_by_field)
         else:
             if self.query_params.get('sort_on'):
                 if self.query_params.get('sort_on') == 'experience':
@@ -209,7 +209,7 @@ class DoctorSearchHelper:
                     order_by_field = " distance ASC, deal_price ASC, priority desc "
                     rank_by = " rnk=1 "
             else:
-                order_by_field = ' floor(distance/{bucket_size}) ASC, is_license_verified DESC, search_score desc '.format(bucket_size=str(bucket_size))
+                order_by_field = ' welcome_calling_done DESC, floor(distance/{bucket_size}) ASC, is_license_verified DESC, search_score desc '.format(bucket_size=str(bucket_size))
                 rank_by = "rnk=1"
 
             order_by_field = "{}, {} ".format(' enabled_for_online_booking DESC ', order_by_field)
@@ -249,17 +249,17 @@ class DoctorSearchHelper:
             query_string = "SELECT doctor_id, hospital_id, doctor_clinic_id, doctor_clinic_timing_id " \
                            "FROM (SELECT total_price, " \
                            " {rank_part} ," \
-                           " distance, enabled_for_online_booking, is_license_verified, priority " \
+                           " distance, enabled_for_online_booking, is_license_verified, welcome_calling_done, priority " \
                            "procedure_deal_price, doctor_id, practicing_since, doctor_clinic_id, doctor_clinic_timing_id, " \
                            "procedure_id, doctor_clinic_deal_price, hospital_id " \
                            "FROM (SELECT distance, procedure_deal_price, doctor_id, practicing_since, doctor_clinic_id, doctor_clinic_timing_id, procedure_id," \
-                           "enabled_for_online_booking, is_license_verified, priority, " \
+                           "enabled_for_online_booking, is_license_verified, welcome_calling_done, priority, " \
                            "doctor_clinic_deal_price, hospital_id , count_per_clinic, sum_per_clinic, sum_per_clinic+doctor_clinic_deal_price as total_price FROM " \
                            "(SELECT " \
                            "COUNT(procedure_id) OVER (PARTITION BY dct.id) AS count_per_clinic, " \
                            "SUM(dcp.deal_price) OVER (PARTITION BY dct.id) AS sum_per_clinic, " \
                            "St_distance(St_setsrid(St_point((%(longitude)s), (%(latitude)s)), 4326), h.location) AS distance, " \
-                           "dcp.deal_price AS procedure_deal_price, " \
+                           "dcp.deal_price AS procedure_deal_price, h.welcome_calling_done,  " \
                            "d.id AS doctor_id, practicing_since, " \
                            "d.enabled_for_online_booking and dc.enabled_for_online_booking and h.enabled_for_online_booking as enabled_for_online_booking, d.is_license_verified, dc.priority, " \
                            "dc.id AS doctor_clinic_id,  dct.id AS doctor_clinic_timing_id, dcp.id AS doctor_clinic_procedure_id, " \
@@ -303,7 +303,7 @@ class DoctorSearchHelper:
             "dc.id as doctor_clinic_id,  " \
             "dct.id as doctor_clinic_timing_id,practicing_since, " \
             "d.enabled_for_online_booking and dc.enabled_for_online_booking and h.enabled_for_online_booking as enabled_for_online_booking, " \
-            "is_license_verified, priority,deal_price, " \
+            "is_license_verified, priority,deal_price, h.welcome_calling_done, " \
             "dc.hospital_id as hospital_id, d.search_score FROM doctor d " \
             "INNER JOIN doctor_clinic dc ON d.id = dc.doctor_id and dc.enabled=true and d.is_live=true " \
             "and d.is_test_doctor is False and d.is_internal is False " \
@@ -385,7 +385,7 @@ class DoctorSearchHelper:
             if not doctor_clinic:
                 hospitals = []
             else:
-                all_doctor_clinic_procedures = list(doctor_clinic.doctorclinicprocedure_set.all())
+                all_doctor_clinic_procedures = list(doctor_clinic.procedures_from_doctor_clinic.all())
                 selected_procedures_data = get_included_doctor_clinic_procedure(all_doctor_clinic_procedures,
                                                                                 selected_procedure_ids)
                 other_procedures_data = get_included_doctor_clinic_procedure(all_doctor_clinic_procedures,
@@ -410,6 +410,7 @@ class DoctorSearchHelper:
 
                 hospitals = [{
                     "enabled_for_online_booking": enable_online_booking,
+                    "welcome_calling_done": doctor_clinic.hospital.welcome_calling_done,
                     "hospital_name": doctor_clinic.hospital.name,
                     "address": ", ".join(
                         [value for value in [doctor_clinic.hospital.sublocality, doctor_clinic.hospital.locality] if
@@ -455,6 +456,7 @@ class DoctorSearchHelper:
             schema_specialization = None
             schema_specialization = sorted_spec_list[0].get('name') if sorted_spec_list and len(sorted_spec_list)>0 and sorted_spec_list[0].get('name') else None
             schema_type = None
+            new_schema = OrderedDict()
             if schema_specialization == 'Dentist':
                 schema_type = 'Dentist'
             else:
@@ -478,6 +480,7 @@ class DoctorSearchHelper:
                 "experience_years": doctor.experience_years(),
                 #"experiences": serializers.DoctorExperienceSerializer(doctor.experiences.all(), many=True).data,
                 "qualifications": serializers.DoctorQualificationSerializer(doctor.qualifications.all(), many=True).data,
+                "average rating": doctor.avg_rating,
                 # "general_specialization": serializers.DoctorPracticeSpecializationSerializer(
                 #     doctor.doctorpracticespecializations.all(),
                 #     many=True).data,
@@ -523,60 +526,65 @@ class DoctorSearchHelper:
                         }
                     }
 
-                },
+                }
 
-                "new_schema": {
-                    "@context": 'http://schema.org',
-                    "@type": schema_type,
-                    "currenciesAccepted": "INR",
-                    "MedicalSpeciality": schema_specialization,
-                    "name": doctor.get_display_name(),
-                    "image": doctor.get_thumbnail() if doctor.get_thumbnail() else static(
-                        'web/images/doc_placeholder.png'),
-                    "url": None,
-                    "address": {
-                        "@type": 'PostalAddress',
-                        "addressLocality": doctor_clinic.hospital.locality if doctor_clinic and getattr(doctor_clinic, 'hospital', None) else '',
-                        "addressRegion": doctor_clinic.hospital.city if doctor_clinic and getattr(doctor_clinic, 'hospital', None) else '',
-                        # "postalCode": doctor_clinic.hospital.pin_code if doctor_clinic and getattr(doctor_clinic, 'hospital', None) else '',
-                        # "streetAddress": doctor_clinic.hospital.get_hos_address() if doctor_clinic and getattr(doctor_clinic, 'hospital', None) else '',
-                    },
-                    # "description": doctor.about,
+            }
+
+
+            new_schema["@context"] = 'http://schema.org'
+            new_schema["@type"] = schema_type
+            new_schema["name"] = doctor.get_display_name()
+            new_schema["image"] = doctor.get_thumbnail() if doctor.get_thumbnail() else static(
+                'web/images/doc_placeholder.png')
+            new_schema["url"] = None
+            new_schema["medicalSpecialty"] = [schema_specialization]
+            new_schema["currenciesAccepted"] = "INR"
+            new_schema["priceRange"] = min_price["deal_price"]
+            new_schema["address"] = {
+                                        "@type": 'PostalAddress',
+                                        "addressLocality": doctor_clinic.hospital.locality if doctor_clinic and getattr(
+                                            doctor_clinic, 'hospital', None) else '',
+                                        "addressRegion": doctor_clinic.hospital.city if doctor_clinic and getattr(
+                                            doctor_clinic, 'hospital', None) else '',
+                                        # "postalCode": doctor_clinic.hospital.pin_code if doctor_clinic and getattr(doctor_clinic, 'hospital', None) else '',
+                                        # "streetAddress": doctor_clinic.hospital.get_hos_address() if doctor_clinic and getattr(doctor_clinic, 'hospital', None) else '',
+                                    }
+            new_schema['location'] = {
+                                         '@type': 'Place',
+                                         'geo': {
+                                             '@type': 'GeoCoordinates',
+                                             'latitude': doctor_clinic.hospital.location.y if doctor_clinic and
+                                                                                              getattr(doctor_clinic,
+                                                                                                      'hospital',
+                                                                                                      None) and getattr(
+                                                 doctor_clinic.hospital, 'location', None) else None,
+                                             'longitude': doctor_clinic.hospital.location.x if doctor_clinic and
+                                                                                               getattr(doctor_clinic,
+                                                                                                       'hospital',
+                                                                                                       None) and getattr(
+                                                 doctor_clinic.hospital, 'location', None) else None,
+
+                                         }
+                                     }
+            new_schema["branchOf"] = [
+                {
+                    "@type": "MedicalClinic",
+                    "name": doctor_clinic.hospital.name,
                     "priceRange": min_price["deal_price"],
-                    # 'openingHours': opening_hours,
-                    'location': {
-                        '@type': 'Place',
-                        'geo': {
-                            # '@type': 'GeoCircle',
-                            # 'geoMidpoint': {
-                                '@type': 'GeoCoordinates',
-                                'latitude': doctor_clinic.hospital.location.y if doctor_clinic and
-                                                                                 getattr(doctor_clinic, 'hospital', None) and getattr(doctor_clinic.hospital, 'location', None) else None,
-                                'longitude': doctor_clinic.hospital.location.x if doctor_clinic and
-                                                                                  getattr(doctor_clinic, 'hospital', None) and getattr(doctor_clinic.hospital, 'location', None) else None,
-
-                        }
-                    },
-                    "branchOf": [
+                    "image": doctor_clinic.hospital.get_thumbnail() if doctor_clinic.hospital.get_thumbnail() else None,
+                    "address":
                         {
-                            "@type": "MedicalClinic",
-                            "name": doctor_clinic.hospital.name,
-                            "priceRange": min_price["deal_price"],
-                            "image": doctor_clinic.hospital.get_thumbnail() if doctor_clinic.hospital.get_thumbnail() else None,
-                            "address":
-                                {
-                                    "@type": 'PostalAddress',
-                                    "addressLocality": doctor_clinic.hospital.locality if doctor_clinic and getattr(
-                                        doctor_clinic, 'hospital', None) else '',
-                                    "addressRegion": doctor_clinic.hospital.city if doctor_clinic and getattr(
-                                        doctor_clinic, 'hospital', None) else '',
-
-                                }
+                            "@type": 'PostalAddress',
+                            "addressLocality": doctor_clinic.hospital.locality if doctor_clinic and getattr(
+                                doctor_clinic, 'hospital', None) else '',
+                            "addressRegion": doctor_clinic.hospital.city if doctor_clinic and getattr(
+                                doctor_clinic, 'hospital', None) else '',
 
                         }
-                    ]
 
                 }
-            }
+            ]
+
+            temp['new_schema'] = new_schema
             response.append(temp)
         return response

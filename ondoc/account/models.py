@@ -1,5 +1,7 @@
 from django.db import models
 from django.contrib.postgres.fields import JSONField
+from django.forms import model_to_dict
+
 from ondoc.authentication.models import TimeStampedModel, User, UserProfile, Merchant
 from ondoc.account.tasks import refund_curl_task
 from ondoc.notification.models import AppNotification, NotificationAction
@@ -63,6 +65,7 @@ class Order(TimeStampedModel):
     parent = models.ForeignKey('self', on_delete=models.CASCADE, related_name="orders", blank=True, null=True)
     cart = models.ForeignKey('cart.Cart', on_delete=models.CASCADE, related_name="order", blank=True, null=True)
     user = models.ForeignKey(User, on_delete=models.DO_NOTHING, blank=True, null=True)
+    visitor_info = JSONField(blank=True, null=True)
 
     def __str__(self):
         return "{}".format(self.id)
@@ -98,6 +101,10 @@ class Order(TimeStampedModel):
         from ondoc.diagnostic.models import LabAppointment
         from ondoc.api.v1.doctor.serializers import OpdAppTransactionModelSerializer
         from ondoc.api.v1.diagnostic.serializers import LabAppTransactionModelSerializer
+
+        # skip if order already processed
+        if self.reference_id:
+            raise Exception("Order already processed - " + str(self.id))
 
         # Initial validations for appointment data
         appointment_data = self.action_data
@@ -171,8 +178,9 @@ class Order(TimeStampedModel):
         wallet_amount = cashback_amount = 0
         # If payment is required and appointment is created successfully, debit consumer's account
         if appointment_obj and not payment_not_required:
-            # debit consumer account and update appointment with price breakup
             wallet_amount, cashback_amount = consumer_account.debit_schedule(appointment_obj, self.product_id, amount)
+        # update appointment with price breakup
+        if appointment_obj:
             appointment_obj.price_data = {"wallet_amount": int(wallet_amount), "cashback_amount": int(cashback_amount)}
             appointment_obj.save()
 
@@ -331,6 +339,16 @@ class Order(TimeStampedModel):
         total_balance = balance + cashback_balance
         payable_amount = cls.get_total_payable_amount(fulfillment_data)
 
+        # utility to fetch and save visitor info for an parent order
+        visitor_info = None
+        try:
+            from ondoc.api.v1.tracking.views import EventCreateViewSet
+            with transaction.atomic():
+                event_api = EventCreateViewSet()
+                visitor_id, visit_id = event_api.get_visit(request)
+                visitor_info = { "visitor_id": visitor_id, "visit_id": visit_id }
+        except Exception as e:
+            logger.log("Could not fecth visitor info - " + str(e))
 
         # create a Parent order to accumulate sub-orders
         process_immediately = False
@@ -343,7 +361,8 @@ class Order(TimeStampedModel):
                 cashback_amount= cashback_amount,
                 payment_status= cls.PAYMENT_PENDING,
                 user=user,
-                product_id=1 # remove later
+                product_id=1, # remove later
+                visitor_info=visitor_info
             )
             process_immediately = True
         else:
@@ -360,7 +379,8 @@ class Order(TimeStampedModel):
                 cashback_amount= cashback_amount,
                 payment_status= cls.PAYMENT_PENDING,
                 user=user,
-                product_id=1  # remove later
+                product_id=1,  # remove later
+                visitor_info=visitor_info
             )
 
         # building separate orders for all fulfillments
@@ -389,6 +409,16 @@ class Order(TimeStampedModel):
                 )
             elif appointment_detail.get('payment_type') == OpdAppointment.INSURANCE:
                 order = cls.Order.objects.create(
+                    product_id=product_id,
+                    action=action,
+                    action_data=appointment_detail,
+                    payment_status=cls.PAYMENT_PENDING,
+                    parent=pg_order,
+                    cart_id=appointment_detail["cart_item_id"],
+                    user=user
+                )
+            elif appointment_detail.get('payment_type') == OpdAppointment.COD:
+                order = cls.objects.create(
                     product_id=product_id,
                     action=action,
                     action_data=appointment_detail,
@@ -449,6 +479,9 @@ class Order(TimeStampedModel):
 
                 total_cashback_used += curr_cashback
                 total_wallet_used += curr_wallet
+
+                # trigger event for new appointment creation
+                curr_app.trigger_created_event(self.visitor_info)
 
                 # mark cart item delete after order process
                 if order.cart:
@@ -912,6 +945,21 @@ class ConsumerTransaction(TimeStampedModel):
     amount = models.DecimalField(max_digits=10, decimal_places=2, default=0)
     source = models.SmallIntegerField(choices=SOURCE_TYPE, blank=True, null=True)
 
+    def save(self, *args, **kwargs):
+        database_instance = ConsumerTransaction.objects.filter(pk=self.id).first()
+        super().save(*args, **kwargs)
+        transaction.on_commit(lambda: self.app_commit_tasks(database_instance))
+
+    def app_commit_tasks(self, old_instance):
+        from ondoc.notification import tasks as notification_tasks
+        if not old_instance and self.type == PgTransaction.DEBIT and self.action == self.action_list.index('Refund'):
+            try:
+                notification_tasks.refund_breakup_sms_task.apply_async((self.id,), countdown=1)
+            except Exception as e:
+                logger.error(str(e))
+
+
+
     @classmethod
     def valid_appointment_for_cancellation(cls, app_id, product_id):
         return not cls.objects.filter(type=PgTransaction.CREDIT, reference_id=app_id, product_id=product_id,
@@ -936,6 +984,19 @@ class ConsumerRefund(TimeStampedModel):
     pg_transaction = models.ForeignKey(PgTransaction, related_name='pg_refund', blank=True, null=True, on_delete=models.DO_NOTHING)
     refund_state = models.PositiveSmallIntegerField(choices=state_type, default=PENDING)
     refund_initiated_at = models.DateTimeField(blank=True, null=True)
+
+    def save(self, *args, **kwargs):
+        database_instance = ConsumerRefund.objects.filter(pk=self.id).first()
+        super().save(*args, **kwargs)
+        transaction.on_commit(lambda: self.app_commit_tasks(database_instance))
+
+    def app_commit_tasks(self, old_instance):
+        from ondoc.notification import tasks as notification_tasks
+        if old_instance and old_instance.refund_state != self.refund_state and self.refund_state == self.COMPLETED:
+            try:
+                notification_tasks.refund_completed_sms_task.apply_async((self.id,), countdown=1)
+            except Exception as e:
+                logger.error(str(e))
 
     @classmethod
     def initiate_refund(cls, user, ctx_obj):
@@ -1257,3 +1318,13 @@ class UserReferred(TimeStampedModel):
     class Meta:
         db_table = "user_referred"
 
+
+class PgLogs(TimeStampedModel):
+    decoded_response = JSONField(blank=True, null=True)
+    coded_response = models.TextField(blank=True, null=True)
+
+    def __str__(self):
+        return "{}".format(self.id)
+
+    class Meta:
+        db_table = "pg_log"

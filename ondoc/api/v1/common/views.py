@@ -8,7 +8,7 @@ from ondoc.api.v1.common.serializers import SearchLeadSerializer
 from django.utils.dateparse import parse_datetime
 from weasyprint import HTML
 from django.http import HttpResponse
-from ondoc.api.v1.utils import html_to_pdf
+from ondoc.api.v1.utils import html_to_pdf, generate_short_url
 from ondoc.diagnostic.models import Lab
 from ondoc.doctor.models import (Doctor, DoctorPracticeSpecialization, PracticeSpecialization, DoctorMobile, Qualification,
                                  Specialization, College, DoctorQualification, DoctorExperience, DoctorAward,
@@ -893,7 +893,7 @@ class GetPaymentOptionsViewSet(viewsets.GenericViewSet):
         params = request.query_params
         from_app = params.get("from_app", False)
         if from_app:
-            queryset = PaymentOptions.objects.filter(is_enabled=True, payment_gateway__iexact="paytm").order_by('-priority')
+            queryset = PaymentOptions.objects.filter(is_enabled=True).order_by('-priority')
         else:
             queryset = PaymentOptions.objects.filter(is_enabled=True).order_by('-priority')
         return queryset
@@ -903,3 +903,25 @@ class GetPaymentOptionsViewSet(viewsets.GenericViewSet):
         options = PaymentOptions.build_payment_option(queryset)
 
         return Response(options)
+
+
+class GetSearchUrlViewSet(viewsets.GenericViewSet):
+
+    def search_url(self, request):
+        params = request.query_params
+        specialization_ids = params.get("specialization", '')
+        test_ids = params.get("test", '')
+        lat = params.get("lat", 28.4485)  # if no lat long then default to gurgaon
+        long = params.get("long", 77.0759)
+
+        opd_search_url = "%s/opd/searchresults?specializations=%s" \
+                         "&lat=%s&long=%s" \
+                         % (settings.BASE_URL, specialization_ids, lat, long)
+        tiny_opd_search_url = generate_short_url(opd_search_url)
+
+        lab_search_url = "%s/lab/searchresults?test_ids=%s" \
+                         "&lat=%s&long=%s" \
+                         % (settings.BASE_URL, test_ids, lat, long)
+        tiny_lab_search_url = generate_short_url(lab_search_url)
+
+        return Response({"opd_search_url": tiny_opd_search_url, "lab_search_url": tiny_lab_search_url})

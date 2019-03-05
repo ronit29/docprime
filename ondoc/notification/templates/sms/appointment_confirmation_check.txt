@@ -1,0 +1,7 @@
+Dear {{patient_name|capfirst}},
+
+Your appointment ID - {{instance.id}} with Dr. {{doctor_name|capfirst}} was scheduled on {{instance.time_slot_start|date:"D jS F Y"}} at {{instance.time_slot_start|date:"h:i A"}}.
+Please click {{opd_appointment_complete_url}} if appointment is completed or {{reschdule_appointment_bypass_url}} to reschedule the appointment.
+
+Thanks,
+Team Docprime.com
