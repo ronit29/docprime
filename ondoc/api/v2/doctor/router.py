@@ -17,6 +17,6 @@ urlpatterns = [
     path('provider-signup/consent', views.ProviderSignupDataViewset.as_view({'post': 'consent_is_docprime'}), name='consent-is-docprime'),
     path('provider-signup/add/hospital', views.ProviderSignupDataViewset.as_view({'post': 'create_hospital'}), name='create-hospital'),
     path('provider-signup/add/doctor', views.ProviderSignupDataViewset.as_view({'post': 'create_doctor'}), name='create-doctor'),
-    path('provider-signup/add/generic-admin', views.ProviderSignupDataViewset.as_view({'post': 'create_generic_admin'}), name='create-generic-admin'),
+    path('provider-signup/add/staffs', views.ProviderSignupDataViewset.as_view({'post': 'create_staffs'}), name='create-staffs'),
 ]
 

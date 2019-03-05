@@ -199,6 +199,11 @@ class ConsentIsDocprimeSerializer(serializers.Serializer):
 
 class BulkCreateDoctorSerializer(serializers.Serializer):
     name = serializers.CharField(max_length=200)
+    online_consultation_fees = serializers.IntegerField(required=False, min_value=0)
+    phone_number = serializers.IntegerField(required=False, min_value=5000000000, max_value=9999999999)
+    is_appointment = serializers.BooleanField(default=False)
+    is_billing = serializers.BooleanField(default=False)
+    is_superuser = serializers.BooleanField(default=False)
 
 
 class CreateDoctorSerializer(serializers.Serializer):
@@ -208,43 +213,52 @@ class CreateDoctorSerializer(serializers.Serializer):
 
 class BulkCreateGenericAdminSerializer(serializers.Serializer):
     phone_number = serializers.IntegerField(min_value=5000000000, max_value=9999999999)
-    permission_type = serializers.ChoiceField(choices=GenericAdmin.type_choices)
+    is_appointment = serializers.BooleanField(default=False)
+    is_billing = serializers.BooleanField(default=False)
+    is_superuser = serializers.BooleanField(default=False)
     name = serializers.CharField(max_length=200)
 
 
 class CreateGenericAdminSerializer(serializers.Serializer):
     hospital_id = serializers.PrimaryKeyRelatedField(queryset=doc_models.Hospital.objects.all())
-    generic_admins = serializers.ListField(child=BulkCreateGenericAdminSerializer(many=False))
+    staffs = serializers.ListField(child=BulkCreateGenericAdminSerializer(many=False))
 
 
 class CreateHospitalSerializer(serializers.Serializer):
     name = serializers.CharField(max_length=200)
     city = serializers.CharField(max_length=20)
     country = serializers.CharField(max_length=20)
-    doctors = serializers.ListField(child=BulkCreateDoctorSerializer(many=False), allow_empty=True, required=False)
-    generic_admins = serializers.ListField(child=BulkCreateGenericAdminSerializer(many=False),
-                                           allow_empty=True, required=False)
+    contact_number = serializers.IntegerField(required=False, min_value=5000000000, max_value=9999999999)
+    doctors = serializers.ListField(required=False, child=BulkCreateDoctorSerializer(many=False), allow_empty=True)
+    staffs = serializers.ListField(required=False, child=BulkCreateGenericAdminSerializer(many=False),
+                                           allow_empty=True)
 
 
 class DoctorModelSerializer(serializers.ModelSerializer):
     class Meta:
         model = doc_models.Doctor
-        fields = ('name',)
+        fields = ('id', 'name')
 
 
 class HospitalModelSerializer(serializers.ModelSerializer):
     class Meta:
         model = doc_models.Hospital
-        fields = ('name', 'city', 'country')
+        fields = ('id', 'name', 'city', 'country')
 
 
 class DoctorClinicModelSerializer(serializers.ModelSerializer):
     class Meta:
         model = doc_models.DoctorClinic
-        fields = ('doctor', 'hospital', 'enabled')
+        fields = ('id', 'doctor', 'hospital', 'enabled')
+
+
+class DoctorMobileModelSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = doc_models.DoctorMobile
+        fields = ('id', 'doctor', 'number', 'is_primary')
 
 
 class GenericAdminModelSerializer(serializers.ModelSerializer):
     class Meta:
         model = GenericAdmin
-        fields = ('phone_number', 'permission_type', 'name')
+        fields = ('id', 'phone_number', 'permission_type', 'name', 'doctor', 'hospital', 'super_user_permission')
