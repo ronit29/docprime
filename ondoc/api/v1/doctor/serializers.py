@@ -730,6 +730,7 @@ class DoctorListSerializer(serializers.Serializer):
     max_distance = serializers.IntegerField(required=False, allow_null=True)
     min_distance = serializers.IntegerField(required=False, allow_null=True)
     hospital_id = serializers.IntegerField(required=False, allow_null=True)
+    ipd_procedure_ids = CommaSepratedToListField(required=False, max_length=500, typecast_to=str)
 
     def validate_procedure_ids(self, attrs):
         try:

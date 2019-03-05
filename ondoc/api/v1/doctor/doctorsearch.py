@@ -41,7 +41,8 @@ class DoctorSearchHelper:
         specialization_ids = self.query_params.get("specialization_ids", [])
         condition_ids = self.query_params.get("condition_ids", [])
 
-        procedure_ids = self.query_params.get("procedure_ids", [])  # NEW_LOGIC
+        procedure_ids = self.query_params.get("procedure_ids", [])# NEW_LOGIC
+        ipd_procedure_ids = self.query_params.get("ipd_procedure_ids", [])
         procedure_category_ids = self.query_params.get("procedure_category_ids", [])  # NEW_LOGIC
 
         if self.query_params.get('hospital_id') is not None:
@@ -102,6 +103,19 @@ class DoctorSearchHelper:
                 counter += 1
             filtering_params.append(
                 dcp_str + ')'
+            )
+
+        counter = 1
+        if len(ipd_procedure_ids) > 0:
+            dcip_str = 'dcip.ipd_procedure_id IN ('
+            for id in ipd_procedure_ids:
+                if not counter == 1:
+                    dcip_str += ','
+                dcip_str = dcip_str + '%(' + 'ipd_procedure' + str(counter) + ')s'
+                params['ipd_procedure' + str(counter)] = id
+                counter += 1
+            filtering_params.append(
+                dcip_str + ')'
             )
 
         if len(procedure_ids) == 0 and self.query_params.get("min_fees") is not None:
@@ -270,6 +284,7 @@ class DoctorSearchHelper:
                            "INNER JOIN hospital h ON h.id = dc.hospital_id AND h.is_live=true " \
                            "INNER JOIN doctor_clinic_timing dct ON dc.id = dct.doctor_clinic_id " \
                            "INNER JOIN doctor_clinic_procedure dcp ON dc.id = dcp.doctor_clinic_id " \
+                           "INNER JOIN doctor_clinic_ipd_procedure dcip on dc.id = dcip.doctor_clinic_id  AND dcip.enabled=True " \
                            "WHERE {filtering_params} AND " \
                            "St_dwithin(St_setsrid(St_point((%(longitude)s), (%(latitude)s)), 4326 ), h.location, (%(max_distance)s)) AND " \
                            "St_dwithin(St_setsrid(St_point((%(longitude)s), (%(latitude)s)), 4326 ), h.location, (%(min_distance)s)) = false " \
