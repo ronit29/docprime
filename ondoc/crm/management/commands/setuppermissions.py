@@ -156,7 +156,7 @@ class Command(BaseCommand):
                 Q(content_type=ct), Q(codename='change_' + ct.model))
             group.permissions.add(*permissions)
 
-        content_types = ContentType.objects.get_for_models(Merchant, Doctor,
+        content_types = ContentType.objects.get_for_models(Merchant, Doctor, Hospital, HospitalNetwork,
                                                            Qualification, Specialization, Language, MedicalService,
                                                            College, SpecializationDepartment,
                                                            SpecializationField,
