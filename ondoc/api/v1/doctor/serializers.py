@@ -1663,11 +1663,13 @@ class HospitalDetailIpdProcedureSerializer(TopHospitalForIpdProcedureSerializer)
         return result
 
     def get_doctors(self, obj):
-        # from ondoc.api.v1.doctor.views import DoctorListViewSet
-        # request = self.context.get('request')
-        # doctor_list_viewset = DoctorListViewSet()
-        # return doctor_list_viewset.search_by_hospital(request, hospital_id=obj.id, sort_on='experience').data
-        pass
+        from ondoc.api.v1.doctor.views import DoctorListViewSet
+        request = self.context.get('request')
+        validated_data = self.context.get('validated_data')
+        doctor_list_viewset = DoctorListViewSet()
+        return doctor_list_viewset.list(request,
+                                        parameters={'hospital_id': str(obj.id), 'longitude': validated_data.get('long'),
+                                                    'latitude': validated_data.get('lat'), 'sort_on': 'experience'}).data
 
     def get_rating_graph(self, obj):
         from ondoc.ratings_review.models import RatingsReview
@@ -1678,7 +1680,6 @@ class HospitalDetailIpdProcedureSerializer(TopHospitalForIpdProcedureSerializer)
                     appointment_id__in=OpdAppointment.objects.filter(hospital=obj).values_list('id', flat=True),
                     appointment_type=RatingsReview.OPD)
         return RatingsGraphSerializer(queryset, context={'request': self.context.get('request')}).data
-        # OpdAppointment.objects.filter(hospital=obj)
 
 
 class HospitalRequestSerializer(serializers.Serializer):
@@ -1718,3 +1719,13 @@ class IpdProcedureLeadSerializer(serializers.ModelSerializer):
                                                        doctor_clinic__hospital=hospital):
             raise serializers.ValidationError('IPD procedure is not available in the hospital.')
         return super().validate(attrs)
+
+
+class HospitalDetailRequestSerializer(serializers.Serializer):
+    long = serializers.FloatField(default=77.071848)
+    lat = serializers.FloatField(default=28.450367)
+
+
+class IpdDetailsRequestDetailRequestSerializer(serializers.Serializer):
+    long = serializers.FloatField(default=77.071848)
+    lat = serializers.FloatField(default=28.450367)
