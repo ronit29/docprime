@@ -119,7 +119,6 @@ class DoctorSearchHelper:
                 dcip_str + ')'
             )
 
-
         if len(procedure_ids) == 0 and self.query_params.get("min_fees") is not None:
             filtering_params.append(
                 # "deal_price>={}".format(str(self.query_params.get("min_fees")))

@@ -732,6 +732,17 @@ class DoctorListSerializer(serializers.Serializer):
     hospital_id = serializers.IntegerField(required=False, allow_null=True)
     ipd_procedure_ids = CommaSepratedToListField(required=False, max_length=500, typecast_to=str)
 
+    def validate_ipd_procedure_ids(self, attrs):
+        try:
+            temp_attrs = [int(attr) for attr in attrs]
+            temp_attrs=set(temp_attrs)
+            if IpdProcedure.objects.filter(id__in=temp_attrs, is_enabled=True).count() == len(temp_attrs):
+                return attrs
+        except:
+            raise serializers.ValidationError('Invalid IPD Procedure IDs')
+        raise serializers.ValidationError('Invalid IPD Procedure IDs')
+
+
     def validate_procedure_ids(self, attrs):
         try:
             temp_attrs = [int(attr) for attr in attrs]
