@@ -649,7 +649,7 @@ class WHTSAPPNotification:
             receiver_user = receiver.get('user')
 
             instance = self.context.get('instance')
-            if receiver_user.user_type == User.CONSUMER and not instance.profile.whatsapp_optin:
+            if receiver_user and receiver_user.user_type == User.CONSUMER and not instance.profile.whatsapp_optin:
                 continue
 
             template, data = self.get_template_and_data(receiver_user)
