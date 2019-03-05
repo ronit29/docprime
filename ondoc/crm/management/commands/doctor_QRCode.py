@@ -39,13 +39,16 @@ class Command(BaseCommand):
         for curr_row in range(1, num_rows):
             data = worksheet.cell(curr_row, 0)
             result_data.append(data)
-            for item in result_data:
-                doctor_id = item.value
-                doc = Doctor.objects.filter(id=doctor_id, is_live=True).first()
-                if doc:
-                    qr_code = doc.generate_qr_code()
-                # if qr_code:
-                #     sticker = qr_code.generate_sticker()
+        for item in result_data:
+            doctor_id = item.value
+            doc = Doctor.objects.filter(id=2, is_live=True).first()
+            if doc:
+                qr_code = doc.generate_qr_code()
+                # for qr in doc.qr_code.all():
+                #     object = qr
+                #     if object:
+                doc.generate_sticker()
+
 
 
 

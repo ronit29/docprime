@@ -579,6 +579,7 @@ class Doctor(auth_model.TimeStampedModel, auth_model.QCModel, SearchKey):
         for image in self.images.all():
             if image.cropped_image:
                 thumbnail = image.cropped_image
+
                 break
         if not thumbnail:
             return
@@ -649,6 +650,7 @@ class Doctor(auth_model.TimeStampedModel, auth_model.QCModel, SearchKey):
 
         sticker = DoctorSticker(name=image_file1, doctor=self)
         sticker.save()
+        return sticker
 
     class Meta:
         db_table = "doctor"
