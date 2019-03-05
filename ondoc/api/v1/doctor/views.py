@@ -1570,15 +1570,11 @@ class DoctorListViewSet(viewsets.GenericViewSet):
                          'bottom_content': bottom_content, 'canonical_url': canonical_url})
 
     @transaction.non_atomic_requests
-    def search_by_hospital(self, request, hospital_id=None, sort_on=None):
+    def search_by_hospital(self, request):
         parameters = request.query_params
         serializer = serializers.DoctorListSerializer(data=parameters, context={"request": request})
         serializer.is_valid(raise_exception=True)
         validated_data = serializer.validated_data
-        if 'hospital_id' not in validated_data and hospital_id:
-            validated_data['hospital_id'] = hospital_id
-        if 'sort_on' not in validated_data and sort_on:
-            validated_data['sort_on'] = sort_on
         specialization_dynamic_content = ''
         doctor_search_helper = DoctorSearchByHospitalHelper(validated_data)
         # if not validated_data.get("search_id"):
