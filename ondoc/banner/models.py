@@ -11,10 +11,7 @@ import re
 from urllib.parse import urlparse
 from django.http import QueryDict
 from django.utils import timezone
-
-
-
-
+from django.db.models import Q
 
 
 class SliderLocation(models.Model):
@@ -83,7 +80,7 @@ class Banner(auth_model.TimeStampedModel):
     @staticmethod
     def get_all_banners(request):
 
-        queryset = Banner.objects.filter(enable=True, start_date__lte=timezone.now(), end_date__gte=timezone.now()).order_by('-priority')[:100]
+        queryset = Banner.objects.filter(enable=True).filter(Q(start_date__lte=timezone.now()) | Q(start_date__isnull=True)).filter(Q(end_date__gte=timezone.now()) | Q(end_date__isnull=True)).order_by('-priority')[:100]
         # slider_locate = dict(Banner.slider_location)
         final_result = []
         for data in queryset:
