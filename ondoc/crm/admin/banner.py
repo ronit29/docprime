@@ -59,7 +59,7 @@ class BannerAdmin(admin.ModelAdmin):
     model = Banner
     form = BannerForm
     list_display = ['title', 'priority', 'location', 'start_date', 'end_date', 'enable']
-    readonly_fields = ['event_name', 'slider_locate']
+    readonly_fields = ['event_name']
     list_filter = ['enable']
     exclude = ['slider_locate']
 
