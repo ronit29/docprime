@@ -1,3 +1,5 @@
+import base64
+
 from django.forms.utils import ErrorList
 from reversion.admin import VersionAdmin
 from django.core.exceptions import FieldDoesNotExist, MultipleObjectsReturned
@@ -22,14 +24,16 @@ import logging
 from dal import autocomplete
 from ondoc.api.v1.utils import GenericAdminEntity, util_absolute_url, util_file_name
 from ondoc.common.models import AppointmentHistory
-from ondoc.procedure.models import DoctorClinicProcedure, Procedure
+from django.contrib import messages
+from django.http import HttpResponseRedirect
+from ondoc.procedure.models import DoctorClinicProcedure, Procedure, DoctorClinicIpdProcedure
 
 logger = logging.getLogger(__name__)
 
 
 from ondoc.account.models import Order, Invoice
 from django.contrib.contenttypes.admin import GenericTabularInline
-from ondoc.authentication.models import GenericAdmin, SPOCDetails, AssociatedMerchant, Merchant
+from ondoc.authentication.models import GenericAdmin, SPOCDetails, AssociatedMerchant, Merchant, QCModel
 from ondoc.doctor.models import (Doctor, DoctorQualification,
                                  DoctorLanguage, DoctorAward, DoctorAssociation, DoctorExperience,
                                  MedicalConditionSpecialization, DoctorMedicalService, DoctorImage,
@@ -55,7 +59,7 @@ from django.contrib.admin.widgets import AdminSplitDateTime
 from ondoc.authentication import models as auth_model
 from django import forms
 from decimal import Decimal
-from .common import AssociatedMerchantInline
+from .common import AssociatedMerchantInline, RemarkInline
 from ondoc.sms import api
 from ondoc.ratings_review import models as rating_models
 
@@ -170,6 +174,7 @@ class DoctorClinicTimingFormSet(forms.BaseInlineFormSet):
                 else:
                     raise forms.ValidationError("Duplicate records not allowed.")
 
+
 class DoctorClinicProcedureInline(nested_admin.NestedTabularInline):
     model = DoctorClinicProcedure
     extra = 0
@@ -178,6 +183,16 @@ class DoctorClinicProcedureInline(nested_admin.NestedTabularInline):
     verbose_name = 'Procedure'
     verbose_name_plural = 'Procedures'
     autocomplete_fields = ['procedure']
+
+
+class DoctorClinicIpdProcedureInline(nested_admin.NestedTabularInline):
+    model = DoctorClinicIpdProcedure
+    extra = 0
+    can_delete = True
+    show_change_link = False
+    verbose_name = 'IPD Procedure'
+    verbose_name_plural = 'IPD Procedures'
+    autocomplete_fields = ['ipd_procedure']
 
 
 class DoctorClinicTimingInline(nested_admin.NestedTabularInline):
@@ -200,6 +215,14 @@ class DoctorClinicInlineForm(forms.ModelForm):
         model = DoctorClinic
         fields = ('__all__')
 
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        if self and hasattr(self, 'request') and self.request and isinstance(self.request.GET, dict):
+            # http://127.0.0.1:8000/admin/doctor/hospital/add/?AgentId=9876
+            self.request_matrix_lead_id = self.request.GET.get('LeadId', None)
+            self.request_agent_lead_id = self.request.GET.get('AgentId', None)
+
+
 
 class DoctorClinicInline(nested_admin.NestedTabularInline):
     model = DoctorClinic
@@ -209,7 +232,26 @@ class DoctorClinicInline(nested_admin.NestedTabularInline):
     formset = DoctorClinicFormSet
     show_change_link = False
     # autocomplete_fields = ['hospital']
-    inlines = [DoctorClinicTimingInline, DoctorClinicProcedureInline, AssociatedMerchantInline]
+    inlines = [DoctorClinicTimingInline, DoctorClinicProcedureInline, DoctorClinicIpdProcedureInline, AssociatedMerchantInline]
+    fields = ['hospital', 'add_hospital_link', 'followup_duration', 'followup_charges', 'enabled_for_online_booking', 'enabled', 'priority']
+
+    def get_readonly_fields(self, *args, **kwargs):
+        read_only = super().get_readonly_fields(*args, **kwargs)
+        if args:
+            request = args[0]
+            if request.GET.get('AgentId', None):
+                self.matrix_agent_id = request.GET.get('AgentId', None)
+            read_only += ('add_hospital_link',)
+        return read_only
+
+    def add_hospital_link(self, obj):
+        content_type = ContentType.objects.get_for_model(Hospital)
+        add_hospital_url = reverse('admin:%s_%s_add' % (content_type.app_label, content_type.model))
+        # add_hospital_url+='?_to_field=id&_popup=1'
+        if hasattr(self, 'matrix_agent_id') and self.matrix_agent_id:
+            add_hospital_url += '?AgentId={}'.format(self.matrix_agent_id)
+        html = '''<a href='%s' target=_blank>%s</a><br>''' % (add_hospital_url, "Add Hospital")
+        return mark_safe(html)
 
     def get_queryset(self, request):
         return super(DoctorClinicInline, self).get_queryset(request).select_related('hospital')
@@ -641,12 +683,24 @@ class DoctorForm(FormCleanMixin):
     practicing_since = forms.ChoiceField(required=False, choices=practicing_since_choices)
     # onboarding_status = forms.ChoiceField(disabled=True, required=False, choices=Doctor.ONBOARDING_STATUS)
 
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        if self and self.request and isinstance(self.request.GET, dict):
+            # http://127.0.0.1:8000/admin/doctor/doctor/add/?Lead_id=1234&AgentId=9876
+            if hasattr(self.instance, 'id') and not self.instance.id:
+                try:
+                    requested_leadId = self.request.GET.get('LeadId', None)
+                    self.request_matrix_lead_id = base64.b64decode(requested_leadId).decode()
+                except Exception as e:
+                    logger.error("Invalid Matrix Lead ID received from Matrix - " + str(e))
+                self.request_agent_lead_id = self.request.GET.get('AgentId', None)
+
     def validate_qc(self):
         qc_required = {'name': 'req', 'gender': 'req',
                        # 'practicing_since': 'req',
                        'emails': 'count',
                        'doctor_clinics': 'count', 'languages': 'count',
-                       'doctorpracticespecializations': 'count'}
+                       'doctorpracticespecializations': 'count', 'matrix_lead_id': 'value_req'}
 
         # Q(hospital__is_billing_enabled=False, doctor=self.instance) &&
         # (network is null or network billing is false)
@@ -669,7 +723,9 @@ class DoctorForm(FormCleanMixin):
                         all_hospital_ids.append(int(self.data[key + '-{}-hospital'.format(indx)]))
                     if not Hospital.objects.filter(pk__in=all_hospital_ids, is_live=True).count():
                         raise forms.ValidationError("Atleast one entry of " + key + " should be live for Quality Check")
-
+            if value == 'value_req':
+                if hasattr(self.instance, key) and not getattr(self.instance, key):
+                    raise forms.ValidationError(key + " is required for Quality Check")
 
     def clean_practicing_since(self):
         data = self.cleaned_data['practicing_since']
@@ -682,24 +738,27 @@ class DoctorForm(FormCleanMixin):
         if any(self.errors):
             return
         data = self.cleaned_data
-        is_enabled = data.get('enabled', None)
-        enabled_for_online_booking = data.get('enabled_for_online_booking', None)
-        if is_enabled is None:
-            is_enabled = self.instance.enabled if self.instance else False
-        if enabled_for_online_booking is None:
-            enabled_for_online_booking = self.instance.enabled_for_online_booking if self.instance else False
-        if is_enabled and enabled_for_online_booking:
-            if any([data.get('disabled_after', None), data.get('disable_reason', None),
-                    data.get('disable_comments', None)]):
-                raise forms.ValidationError(
-                    "Cannot have disabled after/disabled reason/disable comments if doctor is enabled or not enabled for online booking.")
-        elif not is_enabled or not enabled_for_online_booking:
-            if not all([data.get('disabled_after', None), data.get('disable_reason', None)]):
-                raise forms.ValidationError(
-                    "Must have disabled after/disable reason if doctor is not enabled or not enabled for online booking.")
-            if data.get('disable_reason', None) and data.get('disable_reason', None) == Doctor.OTHERS and not data.get(
-                    'disable_comments', None):
-                raise forms.ValidationError("Must have disable comments if disable reason is others.")
+        if self.instance and self.instance.id and self.instance.data_status == QCModel.QC_APPROVED:
+            is_enabled = data.get('enabled', None)
+            enabled_for_online_booking = data.get('enabled_for_online_booking', None)
+            if is_enabled is None:
+                is_enabled = self.instance.enabled if self.instance else False
+            if enabled_for_online_booking is None:
+                enabled_for_online_booking = self.instance.enabled_for_online_booking if self.instance else False
+            if is_enabled and enabled_for_online_booking:
+                if any([data.get('disabled_after', None), data.get('disable_reason', None),
+                        data.get('disable_comments', None)]):
+                    raise forms.ValidationError(
+                        "Cannot have disabled after/disabled reason/disable comments if doctor is enabled or not enabled for online booking.")
+            elif not is_enabled or not enabled_for_online_booking:
+                if not all([data.get('disabled_after', None), data.get('disable_reason', None)]):
+                    raise forms.ValidationError(
+                        "Must have disabled after/disable reason if doctor is not enabled or not enabled for online booking.")
+                if data.get('disable_reason', None) and data.get('disable_reason', None) == Doctor.OTHERS and not data.get(
+                        'disable_comments', None):
+                    raise forms.ValidationError("Must have disable comments if disable reason is others.")
+        # if '_mark_in_progress' in self.data and data.get('enabled'):
+        #     raise forms.ValidationError("Must be disabled before rejecting.")
 
 
 class CityFilter(SimpleListFilter):
@@ -840,6 +899,7 @@ class DoctorImageAdmin(admin.ModelAdmin):
     readonly_fields = ('original_image', 'cropped_img', 'crop_image', 'doctor',)
     fields = ('original_image', 'cropped_img', 'crop_image', 'doctor')
     list_filter = ('doctor__data_status', CroppedImageNullFilter)
+    search_fields = ['doctor__id', 'doctor__name']
 
     def has_change_permission(self, request, obj=None):
         if not super().has_change_permission(request, obj):
@@ -1029,6 +1089,36 @@ class DoctorAdmin(AutoComplete, ImportExportMixin, VersionAdmin, ActionAdmin, QC
     list_filter = (
         'data_status', 'onboarding_status', 'is_live', 'enabled', 'is_insurance_enabled', 'doctorpracticespecializations__specialization',
         CityFilter, CreatedByFilter)
+
+    def has_delete_permission(self, request, obj=None):
+        return super().has_delete_permission(request, obj)
+
+    def delete_view(self, request, object_id, extra_context=None):
+        obj = self.model.objects.filter(id=object_id).first()
+        opd_appointment = OpdAppointment.objects.filter(doctor_id=object_id).first()
+        content_type = ContentType.objects.get_for_model(obj)
+        if opd_appointment:
+            messages.set_level(request, messages.ERROR)
+            messages.error(request, '{} could not deleted, as {} is present in appointment history'.format(content_type.model, content_type.model))
+            return HttpResponseRedirect(reverse('admin:{}_{}_change'.format(content_type.app_label,
+                                                                     content_type.model), args=[object_id]))
+        if not obj:
+            pass
+        elif obj.enabled == False:
+            pass
+        else:
+            messages.set_level(request, messages.ERROR)
+            messages.error(request, '{} should be disable before delete'.format(content_type.model))
+            return HttpResponseRedirect(reverse('admin:{}_{}_change'.format(content_type.app_label,
+                                                                            content_type.model), args=[object_id]))
+        return super().delete_view(request, object_id, extra_context)
+
+    def get_actions(self, request):
+        actions = super().get_actions(request)
+        if 'delete_selected' in actions:
+            del actions['delete_selected']
+        return actions
+
     form = DoctorForm
     inlines = [
         CompetitorInfoInline,
@@ -1046,7 +1136,8 @@ class DoctorAdmin(AutoComplete, ImportExportMixin, VersionAdmin, ActionAdmin, QC
         DoctorImageInline,
         DoctorDocumentInline,
         GenericAdminInline,
-        AssociatedMerchantInline
+        AssociatedMerchantInline,
+        RemarkInline
     ]
 
     search_fields = ['name']
@@ -1095,16 +1186,7 @@ class DoctorAdmin(AutoComplete, ImportExportMixin, VersionAdmin, ActionAdmin, QC
         excluded = self.get_exclude(request, obj)
         final = [x for x in read_only_fields if x not in excluded]
         #make matrix_lead_id ediable if not present or user is superqc or superuser
-        is_matrix_id_editable = False
-        if obj:
-            if not obj.matrix_lead_id:
-                is_matrix_id_editable = True
-            if request.user.is_member_of(constants['SUPER_QC_GROUP']) or request.user.is_superuser:
-                is_matrix_id_editable = True
-        else:
-            is_matrix_id_editable = True
-
-        if is_matrix_id_editable:
+        if request.user.is_member_of(constants['SUPER_QC_GROUP']) or request.user.is_superuser:
             final.remove('matrix_lead_id')
 
         return final
@@ -1215,6 +1297,9 @@ class DoctorAdmin(AutoComplete, ImportExportMixin, VersionAdmin, ActionAdmin, QC
                 if (not instance.id):
                     instance.source_type = GenericAdmin.CRM
                     instance.entity_type = GenericAdmin.DOCTOR
+            if isinstance(instance, Remark):
+                if (not instance.user):
+                    instance.user = request.user
             instance.save()
         formset.save_m2m()
 
@@ -1249,7 +1334,15 @@ class DoctorAdmin(AutoComplete, ImportExportMixin, VersionAdmin, ActionAdmin, QC
     #             GenericAdmin.create_admin_billing_permissions(doctor)
 
     def save_model(self, request, obj, form, change):
-        if not request.user.is_member_of(constants['DOCTOR_SALES_GROUP']):        
+        if obj and not obj.id and not obj.matrix_lead_id:
+            try:
+                obj.matrix_lead_id = int(form.request_matrix_lead_id) if hasattr(form, 'request_matrix_lead_id') else None
+            except Exception as e:
+                logger.error("Invalid Matrix ID received from Matrix - " + str(e))
+
+        obj.request_agent_lead_id = form.request_agent_lead_id if hasattr(form, 'request_agent_lead_id') else None
+
+        if not request.user.is_member_of(constants['DOCTOR_SALES_GROUP']):
             if not obj.created_by:
                 obj.created_by = request.user
             if not obj.assigned_to:
@@ -1259,14 +1352,29 @@ class DoctorAdmin(AutoComplete, ImportExportMixin, VersionAdmin, ActionAdmin, QC
         elif form.cleaned_data.get('enabled', False) and obj.disabled_by:
             obj.disabled_by = None
         if '_submit_for_qc' in request.POST:
-            obj.data_status = 2
+            obj.data_status = QCModel.SUBMITTED_FOR_QC
         if '_qc_approve' in request.POST:
-            obj.data_status = 3
+            obj.data_status = QCModel.QC_APPROVED
             obj.qc_approved_at = datetime.datetime.now()
         if '_mark_in_progress' in request.POST:
-            obj.data_status = 1
+            obj.data_status = QCModel.REOPENED
+        obj.status_changed_by = request.user
 
         super().save_model(request, obj, form, change)
+
+    def has_add_permission(self, request):
+        if request.user.groups.filter(name=constants['DOCTOR_NETWORK_GROUP_NAME']).exists():
+            requested_leadId = request.GET.get('LeadId')
+            if not requested_leadId:
+                return False
+            else:
+                try:
+                    matrix_lead_id = base64.b64decode(requested_leadId).decode()
+                    matrix_lead_id = int(matrix_lead_id)
+                except Exception as e:
+                    logger.error("Invalid Matrix Lead ID received from Matrix - " + str(e))
+                    return False
+        return super().has_add_permission(request)
 
     def has_change_permission(self, request, obj=None):
         if not super().has_change_permission(request, obj):
@@ -1279,7 +1387,8 @@ class DoctorAdmin(AutoComplete, ImportExportMixin, VersionAdmin, ActionAdmin, QC
         if (request.user.groups.filter(name=constants['QC_GROUP_NAME']).exists() or request.user.groups.filter(
                 name=constants['SUPER_QC_GROUP']).exists() or request.user.groups.filter(
                 name=constants['DOCTOR_SALES_GROUP']).exists() or request.user.groups.filter(
-                name=constants['DOCTOR_NETWORK_GROUP_NAME']).exists()) and obj.data_status in (1, 2, 3):
+                name=constants['DOCTOR_NETWORK_GROUP_NAME']).exists() or request.user.groups.filter(
+                name=constants['WELCOME_CALLING_TEAM']).exists()) and obj.data_status in (QCModel.IN_PROGRESS, QCModel.SUBMITTED_FOR_QC, QCModel.QC_APPROVED, QCModel.REOPENED):
             return True
         return obj.created_by == request.user
 
