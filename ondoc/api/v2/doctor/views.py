@@ -554,21 +554,24 @@ class ProviderSignupDataViewset(viewsets.GenericViewSet):
             if details.get('phone_number'):
                 phone_number = details.get('phone_number')
                 if details.get('is_superuser'):
-                    generic_admin_obj_list.append(auth_models.GenericAdmin(doctor=doctor, hospital=hospital,
+                    generic_admin_obj_list.append(auth_models.GenericAdmin(name=doctor.name,
+                                                                           doctor=doctor, hospital=hospital,
                                                                            phone_number=phone_number,
                                                                            source_type=auth_models.GenericAdmin.APP,
                                                                            entity_type=auth_models.GenericAdmin.DOCTOR,
                                                                            super_user_permission=True))
                     continue
                 if details.get('is_appointment'):
-                    generic_admin_obj_list.append(auth_models.GenericAdmin(doctor=doctor, hospital=hospital,
+                    generic_admin_obj_list.append(auth_models.GenericAdmin(name=doctor.name,
+                                                                           doctor=doctor, hospital=hospital,
                                                                            phone_number=phone_number,
                                                                            source_type=auth_models.GenericAdmin.APP,
                                                                            entity_type=auth_models.GenericAdmin.DOCTOR,
                                                                            permission_type=auth_models.GenericAdmin.APPOINTMENT,
                                                                            write_permission=True))
                 if details.get('is_billing'):
-                    generic_admin_obj_list.append(auth_models.GenericAdmin(doctor=doctor, hospital=hospital,
+                    generic_admin_obj_list.append(auth_models.GenericAdmin(name=doctor.name,
+                                                                           doctor=doctor, hospital=hospital,
                                                                            phone_number=phone_number,
                                                                            source_type=auth_models.GenericAdmin.APP,
                                                                            entity_type=auth_models.GenericAdmin.DOCTOR,
@@ -696,7 +699,7 @@ class ProviderSignupDataViewset(viewsets.GenericViewSet):
                 doctors_data, doctor_clinics_data, doctors_mobile_data, doctors_generic_admin_data = self.doctor_creation_flow(hospital, doctor_details)
 
             if hospital_generic_admin_details:
-                hospital_generic_admins_data = self.hospital_generic_admins_creation_flow(hospital, hospital_generic_admin_details)
+                hospital_generic_admins_data = self.bulk_create_hospital_generic_admins(hospital, hospital_generic_admin_details)
 
             return Response({"status": 1,
                              "hospital": hospital_model_serializer.data,

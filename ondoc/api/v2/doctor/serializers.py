@@ -205,6 +205,13 @@ class BulkCreateDoctorSerializer(serializers.Serializer):
     is_billing = serializers.BooleanField(default=False)
     is_superuser = serializers.BooleanField(default=False)
 
+    def validate(self, attrs):
+        if not (attrs.get('is_appointment') or attrs.get('is_billing') or attrs.get('is_superuser')):
+            raise serializers.ValidationError('permission type or super user access not given')
+        elif not attrs.get('phone_number'):
+            raise serializers.ValidationError('permission type or super user access given, but phone number not provided')
+        return attrs
+
 
 class CreateDoctorSerializer(serializers.Serializer):
     hospital_id = serializers.PrimaryKeyRelatedField(queryset=doc_models.Hospital.objects.all())
@@ -212,11 +219,16 @@ class CreateDoctorSerializer(serializers.Serializer):
 
 
 class BulkCreateGenericAdminSerializer(serializers.Serializer):
+    name = serializers.CharField(max_length=200)
     phone_number = serializers.IntegerField(min_value=5000000000, max_value=9999999999)
     is_appointment = serializers.BooleanField(default=False)
     is_billing = serializers.BooleanField(default=False)
     is_superuser = serializers.BooleanField(default=False)
-    name = serializers.CharField(max_length=200)
+
+    def validate(self, attrs):
+        if not (attrs.get('is_appointment') or attrs.get('is_billing') or attrs.get('is_superuser')):
+            raise serializers.ValidationError('permission type or super user access not given')
+        return attrs
 
 
 class CreateGenericAdminSerializer(serializers.Serializer):
@@ -237,7 +249,7 @@ class CreateHospitalSerializer(serializers.Serializer):
 class DoctorModelSerializer(serializers.ModelSerializer):
     class Meta:
         model = doc_models.Doctor
-        fields = ('id', 'name')
+        fields = ('id', 'name', 'online_consultation_fees')
 
 
 class HospitalModelSerializer(serializers.ModelSerializer):
