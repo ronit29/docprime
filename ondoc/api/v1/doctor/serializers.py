@@ -1166,6 +1166,7 @@ class DoctorAppointmentRetrieveSerializer(OpdAppointmentSerializer):
     hospital = HospitalModelSerializer()
     doctor = AppointmentRetrieveDoctorSerializer()
     mask_data = serializers.SerializerMethodField()
+    mrp = serializers.ReadOnlyField(source='fees')
 
     def get_mask_data(self, obj):
         mask_number = obj.mask_number.first()
