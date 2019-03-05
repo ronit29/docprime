@@ -29,6 +29,7 @@ class DoctorSearchHelper:
     def __init__(self, query_params):
         self.query_params = query_params
         self.count_of_procedure = 0
+        self.count_of_ipd_procedures = 0
 
     def get_filtering_params(self):
         """Helper function that prepare dynamic query for filtering"""
@@ -104,6 +105,7 @@ class DoctorSearchHelper:
             filtering_params.append(
                 dcp_str + ')'
             )
+            self.count_of_ipd_procedures = len(ipd_procedure_ids)
 
         counter = 1
         if len(ipd_procedure_ids) > 0:
@@ -253,7 +255,7 @@ class DoctorSearchHelper:
         condition_ids = self.query_params.get("condition_ids", [])
 
 
-        if self.count_of_procedure:
+        if self.count_of_procedure or self.count_of_ipd_procedures>0:
             rank_part = "Row_number() OVER( PARTITION BY doctor_id ORDER BY " \
                            "distance, total_price ASC) rnk "
             if self.query_params.get('sort_on') == 'fees':
