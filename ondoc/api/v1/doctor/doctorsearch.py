@@ -29,7 +29,6 @@ class DoctorSearchHelper:
     def __init__(self, query_params):
         self.query_params = query_params
         self.count_of_procedure = 0
-        self.count_of_ipd_procedures = 0
 
     def get_filtering_params(self):
         """Helper function that prepare dynamic query for filtering"""
@@ -105,7 +104,7 @@ class DoctorSearchHelper:
             filtering_params.append(
                 dcp_str + ')'
             )
-            self.count_of_ipd_procedures = len(ipd_procedure_ids)
+
 
         counter = 1
         if len(ipd_procedure_ids) > 0:
@@ -119,6 +118,7 @@ class DoctorSearchHelper:
             filtering_params.append(
                 dcip_str + ')'
             )
+
 
         if len(procedure_ids) == 0 and self.query_params.get("min_fees") is not None:
             filtering_params.append(
@@ -255,7 +255,7 @@ class DoctorSearchHelper:
         condition_ids = self.query_params.get("condition_ids", [])
 
 
-        if self.count_of_procedure or self.count_of_ipd_procedures>0:
+        if self.count_of_procedure:
             rank_part = "Row_number() OVER( PARTITION BY doctor_id ORDER BY " \
                            "distance, total_price ASC) rnk "
             if self.query_params.get('sort_on') == 'fees':
@@ -286,7 +286,6 @@ class DoctorSearchHelper:
                            "INNER JOIN hospital h ON h.id = dc.hospital_id AND h.is_live=true " \
                            "INNER JOIN doctor_clinic_timing dct ON dc.id = dct.doctor_clinic_id " \
                            "INNER JOIN doctor_clinic_procedure dcp ON dc.id = dcp.doctor_clinic_id " \
-                           "INNER JOIN doctor_clinic_ipd_procedure dcip on dc.id = dcip.doctor_clinic_id  AND dcip.enabled=True " \
                            "WHERE {filtering_params} AND " \
                            "St_dwithin(St_setsrid(St_point((%(longitude)s), (%(latitude)s)), 4326 ), h.location, (%(max_distance)s)) AND " \
                            "St_dwithin(St_setsrid(St_point((%(longitude)s), (%(latitude)s)), 4326 ), h.location, (%(min_distance)s)) = false " \
@@ -326,6 +325,8 @@ class DoctorSearchHelper:
             "and d.is_test_doctor is False and d.is_internal is False " \
             "INNER JOIN hospital h ON h.id = dc.hospital_id and h.is_live=true " \
             "INNER JOIN doctor_clinic_timing dct ON dc.id = dct.doctor_clinic_id " \
+            "INNER JOIN doctor_clinic_ipd_procedure dcip on dc.id = dcip.doctor_clinic_id " \
+            " AND dcip.enabled=True " \
             "{sp_cond}" \
             "WHERE {filtering_params} " \
             "and St_dwithin(St_setsrid(St_point((%(longitude)s), (%(latitude)s)), 4326 ), h.location, (%(max_distance)s)) " \
