@@ -1709,6 +1709,9 @@ class LabTimingListView(mixins.ListModelMixin,
         for_home_pickup = True if int(params.get('pickup', 0)) else False
         lab = params.get('lab')
 
+        lab = Lab.objects.filter(id=lab, is_live=True).first()
+        lab_timing = lab.get_timing(for_home_pickup)
+
         resp_data = LabTiming.timing_manager.lab_booking_slots(lab__id=lab, lab__is_live=True, for_home_pickup=for_home_pickup)
         global_leave_serializer = v2_serializers.GlobalNonBookableSerializer(
             GlobalNonBookable.objects.filter(deleted_at__isnull=True, booking_type=GlobalNonBookable.LAB), many=True)

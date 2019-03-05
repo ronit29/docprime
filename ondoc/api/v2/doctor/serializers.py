@@ -94,19 +94,6 @@ class DoctorLeaveSerializer(serializers.ModelSerializer):
         exclude = ('created_at', 'updated_at', 'deleted_at')
 
 
-class GlobalNonBookableSerializer(serializers.ModelSerializer):
-    interval = serializers.CharField(read_only=True)
-    start_date = serializers.DateField(read_only=True)
-    end_date = serializers.DateField(read_only=True)
-    start_time = serializers.FloatField(read_only=True, source='start_time_in_float')
-    end_time = serializers.FloatField(read_only=True, source='end_time_in_float')
-
-    class Meta:
-        model = GlobalNonBookable
-        exclude = ('booking_type', 'created_at', 'updated_at', 'deleted_at')
-
-
-
 class PracticeSpecializationSerializer(serializers.ModelSerializer):
     class Meta:
         model = doc_models.PracticeSpecialization

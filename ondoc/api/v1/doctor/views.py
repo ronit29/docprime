@@ -8,7 +8,6 @@ from ondoc.api.v1.doctor.DoctorSearchByHospitalHelper import DoctorSearchByHospi
 from ondoc.api.v1.procedure.serializers import CommonProcedureCategorySerializer, ProcedureInSerializer, \
     ProcedureSerializer, DoctorClinicProcedureSerializer, CommonProcedureSerializer
 from ondoc.cart.models import Cart
-from ondoc.common.models import GlobalNonBookable
 from ondoc.doctor import models
 from ondoc.authentication import models as auth_models
 from ondoc.diagnostic import models as lab_models
@@ -67,6 +66,8 @@ from django.db.models import Avg
 from django.db.models import Count
 from ondoc.api.v1.auth import serializers as auth_serializers
 from copy import deepcopy
+from ondoc.common.models import GlobalNonBookable
+from ondoc.api.v1.common import serializers as common_serializers
 
 logger = logging.getLogger(__name__)
 import random
@@ -1612,31 +1613,35 @@ class DoctorAvailabilityTimingViewSet(viewsets.ViewSet):
         serializer = serializers.DoctorAvailabilityTimingSerializer(data=request.query_params)
         serializer.is_valid(raise_exception=True)
         validated_data = serializer.validated_data
-        queryset = models.DoctorClinicTiming.objects.filter(doctor_clinic__doctor=validated_data.get('doctor_id'),
-                                                            doctor_clinic__hospital=validated_data.get(
-                                                                'hospital_id')).order_by("start")
+        dc_obj = models.DoctorClinic.objects.filter(doctor_id=validated_data.get('doctor_id'),
+                                                            hospital_id=validated_data.get(
+                                                                'hospital_id')).first()
+        timeslots = dc_obj.get_timings()
+        # queryset = models.DoctorClinicTiming.objects.filter(doctor_clinic__doctor=validated_data.get('doctor_id'),
+        #                                                     doctor_clinic__hospital=validated_data.get(
+        #                                                         'hospital_id')).order_by("start")
         doctor_queryset = (models.Doctor
                            .objects.prefetch_related("qualifications__qualification",
                                                      "qualifications__specialization")
                            .filter(pk=validated_data.get('doctor_id').id))
         doctor_serializer = serializers.DoctorTimeSlotSerializer(doctor_queryset, many=True)
-        doctor_leave_serializer = v2_serializers.DoctorLeaveSerializer(
-            models.DoctorLeave.objects.filter(doctor=validated_data.get("doctor_id"), deleted_at__isnull=True), many=True)
-        global_leave_serializer = v2_serializers.GlobalNonBookableSerializer(
-            GlobalNonBookable.objects.filter(deleted_at__isnull=True, booking_type=GlobalNonBookable.DOCTOR), many=True)
-        total_leaves = dict()
-        total_leaves['global'] = global_leave_serializer.data
-        total_leaves['doctor'] = doctor_leave_serializer.data
-        timeslots = dict()
-        obj = TimeSlotExtraction()
-
-        for data in queryset:
-            obj.form_time_slots(data.day, data.start, data.end, data.fees, True,
-                                data.deal_price, data.mrp, True, on_call=data.type)
-
-        date = datetime.datetime.today().strftime('%Y-%m-%d')
-        # timeslots = obj.get_timing_list()
-        timeslots = obj.get_timing_slots(date, total_leaves)
+        # doctor_leave_serializer = v2_serializers.DoctorLeaveSerializer(
+        #     models.DoctorLeave.objects.filter(doctor=validated_data.get("doctor_id"), deleted_at__isnull=True), many=True)
+        # global_leave_serializer = common_serializers.GlobalNonBookableSerializer(
+        #     GlobalNonBookable.objects.filter(deleted_at__isnull=True, booking_type=GlobalNonBookable.DOCTOR), many=True)
+        # total_leaves = dict()
+        # total_leaves['global'] = global_leave_serializer.data
+        # total_leaves['doctor'] = doctor_leave_serializer.data
+        # timeslots = dict()
+        # obj = TimeSlotExtraction()
+        #
+        # for data in queryset:
+        #     obj.form_time_slots(data.day, data.start, data.end, data.fees, True,
+        #                         data.deal_price, data.mrp, True, on_call=data.type)
+        #
+        # date = datetime.datetime.today().strftime('%Y-%m-%d')
+        # # timeslots = obj.get_timing_list()
+        # timeslots = obj.get_doctor_timing_slots(date, total_leaves, "doctor")
         return Response({"timeslots": timeslots, "doctor_data": doctor_serializer.data})
 
 

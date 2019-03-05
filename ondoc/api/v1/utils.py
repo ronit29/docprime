@@ -822,11 +822,15 @@ class TimeSlotExtraction(object):
 
         return whole_timing_data
 
-    def get_timing_slots(self, date, leaves, is_thyrocare=False):
+    def get_timing_slots(self, date, leaves, type, is_thyrocare=False):
         date = datetime.datetime.strptime(date, '%Y-%m-%d')
         day = date.weekday()
+        if type == "doctor":
+            total_leave_list = self.get_doctor_leave_list(leaves)
+        else:
+            total_leave_list = self.get_lab_leave_list(leaves)
         whole_timing_data = OrderedDict()
-        total_leave_list = self.get_leave_list(leaves)
+
         j = 0
         if is_thyrocare:
             self.get_slots(date, day, j, whole_timing_data, total_leave_list)
@@ -862,7 +866,7 @@ class TimeSlotExtraction(object):
                 whole_timing_data[converted_date].append(
                     self.format_data(self.timing[i]['timing'][self.EVENING], self.EVENING, pa, format_date))
 
-    def get_leave_list(self, leaves):
+    def get_doctor_leave_list(self, leaves):
         total_leaves = list()
         doctor_leaves = leaves.get('doctor')
         global_leaves = leaves.get('global')
@@ -870,12 +874,12 @@ class TimeSlotExtraction(object):
             start_date = dl.get('start_date')
             end_date = dl.get('end_date')
             if start_date == end_date:
-                total_leaves.append(start_date)
+                total_leaves.append(datetime.datetime.strptime(start_date, '%Y-%m-%d'))
             else:
                 delta = datetime.strptime(end_date, '%d-%m-%Y') - datetime.strptime(start_date, '%d-%m-%Y')
+                total_leaves.append(datetime.datetime.strptime(start_date, '%Y-%m-%d'))
                 for i in range(delta.days + 1):
                     total_leaves.append(datetime.datetime.strptime(start_date, '%Y-%m-%d') + datetime.timedelta(i))
-                    print(datetime.datetime.strptime(start_date, '%Y-%m-%d') + datetime.timedelta(i))
         for gl in global_leaves:
             start_date = gl.get('start_date')
             end_date = gl.get('end_date')
@@ -885,12 +889,26 @@ class TimeSlotExtraction(object):
                 delta = datetime.datetime.strptime(end_date, '%Y-%m-%d') - datetime.datetime.strptime(start_date, '%Y-%m-%d')
                 for i in range(delta.days + 1):
                     total_leaves.append(datetime.datetime.strptime(start_date, '%Y-%m-%d') + datetime.timedelta(i))
-                    print(datetime.datetime.strptime(start_date, '%Y-%m-%d') + datetime.timedelta(i))
-        my_leave_set = set(total_leaves)
-        final_leaves = list(my_leave_set)
+        doc_leave_set = set(total_leaves)
+        final_leaves = list(doc_leave_set)
         return final_leaves
 
-
+    def get_lab_leave_list(self, leaves):
+        total_leaves = list()
+        for gl in leaves:
+            start_date = gl.get('start_date')
+            end_date = gl.get('end_date')
+            if start_date == end_date:
+                total_leaves.append(datetime.datetime.strptime(start_date, '%Y-%m-%d'))
+            else:
+                delta = datetime.datetime.strptime(end_date, '%Y-%m-%d') - datetime.datetime.strptime(start_date,
+                                                                                                      '%Y-%m-%d')
+                total_leaves.append(datetime.datetime.strptime(start_date, '%Y-%m-%d'))
+                for i in range(delta.days + 1):
+                    total_leaves.append(datetime.datetime.strptime(start_date, '%Y-%m-%d') + datetime.timedelta(i))
+        lab_leave_set = set(total_leaves)
+        final_leaves = list(lab_leave_set)
+        return final_leaves
 
     def format_data(self, data, day_time, pa, date):
         current_date_time = datetime.datetime.now()
@@ -899,28 +917,35 @@ class TimeSlotExtraction(object):
             booking_minimum_time = booking_minimum_time.strftime('%H.%M')
         data_list = list()
         for k, v in data.items():
-            if pa[k].get('on_call') == False:
+            if 'mrp' in pa[k].keys() and 'deal_price' in pa[k].keys():
+                if pa[k].get('on_call') == False:
+                    if current_date_time.date() == date.date():
+                        if k >= float(booking_minimum_time):
+                            data_list.append({"value": k, "text": v, "price": pa[k]["price"],
+                                              "mrp": pa[k]['mrp'], 'deal_price': pa[k]['deal_price'],
+                                              "is_available": pa[k]["is_available"], "on_call": pa[k].get("on_call", False)})
+                        else:
+                            pass
+                    else:
+                        data_list.append({"value": k, "text": v, "price": pa[k]["price"],
+                                          "mrp": pa[k]['mrp'], 'deal_price': pa[k]['deal_price'],
+                                          "is_available": pa[k]["is_available"],
+                                          "on_call": pa[k].get("on_call", False)})
+                else:
+                    pass
+            else:
                 if current_date_time.date() == date.date():
                     if k >= float(booking_minimum_time):
-                        if 'mrp' in pa[k].keys() and 'deal_price' in pa[k].keys():
-                                data_list.append({"value": k, "text": v, "price": pa[k]["price"],
-                                                  "mrp": pa[k]['mrp'], 'deal_price': pa[k]['deal_price'],
-                                                  "is_available": pa[k]["is_available"], "on_call": pa[k].get("on_call", False)})
-                        else:
-                            data_list.append({"value": k, "text": v, "price": pa[k]["price"],
-                                            "is_available": pa[k]["is_available"], "on_call": pa[k].get("on_call", False)})
+                        data_list.append({"value": k, "text": v, "price": pa[k]["price"],
+                                          "is_available": pa[k]["is_available"],
+                                          "on_call": pa[k].get("on_call", False)})
                     else:
                         pass
                 else:
-                    if 'mrp' in pa[k].keys() and 'deal_price' in pa[k].keys():
-                        data_list.append({"value": k, "text": v, "price": pa[k]["price"],
-                                          "mrp": pa[k]['mrp'], 'deal_price': pa[k]['deal_price'],
-                                          "is_available": pa[k]["is_available"], "on_call": pa[k].get("on_call", False)})
-                    else:
-                        data_list.append({"value": k, "text": v, "price": pa[k]["price"],
-                                          "is_available": pa[k]["is_available"], "on_call": pa[k].get("on_call", False)})
-            else:
-                pass
+                    data_list.append({"value": k, "text": v, "price": pa[k]["price"],
+                                      "is_available": pa[k]["is_available"],
+                                      "on_call": pa[k].get("on_call", False)})
+
         format_data = dict()
         format_data['type'] = 'AM' if day_time == self.MORNING else 'PM'
         format_data['title'] = day_time
