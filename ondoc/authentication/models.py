@@ -1482,7 +1482,7 @@ class Merchant(TimeStampedModel):
 
         if response.status_code == status.HTTP_200_OK:
             resp_data = response.json()
-            if resp_data.get('StatusCode') and resp_data.get('StatusCode') == 1:
+            if resp_data.get('StatusCode') and resp_data.get('StatusCode') == self.INITIATED:
                 self.pg_status = resp_data.get('StatusCode')
                 self.save()
                 print(resp_data)
@@ -1499,7 +1499,7 @@ class Merchant(TimeStampedModel):
                                                                                      'Content-Type': 'application/json'})
             if response.status_code == status.HTTP_200_OK:
                 resp_data = response.json()
-                if resp_data.get('statusCode') and resp_data.get('statusCode') in (1, 2, 3):
+                if resp_data.get('statusCode') and resp_data.get('statusCode') in (Merchant.INITIATED, Merchant.INPROCESS, Merchant.COMPLETE):
                     data.pg_status = resp_data.get('statusCode')
                     data.save()
 
