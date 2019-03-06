@@ -718,7 +718,8 @@ class DoctorClinic(auth_model.TimeStampedModel):
                                data.deal_price, data.mrp, True, on_call=data.type)
 
         date = datetime.datetime.today().strftime('%Y-%m-%d')
-        slots = obj.get_timing_slots(date, total_leaves, "doctor")
+        booking_details = {"type": "doctor"}
+        slots = obj.get_timing_slots(date, total_leaves, booking_details)
         return slots
 
 

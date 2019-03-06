@@ -494,7 +494,8 @@ class Lab(TimeStampedModel, CreatedByModel, QCModel, SearchKey):
                 GlobalNonBookable.objects.filter(deleted_at__isnull=True,
                                                  booking_type=GlobalNonBookable.DOCTOR), many=True)
             date = datetime.datetime.today().strftime('%Y-%m-%d')
-            resp_list = obj.get_timing_slots(date, global_leave_serializer.data, "lab")
+            booking_details = {"type": "lab", "is_home_pickup": is_home_pickup}
+            resp_list = obj.get_timing_slots(date, global_leave_serializer.data, booking_details)
             is_thyrocare = False
             lab_id = self.id
             if lab_id and settings.THYROCARE_NETWORK_ID:

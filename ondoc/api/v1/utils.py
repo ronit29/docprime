@@ -822,34 +822,37 @@ class TimeSlotExtraction(object):
 
         return whole_timing_data
 
-    def get_timing_slots(self, date, leaves, type, is_thyrocare=False):
+    def get_timing_slots(self, date, leaves, booking_details, is_thyrocare=False):
         date = datetime.datetime.strptime(date, '%Y-%m-%d')
         day = date.weekday()
-        if type == "doctor":
+        booking_type = booking_details.get('type')
+        if booking_type == "doctor":
             total_leave_list = self.get_doctor_leave_list(leaves)
         else:
             total_leave_list = self.get_lab_leave_list(leaves)
         whole_timing_data = OrderedDict()
+        booking_details['total_leave_list'] = total_leave_list
 
         j = 0
         if is_thyrocare:
-            self.get_slots(date, day, j, whole_timing_data, total_leave_list)
+            self.get_slots(date, day, j, whole_timing_data, booking_details)
         else:
             for k in range(int(settings.NO_OF_WEEKS_FOR_TIME_SLOTS)):
                 for i in range(7):
                     if k == 0:
                         if i >= day:
-                            self.get_slots(date, i, j, whole_timing_data, total_leave_list)
+                            self.get_slots(date, i, j, whole_timing_data, booking_details)
                             j = j + 1
                     else:
-                        self.get_slots(date, i, j, whole_timing_data, total_leave_list)
+                        self.get_slots(date, i, j, whole_timing_data, booking_details)
                         j = j + 1
         return whole_timing_data
 
-    def get_slots(self, date, i, j, whole_timing_data, total_leave_list):
+    def get_slots(self, date, i, j, whole_timing_data, booking_details):
         converted_date = (date + datetime.timedelta(days=j))
-        format_date = converted_date
-
+        # format_date = converted_date
+        booking_details['date'] = converted_date
+        total_leave_list = booking_details.get('total_leave_list')
         if converted_date in total_leave_list:
             converted_date = str(converted_date)
             whole_timing_data[converted_date] = list()
@@ -862,9 +865,9 @@ class TimeSlotExtraction(object):
 
             if self.timing[i].get('timing'):
                 whole_timing_data[converted_date].append(
-                    self.format_data(self.timing[i]['timing'][self.MORNING], self.MORNING, pa, format_date))
+                    self.format_data(self.timing[i]['timing'][self.MORNING], self.MORNING, pa, booking_details))
                 whole_timing_data[converted_date].append(
-                    self.format_data(self.timing[i]['timing'][self.EVENING], self.EVENING, pa, format_date))
+                    self.format_data(self.timing[i]['timing'][self.EVENING], self.EVENING, pa, booking_details))
 
     def get_doctor_leave_list(self, leaves):
         total_leaves = list()
@@ -910,16 +913,17 @@ class TimeSlotExtraction(object):
         final_leaves = list(lab_leave_set)
         return final_leaves
 
-    def format_data(self, data, day_time, pa, date):
+    def format_data(self, data, day_time, pa, booking_details):
         current_date_time = datetime.datetime.now()
-        if current_date_time.date() == date.date():
+        booking_date = booking_details.get('date')
+        if current_date_time.date() == booking_date.date():
             booking_minimum_time = current_date_time + datetime.timedelta(hours=1)
             booking_minimum_time = booking_minimum_time.strftime('%H.%M')
         data_list = list()
         for k, v in data.items():
             if 'mrp' in pa[k].keys() and 'deal_price' in pa[k].keys():
                 if pa[k].get('on_call') == False:
-                    if current_date_time.date() == date.date():
+                    if current_date_time.date() == booking_date.date():
                         if k >= float(booking_minimum_time):
                             data_list.append({"value": k, "text": v, "price": pa[k]["price"],
                                               "mrp": pa[k]['mrp'], 'deal_price': pa[k]['deal_price'],
@@ -934,7 +938,7 @@ class TimeSlotExtraction(object):
                 else:
                     pass
             else:
-                if current_date_time.date() == date.date():
+                if current_date_time.date() == booking_date.date():
                     if k >= float(booking_minimum_time):
                         data_list.append({"value": k, "text": v, "price": pa[k]["price"],
                                           "is_available": pa[k]["is_available"],
