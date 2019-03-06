@@ -467,7 +467,7 @@ class Lab(TimeStampedModel, CreatedByModel, QCModel, SearchKey):
         from ondoc.api.v1.common import serializers as common_serializers
         lab_timing_queryset = self.lab_timings.filter(lab__is_home_collection_enabled=is_home_pickup)
         lab_slots = []
-        if not lab_timing_queryset or (is_home_pickup and not lab_timing_queryset[0].is_home_collection_enabled):
+        if not lab_timing_queryset or (is_home_pickup and not lab_timing_queryset[0].lab.is_home_collection_enabled):
             return {
                 "time_slots": [],
                 "today_min": None,
@@ -492,7 +492,7 @@ class Lab(TimeStampedModel, CreatedByModel, QCModel, SearchKey):
 
             global_leave_serializer = common_serializers.GlobalNonBookableSerializer(
                 GlobalNonBookable.objects.filter(deleted_at__isnull=True,
-                                                 booking_type=GlobalNonBookable.DOCTOR), many=True)
+                                                 booking_type=GlobalNonBookable.LAB), many=True)
             date = datetime.datetime.today().strftime('%Y-%m-%d')
             booking_details = {"type": "lab", "is_home_pickup": is_home_pickup}
             resp_list = obj.get_timing_slots(date, global_leave_serializer.data, booking_details)
@@ -502,15 +502,17 @@ class Lab(TimeStampedModel, CreatedByModel, QCModel, SearchKey):
                 if Lab.objects.filter(id=lab_id, network_id=settings.THYROCARE_NETWORK_ID).exists():
                     is_thyrocare = True
 
-            today_min, tomorrow_min, today_max = obj.initial_start_times(is_thyrocare=is_thyrocare,
-                                                                         is_home_pickup=is_home_pickup,
-                                                                         time_slots=resp_list)
-            res_data = {
-                "time_slots": resp_list,
-                "today_min": today_min,
-                "tomorrow_min": tomorrow_min,
-                "today_max": today_max
-            }
+            # today_min, tomorrow_min, today_max = obj.initial_start_times(is_thyrocare=is_thyrocare,
+            #                                                              is_home_pickup=is_home_pickup,
+            #                                                              time_slots=resp_list)
+            # res_data = {
+            #     "time_slots": resp_list,
+            #     "today_min": today_min,
+            #     "tomorrow_min": tomorrow_min,
+            #     "today_max": today_max
+            # }
+
+            res_data = {"time_slots": resp_list}
 
             return res_data
 
