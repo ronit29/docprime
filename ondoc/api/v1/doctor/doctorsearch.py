@@ -124,8 +124,8 @@ class DoctorSearchHelper:
             ist_time = current_time.strftime("%H:%M:%S")
             current_hour = round(float(current_time.hour) + (float(current_time.minute)*1/60), 2) + .75
             query_str = '((dl.id is NULL) OR ' \
-                        '((current_date >= dl.start_date and (%(ist_time)s) NOT BETWEEN dl.start_time and dl.end_time) ' \
-                        'AND (current_date <= dl.end_date and (%(ist_time)s) NOT BETWEEN dl.start_time and dl.end_time))' \
+                        '(current_date BETWEEN dl.start_date and dl.end_date ' \
+                        'AND (%(ist_time)s) NOT BETWEEN dl.start_time and dl.end_time)' \
                         ' OR current_date not between dl.start_date and dl.end_date)'
             filtering_params.append(query_str)
             filtering_params.append(
