@@ -7,7 +7,8 @@ import datetime
 from ondoc.crm.admin.doctor import CreatedByFilter
 from ondoc.doctor.models import (HospitalImage, HospitalDocument, HospitalAward, Doctor,
                                  HospitalAccreditation, HospitalCertification, HospitalSpeciality, HospitalNetwork,
-                                 Hospital, HospitalServiceMapping, HealthInsuranceProviderHospitalMapping)
+                                 Hospital, HospitalServiceMapping, HealthInsuranceProviderHospitalMapping,
+                                 HospitalHelpline)
 from .common import *
 from ondoc.crm.constants import constants
 from django.utils.safestring import mark_safe
@@ -87,6 +88,14 @@ class HospitalServiceInline(admin.TabularInline):
     can_delete = True
     show_change_link = False
     autocomplete_fields = ['service']
+
+
+class HospitalHelplineInline(admin.TabularInline):
+    model = HospitalHelpline
+    fk_name = 'hospital'
+    extra = 0
+    can_delete = True
+    show_change_link = False
 
 
 class HospitalHealthInsuranceProviderInline(admin.TabularInline):
@@ -457,6 +466,7 @@ class HospitalAdmin(admin.GeoModelAdmin, VersionAdmin, ActionAdmin, QCPemAdmin):
     # autocomplete_fields = ['matrix_city', 'matrix_state']
     inlines = [
         # HospitalNetworkMappingInline,
+        HospitalHelplineInline,
         HospitalServiceInline,
         HospitalHealthInsuranceProviderInline,
         HospitalSpecialityInline,
