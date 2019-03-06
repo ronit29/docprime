@@ -197,7 +197,7 @@ class Hospital(auth_model.TimeStampedModel, auth_model.CreatedByModel, auth_mode
     disabled_by = models.ForeignKey(settings.AUTH_USER_MODEL, related_name="disabled_hospitals", null=True, editable=False,
                                     on_delete=models.SET_NULL)
     is_mask_number_required = models.BooleanField(default=True)
-    source_type = models.IntegerField(choices=SOURCE_TYPE_CHOICES, default=None, null=True, editable=False)
+    source_type = models.IntegerField(choices=SOURCE_TYPE_CHOICES, null=True, editable=False)
     service = models.ManyToManyField(Service, through='HospitalServiceMapping', through_fields=('hospital', 'service'),
                                      related_name='of_hospitals')
     health_insurance_providers = models.ManyToManyField('HealthInsuranceProvider',
@@ -507,7 +507,7 @@ class Doctor(auth_model.TimeStampedModel, auth_model.QCModel, SearchKey, auth_mo
     disable_comments = models.CharField(max_length=500, blank=True)
     disabled_by = models.ForeignKey(settings.AUTH_USER_MODEL, related_name="disabled_doctors", null=True, editable=False,
                                    on_delete=models.SET_NULL)
-    source_type = models.IntegerField(choices=SOURCE_TYPE_CHOICES, default=None, null=True, editable=False)
+    source_type = models.IntegerField(choices=SOURCE_TYPE_CHOICES, null=True, editable=False)
     avg_rating = models.DecimalField(max_digits=5, decimal_places=2, null=True, editable=False)
     remark = GenericRelation(Remark)
 
@@ -2649,7 +2649,6 @@ class ProviderSignupLead(auth_model.TimeStampedModel):
     phone_number = models.BigIntegerField(unique=True)
     email = models.EmailField()
     type = models.IntegerField(choices=TYPE_CHOICES)
-    # TODO - blank=true to be added or not?
     is_docprime = models.NullBooleanField(null=True)
 
     class Meta:
