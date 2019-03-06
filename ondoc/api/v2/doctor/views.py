@@ -451,13 +451,13 @@ class DoctorDataViewset(viewsets.GenericViewSet):
 
 class AppointmentViewSet(viewsets.GenericViewSet):
     authentication_classes = (JWTAuthentication,)
-    permission_classes = (IsAuthenticated,)
+    #permission_classes = (IsAuthenticated,)
 
     def upcoming_appointments(self, request):
         # ti = datetime.datetime.now().strftime('%Y-%m-%d %H:%M')
         ti = timezone.now()
         user_id = request.user.id
-        user_id = 2300
+        #user_id = 2300
         response_appointment = OpdAppointment.objects.filter(time_slot_start__gte=ti, user_id=user_id).exclude(
             status__in=[OpdAppointment.CANCELLED, OpdAppointment.COMPLETED]).select_related('doctor', 'hospital',
                                                                                             'profile')
