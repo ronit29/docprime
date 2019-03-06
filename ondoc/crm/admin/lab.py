@@ -1139,6 +1139,7 @@ class TestParameterAdminForm(forms.ModelForm):
 class TestParameterAdmin(VersionAdmin):
     form = TestParameterAdminForm
     search_fields = ['name']
+    list_display = ['name']
 
 
 class LabTestPackageInline(admin.TabularInline):
