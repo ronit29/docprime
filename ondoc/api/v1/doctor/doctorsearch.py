@@ -294,8 +294,7 @@ class DoctorSearchHelper:
 
             if len(specialization_ids)>0 or len(condition_ids)>0:
                 sp_cond = " LEFT JOIN doctor_practice_specialization ds on ds.doctor_id = d.id " \
-                       " LEFT JOIN practice_specialization gs on ds.specialization_id = gs.id " \
-                          " LEFT JOIN doctor_leave dl on dl.doctor_id = d.id "
+                       " LEFT JOIN practice_specialization gs on ds.specialization_id = gs.id "
             if min_distance>0:
                 min_dist_cond = " and St_dwithin(St_setsrid(St_point((%(longitude)s), (%(latitude)s)), 4326 ), h.location, (%(min_distance)s)) = false "
 
@@ -316,6 +315,7 @@ class DoctorSearchHelper:
             "and d.is_test_doctor is False and d.is_internal is False " \
             "INNER JOIN hospital h ON h.id = dc.hospital_id and h.is_live=true " \
             "INNER JOIN doctor_clinic_timing dct ON dc.id = dct.doctor_clinic_id " \
+            "LEFT JOIN doctor_leave dl on dl.doctor_id = d.id " \
             "{sp_cond}" \
             "WHERE {filtering_params} " \
             "and St_dwithin(St_setsrid(St_point((%(longitude)s), (%(latitude)s)), 4326 ), h.location, (%(max_distance)s)) " \
