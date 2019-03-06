@@ -1,7 +1,7 @@
 from copy import deepcopy
 
 from django.contrib.gis.db import models
-from django.db import migrations, transaction
+from django.db import migrations, transaction, connection
 from django.db.models import Count, Sum, When, Case, Q, F, Avg
 from django.contrib.postgres.operations import CreateExtension
 from django.contrib.staticfiles.templatetags.staticfiles import static
@@ -511,9 +511,15 @@ class Doctor(auth_model.TimeStampedModel, auth_model.QCModel, SearchKey, auth_mo
         query = '''update doctor_clinic_timing set 
                     deal_price = least(greatest(floor(case when least(fees*1.5, .8*mrp) - fees >100 then least(fees*1.5, .8*mrp)
                     else least(fees+100, mrp) end /5)*5, fees), mrp) where doctor_clinic_id in (
-                    select id from doctor_clinic where doctor_id= %s) '''
+                    select id from doctor_clinic where doctor_id= %s) ''' %self.pk
 
-        update_doctor_deal_price = RawSql(query, [self.pk]).execute()
+
+        # update_doctor_deal_price = RawSql(query, [self.pk]).execute()
+        with connection.cursor() as cursor:
+            cursor.execute(query)
+            # connection.commit()
+            # cursor.commit()
+            # connection.close()
 
     @classmethod
     def update_all_deal_price(cls):
@@ -604,7 +610,6 @@ class Doctor(auth_model.TimeStampedModel, auth_model.QCModel, SearchKey, auth_mo
     def save(self, *args, **kwargs):
         self.update_time_stamps()
         self.update_live_status()
-        # self.update_deal_price()
         request_agent_lead_id = self.request_agent_lead_id if hasattr(self, 'request_agent_lead_id') else None
         # On every update of onboarding status or Qcstatus push to matrix
         push_to_matrix = False
@@ -618,11 +623,14 @@ class Doctor(auth_model.TimeStampedModel, auth_model.QCModel, SearchKey, auth_mo
             push_to_matrix = True
 
         super(Doctor, self).save(*args, **kwargs)
-        self.update_deal_price()
+        print(self.doctor_clinics.all()[0].availability.all()[0].mrp)
+        print(self.doctor_clinics.all()[0].availability.all()[0].fees)
 
+        self.update_deal_price()
         transaction.on_commit(lambda: self.app_commit_tasks(push_to_matrix=push_to_matrix,
                                                             update_status_in_matrix=update_status_in_matrix,
                                                             request_agent_lead_id=request_agent_lead_id))
+
 
     def app_commit_tasks(self, push_to_matrix=False, update_status_in_matrix=False, request_agent_lead_id=None):
         if push_to_matrix:
