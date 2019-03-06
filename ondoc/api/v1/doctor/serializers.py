@@ -69,9 +69,11 @@ class AppointmentFilterSerializer(serializers.Serializer):
     CHOICES = ['all', 'previous', 'upcoming', 'pending']
 
     range = serializers.ChoiceField(choices=CHOICES, required=False)
-    hospital_id = serializers.PrimaryKeyRelatedField(queryset=Hospital.objects.filter(is_live=True), required=False)
+    hospital_id = serializers.PrimaryKeyRelatedField(queryset=Hospital.objects.filter(
+                                                    Q(is_live=True) | Q(source_type=Hospital.PROVIDER)), required=False)
     profile_id = serializers.PrimaryKeyRelatedField(queryset=UserProfile.objects.all(), required=False)
-    doctor_id = serializers.PrimaryKeyRelatedField(queryset=Doctor.objects.filter(is_live=True), required=False)
+    doctor_id = serializers.PrimaryKeyRelatedField(queryset=Doctor.objects.filter(
+                                                    Q(is_live=True) | Q(source_type=Doctor.PROVIDER)), required=False)
     date = serializers.DateField(required=False)
 
 
@@ -1476,8 +1478,8 @@ class OfflinePatientCreateSerializer(serializers.Serializer):
 
 
 class GetOfflinePatientsSerializer(serializers.Serializer):
-    doctor_id = serializers.PrimaryKeyRelatedField(queryset=Doctor.objects.filter(is_live=True), required=False)
-    hospital_id = serializers.PrimaryKeyRelatedField(queryset=Hospital.objects.filter(is_live=True), required=False)
+    doctor_id = serializers.PrimaryKeyRelatedField(queryset=Doctor.objects.filter(Q(is_live=True) | Q(source_type=Doctor.PROVIDER)), required=False)
+    hospital_id = serializers.PrimaryKeyRelatedField(queryset=Hospital.objects.filter(Q(is_live=True) | Q(source_type=Hospital.PROVIDER)), required=False)
     updated_at = serializers.DateField(format="%Y-%m-%d", required=False)
 
 

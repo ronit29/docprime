@@ -426,7 +426,8 @@ class DoctorProfileView(viewsets.GenericViewSet):
         from django.contrib.staticfiles.templatetags.staticfiles import static
         resp_data = dict()
         today = datetime.date.today()
-        queryset = models.OpdAppointment.objects.filter(doctor__is_live=True, hospital__is_live=True).filter(
+        queryset = models.OpdAppointment.objects.filter(Q(doctor__is_live=True, hospital__is_live=True)|
+                                                        Q(doctor__source_type=Doctor.PROVIDER, hospital__source_type=models.Hospital.PROVIDER)).filter(
             (Q(doctor__manageable_doctors__user=request.user,
                doctor__manageable_doctors__hospital=F('hospital'),
                doctor__manageable_doctors__is_disabled=False) |
@@ -1976,7 +1977,7 @@ class CreateAdminViewSet(viewsets.GenericViewSet):
 
     def assoc_hosp(self, request, pk=None):
         doctor = get_object_or_404(models.Doctor.objects.prefetch_related('hospitals'), pk=pk)
-        queryset = doctor.hospitals.filter(is_appointment_manager=False, is_live=True)
+        queryset = doctor.hospitals.filter(Q(is_appointment_manager=False), (Q(is_live=True) | Q(source_type=models.Hospital.PROVIDER)))
         return Response(queryset.values('name', 'id'))
 
     def list_entities(self, request):
@@ -1984,25 +1985,23 @@ class CreateAdminViewSet(viewsets.GenericViewSet):
         opd_list = []
         opd_queryset = (models.Doctor.objects
                         .prefetch_related('manageable_doctors', 'qualifications')
-                        .filter(
-                                      is_live=True,
-                                      manageable_doctors__user=user,
-                                      manageable_doctors__is_disabled=False,
-                                      manageable_doctors__super_user_permission=True,
-                                      manageable_doctors__entity_type=GenericAdminEntity.DOCTOR).distinct('id'))
+                        .filter((Q(is_live=True)| Q(source_type=Doctor.PROVIDER)),
+                                  Q(manageable_doctors__user=user,
+                                  manageable_doctors__is_disabled=False,
+                                  manageable_doctors__super_user_permission=True,
+                                  manageable_doctors__entity_type=GenericAdminEntity.DOCTOR)).distinct('id'))
         doc_serializer = serializers.DoctorEntitySerializer(opd_queryset, many=True, context={'request': request})
         doc_data = doc_serializer.data
         if doc_data:
             opd_list = [i for i in doc_data]
         opd_queryset_hos = (models.Hospital.objects
                             .prefetch_related('manageable_hospitals')
-                            .filter(
-                                      is_live=True,
-                                      is_appointment_manager=True,
+                            .filter((Q(is_live=True)| Q(source_type=models.Hospital.PROVIDER)),
+                                      Q(is_appointment_manager=True,
                                       manageable_hospitals__user=user,
                                       manageable_hospitals__is_disabled=False,
                                       manageable_hospitals__super_user_permission=True,
-                                      manageable_hospitals__entity_type=GenericAdminEntity.HOSPITAL)
+                                      manageable_hospitals__entity_type=GenericAdminEntity.HOSPITAL))
                             .distinct('id')
                             )
         hos_list = []
@@ -2036,10 +2035,6 @@ class CreateAdminViewSet(viewsets.GenericViewSet):
         if valid_data.get('entity_type') == GenericAdminEntity.DOCTOR:
             query = queryset.exclude(user=request.user).filter(doctor_id=valid_data.get('id'),
                                     entity_type=GenericAdminEntity.DOCTOR
-                                    # (
-                                    #     Q(hospital__isnull=True)|
-                                    #     Q(hospital__isnull=False, doctor__doctor_clinics__hospital=F('hospital'))
-                                    # )
                                     ) \
                             .annotate(hospital_ids=F('hospital__id'), hospital_ids_count=Count('hospital__hospital_doctors__doctor'))\
                             .values('id', 'phone_number', 'name', 'is_disabled', 'permission_type', 'super_user_permission', 'hospital_ids',
@@ -2059,11 +2054,6 @@ class CreateAdminViewSet(viewsets.GenericViewSet):
 
         elif valid_data.get('entity_type') == GenericAdminEntity.HOSPITAL:
             response = queryset.filter(hospital_id=valid_data.get('id'), entity_type=GenericAdminEntity.HOSPITAL
-                                       # (
-                                       #      Q(doctor__isnull=True) |
-                                       #      Q(doctor__isnull=False, hospital__hospital_doctors__doctor=F('doctor'))
-                                       # )
-
                                        ) \
                 .annotate(doctor_ids=F('doctor__id'), hospital_name=F('hospital__name'), doctor_ids_count=Count('hospital__hospital_doctors__doctor')) \
                 .values('phone_number', 'name', 'is_disabled', 'permission_type', 'super_user_permission', 'doctor_ids',
@@ -2077,7 +2067,7 @@ class CreateAdminViewSet(viewsets.GenericViewSet):
                     'assigned': 'CASE WHEN  ((SELECT COUNT(*) FROM doctor_number WHERE doctor_id = doctor.id) = 0) THEN 0 ELSE 1  END',
                     'phone_number': 'SELECT phone_number FROM doctor_number WHERE doctor_id = doctor.id',
                     'enabled': 'SELECT enabled FROM doctor_clinic WHERE doctor_id = doctor.id AND hospital_id='+str(hos_obj.id)})\
-                    .values('name', 'id', 'assigned', 'phone_number', 'enabled', 'is_live')
+                    .values('name', 'id', 'assigned', 'phone_number', 'enabled', 'is_live', 'source_type')
 
             for x in response:
                 if temp.get(x['phone_number']):
@@ -2087,7 +2077,7 @@ class CreateAdminViewSet(viewsets.GenericViewSet):
                         temp[x['phone_number']]['permission_type'] = auth_models.GenericAdmin.ALL
                 else:
                     for doc in assoc_docs:
-                        if (doc.get('is_live') and doc.get('enabled')) and (doc.get('phone_number') and doc.get('phone_number') == x['phone_number']):
+                        if ((doc.get('is_live') and doc.get('enabled')) or doc.get('source_type') == Doctor.PROVIDER) and (doc.get('phone_number') and doc.get('phone_number') == x['phone_number']):
                             x['is_doctor'] = True
                             x['name'] = doc.get('name')
                             x['id'] = doc.get('id')
@@ -2103,7 +2093,7 @@ class CreateAdminViewSet(viewsets.GenericViewSet):
                     temp[x['phone_number']] = x
             admin_final_list = list(temp.values())
             for a_d in assoc_docs:
-                if (a_d.get('is_live') and a_d.get('enabled')) and not a_d.get('phone_number'):
+                if ((a_d.get('is_live') and a_d.get('enabled')) or a_d.get('source_type') == Doctor.PROVIDER) and not a_d.get('phone_number'):
                     a_d['is_doctor'] = True
                     a_d['hospital_name'] = hos_name
                     admin_final_list.append(a_d)
