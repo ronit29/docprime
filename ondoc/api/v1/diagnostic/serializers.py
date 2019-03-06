@@ -615,7 +615,6 @@ class LabAppointmentCreateSerializer(serializers.Serializer):
     coupon_code = serializers.ListField(child=serializers.CharField(), required=False, default=[])
     use_wallet = serializers.BooleanField(required=False)
     cart_item = serializers.PrimaryKeyRelatedField(queryset=Cart.objects.all(), required=False, allow_null=True)
-    whatsapp_optin = serializers.BooleanField(required=False)
 
     def validate(self, data):
         MAX_APPOINTMENTS_ALLOWED = 10

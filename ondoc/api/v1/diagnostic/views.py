@@ -1442,12 +1442,6 @@ class LabAppointmentView(mixins.CreateModelMixin,
         else:
             resp = account_models.Order.create_order(request, [cart_item], validated_data.get("use_wallet"))
 
-        profile = validated_data.get('profile')
-        whatsapp_optin = validated_data.get('whatsapp_optin')
-        if whatsapp_optin in [True, False] and profile:
-            profile.whatsapp_optin = whatsapp_optin
-            profile.save()
-
         return Response(data=resp)
 
     def form_lab_app_data(self, request, data):
