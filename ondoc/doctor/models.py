@@ -205,6 +205,7 @@ class Hospital(auth_model.TimeStampedModel, auth_model.CreatedByModel, auth_mode
 
     remark = GenericRelation(Remark)
     matrix_lead_id = models.BigIntegerField(blank=True, null=True, unique=True)
+    about = models.TextField(blank="", default="")
 
     def __str__(self):
         return self.name
@@ -2653,3 +2654,16 @@ class HealthInsuranceProviderHospitalMapping(models.Model):
     class Meta:
         db_table = "hospital__health_insurance_provider_mapping"
         unique_together = (('hospital', 'provider'),)
+
+
+class HospitalHelpline(auth_model.TimeStampedModel):
+    hospital = models.ForeignKey(Hospital, on_delete=models.CASCADE, related_name="hospital_helpline_numbers")
+    std_code = models.IntegerField(blank=True, null=True)
+    number = models.BigIntegerField()
+    details = models.CharField(max_length=200, blank=True)
+
+    def __str__(self):
+        return self.hospital.name
+
+    class Meta:
+        db_table = "hospital_helpline"

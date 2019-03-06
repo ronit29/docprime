@@ -544,9 +544,9 @@ def create_or_update_lead_on_matrix(self, data):
             self.retry([data], countdown=countdown_time)
         else:
             resp_data = response.json()
-            if not resp_data.get('Id', None):
-                logger.error(json.dumps(request_data))
-                raise Exception("[ERROR] ID not received from the matrix while creating lead for {} with ID {}.")
+            if not (resp_data.get('Id', None) or resp_data.get('IsSaved', False)):
+                logger.error("[ERROR] ID not received from the matrix while creating lead for {} with ID {}. ".format(obj_type, obj_id)+json.dumps(request_data))
+                # raise Exception("[ERROR] ID not received from the matrix while creating lead for {} with ID {}.")
 
             # save the order with the matrix lead id.
             if obj and hasattr(obj, 'matrix_lead_id') and not obj.matrix_lead_id:
@@ -620,8 +620,8 @@ def update_onboarding_qcstatus_to_matrix(self, data):
         else:
             resp_data = response.json()
             if not resp_data.get('IsSaved', False):
-                logger.error(json.dumps(request_data))
-                raise Exception("[ERROR] {} with ID {} not saved to matrix while updating status.".format(obj_type, obj_id))
+                logger.error("[ERROR] {} with ID {} not saved to matrix while updating status. ".format(obj_type, obj_id) + json.dumps(request_data))
+                # raise Exception("[ERROR] {} with ID {} not saved to matrix while updating status.".format(obj_type, obj_id))
     except Exception as e:
         logger.error("Error in Celery. Failed to update status to the matrix - " + str(e))
 
