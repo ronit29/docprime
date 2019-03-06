@@ -305,6 +305,29 @@ class NotificationViewSet(GenericViewSet):
         return Response(serializer.data)
 
 
+class WhatsappOptinViewSet(GenericViewSet):
+
+    def update(self, request, *args, **kwargs):
+        phone_number = request.data.get('phone_number')
+        optin = request.data.get('optin')
+        source = request.data.get('source')
+
+        if optin not in [True, False]:
+            return Response(status=status.HTTP_400_BAD_REQUEST, data={'error': 'optin must be boolean field.'})
+
+        if not phone_number:
+            return Response(status=status.HTTP_400_BAD_REQUEST, data={'error': 'phone_number is required.'})
+
+        user_profile_obj = UserProfile.objects.filter(phone_number=phone_number)
+        if not user_profile_obj:
+            return Response(status=status.HTTP_400_BAD_REQUEST, data={'error': 'could not find the userprofile with number %s' % str(phone_number)})
+
+        if source == 'WHATSAPP_SERVICE' and optin is False:
+            user_profile_obj.update(whatsapp_optin=optin, whatsapp_is_declined=True)
+
+        return Response()
+
+
 class UserProfileViewSet(mixins.CreateModelMixin, mixins.ListModelMixin,
                          mixins.RetrieveModelMixin, mixins.UpdateModelMixin,
                          GenericViewSet):
@@ -319,6 +342,12 @@ class UserProfileViewSet(mixins.CreateModelMixin, mixins.ListModelMixin,
         queryset = UserProfile.objects.filter(user=request.user)
         return queryset
 
+    def list(self, request, *args, **kwargs):
+        qs = self.get_queryset()
+
+        serializer = [serializers.UserProfileSerializer(q, context= {'request':request}).data for q in qs]
+        return Response(data=serializer)
+
     def create(self, request, *args, **kwargs):
         queryset = self.get_queryset()
         data = {}
@@ -327,6 +356,7 @@ class UserProfileViewSet(mixins.CreateModelMixin, mixins.ListModelMixin,
         # data['age'] = request.data.get('age')
         data['email'] = request.data.get('email')
         data['phone_number'] = request.data.get('phone_number')
+        data['whatsapp_optin'] = request.data.get('whatsapp_optin')
         data['user'] = request.user.id
         first_profile = False
 
