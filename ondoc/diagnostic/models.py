@@ -1080,7 +1080,6 @@ class AvailableLabTest(TimeStampedModel):
         super(AvailableLabTest, self).save(*args, **kwargs)
         self.update_deal_price()
 
-
     def get_computed_deal_price(self):
         if self.test.test_type == LabTest.RADIOLOGY:
             deal_percent = self.lab_pricing_group.radiology_deal_price_percentage if self.lab_pricing_group.radiology_deal_price_percentage else None
