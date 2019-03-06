@@ -669,7 +669,7 @@ class WHTSAPPNotification:
 
             if undesired_params:
                 logger.error('[ERROR] Could not send Whtsapp message to user as missing parameters for the appointment '
-                             'id %d. Params %s' % (self.context.get('instance').id, ", ".join(undesired_params)))
+                             'id %d. Params %s' % (self.context.get('instance').id, str(data)))
 
             # prepare payload for the whtsapp service.
             payload = {
