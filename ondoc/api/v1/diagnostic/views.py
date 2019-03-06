@@ -423,11 +423,15 @@ class LabList(viewsets.ReadOnlyModelViewSet):
                      then=F('availablelabs__computed_deal_price')),
                 When(availablelabs__custom_deal_price__isnull=False,
                      then=F('availablelabs__custom_deal_price'))),
-            rank=Window(expression=RowNumber(), order_by=F('distance').asc(),
-                        partition_by=Case(When(F(availablelabs__lab_pricing_group__labs__network__isnull=False, then=F([F(
+            rank=Case(
+                When(availablelabs__custom_deal_price__isnull=False,
+                     then=F(Window(expression=RowNumber(), order_by=F('distance').asc(),
+                        partition_by=[F(
                             'availablelabs__lab_pricing_group__labs__network'), F('id')]))),
-                        When(availablelabs__lab_pricing_group__labs__network__isnull=True,
-                             then=[F(random.randint(1111,9999),F('id'))]))))
+                When(availablelabs__custom_deal_price__isnull=True,
+                     then
+                     )
+            )
 
             # rank=Case(When(availablelabs__lab_pricing_group__labs__network__isnull = False,
             #                then=F(Window(expression=RowNumber(), order_by=F('distance').asc(),
