@@ -12,5 +12,5 @@ urlpatterns = [
     path('medical-services', views.DoctorDataViewset.as_view({'get': 'get_doctor_medical_services'}), name='get-doctor-medical-services'),
     path('procedures', views.DoctorDataViewset.as_view({'get': 'get_procedures'}), name='get-procedures'),
     path('specializations', views.DoctorDataViewset.as_view({'get': 'get_specializations'}), name='get-specializations'),
-    path('upcoming/appointments/', views.AppointmentViewSet.as_view({'get': 'upcoming_appointments'}), name='upcoming_appointments')
+    path('upcoming/appointments', views.AppointmentViewSet.as_view({'get': 'upcoming_appointments'}), name='upcoming_appointments')
 ]

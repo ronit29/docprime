@@ -451,7 +451,7 @@ class DoctorDataViewset(viewsets.GenericViewSet):
 
 class AppointmentViewSet(viewsets.GenericViewSet):
     authentication_classes = (JWTAuthentication,)
-    #permission_classes = (IsAuthenticated,)
+    permission_classes = (IsAuthenticated,)
 
     def upcoming_appointments(self, request):
         # ti = datetime.datetime.now().strftime('%Y-%m-%d %H:%M')
