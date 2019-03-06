@@ -1056,9 +1056,9 @@ class AvailableLabTest(TimeStampedModel):
 
         query = '''update available_lab_test set computed_deal_price = 
                     least(greatest(floor(	
-                    case when least((case when custom_agreed_price is not null 
+                    case when (least((case when custom_agreed_price is not null 
                     then custom_agreed_price else computed_agreed_price end)*1.5, mrp*.8) - case when custom_agreed_price
-                    is not null then custom_agreed_price else computed_agreed_price end >100  then 
+                    is not null then custom_agreed_price else computed_agreed_price end) >100  then 
                     least((case when custom_agreed_price is not null 
                     then custom_agreed_price else computed_agreed_price end)*1.5, mrp*.8) else 
                     least((case when custom_agreed_price is not null 
@@ -1077,9 +1077,9 @@ class AvailableLabTest(TimeStampedModel):
         # will update all lab prices
         query = '''update available_lab_test set computed_deal_price = 
                     least(greatest(floor(	
-                    case when least((case when custom_agreed_price is not null 
+                    case when (least((case when custom_agreed_price is not null 
                     then custom_agreed_price else computed_agreed_price end)*1.5, mrp*.8) - case when custom_agreed_price
-                    is not null then custom_agreed_price else computed_agreed_price end >100  then 
+                    is not null then custom_agreed_price else computed_agreed_price end) >100  then 
                     least((case when custom_agreed_price is not null 
                     then custom_agreed_price else computed_agreed_price end)*1.5, mrp*.8) else 
                     least((case when custom_agreed_price is not null 
