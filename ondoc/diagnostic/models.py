@@ -1055,10 +1055,17 @@ class AvailableLabTest(TimeStampedModel):
         #         else computed_agreed_price end), mrp) where id = %s '''
 
         query = '''update available_lab_test set computed_deal_price = 
-                   least(greatest(floor(least((case when custom_agreed_price is not null 
-                   then custom_agreed_price else computed_agreed_price end)*1.5, mrp*.8)/5)*5, case when custom_agreed_price
-                   is not null then custom_agreed_price else computed_agreed_price end), mrp)
-                   where enabled=true and id=%s ''' 
+                    least(greatest(floor(	
+                    case when (least((case when custom_agreed_price is not null 
+                    then custom_agreed_price else computed_agreed_price end)*1.5, mrp*.8) - case when custom_agreed_price
+                    is not null then custom_agreed_price else computed_agreed_price end) >100  then 
+                    least((case when custom_agreed_price is not null 
+                    then custom_agreed_price else computed_agreed_price end)*1.5, mrp*.8) else 
+                    least((case when custom_agreed_price is not null 
+                    then custom_agreed_price else computed_agreed_price end)+100, mrp) end
+                    /5)*5, case when custom_agreed_price
+                    is not null then custom_agreed_price else computed_agreed_price end), mrp)
+                    where enabled=true and id=%s '''
 
         update_available_lab_test_deal_price = RawSql(query, [self.pk]).execute()
         # deal_price = RawSql(query, [self.pk]).fetch_all()
@@ -1069,10 +1076,17 @@ class AvailableLabTest(TimeStampedModel):
     def update_all_deal_price(cls):
         # will update all lab prices
         query = '''update available_lab_test set computed_deal_price = 
-                least(greatest(floor(least((case when custom_agreed_price is not null 
-                then custom_agreed_price else computed_agreed_price end)*1.5, mrp*.8)/5)*5, case when custom_agreed_price
-                is not null then custom_agreed_price else computed_agreed_price end), mrp)
-                where enabled=true'''
+                    least(greatest(floor(	
+                    case when (least((case when custom_agreed_price is not null 
+                    then custom_agreed_price else computed_agreed_price end)*1.5, mrp*.8) - case when custom_agreed_price
+                    is not null then custom_agreed_price else computed_agreed_price end) >100  then 
+                    least((case when custom_agreed_price is not null 
+                    then custom_agreed_price else computed_agreed_price end)*1.5, mrp*.8) else 
+                    least((case when custom_agreed_price is not null 
+                    then custom_agreed_price else computed_agreed_price end)+100, mrp) end
+                    /5)*5, case when custom_agreed_price
+                    is not null then custom_agreed_price else computed_agreed_price end), mrp)
+                    where enabled=true'''
 
         update_all_available_lab_test_deal_price = RawSql(query, []).execute()
 
@@ -1088,8 +1102,11 @@ class AvailableLabTest(TimeStampedModel):
             # self.computed_deal_price = self.get_computed_deal_price()
             self.computed_deal_price = self.computed_agreed_price
         super(AvailableLabTest, self).save(*args, **kwargs)
-        self.update_deal_price()
 
+        transaction.on_commit(lambda: self.app_commit_tasks())
+
+    def app_commit_tasks(self):
+        self.update_deal_price()
 
     def get_computed_deal_price(self):
         if self.test.test_type == LabTest.RADIOLOGY:
