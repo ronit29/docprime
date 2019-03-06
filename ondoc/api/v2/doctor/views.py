@@ -700,9 +700,9 @@ class ProviderSignupDataViewset(viewsets.GenericViewSet):
         hospital_generic_admins_data = None
         try:
             hospital = doc_models.Hospital.objects.create(name=valid_data.get('name'),
-                                                          city=valid_data.get('city', None),
-                                                          state=valid_data.get('state', None),
-                                                          country=valid_data.get('country', None),
+                                                          # city=valid_data.get('city'),
+                                                          # state=valid_data.get('state'),
+                                                          country=valid_data.get('country'),
                                                           source_type=doc_models.Hospital.PROVIDER)
             hospital_model_serializer = serializers.HospitalModelSerializer(hospital, many=False)
             auth_models.GenericAdmin.objects.create(user=request.user, phone_number=request.user.phone_number,
