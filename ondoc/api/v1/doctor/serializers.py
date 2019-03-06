@@ -204,6 +204,13 @@ class CreateAppointmentSerializer(serializers.Serializer):
 
         time_slot_end = None
 
+        doctor_clinic = data.get('doctor').doctor_clinics.filter(hospital=data.get('hospital'), enabled=True).first()
+        if not doctor_clinic:
+            raise serializers.ValidationError("Doctor Hospital not related.")
+        if not data.get('doctor').enabled_for_online_booking or \
+                not data.get('hospital').enabled_for_online_booking or not doctor_clinic.enabled_for_online_booking:
+            raise serializers.ValidationError("Online booking not enabled")
+
         if OpdAppointment.objects.filter(profile=data.get("profile"), doctor=data.get("doctor"),
                                          hospital=data.get("hospital"), time_slot_start=time_slot_start) \
                                 .exclude(status__in=[OpdAppointment.COMPLETED, OpdAppointment.CANCELLED]).exists():
@@ -727,6 +734,8 @@ class DoctorListSerializer(serializers.Serializer):
     max_distance = serializers.IntegerField(required=False, allow_null=True)
     min_distance = serializers.IntegerField(required=False, allow_null=True)
     hospital_id = serializers.IntegerField(required=False, allow_null=True)
+    locality = serializers.CharField(required=False)
+    city = serializers.CharField(required=False)
 
     def validate_procedure_ids(self, attrs):
         try:
@@ -1157,6 +1166,7 @@ class DoctorAppointmentRetrieveSerializer(OpdAppointmentSerializer):
     hospital = HospitalModelSerializer()
     doctor = AppointmentRetrieveDoctorSerializer()
     mask_data = serializers.SerializerMethodField()
+    mrp = serializers.ReadOnlyField(source='fees')
 
     def get_mask_data(self, obj):
         mask_number = obj.mask_number.first()

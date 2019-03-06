@@ -66,6 +66,7 @@ from django.db.models import Avg
 from django.db.models import Count
 from ondoc.api.v1.auth import serializers as auth_serializers
 from copy import deepcopy
+from django.utils.text import slugify
 
 logger = logging.getLogger(__name__)
 import random
@@ -575,8 +576,11 @@ class DoctorProfileUserViewSet(viewsets.GenericViewSet):
                     about_doctor += ' ' + person + ' is located in ' + hospital_obj.city + '. '
 
         if doctor.name and hospital and  hospital_obj and hospital_obj.city and hospital_obj.state:
-            about_doctor += '<br><br>Dr. ' + doctor.name
-            if hospital_obj.city:
+            if not about_doctor:
+                about_doctor = 'Dr. ' + doctor.name
+            else:
+                about_doctor += '<br><br>Dr. ' + doctor.name
+            if hospital_obj.city and hospital_obj.name:
                 about_doctor += ' practices at the ' + hospital_obj.name + ' in ' + hospital_obj.city + '. '
 
             if hospital and hospital.get('hospital_name') and hospital.get('address'):
@@ -599,19 +603,26 @@ class DoctorProfileUserViewSet(viewsets.GenericViewSet):
 
         doctor_qual = doctor.qualifications.all()
         if doctor_qual:
-            about_doctor += '<br><br>'
+            if not about_doctor:
+                about_doctor = ''
+            else:
+                about_doctor += '<br><br>'
             count = 0
             for data in doctor_qual:
                 if count > 2:
                     count = 2
                 qual_str = [' pursued ', ' completed ', ' has also done ']
-                if data.qualification and data.qualification.name and data.college and data.college.name:
+                if data.qualification and data.qualification.name and data.college and data.college.name and data.passing_year:
                     about_doctor += person + qual_str[
                         count] + his_her + ' ' + data.qualification.name + ' in the year ' \
                                     + str(data.passing_year) + ' from ' + data.college.name + '. '
                     count = count + 1
         if doctor.name:
-            about_doctor += '<br><br>' + 'Dr. ' + doctor.name + ' is an experienced, skilled and awarded doctor in ' + his_her + ' field of specialization. '
+            if not about_doctor:
+                about_doctor = ''
+            else:
+                about_doctor += '<br><br>'
+            about_doctor += 'Dr. ' + doctor.name + ' is an experienced, skilled and awarded doctor in ' + his_her + ' field of specialization. '
             doc_awards_obj = doctor.awards.all()
             if doc_awards_obj:
                 for data in doc_awards_obj:
@@ -623,9 +634,13 @@ class DoctorProfileUserViewSet(viewsets.GenericViewSet):
 
         doc_experience_details = response_data.get('experiences')
         if doc_experience_details:
+            if not about_doctor:
+                about_doctor = ''
+            else:
+                about_doctor += '<br><br>'
             if doc_experience_details[0].get('hospital') and doc_experience_details[0].get('start_year') and \
                     doc_experience_details[0].get('end_year'):
-                about_doctor += '<br><br>' + person + ' worked at ' + doc_experience_details[0].get(
+                about_doctor += person + ' worked at ' + doc_experience_details[0].get(
                     'hospital') + ' from ' + str(doc_experience_details[0].get('start_year')) + ' to ' + str(
                     doc_experience_details[0].get('end_year'))
             if len(doc_experience_details) > 1:
@@ -1232,6 +1247,9 @@ class DoctorListViewSet(viewsets.GenericViewSet):
         seo = None
         breadcrumb = None
         ratings_title = ''
+        specialization_name = None
+        canonical_url = None
+        url = None
         # if False and (validated_data.get('extras') or validated_data.get('specialization_ids')):
         if validated_data.get('locality_value') or validated_data.get('sublocality_value'):
             location = None
@@ -1243,6 +1261,7 @@ class DoctorListViewSet(viewsets.GenericViewSet):
             sublocality = ''
             specializations = ''
             breadcrumb_locality_url = None
+
 
             if validated_data.get('locality_value'):
                 locality = validated_data.get('locality_value')
@@ -1485,8 +1504,28 @@ class DoctorListViewSet(viewsets.GenericViewSet):
                         if hospital_location.distance(parent_location)*100 < 1:
                             resp['parent_url'] = parent_url
 
-
         specializations = list(models.PracticeSpecialization.objects.filter(id__in=validated_data.get('specialization_ids',[])).values('id','name'));
+        if validated_data.get('url'):
+            canonical_url = validated_data.get('url')
+        else:
+            if validated_data.get('city'):
+                if specializations:
+                    specialization_name = specializations[0].get('name')
+                    if not validated_data.get('locality'):
+                        url = slugify(specialization_name + '-in-' + validated_data.get('city') + '-sptcit')
+                    else:
+                        url = slugify(specialization_name + '-in-' + validated_data.get('locality') + '-' +
+                                                validated_data.get('city') + '-sptlitcit')
+                else:
+                    if not validated_data.get('locality'):
+                        url = slugify('doctors' + '-in-' + validated_data.get('city') + '-sptcit')
+                    else:
+                        url = slugify('doctors' + '-in-' + validated_data.get('locality') + '-' +
+                                                validated_data.get('city') + '-sptlitcit')
+
+                entity = EntityUrls.objects.filter(url=url, url_type='SEARCHURL', entity_type='Doctor', is_valid=True)
+                if entity:
+                    canonical_url = entity[0].url
 
         if parameters.get('doctor_suggestions') == 1:
             result = list()
@@ -1512,7 +1551,7 @@ class DoctorListViewSet(viewsets.GenericViewSet):
                          "breadcrumb": breadcrumb, 'search_content': top_content,
                          'procedures': procedures, 'procedure_categories': procedure_categories,
                          'ratings':ratings, 'reviews': reviews, 'ratings_title': ratings_title,
-                         'bottom_content': bottom_content})
+                         'bottom_content': bottom_content, 'canonical_url': canonical_url})
 
     @transaction.non_atomic_requests
     def search_by_hospital(self, request):
@@ -2918,7 +2957,9 @@ class OfflineCustomerViewSet(viewsets.GenericViewSet):
             else:
                 is_docprime = True
                 effective_price = app.effective_price
-                mrp = app.mrp
+                # mrp = app.mrp
+                #RAJIV YADAV
+                mrp = app.fees if app.fees else 0
                 payment_type = app.payment_type
                 deal_price = app.deal_price
                 mask_number = app.mask_number.first()
