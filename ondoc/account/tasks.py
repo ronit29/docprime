@@ -164,14 +164,25 @@ def dump_to_elastic():
             ]
         }
 
-        response = requests.post(elastic_url + '/_aliases', headers={'Content-Type': 'application/json'}, data=json.dumps(aliasData))
-        if response.status_code != status.HTTP_200_OK or not response.ok:
-            raise Exception('Could not switch the latest index to the live aliases. ', aliasData)
-
-        print("Sync to elastic successfull.")
+        elastic_alias_switch.apply_async(({'url': elastic_url, 'alias_data': aliasData},), countdown=3600)
 
     except Exception as e:
         logger.error("Error in syncing process of elastic - " + str(e))
+
+@task()
+def elastic_alias_switch(data):
+    elastic_url = data.get('url')
+    alias_data = data.get('alias_data')
+    if not elastic_url or not alias_data:
+        raise Exception('Url and alias data not found.')
+
+    response = requests.post(elastic_url + '/_aliases', headers={'Content-Type': 'application/json'}, data=json.dumps(alias_data))
+    if response.status_code != status.HTTP_200_OK or not response.ok:
+        logger.error('Could not switch the latest index to the live aliases. ', alias_data)
+        print("Sync to elastic failed.")
+    else:
+        print("Sync to elastic successfull.")
+
 
 @task()
 def consumer_refund_update():
