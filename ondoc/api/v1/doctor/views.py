@@ -3232,6 +3232,7 @@ class HospitalViewSet(viewsets.GenericViewSet):
         validated_data = serializer.validated_data
         hospital_obj = Hospital.objects.prefetch_related('service', 'network', 'hospitalimage_set',
                                                          'hospital_documents',
+                                                         'hospital_helpline_numbers',
                                                          'network__hospital_network_documents',
                                                          'hospitalcertification_set',
                                                          'hospitalspeciality_set').filter(id=pk, is_live=True).first()

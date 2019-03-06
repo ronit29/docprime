@@ -1605,14 +1605,15 @@ class HospitalDetailIpdProcedureSerializer(TopHospitalForIpdProcedureSerializer)
     other_network_hospitals = serializers.SerializerMethodField()
     doctors = serializers.SerializerMethodField()
     rating_graph = serializers.SerializerMethodField()
+    opd_timings = serializers.SerializerMethodField()
+    contact_number = serializers.SerializerMethodField()
 
     class Meta:
         model = Hospital
         fields = ('id', 'name', 'distance', 'certifications', 'bed_count', 'logo', 'avg_rating',
-                  'multi_speciality', 'address',
+                  'opd_timings', 'contact_number', 'multi_speciality', 'address',
                   'lat', 'long', 'about', 'services', 'images', 'ipd_procedure_categories', 'other_network_hospitals',
-                  'doctors', 'rating_graph',
-                  # TODO : SHASHANK_SINGH hospital timings
+                  'doctors', 'rating_graph'
                   )
 
     def get_lat(self, obj):
@@ -1629,6 +1630,14 @@ class HospitalDetailIpdProcedureSerializer(TopHospitalForIpdProcedureSerializer)
         if obj.network:
             return obj.network.about
         return obj.about
+
+    def get_opd_timings(self, obj):
+        return obj.opd_timings
+
+    def get_contact_number(self, obj):
+        for x in obj.hospital_helpline_numbers.all():
+            return ("{} ".format(x.std_code) if x.std_code else "") + str(x.number)
+        return None
 
     def get_services(self, obj):
         request = self.context.get('request')

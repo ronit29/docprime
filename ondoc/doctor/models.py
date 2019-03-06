@@ -206,7 +206,8 @@ class Hospital(auth_model.TimeStampedModel, auth_model.CreatedByModel, auth_mode
 
     remark = GenericRelation(Remark)
     matrix_lead_id = models.BigIntegerField(blank=True, null=True, unique=True)
-    about = models.TextField(blank="", default="")
+    about = models.TextField(blank=True, null=True, default="")
+    opd_timings = models.CharField(max_length=150, blank=True, null=True, default="")
 
     def __str__(self):
         return self.name
