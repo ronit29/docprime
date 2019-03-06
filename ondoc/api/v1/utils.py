@@ -915,37 +915,43 @@ class TimeSlotExtraction(object):
     def format_data(self, data, day_time, pa, booking_details):
         current_date_time = datetime.datetime.now()
         booking_date = booking_details.get('date')
-        lab_tomorrow_booking_time = None
-        lab_booking_minimum_time = None
-        doc_booking_minimum_time = None
+        lab_tomorrow_time = None
+        lab_minimum_time = None
+        doc_minimum_time = None
         if booking_details.get('type') == "doctor":
             if current_date_time.date() == booking_date.date():
                 doc_booking_minimum_time = current_date_time + datetime.timedelta(hours=1)
+                doc_booking_hours = doc_booking_minimum_time.strftime('%H:%M')
+                hours, minutes = doc_booking_hours.split(':')
+                mins = int(hours) * 60 + int(minutes)
+                doc_minimum_time = mins / 60
         else:
             is_home_pickup = booking_details.get('is_home_pickup')
             if is_home_pickup:
                 if current_date_time.weekday() == 6:
-                    lab_booking_minimum_time = current_date_time + datetime.timedelta(hours=24)
+                    lab_minimum_time = 24.0
                 if current_date_time.hour < 13:
                     lab_booking_minimum_time = current_date_time + datetime.timedelta(hours=4)
+                    lab_booking_hours = lab_booking_minimum_time.strftime('%H:%M')
+                    hours, minutes = lab_booking_hours.split(':')
+                    mins = int(hours) * 60 + int(minutes)
+                    lab_minimum_time = mins / 60
                 elif current_date_time.hour >= 13:
-                    lab_booking_minimum_time = current_date_time + datetime.timedelta(hours=24)
+                    lab_minimum_time = 24.0
                 if current_date_time.hour > 17:
-                    lab_tomorrow_booking_time = current_date_time + datetime.timedelta(hours=12)
+                    lab_tomorrow_time = 12.0
             else:
                 lab_booking_minimum_time = current_date_time + datetime.timedelta(hours=1)
-                # lab_tomorrow_booking_time = current_date_time + datetime.timedelta(hours=12)
+                lab_booking_hours = lab_booking_minimum_time.strftime('%H:%M')
+                hours, minutes = lab_booking_hours.split(':')
+                mins = int(hours) * 60 + int(minutes)
+                lab_minimum_time = mins / 60
 
         data_list = list()
         for k, v in data.items():
             if 'mrp' in pa[k].keys() and 'deal_price' in pa[k].keys():
                 if pa[k].get('on_call') == False:
                     if current_date_time.date() == booking_date.date():
-                        doc_booking_hours = doc_booking_minimum_time.strftime('%H:%M')
-                        hours, minutes = doc_booking_hours.split(':')
-                        mins = int(hours) * 60 + int(minutes)
-                        doc_minimum_time = mins/60
-
                         if k >= float(doc_minimum_time):
                             data_list.append({"value": k, "text": v, "price": pa[k]["price"],
                                               "mrp": pa[k]['mrp'], 'deal_price': pa[k]['deal_price'],
@@ -960,24 +966,17 @@ class TimeSlotExtraction(object):
                 else:
                     pass
             else:
-                lab_booking_hours = lab_booking_minimum_time.strftime('%H:%M')
-                hours, minutes = lab_booking_hours.split(':')
-                mins = int(hours) * 60 + int(minutes)
-                lab_minimum_time = mins / 60
                 next_date = current_date_time + datetime.timedelta(days=1)
                 if current_date_time.date() == booking_date.date():
-                    if is_home_pickup:
-                        pass
+                    if k >= float(lab_minimum_time):
+                        data_list.append({"value": k, "text": v, "price": pa[k]["price"],
+                                          "is_available": pa[k]["is_available"],
+                                          "on_call": pa[k].get("on_call", False)})
                     else:
-                        if k >= float(lab_minimum_time):
-                            data_list.append({"value": k, "text": v, "price": pa[k]["price"],
-                                              "is_available": pa[k]["is_available"],
-                                              "on_call": pa[k].get("on_call", False)})
-                        else:
-                            pass
+                        pass
                 elif next_date.date() == booking_date.date():
-                    if lab_tomorrow_booking_time:
-                        lab_tomorrow_booking_hours = lab_tomorrow_booking_time.strftime('%H:%M')
+                    if lab_tomorrow_time:
+                        lab_tomorrow_booking_hours = lab_tomorrow_time.strftime('%H:%M')
                         hours, minutes = lab_tomorrow_booking_hours.split(':')
                         mins = int(hours) * 60 + int(minutes)
                         lab_tomorrow_time = mins / 60
@@ -1046,6 +1045,7 @@ class TimeSlotExtraction(object):
                         today_max = max_val - 2
 
         return today_min, tomorrow_min, today_max
+
 
 def consumers_balance_refund():
     from ondoc.account.models import ConsumerAccount, ConsumerRefund
