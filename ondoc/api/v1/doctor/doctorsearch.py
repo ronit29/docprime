@@ -121,14 +121,17 @@ class DoctorSearchHelper:
 
         if self.query_params.get("is_available"):
             current_time = datetime.now()
+            ist_time = current_time.strftime("%H:%M:%S")
             current_hour = round(float(current_time.hour) + (float(current_time.minute)*1/60), 2) + .75
-            query_str = "((dl.start_date is NULL OR dl.end_date is NULL) OR" \
-                        " (current_date NOT BETWEEN dl.start_date AND dl.end_date))"
+            query_str = '((dl.id is NULL) OR ' \
+                        '((current_date >= dl.start_date and (%(ist_time)s) NOT BETWEEN dl.start_time and dl.end_time) ' \
+                        'AND (current_date <= dl.end_date and (%(ist_time)s) NOT BETWEEN dl.start_time and dl.end_time)))'
             filtering_params.append(query_str)
             filtering_params.append(
                 'dct.day=(%(current_time)s) and dct.end>=(%(current_hour)s)')
             params['current_time'] = str(current_time.weekday())
             params['current_hour'] = str(current_hour)
+            params['ist_time'] = str(ist_time)
 
         if self.query_params.get("doctor_name"):
             name = self.query_params.get("doctor_name").lower().strip()
