@@ -25,8 +25,8 @@ class TrackingEvent(DynamicDocument, TimeStampedModel):
         user = kwargs.get('user', None)
         triggered_at = kwargs.get('triggered_at', datetime.datetime.utcnow())
         if event_name and visit_id and visitor_id:
-            event = cls(visitor_id=visitor_id, name=event_name, data=data, visit_id=visit_id, user=user,
-                        triggered_at=triggered_at, created_at=datetime.datetime.utcnow(), updated_at=datetime.datetime.utcnow())
+            event = cls(visitor_id=visitor_id, name=event_name, **data, visit_id=visit_id, user=user.id,
+                        created_at=datetime.datetime.utcnow(), updated_at=datetime.datetime.utcnow())
             event.save()
             return event
         return None
