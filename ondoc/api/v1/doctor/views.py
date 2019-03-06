@@ -66,6 +66,7 @@ from django.db.models import Avg
 from django.db.models import Count
 from ondoc.api.v1.auth import serializers as auth_serializers
 from copy import deepcopy
+from django.utils.text import slugify
 
 logger = logging.getLogger(__name__)
 import random
@@ -1252,6 +1253,9 @@ class DoctorListViewSet(viewsets.GenericViewSet):
         seo = None
         breadcrumb = None
         ratings_title = ''
+        specialization_name = None
+        canonical_url = None
+        url = None
         # if False and (validated_data.get('extras') or validated_data.get('specialization_ids')):
         if validated_data.get('locality_value') or validated_data.get('sublocality_value'):
             location = None
@@ -1263,6 +1267,7 @@ class DoctorListViewSet(viewsets.GenericViewSet):
             sublocality = ''
             specializations = ''
             breadcrumb_locality_url = None
+
 
             if validated_data.get('locality_value'):
                 locality = validated_data.get('locality_value')
@@ -1505,8 +1510,28 @@ class DoctorListViewSet(viewsets.GenericViewSet):
                         if hospital_location.distance(parent_location)*100 < 1:
                             resp['parent_url'] = parent_url
 
-
         specializations = list(models.PracticeSpecialization.objects.filter(id__in=validated_data.get('specialization_ids',[])).values('id','name'));
+        if validated_data.get('url'):
+            canonical_url = validated_data.get('url')
+        else:
+            if validated_data.get('city'):
+                if specializations:
+                    specialization_name = specializations[0].get('name')
+                    if not validated_data.get('locality'):
+                        url = slugify(specialization_name + '-in-' + validated_data.get('city') + '-sptcit')
+                    else:
+                        url = slugify(specialization_name + '-in-' + validated_data.get('locality') + '-' +
+                                                validated_data.get('city') + '-sptlitcit')
+                else:
+                    if not validated_data.get('locality'):
+                        url = slugify('doctors' + '-in-' + validated_data.get('city') + '-sptcit')
+                    else:
+                        url = slugify('doctors' + '-in-' + validated_data.get('locality') + '-' +
+                                                validated_data.get('city') + '-sptlitcit')
+
+                entity = EntityUrls.objects.filter(url=url, url_type='SEARCHURL', entity_type='Doctor', is_valid=True)
+                if entity:
+                    canonical_url = entity[0].url
 
         if parameters.get('doctor_suggestions') == 1:
             result = list()
@@ -1532,7 +1557,7 @@ class DoctorListViewSet(viewsets.GenericViewSet):
                          "breadcrumb": breadcrumb, 'search_content': top_content,
                          'procedures': procedures, 'procedure_categories': procedure_categories,
                          'ratings':ratings, 'reviews': reviews, 'ratings_title': ratings_title,
-                         'bottom_content': bottom_content})
+                         'bottom_content': bottom_content, 'canonical_url': canonical_url})
 
     @transaction.non_atomic_requests
     def search_by_hospital(self, request):
@@ -2938,7 +2963,9 @@ class OfflineCustomerViewSet(viewsets.GenericViewSet):
             else:
                 is_docprime = True
                 effective_price = app.effective_price
-                mrp = app.mrp
+                # mrp = app.mrp
+                #RAJIV YADAV
+                mrp = app.fees if app.fees else 0
                 payment_type = app.payment_type
                 deal_price = app.deal_price
                 mask_number = app.mask_number.first()
