@@ -1127,7 +1127,17 @@ class TestPackageFormSet(forms.BaseInlineFormSet):
                 raise forms.ValidationError('{} is a test package'.format(lab_test.name))
 
 
+class TestParameterAdminForm(forms.ModelForm):
+    name = forms.CharField(widget=forms.Textarea, required=False)
+
+    class Media:
+        extend = False
+        js = ('https://cdn.ckeditor.com/ckeditor5/10.1.0/classic/ckeditor.js', 'test_parameter/js/init.js')
+        css = {'all': ('test_parameter/css/style.css',)}
+
+
 class TestParameterAdmin(VersionAdmin):
+    form = TestParameterAdminForm
     search_fields = ['name']
 
 
@@ -1206,6 +1216,7 @@ class LabTestAdminForm(forms.ModelForm):
     why = forms.CharField(widget=forms.Textarea, required=False)
     about_test = forms.CharField(widget=forms.Textarea, required=False)
     preparations = forms.CharField(widget=forms.Textarea, required=False)
+    # parameter = forms.CharField(widget=forms.Textarea, required=False)
 
     class Media:
         extend = False
