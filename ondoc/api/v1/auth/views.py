@@ -1882,19 +1882,20 @@ class AppointmentViewSet(viewsets.GenericViewSet):
     permission_classes = (IsAuthenticated,)
 
     def upcoming_appointments(self, request):
-        user_id = request.user.id
-        opd = OpdAppointment.get_upcoming_appointment(user_id)
-        opd_appointments = OpdAppointmentUpcoming(opd, many=True).data
-        lab = LabAppointment.get_upcoming_appointment(user_id)
-        lab_appointments = LabAppointmentUpcoming(lab, many=True).data
+        all_appointments = []
+        try:
+            user_id = request.user.id
+            opd = OpdAppointment.get_upcoming_appointment(user_id)
+            opd_appointments = OpdAppointmentUpcoming(opd, many=True).data
+            lab = LabAppointment.get_upcoming_appointment(user_id)
+            lab_appointments = LabAppointmentUpcoming(lab, many=True).data
 
-        all_appointments = opd_appointments + lab_appointments
-        # print(all_appointments)
-        # all_appointments = sorted(all_appointments, key=lambda x: datetime.datetime.strptime(x["time_slot_start"],
-        #                                                                                      '%Y-%m-%dT%H:%M:%S%z'))
-        # print(all_appointments)
-        # all_appointments = sorted(all_appointments, key=lambda x: x["time_slot_start"], reverse=True)
-        # print(all_appointments)
+            all_appointments = opd_appointments + lab_appointments
+            all_appointments = sorted(all_appointments,
+                                      key=lambda x: datetime.datetime.strptime(x["time_slot_start"][:-6],
+                                                                               '%Y-%m-%dT%H:%M:%S'))
+        except Exception as e:
+            logger.error(str(e))
         return Response(all_appointments)
 
     def get_queryset(self):
