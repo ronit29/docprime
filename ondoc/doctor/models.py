@@ -661,18 +661,17 @@ class Doctor(auth_model.TimeStampedModel, auth_model.QCModel, SearchKey, auth_mo
         doctor_url = settings.BASE_URL + "/opd/doctor/{}".format(self.id)
 
         img = qrcode.make(doctor_url)
-        md5_hash = hashlib.md5(img.tobytes()).hexdigest()
+        # md5_hash = hashlib.md5(img.tobytes()).hexdigest()
 
         tempfile_io = BytesIO()
         img.save(tempfile_io, format='JPEG')
 
-        # filename = "qrcode_{}_{}.jpeg".format(str(timezone.now().strftime("%I%M%S_%d%m%Y")),
-        #                                       random.randint(1111111111, 9999999999))
+        filename = "qrcode_{}_{}.jpeg".format(str(self.name ) + '_id:' + str(self.id),
+                                              random.randint(1111111111, 9999999999))
         # image_file1 = InMemoryUploadedFile(tempfile_io, None, name=filename, content_type='image/jpeg', size=10000,
         #                                    charset=None)
 
-        image_file1 = InMemoryUploadedFile(tempfile_io, None, md5_hash + ".jpg", 'image/jpeg',
-                                           tempfile_io.tell(), None)
+        image_file1 = InMemoryUploadedFile(tempfile_io, None, filename, 'image/jpeg', tempfile_io.tell(), None)
 
         QRCode_object = QRCode(name=image_file1, content_type=ContentType.objects.get_for_model(Doctor),
                                object_id=self.id)
@@ -745,14 +744,15 @@ class Doctor(auth_model.TimeStampedModel, auth_model.QCModel, SearchKey, auth_mo
         blank_image = Image.new('RGBA', (1000, 1000), 'white')
         img_draw = ImageDraw.Draw(canvas)
         font = ImageFont.truetype("/home/sheryas/.fonts/ProspectusPro-Desktop-v1-002/ProspectusSBld.otf", 40)
-        img_draw.text((350, 530), self.name + self.about , fill='black', font=font)
-        md5_hash = hashlib.md5(canvas.tobytes()).hexdigest()
+        img_draw.text((350, 530), self.name, fill='black', font=font)
+        # md5_hash = hashlib.md5(canvas.tobytes()).hexdigest()
 
         tempfile_io = BytesIO()
         canvas.save(tempfile_io, format='JPEG')
+        filename = "doctor_sticker_{}_{}.jpeg".format(str(self.name) + '_id:' + str(self.id),
+                                              random.randint(1111111111, 9999999999))
 
-        image_file1 = InMemoryUploadedFile(tempfile_io, None, md5_hash + ".jpg", 'image/jpeg',
-                                           tempfile_io.tell(), None)
+        image_file1 = InMemoryUploadedFile(tempfile_io, None, filename, 'image/jpeg', tempfile_io.tell(), None)
 
         sticker = DoctorSticker(name=image_file1, doctor=self)
         sticker.save()
