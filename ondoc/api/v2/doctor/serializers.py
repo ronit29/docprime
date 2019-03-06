@@ -199,8 +199,8 @@ class ConsentIsDocprimeSerializer(serializers.Serializer):
 
 class BulkCreateDoctorSerializer(serializers.Serializer):
     name = serializers.CharField(max_length=200)
-    online_consultation_fees = serializers.IntegerField(required=False, min_value=0)
-    phone_number = serializers.IntegerField(required=False, min_value=5000000000, max_value=9999999999)
+    online_consultation_fees = serializers.IntegerField(required=False, min_value=0, allow_null=True)
+    phone_number = serializers.IntegerField(required=False, min_value=5000000000, max_value=9999999999, allow_null=True)
     is_appointment = serializers.BooleanField(default=False)
     is_billing = serializers.BooleanField(default=False)
     is_superuser = serializers.BooleanField(default=False)
