@@ -511,15 +511,9 @@ class Doctor(auth_model.TimeStampedModel, auth_model.QCModel, SearchKey, auth_mo
         query = '''update doctor_clinic_timing set 
                     deal_price = least(greatest(floor(case when least(fees*1.5, .8*mrp) - fees >100 then least(fees*1.5, .8*mrp)
                     else least(fees+100, mrp) end /5)*5, fees), mrp) where doctor_clinic_id in (
-                    select id from doctor_clinic where doctor_id= %s) ''' %self.pk
+                    select id from doctor_clinic where doctor_id= %s) '''
 
-
-        # update_doctor_deal_price = RawSql(query, [self.pk]).execute()
-        with connection.cursor() as cursor:
-            cursor.execute(query)
-            # connection.commit()
-            # cursor.commit()
-            # connection.close()
+        update_doctor_deal_price = RawSql(query, [self.pk]).execute()
 
     @classmethod
     def update_all_deal_price(cls):
@@ -623,16 +617,13 @@ class Doctor(auth_model.TimeStampedModel, auth_model.QCModel, SearchKey, auth_mo
             push_to_matrix = True
 
         super(Doctor, self).save(*args, **kwargs)
-        print(self.doctor_clinics.all()[0].availability.all()[0].mrp)
-        print(self.doctor_clinics.all()[0].availability.all()[0].fees)
 
-        self.update_deal_price()
         transaction.on_commit(lambda: self.app_commit_tasks(push_to_matrix=push_to_matrix,
                                                             update_status_in_matrix=update_status_in_matrix,
                                                             request_agent_lead_id=request_agent_lead_id))
 
-
     def app_commit_tasks(self, push_to_matrix=False, update_status_in_matrix=False, request_agent_lead_id=None):
+        self.update_deal_price()
         if push_to_matrix:
             # push_onboarding_qcstatus_to_matrix.apply_async(({'obj_type': self.__class__.__name__, 'obj_id': self.id}
             #                                                 ,), countdown=5)

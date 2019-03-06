@@ -1102,8 +1102,11 @@ class AvailableLabTest(TimeStampedModel):
             # self.computed_deal_price = self.get_computed_deal_price()
             self.computed_deal_price = self.computed_agreed_price
         super(AvailableLabTest, self).save(*args, **kwargs)
-        self.update_deal_price()
 
+        transaction.on_commit(lambda: self.app_commit_tasks())
+
+    def app_commit_tasks(self):
+        self.update_deal_price()
 
     def get_computed_deal_price(self):
         if self.test.test_type == LabTest.RADIOLOGY:
