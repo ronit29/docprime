@@ -90,8 +90,32 @@ class HospitalServiceInline(admin.TabularInline):
     autocomplete_fields = ['service']
 
 
+class HospitalHelpineInlineForm(forms.ModelForm):
+
+    def clean(self):
+        super().clean()
+        if any(self.errors):
+            return
+        data = self.cleaned_data
+        std_code = data.get('std_code')
+        number = data.get('number')
+        if std_code:
+            try:
+                std_code = int(std_code)
+            except:
+                raise forms.ValidationError("Invalid STD code")
+
+        if not std_code:
+            if number and (number < 5000000000 or number > 9999999999):
+                raise forms.ValidationError("Invalid mobile number")
+
+    class Meta:
+        fields = '__all__'
+
+
 class HospitalHelplineInline(admin.TabularInline):
     model = HospitalHelpline
+    form = HospitalHelpineInlineForm
     fk_name = 'hospital'
     extra = 0
     can_delete = True

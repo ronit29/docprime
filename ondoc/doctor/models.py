@@ -2658,7 +2658,7 @@ class HealthInsuranceProviderHospitalMapping(models.Model):
 
 class HospitalHelpline(auth_model.TimeStampedModel):
     hospital = models.ForeignKey(Hospital, on_delete=models.CASCADE, related_name="hospital_helpline_numbers")
-    std_code = models.IntegerField(blank=True, null=True)
+    std_code = models.CharField(max_length=20, blank=True, default="")
     number = models.BigIntegerField()
     details = models.CharField(max_length=200, blank=True)
 
