@@ -238,9 +238,9 @@ class CreateGenericAdminSerializer(serializers.Serializer):
 
 class CreateHospitalSerializer(serializers.Serializer):
     name = serializers.CharField(max_length=200)
-    city = serializers.CharField(required=False, max_length=40)
-    state = serializers.CharField(required=False, max_length=40)
-    country = serializers.CharField(required=False, max_length=40)
+    city = serializers.CharField(required=False, max_length=40, allow_null=True)
+    state = serializers.CharField(required=False, max_length=40, allow_null=True)
+    country = serializers.CharField(required=False, max_length=40, allow_null=True)
     contact_number = serializers.IntegerField(required=False, min_value=5000000000, max_value=9999999999)
     doctors = serializers.ListField(required=False, child=BulkCreateDoctorSerializer(many=False), allow_empty=True)
     staffs = serializers.ListField(required=False, child=BulkCreateGenericAdminSerializer(many=False),
