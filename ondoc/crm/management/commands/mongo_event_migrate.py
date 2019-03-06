@@ -35,7 +35,7 @@ class Command(BaseCommand):
                 self.last_migrate_ts.save()
 
                 events = track_models.TrackingEvent.objects.filter(created_at__lte=self.time_upper_limit,
-                                                                   created_at__gte=self.time_lower_limit).order_by('-created_at')
+                                                                   created_at__gte=self.time_lower_limit)
 
                 if self.iter_count >= self.iter_count_limit:
                     raise StopIteration
