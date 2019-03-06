@@ -546,6 +546,18 @@ class ProviderSignupDataViewset(viewsets.GenericViewSet):
         created_doctor_mobiles = doc_models.DoctorMobile.objects.bulk_create(doctor_mobile_obj_list)
         return created_doctor_mobiles
 
+    def bulk_create_doctor_phone_number(self, hospital, doctors, doctor_details):
+        doctor_number_obj_list = list()
+        doctor_details_by_name = dict((d['name'], dict(d, index=index)) for (index, d) in enumerate(doctor_details))
+        for doctor in doctors:
+            phone_number = doctor_details_by_name.get(doctor.name).get('phone_number') if doctor_details_by_name.get(
+                doctor.name) else None
+            if phone_number:
+                doctor_number_obj_list.append(auth_models.DoctorNumber(doctor=doctor, hospital=hospital,
+                                                                       phone_number=phone_number))
+        created_doctor_numbers = auth_models.DoctorNumber.objects.bulk_create(doctor_number_obj_list)
+        return created_doctor_numbers
+
     def bulk_create_doctor_generic_admins(self, hospital, doctors, doctor_details):
         generic_admin_obj_list = list()
         doctor_details_by_name = dict((d['name'], dict(d, index=index)) for (index, d) in enumerate(doctor_details))
@@ -558,7 +570,7 @@ class ProviderSignupDataViewset(viewsets.GenericViewSet):
                                                                            doctor=doctor, hospital=hospital,
                                                                            phone_number=phone_number,
                                                                            source_type=auth_models.GenericAdmin.APP,
-                                                                           entity_type=auth_models.GenericAdmin.DOCTOR,
+                                                                           entity_type=auth_models.GenericAdmin.HOSPITAL,
                                                                            super_user_permission=True))
                     continue
                 if details.get('is_appointment'):
@@ -566,7 +578,7 @@ class ProviderSignupDataViewset(viewsets.GenericViewSet):
                                                                            doctor=doctor, hospital=hospital,
                                                                            phone_number=phone_number,
                                                                            source_type=auth_models.GenericAdmin.APP,
-                                                                           entity_type=auth_models.GenericAdmin.DOCTOR,
+                                                                           entity_type=auth_models.GenericAdmin.HOSPITAL,
                                                                            permission_type=auth_models.GenericAdmin.APPOINTMENT,
                                                                            write_permission=True))
                 if details.get('is_billing'):
@@ -574,7 +586,7 @@ class ProviderSignupDataViewset(viewsets.GenericViewSet):
                                                                            doctor=doctor, hospital=hospital,
                                                                            phone_number=phone_number,
                                                                            source_type=auth_models.GenericAdmin.APP,
-                                                                           entity_type=auth_models.GenericAdmin.DOCTOR,
+                                                                           entity_type=auth_models.GenericAdmin.HOSPITAL,
                                                                            permission_type=auth_models.GenericAdmin.BILLINNG,
                                                                            write_permission=True))
         created_doctor_generic_admins = auth_models.GenericAdmin.objects.bulk_create(generic_admin_obj_list)
@@ -645,20 +657,21 @@ class ProviderSignupDataViewset(viewsets.GenericViewSet):
         created_doctors = self.bulk_create_doctors(doctor_details)
         created_doctor_clinics = self.bulk_create_doctor_clinics(hospital, created_doctors)
         created_doctor_mobiles = self.bulk_create_doctor_mobiles(created_doctors, doctor_details)
+        created_doctor_numbers = self.bulk_create_doctor_phone_number(hospital, created_doctors, doctor_details)
         created_doctor_generic_admins = self.bulk_create_doctor_generic_admins(hospital, created_doctors,
                                                                                doctor_details)
         doctor_model_serializer = serializers.DoctorModelSerializer(created_doctors, many=True)
-        doctor_clinic_model_serializer = serializers.DoctorClinicModelSerializer(created_doctor_clinics,
-                                                                                 many=True)
-        doctor_mobile_model_serializer = serializers.DoctorMobileModelSerializer(created_doctor_mobiles,
-                                                                                 many=True)
+        # doctor_clinic_model_serializer = serializers.DoctorClinicModelSerializer(created_doctor_clinics,
+        #                                                                          many=True)
+        # doctor_mobile_model_serializer = serializers.DoctorMobileModelSerializer(created_doctor_mobiles,
+        #                                                                          many=True)
         doctor_generic_admin_model_serializer = serializers.GenericAdminModelSerializer(created_doctor_generic_admins,
                                                                                         many=True)
         doctors_data = doctor_model_serializer.data
-        doctor_clinics_data = doctor_clinic_model_serializer.data
-        doctors_mobile_data = doctor_mobile_model_serializer.data
+        # doctor_clinics_data = doctor_clinic_model_serializer.data
+        # doctors_mobile_data = doctor_mobile_model_serializer.data
         doctors_generic_admin_data = doctor_generic_admin_model_serializer.data
-        return doctors_data, doctor_clinics_data, doctors_mobile_data, doctors_generic_admin_data
+        return doctors_data, doctors_generic_admin_data
 
     # def hospital_generic_admins_creation_flow(self, hospital, hospital_generic_admin_details):
     #     created_hospital_generic_admins = self.bulk_create_hospital_generic_admins(hospital,
@@ -681,13 +694,15 @@ class ProviderSignupDataViewset(viewsets.GenericViewSet):
         doctor_details = valid_data.get('doctors')
         hospital_generic_admin_details = valid_data.get('staffs')
         doctors_data = None
-        doctor_clinics_data = None
-        doctors_mobile_data = None
+        # doctor_clinics_data = None
+        # doctors_mobile_data = None
         doctors_generic_admin_data = None
         hospital_generic_admins_data = None
         try:
-            hospital = doc_models.Hospital.objects.create(name=valid_data.get('name'), city=valid_data.get('city'),
-                                                          country=valid_data.get('country'),
+            hospital = doc_models.Hospital.objects.create(name=valid_data.get('name'),
+                                                          city=valid_data.get('city', None),
+                                                          state=valid_data.get('state', None),
+                                                          country=valid_data.get('country', None),
                                                           source_type=doc_models.Hospital.PROVIDER)
             hospital_model_serializer = serializers.HospitalModelSerializer(hospital, many=False)
             auth_models.GenericAdmin.objects.create(user=request.user, phone_number=request.user.phone_number,
@@ -698,7 +713,7 @@ class ProviderSignupDataViewset(viewsets.GenericViewSet):
                                                        contact_type=auth_models.SPOCDetails.OTHER,
                                                        content_object=hospital)
             if doctor_details:
-                doctors_data, doctor_clinics_data, doctors_mobile_data, doctors_generic_admin_data = self.doctor_creation_flow(hospital, doctor_details)
+                doctors_data, doctors_generic_admin_data = self.doctor_creation_flow(hospital, doctor_details)
 
             if hospital_generic_admin_details:
                 hospital_generic_admins_data = self.bulk_create_hospital_generic_admins(hospital, hospital_generic_admin_details)
@@ -706,9 +721,9 @@ class ProviderSignupDataViewset(viewsets.GenericViewSet):
             return Response({"status": 1,
                              "hospital": hospital_model_serializer.data,
                              "doctors": doctors_data if doctors_data else None,
-                             "doctor_clinics": doctor_clinics_data if doctor_clinics_data else None,
+                             # "doctor_clinics": doctor_clinics_data if doctor_clinics_data else None,
                              "doctors_generic_admins": doctors_generic_admin_data if doctors_generic_admin_data else None,
-                             "doctors_mobile": doctors_mobile_data if doctors_mobile_data else None,
+                             # "doctors_mobile": doctors_mobile_data if doctors_mobile_data else None,
                              "hospital_generic_admins": hospital_generic_admins_data if hospital_generic_admins_data else None})
         except Exception as e:
             logger.error('Error creating Hospital: ' + str(e))
@@ -721,13 +736,13 @@ class ProviderSignupDataViewset(viewsets.GenericViewSet):
         hospital = valid_data.get('hospital_id')
         doctor_details = valid_data.get("doctors", [])
         try:
-            doctors_data, doctor_clinics_data, doctors_mobile_data, doctors_generic_admin_data = self.doctor_creation_flow(
-                hospital, doctor_details)
+            doctors_data, doctors_generic_admin_data = self.doctor_creation_flow(hospital, doctor_details)
             return Response({"status": 1,
                              "doctors": doctors_data if doctors_data else None,
-                             "doctor_clinics": doctor_clinics_data if doctor_clinics_data else None,
+                             # "doctor_clinics": doctor_clinics_data if doctor_clinics_data else None,
                              "doctors_generic_admins": doctors_generic_admin_data if doctors_generic_admin_data else None,
-                             "doctors_mobile": doctors_mobile_data if doctors_mobile_data else None,})
+                             # "doctors_mobile": doctors_mobile_data if doctors_mobile_data else None,
+                            })
         except Exception as e:
             logger.error('Error adding Doctors ' + str(e))
             return Response({"status": 0, "message": "Error adding Doctors - " + str(e)}, status.HTTP_400_BAD_REQUEST)
