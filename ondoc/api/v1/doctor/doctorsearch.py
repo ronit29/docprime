@@ -121,18 +121,11 @@ class DoctorSearchHelper:
 
         if self.query_params.get("is_available"):
             current_time = datetime.now()
-            ist_time = current_time.strftime("%H:%M:%S")
             current_hour = round(float(current_time.hour) + (float(current_time.minute)*1/60), 2) + .75
-            query_str = '((dl.id is NULL) OR ' \
-                        '(current_date BETWEEN dl.start_date and dl.end_date ' \
-                        'AND (%(ist_time)s) NOT BETWEEN dl.start_time and dl.end_time)' \
-                        ' OR current_date not between dl.start_date and dl.end_date)'
-            filtering_params.append(query_str)
             filtering_params.append(
-                'dct.day=(%(current_time)s) and dct.end>=(%(current_hour)s)')
+                'dl.id is NULL and dct.day=(%(current_time)s) and dct.end>=(%(current_hour)s)')
             params['current_time'] = str(current_time.weekday())
             params['current_hour'] = str(current_hour)
-            params['ist_time'] = str(ist_time)
 
         if self.query_params.get("doctor_name"):
             name = self.query_params.get("doctor_name").lower().strip()
@@ -226,6 +219,8 @@ class DoctorSearchHelper:
     def prepare_raw_query(self, filtering_params, order_by_field, rank_by):
         longitude = str(self.query_params["longitude"])
         latitude = str(self.query_params["latitude"])
+        ist_time = datetime.now().strftime("%H:%M:%S")
+
         max_distance = str(
             self.query_params.get('max_distance') * 1000 if self.query_params.get(
                 'max_distance') and self.query_params.get(
@@ -316,7 +311,8 @@ class DoctorSearchHelper:
             "and d.is_test_doctor is False and d.is_internal is False " \
             "INNER JOIN hospital h ON h.id = dc.hospital_id and h.is_live=true " \
             "INNER JOIN doctor_clinic_timing dct ON dc.id = dct.doctor_clinic_id " \
-            "LEFT JOIN doctor_leave dl on dl.doctor_id = d.id " \
+            "LEFT JOIN doctor_leave dl on dl.doctor_id = d.id and current_date BETWEEN dl.start_date and dl.end_date " \
+            "AND (%(ist_time)s) BETWEEN dl.start_time and dl.end_time" \
             "{sp_cond}" \
             "WHERE {filtering_params} " \
             "and St_dwithin(St_setsrid(St_point((%(longitude)s), (%(latitude)s)), 4326 ), h.location, (%(max_distance)s)) " \
@@ -332,11 +328,13 @@ class DoctorSearchHelper:
             filtering_params.get('params')['latitude'] = latitude
             filtering_params.get('params')['min_distance'] = min_distance
             filtering_params.get('params')['max_distance'] = max_distance
+            filtering_params.get('params')['ist_time'] = ist_time
         else:
-             filtering_params['params']['longitude'] = longitude
-             filtering_params['params']['latitude'] = latitude
-             filtering_params['params']['min_distance'] = min_distance
-             filtering_params['params']['max_distance'] = max_distance
+            filtering_params['params']['longitude'] = longitude
+            filtering_params['params']['latitude'] = latitude
+            filtering_params['params']['min_distance'] = min_distance
+            filtering_params['params']['max_distance'] = max_distance
+            filtering_params.get('params')['ist_time'] = ist_time
 
         return {'params':filtering_params.get('params'), 'query': query_string}
 
