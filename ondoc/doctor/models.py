@@ -33,7 +33,7 @@ from ondoc.notification import tasks as notification_tasks
 from django.contrib.contenttypes.fields import GenericRelation
 from ondoc.api.v1.utils import get_start_end_datetime, custom_form_datetime, CouponsMixin, aware_time_zone, \
     form_time_slot, util_absolute_url, html_to_pdf
-from ondoc.common.models import AppointmentHistory, AppointmentMaskNumber, Service
+from ondoc.common.models import AppointmentHistory, AppointmentMaskNumber, Service, Remark, MatrixMappedState, MatrixMappedCity
 from functools import reduce
 from operator import or_
 import logging
@@ -48,7 +48,8 @@ import hashlib
 from django.contrib.contenttypes.fields import GenericRelation
 from django.contrib.contenttypes.fields import GenericForeignKey
 from django.contrib.contenttypes.models import ContentType
-from ondoc.matrix.tasks import push_appointment_to_matrix, push_onboarding_qcstatus_to_matrix
+from ondoc.matrix.tasks import push_appointment_to_matrix, push_onboarding_qcstatus_to_matrix, \
+    update_onboarding_qcstatus_to_matrix, create_or_update_lead_on_matrix
 # from ondoc.procedure.models import Procedure
 from ondoc.ratings_review import models as ratings_models
 from django.utils import timezone
@@ -57,7 +58,7 @@ import reversion
 from ondoc.doctor import models as doctor_models
 from django.db.models import Count
 from ondoc.api.v1.utils import RawSql
-
+from safedelete import SOFT_DELETE
 logger = logging.getLogger(__name__)
 
 
@@ -124,7 +125,7 @@ class MedicalService(auth_model.TimeStampedModel, UniqueNameModel):
         db_table = "medical_service"
 
 
-class Hospital(auth_model.TimeStampedModel, auth_model.CreatedByModel, auth_model.QCModel, SearchKey):
+class Hospital(auth_model.TimeStampedModel, auth_model.CreatedByModel, auth_model.QCModel, SearchKey, auth_model.SoftDelete, auth_model.WelcomeCallingDone):
     PRIVATE = 1
     CLINIC = 2
     HOSPITAL = 3
@@ -138,12 +139,14 @@ class Hospital(auth_model.TimeStampedModel, auth_model.CreatedByModel, auth_mode
     CHARGES_ISSUES = 4
     DUPLICATE = 5
     OTHERS = 9
+    PHONE_RINGING_BUT_COULD_NOT_CONNECT = 10
     WELCOME_CALLING = 1
     ESCALATION = 2
     DISABLED_REASONS_CHOICES = (
         ("", "Select"), (INCORRECT_CONTACT_DETAILS, "Incorrect contact details"),
         (MOU_AGREEMENT_NEEDED, "MoU agreement needed"), (HOSPITAL_NOT_INTERESTED, "Hospital not interested for tie-up"),
         (CHARGES_ISSUES, "Issue in discount % / consultation charges"),
+        (PHONE_RINGING_BUT_COULD_NOT_CONNECT, "Phone ringing but could not connect"),
         (DUPLICATE, "Duplicate"), (OTHERS, "Others (please specify)"))
     DISABLED_AFTER_CHOICES = (("", "Select"), (WELCOME_CALLING, "Welcome Calling"), (ESCALATION, "Escalation"))
     name = models.CharField(max_length=200)
@@ -158,6 +161,8 @@ class Hospital(auth_model.TimeStampedModel, auth_model.CreatedByModel, auth_mode
     locality = models.CharField(max_length=100, blank=True)
     city = models.CharField(max_length=100)
     state = models.CharField(max_length=100, blank=True)
+    matrix_state = models.ForeignKey(MatrixMappedState, null=True, blank=False, on_delete=models.DO_NOTHING, related_name='hospitals_in_state', verbose_name='State')
+    matrix_city = models.ForeignKey(MatrixMappedCity, null=True, blank=False, on_delete=models.DO_NOTHING, related_name='hospitals_in_city', verbose_name='City')
     country = models.CharField(max_length=100)
     pin_code = models.PositiveIntegerField(blank=True, null=True)
     hospital_type = models.PositiveSmallIntegerField(blank=True, null=True, choices=HOSPITAL_TYPE_CHOICES)
@@ -178,8 +183,8 @@ class Hospital(auth_model.TimeStampedModel, auth_model.CreatedByModel, auth_mode
     enabled_for_online_booking = models.BooleanField(verbose_name='enabled_for_online_booking?', default=True)
     merchant = GenericRelation(auth_model.AssociatedMerchant)
     merchant_payout = GenericRelation(MerchantPayout)
-    welcome_calling_done = models.BooleanField(default=False)
-    welcome_calling_done_at = models.DateTimeField(null=True, blank=True)
+    # welcome_calling_done = models.BooleanField(default=False)
+    # welcome_calling_done_at = models.DateTimeField(null=True, blank=True)
     physical_agreement_signed = models.BooleanField(default=False)
     physical_agreement_signed_at = models.DateTimeField(null=True, blank=True)
     disabled_at = models.DateTimeField(null=True, blank=True)
@@ -195,12 +200,23 @@ class Hospital(auth_model.TimeStampedModel, auth_model.CreatedByModel, auth_mode
                                                         through='HealthInsuranceProviderHospitalMapping',
                                                         through_fields=('hospital', 'provider'),
                                                         related_name='available_in_hospital')
+    open_for_communication = models.BooleanField(default=True)
+    bed_count = models.PositiveIntegerField(null=True, blank=True, default=None)
+
+    remark = GenericRelation(Remark)
+    matrix_lead_id = models.BigIntegerField(blank=True, null=True, unique=True)
 
     def __str__(self):
         return self.name
 
     class Meta:
         db_table = "hospital"
+
+    def open_for_communications(self):
+        if (self.network and self.network.open_for_communication) or (not self.network and self.open_for_communication):
+            return True
+
+        return False
 
     def get_thumbnail(self):
         return None
@@ -270,6 +286,15 @@ class Hospital(auth_model.TimeStampedModel, auth_model.CreatedByModel, auth_mode
         # if self.is_live and self.id and self.location:
         #     if Hospital.objects.filter(location__distance_lte=(self.location, 0), id=self.id).exists():
         #         build_url = False
+
+        push_to_matrix = False
+        update_status_in_matrix = False
+        if self.id:
+            hospital_obj = Hospital.objects.filter(pk=self.id).first()
+            if hospital_obj and self.data_status != hospital_obj.data_status:
+                update_status_in_matrix = True
+        else:
+            push_to_matrix = True
         super(Hospital, self).save(*args, **kwargs)
         if self.is_appointment_manager:
             auth_model.GenericAdmin.objects.filter(hospital=self, entity_type=auth_model.GenericAdmin.DOCTOR, permission_type=auth_model.GenericAdmin.APPOINTMENT)\
@@ -279,6 +304,17 @@ class Hospital(auth_model.TimeStampedModel, auth_model.CreatedByModel, auth_mode
                 .update(is_disabled=False)
         # if build_url and self.location and self.is_live:
         #     ea = location_models.EntityLocationRelationship.create(latitude=self.location.y, longitude=self.location.x, content_object=self)
+        transaction.on_commit(lambda: self.app_commit_tasks(push_to_matrix=push_to_matrix,
+                                                            update_status_in_matrix=update_status_in_matrix))
+
+    def app_commit_tasks(self, push_to_matrix=False, update_status_in_matrix=False):
+        if push_to_matrix:
+            create_or_update_lead_on_matrix.apply_async(({'obj_type': self.__class__.__name__, 'obj_id': self.id}
+                                                         ,), countdown=5)
+
+        if update_status_in_matrix:
+            update_onboarding_qcstatus_to_matrix.apply_async(({'obj_type': self.__class__.__name__, 'obj_id': self.id}
+                                                              ,), countdown=5)
 
     def get_spocs_for_communication(self):
         result = []
@@ -379,7 +415,7 @@ class College(auth_model.TimeStampedModel):
         db_table = "college"
 
 
-class Doctor(auth_model.TimeStampedModel, auth_model.QCModel, SearchKey):
+class Doctor(auth_model.TimeStampedModel, auth_model.QCModel, SearchKey, auth_model.SoftDelete):
     SOURCE_PRACTO = "pr"
     SOURCE_CRM = 'crm'
 
@@ -398,6 +434,7 @@ class Doctor(auth_model.TimeStampedModel, auth_model.QCModel, SearchKey):
     CHARGES_ISSUES = 7
     DUPLICATE = 8
     OTHERS = 9
+    PHONE_RINGING_BUT_COULD_NOT_CONNECT = 10
     DISABLE_REASON_CHOICES = (
         ("", "Select"), (DOCTOR_NOT_ASSOCIATED, "Doctor not associated with the hospital anymore"),
         (DOCTOR_ONLY_FOR_IPD_SERVICES, "Doctor only for IPD services"),
@@ -405,7 +442,8 @@ class Doctor(auth_model.TimeStampedModel, auth_model.QCModel, SearchKey):
         (INCORRECT_CONTACT_DETAILS, "Incorrect contact details"), (MOU_AGREEMENT_NEEDED, "MoU agreement needed"),
         (DOCTOR_NOT_INTERESTED_FOR_TIE_UP, "Doctor not interested for tie-up"),
         (CHARGES_ISSUES, "Issue in discount % / consultation charges"),
-        (DUPLICATE, "Duplicate"), (OTHERS, "Others (please specify)"))
+        (PHONE_RINGING_BUT_COULD_NOT_CONNECT, "Phone ringing but could not connect"), (DUPLICATE, "Duplicate"),
+        (OTHERS, "Others (please specify)"))
     name = models.CharField(max_length=200)
     gender = models.CharField(max_length=2, default=None, blank=True, null=True,
                               choices=GENDER_CHOICES)
@@ -463,6 +501,7 @@ class Doctor(auth_model.TimeStampedModel, auth_model.QCModel, SearchKey):
     disabled_by = models.ForeignKey(settings.AUTH_USER_MODEL, related_name="disabled_doctors", null=True, editable=False,
                                    on_delete=models.SET_NULL)
     avg_rating = models.DecimalField(max_digits=5, decimal_places=2, null=True, editable=False)
+    remark = GenericRelation(Remark)
 
     def __str__(self):
         return '{} ({})'.format(self.name, self.id)
@@ -564,24 +603,36 @@ class Doctor(auth_model.TimeStampedModel, auth_model.QCModel, SearchKey):
         self.update_time_stamps()
         self.update_live_status()
         self.update_deal_price()
-
+        request_agent_lead_id = self.request_agent_lead_id if hasattr(self, 'request_agent_lead_id') else None
         # On every update of onboarding status or Qcstatus push to matrix
         push_to_matrix = False
+        update_status_in_matrix = False
         if self.id:
             doctor_obj = Doctor.objects.filter(pk=self.id).first()
-            if doctor_obj and (self.onboarding_status!=doctor_obj.onboarding_status or
-                  self.data_status !=doctor_obj.data_status):
-                # Push to matrix
-                push_to_matrix = True
+            if doctor_obj and (self.onboarding_status != doctor_obj.onboarding_status or
+                               self.data_status != doctor_obj.data_status):
+                update_status_in_matrix = True
+        else:
+            push_to_matrix = True
 
         super(Doctor, self).save(*args, **kwargs)
 
-        transaction.on_commit(lambda: self.app_commit_tasks(push_to_matrix))
+        transaction.on_commit(lambda: self.app_commit_tasks(push_to_matrix=push_to_matrix,
+                                                            update_status_in_matrix=update_status_in_matrix,
+                                                            request_agent_lead_id=request_agent_lead_id))
 
-    def app_commit_tasks(self, push_to_matrix):
+    def app_commit_tasks(self, push_to_matrix=False, update_status_in_matrix=False, request_agent_lead_id=None):
         if push_to_matrix:
-            push_onboarding_qcstatus_to_matrix.apply_async(({'obj_type': self.__class__.__name__, 'obj_id': self.id}
-                                                            ,), countdown=5)
+            # push_onboarding_qcstatus_to_matrix.apply_async(({'obj_type': self.__class__.__name__, 'obj_id': self.id}
+            #                                                 ,), countdown=5)
+            create_or_update_lead_on_matrix.apply_async(({'obj_type': self.__class__.__name__, 'obj_id': self.id,
+                                                          'request_agent_lead_id': request_agent_lead_id}
+                                                         ,), countdown=5)
+
+        if update_status_in_matrix:
+            update_onboarding_qcstatus_to_matrix.apply_async(({'obj_type': self.__class__.__name__, 'obj_id': self.id}
+                                                              ,), countdown=5)
+
     @classmethod
     def update_avg_rating(cls):
         from django.db import connection
@@ -1090,7 +1141,7 @@ class DoctorEmail(auth_model.TimeStampedModel):
         unique_together = (("doctor", "email"),)
 
 
-class HospitalNetwork(auth_model.TimeStampedModel, auth_model.CreatedByModel, auth_model.QCModel):
+class HospitalNetwork(auth_model.TimeStampedModel, auth_model.CreatedByModel, auth_model.QCModel, auth_model.WelcomeCallingDone):
     name = models.CharField(max_length=100)
     operational_since = models.PositiveSmallIntegerField(blank=True, null=True, validators=[MinValueValidator(1900)])
     about = models.CharField(max_length=2000, blank=True)
@@ -1100,6 +1151,10 @@ class HospitalNetwork(auth_model.TimeStampedModel, auth_model.CreatedByModel, au
     locality = models.CharField(max_length=100, blank=True)
     city = models.CharField(max_length=100)
     state = models.CharField(max_length=100)
+    matrix_state = models.ForeignKey(MatrixMappedState, null=True, blank=False, on_delete=models.DO_NOTHING,
+                                     related_name='hospital_networks_in_state', verbose_name='State')
+    matrix_city = models.ForeignKey(MatrixMappedCity, null=True, blank=False, on_delete=models.DO_NOTHING,
+                                    related_name='hospital_networks_in_city', verbose_name='City')
     country = models.CharField(max_length=100)
     pin_code = models.PositiveIntegerField(blank=True, null=True)
     is_billing_enabled = models.BooleanField(verbose_name='Enabled for Billing', default=False)
@@ -1109,6 +1164,38 @@ class HospitalNetwork(auth_model.TimeStampedModel, auth_model.CreatedByModel, au
     billing_merchant = GenericRelation(auth_model.BillingAccount)
     spoc_details = GenericRelation(auth_model.SPOCDetails)
     merchant = GenericRelation(auth_model.AssociatedMerchant)
+    open_for_communication = models.BooleanField(default=True)    
+    matrix_lead_id = models.BigIntegerField(blank=True, null=True, unique=True)
+    remark = GenericRelation(Remark)
+
+    def update_time_stamps(self):
+        if self.welcome_calling_done and not self.welcome_calling_done_at:
+            self.welcome_calling_done_at = timezone.now()
+        elif not self.welcome_calling_done and self.welcome_calling_done_at:
+            self.welcome_calling_done_at = None
+
+    def save(self, *args, **kwargs):
+        self.update_time_stamps()
+        push_to_matrix = False
+        update_status_in_matrix = False
+        if self.id:
+            hospital_network_obj = HospitalNetwork.objects.filter(pk=self.id).first()
+            if hospital_network_obj and self.data_status != hospital_network_obj.data_status:
+                update_status_in_matrix = True
+        else:
+            push_to_matrix = True
+        super().save(*args, **kwargs)
+        transaction.on_commit(lambda: self.app_commit_tasks(push_to_matrix=push_to_matrix,
+                                                            update_status_in_matrix=update_status_in_matrix))
+
+    def app_commit_tasks(self, push_to_matrix=False, update_status_in_matrix=False):
+        if push_to_matrix:
+            create_or_update_lead_on_matrix.apply_async(({'obj_type': self.__class__.__name__, 'obj_id': self.id}
+                                                         ,), countdown=5)
+
+        if update_status_in_matrix:
+            update_onboarding_qcstatus_to_matrix.apply_async(({'obj_type': self.__class__.__name__, 'obj_id': self.id}
+                                                              ,), countdown=5)
 
     def __str__(self):
         return self.name

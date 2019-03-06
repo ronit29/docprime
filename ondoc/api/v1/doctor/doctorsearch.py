@@ -184,7 +184,7 @@ class DoctorSearchHelper:
                                              or self.query_params.get('sort_on')=='distance'):
             return ' enabled_for_online_booking DESC, distance, priority desc ', ' rnk=1 '
 
-        bucket_size=5000
+        bucket_size=2000
 
         if self.count_of_procedure:
             order_by_field = ' distance, total_price '
@@ -202,7 +202,7 @@ class DoctorSearchHelper:
             else:
                 order_by_field = " floor(distance/{bucket_size}) ASC, distance, total_price ASC".format(bucket_size=str(bucket_size))
                 rank_by = "rnk=1"
-            order_by_field = "{}, {} ".format(' enabled_for_online_booking DESC, welcome_calling_done DESC ' ,order_by_field)
+            order_by_field = "{}, {} ".format(' enabled_for_online_booking DESC ', order_by_field)
         else:
             if self.query_params.get('sort_on'):
                 if self.query_params.get('sort_on') == 'experience':
@@ -215,10 +215,10 @@ class DoctorSearchHelper:
                     order_by_field = " distance ASC, deal_price ASC, priority desc "
                     rank_by = " rnk=1 "
             else:
-                order_by_field = ' floor(distance/{bucket_size}) ASC, is_license_verified DESC, search_score desc '.format(bucket_size=str(bucket_size))
+                order_by_field = ' welcome_calling_done DESC, floor(distance/{bucket_size}) ASC, is_license_verified DESC, search_score desc '.format(bucket_size=str(bucket_size))
                 rank_by = "rnk=1"
 
-            order_by_field = "{}, {} ".format(' enabled_for_online_booking DESC, welcome_calling_done DESC ', order_by_field)
+            order_by_field = "{}, {} ".format(' enabled_for_online_booking DESC ', order_by_field)
 
         return order_by_field, rank_by
 
