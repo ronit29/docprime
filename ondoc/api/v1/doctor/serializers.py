@@ -1612,6 +1612,7 @@ class HospitalDetailIpdProcedureSerializer(TopHospitalForIpdProcedureSerializer)
                   'multi_speciality', 'address',
                   'lat', 'long', 'about', 'services', 'images', 'ipd_procedure_categories', 'other_network_hospitals',
                   'doctors', 'rating_graph',
+                  # TODO : SHASHANK_SINGH hospital timings
                   )
 
     def get_lat(self, obj):
@@ -1627,8 +1628,7 @@ class HospitalDetailIpdProcedureSerializer(TopHospitalForIpdProcedureSerializer)
     def get_about(self, obj):
         if obj.network:
             return obj.network.about
-        # TODO: SHASHANK_SINGH about per hospital
-        return ''
+        return obj.about
 
     def get_services(self, obj):
         request = self.context.get('request')

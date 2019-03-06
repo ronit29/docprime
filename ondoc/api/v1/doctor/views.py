@@ -1556,6 +1556,7 @@ class DoctorListViewSet(viewsets.GenericViewSet):
 
         validated_data.get('procedure_categories', [])
         procedures = list(Procedure.objects.filter(pk__in=validated_data.get('procedure_ids', [])).values('id', 'name'))
+        ipd_procedures = list(IpdProcedure.objects.filter(pk__in=validated_data.get('ipd_procedure_ids', [])).values('id', 'name'))
         procedure_categories = list(ProcedureCategory.objects.filter(pk__in=validated_data.get('procedure_category_ids', [])).values('id', 'name'))
         conditions = list(models.MedicalCondition.objects.filter(id__in=validated_data.get('condition_ids',[])).values('id','name'));
         if validated_data.get('ratings'):
@@ -1567,7 +1568,8 @@ class DoctorListViewSet(viewsets.GenericViewSet):
                          "breadcrumb": breadcrumb, 'search_content': top_content,
                          'procedures': procedures, 'procedure_categories': procedure_categories,
                          'ratings':ratings, 'reviews': reviews, 'ratings_title': ratings_title,
-                         'bottom_content': bottom_content, 'canonical_url': canonical_url})
+                         'bottom_content': bottom_content, 'canonical_url': canonical_url,
+                         'ipd_procedures': ipd_procedures})
 
     @transaction.non_atomic_requests
     def search_by_hospital(self, request):
@@ -3187,7 +3189,6 @@ class HospitalViewSet(viewsets.GenericViewSet):
             return Response([], status=status.HTTP_400_BAD_REQUEST)
         lat = validated_data.get('lat')
         long = validated_data.get('long')
-        # TODO: SHASHANK_SINGH Add min_distance, max_distance filter
         min_distance = validated_data.get('min_distance')
         max_distance = validated_data.get('max_distance')
         max_distance = max_distance * 1000 if max_distance is not None else 10000
