@@ -14,16 +14,6 @@ class Command(BaseCommand):
         visits = track_models.TrackingVisit.objects.all()[0:visits_count]
         visitors = track_models.TrackingVisitor.objects.all()[0:visitors_count]
 
-        last_migrate_ts = MigrateTracker.objects.first()
-        if not last_migrate_ts:
-            print("Specify from where to start Migration")
-            return
-        migration_start_time = last_migrate_ts.start_time
-        migration_end_time =  migration_start_time - timedelta(hours = 1)
-
-        events = track_models.TrackingEvent.objects.filter(created_at__lte=migration_start_time,
-                                                           created_at__gte=migration_end_time).order_by('-created_at')
-
         # storing visitors
         for visitor in visitors.iterator(chunk_size=2000):
             mongo_visitor = track_mongo_models.TrackingVisitor.objects.filter(id=visitor.id).first()
@@ -50,29 +40,7 @@ class Command(BaseCommand):
 
         print("DONE MIGRATING VISITS")
 
-        # storing events
-        stored_all_events = True
-        for event in events.iterator(chunk_size=1000):
-            try:
-                mongo_event = track_mongo_models.TrackingEvent.objects.filter(id=event.id).first()
-                if not mongo_event:
-                    eventJson = {"id": event.id, "name": event.name, "visit_id": event.visit_id, "user": event.user_id,
-                                 "created_at": event.created_at, "updated_at": event.updated_at}
 
-                    if event.data:
-                        eventJson = { **eventJson , **event.data }
 
-                    mongo_event = track_mongo_models.TrackingEvent(**eventJson)
-                    mongo_event.save()
-            except:
-                last_migrate_ts.start_time = event.created_at
-                stored_all_events = False
-                break
-
-        if stored_all_events and events:
-            last_migrate_ts.start_time = events.last().created_at
-        last_migrate_ts.save()
-
-        print("DONE MIGRATING EVENTS - upto - " + str(last_migrate_ts.start_time))
 
 
