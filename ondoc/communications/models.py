@@ -616,6 +616,21 @@ class WHTSAPPNotification:
         user = receiver.get('user')
         phone_number = receiver.get('phone_number')
         notification_type = self.notification_type
+
+        context = copy.deepcopy(context)
+
+        instance = context.get('instance')
+        receiver_user = receiver.get('user')
+
+        # Hospital and labs which has the flag open to communication, send notificaiton to them only.
+        if (instance.__class__.__name__ == LabAppointment.__name__) and (not receiver_user or receiver_user.user_type == User.DOCTOR):
+            if not instance.lab.open_for_communications():
+                return
+
+        if (instance.__class__.__name__ == OpdAppointment.__name__) and (not receiver_user or receiver_user.user_type == User.DOCTOR):
+            if instance.hospital and not instance.hospital.open_for_communications():
+                return
+
         if phone_number and user and user.user_type == User.DOCTOR and notification_type in [
             NotificationAction.LAB_APPOINTMENT_CANCELLED,
             NotificationAction.LAB_APPOINTMENT_BOOKED,
