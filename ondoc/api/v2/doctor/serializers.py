@@ -206,9 +206,9 @@ class BulkCreateDoctorSerializer(serializers.Serializer):
     is_superuser = serializers.BooleanField(default=False)
 
     def validate(self, attrs):
-        if not (attrs.get('is_appointment') or attrs.get('is_billing') or attrs.get('is_superuser')):
-            raise serializers.ValidationError('permission type or super user access not given')
-        elif not attrs.get('phone_number'):
+        # if not (attrs.get('is_appointment') or attrs.get('is_billing') or attrs.get('is_superuser')):
+        #     raise serializers.ValidationError('permission type or super user access not given')
+        if (attrs.get('is_appointment') or attrs.get('is_billing') or attrs.get('is_superuser')) and not attrs.get('phone_number'):
             raise serializers.ValidationError('permission type or super user access given, but phone number not provided')
         return attrs
 
