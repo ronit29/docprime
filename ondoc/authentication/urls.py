@@ -8,6 +8,5 @@ urlpatterns = [
     path('user/otp/generate',views.generate_otp_user),
     path('user/login',views.login_user),
     path('user/register',views.register_user),
-    path('logout',views.logout),
-    path('upcoming/appointments/',views.upcoming_appointments)
+    path('logout',views.logout)
 ]

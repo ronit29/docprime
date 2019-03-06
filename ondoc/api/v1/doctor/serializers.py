@@ -1506,3 +1506,17 @@ class AppointmentMessageSerializer(serializers.Serializer):
             raise serializers.ValidationError('Appointment Id Not Found')
         attrs['appointment'] = query.first()
         return attrs
+
+
+class OpdAppointmentUpcoming(OpdAppointmentSerializer):
+    address = serializers.SerializerMethodField()
+    provider_id = serializers.IntegerField(source='doctor.id')
+    name = serializers.ReadOnlyField(source='doctor.name')
+
+    class Meta:
+        model = OpdAppointment
+        fields = ('id', 'provider_id', 'name', 'hospital_name', 'patient_name', 'type',
+                  'status', 'time_slot_start', 'time_slot_end', 'address')
+
+    def get_address(self, obj):
+        return obj.hospital.get_hos_address()

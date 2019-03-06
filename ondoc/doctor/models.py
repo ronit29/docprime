@@ -57,6 +57,7 @@ import reversion
 from ondoc.doctor import models as doctor_models
 from django.db.models import Count
 from ondoc.api.v1.utils import RawSql
+#from ondoc.api.v1.doctor import serializers as doctor_serializers
 
 logger = logging.getLogger(__name__)
 
@@ -1369,6 +1370,19 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
                 if invoice.file:
                     invoices_urls.append(util_absolute_url(invoice.file.url))
         return invoices_urls
+
+    # @staticmethod
+    # def get_upcoming_appointment_serialized(user_id):
+    #     response_appointment = OpdAppointment.get_upcoming_appointment(user_id)
+    #     appointment = doctor_serializers.OpdAppointmentUpcoming(response_appointment, many=True)
+    #     return appointment.data
+
+    @classmethod
+    def get_upcoming_appointment(cls, user_id):
+        current_time = timezone.now()
+        appointments = OpdAppointment.objects.filter(time_slot_start__gte=current_time, user_id=user_id).exclude(
+            status__in=[OpdAppointment.CANCELLED, OpdAppointment.COMPLETED]).select_related('doctor', 'hospital','profile')
+        return appointments
 
     @classmethod
     def create_appointment(cls, appointment_data):

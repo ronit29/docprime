@@ -1263,3 +1263,21 @@ class RecommendedPackageCategoryList(serializers.ModelSerializer):
     class Meta:
         model = LabTestCategory
         fields = ('id', 'name', 'tests', 'icon')
+
+
+class LabAppointmentUpcoming(LabAppointmentModelSerializer):
+    address = serializers.SerializerMethodField()
+    provider_id = serializers.IntegerField(source='lab.id')
+    name = serializers.ReadOnlyField(source='lab.name')
+    hospital_name = serializers.SerializerMethodField()
+
+    class Meta:
+        model = LabAppointment
+        fields = ('id', 'provider_id', 'name', 'hospital_name', 'patient_name', 'type',
+                  'status', 'time_slot_start', 'time_slot_end', 'address')
+
+    def get_address(self, obj):
+        return obj.lab.get_lab_address()
+
+    def get_hospital_name(self, obj):
+        return None
