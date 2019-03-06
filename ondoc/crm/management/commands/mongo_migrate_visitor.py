@@ -6,11 +6,11 @@ from datetime import datetime, timedelta
 
 class Command(BaseCommand):
 
-    help = 'Migrate Old tracking events from psql into mongo'
+    help = 'Migrate Old tracking data from psql into mongo'
 
     def handle(self, *args, **options):
 
-        class EventMigrateIterator():
+        class VisitorMigrateIterator():
 
             def __init__(self, delta_hours, iter_count_limit):
                 self.delta_hours = delta_hours
@@ -34,8 +34,8 @@ class Command(BaseCommand):
                 self.last_migrate_ts.start_time = self.time_upper_limit
                 self.last_migrate_ts.save()
 
-                events = track_models.TrackingEvent.objects.filter(created_at__lte=self.time_upper_limit,
-                                                                   created_at__gte=self.time_lower_limit)
+                visitors = track_models.TrackingVisitor.objects.filter(created_at__lte=self.time_upper_limit,
+                                                                       created_at__gte=self.time_lower_limit)
 
                 if self.iter_count >= self.iter_count_limit:
                     raise StopIteration
@@ -45,40 +45,35 @@ class Command(BaseCommand):
                 self.time_upper_limit = self.time_lower_limit
                 self.time_lower_limit = self.time_upper_limit - timedelta(hours=self.delta_hours)
 
-                return events
+                return visitors
 
         total_migrated = 0
         # storing events
         try:
-            for psql_events in EventMigrateIterator(24, 10):
+            for visitors in VisitorMigrateIterator(720, 6):
                 create_objects = []
-                mongo_events = track_mongo_models.TrackingEvent.objects.filter(id__in=[x.id for x in psql_events]).values_list('id')
-                psql_events = psql_events.exclude(id__in=mongo_events)
+                mongo_visitors = track_mongo_models.TrackingVisitor.objects.filter(id__in=[ x.id for x in visitors ]).values_list('id')
+                psql_visitors = visitors.exclude(id__in=mongo_visitors)
 
-                for event in psql_events:
-                    eventJson = {"id": event.id, "name": event.name, "visit_id": event.visit_id, "user": event.user_id,
-                                 "created_at": event.created_at, "updated_at": event.updated_at}
-
-                    if event.data:
-                        eventJson = { **eventJson , **event.data }
-
-                    mongo_event = track_mongo_models.TrackingEvent(**eventJson)
-                    create_objects.append(mongo_event)
+                for visitor in psql_visitors:
+                    visitorJson = {"id": visitor.id, "created_at": visitor.created_at,
+                                   "updated_at": visitor.updated_at}
+                    if visitor.device_info:
+                        visitorJson["device_info"] = visitor.device_info
+                    mongo_visitor = track_mongo_models.TrackingVisitor(**visitorJson)
+                    create_objects.append(mongo_visitor)
                     total_migrated += 1
 
                 if create_objects:
-                    track_mongo_models.TrackingEvent.objects.insert(create_objects)
+                    track_mongo_models.TrackingVisitor.objects.insert(create_objects)
                 print("MIGRATED COUNT : " + str(total_migrated))
-
         except StopIteration:
             pass
         except Exception as e:
-            print("FAILED TO MIGRATE ALL EVENTS")
+            print("FAILED TO MIGRATE VISITORS")
             return
 
-        print("DONE MIGRATING EVENTS")
-
-
+        print("DONE MIGRATING VISITORS")
 
 
 
