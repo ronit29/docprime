@@ -3,6 +3,7 @@ from ondoc.authentication.models import (OtpVerifications, User, UserProfile, No
                                          DoctorNumber, Address, GenericAdmin, UserSecretKey,
                                          UserPermission, Address, GenericAdmin, GenericLabAdmin)
 from ondoc.doctor.models import DoctorMobile, ProviderSignupLead
+from ondoc.common.models import AppointmentHistory
 from ondoc.diagnostic.models import AvailableLabTest
 from ondoc.account.models import ConsumerAccount, Order, ConsumerTransaction
 import datetime, calendar
@@ -162,12 +163,14 @@ class UserProfileSerializer(serializers.ModelSerializer):
     gender = serializers.ChoiceField(choices=GENDER_CHOICES)
     email = serializers.EmailField(required=False, allow_null=True, allow_blank=True)
     profile_image = serializers.SerializerMethodField()
-
+    dob = serializers.DateField(allow_null=True, required=False)
+    whatsapp_optin = serializers.NullBooleanField(required=False)
+    whatsapp_is_declined = serializers.BooleanField(required=False)
 
     class Meta:
         model = UserProfile
         fields = ("id", "name", "email", "gender", "phone_number", "is_otp_verified", "is_default_user",
-                  "profile_image", "age", "user", "dob", "updated_at")
+                  "profile_image", "age", "user", "dob", "updated_at", "whatsapp_optin", "whatsapp_is_declined")
 
     def get_age(self, obj):
         from datetime import date
@@ -247,6 +250,8 @@ class AddressSerializer(serializers.ModelSerializer):
 
 class AppointmentqueryRetrieveSerializer(serializers.Serializer):
     type = serializers.CharField(required=True)
+    source = serializers.ChoiceField(choices=AppointmentHistory.SOURCE_CHOICES, required=False)
+    completed = serializers.BooleanField(required=False)
 
 
 class ConsumerAccountModelSerializer(serializers.ModelSerializer):

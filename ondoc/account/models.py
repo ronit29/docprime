@@ -1,5 +1,7 @@
 from django.db import models
 from django.contrib.postgres.fields import JSONField
+from django.forms import model_to_dict
+
 from ondoc.authentication.models import TimeStampedModel, User, UserProfile, Merchant
 from ondoc.account.tasks import refund_curl_task
 from ondoc.notification.models import AppNotification, NotificationAction
@@ -99,6 +101,10 @@ class Order(TimeStampedModel):
         from ondoc.diagnostic.models import LabAppointment
         from ondoc.api.v1.doctor.serializers import OpdAppTransactionModelSerializer
         from ondoc.api.v1.diagnostic.serializers import LabAppTransactionModelSerializer
+
+        # skip if order already processed
+        if self.reference_id:
+            raise Exception("Order already processed - " + str(self.id))
 
         # Initial validations for appointment data
         appointment_data = self.action_data
@@ -939,6 +945,21 @@ class ConsumerTransaction(TimeStampedModel):
     amount = models.DecimalField(max_digits=10, decimal_places=2, default=0)
     source = models.SmallIntegerField(choices=SOURCE_TYPE, blank=True, null=True)
 
+    def save(self, *args, **kwargs):
+        database_instance = ConsumerTransaction.objects.filter(pk=self.id).first()
+        super().save(*args, **kwargs)
+        transaction.on_commit(lambda: self.app_commit_tasks(database_instance))
+
+    def app_commit_tasks(self, old_instance):
+        from ondoc.notification import tasks as notification_tasks
+        if not old_instance and self.type == PgTransaction.DEBIT and self.action == self.action_list.index('Refund'):
+            try:
+                notification_tasks.refund_breakup_sms_task.apply_async((self.id,), countdown=1)
+            except Exception as e:
+                logger.error(str(e))
+
+
+
     @classmethod
     def valid_appointment_for_cancellation(cls, app_id, product_id):
         return not cls.objects.filter(type=PgTransaction.CREDIT, reference_id=app_id, product_id=product_id,
@@ -963,6 +984,19 @@ class ConsumerRefund(TimeStampedModel):
     pg_transaction = models.ForeignKey(PgTransaction, related_name='pg_refund', blank=True, null=True, on_delete=models.DO_NOTHING)
     refund_state = models.PositiveSmallIntegerField(choices=state_type, default=PENDING)
     refund_initiated_at = models.DateTimeField(blank=True, null=True)
+
+    def save(self, *args, **kwargs):
+        database_instance = ConsumerRefund.objects.filter(pk=self.id).first()
+        super().save(*args, **kwargs)
+        transaction.on_commit(lambda: self.app_commit_tasks(database_instance))
+
+    def app_commit_tasks(self, old_instance):
+        from ondoc.notification import tasks as notification_tasks
+        if old_instance and old_instance.refund_state != self.refund_state and self.refund_state == self.COMPLETED:
+            try:
+                notification_tasks.refund_completed_sms_task.apply_async((self.id,), countdown=1)
+            except Exception as e:
+                logger.error(str(e))
 
     @classmethod
     def initiate_refund(cls, user, ctx_obj):
@@ -1284,3 +1318,13 @@ class UserReferred(TimeStampedModel):
     class Meta:
         db_table = "user_referred"
 
+
+class PgLogs(TimeStampedModel):
+    decoded_response = JSONField(blank=True, null=True)
+    coded_response = models.TextField(blank=True, null=True)
+
+    def __str__(self):
+        return "{}".format(self.id)
+
+    class Meta:
+        db_table = "pg_log"

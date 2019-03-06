@@ -1,4 +1,5 @@
 from django.contrib.gis.db import models
+from django.contrib.gis.geos import Point
 from django.contrib.postgres.fields import JSONField
 
 from ondoc.authentication import models as auth_model
@@ -10,6 +11,17 @@ import re
 from urllib.parse import urlparse
 from django.http import QueryDict
 from django.utils import timezone
+from django.db.models import Q
+
+
+class SliderLocation(models.Model):
+    name = models.CharField(max_length=1000, null=True, default='Home_Page')
+
+    def __str__(self):
+        return self.name
+
+    class Meta:
+        db_table = 'slider_location'
 
 
 class Banner(auth_model.TimeStampedModel):
@@ -26,14 +38,14 @@ class Banner(auth_model.TimeStampedModel):
     PACKAGE = 4
     PROCEDURE = 5
     OFFERS_PAGE = 6
-
     slider_location = [(HOME_PAGE, 'home_page'), (DOCTOR_RESULT, 'doctor_search_page'), (LAB_RESULT, 'lab_search_page'), (PROCEDURE, 'procedure_search_page'), (PACKAGE, 'package_search_page'),
                        (OFFERS_PAGE, 'offers_page')]
+    location = models.ForeignKey(SliderLocation, on_delete=models.CASCADE, null=True, blank=True)
     title = models.CharField(max_length=500)
     image = models.ImageField('Banner image', upload_to='banner/images')
     url = models.URLField(max_length=10000, null=True, blank=True)
     priority = models.PositiveIntegerField(blank=True, null=True, default=0)
-    slider_locate = models.SmallIntegerField(choices=slider_location)
+    slider_locate = models.SmallIntegerField(choices=slider_location, default=1, null=True, blank=True) # Do not use
     slider_action = models.SmallIntegerField(choices=slider_choice, null=True, blank=True)
     object_id = models.PositiveIntegerField(null=True, blank=True)
     start_date = models.DateTimeField(null=True, blank=True)
@@ -42,6 +54,7 @@ class Banner(auth_model.TimeStampedModel):
     event_name = models.CharField(max_length=1000)
     latitude = models.FloatField(null=True, blank=True)
     longitude = models.FloatField(null=True, blank=True)
+    radius = models.FloatField(null=True, blank=True)
     show_in_app = models.BooleanField(default=True)
     app_screen = models.CharField(max_length=1000, null=True, blank=True)
     app_params = JSONField(null=True, blank=True)
@@ -51,26 +64,34 @@ class Banner(auth_model.TimeStampedModel):
         return self.title
 
     def save(self, force_insert=False, force_update=False, using=None, update_fields=None):
-        slider_locate_choices = dict(self.slider_location)
+        # slider_locate_choices = dict(self.location.name)
         # self.event_name = self.title+'_'+ str(slider_locate[self.slider_locate])
-        self.event_name = '_'.join(self.title.lower().split())\
-                          + '_' \
-                          + '_'.join(
-            str(slider_locate_choices[self.slider_locate]).lower().split())
-        super().save(force_insert, force_update, using, update_fields)
+        if self.location.name:
+            self.event_name = '_'.join(self.title.lower().split())\
+                              + '_' \
+                              + '_'.join(
+                self.location.name.lower().split())
+            # self.slider_locate = self.location.name
+            super().save(force_insert, force_update, using, update_fields)
+        else:
+            super().save(force_insert, force_update, using, update_fields)
+
 
     @staticmethod
     def get_all_banners(request):
 
-        queryset = Banner.objects.filter(enable=True).order_by('-priority')[:10]
-        slider_locate = dict(Banner.slider_location)
+        queryset = Banner.objects.filter(enable=True).filter(Q(start_date__lte=timezone.now()) | Q(start_date__isnull=True)).filter(Q(end_date__gte=timezone.now()) | Q(end_date__isnull=True)).order_by('-priority')[:100]
+        # slider_locate = dict(Banner.slider_location)
         final_result = []
-
         for data in queryset:
             resp = dict()
             resp['title'] = data.title
             resp['id'] = data.id
-            resp['slider_location'] = slider_locate[data.slider_locate]
+            # resp['slider_location'] = slider_locate[data.slider_locate]
+            resp['slider_location'] = data.location.name if data.location and data.location.name else None
+            resp['latitude'] = data.latitude
+            resp['longitude'] = data.longitude
+            resp['radius'] = data.radius
             resp['start_date'] = data.start_date
             resp['end_date'] = data.end_date
             resp['priority'] = data.priority
@@ -80,7 +101,7 @@ class Banner(auth_model.TimeStampedModel):
             resp['event_name'] = data.event_name
             if data.url:
                 path = urlparse(data.url).path
-                params = urlparse(data.url).params
+                params = urlparse(data.url).params + '?'
                 query = urlparse(data.url).query
                 if path:
                     resp['url'] = path + params + query
