@@ -45,7 +45,7 @@ from django.utils import timezone
 from ondoc.diagnostic import models
 from ondoc.authentication import models as auth_models
 from django.db.models import Q, Value
-from django.db.models.functions import StrIndex, Rank
+from django.db.models.functions import StrIndex, Rank, Coalesce
 
 from ondoc.location.models import EntityUrls, EntityAddress
 from ondoc.seo.models import NewDynamic
@@ -406,7 +406,17 @@ class LabList(viewsets.ReadOnlyModelViewSet):
 
         if package_ids:
             main_queryset = main_queryset.filter(id__in=package_ids)
-        all_packages_in_labs = main_queryset.filter(
+
+        def gen():
+            random_no = random.randint(300000, 1000000)
+            i = 0
+            while (True):
+                yield random_no + i
+                i += 1
+
+        random_no_generator = gen()
+
+        main_queryset = main_queryset.filter(
             availablelabs__enabled=True,
             availablelabs__lab_pricing_group__labs__is_live=True,
             availablelabs__lab_pricing_group__labs__enabled=True,
@@ -414,63 +424,33 @@ class LabList(viewsets.ReadOnlyModelViewSet):
                 Point(float(long),
                       float(lat)),
                 D(m=max_distance))).annotate(
-            priority_score=F('availablelabs__lab_pricing_group__labs__lab_priority') * F('priority')).annotate(
-            distance=Distance('availablelabs__lab_pricing_group__labs__location', pnt)).annotate(
-            lab=F('availablelabs__lab_pricing_group__labs'), mrp=F('availablelabs__mrp'),
-            price=Case(
-                When(availablelabs__custom_deal_price__isnull=True,
-                     then=F('availablelabs__computed_deal_price')),
-                When(availablelabs__custom_deal_price__isnull=False,
-                     then=F('availablelabs__custom_deal_price'))),
-            rank=Window(expression=RowNumber(), order_by=F('distance').asc(),
-                        partition_by=Case(When(availablelabs__custom_deal_price__isnull=False, then=[F(
-                            'availablelabs__lab_pricing_group__labs__network'), F('id')]),
-                                          When(availablelabs__custom_deal_price__isnull=True, then=F('id')))))
+            alias_network=Coalesce(F('availablelabs__lab_pricing_group__labs__network'),
+                                   F('id') + random.randint(11111,99999))).annotate(
+                                       priority_score=F('availablelabs__lab_pricing_group__labs__lab_priority') * F(
+                                           'priority')).annotate(
+                                       distance=Distance('availablelabs__lab_pricing_group__labs__location',
+                                                         pnt)).annotate(
+                                       lab=F('availablelabs__lab_pricing_group__labs'), mrp=F('availablelabs__mrp'),
+                                       price=Case(
+                                           When(availablelabs__custom_deal_price__isnull=True,
+                                                then=F('availablelabs__computed_deal_price')),
+                                           When(availablelabs__custom_deal_price__isnull=False,
+                                                then=F('availablelabs__custom_deal_price'))),
+                                       rank=Window(expression=RowNumber(), order_by=F('distance').asc(),
+                                                   partition_by=[F('alias_network'), F('id')]))
 
-        # all_packages_in_labs = main_queryset.filter(
-        #     availablelabs__enabled=True,
-        #     availablelabs__lab_pricing_group__labs__is_live=True,
-        #     availablelabs__lab_pricing_group__labs__enabled=True,
-        #     availablelabs__lab_pricing_group__labs__location__dwithin=(
-        #         Point(float(long),
-        #               float(lat)),
-        #         D(m=max_distance))).annotate(
-        #     priority_score=F('availablelabs__lab_pricing_group__labs__lab_priority') * F('priority')).annotate(
-        #     distance=Distance('availablelabs__lab_pricing_group__labs__location', pnt)).annotate(
-        #     lab=F('availablelabs__lab_pricing_group__labs'), mrp=F('availablelabs__mrp'),
-        #     price=Case(
-        #         When(availablelabs__custom_deal_price__isnull=True,
-        #              then=F('availablelabs__computed_deal_price')),
-        #         When(availablelabs__custom_deal_price__isnull=False,
-        #              then=F('availablelabs__custom_deal_price'))),
-        #     rank=Window(expression=RowNumber(), order_by=F('distance').asc(),
-        #               partition_by=[F(
-        #                   'availablelabs__lab_pricing_group__labs__network'), F('id')]))
-
-        # rank=Case(When(availablelabs__lab_pricing_group__labs__network__isnull = False,
-            #                then=F(Window(expression=RowNumber(), order_by=F('distance').asc(),
-            #             partition_by=[F('availablelabs__lab_pricing_group__labs__network'), F('id')]))),
-                           # When(availablelabs__custom_deal_price__isnull=True,
-                           #      then=F(Window(expression=RowNumber(), order_by=F('distance').asc(),
-                           #                    partition_by=[F(
-                           #                        random.randint(1111, 9999)), F('id')])
-                           #             )))
-        # )
-
-        # rank = Window(expression=RowNumber(), order_by=F('distance').asc(),
-        #               partition_by=[F(
-        #                   'availablelabs__lab_pricing_group__labs__network'), F('id')])
-
-        if test_ids:
-            all_packages_in_labs = all_packages_in_labs.filter(test__id__in=test_ids).annotate(
-                included_test_count=Count('test')).filter(included_test_count=len(test_ids))
-
-        if category_ids:
-            all_packages_in_labs = all_packages_in_labs.filter(
-                categories__id__in=category_ids).annotate(category_count=Count(F('categories'))).filter(
-                category_count=len(category_ids))
-
-        all_packages_in_labs = all_packages_in_labs.distinct()
+        # all_packages_in_labs = all_packages__in_labs_random_no.\
+        #     annotate(rank=Coalesce(F('availablelabs__lab_pricing_group__labs__network'), F('random_no')))
+        # all_packages_in_labs = all_packages.annotate(random_no=F('id') + next(gen()))
+        # if test_ids:
+        #     all_packages_in_labs = all_packages_in_labs.filter(test__id__in=test_ids).annotate(
+        #         included_test_count=Count('test')).filter(included_test_count=len(test_ids))
+        #
+        # if category_ids:
+        #     all_packages_in_labs = all_packages_in_labs.filter(
+        #         categories__id__in=category_ids).annotate(category_count=Count(F('categories'))).filter(
+        #         category_count=len(category_ids))
+        all_packages_in_labs = main_queryset.distinct()
         all_packages = [package for package in all_packages_in_labs if package.rank == 1]
         all_packages = filter(lambda x: x, all_packages)
         if min_distance:
