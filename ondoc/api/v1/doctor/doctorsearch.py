@@ -314,32 +314,39 @@ class DoctorSearchHelper:
                 rank_part = " Row_number() OVER( partition BY d.id  ORDER BY " \
                             "dct.deal_price, St_distance(St_setsrid(St_point((%(longitude)s), (%(latitude)s)), 4326 ), h.location) ASC) rnk " \
 
+            if self.query_params and self.query_params.get("ipd_procedure_ids"):
+                ipd_query = " INNER JOIN doctor_clinic_ipd_procedure dcip on dc.id = dcip.doctor_clinic_id " \
+                            " AND dcip.enabled=True "
+            else:
+                ipd_query = ""
+
             query_string = "SELECT x.doctor_id, x.hospital_id, doctor_clinic_id, doctor_clinic_timing_id " \
-            "FROM (select {rank_part}, " \
-            "St_distance(St_setsrid(St_point((%(longitude)s), (%(latitude)s)), 4326), h.location) distance, " \
-            "d.id as doctor_id, " \
-            "dc.id as doctor_clinic_id,  " \
-            "dct.id as doctor_clinic_timing_id,practicing_since, " \
-            "d.enabled_for_online_booking and dc.enabled_for_online_booking and h.enabled_for_online_booking as enabled_for_online_booking, " \
-            "is_license_verified, priority,deal_price, h.welcome_calling_done, " \
-            "dc.hospital_id as hospital_id, d.search_score FROM doctor d " \
-            "INNER JOIN doctor_clinic dc ON d.id = dc.doctor_id and dc.enabled=true and d.is_live=true " \
-            "and d.is_test_doctor is False and d.is_internal is False " \
-            "INNER JOIN hospital h ON h.id = dc.hospital_id and h.is_live=true " \
-            "INNER JOIN doctor_clinic_timing dct ON dc.id = dct.doctor_clinic_id " \
-            "INNER JOIN doctor_clinic_ipd_procedure dcip on dc.id = dcip.doctor_clinic_id " \
-            " AND dcip.enabled=True " \   
-	    "LEFT JOIN doctor_leave dl on dl.doctor_id = d.id and (%(ist_date)s) BETWEEN dl.start_date and dl.end_date " \
-            "AND (%(ist_time)s) BETWEEN dl.start_time and dl.end_time" \
-            "{sp_cond}" \
-            "WHERE {filtering_params} " \
-            "and St_dwithin(St_setsrid(St_point((%(longitude)s), (%(latitude)s)), 4326 ), h.location, (%(max_distance)s)) " \
-            "{min_dist_cond}" \
-            " )x " \
-            "where {rank_by} ORDER BY {order_by_field}".format(rank_part=rank_part, sp_cond=sp_cond, \
-                filtering_params=filtering_params.get('string'), \
-                min_dist_cond=min_dist_cond, order_by_field=order_by_field, \
-                rank_by = rank_by)
+                           "FROM (select {rank_part}, " \
+                           "St_distance(St_setsrid(St_point((%(longitude)s), (%(latitude)s)), 4326), h.location) distance, " \
+                           "d.id as doctor_id, " \
+                           "dc.id as doctor_clinic_id,  " \
+                           "dct.id as doctor_clinic_timing_id,practicing_since, " \
+                           "d.enabled_for_online_booking and dc.enabled_for_online_booking and h.enabled_for_online_booking as enabled_for_online_booking, " \
+                           "is_license_verified, priority,deal_price, h.welcome_calling_done, " \
+                           "dc.hospital_id as hospital_id, d.search_score FROM doctor d " \
+                           "INNER JOIN doctor_clinic dc ON d.id = dc.doctor_id and dc.enabled=true and d.is_live=true " \
+                           "and d.is_test_doctor is False and d.is_internal is False " \
+                           "INNER JOIN hospital h ON h.id = dc.hospital_id and h.is_live=true " \
+                           "INNER JOIN doctor_clinic_timing dct ON dc.id = dct.doctor_clinic_id " \
+                           "{ipd_query} " \
+                           "LEFT JOIN doctor_leave dl on dl.doctor_id = d.id and (%(ist_date)s) BETWEEN dl.start_date and dl.end_date " \
+                           "AND (%(ist_time)s) BETWEEN dl.start_time and dl.end_time " \
+                           "{sp_cond} " \
+                           "WHERE {filtering_params} " \
+                           "and St_dwithin(St_setsrid(St_point((%(longitude)s), (%(latitude)s)), 4326 ), h.location, (%(max_distance)s)) " \
+                           "{min_dist_cond}" \
+                           " )x " \
+                           "where {rank_by} ORDER BY {order_by_field}".format(rank_part=rank_part, sp_cond=sp_cond, \
+                                                                              filtering_params=filtering_params.get(
+                                                                                  'string'), \
+                                                                              min_dist_cond=min_dist_cond,
+                                                                              order_by_field=order_by_field, \
+                                                                              rank_by=rank_by, ipd_query=ipd_query)
 
         if filtering_params.get('params'):
             filtering_params.get('params')['longitude'] = longitude
@@ -353,6 +360,7 @@ class DoctorSearchHelper:
             filtering_params['params']['latitude'] = latitude
             filtering_params['params']['min_distance'] = min_distance
             filtering_params['params']['max_distance'] = max_distance
+            filtering_params.get('params')['ist_time'] = ist_time
             filtering_params.get('params')['ist_date'] = ist_date
 
         return {'params':filtering_params.get('params'), 'query': query_string}
