@@ -141,7 +141,10 @@ def dump_to_elastic():
             'destination': destination
         }
 
+        logger.error(json.dumps(call_data))
         elastic_alias_switch.apply_async((call_data,), countdown=3600)
+
+        return
 
     except Exception as e:
         logger.error("Error in syncing process of elastic - " + str(e))
@@ -199,6 +202,8 @@ def elastic_alias_switch(data):
         logger.error("Sync to elastic failed.")
     else:
         logger.error("Sync to elastic successfull.")
+
+    return
 
 
 @task()
