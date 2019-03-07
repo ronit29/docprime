@@ -703,6 +703,8 @@ class ProviderSignupDataViewset(viewsets.GenericViewSet):
                                                           # city=valid_data.get('city'),
                                                           # state=valid_data.get('state'),
                                                           country=valid_data.get('country'),
+                                                          is_billing_enabled=True,
+                                                          is_appointment_manager=True,
                                                           source_type=doc_models.Hospital.PROVIDER)
             hospital_model_serializer = serializers.HospitalModelSerializer(hospital, many=False)
             auth_models.GenericAdmin.objects.create(user=request.user, phone_number=request.user.phone_number,
