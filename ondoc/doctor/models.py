@@ -610,8 +610,7 @@ class Doctor(auth_model.TimeStampedModel, auth_model.QCModel, SearchKey, auth_mo
         update_status_in_matrix = False
         if self.id:
             doctor_obj = Doctor.objects.filter(pk=self.id).first()
-            if doctor_obj and (self.onboarding_status != doctor_obj.onboarding_status or
-                               self.data_status != doctor_obj.data_status):
+            if doctor_obj and self.data_status != doctor_obj.data_status:
                 update_status_in_matrix = True
         else:
             push_to_matrix = True
