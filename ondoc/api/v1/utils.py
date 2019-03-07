@@ -1125,7 +1125,7 @@ def payout_checksum(request_payload):
     checksum += curr
 
     checksum = accesskey + "|" + checksum + "|" + secretkey
-    checksum_hash = hashlib.sha512(str(checksum).encode())
+    checksum_hash = hashlib.sha256(str(checksum).encode())
     checksum_hash = checksum_hash.hexdigest()
     return checksum_hash
 
