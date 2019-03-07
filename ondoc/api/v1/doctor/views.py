@@ -445,10 +445,13 @@ class DoctorProfileView(viewsets.GenericViewSet):
               lab__network__manageable_lab_network_admins__is_disabled=False),
             Q(status=lab_models.LabAppointment.ACCEPTED,
               time_slot_start__date=today)).distinct().count()
-        doctor_mobile = auth_models.DoctorNumber.objects.filter(phone_number=request.user.phone_number)
-        doctor = doctor_mobile.first().doctor if doctor_mobile.exists() else None
+        doctor_mobile_live = auth_models.DoctorNumber.objects.filter(phone_number=request.user.phone_number, doctor__is_live=True)
+        doctor = doctor_mobile_live.first().doctor if doctor_mobile_live.exists() else None
         if not doctor:
             doctor = request.user.doctor if hasattr(request.user, 'doctor') else None
+        if not doctor:
+            doctor_mobile_provider = auth_models.DoctorNumber.objects.filter(phone_number=request.user.phone_number, doctor__source_type=Doctor.PROVIDER)
+            doctor = doctor_mobile_provider.first().doctor if doctor_mobile_provider.exists() else None
         if doctor and (doctor.is_live or doctor.source_type == Doctor.PROVIDER):
             doc_serializer = serializers.DoctorProfileSerializer(doctor, many=False,
                                                                  context={"request": request})
@@ -497,7 +500,7 @@ class DoctorProfileView(viewsets.GenericViewSet):
         if provider_signup_lead:
             consent = provider_signup_lead.is_docprime
             resp_data['consent'] = consent
-            resp_data['source_type'] = Doctor.PROVIDER
+            # resp_data['source_type'] = Doctor.PROVIDER
             resp_data['role_type'] = provider_signup_lead.type
             resp_data['phone_number'] = provider_signup_lead.phone_number
             resp_data['email'] = provider_signup_lead.email

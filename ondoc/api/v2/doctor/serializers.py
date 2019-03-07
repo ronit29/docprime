@@ -138,12 +138,14 @@ class GenerateOtpSerializer(serializers.Serializer):
     phone_number = serializers.IntegerField(min_value=5000000000,max_value=9999999999)
 
     def validate(self, attrs):
-        admin_exists = lab_admin_exists = False
+        admin_exists = lab_admin_exists = provider_signup_lead_exists = False
+        if doc_models.ProviderSignupLead.objects.filter(phone_number=attrs['phone_number'], user__isnull=False).exists():
+            provider_signup_lead_exists = True
         if GenericAdmin.objects.filter(phone_number=attrs['phone_number'], is_disabled=False).exists():
             admin_exists = True
         if GenericLabAdmin.objects.filter(phone_number=attrs['phone_number'], is_disabled=False).exists():
             lab_admin_exists = True
-        if admin_exists or lab_admin_exists:
+        if admin_exists or lab_admin_exists or provider_signup_lead_exists:
             raise serializers.ValidationError("Phone number already registered. Please try logging in.")
         return attrs
 
@@ -156,13 +158,15 @@ class OtpVerificationSerializer(serializers.Serializer):
         if not OtpVerifications.objects.filter(phone_number=attrs['phone_number'], code=attrs['otp'], is_expired=False,
                    created_at__gte=timezone.now() - relativedelta(minutes=OtpVerifications.OTP_EXPIRY_TIME)).exists():
             raise serializers.ValidationError("Invalid OTP")
-        admin_exists = lab_admin_exists = False
+        admin_exists = lab_admin_exists = provider_signup_lead_exists = False
+        if doc_models.ProviderSignupLead.objects.filter(phone_number=attrs['phone_number'], user__isnull=False).exists():
+            provider_signup_lead_exists = True
         if GenericAdmin.objects.filter(phone_number=attrs['phone_number'], is_disabled=False).exists():
             admin_exists = True
         if GenericLabAdmin.objects.filter(phone_number=attrs['phone_number'], is_disabled=False).exists():
             lab_admin_exists = True
-        if admin_exists or lab_admin_exists:
-            raise serializers.ValidationError("admin for this phone number already exists")
+        if admin_exists or lab_admin_exists or provider_signup_lead_exists:
+            raise serializers.ValidationError("Phone number already registered. Please try logging in.")
         return attrs
 
 
@@ -245,6 +249,7 @@ class CreateHospitalSerializer(serializers.Serializer):
     doctors = serializers.ListField(required=False, child=BulkCreateDoctorSerializer(many=False), allow_empty=True)
     staffs = serializers.ListField(required=False, child=BulkCreateGenericAdminSerializer(many=False),
                                            allow_empty=True)
+    is_list_on_docprime = serializers.BooleanField(required=False, default=False)
 
 
 class DoctorModelSerializer(serializers.ModelSerializer):
