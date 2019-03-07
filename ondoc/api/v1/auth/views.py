@@ -1892,8 +1892,7 @@ class AppointmentViewSet(viewsets.GenericViewSet):
 
             all_appointments = opd_appointments + lab_appointments
             all_appointments = sorted(all_appointments,
-                                      key=lambda x: datetime.datetime.strptime(x["time_slot_start"][:-6],
-                                                                               '%Y-%m-%dT%H:%M:%S'))
+                                      key=lambda x: x["time_slot_start"])
         except Exception as e:
             logger.error(str(e))
         return Response(all_appointments)
