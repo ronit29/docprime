@@ -1394,7 +1394,9 @@ class HospitalDoctorAppointmentPermissionViewSet(GenericViewSet):
                                        hospital_name=F('hospital__name'),
                                        doctor_name=F('doctor__name'),
                                        doctor_source_type=F('doctor__source_type'),
+                                       doctor_is_live=F('doctor__is_live'),
                                        hospital_source_type=F('hospital__source_type'),
+                                       hospital_is_live=F('hospital__is_live'),
                                        online_consultation_fees=F('doctor__online_consultation_fees')
                                        )
                              .filter(
@@ -1426,7 +1428,8 @@ class HospitalDoctorAppointmentPermissionViewSet(GenericViewSet):
                                               hospital__manageable_hospitals__entity_type=GenericAdminEntity.HOSPITAL)
                                     ))
                              .values('hospital', 'doctor', 'hospital_name', 'doctor_name', 'doctor_gender',
-                                     'doctor_source_type', 'hospital_source_type', 'online_consultation_fees').distinct('hospital', 'doctor')
+                                     'doctor_source_type', 'hospital_source_type', 'online_consultation_fees',
+                                     'doctor_is_live', 'hospital_is_live').distinct('hospital', 'doctor')
                              )
 
         # all_docs = [doc_hosp_queryset

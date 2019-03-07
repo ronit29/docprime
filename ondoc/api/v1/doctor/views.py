@@ -449,7 +449,7 @@ class DoctorProfileView(viewsets.GenericViewSet):
         doctor = doctor_mobile.first().doctor if doctor_mobile.exists() else None
         if not doctor:
             doctor = request.user.doctor if hasattr(request.user, 'doctor') else None
-        if doctor and doctor.is_live:
+        if doctor and (doctor.is_live or doctor.source_type == Doctor.PROVIDER):
             doc_serializer = serializers.DoctorProfileSerializer(doctor, many=False,
                                                                  context={"request": request})
             resp_data = doc_serializer.data
@@ -497,7 +497,7 @@ class DoctorProfileView(viewsets.GenericViewSet):
         if provider_signup_lead:
             consent = provider_signup_lead.is_docprime
             resp_data['consent'] = consent
-            resp_data['source'] = Doctor.PROVIDER
+            resp_data['source_type'] = Doctor.PROVIDER
             resp_data['role_type'] = provider_signup_lead.type
             resp_data['phone_number'] = provider_signup_lead.phone_number
             resp_data['email'] = provider_signup_lead.email

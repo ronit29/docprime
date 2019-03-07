@@ -579,7 +579,8 @@ class DoctorProfileSerializer(serializers.ModelSerializer):
         fields = (
             'id', 'name', 'display_name', 'gender', 'about', 'license', 'emails', 'practicing_since', 'images',
             'languages', 'qualifications', 'general_specialization', 'availability', 'mobiles', 'medical_services',
-            'experiences', 'associations', 'awards', 'appointments', 'hospitals', 'thumbnail', 'signature', 'is_live')
+            'experiences', 'associations', 'awards', 'appointments', 'hospitals', 'thumbnail', 'signature', 'is_live',
+            'source_type')
 
 
 class HospitalModelSerializer(serializers.ModelSerializer):
@@ -1334,7 +1335,8 @@ class HospitalEntitySerializer(HospitalModelSerializer):
 
     class Meta:
         model = Hospital
-        fields = ('id', 'name', 'entity_type', 'address', 'is_billing_enabled', 'is_appointment_manager')
+        fields = ('id', 'name', 'entity_type', 'address', 'is_billing_enabled', 'is_appointment_manager',
+                  'is_live', 'source_type')
 
 
 class DoctorEntitySerializer(serializers.ModelSerializer):
@@ -1355,7 +1357,7 @@ class DoctorEntitySerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Doctor
-        fields = ('id', 'thumbnail', 'name', 'entity_type', 'qualifications')
+        fields = ('id', 'thumbnail', 'name', 'entity_type', 'qualifications', 'is_live', 'source_type')
 
 
 class AdminUpdateBodySerializer(AdminCreateBodySerializer):
