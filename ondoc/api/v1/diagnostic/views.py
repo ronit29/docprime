@@ -200,6 +200,18 @@ class LabList(viewsets.ReadOnlyModelViewSet):
 
         if package_ids:
             main_queryset = main_queryset.filter(id__in=package_ids)
+        valid_package_ids = []
+        if test_ids:
+            valid_package_ids.extend(list(LabTest.objects.filter(test__id__in=test_ids).annotate(
+                included_test_count=Count('test')).filter(
+                included_test_count=len(test_ids)).distinct().values_list('id', flat=True)))
+        if category_ids:
+            valid_package_ids.extend(list(
+                LabTest.objects.filter(test__recommended_categories__id__in=category_ids).distinct().values_list('id',
+                                                                                                                 flat=True)))
+        if valid_package_ids:
+            main_queryset = main_queryset.filter(id__in=valid_package_ids)
+
 
         all_packages_in_network_labs = main_queryset.filter(
             availablelabs__enabled=True,
@@ -240,18 +252,7 @@ class LabList(viewsets.ReadOnlyModelViewSet):
                 When(availablelabs__custom_deal_price__isnull=False,
                      then=F('availablelabs__custom_deal_price'))),
         )
-        if test_ids:
-            all_packages_in_non_network_labs = all_packages_in_non_network_labs.filter(test__id__in=test_ids).annotate(
-                included_test_count=Count('test')).filter(included_test_count=len(test_ids))
-            all_packages_in_network_labs = all_packages_in_network_labs.filter(test__id__in=test_ids).annotate(
-                included_test_count=Count('test')).filter(included_test_count=len(test_ids))
-        if category_ids:
-            all_packages_in_non_network_labs = all_packages_in_non_network_labs.filter(
-                categories__id__in=category_ids).annotate(category_count=Count(F('categories'))).filter(
-                category_count=len(category_ids))
-            all_packages_in_network_labs = all_packages_in_network_labs.filter(
-                categories__id__in=category_ids).annotate(category_count=Count(F('categories'))).filter(
-                category_count=len(category_ids))
+
         all_packages_in_non_network_labs = all_packages_in_non_network_labs.distinct()
         all_packages_in_network_labs = all_packages_in_network_labs.distinct()
         all_packages = [package for package in all_packages_in_network_labs if package.rank == 1]
@@ -294,25 +295,28 @@ class LabList(viewsets.ReadOnlyModelViewSet):
         category_data = {}
         test_package_ids = set([package.id for package in all_packages])
         test_package_queryset = LabTest.objects.prefetch_related('test__recommended_categories', 'test__parameter').filter(id__in=test_package_ids)
+        category_to_be_shown_in_filter_ids=set()
         for temp_package in test_package_queryset:
             single_test_data = {}
             for temp_test in temp_package.test.all():
                 add_test_name = True
                 for temp_category in temp_test.recommended_categories.all():
-                    add_test_name = False
-                    name = temp_category.name
-                    category_id = temp_category.id
-                    test_id = None
-                    icon_url = util_absolute_url(temp_category.icon.url) if temp_category.icon else None
-                    parameter_count = len(temp_test.parameter.all()) or 1
-                    if single_test_data.get((category_id, test_id)):
-                        single_test_data[(category_id, test_id)]['parameter_count'] += parameter_count
-                    else:
-                        single_test_data[(category_id, test_id)] = {'name': name,
-                                                                    'category_id': category_id,
-                                                                    'test_id': test_id,
-                                                                    'parameter_count': parameter_count,
-                                                                    'icon': icon_url}
+                    if temp_category.is_live:
+                        add_test_name = False
+                        name = temp_category.name
+                        category_id = temp_category.id
+                        category_to_be_shown_in_filter_ids.add(category_id)
+                        test_id = None
+                        icon_url = util_absolute_url(temp_category.icon.url) if temp_category.icon else None
+                        parameter_count = len(temp_test.parameter.all()) or 1
+                        if single_test_data.get((category_id, test_id)):
+                            single_test_data[(category_id, test_id)]['parameter_count'] += parameter_count
+                        else:
+                            single_test_data[(category_id, test_id)] = {'name': name,
+                                                                        'category_id': category_id,
+                                                                        'test_id': test_id,
+                                                                        'parameter_count': parameter_count,
+                                                                        'icon': icon_url}
                 if add_test_name:
                     category_id = None
                     test_id = temp_test.id
@@ -328,7 +332,7 @@ class LabList(viewsets.ReadOnlyModelViewSet):
         serializer = CustomLabTestPackageSerializer(all_packages, many=True,
                                                     context={'entity_url_dict': entity_url_dict, 'lab_data': lab_data,
                                                              'request': request, 'category_data': category_data})
-        category_queryset = LabTestCategory.objects.filter(is_package_category=True, is_live=True)
+        category_queryset = LabTestCategory.objects.filter(id__in=category_to_be_shown_in_filter_ids)
         category_result = []
         for category in category_queryset:
             name = category.name
@@ -676,7 +680,7 @@ class LabList(viewsets.ReadOnlyModelViewSet):
             filtering_params['network_id'] = str(network_id)
 
         if name:
-            search_key = re.findall(r'[a-z0-9A-Z.]+',name)
+            search_key = re.findall(r'[a-z0-9A-Z.:]+',name)
             search_key = " ".join(search_key).lower()
             search_key = "".join(search_key.split("."))
             filtering_query.append("lb.name ilike %(name)s")

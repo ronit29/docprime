@@ -1,19 +1,23 @@
 import operator
 from collections import defaultdict, OrderedDict
 from uuid import UUID
+
+from django.contrib.gis.db.models.functions import Distance
+from django.contrib.gis.measure import D
+
 from ondoc.api.v1.auth.serializers import UserProfileSerializer
 from ondoc.api.v1.doctor.serializers import HospitalModelSerializer, AppointmentRetrieveDoctorSerializer, \
     OfflinePatientSerializer
 from ondoc.api.v1.doctor.DoctorSearchByHospitalHelper import DoctorSearchByHospitalHelper
 from ondoc.api.v1.procedure.serializers import CommonProcedureCategorySerializer, ProcedureInSerializer, \
-    ProcedureSerializer, DoctorClinicProcedureSerializer, CommonProcedureSerializer
+    ProcedureSerializer, DoctorClinicProcedureSerializer, CommonProcedureSerializer, CommonIpdProcedureSerializer
 from ondoc.cart.models import Cart
 from ondoc.doctor import models
 from ondoc.authentication import models as auth_models
 from ondoc.diagnostic import models as lab_models
 from ondoc.notification import tasks as notification_tasks
 #from ondoc.doctor.models import Hospital, DoctorClinic,Doctor,  OpdAppointment
-from ondoc.doctor.models import DoctorClinic, OpdAppointment
+from ondoc.doctor.models import DoctorClinic, OpdAppointment, DoctorAssociation, DoctorQualification, Doctor, Hospital, HealthInsuranceProvider
 from ondoc.notification.models import EmailNotification
 from django.utils.safestring import mark_safe
 from ondoc.coupon.models import Coupon
@@ -21,7 +25,7 @@ from ondoc.api.v1.diagnostic import serializers as diagnostic_serializer
 from ondoc.account import models as account_models
 from ondoc.location.models import EntityUrls, EntityAddress, DefaultRating
 from ondoc.procedure.models import Procedure, ProcedureCategory, CommonProcedureCategory, ProcedureToCategoryMapping, \
-    get_selected_and_other_procedures, CommonProcedure
+    get_selected_and_other_procedures, CommonProcedure, CommonIpdProcedure, IpdProcedure, DoctorClinicIpdProcedure
 from ondoc.seo.models import NewDynamic
 from . import serializers
 from ondoc.api.v2.doctor import serializers as v2_serializers
@@ -66,6 +70,7 @@ from django.db.models import Avg
 from django.db.models import Count
 from ondoc.api.v1.auth import serializers as auth_serializers
 from copy import deepcopy
+from django.utils.text import slugify
 
 logger = logging.getLogger(__name__)
 import random
@@ -531,6 +536,133 @@ class DoctorProfileUserViewSet(viewsets.GenericViewSet):
         response_data['hospitals'] = availability
         return response_data
 
+    def construct_about_doctor(self, doctor, response_data, general_specialization, hospital):
+        about_doctor = None
+        person = None
+        his_her = None
+        doctor_assoc_list = list()
+        members = None
+        awards = list()
+        hospital_obj = None
+        specializations = list()
+        if doctor.gender == 'f':
+            person = 'She'
+            his_her = 'her'
+        elif doctor.gender == 'm':
+            person = 'He'
+            his_her = 'his'
+        doc_spec = None
+        startswith = None
+        if hospital:
+            doc_clinics_obj = doctor.doctor_clinics.filter(hospital_id=hospital.get('hospital_id'), doctor_id=doctor.id, hospital__is_live=True)
+            if doc_clinics_obj:
+                hospital_obj = doc_clinics_obj[0].hospital
+        if doctor.name and general_specialization:
+            about_doctor = 'Dr. ' + doctor.name
+            if len(general_specialization) == 1:
+                about_doctor += ' is a proficient ' + general_specialization[0].name
+            elif len(general_specialization) > 1:
+                for data in general_specialization:
+                    specializations.append(data.name)
+                doc_spec = ', '.join(specializations[:-1])
+                if specializations[-1].lower().startswith('a') or specializations[-1].lower().startswith('e') or \
+                        specializations[-1].lower().startswith('i') or specializations[-1].lower().startswith('o') or \
+                        specializations[-1].lower().startswith('u'):
+                    startswith = 'an'
+                else:
+                    startswith = 'a'
+                about_doctor += ' is a proficient ' + doc_spec + ' and ' + startswith + ' ' + specializations[-1]
+            if doctor.experience_years() and doctor.experience_years() > 0:
+                about_doctor += ' with an experience of ' + str(doctor.experience_years()) + ' years'
+            about_doctor += '.'
+            if doctor.gender in ('m', 'f') and hospital_obj and hospital_obj.city:
+                if hospital_obj.city:
+                    about_doctor += ' ' + person + ' is located in ' + hospital_obj.city + '. '
+
+        if doctor.name and hospital and  hospital_obj and hospital_obj.city and hospital_obj.state:
+            if not about_doctor:
+                about_doctor = 'Dr. ' + doctor.name
+            else:
+                about_doctor += '<br><br>Dr. ' + doctor.name
+            if hospital_obj.city and hospital_obj.name:
+                about_doctor += ' practices at the ' + hospital_obj.name + ' in ' + hospital_obj.city + '. '
+
+            if hospital and hospital.get('hospital_name') and hospital.get('address'):
+                about_doctor += 'The ' + hospital.get('hospital_name') + ' is situated at ' + hospital.get(
+                    'address') + '. '
+
+            doctor_assoc = doctor.associations.all()
+            if doctor_assoc:
+                for data in doctor_assoc:
+                    doctor_assoc_list.append(data.name)
+                # members = ' and '.join(doctor_assoc_list)
+
+                if doctor_assoc_list:
+                    if len(doctor_assoc_list) == 1:
+                        members = doctor_assoc_list[0]
+                    elif len(doctor_assoc_list) > 1:
+                        members = ', '.join(doctor_assoc_list[:-1])
+                        members += members + ' and ' + doctor_assoc_list[-1]
+                about_doctor += doctor.name + ' is an esteemed member of ' + members + '.'
+
+        doctor_qual = doctor.qualifications.all()
+        if doctor_qual:
+            if not about_doctor:
+                about_doctor = ''
+            else:
+                about_doctor += '<br><br>'
+            count = 0
+            for data in doctor_qual:
+                if count > 2:
+                    count = 2
+                qual_str = [' pursued ', ' completed ', ' has also done ']
+                if data.qualification and data.qualification.name and data.college and data.college.name and data.passing_year:
+                    about_doctor += person + qual_str[
+                        count] + his_her + ' ' + data.qualification.name + ' in the year ' \
+                                    + str(data.passing_year) + ' from ' + data.college.name + '. '
+                    count = count + 1
+        if doctor.name:
+            if not about_doctor:
+                about_doctor = ''
+            else:
+                about_doctor += '<br><br>'
+            about_doctor += 'Dr. ' + doctor.name + ' is an experienced, skilled and awarded doctor in ' + his_her + ' field of specialization. '
+            doc_awards_obj = doctor.awards.all()
+            if doc_awards_obj:
+                for data in doc_awards_obj:
+                    awards.append(data.name)
+
+            if awards:
+                doc_awards = ', '.join(awards)
+                about_doctor += doctor.name + ' has been awarded with ' + doc_awards + '. '
+
+        doc_experience_details = response_data.get('experiences')
+        if doc_experience_details:
+            if not about_doctor:
+                about_doctor = ''
+            else:
+                about_doctor += '<br><br>'
+            if doc_experience_details[0].get('hospital') and doc_experience_details[0].get('start_year') and \
+                    doc_experience_details[0].get('end_year'):
+                about_doctor += person + ' worked at ' + doc_experience_details[0].get(
+                    'hospital') + ' from ' + str(doc_experience_details[0].get('start_year')) + ' to ' + str(
+                    doc_experience_details[0].get('end_year'))
+            if len(doc_experience_details) > 1:
+                exp_list = list()
+                for data in doc_experience_details[1:-1]:
+                    if data.get('hospital') and data.get('start_year') and data.get('end_year'):
+                        exp_list.append(' from ' + str(data.get('start_year')) + ' to ' + str(
+                            data.get('end_year')) + ' with ' + data.get('hospital'))
+                if exp_list:
+                    about_doctor += ', ' + ','.join(exp_list)
+                if doc_experience_details[-1] and doc_experience_details[-1].get('hospital') and doc_experience_details[
+                    -1].get('start_year') and doc_experience_details[-1].get('end_year'):
+                    about_doctor += ' and from ' + str(doc_experience_details[-1].get('start_year')) + ' to ' + str(
+                        doc_experience_details[-1].get('end_year')) + ' at ' + doc_experience_details[-1].get(
+                        'hospital')
+            about_doctor += '.'
+        return about_doctor
+
     @transaction.non_atomic_requests
     def retrieve_by_url(self, request):
         url = request.GET.get('url')
@@ -574,7 +706,9 @@ class DoctorProfileUserViewSet(viewsets.GenericViewSet):
                                     'qualifications__college',
                                     'doctorpracticespecializations__specialization',
                                     'images',
-                                    'rating'
+                                    'rating',
+                                    'associations',
+                                    'awards'
                                     )
                   .filter(pk=pk).first())
         # if not doctor or not is_valid_testing_data(request.user, doctor):
@@ -586,6 +720,8 @@ class DoctorProfileUserViewSet(viewsets.GenericViewSet):
             entity = EntityUrls.objects.filter(entity_id=pk, sitemap_identifier=EntityUrls.SitemapIdentifier.DOCTOR_PAGE, is_valid='t')
             if len(entity) > 0:
                 entity = entity[0]
+            else:
+                entity = None    
 
         selected_procedure_ids, other_procedure_ids = get_selected_and_other_procedures(category_ids, procedure_ids,
                                                                                         doctor, all=True)
@@ -602,6 +738,27 @@ class DoctorProfileUserViewSet(viewsets.GenericViewSet):
 
         response_data = self.prepare_response(serializer.data, selected_hospital)
 
+        general_specialization = []
+        hospital = None
+        response_data['about_web'] = None
+
+        if response_data and response_data.get('hospitals'):
+            hospital = response_data.get('hospitals')[0]
+
+        for dps in doctor.doctorpracticespecializations.all():
+            general_specialization.append(dps.specialization)
+        if general_specialization:
+            general_specialization = sorted(general_specialization, key=operator.attrgetter('doctor_count'),
+                                            reverse=True)
+
+        if not doctor.about:
+            about_doctor = self.construct_about_doctor(doctor, response_data, general_specialization, hospital)
+            if about_doctor:
+                response_data['about_web'] = '<p>' + about_doctor + '</p>'
+
+        else:
+            response_data['about'] = doctor.about
+
         if entity:
             response_data['url'] = entity.url
             if entity.breadcrumb:
@@ -613,20 +770,24 @@ class DoctorProfileUserViewSet(viewsets.GenericViewSet):
                 breadcrumb = [{'url':'/', 'title': 'Home'}, {'title':'Dr. ' + doctor.name}]
                 response_data['breadcrumb'] = breadcrumb
 
-        if not doctor.enabled_for_online_booking:
+        enabled_for_online_booking = False
+        response_data['doctors'] = None
+        doctor_clinics = doctor.doctor_clinics.all()
+        if len(doctor_clinics)>0 and doctor.enabled_for_online_booking:
+            for dc in doctor_clinics:
+                if dc.enabled and dc.enabled_for_online_booking and dc.hospital.enabled_for_online_booking and dc.hospital.is_live:
+                    enabled_for_online_booking = True
+
+        if not enabled_for_online_booking:
+
             parameters = dict()
             specialization_id = ''
             doc = DoctorListViewSet()
-            general_specialization = []
             doctors_url = None
+            spec_breadcrumb = None
 
-            for dps in doctor.doctorpracticespecializations.all():
-                general_specialization.append(dps.specialization)
-
-            general_specialization = sorted(general_specialization, key=operator.attrgetter('doctor_count'), reverse=True)
-            if general_specialization and response_data.get('hospitals'):
+            if general_specialization and hospital:
                 specialization_id = general_specialization[0].pk
-                hospital = response_data.get('hospitals')[0]
 
                 parameters['specialization_ids'] = str(specialization_id)                
                 parameters['latitude'] = hospital.get('lat')
@@ -636,18 +797,16 @@ class DoctorProfileUserViewSet(viewsets.GenericViewSet):
                 kwargs['parameters'] = parameters
                 response_data['doctors'] = doc.list(request, **kwargs)
                 if response_data.get('doctors'):
-                    breadcrumb = entity.breadcrumb
+                    breadcrumb = entity.breadcrumb if entity else None
                     if breadcrumb:
-                        for data in breadcrumb:
-                            if data.get('url') and not data.get('url').startswith('doctors') and data.get('url').endswith('sptcit'):
-                                doctors_url = data.get('url')
+                        spec_breadcrumb = breadcrumb[-1]
+                        if spec_breadcrumb and spec_breadcrumb.get('url') and not spec_breadcrumb.get('url').startswith('doctors') and spec_breadcrumb.get('url').endswith('sptlitcit'):
+                                doctors_url = spec_breadcrumb.get('url')
                     response_data['doctors']['doctors_url'] = doctors_url
 
                     # response_data['doctors']['doctors_url'] = '/opd/searchresults?specializations=%s&lat=%s&long=%s' % (str(specialization_id), hospital.get('lat'), hospital.get('long'))
                 else:
                     response_data['doctors']['doctors_url'] = None
-        else:
-            response_data['doctors'] = None
 
         return Response(response_data)
 
@@ -923,23 +1082,35 @@ class SearchedItemsViewSet(viewsets.GenericViewSet):
     def common_conditions(self, request):
         count = request.query_params.get('count', 10)
         count = int(count)
-        if count <=0:
+        if count <= 0:
             count = 10
-        medical_conditions = models.CommonMedicalCondition.objects.select_related('condition').all().order_by("-priority")[:count]
-        conditions_serializer = serializers.MedicalConditionSerializer(medical_conditions, many=True, context={'request': request})
+        medical_conditions = models.CommonMedicalCondition.objects.select_related('condition').all().order_by(
+            "-priority")[:count]
+        conditions_serializer = serializers.MedicalConditionSerializer(medical_conditions, many=True,
+                                                                       context={'request': request})
 
-        common_specializations = models.CommonSpecialization.objects.select_related('specialization').all().order_by("-priority")[:10]
-        specializations_serializer = serializers.CommonSpecializationsSerializer(common_specializations, many=True, context={'request': request})
+        common_specializations = models.CommonSpecialization.objects.select_related('specialization').all().order_by(
+            "-priority")[:10]
+        specializations_serializer = serializers.CommonSpecializationsSerializer(common_specializations, many=True,
+                                                                                 context={'request': request})
 
-        common_procedure_categories = CommonProcedureCategory.objects.select_related('procedure_category').filter(procedure_category__is_live=True).all().order_by("-priority")[:10]
-        common_procedure_categories_serializer = CommonProcedureCategorySerializer(common_procedure_categories, many=True)
+        common_procedure_categories = CommonProcedureCategory.objects.select_related('procedure_category').filter(
+            procedure_category__is_live=True).all().order_by("-priority")[:10]
+        common_procedure_categories_serializer = CommonProcedureCategorySerializer(common_procedure_categories,
+                                                                                   many=True)
 
-        common_procedures = CommonProcedure.objects.select_related('procedure').filter(procedure__is_enabled=True).all().order_by("-priority")[:10]
+        common_procedures = CommonProcedure.objects.select_related('procedure').filter(
+            procedure__is_enabled=True).all().order_by("-priority")[:10]
         common_procedures_serializer = CommonProcedureSerializer(common_procedures, many=True)
+
+        common_ipd_procedures = CommonIpdProcedure.objects.select_related('ipd_procedure').filter(
+            ipd_procedure__is_enabled=True).all().order_by("-priority")[:10]
+        common_ipd_procedures_serializer = CommonIpdProcedureSerializer(common_ipd_procedures, many=True)
 
         return Response({"conditions": conditions_serializer.data, "specializations": specializations_serializer.data,
                          "procedure_categories": common_procedure_categories_serializer.data,
-                         "procedures": common_procedures_serializer.data})
+                         "procedures": common_procedures_serializer.data,
+                         "ipd_procedures": common_ipd_procedures_serializer.data})
 
 
 class DoctorListViewSet(viewsets.GenericViewSet):
@@ -1092,6 +1263,9 @@ class DoctorListViewSet(viewsets.GenericViewSet):
         seo = None
         breadcrumb = None
         ratings_title = ''
+        specialization_name = None
+        canonical_url = None
+        url = None
         # if False and (validated_data.get('extras') or validated_data.get('specialization_ids')):
         if validated_data.get('locality_value') or validated_data.get('sublocality_value'):
             location = None
@@ -1103,6 +1277,7 @@ class DoctorListViewSet(viewsets.GenericViewSet):
             sublocality = ''
             specializations = ''
             breadcrumb_locality_url = None
+
 
             if validated_data.get('locality_value'):
                 locality = validated_data.get('locality_value')
@@ -1345,8 +1520,28 @@ class DoctorListViewSet(viewsets.GenericViewSet):
                         if hospital_location.distance(parent_location)*100 < 1:
                             resp['parent_url'] = parent_url
 
-
         specializations = list(models.PracticeSpecialization.objects.filter(id__in=validated_data.get('specialization_ids',[])).values('id','name'));
+        if validated_data.get('url'):
+            canonical_url = validated_data.get('url')
+        else:
+            if validated_data.get('city'):
+                if specializations:
+                    specialization_name = specializations[0].get('name')
+                    if not validated_data.get('locality'):
+                        url = slugify(specialization_name + '-in-' + validated_data.get('city') + '-sptcit')
+                    else:
+                        url = slugify(specialization_name + '-in-' + validated_data.get('locality') + '-' +
+                                                validated_data.get('city') + '-sptlitcit')
+                else:
+                    if not validated_data.get('locality'):
+                        url = slugify('doctors' + '-in-' + validated_data.get('city') + '-sptcit')
+                    else:
+                        url = slugify('doctors' + '-in-' + validated_data.get('locality') + '-' +
+                                                validated_data.get('city') + '-sptlitcit')
+
+                entity = EntityUrls.objects.filter(url=url, url_type='SEARCHURL', entity_type='Doctor', is_valid=True)
+                if entity:
+                    canonical_url = entity[0].url
 
         if parameters.get('doctor_suggestions') == 1:
             result = list()
@@ -1361,6 +1556,7 @@ class DoctorListViewSet(viewsets.GenericViewSet):
 
         validated_data.get('procedure_categories', [])
         procedures = list(Procedure.objects.filter(pk__in=validated_data.get('procedure_ids', [])).values('id', 'name'))
+        ipd_procedures = list(IpdProcedure.objects.filter(pk__in=validated_data.get('ipd_procedure_ids', [])).values('id', 'name'))
         procedure_categories = list(ProcedureCategory.objects.filter(pk__in=validated_data.get('procedure_category_ids', [])).values('id', 'name'))
         conditions = list(models.MedicalCondition.objects.filter(id__in=validated_data.get('condition_ids',[])).values('id','name'));
         if validated_data.get('ratings'):
@@ -1372,7 +1568,8 @@ class DoctorListViewSet(viewsets.GenericViewSet):
                          "breadcrumb": breadcrumb, 'search_content': top_content,
                          'procedures': procedures, 'procedure_categories': procedure_categories,
                          'ratings':ratings, 'reviews': reviews, 'ratings_title': ratings_title,
-                         'bottom_content': bottom_content})
+                         'bottom_content': bottom_content, 'canonical_url': canonical_url,
+                         'ipd_procedures': ipd_procedures})
 
     @transaction.non_atomic_requests
     def search_by_hospital(self, request):
@@ -2778,7 +2975,9 @@ class OfflineCustomerViewSet(viewsets.GenericViewSet):
             else:
                 is_docprime = True
                 effective_price = app.effective_price
-                mrp = app.mrp
+                # mrp = app.mrp
+                #RAJIV YADAV
+                mrp = app.fees if app.fees else 0
                 payment_type = app.payment_type
                 deal_price = app.deal_price
                 mask_number = app.mask_number.first()
@@ -2977,3 +3176,96 @@ class AppointmentMessageViewset(viewsets.GenericViewSet):
         if not 'message' in obj:
             obj['message'] = "Message Sent Successfully"
         return Response(obj)
+
+
+class HospitalViewSet(viewsets.GenericViewSet):
+
+    def list(self, request, ipd_pk, count=None):
+        serializer = serializers.HospitalRequestSerializer(data=request.query_params)
+        serializer.is_valid(raise_exception=True)
+        validated_data = serializer.validated_data
+        ipd_procedure_obj = IpdProcedure.objects.filter(id=ipd_pk, is_enabled=True).first()
+        if not ipd_procedure_obj:
+            return Response([], status=status.HTTP_400_BAD_REQUEST)
+        lat = validated_data.get('lat')
+        long = validated_data.get('long')
+        min_distance = validated_data.get('min_distance')
+        max_distance = validated_data.get('max_distance')
+        max_distance = max_distance * 1000 if max_distance is not None else 10000
+        min_distance = min_distance * 1000 if min_distance is not None else 0
+        provider_ids = validated_data.get('provider_ids')
+        point_string = 'POINT(' + str(long) + ' ' + str(lat) + ')'
+        pnt = GEOSGeometry(point_string, srid=4326)
+        hospital_queryset = Hospital.objects.prefetch_related('hospitalcertification_set',
+                                                              'hospital_documents',
+                                                              'network__hospital_network_documents',
+                                                              'hospitalspeciality_set').filter(
+            is_live=True,
+            hospital_doctors__enabled=True,
+            hospital_doctors__ipd_procedure_clinic_mappings__enabled=True,
+            location__dwithin=(
+                Point(float(long),
+                      float(lat)),
+                D(m=max_distance)),
+            hospital_doctors__ipd_procedure_clinic_mappings__ipd_procedure_id=ipd_pk).annotate(
+            distance=Distance('location', pnt)).annotate(
+            count_of_insurance_provider=Count('health_insurance_providers')).distinct()
+        if provider_ids:
+            hospital_queryset = hospital_queryset.filter(health_insurance_providers__id__in=provider_ids)
+        if min_distance:
+            hospital_queryset = filter(lambda x: x.distance.m >= min_distance if x.distance is not None and x.distance.m is not None else False, hospital_queryset)
+
+        hospital_queryset = list(hospital_queryset)
+        result_count = len(hospital_queryset)
+        if count:
+            hospital_queryset = hospital_queryset[:count]
+        top_hospital_serializer = serializers.TopHospitalForIpdProcedureSerializer(hospital_queryset, many=True,
+                                                                                   context={'request': request})
+        return Response({'count': result_count, 'result': top_hospital_serializer.data,
+                         'ipd_procedure': {'id': ipd_procedure_obj.id, 'name': ipd_procedure_obj.name},
+                         'health_insurance_providers': [{'id': x.id, 'name': x.name} for x in
+                                                        HealthInsuranceProvider.objects.all()]})
+
+    def retrive(self, request, pk):
+        serializer = serializers.HospitalDetailRequestSerializer(data=request.query_params)
+        serializer.is_valid(raise_exception=True)
+        validated_data = serializer.validated_data
+        hospital_obj = Hospital.objects.prefetch_related('service', 'network', 'hospitalimage_set',
+                                                         'hospital_documents',
+                                                         'hospital_helpline_numbers',
+                                                         'network__hospital_network_documents',
+                                                         'hospitalcertification_set',
+                                                         'hospitalspeciality_set').filter(id=pk, is_live=True).first()
+        if not hospital_obj:
+            return Response(status=status.HTTP_400_BAD_REQUEST)
+
+        return Response(
+            serializers.HospitalDetailIpdProcedureSerializer(hospital_obj, context={'request': request,
+                                                                                    'validated_data': validated_data}).data)
+
+
+class IpdProcedureViewSet(viewsets.GenericViewSet):
+
+    def ipd_procedure_detail(self, request, pk):
+        serializer = serializers.IpdDetailsRequestDetailRequestSerializer(data=request.query_params)
+        serializer.is_valid(raise_exception=True)
+        validated_data = serializer.validated_data
+        ipd_procedure = IpdProcedure.objects.prefetch_related('feature_mappings__feature').filter(is_enabled=True, id=pk).first()
+        if ipd_procedure is None:
+            return Response(status=status.HTTP_400_BAD_REQUEST)
+        ipd_procedure_serializer = serializers.IpdProcedureDetailSerializer(ipd_procedure, context={'request': request})
+        hospital_view_set = HospitalViewSet()
+        hospital_result = hospital_view_set.list(request, pk, 2)
+        doctor_list_viewset = DoctorListViewSet()
+        doctor_result = doctor_list_viewset.list(request, parameters={'ipd_procedure_ids': str(pk),
+                                                                      'longitude': validated_data.get('long'),
+                                                                      'latitude': validated_data.get('lat'),
+                                                                      'sort_on': 'experience'})
+        return Response(
+            {'about': ipd_procedure_serializer.data, 'hospitals': hospital_result.data, 'doctors': doctor_result.data})
+
+    def create_lead(self, request):
+        serializer = serializers.IpdProcedureLeadSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        obj_created = serializer.save()
+        return Response(serializers.IpdProcedureLeadSerializer(obj_created).data)
