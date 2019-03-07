@@ -666,7 +666,7 @@ class Doctor(auth_model.TimeStampedModel, auth_model.QCModel, SearchKey, auth_mo
         tempfile_io = BytesIO()
         img.save(tempfile_io, format='JPEG')
 
-        filename = "qrcode_{}_{}.jpeg".format(str(self.name ) + '_id:' + str(self.id),
+        filename = "qrcode_{}_{}.jpeg".format('id:' + str(self.id),
                                               random.randint(1111111111, 9999999999))
         # image_file1 = InMemoryUploadedFile(tempfile_io, None, name=filename, content_type='image/jpeg', size=10000,
         #                                    charset=None)
@@ -749,7 +749,7 @@ class Doctor(auth_model.TimeStampedModel, auth_model.QCModel, SearchKey, auth_mo
 
         tempfile_io = BytesIO()
         canvas.save(tempfile_io, format='JPEG')
-        filename = "doctor_sticker_{}_{}.jpeg".format(str(self.name) + '_id:' + str(self.id),
+        filename = "doctor_sticker_{}_{}.jpeg".format('id:' + str(self.id),
                                               random.randint(1111111111, 9999999999))
 
         image_file1 = InMemoryUploadedFile(tempfile_io, None, filename, 'image/jpeg', tempfile_io.tell(), None)
