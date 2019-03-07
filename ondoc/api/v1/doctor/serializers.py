@@ -1700,6 +1700,19 @@ class HospitalDetailIpdProcedureSerializer(TopHospitalForIpdProcedureSerializer)
                     appointment_type=RatingsReview.OPD)
         return RatingsGraphSerializer(queryset, context={'request': self.context.get('request')}).data
 
+    def get_rating(self, obj):
+        app = OpdAppointment.objects.select_related('profile').filter(hospital_id=obj.id).all()
+        queryset = rate_models.RatingsReview.objects.prefetch_related('compliment') \
+            .exclude(Q(review='') | Q(review=None)) \
+            .filter(is_live=True,
+                    moderation_status__in=[rate_models.RatingsReview.PENDING,
+                                           rate_models.RatingsReview.APPROVED],
+                    appointment_id__in=OpdAppointment.objects.filter(hospital_id=obj.id).values_list('id', flat=True),
+                    appointment_type=rate_models.RatingsReview.OPD) \
+            .order_by('-ratings', '-updated_at')[:5]
+        reviews = rating_serializer.RatingsModelSerializer(queryset, many=True, context={'app': app})
+        return reviews.data
+
 
 class HospitalRequestSerializer(serializers.Serializer):
     long = serializers.FloatField(default=77.071848)
