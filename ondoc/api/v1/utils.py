@@ -8,7 +8,6 @@ from django.db import connection, transaction
 from django.db.models import F, Func, Q, Count, Sum, Case, When, Value, IntegerField
 from django.utils import timezone
 import math
-import datetime
 import pytz
 import calendar
 from django.contrib.auth import get_user_model
@@ -850,22 +849,19 @@ class TimeSlotExtraction(object):
 
     def get_slots(self, date, i, j, whole_timing_data, booking_details):
         converted_date = (date + datetime.timedelta(days=j))
-        # format_date = converted_date
+        readable_date = converted_date.strftime("%Y-%m-%d")
         booking_details['date'] = converted_date
         total_leave_list = booking_details.get('total_leave_list')
         if converted_date in total_leave_list:
-            converted_date = str(converted_date)
-            whole_timing_data[converted_date] = list()
+            whole_timing_data[readable_date] = list()
         else:
-            # converted_date = (date + datetime.timedelta(days=j)).strftime('%d-%m-%Y')
-            converted_date = str(converted_date)
-            whole_timing_data[converted_date] = list()
+            whole_timing_data[readable_date] = list()
             pa = self.price_available[i]
 
             if self.timing[i].get('timing'):
-                whole_timing_data[converted_date].append(
+                whole_timing_data[readable_date].append(
                     self.format_data(self.timing[i]['timing'][self.MORNING], self.MORNING, pa, booking_details))
-                whole_timing_data[converted_date].append(
+                whole_timing_data[readable_date].append(
                     self.format_data(self.timing[i]['timing'][self.EVENING], self.EVENING, pa, booking_details))
 
     def get_doctor_leave_list(self, leaves):
@@ -878,7 +874,7 @@ class TimeSlotExtraction(object):
             if start_date == end_date:
                 total_leaves.append(datetime.datetime.strptime(start_date, '%Y-%m-%d'))
             else:
-                delta = datetime.strptime(end_date, '%d-%m-%Y') - datetime.strptime(start_date, '%d-%m-%Y')
+                delta = datetime.datetime.strptime(end_date, '%Y-%m-%d') - datetime.datetime.strptime(start_date, '%Y-%m-%d')
                 total_leaves.append(datetime.datetime.strptime(start_date, '%Y-%m-%d'))
                 for i in range(delta.days + 1):
                     total_leaves.append(datetime.datetime.strptime(start_date, '%Y-%m-%d') + datetime.timedelta(i))

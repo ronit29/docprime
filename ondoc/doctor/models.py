@@ -715,7 +715,7 @@ class DoctorClinic(auth_model.TimeStampedModel):
 
         for data in clinic_timings:
             obj.form_time_slots(data.day, data.start, data.end, data.fees, True,
-                               data.deal_price, data.mrp, True, on_call=data.type)
+                                data.deal_price, data.mrp, True, on_call=data.type)
 
         date = datetime.datetime.today().strftime('%Y-%m-%d')
         booking_details = {"type": "doctor"}
