@@ -109,7 +109,14 @@ class Banner(auth_model.TimeStampedModel):
                     resp['url'] = '/'
             if data.url:
                 data.url = re.sub('.*?\?', '', data.url)
-                qd = QueryDict(data.url)
+                qd = QueryDict(data.url, mutable=True)
+
+                for key in qd.keys():
+                    if qd[key] and qd[key]=='true':
+                        qd[key] = True
+                    elif qd[key] and qd[key]=='false':
+                        qd[key] = False
+
                 resp['url_details'] = qd
             resp['image'] = request.build_absolute_uri(data.image.url)
 
