@@ -5,7 +5,7 @@ from ondoc.doctor.models import DoctorClinic, SearchKey
 from collections import deque, OrderedDict
 
 
-class IpdProcedure(auth_model.TimeStampedModel, SearchKey):
+class IpdProcedure(auth_model.TimeStampedModel, SearchKey, auth_model.SoftDelete):
     name = models.CharField(max_length=500, unique=True)
     details = models.TextField(blank=True)
     is_live = models.BooleanField(default=False)

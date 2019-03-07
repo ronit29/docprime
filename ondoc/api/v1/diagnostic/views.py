@@ -680,7 +680,7 @@ class LabList(viewsets.ReadOnlyModelViewSet):
             filtering_params['network_id'] = str(network_id)
 
         if name:
-            search_key = re.findall(r'[a-z0-9A-Z.]+',name)
+            search_key = re.findall(r'[a-z0-9A-Z.:]+',name)
             search_key = " ".join(search_key).lower()
             search_key = "".join(search_key.split("."))
             filtering_query.append("lb.name ilike %(name)s")

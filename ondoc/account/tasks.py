@@ -132,56 +132,79 @@ def dump_to_elastic():
                     if dump_response.status_code != status.HTTP_200_OK or not dump_response.ok:
                         raise Exception('Dump unsuccessfull')
 
-        # Delete the index or empty the index for new use.
-        deleteResponse = requests.delete(elastic_url + '/' + destination)
-        if deleteResponse.status_code != status.HTTP_200_OK or not deleteResponse.ok:
-            if deleteResponse.status_code == status.HTTP_404_NOT_FOUND and deleteResponse.json().get('error', {}).get('type', "") == "index_not_found_exception".lower():
-                pass
-            else:
-                raise Exception('Could not delete the destination index.')
-
-        # create the destination index for dumping the data.
-        createDestinationIndex = requests.put(elastic_url + '/' + destination, headers=headers, data=json.dumps(secondary_index_mapping_data))
-        if createDestinationIndex.status_code != status.HTTP_200_OK or not createDestinationIndex.ok:
-            raise Exception('Could not create the destination index. ', destination)
-
-        data = {"source": {"index": primary_index}, "dest": {"index": destination}}
-        response = requests.post(elastic_url + '/_reindex', headers={'Content-Type': 'application/json'}, data=json.dumps(data))
-        if response.status_code != status.HTTP_200_OK or not response.ok:
-            raise Exception('Could not switch the ')
-
-        aliasData = {
-            "actions": [
-                {
-                    "remove": {
-                        "indices": [original],
-                        "alias": elastic_alias
-                    }
-                },
-                {
-                    "add": {"indices": [destination], "alias": elastic_alias}
-                }
-            ]
+        call_data = {
+            'primary_index': primary_index,
+            'secondary_index_mapping_data' : secondary_index_mapping_data,
+            'elastic_alias': elastic_alias,
+            'url': elastic_url,
+            'original': original,
+            'destination': destination
         }
 
-        elastic_alias_switch.apply_async(({'url': elastic_url, 'alias_data': aliasData},), countdown=3600)
+        logger.error(json.dumps(call_data))
+        elastic_alias_switch.apply_async((call_data,), countdown=3600)
+
+        logger.error("Sync elastic job 1 completed")
+        return
 
     except Exception as e:
         logger.error("Error in syncing process of elastic - " + str(e))
 
 @task()
 def elastic_alias_switch(data):
+    headers = {
+        'Content-Type': 'application/json',
+    }
+
     elastic_url = data.get('url')
-    alias_data = data.get('alias_data')
-    if not elastic_url or not alias_data:
-        raise Exception('Url and alias data not found.')
+    destination = data.get('destination')
+    original = data.get('original')
+    elastic_alias = data.get('elastic_alias')
+    secondary_index_mapping_data = data.get('secondary_index_mapping_data')
+    primary_index = data.get('primary_index')
+    if not elastic_url or not destination or not original or not elastic_alias or not secondary_index_mapping_data or not primary_index:
+        raise Exception('Invalid data found. Cannot sync to elastic.')
+
+    # Delete the index or empty the index for new use.
+    deleteResponse = requests.delete(elastic_url + '/' + destination)
+    if deleteResponse.status_code != status.HTTP_200_OK or not deleteResponse.ok:
+        if deleteResponse.status_code == status.HTTP_404_NOT_FOUND and deleteResponse.json().get('error', {}).get('type', "") == "index_not_found_exception".lower():
+            pass
+        else:
+            raise Exception('Could not delete the destination index.')
+
+    # create the destination index for dumping the data.
+    createDestinationIndex = requests.put(elastic_url + '/' + destination, headers=headers, data=json.dumps(secondary_index_mapping_data))
+    if createDestinationIndex.status_code != status.HTTP_200_OK or not createDestinationIndex.ok:
+        raise Exception('Could not create the destination index. ', destination)
+
+    data = {"source": {"index": primary_index}, "dest": {"index": destination}}
+    response = requests.post(elastic_url + '/_reindex', headers={'Content-Type': 'application/json'}, data=json.dumps(data))
+    if response.status_code != status.HTTP_200_OK or not response.ok:
+        raise Exception('Could not switch the ')
+
+    alias_data = {
+        "actions": [
+            {
+                "remove": {
+                    "indices": [original],
+                    "alias": elastic_alias
+                }
+            },
+            {
+                "add": {"indices": [destination], "alias": elastic_alias}
+            }
+        ]
+    }
 
     response = requests.post(elastic_url + '/_aliases', headers={'Content-Type': 'application/json'}, data=json.dumps(alias_data))
     if response.status_code != status.HTTP_200_OK or not response.ok:
         logger.error('Could not switch the latest index to the live aliases. ', alias_data)
-        print("Sync to elastic failed.")
+        logger.error("Sync to elastic failed.")
     else:
-        print("Sync to elastic successfull.")
+        logger.error("Sync to elastic successfull.")
+
+    return
 
 
 @task()
