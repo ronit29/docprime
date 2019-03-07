@@ -220,6 +220,7 @@ class DoctorSearchHelper:
         longitude = str(self.query_params["longitude"])
         latitude = str(self.query_params["latitude"])
         ist_time = datetime.now().strftime("%H:%M:%S")
+        ist_date = datetime.now().strftime("%Y-%m-%d")
 
         max_distance = str(
             self.query_params.get('max_distance') * 1000 if self.query_params.get(
@@ -311,7 +312,7 @@ class DoctorSearchHelper:
             "and d.is_test_doctor is False and d.is_internal is False " \
             "INNER JOIN hospital h ON h.id = dc.hospital_id and h.is_live=true " \
             "INNER JOIN doctor_clinic_timing dct ON dc.id = dct.doctor_clinic_id " \
-            "LEFT JOIN doctor_leave dl on dl.doctor_id = d.id and current_date BETWEEN dl.start_date and dl.end_date " \
+            "LEFT JOIN doctor_leave dl on dl.doctor_id = d.id and (%(ist_date)s) BETWEEN dl.start_date and dl.end_date " \
             "AND (%(ist_time)s) BETWEEN dl.start_time and dl.end_time" \
             "{sp_cond}" \
             "WHERE {filtering_params} " \
@@ -329,12 +330,13 @@ class DoctorSearchHelper:
             filtering_params.get('params')['min_distance'] = min_distance
             filtering_params.get('params')['max_distance'] = max_distance
             filtering_params.get('params')['ist_time'] = ist_time
+            filtering_params.get('params')['ist_date'] = ist_date
         else:
             filtering_params['params']['longitude'] = longitude
             filtering_params['params']['latitude'] = latitude
             filtering_params['params']['min_distance'] = min_distance
             filtering_params['params']['max_distance'] = max_distance
-            filtering_params.get('params')['ist_time'] = ist_time
+            filtering_params.get('params')['ist_date'] = ist_date
 
         return {'params':filtering_params.get('params'), 'query': query_string}
 
