@@ -1128,7 +1128,8 @@ class TestPackageFormSet(forms.BaseInlineFormSet):
 
 
 class TestParameterAdminForm(forms.ModelForm):
-    name = forms.CharField(widget=forms.Textarea, required=False)
+    # name = forms.CharField(widget=forms.Textarea, required=False)
+    details = forms.CharField(widget=forms.Textarea, required=False)
 
     class Media:
         extend = False

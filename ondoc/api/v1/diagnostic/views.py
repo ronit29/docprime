@@ -1963,7 +1963,8 @@ class TestDetailsViewset(viewsets.GenericViewSet):
                         resp = {}
                         resp['name'] = ptest.name
                         resp['id'] = ptest.id
-                        resp['parameters'] = [t_param.name for t_param in ptest.parameter.all()]
+                        resp['parameters'] = [test_parameter.name for test_parameter in ptest.parameter.all()]
+                        resp['parameters_details'] = [{'name': t_param.name, 'details': t_param.details} for t_param in ptest.parameter.all()]
                         pack_list.append(resp)
             result['this_package_will_include'] = {'title': 'This package includes', 'tests': pack_list}
 

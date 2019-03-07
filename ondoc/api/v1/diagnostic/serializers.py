@@ -271,12 +271,14 @@ class AvailableLabTestPackageSerializer(serializers.ModelSerializer):
                 param_list = list()
                 for obj in param_objs:
                     param_list.append(obj.parameter.name)
+                param_details = [{'name': obj.parameter.name, 'details': obj.parameter.details} for obj in param_objs]
                 ret_data.append({
                     "name": t_obj.lab_test.name,
                     "why": t_obj.lab_test.why,
                     "pre_test_info": t_obj.lab_test.pre_test_info,
                     "expected_tat": t_obj.lab_test.expected_tat,
                     "parameters": param_list,
+                    "parameter_details": param_details,
                     "category": rec_dict.get('category')
                 })
         return ret_data

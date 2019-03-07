@@ -17,7 +17,7 @@ function getCookie(name) {
 function initEditor(){
 
    let csrftoken = getCookie('csrftoken')
-   let l = ['#id_name']
+   let l = ['#id_details']
    l.forEach(function(e){
           ckEditor =  ClassicEditor
                .create( document.querySelector(e),
