@@ -500,11 +500,12 @@ class DoctorProfileView(viewsets.GenericViewSet):
         if provider_signup_lead:
             consent = provider_signup_lead.is_docprime
             resp_data['consent'] = consent
-            # resp_data['source_type'] = Doctor.PROVIDER
             resp_data['role_type'] = provider_signup_lead.type
             resp_data['phone_number'] = provider_signup_lead.phone_number
             resp_data['email'] = provider_signup_lead.email
             resp_data['name'] = provider_signup_lead.name
+            if not doctor:
+                resp_data['source_type'] = Doctor.PROVIDER
 
         return Response(resp_data)
 
