@@ -498,14 +498,16 @@ class DoctorProfileView(viewsets.GenericViewSet):
 
         provider_signup_lead = ProviderSignupLead.objects.filter(user=user).first()
         if provider_signup_lead:
-            consent = provider_signup_lead.is_docprime
-            resp_data['consent'] = consent
+            resp_data['consent'] = provider_signup_lead.is_docprime
             resp_data['role_type'] = provider_signup_lead.type
             resp_data['phone_number'] = provider_signup_lead.phone_number
             resp_data['email'] = provider_signup_lead.email
             resp_data['name'] = provider_signup_lead.name
             if not doctor:
                 resp_data['source_type'] = Doctor.PROVIDER
+            resp_data['is_provider_signup_lead'] = True
+        else:
+            resp_data['is_provider_signup_lead'] = False
 
         return Response(resp_data)
 
