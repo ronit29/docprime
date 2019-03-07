@@ -93,13 +93,7 @@ class LoginOTP(GenericViewSet):
         retry_send = request.query_params.get('retry', False)
 
         if req_type == 'doctor':
-            doctor_queryset = GenericAdmin.objects.select_related('doctor', 'hospital').filter( Q(phone_number=phone_number, is_disabled=False),
-                                        (Q(doctor__isnull=True, hospital__data_status=Hospital.QC_APPROVED) |
-                                         Q(doctor__isnull=False,
-                                           doctor__data_status=Doctor.QC_APPROVED, doctor__onboarding_status = Doctor.ONBOARDED
-                                          )
-                                        )
-                                       )
+            doctor_queryset = GenericAdmin.objects.select_related('doctor', 'hospital').filter(phone_number=phone_number, is_disabled=False)
             lab_queryset = GenericLabAdmin.objects.select_related('lab', 'lab_network').filter(
                 Q(phone_number=phone_number, is_disabled=False),
                 (Q(lab__isnull=True, lab_network__data_status=LabNetwork.QC_APPROVED) |
