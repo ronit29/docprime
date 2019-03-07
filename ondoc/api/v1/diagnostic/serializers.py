@@ -412,8 +412,9 @@ class CommonTestSerializer(serializers.ModelSerializer):
 class CommonPackageSerializer(serializers.ModelSerializer):
     id = serializers.ReadOnlyField(source='package.id')
     name = serializers.ReadOnlyField(source='package.name')
-    show_details = serializers.ReadOnlyField(source='test.show_details')
+    show_details = serializers.ReadOnlyField(source='package.show_details')
     icon = serializers.SerializerMethodField()
+    url = serializers.ReadOnlyField(source='package.url')
 
     def get_icon(self, obj):
         request = self.context.get('request')
@@ -421,7 +422,7 @@ class CommonPackageSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = CommonPackage
-        fields = ('id', 'name', 'icon', 'show_details')
+        fields = ('id', 'name', 'icon', 'show_details', 'url')
 
 
 class CommonConditionsSerializer(serializers.ModelSerializer):
