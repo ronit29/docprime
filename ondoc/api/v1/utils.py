@@ -937,7 +937,7 @@ class TimeSlotExtraction(object):
                 if current_date_time.hour > 17:
                     lab_tomorrow_time = 12.0
             else:
-                lab_booking_minimum_time = current_date_time + datetime.timedelta(hours=1)
+                lab_booking_minimum_time = current_date_time + datetime.timedelta(hours=2)
                 lab_booking_hours = lab_booking_minimum_time.strftime('%H:%M')
                 hours, minutes = lab_booking_hours.split(':')
                 mins = int(hours) * 60 + int(minutes)

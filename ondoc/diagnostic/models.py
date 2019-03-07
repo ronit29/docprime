@@ -465,7 +465,7 @@ class Lab(TimeStampedModel, CreatedByModel, QCModel, SearchKey):
 
     def get_timing(self, is_home_pickup):
         from ondoc.api.v1.common import serializers as common_serializers
-        lab_timing_queryset = self.lab_timings.filter(lab__is_home_collection_enabled=is_home_pickup)
+        lab_timing_queryset = self.lab_timings.filter(for_home_pickup=is_home_pickup)
         lab_slots = []
         if not lab_timing_queryset or (is_home_pickup and not lab_timing_queryset[0].lab.is_home_collection_enabled):
             return {
