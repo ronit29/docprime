@@ -1045,6 +1045,7 @@ class TimeSlotExtraction(object):
 
     def get_upcoming_slots(self, time_slots):
         no_of_slots = 3
+        next_day_slot = 0
         upcoming = OrderedDict()
         for key, value in time_slots.items():
             if not value or (not value[0]['timing'] and not value[1]['timing']):
@@ -1052,17 +1053,53 @@ class TimeSlotExtraction(object):
             else:
                 upcoming[key] = list()
                 if len(value[0]['timing']) >= no_of_slots:
-                    for i in range(no_of_slots):
+                    if next_day_slot > 0:
+                        range_upto = next_day_slot
+                    else:
+                        range_upto = no_of_slots
+
+                    for i in range(range_upto):
                         upcoming[key].append(value[0]['timing'][i])
+
+                    next_day_slot = no_of_slots - (len(value[0]['timing']) + next_day_slot)
+
                 elif len(value[0]['timing']) < no_of_slots:
-                    remaining = no_of_slots - len(value[0]['timing'])
-                    for i in range(len(value[0]['timing'])):
-                        upcoming[key].append(value[0]['timing'][i])
+                    if next_day_slot > 0:
+                        if next_day_slot >= len(value[0]['timing']):
+                            range_upto = len(value[0]['timing'])
+                        else:
+                            range_upto = next_day_slot
 
-                    for i in range(remaining):
-                        upcoming[key].append(value[1]['timing'][i])
+                        for i in range(range_upto):
+                            upcoming[key].append(value[0]['timing'][i])
 
-                return upcoming
+                        remaining = next_day_slot - len(value[0]['timing'])
+                        if remaining >= len(value[1]['timing']):
+                            range_upto = len(value[1]['timing'])
+                        else:
+                            range_upto = remaining
+
+                        for i in range(range_upto):
+                            upcoming[key].append(value[1]['timing'][i])
+                    else:
+                        for i in range(len(value[0]['timing'])):
+                            upcoming[key].append(value[0]['timing'][i])
+
+                        remaining = no_of_slots - len(value[0]['timing'])
+                        if remaining >= len(value[1]['timing']):
+                            range_upto = len(value[1]['timing'])
+                        else:
+                            range_upto = remaining
+
+                        for i in range(range_upto):
+                            upcoming[key].append(value[1]['timing'][i])
+                    next_day_slot = no_of_slots - (len(value[0]['timing']) + len(value[1]['timing']) + next_day_slot)
+
+                if next_day_slot > 0:
+                    pass
+                else:
+                    return upcoming
+
 
 
 def consumers_balance_refund():
