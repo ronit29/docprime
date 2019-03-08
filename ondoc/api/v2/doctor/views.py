@@ -654,6 +654,7 @@ class ProviderSignupDataViewset(viewsets.GenericViewSet):
             hosp_essential_dict['state'] = valid_data.get('state')
         if valid_data.get('country'):
             hosp_essential_dict['country'] = valid_data.get('country')
+        hosp_essential_dict['is_listed_on_docprime'] = valid_data.get('is_listed_on_docprime')
 
         contact_number = valid_data.get('contact_number')
         doctor_details = valid_data.get('doctors')

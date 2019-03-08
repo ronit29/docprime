@@ -209,6 +209,7 @@ class Hospital(auth_model.TimeStampedModel, auth_model.CreatedByModel, auth_mode
 
     remark = GenericRelation(Remark)
     matrix_lead_id = models.BigIntegerField(blank=True, null=True, unique=True)
+    is_listed_on_docprime = models.NullBooleanField(null=True, blank=True)
 
     def __str__(self):
         return self.name
@@ -2650,7 +2651,7 @@ class ProviderSignupLead(auth_model.TimeStampedModel):
     phone_number = models.BigIntegerField(unique=True)
     email = models.EmailField()
     type = models.IntegerField(choices=TYPE_CHOICES)
-    is_docprime = models.NullBooleanField(null=True)
+    is_docprime = models.NullBooleanField(null=True, editable=False)
 
     class Meta:
         db_table = "provider_signup_lead"

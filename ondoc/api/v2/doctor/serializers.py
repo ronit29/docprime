@@ -249,7 +249,7 @@ class CreateHospitalSerializer(serializers.Serializer):
     doctors = serializers.ListField(required=False, child=BulkCreateDoctorSerializer(many=False))
     staffs = serializers.ListField(required=False, child=BulkCreateGenericAdminSerializer(many=False),
                                            allow_empty=True)
-    is_list_on_docprime = serializers.BooleanField(required=False, default=False)
+    is_listed_on_docprime = serializers.BooleanField(default=False)
 
 
 class DoctorModelSerializer(serializers.ModelSerializer):
