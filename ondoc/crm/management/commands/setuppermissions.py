@@ -505,7 +505,7 @@ class Command(BaseCommand):
                                                            IpdProcedureFeatureMapping, HospitalServiceMapping,
                                                            DoctorClinic, DoctorClinicIpdProcedure,
                                                            HealthInsuranceProviderHospitalMapping, IpdProcedureCategoryMapping, CommonIpdProcedure,
-                                                           HospitalHelpline)
+                                                           HospitalHelpline, IpdProcedure)
         for cl, ct in content_types.items():
             permissions = Permission.objects.filter(
                 Q(content_type=ct),
@@ -515,7 +515,7 @@ class Command(BaseCommand):
 
             group.permissions.add(*permissions)
 
-        content_types = ContentType.objects.get_for_models(PaymentOptions, EntityUrls, IpdProcedure, Feature, Service, Doctor,
+        content_types = ContentType.objects.get_for_models(PaymentOptions, EntityUrls, Feature, Service, Doctor,
                                                            HealthInsuranceProvider, IpdProcedureCategory)
 
         for cl, ct in content_types.items():
