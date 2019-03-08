@@ -545,9 +545,14 @@ class LabList(viewsets.ReadOnlyModelViewSet):
 
     @transaction.non_atomic_requests
     def search(self, request, **kwargs):
+
         parameters = request.query_params
         if kwargs.get('parameters'):
             parameters = kwargs.get('parameters')
+        test_ids = parameters.get('ids', [])
+        tests = list(LabTest.objects.filter(id__in=test_ids).values('id', 'name', 'hide_price', 'show_details', 'test_type', 'url'))
+        if not tests:
+            return Response(status=status.HTTP_400_BAD_REQUEST)
         serializer = diagnostic_serializer.SearchLabListSerializer(data=parameters)
         serializer.is_valid(raise_exception=True)
         if kwargs.get('location_json'):
@@ -586,9 +591,7 @@ class LabList(viewsets.ReadOnlyModelViewSet):
         #
         # id_url_dict = dict()
 
-        test_ids = parameters.get('ids', [])
 
-        tests = list(LabTest.objects.filter(id__in=test_ids).values('id', 'name', 'hide_price', 'show_details','test_type', 'url'))
         seo = None
         breadcrumb = None
         location = None

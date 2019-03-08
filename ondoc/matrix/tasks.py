@@ -543,7 +543,7 @@ def create_or_update_lead_on_matrix(self, data):
                 # raise Exception("[ERROR] ID not received from the matrix while creating lead for {} with ID {}.")
 
             # save the order with the matrix lead id.
-            obj = model_used.objects.select_for_update().filter(id=obj_id).first()
+            # obj = model_used.objects.select_for_update().filter(id=obj_id).first()
             if obj and hasattr(obj, 'matrix_lead_id') and not obj.matrix_lead_id:
                 obj.matrix_lead_id = resp_data.get('Id', None)
                 obj.matrix_lead_id = int(obj.matrix_lead_id)
