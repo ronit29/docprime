@@ -745,6 +745,8 @@ class LabList(viewsets.ReadOnlyModelViewSet):
         if kwargs.get('parameters'):
             parameters = kwargs.get('parameters')
         test_ids = parameters.get('ids', [])
+        if not isinstance(test_ids, list) and isinstance(test_ids, str):
+            test_ids = test_ids.split(",")
         tests = list(LabTest.objects.filter(id__in=test_ids).values('id', 'name', 'hide_price', 'show_details', 'test_type', 'url'))
         if not tests:
             return Response(status=status.HTTP_400_BAD_REQUEST)
