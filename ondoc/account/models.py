@@ -1269,20 +1269,23 @@ class MerchantPayout(TimeStampedModel):
         return bool(all_txn and all_txn.count() > 0), order_data, appointment
 
     def update_status_from_pg(self):
-        url = 'http://pg.docprime.com/pg/api/settlementDetails'
+        url = 'https://pgqa.docprime.com/pg/api/settlementDetails'
 
         has_txn, order_data, appointment = self.has_transaction()
         print('hello')
         if has_txn or True:
-            #transaction = order_data.getTransactions()[0]
-            #order_no = transaction.order_no
-            order_no = "DP15506"
-            order_no_str = '[\''+order_no+'\']'
-            req_data = {"orderNo":order_no_str,"date":"","days":""}
+            transaction = order_data.getTransactions()[0]
+            order_no = transaction.order_no
+            # order_no = "DP4253"
+            #req_data = {"orderNo":order_no,"date":None,"days":None}
+            req_data = {"orderNo": order_no}
             req_data["hashchecksum"] = self.create_checksum(req_data)
 
-            headers = {"auth": 'gFH8gPXbCWaW8WqUefmFBcyRj0XIw',
-            "Content-Type": "application/json"}
+            # headers = {"auth": 'gFH8gPXbCWaW8WqUefmFBcyRj0XIw',
+            # "Content-Type": "application/json"}
+
+            headers = {"auth": 'gFH8gPXbCWaW8WqUefmFBcyRj0SDs',
+                       "Content-Type": "application/json"}
 
             response = requests.post(url, data=json.dumps(req_data), headers=headers)
             if response.status_code == status.HTTP_200_OK:
@@ -1292,12 +1295,27 @@ class MerchantPayout(TimeStampedModel):
 
     def create_checksum(self, data):
 
-        secret_key = settings.PG_SECRET_KEY_P2
-        client_key = settings.PG_CLIENT_KEY_P2
+        # secretkey = settings.PG_SECRET_KEY_P2
+        # accesskey = settings.PG_CLIENT_KEY_P2
+        accesskey = 'YPL09/78LKpo9l'
+        secretkey = 'aY678ikloPL'
+        checksum = ""
 
-        checksum_string = client_key+'|'+data['orderNo']+'|'+secret_key
+        keylist = sorted(data)
+        for k in keylist:
+            if data[k] is not None and data[k] is not "":
+                curr = k + '=' + str(data[k]) + ';'
+                checksum += curr
+
+        checksum = accesskey + "|" + checksum + "|" + secretkey
+        checksum_hash = hashlib.sha256(str(checksum).encode())
+        checksum_hash = checksum_hash.hexdigest()
+        return checksum_hash
 
 
+        #
+        # checksum_string = client_key+'|' + 'date=' + data['date'] +';days='+ data['days'] + ';orderNo=' + data['orderNo']+';' + '|'+secret_key
+        #
         # accesskey|orderNo|days|date|secretkey
         # And converted into SHA512
 
@@ -1316,11 +1334,6 @@ class MerchantPayout(TimeStampedModel):
         # checksum += curr
 
         # checksum = secret_key + "|[" + checksum + "]|" + client_key
-        checksum_hash = hashlib.sha256(str(checksum_string).encode())
-        checksum_hash = checksum_hash.hexdigest()
-        return checksum_hash
-
-
 
     class Meta:
         db_table = "merchant_payout"

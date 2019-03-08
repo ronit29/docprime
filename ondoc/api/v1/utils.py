@@ -1115,12 +1115,8 @@ def payout_checksum(request_payload):
 
     keylist = sorted(request_payload)
     for k in keylist:
-        if request_payload[k] is not None and request_payload[k] is not "":
+        if request_payload[k] is not None:
             curr = curr + k + '=' + str(request_payload[k]) + ';'
-        elif request_payload[k] is "":
-            curr = curr + k + '=' + "" + ';'
-        else:
-            pass
 
     checksum += curr
 
