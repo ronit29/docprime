@@ -741,9 +741,10 @@ class Doctor(auth_model.TimeStampedModel, auth_model.QCModel, SearchKey, auth_mo
         qrcode_image = qrcode_image.resize((530, 530), Image.ANTIALIAS)
         canvas.paste(qrcode_image, (215, 830))
 
-        blank_image = Image.new('RGBA', (1000, 1000), 'white')
+        blank_image = Image.new('RGBA', (1000, 1000), 'white') # this new image is created to write text and paste on canvas
         img_draw = ImageDraw.Draw(canvas)
-        font = ImageFont.truetype("/home/sheryas/.fonts/ProspectusPro-Desktop-v1-002/ProspectusSBld.otf", 40)
+        font_url = staticfiles_storage.path('web/images/.fonts/ProspectusPro-Desktop-v1-002/ProspectusSBld.otf')
+        font = ImageFont.truetype(font_url, 40)
         img_draw.text((350, 530), self.name, fill='black', font=font)
         # md5_hash = hashlib.md5(canvas.tobytes()).hexdigest()
 
