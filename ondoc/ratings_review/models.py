@@ -57,7 +57,7 @@ class RatingsReview(auth_model.TimeStampedModel):
 
     class Meta:
         db_table = 'ratings_review'
-
+        unique_together = ('appointment_id', 'appointment_type')
 
 class ReviewActions(auth_model.TimeStampedModel):
     NOACTION = 0

@@ -39,10 +39,11 @@ from ondoc.doctor.models import OpdAppointment
 from ondoc.api.v1.doctor.serializers import (OpdAppointmentSerializer, AppointmentFilterUserSerializer,
                                              UpdateStatusSerializer, CreateAppointmentSerializer,
                                              AppointmentRetrieveSerializer, OpdAppTransactionModelSerializer,
-                                             OpdAppModelSerializer)
+                                             OpdAppModelSerializer,OpdAppointmentUpcoming)
 from ondoc.api.v1.diagnostic.serializers import (LabAppointmentModelSerializer,
                                                  LabAppointmentRetrieveSerializer, LabAppointmentCreateSerializer,
-                                                 LabAppTransactionModelSerializer, LabAppRescheduleModelSerializer)
+                                                 LabAppTransactionModelSerializer, LabAppRescheduleModelSerializer,
+                                                 LabAppointmentUpcoming)
 from ondoc.api.v1.diagnostic.views import LabAppointmentView
 from ondoc.diagnostic.models import (Lab, LabAppointment, AvailableLabTest, LabNetwork)
 from ondoc.payout.models import Outstanding
@@ -63,6 +64,7 @@ from django.contrib.contenttypes.models import ContentType
 
 import re
 from ondoc.matrix.tasks import push_order_to_matrix
+
 
 
 logger = logging.getLogger(__name__)
@@ -1913,3 +1915,26 @@ class UserRatingViewSet(GenericViewSet):
                 resp.append(rating_obj)
         return Response(resp)
 
+
+class AppointmentViewSet(viewsets.GenericViewSet):
+    authentication_classes = (JWTAuthentication,)
+    permission_classes = (IsAuthenticated,)
+
+    def upcoming_appointments(self, request):
+        all_appointments = []
+        try:
+            user_id = request.user.id
+            opd = OpdAppointment.get_upcoming_appointment(user_id)
+            opd_appointments = OpdAppointmentUpcoming(opd, many=True).data
+            lab = LabAppointment.get_upcoming_appointment(user_id)
+            lab_appointments = LabAppointmentUpcoming(lab, many=True).data
+
+            all_appointments = opd_appointments + lab_appointments
+            all_appointments = sorted(all_appointments,
+                                      key=lambda x: x["time_slot_start"])
+        except Exception as e:
+            logger.error(str(e))
+        return Response(all_appointments)
+
+    def get_queryset(self):
+        return OpdAppointment.objects.none()

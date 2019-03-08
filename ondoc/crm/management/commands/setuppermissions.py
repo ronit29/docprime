@@ -23,7 +23,7 @@ from ondoc.doctor.models import (Doctor, Hospital, DoctorClinicTiming, DoctorCli
                                  MedicalConditionSpecialization, CompetitorInfo, CompetitorMonthlyVisit,
                                  SpecializationDepartmentMapping, CancellationReason, UploadDoctorData,
                                  HospitalServiceMapping, HealthInsuranceProviderHospitalMapping,
-                                 HealthInsuranceProvider)
+                                 HealthInsuranceProvider, HospitalHelpline)
 
 from ondoc.diagnostic.models import (Lab, LabTiming, LabImage, GenericLabAdmin,
                                      LabManager, LabAccreditation, LabAward, LabCertification,
@@ -39,7 +39,7 @@ from ondoc.diagnostic.models import (Lab, LabTiming, LabImage, GenericLabAdmin,
 
 from ondoc.procedure.models import Procedure, ProcedureCategory, CommonProcedureCategory, DoctorClinicProcedure, \
     ProcedureCategoryMapping, ProcedureToCategoryMapping, CommonProcedure, IpdProcedure, IpdProcedureFeatureMapping, \
-    DoctorClinicIpdProcedure, IpdProcedureCategoryMapping, IpdProcedureCategory
+    DoctorClinicIpdProcedure, IpdProcedureCategoryMapping, IpdProcedureCategory, CommonIpdProcedure
 from ondoc.reports import models as report_models
 
 from ondoc.diagnostic.models import LabPricing
@@ -504,7 +504,8 @@ class Command(BaseCommand):
                                                            NewDynamic, QuestionAnswer, FrequentlyAddedTogetherTests,
                                                            IpdProcedureFeatureMapping, HospitalServiceMapping,
                                                            DoctorClinic, DoctorClinicIpdProcedure,
-                                                           HealthInsuranceProviderHospitalMapping, IpdProcedureCategoryMapping)
+                                                           HealthInsuranceProviderHospitalMapping, IpdProcedureCategoryMapping, CommonIpdProcedure,
+                                                           HospitalHelpline, IpdProcedure)
         for cl, ct in content_types.items():
             permissions = Permission.objects.filter(
                 Q(content_type=ct),
@@ -514,7 +515,7 @@ class Command(BaseCommand):
 
             group.permissions.add(*permissions)
 
-        content_types = ContentType.objects.get_for_models(PaymentOptions, EntityUrls, IpdProcedure, Feature, Service, Doctor,
+        content_types = ContentType.objects.get_for_models(PaymentOptions, EntityUrls, Feature, Service, Doctor,
                                                            HealthInsuranceProvider, IpdProcedureCategory)
 
         for cl, ct in content_types.items():
