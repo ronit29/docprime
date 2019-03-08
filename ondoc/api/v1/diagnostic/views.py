@@ -377,6 +377,7 @@ class LabList(viewsets.ReadOnlyModelViewSet):
 
     @transaction.non_atomic_requests
     def package_list(self, request, **kwrgs):
+        from django.db.models.expressions import RawSQL
         parameters = request.query_params
         serializer = diagnostic_serializer.LabPackageListSerializer(data=parameters)
         serializer.is_valid(raise_exception=True)
@@ -398,23 +399,13 @@ class LabList(viewsets.ReadOnlyModelViewSet):
         point_string = 'POINT(' + str(long) + ' ' + str(lat) + ')'
         pnt = GEOSGeometry(point_string, srid=4326)
         max_distance = max_distance*1000 if max_distance is not None else 10000
-        min_distance = min_distance*1000 if min_distance is not None else 0
+        min_distance = min_distance * 1000 if min_distance is not None else 0
         main_queryset = LabTest.objects.prefetch_related('test', 'test__recommended_categories',
                                                          'test__parameter', 'categories').filter(enable_for_retail=True,
-                                                                                                 searchable=True,
-                                                                                                 is_package=True)
+                                                            searchable=True)
 
         if package_ids:
             main_queryset = main_queryset.filter(id__in=package_ids)
-
-        def gen():
-            random_no = random.randint(300000, 1000000)
-            i = 0
-            while (True):
-                yield random_no + i
-                i += 1
-
-        random_no_generator = gen()
 
         main_queryset = main_queryset.filter(
             availablelabs__enabled=True,
@@ -424,8 +415,6 @@ class LabList(viewsets.ReadOnlyModelViewSet):
                 Point(float(long),
                       float(lat)),
                 D(m=max_distance))).annotate(
-            alias_network=Coalesce(F('availablelabs__lab_pricing_group__labs__network'),
-                                   F('id') + random.randint(11111,99999))).annotate(
                                        priority_score=F('availablelabs__lab_pricing_group__labs__lab_priority') * F(
                                            'priority')).annotate(
                                        distance=Distance('availablelabs__lab_pricing_group__labs__location',
@@ -437,11 +426,9 @@ class LabList(viewsets.ReadOnlyModelViewSet):
                                            When(availablelabs__custom_deal_price__isnull=False,
                                                 then=F('availablelabs__custom_deal_price'))),
                                        rank=Window(expression=RowNumber(), order_by=F('distance').asc(),
-                                                   partition_by=[F('alias_network'), F('id')]))
+                                                   partition_by=[RawSQL('Coalesce(lab.network_id, random())', []), F('id')])
+            )
 
-        # all_packages_in_labs = all_packages__in_labs_random_no.\
-        #     annotate(rank=Coalesce(F('availablelabs__lab_pricing_group__labs__network'), F('random_no')))
-        # all_packages_in_labs = all_packages.annotate(random_no=F('id') + next(gen()))
         # if test_ids:
         #     all_packages_in_labs = all_packages_in_labs.filter(test__id__in=test_ids).annotate(
         #         included_test_count=Count('test')).filter(included_test_count=len(test_ids))
