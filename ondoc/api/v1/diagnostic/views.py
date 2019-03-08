@@ -45,7 +45,7 @@ from django.utils import timezone
 from ondoc.diagnostic import models
 from ondoc.authentication import models as auth_models
 from django.db.models import Q, Value
-from django.db.models.functions import StrIndex, Rank, Coalesce
+from django.db.models.functions import StrIndex
 
 from ondoc.location.models import EntityUrls, EntityAddress
 from ondoc.seo.models import NewDynamic
@@ -192,8 +192,8 @@ class LabList(viewsets.ReadOnlyModelViewSet):
         package_ids = validated_data.get('package_ids', [])
         point_string = 'POINT(' + str(long) + ' ' + str(lat) + ')'
         pnt = GEOSGeometry(point_string, srid=4326)
-        max_distance = max_distance * 1000 if max_distance is not None else 10000
-        min_distance = min_distance * 1000 if min_distance is not None else 0
+        max_distance = max_distance*1000 if max_distance is not None else 10000
+        min_distance = min_distance*1000 if min_distance is not None else 0
         main_queryset = LabTest.objects.prefetch_related('test', 'test__recommended_categories',
                                                          'test__parameter', 'categories').filter(enable_for_retail=True,
                                                                                                  searchable=True,
