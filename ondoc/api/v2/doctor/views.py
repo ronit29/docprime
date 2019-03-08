@@ -21,8 +21,15 @@ from django.conf import settings
 import datetime, logging, re, random
 from django.utils import timezone
 
+from ondoc.diagnostic.models import LabAppointment
+from ondoc.doctor.models import OpdAppointment
+from ondoc.api.v1.doctor import serializers as doctor_serializers
+from ondoc.api.v1.diagnostic import serializers as diagnostic_serializers
+
+
 User = get_user_model()
 logger = logging.getLogger(__name__)
+
 
 
 class DoctorBillingViewSet(viewsets.GenericViewSet):

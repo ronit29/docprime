@@ -55,6 +55,7 @@ from ondoc.common.models import AppointmentHistory, AppointmentMaskNumber, Remar
 import reversion
 from decimal import Decimal
 from django.utils.text import slugify
+#from ondoc.api.v1.diagnostic import serializers as diagnostic_serializers
 
 logger = logging.getLogger(__name__)
 
@@ -1269,13 +1270,24 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin)
     def get_cancellation_reason(self):
         return CancellationReason.objects.filter(Q(type=Order.LAB_PRODUCT_ID) | Q(type__isnull=True),
                                                  visible_on_front_end=True)
+    # @staticmethod
+    # def get_upcoming_appointment_serialized(user_id):
+    #     response_appointment = LabAppointment.get_upcoming_appointment(user_id)
+    #     appointment = diagnostic_serializers.LabAppointmentUpcoming(response_appointment, many=True)
+    #     return appointment.data
+
+    @classmethod
+    def get_upcoming_appointment(cls, user_id):
+        current_time = timezone.now()
+        appointments = LabAppointment.objects.filter(time_slot_start__gte=current_time, user_id=user_id).exclude(
+            status__in=[LabAppointment.CANCELLED, LabAppointment.COMPLETED]).prefetch_related('tests', 'lab', 'profile')
+        return appointments
 
     def get_serialized_cancellation_reason(self):
         res = []
         for cr in self.get_cancellation_reason():
             res.append({'id': cr.id, 'name': cr.name, 'is_comment_needed': cr.is_comment_needed})
         return res
-
 
     def get_report_urls(self):
         reports = self.reports.all()

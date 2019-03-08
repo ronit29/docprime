@@ -144,6 +144,7 @@ def dump_to_elastic():
         logger.error(json.dumps(call_data))
         elastic_alias_switch.apply_async((call_data,), countdown=3600)
 
+        logger.error("Sync elastic job 1 completed")
         return
 
     except Exception as e:

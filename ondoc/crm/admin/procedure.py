@@ -110,11 +110,11 @@ class IpdProcedureAdmin(VersionAdmin):
         content_type = ContentType.objects.get_for_model(obj)
         if not obj:
             pass
-        elif obj.is_live == False:
+        elif obj.is_enabled == False:
             pass
         else:
             messages.set_level(request, messages.ERROR)
-            messages.error(request, '{} should be not be live before delete'.format(content_type.model))
+            messages.error(request, '{} should be disabled before delete'.format(content_type.model))
             return HttpResponseRedirect(reverse('admin:{}_{}_change'.format(content_type.app_label,
                                                                             content_type.model), args=[object_id]))
         return super().delete_view(request, object_id, extra_context)

@@ -30,10 +30,11 @@ def doc_app_auto_cancel(self, prev_app_dict):
 
 @task()
 def save_avg_rating():
-    from ondoc.doctor.models import Doctor
+    from ondoc.doctor.models import Doctor, Hospital
     from ondoc.diagnostic.models import Lab
     Doctor.update_avg_rating()
     Lab.update_avg_rating()
+    Hospital.update_avg_rating()
 
 
 @task()

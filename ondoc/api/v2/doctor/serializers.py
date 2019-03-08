@@ -7,7 +7,10 @@ from ondoc.authentication.models import (OtpVerifications, User, UserProfile, No
                                          UserPermission, Address, GenericAdmin, GenericLabAdmin)
 from ondoc.doctor import models as doc_models
 from ondoc.procedure.models import Procedure
+from ondoc.diagnostic.models import LabAppointment
 from ondoc.api.v1.doctor import serializers as v1_serializers
+from ondoc.api.v1.diagnostic import serializers as v1_diagnostic_serailizers
+
 from dateutil.relativedelta import relativedelta
 from django.utils import timezone
 logger = logging.getLogger(__name__)

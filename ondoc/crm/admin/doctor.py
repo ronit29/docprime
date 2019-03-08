@@ -215,14 +215,6 @@ class DoctorClinicInlineForm(forms.ModelForm):
         model = DoctorClinic
         fields = ('__all__')
 
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        if self and hasattr(self, 'request') and self.request and isinstance(self.request.GET, dict):
-            # http://127.0.0.1:8000/admin/doctor/hospital/add/?AgentId=9876
-            self.request_matrix_lead_id = self.request.GET.get('LeadId', None)
-            self.request_agent_lead_id = self.request.GET.get('AgentId', None)
-
-
 
 class DoctorClinicInline(nested_admin.NestedTabularInline):
     model = DoctorClinic
@@ -233,25 +225,27 @@ class DoctorClinicInline(nested_admin.NestedTabularInline):
     show_change_link = False
     # autocomplete_fields = ['hospital']
     inlines = [DoctorClinicTimingInline, DoctorClinicProcedureInline, DoctorClinicIpdProcedureInline, AssociatedMerchantInline]
-    fields = ['hospital', 'add_hospital_link', 'followup_duration', 'followup_charges', 'enabled_for_online_booking', 'enabled', 'priority']
+    fields = ['hospital',
+              # 'add_hospital_link',
+              'followup_duration', 'followup_charges', 'enabled_for_online_booking', 'enabled', 'priority']
 
-    def get_readonly_fields(self, *args, **kwargs):
-        read_only = super().get_readonly_fields(*args, **kwargs)
-        if args:
-            request = args[0]
-            if request.GET.get('AgentId', None):
-                self.matrix_agent_id = request.GET.get('AgentId', None)
-            read_only += ('add_hospital_link',)
-        return read_only
-
-    def add_hospital_link(self, obj):
-        content_type = ContentType.objects.get_for_model(Hospital)
-        add_hospital_url = reverse('admin:%s_%s_add' % (content_type.app_label, content_type.model))
-        # add_hospital_url+='?_to_field=id&_popup=1'
-        if hasattr(self, 'matrix_agent_id') and self.matrix_agent_id:
-            add_hospital_url += '?AgentId={}'.format(self.matrix_agent_id)
-        html = '''<a href='%s' target=_blank>%s</a><br>''' % (add_hospital_url, "Add Hospital")
-        return mark_safe(html)
+    # def get_readonly_fields(self, *args, **kwargs):
+    #     read_only = super().get_readonly_fields(*args, **kwargs)
+    #     if args:
+    #         request = args[0]
+    #         if request.GET.get('AgentId', None):
+    #             self.matrix_agent_id = request.GET.get('AgentId', None)
+    #         read_only += ('add_hospital_link',)
+    #     return read_only
+    #
+    # def add_hospital_link(self, obj):
+    #     content_type = ContentType.objects.get_for_model(Hospital)
+    #     add_hospital_url = reverse('admin:%s_%s_add' % (content_type.app_label, content_type.model))
+    #     # add_hospital_url+='?_to_field=id&_popup=1'
+    #     if hasattr(self, 'matrix_agent_id') and self.matrix_agent_id:
+    #         add_hospital_url += '?AgentId={}'.format(self.matrix_agent_id)
+    #     html = '''<a href='%s' target=_blank>%s</a><br>''' % (add_hospital_url, "Add Hospital")
+    #     return mark_safe(html)
 
     def get_queryset(self, request):
         return super(DoctorClinicInline, self).get_queryset(request).select_related('hospital')
@@ -693,7 +687,6 @@ class DoctorForm(FormCleanMixin):
                     self.request_matrix_lead_id = base64.b64decode(requested_leadId).decode()
                 except Exception as e:
                     logger.error("Invalid Matrix Lead ID received from Matrix - " + str(e))
-                self.request_agent_lead_id = self.request.GET.get('AgentId', None)
 
     def validate_qc(self):
         qc_required = {'name': 'req', 'gender': 'req',
@@ -1185,7 +1178,7 @@ class DoctorAdmin(AutoComplete, ImportExportMixin, VersionAdmin, ActionAdmin, QC
                                  'is_test_doctor', 'is_license_verified', 'signature', 'enabled', 'raw_about']
         excluded = self.get_exclude(request, obj)
         final = [x for x in read_only_fields if x not in excluded]
-        #make matrix_lead_id ediable if not present or user is superqc or superuser
+        # make matrix_lead_id ediable if not present or user is superqc or superuser
         if request.user.is_member_of(constants['SUPER_QC_GROUP']) or request.user.is_superuser:
             final.remove('matrix_lead_id')
 
@@ -1339,8 +1332,6 @@ class DoctorAdmin(AutoComplete, ImportExportMixin, VersionAdmin, ActionAdmin, QC
                 obj.matrix_lead_id = int(form.request_matrix_lead_id) if hasattr(form, 'request_matrix_lead_id') else None
             except Exception as e:
                 logger.error("Invalid Matrix ID received from Matrix - " + str(e))
-
-        obj.request_agent_lead_id = form.request_agent_lead_id if hasattr(form, 'request_agent_lead_id') else None
 
         if not request.user.is_member_of(constants['DOCTOR_SALES_GROUP']):
             if not obj.created_by:
