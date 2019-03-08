@@ -1619,7 +1619,7 @@ class DoctorAvailabilityTimingViewSet(viewsets.ViewSet):
         if dc_obj:
             timeslots = dc_obj.get_timings()
         else:
-            timeslots = []
+            timeslots = {"time_slots": [], "upcoming_slots": []}
         # queryset = models.DoctorClinicTiming.objects.filter(doctor_clinic__doctor=validated_data.get('doctor_id'),
         #                                                     doctor_clinic__hospital=validated_data.get(
         #                                                         'hospital_id')).order_by("start")
