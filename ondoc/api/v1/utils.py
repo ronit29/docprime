@@ -30,6 +30,7 @@ from django.utils.dateparse import parse_datetime
 import hashlib
 from ondoc.authentication import models as auth_models
 import logging
+
 logger = logging.getLogger(__name__)
 
 User = get_user_model()
@@ -754,7 +755,7 @@ class TimeSlotExtraction(object):
     MORNING = "AM"
     # AFTERNOON = "Afternoon"
     EVENING = "PM"
-    TIME_SPAN = 15  # In minutes
+    TIME_SPAN = 30  # In minutes
     timing = dict()
     price_available = dict()
 
@@ -1041,6 +1042,27 @@ class TimeSlotExtraction(object):
                         today_max = max_val - 2
 
         return today_min, tomorrow_min, today_max
+
+    def get_upcoming_slots(self, time_slots):
+        no_of_slots = 3
+        upcoming = OrderedDict()
+        for key, value in time_slots.items():
+            if not value or (not value[0]['timing'] and not value[1]['timing']):
+                pass
+            else:
+                upcoming[key] = list()
+                if len(value[0]['timing']) >= no_of_slots:
+                    for i in range(no_of_slots):
+                        upcoming[key].append(value[0]['timing'][i])
+                elif len(value[0]['timing']) < no_of_slots:
+                    remaining = no_of_slots - len(value[0]['timing'])
+                    for i in range(len(value[0]['timing'])):
+                        upcoming[key].append(value[0]['timing'][i])
+
+                    for i in range(remaining):
+                        upcoming[key].append(value[1]['timing'][i])
+
+                return upcoming
 
 
 def consumers_balance_refund():

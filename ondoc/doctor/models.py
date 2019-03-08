@@ -720,7 +720,9 @@ class DoctorClinic(auth_model.TimeStampedModel):
         date = datetime.datetime.today().strftime('%Y-%m-%d')
         booking_details = {"type": "doctor"}
         slots = obj.get_timing_slots(date, total_leaves, booking_details)
-        return slots
+        upcoming_slots = obj.get_upcoming_slots(time_slots=slots)
+        res_data = {"time_slots": slots, "upcoming_slots": upcoming_slots}
+        return res_data
 
 
 class DoctorClinicTiming(auth_model.TimeStampedModel):

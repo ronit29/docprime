@@ -1645,7 +1645,7 @@ class DoctorAvailabilityTimingViewSet(viewsets.ViewSet):
         # date = datetime.datetime.today().strftime('%Y-%m-%d')
         # # timeslots = obj.get_timing_list()
         # timeslots = obj.get_doctor_timing_slots(date, total_leaves, "doctor")
-        return Response({"timeslots": timeslots, "doctor_data": doctor_serializer.data})
+        return Response({"timeslots": timeslots["time_slots"], "upcoming_slots": timeslots["upcoming_slots"], "doctor_data": doctor_serializer.data})
 
 
 class HealthTipView(viewsets.GenericViewSet):

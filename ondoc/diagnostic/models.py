@@ -490,31 +490,31 @@ class Lab(TimeStampedModel, CreatedByModel, QCModel, SearchKey):
             for data in lab_timing_queryset:
                 obj.form_time_slots(data.day, data.start, data.end, None, True)
 
-            global_leave_serializer = common_serializers.GlobalNonBookableSerializer(
-                GlobalNonBookable.objects.filter(deleted_at__isnull=True,
-                                                 booking_type=GlobalNonBookable.LAB), many=True)
-            date = datetime.datetime.today().strftime('%Y-%m-%d')
-            booking_details = {"type": "lab", "is_home_pickup": is_home_pickup}
-            resp_list = obj.get_timing_slots(date, global_leave_serializer.data, booking_details)
-            is_thyrocare = False
-            lab_id = self.id
-            if lab_id and settings.THYROCARE_NETWORK_ID:
-                if Lab.objects.filter(id=lab_id, network_id=settings.THYROCARE_NETWORK_ID).exists():
-                    is_thyrocare = True
+        global_leave_serializer = common_serializers.GlobalNonBookableSerializer(
+            GlobalNonBookable.objects.filter(deleted_at__isnull=True,
+                                             booking_type=GlobalNonBookable.LAB), many=True)
+        date = datetime.datetime.today().strftime('%Y-%m-%d')
+        booking_details = {"type": "lab", "is_home_pickup": is_home_pickup}
+        resp_list = obj.get_timing_slots(date, global_leave_serializer.data, booking_details)
+        is_thyrocare = False
+        lab_id = self.id
+        if lab_id and settings.THYROCARE_NETWORK_ID:
+            if Lab.objects.filter(id=lab_id, network_id=settings.THYROCARE_NETWORK_ID).exists():
+                is_thyrocare = True
 
-            # today_min, tomorrow_min, today_max = obj.initial_start_times(is_thyrocare=is_thyrocare,
-            #                                                              is_home_pickup=is_home_pickup,
-            #                                                              time_slots=resp_list)
-            # res_data = {
-            #     "time_slots": resp_list,
-            #     "today_min": today_min,
-            #     "tomorrow_min": tomorrow_min,
-            #     "today_max": today_max
-            # }
+        # today_min, tomorrow_min, today_max = obj.initial_start_times(is_thyrocare=is_thyrocare,
+        #                                                              is_home_pickup=is_home_pickup,
+        #                                                              time_slots=resp_list)
+        # res_data = {
+        #     "time_slots": resp_list,
+        #     "today_min": today_min,
+        #     "tomorrow_min": tomorrow_min,
+        #     "today_max": today_max
+        # }
 
-            res_data = {"time_slots": resp_list}
-
-            return res_data
+        upcoming_slots = obj.get_upcoming_slots(time_slots=resp_list)
+        res_data = {"time_slots": resp_list, "upcoming_slots": upcoming_slots}
+        return res_data
 
 
 class LabCertification(TimeStampedModel):
