@@ -584,8 +584,11 @@ def update_onboarding_qcstatus_to_matrix(self, data):
                 assigned_user = history_obj.user.staffprofile.employee_id if hasattr(history_obj.user,
                                                                                      'staffprofile') and history_obj.user.staffprofile.employee_id else ''
 
+        obj_matrix_lead_id = obj.matrix_lead_id if hasattr(obj, 'matrix_lead_id') and obj.matrix_lead_id else 0
+        if not obj_matrix_lead_id:
+            return
         request_data = {
-            "LeadID": obj.matrix_lead_id if hasattr(obj, 'matrix_lead_id') and obj.matrix_lead_id else 0,
+            "LeadID": obj_matrix_lead_id,
             "Comment": comment,
             "NewJourneyURL": exit_point_url,
             "AssignedUser": assigned_user,

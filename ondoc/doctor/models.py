@@ -619,7 +619,6 @@ class Doctor(auth_model.TimeStampedModel, auth_model.QCModel, SearchKey, auth_mo
     def save(self, *args, **kwargs):
         self.update_time_stamps()
         self.update_live_status()
-        request_agent_lead_id = self.request_agent_lead_id if hasattr(self, 'request_agent_lead_id') else None
         # On every update of onboarding status or Qcstatus push to matrix
         push_to_matrix = False
         update_status_in_matrix = False
@@ -627,22 +626,22 @@ class Doctor(auth_model.TimeStampedModel, auth_model.QCModel, SearchKey, auth_mo
             doctor_obj = Doctor.objects.filter(pk=self.id).first()
             if doctor_obj and self.data_status != doctor_obj.data_status:
                 update_status_in_matrix = True
+            elif not doctor_obj:
+                push_to_matrix = True
         elif not self.matrix_lead_id:
             push_to_matrix = True
 
         super(Doctor, self).save(*args, **kwargs)
 
         transaction.on_commit(lambda: self.app_commit_tasks(push_to_matrix=push_to_matrix,
-                                                            update_status_in_matrix=update_status_in_matrix,
-                                                            request_agent_lead_id=request_agent_lead_id))
+                                                            update_status_in_matrix=update_status_in_matrix))
 
-    def app_commit_tasks(self, push_to_matrix=False, update_status_in_matrix=False, request_agent_lead_id=None):
+    def app_commit_tasks(self, push_to_matrix=False, update_status_in_matrix=False):
         self.update_deal_price()
         if push_to_matrix:
             # push_onboarding_qcstatus_to_matrix.apply_async(({'obj_type': self.__class__.__name__, 'obj_id': self.id}
             #                                                 ,), countdown=5)
-            create_or_update_lead_on_matrix.apply_async(({'obj_type': self.__class__.__name__, 'obj_id': self.id,
-                                                          'request_agent_lead_id': request_agent_lead_id}
+            create_or_update_lead_on_matrix.apply_async(({'obj_type': self.__class__.__name__, 'obj_id': self.id}
                                                          ,), countdown=5)
 
         if update_status_in_matrix:
