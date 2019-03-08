@@ -62,6 +62,7 @@ from django.contrib.gis.measure import D
 from django.db.models.expressions import Window
 from django.db.models.functions import RowNumber
 from django.db.models import Avg
+from django.db.models.expressions import RawSQL
 User = get_user_model()
 
 
@@ -200,6 +201,18 @@ class LabList(viewsets.ReadOnlyModelViewSet):
 
         if package_ids:
             main_queryset = main_queryset.filter(id__in=package_ids)
+        valid_package_ids = []
+        if test_ids:
+            valid_package_ids.extend(list(LabTest.objects.filter(test__id__in=test_ids).annotate(
+                included_test_count=Count('test')).filter(
+                included_test_count=len(test_ids)).distinct().values_list('id', flat=True)))
+        if category_ids:
+            valid_package_ids.extend(list(
+                LabTest.objects.filter(test__recommended_categories__id__in=category_ids).distinct().values_list('id',
+                                                                                                                 flat=True)))
+        if valid_package_ids:
+            main_queryset = main_queryset.filter(id__in=valid_package_ids)
+
 
         all_packages_in_network_labs = main_queryset.filter(
             availablelabs__enabled=True,
@@ -240,18 +253,7 @@ class LabList(viewsets.ReadOnlyModelViewSet):
                 When(availablelabs__custom_deal_price__isnull=False,
                      then=F('availablelabs__custom_deal_price'))),
         )
-        if test_ids:
-            all_packages_in_non_network_labs = all_packages_in_non_network_labs.filter(test__id__in=test_ids).annotate(
-                included_test_count=Count('test')).filter(included_test_count=len(test_ids))
-            all_packages_in_network_labs = all_packages_in_network_labs.filter(test__id__in=test_ids).annotate(
-                included_test_count=Count('test')).filter(included_test_count=len(test_ids))
-        if category_ids:
-            all_packages_in_non_network_labs = all_packages_in_non_network_labs.filter(
-                categories__id__in=category_ids).annotate(category_count=Count(F('categories'))).filter(
-                category_count=len(category_ids))
-            all_packages_in_network_labs = all_packages_in_network_labs.filter(
-                categories__id__in=category_ids).annotate(category_count=Count(F('categories'))).filter(
-                category_count=len(category_ids))
+
         all_packages_in_non_network_labs = all_packages_in_non_network_labs.distinct()
         all_packages_in_network_labs = all_packages_in_network_labs.distinct()
         all_packages = [package for package in all_packages_in_network_labs if package.rank == 1]
@@ -377,7 +379,6 @@ class LabList(viewsets.ReadOnlyModelViewSet):
 
     @transaction.non_atomic_requests
     def package_list(self, request, **kwrgs):
-        from django.db.models.expressions import RawSQL
         parameters = request.query_params
         serializer = diagnostic_serializer.LabPackageListSerializer(data=parameters)
         serializer.is_valid(raise_exception=True)
@@ -398,16 +399,27 @@ class LabList(viewsets.ReadOnlyModelViewSet):
         package_ids = validated_data.get('package_ids', [])
         point_string = 'POINT(' + str(long) + ' ' + str(lat) + ')'
         pnt = GEOSGeometry(point_string, srid=4326)
-        max_distance = max_distance*1000 if max_distance is not None else 10000
+        max_distance = max_distance * 1000 if max_distance is not None else 10000
         min_distance = min_distance * 1000 if min_distance is not None else 0
         main_queryset = LabTest.objects.prefetch_related('test', 'test__recommended_categories',
                                                          'test__parameter', 'categories').filter(enable_for_retail=True,
-                                                            searchable=True)
+                                                                                                 searchable=True)
 
         if package_ids:
             main_queryset = main_queryset.filter(id__in=package_ids)
+        valid_package_ids = []
+        if test_ids:
+            valid_package_ids.extend(list(LabTest.objects.filter(test__id__in=test_ids).annotate(
+                included_test_count=Count('test')).filter(
+                included_test_count=len(test_ids)).distinct().values_list('id', flat=True)))
+        if category_ids:
+            valid_package_ids.extend(list(
+                LabTest.objects.filter(test__recommended_categories__id__in=category_ids).distinct().values_list('id',
+                                                                                                                 flat=True)))
+        if valid_package_ids:
+            main_queryset = main_queryset.filter(id__in=valid_package_ids)
 
-        main_queryset = main_queryset.filter(
+        all_packages_in_labs = main_queryset.filter(
             availablelabs__enabled=True,
             availablelabs__lab_pricing_group__labs__is_live=True,
             availablelabs__lab_pricing_group__labs__enabled=True,
@@ -415,55 +427,57 @@ class LabList(viewsets.ReadOnlyModelViewSet):
                 Point(float(long),
                       float(lat)),
                 D(m=max_distance))).annotate(
-                                       priority_score=F('availablelabs__lab_pricing_group__labs__lab_priority') * F(
-                                           'priority')).annotate(
-                                       distance=Distance('availablelabs__lab_pricing_group__labs__location',
-                                                         pnt)).annotate(
-                                       lab=F('availablelabs__lab_pricing_group__labs'), mrp=F('availablelabs__mrp'),
-                                       price=Case(
-                                           When(availablelabs__custom_deal_price__isnull=True,
-                                                then=F('availablelabs__computed_deal_price')),
-                                           When(availablelabs__custom_deal_price__isnull=False,
-                                                then=F('availablelabs__custom_deal_price'))),
-                                       rank=Window(expression=RowNumber(), order_by=F('distance').asc(),
-                                                   partition_by=[RawSQL('Coalesce(lab.network_id, random())', []), F('id')])
-            )
+            priority_score=F('availablelabs__lab_pricing_group__labs__lab_priority') * F(
+                'priority')).annotate(
+            distance=Distance('availablelabs__lab_pricing_group__labs__location',
+                              pnt)).annotate(
+            lab=F('availablelabs__lab_pricing_group__labs'), mrp=F('availablelabs__mrp'),
+            price=Case(
+                When(availablelabs__custom_deal_price__isnull=True,
+                     then=F('availablelabs__computed_deal_price')),
+                When(availablelabs__custom_deal_price__isnull=False,
+                     then=F('availablelabs__custom_deal_price'))),
+            rank=Window(expression=RowNumber(), order_by=F('distance').asc(),
+                        partition_by=[RawSQL('Coalesce(lab.network_id, random())', []), F('id')])
+        )
 
-        # if test_ids:
-        #     all_packages_in_labs = all_packages_in_labs.filter(test__id__in=test_ids).annotate(
-        #         included_test_count=Count('test')).filter(included_test_count=len(test_ids))
-        #
-        # if category_ids:
-        #     all_packages_in_labs = all_packages_in_labs.filter(
-        #         categories__id__in=category_ids).annotate(category_count=Count(F('categories'))).filter(
-        #         category_count=len(category_ids))
-        all_packages_in_labs = main_queryset.distinct()
+        all_packages_in_labs = all_packages_in_labs.distinct()
         all_packages = [package for package in all_packages_in_labs if package.rank == 1]
         all_packages = filter(lambda x: x, all_packages)
         if min_distance:
-            all_packages = filter(lambda x: x.distance.m >= min_distance if x.distance is not None and x.distance.m is not None else False, all_packages)
+            all_packages = filter(lambda
+                                      x: x.distance.m >= min_distance if x.distance is not None and x.distance.m is not None else False,
+                                  all_packages)
         if min_price:
             all_packages = filter(lambda x: x.price >= min_price if x.price is not None else False, all_packages)
         if max_price:
             all_packages = filter(lambda x: x.price <= max_price if x.price is not None else False, all_packages)
         if min_age and max_age:
-            all_packages = filter(lambda x: (x.min_age <= max_age if x.min_age is not None else False) and (x.max_age >= min_age if x.max_age is not None else False), all_packages)
+            all_packages = filter(lambda x: (x.min_age <= max_age if x.min_age is not None else False) and (
+                x.max_age >= min_age if x.max_age is not None else False), all_packages)
         elif max_age:
             all_packages = filter(lambda x: x.min_age <= max_age if x.min_age is not None else False, all_packages)
         elif min_age:
             all_packages = filter(lambda x: x.max_age >= min_age if x.max_age is not None else False, all_packages)
         if gender:
-            all_packages = filter(lambda x: x.gender_type in [gender, LabTest.ALL] if x.gender_type is not None else False, all_packages)
+            all_packages = filter(
+                lambda x: x.gender_type in [gender, LabTest.ALL] if x.gender_type is not None else False, all_packages)
         if package_type == 1:
             all_packages = filter(lambda x: x.home_collection_possible, all_packages)
         if package_type == 2:
             all_packages = filter(lambda x: not x.home_collection_possible, all_packages)
         if not sort_on:
-            all_packages = sorted(all_packages, key=lambda x: x.priority_score if hasattr(x, 'priority_score') and x.priority_score is not None else -float('inf'), reverse=True)
+            all_packages = sorted(all_packages, key=lambda x: x.priority_score if hasattr(x,
+                                                                                          'priority_score') and x.priority_score is not None else -float(
+                'inf'), reverse=True)
         elif sort_on == 'fees':
-            all_packages = sorted(all_packages, key=lambda x: x.price if hasattr(x, 'price') and x.price is not None else -float('inf'))
+            all_packages = sorted(all_packages,
+                                  key=lambda x: x.price if hasattr(x, 'price') and x.price is not None else -float(
+                                      'inf'))
         elif sort_on == 'distance':
-            all_packages = sorted(all_packages, key=lambda x: x.distance if hasattr(x, 'distance') and x.distance is not None else -float('inf'))
+            all_packages = sorted(all_packages, key=lambda x: x.distance if hasattr(x,
+                                                                                    'distance') and x.distance is not None else -float(
+                'inf'))
         lab_ids = [package.lab for package in all_packages]
         entity_url_qs = EntityUrls.objects.filter(entity_id__in=lab_ids, is_valid=True, url__isnull=False,
                                                   sitemap_identifier=EntityUrls.SitemapIdentifier.LAB_PAGE).values(
@@ -476,7 +490,8 @@ class LabList(viewsets.ReadOnlyModelViewSet):
                                                 'home_collection_charges').in_bulk(lab_ids)
         category_data = {}
         test_package_ids = set([package.id for package in all_packages])
-        test_package_queryset = LabTest.objects.prefetch_related('test__recommended_categories', 'test__parameter').filter(id__in=test_package_ids)
+        test_package_queryset = LabTest.objects.prefetch_related('test__recommended_categories',
+                                                                 'test__parameter').filter(id__in=test_package_ids)
         for temp_package in test_package_queryset:
             single_test_data = {}
             for temp_test in temp_package.test.all():
@@ -529,7 +544,8 @@ class LabList(viewsets.ReadOnlyModelViewSet):
             for package_result in result:
                 if "price" in package_result:
                     price = int(float(package_result["price"]))
-                    discounted_price = price if not search_coupon else search_coupon.get_search_coupon_discounted_price(price)
+                    discounted_price = price if not search_coupon else search_coupon.get_search_coupon_discounted_price(
+                        price)
                     package_result["discounted_price"] = discounted_price
 
         top_content = None
@@ -724,9 +740,14 @@ class LabList(viewsets.ReadOnlyModelViewSet):
 
     @transaction.non_atomic_requests
     def search(self, request, **kwargs):
+
         parameters = request.query_params
         if kwargs.get('parameters'):
             parameters = kwargs.get('parameters')
+        test_ids = parameters.get('ids', [])
+        tests = list(LabTest.objects.filter(id__in=test_ids).values('id', 'name', 'hide_price', 'show_details', 'test_type', 'url'))
+        if not tests:
+            return Response(status=status.HTTP_400_BAD_REQUEST)
         serializer = diagnostic_serializer.SearchLabListSerializer(data=parameters)
         serializer.is_valid(raise_exception=True)
         if kwargs.get('location_json'):
@@ -765,9 +786,7 @@ class LabList(viewsets.ReadOnlyModelViewSet):
         #
         # id_url_dict = dict()
 
-        test_ids = parameters.get('ids', [])
 
-        tests = list(LabTest.objects.filter(id__in=test_ids).values('id', 'name', 'hide_price', 'show_details','test_type', 'url'))
         seo = None
         breadcrumb = None
         location = None
@@ -859,7 +878,7 @@ class LabList(viewsets.ReadOnlyModelViewSet):
             filtering_params['network_id'] = str(network_id)
 
         if name:
-            search_key = re.findall(r'[a-z0-9A-Z.]+',name)
+            search_key = re.findall(r'[a-z0-9A-Z.:]+',name)
             search_key = " ".join(search_key).lower()
             search_key = "".join(search_key.split("."))
             filtering_query.append("lb.name ilike %(name)s")

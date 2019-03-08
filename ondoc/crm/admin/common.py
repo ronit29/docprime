@@ -1,3 +1,4 @@
+from dal import autocomplete
 from django.contrib.contenttypes.admin import GenericTabularInline
 from django.contrib.gis import admin
 import datetime
@@ -8,9 +9,9 @@ from ondoc.crm.constants import constants
 from dateutil import tz
 from django.conf import settings
 from django.utils.dateparse import parse_datetime
-from ondoc.authentication.models import Merchant, AssociatedMerchant
+from ondoc.authentication.models import Merchant, AssociatedMerchant, QCModel
 from ondoc.account.models import MerchantPayout
-from ondoc.common.models import Cities, MatrixCityMapping, PaymentOptions
+from ondoc.common.models import Cities, MatrixCityMapping, PaymentOptions, Remark, MatrixMappedCity, MatrixMappedState
 from import_export import resources, fields
 from import_export.admin import ImportMixin, base_formats, ImportExportMixin, ImportExportModelAdmin, ExportMixin
 from reversion.admin import VersionAdmin
@@ -21,8 +22,9 @@ from django.contrib.contenttypes.models import ContentType
 from import_export.admin import ImportExportMixin
 
 from ondoc.diagnostic.models import Lab, LabAppointment
-from ondoc.doctor.models import Hospital, Doctor, OpdAppointment
+from ondoc.doctor.models import Hospital, Doctor, OpdAppointment, HospitalNetwork
 from django.db.models import Q
+from django import forms
 
 
 def practicing_since_choices():
@@ -101,15 +103,23 @@ class QCPemAdmin(admin.ModelAdmin):
 
 class FormCleanMixin(forms.ModelForm):
     def clean(self):
-        if not self.request.user.is_superuser and not self.request.user.groups.filter(
-                name=constants['SUPER_QC_GROUP']).exists():
-            if self.instance.data_status == 3:
-                raise forms.ValidationError("Cannot modify QC approved Data")
+        if (not self.request.user.is_superuser and not self.request.user.groups.filter(name=constants['SUPER_QC_GROUP']).exists()):
+            # and (not '_reopen' in self.data and not self.request.user.groups.filter(name__in=[constants['QC_GROUP_NAME'], constants['WELCOME_CALLING_TEAM']]).exists()):
+            if isinstance(self.instance, Hospital) or isinstance(self.instance, HospitalNetwork):
+                if self.cleaned_data.get('matrix_city') and hasattr(self.cleaned_data.get('matrix_city'), 'state'):
+                    if self.cleaned_data.get('matrix_city').state != self.cleaned_data.get('matrix_state'):
+                        raise forms.ValidationError("City does not belong to selected state")
+                else:
+                    raise forms.ValidationError("There is not state mapped with selected city")
+            if self.instance.data_status == QCModel.QC_APPROVED:
+                # allow welcome_calling_team to modify qc_approved data
+                if not self.request.user.groups.filter(name=constants['WELCOME_CALLING_TEAM']).exists():
+                    raise forms.ValidationError("Cannot modify QC approved Data")
             if not self.request.user.groups.filter(name=constants['QC_GROUP_NAME']).exists():
-                if self.instance.data_status == 2:
+                if self.instance.data_status == QCModel.SUBMITTED_FOR_QC:
                     raise forms.ValidationError("Cannot update Data submitted for QC approval")
                 if not self.request.user.groups.filter(name=constants['DOCTOR_SALES_GROUP']).exists():
-                    if self.instance.data_status == 1 and self.instance.created_by and self.instance.created_by != self.request.user:
+                    if self.instance.data_status in [QCModel.IN_PROGRESS, QCModel.REOPENED] and self.instance.created_by and self.instance.created_by.groups.filter(name=constants['DOCTOR_NETWORK_GROUP_NAME']).exists() and self.instance.created_by != self.request.user:
                         raise forms.ValidationError("Cannot modify Data added by other users")
             if '_submit_for_qc' in self.data:
                 self.validate_qc()
@@ -119,13 +129,23 @@ class FormCleanMixin(forms.ModelForm):
                 #             raise forms.ValidationError(
                 #                 "Cannot submit for QC without submitting associated Hospitals: " + h.hospital.name)
                 if hasattr(self.instance, 'network') and self.instance.network is not None:
-                    if self.instance.network.data_status < 2:
+                    if self.instance.network.data_status in [QCModel.IN_PROGRESS, QCModel.REOPENED]:
                         class_name = self.instance.network.__class__.__name__
                         raise forms.ValidationError(
                             "Cannot submit for QC without submitting associated " + class_name.rstrip(
                                 'Form') + ": " + self.instance.network.name)
-                if hasattr(self.instance, 'mobiles') and not self.instance.mobiles.filter(is_primary=True).count() == 1:
-                    raise forms.ValidationError("Doctor must have atleast and atmost one primary mobile number.")
+                if hasattr(self.instance, 'mobiles'):
+                    mobile_error = True
+                    mobile_count = int(self.data.get('mobiles-TOTAL_FORMS', 0))
+                    for count in range(mobile_count):
+                        if self.data.get('mobiles-' + str(count) + '-DELETE'):
+                            continue
+                        mobile_error = False if self.data.get('mobiles-' + str(count) + '-is_primary') else True
+                        if not mobile_error:
+                            break
+                    if mobile_error:
+                        raise forms.ValidationError("Doctor must have atleast and atmost one primary mobile number.")
+
             if '_qc_approve' in self.data:
                 self.validate_qc()
                 # if hasattr(self.instance, 'doctor_clinics') and self.instance.doctor_clinics is not None:
@@ -134,15 +154,24 @@ class FormCleanMixin(forms.ModelForm):
                 #             raise forms.ValidationError(
                 #                 "Cannot approve QC check without approving associated Hospitals: " + h.hospital.name)
                 if hasattr(self.instance, 'network') and self.instance.network is not None:
-                    if self.instance.network.data_status < 3:
+                    if self.instance.network.data_status in [QCModel.IN_PROGRESS, QCModel.REOPENED, QCModel.SUBMITTED_FOR_QC]:
                         class_name = self.instance.network.__class__.__name__
                         raise forms.ValidationError(
                             "Cannot approve QC check without approving associated" + class_name.rstrip(
                                 'Form') + ": " + self.instance.network.name)
 
             if '_mark_in_progress' in self.data:
-                if self.instance.data_status == 3:
-                    raise forms.ValidationError("Cannot reject QC approved data")
+                if self.data.get('common-remark-content_type-object_id-INITIAL_FORMS', 0) == self.data.get(
+                        'common-remark-content_type-object_id-TOTAL_FORMS', 1):
+                    raise forms.ValidationError("Must add a remark with reopen status before rejecting.")
+                else:
+                    last_remark_id = int(self.data.get('common-remark-content_type-object_id-TOTAL_FORMS', 1)) - 1
+                    last_remark_status = "common-remark-content_type-object_id-" + str(last_remark_id) + "-status"
+                    if self.data.get(last_remark_status) != str(Remark.REOPEN):
+                        raise forms.ValidationError("Must add a remark with reopen status before rejecting.")
+                if self.instance.data_status == QCModel.QC_APPROVED:
+                    if not self.request.user.groups.filter(name=constants['WELCOME_CALLING_TEAM']).exists():
+                        raise forms.ValidationError("Cannot reject QC approved data")
             return super().clean()
 
 
@@ -459,3 +488,112 @@ class PaymentOptionsAdmin(admin.ModelAdmin):
     model = PaymentOptions
     list_display = ['name', 'description', 'is_enabled']
     search_fields = ['name']
+
+
+class RemarkInlineForm(forms.ModelForm):
+    # content = forms.CharField(widget=forms.Textarea, required=False)
+    # print(content)
+
+    # class Meta:
+    #     model = Remark
+    #     fields = ('__all__')
+
+    # def __init__(self, *args, **kwargs):
+    #     a=5
+    #     super(RemarkInlineForm, self).__init__(*args, **kwargs)
+    def clean(self):
+        super().clean()
+        if any(self.errors):
+            return
+        if self.instance and self.instance.id:
+            if self.changed_data:
+                raise forms.ValidationError("Cannot alter already saved remarks.")
+
+
+
+class RemarkInline(GenericTabularInline, nested_admin.NestedTabularInline):
+    can_delete = True
+    extra = 0
+    model = Remark
+    show_change_link = False
+    readonly_fields = ['user', 'created_at']
+    fields = ['status', 'user', 'content', 'created_at']
+    form = RemarkInlineForm
+    # formset = RemarkInlineFormSet
+
+    # def get_readonly_fields(self, request, obj=None):
+    #     print(self)
+    #     editable_fields = ['user']
+    #     if obj:
+    #         editable_fields += ['content']
+    #     return editable_fields
+
+
+class MatrixMappedStateResource(resources.ModelResource):
+    id = fields.Field(attribute='id', column_name='StateId')
+    name = fields.Field(attribute='name', column_name='State')
+
+    class Meta:
+        model = MatrixMappedState
+
+class MatrixMappedStateAdmin(ImportMixin, admin.ModelAdmin):
+    formats = (base_formats.XLS, base_formats.XLSX,)
+    list_display = ('name',)
+    readonly_fields = ('name',)
+    search_fields = ['name']
+    resource_class = MatrixMappedStateResource
+
+    def get_readonly_fields(self, request, obj=None):
+        if not request.user.is_superuser and not request.user.groups.filter(name=constants['SUPER_QC_GROUP']).exists():
+            return super().get_readonly_fields(request, obj)
+        return ()
+
+
+
+class MatrixMappedCityResource(resources.ModelResource):
+    id = fields.Field(attribute='id', column_name='CityID')
+    state_id = fields.Field(attribute='state_id', column_name='StateId')
+    name = fields.Field(attribute='name', column_name='City')
+
+    class Meta:
+        model = MatrixMappedCity
+        fields = ('id', 'name', 'state_id')
+
+
+
+class MatrixMappedCityAdmin(ImportMixin, admin.ModelAdmin):
+    formats = (base_formats.XLS, base_formats.XLSX,)
+    list_display = ('name', 'state')
+    readonly_fields = ('name', 'state', )
+    search_fields = ['name']
+    resource_class = MatrixMappedCityResource
+
+    def get_readonly_fields(self, request, obj=None):
+        if not request.user.is_superuser and not request.user.groups.filter(name=constants['SUPER_QC_GROUP']).exists():
+            return super().get_readonly_fields(request, obj)
+        return ()
+
+class MatrixStateAutocomplete(autocomplete.Select2QuerySetView):
+
+        def get_queryset(self):
+            queryset = MatrixMappedState.objects.all()
+
+            if self.q:
+                queryset = queryset.filter(name__istartswith=self.q)
+
+            return queryset
+
+
+class MatrixCityAutocomplete(autocomplete.Select2QuerySetView):
+
+    def get_queryset(self):
+        queryset = MatrixMappedCity.objects.none()
+        matrix_state = self.forwarded.get('matrix_state', None)
+
+        if matrix_state:
+            queryset = MatrixMappedCity.objects.filter(state_id=matrix_state)
+        if self.q:
+            queryset = queryset.filter(name__istartswith=self.q)
+
+        return queryset
+

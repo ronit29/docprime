@@ -451,7 +451,7 @@ class EmailNotification(TimeStampedModel, EmailNotificationOpdMixin, EmailNotifi
     user = models.ForeignKey(User, on_delete=models.CASCADE, null=True, blank=True)
     content = models.TextField()
     email_subject = models.TextField(blank=True, null=True)
-    email = models.EmailField()
+    email = models.EmailField(null=True)
     viewed_at = models.DateTimeField(blank=True, null=True)
     read_at = models.DateTimeField(blank=True, null=True)
     notification_type = models.PositiveIntegerField(choices=NotificationAction.NOTIFICATION_TYPE_CHOICES)
@@ -786,6 +786,22 @@ class SmsNotification(TimeStampedModel, SmsNotificationOpdMixin, SmsNotification
             }
             message = json.dumps(message)
             publish_message(message)
+
+
+class WhtsappNotification(TimeStampedModel):
+    user = models.ForeignKey(User, on_delete=models.CASCADE, blank=True, null=True)
+    phone_number = models.BigIntegerField()
+    viewed_at = models.DateTimeField(blank=True, null=True, default=None)
+    read_at = models.DateTimeField(blank=True, null=True, default=None)
+    template_name = models.CharField(max_length=100, null=False, blank=False)
+    notification_type = models.PositiveIntegerField(choices=NotificationAction.NOTIFICATION_TYPE_CHOICES)
+    payload = JSONField(null=False, blank=False, default={})
+
+    class Meta:
+        db_table = "whtsapp_notification"
+
+    def __str__(self):
+        return '{} -> {} ({})'.format(self.notification_type, self.phone_number, self.user)
 
 
 class AppNotification(TimeStampedModel):

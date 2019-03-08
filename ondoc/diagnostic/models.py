@@ -51,10 +51,11 @@ from ondoc.matrix.tasks import push_appointment_to_matrix, push_onboarding_qcsta
 from ondoc.location import models as location_models
 from ondoc.ratings_review import models as ratings_models
 from decimal import Decimal
-from ondoc.common.models import AppointmentHistory, AppointmentMaskNumber
+from ondoc.common.models import AppointmentHistory, AppointmentMaskNumber, Remark
 import reversion
 from decimal import Decimal
 from django.utils.text import slugify
+#from ondoc.api.v1.diagnostic import serializers as diagnostic_serializers
 
 logger = logging.getLogger(__name__)
 
@@ -218,12 +219,20 @@ class Lab(TimeStampedModel, CreatedByModel, QCModel, SearchKey):
     merchant_payout = GenericRelation(account_model.MerchantPayout)
     avg_rating = models.DecimalField(max_digits=5, decimal_places=2, null=True, editable=False)
     lab_priority = models.PositiveIntegerField(blank=False, null=False, default=1)
+    open_for_communication = models.BooleanField(default=True)
+    remark = GenericRelation(Remark)
 
     def __str__(self):
         return self.name
 
     class Meta:
         db_table = "lab"
+
+    def open_for_communications(self):
+        if (self.network and self.network.open_for_communication) or (not self.network and self.open_for_communication):
+            return True
+
+        return False
 
     def convert_min(self, min):
         min_str = str(min)
@@ -645,6 +654,8 @@ class LabNetwork(TimeStampedModel, CreatedByModel, QCModel):
     merchant = GenericRelation(auth_model.AssociatedMerchant)
     merchant_payout = GenericRelation(account_model.MerchantPayout)
     is_mask_number_required = models.BooleanField(default=True)
+    open_for_communication = models.BooleanField(default=True)
+    remark = GenericRelation(Remark)
 
     def all_associated_labs(self):
         if self.id:
@@ -1045,10 +1056,17 @@ class AvailableLabTest(TimeStampedModel):
         #         else computed_agreed_price end), mrp) where id = %s '''
 
         query = '''update available_lab_test set computed_deal_price = 
-                   least(greatest(floor(least((case when custom_agreed_price is not null 
-                   then custom_agreed_price else computed_agreed_price end)*1.5, mrp*.8)/5)*5, case when custom_agreed_price
-                   is not null then custom_agreed_price else computed_agreed_price end), mrp)
-                   where enabled=true and id=%s ''' 
+                    least(greatest(floor(	
+                    case when (least((case when custom_agreed_price is not null 
+                    then custom_agreed_price else computed_agreed_price end)*1.5, mrp*.8) - case when custom_agreed_price
+                    is not null then custom_agreed_price else computed_agreed_price end) >100  then 
+                    least((case when custom_agreed_price is not null 
+                    then custom_agreed_price else computed_agreed_price end)*1.5, mrp*.8) else 
+                    least((case when custom_agreed_price is not null 
+                    then custom_agreed_price else computed_agreed_price end)+100, mrp) end
+                    /5)*5, case when custom_agreed_price
+                    is not null then custom_agreed_price else computed_agreed_price end), mrp)
+                    where enabled=true and id=%s '''
 
         update_available_lab_test_deal_price = RawSql(query, [self.pk]).execute()
         # deal_price = RawSql(query, [self.pk]).fetch_all()
@@ -1059,10 +1077,17 @@ class AvailableLabTest(TimeStampedModel):
     def update_all_deal_price(cls):
         # will update all lab prices
         query = '''update available_lab_test set computed_deal_price = 
-                least(greatest(floor(least((case when custom_agreed_price is not null 
-                then custom_agreed_price else computed_agreed_price end)*1.5, mrp*.8)/5)*5, case when custom_agreed_price
-                is not null then custom_agreed_price else computed_agreed_price end), mrp)
-                where enabled=true'''
+                    least(greatest(floor(	
+                    case when (least((case when custom_agreed_price is not null 
+                    then custom_agreed_price else computed_agreed_price end)*1.5, mrp*.8) - case when custom_agreed_price
+                    is not null then custom_agreed_price else computed_agreed_price end) >100  then 
+                    least((case when custom_agreed_price is not null 
+                    then custom_agreed_price else computed_agreed_price end)*1.5, mrp*.8) else 
+                    least((case when custom_agreed_price is not null 
+                    then custom_agreed_price else computed_agreed_price end)+100, mrp) end
+                    /5)*5, case when custom_agreed_price
+                    is not null then custom_agreed_price else computed_agreed_price end), mrp)
+                    where enabled=true'''
 
         update_all_available_lab_test_deal_price = RawSql(query, []).execute()
 
@@ -1078,6 +1103,10 @@ class AvailableLabTest(TimeStampedModel):
             # self.computed_deal_price = self.get_computed_deal_price()
             self.computed_deal_price = self.computed_agreed_price
         super(AvailableLabTest, self).save(*args, **kwargs)
+
+        transaction.on_commit(lambda: self.app_commit_tasks())
+
+    def app_commit_tasks(self):
         self.update_deal_price()
 
     def get_computed_deal_price(self):
@@ -1241,13 +1270,24 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin)
     def get_cancellation_reason(self):
         return CancellationReason.objects.filter(Q(type=Order.LAB_PRODUCT_ID) | Q(type__isnull=True),
                                                  visible_on_front_end=True)
+    # @staticmethod
+    # def get_upcoming_appointment_serialized(user_id):
+    #     response_appointment = LabAppointment.get_upcoming_appointment(user_id)
+    #     appointment = diagnostic_serializers.LabAppointmentUpcoming(response_appointment, many=True)
+    #     return appointment.data
+
+    @classmethod
+    def get_upcoming_appointment(cls, user_id):
+        current_time = timezone.now()
+        appointments = LabAppointment.objects.filter(time_slot_start__gte=current_time, user_id=user_id).exclude(
+            status__in=[LabAppointment.CANCELLED, LabAppointment.COMPLETED]).prefetch_related('tests', 'lab', 'profile')
+        return appointments
 
     def get_serialized_cancellation_reason(self):
         res = []
         for cr in self.get_cancellation_reason():
             res.append({'id': cr.id, 'name': cr.name, 'is_comment_needed': cr.is_comment_needed})
         return res
-
 
     def get_report_urls(self):
         reports = self.reports.all()

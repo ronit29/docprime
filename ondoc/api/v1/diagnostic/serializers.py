@@ -351,7 +351,7 @@ class LabAppointmentTestMappingSerializer(serializers.ModelSerializer):
     class Meta:
         model = LabAppointmentTestMapping
         fields = ('test_id', 'mrp', 'test', 'agreed_price', 'deal_price',
-                  # 'enabled',  # SHASHANK_SINGH Ask Arun Sir
+                  # 'enabled',
                   'is_home_collection_enabled')
 
 
@@ -412,8 +412,9 @@ class CommonTestSerializer(serializers.ModelSerializer):
 class CommonPackageSerializer(serializers.ModelSerializer):
     id = serializers.ReadOnlyField(source='package.id')
     name = serializers.ReadOnlyField(source='package.name')
-    show_details = serializers.ReadOnlyField(source='test.show_details')
+    show_details = serializers.ReadOnlyField(source='package.show_details')
     icon = serializers.SerializerMethodField()
+    url = serializers.ReadOnlyField(source='package.url')
 
     def get_icon(self, obj):
         request = self.context.get('request')
@@ -421,7 +422,7 @@ class CommonPackageSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = CommonPackage
-        fields = ('id', 'name', 'icon', 'show_details')
+        fields = ('id', 'name', 'icon', 'show_details', 'url')
 
 
 class CommonConditionsSerializer(serializers.ModelSerializer):
@@ -695,6 +696,24 @@ class LabAppointmentCreateSerializer(serializers.Serializer):
         time_slot_start = (form_time_slot(data.get('start_date'), data.get('start_time'))
                            if not data.get("time_slot_start") else data.get("time_slot_start"))
 
+
+        # validations for same day and next day timeslot bookings
+        available_slots = LabTiming.timing_manager.lab_booking_slots(lab__id=data.get("lab").id, lab__is_live=True, for_home_pickup=data.get("is_home_pickup"))
+        now = datetime.datetime.now()
+        tomorrow = datetime.date.today() + datetime.timedelta(days=1)
+        is_today = now.weekday() == time_slot_start.weekday()
+        is_tomorrow = tomorrow.weekday() == time_slot_start.weekday()
+        curr_time = time_slot_start.hour
+        curr_minute = round(round(float(time_slot_start.minute) / 60, 2) * 2) / 2
+        curr_time += curr_minute
+
+        if is_today and available_slots.get("today_min") and available_slots.get("today_min") > curr_time:
+            raise serializers.ValidationError("Invalid Time slot")
+        if is_tomorrow and available_slots.get("tomorrow_min") and available_slots.get("tomorrow_min") > curr_time:
+            raise serializers.ValidationError("Invalid Time slot")
+        if is_today and available_slots.get("today_max") and available_slots.get("today_max") < curr_time:
+            raise serializers.ValidationError("Invalid Time slot")
+
         if LabAppointment.objects.filter(profile=data.get("profile"), lab=data.get("lab"),
                                          tests__in=data.get("test_ids"), time_slot_start=time_slot_start) \
                 .exclude(status__in=[LabAppointment.COMPLETED, LabAppointment.CANCELLED]).exists():
@@ -915,7 +934,7 @@ class UpdateStatusSerializer(serializers.Serializer):
 class LabAppointmentRetrieveSerializer(LabAppointmentModelSerializer):
     profile = UserProfileSerializer()
     lab = LabModelSerializer()
-    # lab_test = AvailableLabTestSerializer(many=True)  # SHASHANK_SINGH CHANGE 17
+    # lab_test = AvailableLabTestSerializer(many=True)
     lab_test = serializers.SerializerMethodField()
     address = serializers.SerializerMethodField()
     type = serializers.ReadOnlyField(default='lab')
@@ -1212,7 +1231,7 @@ class LabPackageListSerializer(serializers.Serializer):
 
     def validate_package_ids(self, attrs):
         try:
-            attrs = set(attrs)
+            attrs = list(set(attrs))
             if LabTest.objects.filter(searchable=True, enable_for_retail=True, id__in=attrs).count() == len(attrs):
                 return attrs
         except:
@@ -1263,3 +1282,21 @@ class RecommendedPackageCategoryList(serializers.ModelSerializer):
     class Meta:
         model = LabTestCategory
         fields = ('id', 'name', 'tests', 'icon')
+
+
+class LabAppointmentUpcoming(LabAppointmentModelSerializer):
+    address = serializers.SerializerMethodField()
+    provider_id = serializers.IntegerField(source='lab.id')
+    name = serializers.ReadOnlyField(source='lab.name')
+    hospital_name = serializers.SerializerMethodField()
+
+    class Meta:
+        model = LabAppointment
+        fields = ('id', 'provider_id', 'name', 'hospital_name', 'patient_name', 'type',
+                  'status', 'time_slot_start', 'time_slot_end', 'address')
+
+    def get_address(self, obj):
+        return obj.lab.get_lab_address()
+
+    def get_hospital_name(self, obj):
+        return None

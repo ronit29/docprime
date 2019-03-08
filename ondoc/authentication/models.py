@@ -14,10 +14,13 @@ import math
 import os
 import hashlib
 import random, string
-from django.contrib.contenttypes.fields import GenericForeignKey
+from django.contrib.contenttypes.fields import GenericForeignKey, GenericRelation
 from django.contrib.contenttypes.models import ContentType
 from django.utils.functional import cached_property
 from datetime import date, timedelta, datetime
+from safedelete import SOFT_DELETE
+from safedelete.models import SafeDeleteModel
+import reversion
 
 
 class Image(models.Model):
@@ -179,11 +182,23 @@ class QCModel(models.Model):
     IN_PROGRESS = 1
     SUBMITTED_FOR_QC = 2
     QC_APPROVED = 3
-    DATA_STATUS_CHOICES = [(IN_PROGRESS, "In Progress"), (SUBMITTED_FOR_QC, "Submitted For QC Check"), (QC_APPROVED, "QC approved")]
+    REOPENED = 4
+    DATA_STATUS_CHOICES = [(IN_PROGRESS, "In Progress"), (SUBMITTED_FOR_QC, "Submitted For QC Check"), (QC_APPROVED, "QC approved"), (REOPENED, "Reopened")]
     data_status = models.PositiveSmallIntegerField(default=1, editable=False, choices=DATA_STATUS_CHOICES)
     qc_approved_at = models.DateTimeField(null=True, blank=True)
+    history = GenericRelation('authentication.StatusHistory')
+
     class Meta:
         abstract = True
+
+    def save(self, *args, **kwargs):
+        if self.pk is not None:
+            orig = self.__class__.objects.get(pk=self.pk)
+            if orig.data_status != self.data_status:
+                StatusHistory.create(content_object=self)
+
+        super().save(*args, **kwargs)
+
 
 class CustomUserManager(BaseUserManager):
     """Define a model manager for User model with no username field."""
@@ -394,6 +409,7 @@ class CreatedByModel(models.Model):
         abstract = True
 
 
+@reversion.register()
 class UserProfile(TimeStampedModel):
     MALE = 'm'
     FEMALE = 'f'
@@ -409,6 +425,8 @@ class UserProfile(TimeStampedModel):
     dob = models.DateField(blank=True, null=True)
     
     profile_image = models.ImageField(upload_to='users/images', height_field=None, width_field=None, blank=True, null=True)
+    whatsapp_optin = models.NullBooleanField(default=None) # optin check of the whatsapp
+    whatsapp_is_declined = models.BooleanField(default=False) # flag to whether show whatsapp pop up or not.
 
     def __str__(self):
         return "{}-{}".format(self.name, self.id)
@@ -1431,4 +1449,39 @@ class AssociatedMerchant(TimeStampedModel):
 
     class Meta:
         db_table = 'associated_merchant'
+
+
+class SoftDelete(SafeDeleteModel):
+    _safedelete_policy = SOFT_DELETE
+
+    class Meta:
+        abstract = True
+
+
+class StatusHistory(TimeStampedModel):
+    content_type = models.ForeignKey(ContentType, on_delete=models.DO_NOTHING)
+    object_id = models.PositiveIntegerField()
+    content_object = GenericForeignKey()
+    status = models.PositiveSmallIntegerField(null=False)
+    user = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True)
+
+    @classmethod
+    def create(cls, *args, **kwargs):
+        obj = kwargs.get('content_object')
+        if not obj:
+            raise Exception('Function accept content_object in **kwargs')
+
+        content_type = ContentType.objects.get_for_model(obj)
+        cls(content_type=content_type, object_id=obj.id, status=obj.data_status, user=obj.status_changed_by).save()
+
+    class Meta:
+        db_table = 'status_history'
+
+
+class WelcomeCallingDone(models.Model):
+    welcome_calling_done = models.BooleanField(default=False)
+    welcome_calling_done_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        abstract = True
 

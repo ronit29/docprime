@@ -5,6 +5,9 @@ from django.conf import settings
 from ondoc.doctor import models as doc_models
 from ondoc.procedure.models import Procedure
 from ondoc.api.v1.doctor import serializers as v1_serializers
+from ondoc.diagnostic.models import LabAppointment
+from ondoc.api.v1.diagnostic import serializers as v1_diagnostic_serailizers
+
 logger = logging.getLogger(__name__)
 User = get_user_model()
 
@@ -127,3 +130,4 @@ class SpecializationSerializer(serializers.ModelSerializer):
     class Meta:
         model = doc_models.Specialization
         fields = '__all__'
+
