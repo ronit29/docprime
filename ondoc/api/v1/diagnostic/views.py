@@ -545,14 +545,23 @@ class LabList(viewsets.ReadOnlyModelViewSet):
 
     @transaction.non_atomic_requests
     def search(self, request, **kwargs):
-
+        tests = []
         parameters = request.query_params
         if kwargs.get('parameters'):
             parameters = kwargs.get('parameters')
         test_ids = parameters.get('ids', [])
-        tests = list(LabTest.objects.filter(id__in=test_ids).values('id', 'name', 'hide_price', 'show_details', 'test_type', 'url'))
-        if not tests:
-            return Response(status=status.HTTP_400_BAD_REQUEST)
+        if test_ids:
+            try:
+                if not isinstance(test_ids, list) and isinstance(test_ids, str):
+                    test_ids = test_ids.split(",")
+                    new_test_ids = [x for x in test_ids if x]
+                    tests = list(
+                        LabTest.objects.filter(id__in=new_test_ids).values('id', 'name', 'hide_price', 'show_details',
+                                                                           'test_type', 'url'))
+            except:
+                tests = []
+            if not tests:
+                return Response(status=status.HTTP_400_BAD_REQUEST)
         serializer = diagnostic_serializer.SearchLabListSerializer(data=parameters)
         serializer.is_valid(raise_exception=True)
         if kwargs.get('location_json'):
