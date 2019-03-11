@@ -86,6 +86,8 @@ class IpdProcedureLead(auth_model.TimeStampedModel):
         db_table = "ipd_procedure_lead"
 
 
+
+
 class ProcedureCategory(auth_model.TimeStampedModel, SearchKey):
     parents = models.ManyToManyField('self', symmetrical=False, through='ProcedureCategoryMapping',
                                      through_fields=('child_category', 'parent_category'), related_name='children')

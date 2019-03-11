@@ -3272,7 +3272,8 @@ class IpdProcedureViewSet(viewsets.GenericViewSet):
         doctor_result = doctor_list_viewset.list(request, parameters={'ipd_procedure_ids': str(pk),
                                                                       'longitude': validated_data.get('long'),
                                                                       'latitude': validated_data.get('lat'),
-                                                                      'sort_on': 'experience'})
+                                                                      'sort_on': 'experience',
+                                                                      'restrict_result_count': 2})
         return Response(
             {'about': ipd_procedure_serializer.data, 'hospitals': hospital_result.data, 'doctors': doctor_result.data})
 
