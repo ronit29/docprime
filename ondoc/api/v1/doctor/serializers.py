@@ -26,7 +26,7 @@ from django.contrib.staticfiles.templatetags.staticfiles import static
 from ondoc.api.v1.auth.serializers import UserProfileSerializer
 from ondoc.api.v1.ratings import serializers as rating_serializer
 from ondoc.api.v1.utils import is_valid_testing_data, form_time_slot, GenericAdminEntity, util_absolute_url, \
-    util_file_name
+    util_file_name, aware_time_zone
 from django.utils import timezone
 from django.contrib.auth import get_user_model
 import math
@@ -1596,9 +1596,10 @@ class TopHospitalForIpdProcedureSerializer(serializers.ModelSerializer):
         return None
 
     def get_open_today(self, obj):
-        now_day = timezone.now().weekday()
+        now = timezone.now()
+        now = aware_time_zone(now)
         for timing in obj.hosp_availability.all():
-            if timing.day == now_day:
+            if timing.day == now.weekday() and timing.start < now.hour < timing.end:
                 return True
         return False
 
@@ -1619,7 +1620,7 @@ class HospitalDetailIpdProcedureSerializer(TopHospitalForIpdProcedureSerializer)
     class Meta:
         model = Hospital
         fields = ('id', 'name', 'distance', 'certifications', 'bed_count', 'logo', 'avg_rating',
-                  'count_of_insurance_provider', 'multi_speciality', 'address', 'open_today',
+                  'multi_speciality', 'address', 'open_today',
                   'opd_timings', 'contact_number',
                   'lat', 'long', 'about', 'services', 'images', 'ipd_procedure_categories', 'other_network_hospitals',
                   'doctors', 'rating_graph'
