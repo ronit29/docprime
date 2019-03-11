@@ -1181,6 +1181,7 @@ class DoctorListViewSet(viewsets.GenericViewSet):
         parameters = request.query_params
         if kwargs.get("parameters"):
             parameters = kwargs.get("parameters")
+        restrict_result_count = parameters.get('restrict_result_count', None)
         serializer = serializers.DoctorListSerializer(data=parameters, context={"request": request})
         serializer.is_valid(raise_exception=True)
         validated_data = serializer.validated_data
@@ -1544,6 +1545,9 @@ class DoctorListViewSet(viewsets.GenericViewSet):
                 entity = EntityUrls.objects.filter(url=url, url_type='SEARCHURL', entity_type='Doctor', is_valid=True)
                 if entity:
                     canonical_url = entity[0].url
+
+        if restrict_result_count:
+            response = response[:restrict_result_count]
 
         if parameters.get('doctor_suggestions') == 1:
             result = list()
