@@ -129,12 +129,15 @@ class GeocodingResults(TimeStampedModel):
         return latitude+'-'+longitude
 
     @classmethod
-    def get_or_create(cls, *args, **kwargs):
+    def create_results(cls, *args, **kwargs):
 
         from .models import GeocodingResults
 
         latitude = kwargs.get('latitude')
         longitude = kwargs.get('longitude')
+        id = kwargs.get('id')
+        type = kwargs.get('type')
+
         key = cls.get_key(latitude, longitude)
 
         exists = cls.get_location_dict().get(key)
@@ -158,13 +161,16 @@ class GeocodingResults(TimeStampedModel):
                 #logger.info("[ERROR] Google API for fetching the location via latitude and longitude failed.")
                 #logger.info("[ERROR] %s", response.reason)
                 #print('google api failed for en' + str(response.reason))
-
-                return ('failure: ' + str(kwargs.get('content_object').__class__.__name__) + '-'
-                        + str(kwargs.get('content_object').id)
+                print(response.json())
+                print('api failure: ' + type + '-'
+                        + str(id)
                         + ', status_code: ' + str(response.status_code)
                         + ', reason: ' + str(response.reason))
 
             resp_data = response.json()
+
+            if resp_data.get('error_message'):
+                print(resp_data)
 
             if resp_data.get('status', None) == 'OK' and isinstance(resp_data.get('results'), list) and \
                     len(resp_data.get('results')) > 0:
@@ -173,13 +179,13 @@ class GeocodingResults(TimeStampedModel):
                 #print(' google api return invalid addresses ')
                 # logger.info("[ERROR] Google API for fetching the location via latitude and longitude failed.")
                 # logger.info("[ERROR] %s", response.reason)
-                return ('failure: ' + str(kwargs.get('content_object').__class__.__name__) + '-'
-                        + str(kwargs.get('content_object').id)
+                print('data not found: ' + type + '-'
+                        + str(id)
                         + ', status_code: ' + str(response.status_code)
                         + ', reason: ' + str(response.reason))
 
-        return ('success: ' + str(kwargs.get('content_object').__class__.__name__) + '-'
-                        + str(kwargs.get('content_object').id))
+        return ('success: ' + type + '-'
+                        + str(id))
 
 
 class CityInventory(TimeStampedModel):
@@ -265,6 +271,8 @@ class EntityAddress(TimeStampedModel):
             or not parent_entity.type or not parent_entity.type.startswith('LOCALITY')):
             use_in_url = False
 
+        if name in ('[no name]', 'Unnamed Road'):
+            use_in_url = False
         # if use_in_url and parent_entity and parent_entity.use_in_url \
         #     and parent_entity.type and parent_entity.type.startswith('SUBLOCALITY'):
         #     use_in_url = False
@@ -591,7 +599,7 @@ class EntityUrls(TimeStampedModel):
     url = models.CharField(blank=False, null=True, max_length=2000, db_index=True)
     url_type = models.CharField(max_length=24, choices=UrlType.as_choices(), null=True)
     entity_type = models.CharField(max_length=24, null=True)
-    extras = JSONField()
+    extras = JSONField(null=True)
     breadcrumb = JSONField(null=True)
     entity_id = models.PositiveIntegerField(null=True, default=None)
     is_valid = models.BooleanField(default=True)
@@ -2066,3 +2074,12 @@ class DefaultRating(TimeStampedModel):
         indexes = [
             models.Index(fields=['url']),
         ]
+
+
+class CityLatLong(TimeStampedModel):
+    city = models.TextField()
+    latitude = models.DecimalField(null=True, max_digits=10, decimal_places=8)
+    longitude = models.DecimalField(null=True, max_digits=10, decimal_places=8)
+
+    class Meta:
+        db_table = 'city_lat_long'

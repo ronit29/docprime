@@ -14,6 +14,7 @@ from django.utils import timezone
 from openpyxl import load_workbook
 
 from ondoc.api.v1.utils import aware_time_zone, util_absolute_url
+from ondoc.common.models import AppointmentMaskNumber
 from ondoc.notification.labnotificationaction import LabNotificationAction
 from ondoc.notification import models as notification_models
 from celery import task
@@ -40,6 +41,15 @@ def send_lab_notifications_refactored(appointment_id):
             return
         if instance.status == lab_models.LabAppointment.COMPLETED:
             instance.generate_invoice()
+        counter = 1
+        is_masking_done = False
+        while counter < 3:
+            if is_masking_done:
+                break
+            else:
+                counter = counter + 1
+                is_masking_done = generate_appointment_masknumber(
+                    ({'type': 'LAB_APPOINTMENT', 'appointment': instance}))
         lab_notification = LabNotification(instance)
         lab_notification.send()
     except Exception as e:
@@ -119,6 +129,15 @@ def send_opd_notifications_refactored(appointment_id):
             return
         if instance.status == OpdAppointment.COMPLETED:
             instance.generate_invoice()
+        counter = 1
+        is_masking_done = False
+        while counter < 3:
+            if is_masking_done:
+                break
+            else:
+                counter = counter + 1
+                is_masking_done = generate_appointment_masknumber(
+                    ({'type': 'OPD_APPOINTMENT', 'appointment': instance}))
         opd_notification = OpdNotification(instance)
         opd_notification.send()
     except Exception as e:
@@ -225,7 +244,10 @@ def set_order_dummy_transaction(self, order_id, user_id):
         order_row = Order.objects.filter(id=order_id).first()
         user = User.objects.filter(id=user_id).first()
 
-        if order_row and user and order_row.reference_id:
+        if order_row and order_row.parent:
+            raise Exception("Cannot create dummy payout for a child order.")
+
+        if order_row and user:
             if order_row.getTransactions():
                 #print("dummy Transaction already set")
                 return
@@ -233,6 +255,8 @@ def set_order_dummy_transaction(self, order_id, user_id):
             appointment = order_row.getAppointment()
             if not appointment:
                 raise Exception("No Appointment found.")
+
+            total_price = order_row.get_total_price()
 
             token = settings.PG_DUMMY_TRANSACTION_TOKEN
             headers = {
@@ -250,9 +274,9 @@ def set_order_dummy_transaction(self, order_id, user_id):
                 "name": appointment.profile.name,
                 "txAmount": 0,
                 "couponCode": "",
-                "couponAmt": str(appointment.effective_price),
+                "couponAmt": str(total_price),
                 "paymentMode": "DC",
-                "AppointmentId": order_row.reference_id,
+                "AppointmentId": appointment.id,
                 "buCallbackSuccessUrl": "",
                 "buCallbackFailureUrl": ""
             }
@@ -267,9 +291,9 @@ def set_order_dummy_transaction(self, order_id, user_id):
                     tx_data['product_id'] = order_row.product_id
                     tx_data['order_no'] = resp_data.get('orderNo')
                     tx_data['order_id'] = order_row.id
-                    tx_data['reference_id'] = order_row.reference_id
+                    tx_data['reference_id'] = appointment.id
                     tx_data['type'] = DummyTransactions.CREDIT
-                    tx_data['amount'] = appointment.effective_price
+                    tx_data['amount'] = total_price
                     tx_data['payment_mode'] = "DC"
 
                     # tx_data['transaction_id'] = resp_data.get('orderNo')
@@ -303,6 +327,91 @@ def send_offline_appointment_message(number, text, type):
     except Exception as e:
         logger.error("Error sending " + str(type) + " message - " + str(e))
 
+def generate_appointment_masknumber(data):
+    from ondoc.doctor.models import OpdAppointment
+    from ondoc.diagnostic.models import LabAppointment
+    appointment_type = data.get('type')
+    is_masking_done = False
+    try:
+        is_mask_number = True
+        is_maskable = True
+        appointment = data.get('appointment', None)
+        if not appointment:
+            # logger.error("[CELERY ERROR: Incorrect values provided.]")
+            raise Exception("Appointment not found, could not get mask number")
+
+        if appointment_type == 'OPD_APPOINTMENT':
+            is_network_enabled_hospital = appointment.hospital
+            if is_network_enabled_hospital:
+                is_maskable = is_network_enabled_hospital.is_mask_number_required
+            else:
+                is_maskable = True
+        elif data.get('type') == 'LAB_APPOINTMENT':
+            is_network_enabled_lab = appointment.lab.network
+            if is_network_enabled_lab:
+                is_maskable = is_network_enabled_lab.is_mask_number_required
+            else:
+                is_maskable = True
+
+        phone_number = appointment.user.phone_number
+        time_slot = appointment.time_slot_start
+        updated_time_slot = time_slot + datetime.timedelta(days=1)
+        validity_up_to = int((time_slot + datetime.timedelta(days=1)).timestamp())
+        if not phone_number:
+            raise Exception("phone Number could not found against appointment id - " + str(appointment.id))
+        if is_maskable:
+            request_data = {
+                "ExpirationDate": validity_up_to,
+                "FromId": appointment.id,
+                "ToNumber": phone_number
+            }
+            url = settings.MATRIX_NUMBER_MASKING
+            matrix_api_token = settings.MATRIX_API_TOKEN
+            response = requests.post(url, data=json.dumps(request_data), headers={'Authorization': matrix_api_token,
+                                                                                  'Content-Type': 'application/json'})
+
+            if response.status_code != status.HTTP_200_OK or not response.ok:
+                logger.info("[ERROR] Appointment could not be get Mask Number")
+                logger.info("[ERROR] %s", response)
+                # countdown_time = (2 ** self.request.retries) * 60 * 10
+                # logging.error("Appointment sync with the Matrix System failed with response - " + str(response.content))
+                # print(countdown_time)
+                # self.retry([data], countdown=countdown_time)
+
+            mask_number = response.json()
+        else:
+            is_mask_number = False
+            mask_number = phone_number
+        if mask_number:
+            existing_mask_number_obj = appointment.mask_number.filter(is_deleted=False).first()
+            if existing_mask_number_obj:
+                existing_mask_number_obj.is_deleted = True
+                existing_mask_number_obj.save()
+                AppointmentMaskNumber(content_object=appointment, mask_number=mask_number,
+                                                     validity_up_to=updated_time_slot, is_mask_number=is_mask_number,
+                                                     is_deleted=False).save()
+                is_masking_done = True
+            else:
+                AppointmentMaskNumber(content_object=appointment, mask_number=mask_number,
+                                                     validity_up_to=updated_time_slot, is_mask_number=is_mask_number,
+                                                     is_deleted=False).save()
+                is_masking_done = True
+        else:
+            raise Exception("Failed to generate Mask Number for the appointment - " + str(appointment.id))
+    except Exception as e:
+        logger.error("Error in Celery. Failed to get mask number for appointment " + str(e))
+    return is_masking_done
+
+@task
+def send_rating_update_message(number, text):
+    data = {}
+    data['phone_number'] = number
+    data['text'] = mark_safe(text)
+    try:
+        notification_models.SmsNotification.send_rating_link(data)
+    except Exception as e:
+        logger.error("Error sending rating update sms")
+
 @task
 def send_appointment_reminder_message(number, patient_name, doctor, hospital_name, date):
     data = {}
@@ -331,6 +440,7 @@ def send_appointment_location_message(number, hospital_lat, hospital_long):
 def process_payout(payout_id):
     from ondoc.account.models import MerchantPayout, Order
     from ondoc.account.models import DummyTransactions
+    from ondoc.doctor.models import OpdAppointment
 
     try:
         if not payout_id:
@@ -340,6 +450,9 @@ def process_payout(payout_id):
         if not payout_data or payout_data.status == payout_data.PAID:
             raise Exception("Payment already done for this payout")
 
+
+        default_payment_mode = payout_data.get_default_payment_mode()
+
         appointment = payout_data.get_appointment()
         billed_to = payout_data.get_billed_to()
         merchant = payout_data.get_merchant()
@@ -347,6 +460,9 @@ def process_payout(payout_id):
 
         if not appointment or not billed_to or not merchant:
             raise Exception("Insufficient Data " + str(payout_data))
+
+        if appointment.payment_type in [OpdAppointment.COD]:
+            raise Exception("Cannot process payout for COD appointments")
 
         if not merchant.verified_by_finance or not merchant.enabled:
             raise Exception("Merchant is not verified or is not enabled. " + str(payout_data))
@@ -370,14 +486,13 @@ def process_payout(payout_id):
         req_data = { "payload" : [], "checkSum" : "" }
         req_data2 = { "payload" : [], "checkSum" : "" }
 
-
         idx = 0
         for txn in all_txn:
             
             curr_txn = OrderedDict()
             curr_txn["idx"] = idx
             curr_txn["orderNo"] = txn.order_no
-            curr_txn["orderId"] = order_data.id
+            curr_txn["orderId"] = txn.order.id
             curr_txn["txnAmount"] = str(txn.amount)
             curr_txn["settledAmount"] = str(payout_data.payable_amount)
             curr_txn["merchantCode"] = merchant.id
@@ -385,6 +500,7 @@ def process_payout(payout_id):
                 curr_txn["pgtxId"] = txn.transaction_id
             curr_txn["refNo"] = payout_data.payout_ref_id
             curr_txn["bookingId"] = appointment.id
+            curr_txn["paymentType"] = payout_data.payment_mode if payout_data.payment_mode else default_payment_mode
             req_data["payload"].append(curr_txn)
             idx += 1
             if isinstance(txn, DummyTransactions) and txn.amount>0:
@@ -401,7 +517,7 @@ def process_payout(payout_id):
             payout_status = request_payout(req_data, order_data)
 
         if payout_status:
-            payout_data.api_response = json.dumps(payout_status.get("response"))
+            payout_data.api_response = payout_status.get("response")
             if payout_status.get("status"):
                 payout_data.payout_time = datetime.datetime.now()
                 payout_data.status = payout_data.PAID
@@ -445,19 +561,22 @@ def request_payout(req_data, order_data):
     resp_data = None
 
     response = requests.post(url, data=json.dumps(req_data), headers=headers)
+    resp_data = response.json()
+
     if response.status_code == status.HTTP_200_OK:
-        resp_data = response.json()
         if resp_data.get("ok") is not None and resp_data.get("ok") == '1':
             success_payout = False
             result = resp_data.get('result')
             if result:
                 for res_txn in result:
                     success_payout = res_txn['status'] == "SUCCESSFULLY_INSERTED"
-                    return {"status":1,"response":resp_data}
+
+            if success_payout:
+                return {"status": 1, "response": resp_data}
             
     
     logger.error("payout failed for request data - " + str(req_data))
-    return {"status":0,"response":resp_data}
+    return {"status" : 0, "response" : resp_data}
 
 
 @task()
@@ -479,6 +598,29 @@ def opd_send_otp_before_appointment(appointment_id, previous_appointment_date_ti
         opd_notification.send()
     except Exception as e:
         logger.error(str(e))
+
+@task()
+def opd_send_after_appointment_confirmation(appointment_id, previous_appointment_date_time, second=False):
+    from ondoc.doctor.models import OpdAppointment
+    from ondoc.communications.models import OpdNotification
+    try:
+        instance = OpdAppointment.objects.filter(id=appointment_id).first()
+        if not instance or \
+                not instance.user or \
+                str(math.floor(instance.time_slot_start.timestamp())) != previous_appointment_date_time:
+            return
+        if instance.status == OpdAppointment.ACCEPTED:
+            if not second:
+                opd_notification = OpdNotification(instance, NotificationAction.OPD_CONFIRMATION_CHECK_AFTER_APPOINTMENT)
+            else:
+                opd_notification = OpdNotification(instance, NotificationAction.OPD_CONFIRMATION_SECOND_CHECK_AFTER_APPOINTMENT)
+            opd_notification.send()
+        if instance.status == OpdAppointment.COMPLETED and not instance.is_rated:
+            opd_notification = OpdNotification(instance, NotificationAction.OPD_FEEDBACK_AFTER_APPOINTMENT)
+            opd_notification.send()
+    except Exception as e:
+        logger.error(str(e))
+
 
 @task()
 def lab_send_otp_before_appointment(appointment_id, previous_appointment_date_time):
@@ -571,3 +713,42 @@ def send_pg_acknowledge(order_id=None, order_no=None):
 
     except Exception as e:
         logger.error("Error in sending pg acknowledge - " + str(e))
+
+
+
+
+@task()
+def refund_completed_sms_task(obj_id):
+    from ondoc.account.models import ConsumerRefund
+    from ondoc.communications.models import SMSNotification
+    from ondoc.notification.models import NotificationAction
+    try:
+        # check if any more obj incomplete status
+        instance = ConsumerRefund.objects.filter(id=obj_id).first()
+        if not instance or not instance.user or ConsumerRefund.objects.filter(
+                consumer_transaction_id=instance.consumer_transaction_id,
+                refund_state__in=[ConsumerRefund.PENDING, ConsumerRefund.REQUESTED]).count() > 1:
+            return
+
+        context = {'amount': instance.consumer_transaction.amount, 'ctrnx_id': instance.consumer_transaction_id}
+        receivers = instance.user.get_phone_number_for_communication()
+        sms_notification = SMSNotification(NotificationAction.REFUND_COMPLETED, context)
+        sms_notification.send(receivers)
+    except Exception as e:
+        logger.error(str(e))
+
+
+@task()
+def refund_breakup_sms_task(obj_id):
+    from ondoc.account.models import ConsumerTransaction
+    from ondoc.communications.models import SMSNotification
+    try:
+        instance = ConsumerTransaction.objects.filter(id=obj_id).first()
+        if not instance or not instance.user:
+            return
+        context = {'amount': instance.amount, 'ctrnx_id': instance.id}
+        receivers = instance.user.get_phone_number_for_communication()
+        sms_notification = SMSNotification(NotificationAction.REFUND_BREAKUP, context)
+        sms_notification.send(receivers)
+    except Exception as e:
+        logger.error(str(e))

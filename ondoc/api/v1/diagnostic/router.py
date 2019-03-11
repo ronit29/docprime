@@ -17,6 +17,7 @@ urlpatterns = [
     path('test', LabTestList.as_view({'get': 'list'}), name='test-list'),
     path('package', LabTestList.as_view({'get': 'autocomplete_packages'}), name='package-autocomplete'),
     path('packagelist', LabList.as_view({'get': 'list_packages'}), name='package-list'),
+    path('package_list', LabList.as_view({'get': 'package_list'}), name='package-list'),
     # path('test/<int:id>/', LabTestList.as_view({'get': 'retrieve'}), name='test-detail'),
     path('lablist', LabList.as_view({'get': 'list'}), name='lab-list'),
     path('labnetworksearch', LabList.as_view({'get': 'search'}), name='lab-network-search'),
@@ -48,5 +49,6 @@ urlpatterns = [
     path('appointment/complete', DoctorLabAppointmentsNoAuthViewSet.as_view({'post': 'complete'}),
          name='appointment-complete'),
     path('test/details', TestDetailsViewset.as_view({'get': 'retrieve'}), name='test-details'),
+    path('test/details_by_url', TestDetailsViewset.as_view({'get': 'retrieve_test_by_url'}), name='test-details-by-url'),
     path('test/category', LabTestCategoryListViewSet.as_view({'get': 'list'}), name='test-category'),
 ]

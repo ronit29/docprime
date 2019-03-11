@@ -679,6 +679,12 @@ class CouponsMixin(object):
             if (hospital and re.search(hospital.city, coupon_obj.cities, re.IGNORECASE)) or not hospital:
                 return False
 
+        if coupon_obj.doctors.exists() and (not doctor or doctor not in coupon_obj.doctors.all()):
+            return False
+
+        if coupon_obj.hospitals.exists() and (not hospital or hospital not in coupon_obj.hospitals.all()):
+            return False
+
         if coupon_obj.procedures.exists():
             if procedures:
                 procedure_count = coupon_obj.procedures.filter(id__in=[proc.id for proc in procedures]).count()
@@ -957,9 +963,9 @@ def get_opd_pem_queryset(user, model):
               doctor__manageable_doctors__hospital=F('hospital'),
               doctor__manageable_doctors__is_disabled=False,) |
             Q(doctor__manageable_doctors__user=user,
-                doctor__manageable_doctors__hospital__isnull=True,
-                doctor__manageable_doctors__is_disabled=False,
-                )
+              doctor__manageable_doctors__hospital__isnull=True,
+              doctor__manageable_doctors__is_disabled=False,
+             )
              |
             Q(hospital__manageable_hospitals__doctor__isnull=True,
               hospital__manageable_hospitals__user=user,
@@ -1084,8 +1090,8 @@ def create_payout_checksum(all_txn, product_id):
     checksum = secret_key + "|[" + checksum + "]|" + client_key
     checksum_hash = hashlib.sha256(str(checksum).encode())
     checksum_hash = checksum_hash.hexdigest()
-    print("checksum string - " + str(checksum) + "checksum hash - " + str(checksum_hash))
-    logger.error("checksum string - " + str(checksum) + "checksum hash - " + str(checksum_hash))
+    #print("checksum string - " + str(checksum) + "checksum hash - " + str(checksum_hash))
+    #logger.error("checksum string - " + str(checksum) + "checksum hash - " + str(checksum_hash))
     return checksum_hash
 
 def html_to_pdf(html_body, filename):
@@ -1128,3 +1134,9 @@ def format_iso_date(date_str):
     if date_field:
         date_field = date_str[:date_field]
     return date_field
+
+def datetime_to_formated_string(instance, time_format='%Y-%m-%d %H:%M:%S', to_zone = tz.gettz(settings.TIME_ZONE)):
+    instance = instance.astimezone(to_zone)
+    formated_date = datetime.datetime.strftime(instance, time_format)
+    return formated_date
+

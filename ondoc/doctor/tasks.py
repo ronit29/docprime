@@ -26,3 +26,21 @@ def doc_app_auto_cancel(self, prev_app_dict):
             logger.error("Error in Celery - No opd appointment for - " + str(prev_app_dict.get("id")))
     except Exception as e:
         logger.error("Error in Celery auto cancel flow - " + str(e))
+
+
+@task()
+def save_avg_rating():
+    from ondoc.doctor.models import Doctor, Hospital
+    from ondoc.diagnostic.models import Lab
+    Doctor.update_avg_rating()
+    Lab.update_avg_rating()
+    Hospital.update_avg_rating()
+
+
+@task()
+def update_prices():
+    from ondoc.doctor.models import Doctor
+    from ondoc.diagnostic.models import AvailableLabTest
+    Doctor.update_all_deal_price()
+    AvailableLabTest.update_all_deal_price()    
+    return 'success'

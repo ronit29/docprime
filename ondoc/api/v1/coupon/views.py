@@ -124,16 +124,20 @@ class ApplicableCouponsViewSet(viewsets.GenericViewSet):
                 coupons = coupons.filter(cities__isnull=True)
 
             if hospital:
+                coupons = coupons.filter(Q(hospitals__isnull=True) | Q(hospitals=hospital))
                 coupons = coupons.filter(Q(cities__isnull=True) | Q(cities__icontains=hospital.city))
             else:
+                coupons = coupons.filter(hospitals__isnull=True)
                 coupons = coupons.filter(cities__isnull=True)
 
             if doctor:
+                coupons = coupons.filter(Q(doctors__isnull=True) | Q(doctors=doctor))
                 coupons = coupons.filter(Q(specializations__isnull=True)
                                          | Q(specializations__in=
                                            doctor.doctorpracticespecializations.values_list('specialization', flat=True))
                                          )
             else:
+                coupons = coupons.filter(doctors__isnull=True)
                 coupons = coupons.filter(specializations__isnull=True)
 
             if procedures:
@@ -205,7 +209,7 @@ class ApplicableCouponsViewSet(viewsets.GenericViewSet):
             if payment_option_filter and coupon.payment_option and coupon.payment_option.id != payment_option_filter.id:
                 allowed = True and show_all
                 valid = False
-                invalidating_message = "Only one type of Payment Gateway Coupon is allowed."
+                invalidating_message = "2 payment gateway coupons cannot be used in the same transaction."
 
             # TODO
             # if ((user_opd_completed + user_lab_completed + 1) % coupon.step_count != 0 ):

@@ -63,7 +63,7 @@
                     <td style="color: #3f3f3f; font-size: 16px; font-weight: 500;">
                         Hi<br/>The appointment for {{patient_name|capfirst}} with Dr {{doctor_name|capfirst}} on
                         {{instance.time_slot_start|date:"D jS F Y"}} at {{instance.time_slot_start|date:"h:i A"}} has
-                        been confirmed.
+                        been confirmed.{% if instance.payment_type == 2 %} Please pay Rs {{cod_amount}} at the clinic.{% endif %}
                     </td>
                 </tr>
                 </tbody>
@@ -229,10 +229,19 @@
                             <tr>
                                 <td colspan="4"
                                     style="border: 1px solid black;text-align: center;color:#000000;font-size:16px;font-weight:700;">
+                                    {% if instance.payment_type == 2 %}
+                                    Amount To Be Paid
+                                    {% else %}
                                     Amount Paid
+                                    {% endif %}
                                 </td>
                                 <td style="border: 1px solid black;text-align: center;color:#3f3f3f;font-size:16px;font-weight:500;">
+                                    {% if instance.payment_type == 2 %}
+                                    {{cod_amount}}
+                                    {% else %}
                                     {{instance.effective_price}}
+                                    {% endif %}
+
                                 </td>
                             </tr>
                             </tbody>
@@ -253,6 +262,7 @@
             </table>
         </td>
     </tr>
+    {{email_banners|safe}}
     <tr>
         <td>
             <table cellpadding="0" cellspacing="0" style="width:100%;padding:20px 15px 40px">

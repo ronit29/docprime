@@ -1,7 +1,14 @@
+from django.contrib import messages
 from django.contrib.admin import TabularInline
+from django.contrib.contenttypes.models import ContentType
+from django.http import HttpResponseRedirect
+from django.urls import reverse
 from reversion.admin import VersionAdmin
+
+from ondoc.common.models import Feature, Service
 from ondoc.crm.admin.doctor import AutoComplete
-from ondoc.procedure.models import Procedure, ProcedureCategory, ProcedureCategoryMapping, ProcedureToCategoryMapping
+from ondoc.procedure.models import Procedure, ProcedureCategory, ProcedureCategoryMapping, ProcedureToCategoryMapping, \
+    IpdProcedure, IpdProcedureFeatureMapping, IpdProcedureCategoryMapping, IpdProcedureCategory
 from django import forms
 
 
@@ -58,6 +65,80 @@ class ProcedureToParentCategoryInlineFormset(forms.BaseInlineFormSet):
         if any([category.related_parent_category.count() for category in
                 all_parent_categories]):  # PROCEDURE_category_SAME_level
             raise forms.ValidationError("Procedure and Category can't be on same level.")
+
+
+class FeatureInline(AutoComplete, TabularInline):
+    model = IpdProcedureFeatureMapping
+    fk_name = 'ipd_procedure'
+    extra = 0
+    can_delete = True
+    autocomplete_fields = ['feature']
+    verbose_name = "IPD Procedure Feature"
+    verbose_name_plural = "IPD Procedure Features"
+
+
+class IpdCategoryInline(AutoComplete, TabularInline):
+    model = IpdProcedureCategoryMapping
+    fk_name = 'ipd_procedure'
+    extra = 0
+    max_num = 1
+    can_delete = True
+    autocomplete_fields = ['category']
+    verbose_name = "IPD Procedure Category"
+    verbose_name_plural = "IPD Procedure Categories"
+
+
+class IpdProcedureAdminForm(forms.ModelForm):
+    details = forms.CharField(widget=forms.Textarea, required=False)
+
+    class Media:
+        extend = False
+        js = ('https://cdn.ckeditor.com/ckeditor5/10.1.0/classic/ckeditor.js', 'ipd_procedure/js/init.js')
+        css = {'all': ('ipd_procedure/css/style.css',)}
+
+
+class IpdProcedureAdmin(VersionAdmin):
+    form = IpdProcedureAdminForm
+    model = IpdProcedure
+    search_fields = ['search_key']
+    exclude = ['search_key']
+    inlines = [IpdCategoryInline, FeatureInline]
+
+    def delete_view(self, request, object_id, extra_context=None):
+        obj = self.model.objects.filter(id=object_id).first()
+
+        content_type = ContentType.objects.get_for_model(obj)
+        if not obj:
+            pass
+        elif obj.is_enabled == False:
+            pass
+        else:
+            messages.set_level(request, messages.ERROR)
+            messages.error(request, '{} should be disabled before delete'.format(content_type.model))
+            return HttpResponseRedirect(reverse('admin:{}_{}_change'.format(content_type.app_label,
+                                                                            content_type.model), args=[object_id]))
+        return super().delete_view(request, object_id, extra_context)
+
+
+class FeatureAdmin(VersionAdmin):
+    model = Feature
+    search_fields = ['name']
+
+
+class IpdProcedureCategoryAdmin(VersionAdmin):
+    model = IpdProcedureCategory
+    exclude = ['search_key']
+    search_fields = ['name']
+
+
+class HealthInsuranceProviderAdmin(VersionAdmin):
+    model = Feature
+    search_fields = ['name']
+
+
+class ServiceAdmin(VersionAdmin):
+    model = Service
+    search_fields = ['name']
 
 
 class ParentCategoryInline(AutoComplete, TabularInline):

@@ -21,7 +21,8 @@ from django.utils.html import format_html_join
 import pytz
 
 from ondoc.account.models import Order, Invoice
-from ondoc.api.v1.utils import util_absolute_url, util_file_name
+from ondoc.api.v1.utils import util_absolute_url, util_file_name, datetime_to_formated_string
+from ondoc.common.models import AppointmentHistory
 from ondoc.doctor.models import Hospital, CancellationReason
 from ondoc.diagnostic.models import (LabTiming, LabImage,
                                      LabManager, LabAccreditation, LabAward, LabCertification, AvailableLabTest,
@@ -30,7 +31,8 @@ from ondoc.diagnostic.models import (LabTiming, LabImage,
                                      LabAppointment, HomePickupCharges,
                                      TestParameter, ParameterLabTest, FrequentlyAddedTogetherTests, QuestionAnswer,
                                      LabReport, LabReportFile, LabTestCategoryMapping,
-                                     LabTestRecommendedCategoryMapping)
+                                     LabTestRecommendedCategoryMapping, LabTestGroupTiming, LabTestGroupMapping)
+from ondoc.notification.models import EmailNotification, NotificationAction
 from .common import *
 from ondoc.authentication.models import GenericAdmin, User, QCModel, GenericLabAdmin, AssociatedMerchant
 from ondoc.crm.admin.doctor import CustomDateInput, TimePickerWidget, CreatedByFilter, AutoComplete
@@ -40,8 +42,8 @@ from ondoc.authentication import forms as auth_forms
 from django.contrib.contenttypes.forms import BaseGenericInlineFormSet
 import logging
 import nested_admin
-from .common import AssociatedMerchantInline
-
+from .common import AssociatedMerchantInline, RemarkInline
+from ondoc.location.models import EntityUrls
 logger = logging.getLogger(__name__)
 
 
@@ -340,6 +342,7 @@ class LabForm(FormCleanMixin):
     primary_mobile = forms.CharField(required=True)
     primary_email = forms.EmailField(required=True)
     city = forms.CharField(required=True)
+    lab_priority = forms.IntegerField(required=True)
     operational_since = forms.ChoiceField(required=False, choices=hospital_operational_since_choices)
     home_pickup_charges = forms.DecimalField(required=False, initial=0)
     # onboarding_status = forms.ChoiceField(disabled=True, required=False, choices=Lab.ONBOARDING_STATUS)
@@ -484,6 +487,23 @@ class LabResource(resources.ModelResource):
         return status
 
 
+class LabTestGroupTimingForm(forms.ModelForm):
+    def clean(self):
+        cleaned_data = super().clean()
+        start = cleaned_data.get("start")
+        end = cleaned_data.get("end")
+        if start and end and start>=end:
+            raise forms.ValidationError("Start time should be less than end time")
+
+
+class LabTestGroupTimingInline(admin.TabularInline):
+    model = LabTestGroupTiming
+    form = LabTestGroupTimingForm
+    extra = 0
+    can_delete = True
+    show_change_link = False
+
+
 class LabAdmin(ImportExportMixin, admin.GeoModelAdmin, VersionAdmin, ActionAdmin, QCPemAdmin):
     change_list_template = 'superuser_import_export.html'
     resource_class = LabResource
@@ -502,7 +522,7 @@ class LabAdmin(ImportExportMixin, admin.GeoModelAdmin, VersionAdmin, ActionAdmin
     inlines = [LabDoctorInline, LabServiceInline, LabDoctorAvailabilityInline, LabCertificationInline, LabAwardInline,
                LabAccreditationInline,
                LabManagerInline, LabTimingInline, LabImageInline, LabDocumentInline, HomePickupChargesInline,
-               GenericLabAdminInline, AssociatedMerchantInline]
+               GenericLabAdminInline, AssociatedMerchantInline, LabTestGroupTimingInline, RemarkInline]
     autocomplete_fields = ['lab_pricing_group', ]
 
     map_width = 200
@@ -614,12 +634,13 @@ class LabAdmin(ImportExportMixin, admin.GeoModelAdmin, VersionAdmin, ActionAdmin
         if not obj.assigned_to:
             obj.assigned_to = request.user
         if '_submit_for_qc' in request.POST:
-            obj.data_status = 2
+            obj.data_status = QCModel.SUBMITTED_FOR_QC
         if '_qc_approve' in request.POST:
-            obj.data_status = 3
+            obj.data_status = QCModel.QC_APPROVED
             obj.qc_approved_at = datetime.datetime.now()
         if '_mark_in_progress' in request.POST:
-            obj.data_status = 1
+            obj.data_status = QCModel.REOPENED
+        obj.status_changed_by = request.user
 
         super().save_model(request, obj, form, change)
 
@@ -660,8 +681,8 @@ class LabAdmin(ImportExportMixin, admin.GeoModelAdmin, VersionAdmin, ActionAdmin
     def get_form(self, request, obj=None, **kwargs):
         form = super(LabAdmin, self).get_form(request, obj=obj, **kwargs)
         form.request = request
-        form.base_fields['network'].queryset = LabNetwork.objects.filter(Q(data_status = 2) | Q(data_status = 3) | Q(created_by = request.user))
-        form.base_fields['hospital'].queryset = Hospital.objects.filter(Q(data_status = 2) | Q(data_status = 3) | Q(created_by = request.user))
+        form.base_fields['network'].queryset = LabNetwork.objects.filter(Q(data_status = QCModel.SUBMITTED_FOR_QC) | Q(data_status = QCModel.QC_APPROVED) | Q(created_by = request.user))
+        form.base_fields['hospital'].queryset = Hospital.objects.filter(Q(data_status = QCModel.SUBMITTED_FOR_QC) | Q(data_status = QCModel.QC_APPROVED) | Q(created_by = request.user))
         form.base_fields['assigned_to'].queryset = User.objects.filter(user_type=User.STAFF)
         if not request.user.is_superuser and not request.user.is_member_of(constants['QC_GROUP_NAME']):
             form.base_fields['assigned_to'].disabled = True
@@ -692,7 +713,7 @@ class LabAppointmentForm(forms.ModelForm):
         else:
             raise forms.ValidationError("Invalid start date and time.")
 
-        if self.instance.id:  # DONE SHASHANK_SINGH
+        if self.instance.id:
             lab_test = self.instance.test_mappings.all()
             lab = self.instance.lab
         else:
@@ -704,7 +725,6 @@ class LabAppointmentForm(forms.ModelForm):
         if cleaned_data.get('send_email_sms_report',
                             False) and self.instance and self.instance.id and not self.instance.status == LabAppointment.COMPLETED:
                 raise forms.ValidationError("Can't send reports as appointment is not completed")
-        # SHASHANK_SINGH if no report error.
 
         # if self.instance.status in [LabAppointment.CANCELLED, LabAppointment.COMPLETED] and len(cleaned_data):
         #     raise forms.ValidationError("Cancelled/Completed appointment cannot be modified.")
@@ -718,10 +738,9 @@ class LabAppointmentForm(forms.ModelForm):
             raise forms.ValidationError("Reason for Cancelled appointment should be set.")
 
         if cleaned_data.get('status') is LabAppointment.CANCELLED and cleaned_data.get(
-                'cancellation_reason') and 'others' in cleaned_data.get(
-                'cancellation_reason').name.lower() and not cleaned_data.get('cancellation_comments'):
+                'cancellation_reason', None) and cleaned_data.get('cancellation_reason').is_comment_needed and not cleaned_data.get('cancellation_comments'):
             raise forms.ValidationError(
-                "If Reason for Cancelled appointment is others it should be mentioned in cancellation comment.")
+                "Cancellation comments must be mentioned for selected cancellation reason.")
 
         if not lab.lab_pricing_group:
             raise forms.ValidationError("Lab is not in any lab pricing group.")
@@ -765,8 +784,8 @@ class LabReportInline(nested_admin.NestedTabularInline):
 class LabAppointmentAdmin(nested_admin.NestedModelAdmin):
     form = LabAppointmentForm
     list_display = (
-        'booking_id', 'get_profile', 'get_lab', 'status', 'reports_uploaded', 'time_slot_start', 'effective_price',
-        'created_at', 'updated_at', 'get_lab_test_name')
+        'booking_id', 'get_profile', 'get_lab', 'status', 'reports_uploaded', 'time_slot_start', 'effective_price', 'get_profile_email',
+        'get_profile_age', 'created_at', 'updated_at', 'get_lab_test_name')
     list_filter = ('status', )
     date_hierarchy = 'created_at'
 
@@ -774,12 +793,28 @@ class LabAppointmentAdmin(nested_admin.NestedModelAdmin):
         LabReportInline
     ]
 
-    def get_autocomplete_fields(self, request):
-        if request.user.is_superuser:
-            temp_autocomplete_fields = ('lab', 'profile', 'user')
-        else:
-            temp_autocomplete_fields = super().get_autocomplete_fields(request)
-        return temp_autocomplete_fields
+    # def get_autocomplete_fields(self, request):
+    #     if request.user.is_superuser:
+    #         temp_autocomplete_fields = ('lab', 'profile', 'user')
+    #     else:
+    #         temp_autocomplete_fields = super().get_autocomplete_fields(request)
+    #     return temp_autocomplete_fields
+
+    def get_profile_email(self, obj):
+        if not obj.profile:
+            return None
+        return obj.profile.email
+
+    get_profile_email.admin_order_field = 'profile'
+    get_profile_email.short_description = 'Profile Email'
+
+    def get_profile_age(self, obj):
+        if not obj.profile:
+            return None
+        return obj.profile.get_age()
+
+    get_profile_age.admin_order_field = 'profile'
+    get_profile_age.short_description = 'Profile Age'
 
     def get_profile(self, obj):
         if not obj.profile:
@@ -818,12 +853,12 @@ class LabAppointmentAdmin(nested_admin.NestedModelAdmin):
 
     def get_fields(self, request, obj=None):
         if request.user.is_superuser:
-            return ('booking_id', 'order_id', 'lab', 'lab_id', 'lab_contact_details', 'profile', 'user',  # DONE SHASHANK_SINGH CHANGE 15 remove and add a read only
+            return ('booking_id', 'order_id', 'lab', 'lab_id', 'lab_contact_details', 'profile', 'user',
                     'profile_detail', 'status', 'cancel_type', 'cancellation_reason', 'cancellation_comments',
                     'get_lab_test', 'price', 'agreed_price',
                     'deal_price', 'effective_price', 'start_date', 'start_time', 'otp', 'payment_status',
                     'payment_type', 'insurance', 'is_home_pickup', 'address', 'outstanding',
-                    'send_email_sms_report', 'invoice_urls', 'reports_uploaded'
+                    'send_email_sms_report', 'invoice_urls', 'reports_uploaded', 'email_notification_timestamp', 'payment_type'
                     )
         elif request.user.groups.filter(name=constants['LAB_APPOINTMENT_MANAGEMENT_TEAM']).exists():
             return ('booking_id', 'order_id',  'lab_id', 'lab_name', 'get_lab_test', 'lab_contact_details',
@@ -832,29 +867,29 @@ class LabAppointmentAdmin(nested_admin.NestedModelAdmin):
                     'deal_price', 'effective_price', 'payment_status', 'payment_type', 'insurance', 'is_home_pickup',
                     'get_pickup_address', 'get_lab_address', 'outstanding', 'otp', 'status', 'cancel_type',
                     'cancellation_reason', 'cancellation_comments', 'start_date', 'start_time',
-                    'send_email_sms_report', 'invoice_urls', 'reports_uploaded'
+                    'send_email_sms_report', 'invoice_urls', 'reports_uploaded', 'email_notification_timestamp', 'payment_type'
                     )
         else:
             return ()
 
     def get_readonly_fields(self, request, obj=None):
         if request.user.is_superuser:
-            read_only =  ['booking_id', 'order_id', 'lab_id', 'lab_contact_details', 'get_lab_test', 'invoice_urls', 'reports_uploaded']
+            read_only =  ['booking_id', 'order_id', 'lab_id', 'lab_contact_details', 'get_lab_test', 'invoice_urls', 'reports_uploaded', 'email_notification_timestamp', 'payment_type']
         elif request.user.groups.filter(name=constants['LAB_APPOINTMENT_MANAGEMENT_TEAM']).exists():
             read_only = ['booking_id', 'order_id', 'lab_name', 'lab_id', 'get_lab_test', 'invoice_urls',
                     'lab_contact_details', 'used_profile_name', 'used_profile_number',
                     'default_profile_name', 'default_profile_number', 'user_number', 'user_id', 'price', 'agreed_price',
                     'deal_price', 'effective_price', 'payment_status', 'otp',
                     'payment_type', 'insurance', 'is_home_pickup', 'get_pickup_address', 'get_lab_address',
-                         'outstanding', 'reports_uploaded']
+                         'outstanding', 'reports_uploaded', 'email_notification_timestamp', 'payment_type']
         else:
             read_only = []
 
-        if obj.status == LabAppointment.COMPLETED or obj.status == LabAppointment.CANCELLED:
+        if obj and (obj.status == LabAppointment.COMPLETED or obj.status == LabAppointment.CANCELLED):
             read_only.extend(['status'])
         return read_only
 
-    # def get_inline_instances(self, request, obj=None):  # ALMOST DONE (Inline To be created) SHASHANK_SINGH CHANGE 16
+    # def get_inline_instances(self, request, obj=None):
     #     inline_instance = super().get_inline_instances(request=request, obj=obj)
     #     if request.user.is_superuser:
     #         inline_instance.append(LabTestInline(self.model, self.admin_site))
@@ -876,6 +911,15 @@ class LabAppointmentAdmin(nested_admin.NestedModelAdmin):
                                                                              util_file_name(invoice))
         return mark_safe(invoices_urls)
     invoice_urls.short_description = 'Invoice(s)'
+
+    def email_notification_timestamp(self, instance):
+        l = instance.email_notification.filter(notification_type=NotificationAction.LAB_REPORT_SEND_VIA_CRM).values_list('created_at', flat=True)
+        result = []
+        for temp_item in l:
+            formated_date = datetime_to_formated_string(temp_item)
+            result.append(formated_date)
+        return ", ".join(result)
+    email_notification_timestamp.short_description = 'Report(s) sent at'
 
     def order_id(self, obj):
         if obj and obj.id:
@@ -914,7 +958,7 @@ class LabAppointmentAdmin(nested_admin.NestedModelAdmin):
 
     def get_lab_test(self, obj):
         format_string = ""
-        for data in obj.test_mappings.all():  # DONE SHASHANK_SINGH CHANGE 11
+        for data in obj.test_mappings.all():
             format_string += "<div><span>{}, MRP : {}, Deal Price : {} </span></div>".format(data.test.name, data.mrp,
                                                                                          data.custom_deal_price if data.custom_deal_price else data.computed_deal_price)
         return format_html_join(
@@ -986,9 +1030,12 @@ class LabAppointmentAdmin(nested_admin.NestedModelAdmin):
 
     @transaction.atomic
     def save_model(self, request, obj, form, change):
+        responsible_user = request.user
+        obj._responsible_user = responsible_user if responsible_user and not responsible_user.is_anonymous else None
         if obj:
             lab_app_obj = None
             if obj.id:
+                obj._source = AppointmentHistory.CRM
                 lab_app_obj = LabAppointment.objects.select_for_update().filter(pk=obj.id).first()
             # date = datetime.datetime.strptime(request.POST['start_date'], '%Y-%m-%d')
             # time = datetime.datetime.strptime(request.POST['start_time'], '%H:%M').time()
@@ -1207,6 +1254,7 @@ class LabTestAdmin(PackageAutoCompleteView, ImportExportMixin, VersionAdmin):
     search_fields = ['name']
     list_filter = ('is_package', 'enable_for_ppc', 'enable_for_retail')
     exclude = ['search_key']
+    readonly_fields = ['url',]
 
     def get_fields(self, request, obj=None):
         fields = super().get_fields(request, obj)
@@ -1222,6 +1270,13 @@ class LabTestAdmin(PackageAutoCompleteView, ImportExportMixin, VersionAdmin):
             inline_instance.append(ParameterLabTestInline(self.model, self.admin_site))
         return inline_instance
 
+    # def get_active_url(self, obj=None):
+    #     if obj:
+    #         active_urls = EntityUrls.objects.filter(entity_id=obj.id, is_valid=True).first()
+    #         if active_urls:
+    #             return active_urls.url
+
+    #     return ''
 
 class LabTestTypeAdmin(VersionAdmin):
     search_fields = ['name']
@@ -1276,6 +1331,7 @@ class AvailableLabTestAdmin(VersionAdmin):
     list_display = ['test', 'lab_pricing_group', 'get_type', 'mrp', 'computed_agreed_price',
                     'custom_agreed_price', 'computed_deal_price', 'custom_deal_price', 'enabled']
     search_fields = ['test__name', 'lab_pricing_group__group_name', 'lab_pricing_group__labs__name']
+    # autocomplete_fields = ['test']
 
 
 class DiagnosticConditionLabTestInline(admin.TabularInline):
@@ -1301,4 +1357,28 @@ class CommonPackageAdmin(VersionAdmin):
         form = super(CommonPackageAdmin, self).get_form(request, obj=obj, **kwargs)
         form.base_fields['package'].queryset = LabTest.objects.filter(is_package=True)
         return form
+
+
+class LabTestGroupAdmin(admin.ModelAdmin):
+    search_fields = ['name']
+    list_display = ['name']
+
+
+class LabTestGroupResource(resources.ModelResource):
+    test = fields.Field(attribute='test_id', column_name='test')
+    lab_test_group = fields.Field(attribute='lab_test_group_id', column_name='group')
+
+    class Meta:
+        model = LabTestGroupMapping
+        fields = ('id')
+
+    def before_save_instance(self, instance, using_transactions, dry_run):
+        super().before_save_instance(instance, using_transactions, dry_run)
+
+
+class LabTestGroupMappingAdmin(ImportMixin, admin.ModelAdmin):
+    resource_class = LabTestGroupResource
+    formats = (base_formats.XLS, base_formats.XLSX)
+    list_display = ['test', 'lab_test_group']
+    search_fields = ['test__name', 'lab_test_group__name']
 

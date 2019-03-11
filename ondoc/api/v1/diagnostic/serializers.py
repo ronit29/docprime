@@ -10,7 +10,7 @@ from ondoc.authentication.models import UserProfile, Address
 from ondoc.api.v1.doctor.serializers import CreateAppointmentSerializer, CommaSepratedToListField
 from ondoc.api.v1.auth.serializers import AddressSerializer, UserProfileSerializer
 from ondoc.api.v1.utils import form_time_slot, GenericAdminEntity, util_absolute_url
-from ondoc.doctor.models import OpdAppointment
+from ondoc.doctor.models import OpdAppointment, CancellationReason
 from ondoc.account.models import Order, Invoice
 from ondoc.coupon.models import Coupon, RandomGeneratedCoupon
 from django.db.models import Count, Sum, When, Case, Q, F, ExpressionWrapper, DateTimeField
@@ -53,7 +53,7 @@ class LabListSerializer(serializers.ModelSerializer):
 class LabTestSerializer(serializers.ModelSerializer):
     class Meta:
         model = LabTest
-        fields = ('id', 'name', 'pre_test_info', 'why', 'show_details')
+        fields = ('id', 'name', 'pre_test_info', 'why', 'show_details', 'url')
         # fields = ('id', 'account_name', 'users', 'created')
 
 
@@ -106,9 +106,10 @@ class LabModelSerializer(serializers.ModelSerializer):
         if self.parent:
             return None
         app = LabAppointment.objects.select_related('profile').filter(lab_id=obj.id).all()
-        # rating_queryset = obj.rating.prefetch_related('compliment').exclude(Q(review='') | Q(review=None)).filter(is_live=True).order_by('-updated_at')
+        if obj.network:
+            app = LabAppointment.objects.select_related('profile').filter(lab__network=obj.network).all()
         query = self.context.get('rating_queryset')
-        rating_queryset = query.exclude(Q(review='') | Q(review=None)).order_by('-updated_at')
+        rating_queryset = query.exclude(Q(review='') | Q(review=None)).order_by('-ratings', '-updated_at')
         reviews = rating_serializer.RatingsModelSerializer(rating_queryset, many=True, context={'app': app})
         return reviews.data[:5]
 
@@ -286,8 +287,15 @@ class AvailableLabTestPackageSerializer(serializers.ModelSerializer):
         if obj.test.is_package:
             packages_test = obj.test.packages.all()
             for t_obj in packages_test:
+                rec_dict = dict()
                 # param_list = t_obj.lab_test.labtests.all().values_list("parameter__name", flat=True)
                 param_objs = t_obj.lab_test.labtests.all()
+                rec_dict['category'] = []
+                rec_obj = t_obj.lab_test.recommended_categories.all()
+                # category = [cat.name for cat in rec_obj]
+                for cat in rec_obj:
+                    rec_dict['category'].append(
+                        {'name': cat.name, 'icon': util_absolute_url(cat.icon.url) if cat.icon else None})
                 param_list = list()
                 for obj in param_objs:
                     param_list.append(obj.parameter.name)
@@ -296,7 +304,8 @@ class AvailableLabTestPackageSerializer(serializers.ModelSerializer):
                     "why": t_obj.lab_test.why,
                     "pre_test_info": t_obj.lab_test.pre_test_info,
                     "expected_tat": t_obj.lab_test.expected_tat,
-                    "parameters": param_list
+                    "parameters": param_list,
+                    "category": rec_dict.get('category')
                 })
         return ret_data
 
@@ -398,7 +407,7 @@ class LabAppointmentTestMappingSerializer(serializers.ModelSerializer):
     class Meta:
         model = LabAppointmentTestMapping
         fields = ('test_id', 'mrp', 'test', 'agreed_price', 'deal_price',
-                  # 'enabled',  # SHASHANK_SINGH Ask Arun Sir
+                  # 'enabled',
                   'is_home_collection_enabled')
 
 
@@ -460,6 +469,7 @@ class CommonTestSerializer(serializers.ModelSerializer):
     show_details = serializers.ReadOnlyField(source='test.show_details')
     icon = serializers.SerializerMethodField
     test_type = serializers.ReadOnlyField(source='test.test_type')
+    url = serializers.ReadOnlyField(source='test.url')
 
     def get_icon(self, obj):
         request = self.context.get('request')
@@ -467,14 +477,15 @@ class CommonTestSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = CommonTest
-        fields = ('id', 'name', 'icon', 'show_details', 'test_type')
+        fields = ('id', 'name', 'icon', 'show_details', 'test_type', 'url')
 
 
 class CommonPackageSerializer(serializers.ModelSerializer):
     id = serializers.ReadOnlyField(source='package.id')
     name = serializers.ReadOnlyField(source='package.name')
-    show_details = serializers.ReadOnlyField(source='test.show_details')
+    show_details = serializers.ReadOnlyField(source='package.show_details')
     icon = serializers.SerializerMethodField()
+    url = serializers.ReadOnlyField(source='package.url')
 
     def get_icon(self, obj):
         request = self.context.get('request')
@@ -482,7 +493,7 @@ class CommonPackageSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = CommonPackage
-        fields = ('id', 'name', 'icon', 'show_details')
+        fields = ('id', 'name', 'icon', 'show_details', 'url')
 
 
 class CommonConditionsSerializer(serializers.ModelSerializer):
@@ -758,6 +769,24 @@ class LabAppointmentCreateSerializer(serializers.Serializer):
         time_slot_start = (form_time_slot(data.get('start_date'), data.get('start_time'))
                            if not data.get("time_slot_start") else data.get("time_slot_start"))
 
+
+        # validations for same day and next day timeslot bookings
+        available_slots = LabTiming.timing_manager.lab_booking_slots(lab__id=data.get("lab").id, lab__is_live=True, for_home_pickup=data.get("is_home_pickup"))
+        now = datetime.datetime.now()
+        tomorrow = datetime.date.today() + datetime.timedelta(days=1)
+        is_today = now.weekday() == time_slot_start.weekday()
+        is_tomorrow = tomorrow.weekday() == time_slot_start.weekday()
+        curr_time = time_slot_start.hour
+        curr_minute = round(round(float(time_slot_start.minute) / 60, 2) * 2) / 2
+        curr_time += curr_minute
+
+        if is_today and available_slots.get("today_min") and available_slots.get("today_min") > curr_time:
+            raise serializers.ValidationError("Invalid Time slot")
+        if is_tomorrow and available_slots.get("tomorrow_min") and available_slots.get("tomorrow_min") > curr_time:
+            raise serializers.ValidationError("Invalid Time slot")
+        if is_today and available_slots.get("today_max") and available_slots.get("today_max") < curr_time:
+            raise serializers.ValidationError("Invalid Time slot")
+
         if LabAppointment.objects.filter(profile=data.get("profile"), lab=data.get("lab"),
                                          tests__in=data.get("test_ids"), time_slot_start=time_slot_start) \
                 .exclude(status__in=[LabAppointment.COMPLETED, LabAppointment.CANCELLED]).exists():
@@ -979,15 +1008,26 @@ class UpdateStatusSerializer(serializers.Serializer):
 class LabAppointmentRetrieveSerializer(LabAppointmentModelSerializer):
     profile = UserProfileSerializer()
     lab = LabModelSerializer()
-    # lab_test = AvailableLabTestSerializer(many=True)  # SHASHANK_SINGH CHANGE 17
+    # lab_test = AvailableLabTestSerializer(many=True)
     lab_test = serializers.SerializerMethodField()
     address = serializers.SerializerMethodField()
     type = serializers.ReadOnlyField(default='lab')
     reports = serializers.SerializerMethodField()
     invoices = serializers.SerializerMethodField()
+    cancellation_reason = serializers.SerializerMethodField()
+    mask_data = serializers.SerializerMethodField()
+
+    def get_mask_data(self, obj):
+        mask_number = obj.mask_number.first()
+        if mask_number:
+            return mask_number.build_data()
+        return None
 
     def get_lab_test(self, obj):
         return LabAppointmentTestMappingSerializer(obj.test_mappings.all(), many=True).data
+
+    def get_cancellation_reason(self, obj):
+        return obj.get_serialized_cancellation_reason()
 
     def get_reports(self, obj):
         reports = []
@@ -1020,7 +1060,7 @@ class LabAppointmentRetrieveSerializer(LabAppointmentModelSerializer):
     class Meta:
         model = LabAppointment
         fields = ('id', 'type', 'lab_name', 'status', 'deal_price', 'effective_price', 'time_slot_start', 'time_slot_end','is_rated', 'rating_declined',
-                   'is_home_pickup', 'lab_thumbnail', 'lab_image', 'profile', 'allowed_action', 'lab_test', 'lab', 'otp', 'address', 'type', 'reports', 'invoices')
+                   'is_home_pickup', 'lab_thumbnail', 'lab_image', 'profile', 'allowed_action', 'lab_test', 'lab', 'otp', 'address', 'type', 'reports', 'invoices', 'cancellation_reason', 'mask_data', 'payment_type', 'price')
 
 
 class DoctorLabAppointmentRetrieveSerializer(LabAppointmentModelSerializer):
@@ -1107,7 +1147,7 @@ class LabEntitySerializer(serializers.ModelSerializer):
 
 
 class CustomPackageLabSerializer(LabModelSerializer):
-    avg_rating = serializers.ReadOnlyField()
+    # avg_rating = serializers.ReadOnlyField()
     url = serializers.SerializerMethodField()
 
     class Meta:
@@ -1136,12 +1176,36 @@ class CustomLabTestPackageSerializer(serializers.ModelSerializer):
     pickup_charges = serializers.SerializerMethodField()
     pickup_available = serializers.SerializerMethodField()
     distance_related_charges = serializers.SerializerMethodField()
+    categories = serializers.SerializerMethodField()
+    priority_score = serializers.SerializerMethodField()
+    category_details = serializers.SerializerMethodField()
+    tests = serializers.SerializerMethodField()
 
     class Meta:
         model = LabTest
         fields = ('id', 'name', 'lab', 'mrp', 'distance', 'price', 'lab_timing', 'lab_timing_data', 'next_lab_timing',
-                  'next_lab_timing_data', 'test_type', 'is_package', 'number_of_tests', 'why', 'pre_test_info', 'is_package',
-                  'pickup_charges', 'pickup_available', 'distance_related_charges', 'priority', 'show_details')
+                  'next_lab_timing_data', 'test_type', 'is_package', 'number_of_tests', 'why', 'pre_test_info',
+                  'is_package', 'pickup_charges', 'pickup_available', 'distance_related_charges', 'priority',
+                  'show_details', 'categories', 'url', 'priority_score', 'category_details', 'tests')
+
+    def get_priority_score(self, obj):
+        return int(obj.priority_score)
+
+    def get_tests(self, obj):
+        return_data = list()
+        for temp_test in obj.test.all():
+            parameter_count = len(temp_test.parameter.all()) or 1
+            name = temp_test.name
+            test_id = temp_test.id
+            return_data.append({'id': test_id, 'name': name, 'parameter_count': parameter_count})
+        return return_data
+
+    def get_categories(self, obj):
+        return obj.get_all_categories_detail()
+
+    def get_category_details(self, obj):
+        category_data = self.context.get('category_data', {})
+        return category_data.get(obj.id, [])
 
     def get_lab(self, obj):
         lab_data = self.context.get('lab_data', {})
@@ -1232,25 +1296,45 @@ class LabPackageListSerializer(serializers.Serializer):
     max_price = serializers.IntegerField(required=False)
     sort_on = serializers.CharField(required=False)
     category_ids = CommaSepratedToListField(required=False, max_length=500, typecast_to=int)
+    package_category_ids = CommaSepratedToListField(required=False, max_length=500, typecast_to=int)
     test_ids = CommaSepratedToListField(required=False, max_length=500, typecast_to=int)
     min_age = serializers.IntegerField(required=False)
     max_age = serializers.IntegerField(required=False)
     gender = serializers.ChoiceField(choices=LabTest.GENDER_TYPE_CHOICES, required=False)
     package_type = serializers.IntegerField(required=False)
+    package_ids = CommaSepratedToListField(required=False, max_length=500, typecast_to=int)
+
+    def validate_package_ids(self, attrs):
+        try:
+            attrs = list(set(attrs))
+            if LabTest.objects.filter(searchable=True, enable_for_retail=True, id__in=attrs).count() == len(attrs):
+                return attrs
+        except:
+            raise serializers.ValidationError('Invalid Package IDs')
+        raise serializers.ValidationError('Invalid Package IDs')
 
     def validate_category_ids(self, attrs):
         try:
-            temp_attrs = [int(attr) for attr in attrs]
-            if LabTestCategory.objects.filter(is_live=True, is_package_category=True, id__in=temp_attrs).count() == len(temp_attrs):
+            attrs = set(attrs)
+            if LabTestCategory.objects.filter(is_live=True, is_package_category=True, id__in=attrs).count() == len(attrs):
                 return attrs
         except:
             raise serializers.ValidationError('Invalid Category IDs')
         raise serializers.ValidationError('Invalid Category IDs')
 
+    def validate_package_category_ids(self, attrs):
+        try:
+            attrs = set(attrs)
+            if LabTestCategory.objects.filter(is_live=True, is_package_category=True, id__in=attrs).count() == len(attrs):
+                return attrs
+        except:
+            raise serializers.ValidationError('Invalid Package Category IDs')
+        raise serializers.ValidationError('Invalid Package Category IDs')
+
     def validate_test_ids(self, attrs):
         try:
-            temp_attrs = [int(attr) for attr in attrs]
-            if LabTest.objects.filter(enable_for_retail=True, searchable=True, id__in=temp_attrs).count() == len(temp_attrs):
+            attrs = set(attrs)
+            if LabTest.objects.filter(enable_for_retail=True, searchable=True, id__in=attrs).count() == len(attrs):
                 return attrs
         except:
             raise serializers.ValidationError('Invalid Test IDs')
@@ -1260,6 +1344,7 @@ class LabPackageListSerializer(serializers.Serializer):
 class RecommendedPackageCategoryList(serializers.ModelSerializer):
 
     tests = serializers.SerializerMethodField()
+    icon = serializers.SerializerMethodField()
 
     def get_tests(self, obj):
         test_id = []
@@ -1272,6 +1357,30 @@ class RecommendedPackageCategoryList(serializers.ModelSerializer):
                                 "parameters": temp_parameters_names})
         return test_id
 
+    def get_icon(self, obj):
+        request = self.context.get('request')
+        if not request:
+            return None
+        return request.build_absolute_uri(obj.icon.url) if obj.icon and obj.icon.url else None
+
     class Meta:
         model = LabTestCategory
-        fields = ('id', 'name', 'tests')
+        fields = ('id', 'name', 'tests', 'icon')
+
+
+class LabAppointmentUpcoming(LabAppointmentModelSerializer):
+    address = serializers.SerializerMethodField()
+    provider_id = serializers.IntegerField(source='lab.id')
+    name = serializers.ReadOnlyField(source='lab.name')
+    hospital_name = serializers.SerializerMethodField()
+
+    class Meta:
+        model = LabAppointment
+        fields = ('id', 'provider_id', 'name', 'hospital_name', 'patient_name', 'type',
+                  'status', 'time_slot_start', 'time_slot_end', 'address')
+
+    def get_address(self, obj):
+        return obj.lab.get_lab_address()
+
+    def get_hospital_name(self, obj):
+        return None

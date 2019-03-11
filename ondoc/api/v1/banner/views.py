@@ -1,6 +1,7 @@
 import re
 from urllib.parse import urlparse
 
+from django.contrib.gis.geos import Point
 from django.http import QueryDict
 from django.utils import timezone
 from rest_framework import viewsets, status, serializers
@@ -12,40 +13,29 @@ class BannerListViewSet(viewsets.GenericViewSet):
 
     def list(self, request):
         parameters = request.query_params
+        lat = parameters.get('lat', None)
+        long = parameters.get('long', None)
+        banners = Banner.get_all_banners(request)
+        res = []
+        for banner_obj in banners:
+            if not banner_obj.get('latitude') or not banner_obj.get('longitude') or not banner_obj.get('radius'):
+                res.append(banner_obj)
+            elif lat and long:
+                if banner_obj.get('latitude') and banner_obj.get('longitude') and banner_obj.get('radius'):
+                    latitude = banner_obj.get('latitude')
+                    longitude = banner_obj.get('longitude')
+                    radius = banner_obj.get('radius')  # Radius in kilo-metres
+                    pnt1 = Point(float(longitude), float(latitude))
+                    try:
+                        pnt2 = Point(float(long), float(lat))
+                    except:
+                        return Response({'msg': 'Invalid Lat Long'}, status=status.HTTP_400_BAD_REQUEST)
 
-        now = timezone.now()
-
-        queryset = Banner.objects.filter(enable=True).order_by('-priority')[:10]
-        slider_locate = dict(Banner.slider_location)
-        final_result = []
-
-        for data in queryset:
-            resp = dict()
-            resp['title'] = data.title
-            resp['id'] = data.id
-            resp['slider_location'] = slider_locate[data.slider_locate]
-            resp['start_date'] = data.start_date
-            resp['end_date'] = data.end_date
-            resp['priority'] = data.priority
-            resp['show_in_app'] = data.show_in_app
-            resp['app_params'] = data.app_params
-            resp['app_screen'] = data.app_screen
-            resp['event_name'] = data.event_name
-            if data.url:
-                path = urlparse(data.url).path
-                params = urlparse(data.url).params
-                query = urlparse(data.url).query
-                if path:
-                    resp['url'] = path + params + query
+                    distance = pnt1.distance(pnt2)*100  # Distance in kilo-metres
+                    if distance <= radius:
+                        res.append(banner_obj)
                 else:
-                    resp['url'] = '/'
-            if data.url:
-                data.url = re.sub('.*?\?', '', data.url)
-                qd = QueryDict(data.url)
-                resp['url_details'] = qd
-            resp['image'] = request.build_absolute_uri(data.image.url)
+                    res.append(banner_obj)
 
-            final_result.append(resp)
-
-        return Response(final_result)
+        return Response(res)
 

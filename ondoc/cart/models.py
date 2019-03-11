@@ -3,7 +3,7 @@ from ondoc.api.v1.utils import format_iso_date
 from ondoc.authentication import models as auth_model
 from ondoc.account.models import Order
 from django.contrib.postgres.fields import JSONField
-
+from datetime import date, timedelta, datetime
 
 class Cart(auth_model.TimeStampedModel, auth_model.SoftDeleteModel):
 
@@ -11,6 +11,14 @@ class Cart(auth_model.TimeStampedModel, auth_model.SoftDeleteModel):
     user = models.ForeignKey(auth_model.User, on_delete=models.CASCADE)
     deleted_at = models.DateTimeField(blank=True, null=True)
     data = JSONField()
+
+    @classmethod
+    def remove_all(cls, user):
+        try:
+            curr_time = datetime.now()
+            cls.objects.filter(user=user, deleted_at__isnull=True).update(deleted_at=curr_time)
+        except Exception as e:
+            pass
 
     @classmethod
     def get_free_opd_item_count(cls, request, cart_item=None):
@@ -43,7 +51,7 @@ class Cart(auth_model.TimeStampedModel, auth_model.SoftDeleteModel):
 
         items_equal = True
         for key in equal_check:
-            if key in item_data and key in data and item_data[key] != data[key]:
+            if key in item_data and key in data and str(item_data[key]) != str(data[key]):
                 items_equal = False
                 continue
             if key in item_data and key not in data:
@@ -73,7 +81,12 @@ class Cart(auth_model.TimeStampedModel, auth_model.SoftDeleteModel):
         if existing_cart_items:
             for item in existing_cart_items:
                 if not cls.compare_item_data(data, item.get("data")):
-                    return False, cls.get_cart_item_by_id(item.get("id"))
+                    # if cart_item is set, we are trying to validate while updating an existing cart_item , in this case do not
+                    # send the duplicate appointment back to the caller
+                    if cart_item:
+                        return False, None
+                    else:
+                        return False, cls.get_cart_item_by_id(item.get("id"))
         return True, None
 
     @classmethod

@@ -12,19 +12,21 @@ from ondoc.authentication.models import (TimeStampedModel, CreatedByModel, Image
                                          BillingAccount, SPOCDetails)
 from ondoc.doctor.models import Hospital, SearchKey, CancellationReason
 from ondoc.coupon.models import Coupon
+from ondoc.location.models import EntityUrls
 from ondoc.notification import models as notification_models
 from ondoc.notification import tasks as notification_tasks
 from ondoc.notification.labnotificationaction import LabNotificationAction
 from django.core.files.storage import get_storage_class
 from ondoc.api.v1.utils import AgreedPriceCalculate, DealPriceCalculate, TimeSlotExtraction, CouponsMixin, \
-    form_time_slot, util_absolute_url, html_to_pdf
+    form_time_slot, util_absolute_url, html_to_pdf, RawSql
 from ondoc.account import models as account_model
 from django.utils import timezone
 from datetime import timedelta
-from django.db.models import F, Sum, When, Case, Q
+from django.db.models import F, Sum, When, Case, Q, Avg
 from django.db import transaction
 from django.contrib.postgres.fields import JSONField
 from ondoc.doctor.models import OpdAppointment
+from ondoc.notification.models import EmailNotification
 from ondoc.payout.models import Outstanding
 from ondoc.authentication import models as auth_model
 from django.core.files.uploadedfile import InMemoryUploadedFile, TemporaryUploadedFile
@@ -49,9 +51,11 @@ from ondoc.matrix.tasks import push_appointment_to_matrix, push_onboarding_qcsta
 from ondoc.location import models as location_models
 from ondoc.ratings_review import models as ratings_models
 from decimal import Decimal
-from ondoc.common.models import AppointmentHistory
+from ondoc.common.models import AppointmentHistory, AppointmentMaskNumber, Remark
 import reversion
 from decimal import Decimal
+from django.utils.text import slugify
+#from ondoc.api.v1.diagnostic import serializers as diagnostic_serializers
 
 logger = logging.getLogger(__name__)
 
@@ -213,12 +217,22 @@ class Lab(TimeStampedModel, CreatedByModel, QCModel, SearchKey):
     order_priority = models.PositiveIntegerField(blank=True, null=True, default=0)
     merchant = GenericRelation(auth_model.AssociatedMerchant)
     merchant_payout = GenericRelation(account_model.MerchantPayout)
+    avg_rating = models.DecimalField(max_digits=5, decimal_places=2, null=True, editable=False)
+    lab_priority = models.PositiveIntegerField(blank=False, null=False, default=1)
+    open_for_communication = models.BooleanField(default=True)
+    remark = GenericRelation(Remark)
 
     def __str__(self):
         return self.name
 
     class Meta:
         db_table = "lab"
+
+    def open_for_communications(self):
+        if (self.network and self.network.open_for_communication) or (not self.network and self.open_for_communication):
+            return True
+
+        return False
 
     def convert_min(self, min):
         min_str = str(min)
@@ -447,6 +461,16 @@ class Lab(TimeStampedModel, CreatedByModel, QCModel, SearchKey):
             result.extend(list(self.labmanager_set.filter(contact_type=LabManager.OWNER)))
         return result
 
+    @classmethod
+    def update_avg_rating(cls):
+        from django.db import connection
+        cursor = connection.cursor()
+        content_type = ContentType.objects.get_for_model(Lab)
+        if content_type:
+            cid = content_type.id
+            query = '''UPDATE lab l set avg_rating = (select avg(ratings) from ratings_review where content_type_id={} and object_id=l.id) '''.format(cid)
+            cursor.execute(query)
+
 
 class LabCertification(TimeStampedModel):
     lab = models.ForeignKey(Lab, related_name = 'lab_certificate', on_delete=models.CASCADE)
@@ -629,6 +653,9 @@ class LabNetwork(TimeStampedModel, CreatedByModel, QCModel):
     spoc_details = GenericRelation(auth_model.SPOCDetails)
     merchant = GenericRelation(auth_model.AssociatedMerchant)
     merchant_payout = GenericRelation(account_model.MerchantPayout)
+    is_mask_number_required = models.BooleanField(default=True)
+    open_for_communication = models.BooleanField(default=True)
+    remark = GenericRelation(Remark)
 
     def all_associated_labs(self):
         if self.id:
@@ -784,6 +811,8 @@ class LabTestCategory(auth_model.TimeStampedModel, SearchKey):
     is_live = models.BooleanField(default=False)
     is_package_category = models.BooleanField(verbose_name='Is this a test package category?')
     show_on_recommended_screen = models.BooleanField(default=False)
+    priority = models.PositiveIntegerField(default=0)
+    icon = models.ImageField(upload_to='test/image', null=True, blank=True)
 
     def __str__(self):
         return self.name
@@ -823,6 +852,8 @@ class LabTestRecommendedCategoryMapping(models.Model):
 
 
 class LabTest(TimeStampedModel, SearchKey):
+    LAB_TEST_SITEMAP_IDENTIFIER = 'LAB_TEST'
+    URL_SUFFIX = 'tpp'
     RADIOLOGY = 1
     PATHOLOGY = 2
     OTHER = 3
@@ -863,13 +894,15 @@ class LabTest(TimeStampedModel, SearchKey):
     about_test = models.TextField(blank=True, verbose_name='About the test')
     show_details = models.BooleanField(default=False)
     preparations = models.TextField(blank=True, verbose_name='Preparations for the test')
-    priority = models.IntegerField(default=0, null=True)
+    priority = models.IntegerField(default=1, null=False, blank=False)
     hide_price = models.BooleanField(default=False)
     searchable = models.BooleanField(default=True)
     categories = models.ManyToManyField(LabTestCategory,
                                         through=LabTestCategoryMapping,
                                         through_fields=('lab_test', 'parent_category'),
                                         related_name='lab_tests')
+    url = models.CharField(max_length=500, blank=True, editable=False)
+    custom_url = models.CharField(max_length=500, blank=True)
     min_age = models.PositiveSmallIntegerField(default=None, blank=True, null=True, validators=[MaxValueValidator(120), MinValueValidator(1)])
     max_age = models.PositiveSmallIntegerField(default=None, blank=True, null=True, validators=[MaxValueValidator(120), MinValueValidator(1)])
     MALE = 1
@@ -896,6 +929,52 @@ class LabTest(TimeStampedModel, SearchKey):
     def __str__(self):
         return '{} ({})'.format(self.name, "PACKAGE" if self.is_package else "TEST")
 
+    def save(self, *args, **kwargs):
+
+        url = slugify(self.custom_url)
+        #self.url = slugify(self.url)
+
+        if not url:
+            url = slugify(self.name)+'-'+self.URL_SUFFIX
+
+        generated_url = self.generate_url(url)
+        if generated_url!=url:
+            url = generated_url
+
+
+        self.url = url
+        super().save(*args, **kwargs)
+        
+        self.create_url(url)
+
+
+    def generate_url(self, url):
+
+        duplicate_urls = EntityUrls.objects.filter(~Q(entity_id=self.id), url__iexact=url, sitemap_identifier=LabTest.LAB_TEST_SITEMAP_IDENTIFIER)
+        if duplicate_urls.exists():
+            url = url.rstrip(self.URL_SUFFIX)
+            url = url.rstrip('-')
+            url = url+'-'+str(id)+'-'+self.URL_SUFFIX
+
+        return url
+
+
+    def create_url(self, url):
+
+        existings_urls = EntityUrls.objects.filter(url__iexact=url, \
+            sitemap_identifier=LabTest.LAB_TEST_SITEMAP_IDENTIFIER, entity_id=self.id).all()
+
+        if not existings_urls.exists():
+            url_entry = EntityUrls.objects.create(url=url, entity_id=self.id, sitemap_identifier=self.LAB_TEST_SITEMAP_IDENTIFIER,\
+                is_valid=True, url_type='PAGEURL', entity_type='LabTest')
+            EntityUrls.objects.filter(entity_id=self.id).filter(~Q(id=url_entry.id)).update(is_valid=False)
+        else:
+            if not existings_urls.filter(is_valid=True).exists():
+                eu = existings_urls.first()
+                eu.is_valid = True
+                eu.save()
+                EntityUrls.objects.filter(entity_id=self.id).filter(~Q(id=eu.id)).update(is_valid=False)
+
     class Meta:
         db_table = "lab_test"
 
@@ -907,6 +986,19 @@ class LabTest(TimeStampedModel, SearchKey):
 #
 #     class Meta:
 #         db_table = "related_tests"
+
+    def get_all_categories_detail(self):
+        all_categories = self.categories.all()
+        res = []
+        for item in all_categories:
+            if item.is_live == True:
+                resp = {}
+                resp['name'] = item.name if item.name else None
+                resp['id'] = item.id if item.id else None
+                resp['icon'] = item.icon.url if item.icon and item.icon.url else None
+                res.append(resp)
+        return res
+
 
 
 class QuestionAnswer(TimeStampedModel):
@@ -955,6 +1047,50 @@ class AvailableLabTest(TimeStampedModel):
     rating = GenericRelation(ratings_models.RatingsReview)
 
 
+    def update_deal_price(self):
+        # will update only this available lab test prices and will be called on save
+        # query = '''update available_lab_test set computed_deal_price = least(greatest( floor(GREATEST
+        #         ((case when custom_agreed_price is not null
+        #         then custom_agreed_price else computed_agreed_price end)*1.2,mrp*.8)/5)*5,case when custom_agreed_price
+        #         is not null then custom_agreed_price
+        #         else computed_agreed_price end), mrp) where id = %s '''
+
+        query = '''update available_lab_test set computed_deal_price = 
+                    least(greatest(floor(	
+                    case when (least((case when custom_agreed_price is not null 
+                    then custom_agreed_price else computed_agreed_price end)*1.5, mrp*.8) - case when custom_agreed_price
+                    is not null then custom_agreed_price else computed_agreed_price end) >100  then 
+                    least((case when custom_agreed_price is not null 
+                    then custom_agreed_price else computed_agreed_price end)*1.5, mrp*.8) else 
+                    least((case when custom_agreed_price is not null 
+                    then custom_agreed_price else computed_agreed_price end)+100, mrp) end
+                    /5)*5, case when custom_agreed_price
+                    is not null then custom_agreed_price else computed_agreed_price end), mrp)
+                    where enabled=true and id=%s '''
+
+        update_available_lab_test_deal_price = RawSql(query, [self.pk]).execute()
+        # deal_price = RawSql(query, [self.pk]).fetch_all()
+        # if deal_price:
+        #    self.computed_deal_price = deepcopy(deal_price[0].get('computed_deal_price'))
+
+    @classmethod
+    def update_all_deal_price(cls):
+        # will update all lab prices
+        query = '''update available_lab_test set computed_deal_price = 
+                    least(greatest(floor(	
+                    case when (least((case when custom_agreed_price is not null 
+                    then custom_agreed_price else computed_agreed_price end)*1.5, mrp*.8) - case when custom_agreed_price
+                    is not null then custom_agreed_price else computed_agreed_price end) >100  then 
+                    least((case when custom_agreed_price is not null 
+                    then custom_agreed_price else computed_agreed_price end)*1.5, mrp*.8) else 
+                    least((case when custom_agreed_price is not null 
+                    then custom_agreed_price else computed_agreed_price end)+100, mrp) end
+                    /5)*5, case when custom_agreed_price
+                    is not null then custom_agreed_price else computed_agreed_price end), mrp)
+                    where enabled=true'''
+
+        update_all_available_lab_test_deal_price = RawSql(query, []).execute()
+
     def get_testid(self):
         return self.test.id
 
@@ -966,8 +1102,12 @@ class AvailableLabTest(TimeStampedModel):
             self.computed_agreed_price = self.get_computed_agreed_price()
             # self.computed_deal_price = self.get_computed_deal_price()
             self.computed_deal_price = self.computed_agreed_price
-
         super(AvailableLabTest, self).save(*args, **kwargs)
+
+        transaction.on_commit(lambda: self.app_commit_tasks())
+
+    def app_commit_tasks(self):
+        self.update_deal_price()
 
     def get_computed_deal_price(self):
         if self.test.test_type == LabTest.RADIOLOGY:
@@ -1097,9 +1237,10 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin)
     price_data = JSONField(blank=True, null=True)
     tests = models.ManyToManyField(LabTest, through='LabAppointmentTestMapping', through_fields=('appointment', 'test'))
     money_pool = models.ForeignKey(MoneyPool, on_delete=models.SET_NULL, null=True)
+    mask_number = GenericRelation(AppointmentMaskNumber)
+    email_notification = GenericRelation(EmailNotification, related_name="lab_notification")
 
     def get_tests_and_prices(self):
-        # DONE SHASHANK_SINGH CHANGE 10
         test_price = []
         for test in self.test_mappings.all():
             test_price.append({'name': test.test.name, 'mrp': test.mrp, 'deal_price': (
@@ -1122,8 +1263,31 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin)
         if self.id:
             invoices = self.get_invoice_objects()
             for invoice in invoices:
-                invoices_urls.append(util_absolute_url(invoice.file.url))
+                if invoice.file:
+                    invoices_urls.append(util_absolute_url(invoice.file.url))
         return invoices_urls
+
+    def get_cancellation_reason(self):
+        return CancellationReason.objects.filter(Q(type=Order.LAB_PRODUCT_ID) | Q(type__isnull=True),
+                                                 visible_on_front_end=True)
+    # @staticmethod
+    # def get_upcoming_appointment_serialized(user_id):
+    #     response_appointment = LabAppointment.get_upcoming_appointment(user_id)
+    #     appointment = diagnostic_serializers.LabAppointmentUpcoming(response_appointment, many=True)
+    #     return appointment.data
+
+    @classmethod
+    def get_upcoming_appointment(cls, user_id):
+        current_time = timezone.now()
+        appointments = LabAppointment.objects.filter(time_slot_start__gte=current_time, user_id=user_id).exclude(
+            status__in=[LabAppointment.CANCELLED, LabAppointment.COMPLETED]).prefetch_related('tests', 'lab', 'profile')
+        return appointments
+
+    def get_serialized_cancellation_reason(self):
+        res = []
+        for cr in self.get_cancellation_reason():
+            res.append({'id': cr.id, 'name': cr.name, 'is_comment_needed': cr.is_comment_needed})
+        return res
 
     def get_report_urls(self):
         reports = self.reports.all()
@@ -1188,6 +1352,13 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin)
                       'sub_product_id': 2},), countdown=5)
             except Exception as e:
                 logger.error(str(e))
+
+        # if push_for_mask_number:
+        #     try:
+        #         generate_appointment_masknumber.apply_async(({'type': 'LAB_APPOINTMENT', 'appointment_id': self.id},),
+        #                                             countdown=5)
+        #     except Exception as e:
+        #         logger.error(str(e))
 
         if self.is_to_send_notification(old_instance):
             try:
@@ -1282,7 +1453,7 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin)
             # while completing appointment
             if database_instance and database_instance.status != self.status and self.status == self.COMPLETED:
                 # add a merchant_payout entry
-                if self.merchant_payout is None:
+                if self.merchant_payout is None and self.payment_type not in [OpdAppointment.COD]:
                     self.save_merchant_payout()
                 # credit cashback if any
                 if self.cashback is not None and self.cashback > 0:
@@ -1294,9 +1465,21 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin)
         except Exception as e:
             logger.error("Error while saving payout mercahnt for lab- " + str(e))
 
-        push_to_matrix = kwargs.get('push_again_to_matrix', True)
-        if 'push_again_to_matrix' in kwargs.keys():
-            kwargs.pop('push_again_to_matrix')
+        push_to_matrix = True
+        if database_instance and self.status == database_instance.status and self.time_slot_start == database_instance.time_slot_start:
+            push_to_matrix = False
+        else:
+            push_to_matrix = True
+
+        # push_for_mask_number = True
+        # if self.time_slot_start != LabAppointment.objects.get(pk=self.id).time_slot_start:
+        #     push_for_mask_number = True
+        # else:
+        #     push_for_mask_number = False
+
+        # push_to_matrix = kwargs.get('push_again_to_matrix', True)
+        # if 'push_again_to_matrix' in kwargs.keys():
+        #     kwargs.pop('push_again_to_matrix')
 
         # Pushing every status to the Appointment history
         push_to_history = False
@@ -1313,6 +1496,9 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin)
         transaction.on_commit(lambda: self.app_commit_tasks(database_instance, push_to_matrix))
 
     def save_merchant_payout(self):
+        if self.payment_type in [OpdAppointment.COD]:
+            raise Exception("Cannot create payout for COD appointments")
+
         payout_amount = self.agreed_price
         if self.is_home_pickup:
             payout_amount += self.home_pickup_charges
@@ -1588,11 +1774,15 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin)
 
         coupon_discount, coupon_cashback, coupon_list = Coupon.get_total_deduction(data, effective_price)
 
-        if data.get("payment_type") in [OpdAppointment.COD, OpdAppointment.PREPAID]:
+        if data.get("payment_type") in [OpdAppointment.PREPAID]:
             if coupon_discount >= effective_price:
                 effective_price = 0
             else:
                 effective_price = effective_price - coupon_discount
+
+        if data.get("payment_type") in [OpdAppointment.COD]:
+            effective_price = 0
+            coupon_discount, coupon_cashback, coupon_list = 0, 0, []
 
         return {
             "deal_price" : total_deal_price,
@@ -1661,6 +1851,17 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin)
             })
         return fulfillment_data
 
+    def trigger_created_event(self, visitor_info):
+        from ondoc.tracking.models import TrackingEvent
+        try:
+            with transaction.atomic():
+                event_data = TrackingEvent.build_event_data(self.user, TrackingEvent.LabAppointmentBooked, appointmentId=self.id)
+                if event_data and visitor_info:
+                    TrackingEvent.save_event(event_name=event_data.get('event'), data=event_data, visit_id=visitor_info.get('visit_id'),
+                                             user=self.user, triggered_at=datetime.datetime.utcnow())
+        except Exception as e:
+            logger.error("Could not save triggered event - " + str(e))
+
     def __str__(self):
         return "{}, {}".format(self.profile.name if self.profile else "", self.lab.name)
 
@@ -1671,6 +1872,7 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin)
 class CommonTest(TimeStampedModel):
     test = models.ForeignKey(LabTest, on_delete=models.CASCADE, related_name='commontest')
     icon = models.ImageField(upload_to='diagnostic/common_test_icons', null=True)
+    priority = models.PositiveIntegerField(default=0)
 
     def __str__(self):
         return "{}-{}".format(self.test.name, self.id)
@@ -1679,7 +1881,7 @@ class CommonTest(TimeStampedModel):
 class CommonPackage(TimeStampedModel):
     package = models.ForeignKey(LabTest, on_delete=models.CASCADE, related_name='commonpackage')
     icon = models.ImageField(upload_to='diagnostic/common_package_icons', null=True)
-
+    priority = models.PositiveIntegerField(default=0)
     def __str__(self):
         return "{}-{}".format(self.package.name, self.id)
 
@@ -1694,6 +1896,7 @@ class CommonDiagnosticCondition(TimeStampedModel):
         through='DiagnosticConditionLabTest',
         through_fields=('diagnostic_condition', 'lab_test'),
     )
+    priority = models.PositiveIntegerField(default=0)
     # test = models.ManyToManyField(LabTest)
 
     def __str__(self):
@@ -1952,12 +2155,15 @@ class LabReportFile(auth_model.TimeStampedModel, auth_model.Document):
 
 class LabTestGroup(auth_model.TimeStampedModel):
     TEST_TYPE_CHOICES = LabTest.TEST_TYPE_CHOICES
-    name = models.CharField(max_length=200)
-    tests = models.ManyToManyField(LabTest)
-    type = models.PositiveSmallIntegerField(choices=TEST_TYPE_CHOICES)
+    name = models.CharField(max_length=200, null=False, blank=False)
+    # tests = models.ManyToManyField(LabTest)
+    type = models.PositiveSmallIntegerField(choices=TEST_TYPE_CHOICES, null=True, blank=True)
 
     class Meta:
         db_table = 'lab_test_group'
+
+    def __str__(self):
+        return "{}".format(self.name)
 
 
 class LabAppointmentTestMapping(models.Model):
@@ -1974,3 +2180,27 @@ class LabAppointmentTestMapping(models.Model):
 
     class Meta:
         db_table = 'lab_appointment_test_mapping'
+
+
+class LabTestGroupTiming(TimeStampedModel):
+    TIME_CHOICES = LabTiming.TIME_CHOICES
+
+    lab = models.ForeignKey(Lab, on_delete=models.CASCADE, null=True, blank=True)
+    lab_test_group = models.ForeignKey(LabTestGroup, on_delete=models.CASCADE, null=False)
+    day = models.PositiveSmallIntegerField(blank=False, null=False,
+                                           choices=[(0, "Monday"), (1, "Tuesday"), (2, "Wednesday"), (3, "Thursday"),
+                                                    (4, "Friday"), (5, "Saturday"), (6, "Sunday")])
+    start = models.DecimalField(max_digits=3, decimal_places=1, choices=TIME_CHOICES)
+    end = models.DecimalField(max_digits=3, decimal_places=1, choices=TIME_CHOICES)
+    for_home_pickup = models.BooleanField(default=False)
+
+    class Meta:
+        db_table = "lab_test_group_timing"
+
+
+class LabTestGroupMapping(TimeStampedModel):
+    test = models.ForeignKey(LabTest, on_delete=models.CASCADE, null=False)
+    lab_test_group = models.ForeignKey(LabTestGroup, on_delete=models.CASCADE, null=False)
+
+    class Meta:
+        db_table = "lab_test_group_mapping"

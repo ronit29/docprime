@@ -1,4 +1,7 @@
 import json
+
+from django.contrib.contenttypes.fields import GenericForeignKey
+from django.contrib.contenttypes.models import ContentType
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.db import models
 from django.contrib.postgres.fields import JSONField, ArrayField
@@ -58,6 +61,12 @@ class NotificationAction:
     INSURANCE_CONFIRMED=15
     OPD_OTP_BEFORE_APPOINTMENT = 30
     LAB_OTP_BEFORE_APPOINTMENT = 31
+    OPD_CONFIRMATION_CHECK_AFTER_APPOINTMENT = 32
+    OPD_CONFIRMATION_SECOND_CHECK_AFTER_APPOINTMENT = 33
+    OPD_FEEDBACK_AFTER_APPOINTMENT = 34
+
+    REFUND_BREAKUP = 40
+    REFUND_COMPLETED = 42
 
     CASHBACK_CREDITED = 55
 
@@ -83,7 +92,9 @@ class NotificationAction:
         (DOCTOR_INVOICE, "Doctor Invoice"),
         (LAB_INVOICE, "Lab Invoice"),
         (INSURANCE_CONFIRMED, "Insurance Confirmed"),
-        (CASHBACK_CREDITED, "Cashback Credited")
+        (CASHBACK_CREDITED, "Cashback Credited"),
+        (REFUND_BREAKUP, 'Refund break up'),
+        (REFUND_COMPLETED, 'Refund Completed')
     )
 
     OPD_APPOINTMENT = "opd_appointment"
@@ -522,13 +533,16 @@ class EmailNotification(TimeStampedModel, EmailNotificationOpdMixin, EmailNotifi
     user = models.ForeignKey(User, on_delete=models.CASCADE, null=True, blank=True)
     content = models.TextField()
     email_subject = models.TextField(blank=True, null=True)
-    email = models.EmailField()
+    email = models.EmailField(null=True)
     viewed_at = models.DateTimeField(blank=True, null=True)
     read_at = models.DateTimeField(blank=True, null=True)
     notification_type = models.PositiveIntegerField(choices=NotificationAction.NOTIFICATION_TYPE_CHOICES)
     cc = ArrayField(models.EmailField(), default=[], blank=[])
     bcc = ArrayField(models.EmailField(), default=[], blank=[])
     attachments = JSONField(default=[], blank=[])
+    content_type = models.ForeignKey(ContentType, on_delete=models.CASCADE, null=True)
+    object_id = models.PositiveIntegerField(null=True)
+    content_object = GenericForeignKey()
 
     class Meta:
         db_table = "email_notification"
@@ -684,7 +698,7 @@ class EmailNotification(TimeStampedModel, EmailNotificationOpdMixin, EmailNotifi
             publish_message(message)
 
     @classmethod
-    def send_booking_url(cls, token, order_id, email):
+    def send_booking_url(cls, token, email):
         booking_url = "{}/agent/booking?token={}".format(settings.CONSUMER_APP_DOMAIN, token)
         html_body = "Your booking url is - {} . Please pay to confirm".format(booking_url)
         email_subject = "Booking Url"
@@ -810,7 +824,7 @@ class SmsNotification(TimeStampedModel, SmsNotificationOpdMixin, SmsNotification
             publish_message(message)
 
     @classmethod
-    def send_booking_url(cls, token, order_id, phone_number):
+    def send_booking_url(cls, token, phone_number):
         booking_url = "{}/agent/booking?token={}".format(settings.CONSUMER_APP_DOMAIN, token)
         html_body = "Your booking url is - {} . Please pay to confirm".format(booking_url)
         if phone_number:
@@ -854,6 +868,22 @@ class SmsNotification(TimeStampedModel, SmsNotificationOpdMixin, SmsNotification
             }
             message = json.dumps(message)
             publish_message(message)
+
+
+class WhtsappNotification(TimeStampedModel):
+    user = models.ForeignKey(User, on_delete=models.CASCADE, blank=True, null=True)
+    phone_number = models.BigIntegerField()
+    viewed_at = models.DateTimeField(blank=True, null=True, default=None)
+    read_at = models.DateTimeField(blank=True, null=True, default=None)
+    template_name = models.CharField(max_length=100, null=False, blank=False)
+    notification_type = models.PositiveIntegerField(choices=NotificationAction.NOTIFICATION_TYPE_CHOICES)
+    payload = JSONField(null=False, blank=False, default={})
+
+    class Meta:
+        db_table = "whtsapp_notification"
+
+    def __str__(self):
+        return '{} -> {} ({})'.format(self.notification_type, self.phone_number, self.user)
 
 
 class AppNotification(TimeStampedModel):

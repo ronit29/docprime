@@ -2,6 +2,7 @@ from rest_framework import serializers
 from ondoc.authentication.models import (OtpVerifications, User, UserProfile, Notification, NotificationEndpoint,
                                          DoctorNumber, Address, GenericAdmin, UserSecretKey,
                                          UserPermission, Address, GenericAdmin, GenericLabAdmin)
+from ondoc.common.models import AppointmentHistory
 from ondoc.doctor.models import DoctorMobile
 from ondoc.insurance.models import InsuredMembers
 from ondoc.diagnostic.models import AvailableLabTest
@@ -162,11 +163,14 @@ class UserProfileSerializer(serializers.ModelSerializer):
     email = serializers.EmailField(required=False, allow_null=True, allow_blank=True)
     profile_image = serializers.SerializerMethodField()
     is_insured = serializers.SerializerMethodField()
+    dob = serializers.DateField(allow_null=True, required=False)
+    whatsapp_optin = serializers.NullBooleanField(required=False)
+    whatsapp_is_declined = serializers.BooleanField(required=False)
 
     class Meta:
         model = UserProfile
-        fields = ("id", "name", "email", "gender", "phone_number", "is_otp_verified", "is_default_user",
-                  "profile_image", "age", "user", "dob", "is_insured", "updated_at")
+        fields = ("id", "name", "email", "gender", "phone_number", "is_otp_verified", "is_default_user", "profile_image"
+                  , "age", "user", "dob", "is_insured", "updated_at", "whatsapp_optin", "whatsapp_is_declined")
 
     def get_is_insured(self, obj):
         return InsuredMembers.objects.filter(profile=obj).exists()
@@ -249,6 +253,8 @@ class AddressSerializer(serializers.ModelSerializer):
 
 class AppointmentqueryRetrieveSerializer(serializers.Serializer):
     type = serializers.CharField(required=True)
+    source = serializers.ChoiceField(choices=AppointmentHistory.SOURCE_CHOICES, required=False)
+    completed = serializers.BooleanField(required=False)
 
 
 class ConsumerAccountModelSerializer(serializers.ModelSerializer):
