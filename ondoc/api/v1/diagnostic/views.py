@@ -305,27 +305,29 @@ class LabList(viewsets.ReadOnlyModelViewSet):
                                                 'home_collection_charges').in_bulk(lab_ids)
         category_data = {}
         test_package_ids = set([package.id for package in all_packages])
-        test_package_queryset = LabTest.objects.prefetch_related('test__recommended_categories',
-                                                                 'test__parameter').filter(id__in=test_package_ids)
+        test_package_queryset = LabTest.objects.prefetch_related('test__recommended_categories', 'test__parameter').filter(id__in=test_package_ids)
+        category_to_be_shown_in_filter_ids=set()
         for temp_package in test_package_queryset:
             single_test_data = {}
             for temp_test in temp_package.test.all():
                 add_test_name = True
                 for temp_category in temp_test.recommended_categories.all():
-                    add_test_name = False
-                    name = temp_category.name
-                    category_id = temp_category.id
-                    test_id = None
-                    icon_url = util_absolute_url(temp_category.icon.url) if temp_category.icon else None
-                    parameter_count = len(temp_test.parameter.all()) or 1
-                    if single_test_data.get((category_id, test_id)):
-                        single_test_data[(category_id, test_id)]['parameter_count'] += parameter_count
-                    else:
-                        single_test_data[(category_id, test_id)] = {'name': name,
-                                                                    'category_id': category_id,
-                                                                    'test_id': test_id,
-                                                                    'parameter_count': parameter_count,
-                                                                    'icon': icon_url}
+                    if temp_category.is_live:
+                        add_test_name = False
+                        name = temp_category.name
+                        category_id = temp_category.id
+                        category_to_be_shown_in_filter_ids.add(category_id)
+                        test_id = None
+                        icon_url = util_absolute_url(temp_category.icon.url) if temp_category.icon else None
+                        parameter_count = len(temp_test.parameter.all()) or 1
+                        if single_test_data.get((category_id, test_id)):
+                            single_test_data[(category_id, test_id)]['parameter_count'] += parameter_count
+                        else:
+                            single_test_data[(category_id, test_id)] = {'name': name,
+                                                                        'category_id': category_id,
+                                                                        'test_id': test_id,
+                                                                        'parameter_count': parameter_count,
+                                                                        'icon': icon_url}
                 if add_test_name:
                     category_id = None
                     test_id = temp_test.id
@@ -341,7 +343,7 @@ class LabList(viewsets.ReadOnlyModelViewSet):
         serializer = CustomLabTestPackageSerializer(all_packages, many=True,
                                                     context={'entity_url_dict': entity_url_dict, 'lab_data': lab_data,
                                                              'request': request, 'category_data': category_data})
-        category_queryset = LabTestCategory.objects.filter(is_package_category=True, is_live=True)
+        category_queryset = LabTestCategory.objects.filter(id__in=category_to_be_shown_in_filter_ids).order_by('-priority')
         category_result = []
         for category in category_queryset:
             name = category.name
@@ -359,8 +361,7 @@ class LabList(viewsets.ReadOnlyModelViewSet):
             for package_result in result:
                 if "price" in package_result:
                     price = int(float(package_result["price"]))
-                    discounted_price = price if not search_coupon else search_coupon.get_search_coupon_discounted_price(
-                        price)
+                    discounted_price = price if not search_coupon else search_coupon.get_search_coupon_discounted_price(price)
                     package_result["discounted_price"] = discounted_price
 
         top_content = None
