@@ -2022,8 +2022,9 @@ class CreateAdminViewSet(viewsets.GenericViewSet):
             opd_list = [i for i in doc_data]
         opd_queryset_hos = (models.Hospital.objects
                             .prefetch_related('manageable_hospitals')
-                            .filter((Q(is_live=True, is_appointment_manager=True)| Q(source_type=models.Hospital.PROVIDER)),
-                                      Q(manageable_hospitals__user=user,
+                            .filter((Q(is_live=True)| Q(source_type=models.Hospital.PROVIDER)),
+                                      Q(is_appointment_manager=True,
+                                      manageable_hospitals__user=user,
                                       manageable_hospitals__is_disabled=False,
                                       manageable_hospitals__super_user_permission=True,
                                       manageable_hospitals__entity_type=GenericAdminEntity.HOSPITAL))
