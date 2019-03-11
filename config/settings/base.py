@@ -74,8 +74,11 @@ DATABASES = {
     'default': env.db('DATABASE_URL'),
 }
 DATABASES['default']['ENGINE'] = 'django.contrib.gis.db.backends.postgis'
-connect('docprime', host='localhost', port=27017)
 
+try:
+    connect('docprime', port=27017, host='mongodb://localhost/docprime?connectTimeoutms=2000')
+except Exception as e:
+    pass
 
 
 # Application definition
