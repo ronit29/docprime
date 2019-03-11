@@ -1,5 +1,5 @@
 from django.core.validators import MaxValueValidator, MinValueValidator
-from django.db import models
+from django.db import models, transaction
 from ondoc.authentication import models as auth_model
 from ondoc.authentication.models import User, UserProfile
 from ondoc.common.models import Feature
@@ -85,7 +85,16 @@ class IpdProcedureLead(auth_model.TimeStampedModel):
     class Meta:
         db_table = "ipd_procedure_lead"
 
+    def save(self, *args, **kwargs):
+        send_lead_email = False
+        if not self.id:
+            send_lead_email = True
+        super().save(*args, **kwargs)
+        transaction.on_commit(lambda: self.app_commit_tasks(send_lead_email=send_lead_email))
 
+    def app_commit_tasks(self, send_lead_email):
+        from ondoc.notification.tasks import send_ipd_procedure_lead_mail
+        send_ipd_procedure_lead_mail(self.id)
 
 
 class ProcedureCategory(auth_model.TimeStampedModel, SearchKey):
