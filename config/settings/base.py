@@ -76,11 +76,11 @@ DATABASES = {
 DATABASES['default']['ENGINE'] = 'django.contrib.gis.db.backends.postgis'
 
 try:
-    mongo_port = 27017
-    if env('MONGO_DB_PORT'):
+    MONGO_STORE = False
+    if env('MONGO_DB_NAME') and env('MONGO_DB_PORT') and env('MONGO_DB_URL'):
         mongo_port = int(env('MONGO_DB_PORT'))
-    connect(env('MONGO_DB_NAME'), port=mongo_port, host=env('MONGO_DB_URL'))
-    MONGO_STORE = env.bool('MONGO_STORE', default=False)
+        connect(env('MONGO_DB_NAME'), port=mongo_port, host=env('MONGO_DB_URL'))
+        MONGO_STORE = env.bool('MONGO_STORE', default=False)
 except Exception as e:
     MONGO_STORE = False
 
