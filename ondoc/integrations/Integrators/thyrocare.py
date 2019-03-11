@@ -316,7 +316,7 @@ class Thyrocare(BaseIntegrator):
             if response.get('RES_ID') == 'RES0000':
                 thyrocare_appointment_time = response['LEADHISORY_MASTER'][0]['APPOINT_ON'][0]['DATE'].strftime("%d-%m-%Y")
                 dp_appointment_time = dp_appointment.time_slot_start.strftime("%d-%m-%Y")
-                if thyrocare_appointment_time == dp_appointment_time:
+                if not thyrocare_appointment_time == dp_appointment_time:
                     dp_appointment.update(time_slot_start=thyrocare_appointment_time, status=3)
 
                 # check integrator order status and update docprime booking
