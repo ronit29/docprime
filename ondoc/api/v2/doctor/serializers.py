@@ -139,20 +139,24 @@ class SpecializationSerializer(serializers.ModelSerializer):
 
 class ProviderSignupValidations:
 
-    def provider_signup_lead_exists(self, attrs):
+    @staticmethod
+    def provider_signup_lead_exists(attrs):
         return doc_models.ProviderSignupLead.objects.filter(phone_number=attrs['phone_number'],
-                                                        user__isnull=False).exists()
+                                                            user__isnull=False).exists()
 
-    def admin_exists(self, attrs):
+    @staticmethod
+    def admin_exists(attrs):
         return GenericAdmin.objects.filter(phone_number=attrs['phone_number'], is_disabled=False).exists()
 
-    def lab_admin_exists(self, attrs):
+    @staticmethod
+    def lab_admin_exists(attrs):
         return GenericLabAdmin.objects.filter(phone_number=attrs['phone_number'], is_disabled=False).exists()
 
-    def user_exists(self, attrs):
-        provider_signup_lead_exists = self.provider_signup_lead_exists(attrs)
-        admin_exists = self.admin_exists(attrs)
-        lab_admin_exists = self.lab_admin_exists(attrs)
+    @staticmethod
+    def user_exists(attrs):
+        provider_signup_lead_exists = ProviderSignupValidations.provider_signup_lead_exists(attrs)
+        admin_exists = ProviderSignupValidations.admin_exists(attrs)
+        lab_admin_exists = ProviderSignupValidations.lab_admin_exists(attrs)
         return (admin_exists or lab_admin_exists or provider_signup_lead_exists)
 
 class GenerateOtpSerializer(serializers.Serializer):
