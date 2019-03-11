@@ -188,6 +188,7 @@ class LabList(viewsets.ReadOnlyModelViewSet):
         package_type = validated_data.get('package_type')
         sort_on = validated_data.get('sort_on')
         category_ids = validated_data.get('category_ids', [])
+        package_category_ids = validated_data.get('package_category_ids', [])
         test_ids = validated_data.get('test_ids', [])
         package_ids = validated_data.get('package_ids', [])
         point_string = 'POINT(' + str(long) + ' ' + str(lat) + ')'
@@ -201,16 +202,28 @@ class LabList(viewsets.ReadOnlyModelViewSet):
 
         if package_ids:
             main_queryset = main_queryset.filter(id__in=package_ids)
-        valid_package_ids = []
+        valid_package_ids = None
+
         if test_ids:
-            valid_package_ids.extend(list(LabTest.objects.filter(test__id__in=test_ids).annotate(
+            valid_package_ids = list(LabTest.objects.filter(test__id__in=test_ids).annotate(
                 included_test_count=Count('test')).filter(
-                included_test_count=len(test_ids)).distinct().values_list('id', flat=True)))
+                included_test_count=len(test_ids)).distinct().values_list('id', flat=True))
+
         if category_ids:
+            if valid_package_ids is None:
+                valid_package_ids = []
             valid_package_ids.extend(list(
                 LabTest.objects.filter(test__recommended_categories__id__in=category_ids).distinct().values_list('id',
                                                                                                                  flat=True)))
-        if valid_package_ids:
+
+        if package_category_ids:
+            if valid_package_ids is None:
+                valid_package_ids = []
+            valid_package_ids.extend(list(
+                LabTest.objects.filter(categories__id__in=category_ids).distinct().values_list('id',
+                                                                                               flat=True)))
+
+        if valid_package_ids is not None:
             main_queryset = main_queryset.filter(id__in=valid_package_ids)
 
 
@@ -396,28 +409,42 @@ class LabList(viewsets.ReadOnlyModelViewSet):
         package_type = validated_data.get('package_type')
         sort_on = validated_data.get('sort_on')
         category_ids = validated_data.get('category_ids', [])
+        package_category_ids = validated_data.get('package_category_ids', [])
         test_ids = validated_data.get('test_ids', [])
         package_ids = validated_data.get('package_ids', [])
         point_string = 'POINT(' + str(long) + ' ' + str(lat) + ')'
         pnt = GEOSGeometry(point_string, srid=4326)
-        max_distance = max_distance * 1000 if max_distance is not None else 10000
-        min_distance = min_distance * 1000 if min_distance is not None else 0
+        max_distance = max_distance*1000 if max_distance is not None else 10000
+        min_distance = min_distance*1000 if min_distance is not None else 0
         main_queryset = LabTest.objects.prefetch_related('test', 'test__recommended_categories',
                                                          'test__parameter', 'categories').filter(enable_for_retail=True,
-                                                                                                 searchable=True)
+                                                                                                 searchable=True,
+                                                                                                 is_package=True)
 
         if package_ids:
             main_queryset = main_queryset.filter(id__in=package_ids)
-        valid_package_ids = []
+        valid_package_ids = None
+
         if test_ids:
-            valid_package_ids.extend(list(LabTest.objects.filter(test__id__in=test_ids).annotate(
+            valid_package_ids = list(LabTest.objects.filter(test__id__in=test_ids).annotate(
                 included_test_count=Count('test')).filter(
-                included_test_count=len(test_ids)).distinct().values_list('id', flat=True)))
+                included_test_count=len(test_ids)).distinct().values_list('id', flat=True))
+
         if category_ids:
+            if valid_package_ids is None:
+                valid_package_ids = []
             valid_package_ids.extend(list(
                 LabTest.objects.filter(test__recommended_categories__id__in=category_ids).distinct().values_list('id',
                                                                                                                  flat=True)))
-        if valid_package_ids:
+
+        if package_category_ids:
+            if valid_package_ids is None:
+                valid_package_ids = []
+            valid_package_ids.extend(list(
+                LabTest.objects.filter(categories__id__in=category_ids).distinct().values_list('id',
+                                                                                               flat=True)))
+
+        if valid_package_ids is not None:
             main_queryset = main_queryset.filter(id__in=valid_package_ids)
 
         all_packages_in_labs = main_queryset.filter(
@@ -443,8 +470,10 @@ class LabList(viewsets.ReadOnlyModelViewSet):
         )
 
         all_packages_in_labs = all_packages_in_labs.distinct()
+        # all_packages_in_labs = list(all_packages_in_labs)
+        # all_packages = filter(lambda x: x.rank == 1, all_packages_in_labs)
         all_packages = [package for package in all_packages_in_labs if package.rank == 1]
-        all_packages = filter(lambda x: x, all_packages)
+        # all_packages = filter(lambda x: x, all_packages)
         if min_distance:
             all_packages = filter(lambda
                                       x: x.distance.m >= min_distance if x.distance is not None and x.distance.m is not None else False,
