@@ -1059,7 +1059,7 @@ class TimeSlotExtraction(object):
                         range_upto = no_of_slots
 
                     for i in range(range_upto):
-                        upcoming[key].append(value[0]['timing'][i])
+                        upcoming[str(key)].append(value[0]['timing'][i])
 
                     next_day_slot = no_of_slots - (len(value[0]['timing']) + next_day_slot)
 
@@ -1071,7 +1071,7 @@ class TimeSlotExtraction(object):
                             range_upto = next_day_slot
 
                         for i in range(range_upto):
-                            upcoming[key].append(value[0]['timing'][i])
+                            upcoming[str(key)].append(value[0]['timing'][i])
 
                         remaining = next_day_slot - len(value[0]['timing'])
                         if remaining >= len(value[1]['timing']):
@@ -1080,10 +1080,10 @@ class TimeSlotExtraction(object):
                             range_upto = remaining
 
                         for i in range(range_upto):
-                            upcoming[key].append(value[1]['timing'][i])
+                            upcoming[str(key)].append(value[1]['timing'][i])
                     else:
                         for i in range(len(value[0]['timing'])):
-                            upcoming[key].append(value[0]['timing'][i])
+                            upcoming[str(key)].append(value[0]['timing'][i])
 
                         remaining = no_of_slots - len(value[0]['timing'])
                         if remaining >= len(value[1]['timing']):
@@ -1092,7 +1092,7 @@ class TimeSlotExtraction(object):
                             range_upto = remaining
 
                         for i in range(range_upto):
-                            upcoming[key].append(value[1]['timing'][i])
+                            upcoming[str(key)].append(value[1]['timing'][i])
                     next_day_slot = no_of_slots - (len(value[0]['timing']) + len(value[1]['timing']) + next_day_slot)
 
                 if next_day_slot > 0:
