@@ -1023,6 +1023,7 @@ class PrescriptionFileViewset(OndocViewSet):
         # resp_data = prescription_file_serializer.data
         resp_data = serializers.DoctorAppointmentRetrieveSerializer(validated_data.get('appointment'),
                                                                          context={'request': request}).data
+        resp_data['prescriptions'] = validated_data.get('appointment').get_prescriptions(request)
 
         return Response(resp_data)
 
