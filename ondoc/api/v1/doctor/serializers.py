@@ -1552,7 +1552,7 @@ class IpdProcedureDetailSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = IpdProcedure
-        fields = ('id', 'name', 'details', 'is_enabled', 'features')
+        fields = ('id', 'name', 'details', 'is_enabled', 'features', 'about')
 
 
 class TopHospitalForIpdProcedureSerializer(serializers.ModelSerializer):
@@ -1646,7 +1646,7 @@ class HospitalDetailIpdProcedureSerializer(TopHospitalForIpdProcedureSerializer)
     def get_images(self, obj):
         request = self.context.get('request')
         # TODO: SHASHANK_SINGH Thumbnail to be added or not
-        return [{'original': request.build_absolute_uri(img.name.url), "thumbnail": None} for img in
+        return [{'original': request.build_absolute_uri(img.name.url), "thumbnail": None, "cover_image": img.cover_image} for img in
                 obj.hospitalimage_set.all() if img.name]
 
     def get_ipd_procedure_categories(self, obj):

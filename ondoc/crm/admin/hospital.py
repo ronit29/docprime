@@ -31,7 +31,7 @@ class HospitalImageInline(admin.TabularInline):
     extra = 0
     can_delete = True
     show_change_link = False
-    max_num = 5
+    max_num = 10
 
 
 # class DcotorInline(admin.TabularInline):
