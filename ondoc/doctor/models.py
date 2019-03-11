@@ -2699,3 +2699,35 @@ class HospitalHelpline(auth_model.TimeStampedModel):
 
     class Meta:
         db_table = "hospital_helpline"
+
+
+class HospitalTiming(auth_model.TimeStampedModel):
+    DAY_CHOICES = [(0, "Monday"), (1, "Tuesday"), (2, "Wednesday"), (3, "Thursday"), (4, "Friday"), (5, "Saturday"), (6, "Sunday")]
+    SHORT_DAY_CHOICES = [(0, "Mon"), (1, "Tue"), (2, "Wed"), (3, "Thu"), (4, "Fri"), (5, "Sat"), (6, "Sun")]
+    TIME_CHOICES = [(5.0, "5 AM"), (5.5, "5:30 AM"),
+                    (6.0, "6 AM"), (6.5, "6:30 AM"),
+                    (7.0, "7:00 AM"), (7.5, "7:30 AM"),
+                    (8.0, "8:00 AM"), (8.5, "8:30 AM"),
+                    (9.0, "9:00 AM"), (9.5, "9:30 AM"),
+                    (10.0, "10:00 AM"), (10.5, "10:30 AM"),
+                    (11.0, "11:00 AM"), (11.5, "11:30 AM"),
+                    (12.0, "12:00 PM"), (12.5, "12:30 PM"),
+                    (13.0, "1:00 PM"), (13.5, "1:30 PM"),
+                    (14.0, "2:00 PM"), (14.5, "2:30 PM"),
+                    (15.0, "3:00 PM"), (15.5, "3:30 PM"),
+                    (16.0, "4:00 PM"), (16.5, "4:30 PM"),
+                    (17.0, "5:00 PM"), (17.5, "5:30 PM"),
+                    (18.0, "6:00 PM"), (18.5, "6:30 PM"),
+                    (19.0, "7:00 PM"), (19.5, "7:30 PM"),
+                    (20.0, "8:00 PM"), (20.5, "8:30 PM"),
+                    (21.0, "9:00 PM"), (21.5, "9:30 PM"),
+                    (22.0, "10:00 PM"), (22.5, "10:30 PM"),
+                    (23.0, "11 PM"), (23.5, "11:30 PM")]
+
+    hospital = models.ForeignKey(Hospital, on_delete=models.CASCADE, related_name='hosp_availability')
+    day = models.PositiveSmallIntegerField(blank=False, null=False, choices=DAY_CHOICES)
+    start = models.DecimalField(max_digits=3, decimal_places=1, choices=TIME_CHOICES)
+    end = models.DecimalField(max_digits=3, decimal_places=1, choices=TIME_CHOICES)
+
+    class Meta:
+        db_table = "hospital_timing"
