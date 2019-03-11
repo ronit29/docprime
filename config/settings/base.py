@@ -82,6 +82,7 @@ try:
         connect(env('MONGO_DB_NAME'), port=mongo_port, host=env('MONGO_DB_URL'))
         MONGO_STORE = env.bool('MONGO_STORE', default=False)
 except Exception as e:
+    print(e)
     print('Failed to connect to mongo')
     MONGO_STORE = False
 
