@@ -308,7 +308,7 @@ class Hospital(auth_model.TimeStampedModel, auth_model.CreatedByModel, auth_mode
             hospital_obj = Hospital.objects.filter(pk=self.id).first()
             if hospital_obj and self.data_status != hospital_obj.data_status:
                 update_status_in_matrix = True
-        elif not self.matrix_lead_id:
+        if not self.matrix_lead_id:
             push_to_matrix = True
         super(Hospital, self).save(*args, **kwargs)
         if self.is_appointment_manager:
@@ -1200,7 +1200,7 @@ class HospitalNetwork(auth_model.TimeStampedModel, auth_model.CreatedByModel, au
             hospital_network_obj = HospitalNetwork.objects.filter(pk=self.id).first()
             if hospital_network_obj and self.data_status != hospital_network_obj.data_status:
                 update_status_in_matrix = True
-        elif not self.matrix_lead_id:
+        if not self.matrix_lead_id:
             push_to_matrix = True
         super().save(*args, **kwargs)
         transaction.on_commit(lambda: self.app_commit_tasks(push_to_matrix=push_to_matrix,
