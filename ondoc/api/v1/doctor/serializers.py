@@ -1562,11 +1562,12 @@ class TopHospitalForIpdProcedureSerializer(serializers.ModelSerializer):
     multi_speciality = serializers.SerializerMethodField()
     address = serializers.SerializerMethodField()
     logo = serializers.SerializerMethodField()
+    open_today = serializers.SerializerMethodField()
 
     class Meta:
         model = Hospital
         fields = ('id', 'name', 'distance', 'certifications', 'bed_count', 'logo', 'avg_rating',
-                  'count_of_insurance_provider', 'multi_speciality', 'address')
+                  'count_of_insurance_provider', 'multi_speciality', 'address', 'open_today')
 
     def get_distance(self, obj):
         return int(obj.distance.m) if hasattr(obj, 'distance') and obj.distance else None
@@ -1594,6 +1595,13 @@ class TopHospitalForIpdProcedureSerializer(serializers.ModelSerializer):
                     return request.build_absolute_uri(document.name.url) if document.name else None
         return None
 
+    def get_open_today(self, obj):
+        now_day = timezone.now().weekday()
+        for timing in obj.hosp_availability.all():
+            if timing.day == now_day:
+                return True
+        return False
+
 
 class HospitalDetailIpdProcedureSerializer(TopHospitalForIpdProcedureSerializer):
     lat = serializers.SerializerMethodField()
@@ -1611,7 +1619,8 @@ class HospitalDetailIpdProcedureSerializer(TopHospitalForIpdProcedureSerializer)
     class Meta:
         model = Hospital
         fields = ('id', 'name', 'distance', 'certifications', 'bed_count', 'logo', 'avg_rating',
-                  'opd_timings', 'contact_number', 'multi_speciality', 'address',
+                  'count_of_insurance_provider', 'multi_speciality', 'address', 'open_today',
+                  'opd_timings', 'contact_number',
                   'lat', 'long', 'about', 'services', 'images', 'ipd_procedure_categories', 'other_network_hospitals',
                   'doctors', 'rating_graph'
                   )

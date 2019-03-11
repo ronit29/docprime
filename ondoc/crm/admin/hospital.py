@@ -1,6 +1,7 @@
 from dal import autocomplete
 from django.contrib.contenttypes.admin import GenericTabularInline
 from django.contrib.gis import admin
+from django.forms.utils import ErrorList
 from reversion.admin import VersionAdmin
 from django.db.models import Q
 import datetime
@@ -8,7 +9,7 @@ from ondoc.crm.admin.doctor import CreatedByFilter
 from ondoc.doctor.models import (HospitalImage, HospitalDocument, HospitalAward, Doctor,
                                  HospitalAccreditation, HospitalCertification, HospitalSpeciality, HospitalNetwork,
                                  Hospital, HospitalServiceMapping, HealthInsuranceProviderHospitalMapping,
-                                 HospitalHelpline)
+                                 HospitalHelpline, HospitalTiming)
 from .common import *
 from ondoc.crm.constants import constants
 from django.utils.safestring import mark_safe
@@ -88,6 +89,35 @@ class HospitalServiceInline(admin.TabularInline):
     can_delete = True
     show_change_link = False
     autocomplete_fields = ['service']
+
+
+class HospitalTimingInlineFormSet(forms.BaseInlineFormSet):
+    def clean(self):
+        super().clean()
+        if any(self.errors):
+            return
+        temp = set()
+
+        for value in self.cleaned_data:
+            if not value.get("DELETE"):
+                t = tuple([value.get("day"), value.get("start"), value.get("end")])
+                if t not in temp:
+                    temp.add(t)
+                else:
+                    raise forms.ValidationError("Duplicate records not allowed.")
+
+
+class HospitalTimingInline(admin.TabularInline):
+    model = HospitalTiming
+    # form = HospitalTimingInlineForm
+    formset = HospitalTimingInlineFormSet
+    fk_name = 'hospital'
+    extra = 0
+    can_delete = True
+    show_change_link = False
+    # autocomplete_fields = ['hospital']
+    # inlines = [DoctorClinicTimingInline, DoctorClinicProcedureInline, DoctorClinicIpdProcedureInline, AssociatedMerchantInline]
+    # fields = '__all__'
 
 
 class HospitalHelpineInlineForm(forms.ModelForm):
@@ -332,7 +362,7 @@ class HospCityFilter(SimpleListFilter):
             return queryset.filter(city__iexact=self.value()).distinct()
 
 
-class HospitalAdmin(admin.GeoModelAdmin, VersionAdmin, ActionAdmin, QCPemAdmin, nested_admin.NestedModelAdmin):
+class HospitalAdmin(admin.GeoModelAdmin, VersionAdmin, ActionAdmin, QCPemAdmin):
     list_filter = ('data_status', 'welcome_calling_done', HospCityFilter, CreatedByFilter)
     readonly_fields = ('source', 'batch', 'associated_doctors', 'is_live', 'matrix_lead_id', 'city', 'state', )
     exclude = (
@@ -492,6 +522,7 @@ class HospitalAdmin(admin.GeoModelAdmin, VersionAdmin, ActionAdmin, QCPemAdmin, 
         # HospitalNetworkMappingInline,
         HospitalHelplineInline,
         HospitalServiceInline,
+        HospitalTimingInline,
         HospitalHealthInsuranceProviderInline,
         HospitalSpecialityInline,
         HospitalAwardInline,

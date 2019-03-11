@@ -210,6 +210,7 @@ class Hospital(auth_model.TimeStampedModel, auth_model.CreatedByModel, auth_mode
     matrix_lead_id = models.BigIntegerField(blank=True, null=True, unique=True)
     about = models.TextField(blank=True, null=True, default="")
     opd_timings = models.CharField(max_length=150, blank=True, null=True, default="")
+    always_open = models.BooleanField(verbose_name='Is hospital open 24X7', default=False)
 
     def __str__(self):
         return self.name
@@ -2704,7 +2705,12 @@ class HospitalHelpline(auth_model.TimeStampedModel):
 class HospitalTiming(auth_model.TimeStampedModel):
     DAY_CHOICES = [(0, "Monday"), (1, "Tuesday"), (2, "Wednesday"), (3, "Thursday"), (4, "Friday"), (5, "Saturday"), (6, "Sunday")]
     SHORT_DAY_CHOICES = [(0, "Mon"), (1, "Tue"), (2, "Wed"), (3, "Thu"), (4, "Fri"), (5, "Sat"), (6, "Sun")]
-    TIME_CHOICES = [(5.0, "5 AM"), (5.5, "5:30 AM"),
+    TIME_CHOICES = [(0.0, "12 AM"), (0.5, "12:30 AM"),
+                    (1.0, "1 AM"), (5.5, "1:30 AM"),
+                    (2.0, "2 AM"), (5.5, "2:30 AM"),
+                    (3.0, "3 AM"), (5.5, "3:30 AM"),
+                    (4.0, "4 AM"), (5.5, "4:30 AM"),
+                    (5.0, "5 AM"), (5.5, "5:30 AM"),
                     (6.0, "6 AM"), (6.5, "6:30 AM"),
                     (7.0, "7:00 AM"), (7.5, "7:30 AM"),
                     (8.0, "8:00 AM"), (8.5, "8:30 AM"),
@@ -2725,9 +2731,10 @@ class HospitalTiming(auth_model.TimeStampedModel):
                     (23.0, "11 PM"), (23.5, "11:30 PM")]
 
     hospital = models.ForeignKey(Hospital, on_delete=models.CASCADE, related_name='hosp_availability')
-    day = models.PositiveSmallIntegerField(blank=False, null=False, choices=DAY_CHOICES)
+    day = models.PositiveSmallIntegerField(choices=DAY_CHOICES)
     start = models.DecimalField(max_digits=3, decimal_places=1, choices=TIME_CHOICES)
     end = models.DecimalField(max_digits=3, decimal_places=1, choices=TIME_CHOICES)
+
 
     class Meta:
         db_table = "hospital_timing"
