@@ -168,7 +168,7 @@ class GlobalNonBookable(TimeStampedModel):
     DOCTOR = "doctor"
     LAB = "lab"
     BOOKING_TYPE_CHOICES = ((DOCTOR, "Doctor Clinic"), (LAB, "Lab"))
-    booking_type = models.CharField(max_length=20, blank=True, choices=BOOKING_TYPE_CHOICES, default='')
+    booking_type = models.CharField(max_length=20, blank=False, choices=BOOKING_TYPE_CHOICES, null=False)
     start_date = models.DateField(null=False)
     end_date = models.DateField(null=False)
     start_time = models.TimeField(null=False)
