@@ -769,7 +769,7 @@ class DoctorProfileUserViewSet(viewsets.GenericViewSet):
             general_specialization = sorted(general_specialization, key=operator.attrgetter('doctor_count'),
                                             reverse=True)
 
-        if not doctor.about:
+        if not doctor.about and doctor.gender:
             about_doctor = self.construct_about_doctor(doctor, response_data, general_specialization, hospital)
             if about_doctor:
                 response_data['about_web'] = '<p>' + about_doctor + '</p>'

@@ -637,7 +637,7 @@ class Doctor(auth_model.TimeStampedModel, auth_model.QCModel, SearchKey, auth_mo
                 update_status_in_matrix = True
             elif not doctor_obj:
                 push_to_matrix = True
-        elif not self.matrix_lead_id:
+        else:
             push_to_matrix = True
 
         super(Doctor, self).save(*args, **kwargs)

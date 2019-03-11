@@ -1098,6 +1098,18 @@ class TransactionViewSet(viewsets.GenericViewSet):
             except Exception as e:
                 logger.error("Cannot log pg response - " + str(e))
 
+
+            ## Check if already processes
+            try:
+                if response and response.get("orderNo"):
+                    pg_txn = PgTransaction.objects.filter(order_no__iexact=response.get("orderNo")).first()
+                    if pg_txn:
+                        send_pg_acknowledge.apply_async((pg_txn.order_id, pg_txn.order_no,), countdown=1)
+                        return
+            except Exception as e:
+               logger.error("Error in sending pg acknowledge - " + str(e))
+    
+
             # For testing only
             # response = request.data
             success_in_process = False
