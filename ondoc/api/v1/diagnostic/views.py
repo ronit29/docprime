@@ -220,7 +220,7 @@ class LabList(viewsets.ReadOnlyModelViewSet):
             if valid_package_ids is None:
                 valid_package_ids = []
             valid_package_ids.extend(list(
-                LabTest.objects.filter(categories__id__in=category_ids).distinct().values_list('id',
+                LabTest.objects.filter(categories__id__in=package_category_ids).distinct().values_list('id',
                                                                                                flat=True)))
 
         if valid_package_ids is not None:
@@ -441,7 +441,7 @@ class LabList(viewsets.ReadOnlyModelViewSet):
             if valid_package_ids is None:
                 valid_package_ids = []
             valid_package_ids.extend(list(
-                LabTest.objects.filter(categories__id__in=category_ids).distinct().values_list('id',
+                LabTest.objects.filter(categories__id__in=package_category_ids).distinct().values_list('id',
                                                                                                flat=True)))
 
         if valid_package_ids is not None:
