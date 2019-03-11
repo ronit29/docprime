@@ -24,7 +24,8 @@ from ondoc.common.models import UserConfig, PaymentOptions, AppointmentHistory
 from ondoc.coupon.models import UserSpecificCoupon, Coupon
 from ondoc.lead.models import UserLead
 from ondoc.sms.api import send_otp
-from ondoc.doctor.models import DoctorMobile, Doctor, HospitalNetwork, Hospital, DoctorHospital, DoctorClinic, DoctorClinicTiming
+from ondoc.doctor.models import DoctorMobile, Doctor, HospitalNetwork, Hospital, DoctorHospital, DoctorClinic, \
+                                DoctorClinicTiming, ProviderSignupLead
 from ondoc.authentication.models import (OtpVerifications, NotificationEndpoint, Notification, UserProfile,
                                          Address, AppointmentTransaction, GenericAdmin, UserSecretKey, GenericLabAdmin,
                                          AgentToken, DoctorNumber)
@@ -39,10 +40,11 @@ from ondoc.doctor.models import OpdAppointment
 from ondoc.api.v1.doctor.serializers import (OpdAppointmentSerializer, AppointmentFilterUserSerializer,
                                              UpdateStatusSerializer, CreateAppointmentSerializer,
                                              AppointmentRetrieveSerializer, OpdAppTransactionModelSerializer,
-                                             OpdAppModelSerializer)
+                                             OpdAppModelSerializer,OpdAppointmentUpcoming)
 from ondoc.api.v1.diagnostic.serializers import (LabAppointmentModelSerializer,
                                                  LabAppointmentRetrieveSerializer, LabAppointmentCreateSerializer,
-                                                 LabAppTransactionModelSerializer, LabAppRescheduleModelSerializer)
+                                                 LabAppTransactionModelSerializer, LabAppRescheduleModelSerializer,
+                                                 LabAppointmentUpcoming)
 from ondoc.api.v1.diagnostic.views import LabAppointmentView
 from ondoc.diagnostic.models import (Lab, LabAppointment, AvailableLabTest, LabNetwork)
 from ondoc.payout.models import Outstanding
@@ -63,6 +65,7 @@ from django.contrib.contenttypes.models import ContentType
 
 import re
 from ondoc.matrix.tasks import push_order_to_matrix
+
 
 
 logger = logging.getLogger(__name__)
@@ -92,13 +95,7 @@ class LoginOTP(GenericViewSet):
         retry_send = request.query_params.get('retry', False)
 
         if req_type == 'doctor':
-            doctor_queryset = GenericAdmin.objects.select_related('doctor', 'hospital').filter( Q(phone_number=phone_number, is_disabled=False),
-                                        (Q(doctor__isnull=True, hospital__data_status=Hospital.QC_APPROVED) |
-                                         Q(doctor__isnull=False,
-                                           doctor__data_status=Doctor.QC_APPROVED, doctor__onboarding_status = Doctor.ONBOARDED
-                                          )
-                                        )
-                                       )
+            doctor_queryset = GenericAdmin.objects.select_related('doctor', 'hospital').filter(phone_number=phone_number, is_disabled=False)
             lab_queryset = GenericLabAdmin.objects.select_related('lab', 'lab_network').filter(
                 Q(phone_number=phone_number, is_disabled=False),
                 (Q(lab__isnull=True, lab_network__data_status=LabNetwork.QC_APPROVED) |
@@ -107,8 +104,9 @@ class LoginOTP(GenericViewSet):
                    )
                  )
                 )
+            provider_signup_queryset = ProviderSignupLead.objects.filter(phone_number=phone_number, user__isnull=False)
 
-            if lab_queryset.exists() or doctor_queryset.exists():
+            if lab_queryset.exists() or doctor_queryset.exists() or provider_signup_queryset.exists():
                 response['exists'] = 1
                 send_otp("OTP for login is {}", phone_number, retry_send)
 
@@ -1100,6 +1098,18 @@ class TransactionViewSet(viewsets.GenericViewSet):
             except Exception as e:
                 logger.error("Cannot log pg response - " + str(e))
 
+
+            ## Check if already processes
+            try:
+                if response and response.get("orderNo"):
+                    pg_txn = PgTransaction.objects.filter(order_no__iexact=response.get("orderNo")).first()
+                    if pg_txn:
+                        send_pg_acknowledge.apply_async((pg_txn.order_id, pg_txn.order_no,), countdown=1)
+                        return
+            except Exception as e:
+               logger.error("Error in sending pg acknowledge - " + str(e))
+    
+
             # For testing only
             # response = request.data
             success_in_process = False
@@ -1385,11 +1395,17 @@ class HospitalDoctorAppointmentPermissionViewSet(GenericViewSet):
         doc_hosp_queryset = (DoctorClinic.objects
                              .select_related('doctor', 'hospital')
                              .prefetch_related('doctor__manageable_doctors', 'hospital__manageable_hospitals')
-                             .filter(doctor__is_live=True, hospital__is_live=True)
+                             .filter(Q(doctor__is_live=True, hospital__is_live=True) |
+                                     Q(doctor__source_type=Doctor.PROVIDER, hospital__source_type=Hospital.PROVIDER))
                              .annotate(doctor_gender=F('doctor__gender'),
                                        hospital_building=F('hospital__building'),
                                        hospital_name=F('hospital__name'),
-                                       doctor_name=F('doctor__name')
+                                       doctor_name=F('doctor__name'),
+                                       doctor_source_type=F('doctor__source_type'),
+                                       doctor_is_live=F('doctor__is_live'),
+                                       hospital_source_type=F('hospital__source_type'),
+                                       hospital_is_live=F('hospital__is_live'),
+                                       online_consultation_fees=F('doctor__online_consultation_fees')
                                        )
                              .filter(
                                     Q(
@@ -1419,7 +1435,9 @@ class HospitalDoctorAppointmentPermissionViewSet(GenericViewSet):
                                               hospital__manageable_hospitals__is_disabled=False,
                                               hospital__manageable_hospitals__entity_type=GenericAdminEntity.HOSPITAL)
                                     ))
-                             .values('hospital', 'doctor', 'hospital_name', 'doctor_name', 'doctor_gender').distinct('hospital', 'doctor')
+                             .values('hospital', 'doctor', 'hospital_name', 'doctor_name', 'doctor_gender',
+                                     'doctor_source_type', 'hospital_source_type', 'online_consultation_fees',
+                                     'doctor_is_live', 'hospital_is_live').distinct('hospital', 'doctor')
                              )
 
         # all_docs = [doc_hosp_queryset
@@ -1913,3 +1931,26 @@ class UserRatingViewSet(GenericViewSet):
                 resp.append(rating_obj)
         return Response(resp)
 
+
+class AppointmentViewSet(viewsets.GenericViewSet):
+    authentication_classes = (JWTAuthentication,)
+    permission_classes = (IsAuthenticated,)
+
+    def upcoming_appointments(self, request):
+        all_appointments = []
+        try:
+            user_id = request.user.id
+            opd = OpdAppointment.get_upcoming_appointment(user_id)
+            opd_appointments = OpdAppointmentUpcoming(opd, many=True).data
+            lab = LabAppointment.get_upcoming_appointment(user_id)
+            lab_appointments = LabAppointmentUpcoming(lab, many=True).data
+
+            all_appointments = opd_appointments + lab_appointments
+            all_appointments = sorted(all_appointments,
+                                      key=lambda x: x["time_slot_start"])
+        except Exception as e:
+            logger.error(str(e))
+        return Response(all_appointments)
+
+    def get_queryset(self):
+        return OpdAppointment.objects.none()

@@ -61,7 +61,7 @@ def prepare_and_hit(self, data):
         patient_address = resolve_address(appointment.address)
     service_name = ""
     if task_data.get('type') == 'LAB_APPOINTMENT':
-        service_name = ','.join([test_obj.test.name for test_obj in appointment.test_mappings.all()])  # DONE SHASHANK_SINGH CHANGE 13
+        service_name = ','.join([test_obj.test.name for test_obj in appointment.test_mappings.all()])
 
     order_id = data.get('order_id')
 
@@ -525,30 +525,25 @@ def create_or_update_lead_on_matrix(self, data):
         }
         url = settings.MATRIX_API_URL
         matrix_api_token = settings.MATRIX_API_TOKEN
-        logger.error("Matrix URL - ")
-        logger.error(url)
-        logger.error("Payload - ")
-        logger.error(json.dumps(request_data))
 
         response = requests.post(url, data=json.dumps(request_data), headers={'Authorization': matrix_api_token,
                                                                              'Content-Type': 'application/json'})
-
-        logger.error("Matrix lead create response -")
-        logger.error(json.dumps(response.json()))
 
         if response.status_code != status.HTTP_200_OK or not response.ok:
             logger.info("[ERROR] {} with ID {} could not be published to the matrix system".format(obj_type, obj_id))
             logger.info("[ERROR] %s", response.reason)
             countdown_time = (2 ** self.request.retries) * 60 * 10
-            logging.error("Lead creation on the Matrix System failed with response - " + str(response.content))
+            # logging.error("Lead creation on the Matrix System failed with response - " + str(response.content))
+            logger.error("Matrix URL - "+ url +", Payload - "+ json.dumps(request_data) + ", Matrix Response - " + json.dumps(response.json()) + "")
             self.retry([data], countdown=countdown_time)
         else:
             resp_data = response.json()
-            if not resp_data.get('Id', None):
-                logger.error(json.dumps(request_data))
-                raise Exception("[ERROR] ID not received from the matrix while creating lead for {} with ID {}.")
+            if not (resp_data.get('Id', None) or resp_data.get('IsSaved', False)):
+                logger.error("[ERROR] ID not received from the matrix while creating lead for {} with ID {}. ".format(obj_type, obj_id)+json.dumps(request_data))
+                # raise Exception("[ERROR] ID not received from the matrix while creating lead for {} with ID {}.")
 
             # save the order with the matrix lead id.
+            # obj = model_used.objects.select_for_update().filter(id=obj_id).first()
             if obj and hasattr(obj, 'matrix_lead_id') and not obj.matrix_lead_id:
                 obj.matrix_lead_id = resp_data.get('Id', None)
                 obj.matrix_lead_id = int(obj.matrix_lead_id)
@@ -589,8 +584,11 @@ def update_onboarding_qcstatus_to_matrix(self, data):
                 assigned_user = history_obj.user.staffprofile.employee_id if hasattr(history_obj.user,
                                                                                      'staffprofile') and history_obj.user.staffprofile.employee_id else ''
 
+        obj_matrix_lead_id = obj.matrix_lead_id if hasattr(obj, 'matrix_lead_id') and obj.matrix_lead_id else 0
+        if not obj_matrix_lead_id:
+            return
         request_data = {
-            "LeadID": obj.matrix_lead_id if hasattr(obj, 'matrix_lead_id') and obj.matrix_lead_id else 0,
+            "LeadID": obj_matrix_lead_id,
             "Comment": comment,
             "NewJourneyURL": exit_point_url,
             "AssignedUser": assigned_user,
@@ -600,28 +598,21 @@ def update_onboarding_qcstatus_to_matrix(self, data):
         url = settings.MATRIX_STATUS_UPDATE_API_URL
         matrix_api_token = settings.MATRIX_API_TOKEN
 
-        logger.error("Matrix URL - ")
-        logger.error(url)
-        logger.error("Payload - ")
-        logger.error(json.dumps(request_data))
-
         response = requests.post(url, data=json.dumps(request_data), headers={'Authorization': matrix_api_token,
                                                                               'Content-Type': 'application/json'})
-
-        logger.error("Matrix status update response -")
-        logger.error(json.dumps(response.json()))
 
         if response.status_code != status.HTTP_200_OK or not response.ok:
             logger.info("[ERROR] Status couldn't be updated for {} with ID {} to the matrix system".format(obj_type, obj_id))
             logger.info("[ERROR] %s", response.reason)
             countdown_time = (2 ** self.request.retries) * 60 * 10
-            logging.error("Update with status sync with the Matrix System failed with response - " + str(response.content))
+            # logging.error("Update with status sync with the Matrix System failed with response - " + str(response.content))
+            logger.error("Matrix URL - " + url + ", Payload - " + json.dumps(request_data) + ", Matrix Response - " + json.dumps(response.json()) + "")
             self.retry([data], countdown=countdown_time)
         else:
             resp_data = response.json()
             if not resp_data.get('IsSaved', False):
-                logger.error(json.dumps(request_data))
-                raise Exception("[ERROR] {} with ID {} not saved to matrix while updating status.".format(obj_type, obj_id))
+                logger.error("[ERROR] {} with ID {} not saved to matrix while updating status. ".format(obj_type, obj_id) + json.dumps(request_data))
+                # raise Exception("[ERROR] {} with ID {} not saved to matrix while updating status.".format(obj_type, obj_id))
     except Exception as e:
         logger.error("Error in Celery. Failed to update status to the matrix - " + str(e))
 
