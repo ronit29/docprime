@@ -76,9 +76,13 @@ DATABASES = {
 DATABASES['default']['ENGINE'] = 'django.contrib.gis.db.backends.postgis'
 
 try:
-    connect('docprime', port=27017, host='mongodb://localhost/docprime?connectTimeoutms=2000')
+    mongo_port = 27017
+    if env('MONGO_DB_PORT'):
+        mongo_port = int(env('MONGO_DB_PORT'))
+    connect(env('MONGO_DB_NAME'), port=mongo_port, host=env('MONGO_DB_URL'))
+    MONGO_STORE = env.bool('MONGO_STORE', default=False)
 except Exception as e:
-    pass
+    MONGO_STORE = False
 
 
 # Application definition
@@ -389,8 +393,6 @@ CONN_MAX_AGE=600
 AWS_ACCESS_KEY_ID = env('AWS_ACCESS_KEY_ID', default='')
 AWS_SECRET_ACCESS_KEY = env('AWS_SECRET_ACCESS_KEY', default='')
 PROVIDER_EMAIL = env('PROVIDER_EMAIL', default='')
-MONGO_STORE=env.bool('MONGO_STORE', default=False)
-
 
 #comments Settings
 COMMENTS_APP = 'fluent_comments'
