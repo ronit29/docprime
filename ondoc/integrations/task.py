@@ -70,20 +70,19 @@ def push_lab_appointment_to_integrator(self, data):
                 logger.error("[ERROR] Cant find integrator response for appointment id " + str(appointment.id))
 
             integrator_obj = service.create_integrator_obj(saved_response.integrator_class_name)
-            response = integrator_obj.cancel_order(appointment, saved_response)
+            response = integrator_obj.cancel_integrator_order(appointment, saved_response)
 
             if not response:
                 countdown_time = 1 * 60
                 print(countdown_time)
                 self.retry([data], countdown=countdown_time)
 
-            # if successfully cancelled write according to response
-
-
     except Exception as e:
         logger.error(str(e))
 
-@task
-def integrator_order_summary():
-    from ondoc.integrations.models import IntegratorResponse
-    IntegratorResponse.get_order_summary()
+
+
+# @task
+# def integrator_order_summary():
+#     from ondoc.integrations.models import IntegratorResponse
+#     IntegratorResponse.get_order_summary()

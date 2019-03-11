@@ -42,18 +42,18 @@ class BaseIntegrator(object):
         except Exception as e:
             logger.error("[ERROR]" + self.__class__.__name__ + " report error." + str(e))
 
-    # # This method is use to cancel an order to respective integrator.
-    # def cancel_order(self, appointment, integrator_response):
-    #     try:
-    #         order = self._cancel_order(appointment, integrator_response, **kwargs)
-    #         return order
-    #     except Exception as e:
-    #         logger.error("[ERROR]" + self.__class__.__name__ + " cancel order error." + str(e))
+    # This method is use to cancel an order to respective integrator.
+    def cancel_integrator_order(self, appointment, integrator_response):
+        try:
+            order = self._cancel_order(appointment, integrator_response)
+            return order
+        except Exception as e:
+            logger.error("[ERROR]" + self.__class__.__name__ + " cancel order error." + str(e))
 
     # This method is use to check order status at respective integrator.
     def get_order_summary(self, integrator_response):
         try:
-            order_summary = self.order_summary(integrator_response)
+            order_summary = self._order_summary(integrator_response)
             return order_summary
         except Exception as e:
             logger.error("[ERROR]" + self.__class__.__name__ + " order summary error." + str(e))

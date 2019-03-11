@@ -281,8 +281,13 @@ class Thyrocare(BaseIntegrator):
         except Exception as e:
             logger.error(str(e))
 
-    def cancel_order(self, appointment, integrator_response):
+    def _cancel_order(self, appointment, integrator_response):
         url = "%s/ORDER.svc/cancelledorder" % settings.THYROCARE_BASE_URL
+        if appointment.cancellation_comments:
+            reason = appointment.cancellation_reason.name + " " + appointment.cancellation_comments
+        else:
+            reason = appointment.cancellation_reason.name
+
         payload = {
             "UserId": 2147,
             "OrderNo": integrator_response.dp_order_id,
@@ -291,7 +296,7 @@ class Thyrocare(BaseIntegrator):
             "Status": 2,
             "RemarksId": 67,
             "ReasonId": 172,  # Not interested
-            "Others": appointment.cancellation_reason.name + " " + appointment.cancellation_comments,
+            "Others": reason,
             "AppointmentDate": "",
             "AppointmentSlot": ""
         }
@@ -303,7 +308,7 @@ class Thyrocare(BaseIntegrator):
         else:
             logger.error("[ERROR] %s" % response.get('RESPONSE'))
 
-    def order_summary(self, integrator_response):
+    def _order_summary(self, integrator_response):
         dp_appointment = LabAppointment.objects.filter(id=integrator_response.object_id).first()
         if dp_appointment.status != LabAppointment.CANCELLED or dp_appointment.status != LabAppointment.COMPLETED or \
                                             (dp_appointment.time_slot_start + timedelta(days=1) < datetime.now()):
