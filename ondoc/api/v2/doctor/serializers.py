@@ -192,7 +192,7 @@ class ProviderSignupLeadDataSerializer(serializers.Serializer):
         phone_number = attrs.get("phone_number")
         if ProviderSignupValidations.user_exists(attrs):
             raise serializers.ValidationError("Phone number already registered. Please try logging in.")
-        if not (user and int(user.phone_number) != int(phone_number)):
+        if not (user and int(user.phone_number) == int(phone_number)):
             raise serializers.ValidationError("either user is missing or user and phone number mismatch")
         return attrs
 
