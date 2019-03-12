@@ -827,7 +827,9 @@ class TimeSlotExtraction(object):
         date = datetime.datetime.strptime(date, '%Y-%m-%d')
         day = date.weekday()
         booking_type = booking_details.get('type')
-        if booking_type == "doctor":
+        if booking_type == 'integration':
+            total_leave_list = []
+        elif booking_type == "doctor":
             total_leave_list = self.get_doctor_leave_list(leaves)
         else:
             total_leave_list = self.get_lab_leave_list(leaves)
@@ -1048,50 +1050,6 @@ class TimeSlotExtraction(object):
                         today_max = max_val - 2
 
         return today_min, tomorrow_min, today_max
-
-    # def initial_start_time_slots(self, is_thyrocare, is_home_pickup, time_slots, date):
-    #     today_min = None
-    #     tomorrow_min = None
-    #     today_max = None
-    #
-    #     now = datetime.datetime.now()
-    #     curr_time = now.hour
-    #     curr_minute = round(round(float(now.minute) / 60, 2) * 2) / 2
-    #     curr_time += curr_minute
-    #     is_sunday = now.weekday() == 6
-    #
-    #     # TODO: put time gaps in config
-    #     if is_home_pickup:
-    #         if is_thyrocare:
-    #             today_min = 24
-    #             if curr_time >= 17:
-    #                 tomorrow_min = 24
-    #         else:
-    #             if is_sunday:
-    #                 today_min = 24
-    #             else:
-    #                 if curr_time < 13:
-    #                     today_min = curr_time + 4
-    #                 elif curr_time >= 13:
-    #                     today_min = 24
-    #             if curr_time >= 17:
-    #                 tomorrow_min = 12
-    #     else:
-    #         if not is_thyrocare:
-    #             # add 2 hours gap,
-    #             today_min = curr_time + 2
-    #
-    #             # block lab for 2 hours, before last found time slot
-    #             if time_slots and time_slots[date]:
-    #                 max_val = 0
-    #                 for s in time_slots[date]:
-    #                     if s["timing"]:
-    #                         for t in s["timing"]:
-    #                             max_val = max(t["value"], max_val)
-    #                 if max_val >= 2:
-    #                     today_max = max_val - 2
-    #
-    #     return today_min, tomorrow_min, today_max
 
     def get_upcoming_slots(self, time_slots):
         no_of_slots = 3

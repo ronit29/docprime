@@ -1714,6 +1714,7 @@ class LabTimingListView(mixins.ListModelMixin,
         from ondoc.integrations import service
         pincode = params.get('pincode')
         date = params.get('date')
+        integration_dict = None
         if lab:
             lab_obj = Lab.objects.filter(id=int(lab), is_live=True).first()
             if lab_obj.network and lab_obj.network.id:
