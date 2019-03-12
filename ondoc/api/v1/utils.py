@@ -866,10 +866,8 @@ class TimeSlotExtraction(object):
                     # whole_timing_data[readable_date].append({})
                     pass
                 else:
-                    whole_timing_data[readable_date].append(
-                        self.format_data(self.timing[i]['timing'][self.MORNING], self.MORNING, pa, booking_details))
-                    whole_timing_data[readable_date].append(
-                        self.format_data(self.timing[i]['timing'][self.EVENING], self.EVENING, pa, booking_details))
+                    whole_timing_data[readable_date].append(am_timings)
+                    whole_timing_data[readable_date].append(pm_timings)
 
     def get_doctor_leave_list(self, leaves):
         total_leaves = list()
@@ -963,7 +961,7 @@ class TimeSlotExtraction(object):
                         else:
                             pass
                     else:
-                        if k >= doctor_maximum_timing:
+                        if k <= doctor_maximum_timing:
                             data_list.append({"value": k, "text": v, "price": pa[k]["price"],
                                               "mrp": pa[k]['mrp'], 'deal_price': pa[k]['deal_price'],
                                               "is_available": pa[k]["is_available"],
