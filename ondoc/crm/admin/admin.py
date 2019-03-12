@@ -1,10 +1,9 @@
 
 from django.contrib.gis import admin
-
-from ondoc.common.models import PaymentOptions, UserConfig, Feature, Service
+from ondoc.common.models import PaymentOptions, UserConfig, Feature, Service, GlobalNonBookable
 from ondoc.crm.admin.banner import BannerAdmin, SliderLocationAdmin
 from ondoc.crm.admin.procedure import ProcedureCategoryAdmin, ProcedureAdmin, IpdProcedureAdmin, FeatureAdmin, \
-    ServiceAdmin, HealthInsuranceProviderAdmin
+    ServiceAdmin, HealthInsuranceProviderAdmin, IpdProcedureCategoryAdmin
 from ondoc.doctor.models import (Doctor, Language, MedicalService, Specialization, College, Qualification, Hospital,
                                  HospitalNetwork, DoctorOnboardingToken, OpdAppointment,
                                  MedicalCondition, AboutDoctor, HealthTip, CommonMedicalCondition, CommonSpecialization,
@@ -23,9 +22,10 @@ from ondoc.account.models import ConsumerAccount, MerchantPayout
 from ondoc.location.admin import EntityUrlsAdmin
 from ondoc.location.models import EntityUrls
 from ondoc.notification import models as notifcation_model
-from ondoc.procedure.models import Procedure, ProcedureCategory, CommonProcedureCategory, CommonProcedure, IpdProcedure
+from ondoc.procedure.models import Procedure, ProcedureCategory, CommonProcedureCategory, CommonProcedure, IpdProcedure, \
+    IpdProcedureCategory
 from .common import Cities, CitiesAdmin, MatrixCityMapping, MatrixCityAdmin, MerchantAdmin, MerchantPayoutAdmin, \
-    PaymentOptionsAdmin
+    PaymentOptionsAdmin, GlobalNonBookableAdmin
 from .lead import HospitalLeadAdmin, DoctorLeadAdmin, SearchLeadAdmin
 from .doctor import (DoctorAdmin, MedicalServiceAdmin, SpecializationAdmin, QualificationAdmin, LanguageAdmin,
                      CollegeAdmin, MedicalConditionAdmin, HealthTipAdmin, DoctorClinicAdmin,
@@ -173,8 +173,10 @@ admin.site.register(UploadDoctorData, UploadDoctorDataAdmin)
 admin.site.register(SliderLocation, SliderLocationAdmin)
 admin.site.register(IntegratorMapping, IntegratorMappingAdmin)
 admin.site.register(IntegratorProfileMapping, IntegratorProfileMappingAdmin)
+admin.site.register(GlobalNonBookable, GlobalNonBookableAdmin)
 admin.site.register(IpdProcedure, IpdProcedureAdmin)
 admin.site.register(Feature, FeatureAdmin)
 admin.site.register(Service, ServiceAdmin)
 admin.site.register(HealthInsuranceProvider, HealthInsuranceProviderAdmin)
 admin.site.register(IntegratorReport, IntegratorReportAdmin)
+admin.site.register(IpdProcedureCategory, IpdProcedureCategoryAdmin)

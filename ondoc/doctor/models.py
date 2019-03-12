@@ -32,8 +32,8 @@ from ondoc.notification import models as notification_models
 from ondoc.notification import tasks as notification_tasks
 from django.contrib.contenttypes.fields import GenericRelation
 from ondoc.api.v1.utils import get_start_end_datetime, custom_form_datetime, CouponsMixin, aware_time_zone, \
-    form_time_slot, util_absolute_url, html_to_pdf
-from ondoc.common.models import AppointmentHistory, AppointmentMaskNumber, Service
+    form_time_slot, util_absolute_url, html_to_pdf, TimeSlotExtraction
+from ondoc.common.models import AppointmentHistory, AppointmentMaskNumber, Service, GlobalNonBookable
 from functools import reduce
 from operator import or_
 import logging
@@ -57,6 +57,7 @@ import reversion
 from ondoc.doctor import models as doctor_models
 from django.db.models import Count
 from ondoc.api.v1.utils import RawSql
+from safedelete import SOFT_DELETE
 
 logger = logging.getLogger(__name__)
 
@@ -124,7 +125,7 @@ class MedicalService(auth_model.TimeStampedModel, UniqueNameModel):
         db_table = "medical_service"
 
 
-class Hospital(auth_model.TimeStampedModel, auth_model.CreatedByModel, auth_model.QCModel, SearchKey):
+class Hospital(auth_model.TimeStampedModel, auth_model.CreatedByModel, auth_model.QCModel, SearchKey, auth_model.SoftDelete):
     PRIVATE = 1
     CLINIC = 2
     HOSPITAL = 3
@@ -195,6 +196,7 @@ class Hospital(auth_model.TimeStampedModel, auth_model.CreatedByModel, auth_mode
                                                         through='HealthInsuranceProviderHospitalMapping',
                                                         through_fields=('hospital', 'provider'),
                                                         related_name='available_in_hospital')
+    bed_count = models.PositiveIntegerField(null=True, blank=True, default=None)
 
     def __str__(self):
         return self.name
@@ -379,7 +381,7 @@ class College(auth_model.TimeStampedModel):
         db_table = "college"
 
 
-class Doctor(auth_model.TimeStampedModel, auth_model.QCModel, SearchKey):
+class Doctor(auth_model.TimeStampedModel, auth_model.QCModel, SearchKey, auth_model.SoftDelete):
     SOURCE_PRACTO = "pr"
     SOURCE_CRM = 'crm'
 
@@ -696,6 +698,31 @@ class DoctorClinic(auth_model.TimeStampedModel):
 
     # def __str__(self):
     #     return '{}-{}'.format(self.doctor, self.hospital)
+
+    def get_timings(self):
+        from ondoc.api.v2.doctor import serializers as v2_serializers
+        from ondoc.api.v1.common import serializers as common_serializers
+        clinic_timings= self.availability.order_by("start")
+        doctor_leave_serializer = v2_serializers.DoctorLeaveSerializer(
+            DoctorLeave.objects.filter(doctor=self.doctor_id, deleted_at__isnull=True), many=True)
+        global_leave_serializer = common_serializers.GlobalNonBookableSerializer(
+           GlobalNonBookable.objects.filter(deleted_at__isnull=True, booking_type=GlobalNonBookable.DOCTOR), many=True)
+        total_leaves = dict()
+        total_leaves['global'] = global_leave_serializer.data
+        total_leaves['doctor'] = doctor_leave_serializer.data
+        timeslots = dict()
+        obj = TimeSlotExtraction()
+
+        for data in clinic_timings:
+            obj.form_time_slots(data.day, data.start, data.end, data.fees, True,
+                                data.deal_price, data.mrp, True, on_call=data.type)
+
+        date = datetime.datetime.today().strftime('%Y-%m-%d')
+        booking_details = {"type": "doctor"}
+        slots = obj.get_timing_slots(date, total_leaves, booking_details)
+        upcoming_slots = obj.get_upcoming_slots(time_slots=slots)
+        res_data = {"time_slots": slots, "upcoming_slots": upcoming_slots}
+        return res_data
 
 
 class DoctorClinicTiming(auth_model.TimeStampedModel):

@@ -10,7 +10,7 @@ from django.conf import settings
 from django.utils.dateparse import parse_datetime
 from ondoc.authentication.models import Merchant, AssociatedMerchant
 from ondoc.account.models import MerchantPayout
-from ondoc.common.models import Cities, MatrixCityMapping, PaymentOptions
+from ondoc.common.models import Cities, MatrixCityMapping, PaymentOptions, GlobalNonBookable
 from import_export import resources, fields
 from import_export.admin import ImportMixin, base_formats, ImportExportMixin, ImportExportModelAdmin, ExportMixin
 from reversion.admin import VersionAdmin
@@ -459,3 +459,8 @@ class PaymentOptionsAdmin(admin.ModelAdmin):
     model = PaymentOptions
     list_display = ['name', 'description', 'is_enabled']
     search_fields = ['name']
+
+
+class GlobalNonBookableAdmin(admin.ModelAdmin):
+    model = GlobalNonBookable
+    list_display = ['booking_type', 'start_date', 'end_date', 'start_time', 'end_time']

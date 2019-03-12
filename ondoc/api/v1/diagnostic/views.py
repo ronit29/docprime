@@ -6,7 +6,7 @@ from ondoc.api.v1.diagnostic import serializers as diagnostic_serializer
 from ondoc.api.v1.auth.serializers import AddressSerializer
 from ondoc.integrations.models import IntegratorMapping
 from ondoc.cart.models import Cart
-from ondoc.common.models import UserConfig
+from ondoc.common.models import UserConfig, GlobalNonBookable
 from ondoc.ratings_review import models as rating_models
 from ondoc.diagnostic.models import (LabTest, AvailableLabTest, Lab, LabAppointment, LabTiming, PromotedLab,
                                      CommonDiagnosticCondition, CommonTest, CommonPackage,
@@ -63,6 +63,7 @@ from django.contrib.gis.measure import D
 from django.db.models.expressions import Window
 from django.db.models.functions import RowNumber
 from django.db.models import Avg
+from ondoc.api.v2.doctor import serializers as v2_serializers
 User = get_user_model()
 
 
@@ -1709,8 +1710,13 @@ class LabTimingListView(mixins.ListModelMixin,
         for_home_pickup = True if int(params.get('pickup', 0)) else False
         lab = params.get('lab')
 
-        resp_data = LabTiming.timing_manager.lab_booking_slots(lab__id=lab, lab__is_live=True, for_home_pickup=for_home_pickup)
+        lab = Lab.objects.filter(id=lab, is_live=True).first()
+        lab_slots = lab.get_timing(for_home_pickup)
+        resp_data = {"time_slots": lab_slots}
 
+        # resp_data = LabTiming.timing_manager.lab_booking_slots(lab__id=lab, lab__is_live=True, for_home_pickup=for_home_pickup)
+        # global_leave_serializer = v2_serializers.GlobalNonBookableSerializer(
+        #     GlobalNonBookable.objects.filter(deleted_at__isnull=True, booking_type=GlobalNonBookable.LAB), many=True)
         # for agent do not set any time limitations
         if hasattr(request, "agent") and request.agent:
             resp_data = {
@@ -1719,6 +1725,7 @@ class LabTimingListView(mixins.ListModelMixin,
                 "tomorrow_min": None,
                 "today_max": None
             }
+        # resp_data['global_leaves'] = global_leave_serializer.data
         return Response(resp_data)
 
     @transaction.non_atomic_requests

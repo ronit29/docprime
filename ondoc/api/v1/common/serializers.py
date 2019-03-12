@@ -1,5 +1,6 @@
 from rest_framework import serializers
 
+from ondoc.common.models import GlobalNonBookable
 from ondoc.lead.models import SearchLead
 
 
@@ -32,3 +33,15 @@ class SearchLeadSerializer(serializers.ModelSerializer):
     class Meta:
         model = SearchLead
         fields = '__all__'
+
+
+class GlobalNonBookableSerializer(serializers.ModelSerializer):
+    interval = serializers.CharField(read_only=True)
+    start_date = serializers.DateField(read_only=True)
+    end_date = serializers.DateField(read_only=True)
+    start_time = serializers.FloatField(read_only=True, source='start_time_in_float')
+    end_time = serializers.FloatField(read_only=True, source='end_time_in_float')
+
+    class Meta:
+        model = GlobalNonBookable
+        exclude = ('booking_type', 'created_at', 'updated_at', 'deleted_at')

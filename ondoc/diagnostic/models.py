@@ -52,10 +52,11 @@ from ondoc.integrations.task import push_lab_appointment_to_integrator
 from ondoc.location import models as location_models
 from ondoc.ratings_review import models as ratings_models
 from decimal import Decimal
-from ondoc.common.models import AppointmentHistory, AppointmentMaskNumber
+from ondoc.common.models import AppointmentHistory, AppointmentMaskNumber, GlobalNonBookable
 import reversion
 from decimal import Decimal
 from django.utils.text import slugify
+from ondoc.api.v1.common import serializers as common_serializers
 
 logger = logging.getLogger(__name__)
 
@@ -463,6 +464,59 @@ class Lab(TimeStampedModel, CreatedByModel, QCModel, SearchKey):
             query = '''UPDATE lab l set avg_rating = (select avg(ratings) from ratings_review where content_type_id={} and object_id=l.id) '''.format(cid)
             cursor.execute(query)
 
+    def get_timing(self, is_home_pickup):
+        from ondoc.api.v1.common import serializers as common_serializers
+        lab_timing_queryset = self.lab_timings.filter(for_home_pickup=is_home_pickup)
+        lab_slots = []
+        if not lab_timing_queryset or (is_home_pickup and not lab_timing_queryset[0].lab.is_home_collection_enabled):
+            return {
+                "time_slots": [],
+                "today_min": None,
+                "tomorrow_min": None,
+                "today_max": None
+            }
+        else:
+            global_leave_serializer = common_serializers.GlobalNonBookableSerializer(
+                GlobalNonBookable.objects.filter(deleted_at__isnull=True, booking_type=GlobalNonBookable.LAB), many=True)
+            total_leaves = dict()
+            total_leaves['global'] = global_leave_serializer.data
+
+        obj = TimeSlotExtraction()
+
+        if not is_home_pickup and lab_timing_queryset[0].lab.always_open:
+            for day in range(0, 7):
+                obj.form_time_slots(day, 0.0, 23.75, None, True)
+
+        else:
+            for data in lab_timing_queryset:
+                obj.form_time_slots(data.day, data.start, data.end, None, True)
+
+        global_leave_serializer = common_serializers.GlobalNonBookableSerializer(
+            GlobalNonBookable.objects.filter(deleted_at__isnull=True,
+                                             booking_type=GlobalNonBookable.LAB), many=True)
+        date = datetime.datetime.today().strftime('%Y-%m-%d')
+        booking_details = {"type": "lab", "is_home_pickup": is_home_pickup}
+        resp_list = obj.get_timing_slots(date, global_leave_serializer.data, booking_details)
+        is_thyrocare = False
+        lab_id = self.id
+        if lab_id and settings.THYROCARE_NETWORK_ID:
+            if Lab.objects.filter(id=lab_id, network_id=settings.THYROCARE_NETWORK_ID).exists():
+                is_thyrocare = True
+
+        # today_min, tomorrow_min, today_max = obj.initial_start_times(is_thyrocare=is_thyrocare,
+        #                                                              is_home_pickup=is_home_pickup,
+        #                                                              time_slots=resp_list)
+        # res_data = {
+        #     "time_slots": resp_list,
+        #     "today_min": today_min,
+        #     "tomorrow_min": tomorrow_min,
+        #     "today_max": today_max
+        # }
+
+        upcoming_slots = obj.get_upcoming_slots(time_slots=resp_list)
+        res_data = {"time_slots": resp_list, "upcoming_slots": upcoming_slots}
+        return res_data
+
 
 class LabCertification(TimeStampedModel):
     lab = models.ForeignKey(Lab, related_name = 'lab_certificate', on_delete=models.CASCADE)
@@ -567,8 +621,12 @@ class LabBookingClosingManager(models.Manager):
                 #         if data.start <= end <= data.end:
                 #             data.end = end
                 #         obj.form_time_slots(data.day, data.start, data.end, None, True)
-
-            resp_list = obj.get_timing_list()
+            global_leave_serializer = common_serializers.GlobalNonBookableSerializer(
+                                GlobalNonBookable.objects.filter(deleted_at__isnull=True,
+                                                                 booking_type=GlobalNonBookable.DOCTOR), many=True)
+            date = datetime.datetime.today().strftime('%Y-%m-%d')
+            # resp_list = obj.get_timing_list()
+            resp_list = obj.get_timing_slots(date, global_leave_serializer.data, "lab")
             is_thyrocare = False
             lab_id = kwargs.get("lab__id", None)
             if lab_id and settings.THYROCARE_NETWORK_ID:

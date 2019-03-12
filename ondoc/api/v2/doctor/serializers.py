@@ -3,6 +3,7 @@ from django.contrib.auth import get_user_model
 import logging
 from django.conf import settings
 from ondoc.doctor import models as doc_models
+from ondoc.common.models import GlobalNonBookable
 from ondoc.procedure.models import Procedure
 from ondoc.api.v1.doctor import serializers as v1_serializers
 logger = logging.getLogger(__name__)
