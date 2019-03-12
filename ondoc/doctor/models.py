@@ -151,6 +151,9 @@ class Hospital(auth_model.TimeStampedModel, auth_model.CreatedByModel, auth_mode
         (PHONE_RINGING_BUT_COULD_NOT_CONNECT, "Phone ringing but could not connect"),
         (DUPLICATE, "Duplicate"), (OTHERS, "Others (please specify)"))
     DISABLED_AFTER_CHOICES = (("", "Select"), (WELCOME_CALLING, "Welcome Calling"), (ESCALATION, "Escalation"))
+    AGENT = 1
+    PROVIDER = 2
+    SOURCE_TYPE_CHOICES = ((AGENT, "Agent"), (PROVIDER, "Provider"))
     name = models.CharField(max_length=200)
     location = models.PointField(geography=True, srid=4326, blank=True, null=True)
     location_error = models.PositiveIntegerField(blank=True, null=True)
@@ -196,6 +199,7 @@ class Hospital(auth_model.TimeStampedModel, auth_model.CreatedByModel, auth_mode
     disabled_by = models.ForeignKey(settings.AUTH_USER_MODEL, related_name="disabled_hospitals", null=True, editable=False,
                                     on_delete=models.SET_NULL)
     is_mask_number_required = models.BooleanField(default=True)
+    source_type = models.IntegerField(choices=SOURCE_TYPE_CHOICES, null=True, editable=False)
     service = models.ManyToManyField(Service, through='HospitalServiceMapping', through_fields=('hospital', 'service'),
                                      related_name='of_hospitals')
     health_insurance_providers = models.ManyToManyField('HealthInsuranceProvider',
@@ -208,6 +212,7 @@ class Hospital(auth_model.TimeStampedModel, auth_model.CreatedByModel, auth_mode
 
     remark = GenericRelation(Remark)
     matrix_lead_id = models.BigIntegerField(blank=True, null=True, unique=True)
+    is_listed_on_docprime = models.NullBooleanField(null=True, blank=True)
     about = models.TextField(blank=True, null=True, default="")
     opd_timings = models.CharField(max_length=150, blank=True, null=True, default="")
     always_open = models.BooleanField(verbose_name='Is hospital open 24X7', default=False)
@@ -460,6 +465,9 @@ class Doctor(auth_model.TimeStampedModel, auth_model.QCModel, SearchKey, auth_mo
         (CHARGES_ISSUES, "Issue in discount % / consultation charges"),
         (PHONE_RINGING_BUT_COULD_NOT_CONNECT, "Phone ringing but could not connect"), (DUPLICATE, "Duplicate"),
         (OTHERS, "Others (please specify)"))
+    AGENT = 1
+    PROVIDER = 2
+    SOURCE_TYPE_CHOICES = ((AGENT, "Agent"), (PROVIDER, "Provider"))
     name = models.CharField(max_length=200)
     gender = models.CharField(max_length=2, default=None, blank=True, null=True,
                               choices=GENDER_CHOICES)
@@ -516,6 +524,7 @@ class Doctor(auth_model.TimeStampedModel, auth_model.QCModel, SearchKey, auth_mo
     disable_comments = models.CharField(max_length=500, blank=True)
     disabled_by = models.ForeignKey(settings.AUTH_USER_MODEL, related_name="disabled_doctors", null=True, editable=False,
                                    on_delete=models.SET_NULL)
+    source_type = models.IntegerField(choices=SOURCE_TYPE_CHOICES, null=True, editable=False)
     avg_rating = models.DecimalField(max_digits=5, decimal_places=2, null=True, editable=False)
     remark = GenericRelation(Remark)
 
@@ -2061,12 +2070,18 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
 
     def trigger_created_event(self, visitor_info):
         from ondoc.tracking.models import TrackingEvent
+        from ondoc.tracking.mongo_models import TrackingEvent as MongoTrackingEvent
         try:
             with transaction.atomic():
                 event_data = TrackingEvent.build_event_data(self.user, TrackingEvent.DoctorAppointmentBooked, appointmentId=self.id)
                 if event_data and visitor_info:
                     TrackingEvent.save_event(event_name=event_data.get('event'), data=event_data, visit_id=visitor_info.get('visit_id'),
                                              user=self.user, triggered_at=datetime.datetime.utcnow())
+                    if settings.MONGO_STORE:
+                        MongoTrackingEvent.save_event(event_name=event_data.get('event'), data=event_data,
+                                                 visit_id=visitor_info.get('visit_id'),
+                                                 visitor_id=visitor_info.get('visitor_id'),
+                                                 user=self.user, triggered_at=datetime.datetime.utcnow())
         except Exception as e:
             logger.error("Could not save triggered event - " + str(e))
 
@@ -2663,6 +2678,22 @@ class UploadDoctorData(auth_model.TimeStampedModel):
             self.error_msg = None
             super().save(*args, **kwargs)
             upload_doctor_data.apply_async((self.id,), countdown=1)
+
+
+class ProviderSignupLead(auth_model.TimeStampedModel):
+    DOCTOR = 1
+    HOSPITAL_ADMIN = 2
+    TYPE_CHOICES = ((DOCTOR, "Doctor"), (HOSPITAL_ADMIN, "Hospital Admin"),)
+
+    user = models.ForeignKey(auth_model.User, on_delete=models.CASCADE)
+    name = models.CharField(max_length=200)
+    phone_number = models.BigIntegerField(unique=True)
+    email = models.EmailField()
+    type = models.IntegerField(choices=TYPE_CHOICES)
+    is_docprime = models.NullBooleanField(null=True, editable=False)
+
+    class Meta:
+        db_table = "provider_signup_lead"
 
 
 class HealthInsuranceProvider(auth_model.TimeStampedModel):

@@ -72,9 +72,11 @@ class AppointmentFilterSerializer(serializers.Serializer):
     CHOICES = ['all', 'previous', 'upcoming', 'pending']
 
     range = serializers.ChoiceField(choices=CHOICES, required=False)
-    hospital_id = serializers.PrimaryKeyRelatedField(queryset=Hospital.objects.filter(is_live=True), required=False)
+    hospital_id = serializers.PrimaryKeyRelatedField(queryset=Hospital.objects.filter(
+                                                    Q(is_live=True) | Q(source_type=Hospital.PROVIDER)), required=False)
     profile_id = serializers.PrimaryKeyRelatedField(queryset=UserProfile.objects.all(), required=False)
-    doctor_id = serializers.PrimaryKeyRelatedField(queryset=Doctor.objects.filter(is_live=True), required=False)
+    doctor_id = serializers.PrimaryKeyRelatedField(queryset=Doctor.objects.filter(
+                                                    Q(is_live=True) | Q(source_type=Doctor.PROVIDER)), required=False)
     date = serializers.DateField(required=False)
 
 
@@ -580,7 +582,8 @@ class DoctorProfileSerializer(serializers.ModelSerializer):
         fields = (
             'id', 'name', 'display_name', 'gender', 'about', 'license', 'emails', 'practicing_since', 'images',
             'languages', 'qualifications', 'general_specialization', 'availability', 'mobiles', 'medical_services',
-            'experiences', 'associations', 'awards', 'appointments', 'hospitals', 'thumbnail', 'signature', 'is_live')
+            'experiences', 'associations', 'awards', 'appointments', 'hospitals', 'thumbnail', 'signature', 'is_live',
+            'source_type')
 
 
 class HospitalModelSerializer(serializers.ModelSerializer):
@@ -1347,7 +1350,8 @@ class HospitalEntitySerializer(HospitalModelSerializer):
 
     class Meta:
         model = Hospital
-        fields = ('id', 'name', 'entity_type', 'address', 'is_billing_enabled', 'is_appointment_manager')
+        fields = ('id', 'name', 'entity_type', 'address', 'is_billing_enabled', 'is_appointment_manager',
+                  'is_live', 'source_type')
 
 
 class DoctorEntitySerializer(serializers.ModelSerializer):
@@ -1368,7 +1372,7 @@ class DoctorEntitySerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Doctor
-        fields = ('id', 'thumbnail', 'name', 'entity_type', 'qualifications')
+        fields = ('id', 'thumbnail', 'name', 'entity_type', 'qualifications', 'is_live', 'source_type')
 
 
 class AdminUpdateBodySerializer(AdminCreateBodySerializer):
@@ -1491,8 +1495,8 @@ class OfflinePatientCreateSerializer(serializers.Serializer):
 
 
 class GetOfflinePatientsSerializer(serializers.Serializer):
-    doctor_id = serializers.PrimaryKeyRelatedField(queryset=Doctor.objects.filter(is_live=True), required=False)
-    hospital_id = serializers.PrimaryKeyRelatedField(queryset=Hospital.objects.filter(is_live=True), required=False)
+    doctor_id = serializers.PrimaryKeyRelatedField(queryset=Doctor.objects.filter(Q(is_live=True) | Q(source_type=Doctor.PROVIDER)), required=False)
+    hospital_id = serializers.PrimaryKeyRelatedField(queryset=Hospital.objects.filter(Q(is_live=True) | Q(source_type=Hospital.PROVIDER)), required=False)
     updated_at = serializers.DateField(format="%Y-%m-%d", required=False)
 
 

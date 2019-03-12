@@ -105,3 +105,11 @@ class ServerHitMonitor(auth_models.TimeStampedModel):
 
     class Meta:
         db_table = 'server_hit_monitor'
+
+
+class MigrateTracker(auth_models.TimeStampedModel):
+
+    start_time = models.DateTimeField(null=True)
+
+    class Meta:
+        db_table = 'migrate_tracker'

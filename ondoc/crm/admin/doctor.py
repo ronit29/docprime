@@ -1349,6 +1349,8 @@ class DoctorAdmin(AutoComplete, ImportExportMixin, VersionAdmin, ActionAdmin, QC
             obj.qc_approved_at = datetime.datetime.now()
         if '_mark_in_progress' in request.POST:
             obj.data_status = QCModel.REOPENED
+        if not obj.source_type:
+            obj.source_type = Doctor.AGENT
         obj.status_changed_by = request.user
 
         super().save_model(request, obj, form, change)
