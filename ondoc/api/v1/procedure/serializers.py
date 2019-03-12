@@ -2,7 +2,7 @@ from rest_framework import serializers
 
 from ondoc.doctor.models import OpdAppointmentProcedureMapping
 from ondoc.procedure.models import Procedure, DoctorClinicProcedure, ProcedureToCategoryMapping, \
-    CommonProcedureCategory, CommonProcedure
+    CommonProcedureCategory, CommonProcedure, CommonIpdProcedure
 
 
 class ProcedureSerializer(serializers.ModelSerializer):
@@ -98,4 +98,13 @@ class CommonProcedureSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = CommonProcedure
+        fields = ['id', 'name']
+
+
+class CommonIpdProcedureSerializer(serializers.ModelSerializer):
+    id = serializers.ReadOnlyField(source='ipd_procedure.id')
+    name = serializers.ReadOnlyField(source='ipd_procedure.name')
+
+    class Meta:
+        model = CommonIpdProcedure
         fields = ['id', 'name']

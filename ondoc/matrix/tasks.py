@@ -1,6 +1,7 @@
 from __future__ import absolute_import, unicode_literals
-from ondoc.account.models import Order
 from django.contrib.contenttypes.models import ContentType
+from django.urls import reverse
+from ondoc.account.models import Order
 from rest_framework import status
 from django.conf import settings
 from celery import task
@@ -9,9 +10,11 @@ import json
 import logging
 import datetime
 from datetime import date
-from ondoc.authentication.models import Address
+from ondoc.authentication.models import Address, SPOCDetails, QCModel
 from ondoc.api.v1.utils import resolve_address
 from ondoc.common.models import AppointmentMaskNumber
+from django.apps import apps
+from ondoc.crm.constants import matrix_product_ids, matrix_subproduct_ids
 
 logger = logging.getLogger(__name__)
 
@@ -58,9 +61,9 @@ def prepare_and_hit(self, data):
         patient_address = resolve_address(appointment.address)
     service_name = ""
     if task_data.get('type') == 'LAB_APPOINTMENT':
-        service_name = ','.join([test_obj.test.name for test_obj in appointment.test_mappings.all()])  # DONE SHASHANK_SINGH CHANGE 13
+        service_name = ','.join([test_obj.test.name for test_obj in appointment.test_mappings.all()])
 
-    order = data.get('order')
+    order_id = data.get('order_id')
 
     dob_value = ''
     try:
@@ -88,7 +91,7 @@ def prepare_and_hit(self, data):
         'Location': location,
         'PaymentType': appointment.payment_type,
         'PaymentStatus': 300,
-        'OrderID': order.id if order else 0,
+        'OrderID': order_id if order_id else 0,
         'DocPrimeBookingID': appointment.id,
         'BookingDateTime': int(appointment.created_at.timestamp()),
         'AppointmentDateTime': int(appointment.time_slot_start.timestamp()),
@@ -240,7 +243,7 @@ def push_appointment_to_matrix(self, data):
 
         # Preparing the data and now pushing the data to the matrix system.
         if appointment:
-            prepare_and_hit(self, {'appointment': appointment, 'mobile_list': mobile_list, 'task_data': data, 'order': appointment_order})
+            prepare_and_hit(self, {'appointment': appointment, 'mobile_list': mobile_list, 'task_data': data, 'order_id': appointment_order.id})
         else:
             logger.error("Appointment not found for the appointment id ", appointment_id)
 
@@ -462,6 +465,158 @@ def push_order_to_matrix(self, data):
     except Exception as e:
         logger.error("Error in Celery. Failed pushing order to the matrix- " + str(e))
 
+
+@task(bind=True, max_retries=2)
+def create_or_update_lead_on_matrix(self, data):
+    from ondoc.doctor.models import Doctor
+    from ondoc.doctor.models import Hospital
+    from ondoc.doctor.models import HospitalNetwork
+    try:
+        obj_id = data.get('obj_id', None)
+        obj_type = data.get('obj_type', None)
+        if not obj_id or not obj_type:
+            logger.error("CELERY ERROR: Incorrect values provided.")
+            raise ValueError()
+        product_id = matrix_product_ids.get('opd_products', 1)
+        sub_product_id = matrix_subproduct_ids.get(obj_type.lower(), 4)
+        ct = ContentType.objects.get(model=obj_type.lower())
+        model_used = ct.model_class()
+        content_type = ContentType.objects.get_for_model(model_used)
+        exit_point_url = settings.ADMIN_BASE_URL + reverse('admin:{}_{}_change'.format(content_type.app_label, content_type.model), kwargs={"object_id": obj_id})
+        obj = model_used.objects.filter(id=obj_id).first()
+        if not obj:
+            raise Exception("{} could not found against id - {}".format(obj_type, obj_id))
+
+        mobile = '0'
+        gender = 0
+        if obj_type == Doctor.__name__:
+            if obj.gender and obj.gender == 'm':
+                gender = 1
+            elif obj.gender and obj.gender == 'f':
+                gender = 2
+        elif obj_type == Hospital.__name__:
+            spoc_details = obj.spoc_details.filter(contact_type=SPOCDetails.SPOC).first()
+            if spoc_details:
+                mobile = str(spoc_details.std_code) if spoc_details.std_code else ''
+                mobile += str(spoc_details.number) if spoc_details.number else ''
+        elif obj_type == HospitalNetwork.__name__:
+            spoc_details = obj.spoc_details.filter(contact_type=SPOCDetails.SPOC).first()
+            if spoc_details:
+                mobile = str(spoc_details.std_code) if spoc_details.std_code else ''
+                mobile += str(spoc_details.number) if spoc_details.number else ''
+            # spoc_details = obj.hospitalnetworkmanager_set.filter(contact_type=2).first()
+            # if spoc_details:
+            #     mobile += str(spoc_details.number) if hasattr(spoc_details, 'number') and spoc_details.number else ''
+        mobile = int(mobile)
+        # if not mobile:
+        #     return
+        request_data = {
+            'LeadSource': 'referral',
+            'LeadID': obj.matrix_lead_id if hasattr(obj, 'matrix_lead_id') and obj.matrix_lead_id else 0,
+            'PrimaryNo': mobile,
+            'QcStatus': obj.data_status,
+            'OnBoarding': obj.onboarding_status if hasattr(obj, 'onboarding_status') else 0,
+            'Gender': gender,
+            'ProductId': product_id,
+            'SubProductId': sub_product_id,
+            'Name': obj.name if hasattr(obj, 'name') and obj.name else '',
+            'ExitPointUrl': exit_point_url,
+            'CityId': obj.matrix_city.id if hasattr(obj, 'matrix_city') and obj.matrix_city.id else 0
+        }
+        url = settings.MATRIX_API_URL
+        matrix_api_token = settings.MATRIX_API_TOKEN
+
+        response = requests.post(url, data=json.dumps(request_data), headers={'Authorization': matrix_api_token,
+                                                                             'Content-Type': 'application/json'})
+
+        if response.status_code != status.HTTP_200_OK or not response.ok:
+            logger.info("[ERROR] {} with ID {} could not be published to the matrix system".format(obj_type, obj_id))
+            logger.info("[ERROR] %s", response.reason)
+            countdown_time = (2 ** self.request.retries) * 60 * 10
+            # logging.error("Lead creation on the Matrix System failed with response - " + str(response.content))
+            logger.error("Matrix URL - "+ url +", Payload - "+ json.dumps(request_data) + ", Matrix Response - " + json.dumps(response.json()) + "")
+            self.retry([data], countdown=countdown_time)
+        else:
+            resp_data = response.json()
+            if not (resp_data.get('Id', None) or resp_data.get('IsSaved', False)):
+                logger.error("[ERROR] ID not received from the matrix while creating lead for {} with ID {}. ".format(obj_type, obj_id)+json.dumps(request_data))
+                # raise Exception("[ERROR] ID not received from the matrix while creating lead for {} with ID {}.")
+
+            # save the order with the matrix lead id.
+            # obj = model_used.objects.select_for_update().filter(id=obj_id).first()
+            if obj and hasattr(obj, 'matrix_lead_id') and not obj.matrix_lead_id:
+                obj.matrix_lead_id = resp_data.get('Id', None)
+                obj.matrix_lead_id = int(obj.matrix_lead_id)
+                obj.save()
+
+    except Exception as e:
+        logger.error("Error in Celery. Failed pushing order to the matrix- " + str(e))
+
+
+@task(bind=True, max_retries=3)
+def update_onboarding_qcstatus_to_matrix(self, data):
+    try:
+        obj_id = data.get('obj_id', None)
+        obj_type = data.get('obj_type', None)
+        if not obj_id or not obj_type:
+            logger.error("CELERY ERROR: Incorrect values provided.")
+            raise ValueError()
+        ct = ContentType.objects.get(model=obj_type.lower())
+        model_used = ct.model_class()
+        content_type = ContentType.objects.get_for_model(model_used)
+        exit_point_url = settings.ADMIN_BASE_URL + reverse('admin:{}_{}_change'.format(content_type.app_label, content_type.model), kwargs={"object_id": obj_id})
+        obj = model_used.objects.filter(id=obj_id).first()
+        if not obj:
+            raise Exception("{} could not found against id - {}".format(obj_type, obj_id))
+
+        comment = ''
+        from ondoc.common.models import Remark
+        remark_obj = obj.remark.order_by('-created_at').first()
+        if remark_obj:
+            comment = remark_obj.content
+
+        assigned_user = ''
+        if data.get('assigned_matrix_user', None):
+            assigned_user = data.get('assigned_user')
+        else:
+            history_obj = obj.history.filter(status=QCModel.SUBMITTED_FOR_QC).order_by('-created_at').first()
+            if history_obj:
+                assigned_user = history_obj.user.staffprofile.employee_id if hasattr(history_obj.user,
+                                                                                     'staffprofile') and history_obj.user.staffprofile.employee_id else ''
+
+        obj_matrix_lead_id = obj.matrix_lead_id if hasattr(obj, 'matrix_lead_id') and obj.matrix_lead_id else 0
+        if not obj_matrix_lead_id:
+            return
+        request_data = {
+            "LeadID": obj_matrix_lead_id,
+            "Comment": comment,
+            "NewJourneyURL": exit_point_url,
+            "AssignedUser": assigned_user,
+            "CRMStatusId": obj.data_status
+        }
+
+        url = settings.MATRIX_STATUS_UPDATE_API_URL
+        matrix_api_token = settings.MATRIX_API_TOKEN
+
+        response = requests.post(url, data=json.dumps(request_data), headers={'Authorization': matrix_api_token,
+                                                                              'Content-Type': 'application/json'})
+
+        if response.status_code != status.HTTP_200_OK or not response.ok:
+            logger.info("[ERROR] Status couldn't be updated for {} with ID {} to the matrix system".format(obj_type, obj_id))
+            logger.info("[ERROR] %s", response.reason)
+            countdown_time = (2 ** self.request.retries) * 60 * 10
+            # logging.error("Update with status sync with the Matrix System failed with response - " + str(response.content))
+            logger.error("Matrix URL - " + url + ", Payload - " + json.dumps(request_data) + ", Matrix Response - " + json.dumps(response.json()) + "")
+            self.retry([data], countdown=countdown_time)
+        else:
+            resp_data = response.json()
+            if not resp_data.get('IsSaved', False):
+                logger.error("[ERROR] {} with ID {} not saved to matrix while updating status. ".format(obj_type, obj_id) + json.dumps(request_data))
+                # raise Exception("[ERROR] {} with ID {} not saved to matrix while updating status.".format(obj_type, obj_id))
+    except Exception as e:
+        logger.error("Error in Celery. Failed to update status to the matrix - " + str(e))
+
+
 @task(bind=True, max_retries=2)
 def push_onboarding_qcstatus_to_matrix(self, data):
     from ondoc.doctor.models import Doctor
@@ -476,6 +631,10 @@ def push_onboarding_qcstatus_to_matrix(self, data):
 
         product_id = 0
         gender = 0
+        obj = None
+        mobile = None
+        exit_point_url = None
+
         if obj_type == 'Lab':
             obj = Lab.objects.get(id=obj_id)
             mobile = obj.primary_mobile

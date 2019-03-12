@@ -1,6 +1,6 @@
 
 from django.contrib.gis import admin
-from ondoc.common.models import PaymentOptions, UserConfig, Feature, Service, GlobalNonBookable
+from ondoc.common.models import PaymentOptions, UserConfig, Feature, Service, MatrixMappedState, MatrixMappedCity, GlobalNonBookable
 from ondoc.crm.admin.banner import BannerAdmin, SliderLocationAdmin
 from ondoc.crm.admin.procedure import ProcedureCategoryAdmin, ProcedureAdmin, IpdProcedureAdmin, FeatureAdmin, \
     ServiceAdmin, HealthInsuranceProviderAdmin, IpdProcedureCategoryAdmin
@@ -23,9 +23,9 @@ from ondoc.location.admin import EntityUrlsAdmin
 from ondoc.location.models import EntityUrls
 from ondoc.notification import models as notifcation_model
 from ondoc.procedure.models import Procedure, ProcedureCategory, CommonProcedureCategory, CommonProcedure, IpdProcedure, \
-    IpdProcedureCategory
+    IpdProcedureCategory, CommonIpdProcedure
 from .common import Cities, CitiesAdmin, MatrixCityMapping, MatrixCityAdmin, MerchantAdmin, MerchantPayoutAdmin, \
-    PaymentOptionsAdmin, GlobalNonBookableAdmin
+    PaymentOptionsAdmin, MatrixMappedStateAdmin, MatrixMappedCityAdmin, GlobalNonBookableAdmin
 from .lead import HospitalLeadAdmin, DoctorLeadAdmin, SearchLeadAdmin
 from .doctor import (DoctorAdmin, MedicalServiceAdmin, SpecializationAdmin, QualificationAdmin, LanguageAdmin,
                      CollegeAdmin, MedicalConditionAdmin, HealthTipAdmin, DoctorClinicAdmin,
@@ -124,6 +124,8 @@ admin.site.register(LabTestGroupMapping, LabTestGroupMappingAdmin)
 
 admin.site.register(HospitalLead, HospitalLeadAdmin)
 admin.site.register(Cities, CitiesAdmin)
+admin.site.register(MatrixMappedState, MatrixMappedStateAdmin)
+admin.site.register(MatrixMappedCity, MatrixMappedCityAdmin)
 admin.site.register(MatrixCityMapping, MatrixCityAdmin)
 admin.site.register(DoctorLead, DoctorLeadAdmin)
 admin.site.register(SearchLead, SearchLeadAdmin)
@@ -180,3 +182,4 @@ admin.site.register(Service, ServiceAdmin)
 admin.site.register(HealthInsuranceProvider, HealthInsuranceProviderAdmin)
 admin.site.register(IntegratorReport, IntegratorReportAdmin)
 admin.site.register(IpdProcedureCategory, IpdProcedureCategoryAdmin)
+admin.site.register(CommonIpdProcedure)
