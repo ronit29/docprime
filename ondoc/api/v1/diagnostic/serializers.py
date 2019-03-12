@@ -84,8 +84,7 @@ class LabModelSerializer(serializers.ModelSerializer):
         if obj and obj.network and settings.THYROCARE_NETWORK_ID:
             if obj.network.id == settings.THYROCARE_NETWORK_ID:
                 return True
-        else:
-            return False
+        return False
 
     def get_display_rating_widget(self, obj):
         if self.parent:

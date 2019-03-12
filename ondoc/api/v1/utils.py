@@ -838,20 +838,20 @@ class TimeSlotExtraction(object):
 
         j = 0
         if is_thyrocare:
-            self.get_slots(date, day, j, whole_timing_data, booking_details)
+            self.get_slots(date, day, j, whole_timing_data, booking_details, is_thyrocare)
         else:
             for k in range(int(settings.NO_OF_WEEKS_FOR_TIME_SLOTS)):
                 for i in range(7):
                     if k == 0:
                         if i >= day:
-                            self.get_slots(date, i, j, whole_timing_data, booking_details)
+                            self.get_slots(date, i, j, whole_timing_data, booking_details, is_thyrocare)
                             j = j + 1
                     else:
-                        self.get_slots(date, i, j, whole_timing_data, booking_details)
+                        self.get_slots(date, i, j, whole_timing_data, booking_details, is_thyrocare)
                         j = j + 1
         return whole_timing_data
 
-    def get_slots(self, date, i, j, whole_timing_data, booking_details):
+    def get_slots(self, date, i, j, whole_timing_data, booking_details, is_thyrocare):
         converted_date = (date + datetime.timedelta(days=j))
         readable_date = converted_date.strftime("%Y-%m-%d")
         booking_details['date'] = converted_date
@@ -863,8 +863,8 @@ class TimeSlotExtraction(object):
             pa = self.price_available[i]
 
             if self.timing[i].get('timing'):
-                am_timings = self.format_data(self.timing[i]['timing'][self.MORNING], self.MORNING, pa, booking_details)
-                pm_timings = self.format_data(self.timing[i]['timing'][self.EVENING], self.EVENING, pa, booking_details)
+                am_timings = self.format_data(self.timing[i]['timing'][self.MORNING], self.MORNING, pa, booking_details, is_thyrocare)
+                pm_timings = self.format_data(self.timing[i]['timing'][self.EVENING], self.EVENING, pa, booking_details, is_thyrocare)
                 if len(am_timings.get('timing')) == 0 and len(pm_timings.get('timing')) == 0:
                     # whole_timing_data[readable_date].append({})
                     pass
@@ -916,7 +916,7 @@ class TimeSlotExtraction(object):
         final_leaves = list(lab_leave_set)
         return final_leaves
 
-    def format_data(self, data, day_time, pa, booking_details):
+    def format_data(self, data, day_time, pa, booking_details, is_thyrocare):
         current_date_time = datetime.datetime.now()
         booking_date = booking_details.get('date')
         lab_tomorrow_time = 0.0
@@ -931,27 +931,30 @@ class TimeSlotExtraction(object):
                 mins = int(hours) * 60 + int(minutes)
                 doc_minimum_time = mins / 60
         else:
-            is_home_pickup = booking_details.get('is_home_pickup')
-            if is_home_pickup:
-                if current_date_time.weekday() == 6:
-                    lab_minimum_time = 24.0
-                if current_date_time.hour < 13:
-                    lab_booking_minimum_time = current_date_time + datetime.timedelta(hours=4)
+            if is_thyrocare:
+                pass
+            else:
+                is_home_pickup = booking_details.get('is_home_pickup')
+                if is_home_pickup:
+                    if current_date_time.weekday() == 6:
+                        lab_minimum_time = 24.0
+                    if current_date_time.hour < 13:
+                        lab_booking_minimum_time = current_date_time + datetime.timedelta(hours=4)
+                        lab_booking_hours = lab_booking_minimum_time.strftime('%H:%M')
+                        hours, minutes = lab_booking_hours.split(':')
+                        mins = int(hours) * 60 + int(minutes)
+                        lab_minimum_time = mins / 60
+                    elif current_date_time.hour >= 13 and current_date_time.hour < 17:
+                        lab_minimum_time = 24.0
+                    if current_date_time.hour >= 17:
+                        lab_minimum_time = 24.0
+                        lab_tomorrow_time = 12.0
+                else:
+                    lab_booking_minimum_time = current_date_time + datetime.timedelta(hours=2)
                     lab_booking_hours = lab_booking_minimum_time.strftime('%H:%M')
                     hours, minutes = lab_booking_hours.split(':')
                     mins = int(hours) * 60 + int(minutes)
                     lab_minimum_time = mins / 60
-                elif current_date_time.hour >= 13 and current_date_time.hour < 17:
-                    lab_minimum_time = 24.0
-                if current_date_time.hour >= 17:
-                    lab_minimum_time = 24.0
-                    lab_tomorrow_time = 12.0
-            else:
-                lab_booking_minimum_time = current_date_time + datetime.timedelta(hours=2)
-                lab_booking_hours = lab_booking_minimum_time.strftime('%H:%M')
-                hours, minutes = lab_booking_hours.split(':')
-                mins = int(hours) * 60 + int(minutes)
-                lab_minimum_time = mins / 60
 
 
         data_list = list()
