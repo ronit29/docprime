@@ -74,6 +74,8 @@ class Thyrocare(BaseIntegrator):
 
     def _get_appointment_slots(self, pincode, date, **kwargs):
         obj = TimeSlotExtraction()
+        if not pincode or date:
+            return {"error": 'pincode and date required for thyrocare lab.'}
 
         url = '%s/ORDER.svc/%s/%s/GetAppointmentSlots' % (settings.THYROCARE_BASE_URL, pincode, date)
         response = requests.get(url)
@@ -101,14 +103,11 @@ class Thyrocare(BaseIntegrator):
             obj.form_time_slots(datetime.strptime(date, '%d-%m-%Y').weekday(), start, end, None, True)
 
         resp_list = obj.get_timing_slots(date, is_thyrocare=True)
-        is_home_pickup = kwargs.get('is_home_pickup', False)
-        today_min, tomorrow_min, today_max = obj.initial_start_times(is_thyrocare=True, is_home_pickup=is_home_pickup, time_slots=resp_list)
+        # is_home_pickup = kwargs.get('is_home_pickup', False)
+        # today_min, tomorrow_min, today_max = obj.initial_start_times(is_thyrocare=True, is_home_pickup=is_home_pickup, time_slots=resp_list)
 
         res_data = {
-            "time_slots": resp_list,
-            "today_min": today_min,
-            "tomorrow_min": tomorrow_min,
-            "today_max": today_max
+            "time_slots": resp_list
         }
 
         return res_data

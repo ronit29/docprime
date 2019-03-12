@@ -82,7 +82,7 @@ def push_lab_appointment_to_integrator(self, data):
 
 
 
-# @task
-# def integrator_order_summary():
-#     from ondoc.integrations.models import IntegratorResponse
-#     IntegratorResponse.get_order_summary()
+@task
+def integrator_order_summary():
+    from ondoc.integrations.models import IntegratorResponse
+    IntegratorResponse.get_order_summary()

@@ -842,10 +842,10 @@ class TimeSlotExtraction(object):
                 for i in range(7):
                     if k == 0:
                         if i >= day:
-                            self.get_slots(date, i, j, whole_timing_data)
+                            self.get_slots(date, i, j, whole_timing_data, booking_details)
                             j = j + 1
                     else:
-                        self.get_slots(date, i, j, whole_timing_data)
+                        self.get_slots(date, i, j, whole_timing_data, booking_details)
                         j = j + 1
         return whole_timing_data
 
