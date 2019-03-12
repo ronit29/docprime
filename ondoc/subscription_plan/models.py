@@ -16,6 +16,9 @@ class Plan(auth_model.TimeStampedModel):
     class Meta:
         db_table = "subscription_plan"
 
+    def __str__(self):
+        return self.name
+
 
 class PlanFeature(auth_model.TimeStampedModel):
     plan = models.ForeignKey(Plan, on_delete=models.CASCADE, related_name="plan_features")
