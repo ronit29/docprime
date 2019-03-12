@@ -162,6 +162,7 @@ class AppointmentMaskNumber(TimeStampedModel):
 class Feature(TimeStampedModel):
     icon = models.ImageField('Feature image', upload_to='feature/images')
     name = models.CharField(max_length=100)
+    priority = models.PositiveSmallIntegerField(default=0)
 
     class Meta:
         db_table = 'feature'
