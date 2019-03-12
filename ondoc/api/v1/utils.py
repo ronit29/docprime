@@ -919,10 +919,10 @@ class TimeSlotExtraction(object):
     def format_data(self, data, day_time, pa, booking_details):
         current_date_time = datetime.datetime.now()
         booking_date = booking_details.get('date')
-        lab_tomorrow_time = None
+        lab_tomorrow_time = 0.0
         lab_minimum_time = None
         doc_minimum_time = None
-        doctor_maximum_timing = 18.0
+        doctor_maximum_timing = 20.0
         if booking_details.get('type') == "doctor":
             if current_date_time.date() == booking_date.date():
                 doc_booking_minimum_time = current_date_time + datetime.timedelta(hours=1)
@@ -944,6 +944,7 @@ class TimeSlotExtraction(object):
                 elif current_date_time.hour >= 13 and current_date_time.hour < 17:
                     lab_minimum_time = 24.0
                 if current_date_time.hour >= 17:
+                    lab_minimum_time = 24.0
                     lab_tomorrow_time = 12.0
             else:
                 lab_booking_minimum_time = current_date_time + datetime.timedelta(hours=2)
