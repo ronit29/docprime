@@ -3224,8 +3224,7 @@ class HospitalViewSet(viewsets.GenericViewSet):
                       float(lat)),
                 D(m=max_distance)),
             hospital_doctors__ipd_procedure_clinic_mappings__ipd_procedure_id=ipd_pk).annotate(
-            distance=Distance('location', pnt)).annotate(
-            count_of_insurance_provider=Count('health_insurance_providers')).distinct()
+            distance=Distance('location', pnt)).distinct()
         if provider_ids:
             hospital_queryset = hospital_queryset.filter(health_insurance_providers__id__in=provider_ids)
         if min_distance:
