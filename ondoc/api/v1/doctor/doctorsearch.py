@@ -41,12 +41,13 @@ class DoctorSearchHelper:
         specialization_ids = self.query_params.get("specialization_ids", [])
         condition_ids = self.query_params.get("condition_ids", [])
 
-        procedure_ids = self.query_params.get("procedure_ids", [])  # NEW_LOGIC
+        procedure_ids = self.query_params.get("procedure_ids", [])# NEW_LOGIC
+        ipd_procedure_ids = self.query_params.get("ipd_procedure_ids", [])
         procedure_category_ids = self.query_params.get("procedure_category_ids", [])  # NEW_LOGIC
 
         if self.query_params.get('hospital_id') is not None:
             filtering_params.append(
-                "hospital_id=(%(hospital_id)s)")
+                "h.id=(%(hospital_id)s)")
             params['hospital_id'] = str(self.query_params.get("hospital_id"))
 
         if len(condition_ids)>0:
@@ -104,6 +105,20 @@ class DoctorSearchHelper:
                 dcp_str + ')'
             )
 
+
+        counter = 1
+        if len(ipd_procedure_ids) > 0:
+            dcip_str = 'dcip.ipd_procedure_id IN ('
+            for id in ipd_procedure_ids:
+                if not counter == 1:
+                    dcip_str += ','
+                dcip_str = dcip_str + '%(' + 'ipd_procedure' + str(counter) + ')s'
+                params['ipd_procedure' + str(counter)] = id
+                counter += 1
+            filtering_params.append(
+                dcip_str + ')'
+            )
+
         if len(procedure_ids) == 0 and self.query_params.get("min_fees") is not None:
             filtering_params.append(
                 # "deal_price>={}".format(str(self.query_params.get("min_fees")))
@@ -123,7 +138,7 @@ class DoctorSearchHelper:
             current_time = datetime.now()
             current_hour = round(float(current_time.hour) + (float(current_time.minute)*1/60), 2) + .75
             filtering_params.append(
-                'dct.day=(%(current_time)s) and dct.end>=(%(current_hour)s)')
+                'dl.id is NULL and dct.day=(%(current_time)s) and dct.end>=(%(current_hour)s)')
             params['current_time'] = str(current_time.weekday())
             params['current_hour'] = str(current_hour)
 
@@ -178,7 +193,7 @@ class DoctorSearchHelper:
                                              or self.query_params.get('sort_on')=='distance'):
             return ' enabled_for_online_booking DESC, distance, priority desc ', ' rnk=1 '
 
-        bucket_size=5000
+        bucket_size=2000
 
         if self.count_of_procedure:
             order_by_field = ' distance, total_price '
@@ -196,7 +211,7 @@ class DoctorSearchHelper:
             else:
                 order_by_field = " floor(distance/{bucket_size}) ASC, distance, total_price ASC".format(bucket_size=str(bucket_size))
                 rank_by = "rnk=1"
-            order_by_field = "{}, {} ".format(' enabled_for_online_booking DESC ' ,order_by_field)
+            order_by_field = "{}, {} ".format(' enabled_for_online_booking DESC ', order_by_field)
         else:
             if self.query_params.get('sort_on'):
                 if self.query_params.get('sort_on') == 'experience':
@@ -209,7 +224,7 @@ class DoctorSearchHelper:
                     order_by_field = " distance ASC, deal_price ASC, priority desc "
                     rank_by = " rnk=1 "
             else:
-                order_by_field = ' floor(distance/{bucket_size}) ASC, is_license_verified DESC, search_score desc '.format(bucket_size=str(bucket_size))
+                order_by_field = ' welcome_calling_done DESC, floor(distance/{bucket_size}) ASC, is_license_verified DESC, search_score desc '.format(bucket_size=str(bucket_size))
                 rank_by = "rnk=1"
 
             order_by_field = "{}, {} ".format(' enabled_for_online_booking DESC ', order_by_field)
@@ -219,6 +234,9 @@ class DoctorSearchHelper:
     def prepare_raw_query(self, filtering_params, order_by_field, rank_by):
         longitude = str(self.query_params["longitude"])
         latitude = str(self.query_params["latitude"])
+        ist_time = datetime.now().strftime("%H:%M:%S")
+        ist_date = datetime.now().strftime("%Y-%m-%d")
+
         max_distance = str(
             self.query_params.get('max_distance') * 1000 if self.query_params.get(
                 'max_distance') and self.query_params.get(
@@ -249,17 +267,17 @@ class DoctorSearchHelper:
             query_string = "SELECT doctor_id, hospital_id, doctor_clinic_id, doctor_clinic_timing_id " \
                            "FROM (SELECT total_price, " \
                            " {rank_part} ," \
-                           " distance, enabled_for_online_booking, is_license_verified, priority " \
+                           " distance, enabled_for_online_booking, is_license_verified, welcome_calling_done, priority " \
                            "procedure_deal_price, doctor_id, practicing_since, doctor_clinic_id, doctor_clinic_timing_id, " \
                            "procedure_id, doctor_clinic_deal_price, hospital_id " \
                            "FROM (SELECT distance, procedure_deal_price, doctor_id, practicing_since, doctor_clinic_id, doctor_clinic_timing_id, procedure_id," \
-                           "enabled_for_online_booking, is_license_verified, priority, " \
+                           "enabled_for_online_booking, is_license_verified, welcome_calling_done, priority, " \
                            "doctor_clinic_deal_price, hospital_id , count_per_clinic, sum_per_clinic, sum_per_clinic+doctor_clinic_deal_price as total_price FROM " \
                            "(SELECT " \
                            "COUNT(procedure_id) OVER (PARTITION BY dct.id) AS count_per_clinic, " \
                            "SUM(dcp.deal_price) OVER (PARTITION BY dct.id) AS sum_per_clinic, " \
                            "St_distance(St_setsrid(St_point((%(longitude)s), (%(latitude)s)), 4326), h.location) AS distance, " \
-                           "dcp.deal_price AS procedure_deal_price, " \
+                           "dcp.deal_price AS procedure_deal_price, h.welcome_calling_done,  " \
                            "d.id AS doctor_id, practicing_since, " \
                            "d.enabled_for_online_booking and dc.enabled_for_online_booking and h.enabled_for_online_booking as enabled_for_online_booking, d.is_license_verified, dc.priority, " \
                            "dc.id AS doctor_clinic_id,  dct.id AS doctor_clinic_timing_id, dcp.id AS doctor_clinic_procedure_id, " \
@@ -296,39 +314,54 @@ class DoctorSearchHelper:
                 rank_part = " Row_number() OVER( partition BY d.id  ORDER BY " \
                             "dct.deal_price, St_distance(St_setsrid(St_point((%(longitude)s), (%(latitude)s)), 4326 ), h.location) ASC) rnk " \
 
+            if self.query_params and self.query_params.get("ipd_procedure_ids"):
+                ipd_query = " INNER JOIN doctor_clinic_ipd_procedure dcip on dc.id = dcip.doctor_clinic_id " \
+                            " AND dcip.enabled=True "
+            else:
+                ipd_query = ""
+
             query_string = "SELECT x.doctor_id, x.hospital_id, doctor_clinic_id, doctor_clinic_timing_id " \
-            "FROM (select {rank_part}, " \
-            "St_distance(St_setsrid(St_point((%(longitude)s), (%(latitude)s)), 4326), h.location) distance, " \
-            "d.id as doctor_id, " \
-            "dc.id as doctor_clinic_id,  " \
-            "dct.id as doctor_clinic_timing_id,practicing_since, " \
-            "d.enabled_for_online_booking and dc.enabled_for_online_booking and h.enabled_for_online_booking as enabled_for_online_booking, " \
-            "is_license_verified, priority,deal_price, " \
-            "dc.hospital_id as hospital_id, d.search_score FROM doctor d " \
-            "INNER JOIN doctor_clinic dc ON d.id = dc.doctor_id and dc.enabled=true and d.is_live=true " \
-            "and d.is_test_doctor is False and d.is_internal is False " \
-            "INNER JOIN hospital h ON h.id = dc.hospital_id and h.is_live=true " \
-            "INNER JOIN doctor_clinic_timing dct ON dc.id = dct.doctor_clinic_id " \
-            "{sp_cond}" \
-            "WHERE {filtering_params} " \
-            "and St_dwithin(St_setsrid(St_point((%(longitude)s), (%(latitude)s)), 4326 ), h.location, (%(max_distance)s)) " \
-            "{min_dist_cond}" \
-            " )x " \
-            "where {rank_by} ORDER BY {order_by_field}".format(rank_part=rank_part, sp_cond=sp_cond, \
-                filtering_params=filtering_params.get('string'), \
-                min_dist_cond=min_dist_cond, order_by_field=order_by_field, \
-                rank_by = rank_by)
+                           "FROM (select {rank_part}, " \
+                           "St_distance(St_setsrid(St_point((%(longitude)s), (%(latitude)s)), 4326), h.location) distance, " \
+                           "d.id as doctor_id, " \
+                           "dc.id as doctor_clinic_id,  " \
+                           "dct.id as doctor_clinic_timing_id,practicing_since, " \
+                           "d.enabled_for_online_booking and dc.enabled_for_online_booking and h.enabled_for_online_booking as enabled_for_online_booking, " \
+                           "is_license_verified, priority,deal_price, h.welcome_calling_done, " \
+                           "dc.hospital_id as hospital_id, d.search_score FROM doctor d " \
+                           "INNER JOIN doctor_clinic dc ON d.id = dc.doctor_id and dc.enabled=true and d.is_live=true " \
+                           "and d.is_test_doctor is False and d.is_internal is False " \
+                           "INNER JOIN hospital h ON h.id = dc.hospital_id and h.is_live=true " \
+                           "INNER JOIN doctor_clinic_timing dct ON dc.id = dct.doctor_clinic_id " \
+                           "{ipd_query} " \
+                           "LEFT JOIN doctor_leave dl on dl.doctor_id = d.id and (%(ist_date)s) BETWEEN dl.start_date and dl.end_date " \
+                           "AND (%(ist_time)s) BETWEEN dl.start_time and dl.end_time " \
+                           "{sp_cond} " \
+                           "WHERE {filtering_params} " \
+                           "and St_dwithin(St_setsrid(St_point((%(longitude)s), (%(latitude)s)), 4326 ), h.location, (%(max_distance)s)) " \
+                           "{min_dist_cond}" \
+                           " )x " \
+                           "where {rank_by} ORDER BY {order_by_field}".format(rank_part=rank_part, sp_cond=sp_cond, \
+                                                                              filtering_params=filtering_params.get(
+                                                                                  'string'), \
+                                                                              min_dist_cond=min_dist_cond,
+                                                                              order_by_field=order_by_field, \
+                                                                              rank_by=rank_by, ipd_query=ipd_query)
 
         if filtering_params.get('params'):
             filtering_params.get('params')['longitude'] = longitude
             filtering_params.get('params')['latitude'] = latitude
             filtering_params.get('params')['min_distance'] = min_distance
             filtering_params.get('params')['max_distance'] = max_distance
+            filtering_params.get('params')['ist_time'] = ist_time
+            filtering_params.get('params')['ist_date'] = ist_date
         else:
-             filtering_params['params']['longitude'] = longitude
-             filtering_params['params']['latitude'] = latitude
-             filtering_params['params']['min_distance'] = min_distance
-             filtering_params['params']['max_distance'] = max_distance
+            filtering_params['params']['longitude'] = longitude
+            filtering_params['params']['latitude'] = latitude
+            filtering_params['params']['min_distance'] = min_distance
+            filtering_params['params']['max_distance'] = max_distance
+            filtering_params.get('params')['ist_time'] = ist_time
+            filtering_params.get('params')['ist_date'] = ist_date
 
         return {'params':filtering_params.get('params'), 'query': query_string}
 
@@ -385,7 +418,7 @@ class DoctorSearchHelper:
             if not doctor_clinic:
                 hospitals = []
             else:
-                all_doctor_clinic_procedures = list(doctor_clinic.doctorclinicprocedure_set.all())
+                all_doctor_clinic_procedures = list(doctor_clinic.procedures_from_doctor_clinic.all())
                 selected_procedures_data = get_included_doctor_clinic_procedure(all_doctor_clinic_procedures,
                                                                                 selected_procedure_ids)
                 other_procedures_data = get_included_doctor_clinic_procedure(all_doctor_clinic_procedures,
@@ -410,6 +443,7 @@ class DoctorSearchHelper:
 
                 hospitals = [{
                     "enabled_for_online_booking": enable_online_booking,
+                    "welcome_calling_done": doctor_clinic.hospital.welcome_calling_done,
                     "hospital_name": doctor_clinic.hospital.name,
                     "address": ", ".join(
                         [value for value in [doctor_clinic.hospital.sublocality, doctor_clinic.hospital.locality] if
@@ -479,6 +513,7 @@ class DoctorSearchHelper:
                 "experience_years": doctor.experience_years(),
                 #"experiences": serializers.DoctorExperienceSerializer(doctor.experiences.all(), many=True).data,
                 "qualifications": serializers.DoctorQualificationSerializer(doctor.qualifications.all(), many=True).data,
+                "average_rating": doctor.avg_rating,
                 # "general_specialization": serializers.DoctorPracticeSpecializationSerializer(
                 #     doctor.doctorpracticespecializations.all(),
                 #     many=True).data,

@@ -118,14 +118,16 @@ class ArticleListSerializer(serializers.ModelSerializer):
         value = re.sub(r'<h.*?>.*?</h.*?>|<ol>.*?</ol>|<ul>.*?<ul>|<img.*?>', '', obj.body)
         cleanr = re.compile('<.*?>')
         cleantext = re.sub(cleanr, '', value)
-        chunks = cleantext.split(" ")
-        value = " ".join(chunks[:100])
+        # chunks = cleantext.split(" ")
+        value = "".join(cleantext[:200])
         value = value.replace('&nbsp;', '')
+        if len(cleantext) > 200:
+            value += " ..."
         return value
 
     class Meta:
         model = Article
-        fields = ('title', 'url', 'icon', 'header_image', 'header_image_alt', 'articleTeaser')
+        fields = ('title', 'url', 'icon', 'header_image', 'header_image_alt', 'articleTeaser', 'id')
 
 
 class ArticlePreviewSerializer(serializers.Serializer):

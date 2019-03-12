@@ -129,12 +129,15 @@ class GeocodingResults(TimeStampedModel):
         return latitude+'-'+longitude
 
     @classmethod
-    def get_or_create(cls, *args, **kwargs):
+    def create_results(cls, *args, **kwargs):
 
         from .models import GeocodingResults
 
         latitude = kwargs.get('latitude')
         longitude = kwargs.get('longitude')
+        id = kwargs.get('id')
+        type = kwargs.get('type')
+
         key = cls.get_key(latitude, longitude)
 
         exists = cls.get_location_dict().get(key)
@@ -158,13 +161,16 @@ class GeocodingResults(TimeStampedModel):
                 #logger.info("[ERROR] Google API for fetching the location via latitude and longitude failed.")
                 #logger.info("[ERROR] %s", response.reason)
                 #print('google api failed for en' + str(response.reason))
-
-                return ('failure: ' + str(kwargs.get('content_object').__class__.__name__) + '-'
-                        + str(kwargs.get('content_object').id)
+                print(response.json())
+                print('api failure: ' + type + '-'
+                        + str(id)
                         + ', status_code: ' + str(response.status_code)
                         + ', reason: ' + str(response.reason))
 
             resp_data = response.json()
+
+            if resp_data.get('error_message'):
+                print(resp_data)
 
             if resp_data.get('status', None) == 'OK' and isinstance(resp_data.get('results'), list) and \
                     len(resp_data.get('results')) > 0:
@@ -173,13 +179,13 @@ class GeocodingResults(TimeStampedModel):
                 #print(' google api return invalid addresses ')
                 # logger.info("[ERROR] Google API for fetching the location via latitude and longitude failed.")
                 # logger.info("[ERROR] %s", response.reason)
-                return ('failure: ' + str(kwargs.get('content_object').__class__.__name__) + '-'
-                        + str(kwargs.get('content_object').id)
+                print('data not found: ' + type + '-'
+                        + str(id)
                         + ', status_code: ' + str(response.status_code)
                         + ', reason: ' + str(response.reason))
 
-        return ('success: ' + str(kwargs.get('content_object').__class__.__name__) + '-'
-                        + str(kwargs.get('content_object').id))
+        return ('success: ' + type + '-'
+                        + str(id))
 
 
 class CityInventory(TimeStampedModel):

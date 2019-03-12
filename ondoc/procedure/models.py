@@ -1,7 +1,88 @@
+from django.core.validators import MaxValueValidator, MinValueValidator
 from django.db import models
 from ondoc.authentication import models as auth_model
-from ondoc.doctor.models import DoctorClinic, SearchKey
+from ondoc.authentication.models import User, UserProfile
+from ondoc.common.models import Feature
+from ondoc.doctor.models import DoctorClinic, SearchKey, Hospital
 from collections import deque, OrderedDict
+
+
+class IpdProcedure(auth_model.TimeStampedModel, SearchKey, auth_model.SoftDelete):
+    name = models.CharField(max_length=500, unique=True)
+    details = models.TextField(blank=True)
+    is_enabled = models.BooleanField(default=False)
+    features = models.ManyToManyField(Feature, through='IpdProcedureFeatureMapping',
+                                      through_fields=('ipd_procedure', 'feature'), related_name='of_ipd_procedures')
+
+    def __str__(self):
+        return '{}'.format(self.name)
+
+    class Meta:
+        db_table = "ipd_procedure"
+
+
+class IpdProcedureFeatureMapping(models.Model):
+    ipd_procedure = models.ForeignKey(IpdProcedure, on_delete=models.CASCADE,
+                                      related_name='feature_mappings')
+    feature = models.ForeignKey(Feature, on_delete=models.CASCADE,
+                                related_name='ipd_procedures_mappings')
+    value = models.CharField(max_length=500, default='', blank=True)
+
+    def __str__(self):
+        return '{} - {}'.format(self.ipd_procedure.name, self.feature.name)
+
+    class Meta:
+        db_table = "ipd_procedure_feature_mapping"
+        unique_together = (('ipd_procedure', 'feature'),)
+
+
+class DoctorClinicIpdProcedure(auth_model.TimeStampedModel):
+    ipd_procedure = models.ForeignKey(IpdProcedure, on_delete=models.CASCADE, related_name="doctor_clinic_ipd_mappings")
+    doctor_clinic = models.ForeignKey(DoctorClinic, on_delete=models.CASCADE, related_name="ipd_procedure_clinic_mappings")
+    enabled = models.BooleanField(default=True)
+
+    def __str__(self):
+        return '{} in {}'.format(str(self.ipd_procedure), str(self.doctor_clinic))
+
+    class Meta:
+        db_table = "doctor_clinic_ipd_procedure"
+        unique_together = ('ipd_procedure', 'doctor_clinic')
+
+
+class IpdProcedureCategory(auth_model.TimeStampedModel, SearchKey):
+    name = models.CharField(max_length=500)
+
+    def __str__(self):
+        return self.name
+
+
+class IpdProcedureCategoryMapping(models.Model):
+    ipd_procedure = models.ForeignKey(IpdProcedure, on_delete=models.CASCADE,
+                                      related_name='ipd_category_mappings')
+    category = models.ForeignKey(IpdProcedureCategory, on_delete=models.CASCADE,
+                                 related_name='ipd_procedures_mappings')
+
+    def __str__(self):
+        return '{} - {}'.format(self.ipd_procedure.name, self.category.name)
+
+    class Meta:
+        db_table = "ipd_procedure_category_mapping"
+        unique_together = (('ipd_procedure', 'category'),)
+
+
+class IpdProcedureLead(auth_model.TimeStampedModel):
+    ipd_procedure = models.ForeignKey(IpdProcedure, on_delete=models.SET_NULL, null=True, blank=True)
+    hospital = models.ForeignKey(Hospital, on_delete=models.SET_NULL, null=True, blank=True)
+    user = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True)
+    name = models.CharField(max_length=100, blank=False, null=True, default=None)
+    phone_number = models.BigIntegerField(blank=True, null=True,
+                                          validators=[MaxValueValidator(9999999999), MinValueValidator(1000000000)])
+    email = models.CharField(max_length=256, blank=False, null=True, default=None)
+    gender = models.CharField(max_length=2, default=None, blank=True, null=True, choices=UserProfile.GENDER_CHOICES)
+    age = models.PositiveIntegerField(blank=True, null=True)
+
+    class Meta:
+        db_table = "ipd_procedure_lead"
 
 
 class ProcedureCategory(auth_model.TimeStampedModel, SearchKey):
@@ -147,8 +228,8 @@ class ProcedureCategoryMapping(models.Model):
 
 
 class DoctorClinicProcedure(auth_model.TimeStampedModel):
-    procedure = models.ForeignKey(Procedure, on_delete=models.CASCADE)
-    doctor_clinic = models.ForeignKey(DoctorClinic, on_delete=models.CASCADE)
+    procedure = models.ForeignKey(Procedure, on_delete=models.CASCADE, related_name="doctor_clinics_from_procedure")
+    doctor_clinic = models.ForeignKey(DoctorClinic, on_delete=models.CASCADE, related_name="procedures_from_doctor_clinic")
     mrp = models.IntegerField(default=0)
     agreed_price = models.IntegerField(default=0)
     deal_price = models.IntegerField(default=0)
@@ -170,6 +251,17 @@ class CommonProcedure(auth_model.TimeStampedModel):
 
     class Meta:
         db_table = "common_procedure"
+
+
+class CommonIpdProcedure(auth_model.TimeStampedModel):
+    ipd_procedure = models.ForeignKey(IpdProcedure, on_delete=models.CASCADE)
+    priority = models.PositiveIntegerField(default=0)
+
+    def __str__(self):
+        return "{}".format(self.ipd_procedure.name)
+
+    class Meta:
+        db_table = "common_ipd_procedure"
 
 
 class CommonProcedureCategory(auth_model.TimeStampedModel):
@@ -221,7 +313,7 @@ def get_selected_and_other_procedures(category_ids, procedure_ids, doctor=None, 
             all_procedures_under_doctor = []
             for doctor_clinic in all_clinics_of_doctor:
                 all_procedures_under_doctor.extend(
-                    doctor_clinic.doctorclinicprocedure_set.filter(procedure__is_enabled=True).values_list(
+                    doctor_clinic.procedures_from_doctor_clinic.filter(procedure__is_enabled=True).values_list(
                         'procedure_id', flat=True))
             all_procedures_under_doctor = set(all_procedures_under_doctor)
             selected_procedure_ids = ProcedureCategory.objects.select_related('preferred_procedure').filter(
@@ -234,7 +326,7 @@ def get_selected_and_other_procedures(category_ids, procedure_ids, doctor=None, 
             all_procedures_under_doctor = []
             for doctor_clinic in all_clinics_of_doctor:
                 all_procedures_under_doctor.extend(
-                    doctor_clinic.doctorclinicprocedure_set.filter(procedure__is_enabled=True).values_list('procedure_id',
+                    doctor_clinic.procedures_from_doctor_clinic.filter(procedure__is_enabled=True).values_list('procedure_id',
                                                                                                         flat=True))
             all_procedures_under_doctor = set(all_procedures_under_doctor)
             selected_procedure_ids = procedure_ids
@@ -246,7 +338,7 @@ def get_selected_and_other_procedures(category_ids, procedure_ids, doctor=None, 
             all_procedures_under_doctor = []
             for doctor_clinic in all_clinics_of_doctor:
                 all_procedures_under_doctor.extend(
-                    doctor_clinic.doctorclinicprocedure_set.filter(procedure__is_enabled=True).values_list(
+                    doctor_clinic.procedures_from_doctor_clinic.filter(procedure__is_enabled=True).values_list(
                         'procedure_id', flat=True))
             all_procedures_under_doctor = set(all_procedures_under_doctor)
             selected_procedure_ids = set(selected_procedure_ids)
@@ -256,7 +348,7 @@ def get_selected_and_other_procedures(category_ids, procedure_ids, doctor=None, 
             all_procedures_under_doctor = []
             for doctor_clinic in all_clinics_of_doctor:
                 all_procedures_under_doctor.extend(
-                    doctor_clinic.doctorclinicprocedure_set.filter(procedure__is_enabled=True).values_list('procedure_id', flat=True))
+                    doctor_clinic.procedures_from_doctor_clinic.filter(procedure__is_enabled=True).values_list('procedure_id', flat=True))
             all_procedures_under_doctor = set(all_procedures_under_doctor)
             selected_procedure_ids = []
             selected_procedure_ids = set(selected_procedure_ids)

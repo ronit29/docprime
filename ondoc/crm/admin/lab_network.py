@@ -16,7 +16,7 @@ from django.contrib.contenttypes.admin import GenericTabularInline
 
 from ondoc.authentication.admin import SPOCDetailsInline
 import nested_admin
-from .common import AssociatedMerchantInline
+from .common import AssociatedMerchantInline, RemarkInline
 
 class LabNetworkCertificationInline(admin.TabularInline):
     model = LabNetworkCertification
@@ -224,7 +224,8 @@ class LabNetworkAdmin(VersionAdmin, ActionAdmin, QCPemAdmin):
                LabNetworkDocumentInline,
                GenericLabNetworkAdminInline,
                SPOCDetailsInline,
-               AssociatedMerchantInline]
+               AssociatedMerchantInline,
+               RemarkInline]
 
     def get_queryset(self, request):
         qs = super().get_queryset(request)
@@ -241,12 +242,13 @@ class LabNetworkAdmin(VersionAdmin, ActionAdmin, QCPemAdmin):
         if not obj.assigned_to:
             obj.assigned_to = request.user
         if '_submit_for_qc' in request.POST:
-            obj.data_status = 2
+            obj.data_status = QCModel.SUBMITTED_FOR_QC
         if '_qc_approve' in request.POST:
-            obj.data_status = 3
+            obj.data_status = QCModel.QC_APPROVED
             obj.qc_approved_at = datetime.datetime.now()
         if '_mark_in_progress' in request.POST:
-            obj.data_status = 1
+            obj.data_status = QCModel.REOPENED
+        obj.status_changed_by = request.user
 
         super().save_model(request, obj, form, change)
 

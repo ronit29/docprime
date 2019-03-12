@@ -14,6 +14,7 @@ import environ
 import datetime
 import json
 import os
+from mongoengine import *
 
 # Build paths inside the project like this: os.path.join(BASE_DIR, ...)
 #BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -74,6 +75,16 @@ DATABASES = {
 }
 DATABASES['default']['ENGINE'] = 'django.contrib.gis.db.backends.postgis'
 
+try:
+    MONGO_STORE = False
+    if env('MONGO_DB_NAME') and env('MONGO_DB_PORT') and env('MONGO_DB_URL'):
+        mongo_port = int(env('MONGO_DB_PORT'))
+        connect(env('MONGO_DB_NAME'), port=mongo_port, host=env('MONGO_DB_URL'))
+        MONGO_STORE = env.bool('MONGO_STORE', default=False)
+except Exception as e:
+    print(e)
+    print('Failed to connect to mongo')
+    MONGO_STORE = False
 
 
 # Application definition
@@ -111,6 +122,7 @@ THIRD_PARTY_APPS = (
     'threadedcomments',
     'django_comments',
     'ddtrace.contrib.django',
+    'safedelete'
 )
 
 LOCAL_APPS = (
@@ -301,8 +313,9 @@ CONSUMER_APP_DOMAIN = env('CONSUMER_APP_DOMAIN')
 PROVIDER_APP_DOMAIN = env('PROVIDER_APP_DOMAIN')
 
 API_BASE_URL = env('API_BASE_URL')
-REVERSE_GEOCODING_API_KEY= env('REVERSE_GEOCODING_API_KEY')
-MATRIX_API_URL= env('MATRIX_API_URL')
+REVERSE_GEOCODING_API_KEY = env('REVERSE_GEOCODING_API_KEY')
+MATRIX_API_URL = env('MATRIX_API_URL')
+MATRIX_STATUS_UPDATE_API_URL = env('MATRIX_STATUS_UPDATE_API_URL')
 MATRIX_API_TOKEN = env('MATRIX_API_TOKEN')
 MATRIX_AUTH_TOKEN = env('MATRIX_USER_TOKEN')
 CHAT_API_URL = env('CHAT_API_URL')
@@ -334,15 +347,19 @@ MAXMIND_ACCOUNT_ID = env('MAXMIND_ACCOUNT_ID')
 MAXMIND_LICENSE_KEY = env('MAXMIND_LICENSE_KEY')
 MAXMIND_CITY_API_URL = env('MAXMIND_CITY_API_URL')
 OTP_BYPASS_NUMBERS = env.list('OTP_BYPASS_NUMBERS')
-TIME_BEFORE_APPOINTMENT_TO_SEND_OTP = 60  # in minutes
+TIME_BEFORE_APPOINTMENT_TO_SEND_OTP = env.int('TIME_BEFORE_APPOINTMENT_TO_SEND_OTP', default=60)  # in minutes
+TIME_AFTER_APPOINTMENT_TO_SEND_CONFIRMATION = env.int('TIME_AFTER_APPOINTMENT_TO_SEND_CONFIRMATION', default=120)
+TIME_AFTER_APPOINTMENT_TO_SEND_SECOND_CONFIRMATION = env.int('TIME_AFTER_APPOINTMENT_TO_SEND_SECOND_CONFIRMATION', default=1440)
 # MONGO_URL = env.list('MONGO_URL')
 #GOOGLE_MAP_API_KEY = env('GOOGLE_MAP_API_KEY')
 MATRIX_NUMBER_MASKING = env('MATRIX_NUMBER_MASKING')
 UPDATE_DOCTOR_SEARCH_SCORE_TIME = 24  # In hours
+SYNC_ELASTIC = 24
 THYROCARE_USERNAME=env('THYROCARE_USERNAME')
 THYROCARE_PASSWORD=env('THYROCARE_PASSWORD')
 THYROCARE_API_KEY=env('THYROCARE_API_KEY')
 THYROCARE_BASE_URL=env('THYROCARE_BASE_URL')
+SAFE_DELETE_INTERPRET_UNDELETED_OBJECTS_AS_CREATED=env('SAFE_DELETE_INTERPRET_UNDELETED_OBJECTS_AS_CREATED')
 
 ANYMAIL = {
     "MAILGUN_API_KEY": env('MAILGUN_API_KEY', default=None),
@@ -378,7 +395,6 @@ CONN_MAX_AGE=600
 AWS_ACCESS_KEY_ID = env('AWS_ACCESS_KEY_ID', default='')
 AWS_SECRET_ACCESS_KEY = env('AWS_SECRET_ACCESS_KEY', default='')
 PROVIDER_EMAIL = env('PROVIDER_EMAIL', default='')
-
 
 #comments Settings
 COMMENTS_APP = 'fluent_comments'
