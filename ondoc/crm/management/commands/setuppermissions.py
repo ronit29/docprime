@@ -35,7 +35,8 @@ from ondoc.diagnostic.models import (Lab, LabTiming, LabImage, GenericLabAdmin,
                                      CommonDiagnosticCondition, DiagnosticConditionLabTest, HomePickupCharges,
                                      TestParameter, ParameterLabTest, LabTestPackage, LabReportFile, LabReport,
                                      CommonPackage, LabTestCategory, LabTestCategoryMapping,
-                                     LabTestRecommendedCategoryMapping, QuestionAnswer, FrequentlyAddedTogetherTests)
+                                     LabTestRecommendedCategoryMapping, QuestionAnswer, FrequentlyAddedTogetherTests,
+                                     LabTestGroup, LabTestGroupMapping, LabTestGroupTiming)
 
 from ondoc.procedure.models import Procedure, ProcedureCategory, CommonProcedureCategory, DoctorClinicProcedure, \
     ProcedureCategoryMapping, ProcedureToCategoryMapping, CommonProcedure, IpdProcedure, IpdProcedureFeatureMapping, \
@@ -170,7 +171,8 @@ class Command(BaseCommand):
                 Q(codename='change_' + ct.model))
             group.permissions.add(*permissions)
 
-        content_types = ContentType.objects.get_for_models(LabTest, LabTestType, LabService, TestParameter)
+        content_types = ContentType.objects.get_for_models(LabTest, LabTestType, LabService, TestParameter, LabTestGroup,
+                                                           LabTestGroupMapping, LabTestGroupTiming)
 
         for cl, ct in content_types.items():
             permissions = Permission.objects.filter(
@@ -256,7 +258,8 @@ class Command(BaseCommand):
             LabTestType, LabService, TestParameter, PracticeSpecialization,
             SpecializationField, SpecializationDepartment, SpecializationDepartmentMapping,
             Procedure, ProcedureCategory, CommonProcedureCategory,
-            ProcedureToCategoryMapping, ProcedureCategoryMapping, LabTestCategory, Merchant, CancellationReason, UploadDoctorData
+            ProcedureToCategoryMapping, ProcedureCategoryMapping, LabTestCategory, Merchant, CancellationReason, UploadDoctorData,
+            LabTestGroup, LabTestGroupMapping, LabTestGroupTiming
         )
 
         for cl, ct in content_types.items():
