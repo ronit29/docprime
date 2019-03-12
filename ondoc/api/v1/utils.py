@@ -919,7 +919,7 @@ class TimeSlotExtraction(object):
         lab_tomorrow_time = None
         lab_minimum_time = None
         doc_minimum_time = None
-        doctor_maximum_timing = 18.0
+        doctor_maximum_timing = 20.0
         if booking_details.get('type') == "doctor":
             if current_date_time.date() == booking_date.date():
                 doc_booking_minimum_time = current_date_time + datetime.timedelta(hours=1)
