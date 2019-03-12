@@ -313,7 +313,7 @@ class Hospital(auth_model.TimeStampedModel, auth_model.CreatedByModel, auth_mode
             hospital_obj = Hospital.objects.filter(pk=self.id).first()
             if hospital_obj and self.data_status != hospital_obj.data_status:
                 update_status_in_matrix = True
-        elif not self.matrix_lead_id:
+        if not self.matrix_lead_id:
             push_to_matrix = True
         super(Hospital, self).save(*args, **kwargs)
         if self.is_appointment_manager:
@@ -1208,7 +1208,7 @@ class HospitalNetwork(auth_model.TimeStampedModel, auth_model.CreatedByModel, au
             hospital_network_obj = HospitalNetwork.objects.filter(pk=self.id).first()
             if hospital_network_obj and self.data_status != hospital_network_obj.data_status:
                 update_status_in_matrix = True
-        elif not self.matrix_lead_id:
+        if not self.matrix_lead_id:
             push_to_matrix = True
         super().save(*args, **kwargs)
         transaction.on_commit(lambda: self.app_commit_tasks(push_to_matrix=push_to_matrix,
@@ -2068,12 +2068,18 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
 
     def trigger_created_event(self, visitor_info):
         from ondoc.tracking.models import TrackingEvent
+        from ondoc.tracking.mongo_models import TrackingEvent as MongoTrackingEvent
         try:
             with transaction.atomic():
                 event_data = TrackingEvent.build_event_data(self.user, TrackingEvent.DoctorAppointmentBooked, appointmentId=self.id)
                 if event_data and visitor_info:
                     TrackingEvent.save_event(event_name=event_data.get('event'), data=event_data, visit_id=visitor_info.get('visit_id'),
                                              user=self.user, triggered_at=datetime.datetime.utcnow())
+                    if settings.MONGO_STORE:
+                        MongoTrackingEvent.save_event(event_name=event_data.get('event'), data=event_data,
+                                                 visit_id=visitor_info.get('visit_id'),
+                                                 visitor_id=visitor_info.get('visitor_id'),
+                                                 user=self.user, triggered_at=datetime.datetime.utcnow())
         except Exception as e:
             logger.error("Could not save triggered event - " + str(e))
 

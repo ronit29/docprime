@@ -14,6 +14,7 @@ import environ
 import datetime
 import json
 import os
+from mongoengine import *
 
 # Build paths inside the project like this: os.path.join(BASE_DIR, ...)
 #BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -74,6 +75,16 @@ DATABASES = {
 }
 DATABASES['default']['ENGINE'] = 'django.contrib.gis.db.backends.postgis'
 
+try:
+    MONGO_STORE = False
+    if env('MONGO_DB_NAME') and env('MONGO_DB_PORT') and env('MONGO_DB_URL'):
+        mongo_port = int(env('MONGO_DB_PORT'))
+        connect(env('MONGO_DB_NAME'), port=mongo_port, host=env('MONGO_DB_URL'))
+        MONGO_STORE = env.bool('MONGO_STORE', default=False)
+except Exception as e:
+    print(e)
+    print('Failed to connect to mongo')
+    MONGO_STORE = False
 
 
 # Application definition
@@ -384,7 +395,6 @@ CONN_MAX_AGE=600
 AWS_ACCESS_KEY_ID = env('AWS_ACCESS_KEY_ID', default='')
 AWS_SECRET_ACCESS_KEY = env('AWS_SECRET_ACCESS_KEY', default='')
 PROVIDER_EMAIL = env('PROVIDER_EMAIL', default='')
-
 
 #comments Settings
 COMMENTS_APP = 'fluent_comments'
