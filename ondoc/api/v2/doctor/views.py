@@ -82,8 +82,10 @@ class DoctorBillingViewSet(viewsets.GenericViewSet):
                                                    .prefetch_related('hospital__hospital_doctors', 'hospital__hospital_doctors__doctor',
                                                                      'hospital__merchant', 'hospital__merchant__merchant',
                                                                      'doctor__merchant', 'doctor__merchant__merchant',
-                                                                     'doctor__doctor_clinics', 'doctor__doctor_clinics__hospital')\
-                                                   .filter(user=user, is_disabled=False)
+                                                                     'doctor__doctor_clinics', 'doctor__doctor_clinics__hospital') \
+                            .filter(Q(user=user, is_disabled=False),
+                                    (Q(entity_type=v1_utils.GenericAdminEntity.HOSPITAL, hospital__is_live=True) |
+                                     Q(entity_type=v1_utils.GenericAdminEntity.DOCTOR, doctor__is_live=True)))
         entities = {}
         for admin in queryset.all():
             if admin.entity_type == v1_utils.GenericAdminEntity.HOSPITAL:

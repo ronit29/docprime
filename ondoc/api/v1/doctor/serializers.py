@@ -26,7 +26,7 @@ from django.contrib.staticfiles.templatetags.staticfiles import static
 from ondoc.api.v1.auth.serializers import UserProfileSerializer
 from ondoc.api.v1.ratings import serializers as rating_serializer
 from ondoc.api.v1.utils import is_valid_testing_data, form_time_slot, GenericAdminEntity, util_absolute_url, \
-    util_file_name
+    util_file_name, aware_time_zone
 from django.utils import timezone
 from django.contrib.auth import get_user_model
 import math
@@ -1556,21 +1556,27 @@ class IpdProcedureDetailSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = IpdProcedure
-        fields = ('id', 'name', 'details', 'is_enabled', 'features')
+        fields = ('id', 'name', 'details', 'is_enabled', 'features', 'about')
 
 
 class TopHospitalForIpdProcedureSerializer(serializers.ModelSerializer):
-    count_of_insurance_provider = serializers.IntegerField()
+    count_of_insurance_provider = serializers.SerializerMethodField()
     distance = serializers.SerializerMethodField()
     certifications = serializers.SerializerMethodField()
     multi_speciality = serializers.SerializerMethodField()
     address = serializers.SerializerMethodField()
     logo = serializers.SerializerMethodField()
+    open_today = serializers.SerializerMethodField()
+    insurance_provider = serializers.SerializerMethodField()
 
     class Meta:
         model = Hospital
         fields = ('id', 'name', 'distance', 'certifications', 'bed_count', 'logo', 'avg_rating',
-                  'count_of_insurance_provider', 'multi_speciality', 'address')
+                  'count_of_insurance_provider', 'multi_speciality', 'address', 'open_today',
+                  'insurance_provider')
+
+    def get_count_of_insurance_provider(self, obj):
+        return len(list(obj.health_insurance_providers.all()))
 
     def get_distance(self, obj):
         return int(obj.distance.m) if hasattr(obj, 'distance') and obj.distance else None
@@ -1579,6 +1585,9 @@ class TopHospitalForIpdProcedureSerializer(serializers.ModelSerializer):
         certification_objs = obj.hospitalcertification_set.all()
         names = [x.name for x in certification_objs]
         return names
+
+    def get_insurance_provider(self, obj):
+        return [x.name for x in obj.health_insurance_providers.all()]
 
     def get_multi_speciality(self, obj):
         return len(obj.hospitalspeciality_set.all()) > 1
@@ -1598,6 +1607,16 @@ class TopHospitalForIpdProcedureSerializer(serializers.ModelSerializer):
                     return request.build_absolute_uri(document.name.url) if document.name else None
         return None
 
+    def get_open_today(self, obj):
+        now = timezone.now()
+        now = aware_time_zone(now)
+        if obj.always_open:
+            return True
+        for timing in obj.hosp_availability.all():
+            if timing.day == now.weekday() and timing.start < now.hour < timing.end:
+                return True
+        return False
+
 
 class HospitalDetailIpdProcedureSerializer(TopHospitalForIpdProcedureSerializer):
     lat = serializers.SerializerMethodField()
@@ -1609,15 +1628,18 @@ class HospitalDetailIpdProcedureSerializer(TopHospitalForIpdProcedureSerializer)
     other_network_hospitals = serializers.SerializerMethodField()
     doctors = serializers.SerializerMethodField()
     rating_graph = serializers.SerializerMethodField()
+    rating = serializers.SerializerMethodField()
+    display_rating_widget = serializers.SerializerMethodField()
     opd_timings = serializers.SerializerMethodField()
     contact_number = serializers.SerializerMethodField()
 
     class Meta:
         model = Hospital
         fields = ('id', 'name', 'distance', 'certifications', 'bed_count', 'logo', 'avg_rating',
-                  'opd_timings', 'contact_number', 'multi_speciality', 'address',
+                  'multi_speciality', 'address', 'open_today', 'insurance_provider',
+                  'opd_timings', 'contact_number',
                   'lat', 'long', 'about', 'services', 'images', 'ipd_procedure_categories', 'other_network_hospitals',
-                  'doctors', 'rating_graph'
+                  'doctors', 'rating_graph', 'rating', 'display_rating_widget'
                   )
 
     def get_lat(self, obj):
@@ -1650,7 +1672,7 @@ class HospitalDetailIpdProcedureSerializer(TopHospitalForIpdProcedureSerializer)
     def get_images(self, obj):
         request = self.context.get('request')
         # TODO: SHASHANK_SINGH Thumbnail to be added or not
-        return [{'original': request.build_absolute_uri(img.name.url), "thumbnail": None} for img in
+        return [{'original': request.build_absolute_uri(img.name.url), "thumbnail": None, "cover_image": img.cover_image} for img in
                 obj.hospitalimage_set.all() if img.name]
 
     def get_ipd_procedure_categories(self, obj):
@@ -1692,30 +1714,83 @@ class HospitalDetailIpdProcedureSerializer(TopHospitalForIpdProcedureSerializer)
         doctor_list_viewset = DoctorListViewSet()
         return doctor_list_viewset.list(request,
                                         parameters={'hospital_id': str(obj.id), 'longitude': validated_data.get('long'),
-                                                    'latitude': validated_data.get('lat'), 'sort_on': 'experience'}).data
+                                                    'latitude': validated_data.get('lat'), 'sort_on': 'experience',
+                                                    'restrict_result_count': 3}).data
 
     def get_rating_graph(self, obj):
         from ondoc.ratings_review.models import RatingsReview
-        queryset = RatingsReview.objects.prefetch_related('compliment') \
-            .filter(is_live=True,
-                    moderation_status__in=[RatingsReview.PENDING,
-                                           RatingsReview.APPROVED],
-                    appointment_id__in=OpdAppointment.objects.filter(hospital=obj).values_list('id', flat=True),
-                    appointment_type=RatingsReview.OPD)
+        if obj.network:
+            queryset = RatingsReview.objects.prefetch_related('compliment') \
+                .filter(is_live=True,
+                        moderation_status__in=[RatingsReview.PENDING,
+                                               RatingsReview.APPROVED],
+                        appointment_id__in=OpdAppointment.objects.filter(hospital__network=obj.network).values_list(
+                            'id', flat=True),
+                        appointment_type=RatingsReview.OPD)
+        else:
+            queryset = RatingsReview.objects.prefetch_related('compliment') \
+                .filter(is_live=True,
+                        moderation_status__in=[RatingsReview.PENDING,
+                                               RatingsReview.APPROVED],
+                        appointment_id__in=OpdAppointment.objects.filter(hospital=obj).values_list('id', flat=True),
+                        appointment_type=RatingsReview.OPD)
         return RatingsGraphSerializer(queryset, context={'request': self.context.get('request')}).data
 
     def get_rating(self, obj):
         app = OpdAppointment.objects.select_related('profile').filter(hospital_id=obj.id).all()
-        queryset = rate_models.RatingsReview.objects.prefetch_related('compliment') \
-            .exclude(Q(review='') | Q(review=None)) \
-            .filter(is_live=True,
-                    moderation_status__in=[rate_models.RatingsReview.PENDING,
-                                           rate_models.RatingsReview.APPROVED],
-                    appointment_id__in=OpdAppointment.objects.filter(hospital_id=obj.id).values_list('id', flat=True),
-                    appointment_type=rate_models.RatingsReview.OPD) \
-            .order_by('-ratings', '-updated_at')[:5]
+        if obj.network:
+            queryset = rate_models.RatingsReview.objects.prefetch_related('compliment') \
+                           .exclude(Q(review='') | Q(review=None)) \
+                           .filter(is_live=True,
+                                   moderation_status__in=[rate_models.RatingsReview.PENDING,
+                                                          rate_models.RatingsReview.APPROVED],
+                                   appointment_id__in=OpdAppointment.objects.filter(hospital__network=obj.network).values_list(
+                                       'id', flat=True),
+                                   appointment_type=rate_models.RatingsReview.OPD) \
+                           .order_by('-ratings', '-updated_at')[:5]
+        else:
+            queryset = rate_models.RatingsReview.objects.prefetch_related('compliment') \
+                           .exclude(Q(review='') | Q(review=None)) \
+                           .filter(is_live=True,
+                                   moderation_status__in=[rate_models.RatingsReview.PENDING,
+                                                          rate_models.RatingsReview.APPROVED],
+                                   appointment_id__in=OpdAppointment.objects.filter(hospital=obj).values_list(
+                                       'id', flat=True),
+                                   appointment_type=rate_models.RatingsReview.OPD) \
+                           .order_by('-ratings', '-updated_at')[:5]
         reviews = rating_serializer.RatingsModelSerializer(queryset, many=True, context={'app': app})
         return reviews.data
+
+    def get_display_rating_widget(self, obj):
+        from ondoc.ratings_review.models import RatingsReview
+        if obj.network:
+            queryset = RatingsReview.objects.prefetch_related('compliment') \
+                .filter(is_live=True,
+                        moderation_status__in=[RatingsReview.PENDING,
+                                               RatingsReview.APPROVED],
+                        appointment_id__in=OpdAppointment.objects.filter(hospital__network=obj.network).values_list(
+                            'id', flat=True),
+                        appointment_type=RatingsReview.OPD)
+        else:
+            queryset = RatingsReview.objects.prefetch_related('compliment') \
+                .filter(is_live=True,
+                        moderation_status__in=[RatingsReview.PENDING,
+                                               RatingsReview.APPROVED],
+                        appointment_id__in=OpdAppointment.objects.filter(hospital=obj).values_list('id', flat=True),
+                        appointment_type=RatingsReview.OPD)
+
+        queryset = list(queryset)
+        rate_count = len(queryset)
+        avg = 0
+        if rate_count:
+            all_rating = []
+            for rate in queryset:
+                all_rating.append(rate.ratings)
+            if all_rating:
+                avg = sum(all_rating) / len(all_rating)
+        if rate_count > 5 or (rate_count <= 5 and avg > 4):
+            return True
+        return False
 
 
 class HospitalRequestSerializer(serializers.Serializer):

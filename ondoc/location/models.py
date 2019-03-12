@@ -586,7 +586,7 @@ class EntityUrls(TimeStampedModel):
         DOCTORS_LOCALITY_CITY = 'DOCTORS_LOCALITY_CITY'
         DOCTORS_CITY = 'DOCTORS_CITY'
         DOCTOR_PAGE = 'DOCTOR_PAGE'
-        #LAB_TEST = 'LAB_TEST'
+        LAB_TEST = 'LAB_TEST'
 
         LAB_LOCALITY_CITY = 'LAB_LOCALITY_CITY'
         LAB_CITY = 'LAB_CITY'
