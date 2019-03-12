@@ -1560,7 +1560,7 @@ class IpdProcedureDetailSerializer(serializers.ModelSerializer):
 
 
 class TopHospitalForIpdProcedureSerializer(serializers.ModelSerializer):
-    count_of_insurance_provider = serializers.IntegerField()
+    count_of_insurance_provider = serializers.SerializerMethodField()
     distance = serializers.SerializerMethodField()
     certifications = serializers.SerializerMethodField()
     multi_speciality = serializers.SerializerMethodField()
@@ -1574,6 +1574,9 @@ class TopHospitalForIpdProcedureSerializer(serializers.ModelSerializer):
         fields = ('id', 'name', 'distance', 'certifications', 'bed_count', 'logo', 'avg_rating',
                   'count_of_insurance_provider', 'multi_speciality', 'address', 'open_today',
                   'insurance_provider')
+
+    def get_count_of_insurance_provider(self, obj):
+        return len(list(obj.health_insurance_providers.all()))
 
     def get_distance(self, obj):
         return int(obj.distance.m) if hasattr(obj, 'distance') and obj.distance else None
