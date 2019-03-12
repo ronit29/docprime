@@ -1598,6 +1598,8 @@ class TopHospitalForIpdProcedureSerializer(serializers.ModelSerializer):
     def get_open_today(self, obj):
         now = timezone.now()
         now = aware_time_zone(now)
+        if obj.always_open:
+            return True
         for timing in obj.hosp_availability.all():
             if timing.day == now.weekday() and timing.start < now.hour < timing.end:
                 return True
