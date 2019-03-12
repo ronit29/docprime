@@ -1567,11 +1567,13 @@ class TopHospitalForIpdProcedureSerializer(serializers.ModelSerializer):
     address = serializers.SerializerMethodField()
     logo = serializers.SerializerMethodField()
     open_today = serializers.SerializerMethodField()
+    insurance_provider = serializers.SerializerMethodField()
 
     class Meta:
         model = Hospital
         fields = ('id', 'name', 'distance', 'certifications', 'bed_count', 'logo', 'avg_rating',
-                  'count_of_insurance_provider', 'multi_speciality', 'address', 'open_today')
+                  'count_of_insurance_provider', 'multi_speciality', 'address', 'open_today',
+                  'insurance_provider')
 
     def get_distance(self, obj):
         return int(obj.distance.m) if hasattr(obj, 'distance') and obj.distance else None
@@ -1580,6 +1582,9 @@ class TopHospitalForIpdProcedureSerializer(serializers.ModelSerializer):
         certification_objs = obj.hospitalcertification_set.all()
         names = [x.name for x in certification_objs]
         return names
+
+    def get_insurance_provider(self, obj):
+        return [x.name for x in obj.health_insurance_providers.all()]
 
     def get_multi_speciality(self, obj):
         return len(obj.hospitalspeciality_set.all()) > 1
@@ -1628,7 +1633,7 @@ class HospitalDetailIpdProcedureSerializer(TopHospitalForIpdProcedureSerializer)
     class Meta:
         model = Hospital
         fields = ('id', 'name', 'distance', 'certifications', 'bed_count', 'logo', 'avg_rating',
-                  'multi_speciality', 'address', 'open_today',
+                  'multi_speciality', 'address', 'open_today', 'insurance_provider',
                   'opd_timings', 'contact_number',
                   'lat', 'long', 'about', 'services', 'images', 'ipd_procedure_categories', 'other_network_hospitals',
                   'doctors', 'rating_graph', 'rating', 'display_rating_widget'
