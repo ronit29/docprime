@@ -125,8 +125,7 @@ THIRD_PARTY_APPS = (
     'fluent_comments',
     'threadedcomments',
     'django_comments',
-    'ddtrace.contrib.django',
-    'safedelete'
+    'safedelete',
 )
 
 LOCAL_APPS = (
