@@ -30,7 +30,7 @@ class PlanFeature(auth_model.TimeStampedModel):
 
 class UserPlanMapping(auth_model.TimeStampedModel):
     plan = models.ForeignKey(Plan, on_delete=models.DO_NOTHING, related_name="subscribed_user_mapping")
-    user = models.ForeignKey(User, on_delete=models.DO_NOTHING, related_name="plan_mapping")
+    user = models.ForeignKey(User, on_delete=models.DO_NOTHING, related_name="plan_mapping", unique=True)
     is_active = models.BooleanField(default=True)
     expire_at = models.DateTimeField()
 
