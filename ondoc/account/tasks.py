@@ -165,7 +165,7 @@ def elastic_alias_switch():
         raise Exception('Could not elastic object.')
 
     data = obj.post_task_data
-    if data.get('id') != obj.id or data.get('timestamp', 0) + (2 * 3600) < int(datetime.datetime.now().timestamp()):
+    if data.get('timestamp', 0) + (2 * 3600) < int(datetime.datetime.now().timestamp()):
         raise Exception('Object found is not desired object or last object.')
 
     headers = {
