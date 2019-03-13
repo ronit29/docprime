@@ -30,6 +30,7 @@ class ScreenViewSet(viewsets.GenericViewSet):
         grid_size = 6
         force_update_version = ""
         update_version = ""
+        app_custom_data = None
 
         params = request.query_params
         from_app = params.get("from_app", False)
@@ -39,6 +40,9 @@ class ScreenViewSet(viewsets.GenericViewSet):
             if app_update:
                 force_update_version = app_update.get("force_update_version", "")
                 update_version = app_update.get("update_version", "")
+
+        if UserConfig.objects.filter(key="app_custom_data").exists():
+            app_custom_data = UserConfig.objects.filter(key="app_custom_data").values_list('data', flat=True).first()
 
         common_specializations = CommonSpecialization.objects.select_related(
             'specialization').all().order_by("priority")[:grid_size-1]
@@ -114,6 +118,7 @@ class ScreenViewSet(viewsets.GenericViewSet):
                 "banner": banner,
                 "upcoming_appointments": upcoming_appointment_result,
                 "payment_options": payment_options,
+                "app_custom_data": app_custom_data,
                 "app_force_update": app_version < force_update_version,
                 "app_update": app_version < update_version,
                 "ask_for_app_rating": self.ask_for_app_rating(request)
