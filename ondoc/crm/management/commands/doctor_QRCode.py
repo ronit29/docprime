@@ -49,10 +49,11 @@ class Command(BaseCommand):
 
         for item in id_list:
             doctor_id = item
-            doc = Doctor.objects.filter(id=2, is_live=True).first()
+            doc = Doctor.objects.filter(id=doctor_id, is_live=True).first()
             if doc:
-                doc.generate_qr_code()
-                doc.generate_sticker()
+                if not doc.qr_code.all().exists():
+                    doc.generate_qr_code()
+                    doc.generate_sticker()
 
 
 
