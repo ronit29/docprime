@@ -1216,7 +1216,6 @@ class LabTestAdminForm(forms.ModelForm):
     why = forms.CharField(widget=forms.Textarea, required=False)
     about_test = forms.CharField(widget=forms.Textarea, required=False)
     preparations = forms.CharField(widget=forms.Textarea, required=False)
-    # parameter = forms.CharField(widget=forms.Textarea, required=False)
 
     class Media:
         extend = False
