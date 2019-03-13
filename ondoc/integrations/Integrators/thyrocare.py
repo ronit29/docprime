@@ -107,7 +107,7 @@ class Thyrocare(BaseIntegrator):
         leaves = None
         resp_list = obj.get_timing_slots(date, leaves, booking_details, is_thyrocare=True)
         res_data = {
-            "time_slots": resp_list
+            "time_slots": resp_list, "upcoming_slots": [], "is_thyrocare": True
         }
         return res_data
 

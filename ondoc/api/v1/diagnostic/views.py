@@ -1957,7 +1957,7 @@ class LabTimingListView(mixins.ListModelMixin,
         integration_dict = None
         if lab:
             lab_obj = Lab.objects.filter(id=int(lab), is_live=True).first()
-            if lab_obj.network and lab_obj.network.id:
+            if lab_obj and lab_obj.network and lab_obj.network.id:
                 integration_dict = IntegratorMapping.get_if_third_party_integration(network_id=lab_obj.network.id)
 
         if not integration_dict:
@@ -1966,7 +1966,8 @@ class LabTimingListView(mixins.ListModelMixin,
         else:
             class_name = integration_dict['class_name']
             integrator_obj = service.create_integrator_obj(class_name)
-            resp_data = integrator_obj.get_appointment_slots(pincode, date, is_home_pickup=for_home_pickup)
+            data = integrator_obj.get_appointment_slots(pincode, date, is_home_pickup=for_home_pickup)
+            resp_data = {"time_slots": data}
 
         # resp_data = LabTiming.timing_manager.lab_booking_slots(lab__id=lab, lab__is_live=True, for_home_pickup=for_home_pickup)
         # global_leave_serializer = v2_serializers.GlobalNonBookableSerializer(
