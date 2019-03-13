@@ -16,6 +16,7 @@ from uuid import UUID
 from django.conf import settings
 from django.db import IntegrityError
 from django.db import transaction
+from mongoengine.errors import NotUniqueError
 
 #from django.utils import timezone
 
@@ -145,7 +146,7 @@ class EventCreateViewSet(GenericViewSet):
                             with transaction.atomic():
                                 track_mongo_models.TrackingVisitor.objects.create(id=visitor_id,
                                                                                   created_at=ex_visitor.created_at, updated_at=ex_visitor.updated_at)
-                        except IntegrityError as e:
+                        except NotUniqueError as e:
                             pass
 
             if visit_id:
@@ -165,7 +166,7 @@ class EventCreateViewSet(GenericViewSet):
                             with transaction.atomic():
                                 track_mongo_models.TrackingVisit.objects.create(id=visit_id, visitor_id=visitor_id, ip_address=client_ip,
                                                                                 created_at=ex_visit.created_at, updated_at=ex_visit.updated_at)
-                        except IntegrityError as e:
+                        except NotUniqueError as e:
                             pass
 
         return (visitor_id, visit_id)
