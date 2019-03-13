@@ -35,10 +35,30 @@ class InsurancePlanContentInline(admin.TabularInline):
     # can_add = False
     # readonly_fields = ("first_name", 'last_name', 'relation', 'dob', 'gender', )
 
+
+class InsurancePlanAdminForm(forms.ModelForm):
+
+    is_selected = forms.BooleanField(required=False)
+
+    def clean_is_selected(self):
+        is_selected = self.cleaned_data.get('is_selected', False)
+        insurer = self.cleaned_data.get('insurer')
+        if is_selected and insurer:
+            if self.instance and self.instance.id:
+                if insurer.plans.filter(is_selected=True).exclude(id=self.instance.id).exists():
+                    raise forms.ValidationError('Only one plan can be marked is_selected true for 1 Insurer.')
+            else:
+                if insurer.plans.filter(is_selected=True).exists():
+                    raise forms.ValidationError('Only one plan can be marked is_selected true for 1 Insurer.')
+
+        return is_selected
+
+
 class InsurancePlansAdmin(admin.ModelAdmin):
 
-    list_display = ['insurer', 'name', 'amount']
+    list_display = ['insurer', 'name', 'amount', 'is_selected']
     inlines = [InsurancePlanContentInline]
+    form = InsurancePlanAdminForm
 
 
 class InsuranceThresholdAdmin(admin.ModelAdmin):
