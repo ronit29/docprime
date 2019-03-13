@@ -58,10 +58,20 @@ class CommaSepratedToListField(CharField):
         super(CommaSepratedToListField, self).__init__(**kwargs)
 
     def to_internal_value(self, data):
-        return list(map(self.typecast_to, data.strip(",").split(",")))
+        result = []
+        try:
+            result = list(map(self.typecast_to, data.strip(",").split(",")))
+        except:
+            pass
+        return result
 
     def to_representation(self, value):
-        return list(map(self.typecast_to, value.strip(",").split(",")))
+        result = []
+        try:
+            result = list(map(self.typecast_to, value.strip(",").split(",")))
+        except:
+            pass
+        return result
 
 
 class OTPSerializer(serializers.Serializer):
