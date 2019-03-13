@@ -2,14 +2,14 @@ from django.contrib.admin import TabularInline
 from reversion.admin import VersionAdmin
 from django import forms
 
-from ondoc.subscription_plan.models import Plan, PlanFeature
+from ondoc.subscription_plan.models import Plan, PlanFeature, PlanFeatureMapping
 
 
-class SubscriptionPlanFeatureInline(TabularInline):
-    model = PlanFeature
+class PlanFeatureMappingInline(TabularInline):
+    model = PlanFeatureMapping
     max_num = 1
     extra = 0
-    autocomplete_fields = ['network', 'lab', 'test']
+    autocomplete_fields = ['feature']
 
     # def get_form(self, request, obj=None, **kwargs):
     #     form = super().get_form(request, obj=obj, **kwargs)
@@ -25,5 +25,9 @@ class SubscriptionPlanFeatureInline(TabularInline):
 
 class SubscriptionPlanAdmin(VersionAdmin):
     model = Plan
-    inlines = [SubscriptionPlanFeatureInline]
+    inlines = [PlanFeatureMappingInline]
 
+
+class SubscriptionPlanFeatureAdmin(VersionAdmin):
+    model = PlanFeature
+    search_fields = ['name']
