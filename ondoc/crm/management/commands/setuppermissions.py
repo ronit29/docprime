@@ -19,11 +19,11 @@ from ondoc.doctor.models import (Doctor, Hospital, DoctorClinicTiming, DoctorCli
                                  HospitalNetworkCertification, DoctorPracticeSpecialization, AboutDoctor,
                                  DoctorMapping, OpdAppointment, CommonMedicalCondition, CommonSpecialization,
                                  MedicalCondition, PracticeSpecialization, SpecializationDepartment,
-                                 SpecializationField,
+                                 SpecializationField, DoctorLeave,
                                  MedicalConditionSpecialization, CompetitorInfo, CompetitorMonthlyVisit,
                                  SpecializationDepartmentMapping, CancellationReason, UploadDoctorData,
                                  HospitalServiceMapping, HealthInsuranceProviderHospitalMapping,
-                                 HealthInsuranceProvider)
+                                 HealthInsuranceProvider, HospitalHelpline, HospitalTiming)
 
 from ondoc.diagnostic.models import (Lab, LabTiming, LabImage, GenericLabAdmin,
                                      LabManager, LabAccreditation, LabAward, LabCertification,
@@ -35,11 +35,12 @@ from ondoc.diagnostic.models import (Lab, LabTiming, LabImage, GenericLabAdmin,
                                      CommonDiagnosticCondition, DiagnosticConditionLabTest, HomePickupCharges,
                                      TestParameter, ParameterLabTest, LabTestPackage, LabReportFile, LabReport,
                                      CommonPackage, LabTestCategory, LabTestCategoryMapping,
-                                     LabTestRecommendedCategoryMapping, QuestionAnswer, FrequentlyAddedTogetherTests)
+                                     LabTestRecommendedCategoryMapping, QuestionAnswer, FrequentlyAddedTogetherTests,
+                                     LabTestGroup, LabTestGroupMapping, LabTestGroupTiming)
 
 from ondoc.procedure.models import Procedure, ProcedureCategory, CommonProcedureCategory, DoctorClinicProcedure, \
     ProcedureCategoryMapping, ProcedureToCategoryMapping, CommonProcedure, IpdProcedure, IpdProcedureFeatureMapping, \
-    DoctorClinicIpdProcedure, IpdProcedureCategoryMapping, IpdProcedureCategory
+    DoctorClinicIpdProcedure, IpdProcedureCategoryMapping, IpdProcedureCategory, CommonIpdProcedure
 from ondoc.reports import models as report_models
 
 from ondoc.diagnostic.models import LabPricing
@@ -156,7 +157,7 @@ class Command(BaseCommand):
                 Q(content_type=ct), Q(codename='change_' + ct.model))
             group.permissions.add(*permissions)
 
-        content_types = ContentType.objects.get_for_models(Merchant, Doctor,
+        content_types = ContentType.objects.get_for_models(Merchant, Doctor, Hospital, HospitalNetwork,
                                                            Qualification, Specialization, Language, MedicalService,
                                                            College, SpecializationDepartment,
                                                            SpecializationField,
@@ -170,7 +171,8 @@ class Command(BaseCommand):
                 Q(codename='change_' + ct.model))
             group.permissions.add(*permissions)
 
-        content_types = ContentType.objects.get_for_models(LabTest, LabTestType, LabService, TestParameter)
+        content_types = ContentType.objects.get_for_models(LabTest, LabTestType, LabService, TestParameter, LabTestGroup,
+                                                           LabTestGroupMapping, LabTestGroupTiming)
 
         for cl, ct in content_types.items():
             permissions = Permission.objects.filter(
@@ -256,7 +258,8 @@ class Command(BaseCommand):
             LabTestType, LabService, TestParameter, PracticeSpecialization,
             SpecializationField, SpecializationDepartment, SpecializationDepartmentMapping,
             Procedure, ProcedureCategory, CommonProcedureCategory,
-            ProcedureToCategoryMapping, ProcedureCategoryMapping, LabTestCategory, Merchant, CancellationReason, UploadDoctorData
+            ProcedureToCategoryMapping, ProcedureCategoryMapping, LabTestCategory, Merchant, CancellationReason, UploadDoctorData,
+            LabTestGroup, LabTestGroupMapping, LabTestGroupTiming
         )
 
         for cl, ct in content_types.items():
@@ -460,6 +463,20 @@ class Command(BaseCommand):
 
             group.permissions.add(*permissions)
 
+        # DoctorAvailibility team Group
+        group, created = Group.objects.get_or_create(name=constants['DOC_AVAILABILITY_TEAM_GROUP'])
+        group.permissions.clear()
+
+        content_types = ContentType.objects.get_for_models(DoctorLeave)
+
+        for cl, ct in content_types.items():
+            permissions = Permission.objects.filter(
+                Q(content_type=ct),
+                Q(codename='add_' + ct.model) |
+                Q(codename='change_' + ct.model)|
+                Q(codename='delete_' + ct.model)
+            )
+            group.permissions.add(*permissions)
 
         # Create Doctor Mapping team Group
         group, created = Group.objects.get_or_create(name=constants['DOCTOR_MAPPING_TEAM'])
@@ -504,7 +521,8 @@ class Command(BaseCommand):
                                                            NewDynamic, QuestionAnswer, FrequentlyAddedTogetherTests,
                                                            IpdProcedureFeatureMapping, HospitalServiceMapping,
                                                            DoctorClinic, DoctorClinicIpdProcedure,
-                                                           HealthInsuranceProviderHospitalMapping, IpdProcedureCategoryMapping)
+                                                           HealthInsuranceProviderHospitalMapping, IpdProcedureCategoryMapping, CommonIpdProcedure,
+                                                           HospitalHelpline, IpdProcedure, HospitalTiming)
         for cl, ct in content_types.items():
             permissions = Permission.objects.filter(
                 Q(content_type=ct),
@@ -514,7 +532,7 @@ class Command(BaseCommand):
 
             group.permissions.add(*permissions)
 
-        content_types = ContentType.objects.get_for_models(PaymentOptions, EntityUrls, IpdProcedure, Feature, Service, Doctor,
+        content_types = ContentType.objects.get_for_models(PaymentOptions, EntityUrls, Feature, Service, Doctor,
                                                            HealthInsuranceProvider, IpdProcedureCategory)
 
         for cl, ct in content_types.items():

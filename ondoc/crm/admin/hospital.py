@@ -1,13 +1,15 @@
 from dal import autocomplete
 from django.contrib.contenttypes.admin import GenericTabularInline
 from django.contrib.gis import admin
+from django.forms.utils import ErrorList
 from reversion.admin import VersionAdmin
 from django.db.models import Q
 import datetime
 from ondoc.crm.admin.doctor import CreatedByFilter
 from ondoc.doctor.models import (HospitalImage, HospitalDocument, HospitalAward, Doctor,
                                  HospitalAccreditation, HospitalCertification, HospitalSpeciality, HospitalNetwork,
-                                 Hospital, HospitalServiceMapping, HealthInsuranceProviderHospitalMapping)
+                                 Hospital, HospitalServiceMapping, HealthInsuranceProviderHospitalMapping,
+                                 HospitalHelpline, HospitalTiming)
 from .common import *
 from ondoc.crm.constants import constants
 from django.utils.safestring import mark_safe
@@ -30,7 +32,7 @@ class HospitalImageInline(admin.TabularInline):
     extra = 0
     can_delete = True
     show_change_link = False
-    max_num = 5
+    max_num = 10
 
 
 # class DcotorInline(admin.TabularInline):
@@ -87,6 +89,67 @@ class HospitalServiceInline(admin.TabularInline):
     can_delete = True
     show_change_link = False
     autocomplete_fields = ['service']
+
+
+class HospitalTimingInlineFormSet(forms.BaseInlineFormSet):
+    def clean(self):
+        super().clean()
+        if any(self.errors):
+            return
+        temp = set()
+
+        for value in self.cleaned_data:
+            if not value.get("DELETE"):
+                t = tuple([value.get("day"), value.get("start"), value.get("end")])
+                if t not in temp:
+                    temp.add(t)
+                else:
+                    raise forms.ValidationError("Duplicate records not allowed.")
+
+
+class HospitalTimingInline(admin.TabularInline):
+    model = HospitalTiming
+    # form = HospitalTimingInlineForm
+    formset = HospitalTimingInlineFormSet
+    fk_name = 'hospital'
+    extra = 0
+    can_delete = True
+    show_change_link = False
+    # autocomplete_fields = ['hospital']
+    # inlines = [DoctorClinicTimingInline, DoctorClinicProcedureInline, DoctorClinicIpdProcedureInline, AssociatedMerchantInline]
+    # fields = '__all__'
+
+
+class HospitalHelpineInlineForm(forms.ModelForm):
+
+    def clean(self):
+        super().clean()
+        if any(self.errors):
+            return
+        data = self.cleaned_data
+        std_code = data.get('std_code')
+        number = data.get('number')
+        if std_code:
+            try:
+                std_code = int(std_code)
+            except:
+                raise forms.ValidationError("Invalid STD code")
+
+        if not std_code:
+            if number and (number < 5000000000 or number > 9999999999):
+                raise forms.ValidationError("Invalid mobile number")
+
+    class Meta:
+        fields = '__all__'
+
+
+class HospitalHelplineInline(admin.TabularInline):
+    model = HospitalHelpline
+    form = HospitalHelpineInlineForm
+    fk_name = 'hospital'
+    extra = 0
+    can_delete = True
+    show_change_link = False
 
 
 class HospitalHealthInsuranceProviderInline(admin.TabularInline):
@@ -457,7 +520,9 @@ class HospitalAdmin(admin.GeoModelAdmin, VersionAdmin, ActionAdmin, QCPemAdmin):
     # autocomplete_fields = ['matrix_city', 'matrix_state']
     inlines = [
         # HospitalNetworkMappingInline,
+        HospitalHelplineInline,
         HospitalServiceInline,
+        HospitalTimingInline,
         HospitalHealthInsuranceProviderInline,
         HospitalSpecialityInline,
         HospitalAwardInline,

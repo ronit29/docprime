@@ -215,14 +215,6 @@ class DoctorClinicInlineForm(forms.ModelForm):
         model = DoctorClinic
         fields = ('__all__')
 
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        if self and hasattr(self, 'request') and self.request and isinstance(self.request.GET, dict):
-            # http://127.0.0.1:8000/admin/doctor/hospital/add/?AgentId=9876
-            self.request_matrix_lead_id = self.request.GET.get('LeadId', None)
-            self.request_agent_lead_id = self.request.GET.get('AgentId', None)
-
-
 
 class DoctorClinicInline(nested_admin.NestedTabularInline):
     model = DoctorClinic
@@ -233,25 +225,27 @@ class DoctorClinicInline(nested_admin.NestedTabularInline):
     show_change_link = False
     # autocomplete_fields = ['hospital']
     inlines = [DoctorClinicTimingInline, DoctorClinicProcedureInline, DoctorClinicIpdProcedureInline, AssociatedMerchantInline]
-    fields = ['hospital', 'add_hospital_link', 'followup_duration', 'followup_charges', 'enabled_for_online_booking', 'enabled', 'priority']
+    fields = ['hospital',
+              # 'add_hospital_link',
+              'followup_duration', 'followup_charges', 'enabled_for_online_booking', 'enabled', 'priority']
 
-    def get_readonly_fields(self, *args, **kwargs):
-        read_only = super().get_readonly_fields(*args, **kwargs)
-        if args:
-            request = args[0]
-            if request.GET.get('AgentId', None):
-                self.matrix_agent_id = request.GET.get('AgentId', None)
-            read_only += ('add_hospital_link',)
-        return read_only
-
-    def add_hospital_link(self, obj):
-        content_type = ContentType.objects.get_for_model(Hospital)
-        add_hospital_url = reverse('admin:%s_%s_add' % (content_type.app_label, content_type.model))
-        # add_hospital_url+='?_to_field=id&_popup=1'
-        if hasattr(self, 'matrix_agent_id') and self.matrix_agent_id:
-            add_hospital_url += '?AgentId={}'.format(self.matrix_agent_id)
-        html = '''<a href='%s' target=_blank>%s</a><br>''' % (add_hospital_url, "Add Hospital")
-        return mark_safe(html)
+    # def get_readonly_fields(self, *args, **kwargs):
+    #     read_only = super().get_readonly_fields(*args, **kwargs)
+    #     if args:
+    #         request = args[0]
+    #         if request.GET.get('AgentId', None):
+    #             self.matrix_agent_id = request.GET.get('AgentId', None)
+    #         read_only += ('add_hospital_link',)
+    #     return read_only
+    #
+    # def add_hospital_link(self, obj):
+    #     content_type = ContentType.objects.get_for_model(Hospital)
+    #     add_hospital_url = reverse('admin:%s_%s_add' % (content_type.app_label, content_type.model))
+    #     # add_hospital_url+='?_to_field=id&_popup=1'
+    #     if hasattr(self, 'matrix_agent_id') and self.matrix_agent_id:
+    #         add_hospital_url += '?AgentId={}'.format(self.matrix_agent_id)
+    #     html = '''<a href='%s' target=_blank>%s</a><br>''' % (add_hospital_url, "Add Hospital")
+    #     return mark_safe(html)
 
     def get_queryset(self, request):
         return super(DoctorClinicInline, self).get_queryset(request).select_related('hospital')
@@ -693,7 +687,6 @@ class DoctorForm(FormCleanMixin):
                     self.request_matrix_lead_id = base64.b64decode(requested_leadId).decode()
                 except Exception as e:
                     logger.error("Invalid Matrix Lead ID received from Matrix - " + str(e))
-                self.request_agent_lead_id = self.request.GET.get('AgentId', None)
 
     def validate_qc(self):
         qc_required = {'name': 'req', 'gender': 'req',
@@ -1185,7 +1178,7 @@ class DoctorAdmin(AutoComplete, ImportExportMixin, VersionAdmin, ActionAdmin, QC
                                  'is_test_doctor', 'is_license_verified', 'signature', 'enabled', 'raw_about']
         excluded = self.get_exclude(request, obj)
         final = [x for x in read_only_fields if x not in excluded]
-        #make matrix_lead_id ediable if not present or user is superqc or superuser
+        # make matrix_lead_id ediable if not present or user is superqc or superuser
         if request.user.is_member_of(constants['SUPER_QC_GROUP']) or request.user.is_superuser:
             final.remove('matrix_lead_id')
 
@@ -1340,8 +1333,6 @@ class DoctorAdmin(AutoComplete, ImportExportMixin, VersionAdmin, ActionAdmin, QC
             except Exception as e:
                 logger.error("Invalid Matrix ID received from Matrix - " + str(e))
 
-        obj.request_agent_lead_id = form.request_agent_lead_id if hasattr(form, 'request_agent_lead_id') else None
-
         if not request.user.is_member_of(constants['DOCTOR_SALES_GROUP']):
             if not obj.created_by:
                 obj.created_by = request.user
@@ -1358,6 +1349,8 @@ class DoctorAdmin(AutoComplete, ImportExportMixin, VersionAdmin, ActionAdmin, QC
             obj.qc_approved_at = datetime.datetime.now()
         if '_mark_in_progress' in request.POST:
             obj.data_status = QCModel.REOPENED
+        if not obj.source_type:
+            obj.source_type = Doctor.AGENT
         obj.status_changed_by = request.user
 
         super().save_model(request, obj, form, change)
@@ -1472,11 +1465,12 @@ class DoctorOpdAppointmentForm(forms.ModelForm):
             raise forms.ValidationError(
                 "Cancellation comments must be mentioned for selected cancellation reason.")
 
-        if not DoctorClinicTiming.objects.filter(doctor_clinic__doctor=doctor,
-                                                 doctor_clinic__hospital=hospital,
-                                                 day=time_slot_start.weekday(),
-                                                 start__lte=hour, end__gt=hour).exists():
-            raise forms.ValidationError("Doctor do not sit at the given hospital in this time slot.")
+        if cleaned_data.get('status') not in [OpdAppointment.CANCELLED, OpdAppointment.COMPLETED]:
+            if not DoctorClinicTiming.objects.filter(doctor_clinic__doctor=doctor,
+                                                     doctor_clinic__hospital=hospital,
+                                                     day=time_slot_start.weekday(),
+                                                     start__lte=hour, end__gt=hour).exists():
+                raise forms.ValidationError("Doctor do not sit at the given hospital in this time slot.")
 
         # if self.instance.id:
         #     if cleaned_data.get('status') == OpdAppointment.RESCHEDULED_PATIENT or cleaned_data.get(
@@ -1548,13 +1542,13 @@ class DoctorOpdAppointmentAdmin(admin.ModelAdmin):
         return form
 
     def get_fields(self, request, obj=None):
-        if request.user.is_superuser and request.user.is_staff:
-            return ('booking_id', 'doctor', 'doctor_id', 'doctor_details', 'hospital', 'hospital_details', 'kyc',
-                    'contact_details', 'profile', 'profile_detail', 'user', 'booked_by', 'procedures_details',
-                    'fees', 'effective_price', 'mrp', 'deal_price', 'payment_status', 'status', 'cancel_type',
-                    'cancellation_reason', 'cancellation_comments', 'ratings',
-                    'start_date', 'start_time', 'payment_type', 'otp', 'insurance', 'outstanding', 'invoice_urls', 'payment_type')
-        elif request.user.groups.filter(name=constants['OPD_APPOINTMENT_MANAGEMENT_TEAM']).exists():
+        # if request.user.is_superuser and request.user.is_staff:
+        #     return ('booking_id', 'doctor', 'doctor_id', 'doctor_details', 'hospital', 'hospital_details', 'kyc',
+        #             'contact_details', 'profile', 'profile_detail', 'user', 'booked_by', 'procedures_details',
+        #             'fees', 'effective_price', 'mrp', 'deal_price', 'payment_status', 'status', 'cancel_type',
+        #             'cancellation_reason', 'cancellation_comments', 'ratings',
+        #             'start_date', 'start_time', 'payment_type', 'otp', 'insurance', 'outstanding', 'invoice_urls', 'payment_type')
+        # elif request.user.groups.filter(name=constants['OPD_APPOINTMENT_MANAGEMENT_TEAM']).exists():
             return ('booking_id', 'doctor_name', 'doctor_id', 'doctor_details', 'hospital_name', 'hospital_details',
                     'kyc', 'contact_details', 'used_profile_name',
                     'used_profile_number', 'default_profile_name',
@@ -1563,22 +1557,23 @@ class DoctorOpdAppointmentAdmin(admin.ModelAdmin):
                     'payment_type', 'admin_information', 'otp', 'insurance', 'outstanding',
                     'status', 'cancel_type', 'cancellation_reason', 'cancellation_comments',
                     'start_date', 'start_time', 'invoice_urls', 'payment_type')
-        else:
-            return ()
+        # else:
+        #     return ()
 
     def get_readonly_fields(self, request, obj=None):
-        if request.user.is_superuser and request.user.is_staff:
-            return ('booking_id', 'doctor_id', 'doctor_details', 'contact_details', 'hospital_details', 'kyc',
-                    'procedures_details', 'invoice_urls', 'ratings', 'payment_type')
-        elif request.user.groups.filter(name=constants['OPD_APPOINTMENT_MANAGEMENT_TEAM']).exists():
+        # if request.user.is_superuser and request.user.is_staff:
+        #     return ('booking_id', 'doctor_id', 'doctor_details', 'contact_details', 'hospital_details', 'kyc',
+        #             'procedures_details', 'invoice_urls', 'ratings', 'payment_type')
+        # elif request.user.groups.filter(name=constants['OPD_APPOINTMENT_MANAGEMENT_TEAM']).exists():
             return ('booking_id', 'doctor_name', 'doctor_id', 'doctor_details', 'hospital_name',
                     'hospital_details', 'kyc', 'contact_details',
                     'used_profile_name', 'used_profile_number', 'default_profile_name',
                     'default_profile_number', 'user_id', 'user_number', 'booked_by',
                     'fees', 'effective_price', 'mrp', 'deal_price', 'payment_status', 'payment_type',
-                    'admin_information', 'otp', 'insurance', 'outstanding', 'procedures_details','invoice_urls', 'payment_type')
-        else:
-            return ('invoice_urls')
+                    'admin_information', 'otp', 'insurance', 'outstanding', 'procedures_details','invoice_urls', 'payment_type',
+                    'invoice_urls')
+        # else:
+        #     return ('invoice_urls')
 
     def ratings(self, obj):
         rating_queryset = rating_models.RatingsReview.objects.filter(appointment_id=obj.id).first()

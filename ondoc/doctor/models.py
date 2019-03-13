@@ -6,7 +6,7 @@ from django.core.files.storage import default_storage
 from PIL import Image, ImageFont, ImageOps
 
 from django.contrib.gis.db import models
-from django.db import migrations, transaction
+from django.db import migrations, transaction, connection
 from django.db.models import Count, Sum, When, Case, Q, F, Avg
 from django.contrib.postgres.operations import CreateExtension
 from django.contrib.staticfiles.templatetags.staticfiles import static
@@ -65,6 +65,7 @@ from ondoc.doctor import models as doctor_models
 from django.db.models import Count
 from ondoc.api.v1.utils import RawSql
 from safedelete import SOFT_DELETE
+#from ondoc.api.v1.doctor import serializers as doctor_serializers
 import qrcode
 
 logger = logging.getLogger(__name__)
@@ -157,6 +158,9 @@ class Hospital(auth_model.TimeStampedModel, auth_model.CreatedByModel, auth_mode
         (PHONE_RINGING_BUT_COULD_NOT_CONNECT, "Phone ringing but could not connect"),
         (DUPLICATE, "Duplicate"), (OTHERS, "Others (please specify)"))
     DISABLED_AFTER_CHOICES = (("", "Select"), (WELCOME_CALLING, "Welcome Calling"), (ESCALATION, "Escalation"))
+    AGENT = 1
+    PROVIDER = 2
+    SOURCE_TYPE_CHOICES = ((AGENT, "Agent"), (PROVIDER, "Provider"))
     name = models.CharField(max_length=200)
     location = models.PointField(geography=True, srid=4326, blank=True, null=True)
     location_error = models.PositiveIntegerField(blank=True, null=True)
@@ -202,6 +206,7 @@ class Hospital(auth_model.TimeStampedModel, auth_model.CreatedByModel, auth_mode
     disabled_by = models.ForeignKey(settings.AUTH_USER_MODEL, related_name="disabled_hospitals", null=True, editable=False,
                                     on_delete=models.SET_NULL)
     is_mask_number_required = models.BooleanField(default=True)
+    source_type = models.IntegerField(choices=SOURCE_TYPE_CHOICES, null=True, editable=False)
     service = models.ManyToManyField(Service, through='HospitalServiceMapping', through_fields=('hospital', 'service'),
                                      related_name='of_hospitals')
     health_insurance_providers = models.ManyToManyField('HealthInsuranceProvider',
@@ -210,9 +215,14 @@ class Hospital(auth_model.TimeStampedModel, auth_model.CreatedByModel, auth_mode
                                                         related_name='available_in_hospital')
     open_for_communication = models.BooleanField(default=True)
     bed_count = models.PositiveIntegerField(null=True, blank=True, default=None)
+    avg_rating = models.DecimalField(max_digits=5, decimal_places=2, null=True, editable=False)
 
     remark = GenericRelation(Remark)
     matrix_lead_id = models.BigIntegerField(blank=True, null=True, unique=True)
+    is_listed_on_docprime = models.NullBooleanField(null=True, blank=True)
+    about = models.TextField(blank=True, null=True, default="")
+    opd_timings = models.CharField(max_length=150, blank=True, null=True, default="")
+    always_open = models.BooleanField(verbose_name='Is hospital open 24X7', default=False)
 
     def __str__(self):
         return self.name
@@ -254,6 +264,16 @@ class Hospital(auth_model.TimeStampedModel, auth_model.CreatedByModel, auth_mode
                 result.append(ad)
 
         return ", ".join(result)
+
+    @classmethod
+    def update_avg_rating(cls):
+        from django.db import connection
+        cursor = connection.cursor()
+        content_type = ContentType.objects.get_for_model(Hospital)
+        if content_type:
+            cid = content_type.id
+            query = """update hospital h set avg_rating=(select avg(ratings) from ratings_review rr left join opd_appointment oa on rr.appointment_id = oa.id where appointment_type = 2 group by hospital_id having oa.hospital_id = h.id)"""
+            cursor.execute(query)
 
     def ad_str(self, string):
         return str(string).strip().replace(',', '')
@@ -301,7 +321,7 @@ class Hospital(auth_model.TimeStampedModel, auth_model.CreatedByModel, auth_mode
             hospital_obj = Hospital.objects.filter(pk=self.id).first()
             if hospital_obj and self.data_status != hospital_obj.data_status:
                 update_status_in_matrix = True
-        else:
+        if not self.matrix_lead_id:
             push_to_matrix = True
         super(Hospital, self).save(*args, **kwargs)
         if self.is_appointment_manager:
@@ -452,6 +472,9 @@ class Doctor(auth_model.TimeStampedModel, auth_model.QCModel, SearchKey, auth_mo
         (CHARGES_ISSUES, "Issue in discount % / consultation charges"),
         (PHONE_RINGING_BUT_COULD_NOT_CONNECT, "Phone ringing but could not connect"), (DUPLICATE, "Duplicate"),
         (OTHERS, "Others (please specify)"))
+    AGENT = 1
+    PROVIDER = 2
+    SOURCE_TYPE_CHOICES = ((AGENT, "Agent"), (PROVIDER, "Provider"))
     name = models.CharField(max_length=200)
     gender = models.CharField(max_length=2, default=None, blank=True, null=True,
                               choices=GENDER_CHOICES)
@@ -508,6 +531,7 @@ class Doctor(auth_model.TimeStampedModel, auth_model.QCModel, SearchKey, auth_mo
     disable_comments = models.CharField(max_length=500, blank=True)
     disabled_by = models.ForeignKey(settings.AUTH_USER_MODEL, related_name="disabled_doctors", null=True, editable=False,
                                    on_delete=models.SET_NULL)
+    source_type = models.IntegerField(choices=SOURCE_TYPE_CHOICES, null=True, editable=False)
     avg_rating = models.DecimalField(max_digits=5, decimal_places=2, null=True, editable=False)
     remark = GenericRelation(Remark)
 
@@ -519,8 +543,9 @@ class Doctor(auth_model.TimeStampedModel, auth_model.QCModel, SearchKey, auth_mo
     def update_deal_price(self):        
         # will update only this doctor prices and will be called on save    
         query = '''update doctor_clinic_timing set 
-                   deal_price = least(greatest(floor(case when fees > 0 then least(fees*1.5, .8*mrp) 
-                   else .8*mrp end /5)*5, fees), mrp) where doctor_clinic_id in (select id from doctor_clinic where doctor_id= %s) '''
+                    deal_price = least(greatest(floor(case when (least(fees*1.5, .8*mrp) - fees) >100 then least(fees*1.5, .8*mrp)
+                    else least(fees+100, mrp) end /5)*5, fees), mrp) where doctor_clinic_id in (
+                    select id from doctor_clinic where doctor_id= %s) '''
 
         update_doctor_deal_price = RawSql(query, [self.pk]).execute()
 
@@ -528,7 +553,8 @@ class Doctor(auth_model.TimeStampedModel, auth_model.QCModel, SearchKey, auth_mo
     def update_all_deal_price(cls):
         # will update all doctors prices
         query = '''update doctor_clinic_timing set 
-            deal_price = least(greatest(floor(case when fees > 0 then least(fees*1.5, .8*mrp) else .8*mrp end /5)*5, fees), mrp) '''
+            deal_price = least(greatest(floor(case when (least(fees*1.5, .8*mrp) - fees) >100 then least(fees*1.5, .8*mrp)
+            else least(fees+100, mrp) end /5)*5, fees), mrp) '''
 
         update_all_doctor_deal_price = RawSql(query, []).execute()
 
@@ -612,31 +638,29 @@ class Doctor(auth_model.TimeStampedModel, auth_model.QCModel, SearchKey, auth_mo
     def save(self, *args, **kwargs):
         self.update_time_stamps()
         self.update_live_status()
-        self.update_deal_price()
-        request_agent_lead_id = self.request_agent_lead_id if hasattr(self, 'request_agent_lead_id') else None
         # On every update of onboarding status or Qcstatus push to matrix
         push_to_matrix = False
         update_status_in_matrix = False
         if self.id:
             doctor_obj = Doctor.objects.filter(pk=self.id).first()
-            if doctor_obj and (self.onboarding_status != doctor_obj.onboarding_status or
-                               self.data_status != doctor_obj.data_status):
+            if doctor_obj and self.data_status != doctor_obj.data_status:
                 update_status_in_matrix = True
+            elif not doctor_obj:
+                push_to_matrix = True
         else:
             push_to_matrix = True
 
         super(Doctor, self).save(*args, **kwargs)
 
         transaction.on_commit(lambda: self.app_commit_tasks(push_to_matrix=push_to_matrix,
-                                                            update_status_in_matrix=update_status_in_matrix,
-                                                            request_agent_lead_id=request_agent_lead_id))
+                                                            update_status_in_matrix=update_status_in_matrix))
 
-    def app_commit_tasks(self, push_to_matrix=False, update_status_in_matrix=False, request_agent_lead_id=None):
+    def app_commit_tasks(self, push_to_matrix=False, update_status_in_matrix=False):
+        self.update_deal_price()
         if push_to_matrix:
             # push_onboarding_qcstatus_to_matrix.apply_async(({'obj_type': self.__class__.__name__, 'obj_id': self.id}
             #                                                 ,), countdown=5)
-            create_or_update_lead_on_matrix.apply_async(({'obj_type': self.__class__.__name__, 'obj_id': self.id,
-                                                          'request_agent_lead_id': request_agent_lead_id}
+            create_or_update_lead_on_matrix.apply_async(({'obj_type': self.__class__.__name__, 'obj_id': self.id}
                                                          ,), countdown=5)
 
         if update_status_in_matrix:
@@ -1105,6 +1129,7 @@ class DoctorDocument(auth_model.TimeStampedModel, auth_model.Document):
 class HospitalImage(auth_model.TimeStampedModel, auth_model.Image):
     hospital = models.ForeignKey(Hospital, on_delete=models.CASCADE)
     name = models.ImageField(upload_to='hospital/images', height_field='height', width_field='width')
+    cover_image = models.BooleanField(default=False, verbose_name="Can be used as Hospital's cover image?")
 
     class Meta:
         db_table = "hospital_image"
@@ -1115,11 +1140,13 @@ class HospitalDocument(auth_model.TimeStampedModel, auth_model.Document):
     ADDRESS = 2
     GST = 3
     CHEQUE = 5
+    LOGO = 6
     COI = 8
     EMAIL_CONFIRMATION = 9
     CHOICES = [(PAN, "PAN Card"), (ADDRESS, "Address Proof"), (GST, "GST Certificate"),
                (CHEQUE, "Cancel Cheque Copy"), (COI, "COI/Company Registration"),
-               (EMAIL_CONFIRMATION, "Email Confirmation")]
+               (EMAIL_CONFIRMATION, "Email Confirmation"),
+               (LOGO, "Logo")]
 
     hospital = models.ForeignKey(Hospital, related_name="hospital_documents", on_delete=models.CASCADE)
     document_type = models.PositiveSmallIntegerField(choices=CHOICES, default=ADDRESS)
@@ -1307,7 +1334,7 @@ class HospitalNetwork(auth_model.TimeStampedModel, auth_model.CreatedByModel, au
             hospital_network_obj = HospitalNetwork.objects.filter(pk=self.id).first()
             if hospital_network_obj and self.data_status != hospital_network_obj.data_status:
                 update_status_in_matrix = True
-        else:
+        if not self.matrix_lead_id:
             push_to_matrix = True
         super().save(*args, **kwargs)
         transaction.on_commit(lambda: self.app_commit_tasks(push_to_matrix=push_to_matrix,
@@ -1334,11 +1361,13 @@ class HospitalNetworkDocument(auth_model.TimeStampedModel, auth_model.Document):
     ADDRESS = 2
     GST = 3
     CHEQUE = 5
+    LOGO = 6
     COI = 8
     EMAIL_CONFIRMATION = 9
     CHOICES = [(PAN, "PAN Card"), (ADDRESS, "Address Proof"), (GST, "GST Certificate"),
                (CHEQUE, "Cancel Cheque Copy"),(COI, "COI/Company Registration"),
-               (EMAIL_CONFIRMATION, "Email Confirmation")]
+               (EMAIL_CONFIRMATION, "Email Confirmation"),
+               (LOGO, "Logo")]
 
     hospital_network = models.ForeignKey(HospitalNetwork, related_name="hospital_network_documents", on_delete=models.CASCADE)
     document_type = models.PositiveSmallIntegerField(choices=CHOICES)
@@ -1601,6 +1630,19 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
                 if invoice.file:
                     invoices_urls.append(util_absolute_url(invoice.file.url))
         return invoices_urls
+
+    # @staticmethod
+    # def get_upcoming_appointment_serialized(user_id):
+    #     response_appointment = OpdAppointment.get_upcoming_appointment(user_id)
+    #     appointment = doctor_serializers.OpdAppointmentUpcoming(response_appointment, many=True)
+    #     return appointment.data
+
+    @classmethod
+    def get_upcoming_appointment(cls, user_id):
+        current_time = timezone.now()
+        appointments = OpdAppointment.objects.filter(time_slot_start__gte=current_time, user_id=user_id).exclude(
+            status__in=[OpdAppointment.CANCELLED, OpdAppointment.COMPLETED]).select_related('doctor', 'hospital','profile')
+        return appointments
 
     @classmethod
     def create_appointment(cls, appointment_data):
@@ -2152,12 +2194,18 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
 
     def trigger_created_event(self, visitor_info):
         from ondoc.tracking.models import TrackingEvent
+        from ondoc.tracking.mongo_models import TrackingEvent as MongoTrackingEvent
         try:
             with transaction.atomic():
                 event_data = TrackingEvent.build_event_data(self.user, TrackingEvent.DoctorAppointmentBooked, appointmentId=self.id)
                 if event_data and visitor_info:
                     TrackingEvent.save_event(event_name=event_data.get('event'), data=event_data, visit_id=visitor_info.get('visit_id'),
                                              user=self.user, triggered_at=datetime.datetime.utcnow())
+                    if settings.MONGO_STORE:
+                        MongoTrackingEvent.save_event(event_name=event_data.get('event'), data=event_data,
+                                                 visit_id=visitor_info.get('visit_id'),
+                                                 visitor_id=visitor_info.get('visitor_id'),
+                                                 user=self.user, triggered_at=datetime.datetime.utcnow())
         except Exception as e:
             logger.error("Could not save triggered event - " + str(e))
 
@@ -2660,9 +2708,10 @@ class OfflineOPDAppointments(auth_model.TimeStampedModel):
     @staticmethod
     def appointment_cancel_sms(sms_obj):
         try:
+            cancel_time = aware_time_zone(sms_obj['old_appointment'].time_slot_start)
             default_text = "Dear %s, your appointment with %s at %s for %s has been cancelled. In case of any query, please reach out to the clinic." % (
                               sms_obj['name'], sms_obj['old_appointment'].doctor.get_display_name(), sms_obj['old_appointment'].hospital.name,
-                              sms_obj['old_appointment'].time_slot_start.strftime("%B %d, %Y %I:%M %p"))
+                              cancel_time.strftime("%B %d, %Y %I:%M %p"))
             notification_tasks.send_offline_appointment_message.apply_async(
                 kwargs={'number': sms_obj['phone_number'], 'text': default_text, 'type': 'Appointment CANCEL'},
                 countdown=1)
@@ -2756,6 +2805,22 @@ class UploadDoctorData(auth_model.TimeStampedModel):
             upload_doctor_data.apply_async((self.id,), countdown=1)
 
 
+class ProviderSignupLead(auth_model.TimeStampedModel):
+    DOCTOR = 1
+    HOSPITAL_ADMIN = 2
+    TYPE_CHOICES = ((DOCTOR, "Doctor"), (HOSPITAL_ADMIN, "Hospital Admin"),)
+
+    user = models.ForeignKey(auth_model.User, on_delete=models.CASCADE)
+    name = models.CharField(max_length=200)
+    phone_number = models.BigIntegerField(unique=True)
+    email = models.EmailField()
+    type = models.IntegerField(choices=TYPE_CHOICES)
+    is_docprime = models.NullBooleanField(null=True, editable=False)
+
+    class Meta:
+        db_table = "provider_signup_lead"
+
+
 class HealthInsuranceProvider(auth_model.TimeStampedModel):
     name = models.CharField(max_length=100)
 
@@ -2778,3 +2843,54 @@ class HealthInsuranceProviderHospitalMapping(models.Model):
     class Meta:
         db_table = "hospital__health_insurance_provider_mapping"
         unique_together = (('hospital', 'provider'),)
+
+
+class HospitalHelpline(auth_model.TimeStampedModel):
+    hospital = models.ForeignKey(Hospital, on_delete=models.CASCADE, related_name="hospital_helpline_numbers")
+    std_code = models.CharField(max_length=20, blank=True, default="")
+    number = models.BigIntegerField()
+    details = models.CharField(max_length=200, blank=True)
+
+    def __str__(self):
+        return self.hospital.name
+
+    class Meta:
+        db_table = "hospital_helpline"
+
+
+class HospitalTiming(auth_model.TimeStampedModel):
+    DAY_CHOICES = [(0, "Monday"), (1, "Tuesday"), (2, "Wednesday"), (3, "Thursday"), (4, "Friday"), (5, "Saturday"), (6, "Sunday")]
+    SHORT_DAY_CHOICES = [(0, "Mon"), (1, "Tue"), (2, "Wed"), (3, "Thu"), (4, "Fri"), (5, "Sat"), (6, "Sun")]
+    TIME_CHOICES = [(0.0, "12 AM"), (0.5, "12:30 AM"),
+                    (1.0, "1 AM"), (5.5, "1:30 AM"),
+                    (2.0, "2 AM"), (5.5, "2:30 AM"),
+                    (3.0, "3 AM"), (5.5, "3:30 AM"),
+                    (4.0, "4 AM"), (5.5, "4:30 AM"),
+                    (5.0, "5 AM"), (5.5, "5:30 AM"),
+                    (6.0, "6 AM"), (6.5, "6:30 AM"),
+                    (7.0, "7:00 AM"), (7.5, "7:30 AM"),
+                    (8.0, "8:00 AM"), (8.5, "8:30 AM"),
+                    (9.0, "9:00 AM"), (9.5, "9:30 AM"),
+                    (10.0, "10:00 AM"), (10.5, "10:30 AM"),
+                    (11.0, "11:00 AM"), (11.5, "11:30 AM"),
+                    (12.0, "12:00 PM"), (12.5, "12:30 PM"),
+                    (13.0, "1:00 PM"), (13.5, "1:30 PM"),
+                    (14.0, "2:00 PM"), (14.5, "2:30 PM"),
+                    (15.0, "3:00 PM"), (15.5, "3:30 PM"),
+                    (16.0, "4:00 PM"), (16.5, "4:30 PM"),
+                    (17.0, "5:00 PM"), (17.5, "5:30 PM"),
+                    (18.0, "6:00 PM"), (18.5, "6:30 PM"),
+                    (19.0, "7:00 PM"), (19.5, "7:30 PM"),
+                    (20.0, "8:00 PM"), (20.5, "8:30 PM"),
+                    (21.0, "9:00 PM"), (21.5, "9:30 PM"),
+                    (22.0, "10:00 PM"), (22.5, "10:30 PM"),
+                    (23.0, "11 PM"), (23.5, "11:30 PM")]
+
+    hospital = models.ForeignKey(Hospital, on_delete=models.CASCADE, related_name='hosp_availability')
+    day = models.PositiveSmallIntegerField(choices=DAY_CHOICES)
+    start = models.DecimalField(max_digits=3, decimal_places=1, choices=TIME_CHOICES)
+    end = models.DecimalField(max_digits=3, decimal_places=1, choices=TIME_CHOICES)
+
+
+    class Meta:
+        db_table = "hospital_timing"
