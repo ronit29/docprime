@@ -17,7 +17,8 @@ from ondoc.authentication import models as auth_models
 from ondoc.diagnostic import models as lab_models
 from ondoc.notification import tasks as notification_tasks
 #from ondoc.doctor.models import Hospital, DoctorClinic,Doctor,  OpdAppointment
-from ondoc.doctor.models import DoctorClinic, OpdAppointment, DoctorAssociation, DoctorQualification, Doctor, Hospital, HealthInsuranceProvider, ProviderSignupLead
+from ondoc.doctor.models import DoctorClinic, OpdAppointment, DoctorAssociation, DoctorQualification, Doctor, Hospital, \
+    HealthInsuranceProvider, ProviderSignupLead, HospitalImage
 from ondoc.notification.models import EmailNotification
 from django.utils.safestring import mark_safe
 from ondoc.coupon.models import Coupon
@@ -25,7 +26,8 @@ from ondoc.api.v1.diagnostic import serializers as diagnostic_serializer
 from ondoc.account import models as account_models
 from ondoc.location.models import EntityUrls, EntityAddress, DefaultRating
 from ondoc.procedure.models import Procedure, ProcedureCategory, CommonProcedureCategory, ProcedureToCategoryMapping, \
-    get_selected_and_other_procedures, CommonProcedure, CommonIpdProcedure, IpdProcedure, DoctorClinicIpdProcedure
+    get_selected_and_other_procedures, CommonProcedure, CommonIpdProcedure, IpdProcedure, DoctorClinicIpdProcedure, \
+    IpdProcedureFeatureMapping
 from ondoc.seo.models import NewDynamic
 from . import serializers
 from ondoc.api.v2.doctor import serializers as v2_serializers
@@ -34,7 +36,7 @@ from ondoc.api.v1.utils import convert_timings, form_time_slot, IsDoctor, paymen
     TimeSlotExtraction, GenericAdminEntity, get_opd_pem_queryset, offline_form_time_slots
 from ondoc.api.v1 import insurance as insurance_utility
 from ondoc.api.v1.doctor.doctorsearch import DoctorSearchHelper
-from django.db.models import Min
+from django.db.models import Min, Prefetch
 from django.contrib.gis.geos import Point, GEOSGeometry
 from django.shortcuts import get_object_or_404
 from rest_framework import viewsets
@@ -1199,6 +1201,7 @@ class DoctorListViewSet(viewsets.GenericViewSet):
         parameters = request.query_params
         if kwargs.get("parameters"):
             parameters = kwargs.get("parameters")
+        restrict_result_count = parameters.get('restrict_result_count', None)
         serializer = serializers.DoctorListSerializer(data=parameters, context={"request": request})
         serializer.is_valid(raise_exception=True)
         validated_data = serializer.validated_data
@@ -1562,6 +1565,9 @@ class DoctorListViewSet(viewsets.GenericViewSet):
                 entity = EntityUrls.objects.filter(url=url, url_type='SEARCHURL', entity_type='Doctor', is_valid=True)
                 if entity:
                     canonical_url = entity[0].url
+
+        if restrict_result_count:
+            response = response[:restrict_result_count]
 
         if parameters.get('doctor_suggestions') == 1:
             result = list()
@@ -3153,7 +3159,7 @@ class AppointmentMessageViewset(viewsets.GenericViewSet):
                                 'patient_name': patient_name,
                                 'doctor': appnt.doctor.name,
                                 'hospital_name': appnt.hospital.name,
-                                'date': time.strftime("%B %d, %Y %H:%M")},
+                                'date': time.strftime("%B %d, %Y %I:%M %p")},
                         countdown=1)
 
                 except Exception as e:
@@ -3207,6 +3213,7 @@ class HospitalViewSet(viewsets.GenericViewSet):
         pnt = GEOSGeometry(point_string, srid=4326)
         hospital_queryset = Hospital.objects.prefetch_related('hospitalcertification_set',
                                                               'hospital_documents',
+                                                              'hosp_availability',
                                                               'network__hospital_network_documents',
                                                               'hospitalspeciality_set').filter(
             is_live=True,
@@ -3217,8 +3224,7 @@ class HospitalViewSet(viewsets.GenericViewSet):
                       float(lat)),
                 D(m=max_distance)),
             hospital_doctors__ipd_procedure_clinic_mappings__ipd_procedure_id=ipd_pk).annotate(
-            distance=Distance('location', pnt)).annotate(
-            count_of_insurance_provider=Count('health_insurance_providers')).distinct()
+            distance=Distance('location', pnt)).distinct()
         if provider_ids:
             hospital_queryset = hospital_queryset.filter(health_insurance_providers__id__in=provider_ids)
         if min_distance:
@@ -3239,12 +3245,16 @@ class HospitalViewSet(viewsets.GenericViewSet):
         serializer = serializers.HospitalDetailRequestSerializer(data=request.query_params)
         serializer.is_valid(raise_exception=True)
         validated_data = serializer.validated_data
-        hospital_obj = Hospital.objects.prefetch_related('service', 'network', 'hospitalimage_set',
+        hospital_obj = Hospital.objects.prefetch_related('service', 'network',
                                                          'hospital_documents',
                                                          'hospital_helpline_numbers',
                                                          'network__hospital_network_documents',
                                                          'hospitalcertification_set',
-                                                         'hospitalspeciality_set').filter(id=pk, is_live=True).first()
+                                                         'hosp_availability',
+                                                         'hospitalspeciality_set', Prefetch('hospitalimage_set',
+                                                                                            HospitalImage.objects.all().order_by(
+                                                                                                '-cover_image'))).filter(
+            id=pk, is_live=True).first()
         if not hospital_obj:
             return Response(status=status.HTTP_400_BAD_REQUEST)
 
@@ -3259,7 +3269,10 @@ class IpdProcedureViewSet(viewsets.GenericViewSet):
         serializer = serializers.IpdDetailsRequestDetailRequestSerializer(data=request.query_params)
         serializer.is_valid(raise_exception=True)
         validated_data = serializer.validated_data
-        ipd_procedure = IpdProcedure.objects.prefetch_related('feature_mappings__feature').filter(is_enabled=True, id=pk).first()
+        # ipd_procedure = IpdProcedure.objects.prefetch_related('feature_mappings__feature').filter(is_enabled=True, id=pk).first()
+        ipd_procedure = IpdProcedure.objects.prefetch_related(
+            Prefetch('feature_mappings', IpdProcedureFeatureMapping.objects.select_related('feature').all().order_by('-feature__priority'))).filter(
+            is_enabled=True, id=pk).first()
         if ipd_procedure is None:
             return Response(status=status.HTTP_400_BAD_REQUEST)
         ipd_procedure_serializer = serializers.IpdProcedureDetailSerializer(ipd_procedure, context={'request': request})
@@ -3269,7 +3282,8 @@ class IpdProcedureViewSet(viewsets.GenericViewSet):
         doctor_result = doctor_list_viewset.list(request, parameters={'ipd_procedure_ids': str(pk),
                                                                       'longitude': validated_data.get('long'),
                                                                       'latitude': validated_data.get('lat'),
-                                                                      'sort_on': 'experience'})
+                                                                      'sort_on': 'experience',
+                                                                      'restrict_result_count': 2})
         return Response(
             {'about': ipd_procedure_serializer.data, 'hospitals': hospital_result.data, 'doctors': doctor_result.data})
 

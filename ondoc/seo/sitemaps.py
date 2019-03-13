@@ -156,7 +156,20 @@ class ArticleSitemap(Sitemap):
 
     def lastmod(self, obj):
         return obj.updated_at
-    
+
+
+class LabTestSitemap(Sitemap):
+    changefreq = "weekly"
+    priority = 1
+
+    def items(self):
+        return EntityUrls.objects.filter(is_valid=True, sitemap_identifier=EntityUrls.SitemapIdentifier.LAB_TEST).order_by('created_at')
+
+    def location(self, obj):
+        return "/%s" % obj.url
+
+    def lastmod(self, obj):
+        return datetime.datetime.today() - datetime.timedelta(days=datetime.datetime.today().isoweekday() % 7)
 
 
 sitemap_identifier_mapping = {
@@ -169,6 +182,7 @@ sitemap_identifier_mapping = {
     'LAB_CITY': LabCitySitemap,
     'LAB_PAGE': LabPageSitemap,
     'ARTICLES': ArticleSitemap,
+    'LAB_TEST': LabTestSitemap
 
 }
 
