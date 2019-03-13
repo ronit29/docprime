@@ -119,6 +119,7 @@ class InsurancePlans(auth_model.TimeStampedModel, LiveMixin):
     enabled = models.BooleanField(default=False)
     is_live = models.BooleanField(default=False)
     total_allowed_members = models.PositiveSmallIntegerField(default=0)
+    is_selected = models.BooleanField(default=False)
 
     @property
     def get_active_threshold(self):
