@@ -1,7 +1,9 @@
 from rest_framework import viewsets
+from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
 from ondoc.api.v1.auth.views import AppointmentViewSet
+from ondoc.authentication.backends import JWTAuthentication
 from ondoc.doctor.models import CommonSpecialization
 from ondoc.diagnostic.models import CommonTest
 from ondoc.diagnostic.models import CommonPackage
@@ -16,6 +18,10 @@ from ondoc.api.v1.diagnostic.serializers import CommonPackageSerializer
 
 
 class ScreenViewSet(viewsets.GenericViewSet):
+
+    authentication_classes = (JWTAuthentication,)
+    permission_classes = (IsAuthenticated,)
+
 
     def home_page(self, request, *args, **kwargs):
 
