@@ -269,9 +269,13 @@ class AvailableLabTestPackageSerializer(serializers.ModelSerializer):
                     rec_dict['category'].append(
                         {'name': cat.name, 'icon': util_absolute_url(cat.icon.url) if cat.icon else None})
                 param_list = list()
-                for obj in param_objs:
-                    param_list.append(obj.parameter.name)
-                param_details = [{'name': obj.parameter.name, 'details': obj.parameter.details} for obj in param_objs]
+                param_details = list()
+                for p_obj in param_objs:
+                    param_list.append(p_obj.parameter.name)
+                    name = p_obj.parameter.name
+                    details = p_obj.parameter.details
+                    param_details.append({'name': name, 'details': details})
+                # param_details = [{'name': data.parameter.name, 'details': data.parameter.details} for data in param_objs]
                 ret_data.append({
                     "name": t_obj.lab_test.name,
                     "why": t_obj.lab_test.why,
