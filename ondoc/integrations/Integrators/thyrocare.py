@@ -77,8 +77,8 @@ class Thyrocare(BaseIntegrator):
         if not pincode or not date:
             return {"error": 'pincode and date required for thyrocare lab.'}
 
-        converted_date = datetime.strptime(date, '%Y-%m-%d').strftime('%Y-%m-%d')
-        url = '%s/ORDER.svc/%s/%s/GetAppointmentSlots' % (settings.THYROCARE_BASE_URL, pincode, converted_date)
+        converted_date = datetime.strptime(date, '%Y-%m-%d').strftime('%d-%m-%Y')
+        url = '%s/ORDER.svc/%s/%s/GetAppointmentSlots' % (settings.THYROCARE_BASE_URL, pincode, date)
         response = requests.get(url)
         if response.status_code != status.HTTP_200_OK or not response.ok:
             logger.error("[ERROR] Thyrocare Time slot api failed.")
