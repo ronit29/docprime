@@ -89,6 +89,7 @@ class IpdCategoryInline(AutoComplete, TabularInline):
 
 
 class IpdProcedureAdminForm(forms.ModelForm):
+    about = forms.CharField(widget=forms.Textarea, required=False)
     details = forms.CharField(widget=forms.Textarea, required=False)
 
     class Media:

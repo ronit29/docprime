@@ -14,6 +14,7 @@ import environ
 import datetime
 import json
 import os
+from mongoengine import *
 
 # Build paths inside the project like this: os.path.join(BASE_DIR, ...)
 #BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -74,6 +75,20 @@ DATABASES = {
 }
 DATABASES['default']['ENGINE'] = 'django.contrib.gis.db.backends.postgis'
 
+try:
+    MONGO_STORE = False
+    if env('MONGO_DB_NAME') and env('MONGO_DB_HOST') and env('MONGO_DB_PORT'):
+        mongo_port = int(env('MONGO_DB_PORT'))
+        if env('MONGO_DB_USERNAME', None) and env('MONGO_DB_PASSWORD', None):
+            connect(env('MONGO_DB_NAME'), host=env('MONGO_DB_HOST'), port=mongo_port, username=env('MONGO_DB_USERNAME'),
+                                            password=env('MONGO_DB_PASSWORD'), authentication_source='admin')
+        else:
+            connect(env('MONGO_DB_NAME'), host=env('MONGO_DB_HOST'), port=mongo_port)
+        MONGO_STORE = env.bool('MONGO_STORE', default=False)
+except Exception as e:
+    print(e)
+    print('Failed to connect to mongo')
+    MONGO_STORE = False
 
 
 # Application definition
@@ -110,8 +125,7 @@ THIRD_PARTY_APPS = (
     'fluent_comments',
     'threadedcomments',
     'django_comments',
-    'ddtrace.contrib.django',
-    'safedelete'
+    'safedelete',
 )
 
 LOCAL_APPS = (
@@ -144,7 +158,8 @@ LOCAL_APPS = (
     'ondoc.ckedit',
     'ondoc.screen',
     'ondoc.comments',
-    'ondoc.integrations'
+    'ondoc.integrations',
+    'ondoc.subscription_plan'
 )
 
 INSTALLED_APPS = DJANGO_APPS + THIRD_PARTY_APPS + LOCAL_APPS
@@ -328,6 +343,7 @@ REFUND_INACTIVE_TIME = 24  # In hours
 AUTO_CANCEL_OPD_DELAY = 3000  # In min
 AUTO_CANCEL_LAB_DELAY = 30  # In min
 OPS_EMAIL_ID = env.list('OPS_EMAIL_ID')
+IPD_PROCEDURE_CONTACT_DETAILS = env.list('IPD_PROCEDURE_CONTACT_DETAILS')
 ORDER_FAILURE_EMAIL_ID = env.list('ORDER_FAILURE_EMAIL_ID')
 AUTO_REFUND = env.bool('AUTO_REFUND')
 HARD_CODED_OTP = '357237'
@@ -384,7 +400,6 @@ CONN_MAX_AGE=600
 AWS_ACCESS_KEY_ID = env('AWS_ACCESS_KEY_ID', default='')
 AWS_SECRET_ACCESS_KEY = env('AWS_SECRET_ACCESS_KEY', default='')
 PROVIDER_EMAIL = env('PROVIDER_EMAIL', default='')
-
 
 #comments Settings
 COMMENTS_APP = 'fluent_comments'

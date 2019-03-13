@@ -48,6 +48,8 @@ def processor(sitemap_identifier, sitemap_obj):
             filename = 'doctor-profile'
         elif sitemap_identifier == 'ARTICLES':
             filename = sitemap_obj.customized_name
+        elif sitemap_identifier == 'LAB_TEST':
+            filename = 'lab-test'
 
         filename = slugify(filename)
 

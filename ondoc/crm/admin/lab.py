@@ -852,15 +852,15 @@ class LabAppointmentAdmin(nested_admin.NestedModelAdmin):
         return form
 
     def get_fields(self, request, obj=None):
-        if request.user.is_superuser:
-            return ('booking_id', 'order_id', 'lab', 'lab_id', 'lab_contact_details', 'profile', 'user',
-                    'profile_detail', 'status', 'cancel_type', 'cancellation_reason', 'cancellation_comments',
-                    'get_lab_test', 'price', 'agreed_price',
-                    'deal_price', 'effective_price', 'start_date', 'start_time', 'otp', 'payment_status',
-                    'payment_type', 'insurance', 'is_home_pickup', 'address', 'outstanding',
-                    'send_email_sms_report', 'invoice_urls', 'reports_uploaded', 'email_notification_timestamp', 'payment_type'
-                    )
-        elif request.user.groups.filter(name=constants['LAB_APPOINTMENT_MANAGEMENT_TEAM']).exists():
+        # if request.user.is_superuser:
+        #     return ('booking_id', 'order_id', 'lab', 'lab_id', 'lab_contact_details', 'profile', 'user',
+        #             'profile_detail', 'status', 'cancel_type', 'cancellation_reason', 'cancellation_comments',
+        #             'get_lab_test', 'price', 'agreed_price',
+        #             'deal_price', 'effective_price', 'start_date', 'start_time', 'otp', 'payment_status',
+        #             'payment_type', 'insurance', 'is_home_pickup', 'address', 'outstanding',
+        #             'send_email_sms_report', 'invoice_urls', 'reports_uploaded', 'email_notification_timestamp', 'payment_type'
+        #             )
+        # elif request.user.groups.filter(name=constants['LAB_APPOINTMENT_MANAGEMENT_TEAM']).exists():
             return ('booking_id', 'order_id',  'lab_id', 'lab_name', 'get_lab_test', 'lab_contact_details',
                     'used_profile_name', 'used_profile_number',
                     'default_profile_name', 'default_profile_number', 'user_id', 'user_number', 'price', 'agreed_price',
@@ -869,22 +869,21 @@ class LabAppointmentAdmin(nested_admin.NestedModelAdmin):
                     'cancellation_reason', 'cancellation_comments', 'start_date', 'start_time',
                     'send_email_sms_report', 'invoice_urls', 'reports_uploaded', 'email_notification_timestamp', 'payment_type'
                     )
-        else:
-            return ()
+        # else:
+        #     return ()
 
     def get_readonly_fields(self, request, obj=None):
-        if request.user.is_superuser:
-            read_only =  ['booking_id', 'order_id', 'lab_id', 'lab_contact_details', 'get_lab_test', 'invoice_urls', 'reports_uploaded', 'email_notification_timestamp', 'payment_type']
-        elif request.user.groups.filter(name=constants['LAB_APPOINTMENT_MANAGEMENT_TEAM']).exists():
-            read_only = ['booking_id', 'order_id', 'lab_name', 'lab_id', 'get_lab_test', 'invoice_urls',
-                    'lab_contact_details', 'used_profile_name', 'used_profile_number',
-                    'default_profile_name', 'default_profile_number', 'user_number', 'user_id', 'price', 'agreed_price',
-                    'deal_price', 'effective_price', 'payment_status', 'otp',
-                    'payment_type', 'insurance', 'is_home_pickup', 'get_pickup_address', 'get_lab_address',
-                         'outstanding', 'reports_uploaded', 'email_notification_timestamp', 'payment_type']
-        else:
-            read_only = []
-
+        # if request.user.is_superuser:
+        #     read_only =  ['booking_id', 'order_id', 'lab_id', 'lab_contact_details', 'get_lab_test', 'invoice_urls', 'reports_uploaded', 'email_notification_timestamp', 'payment_type']
+        # elif request.user.groups.filter(name=constants['LAB_APPOINTMENT_MANAGEMENT_TEAM']).exists():
+        read_only = ['booking_id', 'order_id', 'lab_name', 'lab_id', 'get_lab_test', 'invoice_urls',
+                'lab_contact_details', 'used_profile_name', 'used_profile_number',
+                'default_profile_name', 'default_profile_number', 'user_number', 'user_id', 'price', 'agreed_price',
+                'deal_price', 'effective_price', 'payment_status', 'otp',
+                'payment_type', 'insurance', 'is_home_pickup', 'get_pickup_address', 'get_lab_address',
+                     'outstanding', 'reports_uploaded', 'email_notification_timestamp', 'payment_type']
+        # else:
+        #     read_only = []
         if obj and (obj.status == LabAppointment.COMPLETED or obj.status == LabAppointment.CANCELLED):
             read_only.extend(['status'])
         return read_only
