@@ -617,8 +617,10 @@ class InsuranceTransaction(auth_model.TimeStampedModel):
 
     def after_commit_tasks(self):
         if self.transaction_type == InsuranceTransaction.DEBIT:
-            self.user_insurance.generate_pdf()
-            send_insurance_notifications(self.user_insurance.user.id)
+            # self.user_insurance.generate_pdf()
+            # send_insurance_notifications(self.user_insurance.user.id)
+
+            send_insurance_notifications.apply_async(({'user_id': self.user_insurance.user.id}, ), countdown=10)
 
     def save(self, *args, **kwargs):
         if self.pk:
