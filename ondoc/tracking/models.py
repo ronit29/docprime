@@ -47,10 +47,11 @@ class TrackingVisit(auth_models.TimeStampedModel):
 class TrackingEvent(auth_models.TimeStampedModel):
     DoctorAppointmentBooked = 'DoctorAppointmentBooked'
     LabAppointmentBooked = 'LabAppointmentBooked'
-
+    InsurancePurchased = 'InsurancePurchased'
     ACTION_EVENTS = {
         DoctorAppointmentBooked : 'doctor-appointment-booked',
         LabAppointmentBooked : 'lab-appointment-booked',
+        InsurancePurchased: 'insurance-purchased'
     }
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)

@@ -1124,21 +1124,22 @@ class TransactionViewSet(viewsets.GenericViewSet):
             coded_response = None
             data = request.data
             # Commenting below for testing
-            try:
-                coded_response = data.get("response")
-                if isinstance(coded_response, list):
-                    coded_response = coded_response[0]
-                coded_response += "=="
-                decoded_response = base64.b64decode(coded_response).decode()
-                response = json.loads(decoded_response)
-            except Exception as e:
-                logger.error("Cannot decode pg data - " + str(e))
+            # try:
+            #     coded_response = data.get("response")
+            #     if isinstance(coded_response, list):
+            #         coded_response = coded_response[0]
+            #     coded_response += "=="
+            #     decoded_response = base64.b64decode(coded_response).decode()
+            #     response = json.loads(decoded_response)
+            # except Exception as e:
+            #     logger.error("Cannot decode pg data - " + str(e))
+            response = request.data
 
             # log pg data
-            try:
-                PgLogs.objects.create(decoded_response=response, coded_response=coded_response)
-            except Exception as e:
-                logger.error("Cannot log pg response - " + str(e))
+            # try:
+            #     PgLogs.objects.create(decoded_response=response, coded_response=coded_response)
+            # except Exception as e:
+            #     logger.error("Cannot log pg response - " + str(e))
 
 
             ## Check if already processes
@@ -1170,8 +1171,9 @@ class TransactionViewSet(viewsets.GenericViewSet):
                 if resp_serializer.is_valid():
                     response_data = self.form_pg_transaction_data(resp_serializer.validated_data, order_obj)
                     # For Testing
-                    if PgTransaction.is_valid_hash(response, product_id=order_obj.product_id):
-                        pg_tx_queryset = None
+                    # if PgTransaction.is_valid_hash(response, product_id=order_obj.product_id):
+                    #     pg_tx_queryset = None
+                    if True:
                         try:
                             with transaction.atomic():
                                 pg_tx_queryset = PgTransaction.objects.create(**response_data)
@@ -1207,6 +1209,8 @@ class TransactionViewSet(viewsets.GenericViewSet):
                     REDIRECT_URL = OPD_REDIRECT_URL + "/" + str(processed_data.get("id","")) + "?payment_success=true"
                 elif processed_data.get("type") == "lab":
                     REDIRECT_URL = LAB_REDIRECT_URL + "/" + str(processed_data.get("id","")) + "?payment_success=true"
+                elif processed_data.get("type") == "insurance":
+                    REDIRECT_URL = settings.BASE_URL + "/insurance/complete"
 
         except Exception as e:
             logger.error("Error - " + str(e))

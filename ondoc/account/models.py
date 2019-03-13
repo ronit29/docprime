@@ -115,6 +115,7 @@ class Order(TimeStampedModel):
 
         # Initial validations for appointment data
         appointment_data = self.action_data
+        user_insurance_data = self.action_data
         # Check if payment is required at all, only when payment is required we debit consumer's account
         payment_not_required = False
         if self.product_id == self.DOCTOR_PRODUCT_ID:
@@ -133,6 +134,14 @@ class Order(TimeStampedModel):
                 payment_not_required = True
             elif appointment_data['payment_type'] == OpdAppointment.INSURANCE:
                 payment_not_required = True
+        elif self.product_id == self.INSURANCE_PRODUCT_ID:
+            insurance_data = deepcopy(self.action_data)
+            insurance_data = insurance_reverse_transform(insurance_data)
+            insurance_data['user_insurance']['order'] = self.id
+            serializer = UserInsuranceSerializer(data=insurance_data.get('user_insurance'))
+            serializer.is_valid(raise_exception=True)
+            user_insurance_data = serializer.validated_data
+
 
         consumer_account = ConsumerAccount.objects.get_or_create(user=appointment_data['user'])
         consumer_account = ConsumerAccount.objects.select_for_update().get(user=appointment_data['user'])
@@ -179,16 +188,14 @@ class Order(TimeStampedModel):
                     "payment_status": Order.PAYMENT_ACCEPTED
                 }
         elif self.action == Order.INSURANCE_CREATE:
-            insurance_data = deepcopy(self.action_data)
-            insurance_data = insurance_reverse_transform(insurance_data)
-            insurance_data['user_insurance']['order'] = self.id
-            user = User.objects.get(id=self.action_data.get('user'))
-            insurance_data['user_insurance']['premium_amount'] = self.amount + self.wallet_amount
-            serializer = UserInsuranceSerializer(data=insurance_data.get('user_insurance'))
-            serializer.is_valid(raise_exception=True)
-            user_insurance_data = serializer.validated_data
-            appointment_data = user_insurance_data
-            appointment_obj = self.process_insurance_order(consumer_account,user_insurance_data)
+            # insurance_data = deepcopy(self.action_data)
+            # insurance_data = insurance_reverse_transform(insurance_data)
+            # insurance_data['user_insurance']['order'] = self.id
+            # insurance_data['user_insurance']['premium_amount'] = self.amount + self.wallet_amount
+            # serializer = UserInsuranceSerializer(data=insurance_data.get('user_insurance'))
+            # serializer.is_valid(raise_exception=True)
+            # user_insurance_data = serializer.validated_data
+            appointment_obj = self.process_insurance_order(consumer_account, user_insurance_data)
             amount = appointment_obj.premium_amount
             order_dict = {
                 "reference_id": appointment_obj.id,
@@ -506,6 +513,7 @@ class Order(TimeStampedModel):
     def process_pg_order(self):
         from ondoc.doctor.models import OpdAppointment
         from ondoc.diagnostic.models import LabAppointment
+        from ondoc.insurance.models import UserInsurance
 
         orders_to_process = []
         if self.orders.exists():
@@ -516,6 +524,7 @@ class Order(TimeStampedModel):
         total_cashback_used = total_wallet_used = 0
         opd_appointment_ids = []
         lab_appointment_ids = []
+        insurance_id = None
 
         for order in orders_to_process:
             try:
@@ -528,6 +537,8 @@ class Order(TimeStampedModel):
                     opd_appointment_ids.append(curr_app.id)
                 elif order.product_id == Order.LAB_PRODUCT_ID:
                     lab_appointment_ids.append(curr_app.id)
+                elif order.product_id == Order.INSURANCE_PRODUCT_ID:
+                    insurance_id = curr_app.id
 
                 total_cashback_used += curr_cashback
                 total_wallet_used += curr_wallet
@@ -541,7 +552,7 @@ class Order(TimeStampedModel):
             except Exception as e:
                 logger.error(str(e))
 
-        if not opd_appointment_ids and not lab_appointment_ids:
+        if not opd_appointment_ids and not lab_appointment_ids and not insurance_id:
             raise Exception("Could not process entire order")
 
         # mark order processed:
@@ -562,12 +573,24 @@ class Order(TimeStampedModel):
             OpdAppointment.objects.filter(id__in=opd_appointment_ids).update(money_pool=money_pool)
         if lab_appointment_ids:
             LabAppointment.objects.filter(id__in=lab_appointment_ids).update(money_pool=money_pool)
+        if insurance_id:
+            UserInsurance.objects.filter(id=insurance_id).update(money_pool=money_pool)
 
-        resp = { "opd" : opd_appointment_ids , "lab" : lab_appointment_ids, "type" : "all", "id" : None }
+        resp = { "opd" : opd_appointment_ids , "lab" : lab_appointment_ids, "insurance": insurance_id,
+                 "type" : "all", "id" : None }
         # Handle backward compatibility, in case of single booking, return the booking id
-        if (len(opd_appointment_ids) + len(lab_appointment_ids)) == 1:
-            resp["type"] = "doctor" if len(opd_appointment_ids) > 0 else "lab"
-            resp["id"] = opd_appointment_ids[0] if len(opd_appointment_ids) > 0 else lab_appointment_ids[0]
+        if (len(opd_appointment_ids) + len(lab_appointment_ids)) == 1 or insurance_id is not None:
+            # resp["type"] = "doctor" if len(opd_appointment_ids) > 0 else "lab"
+            if len(opd_appointment_ids) > 0:
+                resp["type"] = "doctor"
+                resp["id"] = opd_appointment_ids[0]
+            elif len(lab_appointment_ids) > 0:
+                resp["type"] = "lab"
+                resp["id"] = lab_appointment_ids[0]
+            else:
+                resp["type"] = "insurance"
+                resp["id"] = insurance_id
+            # resp["id"] = opd_appointment_ids[0] if len(opd_appointment_ids) > 0 else lab_appointment_ids[0]
 
         return resp
 
