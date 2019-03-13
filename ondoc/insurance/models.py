@@ -64,6 +64,55 @@ class LiveMixin(models.Model):
         abstract = True
 
 
+class StateGSTCode(auth_model.TimeStampedModel):
+    gst_code = models.CharField(max_length=10)
+    state_name = models.CharField(max_length=100)
+    is_enabled = models.BooleanField(default=True)
+    is_live = models.BooleanField(default=True)
+
+    @property
+    def get_active_city(self):
+        return self.related_cities.filter(is_live=True).order_by('city_name')
+
+    @property
+    def get_active_district(self):
+        return self.related_districts.filter(is_live=True).order_by('district_name')
+
+    def __str__(self):
+        return "{} ({})".format(self.gst_code, self.state_name)
+
+    class Meta:
+        db_table = "insurance_state"
+
+
+class InsuranceCity(auth_model.TimeStampedModel):
+    city_code = models.CharField(max_length=10)
+    city_name = models.CharField(max_length=100)
+    state = models.ForeignKey(StateGSTCode, related_name="related_cities", on_delete=models.SET_NULL, null=True)
+    is_enabled = models.BooleanField(default=True)
+    is_live = models.BooleanField(default=True)
+
+    def __str__(self):
+        return "{} ({})".format(self.city_code, self.city_name)
+
+    class Meta:
+        db_table = "insurance_city"
+
+
+class InsuranceDistrict(auth_model.TimeStampedModel):
+    district_code = models.CharField(max_length=10)
+    district_name = models.CharField(max_length=100)
+    state = models.ForeignKey(StateGSTCode, related_name="related_districts", on_delete=models.SET_NULL, null=True)
+    is_enabled = models.BooleanField(default=True)
+    is_live = models.BooleanField(default=True)
+
+    def __str__(self):
+        return "{} ({})".format(self.district_code, self.district_name)
+
+    class Meta:
+        db_table = "insurance_district"
+
+
 class Insurer(auth_model.TimeStampedModel, LiveMixin):
     name = models.CharField(max_length=100)
     min_float = models.PositiveIntegerField(default=None)
@@ -85,6 +134,7 @@ class Insurer(auth_model.TimeStampedModel, LiveMixin):
     igst = models.PositiveSmallIntegerField(blank=False, null=True)
     sgst = models.PositiveSmallIntegerField(blank=False, null=True)
     cgst = models.PositiveSmallIntegerField(blank=False, null=True)
+    state = models.ForeignKey(StateGSTCode, on_delete=models.CASCADE, default=None, blank=False, null=True)
 
     @property
     def get_active_plans(self):
@@ -216,6 +266,9 @@ class UserInsurance(auth_model.TimeStampedModel):
         return str(self.user)
 
     def generate_pdf(self):
+        insurer_state_code_obj = self.insurance_plan.insurer.state
+        insurer_state_code = insurer_state_code_obj.gst_code
+
         insured_members = self.members.filter().order_by('id')
         proposer = list(filter(lambda member: member.relation.lower() == 'self', insured_members))
         proposer = proposer[0]
@@ -258,14 +311,14 @@ class UserInsurance(auth_model.TimeStampedModel):
         sgst_tax = 'NA'
         igst_tax = 'NA'
 
-        if self.insurance_plan.insurer.cgst and self.insurance_plan.insurer.sgst:
+        if insurer_state_code == gst_state_code and self.insurance_plan.insurer.cgst and self.insurance_plan.insurer.sgst:
             cgst_tax = (amount_without_tax/Decimal(100)) * Decimal(self.insurance_plan.insurer.cgst)
             cgst_tax = '%.2f' % (float(str(cgst_tax)))
 
             sgst_tax = (amount_without_tax/Decimal(100)) * Decimal(self.insurance_plan.insurer.sgst)
             sgst_tax = '%.2f' % (float(str(sgst_tax)))
 
-        elif self.insurance_plan.insurer.igst:
+        elif insurer_state_code != gst_state_code and self.insurance_plan.insurer.igst:
             igst_tax = (amount_without_tax/Decimal(100)) * Decimal(self.insurance_plan.insurer.igst)
             igst_tax = '%.2f' % (float(str(igst_tax)))
 
@@ -667,41 +720,3 @@ class InsuranceDiseaseResponse(auth_model.TimeStampedModel):
         db_table = "insurance_disease_response"
 
 
-class StateGSTCode(auth_model.TimeStampedModel):
-    gst_code = models.CharField(max_length=10)
-    state_name = models.CharField(max_length=100)
-    is_enabled = models.BooleanField(default=True)
-    is_live = models.BooleanField(default=True)
-
-    @property
-    def get_active_city(self):
-        return self.related_cities.filter(is_live=True).order_by('city_name')
-
-    @property
-    def get_active_district(self):
-        return self.related_districts.filter(is_live=True).order_by('district_name')
-
-    class Meta:
-        db_table = "insurance_state"
-
-
-class InsuranceCity(auth_model.TimeStampedModel):
-    city_code = models.CharField(max_length=10)
-    city_name = models.CharField(max_length=100)
-    state = models.ForeignKey(StateGSTCode, related_name="related_cities", on_delete=models.SET_NULL, null=True)
-    is_enabled = models.BooleanField(default=True)
-    is_live = models.BooleanField(default=True)
-
-    class Meta:
-        db_table = "insurance_city"
-
-
-class InsuranceDistrict(auth_model.TimeStampedModel):
-    district_code = models.CharField(max_length=10)
-    district_name = models.CharField(max_length=100)
-    state = models.ForeignKey(StateGSTCode, related_name="related_districts", on_delete=models.SET_NULL, null=True)
-    is_enabled = models.BooleanField(default=True)
-    is_live = models.BooleanField(default=True)
-
-    class Meta:
-        db_table = "insurance_district"
