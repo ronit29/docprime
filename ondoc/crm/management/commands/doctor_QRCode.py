@@ -47,13 +47,11 @@ class Command(BaseCommand):
         #     data = worksheet.cell(curr_row, 0)
         #     result_data.append(data)
 
-        for item in id_list:
-            doctor_id = item
-            doc = Doctor.objects.filter(id=doctor_id, is_live=True).first()
-            if doc:
-                if not doc.qr_code.all().exists():
-                    doc.generate_qr_code()
-                    doc.generate_sticker()
+
+        for doc in Doctor.objects.filter(id__in=id_list, is_live=True).first():
+            if not doc.qr_code.all().exists():
+                doc.generate_qr_code()
+                doc.generate_sticker()
 
 
 
