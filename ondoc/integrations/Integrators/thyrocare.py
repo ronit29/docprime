@@ -77,7 +77,7 @@ class Thyrocare(BaseIntegrator):
         if not pincode or not date:
             return {"error": 'pincode and date required for thyrocare lab.'}
 
-        converted_date = datetime.strptime(date, '%Y-%m-%d').strftime('%d-%m-%Y')
+        converted_date = datetime.strptime(date, '%Y-%m-%d').strftime('%Y-%m-%d')
         url = '%s/ORDER.svc/%s/%s/GetAppointmentSlots' % (settings.THYROCARE_BASE_URL, pincode, converted_date)
         response = requests.get(url)
         if response.status_code != status.HTTP_200_OK or not response.ok:
@@ -152,7 +152,7 @@ class Thyrocare(BaseIntegrator):
             patient_address = "Address not available"
             pincode = "122002"
 
-        order_id = "DP00{}".format(lab_appointment.id)
+        order_id = "DP{}".format(lab_appointment.id)
         bendataxml = "<NewDataSet><Ben_details><Name>%s</Name><Age>%s</Age><Gender>%s</Gender></Ben_details></NewDataSet>" % (profile.name, self.calculate_age(profile), profile.gender)
 
         payload = {
@@ -317,23 +317,27 @@ class Thyrocare(BaseIntegrator):
             response = requests.get(url)
             response = response.json()
             if response.get('RES_ID') == 'RES0000':
-                thyrocare_appointment_time = response['LEADHISORY_MASTER'][0]['APPOINT_ON'][0]['DATE'].strftime("%d-%m-%Y")
-                dp_appointment_time = dp_appointment.time_slot_start.strftime("%d-%m-%Y")
+                thyrocare_appointment_time = response['LEADHISORY_MASTER'][0]['APPOINT_ON'][0]['DATE']
+                thyrocare_appointment_time = datetime.strptime(thyrocare_appointment_time, "%d-%m-%Y %H:%M").strftime("%Y-%m-%d")
+                dp_appointment_time = dp_appointment.time_slot_start.strftime("%Y-%m-%d")
                 if not thyrocare_appointment_time == dp_appointment_time:
-                    dp_appointment.update(time_slot_start=thyrocare_appointment_time, status=3)
+                    dp_appointment.time_slot_start = thyrocare_appointment_time
+                    dp_appointment.status = 3
+                    dp_appointment.save()
 
                 # check integrator order status and update docprime booking
                 if response['BEN_MASTER'][0]['STATUS'].upper() == 'YET TO ASSIGN':
                     pass
                 elif response['BEN_MASTER'][0]['STATUS'].upper() == 'DELIVERY' or 'REPORTED' or 'SERVICED' or 'CREDITED':
                     if not dp_appointment.status == 5:
-                        dp_appointment.update(status=5)
+                        dp_appointment.status = 5
+                        dp_appointment.save()
                 elif response['BEN_MASTER'][0]['STATUS'].upper() == 'DONE':
                     pass
                 elif response['BEN_MASTER'][0]['STATUS'].upper() == 'CANCELLED' or 'REJECTED':
                     if not dp_appointment.status == 6:
-                        dp_appointment.update(status=6, cancellation_type=2)
-
-                return True
+                        dp_appointment.status = 6
+                        dp_appointment.cancellation_type = 2
+                        dp_appointment.save()
             else:
                 print("[ERROR] %s %s" % (integrator_response.id, response.get('RESPONSE')))

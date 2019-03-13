@@ -721,7 +721,7 @@ class LabAppointmentCreateSerializer(serializers.Serializer):
         selected_day_slots = available_slots['time_slots'][selected_date]
         current_day_slots = self.get_slots_list(selected_day_slots)
 
-        if curr_time < current_day_slots[0] and curr_time > current_day_slots[-1]:
+        if curr_time < current_day_slots[0] or curr_time > current_day_slots[-1]:
             raise serializers.ValidationError("Invalid Time slot")
 
         # if is_today and available_slots.get("today_min") and available_slots.get("today_min") > curr_time:

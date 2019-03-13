@@ -6,10 +6,9 @@ import raven
 import os
 from django.conf import settings
 from raven.contrib.celery import register_signal, register_logger_signal
-from ondoc.account.tasks import refund_status_update, consumer_refund_update, dump_to_elastic
+from ondoc.account.tasks import refund_status_update, consumer_refund_update, dump_to_elastic, integrator_order_summary
 from celery.schedules import crontab
 from ondoc.doctor.tasks import save_avg_rating, update_prices
-from ondoc.integrations.task import integrator_order_summary
 # from ondoc.doctor.services.update_search_score import DoctorSearchScore
 
 
@@ -64,7 +63,7 @@ def setup_periodic_tasks(sender, **kwargs):
     sender.add_periodic_task(elastic_sync_cron_schedule, dump_to_elastic.s(), name='Sync Elastic')
     sender.add_periodic_task(crontab(hour=18, minute=30), save_avg_rating.s(), name='Update Lab and Doctor Average Rating')
     sender.add_periodic_task(crontab(hour=19, minute=30), update_prices.s(), name='Update Lab and Doctor Prices')
-    sender.add_periodic_task(300.0, integrator_order_summary.s(), name='Get Order Summary From Integrator')
+    # sender.add_periodic_task(300.0, integrator_order_summary.s(), name='Get Order Summary From Integrator')
 
     
     # doctor_search_score_creation_time = float(settings.CREATE_DOCTOR_SEARCH_SCORE) * float(3600.0)

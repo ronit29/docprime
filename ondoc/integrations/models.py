@@ -98,9 +98,11 @@ class IntegratorResponse(TimeStampedModel):
         integrator_responses = IntegratorResponse.objects.all()
         for integrator_response in integrator_responses:
             integrator_obj = service.create_integrator_obj(integrator_response.integrator_class_name)
-            response = integrator_obj.get_order_summary(integrator_response)
-            if response:
-                return True
+            integrator_obj.get_order_summary(integrator_response)
+
+        print("Order Summary for Thyrocare Complete")
+
+
 
 
 class IntegratorReport(TimeStampedModel):
