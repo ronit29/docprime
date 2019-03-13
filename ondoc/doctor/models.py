@@ -718,7 +718,6 @@ class Doctor(auth_model.TimeStampedModel, auth_model.QCModel, SearchKey, auth_mo
             if qrcode:
                 qrcode = default_storage.path(qrcode.name)
                 break
-        print(qrcode)
 
         template_url = staticfiles_storage.path('web/images/qr_image.png')
         template = Image.open(template_url)
