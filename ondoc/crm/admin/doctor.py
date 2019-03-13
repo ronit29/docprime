@@ -1349,6 +1349,8 @@ class DoctorAdmin(AutoComplete, ImportExportMixin, VersionAdmin, ActionAdmin, QC
             obj.qc_approved_at = datetime.datetime.now()
         if '_mark_in_progress' in request.POST:
             obj.data_status = QCModel.REOPENED
+        if not obj.source_type:
+            obj.source_type = Doctor.AGENT
         obj.status_changed_by = request.user
 
         super().save_model(request, obj, form, change)
@@ -1463,11 +1465,12 @@ class DoctorOpdAppointmentForm(forms.ModelForm):
             raise forms.ValidationError(
                 "Cancellation comments must be mentioned for selected cancellation reason.")
 
-        if not DoctorClinicTiming.objects.filter(doctor_clinic__doctor=doctor,
-                                                 doctor_clinic__hospital=hospital,
-                                                 day=time_slot_start.weekday(),
-                                                 start__lte=hour, end__gt=hour).exists():
-            raise forms.ValidationError("Doctor do not sit at the given hospital in this time slot.")
+        if cleaned_data.get('status') not in [OpdAppointment.CANCELLED, OpdAppointment.COMPLETED]:
+            if not DoctorClinicTiming.objects.filter(doctor_clinic__doctor=doctor,
+                                                     doctor_clinic__hospital=hospital,
+                                                     day=time_slot_start.weekday(),
+                                                     start__lte=hour, end__gt=hour).exists():
+                raise forms.ValidationError("Doctor do not sit at the given hospital in this time slot.")
 
         # if self.instance.id:
         #     if cleaned_data.get('status') == OpdAppointment.RESCHEDULED_PATIENT or cleaned_data.get(
@@ -1539,13 +1542,13 @@ class DoctorOpdAppointmentAdmin(admin.ModelAdmin):
         return form
 
     def get_fields(self, request, obj=None):
-        if request.user.is_superuser and request.user.is_staff:
-            return ('booking_id', 'doctor', 'doctor_id', 'doctor_details', 'hospital', 'hospital_details', 'kyc',
-                    'contact_details', 'profile', 'profile_detail', 'user', 'booked_by', 'procedures_details',
-                    'fees', 'effective_price', 'mrp', 'deal_price', 'payment_status', 'status', 'cancel_type',
-                    'cancellation_reason', 'cancellation_comments', 'ratings',
-                    'start_date', 'start_time', 'payment_type', 'otp', 'insurance', 'outstanding', 'invoice_urls', 'payment_type')
-        elif request.user.groups.filter(name=constants['OPD_APPOINTMENT_MANAGEMENT_TEAM']).exists():
+        # if request.user.is_superuser and request.user.is_staff:
+        #     return ('booking_id', 'doctor', 'doctor_id', 'doctor_details', 'hospital', 'hospital_details', 'kyc',
+        #             'contact_details', 'profile', 'profile_detail', 'user', 'booked_by', 'procedures_details',
+        #             'fees', 'effective_price', 'mrp', 'deal_price', 'payment_status', 'status', 'cancel_type',
+        #             'cancellation_reason', 'cancellation_comments', 'ratings',
+        #             'start_date', 'start_time', 'payment_type', 'otp', 'insurance', 'outstanding', 'invoice_urls', 'payment_type')
+        # elif request.user.groups.filter(name=constants['OPD_APPOINTMENT_MANAGEMENT_TEAM']).exists():
             return ('booking_id', 'doctor_name', 'doctor_id', 'doctor_details', 'hospital_name', 'hospital_details',
                     'kyc', 'contact_details', 'used_profile_name',
                     'used_profile_number', 'default_profile_name',
@@ -1554,22 +1557,23 @@ class DoctorOpdAppointmentAdmin(admin.ModelAdmin):
                     'payment_type', 'admin_information', 'otp', 'insurance', 'outstanding',
                     'status', 'cancel_type', 'cancellation_reason', 'cancellation_comments',
                     'start_date', 'start_time', 'invoice_urls', 'payment_type')
-        else:
-            return ()
+        # else:
+        #     return ()
 
     def get_readonly_fields(self, request, obj=None):
-        if request.user.is_superuser and request.user.is_staff:
-            return ('booking_id', 'doctor_id', 'doctor_details', 'contact_details', 'hospital_details', 'kyc',
-                    'procedures_details', 'invoice_urls', 'ratings', 'payment_type')
-        elif request.user.groups.filter(name=constants['OPD_APPOINTMENT_MANAGEMENT_TEAM']).exists():
+        # if request.user.is_superuser and request.user.is_staff:
+        #     return ('booking_id', 'doctor_id', 'doctor_details', 'contact_details', 'hospital_details', 'kyc',
+        #             'procedures_details', 'invoice_urls', 'ratings', 'payment_type')
+        # elif request.user.groups.filter(name=constants['OPD_APPOINTMENT_MANAGEMENT_TEAM']).exists():
             return ('booking_id', 'doctor_name', 'doctor_id', 'doctor_details', 'hospital_name',
                     'hospital_details', 'kyc', 'contact_details',
                     'used_profile_name', 'used_profile_number', 'default_profile_name',
                     'default_profile_number', 'user_id', 'user_number', 'booked_by',
                     'fees', 'effective_price', 'mrp', 'deal_price', 'payment_status', 'payment_type',
-                    'admin_information', 'otp', 'insurance', 'outstanding', 'procedures_details','invoice_urls', 'payment_type')
-        else:
-            return ('invoice_urls')
+                    'admin_information', 'otp', 'insurance', 'outstanding', 'procedures_details','invoice_urls', 'payment_type',
+                    'invoice_urls')
+        # else:
+        #     return ('invoice_urls')
 
     def ratings(self, obj):
         rating_queryset = rating_models.RatingsReview.objects.filter(appointment_id=obj.id).first()

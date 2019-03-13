@@ -801,6 +801,9 @@ class EMAILNotification:
             context.update({'attachments': attachments})
             body_template = "email/lab/lab_report_send_crm/body.html"
             subject_template = "email/lab/lab_report_send_crm/subject.txt"
+        elif notification_type == NotificationAction.IPD_PROCEDURE_MAIL:
+            body_template = "email/ipd_lead/body.html"
+            subject_template = "email/ipd_lead/subject.txt"
 
         return subject_template, body_template
 
