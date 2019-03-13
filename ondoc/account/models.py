@@ -1272,7 +1272,6 @@ class MerchantPayout(TimeStampedModel):
         url = 'https://pgqa.docprime.com/pg/api/settlementDetails'
 
         has_txn, order_data, appointment = self.has_transaction()
-        print('hello')
         if has_txn or True:
             transaction = order_data.getTransactions()[0]
             order_no = transaction.order_no
@@ -1297,7 +1296,7 @@ class MerchantPayout(TimeStampedModel):
 
         # secretkey = settings.PG_SECRET_KEY_P2
         # accesskey = settings.PG_CLIENT_KEY_P2
-        accesskey = 'YPL09/78LKpo9l'
+        accesskey = 'b7YPL09/78LKpo9l'
         secretkey = 'aY678ikloPL'
         checksum = ""
 
@@ -1308,6 +1307,7 @@ class MerchantPayout(TimeStampedModel):
                 checksum += curr
 
         checksum = accesskey + "|" + checksum + "|" + secretkey
+        print(checksum)
         checksum_hash = hashlib.sha256(str(checksum).encode())
         checksum_hash = checksum_hash.hexdigest()
         return checksum_hash
