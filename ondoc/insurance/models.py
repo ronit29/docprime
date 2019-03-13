@@ -1,5 +1,6 @@
 import datetime
 from django.core.validators import FileExtensionValidator
+
 from ondoc.notification.tasks import send_insurance_notifications
 import json
 
@@ -200,6 +201,8 @@ class InsuranceThreshold(auth_model.TimeStampedModel, LiveMixin):
 
 
 class UserInsurance(auth_model.TimeStampedModel):
+    from ondoc.account.models import MoneyPool
+
     insurance_plan = models.ForeignKey(InsurancePlans, related_name='active_users', on_delete=models.DO_NOTHING)
     user = models.ForeignKey(auth_model.User, related_name='purchased_insurance', on_delete=models.DO_NOTHING)
     purchase_date = models.DateTimeField(blank=False, null=False)
@@ -210,6 +213,8 @@ class UserInsurance(auth_model.TimeStampedModel):
     order = models.ForeignKey(account_model.Order, on_delete=models.DO_NOTHING)
     receipt_number = models.BigIntegerField(null=False, unique=True, default=generate_insurance_reciept_number)
     coi = models.FileField(default=None, null=True, upload_to='insurance/coi', validators=[FileExtensionValidator(allowed_extensions=['pdf'])])
+    price_data = JSONField(blank=True, null=True)
+    money_pool = models.ForeignKey(MoneyPool, on_delete=models.SET_NULL, null=True)
 
     def __str__(self):
         return str(self.user)
@@ -533,6 +538,17 @@ class UserInsurance(auth_model.TimeStampedModel):
 
             is_insured, insurance_id, insurance_message = user_insurance.doctor_specialization_validation(appointment_data)
             return is_insured, insurance_id, insurance_message
+
+    def trigger_created_event(self, visitor_info):
+        from ondoc.tracking.models import TrackingEvent
+        try:
+            with transaction.atomic():
+                event_data = TrackingEvent.build_event_data(self.user, TrackingEvent.LabAppointmentBooked, appointmentId=self.id)
+                if event_data and visitor_info:
+                    TrackingEvent.save_event(event_name=event_data.get('event'), data=event_data, visit_id=visitor_info.get('visit_id'),
+                                             user=self.user, triggered_at=datetime.datetime.utcnow())
+        except Exception as e:
+            logger.error("Could not save triggered event - " + str(e))
 
 
 class InsuranceTransaction(auth_model.TimeStampedModel):

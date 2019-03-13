@@ -161,11 +161,11 @@ class InsuranceOrderViewSet(viewsets.GenericViewSet):
 
         expiry_date = transaction_date + timedelta(days=insurance_plan.policy_tenure*364)
         expiry_date = datetime.datetime.combine(expiry_date, datetime.datetime.max.time())
-        user_insurance = {'insurer': insurance_plan.insurer_id, 'insurance_plan': insurance_plan.id, 'purchase_date':
+        user_insurance_data = {'insurer': insurance_plan.insurer_id, 'insurance_plan': insurance_plan.id, 'purchase_date':
                             transaction_date, 'expiry_date': expiry_date, 'premium_amount': amount,
                             'user': request.user.pk, "insured_members": insured_members_list}
         insurance_data = {"profile_detail": user_profile, "insurance_plan": insurance_plan.id,
-                          "user": request.user.pk, "user_insurance": user_insurance}
+                          "user": request.user.pk, "user_insurance": user_insurance_data}
 
         consumer_account = account_models.ConsumerAccount.objects.get_or_create(user=user)
         consumer_account = account_models.ConsumerAccount.objects.select_for_update().get(user=user)
@@ -178,15 +178,15 @@ class InsuranceOrderViewSet(viewsets.GenericViewSet):
         insurance_data = insurance_transform(insurance_data)
 
         if balance < amount or resp['is_agent']:
-
             payable_amount = amount - balance
-
             order = account_models.Order.objects.create(
                 product_id=account_models.Order.INSURANCE_PRODUCT_ID,
                 action=account_models.Order.INSURANCE_CREATE,
                 action_data=insurance_data,
                 amount=payable_amount,
+                cashback_amount=0,
                 wallet_amount=balance,
+                user=user,
                 payment_status=account_models.Order.PAYMENT_PENDING
             )
             resp["status"] = 1
@@ -200,14 +200,20 @@ class InsuranceOrderViewSet(viewsets.GenericViewSet):
                 action_data=insurance_data,
                 amount=0,
                 wallet_amount=wallet_amount,
+                cashback_amount=0,
+                user=user,
                 payment_status=account_models.Order.PAYMENT_PENDING
             )
 
-            insurance_object = order.process_order()
+            insurance_object, wallet_amount, cashback_amount = order.process_order()
             resp["status"] = 1
             resp["payment_required"] = False
             resp["data"] = {'id': insurance_object.id}
-
+            resp["data"] = {
+                "orderId": order.id,
+                "type": "insurance",
+                "id": insurance_object.id if insurance_object else None
+            }
         return Response(resp)
 
 
