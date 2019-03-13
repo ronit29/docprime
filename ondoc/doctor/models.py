@@ -2582,9 +2582,10 @@ class OfflineOPDAppointments(auth_model.TimeStampedModel):
     @staticmethod
     def appointment_cancel_sms(sms_obj):
         try:
+            cancel_time = aware_time_zone(sms_obj['old_appointment'].time_slot_start)
             default_text = "Dear %s, your appointment with %s at %s for %s has been cancelled. In case of any query, please reach out to the clinic." % (
                               sms_obj['name'], sms_obj['old_appointment'].doctor.get_display_name(), sms_obj['old_appointment'].hospital.name,
-                              sms_obj['old_appointment'].time_slot_start.strftime("%B %d, %Y %I:%M %p"))
+                              cancel_time.strftime("%B %d, %Y %I:%M %p"))
             notification_tasks.send_offline_appointment_message.apply_async(
                 kwargs={'number': sms_obj['phone_number'], 'text': default_text, 'type': 'Appointment CANCEL'},
                 countdown=1)
