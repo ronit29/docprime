@@ -704,7 +704,12 @@ class LabAppointmentCreateSerializer(serializers.Serializer):
 
 
         # validations for same day and next day timeslot bookings
-        available_slots = LabTiming.timing_manager.lab_booking_slots(lab__id=data.get("lab").id, lab__is_live=True, for_home_pickup=data.get("is_home_pickup"))
+        selected_date = time_slot_start.strftime("%Y-%m-%d")
+        lab = data.get("lab")
+        address = data.get("address", None)
+        available_slots = lab.get_available_slots(data.get("is_home_pickup"), address, selected_date)
+        is_integrated = lab.is_integrated()
+        # available_slots = LabTiming.timing_manager.lab_booking_slots(lab__id=data.get("lab").id, lab__is_live=True, for_home_pickup=data.get("is_home_pickup"))
         now = datetime.datetime.now()
         tomorrow = datetime.date.today() + datetime.timedelta(days=1)
         is_today = now.weekday() == time_slot_start.weekday()
@@ -713,12 +718,18 @@ class LabAppointmentCreateSerializer(serializers.Serializer):
         curr_minute = round(round(float(time_slot_start.minute) / 60, 2) * 2) / 2
         curr_time += curr_minute
 
-        if is_today and available_slots.get("today_min") and available_slots.get("today_min") > curr_time:
+        selected_day_slots = available_slots['time_slots'][selected_date]
+        current_day_slots = self.get_slots_list(selected_day_slots)
+
+        if curr_time < current_day_slots[0] and curr_time > current_day_slots[-1]:
             raise serializers.ValidationError("Invalid Time slot")
-        if is_tomorrow and available_slots.get("tomorrow_min") and available_slots.get("tomorrow_min") > curr_time:
-            raise serializers.ValidationError("Invalid Time slot")
-        if is_today and available_slots.get("today_max") and available_slots.get("today_max") < curr_time:
-            raise serializers.ValidationError("Invalid Time slot")
+
+        # if is_today and available_slots.get("today_min") and available_slots.get("today_min") > curr_time:
+        #     raise serializers.ValidationError("Invalid Time slot")
+        # if is_tomorrow and available_slots.get("tomorrow_min") and available_slots.get("tomorrow_min") > curr_time:
+        #     raise serializers.ValidationError("Invalid Time slot")
+        # if is_today and available_slots.get("today_max") and available_slots.get("today_max") < curr_time:
+        #     raise serializers.ValidationError("Invalid Time slot")
 
         if LabAppointment.objects.filter(profile=data.get("profile"), lab=data.get("lab"),
                                          tests__in=data.get("test_ids"), time_slot_start=time_slot_start) \
@@ -731,7 +742,7 @@ class LabAppointmentCreateSerializer(serializers.Serializer):
             data['use_wallet'] = True
 
         self.test_lab_id_validator(data, request)
-        self.time_slot_validator(data, request)
+        self.time_slot_validator(data, request, is_integrated)
         return data
 
     def create(self, data):
@@ -813,7 +824,7 @@ class LabAppointmentCreateSerializer(serializers.Serializer):
             raise serializers.ValidationError("Test Ids or lab Id is incorrect")
 
     @staticmethod
-    def time_slot_validator(data, request):
+    def time_slot_validator(data, request, is_integrated):
         start_dt = (form_time_slot(data.get('start_date'), data.get('start_time')) if not data.get("time_slot_start") else data.get("time_slot_start"))
 
         if start_dt < timezone.now():
@@ -827,22 +838,37 @@ class LabAppointmentCreateSerializer(serializers.Serializer):
         lab_timing_queryset = lab_queryset.lab_timings.filter(day=day_of_week, start__lte=data.get('start_time'),
                                                               end__gte=data.get('start_time'),
                                                               for_home_pickup=data["is_home_pickup"]).exists()
-        if data["is_home_pickup"]:
-            if not lab_queryset.is_home_collection_enabled:
-                logger.error(
-                    "Error 'Home Pickup is disabled for the lab' for lab appointment with data - " + json.dumps(
-                        request.data))
-                raise serializers.ValidationError("Home Pickup is disabled for the lab")
-            if data.get("start_time") < 7.0 or data.get("start_time") > 19.0:
-                logger.error(
-                    "Error 'No time slot available' for lab appointment with data - " + json.dumps(
-                        request.data))
-                raise serializers.ValidationError("No time slot available")
+        if is_integrated:
+            pass
         else:
-            if not lab_queryset.always_open and not lab_timing_queryset:
-                logger.error(
-                    "Error 'No time slot available' for lab appointment with data - " + json.dumps(request.data))
-                raise serializers.ValidationError("No time slot available")
+            if data["is_home_pickup"]:
+                if not lab_queryset.is_home_collection_enabled:
+                    logger.error(
+                        "Error 'Home Pickup is disabled for the lab' for lab appointment with data - " + json.dumps(
+                            request.data))
+                    raise serializers.ValidationError("Home Pickup is disabled for the lab")
+                if data.get("start_time") < 7.0 or data.get("start_time") > 19.0:
+                    logger.error(
+                        "Error 'No time slot available' for lab appointment with data - " + json.dumps(
+                            request.data))
+                    raise serializers.ValidationError("No time slot available")
+            else:
+                if not lab_queryset.always_open and not lab_timing_queryset:
+                    logger.error(
+                        "Error 'No time slot available' for lab appointment with data - " + json.dumps(request.data))
+                    raise serializers.ValidationError("No time slot available")
+
+    def get_slots_list(self, data):
+        slots = list()
+        am_timings = data[0]['timing']
+        pm_timings = data[1]['timing']
+        for timing in am_timings:
+            slots.append(timing['value'])
+
+        for timing in pm_timings:
+            slots.append(timing['value'])
+
+        return slots
 
 
 class TimeSlotSerializer(serializers.Serializer):

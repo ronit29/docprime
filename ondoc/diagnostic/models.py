@@ -525,7 +525,7 @@ class Lab(TimeStampedModel, CreatedByModel, QCModel, SearchKey):
         res_data = {"time_slots": resp_list, "upcoming_slots": upcoming_slots, "is_thyrocare": False}
         return res_data
 
-    def get_available_slots(self, is_home_pickup):
+    def get_available_slots(self, is_home_pickup, address, date):
         from ondoc.integrations.models import IntegratorMapping
         from ondoc.integrations import service
 
@@ -538,12 +538,24 @@ class Lab(TimeStampedModel, CreatedByModel, QCModel, SearchKey):
         if not integration_dict:
             available_slots = lab.get_timing(is_home_pickup)
         else:
+            pincode = address.pincode
             class_name = integration_dict['class_name']
             integrator_obj = service.create_integrator_obj(class_name)
-            available_slots = integrator_obj.get_appointment_slots('122002', '2019-04-10',
+            available_slots = integrator_obj.get_appointment_slots(pincode, date,
                                                                    is_home_pickup=is_home_pickup)
 
         return available_slots
+
+    def is_integrated(self):
+        from ondoc.integrations.models import IntegratorMapping
+
+        integration_dict = None
+        if self.network and self.network.id:
+            integration_dict = IntegratorMapping.get_if_third_party_integration(network_id=self.network.id)
+        if not integration_dict:
+            return False
+        else:
+            return True
 
 class LabCertification(TimeStampedModel):
     lab = models.ForeignKey(Lab, related_name = 'lab_certificate', on_delete=models.CASCADE)

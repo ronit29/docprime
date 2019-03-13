@@ -960,8 +960,8 @@ class TimeSlotExtraction(object):
         data_list = list()
         for k, v in data.items():
             if 'mrp' in pa[k].keys() and 'deal_price' in pa[k].keys():
-                if pa[k].get('on_call') == False:
-                    if current_date_time.date() == booking_date.date():
+                if current_date_time.date() == booking_date.date():
+                    if pa[k].get('on_call') == False:
                         if k >= float(doc_minimum_time) and k <= doctor_maximum_timing:
                             data_list.append({"value": k, "text": v, "price": pa[k]["price"],
                                               "mrp": pa[k]['mrp'], 'deal_price': pa[k]['deal_price'],
@@ -969,15 +969,15 @@ class TimeSlotExtraction(object):
                         else:
                             pass
                     else:
-                        if k <= doctor_maximum_timing:
-                            data_list.append({"value": k, "text": v, "price": pa[k]["price"],
-                                              "mrp": pa[k]['mrp'], 'deal_price': pa[k]['deal_price'],
-                                              "is_available": pa[k]["is_available"],
-                                              "on_call": pa[k].get("on_call", False)})
-                        else:
-                            pass
+                        pass
                 else:
-                    pass
+                    if k <= doctor_maximum_timing:
+                        data_list.append({"value": k, "text": v, "price": pa[k]["price"],
+                                          "mrp": pa[k]['mrp'], 'deal_price': pa[k]['deal_price'],
+                                          "is_available": pa[k]["is_available"],
+                                          "on_call": pa[k].get("on_call", False)})
+                    else:
+                        pass
             else:
                 next_date = current_date_time + datetime.timedelta(days=1)
                 if current_date_time.date() == booking_date.date():
