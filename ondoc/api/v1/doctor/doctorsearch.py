@@ -51,7 +51,7 @@ class DoctorSearchHelper:
             params['hospital_id'] = str(self.query_params.get("hospital_id"))
 
         if self.query_params.get('locality_value'):
-            filtering_params.append("lower(h.city) = (%(locality_value)s)")
+            filtering_params.append("lower(h.city_search_key) = (%(locality_value)s)")
             params['locality_value'] = self.query_params.get('locality_value').lower()
 
         if len(condition_ids)>0:
