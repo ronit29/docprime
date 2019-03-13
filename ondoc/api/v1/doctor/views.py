@@ -1,19 +1,23 @@
 import operator
 from collections import defaultdict, OrderedDict
 from uuid import UUID
+
+from django.contrib.gis.db.models.functions import Distance
+from django.contrib.gis.measure import D
+
 from ondoc.api.v1.auth.serializers import UserProfileSerializer
 from ondoc.api.v1.doctor.serializers import HospitalModelSerializer, AppointmentRetrieveDoctorSerializer, \
     OfflinePatientSerializer
 from ondoc.api.v1.doctor.DoctorSearchByHospitalHelper import DoctorSearchByHospitalHelper
 from ondoc.api.v1.procedure.serializers import CommonProcedureCategorySerializer, ProcedureInSerializer, \
-    ProcedureSerializer, DoctorClinicProcedureSerializer, CommonProcedureSerializer
+    ProcedureSerializer, DoctorClinicProcedureSerializer, CommonProcedureSerializer, CommonIpdProcedureSerializer
 from ondoc.cart.models import Cart
 from ondoc.doctor import models
 from ondoc.authentication import models as auth_models
 from ondoc.diagnostic import models as lab_models
 from ondoc.notification import tasks as notification_tasks
 #from ondoc.doctor.models import Hospital, DoctorClinic,Doctor,  OpdAppointment
-from ondoc.doctor.models import DoctorClinic, OpdAppointment, DoctorAssociation, DoctorQualification
+from ondoc.doctor.models import DoctorClinic, OpdAppointment, DoctorAssociation, DoctorQualification, Doctor, Hospital, HealthInsuranceProvider
 from ondoc.notification.models import EmailNotification
 from django.utils.safestring import mark_safe
 from ondoc.coupon.models import Coupon
@@ -21,7 +25,7 @@ from ondoc.api.v1.diagnostic import serializers as diagnostic_serializer
 from ondoc.account import models as account_models
 from ondoc.location.models import EntityUrls, EntityAddress, DefaultRating
 from ondoc.procedure.models import Procedure, ProcedureCategory, CommonProcedureCategory, ProcedureToCategoryMapping, \
-    get_selected_and_other_procedures, CommonProcedure
+    get_selected_and_other_procedures, CommonProcedure, CommonIpdProcedure, IpdProcedure, DoctorClinicIpdProcedure
 from ondoc.seo.models import NewDynamic
 from . import serializers
 from ondoc.api.v2.doctor import serializers as v2_serializers
@@ -1078,23 +1082,35 @@ class SearchedItemsViewSet(viewsets.GenericViewSet):
     def common_conditions(self, request):
         count = request.query_params.get('count', 10)
         count = int(count)
-        if count <=0:
+        if count <= 0:
             count = 10
-        medical_conditions = models.CommonMedicalCondition.objects.select_related('condition').all().order_by("-priority")[:count]
-        conditions_serializer = serializers.MedicalConditionSerializer(medical_conditions, many=True, context={'request': request})
+        medical_conditions = models.CommonMedicalCondition.objects.select_related('condition').all().order_by(
+            "-priority")[:count]
+        conditions_serializer = serializers.MedicalConditionSerializer(medical_conditions, many=True,
+                                                                       context={'request': request})
 
-        common_specializations = models.CommonSpecialization.objects.select_related('specialization').all().order_by("-priority")[:10]
-        specializations_serializer = serializers.CommonSpecializationsSerializer(common_specializations, many=True, context={'request': request})
+        common_specializations = models.CommonSpecialization.objects.select_related('specialization').all().order_by(
+            "-priority")[:10]
+        specializations_serializer = serializers.CommonSpecializationsSerializer(common_specializations, many=True,
+                                                                                 context={'request': request})
 
-        common_procedure_categories = CommonProcedureCategory.objects.select_related('procedure_category').filter(procedure_category__is_live=True).all().order_by("-priority")[:10]
-        common_procedure_categories_serializer = CommonProcedureCategorySerializer(common_procedure_categories, many=True)
+        common_procedure_categories = CommonProcedureCategory.objects.select_related('procedure_category').filter(
+            procedure_category__is_live=True).all().order_by("-priority")[:10]
+        common_procedure_categories_serializer = CommonProcedureCategorySerializer(common_procedure_categories,
+                                                                                   many=True)
 
-        common_procedures = CommonProcedure.objects.select_related('procedure').filter(procedure__is_enabled=True).all().order_by("-priority")[:10]
+        common_procedures = CommonProcedure.objects.select_related('procedure').filter(
+            procedure__is_enabled=True).all().order_by("-priority")[:10]
         common_procedures_serializer = CommonProcedureSerializer(common_procedures, many=True)
+
+        common_ipd_procedures = CommonIpdProcedure.objects.select_related('ipd_procedure').filter(
+            ipd_procedure__is_enabled=True).all().order_by("-priority")[:10]
+        common_ipd_procedures_serializer = CommonIpdProcedureSerializer(common_ipd_procedures, many=True)
 
         return Response({"conditions": conditions_serializer.data, "specializations": specializations_serializer.data,
                          "procedure_categories": common_procedure_categories_serializer.data,
-                         "procedures": common_procedures_serializer.data})
+                         "procedures": common_procedures_serializer.data,
+                         "ipd_procedures": common_ipd_procedures_serializer.data})
 
 
 class DoctorListViewSet(viewsets.GenericViewSet):
@@ -1540,6 +1556,7 @@ class DoctorListViewSet(viewsets.GenericViewSet):
 
         validated_data.get('procedure_categories', [])
         procedures = list(Procedure.objects.filter(pk__in=validated_data.get('procedure_ids', [])).values('id', 'name'))
+        ipd_procedures = list(IpdProcedure.objects.filter(pk__in=validated_data.get('ipd_procedure_ids', [])).values('id', 'name'))
         procedure_categories = list(ProcedureCategory.objects.filter(pk__in=validated_data.get('procedure_category_ids', [])).values('id', 'name'))
         conditions = list(models.MedicalCondition.objects.filter(id__in=validated_data.get('condition_ids',[])).values('id','name'));
         if validated_data.get('ratings'):
@@ -1551,7 +1568,8 @@ class DoctorListViewSet(viewsets.GenericViewSet):
                          "breadcrumb": breadcrumb, 'search_content': top_content,
                          'procedures': procedures, 'procedure_categories': procedure_categories,
                          'ratings':ratings, 'reviews': reviews, 'ratings_title': ratings_title,
-                         'bottom_content': bottom_content, 'canonical_url': canonical_url})
+                         'bottom_content': bottom_content, 'canonical_url': canonical_url,
+                         'ipd_procedures': ipd_procedures})
 
     @transaction.non_atomic_requests
     def search_by_hospital(self, request):
@@ -3158,3 +3176,96 @@ class AppointmentMessageViewset(viewsets.GenericViewSet):
         if not 'message' in obj:
             obj['message'] = "Message Sent Successfully"
         return Response(obj)
+
+
+class HospitalViewSet(viewsets.GenericViewSet):
+
+    def list(self, request, ipd_pk, count=None):
+        serializer = serializers.HospitalRequestSerializer(data=request.query_params)
+        serializer.is_valid(raise_exception=True)
+        validated_data = serializer.validated_data
+        ipd_procedure_obj = IpdProcedure.objects.filter(id=ipd_pk, is_enabled=True).first()
+        if not ipd_procedure_obj:
+            return Response([], status=status.HTTP_400_BAD_REQUEST)
+        lat = validated_data.get('lat')
+        long = validated_data.get('long')
+        min_distance = validated_data.get('min_distance')
+        max_distance = validated_data.get('max_distance')
+        max_distance = max_distance * 1000 if max_distance is not None else 10000
+        min_distance = min_distance * 1000 if min_distance is not None else 0
+        provider_ids = validated_data.get('provider_ids')
+        point_string = 'POINT(' + str(long) + ' ' + str(lat) + ')'
+        pnt = GEOSGeometry(point_string, srid=4326)
+        hospital_queryset = Hospital.objects.prefetch_related('hospitalcertification_set',
+                                                              'hospital_documents',
+                                                              'network__hospital_network_documents',
+                                                              'hospitalspeciality_set').filter(
+            is_live=True,
+            hospital_doctors__enabled=True,
+            hospital_doctors__ipd_procedure_clinic_mappings__enabled=True,
+            location__dwithin=(
+                Point(float(long),
+                      float(lat)),
+                D(m=max_distance)),
+            hospital_doctors__ipd_procedure_clinic_mappings__ipd_procedure_id=ipd_pk).annotate(
+            distance=Distance('location', pnt)).annotate(
+            count_of_insurance_provider=Count('health_insurance_providers')).distinct()
+        if provider_ids:
+            hospital_queryset = hospital_queryset.filter(health_insurance_providers__id__in=provider_ids)
+        if min_distance:
+            hospital_queryset = filter(lambda x: x.distance.m >= min_distance if x.distance is not None and x.distance.m is not None else False, hospital_queryset)
+
+        hospital_queryset = list(hospital_queryset)
+        result_count = len(hospital_queryset)
+        if count:
+            hospital_queryset = hospital_queryset[:count]
+        top_hospital_serializer = serializers.TopHospitalForIpdProcedureSerializer(hospital_queryset, many=True,
+                                                                                   context={'request': request})
+        return Response({'count': result_count, 'result': top_hospital_serializer.data,
+                         'ipd_procedure': {'id': ipd_procedure_obj.id, 'name': ipd_procedure_obj.name},
+                         'health_insurance_providers': [{'id': x.id, 'name': x.name} for x in
+                                                        HealthInsuranceProvider.objects.all()]})
+
+    def retrive(self, request, pk):
+        serializer = serializers.HospitalDetailRequestSerializer(data=request.query_params)
+        serializer.is_valid(raise_exception=True)
+        validated_data = serializer.validated_data
+        hospital_obj = Hospital.objects.prefetch_related('service', 'network', 'hospitalimage_set',
+                                                         'hospital_documents',
+                                                         'hospital_helpline_numbers',
+                                                         'network__hospital_network_documents',
+                                                         'hospitalcertification_set',
+                                                         'hospitalspeciality_set').filter(id=pk, is_live=True).first()
+        if not hospital_obj:
+            return Response(status=status.HTTP_400_BAD_REQUEST)
+
+        return Response(
+            serializers.HospitalDetailIpdProcedureSerializer(hospital_obj, context={'request': request,
+                                                                                    'validated_data': validated_data}).data)
+
+
+class IpdProcedureViewSet(viewsets.GenericViewSet):
+
+    def ipd_procedure_detail(self, request, pk):
+        serializer = serializers.IpdDetailsRequestDetailRequestSerializer(data=request.query_params)
+        serializer.is_valid(raise_exception=True)
+        validated_data = serializer.validated_data
+        ipd_procedure = IpdProcedure.objects.prefetch_related('feature_mappings__feature').filter(is_enabled=True, id=pk).first()
+        if ipd_procedure is None:
+            return Response(status=status.HTTP_400_BAD_REQUEST)
+        ipd_procedure_serializer = serializers.IpdProcedureDetailSerializer(ipd_procedure, context={'request': request})
+        hospital_view_set = HospitalViewSet()
+        hospital_result = hospital_view_set.list(request, pk, 2)
+        doctor_list_viewset = DoctorListViewSet()
+        doctor_result = doctor_list_viewset.list(request, parameters={'ipd_procedure_ids': str(pk),
+                                                                      'longitude': validated_data.get('long'),
+                                                                      'latitude': validated_data.get('lat'),
+                                                                      'sort_on': 'experience'})
+        return Response(
+            {'about': ipd_procedure_serializer.data, 'hospitals': hospital_result.data, 'doctors': doctor_result.data})
+
+    def create_lead(self, request):
+        serializer = serializers.IpdProcedureLeadSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        obj_created = serializer.save()
+        return Response(serializers.IpdProcedureLeadSerializer(obj_created).data)
