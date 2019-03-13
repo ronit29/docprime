@@ -22,3 +22,5 @@ def paginate_raw_query(request, query_string, page_size=20):
 
     offset = (page - 1) * page_size
     return " {} offset {} limit {}".format(query_string, offset, page_size)
+
+

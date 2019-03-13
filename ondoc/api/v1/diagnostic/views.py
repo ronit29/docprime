@@ -353,7 +353,8 @@ class LabList(viewsets.ReadOnlyModelViewSet):
                                                                 'parameter_count': parameter_count,
                                                                 'icon': icon_url}
             category_data[temp_package.id] = list(single_test_data.values())
-        serializer = CustomLabTestPackageSerializer(all_packages, many=True,
+        all_packages_data = paginate_queryset(all_packages, request, 30)
+        serializer = CustomLabTestPackageSerializer(all_packages_data, many=True,
                                                     context={'entity_url_dict': entity_url_dict, 'lab_data': lab_data,
                                                              'request': request, 'category_data': category_data})
         category_queryset = LabTestCategory.objects.filter(id__in=category_to_be_shown_in_filter_ids).order_by('-priority')
