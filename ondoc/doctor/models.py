@@ -223,7 +223,7 @@ class Hospital(auth_model.TimeStampedModel, auth_model.CreatedByModel, auth_mode
     about = models.TextField(blank=True, null=True, default="")
     opd_timings = models.CharField(max_length=150, blank=True, null=True, default="")
     always_open = models.BooleanField(verbose_name='Is hospital open 24X7', default=False)
-    city_search_key = models.CharField(db_index=True, max_length=100, default="", null=True, blank=True)
+    city_search_key = models.CharField(db_index=True,editable=False, max_length=100, default="", null=True, blank=True)
 
     def __str__(self):
         return self.name
