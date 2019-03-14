@@ -1,7 +1,4 @@
 from __future__ import absolute_import, unicode_literals
-from django.contrib.contenttypes.models import ContentType
-from django.urls import reverse
-from ondoc.account.models import Order
 from rest_framework import status
 from django.conf import settings
 from celery import task
@@ -48,7 +45,7 @@ def push_insurance_banner_lead_to_matrix(self, data):
 
         if response.status_code != status.HTTP_200_OK or not response.ok:
             logger.error(json.dumps(request_data))
-            logger.info("[ERROR] Insurance could not be published to the matrix system")
+            logger.info("[ERROR] Insurance banner lead could not be published to the matrix system")
             logger.info("[ERROR] %s", response.reason)
 
             countdown_time = (2 ** self.request.retries) * 60 * 10
