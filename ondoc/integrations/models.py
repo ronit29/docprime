@@ -1,3 +1,5 @@
+from django.conf import settings
+
 from ondoc.integrations import service
 from django.db import models
 from django.contrib.contenttypes.fields import GenericForeignKey
@@ -97,8 +99,17 @@ class IntegratorResponse(TimeStampedModel):
     def get_order_summary(cls):
         integrator_responses = IntegratorResponse.objects.all()
         for integrator_response in integrator_responses:
-            integrator_obj = service.create_integrator_obj(integrator_response.integrator_class_name)
-            integrator_obj.get_order_summary(integrator_response)
+            if integrator_response.integrator_class_name == 'Thyrocare':
+                if settings.THYROCARE_INTEGRATION_ENABLED:
+                    is_thyrocare_enabled = True
+                else:
+                    is_thyrocare_enabled = False
+            else:
+                is_thyrocare_enabled = True
+
+            if is_thyrocare_enabled:
+                integrator_obj = service.create_integrator_obj(integrator_response.integrator_class_name)
+                integrator_obj.get_order_summary(integrator_response)
 
         print("Order Summary for Thyrocare Complete")
 

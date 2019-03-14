@@ -214,25 +214,25 @@ class Thyrocare(BaseIntegrator):
     @classmethod
     def get_generated_report(cls):
         from ondoc.integrations.models import IntegratorResponse
+        if settings.THYROCARE_INTEGRATION_ENABLED:
+            integrator_bookings = IntegratorResponse.objects.filter(integrator_class_name=Thyrocare.__name__, report_received=False)
+            formats = ['pdf', 'xml']
+            for booking in integrator_bookings:
+                lead_id = booking.lead_id
+                mobile = booking.content_object.profile.phone_number
+                result = dict()
 
-        integrator_bookings = IntegratorResponse.objects.filter(integrator_class_name=Thyrocare.__name__, report_received=False)
-        formats = ['pdf', 'xml']
-        for booking in integrator_bookings:
-            lead_id = booking.lead_id
-            mobile = booking.content_object.profile.phone_number
-            result = dict()
+                for format in formats:
+                    url = "%s/order.svc/%s/GETREPORTS/%s/%s/%s/Myreport" % (settings.THYROCARE_BASE_URL, settings.THYROCARE_API_KEY, lead_id, format, mobile)
+                    response = requests.get(url)
+                    response = response.json()
+                    if response.get('RES_ID') == 'RES0000':
+                        result[format] = response["URL"]
+                    else:
+                        logger.error("[ERROR] %s" % response.get('RESPONSE'))
 
-            for format in formats:
-                url = "%s/order.svc/%s/GETREPORTS/%s/%s/%s/Myreport" % (settings.THYROCARE_BASE_URL, settings.THYROCARE_API_KEY, lead_id, format, mobile)
-                response = requests.get(url)
-                response = response.json()
-                if response.get('RES_ID') == 'RES0000':
-                    result[format] = response["URL"]
-                else:
-                    logger.error("[ERROR] %s" % response.get('RESPONSE'))
-
-            if result:
-                cls.save_reports(booking, result)
+                if result:
+                    cls.save_reports(booking, result)
 
     @classmethod
     def save_reports(cls, integrator_response, result):

@@ -1490,8 +1490,18 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin)
 
 
         if push_to_integrator:
+            if self.lab.network.id == settings.THYROCARE_NETWORK_ID:
+                if settings.THYROCARE_INTEGRATION_ENABLED:
+                    is_thyrocare_enabled = True
+                else:
+                    is_thyrocare_enabled = False
+            else:
+                is_thyrocare_enabled = True
+
+
             try:
-                push_lab_appointment_to_integrator.apply_async(({'appointment_id': self.id},), countdown=5)
+                if is_thyrocare_enabled:
+                    push_lab_appointment_to_integrator.apply_async(({'appointment_id': self.id},), countdown=5)
             except Exception as e:
                 logger.error(str(e))
 

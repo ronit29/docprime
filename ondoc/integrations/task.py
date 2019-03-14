@@ -1,6 +1,7 @@
 from __future__ import absolute_import, unicode_literals
 from celery import task
 import logging
+from django.conf import settings
 
 logger = logging.getLogger(__name__)
 
