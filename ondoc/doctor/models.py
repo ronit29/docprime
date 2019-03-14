@@ -223,7 +223,7 @@ class Hospital(auth_model.TimeStampedModel, auth_model.CreatedByModel, auth_mode
     about = models.TextField(blank=True, null=True, default="")
     opd_timings = models.CharField(max_length=150, blank=True, null=True, default="")
     always_open = models.BooleanField(verbose_name='Is hospital open 24X7', default=False)
-    city_search_key = models.CharField(max_length=100, default="", null=True, blank=True)
+    city_search_key = models.CharField(db_index=True, max_length=100, default="", null=True, blank=True)
 
     def __str__(self):
         return self.name
@@ -337,7 +337,6 @@ class Hospital(auth_model.TimeStampedModel, auth_model.CreatedByModel, auth_mode
     def save(self, *args, **kwargs):
         self.update_time_stamps()
         self.update_live_status()
-        # self.update_city_search()
         # build_url = True
         # if self.is_live and self.id and self.location:
         #     if Hospital.objects.filter(location__distance_lte=(self.location, 0), id=self.id).exists():
