@@ -40,7 +40,8 @@ from ondoc.doctor.models import OpdAppointment
 from ondoc.api.v1.doctor.serializers import (OpdAppointmentSerializer, AppointmentFilterUserSerializer,
                                              UpdateStatusSerializer, CreateAppointmentSerializer,
                                              AppointmentRetrieveSerializer, OpdAppTransactionModelSerializer,
-                                             OpdAppModelSerializer,OpdAppointmentUpcoming)
+                                             OpdAppModelSerializer, OpdAppointmentUpcoming,
+                                             NewAppointmentRetrieveSerializer)
 from ondoc.api.v1.diagnostic.serializers import (LabAppointmentModelSerializer,
                                                  LabAppointmentRetrieveSerializer, LabAppointmentCreateSerializer,
                                                  LabAppTransactionModelSerializer, LabAppRescheduleModelSerializer,
@@ -540,7 +541,7 @@ class UserAppointmentsViewSet(OndocViewSet):
             return Response(serializer.data)
         elif appointment_type == 'doctor':
             queryset = OpdAppointment.objects.filter(pk=pk, user=user)
-            serializer = AppointmentRetrieveSerializer(queryset, many=True, context={"request": request})
+            serializer = NewAppointmentRetrieveSerializer(queryset, many=True, context={"request": request})
             return Response(serializer.data)
         else:
             return Response({'Error': 'Invalid Request Type'})
