@@ -224,14 +224,31 @@ class Hospital(auth_model.TimeStampedModel, auth_model.CreatedByModel, auth_mode
     class Meta:
         db_table = "hospital"
 
-    def update_search_city(self):
-        search_city = None
-        if self.city:
-            search_city = re.findall(r'[a-zA-Z ]+', self.city)
-            search_city = " ".join(search_city).lower()
-            self.city_search_key = search_city
-            return self.city
-        return None
+    # def update_search_city(self):
+    #     search_city = None
+    #     if self.city:
+    #         search_city = re.findall(r'[a-zA-Z ]+', self.city)
+    #         search_city = " ".join(search_city).lower()
+    #         self.city_search_key = search_city
+    #         return self.city
+    #     return None
+
+    @classmethod
+    def update_city_search(cls):
+        query = '''  update hospital h set city_search_key = 
+            (	select lower(ea.alternative_value)
+            from entity_location_relations elr 
+            inner join entity_address ea on elr.location_id=ea.id  
+            and ea.use_in_url=True and ea.type='LOCALITY' and elr.content_type_id=28
+            and  h.id = elr.object_id order by ea.order desc nulls last limit 1	
+            )
+            '''
+        update_alternative_value = RawSql(query, []).fetch_all()
+
+        query1 = '''update hospital set city_search_key = city where city_search_key is null
+                    or city_search_key='''''
+        update_city = RawSql(query, []).fetch_all()
+
 
     def open_for_communications(self):
         if (self.network and self.network.open_for_communication) or (not self.network and self.open_for_communication):
@@ -313,7 +330,7 @@ class Hospital(auth_model.TimeStampedModel, auth_model.CreatedByModel, auth_mode
     def save(self, *args, **kwargs):
         self.update_time_stamps()
         self.update_live_status()
-        self.update_search_city()
+        # self.update_search_city()
         # build_url = True
         # if self.is_live and self.id and self.location:
         #     if Hospital.objects.filter(location__distance_lte=(self.location, 0), id=self.id).exists():
