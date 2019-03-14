@@ -1960,10 +1960,10 @@ class LabTimingListView(mixins.ListModelMixin,
             if lab_obj and lab_obj.network and lab_obj.network.id:
                 integration_dict = IntegratorMapping.get_if_third_party_integration(network_id=lab_obj.network.id)
 
-            if lab_obj.network.id == settings.THYROCARE_NETWORK_ID and settings.THYROCARE_INTEGRATION_ENABLED:
-                pass
-            else:
-                integration_dict = None
+                if lab_obj.network.id == settings.THYROCARE_NETWORK_ID and settings.THYROCARE_INTEGRATION_ENABLED:
+                    pass
+                else:
+                    integration_dict = None
 
         if not integration_dict:
             lab_slots = lab_obj.get_timing(for_home_pickup)
