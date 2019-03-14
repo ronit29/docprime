@@ -2,6 +2,8 @@ import datetime
 from django.db import models, transaction
 from django.utils import timezone
 
+from ondoc.account.models import ConsumerAccount, Order
+from ondoc.api.v1.utils import payment_details
 from ondoc.authentication import models as auth_model
 from ondoc.authentication.models import User
 from ondoc.diagnostic.models import LabNetwork, Lab, LabTest
@@ -23,6 +25,82 @@ class Plan(auth_model.TimeStampedModel):
 
     def __str__(self):
         return self.name
+
+    @classmethod
+    @transaction.atomic()
+    def create_order(cls, request, data):
+        user = request.user
+        resp = {}
+        # balance = 0
+        # cashback_balance = 0
+        plan = data.get('plan')
+        # amount_to_be_paid = plan.deal_price
+        process_immediately = False
+        consumer_account = ConsumerAccount.objects.get_or_create(user=user)
+        consumer_account = ConsumerAccount.objects.select_for_update().get(user=user)
+        balance = consumer_account.balance
+        cashback_balance = consumer_account.cashback
+        total_balance = balance + cashback_balance
+        payable_amount = plan.deal_price
+        product_id = Order.SUBSCRIPTION_PLAN_PRODUCT_ID
+        if total_balance >= payable_amount:
+            cashback_amount = min(cashback_balance, payable_amount)
+            wallet_amount = max(0, payable_amount - cashback_amount)
+            pg_order = Order.objects.create(
+                amount=0,
+                wallet_amount=wallet_amount,
+                cashback_amount=cashback_amount,
+                payment_status=Order.PAYMENT_PENDING,
+                user=user,
+                product_id=product_id,
+                # visitor_info=visitor_info
+            )
+            process_immediately = True
+        else:
+            amount_from_pg = max(0, payable_amount - total_balance)
+            required_amount = payable_amount
+            cashback_amount = min(required_amount, cashback_balance)
+            wallet_amount = 0
+            if cashback_amount < required_amount:
+                wallet_amount = min(balance, required_amount - cashback_amount)
+
+            pg_order = Order.objects.create(
+                amount=amount_from_pg,
+                wallet_amount=wallet_amount,
+                cashback_amount=cashback_amount,
+                payment_status=Order.PAYMENT_PENDING,
+                user=user,
+                product_id=product_id,
+                # visitor_info=visitor_info
+            )
+
+        action = Order.SUBSCRIPTION_PLAN_BUY
+        action_data = {"user_id": str(user.id), "plan_id": str(plan.id)}
+        child_order = Order.objects.create(
+            product_id=product_id,
+            action=action,
+            action_data=action_data,
+            payment_status=Order.PAYMENT_PENDING,
+            parent=pg_order,
+            user=user
+        )
+        if process_immediately:
+            # appointment_ids = pg_order.process_pg_order()  # TODO: SHASHANK_SINGH what to do?
+
+            resp["status"] = 1
+            resp["payment_required"] = False
+            # resp["data"] = {
+            #     "orderId" : pg_order.id,
+            #     "type" : appointment_ids.get("type", "all"),
+            #     "id" : appointment_ids.get("id", None)
+            # }
+            # resp["appointments"] = appointment_ids
+
+        else:
+            resp["status"] = 1
+            resp['data'], resp["payment_required"] = payment_details(request, pg_order)
+
+        return resp
 
 
 class PlanFeature(auth_model.TimeStampedModel):
@@ -60,6 +138,7 @@ class PlanFeatureMapping(models.Model):
 
 
 class UserPlanMapping(auth_model.TimeStampedModel):
+    # TODO: SHASHANK_SINGH stop anyone from deleting plan.
     plan = models.ForeignKey(Plan, on_delete=models.DO_NOTHING, related_name="subscribed_user_mapping")
     user = models.ForeignKey(User, on_delete=models.DO_NOTHING, related_name="plan_mapping", unique=True)
     is_active = models.BooleanField(default=True)
@@ -69,6 +148,7 @@ class UserPlanMapping(auth_model.TimeStampedModel):
         db_table = "subscription_plan_user"
 
     def save(self, *args, **kwargs):
+        # TODO: SHASHANK_SINGH expire it after one year.
         if not self.expire_at:
             self.expire_at = timezone.now() + datetime.timedelta(days=365)
             super().save(*args, **kwargs)

@@ -1,7 +1,10 @@
 from django.db.models import Prefetch
 from django.utils import timezone
 from rest_framework import viewsets
+from rest_framework.permissions import IsAuthenticated
+
 from ondoc.api.v1.subscription_plan import serializers
+from ondoc.authentication.backends import JWTAuthentication
 from ondoc.authentication.models import User
 from ondoc.subscription_plan.models import UserPlanMapping, Plan, PlanFeature, PlanFeatureMapping
 from rest_framework.response import Response
@@ -33,3 +36,19 @@ class SubscriptionPlanListViewSet(viewsets.GenericViewSet):
                                                context={"plan_feature_queryset": plan_feature_queryset}).data
         feature_data = serializers.PlanFeatureSerializer(plan_feature_queryset, many=True).data
         return Response({'plans': plans_data, 'feature_details': feature_data})
+
+
+class SubscriptionPlanLoggedInUserViewSet(viewsets.GenericViewSet):
+    authentication_classes = (JWTAuthentication,)
+    permission_classes = (IsAuthenticated,)
+
+    def buy(self, request):
+        serializer = serializers.UserSubscriptionBuyRequestSerializer(data=request.query_params,
+                                                                      context={'request': request})
+        serializer.is_valid(raise_exception=True)
+        validated_data = serializer.validated_data
+        resp = Plan.create_order(request, validated_data)
+        return Response(resp)
+
+    def get_queryset(self):
+        return UserPlanMapping.objects.objects.none()

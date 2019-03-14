@@ -351,6 +351,7 @@ def payment_details(request, order):
     elif order.product_id == Order.LAB_PRODUCT_ID:
         secret_key = settings.PG_SECRET_KEY_P2
         client_key = settings.PG_CLIENT_KEY_P2
+    # TODO : SHASHANK_SINGH for plan
 
     pgdata['hash'] = PgTransaction.create_pg_hash(pgdata, secret_key, client_key)
 

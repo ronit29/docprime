@@ -1,8 +1,9 @@
+from django.utils import timezone
 from rest_framework import serializers
 
 from ondoc.api.v1.auth.serializers import UserProfileSerializer
 from ondoc.api.v1.diagnostic.serializers import LabTestSerializer, PackageSerializer
-from ondoc.subscription_plan.models import Plan, PlanFeature
+from ondoc.subscription_plan.models import Plan, PlanFeature, UserPlanMapping
 
 
 class UserSubscriptionRequestSerializer(serializers.Serializer):
@@ -63,3 +64,15 @@ class UserSubscriptionResponseSerializer(serializers.Serializer):
         if obj.plan:
             return PlanSerializer(obj.plan).data
         return None
+
+
+class UserSubscriptionBuyRequestSerializer(serializers.Serializer):
+    plan = serializers.PrimaryKeyRelatedField(queryset=Plan.objects.filter(enabled=True))
+
+    def validate(self, attrs):
+        request = self.context.get('request')
+        if not request:
+            raise serializers.ValidationError('Invalid request.')
+        if UserPlanMapping.objects.filter(user=request.user, is_active=True, expire_at__gte=timezone.now()).exists():
+            raise serializers.ValidationError('User already has a subscription plan.')
+        return attrs

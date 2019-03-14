@@ -35,6 +35,7 @@ class Order(TimeStampedModel):
     OPD_APPOINTMENT_CREATE = 2
     LAB_APPOINTMENT_RESCHEDULE = 3
     LAB_APPOINTMENT_CREATE = 4
+    SUBSCRIPTION_PLAN_BUY = 5
     PAYMENT_ACCEPTED = 1
     PAYMENT_PENDING = 0
     PAYMENT_FAILURE = 3
@@ -47,9 +48,11 @@ class Order(TimeStampedModel):
                       (OPD_APPOINTMENT_CREATE, "Opd Create"),
                       (LAB_APPOINTMENT_CREATE, "Lab Create"),
                       (LAB_APPOINTMENT_RESCHEDULE, "Lab Reschedule"),
+                      (SUBSCRIPTION_PLAN_BUY, "Subscription Plan Buy")
                       )
     DOCTOR_PRODUCT_ID = 1
     LAB_PRODUCT_ID = 2
+    SUBSCRIPTION_PLAN_PRODUCT_ID = 3
     PRODUCT_IDS = [(DOCTOR_PRODUCT_ID, "Doctor Appointment"), (LAB_PRODUCT_ID, "LAB_PRODUCT_ID")]
     product_id = models.SmallIntegerField(choices=PRODUCT_IDS, blank=True, null=True)
     reference_id = models.IntegerField(blank=True, null=True)
