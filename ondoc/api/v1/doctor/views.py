@@ -3159,7 +3159,7 @@ class AppointmentMessageViewset(viewsets.GenericViewSet):
                                 'patient_name': patient_name,
                                 'doctor': appnt.doctor.name,
                                 'hospital_name': appnt.hospital.name,
-                                'date': time.strftime("%B %d, %Y %H:%M")},
+                                'date': time.strftime("%B %d, %Y %I:%M %p")},
                         countdown=1)
 
                 except Exception as e:

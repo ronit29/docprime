@@ -1,5 +1,10 @@
 from copy import deepcopy
 
+from PIL.Image import NEAREST, BICUBIC
+from django.contrib.staticfiles.storage import staticfiles_storage
+from django.core.files.storage import default_storage
+from PIL import Image, ImageFont, ImageOps
+
 from django.contrib.gis.db import models
 from django.db import migrations, transaction, connection
 from django.db.models import Count, Sum, When, Case, Q, F, Avg
@@ -34,6 +39,7 @@ from django.contrib.contenttypes.fields import GenericRelation
 from ondoc.api.v1.utils import get_start_end_datetime, custom_form_datetime, CouponsMixin, aware_time_zone, \
     form_time_slot, util_absolute_url, html_to_pdf
 from ondoc.common.models import AppointmentHistory, AppointmentMaskNumber, Service, Remark, MatrixMappedState, MatrixMappedCity
+from ondoc.common.models import AppointmentHistory, QRCode
 from functools import reduce
 from operator import or_
 import logging
@@ -42,7 +48,7 @@ import datetime
 from django.db.models import Q
 from django.core.files.uploadedfile import InMemoryUploadedFile
 from django.utils.safestring import mark_safe
-from PIL import Image as Img
+from PIL import Image as Img, ImageDraw
 from io import BytesIO
 import hashlib
 from django.contrib.contenttypes.fields import GenericRelation
@@ -60,6 +66,7 @@ from django.db.models import Count
 from ondoc.api.v1.utils import RawSql
 from safedelete import SOFT_DELETE
 #from ondoc.api.v1.doctor import serializers as doctor_serializers
+import qrcode
 
 logger = logging.getLogger(__name__)
 
@@ -528,6 +535,8 @@ class Doctor(auth_model.TimeStampedModel, auth_model.QCModel, SearchKey, auth_mo
     avg_rating = models.DecimalField(max_digits=5, decimal_places=2, null=True, editable=False)
     remark = GenericRelation(Remark)
 
+    qr_code = GenericRelation(QRCode, related_name="qrcode")
+
     def __str__(self):
         return '{} ({})'.format(self.name, self.id)
 
@@ -671,8 +680,122 @@ class Doctor(auth_model.TimeStampedModel, auth_model.QCModel, SearchKey, auth_mo
     def enabled_for_cod(self):
         return False
 
+    def generate_qr_code(self):
+
+        doctor_url = settings.BASE_URL + "/opd/doctor/{}".format(self.id)
+
+        img = qrcode.make(doctor_url)
+        # md5_hash = hashlib.md5(img.tobytes()).hexdigest()
+
+        tempfile_io = BytesIO()
+        img.save(tempfile_io, format='JPEG')
+
+        filename = "qrcode_{}_{}.jpeg".format('id:' + str(self.id),
+                                              random.randint(1111111111, 9999999999))
+        # image_file1 = InMemoryUploadedFile(tempfile_io, None, name=filename, content_type='image/jpeg', size=10000,
+        #                                    charset=None)
+
+        image_file1 = InMemoryUploadedFile(tempfile_io, None, filename, 'image/jpeg', tempfile_io.tell(), None)
+
+        QRCode_object = QRCode(name=image_file1, content_type=ContentType.objects.get_for_model(Doctor),
+                               object_id=self.id)
+        QRCode_object.save()
+        return QRCode_object
+
+    def generate_sticker(self):
+
+        thumbnail = None
+        for image in self.images.all():
+            if image.cropped_image:
+                thumbnail = image.cropped_image
+
+                break
+        if not thumbnail:
+            return
+
+        qrcode = None
+        for qrcode in self.qr_code.all():
+            if qrcode:
+                qrcode = default_storage.path(qrcode.name)
+                break
+
+        template_url = staticfiles_storage.path('web/images/qr_image.png')
+        template = Image.open(template_url)
+
+
+        thumbnail = default_storage.path(thumbnail)
+        print(thumbnail)
+        doctor_image = Image.open(thumbnail)
+        qrcode_image = Image.open(qrcode)
+
+        # im = Image.open('avatar.jpg')
+        # im = im.resize((120, 120));
+        # bigsize = (im.size[0] * 3, im.size[1] * 3)
+        # mask = Image.new('L', bigsize, 0)
+        # draw = ImageDraw.Draw(mask)
+        # draw.ellipse((0, 0) + bigsize, fill=255)
+        # mask = mask.resize(im.size, Image.ANTIALIAS)
+        # im.putalpha(mask)
+        #
+        # output = ImageOps.fit(im, mask.size, centering=(0.5, 0.5))
+        # output.putalpha(mask)
+        # output.save('output.png')
+        #
+        # background = Image.open('back.jpg')
+        # background.paste(im, (150, 10), im)
+        # background.save('overlap.png')
+
+        doctor_image = doctor_image.resize((220, 220))
+        bigsize = (doctor_image.size[0] * 200, doctor_image.size[1] * 200)
+
+        mask = Image.new('L', bigsize, 0)
+        draw = ImageDraw.Draw(mask)
+        draw.ellipse((100,100)+bigsize, fill=255)
+        mask = mask.resize(doctor_image.size, Image.ANTIALIAS)
+        doctor_image.putalpha(mask)
+        output = ImageOps.fit(doctor_image, mask.size, centering=(1, 1))
+        output.putalpha(mask)
+        # output.save('output.png')
+        canvas = Image.new('RGB', (992, 1620))
+        canvas.paste(template, (0,0))
+        # doctor_image = doctor_image.resize((200, 200), Image.ANTIALIAS)
+        canvas.paste(doctor_image, (390, 300), doctor_image)
+        canvas.save('overlap.png')
+        qrcode_image = qrcode_image.resize((530, 530), Image.ANTIALIAS)
+        canvas.paste(qrcode_image, (215, 830))
+
+        blank_image = Image.new('RGBA', (1000, 1000), 'white') # this new image is created to write text and paste on canvas
+        img_draw = ImageDraw.Draw(canvas)
+        font_url = staticfiles_storage.path('web/images/.fonts/ProspectusPro-Desktop-v1-002/ProspectusSBld.otf')
+        font = ImageFont.truetype(font_url, 40)
+        img_draw.text((350, 530), self.name, fill='black', font=font)
+        # md5_hash = hashlib.md5(canvas.tobytes()).hexdigest()
+
+        tempfile_io = BytesIO()
+        canvas.save(tempfile_io, format='JPEG')
+        filename = "doctor_sticker_{}_{}.jpeg".format('id:' + str(self.id),
+                                              random.randint(1111111111, 9999999999))
+
+        image_file1 = InMemoryUploadedFile(tempfile_io, None, filename, 'image/jpeg', tempfile_io.tell(), None)
+
+        sticker = DoctorSticker(name=image_file1, doctor=self)
+        sticker.save()
+        return sticker
+
+
+
+
     class Meta:
         db_table = "doctor"
+
+
+class DoctorSticker(auth_model.TimeStampedModel):
+    image_base_path = 'doctor/stickers'
+    doctor = models.ForeignKey(Doctor, related_name="stickers", on_delete=models.CASCADE)
+    name = models.ImageField('Original Image Name',upload_to=image_base_path,blank=True, null=True)
+
+    class Meta:
+        db_table = "doctor_sticker"
 
 
 class AboutDoctor(Doctor):
@@ -2584,9 +2707,10 @@ class OfflineOPDAppointments(auth_model.TimeStampedModel):
     @staticmethod
     def appointment_cancel_sms(sms_obj):
         try:
+            cancel_time = aware_time_zone(sms_obj['old_appointment'].time_slot_start)
             default_text = "Dear %s, your appointment with %s at %s for %s has been cancelled. In case of any query, please reach out to the clinic." % (
                               sms_obj['name'], sms_obj['old_appointment'].doctor.get_display_name(), sms_obj['old_appointment'].hospital.name,
-                              sms_obj['old_appointment'].time_slot_start.strftime("%B %d, %Y %I:%M %p"))
+                              cancel_time.strftime("%B %d, %Y %I:%M %p"))
             notification_tasks.send_offline_appointment_message.apply_async(
                 kwargs={'number': sms_obj['phone_number'], 'text': default_text, 'type': 'Appointment CANCEL'},
                 countdown=1)
