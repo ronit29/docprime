@@ -31,3 +31,4 @@ class SubscriptionPlanAdmin(VersionAdmin):
 class SubscriptionPlanFeatureAdmin(VersionAdmin):
     model = PlanFeature
     search_fields = ['name']
+    exclude = ['network', 'lab']
