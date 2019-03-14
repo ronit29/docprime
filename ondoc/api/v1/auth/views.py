@@ -1210,8 +1210,7 @@ class TransactionViewSet(viewsets.GenericViewSet):
                 elif processed_data.get("type") == "lab":
                     REDIRECT_URL = LAB_REDIRECT_URL + "/" + str(processed_data.get("id","")) + "?payment_success=true"
                 elif processed_data.get("type") == "insurance":
-                    REDIRECT_URL = settings.BASE_URL + "/insurance/complete"
-
+                    REDIRECT_URL = settings.BASE_URL + "/insurance/complete?payment_success=true&id=" + str(processed_data.get("id", ""))
         except Exception as e:
             logger.error("Error - " + str(e))
 
