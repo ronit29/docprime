@@ -56,7 +56,7 @@ class ScreenViewSet(viewsets.GenericViewSet):
         package_serializer = CommonPackageSerializer(package_queryset, many=True, context={'request': request})
 
         upcoming_appointment_viewset = AppointmentViewSet()
-        upcoming_appointment_result = upcoming_appointment_viewset.upcoming_appointments(request)
+        upcoming_appointment_result = upcoming_appointment_viewset.upcoming_appointments(request).data
 
 
         grid_list = [
