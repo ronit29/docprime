@@ -5,6 +5,7 @@ from ondoc.common.models import PaymentOptions, UserConfig, Feature, Service, Ma
 from ondoc.crm.admin.banner import BannerAdmin, SliderLocationAdmin
 from ondoc.crm.admin.procedure import ProcedureCategoryAdmin, ProcedureAdmin, IpdProcedureAdmin, FeatureAdmin, \
     ServiceAdmin, HealthInsuranceProviderAdmin, IpdProcedureCategoryAdmin
+from ondoc.crm.admin.subscription_plan import SubscriptionPlanAdmin, SubscriptionPlanFeatureAdmin
 from ondoc.doctor.models import (Doctor, Language, MedicalService, Specialization, College, Qualification, Hospital,
                                  HospitalNetwork, DoctorOnboardingToken, OpdAppointment,
                                  MedicalCondition, AboutDoctor, HealthTip, CommonMedicalCondition, CommonSpecialization,
@@ -25,6 +26,7 @@ from ondoc.location.models import EntityUrls
 from ondoc.notification import models as notifcation_model
 from ondoc.procedure.models import Procedure, ProcedureCategory, CommonProcedureCategory, CommonProcedure, IpdProcedure, \
     IpdProcedureCategory, CommonIpdProcedure
+from ondoc.subscription_plan.models import Plan, PlanFeature
 from .common import Cities, CitiesAdmin, MatrixCityMapping, MatrixCityAdmin, MerchantAdmin, MerchantPayoutAdmin, \
     PaymentOptionsAdmin, MatrixMappedStateAdmin, MatrixMappedCityAdmin
 from .lead import HospitalLeadAdmin, DoctorLeadAdmin, SearchLeadAdmin
@@ -32,8 +34,9 @@ from .doctor import (DoctorAdmin, MedicalServiceAdmin, SpecializationAdmin, Qual
                      CollegeAdmin, MedicalConditionAdmin, HealthTipAdmin, DoctorClinicAdmin,
                      DoctorMappingAdmin, DoctorImageAdmin, DoctorOpdAppointmentAdmin, CommonSpecializationAdmin,
                      SpecializationFieldAdmin, SpecializationDepartmentAdmin, PracticeSpecializationAdmin,
-                     CompetitorInfoImportAdmin, VisitReasonAdmin, PracticeSpecializationContentAdmin, OfflinePatientAdmin,
-                     UploadDoctorDataAdmin)
+                     CompetitorInfoImportAdmin, VisitReasonAdmin, PracticeSpecializationContentAdmin,
+                     OfflinePatientAdmin,
+                     UploadDoctorDataAdmin, DoctorLeaveAdmin)
 from .aboutdoctor import AboutDoctorAdmin
 from .hospital import HospitalAdmin
 from .user import CustomUserAdmin
@@ -103,7 +106,7 @@ admin.site.register(MedicalCondition, MedicalConditionAdmin)
 admin.site.register(HealthTip, HealthTipAdmin)
 admin.site.register(OfflinePatients, OfflinePatientAdmin)
 admin.site.register(OfflineOPDAppointments)
-admin.site.register(DoctorLeave)
+admin.site.register(DoctorLeave, DoctorLeaveAdmin)
 
 admin.site.register(College, CollegeAdmin)
 admin.site.register(HospitalNetwork, HospitalNetworkAdmin)
@@ -181,3 +184,5 @@ admin.site.register(Service, ServiceAdmin)
 admin.site.register(HealthInsuranceProvider, HealthInsuranceProviderAdmin)
 admin.site.register(IpdProcedureCategory, IpdProcedureCategoryAdmin)
 admin.site.register(CommonIpdProcedure)
+admin.site.register(Plan, SubscriptionPlanAdmin)
+admin.site.register(PlanFeature, SubscriptionPlanFeatureAdmin)

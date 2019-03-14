@@ -138,11 +138,17 @@ def dump_to_elastic():
             'elastic_alias': elastic_alias,
             'url': elastic_url,
             'original': original,
-            'destination': destination
+            'destination': destination,
+            'timestamp': int(datetime.datetime.now().timestamp()),
+            'id': obj.id
         }
 
         logger.error(json.dumps(call_data))
-        elastic_alias_switch.apply_async((call_data,), countdown=3600)
+
+        obj.post_task_data = call_data
+        obj.save()
+
+        # elastic_alias_switch.apply_async((call_data,), countdown=3600)
 
         logger.error("Sync elastic job 1 completed")
         return
@@ -151,7 +157,17 @@ def dump_to_elastic():
         logger.error("Error in syncing process of elastic - " + str(e))
 
 @task()
-def elastic_alias_switch(data):
+def elastic_alias_switch():
+    from ondoc.elastic import models as elastic_models
+
+    obj = elastic_models.DemoElastic.objects.all().order_by('id').last()
+    if not obj:
+        raise Exception('Could not elastic object.')
+
+    data = obj.post_task_data
+    if data.get('timestamp', 0) + (2 * 3600) < int(datetime.datetime.now().timestamp()):
+        raise Exception('Object found is not desired object or last object.')
+
     headers = {
         'Content-Type': 'application/json',
     }
