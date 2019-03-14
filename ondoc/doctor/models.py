@@ -240,7 +240,6 @@ class Hospital(auth_model.TimeStampedModel, auth_model.CreatedByModel, auth_mode
     #         return self.city
     #     return None
 
-
     @classmethod
     def update_city_search(cls):
         query = '''  update hospital h set city_search_key = 
@@ -251,14 +250,12 @@ class Hospital(auth_model.TimeStampedModel, auth_model.CreatedByModel, auth_mode
             and  h.id = elr.object_id order by ea.order desc nulls last limit 1	
             )
             '''
-        update_alternative_value = RawSql(query, []).fetch_all()
+        update_alternative_value = RawSql(query, []).execute()
 
         query1 = '''update hospital set city_search_key = city where city_search_key is null
-                    or city_search_key='''''
-        update_city = RawSql(query, []).fetch_all()
+                        or city_search_key='' '''
+        update_city = RawSql(query1, []).execute()
 
-=======
->>>>>>> a34bbb9519809bd6979a2ddeea423617bbc81ea3
 
     def open_for_communications(self):
         if (self.network and self.network.open_for_communication) or (not self.network and self.open_for_communication):
@@ -340,7 +337,7 @@ class Hospital(auth_model.TimeStampedModel, auth_model.CreatedByModel, auth_mode
     def save(self, *args, **kwargs):
         self.update_time_stamps()
         self.update_live_status()
-        # self.update_search_city()
+        # self.update_city_search()
         # build_url = True
         # if self.is_live and self.id and self.location:
         #     if Hospital.objects.filter(location__distance_lte=(self.location, 0), id=self.id).exists():
