@@ -30,5 +30,6 @@ class SubscriptionPlanAdmin(VersionAdmin):
 
 class SubscriptionPlanFeatureAdmin(VersionAdmin):
     model = PlanFeature
+    autocomplete_fields = ['test']
     search_fields = ['name']
     exclude = ['network', 'lab']
