@@ -39,3 +39,4 @@ django-contrib-comments
 geoip2
 django-safedelete
 mongoengine
+qrcode
