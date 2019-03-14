@@ -6,7 +6,8 @@ import raven
 import os
 from django.conf import settings
 from raven.contrib.celery import register_signal, register_logger_signal
-from ondoc.account.tasks import refund_status_update, consumer_refund_update, dump_to_elastic, integrator_order_summary
+from ondoc.account.tasks import refund_status_update, consumer_refund_update, dump_to_elastic, integrator_order_summary,\
+    get_thyrocare_reports
 from celery.schedules import crontab
 from ondoc.doctor.tasks import save_avg_rating, update_prices
 # from ondoc.doctor.services.update_search_score import DoctorSearchScore
@@ -63,8 +64,12 @@ def setup_periodic_tasks(sender, **kwargs):
     sender.add_periodic_task(elastic_sync_cron_schedule, dump_to_elastic.s(), name='Sync Elastic')
     sender.add_periodic_task(crontab(hour=18, minute=30), save_avg_rating.s(), name='Update Lab and Doctor Average Rating')
     sender.add_periodic_task(crontab(hour=19, minute=30), update_prices.s(), name='Update Lab and Doctor Prices')
-    # sender.add_periodic_task(300.0, integrator_order_summary.s(), name='Get Order Summary From Integrator')
 
-    
+    order_summary_time = float(settings.ORDER_SUMMARY_CRON_TIME) * float(60.0)
+    sender.add_periodic_task(order_summary_time, integrator_order_summary.s(), name='Get Order Summary From Integrator')
+
+    report_time = float(settings.THYROCARE_REPORT_CRON_TIME) * float(60.0)
+    sender.add_periodic_task(report_time, get_thyrocare_reports.s(), name='Get Thyrocare Reports')
+
     # doctor_search_score_creation_time = float(settings.CREATE_DOCTOR_SEARCH_SCORE) * float(3600.0)
     # sender.add_periodic_task(doctor_search_score_creation_time, create_search_score.s(), name='Doctor search score updaed')
