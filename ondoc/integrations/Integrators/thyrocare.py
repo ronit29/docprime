@@ -1,3 +1,5 @@
+from decimal import Decimal
+
 from django.core.files.uploadedfile import TemporaryUploadedFile, InMemoryUploadedFile
 from ondoc.api.v1.utils import TimeSlotExtraction
 from .baseIntegrator import BaseIntegrator
@@ -11,6 +13,7 @@ from datetime import datetime, date, timedelta
 from ondoc.diagnostic.models import LabReport, LabReportFile, LabAppointment
 from django.contrib.contenttypes.models import ContentType
 from ondoc.api.v1.utils import resolve_address, aware_time_zone
+import time
 
 
 class Thyrocare(BaseIntegrator):
@@ -88,27 +91,17 @@ class Thyrocare(BaseIntegrator):
         available_slots = resp_data.get('LSlotDataRes', [])
 
         if available_slots:
-            start = available_slots[0]['Slot'].split("-")[0]
-            hour, minutes = start.split(":")
-            hour, minutes = float(hour), int(minutes)
-            minutes = float("%0.2f" % (minutes/60))
-            start = hour + minutes
+            slots = set()
+            for slot in available_slots:
+                start = slot['Slot'].split("-")[0].strip()
+                end = slot['Slot'].split("-")[1].strip()
+                slots.add(start)
+                slots.add(end)
 
-            end = available_slots[len(available_slots)-1]['Slot'].split("-")[1]
+            sorted_slots = sorted(slots)
+            resp_list = self.time_slot_extraction(sorted_slots, date)
 
-            hour, minutes = end.split(":")
-            hour, minutes = float(hour), int(minutes)
-            minutes = float("%0.2f" % (minutes/60))
-            end = hour + minutes
-
-            obj.form_time_slots(datetime.strptime(converted_date, '%d-%m-%Y').weekday(), start, end, None, True)
-
-        booking_details = {"type": 'integration'}
-        leaves = None
-        resp_list = obj.get_timing_slots(date, leaves, booking_details, is_thyrocare=True)
-        res_data = {
-            "time_slots": resp_list, "upcoming_slots": [], "is_thyrocare": True
-        }
+        res_data = {"time_slots": resp_list, "upcoming_slots": [], "is_thyrocare": True}
         return res_data
 
     def _get_is_user_area_serviceable(self, pincode):
@@ -341,3 +334,31 @@ class Thyrocare(BaseIntegrator):
                         dp_appointment.save()
             else:
                 print("[ERROR] %s %s" % (integrator_response.id, response.get('RESPONSE')))
+
+    def time_slot_extraction(self, slots, date):
+        am_timings, pm_timings = list(), list()
+        am_dict, pm_dict = dict(), dict()
+        time_dict = dict()
+        for slot in slots:
+            hour, minutes = slot.split(":")
+            hour, minutes = float(hour), int(minutes)
+            minutes = float("%0.2f" % (minutes/60))
+            value = hour + minutes
+            data = {"text": slot, "value": value, "price": None, "is_available": True, "on_call": False}
+
+            if value >= 12.0:
+                pm_timings.append(data)
+            else:
+                am_timings.append(data)
+
+        am_dict["title"] = "AM"
+        am_dict["type"] = "AM"
+        am_dict["timing"] = am_timings
+        pm_dict["title"] = "PM"
+        pm_dict["type"] = "PM"
+        pm_dict["timing"] = pm_timings
+
+        time_dict[date] = list()
+        time_dict[date].append(am_dict)
+        time_dict[date].append(pm_dict)
+        return time_dict
