@@ -2,6 +2,7 @@ import datetime
 from django.core.validators import FileExtensionValidator
 
 from ondoc.notification.tasks import send_insurance_notifications
+from ondoc.insurance.tasks import push_insurance_buy_to_matrix, push_insurance_banner_lead_to_matrix
 import json
 
 from django.db import models, transaction
@@ -176,6 +177,9 @@ class InsurancePlans(auth_model.TimeStampedModel, LiveMixin):
     def get_active_threshold(self):
         return self.threshold.filter(is_live=True)
 
+    def get_people_covered(self):
+        return "%d adult, %d childs" % (self.adult_count, self.child_count)
+
     def __str__(self):
         return self.name
 
@@ -266,18 +270,24 @@ class UserInsurance(auth_model.TimeStampedModel):
     coi = models.FileField(default=None, null=True, upload_to='insurance/coi', validators=[FileExtensionValidator(allowed_extensions=['pdf'])])
     price_data = JSONField(blank=True, null=True)
     money_pool = models.ForeignKey(MoneyPool, on_delete=models.SET_NULL, null=True)
+    matrix_lead_id = models.IntegerField(null=True)
 
     def __str__(self):
         return str(self.user)
 
+    def get_primary_member_profile(self):
+        insured_members = self.members.filter().order_by('id')
+        proposers = list(filter(lambda member: member.relation.lower() == 'self', insured_members))
+        if proposers:
+            return proposers[0]
+
+        return None
+
     def generate_pdf(self):
         insurer_state_code_obj = self.insurance_plan.insurer.state
         insurer_state_code = insurer_state_code_obj.gst_code
-
         insured_members = self.members.filter().order_by('id')
-        proposer = list(filter(lambda member: member.relation.lower() == 'self', insured_members))
-        proposer = proposer[0]
-
+        proposer = self.get_primary_member_profile()
         proposer_fname = proposer.first_name if proposer.first_name else ""
         proposer_mname = proposer.middle_name if proposer.middle_name else ""
         proposer_lname = proposer.last_name if proposer.last_name else ""
@@ -620,7 +630,8 @@ class InsuranceTransaction(auth_model.TimeStampedModel):
             # self.user_insurance.generate_pdf()
             # send_insurance_notifications(self.user_insurance.user.id)
 
-            send_insurance_notifications.apply_async(({'user_id': self.user_insurance.user.id}, ), countdown=10)
+            send_insurance_notifications.apply_async(({'user_id': self.user_insurance.user.id}, ),
+                                                     link=push_insurance_buy_to_matrix.s(user_id=self.user_insurance.user.id), countdown=10)
 
     def save(self, *args, **kwargs):
         if self.pk:
@@ -682,6 +693,15 @@ class InsuredMembers(auth_model.TimeStampedModel):
     class Meta:
         db_table = "insured_members"
 
+    def get_full_name(self):
+
+        proposer_fname = self.first_name if self.first_name else ""
+        proposer_mname = self.middle_name if self.middle_name else ""
+        proposer_lname = self.last_name if self.last_name else ""
+
+        proposer_name = '%s %s %s %s' % (self.title, proposer_fname, proposer_mname, proposer_lname)
+        return proposer_name
+
     @classmethod
     def create_insured_members(cls, user_insurance):
         import json
@@ -736,5 +756,17 @@ class InsuranceDiseaseResponse(auth_model.TimeStampedModel):
 
     class Meta:
         db_table = "insurance_disease_response"
+
+
+class InsuranceBannerLead(auth_model.TimeStampedModel):
+    matrix_lead_id = models.IntegerField(null=True)
+    user = models.ForeignKey(User, on_delete=models.CASCADE)
+
+    def save(self, *args, **kwargs):
+        super().save(*args, **kwargs)
+        push_insurance_banner_lead_to_matrix.apply_async(({'id': self.id}, ), countdown=10)
+
+    class Meta:
+        db_table = 'insurance_banner_leads'
 
 

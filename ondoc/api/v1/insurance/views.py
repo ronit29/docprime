@@ -8,7 +8,7 @@ from . import serializers
 from rest_framework.response import Response
 from ondoc.account import models as account_models
 from ondoc.doctor import models as doctor_models
-from ondoc.insurance.models import (Insurer, InsuredMembers, InsuranceThreshold, InsurancePlans, UserInsurance,
+from ondoc.insurance.models import (Insurer, InsuredMembers, InsuranceThreshold, InsurancePlans, UserInsurance, InsuranceBannerLead,
                                     InsuranceTransaction, InsuranceDisease, InsuranceDiseaseResponse, StateGSTCode)
 from ondoc.authentication.models import UserProfile
 from ondoc.authentication.backends import JWTAuthentication
@@ -18,6 +18,7 @@ from django.db.models import F
 import datetime
 from django.db import transaction
 from ondoc.authentication.models import User
+from ondoc.insurance.tasks import push_insurance_banner_lead_to_matrix
 from datetime import timedelta
 from django.utils import timezone
 import logging
@@ -96,6 +97,11 @@ class InsuredMemberViewSet(viewsets.GenericViewSet):
 class InsuranceOrderViewSet(viewsets.GenericViewSet):
     authentication_classes = (JWTAuthentication,)
     permission_classes = (IsAuthenticated,)
+
+    def create_banner_lead(self, request):
+        user = request.user
+        InsuranceBannerLead(user=user).save()
+        return Response({'success': True})
 
     @transaction.atomic
     def create_order(self, request):
