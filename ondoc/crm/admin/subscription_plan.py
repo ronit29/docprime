@@ -1,3 +1,4 @@
+from dal import autocomplete
 from django.contrib.admin import TabularInline
 from reversion.admin import VersionAdmin
 from django import forms
@@ -30,6 +31,6 @@ class SubscriptionPlanAdmin(VersionAdmin):
 
 class SubscriptionPlanFeatureAdmin(VersionAdmin):
     model = PlanFeature
-    autocomplete_fields = ['test']
+    list_display = ['id', 'name', 'test']
     search_fields = ['name']
     exclude = ['network', 'lab']
