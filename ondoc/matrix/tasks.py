@@ -12,6 +12,7 @@ import datetime
 from datetime import date
 from ondoc.authentication.models import Address, SPOCDetails, QCModel
 from ondoc.api.v1.utils import resolve_address
+from ondoc.common.models import AppointmentMaskNumber
 from django.apps import apps
 from ondoc.crm.constants import matrix_product_ids, matrix_subproduct_ids
 
