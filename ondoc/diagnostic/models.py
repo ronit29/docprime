@@ -535,6 +535,11 @@ class Lab(TimeStampedModel, CreatedByModel, QCModel, SearchKey):
             if lab.network and lab.network.id:
                 integration_dict = IntegratorMapping.get_if_third_party_integration(network_id=lab.network.id)
 
+            if lab.network.id == settings.THYROCARE_NETWORK_ID and settings.THYROCARE_INTEGRATION_ENABLED:
+                pass
+            else:
+                integration_dict = None
+
         if not integration_dict:
             available_slots = lab.get_timing(is_home_pickup)
         else:
