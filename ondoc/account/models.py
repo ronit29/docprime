@@ -1176,9 +1176,11 @@ class MerchantPayout(TimeStampedModel):
     status = models.PositiveIntegerField(default=PENDING, choices=STATUS_CHOICES)
     payout_time = models.DateTimeField(null=True, blank=True)
     api_response = JSONField(blank=True, null=True)
+    status_api_response = JSONField(blank=True, default='', editable=False)
     retry_count = models.PositiveIntegerField(default=0)
     paid_to = models.ForeignKey(Merchant, on_delete=models.DO_NOTHING, related_name='payouts', null=True)
     utr_no = models.CharField(max_length=500, blank=True, default='')
+    pg_status = models.CharField(max_length=500, blank=True, default='')
     type = models.PositiveIntegerField(default=None, choices=TYPE_CHOICES, null=True, blank=True)
     amount_paid = models.DecimalField(max_digits=10, decimal_places=2, default=None, null=True, blank=True)
     content_type = models.ForeignKey(ContentType, on_delete=models.CASCADE, null=True, blank=True)
@@ -1186,8 +1188,6 @@ class MerchantPayout(TimeStampedModel):
     content_object = GenericForeignKey()
 
     def save(self, *args, **kwargs):
-
-        self.update_status_from_pg()
 
         first_instance = False
         if not self.id:
@@ -1269,35 +1269,40 @@ class MerchantPayout(TimeStampedModel):
         return bool(all_txn and all_txn.count() > 0), order_data, appointment
 
     def update_status_from_pg(self):
-        url = 'https://pgqa.docprime.com/pg/api/settlementDetails'
+
+        if self.pg_status=='SETTLEMENT_COMPLETED':
+            return
+
+        url = settings.SETTLEMENT_DETAILS_API
 
         has_txn, order_data, appointment = self.has_transaction()
-        if has_txn or True:
-            #transaction = order_data.getTransactions()[0]
-            #order_no = transaction.order_no
-            order_no = "DP4253"
+        if has_txn:
+            transaction = order_data.getTransactions()[0]
+            order_no = transaction.order_no
+            #order_no = "DP4253"
             req_data = {"orderNo":order_no}
-            #req_data = {"orderNo": order_no}
             req_data["hash"] = self.create_checksum(req_data)
 
-            # headers = {"auth": 'gFH8gPXbCWaW8WqUefmFBcyRj0XIw',
-            # "Content-Type": "application/json"}
-
-            headers = {"auth": 'gFH8gPXbCWaW8WqUefmFBcyRj0SDs',
+            headers = {"auth": settings.SETTLEMENT_AUTH,
                        "Content-Type": "application/json"}
 
             response = requests.post(url, data=json.dumps(req_data), headers=headers)
             if response.status_code == status.HTTP_200_OK:
                 resp_data = response.json()
-                print(resp_data)
+                self.status_api_response = resp_data
+                if resp_data.get('ok') == 1 and len(resp_data.get('settleDetails'))>0:
+                    details = resp_data.get('settleDetails')
+                    for d in details:
+                        if d.get('refNo') == str(self.id):
+                            self.utr_no = d.get('utrNo','')
+                            self.pg_status = d.get('txStatus','')
+                            break
 
 
     def create_checksum(self, data):
 
-        # secretkey = settings.PG_SECRET_KEY_P2
-        # accesskey = settings.PG_CLIENT_KEY_P2
-        accesskey = 'b7YPL09/78LKpo9l'
-        secretkey = 'aY678ikloPL'
+        accesskey = settings.PG_CLIENT_KEY_P1
+        secretkey = settings.PG_SECRET_KEY_P1
         checksum = ''
 
         keylist = sorted(data)
@@ -1307,33 +1312,9 @@ class MerchantPayout(TimeStampedModel):
                 checksum += curr
 
         checksum = accesskey + "|" + checksum + "|" + secretkey
-        print(checksum)
         checksum_hash = hashlib.sha256(str(checksum).encode())
         checksum_hash = checksum_hash.hexdigest()
         return checksum_hash
-
-
-        #
-        # checksum_string = client_key+'|' + 'date=' + data['date'] +';days='+ data['days'] + ';orderNo=' + data['orderNo']+';' + '|'+secret_key
-        #
-        # accesskey|orderNo|days|date|secretkey
-        # And converted into SHA512
-
-        # e.g
-
-        # 5apilku_DP789ipb|['DP3787']|4|2019-01-16|5apilsec3_DP568gipb
-        # ce9db08d96cc263dfbe833c16e3c4373ce9e345f80ec55ab738df4d489b7a9ca4eb3987ca5fd5081d7b5a4fccb2adb6ce4aaab72242ef15b24617c9618581a88
-
-
-        # checksum = ""
-        # curr = "{"
-        # for k in data.keys():
-        #     if data[k] and data[k] is not None and data[k] is not "":
-        #         curr = curr + k + "=" + data[k] + ""
-        # curr = curr + "}"
-        # checksum += curr
-
-        # checksum = secret_key + "|[" + checksum + "]|" + client_key
 
     class Meta:
         db_table = "merchant_payout"
