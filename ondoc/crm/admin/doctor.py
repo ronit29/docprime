@@ -2047,6 +2047,18 @@ class OfflinePatientAdmin(VersionAdmin):
     inlines = [PatientMobileInline]
 
 
+class DoctorLeaveAdmin(VersionAdmin):
+
+    autocomplete_fields = ('doctor', 'hospital')
+    exclude = ('deleted_at',)
+
+    def get_readonly_fields(self, request, obj=None):
+        read_only_fileds = super().get_readonly_fields(request, obj)
+        if obj and obj.id:
+            read_only_fileds += ('doctor', 'hospital')
+        return read_only_fileds
+
+
 class UploadDoctorDataAdmin(admin.ModelAdmin):
     list_display = ('id', 'source', 'batch', 'status', 'file')
     readonly_fields = ('status', 'error_message', 'user', 'lines')
