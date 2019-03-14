@@ -26,7 +26,7 @@ from ondoc.location.models import EntityUrls
 from ondoc.notification import models as notifcation_model
 from ondoc.procedure.models import Procedure, ProcedureCategory, CommonProcedureCategory, CommonProcedure, IpdProcedure, \
     IpdProcedureCategory, CommonIpdProcedure
-from ondoc.subscription_plan.models import Plan, PlanFeature
+from ondoc.subscription_plan.models import Plan, PlanFeature, UserPlanMapping
 from .common import Cities, CitiesAdmin, MatrixCityMapping, MatrixCityAdmin, MerchantAdmin, MerchantPayoutAdmin, \
     PaymentOptionsAdmin, MatrixMappedStateAdmin, MatrixMappedCityAdmin
 from .lead import HospitalLeadAdmin, DoctorLeadAdmin, SearchLeadAdmin
@@ -186,3 +186,4 @@ admin.site.register(IpdProcedureCategory, IpdProcedureCategoryAdmin)
 admin.site.register(CommonIpdProcedure)
 admin.site.register(Plan, SubscriptionPlanAdmin)
 admin.site.register(PlanFeature, SubscriptionPlanFeatureAdmin)
+admin.site.register(UserPlanMapping)
