@@ -44,3 +44,8 @@ def update_prices():
     Doctor.update_all_deal_price()
     AvailableLabTest.update_all_deal_price()    
     return 'success'
+
+@task
+def update_city_search_key():
+    from ondoc.doctor.models import Hospital
+    Hospital.update_city_search()
