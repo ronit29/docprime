@@ -1316,3 +1316,21 @@ class LabAppointmentUpcoming(LabAppointmentModelSerializer):
 
     def get_hospital_name(self, obj):
         return None
+
+
+class PackageSerializer(LabTestSerializer):
+    # prefetch labtest's -->> 'test__parameter'
+    included_tests = serializers.SerializerMethodField()
+
+    class Meta:
+        model = LabTest
+        fields = ('id', 'name', 'pre_test_info', 'why', 'show_details', 'url', 'included_tests')
+
+    def get_included_tests(self,obj):
+        return_data = list()
+        for temp_test in obj.test.all():
+            parameter_count = len(temp_test.parameter.all()) or 1
+            name = temp_test.name
+            test_id = temp_test.id
+            return_data.append({'id': test_id, 'name': name, 'parameter_count': parameter_count})
+        return return_data

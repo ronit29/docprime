@@ -16,6 +16,7 @@ class Plan(auth_model.TimeStampedModel):
     priority_queue = models.BooleanField(default=True)
     features = models.ManyToManyField('PlanFeature', through='PlanFeatureMapping', through_fields=('plan', 'feature'),
                                       related_name='plans_included_in')
+    enabled = models.BooleanField(default=True)
 
     class Meta:
         db_table = "subscription_plan"
@@ -28,6 +29,7 @@ class PlanFeature(auth_model.TimeStampedModel):
     network = models.ForeignKey(LabNetwork, on_delete=models.CASCADE, null=True, blank=True)
     lab = models.ForeignKey(Lab, on_delete=models.CASCADE, null=True, blank=True)
     test = models.ForeignKey(LabTest, on_delete=models.CASCADE)
+    enabled = models.BooleanField(default=True)
 
     class Meta:
         db_table = "subscription_plan_feature"
@@ -47,6 +49,10 @@ class PlanFeatureMapping(models.Model):
     plan = models.ForeignKey(Plan, on_delete=models.CASCADE, related_name="feature_mappings")
     feature = models.ForeignKey(PlanFeature, on_delete=models.CASCADE, related_name="plan_mappings")
     count = models.PositiveIntegerField(verbose_name="Times per year?")
+    enabled = models.BooleanField(default=True)
+
+    class Meta:
+        unique_together = (('plan', 'feature'),)
 
 
 class UserPlanMapping(auth_model.TimeStampedModel):
