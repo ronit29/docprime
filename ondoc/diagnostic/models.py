@@ -1493,9 +1493,8 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin)
             except Exception as e:
                 logger.error(str(e))
 
-
         if push_to_integrator:
-            if self.lab.network.id == settings.THYROCARE_NETWORK_ID:
+            if self.lab.network and self.lab.network.id == settings.THYROCARE_NETWORK_ID:
                 if settings.THYROCARE_INTEGRATION_ENABLED:
                     is_thyrocare_enabled = True
                 else:
