@@ -19,8 +19,8 @@ from ondoc.api.v1.diagnostic.serializers import CommonPackageSerializer
 
 class ScreenViewSet(viewsets.GenericViewSet):
 
-    authentication_classes = (JWTAuthentication,)
-    permission_classes = (IsAuthenticated,)
+    # authentication_classes = (JWTAuthentication,)
+    # permission_classes = (IsAuthenticated,)
 
 
     def home_page(self, request, *args, **kwargs):
