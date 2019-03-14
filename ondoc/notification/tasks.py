@@ -530,11 +530,12 @@ def process_payout(payout_id):
         logger.error("Error in processing payout - with exception - " + str(e))
 
 
-# @task
-def send_insurance_notifications(user_id):
+@task(bind=True)
+def send_insurance_notifications(self, data):
     from ondoc.authentication import models as auth_model
     from ondoc.communications.models import InsuranceNotification
     try:
+        user_id = int(data.get('user_id', 0))
         user = auth_model.User.objects.filter(id=user_id).last()
         if not user:
             logger.error("Invalid user id passed for insurance email notification")
@@ -542,6 +543,8 @@ def send_insurance_notifications(user_id):
         user_insurance = user.purchased_insurance.filter().last()
         if not user_insurance or not user_insurance.is_valid():
             logger.error("Invalid or None user insurance found for email notification")
+
+        user_insurance.generate_pdf()
 
         insurance_notification = InsuranceNotification(user_insurance, NotificationAction.INSURANCE_CONFIRMED)
         insurance_notification.send()

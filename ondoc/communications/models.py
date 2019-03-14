@@ -798,6 +798,18 @@ class EMAILNotification:
             body_template = "email/lab_invoice/body.html"
             subject_template = "email/lab_invoice/subject.txt"
         elif notification_type == NotificationAction.INSURANCE_CONFIRMED:
+
+            coi = context.get("instance").coi
+            if not coi:
+                logger.error("Got error while creating pdf for opd invoice")
+                return '', ''
+            context.update({"coi": coi})
+            context.update({"coi_url": coi.url})
+            context.update(
+                {"attachments": [
+                    {"filename": util_file_name(coi.url),
+                     "path": util_absolute_url(coi.url)}]})
+
             body_template = "email/insurance_confirmed/body.html"
             subject_template = "email/insurance_confirmed/subject.txt"
 
@@ -1302,6 +1314,7 @@ class InsuranceNotification(Notification):
             count = count + 1
 
         context = {
+            'instance': instance,
             'purchase_data': str(instance.purchase_date.date().strftime('%d-%m-%Y')),
             'expiry_date': str(instance.expiry_date.date().strftime('%d-%m-%Y')),
             'premium': instance.premium_amount,
