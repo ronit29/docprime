@@ -1273,12 +1273,12 @@ class MerchantPayout(TimeStampedModel):
 
         has_txn, order_data, appointment = self.has_transaction()
         if has_txn or True:
-            transaction = order_data.getTransactions()[0]
-            order_no = transaction.order_no
-            # order_no = "DP4253"
-            #req_data = {"orderNo":order_no,"date":None,"days":None}
-            req_data = {"orderNo": order_no}
-            req_data["hashchecksum"] = self.create_checksum(req_data)
+            #transaction = order_data.getTransactions()[0]
+            #order_no = transaction.order_no
+            order_no = "DP4253"
+            req_data = {"orderNo":order_no}
+            #req_data = {"orderNo": order_no}
+            req_data["hash"] = self.create_checksum(req_data)
 
             # headers = {"auth": 'gFH8gPXbCWaW8WqUefmFBcyRj0XIw',
             # "Content-Type": "application/json"}
@@ -1298,11 +1298,11 @@ class MerchantPayout(TimeStampedModel):
         # accesskey = settings.PG_CLIENT_KEY_P2
         accesskey = 'b7YPL09/78LKpo9l'
         secretkey = 'aY678ikloPL'
-        checksum = ""
+        checksum = ''
 
         keylist = sorted(data)
         for k in keylist:
-            if data[k] is not None and data[k] is not "":
+            if data[k] is not None:
                 curr = k + '=' + str(data[k]) + ';'
                 checksum += curr
 
