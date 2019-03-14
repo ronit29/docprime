@@ -26,6 +26,7 @@ class Plan(auth_model.TimeStampedModel):
 
 
 class PlanFeature(auth_model.TimeStampedModel):
+    name = models.CharField(max_length=150, default='')
     network = models.ForeignKey(LabNetwork, on_delete=models.CASCADE, null=True, blank=True)
     lab = models.ForeignKey(Lab, on_delete=models.CASCADE, null=True, blank=True)
     test = models.ForeignKey(LabTest, on_delete=models.CASCADE)
@@ -35,14 +36,17 @@ class PlanFeature(auth_model.TimeStampedModel):
         db_table = "subscription_plan_feature"
 
     def __str__(self):
-        output = ''
-        if self.network:
-            output += self.network.name
-        if self.lab:
-            output += self.lab.name
-        if self.test:
-            output += self.test.name
-        return output
+        return self.name
+
+    # def __str__(self):
+    #     output = ''
+    #     if self.network:
+    #         output += self.network.name
+    #     if self.lab:
+    #         output += self.lab.name
+    #     if self.test:
+    #         output += self.test.name
+    #     return output
 
 
 class PlanFeatureMapping(models.Model):
