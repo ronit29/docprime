@@ -37,7 +37,8 @@ class AppointmentHistory(TimeStampedModel):
     WEB = "web"
     DOC_APP = "d_app"
     CONSUMER_APP = "c_app"
-    SOURCE_CHOICES = ((CONSUMER_APP, "Consumer App"), (CRM, "CRM"), (WEB, "Web"), (DOC_APP, "Doctor App"))
+    DOC_WEB = "d_web"
+    SOURCE_CHOICES = ((CONSUMER_APP, "Consumer App"), (CRM, "CRM"), (WEB, "Consumer Web"), (DOC_APP, "Doctor App"), (DOC_WEB, "Provider Web"))
     content_type = models.ForeignKey(ContentType, on_delete=models.DO_NOTHING)
     object_id = models.PositiveIntegerField()
     content_object = GenericForeignKey()
