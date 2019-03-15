@@ -535,12 +535,8 @@ class LabAppointmentBillingSerializer(serializers.ModelSerializer):
 
 
 class PlanTransactionModelSerializer(serializers.Serializer):
-    # TODO: SHASHANK_SINGH
     plan = serializers.PrimaryKeyRelatedField(queryset=Plan.objects.all())
     user = serializers.PrimaryKeyRelatedField(queryset=User.objects.all())
-    # payment_type = serializers.IntegerField()
-    # deal_price = serializers.DecimalField(max_digits=10, decimal_places=2)
-    # effective_price = serializers.DecimalField(max_digits=10, decimal_places=2)
     extra_details = serializers.JSONField(required=False)
 
 

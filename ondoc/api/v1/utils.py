@@ -345,13 +345,13 @@ def payment_details(request, order):
         'txAmount': str(order.amount),
     }
     secret_key = client_key = ""
-    if order.product_id == Order.DOCTOR_PRODUCT_ID:
+    # TODO : SHASHANK_SINGH for plan FINAL ??
+    if order.product_id == Order.DOCTOR_PRODUCT_ID or order.product_id == Order.SUBSCRIPTION_PLAN_PRODUCT_ID:
         secret_key = settings.PG_SECRET_KEY_P1
         client_key = settings.PG_CLIENT_KEY_P1
     elif order.product_id == Order.LAB_PRODUCT_ID:
         secret_key = settings.PG_SECRET_KEY_P2
         client_key = settings.PG_CLIENT_KEY_P2
-    # TODO : SHASHANK_SINGH for plan
 
     pgdata['hash'] = PgTransaction.create_pg_hash(pgdata, secret_key, client_key)
 

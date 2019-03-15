@@ -66,19 +66,17 @@ class PlanFeatureMapping(models.Model):
 
 
 class UserPlanMapping(auth_model.TimeStampedModel):
-    # TODO: SHASHANK_SINGH stop anyone from deleting plan.
     plan = models.ForeignKey(Plan, on_delete=models.DO_NOTHING, related_name="subscribed_user_mapping")
     user = models.ForeignKey(User, on_delete=models.DO_NOTHING, related_name="plan_mapping", unique=True)
     is_active = models.BooleanField(default=True)
     expire_at = models.DateTimeField(null=True)
-    extra_details = JSONField(blank=True, null=True)
+    extra_details = JSONField(blank=True, null=True)  # Snapshot of the plan when bought
     money_pool = models.ForeignKey(MoneyPool, on_delete=models.SET_NULL, null=True)
 
     class Meta:
         db_table = "subscription_plan_user"
 
     def save(self, *args, **kwargs):
-        # TODO: SHASHANK_SINGH expire it after one year.
         if not self.expire_at:
             self.expire_at = timezone.now() + datetime.timedelta(days=365)
             super().save(*args, **kwargs)

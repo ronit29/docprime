@@ -1076,7 +1076,7 @@ class TransactionViewSet(viewsets.GenericViewSet):
         SUCCESS_REDIRECT_URL = settings.BASE_URL + "/order/summary/%s"
         LAB_REDIRECT_URL = settings.BASE_URL + "/lab/appointment"
         OPD_REDIRECT_URL = settings.BASE_URL + "/opd/appointment"
-        PLAN_REDIRECT_URL = settings.BASE_URL + "/subscription_plan/"  # TODO: SHASHANK_SINGH
+        PLAN_REDIRECT_URL = settings.BASE_URL + "/subscription_plan/"  # TODO: SHASHANK_SINGH is it OK?
 
         try:
             response = None
