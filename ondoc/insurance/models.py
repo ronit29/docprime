@@ -828,8 +828,9 @@ class InsuranceDiseaseResponse(auth_model.TimeStampedModel):
         db_table = "insurance_disease_response"
 
 
-class InsuranceBannerLead(auth_model.TimeStampedModel):
+class InsuranceLead(auth_model.TimeStampedModel):
     matrix_lead_id = models.IntegerField(null=True)
+    extras = JSONField(default={})
     user = models.ForeignKey(User, on_delete=models.CASCADE)
 
     def save(self, *args, **kwargs):
@@ -837,6 +838,6 @@ class InsuranceBannerLead(auth_model.TimeStampedModel):
         push_insurance_banner_lead_to_matrix.apply_async(({'id': self.id}, ), countdown=10)
 
     class Meta:
-        db_table = 'insurance_banner_leads'
+        db_table = 'insurance_leads'
 
 

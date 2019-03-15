@@ -8,7 +8,7 @@ from . import serializers
 from rest_framework.response import Response
 from ondoc.account import models as account_models
 from ondoc.doctor import models as doctor_models
-from ondoc.insurance.models import (Insurer, InsuredMembers, InsuranceThreshold, InsurancePlans, UserInsurance, InsuranceBannerLead,
+from ondoc.insurance.models import (Insurer, InsuredMembers, InsuranceThreshold, InsurancePlans, UserInsurance, InsuranceLead,
                                     InsuranceTransaction, InsuranceDisease, InsuranceDiseaseResponse, StateGSTCode)
 from ondoc.authentication.models import UserProfile
 from ondoc.authentication.backends import JWTAuthentication
@@ -100,7 +100,7 @@ class InsuranceOrderViewSet(viewsets.GenericViewSet):
 
     def create_banner_lead(self, request):
         user = request.user
-        InsuranceBannerLead(user=user).save()
+        InsuranceLead(user=user, extras=request.data).save()
         return Response({'success': True})
 
     @transaction.atomic
