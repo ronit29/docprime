@@ -415,12 +415,10 @@ class UserInsurance(auth_model.TimeStampedModel):
             return False
 
     def is_appointment_valid(self, appointment_time):
-        return True
-        # pass
-        # if self.expiry_date.date() >= appointment_time:
-        #     return True
-        # else:
-        #     return False
+        if self.expiry_date >= appointment_time:
+            return True
+        else:
+            return False
 
     def doctor_specialization_validation(self, appointment_data):
         from ondoc.doctor.models import DoctorPracticeSpecialization, OpdAppointment
@@ -606,8 +604,8 @@ class UserInsurance(auth_model.TimeStampedModel):
     #         return is_insured, insurance_id, insurance_message
 
     def validate_insurance(self, appointment_data):
-        from ondoc.doctor.models import Doctor
-        from ondoc.diagnostic.models import Lab
+        from ondoc.doctor.models import OpdAppointment
+        from ondoc.diagnostic.models import LabAppointment
         # appointment_data = appointment_data.get('data')
         profile = appointment_data.get('profile', None)
         # profile = UserProfile.objects.filter(id=profile).first()
@@ -637,13 +635,17 @@ class UserInsurance(auth_model.TimeStampedModel):
             lab = appointment_data['lab']
             if not lab.is_insurance_enabled:
                 return False, user_insurance.id, 'Not Covered under Insurance'
-            if appointment_data['extra_details']:
-                for detail in appointment_data['extra_details']:
-                    if int(float(detail['mrp'])) <= threshold_lab:
-                        is_lab_insured = True
+            if appointment_data['test_ids']:
+                for test in appointment_data['test_ids']:
+                    test_price = LabAppointment.get_price_details(appointment_data)
+                    if test_price:
+                        if test_price.get('mrp') <= threshold_lab:
+                            is_lab_insured = True
+                        else:
+                            is_lab_insured = False
+                        lab_mrp_check_list.append(is_lab_insured)
                     else:
-                        is_lab_insured = False
-                    lab_mrp_check_list.append(is_lab_insured)
+                        return False, user_insurance.id, 'Price not available for Test'
                 if not False in lab_mrp_check_list:
                     return True, user_insurance.id, 'Covered Under Insurance'
                 else:
@@ -660,7 +662,7 @@ class UserInsurance(auth_model.TimeStampedModel):
             doctor = appointment_data['doctor']
             if not doctor.is_insurance_enabled:
                 return False, user_insurance.id, "Not Covered Under Insurance"
-            from ondoc.doctor.models import OpdAppointment
+
             price_data = OpdAppointment.get_price_details(appointment_data)
             if not int(price_data.get('mrp')) <= threshold_opd:
                 return False, user_insurance.id, "Not Covered Under Insurance"

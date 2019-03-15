@@ -1704,6 +1704,8 @@ class LabAppointmentView(mixins.CreateModelMixin,
         serializer.is_valid(raise_exception=True)
         validated_data = serializer.validated_data
 
+        data['is_appointment_insured'], data['insurance_id'], data['insurance_message'] = Cart.check_for_insurance(validated_data, request)
+
         cart_item_id = validated_data.get('cart_item').id if validated_data.get('cart_item') else None
 
         if validated_data.get("existing_cart_item"):

@@ -220,14 +220,11 @@ class DoctorAppointmentsViewSet(OndocViewSet):
         serializer.is_valid(raise_exception=True)
         validated_data = serializer.validated_data
 
-        user_insurance = UserInsurance.objects.filter(user=request.user).last()
+
         data = request.data
-        data['is_appointment_insured'] = False
-        data['insurance_id'] = None
-        data['insurance_message'] = ""
-        if user_insurance:
-            data['is_appointment_insured'], data['insurance_id'], data[
-                'insurance_message'] = user_insurance.validate_insurance(validated_data)
+
+        data['is_appointment_insured'], data['insurance_id'], data[
+            'insurance_message'] = Cart.check_for_insurance(validated_data,request)
 
         cart_item_id = validated_data.get('cart_item').id if validated_data.get('cart_item') else None
         if not models.OpdAppointment.can_book_for_free(request, validated_data, cart_item_id):

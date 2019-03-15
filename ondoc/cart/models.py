@@ -150,3 +150,14 @@ class Cart(auth_model.TimeStampedModel, auth_model.SoftDeleteModel):
 
     def __str__(self):
         return str(self.id)
+
+    @classmethod
+    def check_for_insurance(self, validated_data, request):
+        from ondoc.insurance.models import UserInsurance
+        user_insurance = UserInsurance.objects.filter(user=request.user).last()
+        is_appointment_insured = False
+        insurance_id = None
+        insurance_message = ""
+        if user_insurance:
+            is_appointment_insured, insurance_id, insurance_message = user_insurance.validate_insurance(validated_data)
+        return is_appointment_insured, insurance_id, insurance_message
