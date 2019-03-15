@@ -1820,7 +1820,7 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin)
             "gender": data["profile"].gender,
             "dob": str(data["profile"].dob),
         }
-
+        cart_data = data.get('cart_item').data
         fulfillment_data = {
             "lab": data["lab"],
             "user": user,
@@ -1839,7 +1839,10 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin)
             "extra_details": extra_details,
             "coupon": price_data.get("coupon_list"),
             "discount": int(price_data.get("coupon_discount")),
-            "cashback": int(price_data.get("coupon_cashback"))
+            "cashback": int(price_data.get("coupon_cashback")),
+            "is_appointment_insured": cart_data.get('is_appointment_insured', False),
+            "insurance": cart_data.get('insurance_id', None),
+            "insurance_message": cart_data.get('insurance_message', "")
         }
 
         if data.get("is_home_pickup") is True:

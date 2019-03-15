@@ -215,9 +215,16 @@ class DoctorAppointmentsViewSet(OndocViewSet):
 
     @transaction.atomic
     def create(self, request):
+
         serializer = serializers.CreateAppointmentSerializer(data=request.data, context={'request': request, 'data' : request.data, 'use_duplicate' : True})
         serializer.is_valid(raise_exception=True)
         validated_data = serializer.validated_data
+
+
+        data = request.data
+
+        data['is_appointment_insured'], data['insurance_id'], data[
+            'insurance_message'] = Cart.check_for_insurance(validated_data,request)
 
         cart_item_id = validated_data.get('cart_item').id if validated_data.get('cart_item') else None
         if not models.OpdAppointment.can_book_for_free(request, validated_data, cart_item_id):
@@ -232,7 +239,7 @@ class DoctorAppointmentsViewSet(OndocViewSet):
             cart_item.save()
         else:
             cart_item, is_new = Cart.objects.update_or_create(id=cart_item_id, deleted_at__isnull=True, product_id=account_models.Order.DOCTOR_PRODUCT_ID,
-                                                  user=request.user,defaults={"data": request.data})
+                                                  user=request.user,defaults={"data": data})
 
         if hasattr(request, 'agent') and request.agent:
             resp = { 'is_agent': True , "status" : 1 }

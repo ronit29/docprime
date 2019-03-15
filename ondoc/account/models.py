@@ -373,6 +373,8 @@ class Order(TimeStampedModel):
         for item in cart_items:
             validated_data = item.validate(request)
             fd = item.get_fulfillment_data(validated_data)
+            if fd['is_appointment_insured']:
+                fd['payment_type'] = 3
             fd["cart_item_id"] = item.id
             fulfillment_data.append(fd)
         return fulfillment_data
@@ -467,7 +469,7 @@ class Order(TimeStampedModel):
                     user=user
                 )
             elif appointment_detail.get('payment_type') == OpdAppointment.INSURANCE:
-                order = cls.Order.objects.create(
+                order = cls.objects.create(
                     product_id=product_id,
                     action=action,
                     action_data=appointment_detail,

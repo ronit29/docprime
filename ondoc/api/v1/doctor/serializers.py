@@ -336,6 +336,12 @@ class CreateAppointmentSerializer(serializers.Serializer):
         else:
             data['use_wallet'] = True
 
+        is_appointment_insured = data.get('is_appointment_insured')
+        insurance_id = data.get('insurance_id')
+        insurance_message = data.get('insurance_message')
+        if is_appointment_insured:
+            data['payment_type'] = OpdAppointment.PAY_CHOICES.INSURANCE
+
         return data
 
     @staticmethod

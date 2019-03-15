@@ -1996,6 +1996,8 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
                           'mrp': doctor_clinic_procedure.mrp}
             extra_details.append(temp_extra)
 
+        cart_data = data.get('cart_item').data
+
         return {
             "doctor": data.get("doctor"),
             "hospital": data.get("hospital"),
@@ -2012,7 +2014,10 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
             "payment_type": data.get("payment_type"),
             "coupon": price_data.get("coupon_list"),
             "discount": int(price_data.get("coupon_discount")),
-            "cashback": int(price_data.get("coupon_cashback"))
+            "cashback": int(price_data.get("coupon_cashback")),
+            "is_appointment_insured": cart_data.get('is_appointment_insured', False),
+            "insurance": cart_data.get('insurance_id', None),
+            "insurance_message": cart_data.get('insurance_message', "")
         }
 
     @staticmethod

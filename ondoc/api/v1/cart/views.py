@@ -12,12 +12,14 @@ class CartViewSet(viewsets.GenericViewSet):
 
     def add(self, request, *args, **kwargs):
         from ondoc.doctor.models import OpdAppointment
+        from ondoc.insurance.models import UserInsurance
 
         user = request.user
         if not user.is_authenticated:
             return Response({"status": 0}, status.HTTP_401_UNAUTHORIZED)
 
         data = dict(request.data)
+
         serializer = serializers.CartCreateSerializer(data=data, context={'request': request})
         serializer.is_valid(raise_exception=True)
         valid_data = serializer.validated_data
@@ -39,6 +41,9 @@ class CartViewSet(viewsets.GenericViewSet):
             lab_app_serializer.is_valid(raise_exception=True)
             serialized_data = lab_app_serializer.validated_data
             cart_item_id = serialized_data.get('cart_item').id if serialized_data.get('cart_item') else None
+
+        data['data']['is_appointment_insured'], data['data']['insurance_id'], data['data'][
+            'insurance_message'] = Cart.check_for_insurance(serialized_data, request)
 
         Cart.objects.update_or_create( id=cart_item_id, deleted_at__isnull=True,
                                        product_id=valid_data.get("product_id"), user=user, defaults={"data" : valid_data.get("data")} )
