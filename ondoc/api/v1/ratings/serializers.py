@@ -18,12 +18,15 @@ class GetComplementSerializer(serializers.ModelSerializer):
 class RatingCreateBodySerializer(serializers.Serializer):
     rating = serializers.IntegerField(max_value=5)
     review = serializers.CharField(max_length=5000, allow_blank=True)
-    appointment_id = serializers.IntegerField()
+    appointment_id = serializers.IntegerField(required=False)
     appointment_type = serializers.ChoiceField(choices=RatingsReview.APPOINTMENT_TYPE_CHOICES)
     # compliment = ListReviewComplimentSerializer(source='request.data')
     compliment = serializers.ListField(child=serializers.PrimaryKeyRelatedField(queryset=ReviewCompliments.objects.all()), allow_empty=True)
+    entity_id = serializers.IntegerField(required=False)
 
     def validate(self, attrs):
+        if not (attrs.get('appointment_id') or attrs.get('entity_id')):
+            raise serializers.ValidationError("either one of appointment id or entity id is required")
         if (attrs.get('appointment_id') and attrs.get('appointment_type')):
             if attrs.get('appointment_type') == RatingsReview.OPD:
                 app = doc_models.OpdAppointment.objects.filter(id=attrs.get('appointment_id')).first()

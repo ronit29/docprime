@@ -37,10 +37,11 @@ class ReviewCompliments(auth_model.TimeStampedModel):
 class RatingsReview(auth_model.TimeStampedModel):
     LAB = 1
     OPD = 2
+    HOSPITAL = 3
     APPROVED = 1
     PENDING = 2
     DENIED = 3
-    APPOINTMENT_TYPE_CHOICES = [(LAB, 'Lab'), (OPD, 'Opd')]
+    APPOINTMENT_TYPE_CHOICES = [(LAB, 'Lab'), (OPD, 'Opd'), (HOSPITAL, 'Hospital')]
     MODERATION_TYPE_CHOICES = [(APPROVED, 'Approved'), (PENDING, 'Pending'), (DENIED, 'Denied')]
     user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
     ratings = models.PositiveIntegerField(null=True)

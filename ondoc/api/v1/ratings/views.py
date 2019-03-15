@@ -57,25 +57,34 @@ class RatingsViewSet(viewsets.GenericViewSet):
         content_data = None
 
         if valid_data.get('appointment_type') == RatingsReview.OPD:
-            content_data = doc_models.OpdAppointment.objects.filter(id=valid_data.get('appointment_id')).first()
-            if content_data and content_data.status == doc_models.OpdAppointment.COMPLETED:
-                content_obj = content_data.doctor
+            if valid_data.get('appointment_id'):
+                content_data = doc_models.OpdAppointment.objects.filter(id=valid_data.get('appointment_id')).first()
+                if content_data and content_data.status == doc_models.OpdAppointment.COMPLETED:
+                    content_obj = content_data.doctor
+            else:
+                content_obj = doc_models.Doctor.objects.filter(id=valid_data.get('entity_id')).first()
+        elif valid_data.get('appointment_type') == RatingsReview.LAB:
+            if valid_data.get('appointment_id'):
+                content_data = lab_models.LabAppointment.objects.filter(id=valid_data.get('appointment_id')).first()
+                if content_data and content_data.status == lab_models.LabAppointment.COMPLETED:
+                    content_obj = content_data.lab
+            else:
+                content_obj = lab_models.Lab.objects.filter(id=valid_data.get('entity_id')).first()
         else:
-            content_data = lab_models.LabAppointment.objects.filter(id=valid_data.get('appointment_id')).first()
-            if content_data and content_data.status == lab_models.LabAppointment.COMPLETED:
-                content_obj = content_data.lab
+            content_obj = doc_models.Hospital.objects.filter(id=valid_data.get('entity_id')).first()
         if content_obj:
             try:
                 with transaction.atomic():
                     rating_review = RatingsReview(user=request.user, ratings=valid_data.get('rating'),
                                                   appointment_type=valid_data.get('appointment_type'),
-                                                  appointment_id=valid_data.get('appointment_id'),
+                                                  appointment_id=valid_data.get('appointment_id', None),
 
                                                   # review=valid_data.get('review'),
                                                   content_object=content_obj)
                     rating_review.save()
-                    content_data.is_rated = True
-                    content_data.save()
+                    if valid_data.get('appointment_id'):
+                        content_data.is_rated = True
+                        content_data.save()
 
             except Exception as e:
                 logger.error('Error Saving Appointment Rating ' + str(e))
