@@ -778,6 +778,7 @@ class DoctorProfileUserViewSet(viewsets.GenericViewSet):
 
         else:
             response_data['about'] = doctor.about
+            response_data['about_web'] = doctor.about
 
         if entity:
             response_data['url'] = entity.url
