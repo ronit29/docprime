@@ -1,5 +1,6 @@
 from copy import deepcopy
 
+import requests
 from PIL.Image import NEAREST, BICUBIC
 from django.contrib.staticfiles.storage import staticfiles_storage
 from django.core.files.storage import default_storage
@@ -15,6 +16,7 @@ from django.core.validators import MaxValueValidator, MinValueValidator, FileExt
 from django.core.exceptions import ValidationError
 from django.core.exceptions import NON_FIELD_ERRORS
 from django.template.loader import render_to_string
+from rest_framework import status
 from rest_framework.exceptions import ValidationError as RestFrameworkValidationError
 from django.core.files.storage import get_storage_class
 from django.conf import settings
@@ -380,6 +382,44 @@ class Hospital(auth_model.TimeStampedModel, auth_model.CreatedByModel, auth_mode
         if not result:
             result.extend(list(self.spoc_details.filter(contact_type=SPOCDetails.OWNER)))
         return result
+
+
+class HospitalPlaceDetails(auth_model.TimeStampedModel):
+    hospital = models.ForeignKey(Hospital, on_delete=models.CASCADE)
+    place_id = models.TextField()
+    place_details = JSONField(null=True, blank=True)
+    reviews = JSONField(null=True, blank=True)
+
+    class Meta:
+        db_table = 'hospital_place_details'
+
+    def save(self, *args, **kwargs):
+        super().save(*args, **kwargs)
+
+    @classmethod
+    def update_place_details(cls):
+        hosp_place_id = HospitalPlaceDetails.objects.all()
+        for data in hosp_place_id:
+            if not data.place_details:
+                place_searched_data = None
+                params = {'placeid': data.place_id, 'key': settings.REVERSE_GEOCODING_API_KEY}
+                place_response = requests.get('https://maps.googleapis.com/maps/api/place/details/json',
+                                          params=params)
+                if place_response.status_code != status.HTTP_200_OK or not place_response.ok:
+                    print('failure  status_code: ' + str(place_response.status_code) + ', reason: ' + str(
+                        place_response.reason))
+                    pass
+
+                place_searched_data = place_response.json()
+                if place_searched_data.get('status') == 'OVER_QUERY_LIMIT':
+                    print('OVER_QUERY_LIMIT')
+                    pass
+
+                if place_searched_data.get('result'):
+                    place_searched_data = place_searched_data.get('result')
+                    data.place_details = place_searched_data
+                    data.reviews = place_searched_data.get('reviews')
+                    data.save()
 
 
 class HospitalServiceMapping(models.Model):
