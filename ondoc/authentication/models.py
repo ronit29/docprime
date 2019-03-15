@@ -1437,12 +1437,10 @@ class Merchant(TimeStampedModel):
         return self.beneficiary_name+"("+self.account_number+")-("+str(self.id)+")"
 
     def save(self, *args, **kwargs):
-        if self.verified_by_finance and not self.pg_status == self.COMPLETE:
-            pass
+        if self.verified_by_finance and self.pg_status == self.NOT_INITIATED:
+            self.create_in_pg()
 
         super().save(*args, **kwargs)
-        if self.pg_status == 0:
-            self.create_in_pg()
 
     def create_in_pg(self, *args, **kwargs):
         resp_data = None
@@ -1482,14 +1480,15 @@ class Merchant(TimeStampedModel):
 
         if response.status_code == status.HTTP_200_OK:
             resp_data = response.json()
-            if resp_data.get('StatusCode') and resp_data.get('StatusCode') == self.INITIATED:
+            self.api_response  = resp_data
+            if resp_data.get('ok') == 1 and resp_data.get('StatusCode') and resp_data.get('StatusCode') in [1,2,3,4]:
                 self.pg_status = resp_data.get('StatusCode')
-                self.save()
-                print(resp_data)
+        
+        #self.save()
 
     @classmethod
     def update_status_from_pg(cls):
-        merchant = Merchant.objects.all()
+        merchant = Merchant.objects.filter(pg_status__in=[cls.INITIATED, cls.INPROCESS])
         for data in merchant:
             resp_data = None
             request_payload = {"beneCode": str(data.pk)}

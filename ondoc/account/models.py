@@ -1270,7 +1270,7 @@ class MerchantPayout(TimeStampedModel):
 
     def update_status_from_pg(self):
 
-        if self.pg_status=='SETTLEMENT_COMPLETED':
+        if self.pg_status=='SETTLEMENT_COMPLETED' and not self.utr_no and self.type=self.AUTOMATIC:
             return
 
         url = settings.SETTLEMENT_DETAILS_API
@@ -1296,6 +1296,7 @@ class MerchantPayout(TimeStampedModel):
                         if d.get('refNo') == str(self.id):
                             self.utr_no = d.get('utrNo','')
                             self.pg_status = d.get('txStatus','')
+                            self.save()
                             break
 
 
