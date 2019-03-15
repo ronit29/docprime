@@ -2,6 +2,7 @@ from django.db import models
 from django.contrib.postgres.fields import JSONField
 from django.forms import model_to_dict
 
+from ondoc.api.v1.diagnostic.serializers import PlanTransactionModelSerializer
 from ondoc.authentication.models import TimeStampedModel, User, UserProfile, Merchant
 from ondoc.account.tasks import refund_curl_task
 from ondoc.notification.models import AppNotification, NotificationAction
@@ -26,6 +27,8 @@ from django.contrib.contenttypes.fields import GenericForeignKey
 from django.contrib.contenttypes.models import ContentType
 import string
 import random
+
+from ondoc.subscription_plan.models import UserPlanMapping
 
 logger = logging.getLogger(__name__)
 
@@ -53,7 +56,8 @@ class Order(TimeStampedModel):
     DOCTOR_PRODUCT_ID = 1
     LAB_PRODUCT_ID = 2
     SUBSCRIPTION_PLAN_PRODUCT_ID = 3
-    PRODUCT_IDS = [(DOCTOR_PRODUCT_ID, "Doctor Appointment"), (LAB_PRODUCT_ID, "LAB_PRODUCT_ID")]
+    PRODUCT_IDS = [(DOCTOR_PRODUCT_ID, "Doctor Appointment"), (LAB_PRODUCT_ID, "LAB_PRODUCT_ID"),
+                   (SUBSCRIPTION_PLAN_PRODUCT_ID, "SUBSCRIPTION_PLAN_PRODUCT_ID")]
     product_id = models.SmallIntegerField(choices=PRODUCT_IDS, blank=True, null=True)
     reference_id = models.IntegerField(blank=True, null=True)
     action = models.PositiveSmallIntegerField(blank=True, null=True, choices=ACTION_CHOICES)
@@ -129,6 +133,10 @@ class Order(TimeStampedModel):
                 payment_not_required = True
             elif appointment_data['payment_type'] == OpdAppointment.INSURANCE:
                 payment_not_required = True
+        elif self.product_id == self.SUBSCRIPTION_PLAN_PRODUCT_ID:
+            serializer = PlanTransactionModelSerializer(data=appointment_data)
+            serializer.is_valid(raise_exception=True)
+            appointment_data = serializer.validated_data
 
         consumer_account = ConsumerAccount.objects.get_or_create(user=appointment_data['user'])
         consumer_account = ConsumerAccount.objects.select_for_update().get(user=appointment_data['user'])
@@ -170,6 +178,15 @@ class Order(TimeStampedModel):
             if total_balance + appointment_obj.effective_price >= new_appointment_data["effective_price"]:
                 amount = new_appointment_data["effective_price"] - appointment_obj.effective_price
                 appointment_obj.action_rescheduled_patient(new_appointment_data)
+                order_dict = {
+                    "reference_id": appointment_obj.id,
+                    "payment_status": Order.PAYMENT_ACCEPTED
+                }
+        elif self.action == Order.SUBSCRIPTION_PLAN_BUY:
+            if consumer_account.balance > appointment_data.get('effective_price'):
+                new_appointment_data = appointment_data
+                appointment_obj = UserPlanMapping(**new_appointment_data)
+                appointment_obj.save()
                 order_dict = {
                     "reference_id": appointment_obj.id,
                     "payment_status": Order.PAYMENT_ACCEPTED
@@ -467,6 +484,7 @@ class Order(TimeStampedModel):
         total_cashback_used = total_wallet_used = 0
         opd_appointment_ids = []
         lab_appointment_ids = []
+        user_plan_ids = []
 
         for order in orders_to_process:
             try:
@@ -479,12 +497,17 @@ class Order(TimeStampedModel):
                     opd_appointment_ids.append(curr_app.id)
                 elif order.product_id == Order.LAB_PRODUCT_ID:
                     lab_appointment_ids.append(curr_app.id)
+                elif order.product_id == Order.SUBSCRIPTION_PLAN_PRODUCT_ID:
+                    user_plan_ids.append(curr_app.id)
 
                 total_cashback_used += curr_cashback
                 total_wallet_used += curr_wallet
 
                 # trigger event for new appointment creation
-                curr_app.trigger_created_event(self.visitor_info)
+                if order.product_id == Order.SUBSCRIPTION_PLAN_PRODUCT_ID:
+                    pass
+                else:
+                    curr_app.trigger_created_event(self.visitor_info)
 
                 # mark cart item delete after order process
                 if order.cart:
@@ -492,7 +515,7 @@ class Order(TimeStampedModel):
             except Exception as e:
                 logger.error(str(e))
 
-        if not opd_appointment_ids and not lab_appointment_ids:
+        if not opd_appointment_ids and not lab_appointment_ids and not user_plan_ids:
             raise Exception("Could not process entire order")
 
         # mark order processed:
@@ -513,12 +536,28 @@ class Order(TimeStampedModel):
             OpdAppointment.objects.filter(id__in=opd_appointment_ids).update(money_pool=money_pool)
         if lab_appointment_ids:
             LabAppointment.objects.filter(id__in=lab_appointment_ids).update(money_pool=money_pool)
+        if user_plan_ids:
+            UserPlanMapping.objects.filter(id__in=user_plan_ids).update(money_pool=money_pool)
 
-        resp = { "opd" : opd_appointment_ids , "lab" : lab_appointment_ids, "type" : "all", "id" : None }
+        resp = {"opd": opd_appointment_ids, "lab": lab_appointment_ids,
+                "plan": user_plan_ids, "type": "all", "id": None}
         # Handle backward compatibility, in case of single booking, return the booking id
-        if (len(opd_appointment_ids) + len(lab_appointment_ids)) == 1:
-            resp["type"] = "doctor" if len(opd_appointment_ids) > 0 else "lab"
-            resp["id"] = opd_appointment_ids[0] if len(opd_appointment_ids) > 0 else lab_appointment_ids[0]
+        if (len(opd_appointment_ids) + len(lab_appointment_ids) + len(user_plan_ids)) == 1:
+            result_type = "all"
+            result_id = None
+            if len(opd_appointment_ids) > 0:
+                result_type = "doctor"
+                result_id = opd_appointment_ids[0]
+            elif len(lab_appointment_ids) > 0:
+                result_type = "lab"
+                result_id = lab_appointment_ids[0]
+            elif len(user_plan_ids) > 0:
+                result_type = "plan"
+                result_id = user_plan_ids[0]
+            # resp["type"] = "doctor" if len(opd_appointment_ids) > 0 else "lab"
+            # resp["id"] = opd_appointment_ids[0] if len(opd_appointment_ids) > 0 else lab_appointment_ids[0]
+            resp["type"] = result_type
+            resp["id"] = result_id
 
         return resp
 
@@ -822,7 +861,11 @@ class ConsumerAccount(TimeStampedModel):
         return ctx_obj
 
     def debit_schedule(self, appointment_obj, product_id, amount):
-        cashback_deducted = min(self.cashback, amount)
+
+        if product_id == Order.SUBSCRIPTION_PLAN_PRODUCT_ID:
+            cashback_deducted = 0
+        else:
+            cashback_deducted = min(self.cashback, amount)
         self.cashback -= cashback_deducted
 
         balance_deducted = min(self.balance, amount-cashback_deducted)

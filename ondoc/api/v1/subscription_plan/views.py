@@ -47,7 +47,7 @@ class SubscriptionPlanLoggedInUserViewSet(viewsets.GenericViewSet):
                                                                       context={'request': request})
         serializer.is_valid(raise_exception=True)
         validated_data = serializer.validated_data
-        resp = Plan.create_order(request, validated_data)
+        resp = UserPlanMapping.create_order(request, validated_data)
         return Response(resp)
 
     def get_queryset(self):

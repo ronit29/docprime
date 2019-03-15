@@ -30,6 +30,7 @@ from django.db.models import Q
 from ondoc.api.v1.ratings import serializers as rating_serializer
 from ondoc.location.models import EntityUrls, EntityAddress
 from ondoc.seo.models import NewDynamic
+from ondoc.subscription_plan.models import Plan
 
 logger = logging.getLogger(__name__)
 utc = pytz.UTC
@@ -531,6 +532,16 @@ class LabAppointmentBillingSerializer(serializers.ModelSerializer):
         fields = ('id', 'lab', 'lab_test', 'profile', 'type', 'lab_name', 'status', 'agreed_price', 'price',
                   'effective_price', 'time_slot_start', 'time_slot_end', 'is_home_pickup', 'lab_thumbnail', 'lab_image',
                   'patient_thumbnail', 'patient_name', 'payment_type')
+
+
+class PlanTransactionModelSerializer(serializers.Serializer):
+    # TODO: SHASHANK_SINGH
+    plan = serializers.PrimaryKeyRelatedField(queryset=Plan.objects.all())
+    user = serializers.PrimaryKeyRelatedField(queryset=User.objects.all())
+    # payment_type = serializers.IntegerField()
+    # deal_price = serializers.DecimalField(max_digits=10, decimal_places=2)
+    # effective_price = serializers.DecimalField(max_digits=10, decimal_places=2)
+    extra_details = serializers.JSONField(required=False)
 
 
 class LabAppTransactionModelSerializer(serializers.Serializer):
