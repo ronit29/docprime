@@ -8,7 +8,7 @@ from datetime import date, timedelta, datetime
 class Cart(auth_model.TimeStampedModel, auth_model.SoftDeleteModel):
 
     product_id = models.IntegerField(choices=Order.PRODUCT_IDS)
-    user = models.ForeignKey(auth_model.User, on_delete=models.CASCADE)
+    user = models.ForeignKey(auth_model.User, related_name='cart_item', on_delete=models.CASCADE)
     deleted_at = models.DateTimeField(blank=True, null=True)
     data = JSONField()
 
@@ -152,7 +152,7 @@ class Cart(auth_model.TimeStampedModel, auth_model.SoftDeleteModel):
         return str(self.id)
 
     @classmethod
-    def check_for_insurance(self, validated_data, request):
+    def check_for_insurance(cls, validated_data, request):
         from ondoc.insurance.models import UserInsurance
         user_insurance = UserInsurance.objects.filter(user=request.user).last()
         is_appointment_insured = False
@@ -161,3 +161,54 @@ class Cart(auth_model.TimeStampedModel, auth_model.SoftDeleteModel):
         if user_insurance:
             is_appointment_insured, insurance_id, insurance_message = user_insurance.validate_insurance(validated_data)
         return is_appointment_insured, insurance_id, insurance_message
+
+    @classmethod
+    def check_for_specialization_insurance(cls, validated_data, request):
+        from ondoc.insurance.models import UserInsurance
+        from django.conf import settings
+        from ondoc.doctor.models import Doctor
+        import json
+        from ondoc.doctor.models import DoctorPracticeSpecialization
+        user = request.user
+        user_insurance = UserInsurance.objects.filter(user=user).last()
+        # cart_items = user.cart_item
+        counter = 0
+        if user_insurance:
+            if validated_data.get('doctor'):
+                current_doctor = validated_data.get('doctor')
+                is_insurance, insurance_id, insurance_message, gyne_count, onco_count = user_insurance.doctor_specialization_validation(validated_data)
+                if gyne_count > 5:
+                    return False, user_insurance.id, 'Gynecologist Limit of 5 exceeded'
+                if onco_count > 5:
+                    return False, user_insurance.id, 'Oncologist Limit of 5 exceeded'
+            cart_items = Cart.objects.filter(user=user, deleted_at__isnull=True)
+            for cart in cart_items:
+                if cart.product_id == 1:
+                    data = cart.data
+                    doctor_id = data.get('doctor')
+                    gynecologist_list = json.loads(settings.GYNECOLOGIST_SPECIALIZATION_IDS)
+                    # gynecologist_set = set(gynecologist_list)
+                    oncologist_list = json.loads(settings.ONCOLOGIST_SPECIALIZATION_IDS)
+                    # oncologist_set = set(oncologist_list)
+                    doctor_gynecologist = DoctorPracticeSpecialization.objects.filter(
+                        specialization_id__in=gynecologist_list).values_list(
+                        'doctor_id', flat=True)
+                    if doctor_id in doctor_gynecologist:
+                        counter = counter + 1
+
+                    doctor_oncologist = DoctorPracticeSpecialization.objects.filter(
+                        specialization_id__in=oncologist_list).values_list(
+                        'doctor_id', flat=True)
+                    if doctor_id in doctor_oncologist:
+                        counter = counter + 1
+                else:
+                    pass
+
+            if gyne_count + counter > 5:
+                return False, user_insurance.id, 'Gynecologist Limit of 5 exceeded including cart'
+            elif onco_count + counter > 5:
+                return False, user_insurance.id, 'Oncologist Limit of 5 exceeded including cart'
+            else:
+                return True, user_insurance.id, ''
+        else:
+            return False, None, "Not Covered under insurance"
