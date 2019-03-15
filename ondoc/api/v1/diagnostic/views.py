@@ -1203,6 +1203,7 @@ class LabList(viewsets.ReadOnlyModelViewSet):
 
             row['home_pickup_charges'] = lab_obj.home_pickup_charges
             row['is_home_collection_enabled'] = lab_obj.is_home_collection_enabled
+            row['is_insurance_enabled'] = lab_obj.is_insurance_enabled
 
             # if lab_obj.always_open:
             #     lab_timing = "12:00 AM - 11:45 PM"
@@ -1275,15 +1276,17 @@ class LabList(viewsets.ReadOnlyModelViewSet):
                 # lab network case as lab network have more than 1 labs under it.
 
                 res['insurance'] = insurance_data_dict
-                all_tests_under_lab = res['tests']
+                all_tests_under_lab = res.get('tests', [])
                 bool_array = list()
-                if all_tests_under_lab:
+                if all_tests_under_lab and res['is_insurance_enabled']:
                     for paticular_test_in_lab in all_tests_under_lab:
                         insurance_coverage = paticular_test_in_lab.get('mrp', 0) <= insurance_data_dict['insurance_threshold_amount']
                         bool_array.append(insurance_coverage)
 
                     if False not in bool_array and len(bool_array) > 0:
                         res['insurance']['is_insurance_covered'] = True
+                elif res['is_insurance_enabled'] and not all_tests_under_lab:
+                    res['insurance']['is_insurance_covered'] = True
 
                 #existing = res
                 key = network_id
