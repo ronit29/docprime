@@ -242,14 +242,17 @@ class Hospital(auth_model.TimeStampedModel, auth_model.CreatedByModel, auth_mode
 
     @classmethod
     def update_city_search(cls):
-        query = '''  update hospital h set city_search_key = 
-            (	select lower(ea.alternative_value)
-            from entity_location_relations elr 
-            inner join entity_address ea on elr.location_id=ea.id  
-            and ea.use_in_url=True and ea.type='LOCALITY' and elr.content_type_id=28
-            and  h.id = elr.object_id order by ea.order desc nulls last limit 1	
-            )
-            '''
+        query = '''  update hospital set city_search_key = alternative_value
+        from 
+        (select * from 
+        (select h.id,lower(ea.alternative_value) alternative_value,
+        row_number() OVER( PARTITION BY h.id ORDER BY  ea.order desc nulls last) rnk from
+                hospital h inner join 
+                    entity_location_relations elr on h.id = elr.object_id and elr.content_type_id=28
+                    inner join entity_address ea on elr.location_id=ea.id  
+                    and ea.use_in_url=True and ea.type='LOCALITY' 
+        )x where rnk =1 
+        )y where hospital.id = y.id'''
         update_alternative_value = RawSql(query, []).execute()
 
         query1 = '''update hospital set city_search_key = city where city_search_key is null

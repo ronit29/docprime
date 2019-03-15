@@ -50,9 +50,9 @@ class DoctorSearchHelper:
                 "h.id=(%(hospital_id)s)")
             params['hospital_id'] = str(self.query_params.get("hospital_id"))
 
-        # if self.query_params.get('locality_value'):
-        #     filtering_params.append("h.city_search_key = (%(locality_value)s)")
-        #     params['locality_value'] = self.query_params.get('locality_value').lower()
+        if self.query_params.get('locality_value'):
+            filtering_params.append("h.city_search_key = (%(locality_value)s)")
+            params['locality_value'] = self.query_params.get('locality_value').lower()
 
         if len(condition_ids)>0:
             cs = list(models.MedicalConditionSpecialization.objects.filter(medical_condition_id__in=condition_ids).values_list('specialization_id', flat=True));
