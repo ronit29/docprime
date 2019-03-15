@@ -14,7 +14,7 @@ logger = logging.getLogger(__name__)
 
 @task(bind=True, max_retries=2)
 def push_insurance_banner_lead_to_matrix(self, data):
-    from ondoc.insurance.models import InsuranceBannerLead
+    from ondoc.insurance.models import InsuranceLead, InsurancePlans
     try:
         if not data:
             raise Exception('Data not received for banner lead.')
@@ -24,18 +24,22 @@ def push_insurance_banner_lead_to_matrix(self, data):
             logger.error("[CELERY ERROR: Incorrect values provided.]")
             raise ValueError()
 
-        banner_obj = InsuranceBannerLead.objects.filter(id=id).first()
+        banner_obj = InsuranceLead.objects.filter(id=id).first()
 
         if not banner_obj:
             raise Exception("Banner object could not found against id - " + str(id))
 
+        extras = banner_obj.extras
+        plan = InsurancePlans.objects.filter(id=extras.get('plan_id', 0)).first()
+
         request_data = {
             'LeadSource': 'InsuranceOPD',
-            'Name': None,
+            'Name': 'none',
             'BookedBy': banner_obj.user.phone_number,
             'PrimaryNo': banner_obj.user.phone_number,
             'ProductId': 5,
             'SubProductId': 3,
+            'InsurancePlanPurchased': plan.name if plan else None
         }
 
         url = settings.MATRIX_API_URL
@@ -61,7 +65,7 @@ def push_insurance_banner_lead_to_matrix(self, data):
                 logger.error(json.dumps(request_data))
                 raise Exception("[ERROR] Id not recieved from the matrix while pushing insurance banner lead to matrix.")
 
-            insurance_banner_qs = InsuranceBannerLead.objects.filter(id=id)
+            insurance_banner_qs = InsuranceLead.objects.filter(id=id)
             insurance_banner_qs.update(matrix_lead_id=resp_data.get('Id'))
 
     except Exception as e:
