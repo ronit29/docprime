@@ -2,7 +2,7 @@ from django.db import models
 from django.contrib.postgres.fields import JSONField
 from django.forms import model_to_dict
 
-from ondoc.api.v1.diagnostic.serializers import PlanTransactionModelSerializer
+
 from ondoc.authentication.models import TimeStampedModel, User, UserProfile, Merchant
 from ondoc.account.tasks import refund_curl_task
 from ondoc.notification.models import AppNotification, NotificationAction
@@ -28,7 +28,7 @@ from django.contrib.contenttypes.models import ContentType
 import string
 import random
 
-from ondoc.subscription_plan.models import UserPlanMapping
+
 
 logger = logging.getLogger(__name__)
 
@@ -108,6 +108,8 @@ class Order(TimeStampedModel):
         from ondoc.diagnostic.models import LabAppointment
         from ondoc.api.v1.doctor.serializers import OpdAppTransactionModelSerializer
         from ondoc.api.v1.diagnostic.serializers import LabAppTransactionModelSerializer
+        from ondoc.api.v1.diagnostic.serializers import PlanTransactionModelSerializer
+        from ondoc.subscription_plan.models import UserPlanMapping
 
         # skip if order already processed
         if self.reference_id:
@@ -474,6 +476,7 @@ class Order(TimeStampedModel):
     def process_pg_order(self):
         from ondoc.doctor.models import OpdAppointment
         from ondoc.diagnostic.models import LabAppointment
+        from ondoc.subscription_plan.models import UserPlanMapping
 
         orders_to_process = []
         if self.orders.exists():
