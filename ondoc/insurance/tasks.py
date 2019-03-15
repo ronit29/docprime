@@ -31,7 +31,7 @@ def push_insurance_banner_lead_to_matrix(self, data):
 
         request_data = {
             'LeadSource': 'InsuranceOPD',
-            'Name': None,
+            'Name': 'none',
             'BookedBy': banner_obj.user.phone_number,
             'PrimaryNo': banner_obj.user.phone_number,
             'ProductId': 5,

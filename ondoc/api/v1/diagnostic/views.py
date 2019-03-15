@@ -804,6 +804,28 @@ class LabList(viewsets.ReadOnlyModelViewSet):
         parameters = request.query_params
         if kwargs.get('parameters'):
             parameters = kwargs.get('parameters')
+
+        # Insurance check for logged in user
+        logged_in_user = request.user
+        insurance_threshold = InsuranceThreshold.objects.all().order_by('-lab_amount_limit').first()
+        insurance_data_dict = {
+            'is_user_insured': False,
+            'insurance_threshold_amount': insurance_threshold.lab_amount_limit if insurance_threshold else 5000,
+            'is_insurance_covered' : False
+        }
+
+        is_insurance_covered = False
+
+        if logged_in_user.is_authenticated and not logged_in_user.is_anonymous:
+            user_insurance = logged_in_user.purchased_insurance.filter().order_by('id').last()
+            if user_insurance and user_insurance.is_valid():
+                insurance_threshold = user_insurance.insurance_plan.threshold.filter().first()
+                if insurance_threshold:
+                    insurance_data_dict['insurance_threshold_amount'] = 0 if insurance_threshold.lab_amount_limit is None else \
+                        insurance_threshold.lab_amount_limit
+                    insurance_data_dict['is_user_insured'] = True
+
+
         test_ids = parameters.get('ids', [])
         if test_ids:
             try:
@@ -826,6 +848,7 @@ class LabList(viewsets.ReadOnlyModelViewSet):
         parameters = serializer.validated_data
         page = int(request.query_params.get('page', 1))
 
+        parameters['insurance_threshold_amount'] = insurance_data_dict['insurance_threshold_amount']
         queryset_result = self.get_lab_search_list(parameters, page)
         count = 0
         if len(queryset_result)>0:
@@ -833,7 +856,7 @@ class LabList(viewsets.ReadOnlyModelViewSet):
 
         #count = len(queryset_result)
         #paginated_queryset = paginate_queryset(queryset_result, request)
-        result = self.form_lab_search_whole_data(queryset_result, parameters.get("ids"))
+        result = self.form_lab_search_whole_data(queryset_result, parameters.get("ids"), insurance_data_dict=insurance_data_dict)
 
         if result:
             from ondoc.coupon.models import Coupon
@@ -928,6 +951,8 @@ class LabList(viewsets.ReadOnlyModelViewSet):
         max_price = parameters.get('max_price')
         name = parameters.get('name')
         network_id = parameters.get("network_id")
+        is_insurance = parameters.get('is_insurance')
+        insurance_threshold_amount = parameters.get('insurance_threshold_amount')
 
         #filtering_params = []
         #filtering_params_query1 = []
@@ -984,6 +1009,9 @@ class LabList(viewsets.ReadOnlyModelViewSet):
             group_filter.append("price<=(%(max_price)s)")
             filtering_params['max_price'] = max_price
 
+        if is_insurance and ids:
+            filtering_query.append("mrp<=(%(insurance_threshold_amount)s)")
+            filtering_params['insurance_threshold_amount'] = insurance_threshold_amount
 
         filter_query_string = ""    
         if len(filtering_query)>0:
@@ -996,7 +1024,6 @@ class LabList(viewsets.ReadOnlyModelViewSet):
 
         filtering_params['page_start'] = (page-1)*20
         filtering_params['page_end'] = page*20
-
 
         # filtering_result = {}
         # if filtering_params:
@@ -1109,7 +1136,7 @@ class LabList(viewsets.ReadOnlyModelViewSet):
             queryset_order_by =' order_priority desc, distance asc'
         return queryset_order_by
 
-    def form_lab_search_whole_data(self, queryset, test_ids=None):
+    def form_lab_search_whole_data(self, queryset, test_ids=None, insurance_data_dict={}):
         ids = [value.get('id') for value in queryset]
         # ids, id_details = self.extract_lab_ids(queryset)
         labs = Lab.objects.select_related('network').prefetch_related('lab_documents', 'lab_image', 'lab_timings','home_collection_charges')
@@ -1150,6 +1177,7 @@ class LabList(viewsets.ReadOnlyModelViewSet):
                     else:
                         deal_price=test.computed_deal_price
                     tests[obj.id].append({"id": test.test_id, "name": test.test.name, "deal_price": deal_price, "mrp": test.mrp, "number_of_tests": test.test.number_of_tests, 'categories': test.test.get_all_categories_detail(), "url": test.test.url})
+
 
         # day_now = timezone.now().weekday()
         # days_array = [i for i in range(7)]
@@ -1242,6 +1270,21 @@ class LabList(viewsets.ReadOnlyModelViewSet):
 
             if not existing:
                 res['other_labs'] = []
+
+                # Insurance logic. Add Insurance dictionary for all labs and for [0] index for
+                # lab network case as lab network have more than 1 labs under it.
+
+                res['insurance'] = insurance_data_dict
+                all_tests_under_lab = res['tests']
+                bool_array = list()
+                if all_tests_under_lab:
+                    for paticular_test_in_lab in all_tests_under_lab:
+                        insurance_coverage = paticular_test_in_lab.get('mrp', 0) <= insurance_data_dict['insurance_threshold_amount']
+                        bool_array.append(insurance_coverage)
+
+                    if False not in bool_array and len(bool_array) > 0:
+                        res['insurance']['is_insurance_covered'] = True
+
                 #existing = res
                 key = network_id
                 if not key:
