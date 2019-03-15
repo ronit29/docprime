@@ -1270,7 +1270,7 @@ class MerchantPayout(TimeStampedModel):
 
     def update_status_from_pg(self):
 
-        if self.pg_status=='SETTLEMENT_COMPLETED' and not self.utr_no and self.type=self.AUTOMATIC:
+        if self.pg_status=='SETTLEMENT_COMPLETED' and not self.utr_no and self.type ==self.AUTOMATIC:
             return
 
         url = settings.SETTLEMENT_DETAILS_API
@@ -1298,7 +1298,6 @@ class MerchantPayout(TimeStampedModel):
                             self.pg_status = d.get('txStatus','')
                             self.save()
                             break
-
 
     def create_checksum(self, data):
 

@@ -1480,8 +1480,8 @@ class Merchant(TimeStampedModel):
 
         if response.status_code == status.HTTP_200_OK:
             resp_data = response.json()
-            self.api_response  = resp_data
-            if resp_data.get('ok') == 1 and resp_data.get('StatusCode') and resp_data.get('StatusCode') in [1,2,3,4]:
+            self.api_response = resp_data
+            if resp_data.get('StatusCode') and resp_data.get('StatusCode') in [1,2,3,4]:
                 self.pg_status = resp_data.get('StatusCode')
         
         #self.save()
@@ -1498,7 +1498,8 @@ class Merchant(TimeStampedModel):
                                                                                      'Content-Type': 'application/json'})
             if response.status_code == status.HTTP_200_OK:
                 resp_data = response.json()
-                if resp_data.get('statusCode') and resp_data.get('statusCode') in (Merchant.INITIATED, Merchant.INPROCESS, Merchant.COMPLETE):
+                data.api_response = resp_data
+                if resp_data.get('statusCode') and resp_data.get('statusCode') in [cls.INITIATED, cls.INPROCESS]:
                     data.pg_status = resp_data.get('statusCode')
                     data.save()
 
