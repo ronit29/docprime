@@ -49,7 +49,7 @@ from django.contrib.contenttypes.fields import GenericRelation
 from django.contrib.contenttypes.fields import GenericForeignKey
 from django.contrib.contenttypes.models import ContentType
 from ondoc.matrix.tasks import push_appointment_to_matrix, push_onboarding_qcstatus_to_matrix
-from ondoc.integrations.task import push_lab_appointment_to_integrator
+from ondoc.integrations.task import push_lab_appointment_to_integrator, get_integrator_order_status
 from ondoc.location import models as location_models
 from ondoc.ratings_review import models as ratings_models
 from ondoc.api.v1.common import serializers as common_serializers
@@ -1505,10 +1505,12 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin)
             else:
                 is_thyrocare_enabled = True
 
-
             try:
                 if is_thyrocare_enabled:
-                    push_lab_appointment_to_integrator.apply_async(({'appointment_id': self.id},), countdown=5)
+                    # push_lab_appointment_to_integrator.apply_async(({'appointment_id': self.id},), countdown=5)
+                    push_lab_appointment_to_integrator.apply_async(({'appointment_id': self.id},),
+                                                                   link=get_integrator_order_status.s(appointment_id=self.id),
+                                                                   countdown=5)
             except Exception as e:
                 logger.error(str(e))
 

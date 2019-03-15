@@ -76,16 +76,13 @@ class Thyrocare(BaseIntegrator):
         cls.thyrocare_data(obj_id, type)
 
     def _get_appointment_slots(self, pincode, date, **kwargs):
-        obj = TimeSlotExtraction()
         if not pincode or not date:
             resp_list = dict()
             resp_list[date] = list()
 
             res_data = {"time_slots": resp_list, "upcoming_slots": [], "is_thyrocare": True}
             return res_data
-            # return {"error": 'pincode and date required for thyrocare lab.'}
 
-        converted_date = datetime.strptime(date, '%Y-%m-%d').strftime('%d-%m-%Y')
         url = '%s/ORDER.svc/%s/%s/GetAppointmentSlots' % (settings.THYROCARE_BASE_URL, pincode, date)
         response = requests.get(url)
         if response.status_code != status.HTTP_200_OK or not response.ok:
@@ -216,24 +213,29 @@ class Thyrocare(BaseIntegrator):
     def get_generated_report(cls):
         from ondoc.integrations.models import IntegratorResponse
         if settings.THYROCARE_INTEGRATION_ENABLED:
-            integrator_bookings = IntegratorResponse.objects.filter(integrator_class_name=Thyrocare.__name__, report_received=False)
-            formats = ['pdf', 'xml']
-            for booking in integrator_bookings:
-                lead_id = booking.lead_id
-                mobile = booking.content_object.profile.phone_number
-                result = dict()
+            try:
+                integrator_bookings = IntegratorResponse.objects.filter(integrator_class_name=Thyrocare.__name__, report_received=False)
+                formats = ['pdf', 'xml']
+                for booking in integrator_bookings:
+                    dp_appointment = booking.content_object
+                    if dp_appointment.time_slot_start + timedelta(days=1) >= datetime.now():
+                        lead_id = booking.lead_id
+                        mobile = booking.content_object.profile.phone_number
+                        result = dict()
 
-                for format in formats:
-                    url = "%s/order.svc/%s/GETREPORTS/%s/%s/%s/Myreport" % (settings.THYROCARE_BASE_URL, settings.THYROCARE_API_KEY, lead_id, format, mobile)
-                    response = requests.get(url)
-                    response = response.json()
-                    if response.get('RES_ID') == 'RES0000':
-                        result[format] = response["URL"]
-                    else:
-                        logger.error("[ERROR] %s" % response.get('RESPONSE'))
+                        for format in formats:
+                            url = "%s/order.svc/%s/GETREPORTS/%s/%s/%s/Myreport" % (settings.THYROCARE_BASE_URL, settings.THYROCARE_API_KEY, lead_id, format, mobile)
+                            response = requests.get(url)
+                            response = response.json()
+                            if response.get('RES_ID') == 'RES0000':
+                                result[format] = response["URL"]
+                            else:
+                                logger.error("[ERROR] %s" % response.get('RESPONSE'))
 
-                if result:
-                    cls.save_reports(booking, result)
+                        if result:
+                            cls.save_reports(booking, result)
+            except Exception as e:
+                logger.error(str(e))
 
     @classmethod
     def save_reports(cls, integrator_response, result):

@@ -1,4 +1,6 @@
 from __future__ import absolute_import, unicode_literals
+
+import requests
 from celery import task
 import logging
 from django.conf import settings
@@ -77,6 +79,41 @@ def push_lab_appointment_to_integrator(self, data):
                 countdown_time = 1 * 60
                 print(countdown_time)
                 self.retry([data], countdown=countdown_time)
+
+    except Exception as e:
+        logger.error(str(e))
+
+
+@task(bind=True, max_retries=3)
+def get_integrator_order_status(self, *args, **kwargs):
+    from ondoc.diagnostic.models import LabAppointment
+    from ondoc.integrations.models import IntegratorResponse
+
+    try:
+        appointment_id = kwargs.get('appointment_id', None)
+        appointment = LabAppointment.objects.filter(pk=appointment_id).first()
+
+        if not appointment:
+            raise Exception("Appointment could not found against id - " + str(appointment_id))
+
+        integrator_response = IntegratorResponse.objects.filter(object_id=appointment.id).first()
+
+        if not integrator_response:
+            raise Exception("Integrator Response not found for appointment id - " + str(appointment_id))
+
+        url = "%s/order.svc/%s/%s/%s/all/OrderSummary" % (settings.THYROCARE_BASE_URL, settings.THYROCARE_API_KEY,
+                                                          integrator_response.dp_order_id,
+                                                          integrator_response.response_data['MOBILE'])
+        response = requests.get(url)
+        response = response.json()
+        if response.get('RES_ID') == 'RES0000' and response['BEN_MASTER'][0]['STATUS'].upper() == ('DELIVERY' or 'REPORTED' or 'SERVICED' or 'CREDITED'):
+            if not appointment.status == 5:
+                appointment.status = 5
+                appointment.save()
+        else:
+            countdown_time = 1 * 60
+            print(countdown_time)
+            self.retry(**kwargs, countdown=countdown_time)
 
     except Exception as e:
         logger.error(str(e))
