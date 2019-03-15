@@ -78,7 +78,12 @@ class Thyrocare(BaseIntegrator):
     def _get_appointment_slots(self, pincode, date, **kwargs):
         obj = TimeSlotExtraction()
         if not pincode or not date:
-            return {"error": 'pincode and date required for thyrocare lab.'}
+            resp_list = dict()
+            resp_list[date] = list()
+
+            res_data = {"time_slots": resp_list, "upcoming_slots": [], "is_thyrocare": True}
+            return res_data
+            # return {"error": 'pincode and date required for thyrocare lab.'}
 
         converted_date = datetime.strptime(date, '%Y-%m-%d').strftime('%d-%m-%Y')
         url = '%s/ORDER.svc/%s/%s/GetAppointmentSlots' % (settings.THYROCARE_BASE_URL, pincode, date)

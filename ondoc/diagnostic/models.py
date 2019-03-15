@@ -529,7 +529,7 @@ class Lab(TimeStampedModel, CreatedByModel, QCModel, SearchKey):
         res_data = {"time_slots": resp_list, "upcoming_slots": upcoming_slots, "is_thyrocare": False}
         return res_data
 
-    def get_available_slots(self, is_home_pickup, address, date):
+    def get_available_slots(self, is_home_pickup, pincode, date):
         from ondoc.integrations.models import IntegratorMapping
         from ondoc.integrations import service
 
@@ -539,7 +539,7 @@ class Lab(TimeStampedModel, CreatedByModel, QCModel, SearchKey):
             if lab.network and lab.network.id:
                 integration_dict = IntegratorMapping.get_if_third_party_integration(network_id=lab.network.id)
 
-                if lab.network.id == 43 and settings.THYROCARE_INTEGRATION_ENABLED:
+                if lab.network.id == settings.THYROCARE_NETWORK_ID and settings.THYROCARE_INTEGRATION_ENABLED:
                     pass
                 else:
                     integration_dict = None
@@ -547,7 +547,6 @@ class Lab(TimeStampedModel, CreatedByModel, QCModel, SearchKey):
         if not integration_dict:
             available_slots = lab.get_timing(is_home_pickup)
         else:
-            pincode = address.pincode
             class_name = integration_dict['class_name']
             integrator_obj = service.create_integrator_obj(class_name)
             available_slots = integrator_obj.get_appointment_slots(pincode, date,

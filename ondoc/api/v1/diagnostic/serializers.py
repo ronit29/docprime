@@ -622,7 +622,7 @@ class LabAppointmentCreateSerializer(serializers.Serializer):
     coupon_code = serializers.ListField(child=serializers.CharField(), required=False, default=[])
     use_wallet = serializers.BooleanField(required=False)
     cart_item = serializers.PrimaryKeyRelatedField(queryset=Cart.objects.all(), required=False, allow_null=True)
-    pincode = serializers.CharField(required=False, allow_null=True)
+    pincode = serializers.CharField(required=False, allow_null=True, allow_blank=True)
     is_thyrocare = serializers.BooleanField(required=False, default=False)
 
     def validate(self, data):
@@ -708,8 +708,16 @@ class LabAppointmentCreateSerializer(serializers.Serializer):
         # validations for same day and next day timeslot bookings
         selected_date = time_slot_start.strftime("%Y-%m-%d")
         lab = data.get("lab")
+        pincode = data.get('pincode', None)
         address = data.get("address", None)
-        available_slots = lab.get_available_slots(data.get("is_home_pickup"), address, selected_date)
+
+        if bool(data.get("is_thyrocare")):
+            if not pincode:
+                raise serializers.ValidationError("Pincode required for thyrocare.")
+            if not int(pincode) == int(address.pincode):
+                raise serializers.ValidationError("Entered pincode should be same as pickup address pincode.")
+
+        available_slots = lab.get_available_slots(data.get("is_home_pickup"), pincode, selected_date)
         is_integrated = lab.is_integrated()
         # available_slots = LabTiming.timing_manager.lab_booking_slots(lab__id=data.get("lab").id, lab__is_live=True, for_home_pickup=data.get("is_home_pickup"))
         now = datetime.datetime.now()
@@ -721,6 +729,9 @@ class LabAppointmentCreateSerializer(serializers.Serializer):
         curr_time += curr_minute
 
         selected_day_slots = available_slots['time_slots'][selected_date]
+        if not selected_day_slots:
+            raise serializers.ValidationError("No time slots available")
+
         current_day_slots = self.get_slots_list(selected_day_slots)
 
         if not curr_time in current_day_slots:
