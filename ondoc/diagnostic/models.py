@@ -1,3 +1,4 @@
+from collections import OrderedDict
 from copy import deepcopy
 
 from django.contrib.gis.db import models
@@ -474,15 +475,18 @@ class Lab(TimeStampedModel, CreatedByModel, QCModel, SearchKey):
 
     def get_timing(self, is_home_pickup):
         from ondoc.api.v1.common import serializers as common_serializers
+        date = datetime.datetime.today().strftime('%Y-%m-%d')
         lab_timing_queryset = self.lab_timings.filter(for_home_pickup=is_home_pickup)
         lab_slots = []
         if not lab_timing_queryset or (is_home_pickup and not lab_timing_queryset[0].lab.is_home_collection_enabled):
-            return {
-                "time_slots": [],
-                "today_min": None,
-                "tomorrow_min": None,
-                "today_max": None
-            }
+            res_data = OrderedDict()
+            for i in range(30):
+                converted_date = (datetime.datetime.now() + datetime.timedelta(days=i))
+                readable_date = converted_date.strftime("%Y-%m-%d")
+                res_data[readable_date] = list()
+
+            res_data = {"time_slots": res_data, "upcoming_slots": [], "is_thyrocare": False}
+            return res_data
         else:
             global_leave_serializer = common_serializers.GlobalNonBookableSerializer(
                 GlobalNonBookable.objects.filter(deleted_at__isnull=True, booking_type=GlobalNonBookable.LAB), many=True)
@@ -502,7 +506,7 @@ class Lab(TimeStampedModel, CreatedByModel, QCModel, SearchKey):
         global_leave_serializer = common_serializers.GlobalNonBookableSerializer(
             GlobalNonBookable.objects.filter(deleted_at__isnull=True,
                                              booking_type=GlobalNonBookable.LAB), many=True)
-        date = datetime.datetime.today().strftime('%Y-%m-%d')
+
         booking_details = {"type": "lab", "is_home_pickup": is_home_pickup}
         resp_list = obj.get_timing_slots(date, global_leave_serializer.data, booking_details)
         is_thyrocare = False
@@ -535,7 +539,7 @@ class Lab(TimeStampedModel, CreatedByModel, QCModel, SearchKey):
             if lab.network and lab.network.id:
                 integration_dict = IntegratorMapping.get_if_third_party_integration(network_id=lab.network.id)
 
-                if lab.network.id == settings.THYROCARE_NETWORK_ID and settings.THYROCARE_INTEGRATION_ENABLED:
+                if lab.network.id == 43 and settings.THYROCARE_INTEGRATION_ENABLED:
                     pass
                 else:
                     integration_dict = None

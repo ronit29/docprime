@@ -1688,7 +1688,13 @@ class DoctorAvailabilityTimingViewSet(viewsets.ViewSet):
         if dc_obj:
             timeslots = dc_obj.get_timings()
         else:
-            timeslots = {"time_slots": [], "upcoming_slots": []}
+            res_data = OrderedDict()
+            for i in range(30):
+                converted_date = (datetime.datetime.now() + datetime.timedelta(days=i))
+                readable_date = converted_date.strftime("%Y-%m-%d")
+                res_data[readable_date] = list()
+
+            timeslots = {"time_slots": res_data, "upcoming_slots": []}
         # queryset = models.DoctorClinicTiming.objects.filter(doctor_clinic__doctor=validated_data.get('doctor_id'),
         #                                                     doctor_clinic__hospital=validated_data.get(
         #                                                         'hospital_id')).order_by("start")

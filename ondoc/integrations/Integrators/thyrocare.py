@@ -100,6 +100,9 @@ class Thyrocare(BaseIntegrator):
 
             sorted_slots = sorted(slots)
             resp_list = self.time_slot_extraction(sorted_slots, date)
+        else:
+            resp_list = dict()
+            resp_list[date] = list()
 
         res_data = {"time_slots": resp_list, "upcoming_slots": [], "is_thyrocare": True}
         return res_data
