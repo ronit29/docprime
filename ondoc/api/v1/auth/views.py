@@ -541,6 +541,7 @@ class UserAppointmentsViewSet(OndocViewSet):
             return Response(serializer.data)
         elif appointment_type == 'doctor':
             queryset = OpdAppointment.objects.filter(pk=pk, user=user)
+            # serializer = AppointmentRetrieveSerializer(queryset, many=True, context={"request": request})
             serializer = NewAppointmentRetrieveSerializer(queryset, many=True, context={"request": request})
             return Response(serializer.data)
         else:
