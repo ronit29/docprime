@@ -136,7 +136,30 @@ class UserPlanMapping(auth_model.TimeStampedModel):
             )
 
         action = Order.SUBSCRIPTION_PLAN_BUY
-        extra_details = {}
+        # Snapshot of plan and its features
+
+        # extra_details = {"id": str(plan.id),
+        #                  "name": plan.name,
+        #                  "mrp": str(plan.mrp),
+        #                  "unlimited_online_consultation": plan.unlimited_online_consultation,
+        #                  "priority_queue": plan.priority_queue,
+        #                  "deal_price": str(plan.deal_price),
+        #                  "features": [{"id": str(feature_mapping.feature.id), "name": feature_mapping.feature.name,
+        #                                "count": str(feature_mapping.count), "test": str(
+        #                          feature_mapping.feature.test.id)} for feature_mapping in
+        #                               plan.feature_mappings.filter(enabled=True)]}
+
+        extra_details = {"id": plan.id,
+                         "name": plan.name,
+                         "mrp": str(plan.mrp),
+                         "deal_price": str(plan.deal_price),
+                         "unlimited_online_consultation": plan.unlimited_online_consultation,
+                         "priority_queue": plan.priority_queue,
+                         "features": [{"id": feature_mapping.feature.id, "name": feature_mapping.feature.name,
+                                       "count": feature_mapping.count, "test":
+                                           feature_mapping.feature.test.id} for feature_mapping in
+                                      plan.feature_mappings.filter(enabled=True)]}
+
         action_data = {"user": str(user.id), "plan": str(plan.id), "extra_details": extra_details}
         child_order = Order.objects.create(
             product_id=product_id,

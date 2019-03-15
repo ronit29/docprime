@@ -185,7 +185,8 @@ class Order(TimeStampedModel):
                     "payment_status": Order.PAYMENT_ACCEPTED
                 }
         elif self.action == Order.SUBSCRIPTION_PLAN_BUY:
-            if consumer_account.balance > appointment_data.get('effective_price'):
+            amount = Decimal(appointment_data.get('extra_details', {}).get('deal_price', float('inf')))
+            if consumer_account.balance > amount:
                 new_appointment_data = appointment_data
                 appointment_obj = UserPlanMapping(**new_appointment_data)
                 appointment_obj.save()
