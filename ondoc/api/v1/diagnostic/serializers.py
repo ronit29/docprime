@@ -1328,10 +1328,13 @@ class LabAppointmentUpcoming(LabAppointmentModelSerializer):
 class PackageSerializer(LabTestSerializer):
     included_tests = serializers.SerializerMethodField()
     show_detail_in_plan = serializers.SerializerMethodField()
+    total_parameter_count = serializers.SerializerMethodField()
 
     class Meta:
         model = LabTest
-        fields = ('id', 'name', 'pre_test_info', 'why', 'show_details', 'url', 'included_tests', 'show_detail_in_plan')
+        fields = ('id', 'name',
+                  # 'pre_test_info', 'why', 'show_details', 'url',  # They exist but are not needed yet
+                  'included_tests', 'show_detail_in_plan', 'total_parameter_count')
 
     def get_included_tests(self, obj):
         return_data = list()
@@ -1346,3 +1349,10 @@ class PackageSerializer(LabTestSerializer):
         for temp_test in obj.test.all():
             return True
         return False
+
+    def get_total_parameter_count(self, obj):
+        return_data = 0
+        for temp_test in obj.test.all():
+            parameter_count = len(temp_test.parameter.all()) or 1
+            return_data += parameter_count
+        return return_data

@@ -43,7 +43,7 @@ class PlanFeatureSerializer(serializers.ModelSerializer):
     class Meta:
         model = PlanFeature
         fields = ('id', 'test', 'name',
-                  # 'lab', 'hospital'  # TODO: if subscription plan contains anything except test
+                  # 'lab', 'hospital'  # if_subscription_plan_contains_anything_except_test
                   )
 
 
