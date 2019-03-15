@@ -1326,7 +1326,6 @@ class LabAppointmentUpcoming(LabAppointmentModelSerializer):
 
 
 class PackageSerializer(LabTestSerializer):
-    # prefetch labtest's -->> 'test__parameter'
     included_tests = serializers.SerializerMethodField()
     show_detail_in_plan = serializers.SerializerMethodField()
 

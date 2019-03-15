@@ -31,7 +31,7 @@ class SubscriptionPlanListViewSet(viewsets.GenericViewSet):
     def list(self, request):
         plan_queryset = list(Plan.objects.prefetch_related(
             Prefetch('feature_mappings', PlanFeatureMapping.objects.filter(enabled=True))).filter(enabled=True))
-        plan_feature_queryset = list(PlanFeature.objects.filter(enabled=True))
+        plan_feature_queryset = list(PlanFeature.objects.prefetch_related('test__test__parameter').filter(enabled=True))
         plans_data = serializers.PlanSerializerList(plan_queryset, many=True,
                                                context={"plan_feature_queryset": plan_feature_queryset}).data
         feature_data = serializers.PlanFeatureSerializer(plan_feature_queryset, many=True).data

@@ -2,7 +2,6 @@ from django.db import models
 from django.contrib.postgres.fields import JSONField
 from django.forms import model_to_dict
 
-
 from ondoc.authentication.models import TimeStampedModel, User, UserProfile, Merchant
 from ondoc.account.tasks import refund_curl_task
 from ondoc.notification.models import AppNotification, NotificationAction
@@ -27,8 +26,6 @@ from django.contrib.contenttypes.fields import GenericForeignKey
 from django.contrib.contenttypes.models import ContentType
 import string
 import random
-
-
 
 logger = logging.getLogger(__name__)
 
@@ -509,7 +506,7 @@ class Order(TimeStampedModel):
 
                 # trigger event for new appointment creation
                 if order.product_id == Order.SUBSCRIPTION_PLAN_PRODUCT_ID:
-                    pass
+                    pass  # TODO: SHASHANK_SINGH what to de about it finally??
                 else:
                     curr_app.trigger_created_event(self.visitor_info)
 
