@@ -622,6 +622,8 @@ class LabAppointmentCreateSerializer(serializers.Serializer):
     coupon_code = serializers.ListField(child=serializers.CharField(), required=False, default=[])
     use_wallet = serializers.BooleanField(required=False)
     cart_item = serializers.PrimaryKeyRelatedField(queryset=Cart.objects.all(), required=False, allow_null=True)
+    pincode = serializers.CharField(required=False, allow_null=True)
+    is_thyrocare = serializers.BooleanField(required=False, default=False)
 
     def validate(self, data):
         MAX_APPOINTMENTS_ALLOWED = 10
