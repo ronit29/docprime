@@ -1,5 +1,7 @@
 from django.contrib.admin import TabularInline
 from reversion.admin import VersionAdmin
+
+from ondoc.diagnostic.models import LabTest
 from ondoc.subscription_plan.models import Plan, PlanFeature, PlanFeatureMapping, UserPlanMapping
 
 
@@ -46,6 +48,9 @@ class SubscriptionPlanFeatureAdmin(VersionAdmin):
         name_field = form.base_fields.get('name')
         if name_field:
             name_field.required = True
+        test_field = form.base_fields.get('test')
+        if test_field:
+            test_field.queryset = LabTest.objects.filter(is_package=True)
         return form
 
 
