@@ -144,10 +144,11 @@ class UserPlanMapping(auth_model.TimeStampedModel):
                          "priority_queue": plan.priority_queue,
                          "features": [{"id": feature_mapping.feature.id, "name": feature_mapping.feature.name,
                                        "count": feature_mapping.count, "test":
-                                           feature_mapping.feature.test.id} for feature_mapping in
+                                           feature_mapping.feature.test.id,
+                                       "test_name": feature_mapping.feature.test.name} for feature_mapping in
                                       plan.feature_mappings.filter(enabled=True)]}
 
-        action_data = {"user": str(user.id), "plan": str(plan.id), "extra_details": extra_details}
+        action_data = {"user": user.id, "plan": plan.id, "extra_details": extra_details}
         child_order = Order.objects.create(
             product_id=product_id,
             action=action,

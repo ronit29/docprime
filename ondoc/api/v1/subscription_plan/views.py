@@ -32,8 +32,8 @@ class SubscriptionPlanListViewSet(viewsets.GenericViewSet):
         plan_queryset = list(Plan.objects.prefetch_related(
             Prefetch('feature_mappings', PlanFeatureMapping.objects.filter(enabled=True))).filter(enabled=True))
         plan_feature_queryset = list(PlanFeature.objects.prefetch_related('test__test__parameter').filter(enabled=True))
-        plans_data = serializers.PlanSerializerList(plan_queryset, many=True,
-                                               context={"plan_feature_queryset": plan_feature_queryset}).data
+        plans_data = serializers.PlanWithFeatureSerializer(plan_queryset, many=True,
+                                                           context={"plan_feature_queryset": plan_feature_queryset}).data
         feature_data = serializers.PlanFeatureSerializer(plan_feature_queryset, many=True).data
         return Response({'plans': plans_data, 'feature_details': feature_data})
 
@@ -41,6 +41,9 @@ class SubscriptionPlanListViewSet(viewsets.GenericViewSet):
 class SubscriptionPlanLoggedInUserViewSet(viewsets.GenericViewSet):
     authentication_classes = (JWTAuthentication,)
     permission_classes = (IsAuthenticated,)
+
+    def get_queryset(self):
+        return UserPlanMapping.objects.objects.none()
 
     def buy(self, request):
         serializer = serializers.UserSubscriptionBuyRequestSerializer(data=request.query_params,
@@ -50,5 +53,14 @@ class SubscriptionPlanLoggedInUserViewSet(viewsets.GenericViewSet):
         resp = UserPlanMapping.create_order(request, validated_data)
         return Response(resp)
 
-    def get_queryset(self):
-        return UserPlanMapping.objects.objects.none()
+    def retrieve(self, request):
+        from copy import deepcopy
+        serializer = serializers.UserSubscriptionRetrieveRequestSerializer(data=request.query_params,
+                                                                           context={'request': request})
+        serializer.is_valid(raise_exception=True)
+        validated_data = serializer.validated_data
+        user_plan_obj = validated_data.get('user_plan')
+        result = deepcopy(user_plan_obj.extra_details)
+        result.update({"created_at": user_plan_obj.created_at, "expire_at": user_plan_obj.expire_at,
+                       "is_active": user_plan_obj.is_active})
+        return Response(result)

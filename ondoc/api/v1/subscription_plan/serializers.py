@@ -16,7 +16,7 @@ class PlanSerializer(serializers.ModelSerializer):
         fields = '__all__'
 
 
-class PlanSerializerList(PlanSerializer):
+class PlanWithFeatureSerializer(PlanSerializer):
 
     features = serializers.SerializerMethodField()
 
@@ -33,7 +33,7 @@ class PlanSerializerList(PlanSerializer):
         for plan_feature in plan_feature_list:
             temp_plan_feature_mapping = plan_feature_dict.get(plan_feature.id, None)
             result.append({'id': plan_feature.id,
-                           'count': temp_plan_feature_mapping.count if temp_plan_feature_mapping else None})
+                           'count': temp_plan_feature_mapping.count if temp_plan_feature_mapping and temp_plan_feature_mapping.enabled else None})
         return result
 
 
@@ -75,4 +75,16 @@ class UserSubscriptionBuyRequestSerializer(serializers.Serializer):
             raise serializers.ValidationError('Invalid request.')
         if UserPlanMapping.objects.filter(user=request.user, is_active=True, expire_at__gte=timezone.now()).exists():
             raise serializers.ValidationError('User already has a subscription plan.')
+        return attrs
+
+
+class UserSubscriptionRetrieveRequestSerializer(serializers.Serializer):
+    user_plan = serializers.PrimaryKeyRelatedField(queryset=UserPlanMapping.objects.all())
+
+    def validate(self, attrs):
+        request = self.context.get('request')
+        if not request:
+            raise serializers.ValidationError('Invalid request.')
+        if not UserPlanMapping.objects.filter(user=request.user).exists():
+            raise serializers.ValidationError('User has no subscription plan.')
         return attrs
