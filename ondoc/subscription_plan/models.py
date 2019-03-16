@@ -42,17 +42,17 @@ class PlanFeature(auth_model.TimeStampedModel):
         db_table = "subscription_plan_feature"
 
     def __str__(self):
-        return self.name
-
-    # def __str__(self):
-    #     output = ''
-    #     if self.network:
-    #         output += self.network.name
-    #     if self.lab:
-    #         output += self.lab.name
-    #     if self.test:
-    #         output += self.test.name
-    #     return output
+        output = ''
+        if self.name:
+            output = self.name
+            return output
+        if self.network:
+            output += self.network.name
+        if self.lab:
+            output += self.lab.name
+        if self.test:
+            output += self.test.name
+        return output
 
 
 class PlanFeatureMapping(models.Model):

@@ -5,7 +5,7 @@ from ondoc.common.models import PaymentOptions, UserConfig, Feature, Service, Ma
 from ondoc.crm.admin.banner import BannerAdmin, SliderLocationAdmin
 from ondoc.crm.admin.procedure import ProcedureCategoryAdmin, ProcedureAdmin, IpdProcedureAdmin, FeatureAdmin, \
     ServiceAdmin, HealthInsuranceProviderAdmin, IpdProcedureCategoryAdmin
-from ondoc.crm.admin.subscription_plan import SubscriptionPlanAdmin, SubscriptionPlanFeatureAdmin
+from ondoc.crm.admin.subscription_plan import SubscriptionPlanAdmin, SubscriptionPlanFeatureAdmin, UserPlanMappingAdmin
 from ondoc.doctor.models import (Doctor, Language, MedicalService, Specialization, College, Qualification, Hospital,
                                  HospitalNetwork, DoctorOnboardingToken, OpdAppointment,
                                  MedicalCondition, AboutDoctor, HealthTip, CommonMedicalCondition, CommonSpecialization,
@@ -186,4 +186,4 @@ admin.site.register(IpdProcedureCategory, IpdProcedureCategoryAdmin)
 admin.site.register(CommonIpdProcedure)
 admin.site.register(Plan, SubscriptionPlanAdmin)
 admin.site.register(PlanFeature, SubscriptionPlanFeatureAdmin)
-admin.site.register(UserPlanMapping)
+admin.site.register(UserPlanMapping, UserPlanMappingAdmin)

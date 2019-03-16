@@ -1,9 +1,6 @@
-from dal import autocomplete
 from django.contrib.admin import TabularInline
 from reversion.admin import VersionAdmin
-from django import forms
-
-from ondoc.subscription_plan.models import Plan, PlanFeature, PlanFeatureMapping
+from ondoc.subscription_plan.models import Plan, PlanFeature, PlanFeatureMapping, UserPlanMapping
 
 
 class PlanFeatureMappingInline(TabularInline):
@@ -12,21 +9,23 @@ class PlanFeatureMappingInline(TabularInline):
     extra = 0
     autocomplete_fields = ['feature']
 
-    # def get_form(self, request, obj=None, **kwargs):
-    #     form = super().get_form(request, obj=obj, **kwargs)
-    #     form.request = request
-    #     form.base_fields['cancellation_reason'].queryset = CancellationReason.objects.filter(
-    #         Q(type=Order.DOCTOR_PRODUCT_ID) | Q(type__isnull=True), visible_on_admin=True)
-    #     if obj is not None and obj.time_slot_start:
-    #         time_slot_start = timezone.localtime(obj.time_slot_start, pytz.timezone(settings.TIME_ZONE))
-    #         form.base_fields['start_date'].initial = time_slot_start.strftime('%Y-%m-%d')
-    #         form.base_fields['start_time'].initial = time_slot_start.strftime('%H:%M')
-    #     return form
+    def get_readonly_fields(self, request, obj=None):
+        read_only = super().get_readonly_fields(request, obj)
+        if obj and obj.id:
+            read_only += ('feature', 'count')
+        return read_only
 
 
 class SubscriptionPlanAdmin(VersionAdmin):
     model = Plan
     inlines = [PlanFeatureMappingInline]
+    search_fields = ['name']
+
+    def get_readonly_fields(self, request, obj=None):
+        read_only = super().get_readonly_fields(request, obj)
+        if obj and obj.id:
+            read_only += ('mrp', 'deal_price', 'priority_queue', 'unlimited_online_consultation', 'name')
+        return read_only
 
 
 class SubscriptionPlanFeatureAdmin(VersionAdmin):
@@ -34,3 +33,31 @@ class SubscriptionPlanFeatureAdmin(VersionAdmin):
     list_display = ['id', 'name', 'test']
     search_fields = ['name']
     exclude = ['network', 'lab']
+
+    def get_readonly_fields(self, request, obj=None):
+        read_only = super().get_readonly_fields(request, obj)
+        if obj and obj.id:
+            read_only += ('name', 'test',)
+        return read_only
+
+    def get_form(self, request, obj=None, **kwargs):
+        form = super().get_form(request, obj=obj, **kwargs)
+        form.request = request
+        name_field = form.base_fields.get('name')
+        if name_field:
+            name_field.required = True
+        return form
+
+
+class UserPlanMappingAdmin(VersionAdmin):
+    model = UserPlanMapping
+    list_display = ['id', 'plan', 'user', 'expire_at', 'is_active']
+    search_fields = ['user', 'plan']
+    exclude = ['extra_details', 'money_pool']
+    autocomplete_fields = ['plan', 'user']
+
+    def get_readonly_fields(self, request, obj=None):
+        read_only = super().get_readonly_fields(request, obj)
+        if obj and obj.id:
+            read_only += ('id', 'plan', 'user', 'expire_at', 'created_at')
+        return read_only
