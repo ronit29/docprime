@@ -432,6 +432,11 @@ class UserProfileViewSet(mixins.CreateModelMixin, mixins.ListModelMixin,
                                    "message": "Profile with the given name already exists."
                                    }
             }, status=status.HTTP_400_BAD_REQUEST)
+        serializer = serializers.UserProfileSerializer(obj, data=data, partial=True, context={"request": request})
+        serializer.is_valid(raise_exception=True)
+
+        # Insurance work. User is made to update only whatsapp_optin and whatsapp_is_declined in case if userprofile
+        # is covered under insuranc. Else profile under insurance  cannot be updated in any case.
 
         insured_member_obj = InsuredMembers.objects.filter(profile__id=obj.id).last()
         insured_member_profile = None
@@ -450,7 +455,7 @@ class UserProfileViewSet(mixins.CreateModelMixin, mixins.ListModelMixin,
                     insured_member_profile.whatsapp_is_declined = whatsapp_is_declined
 
                 insured_member_profile.save()
-                return Response()
+                return Response(serializer.data)
             else:
                 return Response({
                     "request_errors": {"code": "invalid",
@@ -458,8 +463,6 @@ class UserProfileViewSet(mixins.CreateModelMixin, mixins.ListModelMixin,
                                        }
                 }, status=status.HTTP_400_BAD_REQUEST)
 
-        serializer = serializers.UserProfileSerializer(obj, data=data, partial=True, context={"request": request})
-        serializer.is_valid(raise_exception=True)
         serializer.save()
         return Response(serializer.data)
 
