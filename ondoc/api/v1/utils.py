@@ -368,6 +368,9 @@ def payment_details(request, order):
     profile_name = ""
     if profile:
         profile_name = profile.name
+    if not profile:
+        if order.get('profile_detail'):
+            profile_name = order.get('profile_detail').get('name', "")
     pgdata = {
         'custId': user.id,
         'mobile': user.phone_number,
