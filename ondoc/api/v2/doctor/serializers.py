@@ -6,7 +6,6 @@ from ondoc.authentication.models import (OtpVerifications, User, UserProfile, No
                                          DoctorNumber, Address, GenericAdmin, UserSecretKey,
                                          UserPermission, Address, GenericAdmin, GenericLabAdmin)
 from ondoc.doctor import models as doc_models
-from ondoc.common.models import GlobalNonBookable
 from ondoc.procedure.models import Procedure
 from ondoc.diagnostic.models import LabAppointment
 from ondoc.api.v1.doctor import serializers as v1_serializers
