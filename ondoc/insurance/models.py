@@ -595,7 +595,7 @@ class UserInsurance(auth_model.TimeStampedModel):
         lab_mrp_check_list = []
         if not user_insurance or not user_insurance.is_valid() or \
                 not user_insurance.is_appointment_valid(appointment_data['start_date']):
-            return False, "", 'Not covered under insurance'
+            return False, None, 'Not covered under insurance'
 
         insured_members = user_insurance.members.all().filter(profile=profile)
         if not insured_members.exists():
@@ -709,12 +709,12 @@ class UserInsurance(auth_model.TimeStampedModel):
                                 onco_count = onco_count + 1
                             if gyno_count > int(settings.INSURANCE_GYNECOLOGIST_LIMIT):
                                 return False, self.id,"Gynocologist limit exceeded of limit 5"
-                                break
                             if onco_count > int(settings.INSURANCE_ONCOLOGIST_LIMIT):
                                 return False, self.id, "Oncologist limit exceeded of limit 5"
-                                break
                         else:
                             return is_insured, insurance_id, insurance_message
+
+                    return is_insured, insurance_id, insurance_message
                 else:
                     return is_insured, insurance_id, insurance_message
             else:
