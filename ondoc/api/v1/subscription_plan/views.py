@@ -64,3 +64,12 @@ class SubscriptionPlanLoggedInUserViewSet(viewsets.GenericViewSet):
         result.update({"created_at": user_plan_obj.created_at, "expire_at": user_plan_obj.expire_at,
                        "is_active": user_plan_obj.is_active})
         return Response(result)
+
+    def has_plan(self, request):
+        user_plan_mapping = UserPlanMapping.objects.filter(user=request.user, is_active=True, expire_at__gt=timezone.now()).first()
+        has_active_plan = False
+        user_plan_id = None
+        if user_plan_mapping:
+            has_active_plan = True
+            user_plan_id = user_plan_mapping.id
+        return Response({"has_active_plan": has_active_plan, "user_plan_id": user_plan_id})

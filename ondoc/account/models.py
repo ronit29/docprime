@@ -35,7 +35,7 @@ class Order(TimeStampedModel):
     OPD_APPOINTMENT_CREATE = 2
     LAB_APPOINTMENT_RESCHEDULE = 3
     LAB_APPOINTMENT_CREATE = 4
-    SUBSCRIPTION_PLAN_BUY = 5
+    SUBSCRIPTION_PLAN_BUY = 6
     PAYMENT_ACCEPTED = 1
     PAYMENT_PENDING = 0
     PAYMENT_FAILURE = 3
@@ -52,7 +52,7 @@ class Order(TimeStampedModel):
                       )
     DOCTOR_PRODUCT_ID = 1
     LAB_PRODUCT_ID = 2
-    SUBSCRIPTION_PLAN_PRODUCT_ID = 3
+    SUBSCRIPTION_PLAN_PRODUCT_ID = 4
     PRODUCT_IDS = [(DOCTOR_PRODUCT_ID, "Doctor Appointment"), (LAB_PRODUCT_ID, "LAB_PRODUCT_ID"),
                    (SUBSCRIPTION_PLAN_PRODUCT_ID, "SUBSCRIPTION_PLAN_PRODUCT_ID")]
     product_id = models.SmallIntegerField(choices=PRODUCT_IDS, blank=True, null=True)
@@ -182,7 +182,7 @@ class Order(TimeStampedModel):
                     "payment_status": Order.PAYMENT_ACCEPTED
                 }
         elif self.action == Order.SUBSCRIPTION_PLAN_BUY:
-            amount = Decimal(appointment_data.get('extra_details', {}).get('deal_price', float('inf')))
+            amount = Decimal(appointment_data.get('extra_details').get('deal_price', float('inf')))
             if consumer_account.balance > amount:
                 new_appointment_data = appointment_data
                 appointment_obj = UserPlanMapping(**new_appointment_data)
@@ -287,6 +287,7 @@ class Order(TimeStampedModel):
     def getAppointment(self):
         from ondoc.doctor.models import OpdAppointment
         from ondoc.diagnostic.models import LabAppointment
+        from ondoc.subscription_plan.models import UserPlanMapping
 
         if self.orders.exists():
             completed_order = self.orders.filter(reference_id__isnull=False).first()
@@ -299,6 +300,8 @@ class Order(TimeStampedModel):
             return LabAppointment.objects.filter(id=self.reference_id).first()
         elif self.product_id == self.DOCTOR_PRODUCT_ID:
             return OpdAppointment.objects.filter(id=self.reference_id).first()
+        elif self.product_id == self.SUBSCRIPTION_PLAN_PRODUCT_ID:
+            return UserPlanMapping.objects.filter(id=self.reference_id).first()
         return None
 
     def get_total_price(self):
@@ -505,9 +508,7 @@ class Order(TimeStampedModel):
                 total_wallet_used += curr_wallet
 
                 # trigger event for new appointment creation
-                if order.product_id == Order.SUBSCRIPTION_PLAN_PRODUCT_ID:
-                    pass  # TODO: SHASHANK_SINGH what to de about it finally??
-                else:
+                if self.visitor_info:
                     curr_app.trigger_created_event(self.visitor_info)
 
                 # mark cart item delete after order process
