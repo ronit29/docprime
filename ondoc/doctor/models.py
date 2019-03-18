@@ -385,7 +385,7 @@ class Hospital(auth_model.TimeStampedModel, auth_model.CreatedByModel, auth_mode
 
 
 class HospitalPlaceDetails(auth_model.TimeStampedModel):
-    hospital = models.ForeignKey(Hospital, on_delete=models.CASCADE)
+    hospital = models.ForeignKey(Hospital, on_delete=models.CASCADE, related_name='hospital_reviews')
     place_id = models.TextField()
     place_details = JSONField(null=True, blank=True)
     reviews = JSONField(null=True, blank=True)
@@ -408,12 +408,12 @@ class HospitalPlaceDetails(auth_model.TimeStampedModel):
                 if place_response.status_code != status.HTTP_200_OK or not place_response.ok:
                     print('failure  status_code: ' + str(place_response.status_code) + ', reason: ' + str(
                         place_response.reason))
-                    pass
+                    continue
 
                 place_searched_data = place_response.json()
                 if place_searched_data.get('status') == 'OVER_QUERY_LIMIT':
                     print('OVER_QUERY_LIMIT')
-                    pass
+                    continue
 
                 if place_searched_data.get('result'):
                     place_searched_data = place_searched_data.get('result')

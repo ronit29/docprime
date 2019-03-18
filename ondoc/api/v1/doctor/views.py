@@ -73,6 +73,7 @@ from django.db.models import Count
 from ondoc.api.v1.auth import serializers as auth_serializers
 from copy import deepcopy
 from django.utils.text import slugify
+import time
 
 logger = logging.getLogger(__name__)
 import random
@@ -728,7 +729,8 @@ class DoctorProfileUserViewSet(viewsets.GenericViewSet):
                                     'images',
                                     'rating',
                                     'associations',
-                                    'awards'
+                                    'awards',
+                                    'doctor_clinics__hospital__hospital_reviews'
                                     )
                   .filter(pk=pk).first())
         # if not doctor or not is_valid_testing_data(request.user, doctor):
@@ -761,6 +763,8 @@ class DoctorProfileUserViewSet(viewsets.GenericViewSet):
         general_specialization = []
         hospital = None
         response_data['about_web'] = None
+        google_rating = list()
+        date = None
 
         if response_data and response_data.get('hospitals'):
             hospital = response_data.get('hospitals')[0]
@@ -829,6 +833,34 @@ class DoctorProfileUserViewSet(viewsets.GenericViewSet):
                 else:
                     response_data['doctors']['doctors_url'] = None
 
+        hospital = None
+        if doctor_clinics:
+            for doc_clinic in doctor_clinics:
+                if doc_clinic and doc_clinic.hospital:
+                    hospital = doc_clinic.hospital
+                    hosp_reviews_dict = dict()
+                    hosp_reviews_dict[hospital.pk] = list()
+                    hosp_reviews = hospital.hospital_reviews.all()
+                    if hosp_reviews:
+                        reviews_data = hosp_reviews[0].reviews
+                        if reviews_data:
+                            for data in reviews_data:
+                                if data.get('time'):
+                                    date = time.strftime("%d %b %Y", time.gmtime(data.get('time')))
+
+                                hosp_reviews_dict[hospital.pk].append(
+                                    {'compliment': None, 'date': date, 'id': hosp_reviews[0].pk, 'is_live': hospital.is_live,
+                                     'ratings': data.get('rating'),
+                                     'review': data.get('text'), 'user': None, 'user_name': data.get('author_name')
+                                     })
+                        else:
+                            hosp_reviews_dict[hospital.pk] = None
+                    else:
+                        hosp_reviews_dict[hospital.pk] = None
+
+                    google_rating.append(hosp_reviews_dict)
+
+        response_data['google_rating'] = google_rating
         return Response(response_data)
 
 
