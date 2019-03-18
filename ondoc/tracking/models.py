@@ -9,6 +9,7 @@ import datetime
 class TrackingVisitor(auth_models.TimeStampedModel):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     device_info = JSONField(null=True, blank=True)
+    client_category = models.CharField(max_length=100, blank=True, null=True)
 
     def __str__(self):
         return '{}'.format(self.id)
