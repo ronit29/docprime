@@ -27,8 +27,8 @@ class RatingsViewSet(viewsets.GenericViewSet):
     permission_classes = (IsAuthenticated, IsConsumer, IsNotAgent)
 
     def get_queryset(self):
-        return RatingsReview.objects.prefetch_related('compliment').filter(is_live=True, moderation_status__in=[RatingsReview.PENDING,
-                                                                                                                RatingsReview.APPROVED])
+        return RatingsReview.objects.prefetch_related('compliment').filter(is_live=True)
+
     def prompt_close(self, request):
         serializer = serializers.RatingPromptCloseBodySerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
@@ -116,14 +116,20 @@ class RatingsViewSet(viewsets.GenericViewSet):
         compliments_string= ''
         c_list = []
         cid_list = []
+        appointment_id = rating.appointment_id
         if rating.content_type == ContentType.objects.get_for_model(doc_models.Doctor):
             name = rating.content_object.get_display_name()
-            appointment = doc_models.OpdAppointment.objects.select_related('hospital').filter(id=rating.appointment_id).first()
-            if appointment:
-                address = appointment.hospital.get_hos_address()
-        else:
+            if appointment_id:
+                appointment = doc_models.OpdAppointment.objects.select_related('hospital').filter(id=rating.appointment_id).first()
+                if appointment:
+                    address = appointment.hospital.get_hos_address()
+        elif rating.content_type == ContentType.objects.get_for_model(lab_models.Lab):
             name = rating.content_object.name
             address = rating.content_object.get_lab_address()
+        else:
+            name = rating.content_object.name
+            address = rating.content_object.get_hos_address()
+
         for cm in rating.compliment.all():
             c_list.append(cm.message)
             cid_list.append(cm.id)
@@ -137,7 +143,8 @@ class RatingsViewSet(viewsets.GenericViewSet):
         rating_obj['date'] = rating.updated_at.strftime('%b %d, %Y')
         rating_obj['compliments'] = compliments_string
         rating_obj['compliments_list'] = cid_list
-        rating_obj['appointment_id'] = rating.appointment_id
+        rating_obj['appointment_id'] = appointment_id
+        rating_obj['entity_id'] = rating.object_id
         rating_obj['appointment_type'] = rating.appointment_type
         rating_obj['icon'] = request.build_absolute_uri(rating.content_object.get_thumbnail())
         return Response(rating_obj)
@@ -210,9 +217,7 @@ class AppRatingsViewSet(viewsets.GenericViewSet):
 class ListRatingViewSet(viewsets.GenericViewSet):
 
     def get_queryset(self):
-        return RatingsReview.objects.prefetch_related('compliment').filter(is_live=True,
-                                                                           moderation_status__in=[RatingsReview.PENDING,
-                                                                                                  RatingsReview.APPROVED])
+        return RatingsReview.objects.prefetch_related('compliment').filter(is_live=True)
 
     def list(self, request):
         serializer = serializers.RatingListBodySerializerdata(data=request.query_params)

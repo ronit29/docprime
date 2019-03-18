@@ -6,7 +6,7 @@ from import_export import fields, resources
 from ondoc.authentication.models import AgentToken
 from ondoc.ratings_review.models import ReviewActions, RatingsReview
 from ondoc.diagnostic.models import LabAppointment, Lab
-from ondoc.doctor.models import OpdAppointment, Doctor
+from ondoc.doctor.models import OpdAppointment, Doctor, Hospital
 from django import forms
 from import_export.admin import ImportExportMixin, ImportExportActionModelAdmin
 from django.conf import settings
@@ -88,6 +88,27 @@ class RatingsReviewForm(forms.ModelForm):
     send_update_sms = forms.BooleanField(required=False)
 
 
+class RatingVerificationFilter(admin.SimpleListFilter):
+    title = "type"
+
+    parameter_name = 'appointment_id'
+
+    def lookups(self, request, model_admin):
+
+        return (
+            ('verified', 'Verified'),
+            ('unverified', 'Unverified'),
+        )
+
+    def queryset(self, request, queryset):
+
+        if self.value() == 'verified':
+            return queryset.filter(appointment_id__isnull=False)
+
+        if self.value() == 'unverified':
+            return queryset.filter(appointment_id__isnull=True)
+
+
 class RatingsReviewAdmin(ImportExportMixin, admin.ModelAdmin):
     form = RatingsReviewForm
     resource_class = RatingsReviewResource
@@ -96,25 +117,32 @@ class RatingsReviewAdmin(ImportExportMixin, admin.ModelAdmin):
     readonly_fields = ['user', 'name', 'booking_id', 'appointment_type']
     fields = ('user', 'ratings', 'review', 'name', 'booking_id', 'appointment_type', 'compliment',
               'moderation_status', 'moderation_comments', 'send_update_text', 'send_update_sms')
-    list_filter = ('appointment_type', 'moderation_status', 'ratings')
+    list_filter = ('appointment_type', 'moderation_status', 'ratings', RatingVerificationFilter)
     # form = RatingsReviewForm
 
     def get_queryset(self, request):
         doctors = Doctor.objects.filter(rating__isnull=False).all().distinct()
         labs = Lab.objects.filter(rating__isnull=False).all().distinct()
+        hospitals = Hospital.objects.filter(ratings__isnull=False).all().distinct()
         self.docs = doctors
         self.labs = labs
+        self.hospitals = hospitals
         return super(RatingsReviewAdmin, self).get_queryset(request).select_related('content_type')
 
     def get_form(self, request, obj=None, **kwargs):
         form = super(RatingsReviewAdmin, self).get_form(request, obj, **kwargs)
         if obj:
             form.base_fields['compliment'].widget = forms.CheckboxSelectMultiple()
-            form.base_fields['compliment'].queryset = form.base_fields['compliment'].queryset.filter(type=obj.appointment_type)
+            type = obj.appointment_type
+            if type == RatingsReview.HOSPITAL:
+                type = RatingsReview.OPD
+            form.base_fields['compliment'].queryset = form.base_fields['compliment'].queryset.filter(type=type)
         return form
 
     def booking_id(self, instance):
         url = None
+        if not instance.appointment_id:
+            return ''
         if instance.content_type == ContentType.objects.get_for_model(Doctor):
             url = "/admin/doctor/opdappointment/" + str(instance.appointment_id) + "/change"
 
@@ -123,7 +151,6 @@ class RatingsReviewAdmin(ImportExportMixin, admin.ModelAdmin):
         if url:
             response = mark_safe('''<a href='%s' target='_blank'>%s</a>''' % (url, instance.appointment_id))
             return response
-        return ''
     booking_id.admin_order_field = 'appointment_id'
 
     def send_update_sms(self, instance, msg):
@@ -154,7 +181,10 @@ class RatingsReviewAdmin(ImportExportMixin, admin.ModelAdmin):
             for lab in self.labs:
                 if lab.id == instance.object_id:
                     return lab.name
-
+        elif instance.content_type == ContentType.objects.get_for_model(Hospital):
+            for hospital in self.hospitals:
+                if hospital.id == instance.object_id:
+                    return hospital.name
         return ''
 
     def save_model(self, request, obj, form, change):
