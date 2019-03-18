@@ -443,7 +443,7 @@ class UserInsurance(auth_model.TimeStampedModel):
                                                                   payment_type=3,
                                                                   insurance_id=self.id,
                                                                   profile_id=members.profile.id).count()
-            if gynecologist_opd_count >= 5:
+            if gynecologist_opd_count > int(settings.INSURANCE_GYNECOLOGIST_LIMIT):
                 return False, self.id, 'Gynecologist Limit of 5 exceeded'
             else:
                 return True, self.id, 'Covered Under Insurance'
@@ -456,7 +456,7 @@ class UserInsurance(auth_model.TimeStampedModel):
                                                                   payment_type=3,
                                                                   insurance_id=self.id,
                                                                   profile_id=members.profile.id).count()
-            if oncologist_opd_count >= 5:
+            if oncologist_opd_count > int(settings.INSURANCE_ONCOLOGIST_LIMIT):
                 return False, self.id, 'Oncologist Limit of 5 exceeded'
             else:
                 return True, self.id, 'Covered Under Insurance'
@@ -715,11 +715,11 @@ class UserInsurance(auth_model.TimeStampedModel):
 
             # is_insured, insurance_id, insurance_message = user_insurance.doctor_specialization_validation(appointment_data)
             gynocologist_appointment_count, oncologist_appointment_count = user_insurance.get_doctor_specialization_count(appointment_data)
-            if gynocologist_appointment_count >= 5:
+            if gynocologist_appointment_count > int(settings.INSURANCE_GYNECOLOGIST_LIMIT):
                 is_insured = False
                 insurance_id = user_insurance.id
                 insurance_message = "Gynocologist Appointment exceeded of limit 5"
-            elif oncologist_appointment_count >= 5:
+            elif oncologist_appointment_count > int(settings.INSURANCE_ONCOLOGIST_LIMIT):
                 is_insured = False
                 insurance_id = user_insurance.id
                 insurance_message = "Oncologist Appointment exceeded of limit 5"
@@ -773,10 +773,10 @@ class UserInsurance(auth_model.TimeStampedModel):
                             gyno_count = gyno_count + 1
                         if is_doctor_onco:
                             onco_count = onco_count + 1
-                        if gyno_count >= 5:
+                        if gyno_count > int(settings.settings.INSURANCE_GYNECOLOGIST_LIMIT):
                             return False, self.id,"Gynocologist limit exceeded of limit 5"
                             Break
-                        if onco_count >= 5:
+                        if onco_count > int(settings.INSURANCE_ONCOLOGIST_LIMIT):
                             return False, self.id, "Oncologist limit exceeded of limit 5"
                             Break
                     else:
