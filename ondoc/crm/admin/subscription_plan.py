@@ -50,7 +50,7 @@ class SubscriptionPlanFeatureAdmin(VersionAdmin):
             name_field.required = True
         test_field = form.base_fields.get('test')
         if test_field:
-            test_field.queryset = LabTest.objects.filter(is_package=True)
+            test_field.queryset = LabTest.objects.filter(is_package=True, enable_for_retail=True, searchable=True)
         return form
 
 
