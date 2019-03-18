@@ -584,77 +584,12 @@ class UserInsurance(auth_model.TimeStampedModel):
         insured_members = InsuredMembers.create_insured_members(user_insurance_obj)
         return user_insurance_obj
 
-    @classmethod
-    # def validate_insurance(self, appointment_data):
-    #     from ondoc.doctor.models import Doctor
-    #     from ondoc.diagnostic.models import Lab
-    #     profile = appointment_data['profile']
-    #     user = appointment_data['user']
-    #     is_lab_insured = False
-    #     lab_mrp_check_list = []
-    #     user_insurance = UserInsurance.objects.filter(user=user).last()
-    #
-    #     if not user_insurance or not user_insurance.is_valid() or \
-    #             not user_insurance.is_appointment_valid(appointment_data['time_slot_start']):
-    #         return False, "", 'Not covered under insurance'
-    #
-    #     insured_members = user_insurance.members.all().filter(profile=profile)
-    #     if not insured_members.exists():
-    #         return False, user_insurance.id, 'Profile Not covered under insurance'
-    #
-    #     threshold = InsuranceThreshold.objects.get(insurance_plan_id=user_insurance.insurance_plan_id)
-    #     if threshold:
-    #         threshold_lab = threshold.lab_amount_limit
-    #         threshold_opd = threshold.opd_amount_limit
-    #     else:
-    #         return False, user_insurance.id, 'Threshold Amount Not define for plan'
-    #
-    #     if not 'doctor' in appointment_data:
-    #         # if not user_insurance.is_lab_appointment_count_valid(appointment_data):
-    #         #     return False, user_insurance.id, 'Not Covered under Insurance'
-    #         lab = appointment_data['lab']
-    #         if not lab.is_insurance_enabled:
-    #             return False, user_insurance.id, 'Not Covered under Insurance'
-    #         if appointment_data['extra_details']:
-    #             for detail in appointment_data['extra_details']:
-    #                 if int(float(detail['mrp'])) <= threshold_lab:
-    #                     is_lab_insured = True
-    #                 else:
-    #                     is_lab_insured = False
-    #                 lab_mrp_check_list.append(is_lab_insured)
-    #             if not False in lab_mrp_check_list:
-    #                 return True, user_insurance.id, 'Covered Under Insurance'
-    #             else:
-    #                 return False, user_insurance.id, 'Not Covered under Insurance'
-    #         else:
-    #             return False, user_insurance.id, 'Not Covered under Insurance'
-    #
-    #     else:
-    #         if appointment_data['extra_details']:
-    #             for detail in appointment_data:
-    #                 if detail['procedure_id']:
-    #                     return False, user_insurance.id, 'Procedure Not covered under insurance'
-    #         doctor = appointment_data['doctor']
-    #         if not doctor.is_insurance_enabled:
-    #             return False, user_insurance.id, "Not Covered Under Insurance"
-    #         if not int(appointment_data['mrp']) <= threshold_opd:
-    #             return False, user_insurance.id, "Not Covered Under Insurance"
-    #         # if not user_insurance.is_opd_appointment_count_valid(appointment_data):
-    #         #     return False, user_insurance.id, "Not Covered Under Insurance"
-    #
-    #         is_insured, insurance_id, insurance_message = user_insurance.doctor_specialization_validation(appointment_data)
-    #         return is_insured, insurance_id, insurance_message
-
-
-
     def validate_insurance(self, appointment_data):
         from ondoc.doctor.models import OpdAppointment
         from ondoc.diagnostic.models import LabAppointment
         # appointment_data = appointment_data.get('data')
         profile = appointment_data.get('profile', None)
-        # profile = UserProfile.objects.filter(id=profile).first()
         user = profile.user
-        # user = appointment_data['user']
         user_insurance = UserInsurance.objects.filter(user=user).last()
         is_lab_insured = False
         lab_mrp_check_list = []
@@ -710,10 +645,6 @@ class UserInsurance(auth_model.TimeStampedModel):
             price_data = OpdAppointment.get_price_details(appointment_data)
             if not int(price_data.get('mrp')) <= threshold_opd:
                 return False, user_insurance.id, "Not Covered Under Insurance"
-            # if not user_insurance.is_opd_appointment_count_valid(appointment_data):
-            #     return False, user_insurance.id, "Not Covered Under Insurance"
-
-            # is_insured, insurance_id, insurance_message = user_insurance.doctor_specialization_validation(appointment_data)
             gynocologist_appointment_count, oncologist_appointment_count = user_insurance.get_doctor_specialization_count(appointment_data)
             if gynocologist_appointment_count > int(settings.INSURANCE_GYNECOLOGIST_LIMIT):
                 is_insured = False
@@ -741,7 +672,6 @@ class UserInsurance(auth_model.TimeStampedModel):
             else:
                 result = False
         return result
-
 
     def is_doctor_oncologist(self, doctor):
         from ondoc.doctor.models import DoctorPracticeSpecialization

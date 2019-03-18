@@ -373,8 +373,9 @@ class Order(TimeStampedModel):
         for item in cart_items:
             validated_data = item.validate(request)
             fd = item.get_fulfillment_data(validated_data)
-            if fd['is_appointment_insured']:
-                fd['payment_type'] = 3
+            # TODO remove
+            # if fd['is_appointment_insured']:
+            #     fd['payment_type'] = 3
             fd["cart_item_id"] = item.id
             fulfillment_data.append(fd)
         return fulfillment_data
@@ -899,8 +900,11 @@ class ConsumerAccount(TimeStampedModel):
         return ctx_obj
 
     def debit_schedule(self, appointment_obj, product_id, amount):
-        cashback_deducted = min(self.cashback, amount)
-        self.cashback -= cashback_deducted
+        if product_id == 3:
+            cashback_deducted = 0
+        else:
+            cashback_deducted = min(self.cashback, amount)
+            self.cashback -= cashback_deducted
 
         balance_deducted = min(self.balance, amount-cashback_deducted)
         self.balance -= balance_deducted
