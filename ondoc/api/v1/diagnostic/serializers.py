@@ -309,6 +309,7 @@ class AvailableLabTestSerializer(serializers.ModelSerializer):
     agreed_price = serializers.SerializerMethodField()
     deal_price = serializers.SerializerMethodField()
     is_home_collection_enabled = serializers.SerializerMethodField()
+    is_package = serializers.SerializerMethodField()
 
     def get_is_home_collection_enabled(self, obj):
         if self.context.get("lab") is not None:
@@ -326,9 +327,12 @@ class AvailableLabTestSerializer(serializers.ModelSerializer):
         deal_price = obj.computed_deal_price if obj.custom_deal_price is None else obj.custom_deal_price
         return deal_price
 
+    def get_is_package(self, obj):
+        return obj.test.is_package
+
     class Meta:
         model = AvailableLabTest
-        fields = ('test_id', 'mrp', 'test', 'agreed_price', 'deal_price', 'enabled', 'is_home_collection_enabled')
+        fields = ('test_id', 'mrp', 'test', 'agreed_price', 'deal_price', 'enabled', 'is_home_collection_enabled', 'is_package')
 
 
 class LabAppointmentTestMappingSerializer(serializers.ModelSerializer):
