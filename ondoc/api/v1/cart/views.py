@@ -67,10 +67,7 @@ class CartViewSet(viewsets.GenericViewSet):
         for item in cart_items:
             try:
                 validated_data = item.validate(request)
-                if not item.data.get('payment_type') == 3:
-                    price_data = item.get_price_details(validated_data)
-                else:
-                    price_data = None
+                price_data = item.get_price_details(validated_data)
                 items.append({
                     "id" : item.id,
                     "valid": True,
@@ -80,8 +77,8 @@ class CartViewSet(viewsets.GenericViewSet):
                     "actual_data" : item.data,
                     "deal_price" : price_data["deal_price"],
                     "mrp" : price_data["mrp"],
-                    "coupon_discount" : price_data["coupon_discount"] if price_data else None,
-                    "coupon_cashback" : price_data["coupon_cashback"] if price_data else None,
+                    "coupon_discount" : price_data["coupon_discount"],
+                    "coupon_cashback" : price_data["coupon_cashback"],
                     "home_pickup_charges" : price_data.get("home_pickup_charges", 0),
                     "consultation" : price_data.get("consultation", None)
                 })
