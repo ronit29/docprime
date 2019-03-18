@@ -728,7 +728,7 @@ class Doctor(auth_model.TimeStampedModel, auth_model.QCModel, SearchKey, auth_mo
         image_file1 = InMemoryUploadedFile(tempfile_io, None, filename, 'image/jpeg', tempfile_io.tell(), None)
 
         QRCode_object = QRCode(name=image_file1, content_type=ContentType.objects.get_for_model(Doctor),
-                               object_id=self.id)
+                               object_id=self.id, data={"url": doctor_url})
         QRCode_object.save()
         return QRCode_object
 
@@ -1613,28 +1613,33 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
     def __str__(self):
         return self.profile.name + " (" + self.doctor.name + ")"
 
-    def allowed_action(self, user_type, request):
+    def allowed_action(self, user_type, request, **kwargs):
         allowed = []
         current_datetime = timezone.now()
         today = datetime.date.today()
-        if user_type == auth_model.User.DOCTOR and self.time_slot_start.date() >= today:
-            if self.status in [self.BOOKED, self.RESCHEDULED_PATIENT]:
-                allowed = [self.ACCEPTED, self.RESCHEDULED_DOCTOR]
-            elif self.status == self.ACCEPTED:
-                allowed = [self.RESCHEDULED_DOCTOR, self.COMPLETED]
-            elif self.status == self.RESCHEDULED_DOCTOR:
-                allowed = [self.ACCEPTED]
-        elif user_type == auth_model.User.DOCTOR and self.time_slot_start.date() < today:
-            if self.status == self.ACCEPTED:
-                allowed = [self.COMPLETED]
-        elif user_type == auth_model.User.CONSUMER and current_datetime <= self.time_slot_start:
-            if self.status in (self.BOOKED, self.ACCEPTED, self.RESCHEDULED_DOCTOR, self.RESCHEDULED_PATIENT):
-                allowed = [self.RESCHEDULED_PATIENT, self.CANCELLED]
-        elif user_type == auth_model.User.CONSUMER and current_datetime > self.time_slot_start:
-            if self.status in [self.BOOKED, self.RESCHEDULED_DOCTOR, self.RESCHEDULED_PATIENT, self.ACCEPTED]:
-                allowed = [self.RESCHEDULED_PATIENT]
-            if self.status == self.ACCEPTED:
-                allowed.append(self.COMPLETED)
+        if kwargs.get('qr_code') == False:
+            if user_type == auth_model.User.DOCTOR and self.time_slot_start.date() >= today:
+                if self.status in [self.BOOKED, self.RESCHEDULED_PATIENT]:
+                    allowed = [self.ACCEPTED, self.RESCHEDULED_DOCTOR]
+                elif self.status == self.ACCEPTED:
+                    allowed = [self.RESCHEDULED_DOCTOR, self.COMPLETED]
+                elif self.status == self.RESCHEDULED_DOCTOR:
+                    allowed = [self.ACCEPTED]
+            elif user_type == auth_model.User.DOCTOR and self.time_slot_start.date() < today:
+                if self.status == self.ACCEPTED:
+                    allowed = [self.COMPLETED]
+            elif user_type == auth_model.User.CONSUMER and current_datetime <= self.time_slot_start:
+                if self.status in (self.BOOKED, self.ACCEPTED, self.RESCHEDULED_DOCTOR, self.RESCHEDULED_PATIENT):
+                    allowed = [self.RESCHEDULED_PATIENT, self.CANCELLED]
+            elif user_type == auth_model.User.CONSUMER and current_datetime > self.time_slot_start:
+                if self.status in [self.BOOKED, self.RESCHEDULED_DOCTOR, self.RESCHEDULED_PATIENT, self.ACCEPTED]:
+                    allowed = [self.RESCHEDULED_PATIENT]
+                if self.status == self.ACCEPTED:
+                    allowed.append(self.COMPLETED)
+        else:
+            if user_type == auth_model.User.CONSUMER:
+                if self.status == self.ACCEPTED and self.time_slot_start <= current_datetime:
+                    allowed.append(self.COMPLETED)
 
         return allowed
 

@@ -229,6 +229,7 @@ class QRCode(TimeStampedModel):
     content_object = GenericForeignKey()
     name = models.FileField(upload_to='qrcode', validators=[
         FileExtensionValidator(allowed_extensions=['pdf', 'jfif', 'jpg', 'jpeg', 'png'])])
+    data = JSONField(null=True, blank=True)
     # name = models.ImageField(upload_to='qrcode', blank=True, null=True)
 
     class Meta:
