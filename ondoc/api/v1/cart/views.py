@@ -42,8 +42,8 @@ class CartViewSet(viewsets.GenericViewSet):
             serialized_data = lab_app_serializer.validated_data
             cart_item_id = serialized_data.get('cart_item').id if serialized_data.get('cart_item') else None
 
-        data['data']['is_appointment_insured'], data['data']['insurance_id'], data['data'][
-            'insurance_message'] = Cart.check_for_specialization_insurance(serialized_data, request)
+        # data['data']['is_appointment_insured'], data['data']['insurance_id'], data['data'][
+        #     'insurance_message'] = Cart.check_for_specialization_insurance(serialized_data, request)
 
         data['data']['is_appointment_insured'], data['data']['insurance_id'], data['data'][
             'insurance_message'] = Cart.check_for_insurance(serialized_data, request)
