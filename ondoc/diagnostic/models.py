@@ -1502,6 +1502,19 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin)
             return [admin.user for admin in self.lab.manageable_lab_admins.filter(is_disabled=False)
                     if admin.user]
 
+    def created_by_native(self):
+        child_order = Order.objects.filter(reference_id=self.id).first()
+        parent_order = None
+        from_app = False
+
+        if child_order:
+            parent_order = child_order.parent
+
+        if parent_order and parent_order.visitor_info:
+            from_app = parent_order.visitor_info.get('from_app', False)
+
+        return from_app
+
     def app_commit_tasks(self, old_instance, push_to_matrix, push_to_integrator):
         if push_to_matrix:
             # Push the appointment data to the matrix
@@ -1513,19 +1526,20 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin)
                 logger.error(str(e))
 
         is_thyrocare_enabled = False
-        if push_to_integrator:
-            if self.lab.network and self.lab.network.id == settings.THYROCARE_NETWORK_ID:
-                if settings.THYROCARE_INTEGRATION_ENABLED:
-                    is_thyrocare_enabled = True
+        if not self.created_by_native():
+            if push_to_integrator:
+                if self.lab.network and self.lab.network.id == settings.THYROCARE_NETWORK_ID:
+                    if settings.THYROCARE_INTEGRATION_ENABLED:
+                        is_thyrocare_enabled = True
 
-            try:
-                if is_thyrocare_enabled:
-                    # push_lab_appointment_to_integrator.apply_async(({'appointment_id': self.id},), countdown=5)
-                    push_lab_appointment_to_integrator.apply_async(({'appointment_id': self.id},),
-                                                                   link=get_integrator_order_status.s(appointment_id=self.id),
-                                                                   countdown=5)
-            except Exception as e:
-                logger.error(str(e))
+                try:
+                    if is_thyrocare_enabled:
+                        # push_lab_appointment_to_integrator.apply_async(({'appointment_id': self.id},), countdown=5)
+                        push_lab_appointment_to_integrator.apply_async(({'appointment_id': self.id},),
+                                                                       link=get_integrator_order_status.s(appointment_id=self.id),
+                                                                       countdown=5)
+                except Exception as e:
+                    logger.error(str(e))
 
         # if push_for_mask_number:
         #     try:

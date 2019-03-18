@@ -628,255 +628,9 @@ class LabAppointmentCreateSerializer(serializers.Serializer):
     coupon_code = serializers.ListField(child=serializers.CharField(), required=False, default=[])
     use_wallet = serializers.BooleanField(required=False)
     cart_item = serializers.PrimaryKeyRelatedField(queryset=Cart.objects.all(), required=False, allow_null=True)
-
-    def validate(self, data):
-        MAX_APPOINTMENTS_ALLOWED = 10
-        ACTIVE_APPOINTMENT_STATUS = [LabAppointment.BOOKED, LabAppointment.ACCEPTED,
-                                     LabAppointment.RESCHEDULED_PATIENT, LabAppointment.RESCHEDULED_LAB]
-
-        request = self.context.get("request")
-        unserialized_data = self.context.get("data")
-        cart_item_id = data.get('cart_item').id if data.get('cart_item') else None
-        use_duplicate = self.context.get("use_duplicate", False)
-
-        if not utils.is_valid_testing_lab_data(request.user, data["lab"]):
-            raise serializers.ValidationError("Both User and Lab should be for testing")
-
-        if data.get("is_home_pickup"):
-            if data.get("address") is None:
-                raise serializers.ValidationError("Address required for home pickup")
-            elif not Address.objects.filter(id=data.get("address").id, user=request.user).exists():
-                raise serializers.ValidationError("Invalid address for given user")
-
-        if not UserProfile.objects.filter(user=request.user, pk=int(data.get("profile").id)).exists():
-            raise serializers.ValidationError("Invalid profile id")
-
-        # if LabAppointment.objects.filter(status__in=ACTIVE_APPOINTMENT_STATUS, profile=data["profile"], lab=data[
-        #     "lab"]).exists():
-        #     raise serializers.ValidationError("A previous appointment with this lab already exists. Cancel it before booking new Appointment.")
-
-        if LabAppointment.objects.filter(status__in=ACTIVE_APPOINTMENT_STATUS,
-                                         profile=data["profile"]).count() >= MAX_APPOINTMENTS_ALLOWED:
-            raise serializers.ValidationError(
-                'Max ' + str(MAX_APPOINTMENTS_ALLOWED) + ' active appointments are allowed')
-
-        if data.get("coupon_code"):
-            profile = data.get("profile")
-            # coupon_code = data.get("coupon_code")
-            coupon_codes = data.get("coupon_code", [])
-            coupon_obj = None
-            if RandomGeneratedCoupon.objects.filter(random_coupon__in=coupon_codes).exists():
-                expression = F('sent_at') + datetime.timedelta(days=1) * F('validity')
-                annotate_expression = ExpressionWrapper(expression, DateTimeField())
-                random_coupons = RandomGeneratedCoupon.objects.annotate(last_date=annotate_expression
-                                                                        ).filter(random_coupon__in=coupon_codes,
-                                                                                 sent_at__isnull=False,
-                                                                                 consumed_at__isnull=True,
-                                                                                 last_date__gte=datetime.datetime.now()
-                                                                                 ).all()
-                if random_coupons:
-                    coupon_obj = Coupon.objects.filter(id__in=random_coupons.values_list('coupon', flat=True))
-                else:
-                    raise serializers.ValidationError('Invalid coupon codes')
-
-            if coupon_obj:
-                coupon_obj = Coupon.objects.filter(code__in=coupon_codes) | coupon_obj
-            else:
-                coupon_obj = Coupon.objects.filter(code__in=coupon_codes)
-
-            # if len(coupon_code) == len(coupon_obj):
-            if coupon_obj:
-                for coupon in coupon_obj:
-                    obj = LabAppointment()
-                    if obj.validate_user_coupon(cart_item=cart_item_id, user=request.user, coupon_obj=coupon,
-                                                profile=profile).get("is_valid"):
-                        if not obj.validate_product_coupon(coupon_obj=coupon,
-                                                           lab=data.get("lab"), test=data.get("test_ids"),
-                                                           product_id=Order.LAB_PRODUCT_ID):
-                            raise serializers.ValidationError('Invalid coupon code - ' + str(coupon))
-                    else:
-                        raise serializers.ValidationError('Invalid coupon code - ' + str(coupon))
-                data["coupon_obj"] = list(coupon_obj)
-
-        data["existing_cart_item"] = None
-        if unserialized_data:
-            is_valid, duplicate_cart_item = Cart.validate_duplicate(unserialized_data, request.user,
-                                                                    Order.LAB_PRODUCT_ID, cart_item_id)
-            if not is_valid:
-                if use_duplicate and duplicate_cart_item:
-                    data["existing_cart_item"] = duplicate_cart_item
-                else:
-                    raise serializers.ValidationError("Item already exists in cart.")
-
-        time_slot_start = (form_time_slot(data.get('start_date'), data.get('start_time'))
-                           if not data.get("time_slot_start") else data.get("time_slot_start"))
-
-        # validations for same day and next day timeslot bookings
-        available_slots = LabTiming.timing_manager.lab_booking_slots(lab__id=data.get("lab").id, lab__is_live=True,
-                                                                     for_home_pickup=data.get("is_home_pickup"))
-        now = datetime.datetime.now()
-        tomorrow = datetime.date.today() + datetime.timedelta(days=1)
-        is_today = now.weekday() == time_slot_start.weekday()
-        is_tomorrow = tomorrow.weekday() == time_slot_start.weekday()
-        curr_time = time_slot_start.hour
-        curr_minute = round(round(float(time_slot_start.minute) / 60, 2) * 2) / 2
-        curr_time += curr_minute
-
-        if is_today and available_slots.get("today_min") and available_slots.get("today_min") > curr_time:
-            raise serializers.ValidationError("Invalid Time slot")
-        if is_tomorrow and available_slots.get("tomorrow_min") and available_slots.get("tomorrow_min") > curr_time:
-            raise serializers.ValidationError("Invalid Time slot")
-        if is_today and available_slots.get("today_max") and available_slots.get("today_max") < curr_time:
-            raise serializers.ValidationError("Invalid Time slot")
-
-        if LabAppointment.objects.filter(profile=data.get("profile"), lab=data.get("lab"),
-                                         tests__in=data.get("test_ids"), time_slot_start=time_slot_start) \
-                .exclude(status__in=[LabAppointment.COMPLETED, LabAppointment.CANCELLED]).exists():
-            raise serializers.ValidationError(
-                "One active appointment for the selected date & time already exists. Please change the date & time of the appointment.")
-
-        if 'use_wallet' in data and data['use_wallet'] is False:
-            data['use_wallet'] = False
-        else:
-            data['use_wallet'] = True
-
-        self.test_lab_id_validator(data, request)
-        self.time_slot_validator(data, request)
-        return data
-
-    def create(self, data):
-        deal_price_calculation = Case(When(custom_deal_price__isnull=True, then=F('computed_deal_price')),
-                                      When(custom_deal_price__isnull=False, then=F('custom_deal_price')))
-        agreed_price_calculation = Case(When(custom_agreed_price__isnull=True, then=F('computed_agreed_price')),
-                                        When(custom_agreed_price__isnull=False, then=F('custom_agreed_price')))
-
-        self.num_appointment_validator(data)
-        lab_test_queryset = AvailableLabTest.objects.filter(lab_pricing_group__labs=data["lab"],
-                                                            test__in=data['test_ids'])
-        temp_lab_test = lab_test_queryset.values('lab').annotate(total_mrp=Sum("mrp"),
-                                                                 total_deal_price=Sum(deal_price_calculation),
-                                                                 total_agreed_price=Sum(agreed_price_calculation))
-        total_deal_price = total_mrp = effective_price = 0
-        if temp_lab_test:
-            total_mrp = temp_lab_test[0].get("total_mrp", 0)
-            total_agreed = temp_lab_test[0].get("total_agreed_price", 0)
-            total_deal_price = temp_lab_test[0].get("total_deal_price", 0)
-            effective_price = temp_lab_test[0].get("total_deal_price")
-            # TODO PM - call coupon function to calculate effective price
-        start_dt = form_time_slot(data["start_date"], data["start_time"])
-        profile_detail = {
-            "name": data["profile"].name,
-            "gender": data["profile"].gender,
-            "dob": str(data["profile"].dob),
-        }
-        otp = random.randint(1000, 9999)
-        appointment_data = {
-            "lab": data["lab"],
-            "user": self.context["request"].user,
-            "profile": data["profile"],
-            "price": total_mrp,
-            "agreed_price": total_agreed,
-            "deal_price": total_deal_price,
-            "effective_price": effective_price,
-            "time_slot_start": start_dt,
-            "profile_detail": profile_detail,
-            "payment_status": OpdAppointment.PAYMENT_ACCEPTED,
-            "status": LabAppointment.BOOKED,
-            "payment_type": data["payment_type"],
-            "otp": otp
-        }
-        if data.get("is_home_pickup") is True:
-            address = Address.objects.filter(pk=data.get("address")).first()
-            address_serialzer = AddressSerializer(address)
-            appointment_data.update({
-                "address": address_serialzer.data,
-                "is_home_pickup": True
-            })
-        queryset = LabAppointment.objects.create(**appointment_data)
-        queryset.lab_test.add(*lab_test_queryset)
-        return queryset
-
-    def update(self, instance, data):
-        pass
-
-    @staticmethod
-    def num_appointment_validator(data):
-        ACTIVE_APPOINTMENT_STATUS = [LabAppointment.CREATED, LabAppointment.ACCEPTED,
-                                     LabAppointment.RESCHEDULED_PATIENT, LabAppointment.RESCHEDULED_LAB]
-        count = (LabAppointment.objects.filter(lab=data['lab'],
-                                               profile=data['profile'],
-                                               status__in=ACTIVE_APPOINTMENT_STATUS).count())
-        if count >= 2:
-            raise serializers.ValidationError("More than 2 appointment with the lab")
-
-    @staticmethod
-    def test_lab_id_validator(data, request):
-        if not data['test_ids']:
-            logger.error(
-                "Error 'No Test Ids given' for lab appointment with data - " + json.dumps(request.data))
-            raise serializers.ValidationError(" No Test Ids given")
-
-        avail_test_queryset = AvailableLabTest.objects.filter(lab_pricing_group__labs=data["lab"],
-                                                              test__in=data['test_ids']).values(
-            'id').distinct('test')
-
-        if len(avail_test_queryset) != len(data['test_ids']):
-            logger.error(
-                "Error 'Test Ids or lab Id is incorrect' for lab appointment with data - " + json.dumps(request.data))
-            raise serializers.ValidationError("Test Ids or lab Id is incorrect")
-
-    @staticmethod
-    def time_slot_validator(data, request):
-        start_dt = (form_time_slot(data.get('start_date'), data.get('start_time')) if not data.get(
-            "time_slot_start") else data.get("time_slot_start"))
-
-        if start_dt < timezone.now():
-            logger.error("Error 'Cannot book in past' for lab appointment with data - " + json.dumps(request.data))
-            raise serializers.ValidationError("Cannot book in past")
-
-        day_of_week = start_dt.weekday()
-
-        lab_queryset = data['lab']
-
-        lab_timing_queryset = lab_queryset.lab_timings.filter(day=day_of_week, start__lte=data.get('start_time'),
-                                                              end__gte=data.get('start_time'),
-                                                              for_home_pickup=data["is_home_pickup"]).exists()
-        if data["is_home_pickup"]:
-            if not lab_queryset.is_home_collection_enabled:
-                logger.error(
-                    "Error 'Home Pickup is disabled for the lab' for lab appointment with data - " + json.dumps(
-                        request.data))
-                raise serializers.ValidationError("Home Pickup is disabled for the lab")
-            if data.get("start_time") < 7.0 or data.get("start_time") > 19.0:
-                logger.error(
-                    "Error 'No time slot available' for lab appointment with data - " + json.dumps(
-                        request.data))
-                raise serializers.ValidationError("No time slot available")
-        else:
-            if not lab_queryset.always_open and not lab_timing_queryset:
-                logger.error(
-                    "Error 'No time slot available' for lab appointment with data - " + json.dumps(request.data))
-                raise serializers.ValidationError("No time slot available")
-
-
-class LabAppointmentCreateSerializerNew(serializers.Serializer):
-    lab = serializers.PrimaryKeyRelatedField(queryset=Lab.objects.filter(is_live=True))
-    test_ids = serializers.ListField(child=serializers.PrimaryKeyRelatedField(queryset=LabTest.objects.all()))
-    profile = serializers.PrimaryKeyRelatedField(queryset=UserProfile.objects.all())
-    time_slot_start = serializers.DateTimeField(required=False)
-    start_date = serializers.DateTimeField()
-    start_time = serializers.FloatField()
-    end_date = serializers.DateTimeField(required=False)
-    end_time = serializers.FloatField(required=False)
-    is_home_pickup = serializers.BooleanField(default=False)
-    address = serializers.PrimaryKeyRelatedField(queryset=Address.objects.all(), required=False, allow_null=True)
-    # address = serializers.IntegerField(required=False, allow_null=True)
-    payment_type = serializers.IntegerField(default=OpdAppointment.PREPAID)
-    coupon_code = serializers.ListField(child=serializers.CharField(), required=False, default=[])
-    use_wallet = serializers.BooleanField(required=False)
-    cart_item = serializers.PrimaryKeyRelatedField(queryset=Cart.objects.all(), required=False, allow_null=True)
     pincode = serializers.CharField(required=False, allow_null=True, allow_blank=True)
     is_thyrocare = serializers.BooleanField(required=False, default=False)
+    from_app = serializers.BooleanField(required=False, default=False)
 
     def validate(self, data):
         MAX_APPOINTMENTS_ALLOWED = 10
@@ -944,7 +698,6 @@ class LabAppointmentCreateSerializerNew(serializers.Serializer):
                         raise serializers.ValidationError('Invalid coupon code - ' + str(coupon))
                 data["coupon_obj"] = list(coupon_obj)
 
-        
         data["existing_cart_item"] = None
         if unserialized_data:
             is_valid, duplicate_cart_item = Cart.validate_duplicate(unserialized_data, request.user, Order.LAB_PRODUCT_ID, cart_item_id)
@@ -956,7 +709,6 @@ class LabAppointmentCreateSerializerNew(serializers.Serializer):
 
         time_slot_start = (form_time_slot(data.get('start_date'), data.get('start_time'))
                            if not data.get("time_slot_start") else data.get("time_slot_start"))
-
 
         # validations for same day and next day timeslot bookings
         selected_date = time_slot_start.strftime("%Y-%m-%d")
@@ -970,9 +722,6 @@ class LabAppointmentCreateSerializerNew(serializers.Serializer):
             if not int(pincode) == int(address.pincode):
                 raise serializers.ValidationError("Entered pincode should be same as pickup address pincode.")
 
-        available_slots = lab.get_available_slots(data.get("is_home_pickup"), pincode, selected_date)
-        is_integrated = lab.is_integrated()
-        # available_slots = LabTiming.timing_manager.lab_booking_slots(lab__id=data.get("lab").id, lab__is_live=True, for_home_pickup=data.get("is_home_pickup"))
         now = datetime.datetime.now()
         tomorrow = datetime.date.today() + datetime.timedelta(days=1)
         is_today = now.weekday() == time_slot_start.weekday()
@@ -981,21 +730,26 @@ class LabAppointmentCreateSerializerNew(serializers.Serializer):
         curr_minute = round(round(float(time_slot_start.minute) / 60, 2) * 2) / 2
         curr_time += curr_minute
 
-        selected_day_slots = available_slots['time_slots'][selected_date]
-        if not selected_day_slots:
-            raise serializers.ValidationError("No time slots available")
+        if bool(data.get('from_app')):
+            available_slots = LabTiming.timing_manager.lab_booking_slots(lab__id=data.get("lab").id, lab__is_live=True, for_home_pickup=data.get("is_home_pickup"))
+            is_integrated = False
+            if is_today and available_slots.get("today_min") and available_slots.get("today_min") > curr_time:
+                raise serializers.ValidationError("Invalid Time slot")
+            if is_tomorrow and available_slots.get("tomorrow_min") and available_slots.get("tomorrow_min") > curr_time:
+                raise serializers.ValidationError("Invalid Time slot")
+            if is_today and available_slots.get("today_max") and available_slots.get("today_max") < curr_time:
+                raise serializers.ValidationError("Invalid Time slot")
+        else:
+            available_slots = lab.get_available_slots(data.get("is_home_pickup"), pincode, selected_date)
+            is_integrated = lab.is_integrated()
+            selected_day_slots = available_slots['time_slots'][selected_date]
+            if not selected_day_slots:
+                raise serializers.ValidationError("No time slots available")
 
-        current_day_slots = self.get_slots_list(selected_day_slots)
+            current_day_slots = self.get_slots_list(selected_day_slots)
 
-        if not curr_time in current_day_slots:
-            raise serializers.ValidationError("Invalid Time slot")
-
-        # if is_today and available_slots.get("today_min") and available_slots.get("today_min") > curr_time:
-        #     raise serializers.ValidationError("Invalid Time slot")
-        # if is_tomorrow and available_slots.get("tomorrow_min") and available_slots.get("tomorrow_min") > curr_time:
-        #     raise serializers.ValidationError("Invalid Time slot")
-        # if is_today and available_slots.get("today_max") and available_slots.get("today_max") < curr_time:
-        #     raise serializers.ValidationError("Invalid Time slot")
+            if not curr_time in current_day_slots:
+                raise serializers.ValidationError("Invalid Time slot")
 
         if LabAppointment.objects.filter(profile=data.get("profile"), lab=data.get("lab"),
                                          tests__in=data.get("test_ids"), time_slot_start=time_slot_start) \

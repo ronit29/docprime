@@ -1665,13 +1665,7 @@ class LabAppointmentView(mixins.CreateModelMixin,
         if not data.get("is_home_pickup"):
             data.pop("address", None)
 
-        from_app = data.get("from_app", None)
-        if from_app:
-            serializer = diagnostic_serializer.LabAppointmentCreateSerializer(data=data, context={'request': request, 'data' : request.data, 'use_duplicate' : True})
-        else:
-            serializer = diagnostic_serializer.LabAppointmentCreateSerializerNew(data=data, context={'request': request,
-                                                                                                'data': request.data,
-                                                                                                'use_duplicate': True})
+        serializer = diagnostic_serializer.LabAppointmentCreateSerializer(data=data, context={'request': request, 'data' : request.data, 'use_duplicate' : True})
         serializer.is_valid(raise_exception=True)
         validated_data = serializer.validated_data
 
