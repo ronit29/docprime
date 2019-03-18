@@ -763,7 +763,7 @@ class DoctorProfileUserViewSet(viewsets.GenericViewSet):
         general_specialization = []
         hospital = None
         response_data['about_web'] = None
-        google_rating = list()
+        google_reviews = list()
         date = None
 
         if response_data and response_data.get('hospitals'):
@@ -858,9 +858,9 @@ class DoctorProfileUserViewSet(viewsets.GenericViewSet):
                     else:
                         hosp_reviews_dict[hospital.pk] = None
 
-                    google_rating.append(hosp_reviews_dict)
+                    google_reviews.append(hosp_reviews_dict)
 
-        response_data['google_rating'] = google_rating
+        response_data['google_reviews'] = google_reviews
         return Response(response_data)
 
 
