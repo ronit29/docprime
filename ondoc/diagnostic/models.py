@@ -1784,6 +1784,10 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin)
             effective_price = 0
             coupon_discount, coupon_cashback, coupon_list = 0, 0, []
 
+        if data.get("payment_type") in [OpdAppointment.INSURANCE]:
+            effective_price = effective_price
+            coupon_discount, coupon_cashback, coupon_list = 0, 0, []
+
         return {
             "deal_price" : total_deal_price,
             "mrp" : total_mrp,
