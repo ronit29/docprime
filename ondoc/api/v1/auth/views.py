@@ -1904,12 +1904,16 @@ class UserRatingViewSet(GenericViewSet):
                 cid_list = []
                 if obj.content_type == ContentType.objects.get_for_model(Doctor):
                     name = obj.content_object.get_display_name()
-                    appointment = OpdAppointment.objects.select_related('hospital').filter(id=obj.appointment_id).first()
-                    if appointment:
-                        address = appointment.hospital.get_hos_address()
-                else:
+                    if obj.appointment_id:
+                        appointment = OpdAppointment.objects.select_related('hospital').filter(id=obj.appointment_id).first()
+                        if appointment:
+                            address = appointment.hospital.get_hos_address()
+                elif obj.content_type == ContentType.objects.get_for_model(Lab):
                     name = obj.content_object.name
                     address = obj.content_object.get_lab_address()
+                else:
+                    name = obj.content_object.name
+                    address = obj.content_object.get_hos_address()
                 for cm in obj.compliment.all():
                     c_list.append(cm.message)
                     cid_list.append(cm.id)
