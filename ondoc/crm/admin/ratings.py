@@ -108,8 +108,9 @@ class RatingsReviewAdmin(ImportExportMixin, admin.ModelAdmin):
 
     def get_form(self, request, obj=None, **kwargs):
         form = super(RatingsReviewAdmin, self).get_form(request, obj, **kwargs)
-        form.base_fields['compliment'].widget = forms.CheckboxSelectMultiple()
-        form.base_fields['compliment'].queryset = form.base_fields['compliment'].queryset.filter(type=obj.appointment_type)
+        if obj:
+            form.base_fields['compliment'].widget = forms.CheckboxSelectMultiple()
+            form.base_fields['compliment'].queryset = form.base_fields['compliment'].queryset.filter(type=obj.appointment_type)
         return form
 
     def booking_id(self, instance):
@@ -123,6 +124,7 @@ class RatingsReviewAdmin(ImportExportMixin, admin.ModelAdmin):
             response = mark_safe('''<a href='%s' target='_blank'>%s</a>''' % (url, instance.appointment_id))
             return response
         return ''
+    booking_id.admin_order_field = 'appointment_id'
 
     def send_update_sms(self, instance, msg):
         from ondoc.authentication.backends import JWTAuthentication
@@ -159,6 +161,13 @@ class RatingsReviewAdmin(ImportExportMixin, admin.ModelAdmin):
         if form.cleaned_data.get('send_update_sms'):
             text = form.cleaned_data['send_update_text'] if form.cleaned_data.get('send_update_text') else None
             self.send_update_sms(obj, text)
+        moderation_status = form.cleaned_data.get('moderation_status')
+        if moderation_status == RatingsReview.DENIED:
+            obj.is_live = False
+        elif moderation_status == RatingsReview.APPROVED:
+            obj.is_live = True
+        elif moderation_status == RatingsReview.PENDING:
+            obj.is_live = True if obj.appointment_id else False
         super().save_model(request, obj, form, change)
 
         # if instance.appoitnment_type:

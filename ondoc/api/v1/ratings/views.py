@@ -78,8 +78,7 @@ class RatingsViewSet(viewsets.GenericViewSet):
                     rating_review = RatingsReview(user=request.user, ratings=valid_data.get('rating'),
                                                   appointment_type=valid_data.get('appointment_type'),
                                                   appointment_id=valid_data.get('appointment_id', None),
-
-                                                  # review=valid_data.get('review'),
+                                                  is_live=True if valid_data.get('appointment_id') else False,
                                                   content_object=content_obj)
                     rating_review.save()
                     if valid_data.get('appointment_id'):

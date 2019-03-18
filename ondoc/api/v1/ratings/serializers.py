@@ -28,11 +28,12 @@ class RatingCreateBodySerializer(serializers.Serializer):
         if not (attrs.get('appointment_id') or attrs.get('entity_id')):
             raise serializers.ValidationError("either one of appointment id or entity id is required")
         if (attrs.get('appointment_id') and attrs.get('appointment_type')):
-            if attrs.get('appointment_type') == RatingsReview.OPD:
-                app = doc_models.OpdAppointment.objects.filter(id=attrs.get('appointment_id')).first()
-            else:
-                app = lab_models.LabAppointment.objects.filter(id=attrs.get('appointment_id')).first()
-            if app and app.is_rated:
+            query = RatingsReview.objects.filter(appointment_id=attrs['appointment_id'], appointment_type=attrs['appointment_type'])
+            # if attrs.get('appointment_type') == RatingsReview.OPD:
+            #     app = doc_models.OpdAppointment.objects.filter(id=attrs.get('appointment_id')).first()
+            # else:
+            #     app = lab_models.LabAppointment.objects.filter(id=attrs.get('appointment_id')).first()
+            if query.exists():
                 raise serializers.ValidationError("Appointment Already Rated.")
         return attrs
 
