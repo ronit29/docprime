@@ -19,7 +19,7 @@ from ondoc.doctor.models import (Doctor, Hospital, DoctorClinicTiming, DoctorCli
                                  HospitalNetworkCertification, DoctorPracticeSpecialization, AboutDoctor,
                                  DoctorMapping, OpdAppointment, CommonMedicalCondition, CommonSpecialization,
                                  MedicalCondition, PracticeSpecialization, SpecializationDepartment,
-                                 SpecializationField,
+                                 SpecializationField, DoctorLeave,
                                  MedicalConditionSpecialization, CompetitorInfo, CompetitorMonthlyVisit,
                                  SpecializationDepartmentMapping, CancellationReason, UploadDoctorData,
                                  HospitalServiceMapping, HealthInsuranceProviderHospitalMapping,
@@ -71,7 +71,7 @@ class Command(BaseCommand):
         group, created = Group.objects.get_or_create(name=constants['DOCTOR_NETWORK_GROUP_NAME'])
         group.permissions.clear()
 
-        content_types = ContentType.objects.get_for_models(Merchant, Doctor, Hospital, HospitalNetwork, UploadDoctorData, Remark, Qualification, College, Specialization)
+        content_types = ContentType.objects.get_for_models(Merchant, Doctor, Hospital, HospitalNetwork, UploadDoctorData, Remark, Qualification, College, Specialization, GenericAdmin)
         for cl, ct in content_types.items():
 
             permissions = Permission.objects.filter(
@@ -463,6 +463,20 @@ class Command(BaseCommand):
 
             group.permissions.add(*permissions)
 
+        # DoctorAvailibility team Group
+        group, created = Group.objects.get_or_create(name=constants['DOC_AVAILABILITY_TEAM_GROUP'])
+        group.permissions.clear()
+
+        content_types = ContentType.objects.get_for_models(DoctorLeave)
+
+        for cl, ct in content_types.items():
+            permissions = Permission.objects.filter(
+                Q(content_type=ct),
+                Q(codename='add_' + ct.model) |
+                Q(codename='change_' + ct.model)|
+                Q(codename='delete_' + ct.model)
+            )
+            group.permissions.add(*permissions)
 
         # Create Doctor Mapping team Group
         group, created = Group.objects.get_or_create(name=constants['DOCTOR_MAPPING_TEAM'])

@@ -1,4 +1,5 @@
 from django.contrib.postgres.fields import JSONField
+from django.core.validators import FileExtensionValidator
 from django.db import models
 from django.contrib.contenttypes.fields import GenericForeignKey
 from django.contrib.contenttypes.models import ContentType
@@ -36,7 +37,8 @@ class AppointmentHistory(TimeStampedModel):
     WEB = "web"
     DOC_APP = "d_app"
     CONSUMER_APP = "c_app"
-    SOURCE_CHOICES = ((CONSUMER_APP, "Consumer App"), (CRM, "CRM"), (WEB, "Web"), (DOC_APP, "Doctor App"))
+    DOC_WEB = "d_web"
+    SOURCE_CHOICES = ((CONSUMER_APP, "Consumer App"), (CRM, "CRM"), (WEB, "Consumer Web"), (DOC_APP, "Doctor App"), (DOC_WEB, "Provider Web"))
     content_type = models.ForeignKey(ContentType, on_delete=models.DO_NOTHING)
     object_id = models.PositiveIntegerField()
     content_object = GenericForeignKey()
@@ -254,3 +256,15 @@ class MatrixMappedCity(models.Model):
     class Meta:
         db_table = 'matrix_mapped_city'
         verbose_name_plural = "Matrix Mapped Cities"
+
+
+class QRCode(TimeStampedModel):
+    content_type = models.ForeignKey(ContentType, on_delete=models.CASCADE, null=True)
+    object_id = models.PositiveIntegerField(null=True)
+    content_object = GenericForeignKey()
+    name = models.FileField(upload_to='qrcode', validators=[
+        FileExtensionValidator(allowed_extensions=['pdf', 'jfif', 'jpg', 'jpeg', 'png'])])
+    # name = models.ImageField(upload_to='qrcode', blank=True, null=True)
+
+    class Meta:
+        db_table = 'qr_code'

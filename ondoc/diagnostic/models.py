@@ -915,6 +915,7 @@ class LabTestSubType(TimeStampedModel):
 
 class TestParameter(TimeStampedModel):
     name = models.CharField(max_length=200, unique=True)
+    details = models.CharField(max_length=10000, null=True, blank=True)
     # lab_test = models.ForeignKey('LabTest', on_delete=models.DO_NOTHING, null=True, blank=True)
 
     class Meta:
