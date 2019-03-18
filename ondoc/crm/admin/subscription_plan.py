@@ -39,7 +39,7 @@ class SubscriptionPlanFeatureAdmin(VersionAdmin):
     def get_readonly_fields(self, request, obj=None):
         read_only = super().get_readonly_fields(request, obj)
         if obj and obj.id:
-            read_only += ('name', 'test',)
+            read_only += ('test',)
         return read_only
 
     def get_form(self, request, obj=None, **kwargs):

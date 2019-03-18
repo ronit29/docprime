@@ -1332,7 +1332,7 @@ class PackageSerializer(LabTestSerializer):
 
     class Meta:
         model = LabTest
-        fields = ('id', 'name',
+        fields = ('id', 'name', 'is_package',
                   # 'pre_test_info', 'why', 'show_details', 'url',  # They exist but are not needed yet
                   'included_tests', 'show_detail_in_plan', 'total_parameter_count')
 
