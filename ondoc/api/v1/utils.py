@@ -8,7 +8,6 @@ from django.db import connection, transaction
 from django.db.models import F, Func, Q, Count, Sum, Case, When, Value, IntegerField
 from django.utils import timezone
 import math
-import datetime
 import pytz
 import calendar
 from django.contrib.auth import get_user_model
@@ -31,6 +30,8 @@ from django.utils.dateparse import parse_datetime
 import hashlib
 from ondoc.authentication import models as auth_models
 import logging
+from datetime import timedelta
+
 logger = logging.getLogger(__name__)
 
 User = get_user_model()
@@ -756,7 +757,7 @@ class TimeSlotExtraction(object):
     MORNING = "AM"
     # AFTERNOON = "Afternoon"
     EVENING = "PM"
-    TIME_SPAN = 15  # In minutes
+    TIME_SPAN = 30  # In minutes
     timing = dict()
     price_available = dict()
 
@@ -823,6 +824,99 @@ class TimeSlotExtraction(object):
 
         return whole_timing_data
 
+    def get_timing_slots(self, date, leaves, booking_details, is_thyrocare=False):
+        date = datetime.datetime.strptime(date, '%Y-%m-%d')
+        day = date.weekday()
+        booking_type = booking_details.get('type')
+        if booking_type == 'integration':
+            total_leave_list = []
+        elif booking_type == "doctor":
+            total_leave_list = self.get_doctor_leave_list(leaves)
+        else:
+            total_leave_list = self.get_lab_leave_list(leaves)
+        whole_timing_data = OrderedDict()
+        booking_details['total_leave_list'] = total_leave_list
+
+        j = 0
+        if is_thyrocare:
+            self.get_slots(date, day, j, whole_timing_data, booking_details, is_thyrocare)
+        else:
+            for k in range(int(settings.NO_OF_WEEKS_FOR_TIME_SLOTS)):
+                for i in range(7):
+                    if k == 0:
+                        if i >= day:
+                            self.get_slots(date, i, j, whole_timing_data, booking_details, is_thyrocare)
+                            j = j + 1
+                    else:
+                        self.get_slots(date, i, j, whole_timing_data, booking_details, is_thyrocare)
+                        j = j + 1
+        return whole_timing_data
+
+    def get_slots(self, date, i, j, whole_timing_data, booking_details, is_thyrocare):
+        converted_date = (date + datetime.timedelta(days=j))
+        readable_date = converted_date.strftime("%Y-%m-%d")
+        booking_details['date'] = converted_date
+        total_leave_list = booking_details.get('total_leave_list')
+        if converted_date in total_leave_list:
+            whole_timing_data[readable_date] = list()
+        else:
+            whole_timing_data[readable_date] = list()
+            pa = self.price_available[i]
+
+            if self.timing[i].get('timing'):
+                am_timings = self.format_data_new(self.timing[i]['timing'][self.MORNING], self.MORNING, pa, booking_details, is_thyrocare)
+                pm_timings = self.format_data_new(self.timing[i]['timing'][self.EVENING], self.EVENING, pa, booking_details, is_thyrocare)
+                if len(am_timings.get('timing')) == 0 and len(pm_timings.get('timing')) == 0:
+                    # whole_timing_data[readable_date].append({})
+                    pass
+                else:
+                    whole_timing_data[readable_date].append(am_timings)
+                    whole_timing_data[readable_date].append(pm_timings)
+
+    def get_doctor_leave_list(self, leaves):
+        total_leaves = list()
+        doctor_leaves = leaves.get('doctor')
+        global_leaves = leaves.get('global')
+        for dl in doctor_leaves:
+            start_date = dl.get('start_date')
+            end_date = dl.get('end_date')
+            if start_date == end_date:
+                total_leaves.append(datetime.datetime.strptime(start_date, '%Y-%m-%d'))
+            else:
+                delta = datetime.datetime.strptime(end_date, '%Y-%m-%d') - datetime.datetime.strptime(start_date, '%Y-%m-%d')
+                total_leaves.append(datetime.datetime.strptime(start_date, '%Y-%m-%d'))
+                for i in range(delta.days + 1):
+                    total_leaves.append(datetime.datetime.strptime(start_date, '%Y-%m-%d') + datetime.timedelta(i))
+        for gl in global_leaves:
+            start_date = gl.get('start_date')
+            end_date = gl.get('end_date')
+            if start_date == end_date:
+                total_leaves.append(start_date)
+            else:
+                delta = datetime.datetime.strptime(end_date, '%Y-%m-%d') - datetime.datetime.strptime(start_date, '%Y-%m-%d')
+                for i in range(delta.days + 1):
+                    total_leaves.append(datetime.datetime.strptime(start_date, '%Y-%m-%d') + datetime.timedelta(i))
+        doc_leave_set = set(total_leaves)
+        final_leaves = list(doc_leave_set)
+        return final_leaves
+
+    def get_lab_leave_list(self, leaves):
+        total_leaves = list()
+        for gl in leaves:
+            start_date = gl.get('start_date')
+            end_date = gl.get('end_date')
+            if start_date == end_date:
+                total_leaves.append(datetime.datetime.strptime(start_date, '%Y-%m-%d'))
+            else:
+                delta = datetime.datetime.strptime(end_date, '%Y-%m-%d') - datetime.datetime.strptime(start_date,
+                                                                                                      '%Y-%m-%d')
+                total_leaves.append(datetime.datetime.strptime(start_date, '%Y-%m-%d'))
+                for i in range(delta.days + 1):
+                    total_leaves.append(datetime.datetime.strptime(start_date, '%Y-%m-%d') + datetime.timedelta(i))
+        lab_leave_set = set(total_leaves)
+        final_leaves = list(lab_leave_set)
+        return final_leaves
+
     def format_data(self, data, day_time, pa):
         data_list = list()
         for k, v in data.items():
@@ -833,6 +927,101 @@ class TimeSlotExtraction(object):
             else:
                 data_list.append({"value": k, "text": v, "price": pa[k]["price"],
                                   "is_available": pa[k]["is_available"], "on_call": pa[k].get("on_call", False)})
+        format_data = dict()
+        format_data['type'] = 'AM' if day_time == self.MORNING else 'PM'
+        format_data['title'] = day_time
+        format_data['timing'] = data_list
+        return format_data
+
+    def format_data_new(self, data, day_time, pa, booking_details, is_thyrocare):
+        current_date_time = datetime.datetime.now()
+        booking_date = booking_details.get('date')
+        lab_tomorrow_time = 0.0
+        lab_minimum_time = None
+        doc_minimum_time = None
+        doctor_maximum_timing = 20.0
+        if booking_details.get('type') == "doctor":
+            if current_date_time.date() == booking_date.date():
+                doc_booking_minimum_time = current_date_time + datetime.timedelta(hours=1)
+                doc_booking_hours = doc_booking_minimum_time.strftime('%H:%M')
+                hours, minutes = doc_booking_hours.split(':')
+                mins = int(hours) * 60 + int(minutes)
+                doc_minimum_time = mins / 60
+        else:
+            if is_thyrocare:
+                pass
+            else:
+                is_home_pickup = booking_details.get('is_home_pickup')
+                if is_home_pickup:
+                    if current_date_time.weekday() == 6:
+                        lab_minimum_time = 24.0
+                    if current_date_time.hour < 13:
+                        lab_booking_minimum_time = current_date_time + datetime.timedelta(hours=4)
+                        lab_booking_hours = lab_booking_minimum_time.strftime('%H:%M')
+                        hours, minutes = lab_booking_hours.split(':')
+                        mins = int(hours) * 60 + int(minutes)
+                        lab_minimum_time = mins / 60
+                    elif current_date_time.hour >= 13 and current_date_time.hour < 17:
+                        lab_minimum_time = 24.0
+                    if current_date_time.hour >= 17:
+                        lab_minimum_time = 24.0
+                        lab_tomorrow_time = 12.0
+                else:
+                    lab_booking_minimum_time = current_date_time + datetime.timedelta(hours=2)
+                    lab_booking_hours = lab_booking_minimum_time.strftime('%H:%M')
+                    hours, minutes = lab_booking_hours.split(':')
+                    mins = int(hours) * 60 + int(minutes)
+                    lab_minimum_time = mins / 60
+
+
+        data_list = list()
+        for k, v in data.items():
+            if 'mrp' in pa[k].keys() and 'deal_price' in pa[k].keys():
+                if current_date_time.date() == booking_date.date():
+                    if pa[k].get('on_call') == False:
+                        if k >= float(doc_minimum_time) and k <= doctor_maximum_timing:
+                            data_list.append({"value": k, "text": v, "price": pa[k]["price"],
+                                              "mrp": pa[k]['mrp'], 'deal_price': pa[k]['deal_price'],
+                                              "is_available": pa[k]["is_available"], "on_call": pa[k].get("on_call", False)})
+                        else:
+                            pass
+                    else:
+                        pass
+                else:
+                    if k <= doctor_maximum_timing:
+                        data_list.append({"value": k, "text": v, "price": pa[k]["price"],
+                                          "mrp": pa[k]['mrp'], 'deal_price': pa[k]['deal_price'],
+                                          "is_available": pa[k]["is_available"],
+                                          "on_call": pa[k].get("on_call", False)})
+                    else:
+                        pass
+            else:
+                next_date = current_date_time + datetime.timedelta(days=1)
+                if current_date_time.date() == booking_date.date():
+                    if k >= float(lab_minimum_time):
+                        data_list.append({"value": k, "text": v, "price": pa[k]["price"],
+                                          "is_available": pa[k]["is_available"],
+                                          "on_call": pa[k].get("on_call", False)})
+                    else:
+                        pass
+                elif next_date.date() == booking_date.date():
+                    if lab_tomorrow_time:
+                        if k >= float(lab_tomorrow_time):
+                            data_list.append({"value": k, "text": v, "price": pa[k]["price"],
+                                              "is_available": pa[k]["is_available"],
+                                              "on_call": pa[k].get("on_call", False)})
+                        else:
+                            pass
+                    else:
+                        data_list.append({"value": k, "text": v, "price": pa[k]["price"],
+                                          "is_available": pa[k]["is_available"],
+                                          "on_call": pa[k].get("on_call", False)})
+
+                else:
+                    data_list.append({"value": k, "text": v, "price": pa[k]["price"],
+                                      "is_available": pa[k]["is_available"],
+                                      "on_call": pa[k].get("on_call", False)})
+
         format_data = dict()
         format_data['type'] = 'AM' if day_time == self.MORNING else 'PM'
         format_data['title'] = day_time
@@ -883,6 +1072,62 @@ class TimeSlotExtraction(object):
 
         return today_min, tomorrow_min, today_max
 
+    def get_upcoming_slots(self, time_slots):
+        no_of_slots = 3
+        next_day_slot = 0
+        upcoming = OrderedDict()
+        for key, value in time_slots.items():
+            if not value or (not value[0]['timing'] and not value[1]['timing']):
+                pass
+            else:
+                upcoming[key] = list()
+                if len(value[0]['timing']) >= no_of_slots:
+                    if next_day_slot > 0:
+                        range_upto = next_day_slot
+                    else:
+                        range_upto = no_of_slots
+
+                    for i in range(range_upto):
+                        upcoming[str(key)].append(value[0]['timing'][i])
+
+                    next_day_slot = no_of_slots - (len(value[0]['timing']) + next_day_slot)
+
+                elif len(value[0]['timing']) < no_of_slots:
+                    if next_day_slot > 0:
+                        if next_day_slot >= len(value[0]['timing']):
+                            range_upto = len(value[0]['timing'])
+                        else:
+                            range_upto = next_day_slot
+
+                        for i in range(range_upto):
+                            upcoming[str(key)].append(value[0]['timing'][i])
+
+                        remaining = next_day_slot - len(value[0]['timing'])
+                        if remaining >= len(value[1]['timing']):
+                            range_upto = len(value[1]['timing'])
+                        else:
+                            range_upto = remaining
+
+                        for i in range(range_upto):
+                            upcoming[str(key)].append(value[1]['timing'][i])
+                    else:
+                        for i in range(len(value[0]['timing'])):
+                            upcoming[str(key)].append(value[0]['timing'][i])
+
+                        remaining = no_of_slots - len(value[0]['timing'])
+                        if remaining >= len(value[1]['timing']):
+                            range_upto = len(value[1]['timing'])
+                        else:
+                            range_upto = remaining
+
+                        for i in range(range_upto):
+                            upcoming[str(key)].append(value[1]['timing'][i])
+                    next_day_slot = no_of_slots - (len(value[0]['timing']) + len(value[1]['timing']) + next_day_slot)
+
+                if next_day_slot > 0:
+                    pass
+                else:
+                    return upcoming
 
 def consumers_balance_refund():
     from ondoc.account.models import ConsumerAccount, ConsumerRefund
