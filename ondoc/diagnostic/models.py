@@ -630,15 +630,75 @@ class LabImage(TimeStampedModel, Image):
 
 class LabBookingClosingManager(models.Manager):
 
-    def lab_booking_slots(self, *args, **kwargs):
+    # def lab_booking_slots_new(self, *args, **kwargs):
+    #
+    #     is_home_pickup = kwargs.get("for_home_pickup", False)
+    #
+    #     if is_home_pickup:
+    #         kwargs["lab__is_home_collection_enabled"] = is_home_pickup
+    #     lab_timing_queryset = LabTiming.timing_manager.filter(**kwargs)
+    #
+    #     if not lab_timing_queryset or (is_home_pickup and not lab_timing_queryset[0].lab.is_home_collection_enabled):
+    #         return {
+    #             "time_slots": [],
+    #             "today_min": None,
+    #             "tomorrow_min": None,
+    #             "today_max": None
+    #         }
+    #
+    #     else:
+    #         obj = TimeSlotExtraction()
+    #         threshold = lab_timing_queryset[0].lab.booking_closing_hours_from_dayend
+    #
+    #         if not is_home_pickup and lab_timing_queryset[0].lab.always_open:
+    #             for day in range(0, 7):
+    #                 obj.form_time_slots(day, 0.0, 23.75, None, True)
+    #
+    #         else:
+    #             for data in lab_timing_queryset:
+    #                 obj.form_time_slots(data.day, data.start, data.end, None, True)
+    #             # daywise_data_array = sorted(lab_timing_queryset, key=lambda k: [k.day, k.start], reverse=True)
+    #             # day, end = daywise_data_array[0].day, daywise_data_array[0].end
+    #             # end = end - threshold
+    #             # for data in daywise_data_array:
+    #             #     if data.day != day:
+    #             #         day = data.day
+    #             #         end = data.end - threshold
+    #             #     if not end <= data.start <= data.end:
+    #             #         if data.start <= end <= data.end:
+    #             #             data.end = end
+    #             #         obj.form_time_slots(data.day, data.start, data.end, None, True)
+    #         global_leave_serializer = common_serializers.GlobalNonBookableSerializer(
+    #                             GlobalNonBookable.objects.filter(deleted_at__isnull=True,
+    #                                                              booking_type=GlobalNonBookable.DOCTOR), many=True)
+    #         date = datetime.datetime.today().strftime('%Y-%m-%d')
+    #         # resp_list = obj.get_timing_list()
+    #         resp_list = obj.get_timing_slots(date, global_leave_serializer.data, "lab")
+    #         is_thyrocare = False
+    #         lab_id = kwargs.get("lab__id", None)
+    #         if lab_id and settings.THYROCARE_NETWORK_ID:
+    #             if Lab.objects.filter(id=lab_id, network_id=settings.THYROCARE_NETWORK_ID).exists():
+    #                 is_thyrocare = True
+    #
+    #         today_min, tomorrow_min, today_max = obj.initial_start_times(is_thyrocare=is_thyrocare, is_home_pickup=is_home_pickup, time_slots=resp_list)
+    #         res_data = {
+    #             "time_slots": resp_list,
+    #             "today_min": today_min,
+    #             "tomorrow_min": tomorrow_min,
+    #             "today_max": today_max
+    #         }
+    #
+    #         return res_data
 
+    def lab_booking_slots(self, *args, **kwargs):
         is_home_pickup = kwargs.get("for_home_pickup", False)
 
         if is_home_pickup:
             kwargs["lab__is_home_collection_enabled"] = is_home_pickup
         lab_timing_queryset = LabTiming.timing_manager.filter(**kwargs)
 
-        if not lab_timing_queryset or (is_home_pickup and not lab_timing_queryset[0].lab.is_home_collection_enabled):
+        if not lab_timing_queryset or (
+                is_home_pickup and not lab_timing_queryset[0].lab.is_home_collection_enabled):
             return {
                 "time_slots": [],
                 "today_min": None,
@@ -668,62 +728,17 @@ class LabBookingClosingManager(models.Manager):
                 #         if data.start <= end <= data.end:
                 #             data.end = end
                 #         obj.form_time_slots(data.day, data.start, data.end, None, True)
-            global_leave_serializer = common_serializers.GlobalNonBookableSerializer(
-                                GlobalNonBookable.objects.filter(deleted_at__isnull=True,
-                                                                 booking_type=GlobalNonBookable.DOCTOR), many=True)
-            date = datetime.datetime.today().strftime('%Y-%m-%d')
-            # resp_list = obj.get_timing_list()
-            resp_list = obj.get_timing_slots(date, global_leave_serializer.data, "lab")
+
+            resp_list = obj.get_timing_list()
             is_thyrocare = False
             lab_id = kwargs.get("lab__id", None)
             if lab_id and settings.THYROCARE_NETWORK_ID:
                 if Lab.objects.filter(id=lab_id, network_id=settings.THYROCARE_NETWORK_ID).exists():
                     is_thyrocare = True
 
-            today_min, tomorrow_min, today_max = obj.initial_start_times(is_thyrocare=is_thyrocare, is_home_pickup=is_home_pickup, time_slots=resp_list)
-            res_data = {
-                "time_slots": resp_list,
-                "today_min": today_min,
-                "tomorrow_min": tomorrow_min,
-                "today_max": today_max
-            }
-
-            return res_data
-
-    def lab_timings_slots(self, *args, **kwargs):
-        date = args[0]
-        is_home_pickup = kwargs.get("for_home_pickup", False)
-
-        if is_home_pickup:
-            kwargs["lab__is_home_collection_enabled"] = is_home_pickup
-        lab_timing_queryset = LabTiming.timing_manager.filter(**kwargs)
-
-        if not lab_timing_queryset or (is_home_pickup and not lab_timing_queryset[0].lab.is_home_collection_enabled):
-            return {
-                "time_slots": [],
-                "today_min": None,
-                "tomorrow_min": None,
-                "today_max": None
-            }
-        else:
-            obj = TimeSlotExtraction()
-            threshold = lab_timing_queryset[0].lab.booking_closing_hours_from_dayend
-
-            if not is_home_pickup and lab_timing_queryset[0].lab.always_open:
-                for day in range(0, 7):
-                    obj.form_time_slots(day, 0.0, 23.75, None, True)
-            else:
-                for data in lab_timing_queryset:
-                    obj.form_time_slots(data.day, data.start, data.end, None, True)
-
-            resp_list = obj.get_timing_slots(date)
-            is_thyrocare = False
-            lab_id = kwargs.get("lab__id", None)
-            if lab_id and settings.THYROCARE_NETWORK_ID:
-                if Lab.objects.filter(id=lab_id, network_id=settings.THYROCARE_NETWORK_ID).exists():
-                    is_thyrocare = True
-
-            today_min, tomorrow_min, today_max = obj.initial_start_time_slots(is_thyrocare=is_thyrocare, is_home_pickup=is_home_pickup, time_slots=resp_list, date=date)
+            today_min, tomorrow_min, today_max = obj.initial_start_times(is_thyrocare=is_thyrocare,
+                                                                         is_home_pickup=is_home_pickup,
+                                                                         time_slots=resp_list)
             res_data = {
                 "time_slots": resp_list,
                 "today_min": today_min,

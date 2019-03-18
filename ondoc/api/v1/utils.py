@@ -810,18 +810,18 @@ class TimeSlotExtraction(object):
         time = form_dc_time(time, am_pm)
         return time
 
-    # def get_timing_list(self):
-    #     whole_timing_data = dict()
-    #     for i in range(7):
-    #         whole_timing_data[i] = list()
-    #         pa = self.price_available[i]
-    #         if self.timing[i].get('timing'):
-    #             # data = self.format_data(self.timing[i]['timing'][self.MORNING], pa)
-    #             whole_timing_data[i].append(self.format_data(self.timing[i]['timing'][self.MORNING], self.MORNING, pa))
-    #             # whole_timing_data[i].append(self.format_data(self.timing[i]['timing'][self.AFTERNOON], self.AFTERNOON, pa))
-    #             whole_timing_data[i].append(self.format_data(self.timing[i]['timing'][self.EVENING], self.EVENING, pa))
-    #
-    #     return whole_timing_data
+    def get_timing_list(self):
+        whole_timing_data = dict()
+        for i in range(7):
+            whole_timing_data[i] = list()
+            pa = self.price_available[i]
+            if self.timing[i].get('timing'):
+                # data = self.format_data(self.timing[i]['timing'][self.MORNING], pa)
+                whole_timing_data[i].append(self.format_data(self.timing[i]['timing'][self.MORNING], self.MORNING, pa))
+                # whole_timing_data[i].append(self.format_data(self.timing[i]['timing'][self.AFTERNOON], self.AFTERNOON, pa))
+                whole_timing_data[i].append(self.format_data(self.timing[i]['timing'][self.EVENING], self.EVENING, pa))
+
+        return whole_timing_data
 
     def get_timing_slots(self, date, leaves, booking_details, is_thyrocare=False):
         date = datetime.datetime.strptime(date, '%Y-%m-%d')
@@ -863,8 +863,8 @@ class TimeSlotExtraction(object):
             pa = self.price_available[i]
 
             if self.timing[i].get('timing'):
-                am_timings = self.format_data(self.timing[i]['timing'][self.MORNING], self.MORNING, pa, booking_details, is_thyrocare)
-                pm_timings = self.format_data(self.timing[i]['timing'][self.EVENING], self.EVENING, pa, booking_details, is_thyrocare)
+                am_timings = self.format_data_new(self.timing[i]['timing'][self.MORNING], self.MORNING, pa, booking_details, is_thyrocare)
+                pm_timings = self.format_data_new(self.timing[i]['timing'][self.EVENING], self.EVENING, pa, booking_details, is_thyrocare)
                 if len(am_timings.get('timing')) == 0 and len(pm_timings.get('timing')) == 0:
                     # whole_timing_data[readable_date].append({})
                     pass
@@ -916,7 +916,23 @@ class TimeSlotExtraction(object):
         final_leaves = list(lab_leave_set)
         return final_leaves
 
-    def format_data(self, data, day_time, pa, booking_details, is_thyrocare):
+    def format_data(self, data, day_time, pa):
+        data_list = list()
+        for k, v in data.items():
+            if 'mrp' in pa[k].keys() and 'deal_price' in pa[k].keys():
+                data_list.append({"value": k, "text": v, "price": pa[k]["price"],
+                                  "mrp": pa[k]['mrp'], 'deal_price': pa[k]['deal_price'],
+                                  "is_available": pa[k]["is_available"], "on_call": pa[k].get("on_call", False)})
+            else:
+                data_list.append({"value": k, "text": v, "price": pa[k]["price"],
+                                  "is_available": pa[k]["is_available"], "on_call": pa[k].get("on_call", False)})
+        format_data = dict()
+        format_data['type'] = 'AM' if day_time == self.MORNING else 'PM'
+        format_data['title'] = day_time
+        format_data['timing'] = data_list
+        return format_data
+
+    def format_data_new(self, data, day_time, pa, booking_details, is_thyrocare):
         current_date_time = datetime.datetime.now()
         booking_date = booking_details.get('date')
         lab_tomorrow_time = 0.0

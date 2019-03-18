@@ -1942,8 +1942,7 @@ class LabAppointmentView(mixins.CreateModelMixin,
 
 class LabTimingListView(mixins.ListModelMixin,
                         viewsets.GenericViewSet):
-    
-    
+
     @transaction.non_atomic_requests
     def list(self, request, *args, **kwargs):
         params = request.query_params
@@ -1962,7 +1961,6 @@ class LabTimingListView(mixins.ListModelMixin,
                 "today_max": None
             }
         return Response(resp_data)
-
 
     @transaction.non_atomic_requests
     def list_new(self, request, *args, **kwargs):
@@ -2007,39 +2005,6 @@ class LabTimingListView(mixins.ListModelMixin,
                 "today_max": None
             }
         # resp_data['global_leaves'] = global_leave_serializer.data
-        return Response(resp_data)
-
-    @transaction.non_atomic_requests
-    def time_slot(self, request, *args, **kwargs):
-        params = request.query_params
-        for_home_pickup = True if int(params.get('pickup', 0)) else False
-        lab = params.get('lab')
-
-        from ondoc.integrations import service
-        pincode = params.get('pincode')
-        date = params.get('date')
-        integration_dict = None
-        if lab:
-            lab_obj = Lab.objects.filter(id=int(lab)).first()
-            if lab_obj.network and lab_obj.network.id:
-                integration_dict = IntegratorMapping.get_if_third_party_integration(network_id=lab_obj.network.id)
-
-        if not integration_dict:
-            resp_data = LabTiming.timing_manager.lab_timings_slots(date, lab__id=lab, lab__is_live=True,
-                                                                   for_home_pickup=for_home_pickup)
-        else:
-            class_name = integration_dict['class_name']
-            integrator_obj = service.create_integrator_obj(class_name)
-            resp_data = integrator_obj.get_appointment_slots(pincode, date, is_home_pickup=for_home_pickup)
-
-        # for agent do not set any time limitations
-        if hasattr(request, "agent") and request.agent:
-            resp_data = {
-                "time_slots": resp_data["time_slots"],
-                "today_min": None,
-                "tomorrow_min": None,
-                "today_max": None
-            }
         return Response(resp_data)
 
 
