@@ -1901,7 +1901,7 @@ class LabAppointmentView(mixins.CreateModelMixin,
             balance = 0
             resp['is_agent'] = True
 
-        can_use_insurance, insurance_id, insurance_fail_message = self.can_use_insurance(appointment_details)
+        can_use_insurance, insurance_id, insurance_fail_message = self.can_use_insurance(user, appointment_details)
         if can_use_insurance:
             appointment_details['insurance'] = insurance_id
             appointment_details['effective_price'] = appointment_details['agreed_price']
@@ -2009,8 +2009,11 @@ class LabAppointmentView(mixins.CreateModelMixin,
 
         return pgdata, payment_required
 
-    def can_use_insurance(self, appointment_details):
-        insurance_check, insurance_id, fail_message = UserInsurance.validate_insurance(appointment_details)
+    def can_use_insurance(self, user, appointment_details):
+        user_insurance_obj = UserInsurance.objects.filter(user=user).last()
+        if not user_insurance_obj:
+            return False, None, ''
+        insurance_check, insurance_id, fail_message = user_insurance_obj.validate_insurance(appointment_details)
 
         return insurance_check, insurance_id, fail_message
         # Check if appointment can be covered under insurance
