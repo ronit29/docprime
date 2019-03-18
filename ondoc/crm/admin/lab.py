@@ -800,6 +800,9 @@ class LabAppointmentAdmin(nested_admin.NestedModelAdmin):
     #         temp_autocomplete_fields = super().get_autocomplete_fields(request)
     #     return temp_autocomplete_fields
 
+    def through_app(self, obj):
+        return obj.created_by_native()
+
     def get_profile_email(self, obj):
         if not obj.profile:
             return None
@@ -861,16 +864,14 @@ class LabAppointmentAdmin(nested_admin.NestedModelAdmin):
         #             'send_email_sms_report', 'invoice_urls', 'reports_uploaded', 'email_notification_timestamp', 'payment_type'
         #             )
         # elif request.user.groups.filter(name=constants['LAB_APPOINTMENT_MANAGEMENT_TEAM']).exists():
-        all_fields = ('booking_id', 'order_id', 'lab_id', 'lab_name', 'get_lab_test', 'lab_contact_details',
-                      'used_profile_name', 'used_profile_number',
-                      'default_profile_name', 'default_profile_number', 'user_id', 'user_number', 'price',
-                      'agreed_price',
-                      'deal_price', 'effective_price', 'payment_status', 'payment_type', 'insurance', 'is_home_pickup',
-                      'get_pickup_address', 'get_lab_address', 'outstanding', 'status', 'cancel_type',
-                      'cancellation_reason', 'cancellation_comments', 'start_date', 'start_time',
-                      'send_email_sms_report', 'invoice_urls', 'reports_uploaded', 'email_notification_timestamp',
-                      'payment_type'
-                      )
+        all_fields = ('booking_id', 'through_app', 'order_id',  'lab_id', 'lab_name', 'get_lab_test', 'lab_contact_details',
+                    'used_profile_name', 'used_profile_number',
+                    'default_profile_name', 'default_profile_number', 'user_id', 'user_number', 'price', 'agreed_price',
+                    'deal_price', 'effective_price', 'payment_status', 'payment_type', 'insurance', 'is_home_pickup',
+                    'get_pickup_address', 'get_lab_address', 'outstanding', 'status', 'cancel_type',
+                    'cancellation_reason', 'cancellation_comments', 'start_date', 'start_time',
+                    'send_email_sms_report', 'invoice_urls', 'reports_uploaded', 'email_notification_timestamp', 'payment_type'
+                    )
         if request.user.groups.filter(name=constants['APPOINTMENT_OTP_TEAM']).exists() or request.user.is_superuser:
             all_fields = all_fields + ('otp',)
         return all_fields
@@ -881,7 +882,7 @@ class LabAppointmentAdmin(nested_admin.NestedModelAdmin):
         # if request.user.is_superuser:
         #     read_only =  ['booking_id', 'order_id', 'lab_id', 'lab_contact_details', 'get_lab_test', 'invoice_urls', 'reports_uploaded', 'email_notification_timestamp', 'payment_type']
         # elif request.user.groups.filter(name=constants['LAB_APPOINTMENT_MANAGEMENT_TEAM']).exists():
-        read_only = ['booking_id', 'order_id', 'lab_name', 'lab_id', 'get_lab_test', 'invoice_urls',
+        read_only = ['booking_id' ,'through_app', 'order_id', 'lab_name', 'lab_id', 'get_lab_test', 'invoice_urls',
                      'lab_contact_details', 'used_profile_name', 'used_profile_number',
                      'default_profile_name', 'default_profile_number', 'user_number', 'user_id', 'price',
                      'agreed_price',
