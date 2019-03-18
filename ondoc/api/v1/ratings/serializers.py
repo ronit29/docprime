@@ -52,6 +52,8 @@ class RatingListBodySerializerdata(serializers.Serializer):
             raise serializers.ValidationError('Doctor Not Found')
         elif attrs.get('content_type') == RatingsReview.LAB and not lab_models.Lab.objects.filter(id=attrs.get('object_id')).exists():
             raise serializers.ValidationError('Lab Not Found')
+        elif attrs.get('content_type') == RatingsReview.HOSPITAL and not doc_models.Hospital.objects.filter(id=attrs.get('object_id')).exists():
+            raise serializers.ValidationError('Hospital Not Found')
         return attrs
 
 
@@ -128,6 +130,7 @@ class RatingsModelSerializer(serializers.ModelSerializer):
     compliment = serializers.SerializerMethodField()
     date = serializers.SerializerMethodField()
     user_name = serializers.SerializerMethodField()
+    is_verified = serializers.SerializerMethodField()
 
     def get_user_name(self, obj):
         name = app = profile = None
@@ -163,9 +166,12 @@ class RatingsModelSerializer(serializers.ModelSerializer):
             compliments_string = (', ').join(c_list)
         return compliments_string
 
+    def get_is_verified(self, obj):
+        return True if obj.appointment_id else False
+
     class Meta:
         model = RatingsReview
-        fields = ('id', 'user', 'ratings', 'review', 'is_live', 'date', 'compliment', 'user_name')
+        fields = ('id', 'user', 'ratings', 'review', 'is_live', 'date', 'compliment', 'user_name', 'is_verified')
 
 
 class RatingUpdateBodySerializer(serializers.Serializer):

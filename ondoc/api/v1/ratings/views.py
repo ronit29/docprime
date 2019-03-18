@@ -219,30 +219,60 @@ class ListRatingViewSet(viewsets.GenericViewSet):
     def get_queryset(self):
         return RatingsReview.objects.prefetch_related('compliment').filter(is_live=True)
 
+    def get_opd_ratings(self, valid_data):
+        queryset = self.get_queryset().exclude(Q(review='') | Q(review=None)) \
+            .filter(doc_ratings__id=valid_data.get('object_id')) \
+            .order_by('-updated_at')
+        graph_queryset = self.get_queryset().filter(doc_ratings__id=valid_data.get('object_id'))
+        appointment = doc_models.OpdAppointment.objects.select_related('profile').filter(
+            doctor_id=valid_data.get('object_id')).all()
+        return queryset, graph_queryset, appointment
+
+    def get_lab_ratings(self, valid_data):
+        lab = lab_models.Lab.objects.filter(id=valid_data.get('object_id')).first()
+        if lab and lab.network:
+            queryset = self.get_queryset().exclude(Q(review='') | Q(review=None)) \
+                .filter(lab_ratings__network=lab.network) \
+                .order_by('-updated_at')
+            graph_queryset = self.get_queryset().filter(lab_ratings__network=lab.network)
+            appointment = lab_models.LabAppointment.objects.select_related('profile').filter(
+                lab__network=lab.network).all()
+        else:
+            queryset = self.get_queryset().exclude(Q(review='') | Q(review=None)) \
+                .filter(lab_ratings__id=valid_data.get('object_id')) \
+                .order_by('-updated_at')
+            graph_queryset = self.get_queryset().filter(lab_ratings__id=valid_data.get('object_id'))
+            appointment = lab_models.LabAppointment.objects.select_related('profile').filter(
+                lab_id=valid_data.get('object_id')).all()
+        return queryset, graph_queryset, appointment
+
+    def get_hospital_ratings(self, valid_data):
+        hospital = doc_models.Hospital.objects.filter(id=valid_data.get('object_id')).first()
+        if hospital and hospital.network:
+            queryset = self.get_queryset().exclude(Q(review='') | Q(review=None)) \
+                .filter(hospital_ratings__network=hospital.network) \
+                .order_by('-updated_at')
+            graph_queryset = self.get_queryset().filter(hospital_ratings__network=hospital.network)
+            appointment = []
+        else:
+            queryset = self.get_queryset().exclude(Q(review='') | Q(review=None)) \
+                .filter(hospital_ratings__id=valid_data.get('object_id')) \
+                .order_by('-updated_at')
+            graph_queryset = self.get_queryset().filter(hospital_ratings__id=valid_data.get('object_id'))
+            appointment = []
+        return queryset, graph_queryset, appointment
+
     def list(self, request):
         serializer = serializers.RatingListBodySerializerdata(data=request.query_params)
         serializer.is_valid(raise_exception=True)
         valid_data = serializer.validated_data
         if valid_data.get('content_type') == RatingsReview.OPD:
-            queryset = self.get_queryset().exclude(Q(review='') | Q(review=None))\
-                                          .filter(doc_ratings__id=valid_data.get('object_id'))\
-                                          .order_by('-updated_at')
-            graph_queryset = self.get_queryset().filter(doc_ratings__id=valid_data.get('object_id'))
-            appointment = doc_models.OpdAppointment.objects.select_related('profile').filter(doctor_id=valid_data.get('object_id')).all()
+            queryset, graph_queryset, appointment = self.get_opd_ratings(valid_data)
+        elif valid_data.get('content_type') == RatingsReview.LAB:
+            queryset, graph_queryset, appointment = self.get_lab_ratings(valid_data)
         else:
-            lab = lab_models.Lab.objects.filter(id=valid_data.get('object_id')).first()
-            if lab and lab.network:
-                queryset = self.get_queryset().exclude(Q(review='') | Q(review=None)) \
-                    .filter(lab_ratings__network=lab.network) \
-                    .order_by('-updated_at')
-                graph_queryset = self.get_queryset().filter(lab_ratings__network=lab.network)
-                appointment = lab_models.LabAppointment.objects.select_related('profile').filter(lab__network=lab.network).all()
-            else:
-                queryset = self.get_queryset().exclude(Q(review='') | Q(review=None))\
-                                              .filter(lab_ratings__id=valid_data.get('object_id'))\
-                                              .order_by('-updated_at')
-                graph_queryset = self.get_queryset().filter(lab_ratings__id=valid_data.get('object_id'))
-                appointment = lab_models.LabAppointment.objects.select_related('profile').filter(lab_id=valid_data.get('object_id')).all()
+            queryset, graph_queryset, appointment = self.get_hospital_ratings(valid_data)
+
         queryset = paginate_queryset(queryset, request)
         body_serializer = serializers.RatingsModelSerializer(queryset, many=True, context={'request': request,
                                                                                            'app': appointment})
