@@ -19,7 +19,7 @@ from django.core.files.uploadedfile import TemporaryUploadedFile
 from datetime import timedelta
 from django.utils import timezone
 from django.conf import settings
-from ondoc.api.v1.utils import RawSql
+from ondoc.api.v1.utils import RawSql, aware_time_zone
 from django.core.files.uploadedfile import InMemoryUploadedFile
 from django.template.loader import render_to_string
 from num2words import num2words
@@ -346,10 +346,10 @@ class UserInsurance(auth_model.TimeStampedModel):
             'sgst_rate_tax': sgst_tax,
             'igst_rate_tax': igst_tax,
             'gross_amount': self.premium_amount,
-            'purchase_data': str(self.purchase_date.date().strftime('%d-%m-%Y')),
-            'start_time': str(self.purchase_date.strftime('%H:%M')),
-            'expiry_date': str(self.expiry_date.date().strftime('%d-%m-%Y')),
-            'end_time': str(self.expiry_date.strftime('%H:%M')),
+            'purchase_data': str(aware_time_zone(self.purchase_date).date().strftime('%d-%m-%Y')),
+            'start_time': str(aware_time_zone(self.purchase_date).strftime('%H:%M')),
+            'expiry_date': str(aware_time_zone(self.expiry_date).date().strftime('%d-%m-%Y')),
+            'end_time': str(aware_time_zone(self.expiry_date).strftime('%H:%M')),
             'opd_amount_limit': threshold.opd_amount_limit,
             'lab_amount_limit': threshold.lab_amount_limit,
             'premium': self.premium_amount,
