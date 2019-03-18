@@ -778,10 +778,10 @@ class UserInsurance(auth_model.TimeStampedModel):
                             onco_count = onco_count + 1
                         if gyno_count > int(settings.INSURANCE_GYNECOLOGIST_LIMIT):
                             return False, self.id,"Gynocologist limit exceeded of limit 5"
-                            Break
+                            break
                         if onco_count > int(settings.INSURANCE_ONCOLOGIST_LIMIT):
                             return False, self.id, "Oncologist limit exceeded of limit 5"
-                            Break
+                            break
                     else:
                         return is_insured, insurance_id, insurance_message
             else:
