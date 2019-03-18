@@ -46,7 +46,7 @@ class SubscriptionPlanLoggedInUserViewSet(viewsets.GenericViewSet):
         return UserPlanMapping.objects.objects.none()
 
     def buy(self, request):
-        serializer = serializers.UserSubscriptionBuyRequestSerializer(data=request.query_params,
+        serializer = serializers.UserSubscriptionBuyRequestSerializer(data=request.data,
                                                                       context={'request': request})
         serializer.is_valid(raise_exception=True)
         validated_data = serializer.validated_data
