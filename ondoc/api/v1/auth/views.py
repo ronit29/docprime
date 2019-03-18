@@ -433,12 +433,30 @@ class UserProfileViewSet(mixins.CreateModelMixin, mixins.ListModelMixin,
                                    }
             }, status=status.HTTP_400_BAD_REQUEST)
 
-        if obj and hasattr(obj, 'id') and obj.id and InsuredMembers.objects.filter(profile__id=obj.id).exists():
-            return Response({
-                "request_errors": {"code": "invalid",
-                                   "message": "Profile cannot be changed which are covered under insurance."
-                                   }
-            }, status=status.HTTP_400_BAD_REQUEST)
+        insured_member_obj = InsuredMembers.objects.filter(profile__id=obj.id).last()
+        insured_member_profile = None
+        if insured_member_obj:
+            insured_member_profile = insured_member_obj.profile
+        if obj and hasattr(obj, 'id') and obj.id and insured_member_profile:
+
+            whatsapp_optin = data.get('whatsapp_optin')
+            whatsapp_is_declined = data.get('whatsapp_is_declined')
+
+            if (whatsapp_optin and whatsapp_optin in [True, False] and whatsapp_optin != insured_member_profile.whatsapp_optin) or \
+                    (whatsapp_is_declined and whatsapp_is_declined in [True, False] and whatsapp_is_declined != insured_member_profile.whatsapp_is_declined):
+                if whatsapp_optin:
+                    insured_member_profile.whatsapp_optin = whatsapp_optin
+                if whatsapp_is_declined:
+                    insured_member_profile.whatsapp_is_declined = whatsapp_is_declined
+
+                insured_member_profile.save()
+                return Response()
+            else:
+                return Response({
+                    "request_errors": {"code": "invalid",
+                                       "message": "Profile cannot be changed which are covered under insurance."
+                                       }
+                }, status=status.HTTP_400_BAD_REQUEST)
 
         serializer = serializers.UserProfileSerializer(obj, data=data, partial=True, context={"request": request})
         serializer.is_valid(raise_exception=True)
