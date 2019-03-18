@@ -1942,9 +1942,30 @@ class LabAppointmentView(mixins.CreateModelMixin,
 
 class LabTimingListView(mixins.ListModelMixin,
                         viewsets.GenericViewSet):
-
+    
+    
     @transaction.non_atomic_requests
     def list(self, request, *args, **kwargs):
+        params = request.query_params
+
+        for_home_pickup = True if int(params.get('pickup', 0)) else False
+        lab = params.get('lab')
+
+        resp_data = LabTiming.timing_manager.lab_booking_slots(lab__id=lab, lab__is_live=True, for_home_pickup=for_home_pickup)
+
+        # for agent do not set any time limitations
+        if hasattr(request, "agent") and request.agent:
+            resp_data = {
+                "time_slots" : resp_data["time_slots"],
+                "today_min": None,
+                "tomorrow_min": None,
+                "today_max": None
+            }
+        return Response(resp_data)
+
+
+    @transaction.non_atomic_requests
+    def list_new(self, request, *args, **kwargs):
         params = request.query_params
 
         for_home_pickup = True if int(params.get('pickup', 0)) else False

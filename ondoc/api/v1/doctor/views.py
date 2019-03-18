@@ -1683,6 +1683,34 @@ class DoctorAvailabilityTimingViewSet(viewsets.ViewSet):
         serializer = serializers.DoctorAvailabilityTimingSerializer(data=request.query_params)
         serializer.is_valid(raise_exception=True)
         validated_data = serializer.validated_data
+        queryset = models.DoctorClinicTiming.objects.filter(doctor_clinic__doctor=validated_data.get('doctor_id'),
+                                                            doctor_clinic__hospital=validated_data.get(
+                                                                'hospital_id')).order_by("start")
+        doctor_queryset = (models.Doctor
+                           .objects.prefetch_related("qualifications__qualification",
+                                                     "qualifications__specialization")
+                           .filter(pk=validated_data.get('doctor_id').id))
+        doctor_serializer = serializers.DoctorTimeSlotSerializer(doctor_queryset, many=True)
+        doctor_leave_serializer = v2_serializers.DoctorLeaveSerializer(
+            models.DoctorLeave.objects.filter(doctor=validated_data.get("doctor_id"), deleted_at__isnull=True), many=True)
+
+        timeslots = dict()
+        obj = TimeSlotExtraction()
+
+        for data in queryset:
+            obj.form_time_slots(data.day, data.start, data.end, data.fees, True,
+                                data.deal_price, data.mrp, True, on_call=data.type)
+
+        timeslots = obj.get_timing_list()
+        return Response({"timeslots": timeslots, "doctor_data": doctor_serializer.data,
+                         "doctor_leaves": doctor_leave_serializer.data})
+
+
+    @transaction.non_atomic_requests
+    def list_new(self, request, *args, **kwargs):
+        serializer = serializers.DoctorAvailabilityTimingSerializer(data=request.query_params)
+        serializer.is_valid(raise_exception=True)
+        validated_data = serializer.validated_data
         dc_obj = models.DoctorClinic.objects.filter(doctor_id=validated_data.get('doctor_id'),
                                                             hospital_id=validated_data.get(
                                                                 'hospital_id')).first()
