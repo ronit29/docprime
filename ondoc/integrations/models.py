@@ -27,7 +27,7 @@ class IntegratorMapping(TimeStampedModel):
     is_active = models.BooleanField(default=False)
 
     @classmethod
-    def get_if_third_party_integration(cls, test_id=None, network_id=None):
+    def get_if_third_party_integration(cls, network_id=None):
         if network_id:
             mapping = cls.objects.filter(object_id=network_id, is_active=True).first()
         else:
@@ -112,8 +112,6 @@ class IntegratorResponse(TimeStampedModel):
                 integrator_obj.get_order_summary(integrator_response)
 
         print("Order Summary for Thyrocare Complete")
-
-
 
 
 class IntegratorReport(TimeStampedModel):

@@ -111,7 +111,7 @@ def get_integrator_order_status(self, *args, **kwargs):
                 appointment.status = 5
                 appointment.save()
         else:
-            countdown_time = 1 * 60
+            countdown_time = 1 * 120
             print(countdown_time)
             self.retry(**kwargs, countdown=countdown_time)
 

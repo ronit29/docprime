@@ -218,7 +218,7 @@ class Thyrocare(BaseIntegrator):
                 formats = ['pdf', 'xml']
                 for booking in integrator_bookings:
                     dp_appointment = booking.content_object
-                    if dp_appointment.time_slot_start + timedelta(days=1) >= datetime.now():
+                    if dp_appointment.time_slot_start + timedelta(days=1) <= datetime.now():
                         lead_id = booking.lead_id
                         mobile = booking.content_object.profile.phone_number
                         result = dict()
@@ -310,7 +310,7 @@ class Thyrocare(BaseIntegrator):
             logger.error("[ERROR] %s" % response.get('RESPONSE'))
 
     def _order_summary(self, integrator_response):
-        dp_appointment = LabAppointment.objects.filter(id=integrator_response.object_id).first()
+        dp_appointment = integrator_response.content_object
         if dp_appointment.status != LabAppointment.CANCELLED or dp_appointment.status != LabAppointment.COMPLETED or \
                                             (dp_appointment.time_slot_start + timedelta(days=1) < datetime.now()):
 
@@ -331,13 +331,13 @@ class Thyrocare(BaseIntegrator):
                 # check integrator order status and update docprime booking
                 if response['BEN_MASTER'][0]['STATUS'].upper() == 'YET TO ASSIGN':
                     pass
-                elif response['BEN_MASTER'][0]['STATUS'].upper() == 'DELIVERY' or 'REPORTED' or 'SERVICED' or 'CREDITED':
+                elif response['BEN_MASTER'][0]['STATUS'].upper() == ('DELIVERY' or 'REPORTED' or 'SERVICED' or 'CREDITED'):
                     if not dp_appointment.status == 5:
                         dp_appointment.status = 5
                         dp_appointment.save()
                 elif response['BEN_MASTER'][0]['STATUS'].upper() == 'DONE':
                     pass
-                elif response['BEN_MASTER'][0]['STATUS'].upper() == 'CANCELLED' or 'REJECTED':
+                elif response['BEN_MASTER'][0]['STATUS'].upper() == ('CANCELLED' or 'REJECTED'):
                     if not dp_appointment.status == 6:
                         dp_appointment.status = 6
                         dp_appointment.cancellation_type = 2
