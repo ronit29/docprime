@@ -42,11 +42,16 @@ class CartViewSet(viewsets.GenericViewSet):
             serialized_data = lab_app_serializer.validated_data
             cart_item_id = serialized_data.get('cart_item').id if serialized_data.get('cart_item') else None
 
+        # data['data']['is_appointment_insured'], data['data']['insurance_id'], data['data'][
+        #     'insurance_message'] = Cart.check_for_specialization_insurance(serialized_data, request)
+
         data['data']['is_appointment_insured'], data['data']['insurance_id'], data['data'][
             'insurance_message'] = Cart.check_for_insurance(serialized_data, request)
 
-        Cart.objects.update_or_create( id=cart_item_id, deleted_at__isnull=True,
-                                       product_id=valid_data.get("product_id"), user=user, defaults={"data" : valid_data.get("data")} )
+
+
+        Cart.objects.update_or_create(id=cart_item_id, deleted_at__isnull=True,
+                                       product_id=valid_data.get("product_id"), user=user, defaults={"data" : valid_data.get("data")})
 
         return Response({"status": 1, "message": "Saved in cart"}, status.HTTP_200_OK)
 
