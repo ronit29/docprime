@@ -1750,7 +1750,14 @@ class LabAppointmentView(mixins.CreateModelMixin,
         serializer.is_valid(raise_exception=True)
         validated_data = serializer.validated_data
 
-        data['is_appointment_insured'], data['insurance_id'], data['insurance_message'] = Cart.check_for_insurance(validated_data, request)
+        user_insurance = UserInsurance.objects.filter(user=request.user).last()
+        if user_insurance:
+            data['is_appointment_insured'], data['insurance_id'], data[
+                'insurance_message'] = user_insurance.validate_insurance(validated_data)
+        else:
+            data['is_appointment_insured'], data['insurance_id'], data[
+                'insurance_message'] = False, None, ""
+        # data['is_appointment_insured'], data['insurance_id'], data['insurance_message'] = Cart.check_for_insurance(validated_data, request)
 
         cart_item_id = validated_data.get('cart_item').id if validated_data.get('cart_item') else None
 

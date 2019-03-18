@@ -476,7 +476,7 @@ class UserInsurance(auth_model.TimeStampedModel):
         oncologist_list = json.loads(settings.ONCOLOGIST_SPECIALIZATION_IDS)
         oncologist_set = set(oncologist_list)
         if not (specilization_ids_set & oncologist_set) and not (specilization_ids_set & gynecologist_set):
-            return True, self.id, 'Covered Under Insurance'
+            return gynecologist_opd_count, oncologist_opd_count
         members = self.members.all().get(profile=profile)
         # if specilization_ids_set & gynecologist_set:
         doctor_with_gyno_specialization = DoctorPracticeSpecialization.objects.filter(
@@ -758,10 +758,13 @@ class UserInsurance(auth_model.TimeStampedModel):
 
     def validate_insurance_for_cart(self, appointment_data, cart_items):
         is_insured, insurance_id, insurance_message = self.validate_insurance(appointment_data)
-        gynocologist_appointment_count, oncologist_appointment_count = self.get_doctor_specialization_count(appointment_data)
-        gyno_count = gynocologist_appointment_count
-        onco_count = oncologist_appointment_count
+        gyno_count = 0
+        onco_count = 0
         if is_insured:
+            gynocologist_appointment_count, oncologist_appointment_count = self.get_doctor_specialization_count(
+                appointment_data)
+            gyno_count = gynocologist_appointment_count
+            onco_count = oncologist_appointment_count
             if cart_items:
                 for cart_item in cart_items:
                     if cart_item.product_id == 1:
@@ -773,7 +776,7 @@ class UserInsurance(auth_model.TimeStampedModel):
                             gyno_count = gyno_count + 1
                         if is_doctor_onco:
                             onco_count = onco_count + 1
-                        if gyno_count > int(settings.settings.INSURANCE_GYNECOLOGIST_LIMIT):
+                        if gyno_count > int(settings.INSURANCE_GYNECOLOGIST_LIMIT):
                             return False, self.id,"Gynocologist limit exceeded of limit 5"
                             Break
                         if onco_count > int(settings.INSURANCE_ONCOLOGIST_LIMIT):

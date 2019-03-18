@@ -225,9 +225,12 @@ class DoctorAppointmentsViewSet(OndocViewSet):
 
         # data['is_appointment_insured'], data['insurance_id'], data[
         #     'insurance_message'] = Cart.check_for_insurance(validated_data,request)
-        data['is_appointment_insured'], data['insurance_id'], data[
-                'insurance_message'] = user_insurance.validate_insurance(validated_data)
-
+        if user_insurance:
+            data['is_appointment_insured'], data['insurance_id'], data[
+                    'insurance_message'] = user_insurance.validate_insurance(validated_data)
+        else:
+            data['is_appointment_insured'], data['insurance_id'], data[
+                'insurance_message'] = False, None, ""
         cart_item_id = validated_data.get('cart_item').id if validated_data.get('cart_item') else None
         if not models.OpdAppointment.can_book_for_free(request, validated_data, cart_item_id):
             return Response({'request_errors': {"code": "invalid",
