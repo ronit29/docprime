@@ -1350,9 +1350,6 @@ def payout_checksum(request_payload):
 
     secretkey = settings.PG_SECRET_KEY_P2
     accesskey = settings.PG_CLIENT_KEY_P2
-    #
-    # accesskey = 'b7YPL09/78LKpo9l'
-    # secretkey = 'aY678ikloPL'
 
     checksum = ""
 

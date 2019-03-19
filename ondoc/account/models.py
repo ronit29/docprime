@@ -1274,7 +1274,7 @@ class MerchantPayout(TimeStampedModel):
 
     def update_status_from_pg(self):
 
-        if self.pg_status=='SETTLEMENT_COMPLETED' and not self.utr_no and self.type ==self.AUTOMATIC:
+        if self.pg_status=='SETTLEMENT_COMPLETED' or self.utr_no or self.type ==self.MANUAL:
             return
 
         url = settings.SETTLEMENT_DETAILS_API
@@ -1283,7 +1283,6 @@ class MerchantPayout(TimeStampedModel):
         if has_txn:
             transaction = order_data.getTransactions()[0]
             order_no = transaction.order_no
-            #order_no = "DP4253"
             req_data = {"orderNo":order_no}
             req_data["hash"] = self.create_checksum(req_data)
 

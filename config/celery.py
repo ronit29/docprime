@@ -62,13 +62,13 @@ def setup_periodic_tasks(sender, **kwargs):
 
     elastic_sync_cron_schedule = crontab(hour=19, minute=00)
     elastic_sync_post_cron_schedule = crontab(hour=20, minute=00)
-    update_ben_status_time = float(settings.UPDATE_BEN_STATUS_FROM_PG) * float(60.0)
+    update_ben_status_cron_schedule = crontab(hour=21, minute=00)
 
     sender.add_periodic_task(elastic_sync_cron_schedule, dump_to_elastic.s(), name='Sync Elastic')
     sender.add_periodic_task(elastic_sync_post_cron_schedule, elastic_alias_switch.s(), name='Sync Elastic alias')
     sender.add_periodic_task(crontab(hour=18, minute=30), save_avg_rating.s(), name='Update Lab and Doctor Average Rating')
     sender.add_periodic_task(crontab(hour=19, minute=30), update_prices.s(), name='Update Lab and Doctor Prices')
-    sender.add_periodic_task(update_ben_status_time, update_ben_status_from_pg.s(), name='Update Ben Status from pg ')
+    #sender.add_periodic_task(update_ben_status_cron_schedule, update_ben_status_from_pg.s(), name='Update Ben Status from pg ')
 
     order_summary_time = float(settings.ORDER_SUMMARY_CRON_TIME) * float(60.0)
     sender.add_periodic_task(order_summary_time, integrator_order_summary.s(), name='Get Order Summary From Integrator')

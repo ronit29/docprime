@@ -1489,10 +1489,8 @@ class Merchant(TimeStampedModel):
         checksum_response = payout_checksum(request_payload)
         request_payload["hash"] = checksum_response
         url = settings.NODAL_BENEFICIARY_API
-        # url = 'http://pgqa.docprime.com/pg/insertNodalBeneData'
 
         nodal_beneficiary_api_token = settings.NODAL_BENEFICIARY_TOKEN
-        # nodal_beneficiary_api_token = 'gFH8gPXbCWaW8WqUefINBDRj0SDQA'
 
         response = requests.post(url, data=json.dumps(request_payload), headers={'auth': nodal_beneficiary_api_token,
                                                                               'Content-Type': 'application/json'})
@@ -1502,8 +1500,6 @@ class Merchant(TimeStampedModel):
             self.api_response = resp_data
             if resp_data.get('StatusCode') and resp_data.get('StatusCode') in [1,2,3,4]:
                 self.pg_status = resp_data.get('StatusCode')
-        
-        #self.save()
 
     @classmethod
     def update_status_from_pg(cls):
