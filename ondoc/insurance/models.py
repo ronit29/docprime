@@ -550,7 +550,7 @@ class UserInsurance(auth_model.TimeStampedModel):
 
 
     @classmethod
-    def profile_create_or_update(cls, member, user):
+    def profile_create_or_update(cls, member, user, default_user_profile):
         profile = {}
         name = "{fname} {mname} {lname}".format(fname=member['first_name'], mname=member['middle_name'],
                                                 lname=member['last_name'])
@@ -576,19 +576,21 @@ class UserInsurance(auth_model.TimeStampedModel):
             data = {'name': name, 'email': member['email'], 'gender': member['gender'], 'user_id': user.id,
                     'dob': member['dob'], 'is_default_user': False, 'is_otp_verified': False,
                     'phone_number': user.phone_number}
-            if primary_user or member['relation'] == 'self':
+            if (primary_user or member['relation'] == 'self') and not default_user_profile:
                 data['is_default_user'] = True
 
             member_profile = UserProfile.objects.create(**data)
             profile = member_profile.id
+            default_user_profile.append(member_profile.id)
 
         return profile
 
     @classmethod
     def create_user_insurance(cls, insurance_data, user):
         members = insurance_data['insured_members']
+        default_user_profile = list()
         for member in members:
-            member['profile'] = UserInsurance.profile_create_or_update(member, user)
+            member['profile'] = UserInsurance.profile_create_or_update(member, user, default_user_profile)
             member['dob'] = str(member['dob'])
             # member['profile'] = member['profile'].id if member.get('profile') else None
         insurance_data['insured_members'] = members
