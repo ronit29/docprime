@@ -1301,8 +1301,8 @@ class MerchantPayout(TimeStampedModel):
                             if d.get('refNo') == str(data.id):
                                 data.utr_no = d.get('utrNo','')
                                 data.pg_status = d.get('txStatus','')
-                                data.save()
                                 break
+                    data.save()
 
     def create_checksum(self, data):
 
