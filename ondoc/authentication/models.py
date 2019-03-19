@@ -1503,7 +1503,7 @@ class Merchant(TimeStampedModel):
 
     @classmethod
     def update_status_from_pg(cls):
-        merchant = Merchant.objects.filter(pg_status__in=[cls.INITIATED, cls.INPROCESS])
+        merchant = Merchant.objects.filter(pg_status__in=[cls.NOT_INITIATED, cls.INITIATED, cls.INPROCESS])
         for data in merchant:
             resp_data = None
             request_payload = {"beneCode": str(data.pk)}
