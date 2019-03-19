@@ -680,6 +680,9 @@ class ProviderSignupDataViewset(viewsets.GenericViewSet):
             auth_models.GenericAdmin.objects.create(user=request.user, phone_number=request.user.phone_number,
                                                     hospital=hospital, super_user_permission=True,
                                                     entity_type=auth_models.GenericAdmin.HOSPITAL)
+            auth_models.SPOCDetails.objects.create(name=valid_data.get('name'), number=request.user.phone_number,
+                                                   email=valid_data.get('email'), content_object=hospital,
+                                                   contact_type=auth_models.SPOCDetails.SPOC)
             if contact_number:
                 auth_models.SPOCDetails.objects.create(name=valid_data.get('name'), number=contact_number,
                                                        contact_type=auth_models.SPOCDetails.OTHER,

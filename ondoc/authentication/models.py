@@ -1457,7 +1457,8 @@ class Merchant(TimeStampedModel):
 
     def save(self, *args, **kwargs):
         if self.verified_by_finance and self.pg_status == self.NOT_INITIATED:
-            self.create_in_pg()
+            pass
+            #self.create_in_pg()
 
         super().save(*args, **kwargs)
 
@@ -1503,7 +1504,7 @@ class Merchant(TimeStampedModel):
 
     @classmethod
     def update_status_from_pg(cls):
-        merchant = Merchant.objects.filter(pg_status__in=[cls.INITIATED, cls.INPROCESS])
+        merchant = Merchant.objects.filter(pg_status__in=[cls.NOT_INITIATED, cls.INITIATED, cls.INPROCESS])
         for data in merchant:
             resp_data = None
             request_payload = {"beneCode": str(data.pk)}

@@ -63,13 +63,13 @@ def setup_periodic_tasks(sender, **kwargs):
     elastic_sync_cron_schedule = crontab(hour=19, minute=00)
     elastic_sync_post_cron_schedule = crontab(hour=20, minute=00)
     update_ben_status_cron_schedule = crontab(hour=21, minute=00)
-    update_merchant_payout_pg_status_cron_schedule = crontab(hour=21, minute=30)
+    update_merchant_payout_pg_status_cron_schedule = crontab(hour=22, minute=30)
 
     sender.add_periodic_task(elastic_sync_cron_schedule, dump_to_elastic.s(), name='Sync Elastic')
     sender.add_periodic_task(elastic_sync_post_cron_schedule, elastic_alias_switch.s(), name='Sync Elastic alias')
     sender.add_periodic_task(crontab(hour=18, minute=30), save_avg_rating.s(), name='Update Lab and Doctor Average Rating')
     sender.add_periodic_task(crontab(hour=19, minute=30), update_prices.s(), name='Update Lab and Doctor Prices')
-    #sender.add_periodic_task(update_ben_status_cron_schedule, update_ben_status_from_pg.s(), name='Update Ben Status from pg ')
+    sender.add_periodic_task(update_ben_status_cron_schedule, update_ben_status_from_pg.s(), name='Update Ben Status from pg ')
     sender.add_periodic_task(update_merchant_payout_pg_status_cron_schedule, update_merchant_payout_pg_status.s(), name='Update Merchant Payout Status from pg ')
 
 
