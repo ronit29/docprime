@@ -198,7 +198,8 @@ class UserPlanMapping(auth_model.TimeStampedModel):
         used_in_cart_test_count_dict = cls.get_frequency_test(all_tests_in_carts)
         result = {}
         for temp_test in plan_test_count_dict:
-            result[temp_test] = min(0, plan_test_count_dict[temp_test] - used_test_count_dict.get(temp_test, 0) - used_in_cart_test_count_dict.get(temp_test, 0))
+            count_left = plan_test_count_dict[temp_test] - used_test_count_dict.get(temp_test, 0) - used_in_cart_test_count_dict.get(temp_test, 0)
+            result[temp_test] = count_left if count_left >= 0 else 0
         # TODO : SHASHANK_SINGH consider items added in cart
         # used_test_count = LabAppointment.objects.exclude(status=LabAppointment.CANCELLED).filter(user=user).annotate(
         #     booked_test=F('test_mappings__test')).values('booked_test').filter(booked_test__isnull=False).annotate(
