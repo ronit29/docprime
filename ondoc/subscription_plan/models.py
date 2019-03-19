@@ -181,12 +181,33 @@ class UserPlanMapping(auth_model.TimeStampedModel):
     @classmethod
     def get_free_tests(cls, user):
         from django.db.models import F
+        from ondoc.cart.models import Cart
         active_plan_mapping = cls.get_active_plans(user).first()
         if not active_plan_mapping:
             return []
         plan_test_count = active_plan_mapping.plan.feature_mappings.filter(enabled=True).values('count', test_id=F('feature__test_id'))
+        used_test_count = list(LabAppointment.objects.exclude(status=LabAppointment.CANCELLED).filter(user=user,
+                                                                                                 user_plan_used=active_plan_mapping).values(
+            test_id=F('test_mappings__test__id')).values_list('test_id', flat=True))
+        used_test_count_dict = cls.get_frequency_test(used_test_count)
+        plan_test_count_dict = {x['test_id']: x['count'] for x in plan_test_count}
+        all_cart_objs = Cart.objects.filter(deleted_at__isnull=True, product_id=Order.LAB_PRODUCT_ID, user=user)
+        all_tests_in_carts = []
+        for cart_obj in all_cart_objs:
+            all_tests_in_carts.extend(cart_obj.data.get('test_ids', []) if cart_obj.data else [])
+        used_in_cart_test_count_dict = cls.get_frequency_test(all_tests_in_carts)
+        result = {}
+        for temp_test in plan_test_count_dict:
+            result[temp_test] = min(0, plan_test_count_dict[temp_test] - used_test_count_dict.get(temp_test, 0) - used_in_cart_test_count_dict.get(temp_test, 0))
+        # TODO : SHASHANK_SINGH consider items added in cart
         # used_test_count = LabAppointment.objects.exclude(status=LabAppointment.CANCELLED).filter(user=user).annotate(
         #     booked_test=F('test_mappings__test')).values('booked_test').filter(booked_test__isnull=False).annotate(
         #     count=Count('booked_test'))
-        # TODO : SHASHANK_SINGH return difference of both
-        return [x['test_id'] for x in plan_test_count]
+        return [x for x in result if result[x] > 0]
+        # return result
+
+    @staticmethod
+    def get_frequency_test(test_booked):
+        test_booked = sorted(test_booked)
+        from itertools import groupby
+        return {key: len(list(group)) for key, group in groupby(test_booked)}

@@ -8,6 +8,9 @@ from ondoc.api.v1.diagnostic.serializers import LabAppointmentCreateSerializer
 from ondoc.api.v1.doctor.serializers import CreateAppointmentSerializer
 from django.db import transaction
 
+from ondoc.subscription_plan.models import UserPlanMapping
+
+
 class CartViewSet(viewsets.GenericViewSet):
 
     def add(self, request, *args, **kwargs):
@@ -39,11 +42,41 @@ class CartViewSet(viewsets.GenericViewSet):
             lab_app_serializer.is_valid(raise_exception=True)
             serialized_data = lab_app_serializer.validated_data
             cart_item_id = serialized_data.get('cart_item').id if serialized_data.get('cart_item') else None
+            self.update_plan_details(request, serialized_data, valid_data)
 
         Cart.objects.update_or_create( id=cart_item_id, deleted_at__isnull=True,
                                        product_id=valid_data.get("product_id"), user=user, defaults={"data" : valid_data.get("data")} )
 
         return Response({"status": 1, "message": "Saved in cart"}, status.HTTP_200_OK)
+
+    @staticmethod
+    def update_plan_details(request, serialized_data, valid_data):
+        from ondoc.doctor.models import OpdAppointment
+        user = request.user
+        active_plan_mapping = UserPlanMapping.get_active_plans(user).first()
+        user_plan_id = None
+        included_in_user_plan = False
+        test_included_in_user_plan = UserPlanMapping.get_free_tests(request.user)
+        selected_test_id = [temp_test.id for temp_test in serialized_data.get('test_ids', [])]
+        if sorted(selected_test_id) == sorted(test_included_in_user_plan):
+            if active_plan_mapping:
+                user_plan_id = active_plan_mapping.id
+                included_in_user_plan = True
+                valid_data.get('data').update(
+                    {'included_in_user_plan': included_in_user_plan, 'user_plan': user_plan_id})
+                valid_data.get('data')['payment_type'] = OpdAppointment.PLAN
+        # TODO: SHASHANK_SINGH dont do this
+        if not included_in_user_plan:
+            valid_data.get('data').update(
+                {'included_in_user_plan': included_in_user_plan, 'user_plan': user_plan_id})
+
+        if serialized_data.get('cart_item'):
+            old_cart_obj = Cart.objects.filter(id=serialized_data.get('cart_item').id).first()
+            payment_type = old_cart_obj.data.get('payment_type')
+            if payment_type == OpdAppointment.PLAN and valid_data.get('data')['included_in_user_plan'] == False:
+                valid_data.get('data')['payment_type'] = OpdAppointment.PREPAID
+
+
 
     @transaction.non_atomic_requests()
     def list(self, request, *args, **kwargs):

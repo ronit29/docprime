@@ -440,7 +440,7 @@ class Order(TimeStampedModel):
                     cart_id=appointment_detail["cart_item_id"],
                     user=user
                 )
-            elif appointment_detail.get('payment_type') == OpdAppointment.COD:
+            elif appointment_detail.get('payment_type') == OpdAppointment.COD or appointment_detail.get('payment_type') == OpdAppointment.PLAN:
                 order = cls.objects.create(
                     product_id=product_id,
                     action=action,

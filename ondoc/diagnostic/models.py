@@ -1398,6 +1398,8 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin)
     money_pool = models.ForeignKey(MoneyPool, on_delete=models.SET_NULL, null=True)
     mask_number = GenericRelation(AppointmentMaskNumber)
     email_notification = GenericRelation(EmailNotification, related_name="lab_notification")
+    user_plan_used = models.ForeignKey('subscription_plan.UserPlanMapping', null=True, on_delete=models.DO_NOTHING,
+                                       related_name='appointment_using')
 
     def get_tests_and_prices(self):
         test_price = []
@@ -1728,6 +1730,7 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin)
         appointment_data["payment_status"] = OpdAppointment.PAYMENT_ACCEPTED
         appointment_data["status"] = OpdAppointment.BOOKED
         appointment_data["otp"] = otp
+        appointment_data["user_plan_used"] = appointment_data.pop("user_plan", None)
         lab_ids = appointment_data.pop("lab_test")
         coupon_list = appointment_data.pop("coupon", None)
         extra_details = deepcopy(appointment_data.pop("extra_details", None))
@@ -1973,7 +1976,7 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin)
             else:
                 effective_price = effective_price - coupon_discount
 
-        if data.get("payment_type") in [OpdAppointment.COD]:
+        if data.get("payment_type") in [OpdAppointment.COD, OpdAppointment.PLAN]:
             effective_price = 0
             coupon_discount, coupon_cashback, coupon_list = 0, 0, []
 
@@ -2034,6 +2037,11 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin)
             "discount": int(price_data.get("coupon_discount")),
             "cashback": int(price_data.get("coupon_cashback"))
         }
+
+        if data.get('included_in_user_plan', False):
+            fulfillment_data.update({'user_plan': data.get('user_plan', None)})
+        else:
+            fulfillment_data.update({'user_plan': None})
 
         if data.get("is_home_pickup") is True:
             address = Address.objects.filter(pk=data.get("address").id).first()

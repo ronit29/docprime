@@ -30,7 +30,7 @@ from django.db.models import Q
 from ondoc.api.v1.ratings import serializers as rating_serializer
 from ondoc.location.models import EntityUrls, EntityAddress
 from ondoc.seo.models import NewDynamic
-from ondoc.subscription_plan.models import Plan
+from ondoc.subscription_plan.models import Plan, UserPlanMapping
 
 logger = logging.getLogger(__name__)
 utc = pytz.UTC
@@ -578,6 +578,7 @@ class LabAppTransactionModelSerializer(serializers.Serializer):
     discount = serializers.DecimalField(max_digits=10, decimal_places=2)
     cashback = serializers.DecimalField(max_digits=10, decimal_places=2)
     extra_details = serializers.JSONField(required=False)
+    user_plan = serializers.PrimaryKeyRelatedField(queryset=UserPlanMapping.objects.all(), allow_null=False)
 
 
 class LabAppRescheduleModelSerializer(serializers.ModelSerializer):
@@ -649,6 +650,8 @@ class LabAppointmentCreateSerializer(serializers.Serializer):
     pincode = serializers.CharField(required=False, allow_null=True, allow_blank=True)
     is_thyrocare = serializers.BooleanField(required=False, default=False)
     from_app = serializers.BooleanField(required=False, default=False)
+    user_plan = serializers.PrimaryKeyRelatedField(queryset=UserPlanMapping.objects.all(), required=False, allow_null=True, default=None)
+    included_in_user_plan = serializers.BooleanField(required=False, default=False)
 
     def validate(self, data):
         MAX_APPOINTMENTS_ALLOWED = 10
@@ -781,7 +784,23 @@ class LabAppointmentCreateSerializer(serializers.Serializer):
 
         self.test_lab_id_validator(data, request)
         self.time_slot_validator(data, request, is_integrated)
+        self.user_plan_validator(data, request)
         return data
+
+    @staticmethod
+    def user_plan_validator(data, request):
+        if data.get('included_in_user_plan', False):
+            raise_exception = False
+            lab_tests = data.get('test_ids', [])
+            test_included_in_user_plan = UserPlanMapping.get_free_tests(request.user)
+            for temp_test in lab_tests:
+                if temp_test.id not in test_included_in_user_plan:
+                    raise_exception = True
+                    break
+            if raise_exception:
+                raise serializers.ValidationError("LabTest not in free user plans")
+
+
 
     def create(self, data):
         deal_price_calculation= Case(When(custom_deal_price__isnull=True, then=F('computed_deal_price')),

@@ -1669,12 +1669,43 @@ class LabAppointmentView(mixins.CreateModelMixin,
         else:
             return Response(status=status.HTTP_404_NOT_FOUND)
 
+
+    @staticmethod
+    def update_plan_details(request, data):
+        from ondoc.doctor.models import OpdAppointment
+        user = request.user
+        active_plan_mapping = UserPlanMapping.get_active_plans(user).first()
+        user_plan_id = None
+        included_in_user_plan = False
+        test_included_in_user_plan = UserPlanMapping.get_free_tests(request.user)
+        selected_test_id = [x for x in data.get('test_ids', [])]
+        if sorted(selected_test_id) == sorted(test_included_in_user_plan):
+            if active_plan_mapping:
+                user_plan_id = active_plan_mapping.id
+                included_in_user_plan = True
+                data.update(
+                    {'included_in_user_plan': included_in_user_plan, 'user_plan': user_plan_id})
+                data['payment_type'] = OpdAppointment.PLAN
+                return
+
+        if not included_in_user_plan:
+            data.update(
+                {'included_in_user_plan': included_in_user_plan, 'user_plan': user_plan_id})
+
+        # TODO: SHASHANK_SINGH not sure ask shubham
+        if data.get('cart_item'):
+            old_cart_obj = Cart.objects.filter(id=data.get('cart_item').id).first()
+            payment_type = old_cart_obj.data.get('payment_type')
+            if payment_type == OpdAppointment.PLAN and data.get('data')['included_in_user_plan'] == False:
+                data.get('data')['payment_type'] = OpdAppointment.PREPAID
+
     @transaction.atomic
     def create(self, request, **kwargs):
         data = dict(request.data)
         if not data.get("is_home_pickup"):
             data.pop("address", None)
 
+        self.update_plan_details(request, request.data)
         serializer = diagnostic_serializer.LabAppointmentCreateSerializer(data=data, context={'request': request, 'data' : request.data, 'use_duplicate' : True})
         serializer.is_valid(raise_exception=True)
         validated_data = serializer.validated_data

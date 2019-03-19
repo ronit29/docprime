@@ -281,6 +281,8 @@ def labappointment_transform(app_data):
     app_data["home_pickup_charges"] = str(app_data.get("home_pickup_charges",0))
     if app_data.get("coupon"):
         app_data["coupon"] = list(app_data["coupon"])
+    if app_data.get("user_plan"):
+        app_data["user_plan"] = app_data["user_plan"].id
     return app_data
 
 
