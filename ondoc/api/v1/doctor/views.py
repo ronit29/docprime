@@ -228,7 +228,7 @@ class DoctorAppointmentsViewSet(OndocViewSet):
             data['is_appointment_insured'], data['insurance_id'], data[
                     'insurance_message'] = user_insurance.validate_insurance(validated_data)
             if data['is_appointment_insured']:
-                data['payment_type'] = OpdAppointment.PAY_CHOICES.INSURANCE
+                data['payment_type'] = OpdAppointment.INSURANCE
         else:
             data['is_appointment_insured'], data['insurance_id'], data[
                 'insurance_message'] = False, None, ""

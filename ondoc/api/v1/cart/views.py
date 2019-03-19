@@ -46,7 +46,7 @@ class CartViewSet(viewsets.GenericViewSet):
             'insurance_message'] = Cart.check_for_insurance(serialized_data, request)
 
         if data['data']['is_appointment_insured']:
-            data['data']['payment_type'] = OpdAppointment.PAY_CHOICES.INSURANCE
+            data['data']['payment_type'] = OpdAppointment.INSURANCE
 
         Cart.objects.update_or_create(id=cart_item_id, deleted_at__isnull=True,
                                        product_id=valid_data.get("product_id"), user=user, defaults={"data" : valid_data.get("data")})

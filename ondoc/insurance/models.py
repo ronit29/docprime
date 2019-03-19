@@ -492,9 +492,9 @@ class UserInsurance(auth_model.TimeStampedModel):
             #                                                    payment_type=3,
             #                                                    insurance_id=self.id,
             #                                                    profile_id=members.profile.id).count()
-            gynecologist_opd_count = OpdAppointment.objects.filter(~Q(status=OpdAppointment.STATUS_CHOICES.CANCELLED),
+            gynecologist_opd_count = OpdAppointment.objects.filter(~Q(status=OpdAppointment.CANCELLED),
                                                                    doctor_id__in=doctor_with_gyno_specialization,
-                                                                   payment_type=OpdAppointment.PAY_CHOICES.INSURANCE,
+                                                                   payment_type=OpdAppointment.INSURANCE,
                                                                    insurance_id=self.id,
                                                                    user=user).count()
         # elif specilization_ids_set & oncologist_set:
@@ -507,9 +507,9 @@ class UserInsurance(auth_model.TimeStampedModel):
             #                                                  payment_type=3,
             #                                                  insurance_id=self.id,
             #                                                  profile_id=members.profile.id).count()
-            oncologist_opd_count = OpdAppointment.objects.filter(~Q(status=OpdAppointment.STATUS_CHOICES.CANCELLED),
+            oncologist_opd_count = OpdAppointment.objects.filter(~Q(status=OpdAppointment.CANCELLED),
                                                              doctor_id__in=doctor_with_onco_specialization,
-                                                             payment_type=OpdAppointment.PAY_CHOICES.INSURANCE,
+                                                             payment_type=OpdAppointment.INSURANCE,
                                                              insurance_id=self.id,
                                                              user=user).count()
 
