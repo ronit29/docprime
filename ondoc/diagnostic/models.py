@@ -1526,7 +1526,7 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin)
                 logger.error(str(e))
 
         is_thyrocare_enabled = False
-        if not self.created_by_native():
+        if not self.created_by_native() and False:
             if push_to_integrator:
                 if self.lab.network and self.lab.network.id == settings.THYROCARE_NETWORK_ID:
                     if settings.THYROCARE_INTEGRATION_ENABLED:

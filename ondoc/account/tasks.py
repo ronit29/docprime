@@ -219,7 +219,7 @@ def elastic_alias_switch():
         logger.error("Sync to elastic failed.")
     else:
         logger.error("Sync to elastic successfull.")
-
+        obj.save()
     return
 
 
