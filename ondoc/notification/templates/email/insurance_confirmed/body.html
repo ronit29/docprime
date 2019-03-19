@@ -1,246 +1,147 @@
-{% load static %}
-{% load invoice_tags %}
-<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<!DOCTYPE>
 <html xmlns="http://www.w3.org/1999/xhtml">
-	<head>
-		<title>Insurance Purchased</title>
-		<meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
-		<meta name="viewport" content="width=device-width, initial-scale=1.0" />
-		<link href="https://fonts.googleapis.com/css?family=Quicksand:300,400,500,700" rel="stylesheet">
-	</head>
-	<body style="margin: 0; padding: 0; width: 100%; font-family: 'Quicksand', sans-serif;">
-		<table align="center" cellpadding="0" cellspacing="0" style="width: 100%; max-width: 600px; margin: auto;">
-			<tbody>
-				<tr>
-					<td>
-						<table cellpadding="0" cellspacing="0" style="width: 100%; padding: 10px 15px;">
-							<tbody>
-								<tr>
-									<td style="text-align: left;">
-										<img src="https://qacdn.docprime.com/static/notification/images/dp-logo-email.png">
-									</td>
-								</tr>
-							</tbody>
-						</table>
-					</td>
-				</tr>
-				<tr>
-					<td>
-						<table cellpadding="0" cellspacing="0" style="width: 100%; padding: 15px 15px 0;">
-							<tbody>
-								<tr>
-									<td style="text-align: center;">
-										<img width="90" src="https://qacdn.docprime.com/static/notification/images/fp-icon.png">
-									</td>
-								</tr>
-								<tr>
-									<td style="text-align: center;color: #ff6d00;font-size: 18px;font-weight: 500;">
-										Congratulations!
-									</td>
-								</tr>
-							</tbody>
-						</table>
-					</td>
-				</tr>
-				<tr>
-					<td>
-						<table cellpadding="0" cellspacing="0" style="width: 100%; padding: 10px 15px 0;">
-							<tbody>
-								<tr>
-									<td style="text-align: center;color: #070707;font-size: 18px;font-weight: 500;">
-										Your policy has been booked
-									</td>
-								</tr>
-							</tbody>
-						</table>
-					</td>
-				</tr>
-				<tr>
-					<td>
-						<table cellpadding="0" cellspacing="0" style="width: 100%; padding: 15px 15px 0;">
-							<tbody>
-								<tr>
-									<td style="text-align: right;color: #070707;font-size: 16px;font-weight: 500;">
-										<img width="150" src="{{insurer_logo|get_media_absolute_url}}">
-									</td>
-									<td>
-										OPD Insurance <br>
-										by <b>{{insurer_name}}</b>
-									</td>
-								</tr>
-								<tr>
-									<td colspan="2" style="text-align:center;color: #4fc243; font-weight: 500;">
-										Active
-									</td>
-								</tr>
-							</tbody>
-						</table>
-					</td>
-				</tr>
-				<tr>
-					<td style="padding: 20px;">
-					</td>
-				</tr>
-				<tr>
-					<td>
-						<table cellpadding="0" cellspacing="0" style="width: 100%; padding: 15px 15px 0; font-weight: 500;">
-							<tbody>
-								<tr>
-									<td style="text-align: center;color: #757575;   border-right: 1px solid #c5c5c5;">
-										Policy Purchase Date<br>
-										<b style="color: #000000;">{{purchase_data}}</b>
-									</td>
-									<td style="text-align: center;color: #757575;">
-										Policy Expiry Date <br>
-										<b style="color: #000000;">{{expiry_date}}</b>
-									</td>
-								</tr>
-							</tbody>
-						</table>
-					</td>
-				</tr>
-				<tr>
-					<td style="padding: 20px;">
-					</td>
-				</tr>
-				<tr>
-					<td>
-						<table cellpadding="0" cellspacing="0" style="width: 100%; padding: 15px 15px 0; font-weight: 500;">
-							<tbody>
-								<tr>
-									<td style="color: #757575;">
-										Annual Premium
-										<b style="color: #000000;">: Rs {{premium}}</b>
-									</td>
-								</tr>
-							</tbody>
-						</table>
-					</td>
-				</tr>
-				<tr>
-					<td>
-						<table cellpadding="0" cellspacing="0" style="width: 100%; padding: 15px 15px 0; font-weight: 500;">
-							<tbody>
-								<tr>
-									<td style="color: #757575;">
-										Proposer
-										<b style="color: #000000;">: {{proposer_name}}</b>
-									</td>
-								</tr>
-							</tbody>
-						</table>
-					</td>
-				</tr>
-				<tr>
-					<td>
-						<table cellpadding="0" cellspacing="0" style="width: 100%; padding: 15px 15px 0; font-weight: 500;">
-							<tbody>
-								<tr>
-									<td style="color: #757575;">
-										Policy Number
-										<b style="color: #000000;">: {{policy_number}}</b>
-									</td>
-								</tr>
-							</tbody>
-						</table>
-					</td>
-				</tr>
-				<tr>
-					<td>
-						<table cellpadding="0" cellspacing="0" style="width: 100%; padding: 15px 15px 0; font-weight: 500;">
-							<tbody>
-								<tr>
-									<td style="color: #757575;">
-										Cover
-										<b style="color: #000000;">: {{plan}}</b>
-									</td>
-								</tr>
-							</tbody>
-						</table>
-					</td>
-				</tr>
-				{% for member in insured_members %}
-					<tr>
-						<td>
-							<table cellpadding="0" cellspacing="0" style="width: 100%; padding: 15px 15px 0; font-weight: 500;">
-								<tbody>
-									<tr>
-										<td style="color: #757575;">
-											Member {{member.member_number}}
-											<b style="color: #000000;">: {{member.name}}</b>
-										</td>
-									</tr>
-								</tbody>
-							</table>
-						</td>
-					</tr>
-				{% endfor %}
-				<tr>
-					<td style="padding: 20px;">
-					</td>
-				</tr>
-				<tr>
-					<td>
-						<table cellpadding="0" cellspacing="0" style="width: 100%; padding: 10px 15px; font-weight: 500;">
-							<tbody>
-								<tr>
-									<td>
-										To download your Certificate of Insurance <a style="color:#f78631;" href="{{coi_url|get_media_absolute_url}}" target="_blank">Click here</a>
-									</td>
-								</tr>
-								<tr style="padding-top:10px;">
-									<td style="color: #000000;">
-										Thanks for choosing <a style="color:#f78631; " href="https://docprime.com/">docprime.com</a>
-									</td>
-								</tr>
-
-							</tbody>
-						</table>
-					</td>
-				</tr>
-				<tr>
-					<td>
-						<table cellpadding="0" cellspacing="0" style="width:100%;padding:10px 15px 15px;border-top: 1px solid #b5b5b5;">
-							<tbody>
-								<tr>
-									<td style="font-size:14px;font-weight:500;color:#757575;text-align:center">
-										This is a system-generated e-mail. Please do not reply to this e-mail. For any support
-										please write to <a href="mailto:customercare@docprime.com" target="_blank">customercare@docprime.com</a>.
-									</td>
-								</tr>
-							</tbody>
-						</table>
-					</td>
-				</tr>
-				<tr>
-					<td>
-						<table cellpadding="0" cellspacing="0" style="width: 100%; padding: 10px 15px; background-color: #f78631;">
-							<tbody>
-								<tr>
-									<td style="font-size: 14px; color: #fafafa; width: 60%">
-										Docprime.com Copyright © 2018.
-									</td>
-									<td style="width: 8%; text-align: right;">
-										<a href="https://www.youtube.com/channel/UCL_6Tstix2ACaBk0jwf_1ug" target="_blank"><img src="https://cdn.docprime.com/static/notification/images/youtube-email.png"></a>
-									</td>
-									<td style="width: 8%; text-align: right;">
-										<a href="https://www.instagram.com/docprimeIndia/" target="_blank"><img src="https://cdn.docprime.com/static/notification/images/instagram-email.png"></a>
-									</td>
-									<td style="width: 8%; text-align: right;">
-										<a href="https://www.facebook.com/DocPrimeIndia" target="_blank"><img src="https://cdn.docprime.com/static/notification/images/facebook-email.png"></a>
-									</td>
-									<td style="width: 8%; text-align: right;">
-										<a href="https://twitter.com/DocPrimeindia" target="_blank"><img src="https://cdn.docprime.com/static/notification/images/twitter-email.png"></a>
-									</td>
-									<td style="width: 8%; text-align: right;">
-										<a href="https://www.linkedin.com/company/docprime/" target="_blank"><img src="https://cdn.docprime.com/static/notification/images/linkedin-email.png"></a>
-									</td>
-								</tr>
-							</tbody>
-						</table>
-					</td>
-				</tr>
-			</tbody>
-		</table>
-	</body>
-</html>
+   <head>
+      <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+      <meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+      <title>Insurance Emailer</title>
+      <link href="https://fonts.googleapis.com/css?family=Quicksand:400,500,700" rel="stylesheet">
+      <style>
+          @media screen and (max-width: 480px) and (min-width: 320px){
+              .info .info-details{font-size: 12px !important;} 
+              .info .info-title{font-size: 12px !important;} 
+              .policy-table tr td{font-size: 12px !important;}
+              .opd-ins{font-size: 14px !important;}
+          }
+      </style>
+   </head>
+   <body style="margin: 0; padding: 0;font-family: 'Quicksand', sans-serif;">
+      <table align="center" border="0" cellpadding="0" cellspacing="0" width="500" style="width:500px; border-collapse: collapse; border: 1px solid rgba(0,0,0,0.12)">
+         <tr>
+            <td>
+                <table border="0" cellpadding="0" cellspacing="0" width="100%" style="background: #fa7d1f; padding: 15px;box-shadow: 0px 2px 4px 0 rgba(0, 0, 0, 0.2);">
+                   <tr>
+                     <td style="width: 100%;"><a href="#"><img src="{{'notification/images/doc-logo-small.png'|get_absolute_url}}" alt="logo" style="width: 52px;"></a></td>
+                   </tr>
+                </table>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding: 10px"></td>
+          </tr>
+          <tr>
+            <td align="center" style="font-size:30px; color:#fa7d1f; font-weight: 500;">Congratulations !</td>
+          </tr>
+          <tr>
+            <td style="padding:0 10px 10px"></td>
+          </tr>
+          <tr>
+            <td align="center" style="font-size:18px; color:#000; font-weight: 700;">Your OPD insurance policy has been issued</td>
+          </tr>
+          <tr>
+            <td style="padding: 10px"></td>
+          </tr>
+          <tr>
+            <td>
+                <table border="0" cellpadding="0" cellspacing="0" width="100%" style="padding: 0 50px;">
+                   <tr>
+                      <td align="center" style="padding-right: 15px;"><img src="{{'notification/images/appolo.png'|get_absolute_url}}" alt="apolo-logo"></td>
+                      <td class="opd-ins" style="font-size: 14px; text-align: left;">OPD Insurance <br> by <b> Apollo Munich </b> <span style="color: #4fc243;"><img src="{{'notification/images/tick.png'|get_absolute_url}}" alt="green-tick-logo"  style="vertical-align: middle;">Active</span></td>
+                   </tr>
+                </table>  
+            </td>
+          </tr>
+          <tr>
+            <td style="padding: 10px;"></td>
+          </tr>
+          <tr>
+            <td style="font-size: 13px; font-weight: 500;"><img src="{{'notification/images/pdf-icon.png'|get_absolute_url}}" alt="pdf-icon" style="vertical-align: middle; padding:0 10px; width: 24px;">Please find attached the certificate of insurance for the issued policy</td>
+          </tr>
+          <tr>
+            <td style="padding: 10px;"></td>
+          </tr>
+          <tr>
+            <td>
+              <table class="info" border="0" cellpadding="0" cellspacing="0" width="100%" style="width: 100%; padding: 15px 0; background:#fa7d1f; text-align: center;">
+                 <tr>
+                    <td width="33.3%" style="border-right: 1px solid rgba(255, 255, 255, 0.5);">
+                        <span class="info-title" style="color: rgba(255, 255, 255, 0.8); text-align: center; font-size: 12px;">Policy Issue Date</span><br>
+                        <span class="info-details" style="color: rgba(255, 255, 255, 1); text-align: center; font-size: 12px; font-weight: 700;">11<sup>th</sup> Oct 2018</span>
+                     </td>
+                     <td width="33.3%" style="border-right: 1px solid rgba(255, 255, 255, 0.5);">
+                        <span class="info-title" style="color: rgba(255, 255, 255, 0.8); text-align: center; font-size: 12px;">Policy Expiry Date</span><br>
+                        <span class="info-details" style="color: rgba(255, 255, 255, 1); text-align: center; font-size: 12px;font-weight: 700;">10<sup>th</sup> Oct 2019</span>
+                     </td>
+                     <td width="33.3%" style="">
+                        <span class="info-title" style="color: rgba(255, 255, 255, 0.8); text-align: center; font-size: 12px;">Policy Number</span><br>
+                        <span class="info-details" style="color: rgba(255, 255, 255, 1); text-align: center; font-size: 12px;font-weight: 700;">DPHEALTHOPD12345</span>
+                     </td>
+                 </tr>  
+              </table>
+            </td>
+          </tr>
+          <tr>
+            <td>
+               <table border="0" cellpadding="0" cellspacing="0" width="100%" style="padding: 15px; background: #f1f1f1;">
+                  <tr>
+                    <td>
+                        <table border="0" cellpadding="0" cellspacing="0" width="100%" style="padding:15px 30px; background: #fff; border-radius: 5px; border: 1px solid #f78631; width: 500px">
+                           <tr>
+                             <td>
+                                <table border="0" cellpadding="0" cellspacing="0" width="99%" class="policy-table">
+                                   <tr>
+                                      <td width="45%" style="font-size: 12px;  padding-bottom: 15px; color: #757575; border-bottom: 1px solid rgba(0,0,0,0.12)">Annual Premium Paid:</td> 
+                                      <td width="50%" style="font-size: 12px; font-weight: 500; color: #000; vertical-align: top;border-bottom: 1px solid rgba(0,0,0,0.12)"><b><img src="{{'notification/images/rupees.png'|get_absolute_url}}" style="height: 8px;"> 2999</b></td>
+                                    </tr>
+                                    <tr>
+                                      <td width="45%" style="font-size: 12px;  padding-bottom: 15px; color: #757575;border-bottom: 1px solid rgba(0,0,0,0.12);padding-top: 15px;">Praposer Name:</td> 
+                                      <td style="font-weight: 500; color: #000; vertical-align: top;border-bottom: 1px solid rgba(0,0,0,0.12);padding-top: 15px; font-size: 12px;"><b>Mr. Sumit Kumar</b></td>
+                                    </tr>  
+                                    <tr>
+                                      <td width="45%" style="font-size: 12px;  padding-bottom: 15px; color: #757575; padding-top: 15px; vertical-align: top;">Covered Member:</td> 
+                                      <td style="font-weight: 500; color: #000; padding-top: 15px; font-size: 12px;">Self - <b>Sumit Kumar</b> <br> Spouse- <b>Sushmita Kumar</b> <br> Son- P<b>rince Kumar</b> <br> Son - <b> Ronit Kumar</b>  </td>
+                                    </tr>  
+                                </table>  
+                             </td>
+                             <td style="vertical-align: top;">
+                                 <img src="{{'notification/images/dpsmile.png'|get_absolute_url}}" alt="dp-img" width="70">
+                             </td>
+                           </tr>
+                        </table> 
+                    </td> 
+                  </tr>
+               </table>  
+            </td>
+          </tr>
+          <tr>
+            <td>
+               <table border="0" cellpadding="0" cellspacing="0" width="100%" style="padding: 15px;">
+                   <tr>
+                     <td style="text-align: center; font-size: 16px; color: #000;font-weight: 500; border-bottom: 1px solid rgba(0,0,0,0.12); padding-bottom: 15px;"> Thanks for choosing <a href="#" style="text-decoration: none; color: #f78631;">docprime.com</a></td>               
+                   </tr> 
+                   <tr>
+                     <td style="text-align: center; font-size: 12px; color: #000;font-weight: 500;padding: 15px; padding-bottom: 0;"> This is a system-generated e-mail. Please do not reply to this e-mail. For any support please write to . <a href="#" style="text-decoration: none; color: #f78631;">customercare@docprime.com</a></td>               
+                   </tr> 
+               </table>  
+            </td>
+          </tr>
+          <tr>
+            <td style="width: 100%;">
+                <table border="0" cellpadding="0" cellspacing="0" width="100%" style="background: #fa7d1f; padding: 15px;">
+                   <tr>
+                       <td style="text-align: left; color: #fff; font-size: 12px;">docprime.com Copyright © 2019.</td> 
+                       <td style="padding-right: 10px;text-align: right"><img src="{{'notification/images/youtube.png'|get_absolute_url}}" alt="youtube"></td>
+                       <td style="padding-right: 10px;text-align: right"><img src="{{'notification/images/instagram.png'|get_absolute_url}}" alt="instagram"></td>
+                       <td style="padding-right: 10px;text-align: right"><img src="{{'notification/images/facebook.png'|get_absolute_url}}" alt="facebook"></td>
+                       <td style="padding-right: 10px;text-align: right"><img src="{{'notification/images/twitter.png'|get_absolute_url}}" alt="twitter"></td>
+                       <td style="text-align: right"><img src="{{'notification/images/Inklendin.png'|get_absolute_url}}" alt="inklendin"></td>
+                    </tr>
+                </table>
+            </td>
+          </tr>
+       </table>
+       
+       
+       
+       
+       
+       
