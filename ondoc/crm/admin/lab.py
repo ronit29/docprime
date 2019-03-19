@@ -783,6 +783,7 @@ class LabReportInline(nested_admin.NestedTabularInline):
 
 class LabAppointmentAdmin(nested_admin.NestedModelAdmin):
     form = LabAppointmentForm
+    search_fields = ['id']
     list_display = (
         'booking_id', 'get_profile', 'get_lab', 'status', 'reports_uploaded', 'time_slot_start', 'effective_price', 'get_profile_email',
         'get_profile_age', 'created_at', 'updated_at', 'get_lab_test_name')
