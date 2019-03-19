@@ -70,6 +70,8 @@ class NotificationAction:
 
     CASHBACK_CREDITED = 55
 
+    IPD_PROCEDURE_MAIL = 60
+
     NOTIFICATION_TYPE_CHOICES = (
         (APPOINTMENT_ACCEPTED, "Appointment Accepted"),
         (APPOINTMENT_CANCELLED, "Appointment Cancelled"),
@@ -94,7 +96,8 @@ class NotificationAction:
         (INSURANCE_CONFIRMED, "Insurance Confirmed"),
         (CASHBACK_CREDITED, "Cashback Credited"),
         (REFUND_BREAKUP, 'Refund break up'),
-        (REFUND_COMPLETED, 'Refund Completed')
+        (REFUND_COMPLETED, 'Refund Completed'),
+        (IPD_PROCEDURE_MAIL, 'IPD Procedure Mail')
     )
 
     OPD_APPOINTMENT = "opd_appointment"

@@ -2,12 +2,17 @@ from rest_framework import serializers
 from django.contrib.auth import get_user_model
 import logging
 from django.conf import settings
+from ondoc.authentication.models import (OtpVerifications, User, UserProfile, Notification, NotificationEndpoint,
+                                         DoctorNumber, Address, GenericAdmin, UserSecretKey,
+                                         UserPermission, Address, GenericAdmin, GenericLabAdmin)
 from ondoc.doctor import models as doc_models
 from ondoc.procedure.models import Procedure
-from ondoc.api.v1.doctor import serializers as v1_serializers
 from ondoc.diagnostic.models import LabAppointment
+from ondoc.api.v1.doctor import serializers as v1_serializers
 from ondoc.api.v1.diagnostic import serializers as v1_diagnostic_serailizers
 
+from dateutil.relativedelta import relativedelta
+from django.utils import timezone
 logger = logging.getLogger(__name__)
 User = get_user_model()
 
@@ -131,3 +136,151 @@ class SpecializationSerializer(serializers.ModelSerializer):
         model = doc_models.Specialization
         fields = '__all__'
 
+
+class ProviderSignupValidations:
+
+    @staticmethod
+    def provider_signup_lead_exists(attrs):
+        return doc_models.ProviderSignupLead.objects.filter(phone_number=attrs['phone_number'],
+                                                            user__isnull=False).exists()
+
+    @staticmethod
+    def admin_exists(attrs):
+        return GenericAdmin.objects.filter(phone_number=attrs['phone_number'], is_disabled=False).exists()
+
+    @staticmethod
+    def lab_admin_exists(attrs):
+        return GenericLabAdmin.objects.filter(phone_number=attrs['phone_number'], is_disabled=False).exists()
+
+    @staticmethod
+    def user_exists(attrs):
+        provider_signup_lead_exists = ProviderSignupValidations.provider_signup_lead_exists(attrs)
+        admin_exists = ProviderSignupValidations.admin_exists(attrs)
+        lab_admin_exists = ProviderSignupValidations.lab_admin_exists(attrs)
+        return (admin_exists or lab_admin_exists or provider_signup_lead_exists)
+
+class GenerateOtpSerializer(serializers.Serializer):
+    phone_number = serializers.IntegerField(min_value=5000000000,max_value=9999999999)
+
+    def validate(self, attrs):
+        if ProviderSignupValidations.user_exists(attrs):
+            raise serializers.ValidationError("Phone number already registered. Please try logging in.")
+        return attrs
+
+
+class OtpVerificationSerializer(serializers.Serializer):
+    phone_number = serializers.IntegerField(min_value=5000000000, max_value=9999999999)
+    otp = serializers.IntegerField(min_value=100000,max_value=999999)
+
+    def validate(self, attrs):
+        if not OtpVerifications.objects.filter(phone_number=attrs['phone_number'], code=attrs['otp'], is_expired=False,
+                   created_at__gte=timezone.now() - relativedelta(minutes=OtpVerifications.OTP_EXPIRY_TIME)).exists():
+            raise serializers.ValidationError("Invalid OTP")
+        if ProviderSignupValidations.user_exists(attrs):
+            raise serializers.ValidationError("Phone number already registered. Please try logging in.")
+        return attrs
+
+
+class ProviderSignupLeadDataSerializer(serializers.Serializer):
+    name = serializers.CharField(max_length=200)
+    phone_number = serializers.IntegerField(min_value=5000000000, max_value=9999999999)
+    email = serializers.EmailField()
+    type = serializers.ChoiceField(choices=doc_models.ProviderSignupLead.TYPE_CHOICES)
+
+    def validate(self, attrs):
+        user = self.context.get('request').user if self.context.get('request') else None
+        phone_number = attrs.get("phone_number")
+        if ProviderSignupValidations.user_exists(attrs):
+            raise serializers.ValidationError("Phone number already registered. Please try logging in.")
+        if not (user and int(user.phone_number) == int(phone_number)):
+            raise serializers.ValidationError("either user is missing or user and phone number mismatch")
+        return attrs
+
+
+class ConsentIsDocprimeSerializer(serializers.Serializer):
+    is_docprime = serializers.BooleanField()
+
+    def validate(self, attrs):
+        user = self.context.get('request').user if self.context.get('request') else None
+        if not (user and doc_models.ProviderSignupLead.objects.filter(user=user).exists()):
+            raise serializers.ValidationError("Provider not found")
+        return attrs
+
+
+class BulkCreateDoctorSerializer(serializers.Serializer):
+    name = serializers.CharField(max_length=200)
+    online_consultation_fees = serializers.IntegerField(required=False, min_value=0, allow_null=True)
+    phone_number = serializers.IntegerField(required=False, min_value=5000000000, max_value=9999999999, allow_null=True)
+    is_appointment = serializers.BooleanField(default=False)
+    is_billing = serializers.BooleanField(default=False)
+    is_superuser = serializers.BooleanField(default=False)
+
+    def validate(self, attrs):
+        if (attrs.get('is_appointment') or attrs.get('is_billing') or attrs.get('is_superuser')) and not attrs.get('phone_number'):
+            raise serializers.ValidationError('permission type or super user access given, but phone number not provided')
+        return attrs
+
+
+class CreateDoctorSerializer(serializers.Serializer):
+    hospital_id = serializers.PrimaryKeyRelatedField(queryset=doc_models.Hospital.objects.all())
+    doctors = serializers.ListField(child=BulkCreateDoctorSerializer(many=False))
+
+
+class BulkCreateGenericAdminSerializer(serializers.Serializer):
+    name = serializers.CharField(max_length=200)
+    phone_number = serializers.IntegerField(min_value=5000000000, max_value=9999999999)
+    is_appointment = serializers.BooleanField(default=False)
+    is_billing = serializers.BooleanField(default=False)
+    is_superuser = serializers.BooleanField(default=False)
+
+    def validate(self, attrs):
+        if not (attrs.get('is_appointment') or attrs.get('is_billing') or attrs.get('is_superuser')):
+            raise serializers.ValidationError('permission type or super user access not given')
+        return attrs
+
+
+class CreateGenericAdminSerializer(serializers.Serializer):
+    hospital_id = serializers.PrimaryKeyRelatedField(queryset=doc_models.Hospital.objects.all())
+    staffs = serializers.ListField(child=BulkCreateGenericAdminSerializer(many=False))
+
+
+class CreateHospitalSerializer(serializers.Serializer):
+    name = serializers.CharField(max_length=200)
+    city = serializers.CharField(required=False, max_length=40)
+    state = serializers.CharField(required=False, max_length=40)
+    country = serializers.CharField(required=False, max_length=40)
+    contact_number = serializers.IntegerField(required=False, min_value=5000000000, max_value=9999999999)
+    doctors = serializers.ListField(required=False, child=BulkCreateDoctorSerializer(many=False))
+    staffs = serializers.ListField(required=False, child=BulkCreateGenericAdminSerializer(many=False),
+                                           allow_empty=True)
+    is_listed_on_docprime = serializers.BooleanField(default=False)
+
+
+class DoctorModelSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = doc_models.Doctor
+        fields = ('id', 'name', 'online_consultation_fees', 'source_type')
+
+
+class HospitalModelSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = doc_models.Hospital
+        fields = ('id', 'name', 'city', 'state', 'country', 'source_type')
+
+
+class DoctorClinicModelSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = doc_models.DoctorClinic
+        fields = ('id', 'doctor', 'hospital', 'enabled')
+
+
+class DoctorMobileModelSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = doc_models.DoctorMobile
+        fields = ('id', 'doctor', 'number', 'is_primary')
+
+
+class GenericAdminModelSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = GenericAdmin
+        fields = ('id', 'phone_number', 'permission_type', 'name', 'doctor', 'hospital', 'super_user_permission', 'entity_type')

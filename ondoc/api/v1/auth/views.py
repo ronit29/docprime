@@ -24,7 +24,8 @@ from ondoc.common.models import UserConfig, PaymentOptions, AppointmentHistory
 from ondoc.coupon.models import UserSpecificCoupon, Coupon
 from ondoc.lead.models import UserLead
 from ondoc.sms.api import send_otp
-from ondoc.doctor.models import DoctorMobile, Doctor, HospitalNetwork, Hospital, DoctorHospital, DoctorClinic, DoctorClinicTiming
+from ondoc.doctor.models import DoctorMobile, Doctor, HospitalNetwork, Hospital, DoctorHospital, DoctorClinic, \
+                                DoctorClinicTiming, ProviderSignupLead
 from ondoc.authentication.models import (OtpVerifications, NotificationEndpoint, Notification, UserProfile,
                                          Address, AppointmentTransaction, GenericAdmin, UserSecretKey, GenericLabAdmin,
                                          AgentToken, DoctorNumber)
@@ -96,13 +97,7 @@ class LoginOTP(GenericViewSet):
         retry_send = request.query_params.get('retry', False)
 
         if req_type == 'doctor':
-            doctor_queryset = GenericAdmin.objects.select_related('doctor', 'hospital').filter( Q(phone_number=phone_number, is_disabled=False),
-                                        (Q(doctor__isnull=True, hospital__data_status=Hospital.QC_APPROVED) |
-                                         Q(doctor__isnull=False,
-                                           doctor__data_status=Doctor.QC_APPROVED, doctor__onboarding_status = Doctor.ONBOARDED
-                                          )
-                                        )
-                                       )
+            doctor_queryset = GenericAdmin.objects.select_related('doctor', 'hospital').filter(phone_number=phone_number, is_disabled=False)
             lab_queryset = GenericLabAdmin.objects.select_related('lab', 'lab_network').filter(
                 Q(phone_number=phone_number, is_disabled=False),
                 (Q(lab__isnull=True, lab_network__data_status=LabNetwork.QC_APPROVED) |
@@ -111,8 +106,9 @@ class LoginOTP(GenericViewSet):
                    )
                  )
                 )
+            provider_signup_queryset = ProviderSignupLead.objects.filter(phone_number=phone_number, user__isnull=False)
 
-            if lab_queryset.exists() or doctor_queryset.exists():
+            if lab_queryset.exists() or doctor_queryset.exists() or provider_signup_queryset.exists():
                 response['exists'] = 1
                 send_otp("OTP for login is {}", phone_number, retry_send)
 
@@ -1506,11 +1502,17 @@ class HospitalDoctorAppointmentPermissionViewSet(GenericViewSet):
         doc_hosp_queryset = (DoctorClinic.objects
                              .select_related('doctor', 'hospital')
                              .prefetch_related('doctor__manageable_doctors', 'hospital__manageable_hospitals')
-                             .filter(doctor__is_live=True, hospital__is_live=True)
+                             .filter(Q(doctor__is_live=True, hospital__is_live=True) |
+                                     Q(doctor__source_type=Doctor.PROVIDER, hospital__source_type=Hospital.PROVIDER))
                              .annotate(doctor_gender=F('doctor__gender'),
                                        hospital_building=F('hospital__building'),
                                        hospital_name=F('hospital__name'),
-                                       doctor_name=F('doctor__name')
+                                       doctor_name=F('doctor__name'),
+                                       doctor_source_type=F('doctor__source_type'),
+                                       doctor_is_live=F('doctor__is_live'),
+                                       hospital_source_type=F('hospital__source_type'),
+                                       hospital_is_live=F('hospital__is_live'),
+                                       online_consultation_fees=F('doctor__online_consultation_fees')
                                        )
                              .filter(
                                     Q(
@@ -1540,7 +1542,9 @@ class HospitalDoctorAppointmentPermissionViewSet(GenericViewSet):
                                               hospital__manageable_hospitals__is_disabled=False,
                                               hospital__manageable_hospitals__entity_type=GenericAdminEntity.HOSPITAL)
                                     ))
-                             .values('hospital', 'doctor', 'hospital_name', 'doctor_name', 'doctor_gender').distinct('hospital', 'doctor')
+                             .values('hospital', 'doctor', 'hospital_name', 'doctor_name', 'doctor_gender',
+                                     'doctor_source_type', 'hospital_source_type', 'online_consultation_fees',
+                                     'doctor_is_live', 'hospital_is_live').distinct('hospital', 'doctor')
                              )
 
         # all_docs = [doc_hosp_queryset

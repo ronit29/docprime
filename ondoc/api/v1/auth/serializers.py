@@ -2,6 +2,7 @@ from rest_framework import serializers
 from ondoc.authentication.models import (OtpVerifications, User, UserProfile, Notification, NotificationEndpoint,
                                          DoctorNumber, Address, GenericAdmin, UserSecretKey,
                                          UserPermission, Address, GenericAdmin, GenericLabAdmin)
+from ondoc.doctor.models import DoctorMobile, ProviderSignupLead
 from ondoc.common.models import AppointmentHistory
 from ondoc.doctor.models import DoctorMobile
 from ondoc.insurance.models import InsuredMembers
@@ -60,14 +61,16 @@ class DoctorLoginSerializer(serializers.Serializer):
 
         if not User.objects.filter(phone_number=attrs['phone_number'], user_type=User.DOCTOR).exists():
             doctor_not_exists = admin_not_exists = False
-            lab_admin_not_exists = False
+            lab_admin_not_exists = provider_signup_lead_not_exists = False
             if not DoctorNumber.objects.filter(phone_number=attrs['phone_number']).exists():
                 doctor_not_exists = True
             if not GenericAdmin.objects.filter(phone_number=attrs['phone_number'], is_disabled=False).exists():
                 admin_not_exists = True
             if not GenericLabAdmin.objects.filter(phone_number=attrs['phone_number'], is_disabled=False).exists():
                 lab_admin_not_exists = True
-            if doctor_not_exists and admin_not_exists and lab_admin_not_exists:
+            if not ProviderSignupLead.objects.filter(phone_number=attrs['phone_number'], user__isnull=False).exists():
+                provider_signup_lead_not_exists = True
+            if doctor_not_exists and admin_not_exists and lab_admin_not_exists and provider_signup_lead_not_exists:
                 raise serializers.ValidationError('No Doctor or Admin with given phone number found')
 
         return attrs

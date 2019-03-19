@@ -138,11 +138,17 @@ def dump_to_elastic():
             'elastic_alias': elastic_alias,
             'url': elastic_url,
             'original': original,
-            'destination': destination
+            'destination': destination,
+            'timestamp': int(datetime.datetime.now().timestamp()),
+            'id': obj.id
         }
 
         logger.error(json.dumps(call_data))
-        elastic_alias_switch.apply_async((call_data,), countdown=3600)
+
+        obj.post_task_data = call_data
+        obj.save()
+
+        # elastic_alias_switch.apply_async((call_data,), countdown=3600)
 
         logger.error("Sync elastic job 1 completed")
         return
@@ -151,7 +157,17 @@ def dump_to_elastic():
         logger.error("Error in syncing process of elastic - " + str(e))
 
 @task()
-def elastic_alias_switch(data):
+def elastic_alias_switch():
+    from ondoc.elastic import models as elastic_models
+
+    obj = elastic_models.DemoElastic.objects.all().order_by('id').last()
+    if not obj:
+        raise Exception('Could not elastic object.')
+
+    data = obj.post_task_data
+    if data.get('timestamp', 0) + (2 * 3600) < int(datetime.datetime.now().timestamp()):
+        raise Exception('Object found is not desired object or last object.')
+
     headers = {
         'Content-Type': 'application/json',
     }
@@ -203,7 +219,7 @@ def elastic_alias_switch(data):
         logger.error("Sync to elastic failed.")
     else:
         logger.error("Sync to elastic successfull.")
-
+        obj.save()
     return
 
 
@@ -465,3 +481,14 @@ def process_payout(payout_id):
 
     except Exception as e:
         logger.error("Error in processing payout - with exception - " + str(e))
+
+
+@task()
+def integrator_order_summary():
+    from ondoc.integrations.models import IntegratorResponse
+    IntegratorResponse.get_order_summary()
+
+@task()
+def get_thyrocare_reports():
+    from ondoc.integrations.Integrators import Thyrocare
+    Thyrocare.get_generated_report()

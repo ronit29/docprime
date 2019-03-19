@@ -55,7 +55,7 @@ class TrackingEvent(auth_models.TimeStampedModel):
     }
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    name = models.CharField(max_length=50, null=True, blank=True)
+    name = models.CharField(max_length=250, null=True, blank=True)
     data = JSONField(blank=True, null=True)
     visit = models.ForeignKey(TrackingVisit, on_delete=models.CASCADE)
     user = models.ForeignKey(settings.AUTH_USER_MODEL,  on_delete=models.SET_NULL, default=None,
@@ -106,3 +106,11 @@ class ServerHitMonitor(auth_models.TimeStampedModel):
 
     class Meta:
         db_table = 'server_hit_monitor'
+
+
+class MigrateTracker(auth_models.TimeStampedModel):
+
+    start_time = models.DateTimeField(null=True)
+
+    class Meta:
+        db_table = 'migrate_tracker'

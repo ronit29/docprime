@@ -80,6 +80,13 @@ class LabModelSerializer(serializers.ModelSerializer):
     unrated_appointment = serializers.SerializerMethodField()
     center_visit_enabled = serializers.SerializerMethodField()
     display_rating_widget = serializers.SerializerMethodField()
+    is_thyrocare = serializers.SerializerMethodField()
+
+    def get_is_thyrocare(self, obj):
+        if obj and obj.network and settings.THYROCARE_NETWORK_ID:
+            if obj.network.id == settings.THYROCARE_NETWORK_ID:
+                return True
+        return False
 
     def get_display_rating_widget(self, obj):
         if self.parent:
@@ -139,7 +146,6 @@ class LabModelSerializer(serializers.ModelSerializer):
             data = rating_serializer.RatingsGraphSerializer(query, context={'request': self.context.get('request')}).data
             return data
         return None
-
 
     def get_seo(self, obj):
         if self.parent:
@@ -214,7 +220,7 @@ class LabModelSerializer(serializers.ModelSerializer):
         fields = ('id', 'lat', 'long', 'lab_thumbnail', 'name', 'operational_since', 'locality', 'address',
                   'sublocality', 'city', 'state', 'country', 'always_open', 'about', 'home_pickup_charges',
                   'is_home_collection_enabled', 'seo', 'breadcrumb', 'rating', 'rating_graph', 'unrated_appointment',
-                  'center_visit_enabled', 'display_rating_widget')
+                  'center_visit_enabled', 'display_rating_widget', 'is_thyrocare')
 
 
 class LabProfileSerializer(LabModelSerializer):
@@ -297,14 +303,20 @@ class AvailableLabTestPackageSerializer(serializers.ModelSerializer):
                     rec_dict['category'].append(
                         {'name': cat.name, 'icon': util_absolute_url(cat.icon.url) if cat.icon else None})
                 param_list = list()
-                for obj in param_objs:
-                    param_list.append(obj.parameter.name)
+                param_details = list()
+                for p_obj in param_objs:
+                    param_list.append(p_obj.parameter.name)
+                    name = p_obj.parameter.name
+                    details = p_obj.parameter.details
+                    param_details.append({'name': name, 'details': details})
+                # param_details = [{'name': data.parameter.name, 'details': data.parameter.details} for data in param_objs]
                 ret_data.append({
                     "name": t_obj.lab_test.name,
                     "why": t_obj.lab_test.why,
                     "pre_test_info": t_obj.lab_test.pre_test_info,
                     "expected_tat": t_obj.lab_test.expected_tat,
                     "parameters": param_list,
+                    "parameter_details": param_details,
                     "category": rec_dict.get('category')
                 })
         return ret_data
@@ -332,6 +344,7 @@ class AvailableLabTestSerializer(serializers.ModelSerializer):
     deal_price = serializers.SerializerMethodField()
     is_home_collection_enabled = serializers.SerializerMethodField()
     insurance = serializers.SerializerMethodField()
+    is_package = serializers.SerializerMethodField()
 
     def get_is_home_collection_enabled(self, obj):
         if self.context.get("lab") is not None:
@@ -378,7 +391,10 @@ class AvailableLabTestSerializer(serializers.ModelSerializer):
     class Meta:
         model = AvailableLabTest
         fields = ('test_id', 'mrp', 'test', 'agreed_price', 'deal_price', 'enabled', 'is_home_collection_enabled',
-                  'insurance')
+                  'insurance', 'is_package')
+
+    def get_is_package(self, obj):
+        return obj.test.is_package
 
 
 class LabAppointmentTestMappingSerializer(serializers.ModelSerializer):
@@ -689,6 +705,9 @@ class LabAppointmentCreateSerializer(serializers.Serializer):
     coupon_code = serializers.ListField(child=serializers.CharField(), required=False, default=[])
     use_wallet = serializers.BooleanField(required=False)
     cart_item = serializers.PrimaryKeyRelatedField(queryset=Cart.objects.all(), required=False, allow_null=True)
+    pincode = serializers.CharField(required=False, allow_null=True, allow_blank=True)
+    is_thyrocare = serializers.BooleanField(required=False, default=False)
+    from_app = serializers.BooleanField(required=False, default=False)
 
     def validate(self, data):
         MAX_APPOINTMENTS_ALLOWED = 10
@@ -756,7 +775,6 @@ class LabAppointmentCreateSerializer(serializers.Serializer):
                         raise serializers.ValidationError('Invalid coupon code - ' + str(coupon))
                 data["coupon_obj"] = list(coupon_obj)
 
-        
         data["existing_cart_item"] = None
         if unserialized_data:
             is_valid, duplicate_cart_item = Cart.validate_duplicate(unserialized_data, request.user, Order.LAB_PRODUCT_ID, cart_item_id)
@@ -769,9 +787,18 @@ class LabAppointmentCreateSerializer(serializers.Serializer):
         time_slot_start = (form_time_slot(data.get('start_date'), data.get('start_time'))
                            if not data.get("time_slot_start") else data.get("time_slot_start"))
 
-
         # validations for same day and next day timeslot bookings
-        available_slots = LabTiming.timing_manager.lab_booking_slots(lab__id=data.get("lab").id, lab__is_live=True, for_home_pickup=data.get("is_home_pickup"))
+        selected_date = time_slot_start.strftime("%Y-%m-%d")
+        lab = data.get("lab")
+        pincode = data.get('pincode', None)
+        address = data.get("address", None)
+
+        if bool(data.get("is_thyrocare")):
+            if not pincode:
+                raise serializers.ValidationError("Pincode required for thyrocare.")
+            if not int(pincode) == int(address.pincode):
+                raise serializers.ValidationError("Entered pincode should be same as pickup address pincode.")
+
         now = datetime.datetime.now()
         tomorrow = datetime.date.today() + datetime.timedelta(days=1)
         is_today = now.weekday() == time_slot_start.weekday()
@@ -780,12 +807,26 @@ class LabAppointmentCreateSerializer(serializers.Serializer):
         curr_minute = round(round(float(time_slot_start.minute) / 60, 2) * 2) / 2
         curr_time += curr_minute
 
-        if is_today and available_slots.get("today_min") and available_slots.get("today_min") > curr_time:
-            raise serializers.ValidationError("Invalid Time slot")
-        if is_tomorrow and available_slots.get("tomorrow_min") and available_slots.get("tomorrow_min") > curr_time:
-            raise serializers.ValidationError("Invalid Time slot")
-        if is_today and available_slots.get("today_max") and available_slots.get("today_max") < curr_time:
-            raise serializers.ValidationError("Invalid Time slot")
+        if bool(data.get('from_app')):
+            available_slots = LabTiming.timing_manager.lab_booking_slots(lab__id=data.get("lab").id, lab__is_live=True, for_home_pickup=data.get("is_home_pickup"))
+            is_integrated = False
+            if is_today and available_slots.get("today_min") and available_slots.get("today_min") > curr_time:
+                raise serializers.ValidationError("Invalid Time slot")
+            if is_tomorrow and available_slots.get("tomorrow_min") and available_slots.get("tomorrow_min") > curr_time:
+                raise serializers.ValidationError("Invalid Time slot")
+            if is_today and available_slots.get("today_max") and available_slots.get("today_max") < curr_time:
+                raise serializers.ValidationError("Invalid Time slot")
+        else:
+            available_slots = lab.get_available_slots(data.get("is_home_pickup"), pincode, selected_date)
+            is_integrated = lab.is_integrated()
+            selected_day_slots = available_slots['time_slots'][selected_date]
+            if not selected_day_slots:
+                raise serializers.ValidationError("No time slots available")
+
+            current_day_slots = self.get_slots_list(selected_day_slots)
+
+            if not curr_time in current_day_slots:
+                raise serializers.ValidationError("Invalid Time slot")
 
         if LabAppointment.objects.filter(profile=data.get("profile"), lab=data.get("lab"),
                                          tests__in=data.get("test_ids"), time_slot_start=time_slot_start) \
@@ -798,7 +839,7 @@ class LabAppointmentCreateSerializer(serializers.Serializer):
             data['use_wallet'] = True
 
         self.test_lab_id_validator(data, request)
-        self.time_slot_validator(data, request)
+        self.time_slot_validator(data, request, is_integrated)
         return data
 
     def create(self, data):
@@ -880,7 +921,7 @@ class LabAppointmentCreateSerializer(serializers.Serializer):
             raise serializers.ValidationError("Test Ids or lab Id is incorrect")
 
     @staticmethod
-    def time_slot_validator(data, request):
+    def time_slot_validator(data, request, is_integrated):
         start_dt = (form_time_slot(data.get('start_date'), data.get('start_time')) if not data.get("time_slot_start") else data.get("time_slot_start"))
 
         if start_dt < timezone.now():
@@ -894,22 +935,37 @@ class LabAppointmentCreateSerializer(serializers.Serializer):
         lab_timing_queryset = lab_queryset.lab_timings.filter(day=day_of_week, start__lte=data.get('start_time'),
                                                               end__gte=data.get('start_time'),
                                                               for_home_pickup=data["is_home_pickup"]).exists()
-        if data["is_home_pickup"]:
-            if not lab_queryset.is_home_collection_enabled:
-                logger.error(
-                    "Error 'Home Pickup is disabled for the lab' for lab appointment with data - " + json.dumps(
-                        request.data))
-                raise serializers.ValidationError("Home Pickup is disabled for the lab")
-            if data.get("start_time") < 7.0 or data.get("start_time") > 19.0:
-                logger.error(
-                    "Error 'No time slot available' for lab appointment with data - " + json.dumps(
-                        request.data))
-                raise serializers.ValidationError("No time slot available")
+        if is_integrated:
+            pass
         else:
-            if not lab_queryset.always_open and not lab_timing_queryset:
-                logger.error(
-                    "Error 'No time slot available' for lab appointment with data - " + json.dumps(request.data))
-                raise serializers.ValidationError("No time slot available")
+            if data["is_home_pickup"]:
+                if not lab_queryset.is_home_collection_enabled:
+                    logger.error(
+                        "Error 'Home Pickup is disabled for the lab' for lab appointment with data - " + json.dumps(
+                            request.data))
+                    raise serializers.ValidationError("Home Pickup is disabled for the lab")
+                if data.get("start_time") < 7.0 or data.get("start_time") > 19.0:
+                    logger.error(
+                        "Error 'No time slot available' for lab appointment with data - " + json.dumps(
+                            request.data))
+                    raise serializers.ValidationError("No time slot available")
+            else:
+                if not lab_queryset.always_open and not lab_timing_queryset:
+                    logger.error(
+                        "Error 'No time slot available' for lab appointment with data - " + json.dumps(request.data))
+                    raise serializers.ValidationError("No time slot available")
+
+    def get_slots_list(self, data):
+        slots = list()
+        am_timings = data[0]['timing']
+        pm_timings = data[1]['timing']
+        for timing in am_timings:
+            slots.append(timing['value'])
+
+        for timing in pm_timings:
+            slots.append(timing['value'])
+
+        return slots
 
 
 class TimeSlotSerializer(serializers.Serializer):
