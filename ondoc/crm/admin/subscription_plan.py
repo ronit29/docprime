@@ -13,8 +13,8 @@ class PlanFeatureMappingInline(TabularInline):
 
     def get_readonly_fields(self, request, obj=None):
         read_only = super().get_readonly_fields(request, obj)
-        if obj and obj.id:
-            read_only += ('feature', 'count')
+        # if self.instance and self.:
+        #     read_only += ('feature', 'count')
         return read_only
 
 
