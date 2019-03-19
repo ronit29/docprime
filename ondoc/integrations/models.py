@@ -24,6 +24,7 @@ class IntegratorMapping(TimeStampedModel):
     service_type = models.CharField(max_length=30, choices=ServiceType.as_choices(), null=False, blank=False, default=None)
     integrator_product_data = JSONField(blank=True, null=True)
     integrator_test_name = models.CharField(max_length=60, null=False, blank=False, default=None)
+    name_params_required = models.BooleanField(default=False)
     is_active = models.BooleanField(default=False)
 
     @classmethod

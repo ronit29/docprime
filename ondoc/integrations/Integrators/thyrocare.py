@@ -62,7 +62,12 @@ class Thyrocare(BaseIntegrator):
             defaults = {'integrator_product_data': result_obj, 'integrator_class_name': Thyrocare.__name__,
                         'content_type': ContentType.objects.get(model='labnetwork')}
             if type == 'TESTS':
-                defaults = {'service_type': IntegratorMapping.ServiceType.LabTest}
+                name_required_tests = ['H6', 'BTHAL', 'BEAP', 'CUA', 'E22', 'HVA', 'H5', 'SEEL', 'H3', 'MA', 'ELEMENTS']
+                name_params_required = False
+                if result_obj['code'] in name_required_tests:
+                    name_params_required = True
+
+                defaults = {'service_type': IntegratorMapping.ServiceType.LabTest, 'name_params_required': name_params_required}
                 IntegratorMapping.objects.update_or_create(integrator_test_name=result_obj['name'], object_id=obj_id, defaults=defaults)
             else:
                 defaults = {'integrator_type': result_obj['type'], 'service_type': IntegratorProfileMapping.ServiceType.LabTest}
