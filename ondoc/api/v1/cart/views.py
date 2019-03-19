@@ -47,7 +47,7 @@ class CartViewSet(viewsets.GenericViewSet):
 
         if data['data']['is_appointment_insured']:
             data['data']['payment_type'] = OpdAppointment.INSURANCE
-        if serialized_data.get('cart_item').id:
+        if serialized_data.get('cart_item'):
             old_cart_obj = Cart.objects.filter(id=serialized_data.get('cart_item').id).first()
             payment_type = old_cart_obj.data.get('payment_type')
             if payment_type == OpdAppointment.INSURANCE and data['data']['is_appointment_insured'] == False:
