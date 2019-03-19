@@ -26,7 +26,8 @@ constants = {
     'PRODUCT_TEAM': 'product_team',
     'INTEGRATION_MANAGEMENT_TEAM': 'integration_management_team',
     'WELCOME_CALLING_TEAM': 'welcome_calling_team',
-    'DOC_AVAILABILITY_TEAM_GROUP': 'doctor_availability_team'
+    'DOC_AVAILABILITY_TEAM_GROUP': 'doctor_availability_team',
+    'APPOINTMENT_OTP_TEAM': 'appointment_otp_team'
 }
 matrix_product_ids = {
     'opd_products': 1,

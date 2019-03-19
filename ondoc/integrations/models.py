@@ -1,3 +1,6 @@
+from django.conf import settings
+
+from ondoc.integrations import service
 from django.db import models
 from django.contrib.contenttypes.fields import GenericForeignKey
 from django.contrib.contenttypes.models import ContentType
@@ -24,18 +27,21 @@ class IntegratorMapping(TimeStampedModel):
     is_active = models.BooleanField(default=False)
 
     @classmethod
-    def get_if_third_party_integration(cls, test_id):
-        mapping_wrt_test = cls.objects.filter(test__id=test_id, is_active=True).first()
+    def get_if_third_party_integration(cls, network_id=None):
+        if network_id:
+            mapping = cls.objects.filter(object_id=network_id, is_active=True).first()
+        else:
+            return None
 
         # Return if no test exist over here and it depicts that it is not a part of integrations.
-        if not mapping_wrt_test:
+        if not mapping:
             return None
 
         # Part of the integrations.
-        if mapping_wrt_test.content_type == ContentType.objects.get(model='labtest'):
+        if mapping.content_type == ContentType.objects.get(model='labnetwork'):
             return {
-                'class_name': mapping_wrt_test.integrator_class_name,
-                'service_type': mapping_wrt_test.service_type
+                'class_name': mapping.integrator_class_name,
+                'service_type': mapping.service_type
             }
 
     class Meta:
@@ -65,7 +71,7 @@ class IntegratorProfileMapping(TimeStampedModel):
             return None
 
         # Part of the integrations.
-        if mapping_wrt_package.content_type == ContentType.objects.get(model='labtest'):
+        if mapping_wrt_package.content_type == ContentType.objects.get(model='labnetwork'):
             return {
                 'class_name': mapping_wrt_package.integrator_class_name,
                 'service_type': mapping_wrt_package.service_type
@@ -73,3 +79,45 @@ class IntegratorProfileMapping(TimeStampedModel):
 
     class Meta:
         db_table = 'integrator_profile_mapping'
+
+
+class IntegratorResponse(TimeStampedModel):
+    content_type = models.ForeignKey(ContentType, on_delete=models.DO_NOTHING) # model id
+    object_id = models.PositiveIntegerField()
+    content_object = GenericForeignKey()
+    integrator_class_name = models.CharField(max_length=40, null=False, blank=False)
+    lead_id = models.CharField(max_length=40, null=True, blank=True)
+    dp_order_id = models.CharField(max_length=40, null=True, blank=True)
+    integrator_order_id = models.CharField(max_length=40, null=True, blank=True)
+    response_data = JSONField(blank=True, null=True)
+    report_received = models.BooleanField(default=False)
+
+    class Meta:
+        db_table = 'integrator_response'
+
+    @classmethod
+    def get_order_summary(cls):
+        integrator_responses = IntegratorResponse.objects.all()
+        for integrator_response in integrator_responses:
+            if integrator_response.integrator_class_name == 'Thyrocare':
+                if settings.THYROCARE_INTEGRATION_ENABLED:
+                    is_thyrocare_enabled = True
+                else:
+                    is_thyrocare_enabled = False
+            else:
+                is_thyrocare_enabled = True
+
+            if is_thyrocare_enabled:
+                integrator_obj = service.create_integrator_obj(integrator_response.integrator_class_name)
+                integrator_obj.get_order_summary(integrator_response)
+
+        print("Order Summary for Thyrocare Complete")
+
+
+class IntegratorReport(TimeStampedModel):
+    integrator_response = models.ForeignKey(IntegratorResponse, on_delete=models.CASCADE, null=False)
+    pdf_url = models.TextField(null=True, blank=True)
+    xml_url = models.TextField(null=True, blank=True)
+
+    class Meta:
+        db_table = 'integrator_report'
