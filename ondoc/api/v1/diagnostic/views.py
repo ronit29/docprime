@@ -1686,7 +1686,6 @@ class LabAppointmentView(mixins.CreateModelMixin,
                 data.update(
                     {'included_in_user_plan': included_in_user_plan, 'user_plan': user_plan_id})
                 data['payment_type'] = OpdAppointment.PLAN
-                return
 
         if not included_in_user_plan:
             data.update(
@@ -1705,7 +1704,7 @@ class LabAppointmentView(mixins.CreateModelMixin,
         if not data.get("is_home_pickup"):
             data.pop("address", None)
 
-        self.update_plan_details(request, request.data)
+        self.update_plan_details(request, data)
         serializer = diagnostic_serializer.LabAppointmentCreateSerializer(data=data, context={'request': request, 'data' : request.data, 'use_duplicate' : True})
         serializer.is_valid(raise_exception=True)
         validated_data = serializer.validated_data
