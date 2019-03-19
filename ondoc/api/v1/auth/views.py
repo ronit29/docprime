@@ -1988,12 +1988,20 @@ class DoctorScanViewSet(GenericViewSet):
     def doctor_qr_scan(self, request, pk):
         opdapp_obj = OpdAppointment.objects.filter(pk=pk).first()
         data = request.query_params
-        doctor = opdapp_obj.doctor.id
-        complete_with_qr_scanner = True
-        if opdapp_obj.doctor.qr_code.all():
-            url = opdapp_obj.doctor.qr_code.first().data
-            if url:
-                url = url.get('url', None)
-            user_id = request.user.id
-            user_appointment_object = UserAppointmentsViewSet()
-            return user_appointment_object.update(request, pk, parameters={'status': OpdAppointment.COMPLETED, 'qr_code': complete_with_qr_scanner}).data
+        type = data.get('type')
+        request_url = data.get('url')
+        if type == 'doctor':
+            doctor = opdapp_obj.doctor.id
+            complete_with_qr_scanner = True
+            if opdapp_obj.doctor.qr_code.all():
+                url = opdapp_obj.doctor.qr_code.first().data
+                if url:
+                    url = url.get('url', None)
+                    if request_url == url:
+                        user_id = request.user.id
+                        user_appointment_object = UserAppointmentsViewSet()
+                        return user_appointment_object.update(request, pk, parameters={'status': OpdAppointment.COMPLETED, 'qr_code': complete_with_qr_scanner}).data
+                    else:
+                        return Response('Invalid url')
+        else:
+            return Response('Invalid type')
