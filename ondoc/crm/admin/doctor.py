@@ -1549,14 +1549,17 @@ class DoctorOpdAppointmentAdmin(admin.ModelAdmin):
         #             'cancellation_reason', 'cancellation_comments', 'ratings',
         #             'start_date', 'start_time', 'payment_type', 'otp', 'insurance', 'outstanding', 'invoice_urls', 'payment_type')
         # elif request.user.groups.filter(name=constants['OPD_APPOINTMENT_MANAGEMENT_TEAM']).exists():
-            return ('booking_id', 'doctor_name', 'doctor_id', 'doctor_details', 'hospital_name', 'hospital_details',
-                    'kyc', 'contact_details', 'used_profile_name',
-                    'used_profile_number', 'default_profile_name',
-                    'default_profile_number', 'user_id', 'user_number', 'booked_by', 'procedures_details',
-                    'fees', 'effective_price', 'mrp', 'deal_price', 'payment_status',
-                    'payment_type', 'admin_information', 'otp', 'insurance', 'outstanding',
-                    'status', 'cancel_type', 'cancellation_reason', 'cancellation_comments',
-                    'start_date', 'start_time', 'invoice_urls', 'payment_type')
+        all_fields = ('booking_id', 'doctor_name', 'doctor_id', 'doctor_details', 'hospital_name', 'hospital_details',
+                'kyc', 'contact_details', 'used_profile_name',
+                'used_profile_number', 'default_profile_name',
+                'default_profile_number', 'user_id', 'user_number', 'booked_by', 'procedures_details',
+                'fees', 'effective_price', 'mrp', 'deal_price', 'payment_status',
+                'payment_type', 'admin_information', 'insurance', 'outstanding',
+                'status', 'cancel_type', 'cancellation_reason', 'cancellation_comments',
+                'start_date', 'start_time', 'invoice_urls', 'payment_type')
+        if request.user.groups.filter(name=constants['APPOINTMENT_OTP_TEAM']).exists() or request.user.is_superuser:
+            all_fields = all_fields + ('otp',)
+        return all_fields
         # else:
         #     return ()
 
@@ -1565,13 +1568,17 @@ class DoctorOpdAppointmentAdmin(admin.ModelAdmin):
         #     return ('booking_id', 'doctor_id', 'doctor_details', 'contact_details', 'hospital_details', 'kyc',
         #             'procedures_details', 'invoice_urls', 'ratings', 'payment_type')
         # elif request.user.groups.filter(name=constants['OPD_APPOINTMENT_MANAGEMENT_TEAM']).exists():
-            return ('booking_id', 'doctor_name', 'doctor_id', 'doctor_details', 'hospital_name',
-                    'hospital_details', 'kyc', 'contact_details',
-                    'used_profile_name', 'used_profile_number', 'default_profile_name',
-                    'default_profile_number', 'user_id', 'user_number', 'booked_by',
-                    'fees', 'effective_price', 'mrp', 'deal_price', 'payment_status', 'payment_type',
-                    'admin_information', 'otp', 'insurance', 'outstanding', 'procedures_details','invoice_urls', 'payment_type',
-                    'invoice_urls')
+        read_only = ('booking_id', 'doctor_name', 'doctor_id', 'doctor_details', 'hospital_name',
+                     'hospital_details', 'kyc', 'contact_details',
+                     'used_profile_name', 'used_profile_number', 'default_profile_name',
+                     'default_profile_number', 'user_id', 'user_number', 'booked_by',
+                     'fees', 'effective_price', 'mrp', 'deal_price', 'payment_status', 'payment_type',
+                     'admin_information', 'insurance', 'outstanding', 'procedures_details', 'invoice_urls',
+                     'payment_type',
+                     'invoice_urls')
+        if request.user.groups.filter(name=constants['APPOINTMENT_OTP_TEAM']).exists() or request.user.is_superuser:
+            read_only = read_only + ('otp',)
+        return read_only
         # else:
         #     return ('invoice_urls')
 
