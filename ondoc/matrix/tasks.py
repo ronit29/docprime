@@ -479,7 +479,7 @@ def create_or_update_lead_on_matrix(self, data):
             logger.error("CELERY ERROR: Incorrect values provided.")
             raise ValueError()
         product_id = matrix_product_ids.get('opd_products', 1)
-        sub_product_id = matrix_subproduct_ids.get(obj_type.lower(), 4) if obj_type != ProviderSignupLead.__class__.__name__ else matrix_subproduct_ids.get(Doctor.__class__.__name__.lower(), 4)
+        sub_product_id = matrix_subproduct_ids.get(obj_type.lower(), 4) if obj_type != ProviderSignupLead.__name__ else matrix_subproduct_ids.get(Doctor.__name__.lower(), 4)
         ct = ContentType.objects.get(model=obj_type.lower())
         model_used = ct.model_class()
         content_type = ContentType.objects.get_for_model(model_used)
@@ -499,7 +499,7 @@ def create_or_update_lead_on_matrix(self, data):
             elif obj.gender and obj.gender == 'f':
                 gender = 2
         elif obj_type == Hospital.__name__:
-            lead_source = 'provider_app_signup' if obj.source_type == Hospital.PROVIDER and obj.is_listed_on_docprime else 'referral'
+            lead_source = 'ProviderApp' if obj.source_type == Hospital.PROVIDER and obj.is_listed_on_docprime else 'referral'
             spoc_details = obj.spoc_details.filter(contact_type=SPOCDetails.SPOC, email__isnull=False).first()
             if not spoc_details:
                 spoc_details = obj.spoc_details.filter(contact_type=SPOCDetails.SPOC).first()
@@ -517,13 +517,13 @@ def create_or_update_lead_on_matrix(self, data):
             # if spoc_details:
             #     mobile += str(spoc_details.number) if hasattr(spoc_details, 'number') and spoc_details.number else ''
         elif obj_type == ProviderSignupLead.__name__:
-            lead_source = 'provider_app_signup'
+            lead_source = 'ProviderApp'
             mobile = obj.phone_number
             email = obj.email if obj.email else ''
             if obj.type == ProviderSignupLead.DOCTOR:
-                name = obj.name + ' Doctor'
+                name = obj.name + ' (Doctor)'
             elif obj.type == ProviderSignupLead.HOSPITAL_ADMIN:
-                name = obj.name + ' Hospital Admin'
+                name = obj.name + ' (Hospital Admin)'
         mobile = int(mobile)
         # if not mobile:
         #     return

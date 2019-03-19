@@ -2874,7 +2874,7 @@ class ProviderSignupLead(auth_model.TimeStampedModel):
     matrix_lead_id = models.IntegerField(null=True)
 
     def save(self, *args, **kwargs):
-        if kwargs.get('is_docprime'):
+        if kwargs.get('is_docprime') and not self.matrix_lead_id:
             create_or_update_lead_on_matrix.apply_async(({'obj_type': self.__class__.__name__, 'obj_id': self.id}
                                                          ,), countdown=5)
 
