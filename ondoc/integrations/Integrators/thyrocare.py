@@ -60,7 +60,8 @@ class Thyrocare(BaseIntegrator):
 
         for result_obj in result_array:
             defaults = {'integrator_product_data': result_obj, 'service_type': IntegratorMapping.ServiceType.LabTest,
-                        'integrator_class_name': Thyrocare.__name__, 'content_type': ContentType.objects.get(model='labnetwork')}
+                        'integrator_class_name': Thyrocare.__name__,
+                        'content_type': ContentType.objects.get(model='labnetwork')}
 
             if type == 'TESTS':
                 IntegratorMapping.objects.update_or_create(integrator_test_name=result_obj['name'], object_id=obj_id, defaults=defaults)
@@ -73,6 +74,10 @@ class Thyrocare(BaseIntegrator):
 
     @classmethod
     def thyrocare_profile_data(cls, obj_id, type):
+        cls.thyrocare_data(obj_id, type)
+
+    @classmethod
+    def thyrocare_offer_data(cls, obj_id, type):
         cls.thyrocare_data(obj_id, type)
 
     def _get_appointment_slots(self, pincode, date, **kwargs):
