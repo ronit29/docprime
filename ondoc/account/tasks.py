@@ -219,7 +219,7 @@ def elastic_alias_switch():
         logger.error("Sync to elastic failed.")
     else:
         logger.error("Sync to elastic successfull.")
-
+        obj.save()
     return
 
 
@@ -481,3 +481,14 @@ def process_payout(payout_id):
 
     except Exception as e:
         logger.error("Error in processing payout - with exception - " + str(e))
+
+
+@task()
+def integrator_order_summary():
+    from ondoc.integrations.models import IntegratorResponse
+    IntegratorResponse.get_order_summary()
+
+@task()
+def get_thyrocare_reports():
+    from ondoc.integrations.Integrators import Thyrocare
+    Thyrocare.get_generated_report()
