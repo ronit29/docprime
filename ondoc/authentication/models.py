@@ -1457,7 +1457,8 @@ class Merchant(TimeStampedModel):
 
     def save(self, *args, **kwargs):
         if self.verified_by_finance and self.pg_status == self.NOT_INITIATED:
-            self.create_in_pg()
+            pass
+            #self.create_in_pg()
 
         super().save(*args, **kwargs)
 
