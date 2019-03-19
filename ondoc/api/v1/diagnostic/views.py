@@ -1742,6 +1742,7 @@ class LabAppointmentView(mixins.CreateModelMixin,
 
     @transaction.atomic
     def create(self, request, **kwargs):
+        from ondoc.doctor.models import OpdAppointment
         data = dict(request.data)
         if not data.get("is_home_pickup"):
             data.pop("address", None)
@@ -1754,6 +1755,8 @@ class LabAppointmentView(mixins.CreateModelMixin,
         if user_insurance:
             data['is_appointment_insured'], data['insurance_id'], data[
                 'insurance_message'] = user_insurance.validate_insurance(validated_data)
+            if data['is_appointment_insured']:
+                data['payment_type'] = OpdAppointment.PAY_CHOICES.INSURANCE
         else:
             data['is_appointment_insured'], data['insurance_id'], data[
                 'insurance_message'] = False, None, ""

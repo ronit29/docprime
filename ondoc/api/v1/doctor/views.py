@@ -215,7 +215,6 @@ class DoctorAppointmentsViewSet(OndocViewSet):
 
     @transaction.atomic
     def create(self, request):
-
         serializer = serializers.CreateAppointmentSerializer(data=request.data, context={'request': request, 'data' : request.data, 'use_duplicate' : True})
         serializer.is_valid(raise_exception=True)
         validated_data = serializer.validated_data
@@ -229,7 +228,7 @@ class DoctorAppointmentsViewSet(OndocViewSet):
             data['is_appointment_insured'], data['insurance_id'], data[
                     'insurance_message'] = user_insurance.validate_insurance(validated_data)
             if data['is_appointment_insured']:
-                data['payment_type'] = 3
+                data['payment_type'] = OpdAppointment.PAY_CHOICES.INSURANCE
         else:
             data['is_appointment_insured'], data['insurance_id'], data[
                 'insurance_message'] = False, None, ""

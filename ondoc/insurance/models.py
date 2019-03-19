@@ -466,6 +466,9 @@ class UserInsurance(auth_model.TimeStampedModel):
         gynecologist_opd_count = 0
         oncologist_opd_count = 0
         profile = appointment_data['profile']
+        if not profile:
+            return gynecologist_opd_count, oncologist_opd_count
+        user = profile.user
         doctor = DoctorPracticeSpecialization.objects.filter(doctor_id=appointment_data['doctor']).values(
             'specialization_id')
         specilization_ids = doctor
@@ -477,30 +480,42 @@ class UserInsurance(auth_model.TimeStampedModel):
         oncologist_set = set(oncologist_list)
         if not (specilization_ids_set & oncologist_set) and not (specilization_ids_set & gynecologist_set):
             return gynecologist_opd_count, oncologist_opd_count
-        members = self.members.all().get(profile=profile)
+
+        # members = self.members.all().get(profile=profile)
         # if specilization_ids_set & gynecologist_set:
         doctor_with_gyno_specialization = DoctorPracticeSpecialization.objects.filter(
             specialization_id__in=gynecologist_list).values_list(
             'doctor_id', flat=True)
         if doctor_with_gyno_specialization:
-            gynecologist_opd_count = OpdAppointment.objects.filter(~Q(status=6),
-                                                               doctor_id__in=doctor_with_gyno_specialization,
-                                                               payment_type=3,
-                                                               insurance_id=self.id,
-                                                               profile_id=members.profile.id).count()
-
+            # gynecologist_opd_count = OpdAppointment.objects.filter(~Q(status=6),
+            #                                                    doctor_id__in=doctor_with_gyno_specialization,
+            #                                                    payment_type=3,
+            #                                                    insurance_id=self.id,
+            #                                                    profile_id=members.profile.id).count()
+            gynecologist_opd_count = OpdAppointment.objects.filter(~Q(status=OpdAppointment.STATUS_CHOICES.CANCELLED),
+                                                                   doctor_id__in=doctor_with_gyno_specialization,
+                                                                   payment_type=OpdAppointment.PAY_CHOICES.INSURANCE,
+                                                                   insurance_id=self.id,
+                                                                   user=user).count()
         # elif specilization_ids_set & oncologist_set:
         doctor_with_onco_specialization = DoctorPracticeSpecialization.objects.filter(
             specialization_id__in=oncologist_list).values_list(
             'doctor_id', flat=True)
         if doctor_with_onco_specialization:
-            oncologist_opd_count = OpdAppointment.objects.filter(~Q(status=6),
+            # oncologist_opd_count = OpdAppointment.objects.filter(~Q(status=6),
+            #                                                  doctor_id__in=doctor_with_onco_specialization,
+            #                                                  payment_type=3,
+            #                                                  insurance_id=self.id,
+            #                                                  profile_id=members.profile.id).count()
+            oncologist_opd_count = OpdAppointment.objects.filter(~Q(status=OpdAppointment.STATUS_CHOICES.CANCELLED),
                                                              doctor_id__in=doctor_with_onco_specialization,
-                                                             payment_type=3,
+                                                             payment_type=OpdAppointment.PAY_CHOICES.INSURANCE,
                                                              insurance_id=self.id,
-                                                             profile_id=members.profile.id).count()
+                                                             user=user).count()
+
         return gynecologist_opd_count, oncologist_opd_count
 
+    # TODO Incase if Lab limit has to apply on monthly basis.
     # def is_lab_appointment_count_valid(self, appointment_data):
     #     from ondoc.diagnostic.models import LabAppointment
     #     start_time = appointment_data['time_slot_start'] - timedelta(days=30)
@@ -514,7 +529,7 @@ class UserInsurance(auth_model.TimeStampedModel):
     #         return False
     #     else:
     #         return True
-
+    # TODO Incase if Opd limit has to apply on monthly basis.
     # def is_opd_appointment_count_valid(self, appointment_data):
     #     from ondoc.doctor.models import OpdAppointment
     #     start_time = appointment_data['time_slot_start'] - timedelta(days=30)
@@ -591,7 +606,6 @@ class UserInsurance(auth_model.TimeStampedModel):
         profile = appointment_data.get('profile', None)
         user = profile.user
         user_insurance = UserInsurance.objects.filter(user=user).last()
-        is_lab_insured = False
         lab_mrp_check_list = []
         if not user_insurance or not user_insurance.is_valid() or \
                 not user_insurance.is_appointment_valid(appointment_data['start_date']):
