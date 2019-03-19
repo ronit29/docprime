@@ -38,14 +38,14 @@ class DoctorURL():
                  updated_at,  sublocality_latitude, sublocality_longitude, locality_latitude, 
                  locality_longitude, locality_id, sublocality_id,
                  locality_value, sublocality_value, is_valid, locality_location, sublocality_location, location, entity_id, 
-                 specialization_id, specialization, breadcrumb)
+                 specialization_id, specialization, breadcrumb, bookable_doctors_count)
 
                  select %d as sequence ,a.extras, a.sitemap_identifier,getslug(a.url) as url, a.count, a.entity_type,
                   a.url_type, now() as created_at, now() as updated_at,
                   a.sublocality_latitude, a.sublocality_longitude, a.locality_latitude, a.locality_longitude,
                   a.locality_id, a.sublocality_id, a.locality_value, a.sublocality_value, a.is_valid, 
                   a.locality_location, a.sublocality_location, a.location, entity_id, 
-                  specialization_id, specialization, breadcrumb from temp_url a
+                  specialization_id, specialization, breadcrumb, bookable_doctors_count from temp_url a
                   ''' %seq
 
 
@@ -79,25 +79,47 @@ class DoctorURL():
     def create_search_urls(self):
 
         q1 = '''insert into temp_url (specialization_id, search_slug, count, sublocality_id, locality_id, 
-                    sitemap_identifier, entity_type, url_type, is_valid, created_at, updated_at )
-                    select dps.specialization_id,search_slug, count(distinct d.id) count,
+                    sitemap_identifier, entity_type, url_type, is_valid, created_at, updated_at,bookable_doctors_count )
+                   select specialization_id, search_slug, count, sublocality_id,locality_id,sitemap_identifier,
+                    entity_type, url_type, is_valid, now(), now(),
+                    json_build_object('bookable_doctors_count',bookable_doctors_count,'bookable_doctors_2km',bookable_doctors_2km)
+                    as bookable_doctors_count
+                    from (                    
+                    select  dps.specialization_id,search_slug, count(distinct d.id) count, ea.centroid,
+                    COUNT(DISTINCT CASE WHEN d.enabled_for_online_booking=True and dc.enabled_for_online_booking=True
+                    and h.enabled_for_online_booking=True then d.id else null END) as bookable_doctors_count,
+                    COUNT(DISTINCT CASE WHEN d.enabled_for_online_booking=True and dc.enabled_for_online_booking=True
+                    and h.enabled_for_online_booking=True 
+                    and ST_DWithin(ea.centroid::geography,h.location::geography,2000)then d.id else null end) as bookable_doctors_2km,
                     case when ea.type = 'SUBLOCALITY' then ea.id end as sublocality_id,
                     case when ea.type = 'LOCALITY' then ea.id end as locality_id,
                     case when ea.type = 'LOCALITY' then 'SPECIALIZATION_CITY' else 'SPECIALIZATION_LOCALITY_CITY' end as sitemap_identifier,
-                    'Doctor' as entity_type, 'SEARCHURL' url_type, True as is_valid, now(), now()
+                    'Doctor' as entity_type, 'SEARCHURL' url_type, True as is_valid
                     from entity_address ea inner join hospital h on ((ea.type = 'LOCALITY' and 
                     ST_DWithin(ea.centroid::geography,h.location::geography,15000)) OR 
                     (ea.type = 'SUBLOCALITY' and ST_DWithin(ea.centroid::geography,h.location::geography,5000))) and h.is_live=true
-                    and ea.type IN ('SUBLOCALITY' , 'LOCALITY') and ea.use_in_url=true
-                    inner join doctor_clinic dc on dc.hospital_id = h.id
+                    and ea.type IN ('SUBLOCALITY' , 'LOCALITY') and ea.use_in_url=true 
+                    and lower(ea.alternative_value) = lower(h.city_search_key)
+                    inner join doctor_clinic dc on dc.hospital_id = h.id 
                     and dc.enabled=true inner join doctor d on dc.doctor_id= d.id and d.is_live=true
                     inner join doctor_practice_specialization dps on dps.doctor_id = d.id 
                     where ea.id>=%d and ea.id<%d
-                    group by dps.specialization_id, ea.id having count(distinct d.id)>=3'''
+                    group by dps.specialization_id, ea.id having count(distinct d.id)>=3) a'''
 
         q2 = '''insert into temp_url (search_slug, count, sublocality_id, locality_id, 
-                      sitemap_identifier, entity_type, url_type, is_valid, created_at, updated_at )
+                      sitemap_identifier, entity_type, url_type, is_valid, created_at, updated_at, bookable_doctors_count)
+                    select search_slug, count, sublocality_id,locality_id,sitemap_identifier,
+                    entity_type, url_type, is_valid, now(), now(),
+                    json_build_object('bookable_doctors_count',bookable_doctors_count,'bookable_doctors_2km',bookable_doctors_2km)
+                    as bookable_doctors_count
+                    from (
+                    
                     select search_slug, count(distinct d.id) count,
+                    COUNT(DISTINCT CASE WHEN d.enabled_for_online_booking=True and dc.enabled_for_online_booking=True
+                    and h.enabled_for_online_booking=True then d.id else null END) as bookable_doctors_count,
+                    COUNT(DISTINCT CASE WHEN d.enabled_for_online_booking=True and dc.enabled_for_online_booking=True
+                    and h.enabled_for_online_booking=True 
+                    and ST_DWithin(ea.centroid::geography,h.location::geography,2000)then d.id else null end) as bookable_doctors_2km,
                     case when ea.type = 'SUBLOCALITY' then ea.id end as sublocality_id,
                     case when ea.type = 'LOCALITY' then ea.id end as locality_id,
                     case when ea.type = 'LOCALITY' then 'DOCTORS_CITY' else 'DOCTORS_LOCALITY_CITY' end as sitemap_identifier,
@@ -105,11 +127,11 @@ class DoctorURL():
                     from entity_address ea inner join hospital h on ((ea.type = 'LOCALITY' and 
                     ST_DWithin(ea.centroid::geography,h.location::geography,15000)) OR 
                     (ea.type = 'SUBLOCALITY' and ST_DWithin(ea.centroid::geography,h.location::geography,5000))) and h.is_live=true
-                    and ea.type IN ('SUBLOCALITY' , 'LOCALITY') and ea.use_in_url=true
-                    inner join doctor_clinic dc on dc.hospital_id = h.id
+                    and ea.type IN ('SUBLOCALITY' , 'LOCALITY') and ea.use_in_url=true and lower(ea.alternative_value) = lower(h.city_search_key)
+                    inner join doctor_clinic dc on dc.hospital_id = h.id 
                     and dc.enabled=true inner join doctor d on dc.doctor_id= d.id and d.is_live=true
                     where ea.id>=%d and ea.id<%d
-                    group by ea.id having count(distinct d.id)>=3'''            
+                    group by ea.id having count(distinct d.id)>=3)a'''
 
         start = self.min_ea
         while start < self.max_ea:
