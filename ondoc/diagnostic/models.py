@@ -1,3 +1,4 @@
+from collections import OrderedDict
 from copy import deepcopy
 
 from django.contrib.gis.db import models
@@ -48,13 +49,15 @@ from django.contrib.contenttypes.fields import GenericRelation
 from django.contrib.contenttypes.fields import GenericForeignKey
 from django.contrib.contenttypes.models import ContentType
 from ondoc.matrix.tasks import push_appointment_to_matrix, push_onboarding_qcstatus_to_matrix
+from ondoc.integrations.task import push_lab_appointment_to_integrator, get_integrator_order_status
 from ondoc.location import models as location_models
 from ondoc.ratings_review import models as ratings_models
-from decimal import Decimal
-from ondoc.common.models import AppointmentHistory, AppointmentMaskNumber
+from ondoc.api.v1.common import serializers as common_serializers
+from ondoc.common.models import AppointmentHistory, AppointmentMaskNumber, Remark, GlobalNonBookable
 import reversion
 from decimal import Decimal
 from django.utils.text import slugify
+#from ondoc.api.v1.diagnostic import serializers as diagnostic_serializers
 
 logger = logging.getLogger(__name__)
 
@@ -218,12 +221,20 @@ class Lab(TimeStampedModel, CreatedByModel, QCModel, SearchKey):
     merchant_payout = GenericRelation(account_model.MerchantPayout)
     avg_rating = models.DecimalField(max_digits=5, decimal_places=2, null=True, editable=False)
     lab_priority = models.PositiveIntegerField(blank=False, null=False, default=1)
+    open_for_communication = models.BooleanField(default=True)
+    remark = GenericRelation(Remark)
 
     def __str__(self):
         return self.name
 
     class Meta:
         db_table = "lab"
+
+    def open_for_communications(self):
+        if (self.network and self.network.open_for_communication) or (not self.network and self.open_for_communication):
+            return True
+
+        return False
 
     def convert_min(self, min):
         min_str = str(min)
@@ -462,6 +473,97 @@ class Lab(TimeStampedModel, CreatedByModel, QCModel, SearchKey):
             query = '''UPDATE lab l set avg_rating = (select avg(ratings) from ratings_review where content_type_id={} and object_id=l.id) '''.format(cid)
             cursor.execute(query)
 
+    def get_timing(self, is_home_pickup):
+        from ondoc.api.v1.common import serializers as common_serializers
+        date = datetime.datetime.today().strftime('%Y-%m-%d')
+        lab_timing_queryset = self.lab_timings.filter(for_home_pickup=is_home_pickup)
+        lab_slots = []
+        if not lab_timing_queryset or (is_home_pickup and not lab_timing_queryset[0].lab.is_home_collection_enabled):
+            res_data = OrderedDict()
+            for i in range(30):
+                converted_date = (datetime.datetime.now() + datetime.timedelta(days=i))
+                readable_date = converted_date.strftime("%Y-%m-%d")
+                res_data[readable_date] = list()
+
+            res_data = {"time_slots": res_data, "upcoming_slots": [], "is_thyrocare": False}
+            return res_data
+        else:
+            global_leave_serializer = common_serializers.GlobalNonBookableSerializer(
+                GlobalNonBookable.objects.filter(deleted_at__isnull=True, booking_type=GlobalNonBookable.LAB), many=True)
+            total_leaves = dict()
+            total_leaves['global'] = global_leave_serializer.data
+
+        obj = TimeSlotExtraction()
+
+        if not is_home_pickup and lab_timing_queryset[0].lab.always_open:
+            for day in range(0, 7):
+                obj.form_time_slots(day, 0.0, 23.75, None, True)
+
+        else:
+            for data in lab_timing_queryset:
+                obj.form_time_slots(data.day, data.start, data.end, None, True)
+
+        global_leave_serializer = common_serializers.GlobalNonBookableSerializer(
+            GlobalNonBookable.objects.filter(deleted_at__isnull=True,
+                                             booking_type=GlobalNonBookable.LAB), many=True)
+
+        booking_details = {"type": "lab", "is_home_pickup": is_home_pickup}
+        resp_list = obj.get_timing_slots(date, global_leave_serializer.data, booking_details)
+        is_thyrocare = False
+        lab_id = self.id
+        if lab_id and settings.THYROCARE_NETWORK_ID:
+            if Lab.objects.filter(id=lab_id, network_id=settings.THYROCARE_NETWORK_ID).exists():
+                is_thyrocare = True
+
+        # today_min, tomorrow_min, today_max = obj.initial_start_times(is_thyrocare=is_thyrocare,
+        #                                                              is_home_pickup=is_home_pickup,
+        #                                                              time_slots=resp_list)
+        # res_data = {
+        #     "time_slots": resp_list,
+        #     "today_min": today_min,
+        #     "tomorrow_min": tomorrow_min,
+        #     "today_max": today_max
+        # }
+
+        upcoming_slots = obj.get_upcoming_slots(time_slots=resp_list)
+        res_data = {"time_slots": resp_list, "upcoming_slots": upcoming_slots, "is_thyrocare": False}
+        return res_data
+
+    def get_available_slots(self, is_home_pickup, pincode, date):
+        from ondoc.integrations.models import IntegratorMapping
+        from ondoc.integrations import service
+
+        integration_dict = None
+        lab = Lab.objects.filter(id=self.id).first()
+        if lab:
+            if lab.network and lab.network.id:
+                integration_dict = IntegratorMapping.get_if_third_party_integration(network_id=lab.network.id)
+
+                if lab.network.id == settings.THYROCARE_NETWORK_ID and settings.THYROCARE_INTEGRATION_ENABLED:
+                    pass
+                else:
+                    integration_dict = None
+
+        if not integration_dict:
+            available_slots = lab.get_timing(is_home_pickup)
+        else:
+            class_name = integration_dict['class_name']
+            integrator_obj = service.create_integrator_obj(class_name)
+            available_slots = integrator_obj.get_appointment_slots(pincode, date,
+                                                                   is_home_pickup=is_home_pickup)
+
+        return available_slots
+
+    def is_integrated(self):
+        from ondoc.integrations.models import IntegratorMapping
+
+        integration_dict = None
+        if self.network and self.network.id:
+            integration_dict = IntegratorMapping.get_if_third_party_integration(network_id=self.network.id)
+        if not integration_dict:
+            return False
+        else:
+            return True
 
 class LabCertification(TimeStampedModel):
     lab = models.ForeignKey(Lab, related_name = 'lab_certificate', on_delete=models.CASCADE)
@@ -528,15 +630,75 @@ class LabImage(TimeStampedModel, Image):
 
 class LabBookingClosingManager(models.Manager):
 
-    def lab_booking_slots(self, *args, **kwargs):
+    # def lab_booking_slots_new(self, *args, **kwargs):
+    #
+    #     is_home_pickup = kwargs.get("for_home_pickup", False)
+    #
+    #     if is_home_pickup:
+    #         kwargs["lab__is_home_collection_enabled"] = is_home_pickup
+    #     lab_timing_queryset = LabTiming.timing_manager.filter(**kwargs)
+    #
+    #     if not lab_timing_queryset or (is_home_pickup and not lab_timing_queryset[0].lab.is_home_collection_enabled):
+    #         return {
+    #             "time_slots": [],
+    #             "today_min": None,
+    #             "tomorrow_min": None,
+    #             "today_max": None
+    #         }
+    #
+    #     else:
+    #         obj = TimeSlotExtraction()
+    #         threshold = lab_timing_queryset[0].lab.booking_closing_hours_from_dayend
+    #
+    #         if not is_home_pickup and lab_timing_queryset[0].lab.always_open:
+    #             for day in range(0, 7):
+    #                 obj.form_time_slots(day, 0.0, 23.75, None, True)
+    #
+    #         else:
+    #             for data in lab_timing_queryset:
+    #                 obj.form_time_slots(data.day, data.start, data.end, None, True)
+    #             # daywise_data_array = sorted(lab_timing_queryset, key=lambda k: [k.day, k.start], reverse=True)
+    #             # day, end = daywise_data_array[0].day, daywise_data_array[0].end
+    #             # end = end - threshold
+    #             # for data in daywise_data_array:
+    #             #     if data.day != day:
+    #             #         day = data.day
+    #             #         end = data.end - threshold
+    #             #     if not end <= data.start <= data.end:
+    #             #         if data.start <= end <= data.end:
+    #             #             data.end = end
+    #             #         obj.form_time_slots(data.day, data.start, data.end, None, True)
+    #         global_leave_serializer = common_serializers.GlobalNonBookableSerializer(
+    #                             GlobalNonBookable.objects.filter(deleted_at__isnull=True,
+    #                                                              booking_type=GlobalNonBookable.DOCTOR), many=True)
+    #         date = datetime.datetime.today().strftime('%Y-%m-%d')
+    #         # resp_list = obj.get_timing_list()
+    #         resp_list = obj.get_timing_slots(date, global_leave_serializer.data, "lab")
+    #         is_thyrocare = False
+    #         lab_id = kwargs.get("lab__id", None)
+    #         if lab_id and settings.THYROCARE_NETWORK_ID:
+    #             if Lab.objects.filter(id=lab_id, network_id=settings.THYROCARE_NETWORK_ID).exists():
+    #                 is_thyrocare = True
+    #
+    #         today_min, tomorrow_min, today_max = obj.initial_start_times(is_thyrocare=is_thyrocare, is_home_pickup=is_home_pickup, time_slots=resp_list)
+    #         res_data = {
+    #             "time_slots": resp_list,
+    #             "today_min": today_min,
+    #             "tomorrow_min": tomorrow_min,
+    #             "today_max": today_max
+    #         }
+    #
+    #         return res_data
 
+    def lab_booking_slots(self, *args, **kwargs):
         is_home_pickup = kwargs.get("for_home_pickup", False)
 
         if is_home_pickup:
             kwargs["lab__is_home_collection_enabled"] = is_home_pickup
         lab_timing_queryset = LabTiming.timing_manager.filter(**kwargs)
 
-        if not lab_timing_queryset or (is_home_pickup and not lab_timing_queryset[0].lab.is_home_collection_enabled):
+        if not lab_timing_queryset or (
+                is_home_pickup and not lab_timing_queryset[0].lab.is_home_collection_enabled):
             return {
                 "time_slots": [],
                 "today_min": None,
@@ -574,7 +736,9 @@ class LabBookingClosingManager(models.Manager):
                 if Lab.objects.filter(id=lab_id, network_id=settings.THYROCARE_NETWORK_ID).exists():
                     is_thyrocare = True
 
-            today_min, tomorrow_min, today_max = obj.initial_start_times(is_thyrocare=is_thyrocare, is_home_pickup=is_home_pickup, time_slots=resp_list)
+            today_min, tomorrow_min, today_max = obj.initial_start_times(is_thyrocare=is_thyrocare,
+                                                                         is_home_pickup=is_home_pickup,
+                                                                         time_slots=resp_list)
             res_data = {
                 "time_slots": resp_list,
                 "today_min": today_min,
@@ -645,6 +809,8 @@ class LabNetwork(TimeStampedModel, CreatedByModel, QCModel):
     merchant = GenericRelation(auth_model.AssociatedMerchant)
     merchant_payout = GenericRelation(account_model.MerchantPayout)
     is_mask_number_required = models.BooleanField(default=True)
+    open_for_communication = models.BooleanField(default=True)
+    remark = GenericRelation(Remark)
 
     def all_associated_labs(self):
         if self.id:
@@ -764,6 +930,7 @@ class LabTestSubType(TimeStampedModel):
 
 class TestParameter(TimeStampedModel):
     name = models.CharField(max_length=200, unique=True)
+    details = models.CharField(max_length=10000, null=True, blank=True)
     # lab_test = models.ForeignKey('LabTest', on_delete=models.DO_NOTHING, null=True, blank=True)
 
     class Meta:
@@ -1033,6 +1200,9 @@ class AvailableLabTest(TimeStampedModel):
     enabled = models.BooleanField(default=False)
     lab_pricing_group = models.ForeignKey(LabPricingGroup, blank=True, null=True, on_delete=models.SET_NULL,
                                           related_name='available_lab_tests')
+    supplier_name = models.CharField(null=True, blank=True, max_length=40, default=None)
+    supplier_price = models.DecimalField(default=None, max_digits=10, decimal_places=2, null=True, blank=True)
+    desired_docprime_price = models.DecimalField(default=None, max_digits=10, decimal_places=2, null=True, blank=True)
     rating = GenericRelation(ratings_models.RatingsReview)
 
 
@@ -1045,10 +1215,17 @@ class AvailableLabTest(TimeStampedModel):
         #         else computed_agreed_price end), mrp) where id = %s '''
 
         query = '''update available_lab_test set computed_deal_price = 
-                   least(greatest(floor(least((case when custom_agreed_price is not null 
-                   then custom_agreed_price else computed_agreed_price end)*1.5, mrp*.8)/5)*5, case when custom_agreed_price
-                   is not null then custom_agreed_price else computed_agreed_price end), mrp)
-                   where enabled=true and id=%s ''' 
+                    least(greatest(floor(	
+                    case when (least((case when custom_agreed_price is not null 
+                    then custom_agreed_price else computed_agreed_price end)*1.5, mrp*.8) - case when custom_agreed_price
+                    is not null then custom_agreed_price else computed_agreed_price end) >100  then 
+                    least((case when custom_agreed_price is not null 
+                    then custom_agreed_price else computed_agreed_price end)*1.5, mrp*.8) else 
+                    least((case when custom_agreed_price is not null 
+                    then custom_agreed_price else computed_agreed_price end)+100, mrp) end
+                    /5)*5, case when custom_agreed_price
+                    is not null then custom_agreed_price else computed_agreed_price end), mrp)
+                    where enabled=true and id=%s '''
 
         update_available_lab_test_deal_price = RawSql(query, [self.pk]).execute()
         # deal_price = RawSql(query, [self.pk]).fetch_all()
@@ -1059,10 +1236,17 @@ class AvailableLabTest(TimeStampedModel):
     def update_all_deal_price(cls):
         # will update all lab prices
         query = '''update available_lab_test set computed_deal_price = 
-                least(greatest(floor(least((case when custom_agreed_price is not null 
-                then custom_agreed_price else computed_agreed_price end)*1.5, mrp*.8)/5)*5, case when custom_agreed_price
-                is not null then custom_agreed_price else computed_agreed_price end), mrp)
-                where enabled=true'''
+                    least(greatest(floor(	
+                    case when (least((case when custom_agreed_price is not null 
+                    then custom_agreed_price else computed_agreed_price end)*1.5, mrp*.8) - case when custom_agreed_price
+                    is not null then custom_agreed_price else computed_agreed_price end) >100  then 
+                    least((case when custom_agreed_price is not null 
+                    then custom_agreed_price else computed_agreed_price end)*1.5, mrp*.8) else 
+                    least((case when custom_agreed_price is not null 
+                    then custom_agreed_price else computed_agreed_price end)+100, mrp) end
+                    /5)*5, case when custom_agreed_price
+                    is not null then custom_agreed_price else computed_agreed_price end), mrp)
+                    where enabled=true'''
 
         update_all_available_lab_test_deal_price = RawSql(query, []).execute()
 
@@ -1078,8 +1262,11 @@ class AvailableLabTest(TimeStampedModel):
             # self.computed_deal_price = self.get_computed_deal_price()
             self.computed_deal_price = self.computed_agreed_price
         super(AvailableLabTest, self).save(*args, **kwargs)
-        self.update_deal_price()
 
+        transaction.on_commit(lambda: self.app_commit_tasks())
+
+    def app_commit_tasks(self):
+        self.update_deal_price()
 
     def get_computed_deal_price(self):
         if self.test.test_type == LabTest.RADIOLOGY:
@@ -1242,13 +1429,24 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin)
     def get_cancellation_reason(self):
         return CancellationReason.objects.filter(Q(type=Order.LAB_PRODUCT_ID) | Q(type__isnull=True),
                                                  visible_on_front_end=True)
+    # @staticmethod
+    # def get_upcoming_appointment_serialized(user_id):
+    #     response_appointment = LabAppointment.get_upcoming_appointment(user_id)
+    #     appointment = diagnostic_serializers.LabAppointmentUpcoming(response_appointment, many=True)
+    #     return appointment.data
+
+    @classmethod
+    def get_upcoming_appointment(cls, user_id):
+        current_time = timezone.now()
+        appointments = LabAppointment.objects.filter(time_slot_start__gte=current_time, user_id=user_id).exclude(
+            status__in=[LabAppointment.CANCELLED, LabAppointment.COMPLETED]).prefetch_related('tests', 'lab', 'profile')
+        return appointments
 
     def get_serialized_cancellation_reason(self):
         res = []
         for cr in self.get_cancellation_reason():
             res.append({'id': cr.id, 'name': cr.name, 'is_comment_needed': cr.is_comment_needed})
         return res
-
 
     def get_report_urls(self):
         reports = self.reports.all()
@@ -1304,7 +1502,20 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin)
             return [admin.user for admin in self.lab.manageable_lab_admins.filter(is_disabled=False)
                     if admin.user]
 
-    def app_commit_tasks(self, old_instance, push_to_matrix):
+    def created_by_native(self):
+        child_order = Order.objects.filter(reference_id=self.id).first()
+        parent_order = None
+        from_app = False
+
+        if child_order:
+            parent_order = child_order.parent
+
+        if parent_order and parent_order.visitor_info:
+            from_app = parent_order.visitor_info.get('from_app', False)
+
+        return from_app
+
+    def app_commit_tasks(self, old_instance, push_to_matrix, push_to_integrator):
         if push_to_matrix:
             # Push the appointment data to the matrix
             try:
@@ -1313,6 +1524,22 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin)
                       'sub_product_id': 2},), countdown=5)
             except Exception as e:
                 logger.error(str(e))
+
+        is_thyrocare_enabled = False
+        if not self.created_by_native() and False:
+            if push_to_integrator:
+                if self.lab.network and self.lab.network.id == settings.THYROCARE_NETWORK_ID:
+                    if settings.THYROCARE_INTEGRATION_ENABLED:
+                        is_thyrocare_enabled = True
+
+                try:
+                    if is_thyrocare_enabled:
+                        # push_lab_appointment_to_integrator.apply_async(({'appointment_id': self.id},), countdown=5)
+                        push_lab_appointment_to_integrator.apply_async(({'appointment_id': self.id},),
+                                                                       link=get_integrator_order_status.s(appointment_id=self.id),
+                                                                       countdown=5)
+                except Exception as e:
+                    logger.error(str(e))
 
         # if push_for_mask_number:
         #     try:
@@ -1454,7 +1681,12 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin)
         if push_to_history:
             AppointmentHistory.create(content_object=self)
 
-        transaction.on_commit(lambda: self.app_commit_tasks(database_instance, push_to_matrix))
+        # Push the appointment to the integrator.
+        push_to_integrator = kwargs.get('push_to_integrator', True)
+        if 'push_to_integrator' in kwargs.keys():
+            kwargs.pop('push_to_integrator')
+
+        transaction.on_commit(lambda: self.app_commit_tasks(database_instance, push_to_matrix, push_to_integrator))
 
     def save_merchant_payout(self):
         if self.payment_type in [OpdAppointment.COD]:
@@ -1814,12 +2046,20 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin)
 
     def trigger_created_event(self, visitor_info):
         from ondoc.tracking.models import TrackingEvent
+        from ondoc.tracking.mongo_models import TrackingEvent as MongoTrackingEvent
         try:
             with transaction.atomic():
                 event_data = TrackingEvent.build_event_data(self.user, TrackingEvent.LabAppointmentBooked, appointmentId=self.id)
                 if event_data and visitor_info:
                     TrackingEvent.save_event(event_name=event_data.get('event'), data=event_data, visit_id=visitor_info.get('visit_id'),
                                              user=self.user, triggered_at=datetime.datetime.utcnow())
+
+                    if settings.MONGO_STORE:
+                        MongoTrackingEvent.save_event(event_name=event_data.get('event'), data=event_data,
+                                                 visit_id=visitor_info.get('visit_id'),
+                                                 visitor_id=visitor_info.get('visitor_id'),
+                                                 user=self.user, triggered_at=datetime.datetime.utcnow())
+
         except Exception as e:
             logger.error("Could not save triggered event - " + str(e))
 

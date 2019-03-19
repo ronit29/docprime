@@ -102,6 +102,10 @@ class Order(TimeStampedModel):
         from ondoc.api.v1.doctor.serializers import OpdAppTransactionModelSerializer
         from ondoc.api.v1.diagnostic.serializers import LabAppTransactionModelSerializer
 
+        # skip if order already processed
+        if self.reference_id:
+            raise Exception("Order already processed - " + str(self.id))
+
         # Initial validations for appointment data
         appointment_data = self.action_data
         # Check if payment is required at all, only when payment is required we debit consumer's account
@@ -342,7 +346,7 @@ class Order(TimeStampedModel):
             with transaction.atomic():
                 event_api = EventCreateViewSet()
                 visitor_id, visit_id = event_api.get_visit(request)
-                visitor_info = { "visitor_id": visitor_id, "visit_id": visit_id }
+                visitor_info = { "visitor_id": visitor_id, "visit_id": visit_id, "from_app": request.data.get("from_app", None) }
         except Exception as e:
             logger.log("Could not fecth visitor info - " + str(e))
 
@@ -1325,7 +1329,7 @@ class UserReferrals(TimeStampedModel):
     COMPLETION_CASHBACK = 50
 
     code = models.CharField(max_length=10, unique=True)
-    user = models.ForeignKey(User, on_delete=models.DO_NOTHING, unique=True)
+    user = models.ForeignKey(User, on_delete=models.DO_NOTHING, unique=True, related_name='referral')
 
     def save(self, *args, **kwargs):
         if not self.code:
@@ -1363,3 +1367,13 @@ class UserReferred(TimeStampedModel):
     class Meta:
         db_table = "user_referred"
 
+
+class PgLogs(TimeStampedModel):
+    decoded_response = JSONField(blank=True, null=True)
+    coded_response = models.TextField(blank=True, null=True)
+
+    def __str__(self):
+        return "{}".format(self.id)
+
+    class Meta:
+        db_table = "pg_log"

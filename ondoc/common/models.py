@@ -1,4 +1,5 @@
 from django.contrib.postgres.fields import JSONField
+from django.core.validators import FileExtensionValidator
 from django.db import models
 from django.contrib.contenttypes.fields import GenericForeignKey
 from django.contrib.contenttypes.models import ContentType
@@ -7,6 +8,7 @@ from ondoc.authentication.models import TimeStampedModel
 # from ondoc.doctor.models import OpdAppointment
 # from ondoc.diagnostic.models import LabAppointment
 from ondoc.authentication.models import User
+from ondoc.authentication import models as auth_model
 
 
 class Cities(models.Model):
@@ -35,7 +37,8 @@ class AppointmentHistory(TimeStampedModel):
     WEB = "web"
     DOC_APP = "d_app"
     CONSUMER_APP = "c_app"
-    SOURCE_CHOICES = ((CONSUMER_APP, "Consumer App"), (CRM, "CRM"), (WEB, "Web"), (DOC_APP, "Doctor App"))
+    DOC_WEB = "d_web"
+    SOURCE_CHOICES = ((CONSUMER_APP, "Consumer App"), (CRM, "CRM"), (WEB, "Consumer Web"), (DOC_APP, "Doctor App"), (DOC_WEB, "Provider Web"))
     content_type = models.ForeignKey(ContentType, on_delete=models.DO_NOTHING)
     object_id = models.PositiveIntegerField()
     content_object = GenericForeignKey()
@@ -156,3 +159,112 @@ class AppointmentMaskNumber(TimeStampedModel):
 
     class Meta:
         db_table = 'appointment_mask_number'
+
+
+class GlobalNonBookable(TimeStampedModel):
+    INTERVAL_MAPPING = {
+        ("00:00:00", "14:00:00"): 'morning',
+        ("14:00:00", "23:59:59"): 'evening',
+        ("00:00:00", "23:59:59"): 'all',
+    }
+
+    DOCTOR = "doctor"
+    LAB = "lab"
+    BOOKING_TYPE_CHOICES = ((DOCTOR, "Doctor Clinic"), (LAB, "Lab"))
+    booking_type = models.CharField(max_length=20, blank=False, choices=BOOKING_TYPE_CHOICES, null=False)
+    start_date = models.DateField(null=False)
+    end_date = models.DateField(null=False)
+    start_time = models.TimeField(null=False)
+    end_time = models.TimeField(null=False)
+    deleted_at = models.DateTimeField(null=True, blank=True)
+
+    def start_time_in_float(self):
+        start_time = self.start_time
+        start_time = round(float(start_time.hour) + (float(start_time.minute) * 1 / 60), 2)
+        return start_time
+
+    def end_time_in_float(self):
+        end_time = self.end_time
+        end_time = round(float(end_time.hour) + (float(end_time.minute) * 1 / 60), 2)
+        return end_time
+
+    class Meta:
+        db_table = 'global_non_bookable_timing'
+
+    @property
+    def interval(self):
+        return self.INTERVAL_MAPPING.get((str(self.start_time), str(self.end_time)))
+
+
+class Feature(TimeStampedModel):
+    icon = models.ImageField('Feature image', upload_to='feature/images')
+    name = models.CharField(max_length=100)
+    priority = models.PositiveSmallIntegerField(default=0)
+
+    class Meta:
+        db_table = 'feature'
+
+    def __str__(self):
+        return self.name
+
+
+class Service(TimeStampedModel):
+    icon = models.ImageField('Service image', upload_to='service/images')
+    name = models.CharField(max_length=100)
+
+    class Meta:
+        db_table = 'service'
+
+    def __str__(self):
+        return self.name
+
+class Remark(auth_model.TimeStampedModel):
+    FEEDBACK = 1
+    REOPEN = 2
+    OTHER = 3
+    STATUS_CHOICES = [("", "Select"), (FEEDBACK, "Feedback"), (REOPEN, "Reopen"), (OTHER, "Other")]
+
+    content_type = models.ForeignKey(ContentType, on_delete=models.DO_NOTHING)
+    object_id = models.PositiveIntegerField()
+    content_object = GenericForeignKey()
+    user = models.ForeignKey(auth_model.User, on_delete=models.SET_NULL, null=True, blank=True)
+    content = models.TextField()
+    status = models.PositiveSmallIntegerField(default=0, choices=STATUS_CHOICES)
+
+    class Meta:
+        db_table = 'remark'
+
+
+class MatrixMappedState(models.Model):
+    name = models.CharField(max_length=48, db_index=True)
+
+    def __str__(self):
+        return "{}".format(self.name)
+
+    class Meta:
+        db_table = 'matrix_mapped_state'
+        verbose_name_plural = "Matrix Mapped States"
+
+
+class MatrixMappedCity(models.Model):
+    name = models.CharField(max_length=48, db_index=True)
+    state = models.ForeignKey(MatrixMappedState, on_delete=models.SET_NULL, null=True, blank=True)
+
+    def __str__(self):
+        return "{}".format(self.name)
+
+    class Meta:
+        db_table = 'matrix_mapped_city'
+        verbose_name_plural = "Matrix Mapped Cities"
+
+
+class QRCode(TimeStampedModel):
+    content_type = models.ForeignKey(ContentType, on_delete=models.CASCADE, null=True)
+    object_id = models.PositiveIntegerField(null=True)
+    content_object = GenericForeignKey()
+    name = models.FileField(upload_to='qrcode', validators=[
+        FileExtensionValidator(allowed_extensions=['pdf', 'jfif', 'jpg', 'jpeg', 'png'])])
+    # name = models.ImageField(upload_to='qrcode', blank=True, null=True)
+
+    class Meta:
+        db_table = 'qr_code'
