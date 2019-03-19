@@ -1347,3 +1347,11 @@ def datetime_to_formated_string(instance, time_format='%Y-%m-%d %H:%M:%S', to_zo
     formated_date = datetime.datetime.strftime(instance, time_format)
     return formated_date
 
+def get_package_free_or_not_dict(request):
+    from ondoc.subscription_plan.models import UserPlanMapping
+    package_free_or_not_dict = defaultdict(bool)
+    if request.user and request.user.is_authenticated:
+        free_test_in_user_plan = UserPlanMapping.get_free_tests(request.user)
+        for temp_user_plan_package in free_test_in_user_plan:
+            package_free_or_not_dict[temp_user_plan_package] = True
+    return package_free_or_not_dict

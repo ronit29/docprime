@@ -183,7 +183,7 @@ class Order(TimeStampedModel):
                 }
         elif self.action == Order.SUBSCRIPTION_PLAN_BUY:
             amount = Decimal(appointment_data.get('extra_details').get('deal_price', float('inf')))
-            if consumer_account.balance > amount:
+            if consumer_account.balance >= amount:
                 new_appointment_data = appointment_data
                 appointment_obj = UserPlanMapping(**new_appointment_data)
                 appointment_obj.save()
@@ -686,7 +686,7 @@ class PgTransaction(TimeStampedModel):
     @classmethod
     def is_valid_hash(cls, data, product_id):
         client_key = secret_key = ""
-        if product_id == Order.DOCTOR_PRODUCT_ID:
+        if product_id == Order.DOCTOR_PRODUCT_ID or product_id == Order.SUBSCRIPTION_PLAN_PRODUCT_ID:
             client_key = settings.PG_CLIENT_KEY_P1
             secret_key = settings.PG_SECRET_KEY_P1
         elif product_id == Order.LAB_PRODUCT_ID:

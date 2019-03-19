@@ -19,7 +19,7 @@ from ondoc.coupon.models import Coupon
 from ondoc.doctor import models as doctor_model
 from ondoc.api.v1 import insurance as insurance_utility
 from ondoc.api.v1.utils import form_time_slot, IsConsumer, labappointment_transform, IsDoctor, payment_details, \
-    aware_time_zone, get_lab_search_details, TimeSlotExtraction, RawSql, util_absolute_url
+    aware_time_zone, get_lab_search_details, TimeSlotExtraction, RawSql, util_absolute_url, get_package_free_or_not_dict
 from ondoc.api.pagination import paginate_queryset
 
 from rest_framework import viewsets, mixins
@@ -50,6 +50,7 @@ from django.db.models.functions import StrIndex
 
 from ondoc.location.models import EntityUrls, EntityAddress
 from ondoc.seo.models import NewDynamic
+from ondoc.subscription_plan.models import UserPlanMapping
 from . import serializers
 import copy
 import re
@@ -196,6 +197,9 @@ class LabList(viewsets.ReadOnlyModelViewSet):
         pnt = GEOSGeometry(point_string, srid=4326)
         max_distance = max_distance*1000 if max_distance is not None else 10000
         min_distance = min_distance*1000 if min_distance is not None else 0
+
+        package_free_or_not_dict = get_package_free_or_not_dict(request)
+
         main_queryset = LabTest.objects.prefetch_related('test', 'test__recommended_categories',
                                                          'test__parameter', 'categories').filter(enable_for_retail=True,
                                                                                                  searchable=True,
@@ -356,7 +360,8 @@ class LabList(viewsets.ReadOnlyModelViewSet):
             category_data[temp_package.id] = list(single_test_data.values())
         serializer = CustomLabTestPackageSerializer(all_packages, many=True,
                                                     context={'entity_url_dict': entity_url_dict, 'lab_data': lab_data,
-                                                             'request': request, 'category_data': category_data})
+                                                             'request': request, 'category_data': category_data,
+                                                             'package_free_or_not_dict': package_free_or_not_dict})
         category_queryset = LabTestCategory.objects.filter(id__in=category_to_be_shown_in_filter_ids).order_by('-priority')
         category_result = []
         for category in category_queryset:
@@ -1248,6 +1253,7 @@ class LabList(viewsets.ReadOnlyModelViewSet):
 
     @transaction.non_atomic_requests
     def retrieve(self, request, lab_id, entity=None):
+
         lab_obj = Lab.objects.select_related('network')\
                              .prefetch_related('rating', 'lab_documents')\
                              .filter(id=lab_id, is_live=True).first()
@@ -1262,6 +1268,7 @@ class LabList(viewsets.ReadOnlyModelViewSet):
                 entity = entity[0]
 
         test_ids = (request.query_params.get("test_ids").split(",") if request.query_params.get('test_ids') else [])
+        package_free_or_not_dict = get_package_free_or_not_dict(request)
         queryset = AvailableLabTest.objects.prefetch_related('test__labtests__parameter',
                                                              'test__packages__lab_test__recommended_categories',
                                                              'test__packages__lab_test__labtests__parameter').filter(
@@ -1273,10 +1280,13 @@ class LabList(viewsets.ReadOnlyModelViewSet):
             test__in=test_ids)
 
         test_serializer = diagnostic_serializer.AvailableLabTestPackageSerializer(queryset, many=True,
-                                                                           context={"lab": lab_obj})
+                                                                                  context={"lab": lab_obj,
+                                                                                           "package_free_or_not_dict": package_free_or_not_dict})
         # for Demo
         demo_lab_test = AvailableLabTest.objects.filter(test__enable_for_retail=True, lab_pricing_group=lab_obj.lab_pricing_group, enabled=True, test__searchable=True).order_by("-test__priority").prefetch_related('test')[:2]
-        lab_test_serializer = diagnostic_serializer.AvailableLabTestSerializer(demo_lab_test, many=True, context={"lab": lab_obj})
+        lab_test_serializer = diagnostic_serializer.AvailableLabTestSerializer(demo_lab_test, many=True,
+                                                                               context={"lab": lab_obj,
+                                                                                        "package_free_or_not_dict": package_free_or_not_dict})
         # day_now = timezone.now().weekday()
         timing_queryset = list()
         lab_serializable_data = list()
@@ -2035,9 +2045,10 @@ class AvailableTestViewSet(mixins.RetrieveModelMixin,
 
         # queryset = queryset[:20]
         paginated_queryset = paginate_queryset(queryset, request)
-
+        package_free_or_not_dict = get_package_free_or_not_dict(request)
         serializer = diagnostic_serializer.AvailableLabTestSerializer(paginated_queryset, many=True,
-                                                                      context={"lab": lab_obj})
+                                                                      context={"lab": lab_obj,
+                                                                               "package_free_or_not_dict": package_free_or_not_dict})
         return Response(serializer.data)
 
 

@@ -244,6 +244,11 @@ class AvailableLabTestPackageSerializer(serializers.ModelSerializer):
     package = serializers.SerializerMethodField()
     parameters = serializers.SerializerMethodField()
     hide_price = serializers.ReadOnlyField(source='test.hide_price')
+    included_in_user_plan = serializers.SerializerMethodField()
+
+    def get_included_in_user_plan(self, obj):
+        package_free_or_not_dict = self.context.get('package_free_or_not_dict', {})
+        return package_free_or_not_dict.get(obj.test.id, False)
 
     def get_is_home_collection_enabled(self, obj):
         if self.context.get("lab") is not None:
@@ -307,7 +312,8 @@ class AvailableLabTestPackageSerializer(serializers.ModelSerializer):
     class Meta:
         model = AvailableLabTest
         fields = ('test_id', 'mrp', 'test', 'agreed_price', 'deal_price', 'enabled', 'is_home_collection_enabled',
-                  'package', 'parameters', 'is_package', 'number_of_tests', 'why', 'pre_test_info', 'expected_tat', 'hide_price')
+                  'package', 'parameters', 'is_package', 'number_of_tests', 'why', 'pre_test_info', 'expected_tat',
+                  'hide_price', 'included_in_user_plan')
 
 
 class AvailableLabTestSerializer(serializers.ModelSerializer):
@@ -316,6 +322,11 @@ class AvailableLabTestSerializer(serializers.ModelSerializer):
     agreed_price = serializers.SerializerMethodField()
     deal_price = serializers.SerializerMethodField()
     is_home_collection_enabled = serializers.SerializerMethodField()
+    included_in_user_plan = serializers.SerializerMethodField()
+
+    def get_included_in_user_plan(self, obj):
+        package_free_or_not_dict = self.context.get('package_free_or_not_dict', {})
+        return package_free_or_not_dict.get(obj.test.id, False)
 
     def get_is_home_collection_enabled(self, obj):
         if self.context.get("lab") is not None:
@@ -335,7 +346,7 @@ class AvailableLabTestSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = AvailableLabTest
-        fields = ('test_id', 'mrp', 'test', 'agreed_price', 'deal_price', 'enabled', 'is_home_collection_enabled')
+        fields = ('test_id', 'mrp', 'test', 'agreed_price', 'deal_price', 'enabled', 'is_home_collection_enabled', 'included_in_user_plan')
 
 
 class LabAppointmentTestMappingSerializer(serializers.ModelSerializer):
@@ -1165,13 +1176,18 @@ class CustomLabTestPackageSerializer(serializers.ModelSerializer):
     priority_score = serializers.SerializerMethodField()
     category_details = serializers.SerializerMethodField()
     tests = serializers.SerializerMethodField()
+    included_in_user_plan = serializers.SerializerMethodField()
 
     class Meta:
         model = LabTest
         fields = ('id', 'name', 'lab', 'mrp', 'distance', 'price', 'lab_timing', 'lab_timing_data', 'next_lab_timing',
                   'next_lab_timing_data', 'test_type', 'is_package', 'number_of_tests', 'why', 'pre_test_info',
                   'is_package', 'pickup_charges', 'pickup_available', 'distance_related_charges', 'priority',
-                  'show_details', 'categories', 'url', 'priority_score', 'category_details', 'tests')
+                  'show_details', 'categories', 'url', 'priority_score', 'category_details', 'tests', 'included_in_user_plan')
+
+    def get_included_in_user_plan(self, obj):
+        package_free_or_not_dict = self.context.get('package_free_or_not_dict', {})
+        return package_free_or_not_dict.get(obj.id, False)
 
     def get_priority_score(self, obj):
         return int(obj.priority_score)

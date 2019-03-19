@@ -2,13 +2,15 @@ import datetime
 
 from django.contrib.postgres.fields import JSONField
 from django.db import models, transaction
+from django.db.models import Count
 from django.utils import timezone
 import logging
 from ondoc.account.models import ConsumerAccount, Order, MoneyPool
 from ondoc.api.v1.utils import payment_details
 from ondoc.authentication import models as auth_model
 from ondoc.authentication.models import User
-from ondoc.diagnostic.models import LabNetwork, Lab, LabTest
+from ondoc.diagnostic.models import LabNetwork, Lab, LabTest, LabAppointment
+
 # Create your models here.
 
 logger = logging.getLogger(__name__)
@@ -171,3 +173,20 @@ class UserPlanMapping(auth_model.TimeStampedModel):
             resp["status"] = 1
             resp['data'], resp["payment_required"] = payment_details(request, pg_order)
         return resp
+
+    @staticmethod
+    def get_active_plans(user):
+        return user.plan_mapping.filter(is_active=True, expire_at__gt=timezone.now())
+
+    @classmethod
+    def get_free_tests(cls, user):
+        from django.db.models import F
+        active_plan_mapping = cls.get_active_plans(user).first()
+        if not active_plan_mapping:
+            return []
+        plan_test_count = active_plan_mapping.plan.feature_mappings.filter(enabled=True).values('count', test_id=F('feature__test_id'))
+        # used_test_count = LabAppointment.objects.exclude(status=LabAppointment.CANCELLED).filter(user=user).annotate(
+        #     booked_test=F('test_mappings__test')).values('booked_test').filter(booked_test__isnull=False).annotate(
+        #     count=Count('booked_test'))
+        # TODO : SHASHANK_SINGH return difference of both
+        return [x['test_id'] for x in plan_test_count]
