@@ -62,7 +62,7 @@ def setup_periodic_tasks(sender, **kwargs):
 
     elastic_sync_cron_schedule = crontab(hour=19, minute=00)
     elastic_sync_post_cron_schedule = crontab(hour=20, minute=00)
-    update_ben_status_time = float(settings.UPDATE_BEN_STATUS_FROM_PGfloat) * float(60.0)
+    update_ben_status_time = float(settings.UPDATE_BEN_STATUS_FROM_PG) * float(60.0)
 
     sender.add_periodic_task(elastic_sync_cron_schedule, dump_to_elastic.s(), name='Sync Elastic')
     sender.add_periodic_task(elastic_sync_post_cron_schedule, elastic_alias_switch.s(), name='Sync Elastic alias')
