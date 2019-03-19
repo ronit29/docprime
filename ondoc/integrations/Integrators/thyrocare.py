@@ -59,13 +59,13 @@ class Thyrocare(BaseIntegrator):
             return None
 
         for result_obj in result_array:
-            defaults = {'integrator_product_data': result_obj, 'service_type': IntegratorMapping.ServiceType.LabTest,
-                        'integrator_class_name': Thyrocare.__name__,
+            defaults = {'integrator_product_data': result_obj, 'integrator_class_name': Thyrocare.__name__,
                         'content_type': ContentType.objects.get(model='labnetwork')}
-
             if type == 'TESTS':
+                defaults = {'service_type': IntegratorMapping.ServiceType.LabTest}
                 IntegratorMapping.objects.update_or_create(integrator_test_name=result_obj['name'], object_id=obj_id, defaults=defaults)
             else:
+                defaults = {'integrator_type': result_obj['type'], 'service_type': IntegratorProfileMapping.ServiceType.LabTest}
                 IntegratorProfileMapping.objects.update_or_create(integrator_package_name=result_obj['name'], object_id=obj_id, defaults=defaults)
 
     @classmethod
