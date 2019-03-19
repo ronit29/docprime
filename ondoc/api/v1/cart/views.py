@@ -47,6 +47,11 @@ class CartViewSet(viewsets.GenericViewSet):
 
         if data['data']['is_appointment_insured']:
             data['data']['payment_type'] = OpdAppointment.INSURANCE
+        if serialized_data.get('cart_item').id:
+            old_cart_obj = Cart.objects.filter(id=serialized_data.get('cart_item').id).first()
+            payment_type = old_cart_obj.data.get('payment_type')
+            if payment_type == OpdAppointment.INSURANCE and data['data']['is_appointment_insured'] == False:
+                data['data']['payment_type'] == OpdAppointment.PREPAID
 
         Cart.objects.update_or_create(id=cart_item_id, deleted_at__isnull=True,
                                        product_id=valid_data.get("product_id"), user=user, defaults={"data" : valid_data.get("data")})
