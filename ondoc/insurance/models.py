@@ -660,11 +660,11 @@ class UserInsurance(auth_model.TimeStampedModel):
             if not int(price_data.get('mrp')) <= threshold_opd:
                 return False, user_insurance.id, "Not Covered Under Insurance"
             gynocologist_appointment_count, oncologist_appointment_count = user_insurance.get_doctor_specialization_count(appointment_data)
-            if gynocologist_appointment_count > int(settings.INSURANCE_GYNECOLOGIST_LIMIT):
+            if gynocologist_appointment_count >= int(settings.INSURANCE_GYNECOLOGIST_LIMIT):
                 is_insured = False
                 insurance_id = user_insurance.id
                 insurance_message = "Gynocologist Appointment exceeded of limit 5"
-            elif oncologist_appointment_count > int(settings.INSURANCE_ONCOLOGIST_LIMIT):
+            elif oncologist_appointment_count >= int(settings.INSURANCE_ONCOLOGIST_LIMIT):
                 is_insured = False
                 insurance_id = user_insurance.id
                 insurance_message = "Oncologist Appointment exceeded of limit 5"
@@ -678,7 +678,7 @@ class UserInsurance(auth_model.TimeStampedModel):
         from ondoc.doctor.models import DoctorPracticeSpecialization
         all_gynecologist_list = json.loads(settings.GYNECOLOGIST_SPECIALIZATION_IDS)
         result = False
-        doctor_specialization_ids = DoctorPracticeSpecialization.objects.filter(doctor_id=doctor).values_list('id', flat=True)
+        doctor_specialization_ids = DoctorPracticeSpecialization.objects.filter(doctor_id=doctor).values_list('specialization_id', flat=True)
         for specialiization_id in doctor_specialization_ids:
             if specialiization_id in all_gynecologist_list:
                 result = True
@@ -691,7 +691,7 @@ class UserInsurance(auth_model.TimeStampedModel):
         from ondoc.doctor.models import DoctorPracticeSpecialization
         all_oncologist_list = json.loads(settings.ONCOLOGIST_SPECIALIZATION_IDS)
         result = False
-        doctor_specialization_ids = DoctorPracticeSpecialization.objects.filter(doctor_id=doctor).values_list('id', flat=True)
+        doctor_specialization_ids = DoctorPracticeSpecialization.objects.filter(doctor_id=doctor).values_list('specialization_id', flat=True)
         for specialiization_id in doctor_specialization_ids:
             if specialiization_id in all_oncologist_list:
                 result = True
@@ -721,9 +721,9 @@ class UserInsurance(auth_model.TimeStampedModel):
                                 gyno_count = gyno_count + 1
                             if is_doctor_onco:
                                 onco_count = onco_count + 1
-                            if gyno_count > int(settings.INSURANCE_GYNECOLOGIST_LIMIT):
+                            if gyno_count >= int(settings.INSURANCE_GYNECOLOGIST_LIMIT):
                                 return False, self.id,"Gynocologist limit exceeded of limit 5"
-                            if onco_count > int(settings.INSURANCE_ONCOLOGIST_LIMIT):
+                            if onco_count >= int(settings.INSURANCE_ONCOLOGIST_LIMIT):
                                 return False, self.id, "Oncologist limit exceeded of limit 5"
                         else:
                             return is_insured, insurance_id, insurance_message
