@@ -22,6 +22,11 @@ from safedelete import SOFT_DELETE
 from safedelete.models import SafeDeleteModel
 import reversion
 
+import requests
+import json
+from rest_framework import status
+from collections import OrderedDict
+
 
 class Image(models.Model):
     # name = models.ImageField(height_field='height', width_field='width')
@@ -1405,6 +1410,17 @@ class Merchant(TimeStampedModel):
     SAVINGS = 1
     CURRENT = 2
 
+    #pg merchant creation codes
+    NOT_INITIATED = 0
+    INITIATED = 1
+    INPROCESS = 2
+    COMPLETE = 3
+    FAILURE = 4
+    CREATION_STATUS_CHOICES = ((NOT_INITIATED, 'Not Initiated'),
+        (INITIATED,'Initiated'),(INPROCESS, 'In Progress'),
+         (COMPLETE, 'Complete'), (FAILURE, 'Failure')
+        )
+
     beneficiary_name = models.CharField(max_length=128, null=True)
     account_number = models.CharField(max_length=50, null=True, default=None, blank=True)
     ifsc_code = models.CharField(max_length=128, null=True)
@@ -1430,7 +1446,8 @@ class Merchant(TimeStampedModel):
     country = models.CharField(max_length=200, null=False, blank= True)
     email = models.CharField(max_length=200, null=False, blank= True)
     mobile = models.CharField(max_length=200, null=False, blank= True)
-
+    pg_status = models.PositiveIntegerField(choices=CREATION_STATUS_CHOICES, default=NOT_INITIATED, editable=False)
+    api_response = JSONField(blank=True, null=True, editable=False)
 
     class Meta:
         db_table = 'merchant'
@@ -1438,6 +1455,68 @@ class Merchant(TimeStampedModel):
     def __str__(self):
         return self.beneficiary_name+"("+self.account_number+")-("+str(self.id)+")"
 
+    def save(self, *args, **kwargs):
+        if self.verified_by_finance and self.pg_status == self.NOT_INITIATED:
+            self.create_in_pg()
+
+        super().save(*args, **kwargs)
+
+    def create_in_pg(self, *args, **kwargs):
+        resp_data = None
+        request_payload = dict()
+        request_payload["Bene_Code"] = str(self.id)
+        request_payload["Bene Name"] = self.beneficiary_name
+        request_payload["Bene Add 1"] = self.merchant_add_1
+        request_payload["Bene Add 2"] = self.merchant_add_2
+        request_payload["Bene Add 3"] = self.merchant_add_3
+        request_payload["Bene Add 4"] = self.merchant_add_4
+        request_payload["Bene Add 5"] = None
+        request_payload["Bene_City"] = self.city
+        request_payload["Bene_Pin"] = self.pin
+        request_payload["State"] = self.state
+        request_payload["Country"] = self.country
+        request_payload["Bene_Email"] = self.email
+        request_payload["Bene_Mobile"] = self.mobile
+        request_payload["Bene_Tel"] = None
+        request_payload["Bene_Fax"] = None
+        request_payload["IFSC"] = self.ifsc_code
+        request_payload["Bene_A/c No"] = self.account_number
+        request_payload["Bene Bank"] = None
+        request_payload["PaymentType"] = None
+        request_payload["isBulk"] = "0"
+
+        from ondoc.api.v1.utils import payout_checksum
+        checksum_response = payout_checksum(request_payload)
+        request_payload["hash"] = checksum_response
+        url = settings.NODAL_BENEFICIARY_API
+
+        nodal_beneficiary_api_token = settings.NODAL_BENEFICIARY_TOKEN
+
+        response = requests.post(url, data=json.dumps(request_payload), headers={'auth': nodal_beneficiary_api_token,
+                                                                              'Content-Type': 'application/json'})
+
+        if response.status_code == status.HTTP_200_OK:
+            resp_data = response.json()
+            self.api_response = resp_data
+            if resp_data.get('StatusCode') and resp_data.get('StatusCode') in [1,2,3,4]:
+                self.pg_status = resp_data.get('StatusCode')
+
+    @classmethod
+    def update_status_from_pg(cls):
+        merchant = Merchant.objects.filter(pg_status__in=[cls.INITIATED, cls.INPROCESS])
+        for data in merchant:
+            resp_data = None
+            request_payload = {"beneCode": str(data.pk)}
+            url = settings.BENE_STATUS_API
+            bene_status_token = settings.BENE_STATUS_TOKEN
+            response = requests.post(url, data=json.dumps(request_payload), headers={'auth': bene_status_token,
+                                                                                     'Content-Type': 'application/json'})
+            if response.status_code == status.HTTP_200_OK:
+                resp_data = response.json()
+                data.api_response = resp_data
+                if resp_data.get('statusCode') and resp_data.get('statusCode') in [cls.INITIATED, cls.INPROCESS]:
+                    data.pg_status = resp_data.get('statusCode')
+                    data.save()
 
 class AssociatedMerchant(TimeStampedModel):
 

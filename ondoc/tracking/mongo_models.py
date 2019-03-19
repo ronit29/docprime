@@ -23,10 +23,17 @@ class TrackingEvent(DynamicDocument, TimeStampedModel):
         visit_id = kwargs.get('visit_id', None)
         visitor_id = kwargs.get('visitor_id', None)
         user = kwargs.get('user', None)
-        triggered_at = kwargs.get('triggered_at', datetime.datetime.utcnow())
+        triggered_at = data.get('triggered_at', None)
+        if triggered_at:
+            if len(str(triggered_at)) >= 13:
+                triggered_at = triggered_at/1000
+            triggered_at = datetime.datetime.utcfromtimestamp(triggered_at)
+        else:
+            triggered_at = datetime.datetime.utcnow()
+        data.pop('triggered_at', None)
         if event_name and visit_id and visitor_id:
             event = cls(visitor_id=visitor_id, name=event_name, **data, visit_id=visit_id, user=user.id if user else None,
-                        created_at=datetime.datetime.utcnow(), updated_at=datetime.datetime.utcnow())
+                        created_at=datetime.datetime.utcnow(), updated_at=datetime.datetime.utcnow(), triggered_at=triggered_at)
             event.save()
             return event
         return None
@@ -42,3 +49,4 @@ class TrackingVisit(DynamicDocument, TimeStampedModel):
 class TrackingVisitor(DynamicDocument, TimeStampedModel):
     id = UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     device_info = DictField(null=True, blank=True)
+    client_category = StringField(max_length=100, blank=True, null=True)

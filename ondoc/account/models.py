@@ -346,7 +346,7 @@ class Order(TimeStampedModel):
             with transaction.atomic():
                 event_api = EventCreateViewSet()
                 visitor_id, visit_id = event_api.get_visit(request)
-                visitor_info = { "visitor_id": visitor_id, "visit_id": visit_id }
+                visitor_info = { "visitor_id": visitor_id, "visit_id": visit_id, "from_app": request.data.get("from_app", None) }
         except Exception as e:
             logger.log("Could not fecth visitor info - " + str(e))
 
@@ -1180,9 +1180,11 @@ class MerchantPayout(TimeStampedModel):
     status = models.PositiveIntegerField(default=PENDING, choices=STATUS_CHOICES)
     payout_time = models.DateTimeField(null=True, blank=True)
     api_response = JSONField(blank=True, null=True)
+    status_api_response = JSONField(blank=True, default='', editable=False)
     retry_count = models.PositiveIntegerField(default=0)
     paid_to = models.ForeignKey(Merchant, on_delete=models.DO_NOTHING, related_name='payouts', null=True)
     utr_no = models.CharField(max_length=500, blank=True, default='')
+    pg_status = models.CharField(max_length=500, blank=True, default='')
     type = models.PositiveIntegerField(default=None, choices=TYPE_CHOICES, null=True, blank=True)
     amount_paid = models.DecimalField(max_digits=10, decimal_places=2, default=None, null=True, blank=True)
     content_type = models.ForeignKey(ContentType, on_delete=models.CASCADE, null=True, blank=True)
@@ -1190,6 +1192,7 @@ class MerchantPayout(TimeStampedModel):
     content_object = GenericForeignKey()
 
     def save(self, *args, **kwargs):
+
         first_instance = False
         if not self.id:
             first_instance = True
@@ -1248,8 +1251,6 @@ class MerchantPayout(TimeStampedModel):
 
         return default_payment_mode
 
-
-
     def get_merchant(self):
         if self.paid_to:
             return self.paid_to
@@ -1271,6 +1272,55 @@ class MerchantPayout(TimeStampedModel):
 
         return bool(all_txn and all_txn.count() > 0), order_data, appointment
 
+    @classmethod
+    def update_status_from_pg(cls):
+        merchant_payout = MerchantPayout.objects.all()
+        for data in merchant_payout:
+            if data.pg_status=='SETTLEMENT_COMPLETED' or data.utr_no or data.type ==data.MANUAL:
+                continue
+
+            url = settings.SETTLEMENT_DETAILS_API
+
+            has_txn, order_data, appointment = data.has_transaction()
+            if has_txn:
+                transaction = order_data.getTransactions()[0]
+                order_no = transaction.order_no
+                req_data = {"orderNo":order_no}
+                req_data["hash"] = data.create_checksum(req_data)
+
+                headers = {"auth": settings.SETTLEMENT_AUTH,
+                           "Content-Type": "application/json"}
+
+                response = requests.post(url, data=json.dumps(req_data), headers=headers)
+                if response.status_code == status.HTTP_200_OK:
+                    resp_data = response.json()
+                    data.status_api_response = resp_data
+                    if resp_data.get('ok') == 1 and len(resp_data.get('settleDetails'))>0:
+                        details = resp_data.get('settleDetails')
+                        for d in details:
+                            if d.get('refNo') == str(data.id):
+                                data.utr_no = d.get('utrNo','')
+                                data.pg_status = d.get('txStatus','')
+                                break
+                    data.save()
+
+    def create_checksum(self, data):
+
+        accesskey = settings.PG_CLIENT_KEY_P1
+        secretkey = settings.PG_SECRET_KEY_P1
+        checksum = ''
+
+        keylist = sorted(data)
+        for k in keylist:
+            if data[k] is not None:
+                curr = k + '=' + str(data[k]) + ';'
+                checksum += curr
+
+        checksum = accesskey + "|" + checksum + "|" + secretkey
+        checksum_hash = hashlib.sha256(str(checksum).encode())
+        checksum_hash = checksum_hash.hexdigest()
+        return checksum_hash
+
     class Meta:
         db_table = "merchant_payout"
 
@@ -1280,7 +1330,7 @@ class UserReferrals(TimeStampedModel):
     COMPLETION_CASHBACK = 50
 
     code = models.CharField(max_length=10, unique=True)
-    user = models.ForeignKey(User, on_delete=models.DO_NOTHING, unique=True)
+    user = models.ForeignKey(User, on_delete=models.DO_NOTHING, unique=True, related_name='referral')
 
     def save(self, *args, **kwargs):
         if not self.code:
