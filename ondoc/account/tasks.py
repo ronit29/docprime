@@ -235,7 +235,13 @@ def consumer_refund_update():
 def update_ben_status_from_pg():
     from ondoc.authentication.models import Merchant
     Merchant.update_status_from_pg()
-    return "success"
+    return True
+
+@task()
+def update_merchant_payout_pg_status():
+    from ondoc.account.models import MerchantPayout
+    MerchantPayout.update_status_from_pg()
+    return True
 
 @task(bind=True)
 def refund_status_update(self):
