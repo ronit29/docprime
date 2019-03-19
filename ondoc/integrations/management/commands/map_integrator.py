@@ -7,6 +7,7 @@ def map_integrators():
     obj_id = settings.THYROCARE_NETWORK_ID
     Thyrocare.thyrocare_product_data(obj_id, 'TESTS')
     Thyrocare.thyrocare_profile_data(obj_id, 'PROFILE')
+    Thyrocare.thyrocare_offer_data(obj_id, 'OFFER')
 
 
 class Command(BaseCommand):

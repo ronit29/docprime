@@ -1,4 +1,6 @@
 from django.urls import path
+
+from ondoc.api.v1.subscription_plan.views import SubscriptionPlanUserViewSet
 from .views import (LoginOTP, UserViewset, NotificationEndpointViewSet,
                     UserProfileViewSet, UserAppointmentsViewSet, AddressViewsSet,
                     TransactionViewSet, UserTransactionViewSet, UserIDViewSet, OrderHistoryViewSet,
@@ -60,7 +62,8 @@ urlpatterns = [
     path('referral/<str:code>', ReferralViewSet.as_view({'get': 'retrieve_by_code'}), name='retrieve_by_code'),
     path('myratings', UserRatingViewSet.as_view({'get': 'list_ratings'}), name='list_ratings'),
     path('whatsapp-optin', WhatsappOptinViewSet.as_view({'post': 'update'}), name='whatsapp-optin'),
-    path('upcoming/appointments',AppointmentViewSet.as_view({'get': 'upcoming_appointments'}), name='upcoming_appointments')
+    path('upcoming/appointments',AppointmentViewSet.as_view({'get': 'upcoming_appointments'}), name='upcoming_appointments'),
+    path('subscription_plan', SubscriptionPlanUserViewSet.as_view({'get': 'subscription_plan'}), name='user_subscription_plan')
     # path('test/', PathologyTestList.as_view({'get': 'list'}), name='test-list'),
     # path('test/<int:id>/', PathologyTestList.as_view({'get': 'retrieve'}), name='test-detail'),
 ]

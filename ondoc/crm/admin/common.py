@@ -11,7 +11,7 @@ from django.conf import settings
 from django.utils.dateparse import parse_datetime
 from ondoc.authentication.models import Merchant, AssociatedMerchant, QCModel
 from ondoc.account.models import MerchantPayout
-from ondoc.common.models import Cities, MatrixCityMapping, PaymentOptions, Remark, MatrixMappedCity, MatrixMappedState
+from ondoc.common.models import Cities, MatrixCityMapping, PaymentOptions, Remark, MatrixMappedCity, MatrixMappedState, GlobalNonBookable
 from import_export import resources, fields
 from import_export.admin import ImportMixin, base_formats, ImportExportMixin, ImportExportModelAdmin, ExportMixin
 from reversion.admin import VersionAdmin
@@ -401,7 +401,7 @@ class MerchantPayoutAdmin(ExportMixin, VersionAdmin):
     form = MerchantPayoutForm
     model = MerchantPayout
     fields = ['id', 'payment_mode','charged_amount', 'updated_at', 'created_at', 'payable_amount', 'status', 'payout_time', 'paid_to',
-              'appointment_id', 'get_billed_to', 'get_merchant', 'process_payout', 'type', 'utr_no', 'amount_paid']
+              'appointment_id', 'get_billed_to', 'get_merchant', 'process_payout', 'type', 'utr_no', 'amount_paid','api_response','pg_status','status_api_response']
     list_display = ('id', 'status', 'payable_amount', 'appointment_id', 'doc_lab_name')
     search_fields = ['name']
     list_filter = ['status']
@@ -422,7 +422,10 @@ class MerchantPayoutAdmin(ExportMixin, VersionAdmin):
         base = ['appointment_id', 'get_billed_to', 'get_merchant']
         editable_fields = ['payout_approved']
         if obj and obj.status == MerchantPayout.PENDING:
-            editable_fields += ['type', 'utr_no', 'amount_paid','payment_mode']
+            editable_fields += ['type', 'amount_paid','payment_mode']
+        if not obj or not obj.utr_no:
+            editable_fields += ['utr_no']
+
         readonly = [f.name for f in self.model._meta.fields if f.name not in editable_fields]
         return base + readonly
 
@@ -489,6 +492,10 @@ class PaymentOptionsAdmin(admin.ModelAdmin):
     list_display = ['name', 'description', 'is_enabled']
     search_fields = ['name']
 
+
+class GlobalNonBookableAdmin(admin.ModelAdmin):
+    model = GlobalNonBookable
+    list_display = ['booking_type', 'start_date', 'end_date', 'start_time', 'end_time']
 
 class RemarkInlineForm(forms.ModelForm):
     # content = forms.CharField(widget=forms.Textarea, required=False)

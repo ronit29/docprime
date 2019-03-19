@@ -471,6 +471,7 @@ def create_or_update_lead_on_matrix(self, data):
     from ondoc.doctor.models import Doctor
     from ondoc.doctor.models import Hospital
     from ondoc.doctor.models import HospitalNetwork
+    from ondoc.doctor.models import ProviderSignupLead
     try:
         obj_id = data.get('obj_id', None)
         obj_type = data.get('obj_type', None)
@@ -478,7 +479,7 @@ def create_or_update_lead_on_matrix(self, data):
             logger.error("CELERY ERROR: Incorrect values provided.")
             raise ValueError()
         product_id = matrix_product_ids.get('opd_products', 1)
-        sub_product_id = matrix_subproduct_ids.get(obj_type.lower(), 4)
+        sub_product_id = matrix_subproduct_ids.get(obj_type.lower(), 4) if obj_type != ProviderSignupLead.__name__ else matrix_subproduct_ids.get(Doctor.__name__.lower(), 4)
         ct = ContentType.objects.get(model=obj_type.lower())
         model_used = ct.model_class()
         content_type = ContentType.objects.get_for_model(model_used)
@@ -488,18 +489,26 @@ def create_or_update_lead_on_matrix(self, data):
             raise Exception("{} could not found against id - {}".format(obj_type, obj_id))
 
         mobile = '0'
+        email = ''
         gender = 0
+        name = obj.name if hasattr(obj, 'name') and obj.name else ''
         if obj_type == Doctor.__name__:
+            lead_source = 'referral'
             if obj.gender and obj.gender == 'm':
                 gender = 1
             elif obj.gender and obj.gender == 'f':
                 gender = 2
         elif obj_type == Hospital.__name__:
-            spoc_details = obj.spoc_details.filter(contact_type=SPOCDetails.SPOC).first()
+            lead_source = 'ProviderApp' if obj.source_type == Hospital.PROVIDER and obj.is_listed_on_docprime else 'referral'
+            spoc_details = obj.spoc_details.filter(contact_type=SPOCDetails.SPOC, email__isnull=False).first()
+            if not spoc_details:
+                spoc_details = obj.spoc_details.filter(contact_type=SPOCDetails.SPOC).first()
             if spoc_details:
                 mobile = str(spoc_details.std_code) if spoc_details.std_code else ''
                 mobile += str(spoc_details.number) if spoc_details.number else ''
+                email = spoc_details.email if spoc_details.email else ''
         elif obj_type == HospitalNetwork.__name__:
+            lead_source = 'referral'
             spoc_details = obj.spoc_details.filter(contact_type=SPOCDetails.SPOC).first()
             if spoc_details:
                 mobile = str(spoc_details.std_code) if spoc_details.std_code else ''
@@ -507,19 +516,28 @@ def create_or_update_lead_on_matrix(self, data):
             # spoc_details = obj.hospitalnetworkmanager_set.filter(contact_type=2).first()
             # if spoc_details:
             #     mobile += str(spoc_details.number) if hasattr(spoc_details, 'number') and spoc_details.number else ''
+        elif obj_type == ProviderSignupLead.__name__:
+            lead_source = 'ProviderApp'
+            mobile = obj.phone_number
+            email = obj.email if obj.email else ''
+            if obj.type == ProviderSignupLead.DOCTOR:
+                name = obj.name + ' (Doctor)'
+            elif obj.type == ProviderSignupLead.HOSPITAL_ADMIN:
+                name = obj.name + ' (Hospital Admin)'
         mobile = int(mobile)
         # if not mobile:
         #     return
         request_data = {
-            'LeadSource': 'referral',
+            'LeadSource': lead_source,
             'LeadID': obj.matrix_lead_id if hasattr(obj, 'matrix_lead_id') and obj.matrix_lead_id else 0,
             'PrimaryNo': mobile,
-            'QcStatus': obj.data_status,
+            'EmailId': email,
+            'QcStatus': obj.data_status if hasattr(obj, 'data_status') else 0,
             'OnBoarding': obj.onboarding_status if hasattr(obj, 'onboarding_status') else 0,
             'Gender': gender,
             'ProductId': product_id,
             'SubProductId': sub_product_id,
-            'Name': obj.name if hasattr(obj, 'name') and obj.name else '',
+            'Name': name,
             'ExitPointUrl': exit_point_url,
             'CityId': obj.matrix_city.id if hasattr(obj, 'matrix_city') and obj.matrix_city.id else 0
         }
