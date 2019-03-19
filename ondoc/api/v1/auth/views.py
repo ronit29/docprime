@@ -628,7 +628,7 @@ class UserAppointmentsViewSet(OndocViewSet):
             appt_status = validated_data.get('status')
             if appt_status not in allowed:
                 resp['allowed'] = allowed
-                return Response(resp, status=status.HTTP_400_BAD_REQUEST)
+                return Response({})
             updated_opd_appointment = self.doctor_appointment_update(request, opd_appointment, validated_data)
             if updated_opd_appointment.get("status") is not None and updated_opd_appointment["status"] == 0:
                 return Response(updated_opd_appointment, status=status.HTTP_400_BAD_REQUEST)
@@ -2003,5 +2003,7 @@ class DoctorScanViewSet(GenericViewSet):
                         return user_appointment_object.update(request, pk, parameters={'status': OpdAppointment.COMPLETED, 'qr_code': complete_with_qr_scanner}).data
                     else:
                         return Response('Invalid url')
+            else:
+                return Response('QRCode not enabled')
         else:
             return Response('Invalid type')
