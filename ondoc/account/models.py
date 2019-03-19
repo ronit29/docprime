@@ -1280,7 +1280,7 @@ class UserReferrals(TimeStampedModel):
     COMPLETION_CASHBACK = 50
 
     code = models.CharField(max_length=10, unique=True)
-    user = models.ForeignKey(User, on_delete=models.DO_NOTHING, unique=True)
+    user = models.ForeignKey(User, on_delete=models.DO_NOTHING, unique=True, related_name='referral')
 
     def save(self, *args, **kwargs):
         if not self.code:
