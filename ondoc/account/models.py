@@ -1272,17 +1272,30 @@ class MerchantPayout(TimeStampedModel):
 
         return bool(all_txn and all_txn.count() > 0), order_data, appointment
 
+    def get_pg_order_no(self):
+        order_no = None
+        appointment = self.get_appointment()
+        if not appointment:
+            return None
+        order_data = Order.objects.filter(reference_id=appointment.id).order_by('-id').first()
+        if not order_data:
+            dt = DummyTransactions.objects.filter(reference_id=appointment.id).order_by('-id').first()
+            if dt:
+                return dt.order_no
+        else:
+            all_txn = order_data.getTransactions()
+            if all_txn:
+                return all_txn[0].order_no
+
     def update_status_from_pg(self):
 
         if self.pg_status=='SETTLEMENT_COMPLETED' or self.utr_no or self.type ==self.MANUAL:
             return
 
         url = settings.SETTLEMENT_DETAILS_API
+        order_no = self.get_pg_order_no()
 
-        has_txn, order_data, appointment = self.has_transaction()
-        if has_txn:
-            transaction = order_data.getTransactions()[0]
-            order_no = transaction.order_no
+        if order_no:
             req_data = {"orderNo":order_no}
             req_data["hash"] = self.create_checksum(req_data)
 
@@ -1296,11 +1309,11 @@ class MerchantPayout(TimeStampedModel):
                 if resp_data.get('ok') == 1 and len(resp_data.get('settleDetails'))>0:
                     details = resp_data.get('settleDetails')
                     for d in details:
-                        if d.get('refNo') == str(self.id):
+                        if d.get('refNo') == str(self.payout_ref_id):
                             self.utr_no = d.get('utrNo','')
                             self.pg_status = d.get('txStatus','')
-                            self.save()
                             break
+                self.save()
 
     def create_checksum(self, data):
 
