@@ -37,6 +37,7 @@ urlpatterns = [
     path('doctorsearchbyhospital', DoctorListViewSet.as_view({'get':'search_by_hospital'}), name='search-doctor-by-hospital'),
     path('doctorsearch_by_url', DoctorListViewSet.as_view({'get':'list_by_url'}), name='search_by_specializaton'),
     path('doctortiming', DoctorAvailabilityTimingViewSet.as_view({'get': 'list'}), name='doctor-timing-availability'),
+    path('doctortiming_new', DoctorAvailabilityTimingViewSet.as_view({'get': 'list_new'}), name='doctor-timing-availability-new'),
     path('healthtips', HealthTipView.as_view({'get': 'list'}), name='health-tip'),
     path('config', ConfigView.as_view({'post': 'retrieve'}), name='config'),
     # path('test', TestView.as_view({'post': 'retrieve'}), name='test'),

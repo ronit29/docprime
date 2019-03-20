@@ -39,9 +39,10 @@ from ondoc.notification import models as notification_models
 from ondoc.notification import tasks as notification_tasks
 from django.contrib.contenttypes.fields import GenericRelation
 from ondoc.api.v1.utils import get_start_end_datetime, custom_form_datetime, CouponsMixin, aware_time_zone, \
-    form_time_slot, util_absolute_url, html_to_pdf
-from ondoc.common.models import AppointmentHistory, AppointmentMaskNumber, Service, Remark, MatrixMappedState, MatrixMappedCity
-from ondoc.common.models import AppointmentHistory, QRCode
+    form_time_slot, util_absolute_url, html_to_pdf, TimeSlotExtraction
+from ondoc.common.models import AppointmentHistory, AppointmentMaskNumber, Service, Remark, MatrixMappedState, MatrixMappedCity, GlobalNonBookable
+from ondoc.common.models import QRCode
+
 from functools import reduce
 from operator import or_
 import logging
@@ -57,7 +58,7 @@ from django.contrib.contenttypes.fields import GenericRelation
 from django.contrib.contenttypes.fields import GenericForeignKey
 from django.contrib.contenttypes.models import ContentType
 from ondoc.matrix.tasks import push_appointment_to_matrix, push_onboarding_qcstatus_to_matrix, \
-    update_onboarding_qcstatus_to_matrix, create_or_update_lead_on_matrix
+    update_onboarding_qcstatus_to_matrix, create_or_update_lead_on_matrix, push_signup_lead_to_matrix
 # from ondoc.procedure.models import Procedure
 from ondoc.ratings_review import models as ratings_models
 from django.utils import timezone
@@ -257,7 +258,7 @@ class Hospital(auth_model.TimeStampedModel, auth_model.CreatedByModel, auth_mode
         )y where hospital.id = y.id'''
         update_alternative_value = RawSql(query, []).execute()
 
-        query1 = '''update hospital set city_search_key = city where city_search_key is null
+        query1 = '''update hospital set city_search_key = lower(city) where city_search_key is null
                         or city_search_key='' '''
         update_city = RawSql(query1, []).execute()
 
@@ -353,7 +354,7 @@ class Hospital(auth_model.TimeStampedModel, auth_model.CreatedByModel, auth_mode
             hospital_obj = Hospital.objects.filter(pk=self.id).first()
             if hospital_obj and self.data_status != hospital_obj.data_status:
                 update_status_in_matrix = True
-        if not self.matrix_lead_id:
+        if not self.matrix_lead_id and (self.is_listed_on_docprime is None or self.is_listed_on_docprime is True):
             push_to_matrix = True
         super(Hospital, self).save(*args, **kwargs)
         if self.is_appointment_manager:
@@ -612,9 +613,18 @@ class Doctor(auth_model.TimeStampedModel, auth_model.QCModel, SearchKey, auth_mo
 
     def update_deal_price(self):        
         # will update only this doctor prices and will be called on save    
-        query = '''update doctor_clinic_timing set 
-                    deal_price = least(greatest(floor(case when (least(fees*1.5, .8*mrp) - fees) >100 then least(fees*1.5, .8*mrp)
-                    else least(fees+100, mrp) end /5)*5, fees), mrp) where doctor_clinic_id in (
+        query = '''update doctor_clinic_timing set deal_price = least(
+                    greatest(floor(
+                    case when fees <=0 then mrp*.4 
+                    when mrp<=2000 then
+                    case when (least(fees*1.5, .8*mrp) - fees) >100 then least(fees*1.5, .8*mrp) 
+                    else least(fees+100, mrp) end
+                    else 
+                    case when (least(fees*1.5, fees+.5*(mrp-fees)) - fees )>100
+                    then least(fees*1.5, fees+.5*(mrp-fees))
+                    else
+                    least(fees+100, mrp) end 	
+                    end  /5)*5, fees), mrp) where doctor_clinic_id in (
                     select id from doctor_clinic where doctor_id= %s) '''
 
         update_doctor_deal_price = RawSql(query, [self.pk]).execute()
@@ -622,12 +632,20 @@ class Doctor(auth_model.TimeStampedModel, auth_model.QCModel, SearchKey, auth_mo
     @classmethod
     def update_all_deal_price(cls):
         # will update all doctors prices
-        query = '''update doctor_clinic_timing set 
-            deal_price = least(greatest(floor(case when (least(fees*1.5, .8*mrp) - fees) >100 then least(fees*1.5, .8*mrp)
-            else least(fees+100, mrp) end /5)*5, fees), mrp) '''
+        query = '''update doctor_clinic_timing set deal_price = least(
+                    greatest(floor(
+                    case when fees <=0 then mrp*.4 
+                    when mrp<=2000 then
+                    case when (least(fees*1.5, .8*mrp) - fees) >100 then least(fees*1.5, .8*mrp) 
+                    else least(fees+100, mrp) end
+                    else 
+                    case when (least(fees*1.5, fees+.5*(mrp-fees)) - fees )>100
+                    then least(fees*1.5, fees+.5*(mrp-fees))
+                    else
+                    least(fees+100, mrp) end 	
+                    end  /5)*5, fees), mrp) '''
 
         update_all_doctor_deal_price = RawSql(query, []).execute()
-
 
     def get_display_name(self):
         return "Dr. {}".format(self.name.title()) if self.name else None
@@ -965,6 +983,31 @@ class DoctorClinic(auth_model.TimeStampedModel):
 
     # def __str__(self):
     #     return '{}-{}'.format(self.doctor, self.hospital)
+
+    def get_timings(self):
+        from ondoc.api.v2.doctor import serializers as v2_serializers
+        from ondoc.api.v1.common import serializers as common_serializers
+        clinic_timings= self.availability.order_by("start")
+        doctor_leave_serializer = v2_serializers.DoctorLeaveSerializer(
+            DoctorLeave.objects.filter(doctor=self.doctor_id, deleted_at__isnull=True), many=True)
+        global_leave_serializer = common_serializers.GlobalNonBookableSerializer(
+           GlobalNonBookable.objects.filter(deleted_at__isnull=True, booking_type=GlobalNonBookable.DOCTOR), many=True)
+        total_leaves = dict()
+        total_leaves['global'] = global_leave_serializer.data
+        total_leaves['doctor'] = doctor_leave_serializer.data
+        timeslots = dict()
+        obj = TimeSlotExtraction()
+
+        for data in clinic_timings:
+            obj.form_time_slots(data.day, data.start, data.end, data.fees, True,
+                                data.deal_price, data.mrp, True, on_call=data.type)
+
+        date = datetime.datetime.today().strftime('%Y-%m-%d')
+        booking_details = {"type": "doctor"}
+        slots = obj.get_timing_slots(date, total_leaves, booking_details)
+        upcoming_slots = obj.get_upcoming_slots(time_slots=slots)
+        res_data = {"time_slots": slots, "upcoming_slots": upcoming_slots}
+        return res_data
 
 
 class DoctorClinicTiming(auth_model.TimeStampedModel):
@@ -2885,6 +2928,12 @@ class ProviderSignupLead(auth_model.TimeStampedModel):
     email = models.EmailField()
     type = models.IntegerField(choices=TYPE_CHOICES)
     is_docprime = models.NullBooleanField(null=True, editable=False)
+    matrix_lead_id = models.IntegerField(null=True)
+
+    def save(self, *args, **kwargs):
+        if kwargs.get('is_docprime') and not self.matrix_lead_id:
+            create_or_update_lead_on_matrix.apply_async(({'obj_type': self.__class__.__name__, 'obj_id': self.id}
+                                                         ,), countdown=5)
 
     class Meta:
         db_table = "provider_signup_lead"
