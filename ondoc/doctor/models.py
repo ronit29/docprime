@@ -104,7 +104,7 @@ class UniqueNameModel(models.Model):
 
 
 class SearchKey(models.Model):
-    search_key = models.CharField(max_length=256, blank=True, null=True)
+    search_key = models.CharField(max_length=4000, blank=True, null=True)
 
     class Meta:
         db_table = 'search_key'
