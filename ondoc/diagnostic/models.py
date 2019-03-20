@@ -1214,20 +1214,27 @@ class AvailableLabTest(TimeStampedModel):
         #         is not null then custom_agreed_price
         #         else computed_agreed_price end), mrp) where id = %s '''
 
-        query = '''update available_lab_test set computed_deal_price = 
-                    least(greatest(floor(	
-                    case when (least((case when custom_agreed_price is not null 
-                    then custom_agreed_price else computed_agreed_price end)*1.5, mrp*.8) - case when custom_agreed_price
-                    is not null then custom_agreed_price else computed_agreed_price end) >100  then 
-                    least((case when custom_agreed_price is not null 
-                    then custom_agreed_price else computed_agreed_price end)*1.5, mrp*.8) else 
-                    least((case when custom_agreed_price is not null 
-                    then custom_agreed_price else computed_agreed_price end)+100, mrp) end
-                    /5)*5, case when custom_agreed_price
-                    is not null then custom_agreed_price else computed_agreed_price end), mrp)
-                    where enabled=true and id=%s '''
+        query = '''update available_lab_test set computed_deal_price = (select deal_price from 
+                    (select *,  least(greatest(floor(price /5)*5, agreed_price), mrp ) as deal_price from 
+                    (select id, mrp, agreed_price,
+                    case 
+                    when agreed_price <=0 then mrp*.4 
+                    when mrp<=2000 then
+                        case when (least(agreed_price*1.5, .8*mrp) - agreed_price) >100 then least(agreed_price*1.5, .8*mrp) 
+                        else least(agreed_price+100, mrp) end
+                    else 
+                        case when (least(agreed_price*1.5, agreed_price+.5*(mrp-agreed_price)) - agreed_price )>100
+                        then least(agreed_price*1.5, agreed_price+.5*(mrp-agreed_price))
+                        else
+                        least(agreed_price+100, mrp) end 	
+                    end price
+                    from 
+                    (select case when custom_agreed_price is null then computed_agreed_price else
+                     custom_agreed_price end as agreed_price,
+                    mrp, id from available_lab_test  where id=%s )x)y where y.id = available_lab_test.id )z) 
+                    where available_lab_test.enabled=true and id=%s '''
 
-        update_available_lab_test_deal_price = RawSql(query, [self.pk]).execute()
+        update_available_lab_test_deal_price = RawSql(query, [self.pk, self.pk]).execute()
         # deal_price = RawSql(query, [self.pk]).fetch_all()
         # if deal_price:
         #    self.computed_deal_price = deepcopy(deal_price[0].get('computed_deal_price'))
@@ -1235,18 +1242,23 @@ class AvailableLabTest(TimeStampedModel):
     @classmethod
     def update_all_deal_price(cls):
         # will update all lab prices
-        query = '''update available_lab_test set computed_deal_price = 
-                    least(greatest(floor(	
-                    case when (least((case when custom_agreed_price is not null 
-                    then custom_agreed_price else computed_agreed_price end)*1.5, mrp*.8) - case when custom_agreed_price
-                    is not null then custom_agreed_price else computed_agreed_price end) >100  then 
-                    least((case when custom_agreed_price is not null 
-                    then custom_agreed_price else computed_agreed_price end)*1.5, mrp*.8) else 
-                    least((case when custom_agreed_price is not null 
-                    then custom_agreed_price else computed_agreed_price end)+100, mrp) end
-                    /5)*5, case when custom_agreed_price
-                    is not null then custom_agreed_price else computed_agreed_price end), mrp)
-                    where enabled=true'''
+        query = '''update available_lab_test set computed_deal_price = (select deal_price from 
+                (select *,  least(greatest(floor(price /5)*5, agreed_price), mrp ) as deal_price from 
+                (select id, mrp, agreed_price,
+                case 
+                when agreed_price <=0 then mrp*.4 
+                when mrp<=2000 then
+                    case when (least(agreed_price*1.5, .8*mrp) - agreed_price) >100 then least(agreed_price*1.5, .8*mrp) 
+                    else least(agreed_price+100, mrp) end
+                else 
+                    case when (least(agreed_price*1.5, agreed_price+.5*(mrp-agreed_price)) - agreed_price )>100
+                    then least(agreed_price*1.5, agreed_price+.5*(mrp-agreed_price))
+                    else
+                    least(agreed_price+100, mrp) end 	
+                end price
+                from 
+                (select case when custom_agreed_price is null then computed_agreed_price else custom_agreed_price end as agreed_price,
+                mrp, id from available_lab_test)x)y where y.id = available_lab_test.id )z) where available_lab_test.enabled=true'''
 
         update_all_available_lab_test_deal_price = RawSql(query, []).execute()
 

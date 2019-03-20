@@ -35,10 +35,10 @@ WORKDIR /home/docprime/workspace/backend
 RUN pip install -r requirements/local.txt
 ENV DJANGO_SETTINGS_MODULE=config.settings.$ENV_CG
 RUN if [ "$COLLECTSTATIC" = "true" ] ; then\
- RUN python manage.py collectstatic --no-input ; \
+ python manage.py collectstatic --no-input ; \
 fi
 RUN if [ "$MIGRATE" = "true" ] ; then\
- RUN python manage.py migrate --no-input; \
+ python manage.py migrate --no-input; \
 fi 
 
 EXPOSE 80

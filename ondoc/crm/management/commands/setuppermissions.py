@@ -654,6 +654,7 @@ class Command(BaseCommand):
         self.stdout.write('Successfully created groups and permissions')
 
         self.setup_comment_group()
+        self.create_common_groups()
 
     def create_about_doctor_group(self):
         group, created = Group.objects.get_or_create(name=constants['ABOUT_DOCTOR_TEAM'])
@@ -856,3 +857,6 @@ class Command(BaseCommand):
                 Q(codename='add_' + ct.model) | Q(codename='change_' + ct.model))
 
             group.permissions.add(*permissions)
+
+    def create_common_groups(self):
+        group, created = Group.objects.get_or_create(name=constants['APPOINTMENT_OTP_TEAM'])

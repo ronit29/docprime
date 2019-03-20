@@ -1349,6 +1349,27 @@ def datetime_to_formated_string(instance, time_format='%Y-%m-%d %H:%M:%S', to_zo
     formated_date = datetime.datetime.strftime(instance, time_format)
     return formated_date
 
+def payout_checksum(request_payload):
+
+    secretkey = settings.PG_SECRET_KEY_P2
+    accesskey = settings.PG_CLIENT_KEY_P2
+
+    checksum = ""
+
+    curr = ''
+
+    keylist = sorted(request_payload)
+    for k in keylist:
+        if request_payload[k] is not None:
+            curr = curr + k + '=' + str(request_payload[k]) + ';'
+
+    checksum += curr
+
+    checksum = accesskey + "|" + checksum + "|" + secretkey
+    checksum_hash = hashlib.sha256(str(checksum).encode())
+    checksum_hash = checksum_hash.hexdigest()
+    return checksum_hash
+
 def get_package_free_or_not_dict(request):
     from ondoc.subscription_plan.models import UserPlanMapping
     package_free_or_not_dict = defaultdict(bool)
@@ -1357,3 +1378,4 @@ def get_package_free_or_not_dict(request):
         for temp_user_plan_package in free_test_in_user_plan:
             package_free_or_not_dict[temp_user_plan_package] = True
     return package_free_or_not_dict
+
