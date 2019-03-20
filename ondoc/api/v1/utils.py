@@ -863,7 +863,7 @@ class TimeSlotExtraction(object):
         readable_date = converted_date.strftime("%Y-%m-%d")
         booking_details['date'] = converted_date
         total_leave_list = booking_details.get('total_leave_list')
-        if readable_date in total_leave_list:
+        if converted_date in total_leave_list:
             whole_timing_data[readable_date] = list()
         else:
             whole_timing_data[readable_date] = list()
@@ -897,7 +897,7 @@ class TimeSlotExtraction(object):
             start_date = gl.get('start_date')
             end_date = gl.get('end_date')
             if start_date == end_date:
-                total_leaves.append(start_date)
+                total_leaves.append(datetime.datetime.strptime(start_date, '%Y-%m-%d'))
             else:
                 delta = datetime.datetime.strptime(end_date, '%Y-%m-%d') - datetime.datetime.strptime(start_date, '%Y-%m-%d')
                 for i in range(delta.days + 1):
