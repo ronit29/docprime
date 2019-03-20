@@ -732,7 +732,7 @@ class DoctorProfileUserViewSet(viewsets.GenericViewSet):
                                     'rating',
                                     'associations',
                                     'awards',
-                                    'doctor_clinics__hospital__hospital_reviews'
+                                    'doctor_clinics__hospital__hospital_place_details'
                                     )
                   .filter(pk=pk).first())
         # if not doctor or not is_valid_testing_data(request.user, doctor):
@@ -844,7 +844,7 @@ class DoctorProfileUserViewSet(viewsets.GenericViewSet):
                     hosp_reviews_dict[hospital.pk] = dict()
                     hosp_reviews_dict[hospital.pk]['google_rating'] = list()
                     ratings_graph = None
-                    hosp_reviews = hospital.hospital_reviews.all()
+                    hosp_reviews = hospital.hospital_place_details.all()
                     if hosp_reviews:
                         reviews_data = hosp_reviews[0].reviews
 

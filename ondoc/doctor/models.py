@@ -386,7 +386,7 @@ class Hospital(auth_model.TimeStampedModel, auth_model.CreatedByModel, auth_mode
 
 
 class HospitalPlaceDetails(auth_model.TimeStampedModel):
-    hospital = models.ForeignKey(Hospital, on_delete=models.CASCADE, related_name='hospital_reviews')
+    hospital = models.ForeignKey(Hospital, on_delete=models.CASCADE, related_name='hospital_place_details')
     place_id = models.TextField()
     place_details = JSONField(null=True, blank=True)
     reviews = JSONField(null=True, blank=True)
