@@ -60,6 +60,7 @@ class CartViewSet(viewsets.GenericViewSet):
 
     @transaction.non_atomic_requests()
     def list(self, request, *args, **kwargs):
+        from ondoc.insurance.models import UserInsurance
 
         user = request.user
         if not user.is_authenticated:
@@ -71,6 +72,9 @@ class CartViewSet(viewsets.GenericViewSet):
         for item in cart_items:
             try:
                 validated_data = item.validate(request)
+                user_insurance = UserInsurance.objects.filter(user=user).last()
+                if user_insurance:
+                    item.data['is_appointment_insured'], item.data['insurance_id'], item.data['insurance_message'] = user_insurance.validate_insurance(validated_data)
                 price_data = item.get_price_details(validated_data)
                 items.append({
                     "id" : item.id,
