@@ -45,6 +45,7 @@ from ondoc.reports import models as report_models
 
 from ondoc.diagnostic.models import LabPricing
 from ondoc.integrations.models import IntegratorMapping, IntegratorProfileMapping, IntegratorReport
+from ondoc.subscription_plan.models import Plan, PlanFeature, PlanFeatureMapping
 
 from ondoc.web.models import Career, OnlineLead
 from ondoc.ratings_review import models as rating_models
@@ -533,7 +534,8 @@ class Command(BaseCommand):
             group.permissions.add(*permissions)
 
         content_types = ContentType.objects.get_for_models(PaymentOptions, EntityUrls, Feature, Service, Doctor,
-                                                           HealthInsuranceProvider, IpdProcedureCategory)
+                                                           HealthInsuranceProvider, IpdProcedureCategory, Plan,
+                                                           PlanFeature, PlanFeatureMapping)
 
         for cl, ct in content_types.items():
             permissions = Permission.objects.filter(
