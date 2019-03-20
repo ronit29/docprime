@@ -2190,17 +2190,17 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
 
         cart_data = data.get('cart_item').data
         payment_type = data.get("payment_type")
-        # is_appointment_insured = False
-        # insurance_id = None
-        # insurance_message = ""
-        is_appointment_insured = cart_data.get('is_appointment_insured')
-        insurance_id = cart_data.get('insurance_id')
-        insurance_message = cart_data.get('insurance_message')
-        # user_insurance = UserInsurance.objects.filter(user=user).last()
-        # if user_insurance:
-        #     is_appointment_insured, insurance_id, insurance_message = user_insurance.validate_insurance(cart_data)
-        #     if is_appointment_insured:
-        #         payment_type = OpdAppointment.INSURANCE
+        is_appointment_insured = False
+        insurance_id = None
+        insurance_message = ""
+        # is_appointment_insured = cart_data.get('is_appointment_insured')
+        # insurance_id = cart_data.get('insurance_id')
+        # insurance_message = cart_data.get('insurance_message')
+        user_insurance = UserInsurance.objects.filter(user=user).last()
+        if user_insurance:
+            is_appointment_insured, insurance_id, insurance_message = user_insurance.validate_insurance(data)
+            if is_appointment_insured:
+                payment_type = OpdAppointment.INSURANCE
 
         return {
             "doctor": data.get("doctor"),
