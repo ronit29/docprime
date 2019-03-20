@@ -1995,6 +1995,7 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin)
     @classmethod
     def create_fulfillment_data(cls, user, data, price_data):
         from ondoc.api.v1.auth.serializers import AddressSerializer
+        from ondoc.insurance.models import UserInsurance
 
         lab_test_queryset = AvailableLabTest.objects.filter(lab_pricing_group__labs=data["lab"], test__in=data['test_ids'])
         test_ids_list = list()
@@ -2018,6 +2019,15 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin)
             "dob": str(data["profile"].dob),
         }
         cart_data = data.get('cart_item').data
+        payment_type = data.get("payment_type")
+        is_appointment_insured = False
+        insurance_id = None
+        insurance_message = ""
+        user_insurance = UserInsurance.objects.filter(user=user).last()
+        if user_insurance:
+            is_appointment_insured, insurance_id, insurance_message = user_insurance.validate_insurance(cart_data)
+            if is_appointment_insured:
+                payment_type = OpdAppointment.INSURANCE
         fulfillment_data = {
             "lab": data["lab"],
             "user": user,
@@ -2031,15 +2041,16 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin)
             "is_home_pickup": data["is_home_pickup"],
             "profile_detail": profile_detail,
             "status": LabAppointment.BOOKED,
-            "payment_type": data["payment_type"],
+            # "payment_type": data["payment_type"],
+            "payment_type": payment_type,
             "lab_test": test_ids_list,
             "extra_details": extra_details,
             "coupon": price_data.get("coupon_list"),
             "discount": int(price_data.get("coupon_discount")),
             "cashback": int(price_data.get("coupon_cashback")),
-            "is_appointment_insured": cart_data.get('is_appointment_insured', False),
-            "insurance": cart_data.get('insurance_id', None),
-            "insurance_message": cart_data.get('insurance_message', "")
+            "is_appointment_insured": is_appointment_insured,
+            "insurance": insurance_id,
+            "insurance_message": insurance_message
         }
 
         if data.get("is_home_pickup") is True:

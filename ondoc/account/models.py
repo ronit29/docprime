@@ -373,9 +373,6 @@ class Order(TimeStampedModel):
         for item in cart_items:
             validated_data = item.validate(request)
             fd = item.get_fulfillment_data(validated_data)
-            # TODO remove
-            # if fd['is_appointment_insured']:
-            #     fd['payment_type'] = 3
             fd["cart_item_id"] = item.id
             fulfillment_data.append(fd)
         return fulfillment_data
