@@ -335,11 +335,15 @@ def payment_details(request, order):
     profile_name = ""
     if profile:
         profile_name = profile.name
+    if order.product_id == Order.SUBSCRIPTION_PLAN_PRODUCT_ID:
+        temp_product_id = Order.DOCTOR_PRODUCT_ID
+    else:
+        temp_product_id = order.product_id
     pgdata = {
         'custId': user.id,
         'mobile': user.phone_number,
         'email': uemail,
-        'productId': order.product_id,
+        'productId': temp_product_id,
         'surl': surl,
         'furl': furl,
         'referenceId': "",
