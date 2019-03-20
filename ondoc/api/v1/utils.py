@@ -863,7 +863,7 @@ class TimeSlotExtraction(object):
         readable_date = converted_date.strftime("%Y-%m-%d")
         booking_details['date'] = converted_date
         total_leave_list = booking_details.get('total_leave_list')
-        if converted_date in total_leave_list:
+        if readable_date in total_leave_list:
             whole_timing_data[readable_date] = list()
         else:
             whole_timing_data[readable_date] = list()
