@@ -1677,7 +1677,7 @@ class LabAppointmentView(mixins.CreateModelMixin,
         active_plan_mapping = UserPlanMapping.get_active_plans(user).first()
         user_plan_id = None
         included_in_user_plan = False
-        test_included_in_user_plan = UserPlanMapping.get_free_tests(request.user)
+        test_included_in_user_plan = UserPlanMapping.get_free_tests(request)
         selected_test_id = [x for x in data.get('test_ids', [])]
         if sorted(selected_test_id) == sorted(test_included_in_user_plan):
             if active_plan_mapping:

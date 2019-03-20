@@ -179,7 +179,8 @@ class UserPlanMapping(auth_model.TimeStampedModel):
         return user.plan_mapping.filter(is_active=True, expire_at__gt=timezone.now())
 
     @classmethod
-    def get_free_tests(cls, user):
+    def get_free_tests(cls, request, cart_item_id=None):
+        user = request.user
         from django.db.models import F
         from ondoc.cart.models import Cart
         active_plan_mapping = cls.get_active_plans(user).first()
@@ -192,7 +193,10 @@ class UserPlanMapping(auth_model.TimeStampedModel):
         used_test_count_dict = cls.get_frequency_test(used_test_count)
         plan_test_count_dict = {x['test_id']: x['count'] for x in plan_test_count}
         # TODO : SHASHANK_SINGH consider valid cart items only
-        all_cart_objs = Cart.objects.filter(deleted_at__isnull=True, product_id=Order.LAB_PRODUCT_ID, user=user)
+        cart_queryset = Cart.objects.all()
+        if cart_item_id:
+            cart_queryset = cart_queryset.exclude(id=cart_item_id)
+        all_cart_objs = cart_queryset.filter(deleted_at__isnull=True, product_id=Order.LAB_PRODUCT_ID, user=user)
         all_tests_in_carts = []
         for cart_obj in all_cart_objs:
             all_tests_in_carts.extend(cart_obj.data.get('test_ids', []) if cart_obj.data else [])

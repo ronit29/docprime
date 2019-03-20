@@ -784,23 +784,21 @@ class LabAppointmentCreateSerializer(serializers.Serializer):
 
         self.test_lab_id_validator(data, request)
         self.time_slot_validator(data, request, is_integrated)
-        self.user_plan_validator(data, request)
+        self.user_plan_validator(data, request, cart_item_id)
         return data
 
     @staticmethod
-    def user_plan_validator(data, request):
+    def user_plan_validator(data, request, cart_item_id=None):
         if data.get('included_in_user_plan', False):
             raise_exception = False
             lab_tests = data.get('test_ids', [])
-            test_included_in_user_plan = UserPlanMapping.get_free_tests(request.user)
+            test_included_in_user_plan = UserPlanMapping.get_free_tests(request, cart_item_id)
             for temp_test in lab_tests:
                 if temp_test.id not in test_included_in_user_plan:
                     raise_exception = True
                     break
             if raise_exception:
                 raise serializers.ValidationError("LabTest not in free user plans")
-
-
 
     def create(self, data):
         deal_price_calculation= Case(When(custom_deal_price__isnull=True, then=F('computed_deal_price')),
