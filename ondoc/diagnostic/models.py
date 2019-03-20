@@ -1231,10 +1231,10 @@ class AvailableLabTest(TimeStampedModel):
                     from 
                     (select case when custom_agreed_price is null then computed_agreed_price else
                      custom_agreed_price end as agreed_price,
-                    mrp, id from available_lab_test)x)y where y.id = available_lab_test.id )z) 
+                    mrp, id from available_lab_test )x  where id=%s )y where y.id = available_lab_test.id )z) 
                     where available_lab_test.enabled=true and id=%s '''
 
-        update_available_lab_test_deal_price = RawSql(query, [self.pk]).execute()
+        update_available_lab_test_deal_price = RawSql(query, [self.pk, self.pk]).execute()
         # deal_price = RawSql(query, [self.pk]).fetch_all()
         # if deal_price:
         #    self.computed_deal_price = deepcopy(deal_price[0].get('computed_deal_price'))
