@@ -56,7 +56,7 @@ from django.contrib.contenttypes.fields import GenericRelation
 from django.contrib.contenttypes.fields import GenericForeignKey
 from django.contrib.contenttypes.models import ContentType
 from ondoc.matrix.tasks import push_appointment_to_matrix, push_onboarding_qcstatus_to_matrix, \
-    update_onboarding_qcstatus_to_matrix, create_or_update_lead_on_matrix
+    update_onboarding_qcstatus_to_matrix, create_or_update_lead_on_matrix, push_signup_lead_to_matrix
 # from ondoc.procedure.models import Procedure
 from ondoc.ratings_review import models as ratings_models
 from django.utils import timezone
@@ -352,7 +352,7 @@ class Hospital(auth_model.TimeStampedModel, auth_model.CreatedByModel, auth_mode
             hospital_obj = Hospital.objects.filter(pk=self.id).first()
             if hospital_obj and self.data_status != hospital_obj.data_status:
                 update_status_in_matrix = True
-        if not self.matrix_lead_id:
+        if not self.matrix_lead_id and (self.is_listed_on_docprime is None or self.is_listed_on_docprime is True):
             push_to_matrix = True
         super(Hospital, self).save(*args, **kwargs)
         if self.is_appointment_manager:
@@ -2871,6 +2871,12 @@ class ProviderSignupLead(auth_model.TimeStampedModel):
     email = models.EmailField()
     type = models.IntegerField(choices=TYPE_CHOICES)
     is_docprime = models.NullBooleanField(null=True, editable=False)
+    matrix_lead_id = models.IntegerField(null=True)
+
+    def save(self, *args, **kwargs):
+        if kwargs.get('is_docprime') and not self.matrix_lead_id:
+            create_or_update_lead_on_matrix.apply_async(({'obj_type': self.__class__.__name__, 'obj_id': self.id}
+                                                         ,), countdown=5)
 
     class Meta:
         db_table = "provider_signup_lead"

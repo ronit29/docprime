@@ -1346,3 +1346,24 @@ def datetime_to_formated_string(instance, time_format='%Y-%m-%d %H:%M:%S', to_zo
     formated_date = datetime.datetime.strftime(instance, time_format)
     return formated_date
 
+def payout_checksum(request_payload):
+
+    secretkey = settings.PG_SECRET_KEY_P2
+    accesskey = settings.PG_CLIENT_KEY_P2
+
+    checksum = ""
+
+    curr = ''
+
+    keylist = sorted(request_payload)
+    for k in keylist:
+        if request_payload[k] is not None:
+            curr = curr + k + '=' + str(request_payload[k]) + ';'
+
+    checksum += curr
+
+    checksum = accesskey + "|" + checksum + "|" + secretkey
+    checksum_hash = hashlib.sha256(str(checksum).encode())
+    checksum_hash = checksum_hash.hexdigest()
+    return checksum_hash
+
