@@ -1,4 +1,4 @@
-from ondoc.models import AvailableLabTest
+from ondoc.diagnostic.models import AvailableLabTest
 
 class Command(BaseCommand):
     help = 'Fix test mapping'
@@ -14,11 +14,11 @@ class Command(BaseCommand):
                 duplicate = AvailableLabTest.objects.filter(test_id=new,\
                  lab_pricing_group_id=ee.lab_pricing_group_id).first()
                 if not duplicate:
-                    new_entry = New AvailableLabTest()
+                    new_entry = AvailableLabTest()
                     new_entry.mrp = ee.mrp
                     new_entry.computed_agreed_price = ee.computed_agreed_price
                     new_entry.computed_deal_price = ee.computed_deal_price
-                    new_entry.test_id = ee.test_id
+                    new_entry.test_id = new
                     new_entry.custom_deal_price = ee.custom_deal_price
                     new_entry.custom_agreed_price = ee.custom_agreed_price
                     new_entry.enabled = ee.enabled
@@ -29,6 +29,7 @@ class Command(BaseCommand):
                 #ee.save()    
 
         old_ids =  [x[0] for x in data]
+        LabTest.filter(id__in=old_ids).update(enabled=False)
 
 
 
