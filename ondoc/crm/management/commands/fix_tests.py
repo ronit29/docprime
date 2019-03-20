@@ -1,3 +1,5 @@
+from django.core.management.base import BaseCommand
+
 from ondoc.diagnostic.models import AvailableLabTest, LabTest
 from django.db import transaction
 
@@ -25,7 +27,7 @@ class Command(BaseCommand):
                         new_entry.custom_agreed_price = ee.custom_agreed_price
                         new_entry.enabled = ee.enabled
                         new_entry.lab_pricing_group_id = ee.lab_pricing_group_id
-                        #new_entry.save()
+                        new_entry.save()
 
                     ee.enabled = False
                     #ee.save()    
