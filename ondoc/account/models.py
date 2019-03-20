@@ -132,6 +132,8 @@ class Order(TimeStampedModel):
                 payment_not_required = True
             elif appointment_data['payment_type'] == OpdAppointment.INSURANCE:
                 payment_not_required = True
+            elif appointment_data['payment_type'] == OpdAppointment.PLAN:
+                payment_not_required = True
         elif self.product_id == self.SUBSCRIPTION_PLAN_PRODUCT_ID:
             serializer = PlanTransactionModelSerializer(data=appointment_data)
             serializer.is_valid(raise_exception=True)

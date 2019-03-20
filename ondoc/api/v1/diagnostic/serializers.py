@@ -578,7 +578,7 @@ class LabAppTransactionModelSerializer(serializers.Serializer):
     discount = serializers.DecimalField(max_digits=10, decimal_places=2)
     cashback = serializers.DecimalField(max_digits=10, decimal_places=2)
     extra_details = serializers.JSONField(required=False)
-    user_plan = serializers.PrimaryKeyRelatedField(queryset=UserPlanMapping.objects.all(), allow_null=False)
+    user_plan = serializers.PrimaryKeyRelatedField(queryset=UserPlanMapping.objects.all(), allow_null=True)
 
 
 class LabAppRescheduleModelSerializer(serializers.ModelSerializer):
