@@ -196,7 +196,7 @@ class UserPlanMapping(auth_model.TimeStampedModel):
         cart_queryset = Cart.objects.all()
         if cart_item_id:
             cart_queryset = cart_queryset.exclude(id=cart_item_id)
-        all_cart_objs = cart_queryset.filter(data__included_in_user_plan=False, deleted_at__isnull=True,
+        all_cart_objs = cart_queryset.filter(data__included_in_user_plan=True, deleted_at__isnull=True,
                                              product_id=Order.LAB_PRODUCT_ID, user=user)
         all_tests_in_carts = []
         for cart_obj in all_cart_objs:
