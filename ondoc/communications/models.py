@@ -1318,11 +1318,11 @@ class InsuranceNotification(Notification):
 
         context = {
             'instance': instance,
-            'purchase_data': str(aware_time_zone(instance.purchase_date).date().strftime('%d-%m-%Y')),
-            'expiry_date': str(aware_time_zone(instance.expiry_date).date().strftime('%d-%m-%Y')),
+            'purchase_data': str(aware_time_zone(instance.purchase_date).date().strftime('%d %b %Y')),
+            'expiry_date': str(aware_time_zone(instance.expiry_date).date().strftime('%d %b %Y')),
             'premium': instance.premium_amount,
             'proposer_name': proposer_name.title(),
-            'current_date': timezone.now().date().strftime('%d-%m-%Y'),
+            'current_date': timezone.now().date().strftime('%d %b %Y'),
             'policy_number': instance.policy_number,
             'total_member_covered': len(member_list),
             'plan': instance.insurance_plan.name,

@@ -67,15 +67,15 @@
                  <tr>
                     <td width="33.3%" style="border-right: 1px solid rgba(255, 255, 255, 0.5);">
                         <span class="info-title" style="color: rgba(255, 255, 255, 0.8); text-align: center; font-size: 12px;">Policy Issue Date</span><br>
-                        <span class="info-details" style="color: rgba(255, 255, 255, 1); text-align: center; font-size: 12px; font-weight: 700;">11<sup>th</sup> Oct 2018</span>
+                        <span class="info-details" style="color: rgba(255, 255, 255, 1); text-align: center; font-size: 12px; font-weight: 700;">{{purchase_date}}</span>
                      </td>
                      <td width="33.3%" style="border-right: 1px solid rgba(255, 255, 255, 0.5);">
                         <span class="info-title" style="color: rgba(255, 255, 255, 0.8); text-align: center; font-size: 12px;">Policy Expiry Date</span><br>
-                        <span class="info-details" style="color: rgba(255, 255, 255, 1); text-align: center; font-size: 12px;font-weight: 700;">10<sup>th</sup> Oct 2019</span>
+                        <span class="info-details" style="color: rgba(255, 255, 255, 1); text-align: center; font-size: 12px;font-weight: 700;">{{expiry_date}}</span>
                      </td>
                      <td width="33.3%" style="">
                         <span class="info-title" style="color: rgba(255, 255, 255, 0.8); text-align: center; font-size: 12px;">Policy Number</span><br>
-                        <span class="info-details" style="color: rgba(255, 255, 255, 1); text-align: center; font-size: 12px;font-weight: 700;">DPHEALTHOPD12345</span>
+                        <span class="info-details" style="color: rgba(255, 255, 255, 1); text-align: center; font-size: 12px;font-weight: 700;">{{policy_number}}</span>
                      </td>
                  </tr>
               </table>
@@ -92,15 +92,20 @@
                                 <table border="0" cellpadding="0" cellspacing="0" width="99%" class="policy-table">
                                    <tr>
                                       <td width="45%" style="font-size: 12px;  padding-bottom: 15px; color: #757575; border-bottom: 1px solid rgba(0,0,0,0.12)">Annual Premium Paid:</td>
-                                      <td width="50%" style="font-size: 12px; font-weight: 500; color: #000; vertical-align: top;border-bottom: 1px solid rgba(0,0,0,0.12)"><b><img src="https://cdn.docprime.com/images/rupees.png" style="height: 8px;"> 2999</b></td>
+                                      <td width="50%" style="font-size: 12px; font-weight: 500; color: #000; vertical-align: top;border-bottom: 1px solid rgba(0,0,0,0.12)"><b><img src="https://cdn.docprime.com/images/rupees.png" style="height: 8px;"> {{premium}}</b></td>
                                     </tr>
                                     <tr>
                                       <td width="45%" style="font-size: 12px;  padding-bottom: 15px; color: #757575;border-bottom: 1px solid rgba(0,0,0,0.12);padding-top: 15px;">Praposer Name:</td>
-                                      <td style="font-weight: 500; color: #000; vertical-align: top;border-bottom: 1px solid rgba(0,0,0,0.12);padding-top: 15px; font-size: 12px;"><b>Mr. Sumit Kumar</b></td>
+                                      <td style="font-weight: 500; color: #000; vertical-align: top;border-bottom: 1px solid rgba(0,0,0,0.12);padding-top: 15px; font-size: 12px;"><b>{{proposer_name}}</b></td>
                                     </tr>
                                     <tr>
                                       <td width="45%" style="font-size: 12px;  padding-bottom: 15px; color: #757575; padding-top: 15px; vertical-align: top;">Covered Member:</td>
-                                      <td style="font-weight: 500; color: #000; padding-top: 15px; font-size: 12px;">Self - <b>Sumit Kumar</b> <br> Spouse- <b>Sushmita Kumar</b> <br> Son- P<b>rince Kumar</b> <br> Son - <b> Ronit Kumar</b>  </td>
+                                      <td style="font-weight: 500; color: #000; padding-top: 15px; font-size: 12px;">
+                                          {% for member in insured_members %}
+                                          {{member.relation}} - <b>{{member.name}}</b><br>
+                                          {% endfor %}
+
+                                      </td>
                                     </tr>
                                 </table>
                              </td>
