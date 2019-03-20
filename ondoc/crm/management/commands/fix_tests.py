@@ -30,7 +30,7 @@ class Command(BaseCommand):
                         new_entry.save()
 
                     ee.enabled = False
-                    #ee.save()    
+                    ee.save()    
 
             old_ids =  [x[0] for x in data]
-            #LabTest.filter(id__in=old_ids).update(enabled=False)
+            LabTest.objects.filter(id__in=old_ids).update(enable_for_retail=False, searchable=False)
