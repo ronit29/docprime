@@ -18,3 +18,4 @@ tests/report/
 ondoc/media/*
 deploy.sh
 /silk/
+celerybeat-schedule

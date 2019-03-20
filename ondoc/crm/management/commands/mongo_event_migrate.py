@@ -57,7 +57,7 @@ class Command(BaseCommand):
 
                 for event in psql_events:
                     eventJson = {"id": event.id, "name": event.name, "visit_id": event.visit_id, "user": event.user_id,
-                                 "created_at": event.created_at, "updated_at": event.updated_at}
+                                 "created_at": event.created_at, "updated_at": event.updated_at, "triggered_at": event.triggered_at}
 
                     if event.data:
                         eventJson = { **eventJson , **event.data }

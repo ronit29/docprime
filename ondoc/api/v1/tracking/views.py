@@ -96,13 +96,19 @@ class EventCreateViewSet(GenericViewSet):
                 visit.data = ud
                 modify_visit = True
         elif event_name == 'visitor-info':
+            modify_visitor = False
             visitor = VISITOR_MODEL.objects.get(id=visitor_id)
             if not visitor.device_info:
                 ud = {}
-                ud['Device'] = data.get('device')
-                ud['Mobile'] = data.get('mobile')
+                ud['Device'] = data.get('Device')
+                ud['Mobile'] = data.get('Mobile')
                 ud['platform'] = data.get('platform')
                 visitor.device_info = ud
+                modify_visitor = True
+            if not visitor.client_category:
+                visitor.client_category = data.get('Category', "")
+                modify_visitor = True
+            if modify_visitor:
                 visitor.save()
         elif event_name == "change-location":
             if not visit.location:

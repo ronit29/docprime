@@ -1,5 +1,10 @@
 from copy import deepcopy
 
+from PIL.Image import NEAREST, BICUBIC
+from django.contrib.staticfiles.storage import staticfiles_storage
+from django.core.files.storage import default_storage
+from PIL import Image, ImageFont, ImageOps
+
 from django.contrib.gis.db import models
 from django.db import migrations, transaction, connection
 from django.db.models import Count, Sum, When, Case, Q, F, Avg
@@ -32,8 +37,10 @@ from ondoc.notification import models as notification_models
 from ondoc.notification import tasks as notification_tasks
 from django.contrib.contenttypes.fields import GenericRelation
 from ondoc.api.v1.utils import get_start_end_datetime, custom_form_datetime, CouponsMixin, aware_time_zone, \
-    form_time_slot, util_absolute_url, html_to_pdf
-from ondoc.common.models import AppointmentHistory, AppointmentMaskNumber, Service, Remark, MatrixMappedState, MatrixMappedCity
+    form_time_slot, util_absolute_url, html_to_pdf, TimeSlotExtraction
+from ondoc.common.models import AppointmentHistory, AppointmentMaskNumber, Service, Remark, MatrixMappedState, MatrixMappedCity, GlobalNonBookable
+from ondoc.common.models import QRCode
+
 from functools import reduce
 from operator import or_
 import logging
@@ -42,14 +49,14 @@ import datetime
 from django.db.models import Q
 from django.core.files.uploadedfile import InMemoryUploadedFile
 from django.utils.safestring import mark_safe
-from PIL import Image as Img
+from PIL import Image as Img, ImageDraw
 from io import BytesIO
 import hashlib
 from django.contrib.contenttypes.fields import GenericRelation
 from django.contrib.contenttypes.fields import GenericForeignKey
 from django.contrib.contenttypes.models import ContentType
 from ondoc.matrix.tasks import push_appointment_to_matrix, push_onboarding_qcstatus_to_matrix, \
-    update_onboarding_qcstatus_to_matrix, create_or_update_lead_on_matrix
+    update_onboarding_qcstatus_to_matrix, create_or_update_lead_on_matrix, push_signup_lead_to_matrix
 # from ondoc.procedure.models import Procedure
 from ondoc.ratings_review import models as ratings_models
 from django.utils import timezone
@@ -60,6 +67,7 @@ from django.db.models import Count
 from ondoc.api.v1.utils import RawSql
 from safedelete import SOFT_DELETE
 #from ondoc.api.v1.doctor import serializers as doctor_serializers
+import qrcode
 
 logger = logging.getLogger(__name__)
 
@@ -216,12 +224,42 @@ class Hospital(auth_model.TimeStampedModel, auth_model.CreatedByModel, auth_mode
     about = models.TextField(blank=True, null=True, default="")
     opd_timings = models.CharField(max_length=150, blank=True, null=True, default="")
     always_open = models.BooleanField(verbose_name='Is hospital open 24X7', default=False)
+    city_search_key = models.CharField(db_index=True,editable=False, max_length=100, default="", null=True, blank=True)
 
     def __str__(self):
         return self.name
 
     class Meta:
         db_table = "hospital"
+
+    # def update_search_city(self):
+    #     search_city = None
+    #     if self.city and not self.city_search_key:
+    #         search_city = re.findall(r'[a-zA-Z ]+', self.city)
+    #         search_city = " ".join(search_city).lower()
+    #         self.city_search_key = search_city
+    #         return self.city
+    #     return None
+
+    @classmethod
+    def update_city_search(cls):
+        query = '''  update hospital set city_search_key = alternative_value
+        from 
+        (select * from 
+        (select h.id,lower(ea.alternative_value) alternative_value,
+        row_number() OVER( PARTITION BY h.id ORDER BY  ea.order desc nulls last) rnk from
+                hospital h inner join 
+                    entity_location_relations elr on h.id = elr.object_id and elr.content_type_id=28
+                    inner join entity_address ea on elr.location_id=ea.id  
+                    and ea.use_in_url=True and ea.type='LOCALITY' 
+        )x where rnk =1 
+        )y where hospital.id = y.id'''
+        update_alternative_value = RawSql(query, []).execute()
+
+        query1 = '''update hospital set city_search_key = lower(city) where city_search_key is null
+                        or city_search_key='' '''
+        update_city = RawSql(query1, []).execute()
+
 
     def open_for_communications(self):
         if (self.network and self.network.open_for_communication) or (not self.network and self.open_for_communication):
@@ -314,7 +352,7 @@ class Hospital(auth_model.TimeStampedModel, auth_model.CreatedByModel, auth_mode
             hospital_obj = Hospital.objects.filter(pk=self.id).first()
             if hospital_obj and self.data_status != hospital_obj.data_status:
                 update_status_in_matrix = True
-        if not self.matrix_lead_id:
+        if not self.matrix_lead_id and (self.is_listed_on_docprime is None or self.is_listed_on_docprime is True):
             push_to_matrix = True
         super(Hospital, self).save(*args, **kwargs)
         if self.is_appointment_manager:
@@ -528,6 +566,8 @@ class Doctor(auth_model.TimeStampedModel, auth_model.QCModel, SearchKey, auth_mo
     avg_rating = models.DecimalField(max_digits=5, decimal_places=2, null=True, editable=False)
     remark = GenericRelation(Remark)
 
+    qr_code = GenericRelation(QRCode, related_name="qrcode")
+
     def __str__(self):
         return '{} ({})'.format(self.name, self.id)
 
@@ -690,8 +730,122 @@ class Doctor(auth_model.TimeStampedModel, auth_model.QCModel, SearchKey, auth_mo
     def enabled_for_cod(self):
         return False
 
+    def generate_qr_code(self):
+
+        doctor_url = settings.BASE_URL + "/opd/doctor/{}".format(self.id)
+
+        img = qrcode.make(doctor_url)
+        # md5_hash = hashlib.md5(img.tobytes()).hexdigest()
+
+        tempfile_io = BytesIO()
+        img.save(tempfile_io, format='JPEG')
+
+        filename = "qrcode_{}_{}.jpeg".format('id:' + str(self.id),
+                                              random.randint(1111111111, 9999999999))
+        # image_file1 = InMemoryUploadedFile(tempfile_io, None, name=filename, content_type='image/jpeg', size=10000,
+        #                                    charset=None)
+
+        image_file1 = InMemoryUploadedFile(tempfile_io, None, filename, 'image/jpeg', tempfile_io.tell(), None)
+
+        QRCode_object = QRCode(name=image_file1, content_type=ContentType.objects.get_for_model(Doctor),
+                               object_id=self.id)
+        QRCode_object.save()
+        return QRCode_object
+
+    def generate_sticker(self):
+
+        thumbnail = None
+        for image in self.images.all():
+            if image.cropped_image:
+                thumbnail = image.cropped_image
+
+                break
+        if not thumbnail:
+            return
+
+        qrcode = None
+        for qrcode in self.qr_code.all():
+            if qrcode:
+                qrcode = default_storage.path(qrcode.name)
+                break
+
+        template_url = staticfiles_storage.path('web/images/qr_image.png')
+        template = Image.open(template_url)
+
+
+        thumbnail = default_storage.path(thumbnail)
+        print(thumbnail)
+        doctor_image = Image.open(thumbnail)
+        qrcode_image = Image.open(qrcode)
+
+        # im = Image.open('avatar.jpg')
+        # im = im.resize((120, 120));
+        # bigsize = (im.size[0] * 3, im.size[1] * 3)
+        # mask = Image.new('L', bigsize, 0)
+        # draw = ImageDraw.Draw(mask)
+        # draw.ellipse((0, 0) + bigsize, fill=255)
+        # mask = mask.resize(im.size, Image.ANTIALIAS)
+        # im.putalpha(mask)
+        #
+        # output = ImageOps.fit(im, mask.size, centering=(0.5, 0.5))
+        # output.putalpha(mask)
+        # output.save('output.png')
+        #
+        # background = Image.open('back.jpg')
+        # background.paste(im, (150, 10), im)
+        # background.save('overlap.png')
+
+        doctor_image = doctor_image.resize((220, 220))
+        bigsize = (doctor_image.size[0] * 200, doctor_image.size[1] * 200)
+
+        mask = Image.new('L', bigsize, 0)
+        draw = ImageDraw.Draw(mask)
+        draw.ellipse((100,100)+bigsize, fill=255)
+        mask = mask.resize(doctor_image.size, Image.ANTIALIAS)
+        doctor_image.putalpha(mask)
+        output = ImageOps.fit(doctor_image, mask.size, centering=(1, 1))
+        output.putalpha(mask)
+        # output.save('output.png')
+        canvas = Image.new('RGB', (992, 1620))
+        canvas.paste(template, (0,0))
+        # doctor_image = doctor_image.resize((200, 200), Image.ANTIALIAS)
+        canvas.paste(doctor_image, (390, 300), doctor_image)
+        canvas.save('overlap.png')
+        qrcode_image = qrcode_image.resize((530, 530), Image.ANTIALIAS)
+        canvas.paste(qrcode_image, (215, 830))
+
+        blank_image = Image.new('RGBA', (1000, 1000), 'white') # this new image is created to write text and paste on canvas
+        img_draw = ImageDraw.Draw(canvas)
+        font_url = staticfiles_storage.path('web/images/.fonts/ProspectusPro-Desktop-v1-002/ProspectusSBld.otf')
+        font = ImageFont.truetype(font_url, 40)
+        img_draw.text((350, 530), self.name, fill='black', font=font)
+        # md5_hash = hashlib.md5(canvas.tobytes()).hexdigest()
+
+        tempfile_io = BytesIO()
+        canvas.save(tempfile_io, format='JPEG')
+        filename = "doctor_sticker_{}_{}.jpeg".format('id:' + str(self.id),
+                                              random.randint(1111111111, 9999999999))
+
+        image_file1 = InMemoryUploadedFile(tempfile_io, None, filename, 'image/jpeg', tempfile_io.tell(), None)
+
+        sticker = DoctorSticker(name=image_file1, doctor=self)
+        sticker.save()
+        return sticker
+
+
+
+
     class Meta:
         db_table = "doctor"
+
+
+class DoctorSticker(auth_model.TimeStampedModel):
+    image_base_path = 'doctor/stickers'
+    doctor = models.ForeignKey(Doctor, related_name="stickers", on_delete=models.CASCADE)
+    name = models.ImageField('Original Image Name',upload_to=image_base_path,blank=True, null=True)
+
+    class Meta:
+        db_table = "doctor_sticker"
 
 
 class AboutDoctor(Doctor):
@@ -791,6 +945,31 @@ class DoctorClinic(auth_model.TimeStampedModel):
 
     # def __str__(self):
     #     return '{}-{}'.format(self.doctor, self.hospital)
+
+    def get_timings(self):
+        from ondoc.api.v2.doctor import serializers as v2_serializers
+        from ondoc.api.v1.common import serializers as common_serializers
+        clinic_timings= self.availability.order_by("start")
+        doctor_leave_serializer = v2_serializers.DoctorLeaveSerializer(
+            DoctorLeave.objects.filter(doctor=self.doctor_id, deleted_at__isnull=True), many=True)
+        global_leave_serializer = common_serializers.GlobalNonBookableSerializer(
+           GlobalNonBookable.objects.filter(deleted_at__isnull=True, booking_type=GlobalNonBookable.DOCTOR), many=True)
+        total_leaves = dict()
+        total_leaves['global'] = global_leave_serializer.data
+        total_leaves['doctor'] = doctor_leave_serializer.data
+        timeslots = dict()
+        obj = TimeSlotExtraction()
+
+        for data in clinic_timings:
+            obj.form_time_slots(data.day, data.start, data.end, data.fees, True,
+                                data.deal_price, data.mrp, True, on_call=data.type)
+
+        date = datetime.datetime.today().strftime('%Y-%m-%d')
+        booking_details = {"type": "doctor"}
+        slots = obj.get_timing_slots(date, total_leaves, booking_details)
+        upcoming_slots = obj.get_upcoming_slots(time_slots=slots)
+        res_data = {"time_slots": slots, "upcoming_slots": upcoming_slots}
+        return res_data
 
 
 class DoctorClinicTiming(auth_model.TimeStampedModel):
@@ -2603,9 +2782,10 @@ class OfflineOPDAppointments(auth_model.TimeStampedModel):
     @staticmethod
     def appointment_cancel_sms(sms_obj):
         try:
+            cancel_time = aware_time_zone(sms_obj['old_appointment'].time_slot_start)
             default_text = "Dear %s, your appointment with %s at %s for %s has been cancelled. In case of any query, please reach out to the clinic." % (
                               sms_obj['name'], sms_obj['old_appointment'].doctor.get_display_name(), sms_obj['old_appointment'].hospital.name,
-                              sms_obj['old_appointment'].time_slot_start.strftime("%B %d, %Y %I:%M %p"))
+                              cancel_time.strftime("%B %d, %Y %I:%M %p"))
             notification_tasks.send_offline_appointment_message.apply_async(
                 kwargs={'number': sms_obj['phone_number'], 'text': default_text, 'type': 'Appointment CANCEL'},
                 countdown=1)
@@ -2710,6 +2890,12 @@ class ProviderSignupLead(auth_model.TimeStampedModel):
     email = models.EmailField()
     type = models.IntegerField(choices=TYPE_CHOICES)
     is_docprime = models.NullBooleanField(null=True, editable=False)
+    matrix_lead_id = models.IntegerField(null=True)
+
+    def save(self, *args, **kwargs):
+        if kwargs.get('is_docprime') and not self.matrix_lead_id:
+            create_or_update_lead_on_matrix.apply_async(({'obj_type': self.__class__.__name__, 'obj_id': self.id}
+                                                         ,), countdown=5)
 
     class Meta:
         db_table = "provider_signup_lead"
