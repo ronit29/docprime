@@ -722,9 +722,9 @@ class UserInsurance(auth_model.TimeStampedModel):
                             doctor = data.get('doctor')
                             is_doctor_gyno = self.is_doctor_gynecologist(doctor)
                             is_doctor_onco = self.is_doctor_oncologist(doctor)
-                            if is_doctor_gyno:
+                            if is_doctor_gyno and data.get('is_appointment_insured'):
                                 gyno_count = gyno_count + 1
-                            if is_doctor_onco:
+                            if is_doctor_onco and data.get('is_appointment_insured'):
                                 onco_count = onco_count + 1
                             if gyno_count >= int(settings.INSURANCE_GYNECOLOGIST_LIMIT):
                                 return False, self.id,"Gynocologist limit exceeded of limit 5"
