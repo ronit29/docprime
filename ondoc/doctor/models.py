@@ -1643,7 +1643,7 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
         allowed = []
         current_datetime = timezone.now()
         today = datetime.date.today()
-        if kwargs.get('parameters').get('qr_code', False) == False:
+        if kwargs.get('parameters', {}).get('qr_code', False) == False:
             if user_type == auth_model.User.DOCTOR and self.time_slot_start.date() >= today:
                 if self.status in [self.BOOKED, self.RESCHEDULED_PATIENT]:
                     allowed = [self.ACCEPTED, self.RESCHEDULED_DOCTOR]
@@ -1664,8 +1664,13 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
                     allowed.append(self.COMPLETED)
         else:
             if user_type == auth_model.User.CONSUMER:
-                if self.status == self.ACCEPTED and self.time_slot_start <= current_datetime:
+                if self.status == self.ACCEPTED and self.time_slot_start > current_datetime:
                     allowed.append(self.COMPLETED)
+                #
+                # elif self.status == self.ACCEPTED and self.time_slot_start > current_datetime:
+                #     if kwargs:
+                #         kwargs['parameters']['status'] = OpdAppointment.ACCEPTED
+                #         allowed.append(self.ACCEPTED)
 
         return allowed
 
