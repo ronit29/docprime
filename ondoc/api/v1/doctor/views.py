@@ -245,7 +245,12 @@ class DoctorAppointmentsViewSet(OndocViewSet):
 
         if validated_data.get("existing_cart_item"):
             cart_item = validated_data.get("existing_cart_item")
-            cart_item.data = request.data
+            old_cart_obj = Cart.objects.filter(id=validated_data.get('existing_cart_item').id).first()
+            payment_type = old_cart_obj.data.get('payment_type')
+            if payment_type == OpdAppointment.INSURANCE and data['is_appointment_insured'] == False:
+                data['payment_type'] = OpdAppointment.PREPAID
+            # cart_item.data = request.data
+            cart_item.data = data
             cart_item.save()
         else:
             cart_item, is_new = Cart.objects.update_or_create(id=cart_item_id, deleted_at__isnull=True, product_id=account_models.Order.DOCTOR_PRODUCT_ID,

@@ -2164,6 +2164,7 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
 
     @classmethod
     def create_fulfillment_data(cls, user, data, price_data):
+        from ondoc.insurance.models import UserInsurance
         procedures = data.get('procedure_ids', [])
         selected_hospital = data.get('hospital')
         doctor = data.get('doctor')
@@ -2188,6 +2189,18 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
             extra_details.append(temp_extra)
 
         cart_data = data.get('cart_item').data
+        payment_type = data.get("payment_type")
+        is_appointment_insured = False
+        insurance_id = None
+        insurance_message = ""
+        # is_appointment_insured = cart_data.get('is_appointment_insured')
+        # insurance_id = cart_data.get('insurance_id')
+        # insurance_message = cart_data.get('insurance_message')
+        user_insurance = UserInsurance.objects.filter(user=user).last()
+        if user_insurance:
+            is_appointment_insured, insurance_id, insurance_message = user_insurance.validate_insurance(data)
+            if is_appointment_insured:
+                payment_type = OpdAppointment.INSURANCE
 
         return {
             "doctor": data.get("doctor"),
@@ -2202,13 +2215,14 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
             "mrp": price_data.get("mrp"),
             "extra_details": extra_details,
             "time_slot_start": time_slot_start,
-            "payment_type": data.get("payment_type"),
+            # "payment_type": data.get("payment_type"),
+            "payment_type": payment_type,
             "coupon": price_data.get("coupon_list"),
             "discount": int(price_data.get("coupon_discount")),
             "cashback": int(price_data.get("coupon_cashback")),
-            "is_appointment_insured": cart_data.get('is_appointment_insured', False),
-            "insurance": cart_data.get('insurance_id', None),
-            "insurance_message": cart_data.get('insurance_message', "")
+            "is_appointment_insured": is_appointment_insured,
+            "insurance": insurance_id,
+            "insurance_message": insurance_message
         }
 
     @staticmethod
