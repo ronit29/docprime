@@ -2189,7 +2189,7 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
             extra_details.append(temp_extra)
 
         payment_type = data.get("payment_type")
-        effective_price = data.get("effective_price")
+        effective_price = price_data.get("effective_price")
         is_appointment_insured = False
         insurance_id = None
         insurance_message = ""
