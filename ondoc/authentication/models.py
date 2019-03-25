@@ -26,6 +26,7 @@ import requests
 import json
 from rest_framework import status
 from collections import OrderedDict
+from django.utils.text import slugify
 
 
 class Image(models.Model):
@@ -1407,6 +1408,9 @@ class DoctorNumber(TimeStampedModel):
 
 
 class Merchant(TimeStampedModel):
+
+    STATE_ABBREVIATIONS = ('Andhra Pradesh','AP'),('Arunachal Pradesh','AR'),('Assam','AS'),('Bihar','BR'),('Chhattisgarh','CG'),('Goa','GA'),('Gujarat','GJ'),('Haryana','HR'),('Himachal Pradesh','HP'),('Jammu and Kashmir','JK'),('Jharkhand','JH'),('Karnataka','KA'),('Kerala','KL'),('Madhya Pradesh','MP'),('Maharashtra','MH'),('Manipur','MN'),('Meghalaya','ML'),('Mizoram','MZ'),('Nagaland','NL'),('Orissa','OR'),('Punjab','PB'),('Rajasthan','RJ'),('Sikkim','SK'),('Tamil Nadu','TN'),('Tripura','TR'),('Uttarakhand','UK'),('Uttar Pradesh','UP'),('West Bengal','WB'),('Tamil Nadu','TN'),('Tripura','TR'),('Andaman and Nicobar Islands','AN'),('Chandigarh','CH'),('Dadra and Nagar Haveli','DH'),('Daman and Diu','DD'),('Delhi','DL'),('Lakshadweep','LD'),('Pondicherry','PY')
+
     SAVINGS = 1
     CURRENT = 2
 
@@ -1475,6 +1479,13 @@ class Merchant(TimeStampedModel):
         request_payload["Bene_City"] = self.city
         request_payload["Bene_Pin"] = self.pin
         request_payload["State"] = self.state
+
+        abbr = Merchant.get_abbreviation(self.state)
+        if abbr:
+            request_payload["State"] = abbr
+        else:
+            request_payload["State"] = self.state
+
         #request_payload["Country"] = self.country
         request_payload["Country"] = 'in'
         request_payload["Bene_Email"] = self.email
@@ -1502,6 +1513,24 @@ class Merchant(TimeStampedModel):
             self.api_response = resp_data
             if resp_data.get('StatusCode') and resp_data.get('StatusCode') in [1,2,3,4]:
                 self.pg_status = resp_data.get('StatusCode')
+
+    @classmethod
+    def get_abbreviation(cls, state_name):
+        state_slug = slugify(state_name)
+        for state,abbr in cls.STATE_ABBREVIATIONS:
+            if state_slug == slugify(state):
+                return abbr
+
+        return None
+
+    @classmethod
+    def get_states_list(cls):        
+        states = [x[0] for x in cls.STATE_ABBREVIATIONS]
+        return states
+
+    @classmethod
+    def get_states_string(cls):
+        return ", ".join(cls.get_states_list())
 
     @classmethod
     def generate_checksum(cls, request_payload):
