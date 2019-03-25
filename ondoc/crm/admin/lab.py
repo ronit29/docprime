@@ -802,7 +802,7 @@ class LabAppointmentAdmin(nested_admin.NestedModelAdmin):
     #     return temp_autocomplete_fields
 
     def payout_info(self, obj):
-        MerchantPayout.get_merchant_payout_info(obj)
+        return MerchantPayout.get_merchant_payout_info(obj)
     payout_info.short_description = 'Merchant Payment Info'
 
     def through_app(self, obj):

@@ -1583,7 +1583,7 @@ class DoctorOpdAppointmentAdmin(admin.ModelAdmin):
         #     return ('invoice_urls')
 
     def payout_info(self, obj):
-        MerchantPayout.get_merchant_payout_info(obj)
+        return MerchantPayout.get_merchant_payout_info(obj)
     payout_info.short_description = 'Merchant Payment Info'
 
     def ratings(self, obj):
