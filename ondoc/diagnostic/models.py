@@ -2018,11 +2018,8 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin)
             "gender": data["profile"].gender,
             "dob": str(data["profile"].dob),
         }
-        cart_data = data.get('cart_item').data
         payment_type = data.get("payment_type")
-        # is_appointment_insured = cart_data.get('is_appointment_insured')
-        # insurance_id = cart_data.get('insurance_id')
-        # insurance_message = cart_data.get('insurance_message')
+        effective_price = price_data.get("effective_price")
         is_appointment_insured = False
         insurance_id = None
         insurance_message = ""
@@ -2030,7 +2027,12 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin)
         if user_insurance:
             is_appointment_insured, insurance_id, insurance_message = user_insurance.validate_insurance(data)
             if is_appointment_insured:
+                effective_price = 0.0
                 payment_type = OpdAppointment.INSURANCE
+
+            else:
+                insurance_id = None
+
         fulfillment_data = {
             "lab": data["lab"],
             "user": user,
@@ -2038,13 +2040,12 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin)
             "price": price_data.get("mrp"),
             "agreed_price": price_data.get("fees"),
             "deal_price": price_data.get("deal_price"),
-            "effective_price": price_data.get("effective_price"),
+            "effective_price": effective_price,
             "home_pickup_charges": price_data.get("home_pickup_charges"),
             "time_slot_start": start_dt,
             "is_home_pickup": data["is_home_pickup"],
             "profile_detail": profile_detail,
             "status": LabAppointment.BOOKED,
-            # "payment_type": data["payment_type"],
             "payment_type": payment_type,
             "lab_test": test_ids_list,
             "extra_details": extra_details,
