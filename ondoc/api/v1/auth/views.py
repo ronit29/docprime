@@ -2002,11 +2002,11 @@ class DoctorScanViewSet(GenericViewSet):
                 if url:
                     url = url.get('url', None)
                     if request_url == url:
-                        if appt_status == OpdAppointment.ACCEPTED and opdapp_obj.time_slot_start >= timezone.now():
+                        if appt_status == OpdAppointment.ACCEPTED and opdapp_obj.time_slot_start >= timezone.now() and complete_with_qr_scanner == True:
                             opdapp_obj.status = OpdAppointment.COMPLETED
-                            x=opdapp_obj.action_completed()
-                            resp = AppointmentRetrieveSerializer(x, context={"request": request}).data
-                            return resp
+                            opdapp_obj.action_completed()
+                            resp = AppointmentRetrieveSerializer(opdapp_obj, context={"request": request})
+                            return Response(resp.data)
                         else:
                             return Response('Appointment not started', status.HTTP_400_BAD_REQUEST)
 
