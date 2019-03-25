@@ -18,11 +18,11 @@ class GetComplementSerializer(serializers.ModelSerializer):
 class RatingCreateBodySerializer(serializers.Serializer):
     rating = serializers.IntegerField(max_value=5)
     review = serializers.CharField(max_length=5000, allow_blank=True)
-    appointment_id = serializers.IntegerField(required=False)
+    appointment_id = serializers.IntegerField(required=False, allow_null=True)
     appointment_type = serializers.ChoiceField(choices=RatingsReview.APPOINTMENT_TYPE_CHOICES)
     # compliment = ListReviewComplimentSerializer(source='request.data')
     compliment = serializers.ListField(child=serializers.PrimaryKeyRelatedField(queryset=ReviewCompliments.objects.all()), allow_empty=True)
-    entity_id = serializers.IntegerField(required=False)
+    entity_id = serializers.IntegerField(required=False, allow_null=True)
 
     def validate(self, attrs):
         if not (attrs.get('appointment_id') or attrs.get('entity_id')):
