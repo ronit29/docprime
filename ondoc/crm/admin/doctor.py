@@ -1557,7 +1557,7 @@ class DoctorOpdAppointmentAdmin(admin.ModelAdmin):
                 'fees', 'effective_price', 'mrp', 'deal_price', 'payment_status',
                 'payment_type', 'admin_information', 'insurance', 'outstanding',
                 'status', 'cancel_type', 'cancellation_reason', 'cancellation_comments',
-                'start_date', 'start_time', 'invoice_urls', 'payment_type')
+                'start_date', 'start_time', 'invoice_urls', 'payment_type', 'payout_info')
         if request.user.groups.filter(name=constants['APPOINTMENT_OTP_TEAM']).exists() or request.user.is_superuser:
             all_fields = all_fields + ('otp',)
         return all_fields
@@ -1575,13 +1575,16 @@ class DoctorOpdAppointmentAdmin(admin.ModelAdmin):
                      'default_profile_number', 'user_id', 'user_number', 'booked_by',
                      'fees', 'effective_price', 'mrp', 'deal_price', 'payment_status', 'payment_type',
                      'admin_information', 'insurance', 'outstanding', 'procedures_details', 'invoice_urls',
-                     'payment_type',
-                     'invoice_urls')
+                     'payment_type', 'invoice_urls', 'payout_info')
         if request.user.groups.filter(name=constants['APPOINTMENT_OTP_TEAM']).exists() or request.user.is_superuser:
             read_only = read_only + ('otp',)
         return read_only
         # else:
         #     return ('invoice_urls')
+
+    def payout_info(self, obj):
+        return MerchantPayout.get_merchant_payout_info(obj)
+    payout_info.short_description = 'Merchant Payment Info'
 
     def ratings(self, obj):
         rating_queryset = rating_models.RatingsReview.objects.filter(appointment_id=obj.id).first()
