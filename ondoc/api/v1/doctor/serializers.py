@@ -1207,12 +1207,14 @@ class AppointmentRetrieveSerializer(OpdAppointmentSerializer):
 class NewAppointmentRetrieveSerializer(AppointmentRetrieveSerializer):
     doctor = QrcodeRetrieveDoctorSerializer()
 
-    class Meta:
+    class Meta(AppointmentRetrieveSerializer.Meta):
         model = OpdAppointment
-        fields = ('id', 'patient_image', 'patient_name', 'type', 'profile', 'otp', 'is_rated', 'rating_declined',
-                  'allowed_action', 'effective_price', 'deal_price', 'status', 'time_slot_start', 'time_slot_end',
-                  'doctor', 'hospital', 'allowed_action', 'doctor_thumbnail', 'patient_thumbnail', 'procedures', 'mrp',
-                  'invoices', 'cancellation_reason', 'payment_type')
+        # fields = ('id', 'patient_image', 'patient_name', 'type', 'profile', 'otp', 'is_rated', 'rating_declined',
+        #           'allowed_action', 'effective_price', 'deal_price', 'status', 'time_slot_start', 'time_slot_end',
+        #           'doctor', 'hospital', 'allowed_action', 'doctor_thumbnail', 'patient_thumbnail', 'procedures', 'mrp',
+        #           'invoices', 'cancellation_reason', 'payment_type')
+        fields = AppointmentRetrieveSerializer.Meta.fields
+
 
 
 class DoctorAppointmentRetrieveSerializer(OpdAppointmentSerializer):

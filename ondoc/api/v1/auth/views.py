@@ -21,6 +21,7 @@ from django.db.models import F, Sum, Max, Q, Prefetch, Case, When, Count
 from django.forms.models import model_to_dict
 
 from ondoc.common.models import UserConfig, PaymentOptions, AppointmentHistory
+from ondoc.common.utils import get_all_upcoming_appointments
 from ondoc.coupon.models import UserSpecificCoupon, Coupon
 from ondoc.lead.models import UserLead
 from ondoc.sms.api import send_otp
@@ -1944,14 +1945,7 @@ class AppointmentViewSet(viewsets.GenericViewSet):
         all_appointments = []
         try:
             user_id = request.user.id
-            opd = OpdAppointment.get_upcoming_appointment(user_id)
-            opd_appointments = OpdAppointmentUpcoming(opd, many=True).data
-            lab = LabAppointment.get_upcoming_appointment(user_id)
-            lab_appointments = LabAppointmentUpcoming(lab, many=True).data
-
-            all_appointments = opd_appointments + lab_appointments
-            all_appointments = sorted(all_appointments,
-                                      key=lambda x: x["time_slot_start"])
+            get_all_upcoming_appointments(user_id)
         except Exception as e:
             logger.error(str(e))
         return Response(all_appointments)
@@ -1960,38 +1954,44 @@ class AppointmentViewSet(viewsets.GenericViewSet):
         return OpdAppointment.objects.none()
 
 class DoctorScanViewSet(GenericViewSet):
+    authentication_classes = (JWTAuthentication, )
+    permission_classes = (IsAuthenticated, IsNotAgent)
 
     # @transaction.atomic
     def doctor_qr_scan(self, request, pk):
         opdapp_obj = OpdAppointment.objects.filter(pk=pk).first()
+        user = request.user
         if opdapp_obj:
-            data = request.query_params
-            type = data.get('type')
-            request_url = request.data.get('url')
-            if request_url:
-                if type == 'doctor':
-                    complete_with_qr_scanner = True
-                    appt_status = opdapp_obj.status
-                    if opdapp_obj.doctor.qr_code.all():
-                        url = opdapp_obj.doctor.qr_code.first().data
-                        if url:
-                            url = url.get('url', None)
-                            if request_url == url:
-                                if appt_status == OpdAppointment.ACCEPTED and opdapp_obj.time_slot_start <= timezone.now() and complete_with_qr_scanner == True:
-                                    opdapp_obj.status = OpdAppointment.COMPLETED
-                                    opdapp_obj.action_completed()
-                                    resp = AppointmentRetrieveSerializer(opdapp_obj, context={"request": request})
-                                    return Response(resp.data)
-                                else:
-                                    return Response('Bad request', status.HTTP_400_BAD_REQUEST)
+            if user == opdapp_obj.user:
+                data = request.query_params
+                type = data.get('type')
+                request_url = request.data.get('url')
+                if request_url:
+                    if type == 'doctor':
+                        appt_status = opdapp_obj.status
+                        if opdapp_obj.doctor.qr_code.all():
+                            url = opdapp_obj.doctor.qr_code.first().data
+                            complete_with_qr_scanner = True
+                            if url:
+                                url = url.get('url', None)
+                                if request_url == url:
+                                    if appt_status == OpdAppointment.ACCEPTED and opdapp_obj.time_slot_start <= timezone.now() and complete_with_qr_scanner == True:
+                                        opdapp_obj.status = OpdAppointment.COMPLETED
+                                        opdapp_obj.action_completed()
+                                        resp = AppointmentRetrieveSerializer(opdapp_obj, context={"request": request})
+                                        return Response(resp.data)
+                                    else:
+                                        return Response('Bad request', status.HTTP_400_BAD_REQUEST)
 
-                            else:
-                                return Response('Invalid url', status.HTTP_400_BAD_REQUEST)
+                                else:
+                                    return Response('Invalid url', status.HTTP_400_BAD_REQUEST)
+                        else:
+                            return Response('QRCode not enabled for this doctor', status.HTTP_400_BAD_REQUEST)
                     else:
-                        return Response('QRCode not enabled for this doctor', status.HTTP_400_BAD_REQUEST)
+                        return Response('Invalid type', status.HTTP_400_BAD_REQUEST)
                 else:
-                    return Response('Invalid type', status.HTTP_400_BAD_REQUEST)
+                    return Response('URL not given', status.HTTP_400_BAD_REQUEST)
             else:
-                return Response('URL not given', status.HTTP_400_BAD_REQUEST)
+                return Response('User not found', status.HTTP_400_BAD_REQUEST)
         else:
             return Response('Opd Appointment does not exist', status.HTTP_400_BAD_REQUEST)

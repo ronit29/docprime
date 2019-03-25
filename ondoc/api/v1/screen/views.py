@@ -4,6 +4,7 @@ from rest_framework.response import Response
 
 from ondoc.api.v1.auth.views import AppointmentViewSet
 from ondoc.authentication.backends import JWTAuthentication
+from ondoc.common.utils import get_all_upcoming_appointments
 from ondoc.doctor.models import CommonSpecialization
 from ondoc.diagnostic.models import CommonTest
 from ondoc.diagnostic.models import CommonPackage
@@ -55,9 +56,11 @@ class ScreenViewSet(viewsets.GenericViewSet):
         package_queryset = CommonPackage.objects.prefetch_related('package').filter(package__enable_for_retail=True)[:grid_size-1]
         package_serializer = CommonPackageSerializer(package_queryset, many=True, context={'request': request})
 
-        upcoming_appointment_viewset = AppointmentViewSet()
-        upcoming_appointment_result = upcoming_appointment_viewset.upcoming_appointments(request).data
-
+        # upcoming_appointment_viewset = AppointmentViewSet()
+        # upcoming_appointment_result = upcoming_appointment_viewset.upcoming_appointments(request).data
+        upcoming_appointment_result = []
+        if request.user.is_authenticated:
+            upcoming_appointment_result = get_all_upcoming_appointments(request.user.id)
 
         grid_list = [
             {
