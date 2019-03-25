@@ -72,9 +72,11 @@ class CartViewSet(viewsets.GenericViewSet):
         for item in cart_items:
             try:
                 validated_data = item.validate(request)
-                user_insurance = UserInsurance.objects.filter(user=user).last()
-                if user_insurance:
-                    item.data['is_appointment_insured'], item.data['insurance_id'], item.data['insurance_message'] = user_insurance.validate_insurance(validated_data)
+                # user_insurance = UserInsurance.objects.filter(user=user).last()
+                # if user_insurance:
+                    # item.data['is_appointment_insured'], item.data['insurance_id'], item.data['insurance_message'] = user_insurance.validate_insurance(validated_data)
+                item.data['is_appointment_insured'], item.data['insurance_id'], item.data[
+                        'insurance_message'] = Cart.check_for_insurance(validated_data, request)
                 price_data = item.get_price_details(validated_data)
                 items.append({
                     "id" : item.id,
