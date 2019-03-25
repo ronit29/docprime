@@ -1214,20 +1214,27 @@ class AvailableLabTest(TimeStampedModel):
         #         is not null then custom_agreed_price
         #         else computed_agreed_price end), mrp) where id = %s '''
 
-        query = '''update available_lab_test set computed_deal_price = 
-                    least(greatest(floor(	
-                    case when (least((case when custom_agreed_price is not null 
-                    then custom_agreed_price else computed_agreed_price end)*1.5, mrp*.8) - case when custom_agreed_price
-                    is not null then custom_agreed_price else computed_agreed_price end) >100  then 
-                    least((case when custom_agreed_price is not null 
-                    then custom_agreed_price else computed_agreed_price end)*1.5, mrp*.8) else 
-                    least((case when custom_agreed_price is not null 
-                    then custom_agreed_price else computed_agreed_price end)+100, mrp) end
-                    /5)*5, case when custom_agreed_price
-                    is not null then custom_agreed_price else computed_agreed_price end), mrp)
-                    where enabled=true and id=%s '''
+        query = '''update available_lab_test set computed_deal_price = (select deal_price from 
+                    (select *,  least(greatest(floor(price /5)*5, agreed_price), mrp ) as deal_price from 
+                    (select id, mrp, agreed_price,
+                    case 
+                    when agreed_price <=0 then mrp*.4 
+                    when mrp<=2000 then
+                        case when (least(agreed_price*1.5, .8*mrp) - agreed_price) >100 then least(agreed_price*1.5, .8*mrp) 
+                        else least(agreed_price+100, mrp) end
+                    else 
+                        case when (least(agreed_price*1.5, agreed_price+.5*(mrp-agreed_price)) - agreed_price )>100
+                        then least(agreed_price*1.5, agreed_price+.5*(mrp-agreed_price))
+                        else
+                        least(agreed_price+100, mrp) end 	
+                    end price
+                    from 
+                    (select case when custom_agreed_price is null then computed_agreed_price else
+                     custom_agreed_price end as agreed_price,
+                    mrp, id from available_lab_test  where id=%s )x)y where y.id = available_lab_test.id )z) 
+                    where available_lab_test.enabled=true and id=%s '''
 
-        update_available_lab_test_deal_price = RawSql(query, [self.pk]).execute()
+        update_available_lab_test_deal_price = RawSql(query, [self.pk, self.pk]).execute()
         # deal_price = RawSql(query, [self.pk]).fetch_all()
         # if deal_price:
         #    self.computed_deal_price = deepcopy(deal_price[0].get('computed_deal_price'))
@@ -1235,18 +1242,23 @@ class AvailableLabTest(TimeStampedModel):
     @classmethod
     def update_all_deal_price(cls):
         # will update all lab prices
-        query = '''update available_lab_test set computed_deal_price = 
-                    least(greatest(floor(	
-                    case when (least((case when custom_agreed_price is not null 
-                    then custom_agreed_price else computed_agreed_price end)*1.5, mrp*.8) - case when custom_agreed_price
-                    is not null then custom_agreed_price else computed_agreed_price end) >100  then 
-                    least((case when custom_agreed_price is not null 
-                    then custom_agreed_price else computed_agreed_price end)*1.5, mrp*.8) else 
-                    least((case when custom_agreed_price is not null 
-                    then custom_agreed_price else computed_agreed_price end)+100, mrp) end
-                    /5)*5, case when custom_agreed_price
-                    is not null then custom_agreed_price else computed_agreed_price end), mrp)
-                    where enabled=true'''
+        query = '''update available_lab_test set computed_deal_price = (select deal_price from 
+                (select *,  least(greatest(floor(price /5)*5, agreed_price), mrp ) as deal_price from 
+                (select id, mrp, agreed_price,
+                case 
+                when agreed_price <=0 then mrp*.4 
+                when mrp<=2000 then
+                    case when (least(agreed_price*1.5, .8*mrp) - agreed_price) >100 then least(agreed_price*1.5, .8*mrp) 
+                    else least(agreed_price+100, mrp) end
+                else 
+                    case when (least(agreed_price*1.5, agreed_price+.5*(mrp-agreed_price)) - agreed_price )>100
+                    then least(agreed_price*1.5, agreed_price+.5*(mrp-agreed_price))
+                    else
+                    least(agreed_price+100, mrp) end 	
+                end price
+                from 
+                (select case when custom_agreed_price is null then computed_agreed_price else custom_agreed_price end as agreed_price,
+                mrp, id from available_lab_test)x)y where y.id = available_lab_test.id )z) where available_lab_test.enabled=true'''
 
         update_all_available_lab_test_deal_price = RawSql(query, []).execute()
 
@@ -1398,6 +1410,8 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin)
     money_pool = models.ForeignKey(MoneyPool, on_delete=models.SET_NULL, null=True)
     mask_number = GenericRelation(AppointmentMaskNumber)
     email_notification = GenericRelation(EmailNotification, related_name="lab_notification")
+    user_plan_used = models.ForeignKey('subscription_plan.UserPlanMapping', null=True, on_delete=models.DO_NOTHING,
+                                       related_name='appointment_using')
 
     def get_tests_and_prices(self):
         test_price = []
@@ -1728,6 +1742,7 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin)
         appointment_data["payment_status"] = OpdAppointment.PAYMENT_ACCEPTED
         appointment_data["status"] = OpdAppointment.BOOKED
         appointment_data["otp"] = otp
+        appointment_data["user_plan_used"] = appointment_data.pop("user_plan", None)
         lab_ids = appointment_data.pop("lab_test")
         coupon_list = appointment_data.pop("coupon", None)
         extra_details = deepcopy(appointment_data.pop("extra_details", None))
@@ -1973,7 +1988,7 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin)
             else:
                 effective_price = effective_price - coupon_discount
 
-        if data.get("payment_type") in [OpdAppointment.COD]:
+        if data.get("payment_type") in [OpdAppointment.COD, OpdAppointment.PLAN]:
             effective_price = 0
             coupon_discount, coupon_cashback, coupon_list = 0, 0, []
 
@@ -2034,6 +2049,11 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin)
             "discount": int(price_data.get("coupon_discount")),
             "cashback": int(price_data.get("coupon_cashback"))
         }
+
+        if data.get('included_in_user_plan', False):
+            fulfillment_data.update({'user_plan': data.get('user_plan', None)})
+        else:
+            fulfillment_data.update({'user_plan': None})
 
         if data.get("is_home_pickup") is True:
             address = Address.objects.filter(pk=data.get("address").id).first()

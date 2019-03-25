@@ -190,6 +190,8 @@ class UserProfileSerializer(serializers.ModelSerializer):
 
     def get_profile_image(self, obj):
         request = self.context.get('request')
+        if not request:
+            return None
         profile_image = None
         if hasattr(obj, 'profile_image'):
             profile_image = obj.profile_image
