@@ -766,13 +766,16 @@ class UserInsurance(auth_model.TimeStampedModel):
             if not int(price_data.get('mrp')) <= threshold_opd:
                 return False, user_insurance.id, "Not Covered Under Insurance"
             doctor = appointment_data['doctor']
-            if self.is_doctor_gynecologist(doctor) or self.is_doctor_oncologist(doctor):
-                gynocologist_appointment_count, oncologist_appointment_count = user_insurance.get_doctor_specialization_count(appointment_data)
-                if gynocologist_appointment_count >= int(settings.INSURANCE_GYNECOLOGIST_LIMIT):
+            if InsuranceDoctorSpecializations.get_doctor_insurance_specializations(doctor):
+                specialization_count_dict = InsuranceDoctorSpecializations.get_already_booked_specialization_appointments(user, user_insurance.id)
+
+                if specialization_count_dict.get(InsuranceDoctorSpecializations.SpecializationMapping.GYNOCOLOGIST, {})\
+                        .get('count', 0) >= int(settings.INSURANCE_GYNECOLOGIST_LIMIT):
                     is_insured = False
                     insurance_id = user_insurance.id
                     insurance_message = "Gynocologist Appointment exceeded of limit 5"
-                elif oncologist_appointment_count >= int(settings.INSURANCE_ONCOLOGIST_LIMIT):
+                elif specialization_count_dict.get(InsuranceDoctorSpecializations.SpecializationMapping.ONCOLOGIST, {})\
+                        .get('count', 0)  >= int(settings.INSURANCE_ONCOLOGIST_LIMIT):
                     is_insured = False
                     insurance_id = user_insurance.id
                     insurance_message = "Oncologist Appointment exceeded of limit 5"
