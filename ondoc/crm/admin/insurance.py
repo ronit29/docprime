@@ -259,8 +259,8 @@ class UserInsuranceDoctorResource(resources.ModelResource):
         fields = ()
         export_order = ('policy_number', 'member_id', 'name', 'relationship_with_proposer', 'date_of_consultation',
                         'name_of_doctor', 'provider_code_of_doctor', 'speciality_of_doctor', 'diagnosis',
-                        'icd_code_of_diagnosis', 'name_of_clinic', 'address_of_clinic', 'existing_condition',
-                        'amount_to_be_paid', 'bank_detail_of_center', 'gst_number_of_center')
+                        'icd_code_of_diagnosis', 'name_of_clinic', 'address_of_clinic', 'pan_card_of_clinic',
+                        'existing_condition', 'amount_to_be_paid', 'bank_detail_of_center', 'gst_number_of_center')
 
     def get_insured_member(self, profile):
         insured_member = InsuredMembers.objects.filter(profile_id=profile).first()
@@ -306,8 +306,8 @@ class UserInsuranceDoctorResource(resources.ModelResource):
         return ""
 
     def dehydrate_speciality_of_doctor(self, appointment):
-        # return str(appointment.doctor.speciality)
-        return ""
+        return str(appointment.doctor.speciality)
+        # return ""
     def dehydrate_diagnosis(self, appointment):
         return ""
 

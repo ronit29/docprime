@@ -679,6 +679,10 @@ class UserInsurance(auth_model.TimeStampedModel):
                     is_insured = True
                     insurance_id = user_insurance.id
                     insurance_message = "Cover under Insurance"
+            else:
+                is_insured = True
+                insurance_id = user_insurance.id
+                insurance_message = "Cover under Insurance"
             return is_insured, insurance_id, insurance_message
 
     def is_doctor_gynecologist(self, doctor):
