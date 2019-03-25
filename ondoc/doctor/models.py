@@ -2201,6 +2201,8 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
             is_appointment_insured, insurance_id, insurance_message = user_insurance.validate_insurance(data)
             if is_appointment_insured:
                 payment_type = OpdAppointment.INSURANCE
+            else:
+                insurance_id = None
 
         return {
             "doctor": data.get("doctor"),

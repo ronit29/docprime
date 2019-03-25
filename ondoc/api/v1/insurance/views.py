@@ -304,7 +304,7 @@ class InsuranceValidationViewSet(viewsets.GenericViewSet):
                 #     resp['insurance_threshold'] = threshold.opd_amount_limit
                 #     resp['insurance_failure_message'] = "Monthly visit for the doctor exceeded"
             if valid_data.get('doctor'):
-                is_appointment_insured, insurance_id, insurance_message, gyne_opd_count, onco_opd_count = user_insurance.doctor_specialization_validation(valid_data)
+                is_appointment_insured, insurance_id, insurance_message = user_insurance.doctor_specialization_validation(valid_data)
                 resp['is_user_insured'] = True
                 resp['is_insurance_cover'] = is_appointment_insured
                 resp['insurance_threshold'] = threshold.opd_amount_limit
