@@ -159,6 +159,6 @@ class Cart(auth_model.TimeStampedModel, auth_model.SoftDeleteModel):
         insurance_id = None
         insurance_message = ""
         cart_items = Cart.objects.filter(user=request.user, deleted_at__isnull=True)
-        if user_insurance:
+        if user_insurance and user_insurance.is_valid():
             is_appointment_insured, insurance_id, insurance_message = user_insurance.validate_insurance_for_cart(validated_data, cart_items)
         return is_appointment_insured, insurance_id, insurance_message
