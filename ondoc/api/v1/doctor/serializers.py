@@ -1214,17 +1214,6 @@ class NewAppointmentRetrieveSerializer(AppointmentRetrieveSerializer):
                   'doctor', 'hospital', 'allowed_action', 'doctor_thumbnail', 'patient_thumbnail', 'procedures', 'mrp',
                   'invoices', 'cancellation_reason', 'payment_type')
 
-    def get_procedures(self, obj):
-        if obj:
-            return OpdAppointmentProcedureMappingSerializer(obj.procedure_mappings.all().select_related('procedure'), many=True).data
-        return []
-
-    def get_invoices(self, obj):
-        return obj.get_invoice_urls()
-
-    def get_cancellation_reason(self, obj):
-        return obj.get_serialized_cancellation_reason()
-
 
 class DoctorAppointmentRetrieveSerializer(OpdAppointmentSerializer):
     profile = UserProfileSerializer()

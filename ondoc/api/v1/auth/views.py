@@ -1990,31 +1990,32 @@ class DoctorScanViewSet(GenericViewSet):
 
     # @transaction.atomic
     def doctor_qr_scan(self, request, pk):
-        resp = {}
         opdapp_obj = OpdAppointment.objects.filter(pk=pk).first()
-        data = request.query_params
-        type = data.get('type')
-        request_url = data.get('url')
-        if type == 'doctor':
-            doctor = opdapp_obj.doctor.id
-            complete_with_qr_scanner = True
-            appt_status = opdapp_obj.status
-            if opdapp_obj.doctor.qr_code.all():
-                url = opdapp_obj.doctor.qr_code.first().data
-                if url:
-                    url = url.get('url', None)
-                    if request_url == url:
-                        if appt_status == OpdAppointment.ACCEPTED and opdapp_obj.time_slot_start >= timezone.now() and complete_with_qr_scanner == True:
-                            opdapp_obj.status = OpdAppointment.COMPLETED
-                            opdapp_obj.action_completed()
-                            resp = AppointmentRetrieveSerializer(opdapp_obj, context={"request": request})
-                            return Response(resp.data)
-                        else:
-                            return Response('Appointment not started', status.HTTP_400_BAD_REQUEST)
+        if opdapp_obj:
+            data = request.query_params
+            type = data.get('type')
+            request_url = request.data.get('url')
+            if type == 'doctor':
+                complete_with_qr_scanner = True
+                appt_status = opdapp_obj.status
+                if opdapp_obj.doctor.qr_code.all():
+                    url = opdapp_obj.doctor.qr_code.first().data
+                    if url:
+                        url = url.get('url', None)
+                        if request_url == url:
+                            if appt_status == OpdAppointment.ACCEPTED and opdapp_obj.time_slot_start <= timezone.now() and complete_with_qr_scanner == True:
+                                opdapp_obj.status = OpdAppointment.COMPLETED
+                                opdapp_obj.action_completed()
+                                resp = AppointmentRetrieveSerializer(opdapp_obj, context={"request": request})
+                                return Response(resp.data)
+                            else:
+                                return Response('Bad request', status.HTTP_400_BAD_REQUEST)
 
-                    else:
-                        return Response('Invalid url')
+                        else:
+                            return Response('Invalid url')
+                else:
+                    return Response('QRCode not enabled for this doctor')
             else:
-                return Response('QRCode not enabled for this doctor')
+                return Response('Invalid type')
         else:
-            return Response('Invalid type')
+            return Response('Opd Appointment does not exist')
