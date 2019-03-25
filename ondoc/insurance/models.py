@@ -59,7 +59,7 @@ class InsuranceGynocologist:
     def __init__(self):
         self.specializaion_ids = set(json.loads(settings.GYNECOLOGIST_SPECIALIZATION_IDS))
 
-    def get_my_already_booked_appointments_count(self, user, insurance_id):
+    def get_booked_appointments_count(self, user, insurance_id):
         from ondoc.doctor.models import DoctorPracticeSpecialization, OpdAppointment
         error = None
         count = 0
@@ -84,7 +84,7 @@ class InsuranceOncologist:
     def __init__(self):
         self.specializaion_ids = set(json.loads(settings.ONCOLOGIST_SPECIALIZATION_IDS))
 
-    def get_my_already_booked_appointments_count(self, user, insurance_id):
+    def get_booked_appointments_count(self, user, insurance_id):
         from ondoc.doctor.models import DoctorPracticeSpecialization, OpdAppointment
         error = None
         count = 0
@@ -145,11 +145,11 @@ class InsuranceDoctorSpecializations(object):
     @classmethod
     def get_already_booked_specialization_appointments(cls, user, insurance_id):
         if not user:
-            return 0
+            return None
         specialization_count_dict = dict()
         for specialization, class_ref in cls.SpecializationMapping.specialization_mapping.items():
             obj = class_ref()
-            count, error = obj.get_my_already_booked_appointments_count(user, insurance_id)
+            count, error = obj.get_booked_appointments_count(user, insurance_id)
             specialization_count_dict[specialization] = {'specialization': specialization, 'count': count, 'error': error}
 
         return specialization_count_dict
@@ -817,39 +817,39 @@ class UserInsurance(auth_model.TimeStampedModel):
         gyno_count = 0
         onco_count = 0
         doctor = appointment_data.get('doctor', None)
+        user = appointment_data.get('profile').user
         if not is_insured or not doctor:
             return is_insured, insurance_id, insurance_message
 
-        determine_result = InsuranceDoctorSpecializations.get_doctor_insurance_specializations(doctor)
-        if determine_result is None:
+        specialization_result = InsuranceDoctorSpecializations.get_doctor_insurance_specializations(doctor)
+        if specialization_result is None:
             return is_insured, insurance_id, insurance_message
 
-        if type(determine_result).__name__ == 'tuple':
-            specialization_count_dict = InsuranceDoctorSpecializations.get_already_booked_specialization_appointments(appointment_data.get('profile').user, insurance_id)
-            if not cart_items:
+        specialization_count_dict = InsuranceDoctorSpecializations.get_already_booked_specialization_appointments(user, insurance_id)
+        if not specialization_count_dict:
+            return is_insured, insurance_id, insurance_message
+        if not cart_items:
+            return is_insured, insurance_id, insurance_message
+
+        for cart_item in cart_items:
+            if cart_item.product_id == 1:
+                data = cart_item.data
+
+                doctor_in_cart = data.get('doctor')
+                res, specialization = InsuranceDoctorSpecializations.get_doctor_insurance_specializations(doctor_in_cart)
+                if specialization == InsuranceDoctorSpecializations.SpecializationMapping.GYNOCOLOGIST and data.get('is_appointment_insured'):
+                    gyno_count = specialization_count_dict[specialization].get('count') + 1
+                if specialization == InsuranceDoctorSpecializations.SpecializationMapping.ONCOLOGIST and data.get('is_appointment_insured'):
+                    onco_count = specialization_count_dict[specialization].get('count') + 1
+
+                if gyno_count >= int(settings.INSURANCE_GYNECOLOGIST_LIMIT) and specialization == InsuranceDoctorSpecializations.SpecializationMapping.GYNOCOLOGIST:
+                    return False, self.id, "Gynocologist limit exceeded of limit 5"
+                if onco_count >= int(settings.INSURANCE_ONCOLOGIST_LIMIT) and specialization == InsuranceDoctorSpecializations.SpecializationMapping.ONCOLOGIST:
+                    return False, self.id, "Oncologist limit exceeded of limit 5"
+            else:
                 return is_insured, insurance_id, insurance_message
 
-            for cart_item in cart_items:
-                if cart_item.product_id == 1:
-                    data = cart_item.data
-
-                    doctor = data.get('doctor')
-                    res, specialization = InsuranceDoctorSpecializations.get_doctor_insurance_specializations(doctor)
-                    if specialization == InsuranceDoctorSpecializations.SpecializationMapping.GYNOCOLOGIST and data.get('is_appointment_insured'):
-                        gyno_count = specialization_count_dict[specialization].get('count') + 1
-                    if specialization == InsuranceDoctorSpecializations.SpecializationMapping.ONCOLOGIST and data.get('is_appointment_insured'):
-                        onco_count = specialization_count_dict[specialization].get('count') + 1
-
-                    if gyno_count >= int(settings.INSURANCE_GYNECOLOGIST_LIMIT) and specialization == InsuranceDoctorSpecializations.SpecializationMapping.GYNOCOLOGIST:
-                        return False, self.id, "Gynocologist limit exceeded of limit 5"
-                    if onco_count >= int(settings.INSURANCE_ONCOLOGIST_LIMIT) and specialization == InsuranceDoctorSpecializations.SpecializationMapping.ONCOLOGIST:
-                        return False, self.id, "Oncologist limit exceeded of limit 5"
-                else:
-                    return is_insured, insurance_id, insurance_message
-
-            return is_insured, insurance_id, insurance_message
-        else:
-            return is_insured, insurance_id, insurance_message
+        return is_insured, insurance_id, insurance_message
 
     def trigger_created_event(self, visitor_info):
         from ondoc.tracking.models import TrackingEvent
