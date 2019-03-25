@@ -4,8 +4,8 @@ from django.db.models import Count, Q
 from django.db.models import F
 from rest_framework import serializers
 from ondoc.api.v1.insurance.serializers import InsuranceTransactionSerializer
-from ondoc.doctor.models import OpdAppointment
-from ondoc.diagnostic.models import LabAppointment
+from ondoc.doctor.models import OpdAppointment, DoctorPracticeSpecialization, PracticeSpecialization, Hospital
+from ondoc.diagnostic.models import LabAppointment, LabTest, Lab
 from ondoc.insurance.models import InsurancePlanContent, InsurancePlans, InsuredMembers, UserInsurance, StateGSTCode, \
     InsuranceCity, InsuranceDistrict
 from import_export.admin import ImportExportMixin, ImportExportModelAdmin, base_formats
@@ -250,7 +250,7 @@ class UserInsuranceDoctorResource(resources.ModelResource):
         date_range = [datetime.strptime(kwargs.get('from_date'), '%Y-%m-%d').date(), datetime.strptime(
                                         kwargs.get('to_date'), '%Y-%m-%d').date()]
 
-        appointment = OpdAppointment.objects.filter(created_at__date__range=date_range, status=OpdAppointment.COMPLETED, insurance__isnull=False ).prefetch_related(
+        appointment = OpdAppointment.objects.filter(created_at__date__range=date_range, status=OpdAppointment.COMPLETED, insurance__isnull=False).prefetch_related(
                                                 'insurance')
         return appointment
 
@@ -268,6 +268,17 @@ class UserInsuranceDoctorResource(resources.ModelResource):
             return insured_member
         else:
             return None
+
+    def get_merchant_details(self, content_type, obj):
+        from ondoc.authentication.models import AssociatedMerchant
+        from ondoc.authentication.models import Merchant
+        associate_merchant_obj = AssociatedMerchant.objects.filter(content_type_id=content_type.id,
+                                                                   object_id=obj.id).first()
+        if associate_merchant_obj:
+            merchant_obj = Merchant.objects.filter(id=associate_merchant_obj.merchant_id).first()
+            return merchant_obj
+        else:
+            None
 
     def dehydrate_appointment_type(self,appointment):
         return "Doctor"
@@ -303,11 +314,22 @@ class UserInsuranceDoctorResource(resources.ModelResource):
         return str(appointment.doctor.name)
 
     def dehydrate_provider_code_of_doctor(self, appointment):
-        return ""
+        doctor = appointment.doctor
+        hospital = appointment.hospital
+        return str(doctor.id) + "-" + str(hospital.id)
 
     def dehydrate_speciality_of_doctor(self, appointment):
-        return str(appointment.doctor.speciality)
-        # return ""
+        doctor = appointment.doctor
+        doctor_specialization_ids = DoctorPracticeSpecialization.objects.filter(doctor_id=doctor).values_list(
+            'specialization_id', flat=True)
+        specializations = PracticeSpecialization.objects.filter(id__in=doctor_specialization_ids).values_list(
+            'name', flat=True)
+        spd = []
+        for sp in specializations:
+            spd.append(sp)
+        doctor_specialization = ','.join(map(str, spd))
+        return doctor_specialization
+
     def dehydrate_diagnosis(self, appointment):
         return ""
 
@@ -315,19 +337,34 @@ class UserInsuranceDoctorResource(resources.ModelResource):
         return ""
 
     def dehydrate_name_of_clinic(self, appointment):
-        return ""
+        return str(appointment.hospital.name)
 
     def dehydrate_address_of_clinic(self, appointment):
-        return ""
+        building = str(appointment.hospital.building)
+        sublocality = str(appointment.hospital.sublocality)
+        locality = str(appointment.hospital.locality)
+        city = str(appointment.hospital.city)
+        state = str(appointment.hospital.state)
+        pincode = str(appointment.hospital.pin_code)
+        return building + " " + sublocality + " " + locality + " " + city + " " + state + " " + pincode
 
     def dehydrate_existing_condition(self, appointment):
         return ""
 
     def dehydrate_amount_to_be_paid(self, appointment):
-        return ""
+        return str(appointment.fees)
 
     def dehydrate_bank_detail_of_center(self, appointment):
-        return ""
+        from django.contrib.contenttypes.models import ContentType
+        content_type = ContentType.objects.get_for_model(Hospital)
+        center_details = self.get_merchant_details(content_type, appointment.hospital)
+        if center_details:
+            beneficiary_name = center_details.beneficiary_name
+            account_number = center_details.account_number
+            ifsc_code = center_details.ifsc_code
+            return str(beneficiary_name) + "," + str(account_number), + "," + ifsc_code
+        else:
+            return ""
 
     def dehydrate_gst_number_of_center(self, appointment):
         return ""
@@ -377,6 +414,17 @@ class UserInsuranceLabResource(resources.ModelResource):
         else:
             return None
 
+    def get_merchant_details(self, content_type, obj):
+        from ondoc.authentication.models import AssociatedMerchant
+        from ondoc.authentication.models import Merchant
+        associate_merchant_obj = AssociatedMerchant.objects.filter(content_type_id=content_type.id, object_id=obj.id).first()
+        if associate_merchant_obj:
+            merchant_obj = Merchant.objects.filter(id=associate_merchant_obj.merchant_id).first()
+            return merchant_obj
+        else:
+            None
+
+
     def dehydrate_appointment_type(self,appointment):
         return "Lab"
 
@@ -414,26 +462,52 @@ class UserInsuranceLabResource(resources.ModelResource):
         return ""
 
     def dehydrate_name_of_tests(self, appointment):
-        # return str(appointment.doctor.speciality)
-        return ""
-    def dehydrate_address_of_center(self, appointment):
+        # map_tests = appointment.tests
+        # test_list = []
+        # for test in map_tests:
+        #     test_obj = LabTest.objects.filter(id=test.test_id).first()
+        #     test_list.append(test_obj.name)
+        # test_names = ','.join(map(str, test_list))
         return ""
 
+    def dehydrate_address_of_center(self, appointment):
+        building = str(appointment.lab.building)
+        sublocality = str(appointment.lab.sublocality)
+        locality = str(appointment.lab.locality)
+        city = str(appointment.lab.city)
+        state = str(appointment.lab.state)
+        pincode = str(appointment.lab.pin_code)
+        return building + " " + sublocality + " " + locality + " " + city + " " + state + " " + pincode
+
     def dehydrate_pan_card_of_center(self, appointment):
-        return ""
+        from django.contrib.contenttypes.models import ContentType
+        content_type = ContentType.objects.get_for_model(Lab)
+        center_details = self.get_merchant_details(content_type, appointment.lab)
+        if center_details:
+            return str(center_details.pan_number)
+        else:
+            ""
 
     def dehydrate_existing_condition(self, appointment):
         return ""
 
     def dehydrate_amount_to_be_paid(self, appointment):
-        return ""
+        return str(appointment.agreed_price)
 
     def dehydrate_bank_detail_of_center(self, appointment):
-        return ""
+        from django.contrib.contenttypes.models import ContentType
+        content_type = ContentType.objects.get_for_model(Lab)
+        center_details = self.get_merchant_details(content_type, appointment.lab)
+        if center_details:
+            beneficiary_name = center_details.beneficiary_name
+            account_number = center_details.account_number
+            ifsc_code = center_details.ifsc_code
+            return str(beneficiary_name) + "," + str(account_number), + "," + ifsc_code
+        else:
+            return ""
 
     def dehydrate_gst_number_of_center(self, appointment):
         return ""
-
 
 
 class UserInsuranceAdmin(ImportExportMixin, admin.ModelAdmin):
