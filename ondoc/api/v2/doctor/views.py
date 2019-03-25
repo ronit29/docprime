@@ -459,12 +459,14 @@ class DoctorDataViewset(viewsets.GenericViewSet):
 class ProviderSignupOtpViewset(viewsets.GenericViewSet):
 
     def otp_generate(self, request, *args, **kwargs):
+        from ondoc.authentication.models import OtpVerifications
         serializer = serializers.GenerateOtpSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         valid_data = serializer.validated_data
         phone_number = valid_data.get('phone_number')
         retry_send = request.query_params.get('retry', False)
-        send_otp("OTP for login is {}", phone_number, retry_send)
+        otp_message = OtpVerifications.get_otp_message(request.META.get('HTTP_PLATFROM'), None, True)
+        send_otp(otp_message, phone_number, retry_send)
         response = {'otp_generated': True}
         return Response(response)
 
