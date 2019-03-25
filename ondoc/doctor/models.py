@@ -1,5 +1,6 @@
 from copy import deepcopy
 
+import requests
 from PIL.Image import NEAREST, BICUBIC
 from django.contrib.staticfiles.storage import staticfiles_storage
 from django.core.files.storage import default_storage
@@ -15,6 +16,7 @@ from django.core.validators import MaxValueValidator, MinValueValidator, FileExt
 from django.core.exceptions import ValidationError
 from django.core.exceptions import NON_FIELD_ERRORS
 from django.template.loader import render_to_string
+from rest_framework import status
 from rest_framework.exceptions import ValidationError as RestFrameworkValidationError
 from django.core.files.storage import get_storage_class
 from django.conf import settings
@@ -102,7 +104,7 @@ class UniqueNameModel(models.Model):
 
 
 class SearchKey(models.Model):
-    search_key = models.CharField(max_length=256, blank=True, null=True)
+    search_key = models.CharField(max_length=4000, blank=True, null=True)
 
     class Meta:
         db_table = 'search_key'
@@ -383,6 +385,44 @@ class Hospital(auth_model.TimeStampedModel, auth_model.CreatedByModel, auth_mode
         return result
 
 
+class HospitalPlaceDetails(auth_model.TimeStampedModel):
+    hospital = models.ForeignKey(Hospital, on_delete=models.CASCADE, related_name='hospital_place_details')
+    place_id = models.TextField()
+    place_details = JSONField(null=True, blank=True)
+    reviews = JSONField(null=True, blank=True)
+
+    class Meta:
+        db_table = 'hospital_place_details'
+
+    def save(self, *args, **kwargs):
+        super().save(*args, **kwargs)
+
+    @classmethod
+    def update_place_details(cls):
+        hosp_place_id = HospitalPlaceDetails.objects.all()
+        for data in hosp_place_id:
+            if not data.place_details:
+                place_searched_data = None
+                params = {'placeid': data.place_id, 'key': settings.REVERSE_GEOCODING_API_KEY}
+                place_response = requests.get('https://maps.googleapis.com/maps/api/place/details/json',
+                                          params=params)
+                if place_response.status_code != status.HTTP_200_OK or not place_response.ok:
+                    print('failure  status_code: ' + str(place_response.status_code) + ', reason: ' + str(
+                        place_response.reason))
+                    continue
+
+                place_searched_data = place_response.json()
+                if place_searched_data.get('status') == 'OVER_QUERY_LIMIT':
+                    print('OVER_QUERY_LIMIT')
+                    continue
+
+                if place_searched_data.get('result'):
+                    place_searched_data = place_searched_data.get('result')
+                    data.place_details = place_searched_data
+                    data.reviews = place_searched_data.get('reviews')
+                    data.save()
+
+
 class HospitalServiceMapping(models.Model):
     hospital = models.ForeignKey(Hospital, on_delete=models.CASCADE,
                                  related_name='service_mappings')
@@ -573,9 +613,18 @@ class Doctor(auth_model.TimeStampedModel, auth_model.QCModel, SearchKey, auth_mo
 
     def update_deal_price(self):        
         # will update only this doctor prices and will be called on save    
-        query = '''update doctor_clinic_timing set 
-                    deal_price = least(greatest(floor(case when (least(fees*1.5, .8*mrp) - fees) >100 then least(fees*1.5, .8*mrp)
-                    else least(fees+100, mrp) end /5)*5, fees), mrp) where doctor_clinic_id in (
+        query = '''update doctor_clinic_timing set deal_price = least(
+                    greatest(floor(
+                    case when fees <=0 then mrp*.4 
+                    when mrp<=2000 then
+                    case when (least(fees*1.5, .8*mrp) - fees) >100 then least(fees*1.5, .8*mrp) 
+                    else least(fees+100, mrp) end
+                    else 
+                    case when (least(fees*1.5, fees+.5*(mrp-fees)) - fees )>100
+                    then least(fees*1.5, fees+.5*(mrp-fees))
+                    else
+                    least(fees+100, mrp) end 	
+                    end  /5)*5, fees), mrp) where doctor_clinic_id in (
                     select id from doctor_clinic where doctor_id= %s) '''
 
         update_doctor_deal_price = RawSql(query, [self.pk]).execute()
@@ -583,12 +632,20 @@ class Doctor(auth_model.TimeStampedModel, auth_model.QCModel, SearchKey, auth_mo
     @classmethod
     def update_all_deal_price(cls):
         # will update all doctors prices
-        query = '''update doctor_clinic_timing set 
-            deal_price = least(greatest(floor(case when (least(fees*1.5, .8*mrp) - fees) >100 then least(fees*1.5, .8*mrp)
-            else least(fees+100, mrp) end /5)*5, fees), mrp) '''
+        query = '''update doctor_clinic_timing set deal_price = least(
+                    greatest(floor(
+                    case when fees <=0 then mrp*.4 
+                    when mrp<=2000 then
+                    case when (least(fees*1.5, .8*mrp) - fees) >100 then least(fees*1.5, .8*mrp) 
+                    else least(fees+100, mrp) end
+                    else 
+                    case when (least(fees*1.5, fees+.5*(mrp-fees)) - fees )>100
+                    then least(fees*1.5, fees+.5*(mrp-fees))
+                    else
+                    least(fees+100, mrp) end 	
+                    end  /5)*5, fees), mrp) '''
 
         update_all_doctor_deal_price = RawSql(query, []).execute()
-
 
     def get_display_name(self):
         return "Dr. {}".format(self.name.title()) if self.name else None
@@ -1580,7 +1637,8 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
     PREPAID = 1
     COD = 2
     INSURANCE = 3
-    PAY_CHOICES = ((PREPAID, 'Prepaid'), (COD, 'COD'), (INSURANCE, 'Insurance'))
+    PLAN = 4
+    PAY_CHOICES = ((PREPAID, 'Prepaid'), (COD, 'COD'), (INSURANCE, 'Insurance'), (PLAN, "Subscription Plan"))
     ACTIVE_APPOINTMENT_STATUS = [BOOKED, ACCEPTED, RESCHEDULED_PATIENT, RESCHEDULED_DOCTOR]
     STATUS_CHOICES = [(CREATED, 'Created'), (BOOKED, 'Booked'),
                       (RESCHEDULED_DOCTOR, 'Rescheduled by Doctor'),

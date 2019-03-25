@@ -168,9 +168,6 @@ class ChatPrescriptionViewSet(viewsets.GenericViewSet):
 
 class ChatReferralViewSet(viewsets.GenericViewSet):
 
-    authentication_classes = (JWTAuthentication,)
-    permission_classes = (IsAuthenticated,)
-
     def retrieve(self, request):
 
         serializer = serializers.ChatReferralNumberSerializer(data=request.data)
