@@ -1105,6 +1105,7 @@ class TransactionViewSet(viewsets.GenericViewSet):
         SUCCESS_REDIRECT_URL = settings.BASE_URL + "/order/summary/%s"
         LAB_REDIRECT_URL = settings.BASE_URL + "/lab/appointment"
         OPD_REDIRECT_URL = settings.BASE_URL + "/opd/appointment"
+        PLAN_REDIRECT_URL = settings.BASE_URL + "/prime/success?user_plan="  # TODO: SHASHANK_SINGH is it OK?
 
         try:
             response = None
@@ -1191,10 +1192,11 @@ class TransactionViewSet(viewsets.GenericViewSet):
                 if processed_data.get("type") == "all":
                     REDIRECT_URL = (SUCCESS_REDIRECT_URL % order_obj.id) + "?payment_success=true"
                 elif processed_data.get("type") == "doctor":
-                    REDIRECT_URL = OPD_REDIRECT_URL + "/" + str(processed_data.get("id","")) + "?payment_success=true"
+                    REDIRECT_URL = OPD_REDIRECT_URL + "/" + str(processed_data.get("id", "")) + "?payment_success=true"
                 elif processed_data.get("type") == "lab":
-                    REDIRECT_URL = LAB_REDIRECT_URL + "/" + str(processed_data.get("id","")) + "?payment_success=true"
-
+                    REDIRECT_URL = LAB_REDIRECT_URL + "/" + str(processed_data.get("id", "")) + "?payment_success=true"
+                elif processed_data.get("type") == "plan":
+                    REDIRECT_URL = PLAN_REDIRECT_URL + str(processed_data.get("id", "")) + "&payment_success=true"
         except Exception as e:
             logger.error("Error - " + str(e))
 

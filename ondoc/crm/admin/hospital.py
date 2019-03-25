@@ -503,6 +503,8 @@ class HospitalAdmin(admin.GeoModelAdmin, VersionAdmin, ActionAdmin, QCPemAdmin):
             if request.GET.get('AgentId', None):
                 self.matrix_agent_id = request.GET.get('AgentId', None)
             read_only += ('add_network_link',)
+        if not request.user.is_superuser and not request.user.groups.filter(name=constants['SUPER_QC_GROUP']).exists():
+            read_only += ('is_listed_on_docprime',)
         return read_only
 
     def add_network_link(self, obj):
