@@ -135,18 +135,23 @@ class Thyrocare(BaseIntegrator):
         return True if resp_data['status'] == 'Y' else False
 
     def _post_order_details(self, lab_appointment, **kwargs):
+        from ondoc.integrations.models import IntegratorHistory
+
         tests = kwargs.get('tests', None)
         packages = kwargs.get('packages', None)
         payload = self.prepare_data(tests, packages, lab_appointment)
 
         headers = {'Content-Type': "application/json"}
         url = "%s/ORDER.svc/Postorderdata" % settings.THYROCARE_BASE_URL
-
         response = requests.post(url, data=json.dumps(payload), headers=headers)
+        status_code = response.status_code
         response = response.json()
         if response.get('RES_ID') == 'RES0000':
+            # Add details to history table
+            IntegratorHistory.create_history(lab_appointment, payload, response, url, 'post_order', 'Thyrocare', status_code)
             return response
         else:
+            IntegratorHistory.create_history(lab_appointment, payload, response, url, 'post_order', 'Thyrocare', status_code)
             logger.error("[ERROR] %s" % response.get('RESPONSE'))
 
         return None

@@ -12,8 +12,9 @@ logger = logging.getLogger(__name__)
 def push_lab_appointment_to_integrator(self, data):
     from django.contrib.contenttypes.models import ContentType
     from ondoc.diagnostic.models import LabAppointment
-    from ondoc.integrations.models import IntegratorMapping, IntegratorProfileMapping, IntegratorResponse
+    from ondoc.integrations.models import IntegratorMapping, IntegratorProfileMapping, IntegratorResponse, IntegratorHistory
     from ondoc.integrations import service
+
     try:
         appointment_id = data.get('appointment_id', None)
         if not appointment_id:
@@ -52,20 +53,34 @@ def push_lab_appointment_to_integrator(self, data):
             elif tests:
                 integrator_mapping = IntegratorMapping.objects.filter(content_type=lab_network_content_type, object_id=lab_network.id, test=tests[0]).first()
 
+            if not integrator_mapping:
+                logger.error("[ERROR] Mapping not found booked test or package")
+
             integrator_obj = service.create_integrator_obj(integrator_mapping.integrator_class_name)
             integrator_response = integrator_obj.post_order(appointment, tests=tests, packages=packages)
+            history_obj = IntegratorHistory.objects.filter(object_id=appointment.id).first()
 
             if not integrator_response:
                 countdown_time = 1 * 60
                 print(countdown_time)
                 self.retry([data], countdown=countdown_time)
+                if history_obj:
+                    history_obj.retry_count = push_lab_appointment_to_integrator.request.retries
+                    history_obj.save()
 
             # save integrator response
             resp_data = integrator_response
-            IntegratorResponse.objects.create(lead_id=resp_data['ORDERRESPONSE']['PostOrderDataResponse'][0]['LEAD_ID'],
-                                              dp_order_id=resp_data['ORDER_NO'], integrator_order_id=resp_data['REF_ORDERID'],
-                                              content_object=appointment, response_data=resp_data,
-                                              integrator_class_name=integrator_mapping.integrator_class_name)
+            order_response = IntegratorResponse.objects.create(lead_id=resp_data['ORDERRESPONSE']['PostOrderDataResponse'][0]['LEAD_ID'],
+                                                               dp_order_id=resp_data['ORDER_NO'], integrator_order_id=resp_data['REF_ORDERID'],
+                                                               content_object=appointment, response_data=resp_data,
+                                                               integrator_class_name=integrator_mapping.integrator_class_name)
+            if order_response:
+                if history_obj:
+                    history_obj.retry_count = push_lab_appointment_to_integrator.request.retries
+                    history_obj.status = IntegratorHistory.PUSHED_AND_NOT_ACCEPTED
+                    history_obj.save()
+                else:
+                    print("History not found for appointment id " + str(appointment_id))
 
         elif appointment.status == LabAppointment.CANCELLED:
             saved_response = IntegratorResponse.objects.filter(object_id=appointment.id).first()
@@ -87,7 +102,7 @@ def push_lab_appointment_to_integrator(self, data):
 @task(bind=True, max_retries=3)
 def get_integrator_order_status(self, *args, **kwargs):
     from ondoc.diagnostic.models import LabAppointment
-    from ondoc.integrations.models import IntegratorResponse
+    from ondoc.integrations.models import IntegratorResponse, IntegratorHistory
 
     try:
         appointment_id = kwargs.get('appointment_id', None)
@@ -110,6 +125,10 @@ def get_integrator_order_status(self, *args, **kwargs):
             if not appointment.status == 5:
                 appointment.status = 5
                 appointment.save()
+                history_obj = IntegratorHistory.objects.filter(object_id=appointment.id).first()
+                if history_obj:
+                    history_obj.status = IntegratorHistory.PUSHED_AND_ACCEPTED
+                    history_obj.save()
         else:
             countdown_time = 1 * 120
             print(countdown_time)
