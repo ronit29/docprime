@@ -72,7 +72,7 @@ from django.db.models import Avg
 from django.db.models import Count
 from ondoc.api.v1.auth import serializers as auth_serializers
 from copy import deepcopy
-from ondoc.common.models import GlobalNonBookable
+from ondoc.common.models import GlobalNonBookable, AppointmentHistory
 from ondoc.api.v1.common import serializers as common_serializers
 from django.utils.text import slugify
 import time
@@ -182,6 +182,8 @@ class DoctorAppointmentsViewSet(OndocViewSet):
     @transaction.atomic
     def complete(self, request):
         user = request.user
+        source = request.query_params.get('source', '')
+        responsible_user = user
         serializer = serializers.OTPFieldSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         validated_data = serializer.validated_data
@@ -189,6 +191,8 @@ class DoctorAppointmentsViewSet(OndocViewSet):
 
         if not opd_appointment:
             return Response({"message": "Invalid appointment id"}, status.HTTP_404_NOT_FOUND)
+        opd_appointment._source = source if source in [x[0] for x in AppointmentHistory.SOURCE_CHOICES] else ''
+        opd_appointment._responsible_user = responsible_user
         pem_queryset = auth_models.GenericAdmin.objects.filter(Q(user=user, is_disabled=False),
                                                                Q(Q(super_user_permission=True,
                                                                    hospital=opd_appointment.hospital,
@@ -249,11 +253,15 @@ class DoctorAppointmentsViewSet(OndocViewSet):
 
     def update(self, request, pk=None):
         user = request.user
+        source = request.query_params.get('source', '')
+        responsible_user = user
         queryset = self.get_pem_queryset(user).distinct()
         # opd_appointment = get_object_or_404(queryset, pk=pk)
         opd_appointment = models.OpdAppointment.objects.filter(id=pk).first()
         if not opd_appointment:
             return Response({'error': 'Appointment Not Found'}, status=status.HTTP_404_NOT_FOUND)
+        opd_appointment._source = source if source in [x[0] for x in AppointmentHistory.SOURCE_CHOICES] else ''
+        opd_appointment._responsible_user = responsible_user
         serializer = serializers.UpdateStatusSerializer(data=request.data,
                                             context={'request': request, 'opd_appointment': opd_appointment})
         serializer.is_valid(raise_exception=True)
@@ -1826,7 +1834,10 @@ class DoctorAppointmentNoAuthViewSet(viewsets.GenericViewSet):
         opd_appointment = models.OpdAppointment.objects.select_for_update().filter(pk=validated_data.get('opd_appointment')).first()
         if not opd_appointment:
             return Response({"message": "Invalid appointment id"}, status.HTTP_404_NOT_FOUND)
-
+        source = request.query_params.get('source', '')
+        responsible_user = request.user if request.user.is_authenticated else None
+        opd_appointment._source = source if source in [x[0] for x in AppointmentHistory.SOURCE_CHOICES] else ''
+        opd_appointment._responsible_user = responsible_user
         if opd_appointment:
             opd_appointment.action_completed()
 
