@@ -23,7 +23,7 @@ from datetime import timedelta
 from django.utils import timezone
 import logging
 logger = logging.getLogger(__name__)
-
+from dateutil import relativedelta
 
 class ListInsuranceViewSet(viewsets.GenericViewSet):
     # authentication_classes = (JWTAuthentication,)
@@ -163,7 +163,7 @@ class InsuranceOrderViewSet(viewsets.GenericViewSet):
         transaction_date = datetime.datetime.now()
         amount = insurance_plan.amount
 
-        expiry_date = transaction_date + timedelta(year=insurance_plan.policy_tenure)
+        expiry_date = transaction_date + relativedelta(year=int(insurance_plan.policy_tenure))
         expiry_date = datetime.datetime.combine(expiry_date, datetime.datetime.max.time())
         user_insurance_data = {'insurer': insurance_plan.insurer_id, 'insurance_plan': insurance_plan.id, 'purchase_date':
                             transaction_date, 'expiry_date': expiry_date, 'premium_amount': amount,
