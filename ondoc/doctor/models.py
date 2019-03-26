@@ -2111,6 +2111,11 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
                                   "deal_price": self.mrp,
                                   "agreed_price": self.mrp,
                                   "discount": 0})
+        elif self.payment_type == OpdAppointment.INSURANCE:
+            procedures.insert(0, {"name": "Consultation", "mrp": self.mrp,
+                                  "deal_price": "0.00",
+                                  "agreed_price": self.mrp,
+                                  "discount": self.mrp})
         else:
             procedure_mappings = self.procedure_mappings.select_related("procedure").all()
             procedures = [{"name": mapping.procedure.name, "mrp": mapping.mrp, "deal_price": mapping.deal_price,
