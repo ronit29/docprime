@@ -6,6 +6,7 @@ from django.db.models import Q
 from ondoc.banner.models import Banner, SliderLocation
 from ondoc.common.models import PaymentOptions, UserConfig, Feature, Service, Remark, MatrixMappedCity, MatrixMappedState
 from ondoc.coupon.models import Coupon, UserSpecificCoupon
+from ondoc.crm.admin import UserPlanMappingAdmin
 from ondoc.crm.constants import constants
 from ondoc.doctor.models import (Doctor, Hospital, DoctorClinicTiming, DoctorClinic,
                                  DoctorQualification, Qualification, Specialization, DoctorLanguage,
@@ -535,7 +536,7 @@ class Command(BaseCommand):
 
         content_types = ContentType.objects.get_for_models(PaymentOptions, EntityUrls, Feature, Service, Doctor,
                                                            HealthInsuranceProvider, IpdProcedureCategory, Plan,
-                                                           PlanFeature, PlanFeatureMapping)
+                                                           PlanFeature, PlanFeatureMapping, UserPlanMappingAdmin)
 
         for cl, ct in content_types.items():
             permissions = Permission.objects.filter(
