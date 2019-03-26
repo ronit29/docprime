@@ -46,16 +46,16 @@ class CartViewSet(viewsets.GenericViewSet):
             cart_item_id = serialized_data.get('cart_item').id if serialized_data.get('cart_item') else None
             self.update_plan_details(request, serialized_data, valid_data)
 
-        data['data']['is_appointment_insured'], data['data']['insurance_id'], data['data'][
+        valid_data['data']['is_appointment_insured'], valid_data['data']['insurance_id'], valid_data['data'][
             'insurance_message'] = Cart.check_for_insurance(serialized_data, request)
 
-        if data['data']['is_appointment_insured']:
-            data['data']['payment_type'] = OpdAppointment.INSURANCE
+        if valid_data['data']['is_appointment_insured']:
+            valid_data['data']['payment_type'] = OpdAppointment.INSURANCE
         if serialized_data.get('cart_item'):
             old_cart_obj = Cart.objects.filter(id=serialized_data.get('cart_item').id).first()
             payment_type = old_cart_obj.data.get('payment_type')
-            if payment_type == OpdAppointment.INSURANCE and data['data']['is_appointment_insured'] == False:
-                data['data']['payment_type'] = OpdAppointment.PREPAID
+            if payment_type == OpdAppointment.INSURANCE and valid_data['data']['is_appointment_insured'] == False:
+                valid_data['data']['payment_type'] = OpdAppointment.PREPAID
 
         Cart.objects.update_or_create(id=cart_item_id, deleted_at__isnull=True,
                                        product_id=valid_data.get("product_id"), user=user, defaults={"data" : valid_data.get("data")})
