@@ -7,7 +7,8 @@ from ondoc.cart.models import Cart
 from ondoc.api.v1.diagnostic.serializers import LabAppointmentCreateSerializer
 from ondoc.api.v1.doctor.serializers import CreateAppointmentSerializer
 from django.db import transaction
-
+from django.conf import settings
+from ondoc.insurance.models import InsuranceDoctorSpecializations
 from ondoc.subscription_plan.models import UserPlanMapping
 
 
@@ -102,14 +103,42 @@ class CartViewSet(viewsets.GenericViewSet):
         cart_items = Cart.objects.filter(user=user, deleted_at__isnull=True).order_by("-updated_at")
         items = []
 
+        gyno_count = 0
+        onco_count = 0
+
+        user_insurance = UserInsurance.objects.filter(user=request.user).last()
+        specialization_count_dict = None
+        if user_insurance and user_insurance.is_valid():
+
+            specialization_count_dict = InsuranceDoctorSpecializations.get_already_booked_specialization_appointments(user, user_insurance.id)
+            gyno_count = specialization_count_dict[InsuranceDoctorSpecializations.SpecializationMapping.GYNOCOLOGIST].get('count', 0)
+            onco_count = specialization_count_dict[InsuranceDoctorSpecializations.SpecializationMapping.ONCOLOGIST].get('count', 0)
+
+            # if not specialization_count_dict:
+            #     return is_insured, insurance_id, insurance_message
+
         for item in cart_items:
             try:
                 validated_data = item.validate(request)
-                # user_insurance = UserInsurance.objects.filter(user=user).last()
-                # if user_insurance:
-                    # item.data['is_appointment_insured'], item.data['insurance_id'], item.data['insurance_message'] = user_insurance.validate_insurance(validated_data)
-                item.data['is_appointment_insured'], item.data['insurance_id'], item.data[
-                        'insurance_message'] = Cart.check_for_insurance(validated_data, request)
+                insurance_doctor = validated_data.get('doctor', None)
+                if insurance_doctor and user_insurance and user_insurance.is_valid() and specialization_count_dict:
+                    res, specialization = InsuranceDoctorSpecializations.get_doctor_insurance_specializations(insurance_doctor)
+
+                    if specialization == InsuranceDoctorSpecializations.SpecializationMapping.GYNOCOLOGIST and validated_data.get('is_appointment_insured'):
+                        gyno_count = gyno_count + 1
+                    if specialization == InsuranceDoctorSpecializations.SpecializationMapping.ONCOLOGIST and validated_data.get('is_appointment_insured'):
+                        onco_count = onco_count + 1
+
+                    if gyno_count >= int(settings.INSURANCE_GYNECOLOGIST_LIMIT) and specialization == InsuranceDoctorSpecializations.SpecializationMapping.GYNOCOLOGIST:
+                        item.data['is_appointment_insured'] = False
+                        item.data['insurance_id'] = None
+                        item.data['insurance_message'] = "Gynecologist limit exceeded of limit 5"
+
+                    if onco_count >= int(settings.INSURANCE_ONCOLOGIST_LIMIT) and specialization == InsuranceDoctorSpecializations.SpecializationMapping.ONCOLOGIST:
+                        item.data['is_appointment_insured'] = False
+                        item.data['insurance_id'] = None
+                        item.data['insurance_message'] = "Oncologist limit exceeded of limit 5"
+
                 price_data = item.get_price_details(validated_data)
                 items.append({
                     "id" : item.id,
