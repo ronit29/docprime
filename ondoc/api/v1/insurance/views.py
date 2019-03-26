@@ -105,9 +105,7 @@ class InsuranceOrderViewSet(viewsets.GenericViewSet):
 
     @transaction.atomic
     def create_order(self, request):
-
         user = request.user
-
         user_insurance = UserInsurance.objects.filter(user=user).last()
         if user_insurance and user_insurance.is_valid():
             return Response(data={'certificate': True}, status=status.HTTP_200_OK)
