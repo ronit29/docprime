@@ -23,7 +23,7 @@ from datetime import timedelta
 from django.utils import timezone
 import logging
 logger = logging.getLogger(__name__)
-from dateutil import relativedelta
+from dateutil.relativedelta import relativedelta
 
 class ListInsuranceViewSet(viewsets.GenericViewSet):
     # authentication_classes = (JWTAuthentication,)
