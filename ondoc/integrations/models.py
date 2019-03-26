@@ -145,6 +145,7 @@ class IntegratorHistory(TimeStampedModel):
     response_data = JSONField(blank=False, null=False)
     api_name = models.CharField(max_length=40, null=False, blank=False)
     api_endpoint = models.TextField(blank=False, null=False)
+    accepted_through = models.CharField(max_length=30, null=True, blank=True)
 
     class Meta:
         db_table = 'integrator_history'

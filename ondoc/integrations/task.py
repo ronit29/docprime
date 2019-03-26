@@ -128,6 +128,7 @@ def get_integrator_order_status(self, *args, **kwargs):
                 history_obj = IntegratorHistory.objects.filter(object_id=appointment.id).first()
                 if history_obj:
                     history_obj.status = IntegratorHistory.PUSHED_AND_ACCEPTED
+                    history_obj.accepted_through = "integrator_api"
                     history_obj.save()
         else:
             countdown_time = 1 * 120

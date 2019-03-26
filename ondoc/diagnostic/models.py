@@ -2104,6 +2104,17 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin)
             return 'Not Found'
         return integrator_response.lead_id
 
+    def accepted_through(self):
+        from ondoc.integrations.models import IntegratorHistory
+
+        lab_appointment_content_type = ContentType.objects.get_for_model(self)
+        integrator_history = IntegratorHistory.objects.filter(object_id=self.id,
+                                                              content_type=lab_appointment_content_type).first()
+        if not integrator_history:
+            return 'Not Found'
+
+        return integrator_history.accepted_through
+
     def __str__(self):
         return "{}, {}".format(self.profile.name if self.profile else "", self.lab.name)
 

@@ -327,7 +327,10 @@ class Thyrocare(BaseIntegrator):
             logger.error("[ERROR] %s" % response.get('RESPONSE'))
 
     def _order_summary(self, integrator_response):
+        from ondoc.integrations.models import IntegratorHistory
+
         dp_appointment = integrator_response.content_object
+        history_obj = IntegratorHistory.objects.filter(object_id=dp_appointment.id).first()
         if dp_appointment.status != LabAppointment.CANCELLED or dp_appointment.status != LabAppointment.COMPLETED or \
                                             (dp_appointment.time_slot_start + timedelta(days=1) < datetime.now()):
 
@@ -352,6 +355,10 @@ class Thyrocare(BaseIntegrator):
                     if not dp_appointment.status == 5:
                         dp_appointment.status = 5
                         dp_appointment.save()
+                        if history_obj:
+                            history_obj.status = IntegratorHistory.PUSHED_AND_ACCEPTED
+                            history_obj.accepted_through = "integrator_api"
+                            history_obj.save()
                 elif response['BEN_MASTER'][0]['STATUS'].upper() == 'DONE':
                     pass
                 elif response['BEN_MASTER'][0]['STATUS'].upper() in ['CANCELLED', 'REJECTED']:
