@@ -121,7 +121,7 @@ def get_integrator_order_status(self, *args, **kwargs):
                                                           integrator_response.response_data['MOBILE'])
         response = requests.get(url)
         response = response.json()
-        if response.get('RES_ID') == 'RES0000' and response['BEN_MASTER'][0]['STATUS'].upper() == ('DELIVERY' or 'REPORTED' or 'SERVICED' or 'CREDITED'):
+        if response.get('RES_ID') == 'RES0000' and response['BEN_MASTER'][0]['STATUS'].upper() in ['DELIVERY', 'REPORTED', 'SERVICED', 'CREDITED']:
             if not appointment.status == 5:
                 appointment.status = 5
                 appointment.save()

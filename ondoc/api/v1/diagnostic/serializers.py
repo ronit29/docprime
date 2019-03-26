@@ -940,7 +940,7 @@ class LabAppointmentCreateSerializer(serializers.Serializer):
                 integrator_test = IntegratorMapping.objects.filter(test_id=test).first()
                 if integrator_test and integrator_test.integrator_product_data['code'] == 'FBS':
                     self.fbs_valid(test_ids, test)
-                elif integrator_test and integrator_test.integrator_product_data['code'] == ('PPBS' or 'RBS'):
+                elif integrator_test and integrator_test.integrator_product_data['code'] in ['PPBS', 'RBS']:
                     self.ppbs_valid(test_ids, test)
                 elif integrator_test and integrator_test.integrator_product_data['code'] == 'INSPP':
                     self.inspp_valid(test_ids, test)

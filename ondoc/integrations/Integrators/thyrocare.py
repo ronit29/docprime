@@ -348,13 +348,13 @@ class Thyrocare(BaseIntegrator):
                 # check integrator order status and update docprime booking
                 if response['BEN_MASTER'][0]['STATUS'].upper() == 'YET TO ASSIGN':
                     pass
-                elif response['BEN_MASTER'][0]['STATUS'].upper() == ('DELIVERY' or 'REPORTED' or 'SERVICED' or 'CREDITED'):
+                elif response['BEN_MASTER'][0]['STATUS'].upper() in ['DELIVERY', 'REPORTED', 'SERVICED', 'CREDITED']:
                     if not dp_appointment.status == 5:
                         dp_appointment.status = 5
                         dp_appointment.save()
                 elif response['BEN_MASTER'][0]['STATUS'].upper() == 'DONE':
                     pass
-                elif response['BEN_MASTER'][0]['STATUS'].upper() == ('CANCELLED' or 'REJECTED'):
+                elif response['BEN_MASTER'][0]['STATUS'].upper() in ['CANCELLED', 'REJECTED']:
                     if not dp_appointment.status == 6:
                         dp_appointment.status = 6
                         dp_appointment.cancellation_type = 2
