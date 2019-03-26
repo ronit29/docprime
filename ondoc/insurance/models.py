@@ -840,6 +840,9 @@ class UserInsurance(auth_model.TimeStampedModel):
             return is_insured, insurance_id, insurance_message
 
         specialization_count_dict = InsuranceDoctorSpecializations.get_already_booked_specialization_appointments(user, insurance_id)
+        gyno_count = specialization_count_dict[InsuranceDoctorSpecializations.SpecializationMapping.GYNOCOLOGIST].get('count', 0)
+        onco_count = specialization_count_dict[InsuranceDoctorSpecializations.SpecializationMapping.ONCOLOGIST].get('count', 0)
+
         if not specialization_count_dict:
             return is_insured, insurance_id, insurance_message
         if not cart_items:
@@ -852,9 +855,9 @@ class UserInsurance(auth_model.TimeStampedModel):
                 doctor_in_cart = data.get('doctor')
                 res, specialization = InsuranceDoctorSpecializations.get_doctor_insurance_specializations(doctor_in_cart)
                 if specialization == InsuranceDoctorSpecializations.SpecializationMapping.GYNOCOLOGIST and data.get('is_appointment_insured'):
-                    gyno_count = specialization_count_dict[specialization].get('count') + 1
+                    gyno_count = gyno_count + 1
                 if specialization == InsuranceDoctorSpecializations.SpecializationMapping.ONCOLOGIST and data.get('is_appointment_insured'):
-                    onco_count = specialization_count_dict[specialization].get('count') + 1
+                    onco_count = onco_count + 1
 
                 if gyno_count >= int(settings.INSURANCE_GYNECOLOGIST_LIMIT) and specialization == InsuranceDoctorSpecializations.SpecializationMapping.GYNOCOLOGIST:
                     return False, self.id, "Gynocologist limit exceeded of limit 5"
