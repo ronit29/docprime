@@ -3,6 +3,7 @@ from ondoc.tracking import models as track_models
 from ondoc.tracking import mongo_models as track_mongo_models
 from ondoc.tracking.models import MigrateTracker
 from datetime import datetime, timedelta
+from django.forms import model_to_dict
 
 class Command(BaseCommand):
 
@@ -60,6 +61,8 @@ class Command(BaseCommand):
                                    "updated_at": visitor.updated_at}
                     if visitor.device_info:
                         visitorJson["device_info"] = visitor.device_info
+                    if visitor.client_category:
+                        visitorJson["client_category"] = visitor.client_category
                     mongo_visitor = track_mongo_models.TrackingVisitor(**visitorJson)
                     create_objects.append(mongo_visitor)
                     total_migrated += 1
@@ -70,7 +73,7 @@ class Command(BaseCommand):
         except StopIteration:
             pass
         except Exception as e:
-            print("FAILED TO MIGRATE VISITORS")
+            print("FAILED TO MIGRATE VISITORS ")
             return
 
         print("DONE MIGRATING VISITORS")
