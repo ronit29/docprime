@@ -168,7 +168,11 @@ class Thyrocare(BaseIntegrator):
             pincode = "122002"
 
         order_id = "DP{}".format(lab_appointment.id)
-        bendataxml = "<NewDataSet><Ben_details><Name>%s</Name><Age>%s</Age><Gender>%s</Gender></Ben_details></NewDataSet>" % (profile.name, self.calculate_age(profile), profile.gender)
+        if profile and profile.gender:
+            gender = profile.gender.upper()
+        else:
+            gender = "M"
+        bendataxml = "<NewDataSet><Ben_details><Name>%s</Name><Age>%s</Age><Gender>%s</Gender></Ben_details></NewDataSet>" % (profile.name, self.calculate_age(profile), gender)
 
         payload = {
             "api_key": settings.THYROCARE_API_KEY,
@@ -195,7 +199,10 @@ class Thyrocare(BaseIntegrator):
             for test in tests:
                 integrator_test = IntegratorMapping.objects.filter(test_id=test.id, integrator_class_name=Thyrocare.__name__, is_active=True).first()
                 if integrator_test:
-                    product.append(integrator_test.integrator_product_data["code"])
+                    if integrator_test.name_params_required:
+                        product.append(integrator_test.integrator_product_data["name"])
+                    else:
+                        product.append(integrator_test.integrator_product_data["code"])
                     rate += int(integrator_test.integrator_product_data["rate"]["b2c"])
                 else:
                     logger.info("[ERROR] No tests data found in integrator.")
