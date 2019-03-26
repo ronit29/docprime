@@ -1969,7 +1969,7 @@ class DoctorScanViewSet(GenericViewSet):
                 if request_url:
                     if type == 'doctor':
                         appt_status = opdapp_obj.status
-                        if opdapp_obj.doctor.qr_code.all():
+                        if len(opdapp_obj.doctor.qr_code.all()):
                             url = opdapp_obj.doctor.qr_code.first().data
                             complete_with_qr_scanner = True
                             if url:

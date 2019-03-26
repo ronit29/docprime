@@ -1158,10 +1158,9 @@ class QrcodeRetrieveDoctorSerializer(AppointmentRetrieveDoctorSerializer):
     def get_check_qr_code(self, obj):
         return bool(len(obj.qr_code.all()))
 
-    class Meta:
+    class Meta(AppointmentRetrieveDoctorSerializer.Meta):
         model = Doctor
-        fields = ('id', 'name', 'gender', 'about', 'practicing_since',
-                  'qualifications', 'general_specialization', 'display_name', 'check_qr_code')
+        fields = AppointmentRetrieveDoctorSerializer.Meta.fields
 
 class OpdAppointmentBillingSerializer(OpdAppointmentSerializer):
     profile = UserProfileSerializer()
