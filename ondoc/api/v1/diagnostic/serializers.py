@@ -789,7 +789,7 @@ class LabAppointmentCreateSerializer(serializers.Serializer):
         self.test_lab_id_validator(data, request)
         self.time_slot_validator(data, request, is_integrated)
         self.user_plan_validator(data, request, cart_item_id)
-        if lab.network.id == settings.THYROCARE_NETWORK_ID:
+        if lab.network and lab.network.id == settings.THYROCARE_NETWORK_ID:
             self.thyrocare_test_validator(data)
         return data
 
