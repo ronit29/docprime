@@ -1963,8 +1963,7 @@ class DoctorScanViewSet(GenericViewSet):
         user = request.user
         if opdapp_obj:
             if user == opdapp_obj.user:
-                data = request.query_params
-                type = data.get('type')
+                type = request.data.get('type')
                 request_url = request.data.get('url')
                 if request_url:
                     if type == 'doctor':
@@ -1975,7 +1974,7 @@ class DoctorScanViewSet(GenericViewSet):
                             if url:
                                 url = url.get('url', None)
                                 if request_url == url:
-                                    if appt_status == OpdAppointment.ACCEPTED and opdapp_obj.time_slot_start <= timezone.now() and complete_with_qr_scanner == True:
+                                    if appt_status == OpdAppointment.ACCEPTED and complete_with_qr_scanner == True:
                                         opdapp_obj.status = OpdAppointment.COMPLETED
                                         opdapp_obj.action_completed()
                                         resp = AppointmentRetrieveSerializer(opdapp_obj, context={"request": request})

@@ -65,7 +65,7 @@ urlpatterns = [
     path('whatsapp-optin', WhatsappOptinViewSet.as_view({'post': 'update'}), name='whatsapp-optin'),
     path('upcoming/appointments',AppointmentViewSet.as_view({'get': 'upcoming_appointments'}), name='upcoming_appointments'),
     path('subscription_plan', SubscriptionPlanUserViewSet.as_view({'get': 'subscription_plan'}), name='user_subscription_plan'),
-    path('doctor_qr_scan/<int:pk>', DoctorScanViewSet.as_view({'post': 'doctor_qr_scan'}), name='doctor_qr_scan'),
+    path('appointment_qr_scan/<int:pk>', DoctorScanViewSet.as_view({'post': 'doctor_qr_scan'}), name='doctor_qr_scan'),
     # path('test/', PathologyTestList.as_view({'get': 'list'}), name='test-list'),
     # path('test/<int:id>/', PathologyTestList.as_view({'get': 'retrieve'}), name='test-detail'),
 ]
