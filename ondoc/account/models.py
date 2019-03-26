@@ -1274,6 +1274,19 @@ class MerchantPayout(TimeStampedModel):
             self.payout_ref_id = self.id
             self.save()
 
+    @staticmethod
+    def get_merchant_payout_info(obj):
+        """obj is either a labappointment or an opdappointment"""
+        from django.utils.safestring import mark_safe
+        result = ""
+        if obj.merchant_payout:
+            result += "Status : {}<br>".format(dict(MerchantPayout.STATUS_CHOICES)[obj.merchant_payout.status])
+            if obj.merchant_payout.utr_no:
+                result += "UTR No. : {}<br>".format(obj.merchant_payout.utr_no)
+            if obj.merchant_payout.paid_to:
+                result += "Paid To : {}<br>".format(obj.merchant_payout.paid_to)
+        return mark_safe(result)
+
     def get_appointment(self):
         if self.lab_appointment.all():
             return self.lab_appointment.all()[0]

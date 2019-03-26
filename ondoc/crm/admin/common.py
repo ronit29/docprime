@@ -296,6 +296,20 @@ class MerchantResource(resources.ModelResource):
                   'city', 'pin', 'state', 'country', 'email', 'mobile', 'ifsc_code', 'account_number', 'enabled',
                   'verified_by_finance','type')
 
+class MerchantForm(forms.ModelForm):
+    def clean(self):
+        super().clean()
+        if any(self.errors):
+            return
+
+        state = self.cleaned_data.get('state', None)
+        abbr = None
+        if state:
+            abbr = Merchant.get_abbreviation(state)
+        if state and not abbr:
+            raise forms.ValidationError("No abbreviation for the state. Allowed states are " + Merchant.get_states_string())
+
+        return self.cleaned_data
 
 class MerchantAdmin(ImportExportMixin, VersionAdmin):
     resource_class = MerchantResource
@@ -303,6 +317,8 @@ class MerchantAdmin(ImportExportMixin, VersionAdmin):
     list_display = ('beneficiary_name', 'account_number', 'ifsc_code', 'enabled', 'verified_by_finance')
     search_fields = ['beneficiary_name', 'account_number']
     list_filter = ('enabled', 'verified_by_finance')
+    form = MerchantForm
+
 
     def associated_to(self, instance):
         if instance and instance.id:
