@@ -105,7 +105,7 @@ class InsuredMemberResource(resources.ModelResource):
         return super().export(fetched_queryset)
 
     def get_queryset(self, **kwargs):
-        date_range = [datetime.strptime(kwargs.get('from_date'), '%d-%m-%Y').date(), datetime.strptime(kwargs.get('to_date'), '%d-%m-%Y').date()]
+        date_range = [datetime.strptime(kwargs.get('from_date'), '%Y-%m-%d').date(), datetime.strptime(kwargs.get('to_date'), '%Y-%m-%d').date()]
         return InsuredMembers.objects.filter(created_at__date__range=date_range).prefetch_related('user_insurance')
 
     class Meta:
@@ -466,13 +466,7 @@ class UserInsuranceLabResource(resources.ModelResource):
         return ""
 
     def dehydrate_name_of_tests(self, appointment):
-        # map_tests = appointment.tests
-        # test_list = []
-        # for test in map_tests:
-        #     test_obj = LabTest.objects.filter(id=test.test_id).first()
-        #     test_list.append(test_obj.name)
-        # test_names = ','.join(map(str, test_list))
-        return ""
+        return ", ".join(list(map(lambda test: test.name, appointment.tests.all())))
 
     def dehydrate_address_of_center(self, appointment):
         building = str(appointment.lab.building)
