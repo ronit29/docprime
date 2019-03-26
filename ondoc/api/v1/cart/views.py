@@ -124,17 +124,17 @@ class CartViewSet(viewsets.GenericViewSet):
                 if insurance_doctor and user_insurance and user_insurance.is_valid() and specialization_count_dict:
                     res, specialization = InsuranceDoctorSpecializations.get_doctor_insurance_specializations(insurance_doctor)
 
-                    if specialization == InsuranceDoctorSpecializations.SpecializationMapping.GYNOCOLOGIST and validated_data.get('is_appointment_insured'):
+                    if specialization == InsuranceDoctorSpecializations.SpecializationMapping.GYNOCOLOGIST and item.data.get('is_appointment_insured'):
                         gyno_count = gyno_count + 1
-                    if specialization == InsuranceDoctorSpecializations.SpecializationMapping.ONCOLOGIST and validated_data.get('is_appointment_insured'):
+                    if specialization == InsuranceDoctorSpecializations.SpecializationMapping.ONCOLOGIST and item.data.get('is_appointment_insured'):
                         onco_count = onco_count + 1
 
-                    if gyno_count >= int(settings.INSURANCE_GYNECOLOGIST_LIMIT) and specialization == InsuranceDoctorSpecializations.SpecializationMapping.GYNOCOLOGIST:
+                    if gyno_count > int(settings.INSURANCE_GYNECOLOGIST_LIMIT) and specialization == InsuranceDoctorSpecializations.SpecializationMapping.GYNOCOLOGIST:
                         item.data['is_appointment_insured'] = False
                         item.data['insurance_id'] = None
                         item.data['insurance_message'] = "Gynecologist limit exceeded of limit 5"
 
-                    if onco_count >= int(settings.INSURANCE_ONCOLOGIST_LIMIT) and specialization == InsuranceDoctorSpecializations.SpecializationMapping.ONCOLOGIST:
+                    if onco_count > int(settings.INSURANCE_ONCOLOGIST_LIMIT) and specialization == InsuranceDoctorSpecializations.SpecializationMapping.ONCOLOGIST:
                         item.data['is_appointment_insured'] = False
                         item.data['insurance_id'] = None
                         item.data['insurance_message'] = "Oncologist limit exceeded of limit 5"
