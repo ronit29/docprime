@@ -4,7 +4,6 @@ Patient Name : {{patient_name|capfirst}}
 Patient Contact No: {{mask_number}}
 Doctor Name : Dr. {{doctor_name|capfirst}}
 Requested Date and Time : {{instance.time_slot_start|date:"D jS F Y"}} || {{instance.time_slot_start|date:"h:i A"}}
-
 {% if provider_login_url %}
 To confirm the same, please click the link provided below:
 {{provider_login_url}}
