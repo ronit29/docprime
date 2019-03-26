@@ -501,8 +501,8 @@ class OtpVerifications(TimeStampedModel):
         if platform == "android":
             if type == 'doctor' or is_doc:
                 result = "<#> " + result + "\n" + settings.PROVIDER_ANDROID_MESSAGE_HASH
-        else:
-            result = "<#> " + result + "\n" + settings.CONSUMER_ANDROID_MESSAGE_HASH
+            else:
+                result = "<#> " + result + "\n" + settings.CONSUMER_ANDROID_MESSAGE_HASH
         return result
 
 

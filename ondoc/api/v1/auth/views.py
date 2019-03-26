@@ -93,7 +93,7 @@ class LoginOTP(GenericViewSet):
         phone_number = data['phone_number']
         req_type = request.query_params.get('type')
         retry_send = request.query_params.get('retry', False)
-        otp_message = OtpVerifications.get_otp_message(request.META.get('HTTP_PLATFROM'), req_type)
+        otp_message = OtpVerifications.get_otp_message(request.META.get('HTTP_PLATFORM'), req_type)
         if req_type == 'doctor':
             doctor_queryset = GenericAdmin.objects.select_related('doctor', 'hospital').filter(phone_number=phone_number, is_disabled=False)
             lab_queryset = GenericLabAdmin.objects.select_related('lab', 'lab_network').filter(
