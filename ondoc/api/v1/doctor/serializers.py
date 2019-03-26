@@ -1156,9 +1156,7 @@ class QrcodeRetrieveDoctorSerializer(AppointmentRetrieveDoctorSerializer):
 
 
     def get_check_qr_code(self, obj):
-        for x in obj.qr_code.all():
-            return True
-        return False
+        return bool(len(obj.qr_code.all()))
 
     class Meta:
         model = Doctor

@@ -1985,6 +1985,8 @@ class DoctorScanViewSet(GenericViewSet):
 
                                 else:
                                     return Response('Invalid url', status.HTTP_400_BAD_REQUEST)
+                            else:
+                                return Response('URL not found', status.HTTP_404_NOT_FOUND)
                         else:
                             return Response('QRCode not enabled for this doctor', status.HTTP_400_BAD_REQUEST)
                     else:
@@ -1992,6 +1994,6 @@ class DoctorScanViewSet(GenericViewSet):
                 else:
                     return Response('URL not given', status.HTTP_400_BAD_REQUEST)
             else:
-                return Response('User not found', status.HTTP_400_BAD_REQUEST)
+                return Response('Unauthorized User', status.HTTP_401_UNAUTHORIZED)
         else:
             return Response('Opd Appointment does not exist', status.HTTP_400_BAD_REQUEST)
