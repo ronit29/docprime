@@ -154,5 +154,5 @@ class IntegratorHistory(TimeStampedModel):
         lab_appointment_content_type = ContentType.objects.get_for_model(appointment)
         defaults = {'request_data': request, 'response_data': response, 'api_endpoint': url, 'api_name': api_name,
                     'integrator_class_name': integrator_name, 'retry_count': 0, 'api_status': api_status}
-        IntegratorHistory.objects.update_or_create(content_type=lab_appointment_content_type, object_id=appointment.id,
+        IntegratorHistory.objects.get_or_create(content_type=lab_appointment_content_type, object_id=appointment.id,
                                                    defaults=defaults)

@@ -54,7 +54,7 @@ def push_lab_appointment_to_integrator(self, data):
                 integrator_mapping = IntegratorMapping.objects.filter(content_type=lab_network_content_type, object_id=lab_network.id, test=tests[0]).first()
 
             if not integrator_mapping:
-                logger.error("[ERROR] Mapping not found booked test or package")
+                logger.error("[ERROR] Mapping not found for booked test or package")
 
             integrator_obj = service.create_integrator_obj(integrator_mapping.integrator_class_name)
             integrator_response = integrator_obj.post_order(appointment, tests=tests, packages=packages)
