@@ -348,6 +348,9 @@ class UserInsuranceDoctorResource(resources.ModelResource):
         pincode = str(appointment.hospital.pin_code)
         return building + " " + sublocality + " " + locality + " " + city + " " + state + " " + pincode
 
+    def dehydrate_pan_card_of_clinic(self, appointment):
+        return ""
+
     def dehydrate_existing_condition(self, appointment):
         return ""
 
@@ -355,16 +358,17 @@ class UserInsuranceDoctorResource(resources.ModelResource):
         return str(appointment.fees)
 
     def dehydrate_bank_detail_of_center(self, appointment):
-        from django.contrib.contenttypes.models import ContentType
-        content_type = ContentType.objects.get_for_model(Hospital)
-        center_details = self.get_merchant_details(content_type, appointment.hospital)
-        if center_details:
-            beneficiary_name = center_details.beneficiary_name
-            account_number = center_details.account_number
-            ifsc_code = center_details.ifsc_code
-            return str(beneficiary_name) + "," + str(account_number), + "," + ifsc_code
-        else:
-            return ""
+        # from django.contrib.contenttypes.models import ContentType
+        # content_type = ContentType.objects.get_for_model(Hospital)
+        # center_details = self.get_merchant_details(content_type, appointment.hospital)
+        # if center_details:
+        #     beneficiary_name = center_details.beneficiary_name
+        #     account_number = center_details.account_number
+        #     ifsc_code = center_details.ifsc_code
+        #     return str(beneficiary_name) + "," + str(account_number), + "," + ifsc_code
+        # else:
+        #     return ""
+        return ""
 
     def dehydrate_gst_number_of_center(self, appointment):
         return ""
@@ -480,13 +484,14 @@ class UserInsuranceLabResource(resources.ModelResource):
         return building + " " + sublocality + " " + locality + " " + city + " " + state + " " + pincode
 
     def dehydrate_pan_card_of_center(self, appointment):
-        from django.contrib.contenttypes.models import ContentType
-        content_type = ContentType.objects.get_for_model(Lab)
-        center_details = self.get_merchant_details(content_type, appointment.lab)
-        if center_details:
-            return str(center_details.pan_number)
-        else:
-            ""
+        # from django.contrib.contenttypes.models import ContentType
+        # content_type = ContentType.objects.get_for_model(Lab)
+        # center_details = self.get_merchant_details(content_type, appointment.lab)
+        # if center_details:
+        #     return str(center_details.pan_number)
+        # else:
+        #     ""
+        return ""
 
     def dehydrate_existing_condition(self, appointment):
         return ""
@@ -495,16 +500,17 @@ class UserInsuranceLabResource(resources.ModelResource):
         return str(appointment.agreed_price)
 
     def dehydrate_bank_detail_of_center(self, appointment):
-        from django.contrib.contenttypes.models import ContentType
-        content_type = ContentType.objects.get_for_model(Lab)
-        center_details = self.get_merchant_details(content_type, appointment.lab)
-        if center_details:
-            beneficiary_name = center_details.beneficiary_name
-            account_number = center_details.account_number
-            ifsc_code = center_details.ifsc_code
-            return str(beneficiary_name) + "," + str(account_number), + "," + ifsc_code
-        else:
-            return ""
+        # from django.contrib.contenttypes.models import ContentType
+        # content_type = ContentType.objects.get_for_model(Lab)
+        # center_details = self.get_merchant_details(content_type, appointment.lab)
+        # if center_details:
+        #     beneficiary_name = center_details.beneficiary_name
+        #     account_number = center_details.account_number
+        #     ifsc_code = center_details.ifsc_code
+        #     return str(beneficiary_name) + "," + str(account_number), + "," + ifsc_code
+        # else:
+        #     return ""
+        return ""
 
     def dehydrate_gst_number_of_center(self, appointment):
         return ""
