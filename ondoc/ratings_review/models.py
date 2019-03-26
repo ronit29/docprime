@@ -55,6 +55,7 @@ class RatingsReview(auth_model.TimeStampedModel):
     content_type = models.ForeignKey(ContentType, on_delete=models.CASCADE)
     object_id = models.PositiveIntegerField()
     content_object = GenericForeignKey()
+    related_entity_id = models.IntegerField(null=True, blank=True)
 
     class Meta:
         db_table = 'ratings_review'

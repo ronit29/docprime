@@ -19,10 +19,11 @@ class RatingCreateBodySerializer(serializers.Serializer):
     rating = serializers.IntegerField(max_value=5)
     review = serializers.CharField(max_length=5000, allow_blank=True)
     appointment_id = serializers.IntegerField(required=False, allow_null=True)
-    appointment_type = serializers.ChoiceField(choices=RatingsReview.APPOINTMENT_TYPE_CHOICES)
+    appointment_type = serializers.ChoiceField(choices=RatingsReview.APPOINTMENT_TYPE_CHOICES)      #treat appointment_type as entity_type
     # compliment = ListReviewComplimentSerializer(source='request.data')
     compliment = serializers.ListField(child=serializers.PrimaryKeyRelatedField(queryset=ReviewCompliments.objects.all()), allow_empty=True)
     entity_id = serializers.IntegerField(required=False, allow_null=True)
+    related_entity_id = serializers.IntegerField(required=False, allow_null=True)
 
     def validate(self, attrs):
         if not (attrs.get('appointment_id') or attrs.get('entity_id')):
@@ -35,6 +36,11 @@ class RatingCreateBodySerializer(serializers.Serializer):
             #     app = lab_models.LabAppointment.objects.filter(id=attrs.get('appointment_id')).first()
             if query.exists():
                 raise serializers.ValidationError("Appointment Already Rated.")
+        if attrs.get('appointment_type') == RatingsReview.OPD and attrs.get('entity_id'):
+            if not attrs.get('related_entity_id'):
+                raise serializers.ValidationError("related_entity_id(Hospital) is missing for given entity_id(Doctor)")
+            elif not doc_models.Hospital.objects.filter(id=attrs.get('related_entity_id')).exists():
+                raise serializers.ValidationError("object for related_entity_id(Hospital) is not found")
         return attrs
 
 
@@ -219,7 +225,7 @@ class RatingsModelSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = RatingsReview
-        fields = ('id', 'user', 'ratings', 'review', 'is_live', 'date', 'compliment', 'user_name', 'is_verified')
+        fields = ('id', 'user', 'ratings', 'review', 'is_live', 'date', 'compliment', 'user_name', 'is_verified', 'related_entity_id')
 
 
 class RatingUpdateBodySerializer(serializers.Serializer):

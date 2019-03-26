@@ -79,7 +79,8 @@ class RatingsViewSet(viewsets.GenericViewSet):
                                                   appointment_type=valid_data.get('appointment_type'),
                                                   appointment_id=valid_data.get('appointment_id', None),
                                                   is_live=True if valid_data.get('appointment_id') else False,
-                                                  content_object=content_obj)
+                                                  content_object=content_obj,
+                                                  related_entity_id=valid_data.get('related_entity_id', None))
                     rating_review.save()
                     if valid_data.get('appointment_id'):
                         content_data.is_rated = True
