@@ -426,6 +426,7 @@ class UserInsurance(auth_model.TimeStampedModel):
         cgst_tax = 'NA'
         sgst_tax = 'NA'
         igst_tax = 'NA'
+        total_tax = 'NA'
 
         if insurer_state_code == gst_state_code and self.insurance_plan.insurer.cgst and self.insurance_plan.insurer.sgst:
             cgst_tax = (amount_without_tax/Decimal(100)) * Decimal(self.insurance_plan.insurer.cgst)
@@ -434,11 +435,15 @@ class UserInsurance(auth_model.TimeStampedModel):
             sgst_tax = (amount_without_tax/Decimal(100)) * Decimal(self.insurance_plan.insurer.sgst)
             sgst_tax = '%.2f' % (float(str(sgst_tax)))
 
+            total_tax = cgst_tax + sgst_tax
+
         elif insurer_state_code != gst_state_code and self.insurance_plan.insurer.igst:
             igst_tax = (amount_without_tax/Decimal(100)) * Decimal(self.insurance_plan.insurer.igst)
             igst_tax = '%.2f' % (float(str(igst_tax)))
+            total_tax = igst_tax
 
         context = {
+            'total_tax': total_tax,
             'sgst_rate': '(%s%%)' % str(self.insurance_plan.insurer.sgst) if self.insurance_plan.insurer.sgst else '',
             'cgst_rate': '(%s%%)' % str(self.insurance_plan.insurer.cgst) if self.insurance_plan.insurer.cgst else '',
             'igst_rate': '(%s%%)' % str(self.insurance_plan.insurer.igst) if self.insurance_plan.insurer.igst else '',
@@ -454,7 +459,7 @@ class UserInsurance(auth_model.TimeStampedModel):
             'opd_amount_limit': threshold.opd_amount_limit,
             'lab_amount_limit': threshold.lab_amount_limit,
             'premium': self.premium_amount,
-            'premium_in_words': ('%s rupees only.' % num2words(self.premium_amount)).title(),
+            'premium_in_words': ('%s rupees ' % num2words(self.premium_amount)).title() + "only",
             'proposer_name': proposer_name.title(),
             'proposer_address': '%s, %s, %s, %s, %d' % (proposer.address, proposer.town, proposer.district, proposer.state, proposer.pincode),
             'proposer_mobile': proposer.phone_number,
@@ -467,8 +472,8 @@ class UserInsurance(auth_model.TimeStampedModel):
             'group_policy_name': 'Docprime Technologies Pvt. Ltd.',
             'group_policy_address': 'Plot No. 119, Sector 44, Gurugram, Haryana 122001',
             'group_policy_email': 'customercare@docprime.com',
-            'nominee_name': 'legal heir',
-            'nominee_relation': 'legal heir',
+            'nominee_name': 'Legal heir',
+            'nominee_relation': 'Legal heir',
             'nominee_address': 'Same as proposer',
             'policy_related_email_static': 'customercare@docprime.com',
             'policy_related_email': '%s' % self.insurance_plan.insurer.email,

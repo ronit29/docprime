@@ -1308,7 +1308,7 @@ class InsuranceNotification(Notification):
                 'name': name.title(),
                 'member_number': count,
                 'dob': member.dob.strftime('%d-%m-%Y'),
-                'relation': member.relation,
+                'relation': member.relation.title(),
                 'id': member.id,
                 'gender': member.gender.title(),
                 'age': int((datetime.datetime.now().date() - member.dob).days/365),
@@ -1318,7 +1318,7 @@ class InsuranceNotification(Notification):
 
         context = {
             'instance': instance,
-            'purchase_data': str(aware_time_zone(instance.purchase_date).date().strftime('%d %b %Y')),
+            'purchase_date': str(aware_time_zone(instance.purchase_date).date().strftime('%d %b %Y')),
             'expiry_date': str(aware_time_zone(instance.expiry_date).date().strftime('%d %b %Y')),
             'premium': instance.premium_amount,
             'proposer_name': proposer_name.title(),
