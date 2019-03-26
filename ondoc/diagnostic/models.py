@@ -2084,7 +2084,6 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin)
             logger.error("Could not save triggered event - " + str(e))
 
     def integrator_order_status(self):
-        # pass
         from ondoc.integrations.models import IntegratorHistory
 
         lab_appointment_content_type = ContentType.objects.get_for_model(self)
@@ -2094,6 +2093,16 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin)
             return 'Not a part of Integration'
 
         return IntegratorHistory.STATUS_CHOICES[integrator_history.status - 1][1]
+
+    def thyrocare_booking_no(self):
+        from ondoc.integrations.models import IntegratorResponse
+
+        lab_appointment_content_type = ContentType.objects.get_for_model(self)
+        integrator_response = IntegratorResponse.objects.filter(object_id=self.id,
+                                                                content_type=lab_appointment_content_type).first()
+        if not integrator_response:
+            return 'Not Found'
+        return integrator_response.lead_id
 
     def __str__(self):
         return "{}, {}".format(self.profile.name if self.profile else "", self.lab.name)
