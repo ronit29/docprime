@@ -1160,7 +1160,7 @@ class QrcodeRetrieveDoctorSerializer(AppointmentRetrieveDoctorSerializer):
 
     class Meta(AppointmentRetrieveDoctorSerializer.Meta):
         model = Doctor
-        fields = AppointmentRetrieveDoctorSerializer.Meta.fields
+        fields = AppointmentRetrieveDoctorSerializer.Meta.fields + ('check_qr_code',)
 
 class OpdAppointmentBillingSerializer(OpdAppointmentSerializer):
     profile = UserProfileSerializer()
