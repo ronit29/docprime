@@ -26,6 +26,7 @@ import requests
 import json
 from rest_framework import status
 from collections import OrderedDict
+from django.utils.text import slugify
 
 
 class Image(models.Model):
@@ -1417,6 +1418,9 @@ class DoctorNumber(TimeStampedModel):
 
 
 class Merchant(TimeStampedModel):
+
+    STATE_ABBREVIATIONS = ('Andhra Pradesh','AP'),('Arunachal Pradesh','AR'),('Assam','AS'),('Bihar','BR'),('Chhattisgarh','CG'),('Goa','GA'),('Gujarat','GJ'),('Haryana','HR'),('Himachal Pradesh','HP'),('Jammu and Kashmir','JK'),('Jharkhand','JH'),('Karnataka','KA'),('Kerala','KL'),('Madhya Pradesh','MP'),('Maharashtra','MH'),('Manipur','MN'),('Meghalaya','ML'),('Mizoram','MZ'),('Nagaland','NL'),('Orissa','OR'),('Punjab','PB'),('Rajasthan','RJ'),('Sikkim','SK'),('Tamil Nadu','TN'),('Tripura','TR'),('Uttarakhand','UK'),('Uttar Pradesh','UP'),('West Bengal','WB'),('Tamil Nadu','TN'),('Tripura','TR'),('Andaman and Nicobar Islands','AN'),('Chandigarh','CH'),('Dadra and Nagar Haveli','DH'),('Daman and Diu','DD'),('Delhi','DL'),('Lakshadweep','LD'),('Pondicherry','PY')
+
     SAVINGS = 1
     CURRENT = 2
 
@@ -1466,9 +1470,9 @@ class Merchant(TimeStampedModel):
         return self.beneficiary_name+"("+self.account_number+")-("+str(self.id)+")"
 
     def save(self, *args, **kwargs):
-        if self.verified_by_finance and self.pg_status == self.NOT_INITIATED:
-            pass
-            #self.create_in_pg()
+        if self.verified_by_finance and (self.pg_status == self.NOT_INITIATED or self.pg_status == self.FAILURE):
+            #pass
+            self.create_in_pg()
 
         super().save(*args, **kwargs)
 
@@ -1485,7 +1489,15 @@ class Merchant(TimeStampedModel):
         request_payload["Bene_City"] = self.city
         request_payload["Bene_Pin"] = self.pin
         request_payload["State"] = self.state
-        request_payload["Country"] = self.country
+
+        abbr = Merchant.get_abbreviation(self.state)
+        if abbr:
+            request_payload["State"] = abbr
+        else:
+            request_payload["State"] = self.state
+
+        #request_payload["Country"] = self.country
+        request_payload["Country"] = 'in'
         request_payload["Bene_Email"] = self.email
         request_payload["Bene_Mobile"] = self.mobile
         request_payload["Bene_Tel"] = None
@@ -1496,8 +1508,8 @@ class Merchant(TimeStampedModel):
         request_payload["PaymentType"] = None
         request_payload["isBulk"] = "0"
 
-        from ondoc.api.v1.utils import payout_checksum
-        checksum_response = payout_checksum(request_payload)
+        #from ondoc.api.v1.utils import payout_checksum
+        checksum_response = Merchant.generate_checksum(request_payload)
         request_payload["hash"] = checksum_response
         url = settings.NODAL_BENEFICIARY_API
 
@@ -1513,8 +1525,49 @@ class Merchant(TimeStampedModel):
                 self.pg_status = resp_data.get('StatusCode')
 
     @classmethod
+    def get_abbreviation(cls, state_name):
+        state_slug = slugify(state_name)
+        for state,abbr in cls.STATE_ABBREVIATIONS:
+            if state_slug == slugify(state):
+                return abbr
+
+        return None
+
+    @classmethod
+    def get_states_list(cls):        
+        states = [x[0] for x in cls.STATE_ABBREVIATIONS]
+        return states
+
+    @classmethod
+    def get_states_string(cls):
+        return ", ".join(cls.get_states_list())
+
+    @classmethod
+    def generate_checksum(cls, request_payload):
+
+        secretkey = settings.PG_SECRET_KEY_P1
+        accesskey = settings.PG_CLIENT_KEY_P1
+
+        checksum = ""
+
+        curr = ''
+
+        keylist = sorted(request_payload)
+        for k in keylist:
+            if request_payload[k] is not None:
+                curr = curr + k + '=' + str(request_payload[k]) + ';'
+
+        checksum += curr
+
+        checksum = accesskey + "|" + checksum + "|" + secretkey
+        checksum_hash = hashlib.sha256(str(checksum).encode())
+        checksum_hash = checksum_hash.hexdigest()
+        return checksum_hash
+
+
+    @classmethod
     def update_status_from_pg(cls):
-        merchant = Merchant.objects.filter(pg_status__in=[cls.NOT_INITIATED, cls.INITIATED, cls.INPROCESS])
+        merchant = Merchant.objects.filter(pg_status__in=[cls.NOT_INITIATED, cls.INITIATED, cls.INPROCESS, cls.FAILURE])
         for data in merchant:
             resp_data = None
             request_payload = {"beneCode": str(data.pk)}

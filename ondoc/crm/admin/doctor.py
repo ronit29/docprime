@@ -1465,7 +1465,7 @@ class DoctorOpdAppointmentForm(forms.ModelForm):
             raise forms.ValidationError(
                 "Cancellation comments must be mentioned for selected cancellation reason.")
 
-        if cleaned_data.get('status') not in [OpdAppointment.CANCELLED, OpdAppointment.COMPLETED]:
+        if cleaned_data.get('status') not in [OpdAppointment.CANCELLED, OpdAppointment.COMPLETED, None]:
             if not DoctorClinicTiming.objects.filter(doctor_clinic__doctor=doctor,
                                                      doctor_clinic__hospital=hospital,
                                                      day=time_slot_start.weekday(),
