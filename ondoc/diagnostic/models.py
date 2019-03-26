@@ -1415,16 +1415,26 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin)
 
     def get_tests_and_prices(self):
         test_price = []
-        for test in self.test_mappings.all():
-            test_price.append({'name': test.test.name, 'mrp': test.mrp, 'deal_price': (
-                test.custom_deal_price if test.custom_deal_price else test.computed_deal_price),
-                               'discount': test.mrp - (
-                                   test.custom_deal_price if test.custom_deal_price else test.computed_deal_price)})
+        if self.payment_type == OpdAppointment.INSURANCE:
+            for test in self.test_mappings.all():
+                test_price.append({'name': test.test.name, 'mrp': test.mrp, 'deal_price': "0.00",
+                                   'discount': test.mrp})
 
-        if self.is_home_pickup:
-            test_price.append(
-                {'name': 'Home Pick Up Charges', 'mrp': self.home_pickup_charges, 'deal_price': self.home_pickup_charges,
-                 'discount': '0.00'})
+            if self.is_home_pickup:
+                test_price.append(
+                    {'name': 'Home Pick Up Charges', 'mrp': self.home_pickup_charges, 'deal_price': "0.00",
+                     'discount': self.home_pickup_charges})
+        else:
+            for test in self.test_mappings.all():
+                test_price.append({'name': test.test.name, 'mrp': test.mrp, 'deal_price': (
+                    test.custom_deal_price if test.custom_deal_price else test.computed_deal_price),
+                                   'discount': test.mrp - (
+                                       test.custom_deal_price if test.custom_deal_price else test.computed_deal_price)})
+
+            if self.is_home_pickup:
+                test_price.append(
+                    {'name': 'Home Pick Up Charges', 'mrp': self.home_pickup_charges, 'deal_price': self.home_pickup_charges,
+                     'discount': '0.00'})
 
         return test_price
 
