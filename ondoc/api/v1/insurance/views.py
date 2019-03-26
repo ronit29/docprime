@@ -164,6 +164,7 @@ class InsuranceOrderViewSet(viewsets.GenericViewSet):
         amount = insurance_plan.amount
 
         expiry_date = transaction_date + relativedelta(years=int(insurance_plan.policy_tenure))
+        expiry_date = expiry_date - timedelta(days=1)
         expiry_date = datetime.datetime.combine(expiry_date, datetime.datetime.max.time())
         user_insurance_data = {'insurer': insurance_plan.insurer_id, 'insurance_plan': insurance_plan.id, 'purchase_date':
                             transaction_date, 'expiry_date': expiry_date, 'premium_amount': amount,
