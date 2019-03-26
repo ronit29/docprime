@@ -317,6 +317,8 @@ def labappointment_transform(app_data):
     app_data["home_pickup_charges"] = str(app_data.get("home_pickup_charges",0))
     if app_data.get("coupon"):
         app_data["coupon"] = list(app_data["coupon"])
+    if app_data.get("user_plan"):
+        app_data["user_plan"] = app_data["user_plan"].id
     return app_data
 
 
@@ -372,11 +374,15 @@ def payment_details(request, order):
     if not profile and order.product_id == 3:
         if order.action_data.get('profile_detail'):
             profile_name = order.action_data.get('profile_detail').get('name', "")
+    if order.product_id == Order.SUBSCRIPTION_PLAN_PRODUCT_ID:
+        temp_product_id = Order.DOCTOR_PRODUCT_ID
+    else:
+        temp_product_id = order.product_id
     pgdata = {
         'custId': user.id,
         'mobile': user.phone_number,
         'email': uemail,
-        'productId': order.product_id,
+        'productId': temp_product_id,
         'surl': surl,
         'furl': furl,
         'referenceId': "",
@@ -385,7 +391,8 @@ def payment_details(request, order):
         'txAmount': str(order.amount),
     }
     secret_key = client_key = ""
-    if order.product_id == Order.DOCTOR_PRODUCT_ID:
+    # TODO : SHASHANK_SINGH for plan FINAL ??
+    if order.product_id == Order.DOCTOR_PRODUCT_ID or order.product_id == Order.SUBSCRIPTION_PLAN_PRODUCT_ID:
         secret_key = settings.PG_SECRET_KEY_P1
         client_key = settings.PG_CLIENT_KEY_P1
     elif order.product_id == Order.LAB_PRODUCT_ID:
@@ -932,7 +939,7 @@ class TimeSlotExtraction(object):
             start_date = gl.get('start_date')
             end_date = gl.get('end_date')
             if start_date == end_date:
-                total_leaves.append(start_date)
+                total_leaves.append(datetime.datetime.strptime(start_date, '%Y-%m-%d'))
             else:
                 delta = datetime.datetime.strptime(end_date, '%Y-%m-%d') - datetime.datetime.strptime(start_date, '%Y-%m-%d')
                 for i in range(delta.days + 1):
@@ -1387,4 +1394,34 @@ def datetime_to_formated_string(instance, time_format='%Y-%m-%d %H:%M:%S', to_zo
     instance = instance.astimezone(to_zone)
     formated_date = datetime.datetime.strftime(instance, time_format)
     return formated_date
+
+def payout_checksum(request_payload):
+
+    secretkey = settings.PG_SECRET_KEY_P2
+    accesskey = settings.PG_CLIENT_KEY_P2
+
+    checksum = ""
+
+    curr = ''
+
+    keylist = sorted(request_payload)
+    for k in keylist:
+        if request_payload[k] is not None:
+            curr = curr + k + '=' + str(request_payload[k]) + ';'
+
+    checksum += curr
+
+    checksum = accesskey + "|" + checksum + "|" + secretkey
+    checksum_hash = hashlib.sha256(str(checksum).encode())
+    checksum_hash = checksum_hash.hexdigest()
+    return checksum_hash
+
+def get_package_free_or_not_dict(request):
+    from ondoc.subscription_plan.models import UserPlanMapping
+    package_free_or_not_dict = defaultdict(bool)
+    if request.user and request.user.is_authenticated:
+        free_test_in_user_plan = UserPlanMapping.get_free_tests(request)
+        for temp_user_plan_package in free_test_in_user_plan:
+            package_free_or_not_dict[temp_user_plan_package] = True
+    return package_free_or_not_dict
 

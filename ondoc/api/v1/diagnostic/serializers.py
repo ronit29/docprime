@@ -32,6 +32,7 @@ from django.db.models import Q
 from ondoc.api.v1.ratings import serializers as rating_serializer
 from ondoc.location.models import EntityUrls, EntityAddress
 from ondoc.seo.models import NewDynamic
+from ondoc.subscription_plan.models import Plan, UserPlanMapping
 
 logger = logging.getLogger(__name__)
 utc = pytz.UTC
@@ -246,6 +247,11 @@ class AvailableLabTestPackageSerializer(serializers.ModelSerializer):
     parameters = serializers.SerializerMethodField()
     insurance = serializers.SerializerMethodField()
     hide_price = serializers.ReadOnlyField(source='test.hide_price')
+    included_in_user_plan = serializers.SerializerMethodField()
+
+    def get_included_in_user_plan(self, obj):
+        package_free_or_not_dict = self.context.get('package_free_or_not_dict', {})
+        return package_free_or_not_dict.get(obj.test.id, False)
 
     def get_insurance(self, obj):
         request = self.context.get("request")
@@ -334,8 +340,8 @@ class AvailableLabTestPackageSerializer(serializers.ModelSerializer):
     class Meta:
         model = AvailableLabTest
         fields = ('test_id', 'mrp', 'test', 'agreed_price', 'deal_price', 'enabled', 'is_home_collection_enabled',
-                  'package', 'parameters', 'is_package', 'number_of_tests', 'why', 'pre_test_info', 'expected_tat', 'insurance', 'hide_price')
-
+                  'package', 'parameters', 'is_package', 'number_of_tests', 'why', 'pre_test_info', 'expected_tat',
+                  'hide_price', 'included_in_user_plan', 'insurance')
 
 class AvailableLabTestSerializer(serializers.ModelSerializer):
     test = LabTestSerializer()
@@ -345,6 +351,11 @@ class AvailableLabTestSerializer(serializers.ModelSerializer):
     is_home_collection_enabled = serializers.SerializerMethodField()
     insurance = serializers.SerializerMethodField()
     is_package = serializers.SerializerMethodField()
+    included_in_user_plan = serializers.SerializerMethodField()
+
+    def get_included_in_user_plan(self, obj):
+        package_free_or_not_dict = self.context.get('package_free_or_not_dict', {})
+        return package_free_or_not_dict.get(obj.test.id, False)
 
     def get_is_home_collection_enabled(self, obj):
         if self.context.get("lab") is not None:
@@ -391,7 +402,7 @@ class AvailableLabTestSerializer(serializers.ModelSerializer):
     class Meta:
         model = AvailableLabTest
         fields = ('test_id', 'mrp', 'test', 'agreed_price', 'deal_price', 'enabled', 'is_home_collection_enabled',
-                  'insurance', 'is_package')
+                  'insurance', 'is_package', 'included_in_user_plan')
 
     def get_is_package(self, obj):
         return obj.test.is_package
@@ -614,6 +625,12 @@ class LabAppointmentBillingSerializer(serializers.ModelSerializer):
                   'patient_thumbnail', 'patient_name', 'payment_type')
 
 
+class PlanTransactionModelSerializer(serializers.Serializer):
+    plan = serializers.PrimaryKeyRelatedField(queryset=Plan.objects.all())
+    user = serializers.PrimaryKeyRelatedField(queryset=User.objects.all())
+    extra_details = serializers.JSONField(required=False)
+
+
 class LabAppTransactionModelSerializer(serializers.Serializer):
     id = serializers.IntegerField(required=False)
     lab = serializers.PrimaryKeyRelatedField(queryset=Lab.objects.filter(is_live=True))
@@ -637,6 +654,7 @@ class LabAppTransactionModelSerializer(serializers.Serializer):
 
     cashback = serializers.DecimalField(max_digits=10, decimal_places=2)
     extra_details = serializers.JSONField(required=False)
+    user_plan = serializers.PrimaryKeyRelatedField(queryset=UserPlanMapping.objects.all(), allow_null=True)
 
 
 class LabAppRescheduleModelSerializer(serializers.ModelSerializer):
@@ -708,6 +726,8 @@ class LabAppointmentCreateSerializer(serializers.Serializer):
     pincode = serializers.CharField(required=False, allow_null=True, allow_blank=True)
     is_thyrocare = serializers.BooleanField(required=False, default=False)
     from_app = serializers.BooleanField(required=False, default=False)
+    user_plan = serializers.PrimaryKeyRelatedField(queryset=UserPlanMapping.objects.all(), required=False, allow_null=True, default=None)
+    included_in_user_plan = serializers.BooleanField(required=False, default=False)
 
     def validate(self, data):
         MAX_APPOINTMENTS_ALLOWED = 10
@@ -840,7 +860,21 @@ class LabAppointmentCreateSerializer(serializers.Serializer):
 
         self.test_lab_id_validator(data, request)
         self.time_slot_validator(data, request, is_integrated)
+        self.user_plan_validator(data, request, cart_item_id)
         return data
+
+    @staticmethod
+    def user_plan_validator(data, request, cart_item_id=None):
+        if data.get('included_in_user_plan', False):
+            raise_exception = False
+            lab_tests = data.get('test_ids', [])
+            test_included_in_user_plan = UserPlanMapping.get_free_tests(request, cart_item_id)
+            for temp_test in lab_tests:
+                if temp_test.id not in test_included_in_user_plan:
+                    raise_exception = True
+                    break
+            if raise_exception:
+                raise serializers.ValidationError("LabTest not in free user plans")
 
     def create(self, data):
         deal_price_calculation= Case(When(custom_deal_price__isnull=True, then=F('computed_deal_price')),
@@ -1236,13 +1270,18 @@ class CustomLabTestPackageSerializer(serializers.ModelSerializer):
     priority_score = serializers.SerializerMethodField()
     category_details = serializers.SerializerMethodField()
     tests = serializers.SerializerMethodField()
+    included_in_user_plan = serializers.SerializerMethodField()
 
     class Meta:
         model = LabTest
         fields = ('id', 'name', 'lab', 'mrp', 'distance', 'price', 'lab_timing', 'lab_timing_data', 'next_lab_timing',
                   'next_lab_timing_data', 'test_type', 'is_package', 'number_of_tests', 'why', 'pre_test_info',
                   'is_package', 'pickup_charges', 'pickup_available', 'distance_related_charges', 'priority',
-                  'show_details', 'categories', 'url', 'priority_score', 'category_details', 'tests')
+                  'show_details', 'categories', 'url', 'priority_score', 'category_details', 'tests', 'included_in_user_plan')
+
+    def get_included_in_user_plan(self, obj):
+        package_free_or_not_dict = self.context.get('package_free_or_not_dict', {})
+        return package_free_or_not_dict.get(obj.id, False)
 
     def get_priority_score(self, obj):
         return int(obj.priority_score)
@@ -1440,3 +1479,37 @@ class LabAppointmentUpcoming(LabAppointmentModelSerializer):
 
     def get_hospital_name(self, obj):
         return None
+
+
+class PackageSerializer(LabTestSerializer):
+    included_tests = serializers.SerializerMethodField()
+    show_detail_in_plan = serializers.SerializerMethodField()
+    total_parameter_count = serializers.SerializerMethodField()
+
+    class Meta:
+        model = LabTest
+        fields = ('id', 'name', 'is_package',
+                  # 'pre_test_info', 'why',
+                  'show_details', 'url',  # They exist but are not needed yet
+                  'included_tests', 'show_detail_in_plan', 'total_parameter_count')
+
+    def get_included_tests(self, obj):
+        return_data = list()
+        for temp_test in obj.test.all():
+            parameter_count = len(temp_test.parameter.all()) or 1
+            name = temp_test.name
+            test_id = temp_test.id
+            return_data.append({'id': test_id, 'name': name, 'parameter_count': parameter_count})
+        return return_data
+
+    def get_show_detail_in_plan(self, obj):
+        for temp_test in obj.test.all():
+            return True
+        return False
+
+    def get_total_parameter_count(self, obj):
+        return_data = 0
+        for temp_test in obj.test.all():
+            parameter_count = len(temp_test.parameter.all()) or 1
+            return_data += parameter_count
+        return return_data

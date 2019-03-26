@@ -296,6 +296,20 @@ class MerchantResource(resources.ModelResource):
                   'city', 'pin', 'state', 'country', 'email', 'mobile', 'ifsc_code', 'account_number', 'enabled',
                   'verified_by_finance','type')
 
+class MerchantForm(forms.ModelForm):
+    def clean(self):
+        super().clean()
+        if any(self.errors):
+            return
+
+        state = self.cleaned_data.get('state', None)
+        abbr = None
+        if state:
+            abbr = Merchant.get_abbreviation(state)
+        if state and not abbr:
+            raise forms.ValidationError("No abbreviation for the state. Allowed states are " + Merchant.get_states_string())
+
+        return self.cleaned_data
 
 class MerchantAdmin(ImportExportMixin, VersionAdmin):
     resource_class = MerchantResource
@@ -303,6 +317,8 @@ class MerchantAdmin(ImportExportMixin, VersionAdmin):
     list_display = ('beneficiary_name', 'account_number', 'ifsc_code', 'enabled', 'verified_by_finance')
     search_fields = ['beneficiary_name', 'account_number']
     list_filter = ('enabled', 'verified_by_finance')
+    form = MerchantForm
+
 
     def associated_to(self, instance):
         if instance and instance.id:
@@ -401,7 +417,7 @@ class MerchantPayoutAdmin(ExportMixin, VersionAdmin):
     form = MerchantPayoutForm
     model = MerchantPayout
     fields = ['id', 'payment_mode','charged_amount', 'updated_at', 'created_at', 'payable_amount', 'status', 'payout_time', 'paid_to',
-              'appointment_id', 'get_billed_to', 'get_merchant', 'process_payout', 'type', 'utr_no', 'amount_paid']
+              'appointment_id', 'get_billed_to', 'get_merchant', 'process_payout', 'type', 'utr_no', 'amount_paid','api_response','pg_status','status_api_response']
     list_display = ('id', 'status', 'payable_amount', 'appointment_id', 'doc_lab_name')
     search_fields = ['name']
     list_filter = ['status']
@@ -422,7 +438,10 @@ class MerchantPayoutAdmin(ExportMixin, VersionAdmin):
         base = ['appointment_id', 'get_billed_to', 'get_merchant']
         editable_fields = ['payout_approved']
         if obj and obj.status == MerchantPayout.PENDING:
-            editable_fields += ['type', 'utr_no', 'amount_paid','payment_mode']
+            editable_fields += ['type', 'amount_paid','payment_mode']
+        if not obj or not obj.utr_no:
+            editable_fields += ['utr_no']
+
         readonly = [f.name for f in self.model._meta.fields if f.name not in editable_fields]
         return base + readonly
 

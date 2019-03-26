@@ -19,5 +19,6 @@ ondoc/media/*
 deploy.sh
 /silk/
 .DS_Store
-celerybeat-schedule
 ondoc/.DS_Store
+celerybeat-schedule
+>>>>>>> 9-jan

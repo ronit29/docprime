@@ -272,7 +272,7 @@ def set_order_dummy_transaction(self, order_id, user_id):
 
             appointment = order_row.getAppointment()
             if not appointment:
-                raise Exception("No Appointment found.")
+                raise Exception("No Appointment/UserPlanMapping found.")
 
             total_price = order_row.get_total_price()
 
