@@ -3013,7 +3013,7 @@ class OfflineCustomerViewSet(viewsets.GenericViewSet):
         valid_data = serializer.validated_data
         online_queryset = get_opd_pem_queryset(request.user, models.OpdAppointment)\
             .select_related('profile', 'merchant_payout')\
-            .prefetch_related('prescriptions', 'prescriptions__prescription_file').distinct()
+            .prefetch_related('prescriptions', 'prescriptions__prescription_file', 'mask_number').distinct()
 
         offline_queryset = get_opd_pem_queryset(request.user, models.OfflineOPDAppointments)\
             .select_related('user')\
@@ -3085,9 +3085,9 @@ class OfflineCustomerViewSet(viewsets.GenericViewSet):
                 mrp = app.fees if app.fees else 0
                 payment_type = app.payment_type
                 deal_price = app.deal_price
-                mask_number = app.mask_number.first()
-                if mask_number:
-                    mask_data = mask_number.build_data()
+                mask_number = app.mask_number.all()
+                if mask_number and mask_number[0]:
+                    mask_data = mask_number[0].build_data()
                 allowed_actions = app.allowed_action(User.DOCTOR, request)
                 # phone_number.append({"phone_number": app.user.phone_number, "is_default": True})
                 patient_profile = auth_serializers.UserProfileSerializer(app.profile, context={'request': request}).data
@@ -3118,6 +3118,7 @@ class OfflineCustomerViewSet(viewsets.GenericViewSet):
             ret_obj['allowed_action'] = allowed_actions
             ret_obj['patient_name'] = patient_name
             ret_obj['updated_at'] = app.updated_at
+            ret_obj['created_at'] = app.created_at
             ret_obj['doctor_name'] = app.doctor.name
             ret_obj['doctor_id'] = app.doctor.id
             ret_obj['doctor_thumbnail'] = request.build_absolute_uri(app.doctor.get_thumbnail()) if app.doctor.get_thumbnail() else None

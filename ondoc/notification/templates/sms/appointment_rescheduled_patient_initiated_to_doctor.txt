@@ -5,7 +5,10 @@ Patient Contact No: {{mask_number}}
 Doctor Name : Dr. {{doctor_name|capfirst}}
 Requested Date and Time : {{instance.time_slot_start|date:"D jS F Y"}} || {{instance.time_slot_start|date:"h:i A"}}
 
-Please confirm the same by using docprime provider app.
+{% if provider_login_url %}
+To confirm the same, please click the link provided below:
+{{provider_login_url}}
+{% endif %}
 Our associate might try to get in touch with you for the same.
 
 Team docprime

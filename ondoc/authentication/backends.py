@@ -124,3 +124,14 @@ class JWTAuthentication(authentication.BaseAuthentication):
         return {'token': token,
                 'payload': payload}
 
+    @classmethod
+    def provider_sms_payload_handler(cls, user, appointment):
+        return {
+            'provider_id': user.id,
+            'appointment_id': appointment.id,
+            'exp': appointment.time_slot_start + datetime.timedelta(hours=24),
+            'orig_iat': calendar.timegm(
+                datetime.datetime.utcnow().utctimetuple()
+            ),
+            'refresh': False
+        }

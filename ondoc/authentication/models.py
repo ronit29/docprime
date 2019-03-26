@@ -1565,3 +1565,12 @@ class WelcomeCallingDone(models.Model):
     class Meta:
         abstract = True
 
+
+# class ClickLoginToken(TimeStampedModel):
+#     token = models.CharField(max_length=100)
+#     user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
+#     expiration_time = models.DateTimeField()
+#     is_consumed = models.BooleanField(default=False)
+#
+#     class Meta:
+#         db_table = 'click_login_token'

@@ -5,6 +5,8 @@ from collections import defaultdict
 from itertools import groupby
 from datetime import datetime
 import pytz
+import jwt
+from ondoc.authentication.backends import JWTAuthentication
 from django.db.models import F
 # from hardcopy import bytestring_to_pdf
 
@@ -23,7 +25,7 @@ from django.utils import timezone
 from weasyprint import HTML
 
 from ondoc.account.models import Invoice, Order
-from ondoc.authentication.models import UserProfile, GenericAdmin, NotificationEndpoint, AgentToken
+from ondoc.authentication.models import UserProfile, GenericAdmin, NotificationEndpoint, AgentToken, UserSecretKey
 
 from ondoc.notification.models import NotificationAction, SmsNotification, EmailNotification, AppNotification, \
     PushNotification, WhtsappNotification
@@ -336,12 +338,30 @@ class SMSNotification:
             if phone_number not in settings.OTP_BYPASS_NUMBERS:
                 publish_message(message)
 
+    def save_token_to_context(self, context, user):
+        appointment = context.get("instance")
+        user_key = UserSecretKey.objects.get_or_create(user=user)
+        payload = JWTAuthentication.provider_sms_payload_handler(user, appointment)
+        token = jwt.encode(payload, user_key[0].key)
+        token = str(token, 'utf-8')
+        # one_time_token = OneTimeToken(token=token, user=receiver, expiration_time=payload['exp'],
+        #                               is_consumed=False)
+        # one_time_token.save()
+        appointment_type = 'opd' if appointment.__class__ == OpdAppointment else 'lab'
+        # provider_login_url = settings.PROVIDER_APP_DOMAIN + "/sms/login?token=" + token + \
+        provider_login_url = "http://localhost:4000/sms/login?token=" + token + \
+                                        "&url=/sms-redirect/" + appointment_type + "/appointment/" + str(appointment.id)
+        context['provider_login_url'] = generate_short_url(provider_login_url)
+        return context
+
     def send(self, receivers):
         context = self.context
         if not context:
             return
         for receiver in receivers:
             template = self.get_template(receiver.get('user'))
+            if receiver.get('user') and receiver.get('user').user_type == User.DOCTOR:
+                context = self.save_token_to_context(context, receiver['user'])
             if template:
                 self.trigger(receiver, template, context)
 
@@ -1102,7 +1122,7 @@ class OpdNotification(Notification):
         spoc_emails, spoc_numbers = get_spoc_email_and_number_hospital(spocs_to_be_communicated)
         user_and_phone_number.extend(spoc_numbers)
         user_and_email.extend(spoc_emails)
-        all_receivers['sms_receivers'] = user_and_phone_number
+        all_receivers['sms_receivers'] = user_and_phone_number + [{'phone_number': receiver.phone_number, 'user': receiver} for receiver in doctor_spocs_app_recievers]
         all_receivers['email_receivers'] = user_and_email
         all_receivers['app_receivers'] = app_receivers + doctor_spocs_app_recievers
         all_receivers['push_receivers'] = user_and_tokens
