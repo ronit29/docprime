@@ -776,6 +776,9 @@ class LabAppointmentCreateSerializer(serializers.Serializer):
             if not curr_time in current_day_slots:
                 raise serializers.ValidationError("Invalid Time slot")
 
+            if lab.network and lab.network.id == settings.THYROCARE_NETWORK_ID:
+                self.thyrocare_test_validator(data)
+
         if LabAppointment.objects.filter(profile=data.get("profile"), lab=data.get("lab"),
                                          tests__in=data.get("test_ids"), time_slot_start=time_slot_start) \
                 .exclude(status__in=[LabAppointment.COMPLETED, LabAppointment.CANCELLED]).exists():
@@ -789,8 +792,6 @@ class LabAppointmentCreateSerializer(serializers.Serializer):
         self.test_lab_id_validator(data, request)
         self.time_slot_validator(data, request, is_integrated)
         self.user_plan_validator(data, request, cart_item_id)
-        if lab.network and lab.network.id == settings.THYROCARE_NETWORK_ID:
-            self.thyrocare_test_validator(data)
         return data
 
     @staticmethod
