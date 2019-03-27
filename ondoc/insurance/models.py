@@ -721,8 +721,6 @@ class UserInsurance(auth_model.TimeStampedModel):
     def validate_insurance(self, appointment_data):
         from ondoc.doctor.models import OpdAppointment
         from ondoc.diagnostic.models import AvailableLabTest
-        from ondoc.diagnostic.models import LabAppointment
-        # appointment_data = appointment_data.get('data')
         profile = appointment_data.get('profile', None)
         user = profile.user
         user_insurance = UserInsurance.objects.filter(user=user).last()
