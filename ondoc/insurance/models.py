@@ -855,7 +855,11 @@ class UserInsurance(auth_model.TimeStampedModel):
                 data = cart_item.data
 
                 doctor_in_cart = data.get('doctor')
-                res, specialization = InsuranceDoctorSpecializations.get_doctor_insurance_specializations(doctor_in_cart)
+                doctor_specilization_tuple = InsuranceDoctorSpecializations.get_doctor_insurance_specializations(doctor_in_cart)
+                if doctor_specilization_tuple is None:
+                    return is_insured, insurance_id, insurance_message
+
+                res, specialization = doctor_specilization_tuple[0], doctor_specilization_tuple[1]
                 if specialization == InsuranceDoctorSpecializations.SpecializationMapping.GYNOCOLOGIST and data.get('is_appointment_insured'):
                     gyno_count = gyno_count + 1
                 if specialization == InsuranceDoctorSpecializations.SpecializationMapping.ONCOLOGIST and data.get('is_appointment_insured'):
