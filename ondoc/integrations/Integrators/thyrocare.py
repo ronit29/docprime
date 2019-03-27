@@ -214,7 +214,13 @@ class Thyrocare(BaseIntegrator):
             for package in packages:
                 integrator_package = IntegratorProfileMapping.objects.filter(package_id=package.id, integrator_class_name=Thyrocare.__name__, is_active=True).first()
                 if integrator_package:
-                    product.append(integrator_package.integrator_package_name)
+                    if integrator_package.integrator_type == "OFFER":
+                        payload["report_code"] = integrator_package.integrator_product_data["code"]
+                    if integrator_package.integrator_product_data["testnames"] == 'null':
+                        name = integrator_package.integrator_product_data["name"]
+                    else:
+                        name = integrator_package.integrator_product_data["testnames"]
+                    product.append(name)
                     rate += int(integrator_package.integrator_product_data["rate"]["b2c"])
                 else:
                     logger.info("[ERROR] No package data found in integrator for.")
