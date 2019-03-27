@@ -463,7 +463,7 @@ class UserInsuranceLabResource(resources.ModelResource):
         return str(appointment.lab.name)
 
     def dehydrate_provider_code_of_the_center(self, appointment):
-        return ""
+        return str(appointment.lab.id)
 
     def dehydrate_name_of_tests(self, appointment):
         return ", ".join(list(map(lambda test: test.name, appointment.tests.all())))
