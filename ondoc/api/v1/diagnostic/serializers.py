@@ -776,6 +776,9 @@ class LabAppointmentCreateSerializer(serializers.Serializer):
             if not curr_time in current_day_slots:
                 raise serializers.ValidationError("Invalid Time slot")
 
+            if lab.network and lab.network.id == settings.THYROCARE_NETWORK_ID:
+                self.thyrocare_test_validator(data)
+
         if LabAppointment.objects.filter(profile=data.get("profile"), lab=data.get("lab"),
                                          tests__in=data.get("test_ids"), time_slot_start=time_slot_start) \
                 .exclude(status__in=[LabAppointment.COMPLETED, LabAppointment.CANCELLED]).exists():
@@ -928,6 +931,91 @@ class LabAppointmentCreateSerializer(serializers.Serializer):
             slots.append(timing['value'])
 
         return slots
+
+    def thyrocare_test_validator(self, data):
+        from ondoc.integrations.models import IntegratorMapping
+
+        test_ids = data.get("test_ids", None)
+        if test_ids:
+            for test in test_ids:
+                integrator_test = IntegratorMapping.objects.filter(test_id=test).first()
+                if integrator_test and integrator_test.integrator_product_data['code'] == 'FBS':
+                    self.fbs_valid(test_ids, test)
+                elif integrator_test and integrator_test.integrator_product_data['code'] in ['PPBS', 'RBS']:
+                    self.ppbs_valid(test_ids, test)
+                elif integrator_test and integrator_test.integrator_product_data['code'] == 'INSPP':
+                    self.inspp_valid(test_ids, test)
+
+    def fbs_valid(self, test_ids, test):
+        from ondoc.integrations.models import IntegratorMapping, IntegratorProfileMapping
+        if len(test_ids) < 2:
+            raise serializers.ValidationError("FBS can be added with any fasting test or package.")
+
+        is_profile_or_fasting_added = False
+        test_ids.remove(test)
+        if not test_ids:
+            pass
+
+        for test in test_ids:
+            integrator_test = IntegratorMapping.objects.filter(test_id=test).first()
+            if integrator_test and integrator_test.integrator_product_data['fasting'] == 'CF':
+                is_profile_or_fasting_added = True
+            else:
+                integrator_profile = IntegratorProfileMapping.objects.filter(package_id=test).first()
+                if integrator_profile:
+                    is_profile_or_fasting_added = True
+
+        if is_profile_or_fasting_added:
+            pass
+        else:
+            raise serializers.ValidationError("FBS can be added with any fasting test or package.")
+
+    def ppbs_valid(self, test_ids, test):
+        from ondoc.integrations.models import IntegratorMapping, IntegratorProfileMapping
+        if len(test_ids) < 3:
+            raise serializers.ValidationError("PPBS or RBS can be added with FBS and one fasting test or package.")
+
+        is_fbs_present = False
+        is_profile_or_fasting_added = False
+        test_ids.remove(test)
+        if not test_ids:
+            pass
+
+        for test in test_ids:
+            integrator_test = IntegratorMapping.objects.filter(test_id=test).first()
+            if integrator_test and integrator_test.integrator_product_data['code'] == 'FBS':
+                is_fbs_present = True
+            elif integrator_test and integrator_test.integrator_product_data['fasting'] == 'CF':
+                is_profile_or_fasting_added = True
+            else:
+                integrator_profile = IntegratorProfileMapping.objects.filter(package_id=test).first()
+                if integrator_profile:
+                    is_profile_or_fasting_added = True
+
+        if is_fbs_present and is_profile_or_fasting_added:
+            pass
+        else:
+            raise serializers.ValidationError("PPBS or RBS can be added with FBS and one fasting test or package.")
+
+    def inspp_valid(self, test_ids, test):
+        from ondoc.integrations.models import IntegratorMapping
+        if len(test_ids) < 2:
+            raise serializers.ValidationError("INSFA test is mandatory to book INSPP.")
+
+        insfa_test_present = False
+        test_ids.remove(test)
+        if not test_ids:
+            pass
+
+        for test in test_ids:
+            integrator_test = IntegratorMapping.objects.filter(test_id=test).first()
+            if integrator_test and integrator_test.integrator_product_data['code'] == 'INSFA':
+                insfa_test_present = True
+
+        if insfa_test_present:
+            pass
+        else:
+            raise serializers.ValidationError("INSFA test is mandatory to book INSPP.")
 
 
 class TimeSlotSerializer(serializers.Serializer):

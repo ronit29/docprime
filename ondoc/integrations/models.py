@@ -1,6 +1,4 @@
 from django.conf import settings
-
-from ondoc.integrations import service
 from django.db import models
 from django.contrib.contenttypes.fields import GenericForeignKey
 from django.contrib.contenttypes.models import ContentType
@@ -99,6 +97,8 @@ class IntegratorResponse(TimeStampedModel):
 
     @classmethod
     def get_order_summary(cls):
+        from ondoc.integrations import service
+
         integrator_responses = IntegratorResponse.objects.all()
         for integrator_response in integrator_responses:
             if integrator_response.integrator_class_name == 'Thyrocare':
@@ -123,3 +123,43 @@ class IntegratorReport(TimeStampedModel):
 
     class Meta:
         db_table = 'integrator_report'
+
+
+class IntegratorHistory(TimeStampedModel):
+    PUSHED_AND_NOT_ACCEPTED = 1
+    PUSHED_AND_ACCEPTED = 2
+    NOT_PUSHED = 3
+    CANCELLED = 4
+
+    STATUS_CHOICES = [(PUSHED_AND_NOT_ACCEPTED, 'Pushed and not accepted, Manage Manually'),
+                      (PUSHED_AND_ACCEPTED, 'Pushed and accepted'),
+                      (NOT_PUSHED, 'Not pushed, Manage Manually'),
+                      (CANCELLED, 'Cancel')]
+
+    content_type = models.ForeignKey(ContentType, on_delete=models.DO_NOTHING)
+    object_id = models.PositiveIntegerField()
+    content_object = GenericForeignKey()
+    integrator_class_name = models.CharField(max_length=40, null=False, blank=False)
+    retry_count = models.PositiveIntegerField()
+    status = models.PositiveSmallIntegerField(default=NOT_PUSHED, choices=STATUS_CHOICES)
+    api_status = models.PositiveIntegerField()
+    request_data = JSONField(blank=False, null=False)
+    response_data = JSONField(blank=False, null=False)
+    api_name = models.CharField(max_length=40, null=False, blank=False)
+    api_endpoint = models.TextField(blank=False, null=False)
+    accepted_through = models.CharField(max_length=30, null=True, blank=True)
+
+    class Meta:
+        db_table = 'integrator_history'
+
+    @classmethod
+    def create_history(cls, appointment, request, response, url, api_name, integrator_name, api_status, retry_count, status, mode):
+        # Need to send arguments as args or kwargs
+        lab_appointment_content_type = ContentType.objects.get_for_model(appointment)
+        history_obj = IntegratorHistory.objects.filter(content_type=lab_appointment_content_type, object_id=appointment.id,
+                                                       status=status, retry_count=retry_count, api_name=api_name).last()
+        if not history_obj:
+            IntegratorHistory.objects.create(content_type=lab_appointment_content_type, object_id=appointment.id, retry_count=retry_count,
+                                             status=status, request_data=request, response_data=response, api_endpoint=url,
+                                             api_name=api_name, integrator_class_name=integrator_name, api_status=api_status,
+                                             accepted_through=mode)
