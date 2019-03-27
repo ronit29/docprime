@@ -2091,7 +2091,7 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin)
 
         lab_appointment_content_type = ContentType.objects.get_for_model(self)
         integrator_history = IntegratorHistory.objects.filter(object_id=self.id,
-                                                              content_type=lab_appointment_content_type).last()
+                                                              content_type=lab_appointment_content_type).order_by('id').last()
         if not integrator_history:
             return 'Not a part of Integration'
 
@@ -2102,7 +2102,7 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin)
 
         lab_appointment_content_type = ContentType.objects.get_for_model(self)
         integrator_response = IntegratorResponse.objects.filter(object_id=self.id,
-                                                                content_type=lab_appointment_content_type).last()
+                                                                content_type=lab_appointment_content_type).order_by('id').last()
         if not integrator_response:
             return 'Not Found'
         return integrator_response.lead_id
@@ -2112,7 +2112,7 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin)
 
         lab_appointment_content_type = ContentType.objects.get_for_model(self)
         integrator_history = IntegratorHistory.objects.filter(object_id=self.id,
-                                                              content_type=lab_appointment_content_type).last()
+                                                              content_type=lab_appointment_content_type).order_by('id').last()
         if not integrator_history:
             return 'Not Found'
 

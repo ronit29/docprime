@@ -1066,15 +1066,6 @@ class LabAppointmentAdmin(nested_admin.NestedModelAdmin):
             #
             # date_time = datetime.datetime.combine(date, time)
             send_email_sms_report = form.cleaned_data.get('send_email_sms_report', False)
-
-            if request.POST.get('status') and (int(request.POST['status']) == LabAppointment.ACCEPTED):
-                lab_appointment_content_type = ContentType.objects.get_for_model(obj)
-                history_obj = IntegratorHistory.objects.filter(content_type=lab_appointment_content_type, object_id=obj.id).last()
-                if history_obj:
-                    history_obj.status = IntegratorHistory.PUSHED_AND_ACCEPTED
-                    history_obj.accepted_through = "CRM"
-                    history_obj.save()
-
             if request.POST['start_date'] and request.POST['start_time']:
                 date_time_field = request.POST['start_date'] + " " + request.POST['start_time']
                 to_zone = tz.gettz(settings.TIME_ZONE)
@@ -1094,6 +1085,17 @@ class LabAppointmentAdmin(nested_admin.NestedModelAdmin):
                 pass
             else:
                 super().save_model(request, obj, form, change)
+                if request.POST.get('status') and (int(request.POST['status']) == LabAppointment.ACCEPTED):
+                    lab_appointment_content_type = ContentType.objects.get_for_model(obj)
+                    history_obj = IntegratorHistory.objects.filter(content_type=lab_appointment_content_type,
+                                                                   object_id=obj.id).order_by('id').last()
+                    if history_obj:
+                        history_obj.status = IntegratorHistory.PUSHED_AND_ACCEPTED
+                        history_obj.accepted_through = "CRM"
+                        history_obj.save()
+
+
+
             if send_email_sms_report and sum(
                     obj.reports.annotate(no_of_files=Count('files')).values_list('no_of_files', flat=True)):
                 transaction.on_commit(lambda: self.on_commit_tasks(obj.id))
