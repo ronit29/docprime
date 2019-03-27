@@ -223,6 +223,7 @@ class Lab(TimeStampedModel, CreatedByModel, QCModel, SearchKey):
     lab_priority = models.PositiveIntegerField(blank=False, null=False, default=1)
     open_for_communication = models.BooleanField(default=True)
     remark = GenericRelation(Remark)
+    rating_data = JSONField(blank=True, null=True)
 
     def __str__(self):
         return self.name
@@ -470,7 +471,11 @@ class Lab(TimeStampedModel, CreatedByModel, QCModel, SearchKey):
         content_type = ContentType.objects.get_for_model(Lab)
         if content_type:
             cid = content_type.id
-            query = '''UPDATE lab l set avg_rating = (select avg(ratings) from ratings_review where content_type_id={} and object_id=l.id) '''.format(cid)
+            # query = '''UPDATE lab l set avg_rating = (select avg(ratings) from ratings_review where content_type_id={} and object_id=l.id) '''.format(cid)
+            query = '''UPDATE lab l set rating_data = json_build_object('avg_rating', (select round(avg(ratings),1) 
+                                    from ratings_review where content_type_id={} and object_id=l.id), 'rating_count',(select count(ratings) 
+                                    from ratings_review where content_type_id={} and object_id=l.id))  '''.format(
+                cid, cid)
             cursor.execute(query)
 
     def get_timing(self, is_home_pickup):
