@@ -25,6 +25,7 @@ from django.template.loader import render_to_string
 from num2words import num2words
 from hardcopy import bytestring_to_pdf
 import math
+from ondoc.account.models import Order
 from decimal import  *
 logger = logging.getLogger(__name__)
 
@@ -850,7 +851,7 @@ class UserInsurance(auth_model.TimeStampedModel):
             return is_insured, insurance_id, insurance_message
 
         for cart_item in cart_items:
-            if cart_item.product_id == 1:
+            if cart_item.product_id == Order.DOCTOR_PRODUCT_ID:
                 data = cart_item.data
 
                 doctor_in_cart = data.get('doctor')
