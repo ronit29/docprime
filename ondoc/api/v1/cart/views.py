@@ -8,7 +8,7 @@ from ondoc.api.v1.diagnostic.serializers import LabAppointmentCreateSerializer
 from ondoc.api.v1.doctor.serializers import CreateAppointmentSerializer
 from django.db import transaction
 from django.conf import settings
-from ondoc.insurance.models import InsuranceDoctorSpecializations
+from ondoc.insurance.models import InsuranceDoctorSpecializations, UserInsurance
 from ondoc.subscription_plan.models import UserPlanMapping
 from ondoc.doctor.models import OpdAppointment
 
@@ -200,15 +200,18 @@ class CartViewSet(viewsets.GenericViewSet):
         use_wallet = int(request.query_params.get('use_wallet', 1))
         cart_items = Cart.objects.filter(user=user, deleted_at__isnull=True)
         items_to_process = []
-        for item in cart_items:
-            try:
-                item.validate(request)
-                items_to_process.append(item)
-            except Exception as e:
-                pass
+        is_process, error = UserInsurance.validate_cart_items(cart_items, request)
+        if is_process:
+            for item in cart_items:
+                try:
+                    item.validate(request)
+                    items_to_process.append(item)
+                except Exception as e:
+                    pass
 
-        resp = Order.create_order(request, items_to_process, use_wallet)
-
+            resp = Order.create_order(request, items_to_process, use_wallet)
+        else:
+            return Response(status=400,data={"error": error})
         return Response(resp)
 
     def remove(self, request, *args, **kwargs):

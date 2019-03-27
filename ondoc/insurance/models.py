@@ -874,6 +874,61 @@ class UserInsurance(auth_model.TimeStampedModel):
 
         return is_insured, insurance_id, insurance_message
 
+    @classmethod
+    def validate_cart_items(cls,cart_items, request):
+        from ondoc.doctor.models import OpdAppointment
+
+        gyno_count = 0
+        onco_count = 0
+        user = request.user
+        res_dict = dict()
+        is_process = True
+        error = ""
+        user_insurance = UserInsurance.objects.filter(user=user).last()
+        specialization_count_dict = None
+        if user_insurance and user_insurance.is_valid():
+            specialization_count_dict = InsuranceDoctorSpecializations.get_already_booked_specialization_appointments(
+                user, user_insurance.id)
+            gyno_count = specialization_count_dict.get(
+                InsuranceDoctorSpecializations.SpecializationMapping.GYNOCOLOGIST, {}).get('count', 0)
+            onco_count = specialization_count_dict.get(InsuranceDoctorSpecializations.SpecializationMapping.ONCOLOGIST,
+                                                       {}).get('count', 0)
+        else:
+            is_process = True
+        for item in cart_items:
+            validated_data = item.validate(request)
+            insurance_doctor = validated_data.get('doctor', None)
+            insurance_lab = validated_data.get('lab', None)
+            if insurance_doctor:
+                if user_insurance and user_insurance.is_valid() and specialization_count_dict:
+                    doctor_specilization_tuple = InsuranceDoctorSpecializations.get_doctor_insurance_specializations(
+                        insurance_doctor)
+                    if doctor_specilization_tuple:
+                        res, specialization = doctor_specilization_tuple[0], doctor_specilization_tuple[1]
+
+                        if specialization == InsuranceDoctorSpecializations.SpecializationMapping.GYNOCOLOGIST and item.data.get(
+                                'is_appointment_insured'):
+                            gyno_count = gyno_count + 1
+                        if specialization == InsuranceDoctorSpecializations.SpecializationMapping.ONCOLOGIST and item.data.get(
+                                'is_appointment_insured'):
+                            onco_count = onco_count + 1
+
+                        if gyno_count > int(
+                                settings.INSURANCE_GYNECOLOGIST_LIMIT) and specialization == InsuranceDoctorSpecializations.SpecializationMapping.GYNOCOLOGIST:
+                            is_process = False
+                            error = "Gynecology limit exceeded"
+                        if onco_count > int(
+                                settings.INSURANCE_ONCOLOGIST_LIMIT) and specialization == InsuranceDoctorSpecializations.SpecializationMapping.ONCOLOGIST:
+                            is_process = False
+                            error = "Oncology limit exceeded"
+                    else:
+                        is_process = False
+                else:
+                    is_process = False
+            elif insurance_lab:
+                is_process = False
+        return is_process, error
+
     def trigger_created_event(self, visitor_info):
         from ondoc.tracking.models import TrackingEvent
         try:
