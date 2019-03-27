@@ -430,13 +430,14 @@ class UserInsurance(auth_model.TimeStampedModel):
         total_tax = 'NA'
 
         if insurer_state_code == gst_state_code and self.insurance_plan.insurer.cgst and self.insurance_plan.insurer.sgst:
-            cgst_tax = (amount_without_tax/Decimal(100)) * Decimal(self.insurance_plan.insurer.cgst)
-            cgst_tax = '%.2f' % (float(str(cgst_tax)))
+            cgst_tax_numeric = (amount_without_tax/Decimal(100)) * Decimal(self.insurance_plan.insurer.cgst)
+            cgst_tax = '%.2f' % (float(str(cgst_tax_numeric)))
 
-            sgst_tax = (amount_without_tax/Decimal(100)) * Decimal(self.insurance_plan.insurer.sgst)
-            sgst_tax = '%.2f' % (float(str(sgst_tax)))
+            sgst_tax_numeric = (amount_without_tax/Decimal(100)) * Decimal(self.insurance_plan.insurer.sgst)
+            sgst_tax = '%.2f' % (float(str(sgst_tax_numeric)))
 
-            total_tax = cgst_tax + sgst_tax
+            total_tax = cgst_tax_numeric + sgst_tax_numeric
+            total_tax = '%.2f' % (float(str(total_tax)))
 
         elif insurer_state_code != gst_state_code and self.insurance_plan.insurer.igst:
             igst_tax = (amount_without_tax/Decimal(100)) * Decimal(self.insurance_plan.insurer.igst)
@@ -854,7 +855,11 @@ class UserInsurance(auth_model.TimeStampedModel):
                 data = cart_item.data
 
                 doctor_in_cart = data.get('doctor')
-                res, specialization = InsuranceDoctorSpecializations.get_doctor_insurance_specializations(doctor_in_cart)
+                doctor_specilization_tuple = InsuranceDoctorSpecializations.get_doctor_insurance_specializations(doctor_in_cart)
+                if doctor_specilization_tuple is None:
+                    return is_insured, insurance_id, insurance_message
+
+                res, specialization = doctor_specilization_tuple[0], doctor_specilization_tuple[1]
                 if specialization == InsuranceDoctorSpecializations.SpecializationMapping.GYNOCOLOGIST and data.get('is_appointment_insured'):
                     gyno_count = gyno_count + 1
                 if specialization == InsuranceDoctorSpecializations.SpecializationMapping.ONCOLOGIST and data.get('is_appointment_insured'):
