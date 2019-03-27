@@ -126,7 +126,7 @@ class RatingsReviewAdmin(ImportExportMixin, admin.ModelAdmin):
         hospitals = Hospital.objects.filter(ratings__isnull=False).all().distinct()
         self.docs = doctors
         self.labs = labs
-        self.hospitals = hospitals
+        # self.hospitals = hospitals
         return super(RatingsReviewAdmin, self).get_queryset(request).select_related('content_type')
 
     def get_form(self, request, obj=None, **kwargs):
@@ -181,10 +181,10 @@ class RatingsReviewAdmin(ImportExportMixin, admin.ModelAdmin):
             for lab in self.labs:
                 if lab.id == instance.object_id:
                     return lab.name
-        elif instance.content_type == ContentType.objects.get_for_model(Hospital):
-            for hospital in self.hospitals:
-                if hospital.id == instance.object_id:
-                    return hospital.name
+        # elif instance.content_type == ContentType.objects.get_for_model(Hospital):
+        #     for hospital in self.hospitals:
+        #         if hospital.id == instance.object_id:
+        #             return hospital.name
         return ''
 
     def save_model(self, request, obj, form, change):

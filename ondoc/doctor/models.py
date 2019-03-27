@@ -227,7 +227,7 @@ class Hospital(auth_model.TimeStampedModel, auth_model.CreatedByModel, auth_mode
     opd_timings = models.CharField(max_length=150, blank=True, null=True, default="")
     always_open = models.BooleanField(verbose_name='Is hospital open 24X7', default=False)
     city_search_key = models.CharField(db_index=True,editable=False, max_length=100, default="", null=True, blank=True)
-    ratings = GenericRelation(ratings_models.RatingsReview, related_query_name='hospital_ratings')
+    # ratings = GenericRelation(ratings_models.RatingsReview, related_query_name='hospital_ratings')
 
     def __str__(self):
         return self.name

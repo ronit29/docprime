@@ -1726,17 +1726,15 @@ class HospitalDetailIpdProcedureSerializer(TopHospitalForIpdProcedureSerializer)
         from ondoc.ratings_review.models import RatingsReview
         if obj.network:
             queryset = RatingsReview.objects.prefetch_related('compliment') \
-                .filter(Q(is_live=True),
+                .filter(Q(is_live=True, appointment_type=RatingsReview.OPD),
                         Q(appointment_id__in=OpdAppointment.objects.filter(hospital__network=obj.network).values_list(
-                            'id', flat=True),
-                        appointment_type=RatingsReview.OPD) |
-                        Q(appointment_type=RatingsReview.HOSPITAL, appointment_id__isnull=True))
+                            'id', flat=True)) |
+                        Q(related_entity_id=obj.id, appointment_id__isnull=True))
         else:
             queryset = RatingsReview.objects.prefetch_related('compliment') \
-                .filter(Q(is_live=True),
-                        Q(appointment_id__in=OpdAppointment.objects.filter(hospital=obj).values_list('id', flat=True),
-                        appointment_type=RatingsReview.OPD) |
-                        Q(appointment_type=RatingsReview.HOSPITAL, appointment_id__isnull=True))
+                .filter(Q(is_live=True, appointment_type=RatingsReview.OPD),
+                        Q(appointment_id__in=OpdAppointment.objects.filter(hospital=obj).values_list('id', flat=True)) |
+                        Q(related_entity_id=obj.id, appointment_id__isnull=True))
         return RatingsGraphSerializer(queryset, context={'request': self.context.get('request')}).data
 
     def get_rating(self, obj):
@@ -1744,20 +1742,18 @@ class HospitalDetailIpdProcedureSerializer(TopHospitalForIpdProcedureSerializer)
         if obj.network:
             queryset = rate_models.RatingsReview.objects.prefetch_related('compliment') \
                            .exclude(Q(review='') | Q(review=None)) \
-                           .filter(Q(is_live=True),
+                           .filter(Q(is_live=True, appointment_type=rate_models.RatingsReview.OPD),
                                    Q(appointment_id__in=OpdAppointment.objects.filter(hospital__network=obj.network).values_list(
-                                       'id', flat=True),
-                                   appointment_type=rate_models.RatingsReview.OPD),
-                                   Q(appointment_type=rate_models.RatingsReview.HOSPITAL, appointment_id__isnull=True)) \
+                                       'id', flat=True)) |
+                                   Q(related_entity_id=obj.id, appointment_id__isnull=True)) \
                            .order_by('-ratings', '-updated_at')[:5]
         else:
             queryset = rate_models.RatingsReview.objects.prefetch_related('compliment') \
                            .exclude(Q(review='') | Q(review=None)) \
-                           .filter(Q(is_live=True),
+                           .filter(Q(is_live=True, appointment_type=rate_models.RatingsReview.OPD),
                                    Q(appointment_id__in=OpdAppointment.objects.filter(hospital=obj).values_list(
-                                       'id', flat=True),
-                                   appointment_type=rate_models.RatingsReview.OPD) |
-                                   Q(appointment_type=rate_models.RatingsReview.HOSPITAL, appointment_id__isnull=True)) \
+                                       'id', flat=True)) |
+                                   Q(related_entity_id=obj.id, appointment_id__isnull=True)) \
                            .order_by('-ratings', '-updated_at')[:5]
         reviews = rating_serializer.RatingsModelSerializer(queryset, many=True, context={'app': app})
         return reviews.data
@@ -1766,17 +1762,15 @@ class HospitalDetailIpdProcedureSerializer(TopHospitalForIpdProcedureSerializer)
         from ondoc.ratings_review.models import RatingsReview
         if obj.network:
             queryset = RatingsReview.objects.prefetch_related('compliment') \
-                .filter(Q(is_live=True),
+                .filter(Q(is_live=True, appointment_type=RatingsReview.OPD),
                         Q(appointment_id__in=OpdAppointment.objects.filter(hospital__network=obj.network).values_list(
-                            'id', flat=True),
-                        appointment_type=RatingsReview.OPD) |
-                        Q(appointment_type=rate_models.RatingsReview.HOSPITAL, appointment_id__isnull=True))
+                            'id', flat=True)) |
+                        Q(related_entity_id=obj.id, appointment_id__isnull=True))
         else:
             queryset = RatingsReview.objects.prefetch_related('compliment') \
-                .filter(Q(is_live=True),
-                        Q(appointment_id__in=OpdAppointment.objects.filter(hospital=obj).values_list('id', flat=True),
-                        appointment_type=RatingsReview.OPD) |
-                        Q(appointment_type=rate_models.RatingsReview.HOSPITAL, appointment_id__isnull=True))
+                .filter(Q(is_live=True, appointment_type=RatingsReview.OPD),
+                        Q(appointment_id__in=OpdAppointment.objects.filter(hospital=obj).values_list('id', flat=True)) |
+                        Q(related_entity_id=obj.id, appointment_id__isnull=True))
 
         queryset = list(queryset)
         rate_count = len(queryset)

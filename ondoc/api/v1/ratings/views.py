@@ -248,19 +248,31 @@ class ListRatingViewSet(viewsets.GenericViewSet):
         return queryset, graph_queryset, appointment
 
     def get_hospital_ratings(self, valid_data):
-        hospital = doc_models.Hospital.objects.filter(id=valid_data.get('object_id')).first()
+        object_id = valid_data.get('object_id')
+        hospital = doc_models.Hospital.objects.filter(id=object_id).first()
+        appointment = []
         if hospital and hospital.network:
             queryset = self.get_queryset().exclude(Q(review='') | Q(review=None)) \
-                .filter(hospital_ratings__network=hospital.network) \
+                .filter(Q(appointment_id__in=doc_models.OpdAppointment.objects.filter(hospital__network=hospital.network).values_list(
+                                       'id', flat=True), appointment_type=RatingsReview.OPD) |
+                        Q(related_entity_id=object_id, appointment_id__isnull=True)) \
                 .order_by('-updated_at')
-            graph_queryset = self.get_queryset().filter(hospital_ratings__network=hospital.network)
-            appointment = []
+            graph_queryset = self.get_queryset().filter(Q(appointment_id__in=doc_models.OpdAppointment.objects.filter(hospital__network=hospital.network).values_list(
+                                       'id', flat=True), appointment_type=RatingsReview.OPD) |
+                        Q(related_entity_id=object_id, appointment_id__isnull=True)
+                        )
         else:
             queryset = self.get_queryset().exclude(Q(review='') | Q(review=None)) \
-                .filter(hospital_ratings__id=valid_data.get('object_id')) \
+                .filter(Q(appointment_id__in=doc_models.OpdAppointment.objects.filter(hospital_id=object_id).values_list(
+                                       'id', flat=True), appointment_type=RatingsReview.OPD) |
+                        Q(related_entity_id=object_id, appointment_id__isnull=True)
+                        ) \
                 .order_by('-updated_at')
-            graph_queryset = self.get_queryset().filter(hospital_ratings__id=valid_data.get('object_id'))
-            appointment = []
+            graph_queryset = self.get_queryset().filter(Q(appointment_id__in=doc_models.OpdAppointment.objects.filter(hospital_id=object_id).values_list(
+                                       'id', flat=True), appointment_type=RatingsReview.OPD) |
+                        Q(related_entity_id=object_id, appointment_id__isnull=True)
+                        )
+
         return queryset, graph_queryset, appointment
 
     def list(self, request):

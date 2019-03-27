@@ -225,7 +225,7 @@ class RatingsModelSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = RatingsReview
-        fields = ('id', 'user', 'ratings', 'review', 'is_live', 'date', 'compliment', 'user_name', 'is_verified', 'related_entity_id')
+        fields = ('id', 'user', 'ratings', 'review', 'is_live', 'date', 'compliment', 'user_name', 'is_verified', 'appointment_id', 'entity_id', 'related_entity_id')
 
 
 class RatingUpdateBodySerializer(serializers.Serializer):
