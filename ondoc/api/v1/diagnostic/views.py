@@ -1,5 +1,5 @@
 import operator
-
+from copy import deepcopy
 from ondoc.api.v1.diagnostic.serializers import CustomLabTestPackageSerializer
 from ondoc.authentication.backends import JWTAuthentication
 from ondoc.api.v1.diagnostic import serializers as diagnostic_serializer
@@ -1281,7 +1281,7 @@ class LabList(viewsets.ReadOnlyModelViewSet):
                 # Insurance logic. Add Insurance dictionary for all labs and for [0] index for
                 # lab network case as lab network have more than 1 labs under it.
 
-                res['insurance'] = insurance_data_dict
+                res['insurance'] = deepcopy(insurance_data_dict)
                 all_tests_under_lab = res.get('tests', [])
                 bool_array = list()
                 if all_tests_under_lab and res['is_insurance_enabled']:
