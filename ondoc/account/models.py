@@ -606,8 +606,8 @@ class Order(TimeStampedModel):
                 result_type = "plan"
                 result_id = user_plan_ids[0]
             elif len(insurance_ids) > 0:
-                resp["type"] = "insurance"
-                resp["id"] = insurance_ids[0]
+                result_type = "insurance"
+                result_id = insurance_ids[0]
             # resp["type"] = "doctor" if len(opd_appointment_ids) > 0 else "lab"
             # resp["id"] = opd_appointment_ids[0] if len(opd_appointment_ids) > 0 else lab_appointment_ids[0]
             resp["type"] = result_type

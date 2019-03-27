@@ -720,6 +720,7 @@ class UserInsurance(auth_model.TimeStampedModel):
 
     def validate_insurance(self, appointment_data):
         from ondoc.doctor.models import OpdAppointment
+        from ondoc.diagnostic.models import AvailableLabTest
         from ondoc.diagnostic.models import LabAppointment
         # appointment_data = appointment_data.get('data')
         profile = appointment_data.get('profile', None)
@@ -749,15 +750,16 @@ class UserInsurance(auth_model.TimeStampedModel):
                 return False, user_insurance.id, 'Not Covered under Insurance'
             if appointment_data['test_ids']:
                 for test in appointment_data['test_ids']:
-                    test_price = LabAppointment.get_price_details(appointment_data)
-                    if test_price:
-                        if test_price.get('mrp') <= threshold_lab:
-                            is_lab_insured = True
-                        else:
-                            is_lab_insured = False
-                        lab_mrp_check_list.append(is_lab_insured)
-                    else:
+                    lab_test = AvailableLabTest.objects.filter(lab_pricing_group__labs=appointment_data["lab"],
+                                                                        test=test).first()
+                    if not lab_test:
                         return False, user_insurance.id, 'Price not available for Test'
+                    mrp = lab_test.mrp
+                    if mrp <= threshold_lab:
+                        is_lab_insured = True
+                    else:
+                        is_lab_insured = False
+                    lab_mrp_check_list.append(is_lab_insured)
                 if not False in lab_mrp_check_list:
                     return True, user_insurance.id, 'Covered Under Insurance'
                 else:
