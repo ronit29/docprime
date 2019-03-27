@@ -1697,13 +1697,14 @@ class OnlineLeadViewSet(GenericViewSet):
         resp = {}
         data = request.data
 
-        if request.user_agent.is_mobile or request.user_agent.is_tablet:
-            source = request.user_agent.os.family
-        elif request.user_agent.is_pc:
-            source = "WEB %s" % (data.get('source', ''))
-        else:
-            source = "Unknown"
+        # if request.user_agent.is_mobile or request.user_agent.is_tablet:
+        #     source = request.user_agent.os.family
+        # elif request.user_agent.is_pc:
+        #     source = "WEB %s" % (data.get('source', ''))
+        # else:
+        #     source = "Unknown"
 
+        source = "Signup"
         data['source'] = source
         if not data.get('city_name'):
             data['city_name'] = 0
