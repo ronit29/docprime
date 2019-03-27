@@ -371,7 +371,7 @@ class Thyrocare(BaseIntegrator):
                 if response['BEN_MASTER'][0]['STATUS'].upper() == 'YET TO ASSIGN':
                     pass
                 elif response['BEN_MASTER'][0]['STATUS'].upper() in ['DELIVERY', 'REPORTED', 'SERVICED', 'CREDITED']:
-                    if not dp_appointment.status == 5:
+                    if not dp_appointment.status in [5, 6, 7]:
                         dp_appointment.status = 5
                         dp_appointment.save()
                         status = IntegratorHistory.PUSHED_AND_ACCEPTED
