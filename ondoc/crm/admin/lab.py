@@ -1067,7 +1067,8 @@ class LabAppointmentAdmin(nested_admin.NestedModelAdmin):
             send_email_sms_report = form.cleaned_data.get('send_email_sms_report', False)
 
             if request.POST.get('status') and (int(request.POST['status']) == LabAppointment.ACCEPTED):
-                history_obj = IntegratorHistory.objects.filter(object_id=obj.id).first()
+                lab_appointment_content_type = ContentType.objects.get_for_model(obj)
+                history_obj = IntegratorHistory.objects.filter(content_type=lab_appointment_content_type, object_id=obj.id).last()
                 if history_obj:
                     history_obj.status = IntegratorHistory.PUSHED_AND_ACCEPTED
                     history_obj.accepted_through = "CRM"

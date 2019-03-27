@@ -57,30 +57,20 @@ def push_lab_appointment_to_integrator(self, data):
                 logger.error("[ERROR] Mapping not found for booked test or package")
 
             integrator_obj = service.create_integrator_obj(integrator_mapping.integrator_class_name)
-            integrator_response = integrator_obj.post_order(appointment, tests=tests, packages=packages)
-            history_obj = IntegratorHistory.objects.filter(object_id=appointment.id).first()
+            retry_count = push_lab_appointment_to_integrator.request.retries
+            integrator_response = integrator_obj.post_order(appointment, tests=tests, packages=packages, retry_count=retry_count)
 
             if not integrator_response:
                 countdown_time = 1 * 60
                 print(countdown_time)
                 self.retry([data], countdown=countdown_time)
-                if history_obj:
-                    history_obj.retry_count = push_lab_appointment_to_integrator.request.retries
-                    history_obj.save()
 
             # save integrator response
             resp_data = integrator_response
-            order_response = IntegratorResponse.objects.create(lead_id=resp_data['ORDERRESPONSE']['PostOrderDataResponse'][0]['LEAD_ID'],
-                                                               dp_order_id=resp_data['ORDER_NO'], integrator_order_id=resp_data['REF_ORDERID'],
-                                                               content_object=appointment, response_data=resp_data,
-                                                               integrator_class_name=integrator_mapping.integrator_class_name)
-            if order_response:
-                if history_obj:
-                    history_obj.retry_count = push_lab_appointment_to_integrator.request.retries
-                    history_obj.status = IntegratorHistory.PUSHED_AND_NOT_ACCEPTED
-                    history_obj.save()
-                else:
-                    print("History not found for appointment id " + str(appointment_id))
+            IntegratorResponse.objects.create(lead_id=resp_data['ORDERRESPONSE']['PostOrderDataResponse'][0]['LEAD_ID'],
+                                              dp_order_id=resp_data['ORDER_NO'], integrator_order_id=resp_data['REF_ORDERID'],
+                                              content_object=appointment, response_data=resp_data,
+                                              integrator_class_name=integrator_mapping.integrator_class_name)
 
         elif appointment.status == LabAppointment.CANCELLED:
             saved_response = IntegratorResponse.objects.filter(object_id=appointment.id).first()
@@ -88,7 +78,8 @@ def push_lab_appointment_to_integrator(self, data):
                 logger.error("[ERROR] Cant find integrator response for appointment id " + str(appointment.id))
 
             integrator_obj = service.create_integrator_obj(saved_response.integrator_class_name)
-            response = integrator_obj.cancel_integrator_order(appointment, saved_response)
+            retry_count = push_lab_appointment_to_integrator.request.retries
+            response = integrator_obj.cancel_integrator_order(appointment, saved_response, retry_count)
 
             if not response:
                 countdown_time = 1 * 60
@@ -120,19 +111,22 @@ def get_integrator_order_status(self, *args, **kwargs):
                                                           integrator_response.dp_order_id,
                                                           integrator_response.response_data['MOBILE'])
         response = requests.get(url)
+        status_code = response.status_code
         response = response.json()
+        retry_count = get_integrator_order_status.request.retries
         if response.get('RES_ID') == 'RES0000' and response['BEN_MASTER'][0]['STATUS'].upper() in ['DELIVERY', 'REPORTED', 'SERVICED', 'CREDITED']:
             if not appointment.status == 5:
                 appointment.status = 5
                 appointment.save()
-                history_obj = IntegratorHistory.objects.filter(object_id=appointment.id).first()
-                if history_obj:
-                    history_obj.status = IntegratorHistory.PUSHED_AND_ACCEPTED
-                    history_obj.accepted_through = "integrator_api"
-                    history_obj.save()
+                status = IntegratorHistory.PUSHED_AND_ACCEPTED
+                IntegratorHistory.create_history(appointment, url, response, url, 'order_summary', 'Thyrocare',
+                                                 status_code, retry_count, status, 'integrator_api')
         else:
             countdown_time = 1 * 120
             print(countdown_time)
+            status = IntegratorHistory.PUSHED_AND_NOT_ACCEPTED
+            IntegratorHistory.create_history(appointment, url, response, url, 'order_summary', 'Thyrocare',
+                                             status_code, retry_count, status, '')
             self.retry(**kwargs, countdown=countdown_time)
 
     except Exception as e:

@@ -1548,10 +1548,13 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin)
 
                 try:
                     if is_thyrocare_enabled:
-                        # push_lab_appointment_to_integrator.apply_async(({'appointment_id': self.id},), countdown=5)
-                        push_lab_appointment_to_integrator.apply_async(({'appointment_id': self.id},),
-                                                                       link=get_integrator_order_status.s(appointment_id=self.id),
-                                                                       countdown=5)
+                        if old_instance:
+                            if old_instance.status == self.CANCELLED:
+                                push_lab_appointment_to_integrator.apply_async(({'appointment_id': self.id},), countdown=5)
+                        else:
+                            push_lab_appointment_to_integrator.apply_async(({'appointment_id': self.id},),
+                                                                           link=get_integrator_order_status.s(
+                                                                               appointment_id=self.id),countdown=5)
                 except Exception as e:
                     logger.error(str(e))
 
@@ -2088,7 +2091,7 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin)
 
         lab_appointment_content_type = ContentType.objects.get_for_model(self)
         integrator_history = IntegratorHistory.objects.filter(object_id=self.id,
-                                                              content_type=lab_appointment_content_type).first()
+                                                              content_type=lab_appointment_content_type).last()
         if not integrator_history:
             return 'Not a part of Integration'
 
@@ -2099,7 +2102,7 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin)
 
         lab_appointment_content_type = ContentType.objects.get_for_model(self)
         integrator_response = IntegratorResponse.objects.filter(object_id=self.id,
-                                                                content_type=lab_appointment_content_type).first()
+                                                                content_type=lab_appointment_content_type).last()
         if not integrator_response:
             return 'Not Found'
         return integrator_response.lead_id
@@ -2109,7 +2112,7 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin)
 
         lab_appointment_content_type = ContentType.objects.get_for_model(self)
         integrator_history = IntegratorHistory.objects.filter(object_id=self.id,
-                                                              content_type=lab_appointment_content_type).first()
+                                                              content_type=lab_appointment_content_type).last()
         if not integrator_history:
             return 'Not Found'
 

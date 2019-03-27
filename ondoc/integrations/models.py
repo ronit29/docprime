@@ -129,10 +129,12 @@ class IntegratorHistory(TimeStampedModel):
     PUSHED_AND_NOT_ACCEPTED = 1
     PUSHED_AND_ACCEPTED = 2
     NOT_PUSHED = 3
+    CANCELLED = 4
 
     STATUS_CHOICES = [(PUSHED_AND_NOT_ACCEPTED, 'Pushed and not accepted, Manage Manually'),
                       (PUSHED_AND_ACCEPTED, 'Pushed and accepted'),
-                      (NOT_PUSHED, 'Not pushed, Manage Manually')]
+                      (NOT_PUSHED, 'Not pushed, Manage Manually'),
+                      (CANCELLED, 'Cancel')]
 
     content_type = models.ForeignKey(ContentType, on_delete=models.DO_NOTHING)
     object_id = models.PositiveIntegerField()
@@ -151,9 +153,13 @@ class IntegratorHistory(TimeStampedModel):
         db_table = 'integrator_history'
 
     @classmethod
-    def create_history(cls, appointment, request, response, url, api_name, integrator_name, api_status):
+    def create_history(cls, appointment, request, response, url, api_name, integrator_name, api_status, retry_count, status, mode):
+        # Need to send arguments as args or kwargs
         lab_appointment_content_type = ContentType.objects.get_for_model(appointment)
-        defaults = {'request_data': request, 'response_data': response, 'api_endpoint': url, 'api_name': api_name,
-                    'integrator_class_name': integrator_name, 'retry_count': 0, 'api_status': api_status}
-        IntegratorHistory.objects.get_or_create(content_type=lab_appointment_content_type, object_id=appointment.id,
-                                                   defaults=defaults)
+        history_obj = IntegratorHistory.objects.filter(content_type=lab_appointment_content_type, object_id=appointment.id,
+                                                       status=status, retry_count=retry_count, api_name=api_name).last()
+        if not history_obj:
+            IntegratorHistory.objects.create(content_type=lab_appointment_content_type, object_id=appointment.id, retry_count=retry_count,
+                                             status=status, request_data=request, response_data=response, api_endpoint=url,
+                                             api_name=api_name, integrator_class_name=integrator_name, api_status=api_status,
+                                             accepted_through=mode)
