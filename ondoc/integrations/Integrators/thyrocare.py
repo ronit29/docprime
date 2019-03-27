@@ -320,8 +320,8 @@ class Thyrocare(BaseIntegrator):
 
         payload = {
             "UserId": 2147,
-            "OrderNo": integrator_response.dp_order_id,
-            "VisitId": integrator_response.dp_order_id,
+            "OrderNo": integrator_response.integrator_order_id,
+            "VisitId": integrator_response.integrator_order_id,
             "BTechId": 0,
             "Status": 2,
             "RemarksId": 67,
