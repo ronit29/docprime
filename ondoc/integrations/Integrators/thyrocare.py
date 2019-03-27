@@ -60,7 +60,7 @@ class Thyrocare(BaseIntegrator):
 
         for result_obj in result_array:
             if type == 'TESTS':
-                name_required_tests = ['H6', 'BTHAL', 'BEAP', 'CUA', 'E22', 'HVA', 'H5', 'SEEL', 'H3', 'MA', 'ELEMENTS']
+                name_required_tests = settings.THYROCARE_NAME_PARAM_REQUIRED_TESTS.split(',')
                 name_params_required = False
                 if result_obj['code'] in name_required_tests:
                     name_params_required = True
@@ -135,18 +135,26 @@ class Thyrocare(BaseIntegrator):
         return True if resp_data['status'] == 'Y' else False
 
     def _post_order_details(self, lab_appointment, **kwargs):
+        from ondoc.integrations.models import IntegratorHistory
+
         tests = kwargs.get('tests', None)
         packages = kwargs.get('packages', None)
+        retry_count = kwargs.get('retry_count', 0)
         payload = self.prepare_data(tests, packages, lab_appointment)
 
         headers = {'Content-Type': "application/json"}
         url = "%s/ORDER.svc/Postorderdata" % settings.THYROCARE_BASE_URL
-
         response = requests.post(url, data=json.dumps(payload), headers=headers)
+        status_code = response.status_code
         response = response.json()
         if response.get('RES_ID') == 'RES0000':
+            # Add details to history table
+            status = IntegratorHistory.PUSHED_AND_NOT_ACCEPTED
+            IntegratorHistory.create_history(lab_appointment, payload, response, url, 'post_order', 'Thyrocare', status_code, retry_count, status, '')
             return response
         else:
+            status = IntegratorHistory.NOT_PUSHED
+            IntegratorHistory.create_history(lab_appointment, payload, response, url, 'post_order', 'Thyrocare', status_code, retry_count, status, '')
             logger.error("[ERROR] %s" % response.get('RESPONSE'))
 
         return None
@@ -163,7 +171,11 @@ class Thyrocare(BaseIntegrator):
             pincode = "122002"
 
         order_id = "DP{}".format(lab_appointment.id)
-        bendataxml = "<NewDataSet><Ben_details><Name>%s</Name><Age>%s</Age><Gender>%s</Gender></Ben_details></NewDataSet>" % (profile.name, self.calculate_age(profile), profile.gender)
+        if profile and profile.gender:
+            gender = profile.gender.upper()
+        else:
+            gender = "M"
+        bendataxml = "<NewDataSet><Ben_details><Name>%s</Name><Age>%s</Age><Gender>%s</Gender></Ben_details></NewDataSet>" % (profile.name, self.calculate_age(profile), gender)
 
         payload = {
             "api_key": settings.THYROCARE_API_KEY,
@@ -190,7 +202,10 @@ class Thyrocare(BaseIntegrator):
             for test in tests:
                 integrator_test = IntegratorMapping.objects.filter(test_id=test.id, integrator_class_name=Thyrocare.__name__, is_active=True).first()
                 if integrator_test:
-                    product.append(integrator_test.integrator_product_data["code"])
+                    if integrator_test.name_params_required:
+                        product.append(integrator_test.integrator_product_data["name"])
+                    else:
+                        product.append(integrator_test.integrator_product_data["code"])
                     rate += int(integrator_test.integrator_product_data["rate"]["b2c"])
                 else:
                     logger.info("[ERROR] No tests data found in integrator.")
@@ -294,7 +309,9 @@ class Thyrocare(BaseIntegrator):
         except Exception as e:
             logger.error(str(e))
 
-    def _cancel_order(self, appointment, integrator_response):
+    def _cancel_order(self, appointment, integrator_response, retry_count):
+        from ondoc.integrations.models import IntegratorHistory
+
         url = "%s/ORDER.svc/cancelledorder" % settings.THYROCARE_BASE_URL
         if appointment.cancellation_comments:
             reason = appointment.cancellation_reason.name + " " + appointment.cancellation_comments
@@ -315,13 +332,22 @@ class Thyrocare(BaseIntegrator):
         }
         headers = {'Content-Type': "application/json"}
         response = requests.post(url, data=json.dumps(payload), headers=headers)
+        status_code = response.status_code
         response = response.json()
-        if response.get('RES_ID') == 'RES0000':
+        if json.loads(response['RESPONSE'])['Response'] == "SUCCESS":
+            status = IntegratorHistory.CANCELLED
+            IntegratorHistory.create_history(appointment, payload, response, url, 'cancel_order', 'Thyrocare',
+                                             status_code, retry_count, status, '')
             return response
         else:
+            status = IntegratorHistory.NOT_PUSHED
+            IntegratorHistory.create_history(appointment, payload, response, url, 'cancel_order', 'Thyrocare',
+                                             status_code, retry_count, status, '')
             logger.error("[ERROR] %s" % response.get('RESPONSE'))
 
     def _order_summary(self, integrator_response):
+        from ondoc.integrations.models import IntegratorHistory
+
         dp_appointment = integrator_response.content_object
         if dp_appointment.status != LabAppointment.CANCELLED or dp_appointment.status != LabAppointment.COMPLETED or \
                                             (dp_appointment.time_slot_start + timedelta(days=1) < datetime.now()):
@@ -330,6 +356,7 @@ class Thyrocare(BaseIntegrator):
                                                               integrator_response.dp_order_id,
                                                               integrator_response.response_data['MOBILE'])
             response = requests.get(url)
+            status_code = response.status_code
             response = response.json()
             if response.get('RES_ID') == 'RES0000':
                 thyrocare_appointment_time = response['LEADHISORY_MASTER'][0]['APPOINT_ON'][0]['DATE']
@@ -343,13 +370,16 @@ class Thyrocare(BaseIntegrator):
                 # check integrator order status and update docprime booking
                 if response['BEN_MASTER'][0]['STATUS'].upper() == 'YET TO ASSIGN':
                     pass
-                elif response['BEN_MASTER'][0]['STATUS'].upper() == ('DELIVERY' or 'REPORTED' or 'SERVICED' or 'CREDITED'):
-                    if not dp_appointment.status == 5:
+                elif response['BEN_MASTER'][0]['STATUS'].upper() in ['DELIVERY', 'REPORTED', 'SERVICED', 'CREDITED']:
+                    if not dp_appointment.status in [5, 6, 7]:
                         dp_appointment.status = 5
                         dp_appointment.save()
+                        status = IntegratorHistory.PUSHED_AND_ACCEPTED
+                        IntegratorHistory.create_history(dp_appointment, url, response, url, 'order_summary_cron', 'Thyrocare', status_code, 0, status, 'integrator_api')
+
                 elif response['BEN_MASTER'][0]['STATUS'].upper() == 'DONE':
                     pass
-                elif response['BEN_MASTER'][0]['STATUS'].upper() == ('CANCELLED' or 'REJECTED'):
+                elif response['BEN_MASTER'][0]['STATUS'].upper() in ['CANCELLED', 'REJECTED']:
                     if not dp_appointment.status == 6:
                         dp_appointment.status = 6
                         dp_appointment.cancellation_type = 2

@@ -1461,8 +1461,8 @@ class Merchant(TimeStampedModel):
 
     def save(self, *args, **kwargs):
         if self.verified_by_finance and (self.pg_status == self.NOT_INITIATED or self.pg_status == self.FAILURE):
-            #pass
-            self.create_in_pg()
+            pass
+            #self.create_in_pg()
 
         super().save(*args, **kwargs)
 
@@ -1488,7 +1488,7 @@ class Merchant(TimeStampedModel):
 
         #request_payload["Country"] = self.country
         request_payload["Country"] = 'in'
-        request_payload["Bene_Email"] = self.email
+        request_payload["Bene_Email"] = 'payment@docprime.com'
         request_payload["Bene_Mobile"] = self.mobile
         request_payload["Bene_Tel"] = None
         request_payload["Bene_Fax"] = None

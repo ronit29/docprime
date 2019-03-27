@@ -12,8 +12,9 @@ logger = logging.getLogger(__name__)
 def push_lab_appointment_to_integrator(self, data):
     from django.contrib.contenttypes.models import ContentType
     from ondoc.diagnostic.models import LabAppointment
-    from ondoc.integrations.models import IntegratorMapping, IntegratorProfileMapping, IntegratorResponse
+    from ondoc.integrations.models import IntegratorMapping, IntegratorProfileMapping, IntegratorResponse, IntegratorHistory
     from ondoc.integrations import service
+
     try:
         appointment_id = data.get('appointment_id', None)
         if not appointment_id:
@@ -52,8 +53,12 @@ def push_lab_appointment_to_integrator(self, data):
             elif tests:
                 integrator_mapping = IntegratorMapping.objects.filter(content_type=lab_network_content_type, object_id=lab_network.id, test=tests[0]).first()
 
+            if not integrator_mapping:
+                logger.error("[ERROR] Mapping not found for booked test or package")
+
             integrator_obj = service.create_integrator_obj(integrator_mapping.integrator_class_name)
-            integrator_response = integrator_obj.post_order(appointment, tests=tests, packages=packages)
+            retry_count = push_lab_appointment_to_integrator.request.retries
+            integrator_response = integrator_obj.post_order(appointment, tests=tests, packages=packages, retry_count=retry_count)
 
             if not integrator_response:
                 countdown_time = 1 * 60
@@ -73,7 +78,8 @@ def push_lab_appointment_to_integrator(self, data):
                 logger.error("[ERROR] Cant find integrator response for appointment id " + str(appointment.id))
 
             integrator_obj = service.create_integrator_obj(saved_response.integrator_class_name)
-            response = integrator_obj.cancel_integrator_order(appointment, saved_response)
+            retry_count = push_lab_appointment_to_integrator.request.retries
+            response = integrator_obj.cancel_integrator_order(appointment, saved_response, retry_count)
 
             if not response:
                 countdown_time = 1 * 60
@@ -87,7 +93,7 @@ def push_lab_appointment_to_integrator(self, data):
 @task(bind=True, max_retries=3)
 def get_integrator_order_status(self, *args, **kwargs):
     from ondoc.diagnostic.models import LabAppointment
-    from ondoc.integrations.models import IntegratorResponse
+    from ondoc.integrations.models import IntegratorResponse, IntegratorHistory
 
     try:
         appointment_id = kwargs.get('appointment_id', None)
@@ -105,14 +111,22 @@ def get_integrator_order_status(self, *args, **kwargs):
                                                           integrator_response.dp_order_id,
                                                           integrator_response.response_data['MOBILE'])
         response = requests.get(url)
+        status_code = response.status_code
         response = response.json()
-        if response.get('RES_ID') == 'RES0000' and response['BEN_MASTER'][0]['STATUS'].upper() == ('DELIVERY' or 'REPORTED' or 'SERVICED' or 'CREDITED'):
-            if not appointment.status == 5:
+        retry_count = get_integrator_order_status.request.retries
+        if response.get('RES_ID') == 'RES0000' and response['BEN_MASTER'][0]['STATUS'].upper() in ['DELIVERY', 'REPORTED', 'SERVICED', 'CREDITED']:
+            if not appointment.status in [5, 6, 7]:
                 appointment.status = 5
                 appointment.save()
+                status = IntegratorHistory.PUSHED_AND_ACCEPTED
+                IntegratorHistory.create_history(appointment, url, response, url, 'order_summary', 'Thyrocare',
+                                                 status_code, retry_count, status, 'integrator_api')
         else:
             countdown_time = 1 * 120
             print(countdown_time)
+            status = IntegratorHistory.PUSHED_AND_NOT_ACCEPTED
+            IntegratorHistory.create_history(appointment, url, response, url, 'order_summary', 'Thyrocare',
+                                             status_code, retry_count, status, '')
             self.retry(**kwargs, countdown=countdown_time)
 
     except Exception as e:

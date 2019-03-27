@@ -32,6 +32,7 @@ from ondoc.diagnostic.models import (LabTiming, LabImage,
                                      TestParameter, ParameterLabTest, FrequentlyAddedTogetherTests, QuestionAnswer,
                                      LabReport, LabReportFile, LabTestCategoryMapping,
                                      LabTestRecommendedCategoryMapping, LabTestGroupTiming, LabTestGroupMapping)
+from ondoc.integrations.models import IntegratorHistory
 from ondoc.notification.models import EmailNotification, NotificationAction
 from .common import *
 from ondoc.authentication.models import GenericAdmin, User, QCModel, GenericLabAdmin, AssociatedMerchant
@@ -802,6 +803,15 @@ class LabAppointmentAdmin(nested_admin.NestedModelAdmin):
     #         temp_autocomplete_fields = super().get_autocomplete_fields(request)
     #     return temp_autocomplete_fields
 
+    def integrator_order_status(self, obj):
+        return obj.integrator_order_status()
+
+    def thyrocare_booking_id(self, obj):
+        return obj.thyrocare_booking_no()
+
+    def accepted_through(self, obj):
+        return obj.accepted_through()
+
     def payout_info(self, obj):
         return MerchantPayout.get_merchant_payout_info(obj)
     payout_info.short_description = 'Merchant Payment Info'
@@ -870,7 +880,7 @@ class LabAppointmentAdmin(nested_admin.NestedModelAdmin):
         #             'send_email_sms_report', 'invoice_urls', 'reports_uploaded', 'email_notification_timestamp', 'payment_type'
         #             )
         # elif request.user.groups.filter(name=constants['LAB_APPOINTMENT_MANAGEMENT_TEAM']).exists():
-        all_fields = ('booking_id', 'through_app', 'order_id',  'lab_id', 'lab_name', 'get_lab_test', 'lab_contact_details',
+        all_fields = ('booking_id', 'through_app', 'integrator_order_status', 'thyrocare_booking_id', 'accepted_through', 'order_id',  'lab_id', 'lab_name', 'get_lab_test', 'lab_contact_details',
                     'used_profile_name', 'used_profile_number',
                     'default_profile_name', 'default_profile_number', 'user_id', 'user_number', 'price', 'agreed_price',
                     'deal_price', 'effective_price', 'payment_status', 'payment_type', 'insurance', 'is_home_pickup',
@@ -888,7 +898,7 @@ class LabAppointmentAdmin(nested_admin.NestedModelAdmin):
         # if request.user.is_superuser:
         #     read_only =  ['booking_id', 'order_id', 'lab_id', 'lab_contact_details', 'get_lab_test', 'invoice_urls', 'reports_uploaded', 'email_notification_timestamp', 'payment_type']
         # elif request.user.groups.filter(name=constants['LAB_APPOINTMENT_MANAGEMENT_TEAM']).exists():
-        read_only = ['booking_id' ,'through_app', 'order_id', 'lab_name', 'lab_id', 'get_lab_test', 'invoice_urls',
+        read_only = ['booking_id' ,'through_app', 'integrator_order_status', 'accepted_through', 'thyrocare_booking_id', 'order_id', 'lab_name', 'lab_id', 'get_lab_test', 'invoice_urls',
                      'lab_contact_details', 'used_profile_name', 'used_profile_number',
                      'default_profile_name', 'default_profile_number', 'user_number', 'user_id', 'price',
                      'agreed_price',
@@ -1075,6 +1085,17 @@ class LabAppointmentAdmin(nested_admin.NestedModelAdmin):
                 pass
             else:
                 super().save_model(request, obj, form, change)
+                if request.POST.get('status') and (int(request.POST['status']) == LabAppointment.ACCEPTED):
+                    lab_appointment_content_type = ContentType.objects.get_for_model(obj)
+                    history_obj = IntegratorHistory.objects.filter(content_type=lab_appointment_content_type,
+                                                                   object_id=obj.id).order_by('id').last()
+                    if history_obj:
+                        history_obj.status = IntegratorHistory.PUSHED_AND_ACCEPTED
+                        history_obj.accepted_through = "CRM"
+                        history_obj.save()
+
+
+
             if send_email_sms_report and sum(
                     obj.reports.annotate(no_of_files=Count('files')).values_list('no_of_files', flat=True)):
                 transaction.on_commit(lambda: self.on_commit_tasks(obj.id))
