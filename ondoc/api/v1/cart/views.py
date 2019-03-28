@@ -150,7 +150,7 @@ class CartViewSet(viewsets.GenericViewSet):
                         item.data['insurance_message'] = ""
                         item.data['payment_type'] = OpdAppointment.PREPAID
                 else:
-                    is_lab_insured, insurance_id, insurance_message = UserInsurance.validate_lab_insurance(item, user_insurance)
+                    is_lab_insured, insurance_id, insurance_message = user_insurance.validate_lab_insurance(validated_data, user_insurance)
 
                     if user_insurance and user_insurance.is_valid() and is_lab_insured:
                         item.data['is_appointment_insured'] = True
@@ -212,9 +212,10 @@ class CartViewSet(viewsets.GenericViewSet):
                     pass
 
             resp = Order.create_order(request, items_to_process, use_wallet)
+            return Response(resp)
         else:
             return Response(status=400,data={"error": error})
-        return Response(resp)
+
 
     def remove(self, request, *args, **kwargs):
 
