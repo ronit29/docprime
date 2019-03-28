@@ -97,6 +97,28 @@ class IpdProcedureLead(auth_model.TimeStampedModel):
         send_ipd_procedure_lead_mail(self.id)
 
 
+class IpdProcedureDetailType(auth_model.TimeStampedModel):
+    name = models.CharField(max_length=1000)
+
+    def __str__(self):
+        return '{}'.format(self.name)
+
+    class Meta:
+        db_table = "ipd_procedure_detail_type"
+
+
+class IpdProcedureDetail(auth_model.TimeStampedModel):
+    ipd_procedure = models.ForeignKey(IpdProcedure, on_delete=models.CASCADE, null=True, verbose_name="IPD Procedure")
+    detail_type = models.ForeignKey(IpdProcedureDetailType, on_delete=models.SET_NULL, null=True, verbose_name="Detail Type")
+    value = models.TextField(blank=True, verbose_name="Detail")
+
+    def __str__(self):
+        return '{} - {} - {}'.format(self.ipd_procedure, self.detail_type, self.value[:25])
+
+    class Meta:
+        db_table = "ipd_procedure_details"
+
+
 class ProcedureCategory(auth_model.TimeStampedModel, SearchKey):
     parents = models.ManyToManyField('self', symmetrical=False, through='ProcedureCategoryMapping',
                                      through_fields=('child_category', 'parent_category'), related_name='children')
