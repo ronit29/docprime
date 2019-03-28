@@ -614,7 +614,7 @@ class DoctorsCitySearchViewSet(viewsets.GenericViewSet):
         entity = location_models.EntityUrls.objects.filter(url=url, is_valid=True)
         if not len(entity)>0:
             return Response(status=status.HTTP_404_NOT_FOUND)
-        if page>5:
+        if int(page)>5:
             return Response([])
         response = {}
         entity = entity[0]
@@ -622,6 +622,7 @@ class DoctorsCitySearchViewSet(viewsets.GenericViewSet):
         title = dict()
         title_url = dict()
         city_entity = None
+        spec_city_entity= None
         try:
             if entity.sitemap_identifier == EntityUrls.SitemapIdentifier.SPECIALIZATION_CITY:
                 footer = SpecialityCityFooter(entity)
@@ -647,16 +648,27 @@ class DoctorsCitySearchViewSet(viewsets.GenericViewSet):
             logger.error(str(e))
 
         if entity.sitemap_identifier == 'SPECIALIZATION_LOCALITY_CITY':
-            city_entity = EntityUrls.objects.filter(is_valid=True, specialization=entity.specialization,
+            spec_city_entity = EntityUrls.objects.filter(is_valid=True, specialization=entity.specialization,
                                                     locality_value=entity.locality_value, sitemap_identifier='SPECIALIZATION_CITY').first()
 
-        if city_entity and city_entity.specialization:
-            title[1] = entity.specialization + ' in ' + entity.locality_value
-            title[2] = 'Best ' + entity.specialization +' in ' + entity.locality_value
-            title[3] = 'Top ' + entity.specialization + ' in ' + entity.locality_value
-            title[4] = entity.specialization + ' near me'
-            title[5] = 'Find ' + entity.specialization + ' near you'
-            title_url = {'title': title[page], 'url': city_entity.url}
+        if spec_city_entity and spec_city_entity.specialization and spec_city_entity.locality_value:
+            title[1] = spec_city_entity.specialization + ' in ' + spec_city_entity.locality_value
+            title[2] = 'Best ' + spec_city_entity.specialization + ' in ' + spec_city_entity.locality_value
+            title[3] = 'Top ' + spec_city_entity.specialization + ' in ' + spec_city_entity.locality_value
+            title[4] = spec_city_entity.specialization + ' near me'
+            title[5] = 'Find ' + spec_city_entity.specialization + ' near you'
+            title_url = {'title': title[int(page)], 'url': spec_city_entity.url}
+
+        if entity.sitemap_identifier == 'DOCTORS_LOCALITY_CITY':
+            city_entity = EntityUrls.objects.filter(is_valid=True, locality_value=entity.locality_value, sitemap_identifier='DOCTORS_CITY').first()
+
+        if city_entity and city_entity.locality_value:
+            title[1] = 'Doctors in ' + city_entity.locality_value
+            title[2] = 'Best doctors in ' + city_entity.locality_value
+            title[3] = 'Top doctors in ' + city_entity.locality_value
+            title[4] = 'Doctors near me'
+            title[5] = 'Find doctors near you'
+            title_url = {'title': title[int(page)], 'url': city_entity.url}
 
         if title_url:
             response['title_url'] = title_url
