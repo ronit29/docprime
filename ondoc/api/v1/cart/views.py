@@ -122,7 +122,7 @@ class CartViewSet(viewsets.GenericViewSet):
                 validated_data = item.validate(request)
                 insurance_doctor = validated_data.get('doctor', None)
                 if insurance_doctor:
-                    is_doctor_insured, insurance_id, insurance_message = user_insurance.validate_doctor_insurance(item.data, user_insurance)
+                    is_doctor_insured, insurance_id, insurance_message = user_insurance.validate_doctor_insurance(validated_data, user_insurance)
                     if specialization_count_dict and is_doctor_insured:
                         doctor_specilization_tuple = InsuranceDoctorSpecializations.get_doctor_insurance_specializations(insurance_doctor)
                         if doctor_specilization_tuple:
@@ -150,7 +150,7 @@ class CartViewSet(viewsets.GenericViewSet):
                         item.data['insurance_message'] = ""
                         item.data['payment_type'] = OpdAppointment.PREPAID
                 else:
-                    is_lab_insured, insurance_id, insurance_message = UserInsurance.validate_lab_insurance(item, user_insurance)
+                    is_lab_insured, insurance_id, insurance_message = user_insurance.validate_lab_insurance(validated_data, user_insurance)
 
                     if user_insurance and user_insurance.is_valid() and is_lab_insured:
                         item.data['is_appointment_insured'] = True
@@ -212,9 +212,10 @@ class CartViewSet(viewsets.GenericViewSet):
                     pass
 
             resp = Order.create_order(request, items_to_process, use_wallet)
+            return Response(resp)
         else:
             return Response(status=400,data={"error": error})
-        return Response(resp)
+
 
     def remove(self, request, *args, **kwargs):
 

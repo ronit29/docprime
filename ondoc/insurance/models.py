@@ -956,33 +956,43 @@ class UserInsurance(auth_model.TimeStampedModel):
             validated_data = item.validate(request)
             insurance_doctor = validated_data.get('doctor', None)
             insurance_lab = validated_data.get('lab', None)
-            if insurance_doctor:
-                if user_insurance and user_insurance.is_valid() and specialization_count_dict:
-                    doctor_specilization_tuple = InsuranceDoctorSpecializations.get_doctor_insurance_specializations(
-                        insurance_doctor)
-                    if doctor_specilization_tuple:
-                        res, specialization = doctor_specilization_tuple[0], doctor_specilization_tuple[1]
+            cart_data = validated_data.get('cart_item')
+            cart_data = cart_data.data
+            if cart_data.get('is_appointment_insured'):
+                if insurance_doctor:
+                    if user_insurance and user_insurance.is_valid() and specialization_count_dict:
+                        doctor_specilization_tuple = InsuranceDoctorSpecializations.get_doctor_insurance_specializations(
+                            insurance_doctor)
+                        if doctor_specilization_tuple:
+                            res, specialization = doctor_specilization_tuple[0], doctor_specilization_tuple[1]
 
-                        if specialization == InsuranceDoctorSpecializations.SpecializationMapping.GYNOCOLOGIST and item.data.get(
-                                'is_appointment_insured'):
-                            gyno_count = gyno_count + 1
-                        if specialization == InsuranceDoctorSpecializations.SpecializationMapping.ONCOLOGIST and item.data.get(
-                                'is_appointment_insured'):
-                            onco_count = onco_count + 1
+                            if specialization == InsuranceDoctorSpecializations.SpecializationMapping.GYNOCOLOGIST and item.data.get(
+                                    'is_appointment_insured'):
+                                gyno_count = gyno_count + 1
+                            if specialization == InsuranceDoctorSpecializations.SpecializationMapping.ONCOLOGIST and item.data.get(
+                                    'is_appointment_insured'):
+                                onco_count = onco_count + 1
 
-                        if gyno_count > int(
-                                settings.INSURANCE_GYNECOLOGIST_LIMIT) and specialization == InsuranceDoctorSpecializations.SpecializationMapping.GYNOCOLOGIST:
-                            is_process = False
-                            error = "Gynecology limit exceeded"
-                        if onco_count > int(
-                                settings.INSURANCE_ONCOLOGIST_LIMIT) and specialization == InsuranceDoctorSpecializations.SpecializationMapping.ONCOLOGIST:
-                            is_process = False
-                            error = "Oncology limit exceeded"
+                            if gyno_count > int(
+                                    settings.INSURANCE_GYNECOLOGIST_LIMIT) and specialization == InsuranceDoctorSpecializations.SpecializationMapping.GYNOCOLOGIST:
+                                is_process = False
+                                error = "Gynecology limit exceeded"
+                            if onco_count > int(
+                                    settings.INSURANCE_ONCOLOGIST_LIMIT) and specialization == InsuranceDoctorSpecializations.SpecializationMapping.ONCOLOGIST:
+                                is_process = False
+                                error = "Oncology limit exceeded"
+                        else:
+                            is_process = True
                     else:
+                        is_process = False
+                elif insurance_lab:
+                    is_insured, insurance_id, insurance_message = user_insurance.validate_lab_insurance(validated_data, user_insurance)
+                    if is_insured:
                         is_process = True
-                else:
-                    is_process = False
-            elif insurance_lab:
+                    else:
+                        is_process = False
+                        error = insurance_message
+            else:
                 is_process = True
         return is_process, error
 
