@@ -5,7 +5,7 @@ from ondoc.authentication.models import (OtpVerifications, User, UserProfile, No
 from ondoc.doctor.models import DoctorMobile, ProviderSignupLead
 from ondoc.common.models import AppointmentHistory
 from ondoc.doctor.models import DoctorMobile
-from ondoc.insurance.models import InsuredMembers
+from ondoc.insurance.models import InsuredMembers, UserInsurance
 from ondoc.diagnostic.models import AvailableLabTest
 from ondoc.account.models import ConsumerAccount, Order, ConsumerTransaction
 import datetime, calendar
@@ -176,7 +176,14 @@ class UserProfileSerializer(serializers.ModelSerializer):
                   , "age", "user", "dob", "is_insured", "updated_at", "whatsapp_optin", "whatsapp_is_declined")
 
     def get_is_insured(self, obj):
-        return InsuredMembers.objects.filter(profile=obj).exists()
+        insured_member_obj = InsuredMembers.objects.filter(profile=obj).first()
+        if not insured_member_obj:
+            return False
+        user_insurance_obj = UserInsurance.objects.filter(id=insured_member_obj.id).first()
+        if not user_insurance_obj and user_insurance_obj.is_valid():
+            return False
+        else:
+            return True
 
     def get_age(self, obj):
         from datetime import date
