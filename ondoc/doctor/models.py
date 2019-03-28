@@ -678,11 +678,13 @@ class Doctor(auth_model.TimeStampedModel, auth_model.QCModel, SearchKey, auth_mo
 
     def get_avg_rating(self):
         # return self.rating.filter(is_live=True).aggregate(avg_rating=Avg('ratings'))
-        return self.rating_data.get('avg_rating')
+        if self.rating_data:
+            return self.rating_data.get('avg_rating')
+        return None
 
     def get_rating_count(self):
         count = 0
-        if self.rating_data.get('rating_count'):
+        if self.rating_data and self.rating_data.get('rating_count'):
             count = self.rating_data.get('rating_count')
         return count
 
