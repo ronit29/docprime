@@ -74,7 +74,7 @@ class IpdProcedureDetailAdminForm(forms.ModelForm):
 
     class Media:
         extend = True
-        js = ('https://cdn.ckeditor.com/ckeditor5/10.1.0/classic/ckeditor.js', 'ipd_procedure_detail/js/init.js')
+        js = ('ckedit/js/ckeditor.js', 'ipd_procedure_detail/js/init.js')
         css = {'all': ('ipd_procedure_detail/css/style.css',)}
 
 

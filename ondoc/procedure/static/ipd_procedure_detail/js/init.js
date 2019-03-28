@@ -22,6 +22,64 @@ function initEditor(){
           ckEditor =  ClassicEditor
                .create( document.querySelector(e),
                {
+                  plugins: [
+                    "Alignment",
+                    "Essentials",
+                    //"UploadAdapter",
+                    "Autoformat",
+                    "Bold",
+                    "Italic",
+                    "BlockQuote",
+                    "CKFinder",
+                    //"EasyImage",
+                    "Heading",
+                    //"Image",
+                    //"ImageCaption",
+                    //"ImageStyle",
+                    //"ImageToolbar",
+                    //"ImageUpload",
+                    "Link",
+                    "List",
+                    //"MediaEmbed",
+                    "Paragraph",
+                    "PasteFromOffice",
+                    "Table",
+                    "TableToolbar",
+                    "Font"
+],
+                  toolbar: ['heading',
+                            '|',
+                            'bold',
+                            'italic',
+                            'fontSize',
+                            'alignment:left', 'alignment:right', 'alignment:center', 'alignment:justify',
+                            'link',
+                            'bulletedList',
+                            'numberedList',
+                            //'imageUpload',
+                            'blockQuote',
+                            'insertTable',
+                            'mediaEmbed',
+                            'undo',
+                            'redo',],
+                    table: {
+                        contentToolbar: [ 'tableColumn', 'tableRow', 'mergeTableCells' ]
+                    },
+                    alignment: {options: [ 'left', 'right' ,'center','justify'] },
+                    fontSize: {
+                    options: [
+                        9,
+                        11,
+                        13,
+                        'default',
+                        17,
+                        19,
+                        21,
+			23,
+			25,
+                    ]
+                },
+
                   heading: {
                   options: [
                       { model: 'paragraph', title: 'Paragraph', class: 'ck-heading_paragraph' },
