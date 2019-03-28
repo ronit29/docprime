@@ -54,14 +54,14 @@ def push_lab_appointment_to_integrator(self, data):
                 integrator_mapping = IntegratorMapping.objects.filter(content_type=lab_network_content_type, object_id=lab_network.id, test=tests[0]).first()
 
             if not integrator_mapping:
-                logger.error("[ERROR] Mapping not found for booked test or package")
+                raise Exception("[ERROR] Mapping not found for booked test or package - appointment id %d" % appointment.id)
 
             integrator_obj = service.create_integrator_obj(integrator_mapping.integrator_class_name)
             retry_count = push_lab_appointment_to_integrator.request.retries
             integrator_response = integrator_obj.post_order(appointment, tests=tests, packages=packages, retry_count=retry_count)
 
             if not integrator_response:
-                countdown_time = 1 * 60
+                countdown_time = (1 ** self.request.retries) * 60
                 print(countdown_time)
                 self.retry([data], countdown=countdown_time)
 
