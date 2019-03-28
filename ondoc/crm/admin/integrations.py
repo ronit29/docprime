@@ -53,16 +53,34 @@ class IntegratorReportAdmin(admin.ModelAdmin):
         return obj.integrator_response.integrator_class_name
 
 
+# class IntegratorTestMappingForm(forms.ModelForm):
+#     test = forms.ModelChoiceField(
+#         queryset=LabTest.objects.filter(availablelabs__lab_pricing_group__labs__network_id=int(
+#             settings.THYROCARE_NETWORK_ID), enable_for_retail=True, availablelabs__enabled=True).distinct())
+#
+#     # def __init__(self, *args, **kwargs):
+#     #     super().__init__(*args, **kwargs)
+
+
+# class ThyrocareTestAutocomplete(autocomplete.Select2QuerySetView):
+#
+#     def get_queryset(self):
+#         queryset = LabTest.objects.filter(availablelabs__lab_pricing_group__labs__network_id=int(settings.THYROCARE_NETWORK_ID), enable_for_retail=True, availablelabs__enabled=True).distinct()
+#         return queryset
+
+
 class IntegratorTestMappingForm(forms.ModelForm):
     test = forms.ModelChoiceField(
-        queryset=LabTest.objects.filter(availablelabs__lab_pricing_group__labs__network_id=int(
-            settings.THYROCARE_NETWORK_ID), enable_for_retail=True, availablelabs__enabled=True).distinct())
+        queryset=LabTest.objects.filter(availablelabs__lab_pricing_group__labs__network_id=int(settings.THYROCARE_NETWORK_ID),
+                                        enable_for_retail=True, availablelabs__enabled=True).distinct())
 
 
 class IntegratorTestMappingAdmin(admin.ModelAdmin):
     model = IntegratorTestMapping
-    form = IntegratorTestMappingForm
     list_display = ('integrator_class_name', 'integrator_test_name', 'is_active')
-    fields = ('test', 'integrator_test_name', 'is_active')
-    readonly_fields = ('integrator_test_name',)
-    # autocomplete_fields = ['test']
+    fields = ('test', 'integrator_test_name', 'is_active', 'integrator_test_type')
+    form = IntegratorTestMappingForm
+    readonly_fields = ('integrator_test_name', 'integrator_test_type')
+
+    def integrator_test_type(self, obj):
+        return obj.test_type
