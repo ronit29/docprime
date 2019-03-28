@@ -502,9 +502,9 @@ class OtpVerifications(TimeStampedModel):
         result = "OTP for login is {}.\nDon't share this code with others."
         if platform == "android" and version:
             if (user_type == 'doctor' or is_doc) and parse(version) > parse("2.100.4"):
-                result = "<#> " + result + "\n" + settings.PROVIDER_ANDROID_MESSAGE_HASH
+                result = "<#>\n" + result + "\n" + settings.PROVIDER_ANDROID_MESSAGE_HASH
             elif parse(version) > parse("1.1"):
-                result = "<#> " + result + "\n" + settings.CONSUMER_ANDROID_MESSAGE_HASH
+                result = "<#>\n" + result + "\n" + settings.CONSUMER_ANDROID_MESSAGE_HASH
         return result
 
 
