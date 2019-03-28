@@ -614,9 +614,10 @@ class DoctorsCitySearchViewSet(viewsets.GenericViewSet):
         entity = location_models.EntityUrls.objects.filter(url=url, is_valid=True)
         if not len(entity)>0:
             return Response(status=status.HTTP_404_NOT_FOUND)
-        if int(page)>5:
-            return Response([])
         response = {}
+        if int(page)>5:
+            return Response(response)
+
         entity = entity[0]
         footer = None
         title = dict()
