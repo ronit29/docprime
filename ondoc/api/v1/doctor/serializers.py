@@ -40,7 +40,7 @@ import logging
 from dateutil import tz
 from django.conf import settings
 
-from ondoc.insurance.models import UserInsurance, InsuranceThreshold
+from ondoc.insurance.models import UserInsurance, InsuranceThreshold, InsuranceDoctorSpecializations
 from ondoc.authentication import models as auth_models
 from ondoc.location.models import EntityUrls, EntityAddress
 from ondoc.procedure.models import DoctorClinicProcedure, Procedure, ProcedureCategory, \
@@ -506,6 +506,7 @@ class DoctorHospitalSerializer(serializers.ModelSerializer):
             'insurance_threshold_amount':  insurance_threshold.opd_amount_limit if insurance_threshold else 5000,
             'is_user_insured': False
         }
+        user_insurance = None
         if request:
             logged_in_user = request.user
             if logged_in_user.is_authenticated and not logged_in_user.is_anonymous:
@@ -525,7 +526,25 @@ class DoctorHospitalSerializer(serializers.ModelSerializer):
 
             if obj.mrp is not None and obj.mrp <= resp['insurance_threshold_amount'] and doctor.is_insurance_enabled and enabled_for_online_booking and \
                     not (request.query_params.get('procedure_ids') or request.query_params.get('procedure_category_ids')) and doctor.is_insurance_enabled:
-                resp['is_insurance_covered'] = True
+
+                if user_insurance and user_insurance.is_valid():
+                    doctor_specialization = InsuranceDoctorSpecializations.get_doctor_insurance_specializations(doctor)
+                    if not doctor_specialization:
+                        resp['is_insurance_covered'] = True
+                    else:
+                        specialization = doctor_specialization[1]
+                        doctor_specialization_count_dict = InsuranceDoctorSpecializations.get_already_booked_specialization_appointments(logged_in_user, user_insurance.id, doctor_specialization=specialization)
+                        if not doctor_specialization_count_dict:
+                            resp['is_insurance_covered'] = True
+
+                        if specialization == InsuranceDoctorSpecializations.SpecializationMapping.GYNOCOLOGIST and doctor_specialization_count_dict.get(specialization, {}).get('count') >= settings.INSURANCE_GYNECOLOGIST_LIMIT:
+                            resp['is_insurance_covered'] = False
+                        elif specialization == InsuranceDoctorSpecializations.SpecializationMapping.ONCOLOGIST and doctor_specialization_count_dict.get(specialization, {}).get('count') >= settings.INSURANCE_ONCOLOGIST_LIMIT:
+                            resp['is_insurance_covered'] = False
+                        else:
+                            resp['is_insurance_covered'] = True
+                else:
+                    resp['is_insurance_covered'] = True
 
         return resp
 

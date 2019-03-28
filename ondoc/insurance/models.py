@@ -144,14 +144,23 @@ class InsuranceDoctorSpecializations(object):
         return result, specialization
 
     @classmethod
-    def get_already_booked_specialization_appointments(cls, user, insurance_id):
+    def get_already_booked_specialization_appointments(cls, user, insurance_id, **kwargs):
         if not user:
             return None
         specialization_count_dict = dict()
-        for specialization, class_ref in cls.SpecializationMapping.specialization_mapping.items():
+
+        asked_doctor_specialization = kwargs.get('doctor_specialization')
+
+        if not asked_doctor_specialization:
+            for specialization, class_ref in cls.SpecializationMapping.specialization_mapping.items():
+                obj = class_ref()
+                count, error = obj.get_booked_appointments_count(user, insurance_id)
+                specialization_count_dict[specialization] = {'specialization': specialization, 'count': count, 'error': error}
+        else:
+            class_ref = cls.SpecializationMapping.specialization_mapping[asked_doctor_specialization]
             obj = class_ref()
             count, error = obj.get_booked_appointments_count(user, insurance_id)
-            specialization_count_dict[specialization] = {'specialization': specialization, 'count': count, 'error': error}
+            specialization_count_dict[asked_doctor_specialization] = {'specialization': asked_doctor_specialization, 'count': count, 'error': error}
 
         return specialization_count_dict
 
