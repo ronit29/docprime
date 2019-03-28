@@ -50,6 +50,10 @@ class DoctorSearchHelper:
                 "h.id=(%(hospital_id)s)")
             params['hospital_id'] = str(self.query_params.get("hospital_id"))
 
+        if self.query_params.get('locality_value'):
+            filtering_params.append("h.city_search_key = (%(locality_value)s)")
+            params['locality_value'] = self.query_params.get('locality_value').lower()
+
         if len(condition_ids)>0:
             cs = list(models.MedicalConditionSpecialization.objects.filter(medical_condition_id__in=condition_ids).values_list('specialization_id', flat=True));
             cs = [str(i) for i in cs]
@@ -238,16 +242,20 @@ class DoctorSearchHelper:
         latitude = str(self.query_params["latitude"])
         ist_time = datetime.now().strftime("%H:%M:%S")
         ist_date = datetime.now().strftime("%Y-%m-%d")
+        max_distance=None
 
-        max_distance = str(
-            self.query_params.get('max_distance') * 1000 if self.query_params.get(
-                'max_distance') and self.query_params.get(
-                'max_distance') * 1000 < int(DoctorSearchHelper.MAX_DISTANCE) else DoctorSearchHelper.MAX_DISTANCE)
+        if not self.query_params.get('max_distance') == None and self.query_params.get('max_distance')*1000 == 0:
+            max_distance = self.query_params.get('max_distance')
+        else:
+            max_distance = str(
+                self.query_params.get('max_distance') * 1000 if self.query_params.get(
+                    'max_distance') and self.query_params.get(
+                    'max_distance') * 1000 < int(DoctorSearchHelper.MAX_DISTANCE) else DoctorSearchHelper.MAX_DISTANCE)
         min_distance = self.query_params.get('min_distance')*1000 if self.query_params.get('min_distance') else 0
 
-        if self.query_params and self.query_params.get('sitemap_identifier'):            
+        if self.query_params and self.query_params.get('sitemap_identifier') and self.query_params.get('max_distance')==None:
             sitemap_identifier = self.query_params.get('sitemap_identifier')
-            if sitemap_identifier in ('SPECIALIZATION_LOCALITY_CITY', 'DOCTORS_LOCALITY_CITY' ):
+            if sitemap_identifier in ('SPECIALIZATION_LOCALITY_CITY', 'DOCTORS_LOCALITY_CITY'):
                 max_distance = 5000
             if sitemap_identifier in ('SPECIALIZATION_CITY', 'DOCTORS_CITY'):
                 max_distance = 15000

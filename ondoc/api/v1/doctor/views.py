@@ -72,8 +72,11 @@ from django.db.models import Avg
 from django.db.models import Count
 from ondoc.api.v1.auth import serializers as auth_serializers
 from copy import deepcopy
+from ondoc.common.models import GlobalNonBookable
+from ondoc.api.v1.common import serializers as common_serializers
 from django.utils.text import slugify
-
+import time
+from ondoc.api.v1.ratings.serializers import GoogleRatingsGraphSerializer
 logger = logging.getLogger(__name__)
 import random
 
@@ -728,7 +731,8 @@ class DoctorProfileUserViewSet(viewsets.GenericViewSet):
                                     'images',
                                     'rating',
                                     'associations',
-                                    'awards'
+                                    'awards',
+                                    'doctor_clinics__hospital__hospital_place_details'
                                     )
                   .filter(pk=pk).first())
         # if not doctor or not is_valid_testing_data(request.user, doctor):
@@ -761,6 +765,8 @@ class DoctorProfileUserViewSet(viewsets.GenericViewSet):
         general_specialization = []
         hospital = None
         response_data['about_web'] = None
+        google_rating = dict()
+        date = None
 
         if response_data and response_data.get('hospitals'):
             hospital = response_data.get('hospitals')[0]
@@ -778,6 +784,7 @@ class DoctorProfileUserViewSet(viewsets.GenericViewSet):
 
         else:
             response_data['about'] = doctor.about
+            response_data['about_web'] = doctor.about
 
         if entity:
             response_data['url'] = entity.url
@@ -828,6 +835,43 @@ class DoctorProfileUserViewSet(viewsets.GenericViewSet):
                 else:
                     response_data['doctors']['doctors_url'] = None
 
+        hospital = None
+        if doctor_clinics:
+            for doc_clinic in doctor_clinics:
+                if doc_clinic and doc_clinic.hospital:
+                    hospital = doc_clinic.hospital
+                    hosp_reviews_dict = dict()
+                    hosp_reviews_dict[hospital.pk] = dict()
+                    hosp_reviews_dict[hospital.pk]['google_rating'] = list()
+                    ratings_graph = None
+                    hosp_reviews = hospital.hospital_place_details.all()
+                    if hosp_reviews:
+                        reviews_data = hosp_reviews[0].reviews
+
+                        if reviews_data:
+                            ratings_graph = GoogleRatingsGraphSerializer(reviews_data, many=False,
+                                                                         context={"request": request})
+
+                            for data in reviews_data:
+                                if data.get('time'):
+                                    date = time.strftime("%d %b %Y", time.gmtime(data.get('time')))
+
+                                hosp_reviews_dict[hospital.pk]['google_rating'].append(
+                                    {'compliment': None, 'date': date, 'id': hosp_reviews[0].pk, 'is_live': hospital.is_live,
+                                     'ratings': data.get('rating'),
+                                     'review': data.get('text'), 'user': None, 'user_name': data.get('author_name')
+                                     })
+
+                        else:
+                            hosp_reviews_dict[hospital.pk]['google_rating'] = None
+                        hosp_reviews_dict[hospital.pk]['google_rating_graph'] = ratings_graph.data if ratings_graph else None
+                    else:
+                        hosp_reviews_dict[hospital.pk]['google_rating'] = None
+                        hosp_reviews_dict[hospital.pk]['google_rating_graph'] = None
+
+                    google_rating.update(hosp_reviews_dict)
+
+        response_data['google_rating'] = google_rating
         return Response(response_data)
 
 
@@ -1701,6 +1745,52 @@ class DoctorAvailabilityTimingViewSet(viewsets.ViewSet):
         timeslots = obj.get_timing_list()
         return Response({"timeslots": timeslots, "doctor_data": doctor_serializer.data,
                          "doctor_leaves": doctor_leave_serializer.data})
+
+
+    @transaction.non_atomic_requests
+    def list_new(self, request, *args, **kwargs):
+        serializer = serializers.DoctorAvailabilityTimingSerializer(data=request.query_params)
+        serializer.is_valid(raise_exception=True)
+        validated_data = serializer.validated_data
+        dc_obj = models.DoctorClinic.objects.filter(doctor_id=validated_data.get('doctor_id'),
+                                                            hospital_id=validated_data.get(
+                                                                'hospital_id')).first()
+        if dc_obj:
+            timeslots = dc_obj.get_timings()
+        else:
+            res_data = OrderedDict()
+            for i in range(30):
+                converted_date = (datetime.datetime.now() + datetime.timedelta(days=i))
+                readable_date = converted_date.strftime("%Y-%m-%d")
+                res_data[readable_date] = list()
+
+            timeslots = {"time_slots": res_data, "upcoming_slots": []}
+        # queryset = models.DoctorClinicTiming.objects.filter(doctor_clinic__doctor=validated_data.get('doctor_id'),
+        #                                                     doctor_clinic__hospital=validated_data.get(
+        #                                                         'hospital_id')).order_by("start")
+        doctor_queryset = (models.Doctor
+                           .objects.prefetch_related("qualifications__qualification",
+                                                     "qualifications__specialization")
+                           .filter(pk=validated_data.get('doctor_id').id))
+        doctor_serializer = serializers.DoctorTimeSlotSerializer(doctor_queryset, many=True)
+        # doctor_leave_serializer = v2_serializers.DoctorLeaveSerializer(
+        #     models.DoctorLeave.objects.filter(doctor=validated_data.get("doctor_id"), deleted_at__isnull=True), many=True)
+        # global_leave_serializer = common_serializers.GlobalNonBookableSerializer(
+        #     GlobalNonBookable.objects.filter(deleted_at__isnull=True, booking_type=GlobalNonBookable.DOCTOR), many=True)
+        # total_leaves = dict()
+        # total_leaves['global'] = global_leave_serializer.data
+        # total_leaves['doctor'] = doctor_leave_serializer.data
+        # timeslots = dict()
+        # obj = TimeSlotExtraction()
+        #
+        # for data in queryset:
+        #     obj.form_time_slots(data.day, data.start, data.end, data.fees, True,
+        #                         data.deal_price, data.mrp, True, on_call=data.type)
+        #
+        # date = datetime.datetime.today().strftime('%Y-%m-%d')
+        # # timeslots = obj.get_timing_list()
+        # timeslots = obj.get_doctor_timing_slots(date, total_leaves, "doctor")
+        return Response({"timeslots": timeslots["time_slots"], "upcoming_slots": timeslots["upcoming_slots"], "doctor_data": doctor_serializer.data})
 
 
 class HealthTipView(viewsets.GenericViewSet):

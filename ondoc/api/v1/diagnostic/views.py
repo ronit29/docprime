@@ -4,8 +4,9 @@ from ondoc.api.v1.diagnostic.serializers import CustomLabTestPackageSerializer
 from ondoc.authentication.backends import JWTAuthentication
 from ondoc.api.v1.diagnostic import serializers as diagnostic_serializer
 from ondoc.api.v1.auth.serializers import AddressSerializer
+from ondoc.integrations.models import IntegratorMapping
 from ondoc.cart.models import Cart
-from ondoc.common.models import UserConfig
+from ondoc.common.models import UserConfig, GlobalNonBookable
 from ondoc.ratings_review import models as rating_models
 from ondoc.diagnostic.models import (LabTest, AvailableLabTest, Lab, LabAppointment, LabTiming, PromotedLab,
                                      CommonDiagnosticCondition, CommonTest, CommonPackage,
@@ -18,7 +19,7 @@ from ondoc.coupon.models import Coupon
 from ondoc.doctor import models as doctor_model
 from ondoc.api.v1 import insurance as insurance_utility
 from ondoc.api.v1.utils import form_time_slot, IsConsumer, labappointment_transform, IsDoctor, payment_details, \
-    aware_time_zone, get_lab_search_details, TimeSlotExtraction, RawSql, util_absolute_url
+    aware_time_zone, get_lab_search_details, TimeSlotExtraction, RawSql, util_absolute_url, get_package_free_or_not_dict
 from ondoc.api.pagination import paginate_queryset
 
 from rest_framework import viewsets, mixins
@@ -49,6 +50,7 @@ from django.db.models.functions import StrIndex
 
 from ondoc.location.models import EntityUrls, EntityAddress
 from ondoc.seo.models import NewDynamic
+from ondoc.subscription_plan.models import UserPlanMapping
 from . import serializers
 import copy
 import re
@@ -195,6 +197,9 @@ class LabList(viewsets.ReadOnlyModelViewSet):
         pnt = GEOSGeometry(point_string, srid=4326)
         max_distance = max_distance*1000 if max_distance is not None else 10000
         min_distance = min_distance*1000 if min_distance is not None else 0
+
+        package_free_or_not_dict = get_package_free_or_not_dict(request)
+
         main_queryset = LabTest.objects.prefetch_related('test', 'test__recommended_categories',
                                                          'test__parameter', 'categories').filter(enable_for_retail=True,
                                                                                                  searchable=True,
@@ -355,7 +360,8 @@ class LabList(viewsets.ReadOnlyModelViewSet):
             category_data[temp_package.id] = list(single_test_data.values())
         serializer = CustomLabTestPackageSerializer(all_packages, many=True,
                                                     context={'entity_url_dict': entity_url_dict, 'lab_data': lab_data,
-                                                             'request': request, 'category_data': category_data})
+                                                             'request': request, 'category_data': category_data,
+                                                             'package_free_or_not_dict': package_free_or_not_dict})
         category_queryset = LabTestCategory.objects.filter(id__in=category_to_be_shown_in_filter_ids).order_by('-priority')
         category_result = []
         for category in category_queryset:
@@ -1247,6 +1253,7 @@ class LabList(viewsets.ReadOnlyModelViewSet):
 
     @transaction.non_atomic_requests
     def retrieve(self, request, lab_id, entity=None):
+
         lab_obj = Lab.objects.select_related('network')\
                              .prefetch_related('rating', 'lab_documents')\
                              .filter(id=lab_id, is_live=True).first()
@@ -1261,6 +1268,7 @@ class LabList(viewsets.ReadOnlyModelViewSet):
                 entity = entity[0]
 
         test_ids = (request.query_params.get("test_ids").split(",") if request.query_params.get('test_ids') else [])
+        package_free_or_not_dict = get_package_free_or_not_dict(request)
         queryset = AvailableLabTest.objects.prefetch_related('test__labtests__parameter',
                                                              'test__packages__lab_test__recommended_categories',
                                                              'test__packages__lab_test__labtests__parameter').filter(
@@ -1272,10 +1280,13 @@ class LabList(viewsets.ReadOnlyModelViewSet):
             test__in=test_ids)
 
         test_serializer = diagnostic_serializer.AvailableLabTestPackageSerializer(queryset, many=True,
-                                                                           context={"lab": lab_obj})
+                                                                                  context={"lab": lab_obj,
+                                                                                           "package_free_or_not_dict": package_free_or_not_dict})
         # for Demo
         demo_lab_test = AvailableLabTest.objects.filter(test__enable_for_retail=True, lab_pricing_group=lab_obj.lab_pricing_group, enabled=True, test__searchable=True).order_by("-test__priority").prefetch_related('test')[:2]
-        lab_test_serializer = diagnostic_serializer.AvailableLabTestSerializer(demo_lab_test, many=True, context={"lab": lab_obj})
+        lab_test_serializer = diagnostic_serializer.AvailableLabTestSerializer(demo_lab_test, many=True,
+                                                                               context={"lab": lab_obj,
+                                                                                        "package_free_or_not_dict": package_free_or_not_dict})
         # day_now = timezone.now().weekday()
         timing_queryset = list()
         lab_serializable_data = list()
@@ -1658,12 +1669,42 @@ class LabAppointmentView(mixins.CreateModelMixin,
         else:
             return Response(status=status.HTTP_404_NOT_FOUND)
 
+
+    @staticmethod
+    def update_plan_details(request, data):
+        from ondoc.doctor.models import OpdAppointment
+        user = request.user
+        active_plan_mapping = UserPlanMapping.get_active_plans(user).first()
+        user_plan_id = None
+        included_in_user_plan = False
+        test_included_in_user_plan = UserPlanMapping.get_free_tests(request)
+        selected_test_id = [x for x in data.get('test_ids', [])]
+        if sorted(selected_test_id) == sorted(test_included_in_user_plan):
+            if active_plan_mapping:
+                user_plan_id = active_plan_mapping.id
+                included_in_user_plan = True
+                data.update(
+                    {'included_in_user_plan': included_in_user_plan, 'user_plan': user_plan_id})
+                data['payment_type'] = OpdAppointment.PLAN
+
+        if not included_in_user_plan:
+            data.update(
+                {'included_in_user_plan': included_in_user_plan, 'user_plan': user_plan_id})
+
+        # TODO: SHASHANK_SINGH not sure ask shubham
+        if data.get('cart_item'):
+            old_cart_obj = Cart.objects.filter(id=data.get('cart_item').id).first()
+            payment_type = old_cart_obj.data.get('payment_type')
+            if payment_type == OpdAppointment.PLAN and data.get('data')['included_in_user_plan'] == False:
+                data.get('data')['payment_type'] = OpdAppointment.PREPAID
+
     @transaction.atomic
     def create(self, request, **kwargs):
         data = dict(request.data)
         if not data.get("is_home_pickup"):
             data.pop("address", None)
 
+        self.update_plan_details(request, data)
         serializer = diagnostic_serializer.LabAppointmentCreateSerializer(data=data, context={'request': request, 'data' : request.data, 'use_duplicate' : True})
         serializer.is_valid(raise_exception=True)
         validated_data = serializer.validated_data
@@ -1961,6 +2002,51 @@ class LabTimingListView(mixins.ListModelMixin,
             }
         return Response(resp_data)
 
+    @transaction.non_atomic_requests
+    def list_new(self, request, *args, **kwargs):
+        params = request.query_params
+
+        for_home_pickup = True if int(params.get('pickup', 0)) else False
+        lab = params.get('lab')
+
+        # Added for Thyrocare integration
+        from ondoc.integrations import service
+        pincode = params.get('pincode')
+        date = params.get('date')
+        integration_dict = None
+        if lab:
+            lab_obj = Lab.objects.filter(id=int(lab), is_live=True).first()
+            if lab_obj and lab_obj.network and lab_obj.network.id:
+                integration_dict = IntegratorMapping.get_if_third_party_integration(network_id=lab_obj.network.id)
+
+                if lab_obj.network.id == settings.THYROCARE_NETWORK_ID and settings.THYROCARE_INTEGRATION_ENABLED:
+                    pass
+                else:
+                    integration_dict = None
+
+        if not integration_dict:
+            lab_slots = lab_obj.get_timing(for_home_pickup)
+            resp_data = {"time_slots": lab_slots}
+        else:
+            class_name = integration_dict['class_name']
+            integrator_obj = service.create_integrator_obj(class_name)
+            data = integrator_obj.get_appointment_slots(pincode, date, is_home_pickup=for_home_pickup)
+            resp_data = {"time_slots": data}
+
+        # resp_data = LabTiming.timing_manager.lab_booking_slots(lab__id=lab, lab__is_live=True, for_home_pickup=for_home_pickup)
+        # global_leave_serializer = v2_serializers.GlobalNonBookableSerializer(
+        #     GlobalNonBookable.objects.filter(deleted_at__isnull=True, booking_type=GlobalNonBookable.LAB), many=True)
+        # for agent do not set any time limitations
+        if hasattr(request, "agent") and request.agent:
+            resp_data = {
+                "time_slots" : resp_data["time_slots"],
+                "today_min": None,
+                "tomorrow_min": None,
+                "today_max": None
+            }
+        # resp_data['global_leaves'] = global_leave_serializer.data
+        return Response(resp_data)
+
 
 class AvailableTestViewSet(mixins.RetrieveModelMixin,
                            viewsets.GenericViewSet):
@@ -1989,9 +2075,10 @@ class AvailableTestViewSet(mixins.RetrieveModelMixin,
 
         # queryset = queryset[:20]
         paginated_queryset = paginate_queryset(queryset, request)
-
+        package_free_or_not_dict = get_package_free_or_not_dict(request)
         serializer = diagnostic_serializer.AvailableLabTestSerializer(paginated_queryset, many=True,
-                                                                      context={"lab": lab_obj})
+                                                                      context={"lab": lab_obj,
+                                                                               "package_free_or_not_dict": package_free_or_not_dict})
         return Response(serializer.data)
 
 
@@ -2204,7 +2291,8 @@ class TestDetailsViewset(viewsets.GenericViewSet):
                         resp = {}
                         resp['name'] = ptest.name
                         resp['id'] = ptest.id
-                        resp['parameters'] = [t_param.name for t_param in ptest.parameter.all()]
+                        resp['parameters'] = [test_parameter.name for test_parameter in ptest.parameter.all()]
+                        resp['parameters_details'] = [{'name': t_param.name, 'details': t_param.details} for t_param in ptest.parameter.all()]
                         pack_list.append(resp)
             result['this_package_will_include'] = {'title': 'This package includes', 'tests': pack_list}
 

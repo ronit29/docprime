@@ -44,7 +44,8 @@ from ondoc.procedure.models import Procedure, ProcedureCategory, CommonProcedure
 from ondoc.reports import models as report_models
 
 from ondoc.diagnostic.models import LabPricing
-from ondoc.integrations.models import IntegratorMapping, IntegratorProfileMapping
+from ondoc.integrations.models import IntegratorMapping, IntegratorProfileMapping, IntegratorReport
+from ondoc.subscription_plan.models import Plan, PlanFeature, PlanFeatureMapping
 
 from ondoc.web.models import Career, OnlineLead
 from ondoc.ratings_review import models as rating_models
@@ -71,7 +72,7 @@ class Command(BaseCommand):
         group, created = Group.objects.get_or_create(name=constants['DOCTOR_NETWORK_GROUP_NAME'])
         group.permissions.clear()
 
-        content_types = ContentType.objects.get_for_models(Merchant, Doctor, Hospital, HospitalNetwork, UploadDoctorData, Remark, Qualification, College, Specialization)
+        content_types = ContentType.objects.get_for_models(Merchant, Doctor, Hospital, HospitalNetwork, UploadDoctorData, Remark, Qualification, College, Specialization, GenericAdmin)
         for cl, ct in content_types.items():
 
             permissions = Permission.objects.filter(
@@ -533,7 +534,8 @@ class Command(BaseCommand):
             group.permissions.add(*permissions)
 
         content_types = ContentType.objects.get_for_models(PaymentOptions, EntityUrls, Feature, Service, Doctor,
-                                                           HealthInsuranceProvider, IpdProcedureCategory)
+                                                           HealthInsuranceProvider, IpdProcedureCategory, Plan,
+                                                           PlanFeature, PlanFeatureMapping)
 
         for cl, ct in content_types.items():
             permissions = Permission.objects.filter(
@@ -547,7 +549,8 @@ class Command(BaseCommand):
         group, created = Group.objects.get_or_create(name=constants['INTEGRATION_MANAGEMENT_TEAM'])
         group.permissions.clear()
 
-        content_types = ContentType.objects.get_for_models(IntegratorMapping, IntegratorProfileMapping, LabTest, LabNetwork)
+        content_types = ContentType.objects.get_for_models(IntegratorMapping, IntegratorProfileMapping, LabTest, LabNetwork,
+                                                           IntegratorReport)
 
         for cl, ct in content_types.items():
             permissions = Permission.objects.filter(
@@ -653,6 +656,7 @@ class Command(BaseCommand):
         self.stdout.write('Successfully created groups and permissions')
 
         self.setup_comment_group()
+        self.create_common_groups()
 
     def create_about_doctor_group(self):
         group, created = Group.objects.get_or_create(name=constants['ABOUT_DOCTOR_TEAM'])
@@ -855,3 +859,6 @@ class Command(BaseCommand):
                 Q(codename='add_' + ct.model) | Q(codename='change_' + ct.model))
 
             group.permissions.add(*permissions)
+
+    def create_common_groups(self):
+        group, created = Group.objects.get_or_create(name=constants['APPOINTMENT_OTP_TEAM'])
