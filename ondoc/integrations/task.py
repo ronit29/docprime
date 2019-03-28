@@ -82,7 +82,7 @@ def push_lab_appointment_to_integrator(self, data):
             response = integrator_obj.cancel_integrator_order(appointment, saved_response, retry_count)
 
             if not response:
-                countdown_time = 1 * 60
+                countdown_time = (1 ** self.request.retries) * 60
                 print(countdown_time)
                 self.retry([data], countdown=countdown_time)
 
@@ -122,7 +122,7 @@ def get_integrator_order_status(self, *args, **kwargs):
                 IntegratorHistory.create_history(appointment, url, response, url, 'order_summary', 'Thyrocare',
                                                  status_code, retry_count, status, 'integrator_api')
         else:
-            countdown_time = 1 * 120
+            countdown_time = (2 ** self.request.retries) * 60 * 2
             print(countdown_time)
             status = IntegratorHistory.PUSHED_AND_NOT_ACCEPTED
             IntegratorHistory.create_history(appointment, url, response, url, 'order_summary', 'Thyrocare',
