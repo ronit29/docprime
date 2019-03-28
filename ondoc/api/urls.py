@@ -22,6 +22,7 @@ from .v1.procedure.router import urlpatterns as procedure_url
 from .v1.banner.router import urlpatterns as banner_url
 from .v1.cart.router import urlpatterns as cart_url
 from .v1.screen.router import urlpatterns as screen_url
+from .v1.subscription_plan.router import urlpatterns as subscription_plan_url
 
 from .v2.doctor.router import urlpatterns as doctor_v2_url
 
@@ -48,5 +49,6 @@ urlpatterns = [
     path('v1/banner/', include(banner_url)),
     path('v1/cart/', include(cart_url)),
     path('v1/screen/', include(screen_url)),
+    path('v1/subscription_plan/', include(subscription_plan_url)),
     path('v2/doctor/', include(doctor_v2_url))
 ]

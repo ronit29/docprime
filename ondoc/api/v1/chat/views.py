@@ -164,3 +164,20 @@ class ChatPrescriptionViewSet(viewsets.GenericViewSet):
                 return Response({"status": FAILURE_OK_STATUS})
         else:
             return Response({"status": FAILURE_OK_STATUS})
+
+
+class ChatReferralViewSet(viewsets.GenericViewSet):
+
+    def retrieve(self, request):
+
+        serializer = serializers.ChatReferralNumberSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        validated_data = serializer.validated_data
+
+        user = validated_data.get('user')
+        referral_obj = user.referral.first()
+        if referral_obj:
+            code = referral_obj.code
+            return Response({"status": 1, "code": code})
+        else:
+            return Response({"status": 0, "code": 'Referral Code not Found'})

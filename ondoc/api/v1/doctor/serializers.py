@@ -58,10 +58,20 @@ class CommaSepratedToListField(CharField):
         super(CommaSepratedToListField, self).__init__(**kwargs)
 
     def to_internal_value(self, data):
-        return list(map(self.typecast_to, data.strip(",").split(",")))
+        result = []
+        try:
+            result = list(map(self.typecast_to, data.strip(",").split(",")))
+        except:
+            pass
+        return result
 
     def to_representation(self, value):
-        return list(map(self.typecast_to, value.strip(",").split(",")))
+        result = []
+        try:
+            result = list(map(self.typecast_to, value.strip(",").split(",")))
+        except:
+            pass
+        return result
 
 
 class OTPSerializer(serializers.Serializer):
@@ -1812,7 +1822,7 @@ class HospitalRequestSerializer(serializers.Serializer):
 
 class IpdProcedureLeadSerializer(serializers.ModelSerializer):
     ipd_procedure = serializers.PrimaryKeyRelatedField(queryset=IpdProcedure.objects.filter(is_enabled=True))
-    hospital = serializers.PrimaryKeyRelatedField(queryset=Hospital.objects.filter(is_live=True))
+    hospital = serializers.PrimaryKeyRelatedField(queryset=Hospital.objects.filter(is_live=True), required=False)
     name = serializers.CharField(max_length=100)
     phone_number = serializers.IntegerField(min_value=1000000000, max_value=9999999999)
     email = serializers.EmailField(max_length=256)
@@ -1826,9 +1836,10 @@ class IpdProcedureLeadSerializer(serializers.ModelSerializer):
     def validate(self, attrs):
         ipd_procedure = attrs.get('ipd_procedure')
         hospital = attrs.get('hospital')
-        if not DoctorClinicIpdProcedure.objects.filter(enabled=True, ipd_procedure=ipd_procedure,
-                                                       doctor_clinic__hospital=hospital):
-            raise serializers.ValidationError('IPD procedure is not available in the hospital.')
+        if ipd_procedure and hospital:
+            if not DoctorClinicIpdProcedure.objects.filter(enabled=True, ipd_procedure=ipd_procedure,
+                                                           doctor_clinic__hospital=hospital):
+                raise serializers.ValidationError('IPD procedure is not available in the hospital.')
         return super().validate(attrs)
 
 

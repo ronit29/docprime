@@ -120,6 +120,54 @@ class RatingsGraphSerializer(serializers.Serializer):
         return avg
 
 
+class GoogleRatingsGraphSerializer(serializers.Serializer):
+    rating_count = serializers.SerializerMethodField()
+    review_count = serializers.SerializerMethodField()
+    avg_rating = serializers.SerializerMethodField()
+    star_count = serializers.SerializerMethodField()
+    top_compliments = serializers.SerializerMethodField()
+
+    def get_top_compliments(self, obj):
+        return None
+
+    def get_rating_count(self, obj):
+        count = len(obj)
+        return count
+
+    def get_review_count(self, obj):
+        empty_review_count = 0
+        for data in obj:
+            if data.get('text') == '' or data.get('text') == None:
+                empty_review_count += 1
+        count = len(obj) - empty_review_count
+        return count
+
+    def get_star_count(self, obj):
+        star_data = {1: {'count': 0, 'percent': 0},
+                 2: {'count': 0, 'percent': 0},
+                 3: {'count': 0, 'percent': 0},
+                 4: {'count': 0, 'percent': 0},
+                 5: {'count': 0, 'percent': 0}}
+        total = len(obj)
+        if total:
+            for rate in obj:
+                star_data[rate.get('rating')]['count'] += 1
+            for key, value in star_data.items():
+                star_data[key]['percent'] = '{0:.2f}'.format((star_data[key]['count'] / total * 100))
+            return star_data
+        return star_data
+
+    def get_avg_rating(self, obj):
+        avg = None
+        sum_rating = 0
+        if obj:
+            for data in obj:
+                sum_rating += data.get('rating')
+            avg = sum_rating / len(obj)
+            avg = round(avg, 1)
+        return avg
+
+
 class RatingsModelSerializer(serializers.ModelSerializer):
     compliment = serializers.SerializerMethodField()
     date = serializers.SerializerMethodField()

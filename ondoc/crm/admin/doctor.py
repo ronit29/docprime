@@ -710,12 +710,12 @@ class DoctorForm(FormCleanMixin):
                 raise forms.ValidationError(key + " is required for Quality Check")
             if value == 'count' and int(self.data[key + '-TOTAL_FORMS']) <= 0:
                 raise forms.ValidationError("Atleast one entry of " + key + " is required for Quality Check")
-            if key == 'doctor_clinics':
+            if key == 'doctor_clinics' and '_qc_approve' in self.data:
                     all_hospital_ids = []
                     for indx in range(int(self.data[key + '-TOTAL_FORMS'])):
                         all_hospital_ids.append(int(self.data[key + '-{}-hospital'.format(indx)]))
                     if not Hospital.objects.filter(pk__in=all_hospital_ids, is_live=True).count():
-                        raise forms.ValidationError("Atleast one entry of " + key + " should be live for Quality Check")
+                        raise forms.ValidationError("Atleast one entry of " + key + " should be live for submitting to Quality Check")
             if value == 'value_req':
                 if hasattr(self.instance, key) and not getattr(self.instance, key):
                     raise forms.ValidationError(key + " is required for Quality Check")
@@ -1465,7 +1465,7 @@ class DoctorOpdAppointmentForm(forms.ModelForm):
             raise forms.ValidationError(
                 "Cancellation comments must be mentioned for selected cancellation reason.")
 
-        if cleaned_data.get('status') not in [OpdAppointment.CANCELLED, OpdAppointment.COMPLETED]:
+        if cleaned_data.get('status') not in [OpdAppointment.CANCELLED, OpdAppointment.COMPLETED, None]:
             if not DoctorClinicTiming.objects.filter(doctor_clinic__doctor=doctor,
                                                      doctor_clinic__hospital=hospital,
                                                      day=time_slot_start.weekday(),
@@ -1492,6 +1492,7 @@ class DoctorOpdAppointmentForm(forms.ModelForm):
 
 class DoctorOpdAppointmentAdmin(admin.ModelAdmin):
     form = DoctorOpdAppointmentForm
+    search_fields = ['id']
     list_display = ('booking_id', 'get_doctor', 'get_profile', 'status', 'time_slot_start', 'effective_price', 'created_at', 'updated_at')
     list_filter = ('status', )
     date_hierarchy = 'created_at'
@@ -1542,37 +1543,48 @@ class DoctorOpdAppointmentAdmin(admin.ModelAdmin):
         return form
 
     def get_fields(self, request, obj=None):
-        if request.user.is_superuser and request.user.is_staff:
-            return ('booking_id', 'doctor', 'doctor_id', 'doctor_details', 'hospital', 'hospital_details', 'kyc',
-                    'contact_details', 'profile', 'profile_detail', 'user', 'booked_by', 'procedures_details',
-                    'fees', 'effective_price', 'mrp', 'deal_price', 'payment_status', 'status', 'cancel_type',
-                    'cancellation_reason', 'cancellation_comments', 'ratings',
-                    'start_date', 'start_time', 'payment_type', 'otp', 'insurance', 'outstanding', 'invoice_urls', 'payment_type')
-        elif request.user.groups.filter(name=constants['OPD_APPOINTMENT_MANAGEMENT_TEAM']).exists():
-            return ('booking_id', 'doctor_name', 'doctor_id', 'doctor_details', 'hospital_name', 'hospital_details',
-                    'kyc', 'contact_details', 'used_profile_name',
-                    'used_profile_number', 'default_profile_name',
-                    'default_profile_number', 'user_id', 'user_number', 'booked_by', 'procedures_details',
-                    'fees', 'effective_price', 'mrp', 'deal_price', 'payment_status',
-                    'payment_type', 'admin_information', 'otp', 'insurance', 'outstanding',
-                    'status', 'cancel_type', 'cancellation_reason', 'cancellation_comments',
-                    'start_date', 'start_time', 'invoice_urls', 'payment_type')
-        else:
-            return ()
+        # if request.user.is_superuser and request.user.is_staff:
+        #     return ('booking_id', 'doctor', 'doctor_id', 'doctor_details', 'hospital', 'hospital_details', 'kyc',
+        #             'contact_details', 'profile', 'profile_detail', 'user', 'booked_by', 'procedures_details',
+        #             'fees', 'effective_price', 'mrp', 'deal_price', 'payment_status', 'status', 'cancel_type',
+        #             'cancellation_reason', 'cancellation_comments', 'ratings',
+        #             'start_date', 'start_time', 'payment_type', 'otp', 'insurance', 'outstanding', 'invoice_urls', 'payment_type')
+        # elif request.user.groups.filter(name=constants['OPD_APPOINTMENT_MANAGEMENT_TEAM']).exists():
+        all_fields = ('booking_id', 'doctor_name', 'doctor_id', 'doctor_details', 'hospital_name', 'hospital_details',
+                'kyc', 'contact_details', 'used_profile_name',
+                'used_profile_number', 'default_profile_name',
+                'default_profile_number', 'user_id', 'user_number', 'booked_by', 'procedures_details',
+                'fees', 'effective_price', 'mrp', 'deal_price', 'payment_status',
+                'payment_type', 'admin_information', 'insurance', 'outstanding',
+                'status', 'cancel_type', 'cancellation_reason', 'cancellation_comments',
+                'start_date', 'start_time', 'invoice_urls', 'payment_type', 'payout_info')
+        if request.user.groups.filter(name=constants['APPOINTMENT_OTP_TEAM']).exists() or request.user.is_superuser:
+            all_fields = all_fields + ('otp',)
+        return all_fields
+        # else:
+        #     return ()
 
     def get_readonly_fields(self, request, obj=None):
-        if request.user.is_superuser and request.user.is_staff:
-            return ('booking_id', 'doctor_id', 'doctor_details', 'contact_details', 'hospital_details', 'kyc',
-                    'procedures_details', 'invoice_urls', 'ratings', 'payment_type')
-        elif request.user.groups.filter(name=constants['OPD_APPOINTMENT_MANAGEMENT_TEAM']).exists():
-            return ('booking_id', 'doctor_name', 'doctor_id', 'doctor_details', 'hospital_name',
-                    'hospital_details', 'kyc', 'contact_details',
-                    'used_profile_name', 'used_profile_number', 'default_profile_name',
-                    'default_profile_number', 'user_id', 'user_number', 'booked_by',
-                    'fees', 'effective_price', 'mrp', 'deal_price', 'payment_status', 'payment_type',
-                    'admin_information', 'otp', 'insurance', 'outstanding', 'procedures_details','invoice_urls', 'payment_type')
-        else:
-            return ('invoice_urls')
+        # if request.user.is_superuser and request.user.is_staff:
+        #     return ('booking_id', 'doctor_id', 'doctor_details', 'contact_details', 'hospital_details', 'kyc',
+        #             'procedures_details', 'invoice_urls', 'ratings', 'payment_type')
+        # elif request.user.groups.filter(name=constants['OPD_APPOINTMENT_MANAGEMENT_TEAM']).exists():
+        read_only = ('booking_id', 'doctor_name', 'doctor_id', 'doctor_details', 'hospital_name',
+                     'hospital_details', 'kyc', 'contact_details',
+                     'used_profile_name', 'used_profile_number', 'default_profile_name',
+                     'default_profile_number', 'user_id', 'user_number', 'booked_by',
+                     'fees', 'effective_price', 'mrp', 'deal_price', 'payment_status', 'payment_type',
+                     'admin_information', 'insurance', 'outstanding', 'procedures_details', 'invoice_urls',
+                     'payment_type', 'invoice_urls', 'payout_info')
+        if request.user.groups.filter(name=constants['APPOINTMENT_OTP_TEAM']).exists() or request.user.is_superuser:
+            read_only = read_only + ('otp',)
+        return read_only
+        # else:
+        #     return ('invoice_urls')
+
+    def payout_info(self, obj):
+        return MerchantPayout.get_merchant_payout_info(obj)
+    payout_info.short_description = 'Merchant Payment Info'
 
     def ratings(self, obj):
         rating_queryset = rating_models.RatingsReview.objects.filter(appointment_id=obj.id).first()
@@ -2044,6 +2056,18 @@ class OfflinePatientAdmin(VersionAdmin):
     list_display = ('name', 'gender', 'referred_by')
     date_hierarchy = 'created_at'
     inlines = [PatientMobileInline]
+
+
+class DoctorLeaveAdmin(VersionAdmin):
+
+    autocomplete_fields = ('doctor', 'hospital')
+    exclude = ('deleted_at',)
+
+    def get_readonly_fields(self, request, obj=None):
+        read_only_fileds = super().get_readonly_fields(request, obj)
+        if obj and obj.id:
+            read_only_fileds += ('doctor', 'hospital')
+        return read_only_fileds
 
 
 class UploadDoctorDataAdmin(admin.ModelAdmin):

@@ -32,6 +32,7 @@ from ondoc.diagnostic.models import (LabTiming, LabImage,
                                      TestParameter, ParameterLabTest, FrequentlyAddedTogetherTests, QuestionAnswer,
                                      LabReport, LabReportFile, LabTestCategoryMapping,
                                      LabTestRecommendedCategoryMapping, LabTestGroupTiming, LabTestGroupMapping)
+from ondoc.integrations.models import IntegratorHistory
 from ondoc.notification.models import EmailNotification, NotificationAction
 from .common import *
 from ondoc.authentication.models import GenericAdmin, User, QCModel, GenericLabAdmin, AssociatedMerchant
@@ -745,23 +746,24 @@ class LabAppointmentForm(forms.ModelForm):
         if not lab.lab_pricing_group:
             raise forms.ValidationError("Lab is not in any lab pricing group.")
 
-        if self.instance.id:
-            selected_test_ids = lab_test.values_list('test', flat=True)
-            is_lab_timing_available = LabTiming.objects.filter(
-                lab=lab,
-                lab__lab_pricing_group__available_lab_tests__test__in=selected_test_ids,
-                day=time_slot_start.weekday(),
-                start__lte=hour, end__gt=hour).exists()
-            # if not is_lab_timing_available:
-            #     raise forms.ValidationError("This lab test is not available on selected day and time.")
-            if self.instance.is_home_pickup or cleaned_data.get('is_home_pickup'):
-                if not lab.is_home_collection_enabled:
-                    raise forms.ValidationError("Home Pickup is disabled for the lab")
-                if hour < 7.0 or hour > 19.0:
-                    raise forms.ValidationError("No time slot available")
-            else:
-                if not lab.always_open and not is_lab_timing_available:
-                    raise forms.ValidationError("No time slot available")
+        if cleaned_data.get('status') not in [LabAppointment.CANCELLED, LabAppointment.COMPLETED, None]:
+            if self.instance.id:
+                selected_test_ids = lab_test.values_list('test', flat=True)
+                is_lab_timing_available = LabTiming.objects.filter(
+                    lab=lab,
+                    lab__lab_pricing_group__available_lab_tests__test__in=selected_test_ids,
+                    day=time_slot_start.weekday(),
+                    start__lte=hour, end__gt=hour).exists()
+                # if not is_lab_timing_available:
+                #     raise forms.ValidationError("This lab test is not available on selected day and time.")
+                if self.instance.is_home_pickup or cleaned_data.get('is_home_pickup'):
+                    if not lab.is_home_collection_enabled:
+                        raise forms.ValidationError("Home Pickup is disabled for the lab")
+                    if hour < 7.0 or hour > 19.0:
+                        raise forms.ValidationError("No time slot available")
+                else:
+                    if not lab.always_open and not is_lab_timing_available:
+                        raise forms.ValidationError("No time slot available")
 
         return cleaned_data
 
@@ -783,6 +785,7 @@ class LabReportInline(nested_admin.NestedTabularInline):
 
 class LabAppointmentAdmin(nested_admin.NestedModelAdmin):
     form = LabAppointmentForm
+    search_fields = ['id']
     list_display = (
         'booking_id', 'get_profile', 'get_lab', 'status', 'reports_uploaded', 'time_slot_start', 'effective_price', 'get_profile_email',
         'get_profile_age', 'created_at', 'updated_at', 'get_lab_test_name')
@@ -799,6 +802,22 @@ class LabAppointmentAdmin(nested_admin.NestedModelAdmin):
     #     else:
     #         temp_autocomplete_fields = super().get_autocomplete_fields(request)
     #     return temp_autocomplete_fields
+
+    def integrator_order_status(self, obj):
+        return obj.integrator_order_status()
+
+    def thyrocare_booking_id(self, obj):
+        return obj.thyrocare_booking_no()
+
+    def accepted_through(self, obj):
+        return obj.accepted_through()
+
+    def payout_info(self, obj):
+        return MerchantPayout.get_merchant_payout_info(obj)
+    payout_info.short_description = 'Merchant Payment Info'
+
+    def through_app(self, obj):
+        return obj.created_by_native()
 
     def get_profile_email(self, obj):
         if not obj.profile:
@@ -852,41 +871,46 @@ class LabAppointmentAdmin(nested_admin.NestedModelAdmin):
         return form
 
     def get_fields(self, request, obj=None):
-        if request.user.is_superuser:
-            return ('booking_id', 'order_id', 'lab', 'lab_id', 'lab_contact_details', 'profile', 'user',
-                    'profile_detail', 'status', 'cancel_type', 'cancellation_reason', 'cancellation_comments',
-                    'get_lab_test', 'price', 'agreed_price',
-                    'deal_price', 'effective_price', 'start_date', 'start_time', 'otp', 'payment_status',
-                    'payment_type', 'insurance', 'is_home_pickup', 'address', 'outstanding',
-                    'send_email_sms_report', 'invoice_urls', 'reports_uploaded', 'email_notification_timestamp', 'payment_type'
-                    )
-        elif request.user.groups.filter(name=constants['LAB_APPOINTMENT_MANAGEMENT_TEAM']).exists():
-            return ('booking_id', 'order_id',  'lab_id', 'lab_name', 'get_lab_test', 'lab_contact_details',
+        # if request.user.is_superuser:
+        #     return ('booking_id', 'order_id', 'lab', 'lab_id', 'lab_contact_details', 'profile', 'user',
+        #             'profile_detail', 'status', 'cancel_type', 'cancellation_reason', 'cancellation_comments',
+        #             'get_lab_test', 'price', 'agreed_price',
+        #             'deal_price', 'effective_price', 'start_date', 'start_time', 'otp', 'payment_status',
+        #             'payment_type', 'insurance', 'is_home_pickup', 'address', 'outstanding',
+        #             'send_email_sms_report', 'invoice_urls', 'reports_uploaded', 'email_notification_timestamp', 'payment_type'
+        #             )
+        # elif request.user.groups.filter(name=constants['LAB_APPOINTMENT_MANAGEMENT_TEAM']).exists():
+        all_fields = ('booking_id', 'through_app', 'integrator_order_status', 'thyrocare_booking_id', 'accepted_through', 'order_id',  'lab_id', 'lab_name', 'get_lab_test', 'lab_contact_details',
                     'used_profile_name', 'used_profile_number',
                     'default_profile_name', 'default_profile_number', 'user_id', 'user_number', 'price', 'agreed_price',
                     'deal_price', 'effective_price', 'payment_status', 'payment_type', 'insurance', 'is_home_pickup',
-                    'get_pickup_address', 'get_lab_address', 'outstanding', 'otp', 'status', 'cancel_type',
+                    'get_pickup_address', 'get_lab_address', 'outstanding', 'status', 'cancel_type',
                     'cancellation_reason', 'cancellation_comments', 'start_date', 'start_time',
-                    'send_email_sms_report', 'invoice_urls', 'reports_uploaded', 'email_notification_timestamp', 'payment_type'
-                    )
-        else:
-            return ()
+                    'send_email_sms_report', 'invoice_urls', 'reports_uploaded', 'email_notification_timestamp', 'payment_type',
+                     'payout_info')
+        if request.user.groups.filter(name=constants['APPOINTMENT_OTP_TEAM']).exists() or request.user.is_superuser:
+            all_fields = all_fields + ('otp',)
+        return all_fields
+        # else:
+        #     return ()
 
     def get_readonly_fields(self, request, obj=None):
-        if request.user.is_superuser:
-            read_only =  ['booking_id', 'order_id', 'lab_id', 'lab_contact_details', 'get_lab_test', 'invoice_urls', 'reports_uploaded', 'email_notification_timestamp', 'payment_type']
-        elif request.user.groups.filter(name=constants['LAB_APPOINTMENT_MANAGEMENT_TEAM']).exists():
-            read_only = ['booking_id', 'order_id', 'lab_name', 'lab_id', 'get_lab_test', 'invoice_urls',
-                    'lab_contact_details', 'used_profile_name', 'used_profile_number',
-                    'default_profile_name', 'default_profile_number', 'user_number', 'user_id', 'price', 'agreed_price',
-                    'deal_price', 'effective_price', 'payment_status', 'otp',
-                    'payment_type', 'insurance', 'is_home_pickup', 'get_pickup_address', 'get_lab_address',
-                         'outstanding', 'reports_uploaded', 'email_notification_timestamp', 'payment_type']
-        else:
-            read_only = []
-
+        # if request.user.is_superuser:
+        #     read_only =  ['booking_id', 'order_id', 'lab_id', 'lab_contact_details', 'get_lab_test', 'invoice_urls', 'reports_uploaded', 'email_notification_timestamp', 'payment_type']
+        # elif request.user.groups.filter(name=constants['LAB_APPOINTMENT_MANAGEMENT_TEAM']).exists():
+        read_only = ['booking_id' ,'through_app', 'integrator_order_status', 'accepted_through', 'thyrocare_booking_id', 'order_id', 'lab_name', 'lab_id', 'get_lab_test', 'invoice_urls',
+                     'lab_contact_details', 'used_profile_name', 'used_profile_number',
+                     'default_profile_name', 'default_profile_number', 'user_number', 'user_id', 'price',
+                     'agreed_price',
+                     'deal_price', 'effective_price', 'payment_status',
+                     'payment_type', 'insurance', 'is_home_pickup', 'get_pickup_address', 'get_lab_address',
+                     'outstanding', 'reports_uploaded', 'email_notification_timestamp', 'payment_type', 'payout_info']
+        # else:
+        #     read_only = []
         if obj and (obj.status == LabAppointment.COMPLETED or obj.status == LabAppointment.CANCELLED):
             read_only.extend(['status'])
+        if request.user.groups.filter(name=constants['APPOINTMENT_OTP_TEAM']).exists() or request.user.is_superuser:
+            read_only = read_only + ['otp']
         return read_only
 
     # def get_inline_instances(self, request, obj=None):
@@ -1061,6 +1085,17 @@ class LabAppointmentAdmin(nested_admin.NestedModelAdmin):
                 pass
             else:
                 super().save_model(request, obj, form, change)
+                if request.POST.get('status') and (int(request.POST['status']) == LabAppointment.ACCEPTED):
+                    lab_appointment_content_type = ContentType.objects.get_for_model(obj)
+                    history_obj = IntegratorHistory.objects.filter(content_type=lab_appointment_content_type,
+                                                                   object_id=obj.id).order_by('id').last()
+                    if history_obj:
+                        history_obj.status = IntegratorHistory.PUSHED_AND_ACCEPTED
+                        history_obj.accepted_through = "CRM"
+                        history_obj.save()
+
+
+
             if send_email_sms_report and sum(
                     obj.reports.annotate(no_of_files=Count('files')).values_list('no_of_files', flat=True)):
                 transaction.on_commit(lambda: self.on_commit_tasks(obj.id))
@@ -1126,8 +1161,20 @@ class TestPackageFormSet(forms.BaseInlineFormSet):
                 raise forms.ValidationError('{} is a test package'.format(lab_test.name))
 
 
+class TestParameterAdminForm(forms.ModelForm):
+    # name = forms.CharField(widget=forms.Textarea, required=False)
+    details = forms.CharField(widget=forms.Textarea, required=False)
+
+    class Media:
+        extend = False
+        js = ('https://cdn.ckeditor.com/ckeditor5/10.1.0/classic/ckeditor.js', 'test_parameter/js/init.js')
+        css = {'all': ('test_parameter/css/style.css',)}
+
+
 class TestParameterAdmin(VersionAdmin):
+    form = TestParameterAdminForm
     search_fields = ['name']
+    list_display = ['name']
 
 
 class LabTestPackageInline(admin.TabularInline):
