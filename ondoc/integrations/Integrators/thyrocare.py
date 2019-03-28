@@ -13,6 +13,7 @@ from datetime import datetime, date, timedelta
 from ondoc.diagnostic.models import LabReport, LabReportFile, LabAppointment
 from django.contrib.contenttypes.models import ContentType
 from ondoc.api.v1.utils import resolve_address, aware_time_zone
+from django.utils import timezone
 import time
 
 
@@ -167,8 +168,8 @@ class Thyrocare(BaseIntegrator):
             patient_address = resolve_address(lab_appointment.address)
             pincode = lab_appointment.address["pincode"]
         else:
-            patient_address = "Address not available"
-            pincode = "122002"
+            patient_address = ""
+            pincode = ""
 
         order_id = "DP{}".format(lab_appointment.id)
         if profile and profile.gender:
@@ -355,6 +356,10 @@ class Thyrocare(BaseIntegrator):
         from ondoc.integrations.models import IntegratorHistory
 
         dp_appointment = integrator_response.content_object
+        lab_appointment_content_type = ContentType.objects.get_for_model(dp_appointment)
+        integrator_history = IntegratorHistory.objects.filter(object_id=dp_appointment.id,
+                                                              content_type=lab_appointment_content_type).order_by('id').last()
+        status = integrator_history.status
         if dp_appointment.status != LabAppointment.CANCELLED or dp_appointment.status != LabAppointment.COMPLETED or \
                                             (dp_appointment.time_slot_start + timedelta(days=1) < datetime.now()):
 
