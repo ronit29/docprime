@@ -2287,8 +2287,7 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
             "discount": int(price_data.get("coupon_discount")),
             "cashback": int(price_data.get("coupon_cashback")),
             "is_appointment_insured": is_appointment_insured,
-            "insurance": insurance_id,
-            "insurance_message": insurance_message
+            "insurance": insurance_id
         }
 
     @staticmethod

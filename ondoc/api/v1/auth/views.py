@@ -660,6 +660,16 @@ class UserAppointmentsViewSet(OndocViewSet):
                             "message": "Cannot Reschedule for same timeslot"
                         }
                         return resp
+                    if lab_appointment.payment_type == OpdAppointment.INSURANCE and lab_appointment.insurance_id is not None:
+                        user_insurance = UserInsurance.objects.get(id=lab_appointment.insurance_id)
+                        if user_insurance and user_insurance.is_valid():
+                            insurance_threshold = user_insurance.insurance_plan.threshold.filter().first()
+                            if time_slot_start > user_insurance.expiry_date:
+                                resp = {
+                                    "status": 0,
+                                    "message": "Appointment time is not covered under insurance"
+                                }
+                                return resp
 
                     test_ids = lab_appointment.lab_test.values_list('test__id', flat=True)
                     lab_test_queryset = AvailableLabTest.objects.select_related('lab_pricing_group__labs').filter(
@@ -742,9 +752,9 @@ class UserAppointmentsViewSet(OndocViewSet):
                                                                         start__lte=time_slot_start.hour,
                                                                         end__gte=time_slot_start.hour).first()
                     if doctor_hospital:
-                        if opd_appointment.payment_type == 3 and opd_appointment.insurance_id is not None:
+                        if opd_appointment.payment_type == OpdAppointment.INSURANCE and opd_appointment.insurance_id is not None:
                             user_insurance = UserInsurance.objects.get(id=opd_appointment.insurance_id)
-                            if user_insurance:
+                            if user_insurance and user_insurance.is_valid():
                                 insurance_threshold = user_insurance.insurance_plan.threshold.filter().first()
                                 if doctor_hospital.mrp > insurance_threshold.opd_amount_limit:
                                     resp = {

@@ -180,10 +180,10 @@ class UserProfileSerializer(serializers.ModelSerializer):
         if not insured_member_obj:
             return False
         user_insurance_obj = UserInsurance.objects.filter(id=insured_member_obj.user_insurance.id).first()
-        if not user_insurance_obj and user_insurance_obj.is_valid():
-            return False
-        else:
+        if user_insurance_obj and user_insurance_obj.is_valid():
             return True
+        else:
+            return False
 
     def get_age(self, obj):
         from datetime import date
