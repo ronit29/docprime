@@ -330,6 +330,7 @@ class Order(TimeStampedModel):
         from ondoc.doctor.models import OpdAppointment
         from ondoc.diagnostic.models import LabAppointment
         from ondoc.subscription_plan.models import UserPlanMapping
+        from ondoc.insurance.models import UserInsurance
 
         if self.orders.exists():
             completed_order = self.orders.filter(reference_id__isnull=False).first()
@@ -344,6 +345,8 @@ class Order(TimeStampedModel):
             return OpdAppointment.objects.filter(id=self.reference_id).first()
         elif self.product_id == self.SUBSCRIPTION_PLAN_PRODUCT_ID:
             return UserPlanMapping.objects.filter(id=self.reference_id).first()
+        elif self.product_id == self.INSURANCE_PRODUCT_ID:
+            return UserInsurance.objects.filter(id=self.reference_id).first()
         return None
 
     def get_total_price(self):
