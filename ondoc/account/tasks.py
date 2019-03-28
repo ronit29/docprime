@@ -17,8 +17,6 @@ import logging
 from collections import OrderedDict
 import datetime
 
-from ondoc.insurance.models import UserInsurance
-
 logger = logging.getLogger(__name__)
 
 @task()
@@ -329,6 +327,7 @@ def refund_curl_task(self, req_data):
 @task(bind=True, max_retries=5)
 def set_order_dummy_transaction(self, order_id, user_id):
     from ondoc.account.models import Order, DummyTransactions
+    from ondoc.insurance.models import UserInsurance
     from ondoc.account.models import User
     try:
         if not settings.PAYOUTS_ENABLED:
