@@ -72,6 +72,7 @@ from ondoc.banner.models import Banner, SliderLocation
 from .integrations import IntegratorMapping, IntegratorMappingAdmin
 from .integrations import IntegratorProfileMapping, IntegratorProfileMappingAdmin
 from .integrations import IntegratorReport, IntegratorReportAdmin
+from .integrations import IntegratorTestMapping, IntegratorTestMappingAdmin
 
 # Admin Site config
 admin.site.site_header = 'Ondoc CRM'
@@ -184,6 +185,7 @@ admin.site.register(Feature, FeatureAdmin)
 admin.site.register(Service, ServiceAdmin)
 admin.site.register(HealthInsuranceProvider, HealthInsuranceProviderAdmin)
 admin.site.register(IntegratorReport, IntegratorReportAdmin)
+admin.site.register(IntegratorTestMapping, IntegratorTestMappingAdmin)
 admin.site.register(IpdProcedureCategory, IpdProcedureCategoryAdmin)
 admin.site.register(CommonIpdProcedure)
 admin.site.register(Plan, SubscriptionPlanAdmin)
