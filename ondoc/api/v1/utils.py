@@ -32,8 +32,6 @@ from ondoc.authentication import models as auth_models
 import logging
 from datetime import timedelta
 
-from ondoc.insurance.models import InsurancePlans
-
 logger = logging.getLogger(__name__)
 
 User = get_user_model()
@@ -359,6 +357,7 @@ def is_valid_testing_lab_data(user, lab):
 
 def payment_details(request, order):
     from ondoc.authentication.models import UserProfile
+    from ondoc.insurance.models import InsurancePlans
     from ondoc.account.models import PgTransaction, Order
     payment_required = True
     user = request.user
