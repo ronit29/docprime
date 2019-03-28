@@ -168,8 +168,6 @@ class DoctorSearchHelper:
                 "d.search_key ilike (%(doctor_name)s)"
                     )
             params['doctor_name'] = '%'+search_key+'%'
-            params['searched_doctor_name'] = self.query_params.get('doctor_name') + '%'
-
         if self.query_params.get("hospital_name"):
             search_key = re.findall(r'[a-z0-9A-Z.]+', self.query_params.get("hospital_name"))
             search_key = " ".join(search_key).lower()
@@ -267,7 +265,7 @@ class DoctorSearchHelper:
         condition_ids = self.query_params.get("condition_ids", [])
 
         if self.query_params.get('doctor_name'):
-            order_by_field = "{}, {} ".format('search_key ilike (%(searched_doctor_name)s) DESC ', order_by_field)
+            order_by_field = "{}, {} ".format('search_key ASC ', order_by_field)
 
         if self.count_of_procedure:
             rank_part = "Row_number() OVER( PARTITION BY doctor_id ORDER BY " \
