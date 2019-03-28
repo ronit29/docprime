@@ -43,7 +43,7 @@ from ondoc.authentication import models as auth_models
 from ondoc.location.models import EntityUrls, EntityAddress
 from ondoc.procedure.models import DoctorClinicProcedure, Procedure, ProcedureCategory, \
     get_included_doctor_clinic_procedure, get_procedure_categories_with_procedures, IpdProcedure, \
-    IpdProcedureFeatureMapping, IpdProcedureLead, DoctorClinicIpdProcedure
+    IpdProcedureFeatureMapping, IpdProcedureLead, DoctorClinicIpdProcedure, IpdProcedureDetail
 from ondoc.seo.models import NewDynamic
 from ondoc.ratings_review import models as rate_models
 
@@ -1561,12 +1561,21 @@ class IpdProcedureFeatureSerializer(serializers.ModelSerializer):
         return request.build_absolute_uri(photo_url)
 
 
+class IpdProcedureAllDetailsSerializer(serializers.ModelSerializer):
+    name = serializers.CharField(source='detail_type.name')
+
+    class Meta:
+        model = IpdProcedureDetail
+        fields = ('name', 'value')
+
+
 class IpdProcedureDetailSerializer(serializers.ModelSerializer):
     features = IpdProcedureFeatureSerializer(source='feature_mappings', read_only=True, many=True)
+    all_details = IpdProcedureAllDetailsSerializer(source='ipdproceduredetail_set', read_only=True, many=True)
 
     class Meta:
         model = IpdProcedure
-        fields = ('id', 'name', 'details', 'is_enabled', 'features', 'about')
+        fields = ('id', 'name', 'details', 'is_enabled', 'features', 'about', 'all_details')
 
 
 class TopHospitalForIpdProcedureSerializer(serializers.ModelSerializer):

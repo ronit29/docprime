@@ -99,6 +99,7 @@ class IpdProcedureLead(auth_model.TimeStampedModel):
 
 class IpdProcedureDetailType(auth_model.TimeStampedModel):
     name = models.CharField(max_length=1000)
+    priority = models.PositiveIntegerField(default=0)
 
     def __str__(self):
         return '{}'.format(self.name)
