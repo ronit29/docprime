@@ -719,57 +719,78 @@ class UserInsurance(auth_model.TimeStampedModel):
         return user_insurance_obj
 
     def validate_insurance(self, appointment_data):
-        is_insured = False
-        insurance_id = None
-        insurance_message = ""
+        response_dict = {
+            'is_insured': False,
+            'insurance_id': None,
+            'insurance_message': "",
+            'doctor_specialization_dict': dict()
+        }
+
         profile = appointment_data.get('profile', None)
         user = profile.user
         user_insurance = UserInsurance.objects.filter(user=user).last()
         if not user_insurance or not user_insurance.is_valid() or \
                 not user_insurance.is_appointment_valid(appointment_data['start_date']):
-            return False, None, 'Not covered under insurance'
+            response_dict['insurance_message'] = 'Not covered under insurance'
+            return response_dict
 
         insured_members = user_insurance.members.all().filter(profile=profile)
         if not insured_members.exists():
-            return False, user_insurance.id, 'Profile Not covered under insurance'
+            response_dict['insurance_id'] = user_insurance.id
+            response_dict['insurance_message'] = 'Profile Not covered under insurance'
+            return response_dict
 
         threshold = InsuranceThreshold.objects.filter(insurance_plan_id=user_insurance.insurance_plan_id).first()
         if not threshold:
-            return False, user_insurance.id, 'Threshold Amount Not define for plan'
+            response_dict['insurance_id'] = user_insurance.id
+            response_dict['insurance_message'] = 'Threshold Amount Not define for plan'
+            return response_dict
 
         if not 'doctor' in appointment_data:
             is_insured, insurance_id, insurance_message = user_insurance.validate_lab_insurance(appointment_data, user_insurance)
+            response_dict['is_insured'] = is_insured
+            response_dict['insurance_id'] = insurance_id
+            response_dict['insurance_message'] = insurance_message
+
         else:
             is_insured, insurance_id, insurance_message = user_insurance.validate_doctor_insurance(appointment_data, user_insurance)
+            response_dict['is_insured'] = is_insured
+            response_dict['insurance_id'] = insurance_id
+            response_dict['insurance_message'] = insurance_message
+
             doctor = appointment_data['doctor']
             if is_insured:
                 if InsuranceDoctorSpecializations.get_doctor_insurance_specializations(doctor):
                     specialization_count_dict = InsuranceDoctorSpecializations.get_already_booked_specialization_appointments(
                         user, user_insurance.id)
+                    response_dict['doctor_specialization_dict'] = specialization_count_dict
 
                     if specialization_count_dict.get(InsuranceDoctorSpecializations.SpecializationMapping.GYNOCOLOGIST, {}) \
                             .get('count', 0) >= int(settings.INSURANCE_GYNECOLOGIST_LIMIT):
-                        is_insured = False
-                        insurance_id = None
-                        insurance_message = "Gynocologist Appointment exceeded of limit 5"
+                        response_dict['is_insured'] = False
+                        response_dict['insurance_id'] = None
+                        response_dict['insurance_message'] = "Gynocologist Appointment exceeded of limit 5"
+
                     elif specialization_count_dict.get(InsuranceDoctorSpecializations.SpecializationMapping.ONCOLOGIST, {}) \
                             .get('count', 0) >= int(settings.INSURANCE_ONCOLOGIST_LIMIT):
-                        is_insured = False
-                        insurance_id = None
-                        insurance_message = "Oncologist Appointment exceeded of limit 5"
+                        response_dict['is_insured'] = False
+                        response_dict['insurance_id'] = None
+                        response_dict['insurance_message'] = "Oncologist Appointment exceeded of limit 5"
+
                     else:
-                        is_insured = True
-                        insurance_id = user_insurance.id
-                        insurance_message = ""
+                        response_dict['is_insured'] = True
+                        response_dict['insurance_id'] = user_insurance.id
+                        response_dict['insurance_message'] = ""
                 else:
-                    is_insured = True
-                    insurance_id = user_insurance.id
-                    insurance_message = ""
+                    response_dict['is_insured'] = True
+                    response_dict['insurance_id'] = user_insurance.id
+                    response_dict['insurance_message'] = ""
             else:
-                is_insured = False
-                insurance_id = None
-                insurance_message = ""
-        return is_insured, insurance_id, insurance_message
+                response_dict['is_insured'] = False
+                response_dict['insurance_id'] = None
+                response_dict['insurance_message'] = ""
+
+        return response_dict
 
     def validate_lab_insurance(self, appointment_data, user_insurance):
         from ondoc.diagnostic.models import AvailableLabTest
@@ -852,7 +873,11 @@ class UserInsurance(auth_model.TimeStampedModel):
         return result
 
     def validate_insurance_for_cart(self, appointment_data, cart_items):
-        is_insured, insurance_id, insurance_message = self.validate_insurance(appointment_data)
+        insurance_validate_dict = self.validate_insurance(appointment_data)
+        is_insured = insurance_validate_dict['is_insured']
+        insurance_id = insurance_validate_dict['insurance_id']
+        insurance_message = insurance_validate_dict['insurance_message']
+
         gyno_count = 0
         onco_count = 0
         doctor = appointment_data.get('doctor', None)
@@ -864,7 +889,7 @@ class UserInsurance(auth_model.TimeStampedModel):
         if specialization_result is None:
             return is_insured, insurance_id, insurance_message
 
-        specialization_count_dict = InsuranceDoctorSpecializations.get_already_booked_specialization_appointments(user, insurance_id)
+        specialization_count_dict = insurance_validate_dict['doctor_specialization_dict']
         gyno_count = specialization_count_dict[InsuranceDoctorSpecializations.SpecializationMapping.GYNOCOLOGIST].get('count', 0)
         onco_count = specialization_count_dict[InsuranceDoctorSpecializations.SpecializationMapping.ONCOLOGIST].get('count', 0)
 

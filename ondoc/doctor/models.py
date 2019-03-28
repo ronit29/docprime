@@ -2258,7 +2258,11 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
         insurance_message = ""
         user_insurance = UserInsurance.objects.filter(user=user).last()
         if user_insurance:
-            is_appointment_insured, insurance_id, insurance_message = user_insurance.validate_insurance(data)
+            insurance_validate_dict = user_insurance.validate_insurance(data)
+            is_appointment_insured = insurance_validate_dict['is_insured']
+            insurance_id = insurance_validate_dict['insurance_id']
+            insurance_message = insurance_validate_dict['insurance_message']
+
             if is_appointment_insured:
                 payment_type = OpdAppointment.INSURANCE
                 effective_price = 0.0

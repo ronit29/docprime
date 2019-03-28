@@ -1791,8 +1791,11 @@ class LabAppointmentView(mixins.CreateModelMixin,
 
         user_insurance = UserInsurance.objects.filter(user=request.user).last()
         if user_insurance:
-            data['is_appointment_insured'], data['insurance_id'], data[
-                'insurance_message'] = user_insurance.validate_insurance(validated_data)
+            insurance_validate_dict = user_insurance.validate_insurance(validated_data)
+            data['is_appointment_insured'] = insurance_validate_dict['is_insured']
+            data['insurance_id'] = insurance_validate_dict['insurance_id']
+            data['insurance_message'] = insurance_validate_dict['insurance_message']
+
             if data['is_appointment_insured']:
                 data['payment_type'] = OpdAppointment.INSURANCE
         else:
@@ -2066,7 +2069,10 @@ class LabAppointmentView(mixins.CreateModelMixin,
         user_insurance_obj = UserInsurance.objects.filter(user=user).last()
         if not user_insurance_obj:
             return False, None, ''
-        insurance_check, insurance_id, fail_message = user_insurance_obj.validate_insurance(appointment_details)
+        insurance_validate_dict = user_insurance_obj.validate_insurance(appointment_details)
+        insurance_check = insurance_validate_dict['is_insured']
+        insurance_id = insurance_validate_dict['insurance_id']
+        fail_message = insurance_validate_dict['insurance_message']
 
         return insurance_check, insurance_id, fail_message
         # Check if appointment can be covered under insurance
