@@ -1056,6 +1056,26 @@ class OpdNotification(Notification):
             push_notification.send(all_receivers.get('push_receivers', []))
             whtsapp_notification.send(all_receivers.get('sms_receivers', []))
 
+    def get_users_for_spoc_with_admins_entries(self, doctor_spocs):
+        doc_spoc_admin_users = list()
+        for spoc in doctor_spocs:
+            admins = GenericAdmin.objects.prefetch_related('user').filter(Q(phone_number=str(spoc.number)),
+                                                                          Q(super_user_permission=True) | Q(
+                                                                              permission_type=GenericAdmin.APPOINTMENT))
+            admins_with_user = admins.filter(user__isnull=False)
+            if admins_with_user.exists():
+                for admin in admins_with_user:
+                    doc_spoc_admin_users.append(admin.user)
+            # admins_without_user = admins.filter(user__isnull=True)
+            admins_without_user = admins.exclude(id__in=admins_with_user)
+            if admins_without_user.exists():
+                for admin in admins_without_user:
+                    created_user = User.objects.create(phone_number=spoc.number, user_type=User.DOCTOR)
+                    admin.user = created_user
+                    admin.save()
+                    doc_spoc_admin_users.append(created_user)
+        return doc_spoc_admin_users
+
     def get_receivers(self):
         all_receivers = {}
         instance = self.appointment
@@ -1066,6 +1086,7 @@ class OpdNotification(Notification):
             return receivers
 
         doctor_spocs = instance.hospital.get_spocs_for_communication() if instance.hospital else []
+        users_for_spoc_with_admins_entries = self.get_users_for_spoc_with_admins_entries(doctor_spocs)
         spocs_to_be_communicated = []
         if notification_type in [NotificationAction.APPOINTMENT_ACCEPTED,
                                  NotificationAction.APPOINTMENT_RESCHEDULED_BY_DOCTOR,
@@ -1122,7 +1143,7 @@ class OpdNotification(Notification):
         spoc_emails, spoc_numbers = get_spoc_email_and_number_hospital(spocs_to_be_communicated)
         user_and_phone_number.extend(spoc_numbers)
         user_and_email.extend(spoc_emails)
-        all_receivers['sms_receivers'] = user_and_phone_number + [{'phone_number': receiver.phone_number, 'user': receiver} for receiver in doctor_spocs_app_recievers]
+        all_receivers['sms_receivers'] = user_and_phone_number + [{'phone_number': user.phone_number, 'user': user} for user in users_for_spoc_with_admins_entries]
         all_receivers['email_receivers'] = user_and_email
         all_receivers['app_receivers'] = app_receivers + doctor_spocs_app_recievers
         all_receivers['push_receivers'] = user_and_tokens
