@@ -114,7 +114,7 @@ def get_integrator_order_status(self, *args, **kwargs):
         status_code = response.status_code
         response = response.json()
         retry_count = get_integrator_order_status.request.retries
-        if response.get('RES_ID') == 'RES0000' and response['BEN_MASTER'][0]['STATUS'].upper() in ['DELIVERY', 'REPORTED', 'SERVICED', 'CREDITED']:
+        if response.get('RES_ID') == 'RES0000' and response['BEN_MASTER'][0]['STATUS'].upper() == "ACCEPTED":
             if not appointment.status in [5, 6, 7]:
                 appointment.status = 5
                 appointment.save()

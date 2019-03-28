@@ -2105,7 +2105,9 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin)
                                                                 content_type=lab_appointment_content_type).order_by('id').last()
         if not integrator_response:
             return 'Not Found'
-        return integrator_response.lead_id
+
+        return [integrator_response.lead_id, integrator_response.integrator_order_id]
+
 
     def accepted_through(self):
         from ondoc.integrations.models import IntegratorHistory

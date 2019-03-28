@@ -214,7 +214,13 @@ class Thyrocare(BaseIntegrator):
             for package in packages:
                 integrator_package = IntegratorProfileMapping.objects.filter(package_id=package.id, integrator_class_name=Thyrocare.__name__, is_active=True).first()
                 if integrator_package:
-                    product.append(integrator_package.integrator_package_name)
+                    if integrator_package.integrator_type == "OFFER":
+                        payload["report_code"] = integrator_package.integrator_product_data["code"]
+                    if integrator_package.integrator_product_data["testnames"] == 'null':
+                        name = integrator_package.integrator_product_data["name"]
+                    else:
+                        name = integrator_package.integrator_product_data["testnames"]
+                    product.append(name)
                     rate += int(integrator_package.integrator_product_data["rate"]["b2c"])
                 else:
                     logger.info("[ERROR] No package data found in integrator for.")
@@ -320,8 +326,8 @@ class Thyrocare(BaseIntegrator):
 
         payload = {
             "UserId": 2147,
-            "OrderNo": integrator_response.dp_order_id,
-            "VisitId": integrator_response.dp_order_id,
+            "OrderNo": integrator_response.integrator_order_id,
+            "VisitId": integrator_response.integrator_order_id,
             "BTechId": 0,
             "Status": 2,
             "RemarksId": 67,
@@ -370,7 +376,7 @@ class Thyrocare(BaseIntegrator):
                 # check integrator order status and update docprime booking
                 if response['BEN_MASTER'][0]['STATUS'].upper() == 'YET TO ASSIGN':
                     pass
-                elif response['BEN_MASTER'][0]['STATUS'].upper() in ['DELIVERY', 'REPORTED', 'SERVICED', 'CREDITED']:
+                elif response['BEN_MASTER'][0]['STATUS'].upper() == "ACCEPTED":
                     if not dp_appointment.status in [5, 6, 7]:
                         dp_appointment.status = 5
                         dp_appointment.save()
@@ -379,11 +385,13 @@ class Thyrocare(BaseIntegrator):
 
                 elif response['BEN_MASTER'][0]['STATUS'].upper() == 'DONE':
                     pass
-                elif response['BEN_MASTER'][0]['STATUS'].upper() in ['CANCELLED', 'REJECTED']:
+                elif response['BEN_MASTER'][0]['STATUS'].upper() == 'CANCELLED':
                     if not dp_appointment.status == 6:
                         dp_appointment.status = 6
-                        dp_appointment.cancellation_type = 2
                         dp_appointment.save()
+                        status = IntegratorHistory.CANCELLED
+                        IntegratorHistory.create_history(dp_appointment, url, response, url, 'cancel_from_order_summary_cron',
+                                                         'Thyrocare', status_code, 0, status, 'integrator_api')
             else:
                 print("[ERROR] %s %s" % (integrator_response.id, response.get('RESPONSE')))
 
