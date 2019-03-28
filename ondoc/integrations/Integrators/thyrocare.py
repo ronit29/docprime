@@ -375,23 +375,23 @@ class Thyrocare(BaseIntegrator):
 
                 # check integrator order status and update docprime booking
                 if response['BEN_MASTER'][0]['STATUS'].upper() == 'YET TO ASSIGN':
-                    pass
+                    status = IntegratorHistory.PUSHED_AND_NOT_ACCEPTED
+                elif response['BEN_MASTER'][0]['STATUS'].upper() == 'YET TO CONFIRM':
+                    status = IntegratorHistory.PUSHED_AND_NOT_ACCEPTED
                 elif response['BEN_MASTER'][0]['STATUS'].upper() == "ACCEPTED":
                     if not dp_appointment.status in [5, 6, 7]:
                         dp_appointment.status = 5
                         dp_appointment.save()
                         status = IntegratorHistory.PUSHED_AND_ACCEPTED
-                        IntegratorHistory.create_history(dp_appointment, url, response, url, 'order_summary_cron', 'Thyrocare', status_code, 0, status, 'integrator_api')
-
-                elif response['BEN_MASTER'][0]['STATUS'].upper() == 'DONE':
-                    pass
+                # elif response['BEN_MASTER'][0]['STATUS'].upper() == 'DONE':
+                #     pass
                 elif response['BEN_MASTER'][0]['STATUS'].upper() == 'CANCELLED':
                     if not dp_appointment.status == 6:
                         dp_appointment.status = 6
                         dp_appointment.save()
                         status = IntegratorHistory.CANCELLED
-                        IntegratorHistory.create_history(dp_appointment, url, response, url, 'cancel_from_order_summary_cron',
-                                                         'Thyrocare', status_code, 0, status, 'integrator_api')
+
+                IntegratorHistory.create_history(dp_appointment, url, response, url, 'order_summary_cron', 'Thyrocare', status_code, 0, status, 'integrator_api')
             else:
                 print("[ERROR] %s %s" % (integrator_response.id, response.get('RESPONSE')))
 
