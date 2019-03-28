@@ -90,6 +90,7 @@ class RatingsReviewForm(forms.ModelForm):
 
 class RatingsReviewAdmin(ImportExportMixin, admin.ModelAdmin):
     form = RatingsReviewForm
+    search_fields = ['appointment_id']
     resource_class = RatingsReviewResource
     inlines = [ReviewActionsInLine]
     list_display = (['name', 'booking_id', 'appointment_type', 'ratings', 'moderation_status', 'updated_at'])

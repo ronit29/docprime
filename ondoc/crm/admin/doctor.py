@@ -227,7 +227,7 @@ class DoctorClinicInline(nested_admin.NestedTabularInline):
     inlines = [DoctorClinicTimingInline, DoctorClinicProcedureInline, DoctorClinicIpdProcedureInline, AssociatedMerchantInline]
     fields = ['hospital',
               # 'add_hospital_link',
-              'followup_duration', 'followup_charges', 'enabled_for_online_booking', 'enabled', 'priority']
+              'followup_duration', 'followup_charges', 'enabled_for_online_booking', 'enabled', 'priority', 'welcome_calling_done']
 
     # def get_readonly_fields(self, *args, **kwargs):
     #     read_only = super().get_readonly_fields(*args, **kwargs)

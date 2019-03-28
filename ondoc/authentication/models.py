@@ -1615,6 +1615,13 @@ class WelcomeCallingDone(models.Model):
     welcome_calling_done = models.BooleanField(default=False)
     welcome_calling_done_at = models.DateTimeField(null=True, blank=True)
 
+    def save(self, *args, **kwargs):
+        if self.welcome_calling_done and not self.welcome_calling_done_at:
+            self.welcome_calling_done_at = timezone.now()
+        elif not self.welcome_calling_done and self.welcome_calling_done_at:
+            self.welcome_calling_done_at = None
+        super().save(*args, **kwargs)
+
     class Meta:
         abstract = True
 
