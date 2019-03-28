@@ -7,7 +7,7 @@ from datetime import datetime
 import pytz
 import jwt
 from ondoc.authentication.backends import JWTAuthentication
-from django.db.models import F
+from django.db.models import F, Q
 # from hardcopy import bytestring_to_pdf
 
 from ondoc.api.v1.utils import util_absolute_url, util_file_name, generate_short_url
@@ -40,17 +40,37 @@ logger = logging.getLogger(__name__)
 def get_spoc_email_and_number_hospital(spocs):
     user_and_email = []
     user_and_number = []
-    all_email = set()
-    all_phone_number = set()
     for spoc in spocs:
-        if spoc.email:
-            all_email.add(spoc.email)
         if spoc.number and spoc.number in range(1000000000, 9999999999):
-            all_phone_number.add(spoc.number)
-    for phone_number in all_phone_number:
-        user_and_number.append({'user': None, 'phone_number': phone_number})
-    for email in all_email:
-        user_and_email.append({'user': None, 'email': email})
+            admins = GenericAdmin.objects.prefetch_related('user').filter(Q(phone_number=str(spoc.number)),
+                                                                          Q(super_user_permission=True) | Q(
+                                                                              permission_type=GenericAdmin.APPOINTMENT,
+                                                                              write_permission=True))
+            if admins:
+                admins_with_user = admins.filter(user__isnull=False)
+                if admins_with_user.exists():
+                    for admin in admins_with_user:
+                        if int(admin.user.phone_number) == int(spoc.number):
+                            user_and_number.append({'user': admin.user, 'phone_number': spoc.number})
+                            if spoc.email:
+                                user_and_email.append({'user': admin.user, 'email': spoc.email})
+                        else:
+                            user_and_number.append({'user': None, 'phone_number': spoc.number})
+                            if spoc.email:
+                                user_and_email.append({'user': None, 'email': spoc.email})
+                admins_without_user = admins.exclude(id__in=admins_with_user)
+                if admins_without_user.exists():
+                    for admin in admins_without_user:
+                        created_user = User.objects.create(phone_number=spoc.number, user_type=User.DOCTOR)
+                        admin.user = created_user
+                        admin.save()
+                        user_and_number.append({'user': created_user, 'phone_number': spoc.number})
+                        if spoc.email:
+                            user_and_email.append({'user': created_user, 'email': spoc.email})
+            else:
+                user_and_number.append({'user': None, 'phone_number': spoc.number})
+        elif spoc.email:
+            user_and_email.append({'user': None, 'email': spoc.email})
     return user_and_email, user_and_number
 
 
@@ -78,9 +98,8 @@ def unique_emails(list_):
     temp = set()
 
     for item in list_:
-        if item.get('email', None) and item.get('user', None):
+        if item.get('email', None) or item.get('user', None):
             temp.add((item.get('user'), item.get('email').strip().lower()))
-
     return [{'user': item[0], 'email': item[1]} for item in temp]
 
 
@@ -91,7 +110,7 @@ def unique_phone_numbers(list_):
     temp = set()
 
     for item in list_:
-        if item.get('phone_number', None) and item.get('user', None):
+        if item.get('phone_number', None) or item.get('user', None):
             temp.add((item.get('user'), str(item.get('phone_number')).strip().lower()))
 
     return [{'user': item[0], 'phone_number': item[1]} for item in temp]
@@ -1056,26 +1075,6 @@ class OpdNotification(Notification):
             push_notification.send(all_receivers.get('push_receivers', []))
             whtsapp_notification.send(all_receivers.get('sms_receivers', []))
 
-    def get_users_for_spoc_with_admins_entries(self, doctor_spocs):
-        doc_spoc_admin_users = list()
-        for spoc in doctor_spocs:
-            admins = GenericAdmin.objects.prefetch_related('user').filter(Q(phone_number=str(spoc.number)),
-                                                                          Q(super_user_permission=True) | Q(
-                                                                              permission_type=GenericAdmin.APPOINTMENT))
-            admins_with_user = admins.filter(user__isnull=False)
-            if admins_with_user.exists():
-                for admin in admins_with_user:
-                    doc_spoc_admin_users.append(admin.user)
-            # admins_without_user = admins.filter(user__isnull=True)
-            admins_without_user = admins.exclude(id__in=admins_with_user)
-            if admins_without_user.exists():
-                for admin in admins_without_user:
-                    created_user = User.objects.create(phone_number=spoc.number, user_type=User.DOCTOR)
-                    admin.user = created_user
-                    admin.save()
-                    doc_spoc_admin_users.append(created_user)
-        return doc_spoc_admin_users
-
     def get_receivers(self):
         all_receivers = {}
         instance = self.appointment
@@ -1086,7 +1085,6 @@ class OpdNotification(Notification):
             return receivers
 
         doctor_spocs = instance.hospital.get_spocs_for_communication() if instance.hospital else []
-        users_for_spoc_with_admins_entries = self.get_users_for_spoc_with_admins_entries(doctor_spocs)
         spocs_to_be_communicated = []
         if notification_type in [NotificationAction.APPOINTMENT_ACCEPTED,
                                  NotificationAction.APPOINTMENT_RESCHEDULED_BY_DOCTOR,
@@ -1138,12 +1136,12 @@ class OpdNotification(Notification):
                 user_and_phone_number.append({'user': user, 'phone_number': phone_number})
             if email:
                 user_and_email.append({'user': user, 'email': email})
-        user_and_email = unique_emails(user_and_email)
-        user_and_phone_number = unique_phone_numbers(user_and_phone_number)
         spoc_emails, spoc_numbers = get_spoc_email_and_number_hospital(spocs_to_be_communicated)
         user_and_phone_number.extend(spoc_numbers)
         user_and_email.extend(spoc_emails)
-        all_receivers['sms_receivers'] = user_and_phone_number + [{'phone_number': user.phone_number, 'user': user} for user in users_for_spoc_with_admins_entries]
+        user_and_email = unique_emails(user_and_email)
+        user_and_phone_number = unique_phone_numbers(user_and_phone_number)
+        all_receivers['sms_receivers'] = user_and_phone_number
         all_receivers['email_receivers'] = user_and_email
         all_receivers['app_receivers'] = app_receivers + doctor_spocs_app_recievers
         all_receivers['push_receivers'] = user_and_tokens

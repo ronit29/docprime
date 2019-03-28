@@ -12,8 +12,7 @@ Please collect Rs {{cod_amount}} from the customer at the time of appointment.
 {% else %}
 Please note that the consultation needs to be done on Credit Basis.
 Please do not ask for consultation fees from the customer.
-{% endif %}
-{% if provider_login_url %}
+{% endif %}{% if provider_login_url %}
 To accept/reschedule the appointment, please click the link provided below:
 {{provider_login_url}}
 {% endif %}
