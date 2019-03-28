@@ -1,18 +1,35 @@
 from django.contrib import admin
 from ondoc.integrations.models import IntegratorMapping
 from ondoc.integrations.models import IntegratorProfileMapping, IntegratorReport
+from ondoc.diagnostic.models import LabTest, Lab, LabPricingGroup, AvailableLabTest
+from django import forms
+from django.conf import settings
+
+
+class IntegratorMappingForm(forms.ModelForm):
+    test = forms.ModelChoiceField(
+        queryset=LabTest.objects.filter(is_package=False, availablelabs__lab_pricing_group__labs__network_id=int(settings.THYROCARE_NETWORK_ID),
+                                        enable_for_retail=True, availablelabs__enabled=True).distinct())
 
 
 class IntegratorMappingAdmin(admin.ModelAdmin):
     model = IntegratorMapping
+    form = IntegratorMappingForm
     list_display = ('integrator_class_name', 'integrator_test_name', 'is_active',)
     fields = ('test', 'integrator_test_name', 'is_active',)
     readonly_fields = ('integrator_test_name',)
     autocomplete_fields = ['test']
 
 
+class IntegratorProfileMappingForm(forms.ModelForm):
+    package = forms.ModelChoiceField(
+        queryset=LabTest.objects.filter(is_package=True, availablelabs__lab_pricing_group__labs__network_id=int(settings.THYROCARE_NETWORK_ID),
+                                        enable_for_retail=True, availablelabs__enabled=True).distinct())
+
+
 class IntegratorProfileMappingAdmin(admin.ModelAdmin):
     model = IntegratorProfileMapping
+    form = IntegratorProfileMappingForm
     list_display = ('integrator_class_name', 'integrator_package_name', 'is_active',)
     fields = ('package', 'integrator_package_name', 'is_active',)
     readonly_fields = ('integrator_package_name',)
