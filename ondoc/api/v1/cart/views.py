@@ -122,7 +122,7 @@ class CartViewSet(viewsets.GenericViewSet):
                 validated_data = item.validate(request)
                 insurance_doctor = validated_data.get('doctor', None)
                 if insurance_doctor:
-                    is_doctor_insured, insurance_id, insurance_message = user_insurance.validate_doctor_insurance(item, user_insurance)
+                    is_doctor_insured, insurance_id, insurance_message = user_insurance.validate_doctor_insurance(item.data, user_insurance)
                     if specialization_count_dict and is_doctor_insured:
                         doctor_specilization_tuple = InsuranceDoctorSpecializations.get_doctor_insurance_specializations(insurance_doctor)
                         if doctor_specilization_tuple:
