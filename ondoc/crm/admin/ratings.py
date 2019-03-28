@@ -123,6 +123,8 @@ class RatingsReviewAdmin(ImportExportMixin, admin.ModelAdmin):
             response = mark_safe('''<a href='%s' target='_blank'>%s</a>''' % (url, instance.appointment_id))
             return response
         return ''
+    booking_id.admin_order_field = 'appointment_id'
+
 
     def send_update_sms(self, instance, msg):
         from ondoc.authentication.backends import JWTAuthentication
