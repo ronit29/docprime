@@ -49,11 +49,15 @@ class Command(BaseCommand):
 
         total_migrated = 0
         # storing events
+        counter = 0
         try:
-            for psql_events in EventMigrateIterator(24, 10):
+            for psql_events in EventMigrateIterator(1, 250*4):
+                counter += 1
                 create_objects = []
-                mongo_events = track_mongo_models.TrackingEvent.objects.filter(id__in=[x.id for x in psql_events]).values_list('id')
-                psql_events = psql_events.exclude(id__in=mongo_events)
+                mongo_events = []
+                if counter<=3:
+                    mongo_events = track_mongo_models.TrackingEvent.objects.filter(id__in=[x.id for x in psql_events]).values_list('id')
+                    psql_events = psql_events.exclude(id__in=mongo_events)
 
                 for event in psql_events:
                     eventJson = {"id": event.id, "name": event.name, "visit_id": event.visit_id, "user": event.user_id,

@@ -1210,6 +1210,8 @@ class LabList(viewsets.ReadOnlyModelViewSet):
             row['home_pickup_charges'] = lab_obj.home_pickup_charges
             row['is_home_collection_enabled'] = lab_obj.is_home_collection_enabled
             row['is_insurance_enabled'] = lab_obj.is_insurance_enabled
+            row['avg_rating'] = lab_obj.rating_data.get('avg_rating') if lab_obj.rating_data else None
+            row['rating_count'] = lab_obj.rating_data.get('rating_count') if lab_obj.rating_data else None
 
             # if lab_obj.always_open:
             #     lab_timing = "12:00 AM - 11:45 PM"
