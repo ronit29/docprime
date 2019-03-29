@@ -12,7 +12,7 @@ class Migration(migrations.Migration):
     operations = [
         migrations.RunSQL(
             '''
-                CREATE EXTENSION pg_trgm;
+                CREATE EXTENSION if not exists pg_trgm;
                 '''
         ),
         migrations.RunSQL(''' 
