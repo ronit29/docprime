@@ -3,7 +3,6 @@ from django.db import models
 from django.contrib.contenttypes.fields import GenericForeignKey
 from django.contrib.contenttypes.models import ContentType
 from ondoc.authentication.models import TimeStampedModel
-from ondoc.diagnostic.models import LabTest
 from ondoc.common.helper import Choices
 from django.contrib.postgres.fields import JSONField
 
@@ -11,6 +10,8 @@ from django.contrib.postgres.fields import JSONField
 
 
 class IntegratorMapping(TimeStampedModel):
+    from ondoc.diagnostic.models import LabTest
+
     class ServiceType(Choices):
         LabTest = 'LABTEST'
 
@@ -48,6 +49,8 @@ class IntegratorMapping(TimeStampedModel):
 
 
 class IntegratorProfileMapping(TimeStampedModel):
+    from ondoc.diagnostic.models import LabTest
+
     class ServiceType(Choices):
         LabTest = 'PROFILES'
 
@@ -166,6 +169,8 @@ class IntegratorHistory(TimeStampedModel):
 
 
 class IntegratorTestMapping(TimeStampedModel):
+    from ondoc.diagnostic.models import LabTest
+
     class ServiceType(Choices):
         LabTest = 'LABTEST'
 

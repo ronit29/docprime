@@ -803,6 +803,15 @@ class LabAppointmentAdmin(nested_admin.NestedModelAdmin):
     #         temp_autocomplete_fields = super().get_autocomplete_fields(request)
     #     return temp_autocomplete_fields
 
+    def get_search_results(self, request, queryset, search_term):
+        queryset, use_distinct = super().get_search_results(request, queryset, None)
+
+        queryset = queryset.filter(Q(integrator_response__integrator_order_id__icontains=search_term) |
+         Q(id__contains=search_term)).distinct()
+
+        return queryset, use_distinct
+
+
     def integrator_order_status(self, obj):
         return obj.integrator_order_status()
 
