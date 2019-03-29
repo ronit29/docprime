@@ -68,6 +68,7 @@ class ArticleViewSet(viewsets.GenericViewSet):
         article_contains = request.GET.get('contains', None)
         recent_articles = None
         recent_articles_data = None
+        recent_articles_dict = None
 
         title_description = ArticleCategory.objects.filter(url=category_url).values('title', 'description', 'name')
 
@@ -88,6 +89,7 @@ class ArticleViewSet(viewsets.GenericViewSet):
 
         recent_articles = serializers.ArticleListSerializer(recent_articles_data, many=True,
                                                             context={'request': request}).data
+        recent_articles_dict = {'title': 'Recent Articles', 'items': recent_articles}
 
         articles_count = article_data.count()
         article_data = paginate_queryset(article_data, request, 50)
@@ -116,7 +118,7 @@ class ArticleViewSet(viewsets.GenericViewSet):
 
         return Response(
             {'result': resp, 'seo': category_seo, 'category': category.name, 'total_articles': articles_count, 'search_content': top_content
-             , 'bottom_content': bottom_content, 'recent_articles': recent_articles})
+             , 'bottom_content': bottom_content, 'recent_articles': recent_articles_dict})
 
     @transaction.non_atomic_requests
     def retrieve(self, request):
