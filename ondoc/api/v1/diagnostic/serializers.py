@@ -1367,8 +1367,8 @@ class CustomLabTestPackageSerializer(serializers.ModelSerializer):
     def get_rating(self, obj):
         lab_data = self.context.get('lab_data', {})
         data = lab_data.get(obj.lab, None)
-        if data is not None:
-            return data.avg_rating
+        if data is not None and data.rating_data:
+            return data.rating_data.get('avg_rating')
         return None
 
     def get_pickup_charges(self, obj):

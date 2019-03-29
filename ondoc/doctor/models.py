@@ -605,7 +605,7 @@ class Doctor(auth_model.TimeStampedModel, auth_model.QCModel, SearchKey, auth_mo
     source_type = models.IntegerField(choices=SOURCE_TYPE_CHOICES, null=True, editable=False)
     avg_rating = models.DecimalField(max_digits=5, decimal_places=2, null=True, editable=False)
     remark = GenericRelation(Remark)
-
+    rating_data = JSONField(blank=True, null=True)
     qr_code = GenericRelation(QRCode, related_name="qrcode")
 
     def __str__(self):
@@ -678,12 +678,14 @@ class Doctor(auth_model.TimeStampedModel, auth_model.QCModel, SearchKey, auth_mo
 
     def get_avg_rating(self):
         # return self.rating.filter(is_live=True).aggregate(avg_rating=Avg('ratings'))
-        return self.avg_rating
+        if self.rating_data:
+            return self.rating_data.get('avg_rating')
+        return None
 
     def get_rating_count(self):
         count = 0
-        if self.rating.exists():
-            count = self.rating.count()
+        if self.rating_data and self.rating_data.get('rating_count'):
+            count = self.rating_data.get('rating_count')
         return count
 
     def update_live_status(self):
@@ -762,8 +764,17 @@ class Doctor(auth_model.TimeStampedModel, auth_model.QCModel, SearchKey, auth_mo
         content_type = ContentType.objects.get_for_model(Doctor)
         if content_type:
             cid = content_type.id
-            query = '''UPDATE doctor d set avg_rating = (select avg(ratings) from ratings_review where content_type_id={} and object_id=d.id) '''.format(cid)
+
+            query = '''update doctor d set rating_data=
+                       (
+                       select json_build_object('avg_rating', x.avg_rating,'rating_count', x.rating_count) from
+                       (select object_id as doctor_id,round(avg(ratings),1) avg_rating, count(*) rating_count from 
+                       ratings_review where content_type_id={} group by object_id
+                       )x where x.doctor_id = d.id				  
+                       ) where id in (select object_id from ratings_review where content_type_id={})
+                     '''.format(cid, cid)
             cursor.execute(query)
+
 
     def enabled_for_cod(self):
         return False
