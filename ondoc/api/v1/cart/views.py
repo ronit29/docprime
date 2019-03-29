@@ -121,7 +121,8 @@ class CartViewSet(viewsets.GenericViewSet):
             try:
                 validated_data = item.validate(request)
                 insurance_doctor = validated_data.get('doctor', None)
-                if insurance_doctor:
+                cart_data = validated_data.get('cart_item').data
+                if insurance_doctor and cart_data.get('is_appointment_insured') and user_insurance:
                     is_doctor_insured, insurance_id, insurance_message = user_insurance.validate_doctor_insurance(validated_data, user_insurance)
                     if specialization_count_dict and is_doctor_insured:
                         doctor_specilization_tuple = InsuranceDoctorSpecializations.get_doctor_insurance_specializations(insurance_doctor)
@@ -150,13 +151,19 @@ class CartViewSet(viewsets.GenericViewSet):
                         item.data['insurance_message'] = ""
                         item.data['payment_type'] = OpdAppointment.PREPAID
                 else:
-                    is_lab_insured, insurance_id, insurance_message = user_insurance.validate_lab_insurance(validated_data, user_insurance)
+                    if cart_data.get('is_appointment_insured') and user_insurance:
+                        is_lab_insured, insurance_id, insurance_message = user_insurance.validate_lab_insurance(validated_data, user_insurance)
 
-                    if user_insurance and user_insurance.is_valid() and is_lab_insured:
-                        item.data['is_appointment_insured'] = True
-                        item.data['insurance_id'] = insurance_id
-                        item.data['insurance_message'] = ""
-                        item.data['payment_type'] = OpdAppointment.INSURANCE
+                        if user_insurance and user_insurance.is_valid() and is_lab_insured:
+                            item.data['is_appointment_insured'] = True
+                            item.data['insurance_id'] = insurance_id
+                            item.data['insurance_message'] = ""
+                            item.data['payment_type'] = OpdAppointment.INSURANCE
+                        else:
+                            item.data['is_appointment_insured'] = False
+                            item.data['insurance_id'] = None
+                            item.data['insurance_message'] = ""
+                            item.data['payment_type'] = OpdAppointment.PREPAID
                     else:
                         item.data['is_appointment_insured'] = False
                         item.data['insurance_id'] = None

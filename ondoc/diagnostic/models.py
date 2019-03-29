@@ -223,6 +223,7 @@ class Lab(TimeStampedModel, CreatedByModel, QCModel, SearchKey):
     lab_priority = models.PositiveIntegerField(blank=False, null=False, default=1)
     open_for_communication = models.BooleanField(default=True)
     remark = GenericRelation(Remark)
+    rating_data = JSONField(blank=True, null=True)
 
     def __str__(self):
         return self.name
@@ -470,7 +471,17 @@ class Lab(TimeStampedModel, CreatedByModel, QCModel, SearchKey):
         content_type = ContentType.objects.get_for_model(Lab)
         if content_type:
             cid = content_type.id
-            query = '''UPDATE lab l set avg_rating = (select avg(ratings) from ratings_review where content_type_id={} and object_id=l.id) '''.format(cid)
+            query = '''update lab l set rating_data = 
+                        (select rating_data from
+                        (select max(l.id) lab_id,max(l.network_id) network_id,
+                        json_build_object('avg_rating', round(avg(ratings),1),'rating_count' ,count(ratings)) rating_data
+                        from ratings_review rr
+                        inner join lab l on rr.object_id = l.id 
+                        and rr.content_type_id={}
+                        group by case when l.network_id is null then l.id else l.network_id end
+                        )x where case when l.network_id is null then l.id=x.lab_id else l.network_id=x.network_id end
+                        )
+                     '''.format(cid)
             cursor.execute(query)
 
     def get_timing(self, is_home_pickup):
@@ -1550,7 +1561,7 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin)
                 logger.error(str(e))
 
         is_thyrocare_enabled = False
-        if not self.created_by_native() and False:
+        if not self.created_by_native():
             if push_to_integrator:
                 if self.lab.network and self.lab.network.id == settings.THYROCARE_NETWORK_ID:
                     if settings.THYROCARE_INTEGRATION_ENABLED:
@@ -1558,10 +1569,13 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin)
 
                 try:
                     if is_thyrocare_enabled:
-                        # push_lab_appointment_to_integrator.apply_async(({'appointment_id': self.id},), countdown=5)
-                        push_lab_appointment_to_integrator.apply_async(({'appointment_id': self.id},),
-                                                                       link=get_integrator_order_status.s(appointment_id=self.id),
-                                                                       countdown=5)
+                        if old_instance:
+                            if old_instance.status != self.CANCELLED and self.status == self.CANCELLED:
+                                push_lab_appointment_to_integrator.apply_async(({'appointment_id': self.id},), countdown=5)
+                        else:
+                            push_lab_appointment_to_integrator.apply_async(({'appointment_id': self.id},),
+                                                                           link=get_integrator_order_status.s(
+                                                                               appointment_id=self.id),countdown=5)
                 except Exception as e:
                     logger.error(str(e))
 
@@ -2116,6 +2130,40 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin)
 
         except Exception as e:
             logger.error("Could not save triggered event - " + str(e))
+
+    def integrator_order_status(self):
+        from ondoc.integrations.models import IntegratorHistory
+
+        lab_appointment_content_type = ContentType.objects.get_for_model(self)
+        integrator_history = IntegratorHistory.objects.filter(object_id=self.id,
+                                                              content_type=lab_appointment_content_type).order_by('id').last()
+        if not integrator_history:
+            return 'Not a part of Integration'
+
+        return IntegratorHistory.STATUS_CHOICES[integrator_history.status - 1][1]
+
+    def thyrocare_booking_no(self):
+        from ondoc.integrations.models import IntegratorResponse
+
+        lab_appointment_content_type = ContentType.objects.get_for_model(self)
+        integrator_response = IntegratorResponse.objects.filter(object_id=self.id,
+                                                                content_type=lab_appointment_content_type).order_by('id').last()
+        if not integrator_response:
+            return 'Not Found'
+
+        return [integrator_response.lead_id, integrator_response.integrator_order_id]
+
+
+    def accepted_through(self):
+        from ondoc.integrations.models import IntegratorHistory
+
+        lab_appointment_content_type = ContentType.objects.get_for_model(self)
+        integrator_history = IntegratorHistory.objects.filter(object_id=self.id,
+                                                              content_type=lab_appointment_content_type).order_by('id').last()
+        if not integrator_history:
+            return 'Not Found'
+
+        return integrator_history.accepted_through
 
     def __str__(self):
         return "{}, {}".format(self.profile.name if self.profile else "", self.lab.name)
