@@ -7,8 +7,9 @@ from django.conf import settings
 
 
 class IntegratorMappingForm(forms.ModelForm):
-    test = forms.ModelChoiceField(queryset=LabTest.objects.filter(is_package=False, id__in=list(map(lambda available_lab_test: available_lab_test.test_id, AvailableLabTest.objects.select_related('test').filter(
-            lab_pricing_group__in=Lab.objects.filter(network_id=int(settings.THYROCARE_NETWORK_ID)).values_list('lab_pricing_group', flat=True))))).all())
+    test = forms.ModelChoiceField(
+        queryset=LabTest.objects.filter(is_package=False, availablelabs__lab_pricing_group__labs__network_id=int(settings.THYROCARE_NETWORK_ID),
+                                        enable_for_retail=True, availablelabs__enabled=True).distinct())
 
 
 class IntegratorMappingAdmin(admin.ModelAdmin):
@@ -21,8 +22,9 @@ class IntegratorMappingAdmin(admin.ModelAdmin):
 
 
 class IntegratorProfileMappingForm(forms.ModelForm):
-    package = forms.ModelChoiceField(queryset=LabTest.objects.filter(is_package=True, id__in=list(map(lambda available_lab_test: available_lab_test.test_id, AvailableLabTest.objects.select_related('test').filter(
-            lab_pricing_group__in=Lab.objects.filter(network_id=int(settings.THYROCARE_NETWORK_ID)).values_list('lab_pricing_group', flat=True))))).all())
+    package = forms.ModelChoiceField(
+        queryset=LabTest.objects.filter(is_package=True, availablelabs__lab_pricing_group__labs__network_id=int(settings.THYROCARE_NETWORK_ID),
+                                        enable_for_retail=True, availablelabs__enabled=True).distinct())
 
 
 class IntegratorProfileMappingAdmin(admin.ModelAdmin):
