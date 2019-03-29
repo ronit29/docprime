@@ -51,7 +51,7 @@ class Command(BaseCommand):
         # storing events
         counter = 0
         try:
-            for psql_events in EventMigrateIterator(1, 250*4):
+            for psql_events in EventMigrateIterator(.1, 250*4):
                 print('read from postgres done '+ str(datetime.now()))
                 counter += 1
                 create_objects = []
@@ -82,6 +82,7 @@ class Command(BaseCommand):
             pass
         except Exception as e:
             print("FAILED TO MIGRATE ALL EVENTS")
+            print(e)
             return
 
         print("DONE MIGRATING EVENTS")
