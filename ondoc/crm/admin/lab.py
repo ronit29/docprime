@@ -1293,7 +1293,7 @@ class LabTestAdminForm(forms.ModelForm):
                 raise forms.ValidationError('Please dont enter reference code for a test')
 
 
-class LabTestAdmin(PackageAutoCompleteView, ImportExportMixin, VersionAdmin):
+class LabTestAdmin(ImportExportMixin, VersionAdmin):
     form = LabTestAdminForm
     change_list_template = 'superuser_import_export.html'
     formats = (base_formats.XLS, base_formats.XLSX,)

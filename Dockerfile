@@ -43,4 +43,4 @@ fi
 
 EXPOSE 80
 # RUN cp -r /env/django/supervisor_configs/.  /etc/supervisor/conf.d/
-CMD ["sh", "/home/docprime/workspace/entrypoint/entrypoint"]
+#CMD ["sh", "/home/docprime/workspace/entrypoint/entrypoint"]
