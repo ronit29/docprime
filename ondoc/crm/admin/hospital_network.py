@@ -208,7 +208,7 @@ class HospitalNetworkAdmin(VersionAdmin, ActionAdmin, QCPemAdmin):
     list_display = ('name', 'welcome_calling_done', 'updated_at', 'data_status', 'list_created_by', 'list_assigned_to')
     list_filter = ('data_status', 'welcome_calling_done', CreatedByFilter)
     search_fields = ['name']
-    exclude = ('qc_approved_at', 'welcome_calling_done_at', )
+    exclude = ('qc_approved_at', 'welcome_calling_done_at', 'physical_agreement_signed_at')
     # autocomplete_fields = ['matrix_city', 'matrix_state']
     inlines = [
         HospitalNetworkManagerInline,
