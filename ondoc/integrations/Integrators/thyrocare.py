@@ -13,6 +13,7 @@ from datetime import datetime, date, timedelta
 from ondoc.diagnostic.models import LabReport, LabReportFile, LabAppointment
 from django.contrib.contenttypes.models import ContentType
 from ondoc.api.v1.utils import resolve_address, aware_time_zone
+from django.utils import timezone
 import time
 
 
@@ -178,8 +179,8 @@ class Thyrocare(BaseIntegrator):
             patient_address = resolve_address(lab_appointment.address)
             pincode = lab_appointment.address["pincode"]
         else:
-            patient_address = "Address not available"
-            pincode = "122002"
+            patient_address = ""
+            pincode = ""
 
         order_id = "DP{}".format(lab_appointment.id)
         if profile and profile.gender:
@@ -366,46 +367,49 @@ class Thyrocare(BaseIntegrator):
         from ondoc.integrations.models import IntegratorHistory
 
         dp_appointment = integrator_response.content_object
+        lab_appointment_content_type = ContentType.objects.get_for_model(dp_appointment)
+        integrator_history = IntegratorHistory.objects.filter(object_id=dp_appointment.id,
+                                                              content_type=lab_appointment_content_type).order_by('id').last()
+        if integrator_history:
+            status = integrator_history.status
+            if dp_appointment.status != LabAppointment.CANCELLED or dp_appointment.status != LabAppointment.COMPLETED or \
+                                                (dp_appointment.time_slot_start + timedelta(days=1) < timezone.now()):
 
-        if dp_appointment.status != LabAppointment.CANCELLED or dp_appointment.status != LabAppointment.COMPLETED or \
-                                            (dp_appointment.time_slot_start + timedelta(days=1) < datetime.now()):
+                url = "%s/order.svc/%s/%s/%s/all/OrderSummary" % (settings.THYROCARE_BASE_URL, settings.THYROCARE_API_KEY,
+                                                                  integrator_response.dp_order_id,
+                                                                  integrator_response.response_data['MOBILE'])
+                response = requests.get(url)
+                status_code = response.status_code
+                response = response.json()
+                if response.get('RES_ID') == 'RES0000':
+                    ## RESCHUDULE CASE AFTER DISSCUSSION
+                    # thyrocare_appointment_time = response['LEADHISORY_MASTER'][0]['APPOINT_ON'][0]['DATE']
+                    # thyrocare_appointment_time = datetime.strptime(thyrocare_appointment_time, "%d-%m-%Y %H:%M").strftime("%Y-%m-%d")
+                    # dp_appointment_time = dp_appointment.time_slot_start.strftime("%Y-%m-%d")
+                    # if not thyrocare_appointment_time == dp_appointment_time:
+                    #     dp_appointment.time_slot_start = thyrocare_appointment_time
+                    #     dp_appointment.status = 3
+                    #     dp_appointment.save()
 
-            url = "%s/order.svc/%s/%s/%s/all/OrderSummary" % (settings.THYROCARE_BASE_URL, settings.THYROCARE_API_KEY,
-                                                              integrator_response.dp_order_id,
-                                                              integrator_response.response_data['MOBILE'])
-            response = requests.get(url)
-            status_code = response.status_code
-            response = response.json()
-            if response.get('RES_ID') == 'RES0000':
-                thyrocare_appointment_time = response['LEADHISORY_MASTER'][0]['APPOINT_ON'][0]['DATE']
-                thyrocare_appointment_time = datetime.strptime(thyrocare_appointment_time, "%d-%m-%Y %H:%M").strftime("%Y-%m-%d")
-                dp_appointment_time = dp_appointment.time_slot_start.strftime("%Y-%m-%d")
-                if not thyrocare_appointment_time == dp_appointment_time:
-                    dp_appointment.time_slot_start = thyrocare_appointment_time
-                    dp_appointment.status = 3
-                    dp_appointment.save()
+                    # check integrator order status and update docprime booking
+                    if response['BEN_MASTER'][0]['STATUS'].upper() == 'YET TO ASSIGN':
+                        status = IntegratorHistory.PUSHED_AND_NOT_ACCEPTED
+                    elif response['BEN_MASTER'][0]['STATUS'].upper() == 'YET TO CONFIRM':
+                        status = IntegratorHistory.PUSHED_AND_NOT_ACCEPTED
+                    elif response['BEN_MASTER'][0]['STATUS'].upper() == "ACCEPTED":
+                        if not dp_appointment.status in [5, 6, 7]:
+                            dp_appointment.status = 5
+                            dp_appointment.save()
+                            status = IntegratorHistory.PUSHED_AND_ACCEPTED
+                    elif response['BEN_MASTER'][0]['STATUS'].upper() == 'CANCELLED':
+                        if not dp_appointment.status == 6:
+                            dp_appointment.status = 6
+                            dp_appointment.save()
+                            status = IntegratorHistory.CANCELLED
 
-                # check integrator order status and update docprime booking
-                if response['BEN_MASTER'][0]['STATUS'].upper() == 'YET TO ASSIGN':
-                    pass
-                elif response['BEN_MASTER'][0]['STATUS'].upper() == "ACCEPTED":
-                    if not dp_appointment.status in [5, 6, 7]:
-                        dp_appointment.status = 5
-                        dp_appointment.save()
-                        status = IntegratorHistory.PUSHED_AND_ACCEPTED
-                        IntegratorHistory.create_history(dp_appointment, url, response, url, 'order_summary_cron', 'Thyrocare', status_code, 0, status, 'integrator_api')
-
-                elif response['BEN_MASTER'][0]['STATUS'].upper() == 'DONE':
-                    pass
-                elif response['BEN_MASTER'][0]['STATUS'].upper() == 'CANCELLED':
-                    if not dp_appointment.status == 6:
-                        dp_appointment.status = 6
-                        dp_appointment.save()
-                        status = IntegratorHistory.CANCELLED
-                        IntegratorHistory.create_history(dp_appointment, url, response, url, 'cancel_from_order_summary_cron',
-                                                         'Thyrocare', status_code, 0, status, 'integrator_api')
-            else:
-                print("[ERROR] %s %s" % (integrator_response.id, response.get('RESPONSE')))
+                    IntegratorHistory.create_history(dp_appointment, url, response, url, 'order_summary_cron', 'Thyrocare', status_code, 0, status, 'integrator_api')
+                else:
+                    print("[ERROR] %s %s" % (integrator_response.id, response.get('RESPONSE')))
 
     def time_slot_extraction(self, slots, date):
         am_timings, pm_timings = list(), list()
