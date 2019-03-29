@@ -715,7 +715,7 @@ class DoctorForm(FormCleanMixin):
                     for indx in range(int(self.data[key + '-TOTAL_FORMS'])):
                         all_hospital_ids.append(int(self.data[key + '-{}-hospital'.format(indx)]))
                     if not Hospital.objects.filter(pk__in=all_hospital_ids, is_live=True).count():
-                        raise forms.ValidationError("Atleast one entry of " + key + " should be live for submitting to Quality Check")
+                        raise forms.ValidationError("Atleast one entry of " + key + " should be live.")
             if value == 'value_req':
                 if hasattr(self.instance, key) and not getattr(self.instance, key):
                     raise forms.ValidationError(key + " is required for Quality Check")
