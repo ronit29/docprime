@@ -389,7 +389,7 @@ class DoctorSearchHelper:
         current_location = Point(self.query_params.get("longitude"), self.query_params.get("latitude"),
                                 srid=4326)
         for hospital in doctor.hospitals.all():
-            if hospital.id == doctor_clinic_mapping[doctor.id]:
+            if hospital.id == doctor_clinic_mapping[doctor.id] and hospital.location:
                 return current_location.distance(hospital.location)*100
         return ""
 
@@ -473,7 +473,7 @@ class DoctorSearchHelper:
                     "discounted_fees": min_price["deal_price"],
                     "timings": clinic_convert_timings(doctor_clinic.availability.all(), is_day_human_readable=False),
                     "procedure_categories": final_result,
-                    "location": {'lat': doctor_clinic.hospital.location.y, 'long': doctor_clinic.hospital.location.x}
+                    "location": {'lat': doctor_clinic.hospital.location.y, 'long': doctor_clinic.hospital.location.x} if doctor_clinic.hospital and doctor_clinic.hospital.location else None
                 }]
 
             thumbnail = doctor.get_thumbnail()
