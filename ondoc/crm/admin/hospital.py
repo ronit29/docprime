@@ -165,6 +165,13 @@ class HospitalDoctorInline(admin.TabularInline):
         qs = super().get_queryset(request)
         return qs.select_related('doctor')
 
+    def get_readonly_fields(self, request, obj=None):
+        read_only_field = super().get_readonly_fields(request, obj)
+        if not request.user.is_superuser and not request.user.groups.filter(
+            name=constants['WELCOME_CALLING_TEAM']).exists():
+            read_only_field.append('welcome_calling_done')
+        return read_only_field
+
 
 class HospitalHelplineInline(admin.TabularInline):
     model = HospitalHelpline

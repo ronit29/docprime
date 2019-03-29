@@ -229,14 +229,16 @@ class DoctorClinicInline(nested_admin.NestedTabularInline):
               # 'add_hospital_link',
               'followup_duration', 'followup_charges', 'enabled_for_online_booking', 'enabled', 'priority', 'welcome_calling_done']
 
-    # def get_readonly_fields(self, *args, **kwargs):
-    #     read_only = super().get_readonly_fields(*args, **kwargs)
-    #     if args:
-    #         request = args[0]
-    #         if request.GET.get('AgentId', None):
-    #             self.matrix_agent_id = request.GET.get('AgentId', None)
-    #         read_only += ('add_hospital_link',)
-    #     return read_only
+    def get_readonly_fields(self, *args, **kwargs):
+        read_only = super().get_readonly_fields(*args, **kwargs)
+        request = args[0]
+        # def get_readonly_fields(self, request, obj=None):
+        #     read_only_field = super().get_readonly_fields(request, obj)
+        if not request.user.is_superuser and not request.user.groups.filter(
+                name=constants['WELCOME_CALLING_TEAM']).exists():
+            read_only = read_only + ('welcome_calling_done',)
+        #     return read_only_field
+        return read_only
     #
     # def add_hospital_link(self, obj):
     #     content_type = ContentType.objects.get_for_model(Hospital)
