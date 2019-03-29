@@ -83,8 +83,8 @@ class ArticleViewSet(viewsets.GenericViewSet):
         if article_contains and len(article_contains) > 2:
             article_data = article_data.filter(title__icontains=article_contains)
 
-        if title_description and title_description.first().get('name') == 'Medicines':
-            recent_articles_data = article_data.order_by('-updated_at')[:10]
+        if title_description and title_description.first().get('name') and title_description.first().get('name').lower() == 'Medicines'.lower():
+            recent_articles_data = article_data.filter(is_published=True).order_by('-updated_at')[:10]
 
         recent_articles = serializers.ArticleListSerializer(recent_articles_data, many=True,
                                                             context={'request': request}).data
