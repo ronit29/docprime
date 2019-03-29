@@ -72,7 +72,7 @@ class IntegratorReportAdmin(admin.ModelAdmin):
 class IntegratorTestMappingForm(forms.ModelForm):
     test = forms.ModelChoiceField(
         queryset=LabTest.objects.filter(availablelabs__lab_pricing_group__labs__network_id=int(settings.THYROCARE_NETWORK_ID),
-                                        enable_for_retail=True, availablelabs__enabled=True).distinct())
+                                        enable_for_retail=True, availablelabs__enabled=True).distinct().order_by('name'))
 
 
 class IntegratorTestMappingAdmin(admin.ModelAdmin):
