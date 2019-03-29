@@ -90,6 +90,7 @@ class RatingsReviewForm(forms.ModelForm):
 
 class RatingsReviewAdmin(ImportExportMixin, admin.ModelAdmin):
     form = RatingsReviewForm
+    search_fields = ['appointment_id']
     resource_class = RatingsReviewResource
     inlines = [ReviewActionsInLine]
     list_display = (['name', 'booking_id', 'appointment_type', 'ratings', 'moderation_status', 'updated_at'])
@@ -104,7 +105,7 @@ class RatingsReviewAdmin(ImportExportMixin, admin.ModelAdmin):
         labs = Lab.objects.filter(rating__isnull=False).all().distinct()
         self.docs = doctors
         self.labs = labs
-        return super(RatingsReviewAdmin, self).get_queryset(request).select_related('content_type')
+        return super(RatingsReviewAdmin, self).get_queryset(request).select_related('content_type').order_by('-appointment_id')
 
     def get_form(self, request, obj=None, **kwargs):
         form = super(RatingsReviewAdmin, self).get_form(request, obj, **kwargs)

@@ -325,15 +325,8 @@ class Hospital(auth_model.TimeStampedModel, auth_model.CreatedByModel, auth_mode
             self.is_live = False
 
     def update_time_stamps(self):
-        if self.welcome_calling_done and not self.welcome_calling_done_at:
-            self.welcome_calling_done_at = timezone.now()
-        elif not self.welcome_calling_done and self.welcome_calling_done_at:
-            self.welcome_calling_done_at = None
-
-        if self.physical_agreement_signed and not self.physical_agreement_signed_at:
-            self.physical_agreement_signed_at = timezone.now()
-        elif not self.physical_agreement_signed and self.physical_agreement_signed_at:
-            self.physical_agreement_signed_at = None
+        from ondoc.api.v1.utils import update_physical_agreement_timestamp
+        update_physical_agreement_timestamp(self)
 
         if not self.enabled and not self.disabled_at:
             self.disabled_at = timezone.now()
@@ -977,7 +970,7 @@ class DoctorSpecialization(auth_model.TimeStampedModel):
         unique_together = ("doctor", "specialization")
 
 
-class DoctorClinic(auth_model.TimeStampedModel):
+class DoctorClinic(auth_model.TimeStampedModel, auth_model.WelcomeCallingDone):
     doctor = models.ForeignKey(Doctor, on_delete=models.CASCADE, related_name='doctor_clinics')
     hospital = models.ForeignKey(Hospital, on_delete=models.CASCADE, related_name='hospital_doctors')
     followup_duration = models.PositiveSmallIntegerField(blank=True, null=True)
@@ -1416,7 +1409,7 @@ class DoctorEmail(auth_model.TimeStampedModel):
         unique_together = (("doctor", "email"),)
 
 
-class HospitalNetwork(auth_model.TimeStampedModel, auth_model.CreatedByModel, auth_model.QCModel, auth_model.WelcomeCallingDone):
+class HospitalNetwork(auth_model.TimeStampedModel, auth_model.CreatedByModel, auth_model.QCModel, auth_model.WelcomeCallingDone, auth_model.PhysicalAgreementSigned):
     name = models.CharField(max_length=100)
     operational_since = models.PositiveSmallIntegerField(blank=True, null=True, validators=[MinValueValidator(1900)])
     about = models.CharField(max_length=2000, blank=True)
