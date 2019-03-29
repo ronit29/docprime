@@ -1,6 +1,6 @@
 from django.contrib import admin
 from ondoc.integrations.models import IntegratorMapping
-from ondoc.integrations.models import IntegratorProfileMapping, IntegratorReport
+from ondoc.integrations.models import IntegratorProfileMapping, IntegratorReport, IntegratorTestMapping
 from ondoc.diagnostic.models import LabTest, Lab, LabPricingGroup, AvailableLabTest
 from django import forms
 from django.conf import settings
@@ -49,3 +49,36 @@ class IntegratorReportAdmin(admin.ModelAdmin):
 
     def integrator_name(self, obj):
         return obj.integrator_response.integrator_class_name
+
+
+# class IntegratorTestMappingForm(forms.ModelForm):
+#     test = forms.ModelChoiceField(
+#         queryset=LabTest.objects.filter(availablelabs__lab_pricing_group__labs__network_id=int(
+#             settings.THYROCARE_NETWORK_ID), enable_for_retail=True, availablelabs__enabled=True).distinct())
+#
+#     # def __init__(self, *args, **kwargs):
+#     #     super().__init__(*args, **kwargs)
+
+
+# class ThyrocareTestAutocomplete(autocomplete.Select2QuerySetView):
+#
+#     def get_queryset(self):
+#         queryset = LabTest.objects.filter(availablelabs__lab_pricing_group__labs__network_id=int(settings.THYROCARE_NETWORK_ID), enable_for_retail=True, availablelabs__enabled=True).distinct()
+#         return queryset
+
+
+class IntegratorTestMappingForm(forms.ModelForm):
+    test = forms.ModelChoiceField(
+        queryset=LabTest.objects.filter(availablelabs__lab_pricing_group__labs__network_id=int(settings.THYROCARE_NETWORK_ID),
+                                        enable_for_retail=True, availablelabs__enabled=True).distinct().order_by('name'))
+
+
+class IntegratorTestMappingAdmin(admin.ModelAdmin):
+    model = IntegratorTestMapping
+    list_display = ('integrator_class_name', 'integrator_test_name', 'is_active')
+    fields = ('test', 'integrator_test_name', 'is_active', 'integrator_test_type')
+    form = IntegratorTestMappingForm
+    readonly_fields = ('integrator_test_name', 'integrator_test_type')
+
+    def integrator_test_type(self, obj):
+        return obj.test_type

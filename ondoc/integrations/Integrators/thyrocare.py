@@ -34,7 +34,7 @@ class Thyrocare(BaseIntegrator):
 
     @classmethod
     def thyrocare_data(cls, obj_id, type):
-        from ondoc.integrations.models import IntegratorMapping, IntegratorProfileMapping
+        from ondoc.integrations.models import IntegratorMapping, IntegratorProfileMapping, IntegratorTestMapping
         response = cls.thyrocare_auth()
         api_key = response.get('api_key')
 
@@ -59,21 +59,32 @@ class Thyrocare(BaseIntegrator):
             return None
 
         for result_obj in result_array:
-            if type == 'TESTS':
-                name_required_tests = settings.THYROCARE_NAME_PARAM_REQUIRED_TESTS.split(',')
-                name_params_required = False
-                if result_obj['code'] in name_required_tests:
-                    name_params_required = True
+            name_required_tests = settings.THYROCARE_NAME_PARAM_REQUIRED_TESTS.split(',')
+            name_params_required = False
+            if result_obj['code'] in name_required_tests:
+                name_params_required = True
 
-                defaults = {'integrator_product_data': result_obj, 'integrator_class_name': Thyrocare.__name__,
-                            'content_type': ContentType.objects.get(model='labnetwork'), 'service_type': IntegratorMapping.ServiceType.LabTest,
-                            'name_params_required': name_params_required}
-                IntegratorMapping.objects.update_or_create(integrator_test_name=result_obj['name'], object_id=obj_id, defaults=defaults)
-            else:
-                defaults = {'integrator_product_data': result_obj, 'integrator_class_name': Thyrocare.__name__,
-                            'content_type': ContentType.objects.get(model='labnetwork'), 'integrator_type': result_obj['type'],
-                            'service_type': IntegratorProfileMapping.ServiceType.LabTest}
-                IntegratorProfileMapping.objects.update_or_create(integrator_package_name=result_obj['name'], object_id=obj_id, defaults=defaults)
+            defaults = {'integrator_product_data': result_obj, 'integrator_class_name': Thyrocare.__name__,
+                        'content_type': ContentType.objects.get(model='labnetwork'), 'service_type': IntegratorMapping.ServiceType.LabTest,
+                        'name_params_required': name_params_required, 'test_type': result_obj['type']}
+
+            IntegratorTestMapping.objects.update_or_create(integrator_test_name=result_obj['name'], object_id=obj_id, defaults=defaults)
+
+            # if type == 'TESTS':
+            #     name_required_tests = settings.THYROCARE_NAME_PARAM_REQUIRED_TESTS.split(',')
+            #     name_params_required = False
+            #     if result_obj['code'] in name_required_tests:
+            #         name_params_required = True
+            #
+            #     defaults = {'integrator_product_data': result_obj, 'integrator_class_name': Thyrocare.__name__,
+            #                 'content_type': ContentType.objects.get(model='labnetwork'), 'service_type': IntegratorMapping.ServiceType.LabTest,
+            #                 'name_params_required': name_params_required}
+            #     IntegratorMapping.objects.update_or_create(integrator_test_name=result_obj['name'], object_id=obj_id, defaults=defaults)
+            # else:
+            #     defaults = {'integrator_product_data': result_obj, 'integrator_class_name': Thyrocare.__name__,
+            #                 'content_type': ContentType.objects.get(model='labnetwork'), 'integrator_type': result_obj['type'],
+            #                 'service_type': IntegratorProfileMapping.ServiceType.LabTest}
+            #     IntegratorProfileMapping.objects.update_or_create(integrator_package_name=result_obj['name'], object_id=obj_id, defaults=defaults)
 
     @classmethod
     def thyrocare_product_data(cls, obj_id, type):
@@ -355,6 +366,7 @@ class Thyrocare(BaseIntegrator):
         from ondoc.integrations.models import IntegratorHistory
 
         dp_appointment = integrator_response.content_object
+
         if dp_appointment.status != LabAppointment.CANCELLED or dp_appointment.status != LabAppointment.COMPLETED or \
                                             (dp_appointment.time_slot_start + timedelta(days=1) < datetime.now()):
 
