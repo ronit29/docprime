@@ -164,10 +164,18 @@ class DoctorSearchHelper:
             search_key = " ".join(search_key).lower()
 
             search_key = "".join(search_key.split("."))
-            filtering_params.append(
-                "d.search_key ilike (%(doctor_name)s)"
-                    )
-            params['doctor_name'] = '%'+search_key+'%'
+            filtering_params.append("d.search_key like (%(doctor_name1)s) "
+                                    "or d.search_key like  %(doctor_name2)s "
+                                    "or d.search_key like %(doctor_name3)s ")
+            # filtering_params.append(
+            #     "d.search_key ilike (%(doctor_name)s)"
+            #         )
+            # params['doctor_name'] = '%'+search_key+'%'
+            params['order_doctor'] = search_key
+            params['doctor_name1'] = search_key + ' %'
+            params['doctor_name2'] = '% ' + search_key + ' %'
+            params['doctor_name3'] = '% ' + search_key
+
         if self.query_params.get("hospital_name"):
             search_key = re.findall(r'[a-z0-9A-Z.]+', self.query_params.get("hospital_name"))
             search_key = " ".join(search_key).lower()
@@ -192,6 +200,8 @@ class DoctorSearchHelper:
     def get_ordering_params(self):
         # order_by_field = 'is_gold desc, distance, dc.priority desc'
         # rank_by = "rank_distance=1"
+        if self.query_params and self.query_params.get('doctor_name'):
+             return ' enabled_for_online_booking DESC, position(%(order_doctor)s in search_key) ', ' rnk=1'
 
         if self.query_params.get('url') and (not self.query_params.get('sort_on') \
                                              or self.query_params.get('sort_on')=='distance'):
@@ -264,7 +274,6 @@ class DoctorSearchHelper:
         specialization_ids = self.query_params.get("specialization_ids", [])
         condition_ids = self.query_params.get("condition_ids", [])
 
-
         if self.count_of_procedure:
             rank_part = "Row_number() OVER( PARTITION BY doctor_id ORDER BY " \
                            "distance, total_price ASC) rnk "
@@ -332,7 +341,7 @@ class DoctorSearchHelper:
                            "FROM (select {rank_part}, " \
                            "St_distance(St_setsrid(St_point((%(longitude)s), (%(latitude)s)), 4326), h.location) distance, " \
                            "d.id as doctor_id, " \
-                           "dc.id as doctor_clinic_id,  " \
+                           "dc.id as doctor_clinic_id,  d.search_key, " \
                            "dct.id as doctor_clinic_timing_id,practicing_since, " \
                            "d.enabled_for_online_booking and dc.enabled_for_online_booking and h.enabled_for_online_booking as enabled_for_online_booking, " \
                            "is_license_verified, priority,deal_price, h.welcome_calling_done, " \
