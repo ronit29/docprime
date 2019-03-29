@@ -764,11 +764,15 @@ class Doctor(auth_model.TimeStampedModel, auth_model.QCModel, SearchKey, auth_mo
         content_type = ContentType.objects.get_for_model(Doctor)
         if content_type:
             cid = content_type.id
-            # query = '''UPDATE doctor d set avg_rating = (select avg(ratings) from ratings_review where content_type_id={} and object_id=d.id) '''.format(cid)
-            query = '''UPDATE doctor d set rating_data = json_build_object('avg_rating', (select round(avg(ratings),1) 
-                        from ratings_review where content_type_id={} and object_id=d.id), 'rating_count',(select count(ratings) 
-                        from ratings_review where content_type_id={} and object_id=d.id))  '''.format(
-                cid, cid)
+
+            query = '''update doctor d set rating_data=
+                       (
+                       select json_build_object('avg_rating', x.avg_rating,'rating_count', x.rating_count) from
+                       (select object_id as doctor_id,round(avg(ratings),1) avg_rating, count(*) rating_count from 
+                       ratings_review where content_type_id={} group by object_id
+                       )x where x.doctor_id = d.id				  
+                       ) where id in (select object_id from ratings_review where content_type_id={})
+                     '''.format(cid, cid)
             cursor.execute(query)
 
 
