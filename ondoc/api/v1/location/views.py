@@ -495,10 +495,10 @@ class DoctorCityFooter(Footer):
             if doctors_in_top_localities:
                 response['menu'].append({'sub_heading': 'Doctors in Top Localities', 'url_list': doctors_in_top_localities})
 
-        # if self.locality:
-        #     top_specialities_in_city = self.specialist_in_city()
-        #     if top_specialities_in_city:
-        #         response['menu'].append({'sub_heading': 'Top specialities in %s' % self.locality, 'url_list': top_specialities_in_city})
+        if self.locality:
+            top_specialities_in_city = self.specialist_in_city()
+            if top_specialities_in_city:
+                response['menu'].append({'sub_heading': 'Top specialities in %s' % self.locality, 'url_list': top_specialities_in_city})
 
         if response['menu']:
             response['heading'] = 'Dynamic footer on doctors in %s' % self.locality
@@ -512,14 +512,14 @@ class DoctorCityFooter(Footer):
                 and lower(locality_value) = lower(%s)
                 order by count desc limit 10'''
         return self.get_urls(query, [self.centroid.ewkt, self.locality])
-    #
-    # def specialist_in_city(self):
-    #
-    #     query = ''' select url, concat(eu.specialization,' in ',eu.locality_value) title from seo_specialization ss inner join entity_urls eu on ss.specialization_id = eu.specialization_id
-    #                 and lower(eu.locality_value) = lower(%s) and eu.sitemap_identifier='SPECIALIZATION_CITY'
-    #                 and eu.is_valid=True order by count desc limit 10'''
-    #
-    #     return  self.get_urls(query,[self.locality])
+
+    def specialist_in_city(self):
+
+        query = ''' select url, concat(eu.specialization,' in ',eu.locality_value) title from seo_specialization ss inner join entity_urls eu on ss.specialization_id = eu.specialization_id 
+                    and lower(eu.locality_value) = lower(%s) and eu.sitemap_identifier='SPECIALIZATION_CITY'  
+                    and eu.is_valid=True order by count desc limit 10'''
+
+        return  self.get_urls(query,[self.locality])
 
 
 class DoctorLocalityCityFooter(Footer):
