@@ -659,6 +659,8 @@ class DoctorsCitySearchViewSet(viewsets.GenericViewSet):
             title[4] = spec_city_entity.specialization + ' near me'
             title[5] = 'Find ' + spec_city_entity.specialization + ' near you'
             title_url = {'title': title[int(page)], 'url': spec_city_entity.url}
+            if response and response.get('menu'):
+                response.get('menu').insert(0, {'sub_heading': spec_city_entity.specialization + ' in ' + spec_city_entity.locality_value, 'url_list': [title_url]})
 
         if entity.sitemap_identifier == 'DOCTORS_LOCALITY_CITY':
             city_entity = EntityUrls.objects.filter(is_valid=True, locality_value=entity.locality_value, sitemap_identifier='DOCTORS_CITY').first()
@@ -670,9 +672,8 @@ class DoctorsCitySearchViewSet(viewsets.GenericViewSet):
             title[4] = 'Doctors near me'
             title[5] = 'Find doctors near you'
             title_url = {'title': title[int(page)], 'url': city_entity.url}
-
-        if title_url:
-            response['title_url'] = title_url
+            if response and response.get('menu'):
+                response.get('menu').insert(0,{'sub_heading': 'Doctors in '+ city_entity.locality_value , 'url_list': [title_url]})
 
         return Response(response)
 
