@@ -201,7 +201,7 @@ class DoctorSearchHelper:
         # order_by_field = 'is_gold desc, distance, dc.priority desc'
         # rank_by = "rank_distance=1"
         if self.query_params and self.query_params.get('doctor_name'):
-             return 'position(%(order_doctor)s in search_key), enabled_for_online_booking DESC', ' rnk=1'
+             return ' enabled_for_online_booking DESC, position(%(order_doctor)s in search_key) ', ' rnk=1'
 
         if self.query_params.get('url') and (not self.query_params.get('sort_on') \
                                              or self.query_params.get('sort_on')=='distance'):
