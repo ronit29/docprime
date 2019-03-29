@@ -673,7 +673,7 @@ class DoctorsCitySearchViewSet(viewsets.GenericViewSet):
             title[5] = 'Find doctors near you'
             title_url = {'title': title[int(page)], 'url': city_entity.url}
             if response and response.get('menu'):
-                response.get('menu').insert(0,{'sub_heading': 'Doctors in '+ city_entity.locality_value , 'url_list': [title_url]})
+                response.get('menu').insert(0, {'sub_heading': 'Doctors in '+ city_entity.locality_value , 'url_list': [title_url]})
 
         return Response(response)
 
