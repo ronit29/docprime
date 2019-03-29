@@ -302,13 +302,12 @@ class MerchantForm(forms.ModelForm):
         if any(self.errors):
             return
 
-        state = self.cleaned_data.get('state', None)
-        abbr = None
-        if state:
-            abbr = Merchant.get_abbreviation(state)
-        if state and not abbr:
-            raise forms.ValidationError("No abbreviation for the state. Allowed states are " + Merchant.get_states_string())
-
+        # state = self.cleaned_data.get('state', None)
+        # abbr = None
+        # if state:
+        #     abbr = Merchant.get_abbreviation(state)
+        # if state and not abbr:
+        #     raise forms.ValidationError("No abbreviation for the state. Allowed states are " + Merchant.get_states_string())
         return self.cleaned_data
 
 class MerchantAdmin(ImportExportMixin, VersionAdmin):
