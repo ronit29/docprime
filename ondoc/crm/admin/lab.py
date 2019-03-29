@@ -353,6 +353,7 @@ class LabForm(FormCleanMixin):
         model = Lab
         exclude = ()
         widgets = {
+            'lab_pricing_group': autocomplete.ModelSelect2(url='admin:diagnostic_labpricinggroup_autocomplete'),
             'matrix_state': autocomplete.ModelSelect2(url='matrix-state-autocomplete'),
             'matrix_city': autocomplete.ModelSelect2(url='matrix-city-autocomplete', forward=['matrix_state'])
         }
@@ -529,7 +530,7 @@ class LabAdmin(ImportExportMixin, admin.GeoModelAdmin, VersionAdmin, ActionAdmin
                LabAccreditationInline,
                LabManagerInline, LabTimingInline, LabImageInline, LabDocumentInline, HomePickupChargesInline,
                GenericLabAdminInline, AssociatedMerchantInline, LabTestGroupTimingInline, RemarkInline]
-    autocomplete_fields = ['lab_pricing_group', ]
+    # autocomplete_fields = ['lab_pricing_group', ]
 
     map_width = 200
     map_template = 'admin/gis/gmap.html'
