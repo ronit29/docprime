@@ -342,7 +342,7 @@ class LabForm(FormCleanMixin):
     about = forms.CharField(widget=forms.Textarea, required=False)
     primary_mobile = forms.CharField(required=True)
     primary_email = forms.EmailField(required=True)
-    city = forms.CharField(required=True)
+    # city = forms.CharField(required=True)
     lab_priority = forms.IntegerField(required=True)
     operational_since = forms.ChoiceField(required=False, choices=hospital_operational_since_choices)
     home_pickup_charges = forms.DecimalField(required=False, initial=0)

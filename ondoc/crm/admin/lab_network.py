@@ -87,6 +87,7 @@ class LabNetworkForm(FormCleanMixin):
 
     class Meta:
         model = LabNetwork
+        exclude = ()
         widgets = {
             'matrix_state': autocomplete.ModelSelect2(url='matrix-state-autocomplete'),
             'matrix_city': autocomplete.ModelSelect2(url='matrix-city-autocomplete', forward=['matrix_state'])
