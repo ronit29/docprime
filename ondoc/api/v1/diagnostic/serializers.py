@@ -90,7 +90,7 @@ class LabModelSerializer(serializers.ModelSerializer):
     def get_display_rating_widget(self, obj):
         if self.parent:
             return None
-        if obj.network:
+        if obj.network and self.context.get('rating_queryset'):
             network_queryset = self.context.get('rating_queryset')
             rate_count = network_queryset.count()
         else:
