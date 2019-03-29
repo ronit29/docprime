@@ -352,6 +352,10 @@ class LabForm(FormCleanMixin):
     class Meta:
         model = Lab
         exclude = ()
+        widgets = {
+            'matrix_state': autocomplete.ModelSelect2(url='matrix-state-autocomplete'),
+            'matrix_city': autocomplete.ModelSelect2(url='matrix-city-autocomplete', forward=['matrix_state'])
+        }
         # exclude = ('pathology_agreed_price_percentage', 'pathology_deal_price_percentage', 'radiology_agreed_price_percentage',
         #            'radiology_deal_price_percentage', )
 
@@ -369,7 +373,8 @@ class LabForm(FormCleanMixin):
 
     def validate_qc(self):
         qc_required = {'name': 'req', 'location': 'req', 'operational_since': 'req', 'parking': 'req',
-                       'license': 'req', 'building': 'req', 'locality': 'req', 'city': 'req', 'state': 'req',
+                       'license': 'req', 'building': 'req', 'locality': 'req',
+                       'matrix_city': 'req', 'matrix_state': 'req',
                        'country': 'req', 'pin_code': 'req', 'network_type': 'req', 'lab_image': 'count'}
 
         if self.instance.network and self.instance.network.data_status != QCModel.QC_APPROVED:
@@ -536,7 +541,7 @@ class LabAdmin(ImportExportMixin, admin.GeoModelAdmin, VersionAdmin, ActionAdmin
         return super().get_queryset(request).prefetch_related('lab_documents')
 
     def get_readonly_fields(self, request, obj=None):
-        read_only_fields = ['lead_url', 'matrix_lead_id', 'matrix_reference_id', 'is_live']
+        read_only_fields = ['lead_url', 'matrix_lead_id', 'matrix_reference_id', 'is_live', 'city', 'state']
         if (not request.user.is_member_of(constants['QC_GROUP_NAME'])) and (not request.user.is_superuser):
             read_only_fields += ['lab_pricing_group']
         if (not request.user.is_member_of(constants['SUPER_QC_GROUP'])) and (not request.user.is_superuser):
@@ -642,7 +647,8 @@ class LabAdmin(ImportExportMixin, admin.GeoModelAdmin, VersionAdmin, ActionAdmin
         if '_mark_in_progress' in request.POST:
             obj.data_status = QCModel.REOPENED
         obj.status_changed_by = request.user
-
+        obj.city = obj.matrix_city.name
+        obj.state = obj.matrix_state.name
         super().save_model(request, obj, form, change)
 
 

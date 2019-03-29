@@ -53,7 +53,8 @@ from ondoc.integrations.task import push_lab_appointment_to_integrator, get_inte
 from ondoc.location import models as location_models
 from ondoc.ratings_review import models as ratings_models
 from ondoc.api.v1.common import serializers as common_serializers
-from ondoc.common.models import AppointmentHistory, AppointmentMaskNumber, Remark, GlobalNonBookable
+from ondoc.common.models import AppointmentHistory, AppointmentMaskNumber, Remark, GlobalNonBookable, MatrixMappedState, \
+    MatrixMappedCity
 import reversion
 from decimal import Decimal
 from django.utils.text import slugify
@@ -181,6 +182,10 @@ class Lab(TimeStampedModel, CreatedByModel, QCModel, SearchKey):
     locality = models.CharField(max_length=100, blank=True)
     city = models.CharField(max_length=100, blank=True)
     state = models.CharField(max_length=100, blank=True)
+    matrix_state = models.ForeignKey(MatrixMappedState, null=True, blank=False, on_delete=models.DO_NOTHING,
+                                     related_name='labs_in_state', verbose_name='State')
+    matrix_city = models.ForeignKey(MatrixMappedCity, null=True, blank=False, on_delete=models.DO_NOTHING,
+                                    related_name='labs_in_city', verbose_name='City')
     country = models.CharField(max_length=100, blank=True)
     pin_code = models.PositiveIntegerField(blank=True, null=True)
     agreed_rate_list = models.FileField(upload_to='lab/docs', max_length=200, null=True, blank=True,
@@ -808,6 +813,10 @@ class LabNetwork(TimeStampedModel, CreatedByModel, QCModel):
     locality = models.CharField(max_length=100, blank=True)
     city = models.CharField(max_length=100)
     state = models.CharField(max_length=100)
+    matrix_state = models.ForeignKey(MatrixMappedState, null=True, blank=False, on_delete=models.DO_NOTHING,
+                                     related_name='lab_networks_in_state', verbose_name='State')
+    matrix_city = models.ForeignKey(MatrixMappedCity, null=True, blank=False, on_delete=models.DO_NOTHING,
+                                    related_name='lab_networks_in_city', verbose_name='City')
     country = models.CharField(max_length=100)
     pin_code = models.PositiveIntegerField(blank=True, null=True)
     is_billing_enabled = models.BooleanField(verbose_name='Enabled for Billing', default=False)

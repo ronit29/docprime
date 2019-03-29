@@ -9,7 +9,7 @@ from ondoc.crm.admin.doctor import CreatedByFilter
 from ondoc.crm.admin.lab import HomePickupChargesInline
 from ondoc.diagnostic.models import (Lab, LabNetworkCertification,
                                      LabNetworkAward, LabNetworkAccreditation, LabNetworkEmail,
-                                     LabNetworkHelpline, LabNetworkManager, LabNetworkDocument)
+                                     LabNetworkHelpline, LabNetworkManager, LabNetworkDocument, LabNetwork)
 from .common import *
 from ondoc.authentication.models import GenericAdmin, User, GenericLabAdmin, AssociatedMerchant
 from django.contrib.contenttypes.admin import GenericTabularInline
@@ -85,9 +85,17 @@ class LabNetworkForm(FormCleanMixin):
     operational_since = forms.ChoiceField(choices=hospital_operational_since_choices, required=False)
     about = forms.CharField(widget=forms.Textarea, required=False)
 
+    class Meta:
+        model = LabNetwork
+        widgets = {
+            'matrix_state': autocomplete.ModelSelect2(url='matrix-state-autocomplete'),
+            'matrix_city': autocomplete.ModelSelect2(url='matrix-city-autocomplete', forward=['matrix_state'])
+        }
+
     def validate_qc(self):
         qc_required = {'name': 'req', 'operational_since': 'req', 'about': 'req', 'network_size': 'req',
-                       'building': 'req', 'locality': 'req', 'city': 'req', 'state': 'req',
+                       'building': 'req', 'locality': 'req',
+                       'matrix_city': 'req', 'matrix_state': 'req',
                        'country': 'req', 'pin_code': 'req', 'labnetworkmanager': 'count',
                        'labnetworkhelpline': 'count', 'labnetworkemail': 'count'}
 
@@ -249,7 +257,8 @@ class LabNetworkAdmin(VersionAdmin, ActionAdmin, QCPemAdmin):
         if '_mark_in_progress' in request.POST:
             obj.data_status = QCModel.REOPENED
         obj.status_changed_by = request.user
-
+        obj.city = obj.matrix_city.name
+        obj.state = obj.matrix_state.name
         super().save_model(request, obj, form, change)
 
     def get_form(self, request, obj=None, **kwargs):
