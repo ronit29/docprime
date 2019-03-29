@@ -3304,6 +3304,7 @@ class HospitalViewSet(viewsets.GenericViewSet):
         hospital_queryset = Hospital.objects.prefetch_related('hospitalcertification_set',
                                                               'hospital_documents',
                                                               'hosp_availability',
+                                                              'health_insurance_providers',
                                                               'network__hospital_network_documents',
                                                               'hospitalspeciality_set').filter(
             is_live=True,
@@ -3369,7 +3370,7 @@ class IpdProcedureViewSet(viewsets.GenericViewSet):
             is_enabled=True, id=pk).first()
         if ipd_procedure is None:
             return Response(status=status.HTTP_404_NOT_FOUND)
-        ipd_procedure_serializer = serializers.IpdProcedureDetailSerializer(ipd_procedure, context={'request': request})
+
         hospital_view_set = HospitalViewSet()
         hospital_result = hospital_view_set.list(request, pk, 2)
         doctor_list_viewset = DoctorListViewSet()
@@ -3377,9 +3378,12 @@ class IpdProcedureViewSet(viewsets.GenericViewSet):
                                                                       'longitude': validated_data.get('long'),
                                                                       'latitude': validated_data.get('lat'),
                                                                       'sort_on': 'experience',
-                                                                      'restrict_result_count': 2})
+                                                                      'restrict_result_count': 3})
+        doctor_result_data = doctor_result.data
+        ipd_procedure_serializer = serializers.IpdProcedureDetailSerializer(ipd_procedure, context={'request': request,
+                                                                                                    'doctor_result_data': doctor_result_data})
         return Response(
-            {'about': ipd_procedure_serializer.data, 'hospitals': hospital_result.data, 'doctors': doctor_result.data})
+            {'about': ipd_procedure_serializer.data, 'hospitals': hospital_result.data, 'doctors': doctor_result_data})
 
     def create_lead(self, request):
         serializer = serializers.IpdProcedureLeadSerializer(data=request.data)

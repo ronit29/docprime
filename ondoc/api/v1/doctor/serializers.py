@@ -1563,19 +1563,31 @@ class IpdProcedureFeatureSerializer(serializers.ModelSerializer):
 
 class IpdProcedureAllDetailsSerializer(serializers.ModelSerializer):
     name = serializers.CharField(source='detail_type.name')
+    show_doctors = serializers.BooleanField(source='detail_type.show_doctors')
+    doctors = serializers.SerializerMethodField()
 
     class Meta:
         model = IpdProcedureDetail
-        fields = ('name', 'value')
+        fields = ('name', 'value', 'show_doctors', 'doctors')
+
+    def get_doctors(self, obj):
+        result = {}
+        if obj.detail_type.show_doctors:
+            result = self.context.get('doctor_result_data', {})
+        return result
 
 
 class IpdProcedureDetailSerializer(serializers.ModelSerializer):
     features = IpdProcedureFeatureSerializer(source='feature_mappings', read_only=True, many=True)
-    all_details = IpdProcedureAllDetailsSerializer(source='ipdproceduredetail_set', read_only=True, many=True)
+    all_details = serializers.SerializerMethodField()
+    # all_details = IpdProcedureAllDetailsSerializer(source='ipdproceduredetail_set', read_only=True, many=True)
 
     class Meta:
         model = IpdProcedure
         fields = ('id', 'name', 'details', 'is_enabled', 'features', 'about', 'all_details')
+
+    def get_all_details(self, obj):
+        return IpdProcedureAllDetailsSerializer(obj.ipdproceduredetail_set.all(), many=True, context=self.context).data
 
 
 class TopHospitalForIpdProcedureSerializer(serializers.ModelSerializer):
