@@ -86,12 +86,14 @@ class ArticleViewSet(viewsets.GenericViewSet):
         if title_description and title_description.first().get('name') == 'Medicines':
             recent_articles_data = article_data.order_by('-updated_at')[:10]
 
+        recent_articles = serializers.ArticleListSerializer(recent_articles_data, many=True,
+                                                            context={'request': request}).data
+
         articles_count = article_data.count()
         article_data = paginate_queryset(article_data, request, 50)
         resp = serializers.ArticleListSerializer(article_data, many=True,
                                                  context={'request': request}).data
-        recent_articles = serializers.ArticleListSerializer(recent_articles_data, many=True,
-                                                 context={'request': request}).data
+
         title = ''
         description = ''
 
