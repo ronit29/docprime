@@ -1625,3 +1625,15 @@ class WelcomeCallingDone(models.Model):
     class Meta:
         abstract = True
 
+
+class PhysicalAgreementSigned(models.Model):
+    physical_agreement_signed = models.BooleanField(default=False)
+    physical_agreement_signed_at = models.DateTimeField(null=True, blank=True)
+
+    def save(self, *args, **kwargs):
+        from ondoc.api.v1.utils import update_physical_agreement_timestamp
+        update_physical_agreement_timestamp(self)
+        super().save(*args, **kwargs)
+
+    class Meta:
+        abstract = True

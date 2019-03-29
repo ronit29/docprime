@@ -325,10 +325,8 @@ class Hospital(auth_model.TimeStampedModel, auth_model.CreatedByModel, auth_mode
             self.is_live = False
 
     def update_time_stamps(self):
-        if self.physical_agreement_signed and not self.physical_agreement_signed_at:
-            self.physical_agreement_signed_at = timezone.now()
-        elif not self.physical_agreement_signed and self.physical_agreement_signed_at:
-            self.physical_agreement_signed_at = None
+        from ondoc.api.v1.utils import update_physical_agreement_timestamp
+        update_physical_agreement_timestamp(self)
 
         if not self.enabled and not self.disabled_at:
             self.disabled_at = timezone.now()
@@ -1411,7 +1409,7 @@ class DoctorEmail(auth_model.TimeStampedModel):
         unique_together = (("doctor", "email"),)
 
 
-class HospitalNetwork(auth_model.TimeStampedModel, auth_model.CreatedByModel, auth_model.QCModel, auth_model.WelcomeCallingDone):
+class HospitalNetwork(auth_model.TimeStampedModel, auth_model.CreatedByModel, auth_model.QCModel, auth_model.WelcomeCallingDone, auth_model.PhysicalAgreementSigned):
     name = models.CharField(max_length=100)
     operational_since = models.PositiveSmallIntegerField(blank=True, null=True, validators=[MinValueValidator(1900)])
     about = models.CharField(max_length=2000, blank=True)

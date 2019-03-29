@@ -1383,3 +1383,20 @@ def get_package_free_or_not_dict(request):
             package_free_or_not_dict[temp_user_plan_package] = True
     return package_free_or_not_dict
 
+
+def update_physical_agreement_value(obj, value):
+    obj.assoc_hospitals.all().update(physical_agreement_signed=value)
+
+
+def update_physical_agreement_timestamp(obj):
+    from ondoc.doctor.models import HospitalNetwork
+    update_hospitals_under_it = False
+    if obj.physical_agreement_signed and not obj.physical_agreement_signed_at:
+        obj.physical_agreement_signed_at = timezone.now()
+        update_hospitals_under_it = True
+    elif not obj.physical_agreement_signed and obj.physical_agreement_signed_at:
+        obj.physical_agreement_signed_at = None
+        update_hospitals_under_it = True
+    if update_hospitals_under_it:
+        if isinstance(obj, HospitalNetwork):
+            update_physical_agreement_value(obj, obj.physical_agreement_signed)
