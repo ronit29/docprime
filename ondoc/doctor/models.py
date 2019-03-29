@@ -605,7 +605,7 @@ class Doctor(auth_model.TimeStampedModel, auth_model.QCModel, SearchKey, auth_mo
     source_type = models.IntegerField(choices=SOURCE_TYPE_CHOICES, null=True, editable=False)
     avg_rating = models.DecimalField(max_digits=5, decimal_places=2, null=True, editable=False)
     remark = GenericRelation(Remark)
-
+    rating_data = JSONField(blank=True, null=True)
     qr_code = GenericRelation(QRCode, related_name="qrcode")
 
     def __str__(self):
@@ -678,12 +678,14 @@ class Doctor(auth_model.TimeStampedModel, auth_model.QCModel, SearchKey, auth_mo
 
     def get_avg_rating(self):
         # return self.rating.filter(is_live=True).aggregate(avg_rating=Avg('ratings'))
-        return self.avg_rating
+        if self.rating_data:
+            return self.rating_data.get('avg_rating')
+        return None
 
     def get_rating_count(self):
         count = 0
-        if self.rating.exists():
-            count = self.rating.count()
+        if self.rating_data and self.rating_data.get('rating_count'):
+            count = self.rating_data.get('rating_count')
         return count
 
     def update_live_status(self):
