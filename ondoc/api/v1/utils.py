@@ -357,6 +357,7 @@ def is_valid_testing_lab_data(user, lab):
 
 def payment_details(request, order):
     from ondoc.authentication.models import UserProfile
+    from ondoc.insurance.models import InsurancePlans
     from ondoc.account.models import PgTransaction, Order
     payment_required = True
     user = request.user
@@ -374,6 +375,16 @@ def payment_details(request, order):
     if not profile and order.product_id == 3:
         if order.action_data.get('profile_detail'):
             profile_name = order.action_data.get('profile_detail').get('name', "")
+
+    insurer_code = None
+    if order.product_id == Order.INSURANCE_PRODUCT_ID:
+        insurance_plan_id = order.action_data.get('insurance_plan')
+        insurance_plan = InsurancePlans.objects.filter(id=insurance_plan_id).first()
+        if not insurance_plan:
+            raise Exception('Invalid pg transaction as insurer plan is not found.')
+        insurer = insurance_plan.insurer
+        insurer_code = insurer.insurer_merchant_code
+
     if order.product_id == Order.SUBSCRIPTION_PLAN_PRODUCT_ID:
         temp_product_id = Order.DOCTOR_PRODUCT_ID
     else:
@@ -390,6 +401,10 @@ def payment_details(request, order):
         'name': profile_name,
         'txAmount': str(order.amount),
     }
+
+    if insurer_code:
+        pgdata['insurerCode'] = insurer_code
+
     secret_key = client_key = ""
     # TODO : SHASHANK_SINGH for plan FINAL ??
     if order.product_id == Order.DOCTOR_PRODUCT_ID or order.product_id == Order.SUBSCRIPTION_PLAN_PRODUCT_ID:
