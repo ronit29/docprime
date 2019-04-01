@@ -1532,3 +1532,48 @@ class PackageSerializer(LabTestSerializer):
             parameter_count = len(temp_test.parameter.all()) or 1
             return_data += parameter_count
         return return_data
+
+
+class CompareLabPackagesSerializer(serializers.Serializer):
+
+    package_ids = CommaSepratedToListField(required=True, max_length=4, typecast_to=str)
+
+    def validate_package_ids(self, attrs):
+        try:
+            package_ids = [int(attr) for attr in attrs]
+            if LabTest.objects.filter(id__in=package_ids, is_package=True, enable_for_retail=True, searchable=True).count() == len(package_ids):
+                return package_ids
+        except:
+            raise serializers.ValidationError('Invalid Lab Package IDs')
+        raise serializers.ValidationError('Invalid Lab Package IDs')
+
+
+    # def validate_package_ids(self, value):
+    #     request = self.context.get("request")
+    #     if not LabTest.objects.filter(id__in=value).count() == len(value):
+    #         logger.error(
+    #             "Error 'Invalid lab package Id' for Comparing Lab Packages with data - " + json.dumps(
+    #                 request.query_params))
+    #         raise serializers.ValidationError("Invalid Lab Package Id.")
+    #     return value
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

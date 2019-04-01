@@ -1,6 +1,7 @@
 import operator
 
 from ondoc.api.v1.diagnostic.serializers import CustomLabTestPackageSerializer
+from ondoc.api.v1.doctor.serializers import CommaSepratedToListField
 from ondoc.authentication.backends import JWTAuthentication
 from ondoc.api.v1.diagnostic import serializers as diagnostic_serializer
 from ondoc.api.v1.auth.serializers import AddressSerializer
@@ -2412,3 +2413,96 @@ class LabTestCategoryListViewSet(viewsets.GenericViewSet):
                 resp['tests'] = temp_tests
                 empty.append(resp)
         return Response(empty)
+
+
+class CompareLabPackagesViewSet(viewsets.ReadOnlyModelViewSet):
+
+    def retrieve(self, request):
+        parameters = request.query_params
+
+        if not parameters.get('package_ids'):
+            return Response({})
+
+        serializer = serializers.CompareLabPackagesSerializer(data=parameters, context={"request": request})
+        serializer.is_valid(raise_exception=True)
+        validated_data = serializer.validated_data
+
+        if validated_data and validated_data.get('package_ids'):
+            if len(validated_data.get('package_ids')) < 2:
+                return Response({})
+        else:
+            return Response({})
+
+        if len(validated_data.get('package_ids')) <= 4:
+            response = {}
+            lab_packages = []
+            tests = None
+            parameters = []
+            packages = LabTest.objects.prefetch_related('test', 'test__recommended_categories', 'test__parameter',
+                                                        'categories', 'availablelabs__lab_pricing_group__labs').filter(
+                is_package=True, id__in=validated_data.get('package_ids')).annotate(test_ids='test')
+
+            for data in packages:
+                if data.id and data.name:
+                    package_detail = {}
+                    labs_count = 0
+                    tests_included = list()
+                    available_labs = None
+                    tests = None
+                    tests = data.test.all()
+                    parameters_count = data.test.all().count()
+                    package_detail['id'] = data.id
+                    package_detail['name'] = data.name
+                    package_detail['total_parameters_count'] = parameters_count
+                    if data.availablelabs.all():
+                        available_labs = data.availablelabs.all().first()
+                        if available_labs.lab_pricing_group and available_labs.lab_pricing_group.labs.all():
+                            labs_count = available_labs.lab_pricing_group.labs.all().count()
+                    package_detail['total_labs_available'] = labs_count
+
+                    if tests:
+                        for test in tests:
+                            tests_included.append({'test_id': test.id, 'available': True})
+
+                    package_detail['tests_included'] = tests_included
+
+
+                    # data.availablelabs.all()[0].lab_pricing_group.labs.all().count()
+                    # data.categories.all()[0].recommended_lab_tests.all()
+                    # data.categories.all()[3].recommended_lab_tests.all()[0].parameter.all()
+                    # package_detail['categories'] = data.categories.all()
+                    lab_packages.append(package_detail)
+
+                    # if tests and tests.parameter.all():
+                    #     parameters
+            # for category in packages:
+
+
+            response['lab_packages'] = lab_packages
+
+
+
+            return Response(response)
+
+
+
+# {"packages": [{"id":1, "name":"pack a", "total_parameter_count":58, min_price=499, total_labs_available_in:5 ,tests_included = [{"id":1, "available":True }, {{"id":2, "available":False }],
+# category_parameter_count : [{"id":1, "count" :4}, {"id":2, "count" :null}]
+#
+#    }, {{"id":2, "name":"pack b", "total_parameter_count":28}],
+
+
+#  "categories": [{"id":1,"name":"cat 1", tests=[{"id":1, "name":"test_one", parameters = ["p1","p2"]}, {"id":2, "name":"test_two", parameters = ["p3","p"]}]}]}
+
+
+
+
+
+
+
+
+
+
+
+
+
