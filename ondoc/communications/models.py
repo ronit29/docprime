@@ -42,7 +42,8 @@ def get_spoc_email_and_number_hospital(spocs):
     user_and_number = []
     for spoc in spocs:
         if spoc.number and spoc.number in range(1000000000, 9999999999):
-            admins = GenericAdmin.objects.prefetch_related('user').filter(Q(phone_number=str(spoc.number)),
+            admins = GenericAdmin.objects.prefetch_related('user').filter(Q(phone_number=str(spoc.number),
+                                                                            hospital=spoc.content_object),
                                                                           Q(super_user_permission=True) | Q(
                                                                               permission_type=GenericAdmin.APPOINTMENT,
                                                                               write_permission=True))
