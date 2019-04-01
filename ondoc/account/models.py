@@ -119,7 +119,7 @@ class Order(TimeStampedModel):
 
         # Initial validations for appointment data
         appointment_data = self.action_data
-        user_insurance_data = self.action_data
+        user_insurance_data = None
         # Check if payment is required at all, only when payment is required we debit consumer's account
         payment_not_required = False
         if self.product_id == self.DOCTOR_PRODUCT_ID:
@@ -239,10 +239,10 @@ class Order(TimeStampedModel):
         if consumer_account.balance >= user_insurance_data['premium_amount']:
             user_insurance_obj = UserInsurance.create_user_insurance(user_insurance_data, user)
             amount = user_insurance_obj.premium_amount
-            order_dict = {
-                "reference_id": user_insurance_obj.id,
-                "payment_status": Order.PAYMENT_ACCEPTED
-            }
+            # order_dict = {
+            #     "reference_id": user_insurance_obj.id,
+            #     "payment_status": Order.PAYMENT_ACCEPTED
+            # }
             insurer = user_insurance_obj.insurance_plan.insurer
             InsuranceTransaction.objects.create(user_insurance=user_insurance_obj, account=insurer.float.all().first(),
                                                 transaction_type=InsuranceTransaction.DEBIT, amount=amount)

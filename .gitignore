@@ -21,4 +21,3 @@ deploy.sh
 .DS_Store
 ondoc/.DS_Store
 celerybeat-schedule
->>>>>>> 9-jan
