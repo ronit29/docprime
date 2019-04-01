@@ -1364,6 +1364,8 @@ class LabAppointmentInvoiceMixin(object):
 
 @reversion.register()
 class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin):
+    from ondoc.integrations.models import IntegratorResponse
+
     CREATED = 1
     BOOKED = 2
     RESCHEDULED_LAB = 3
@@ -1423,6 +1425,7 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin)
     email_notification = GenericRelation(EmailNotification, related_name="lab_notification")
     user_plan_used = models.ForeignKey('subscription_plan.UserPlanMapping', null=True, on_delete=models.DO_NOTHING,
                                        related_name='appointment_using')
+    integrator_response = GenericRelation(IntegratorResponse)
 
     def get_tests_and_prices(self):
         test_price = []
