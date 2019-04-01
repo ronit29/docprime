@@ -90,7 +90,11 @@ class LabModelSerializer(serializers.ModelSerializer):
     def get_display_rating_widget(self, obj):
         if self.parent:
             return None
-        rate_count = obj.rating.count()
+        if obj.network and self.context.get('rating_queryset'):
+            network_queryset = self.context.get('rating_queryset')
+            rate_count = network_queryset.count()
+        else:
+            rate_count = obj.rating.count()
         avg = 0
         if rate_count:
             all_rating = []
@@ -1367,8 +1371,8 @@ class CustomLabTestPackageSerializer(serializers.ModelSerializer):
     def get_rating(self, obj):
         lab_data = self.context.get('lab_data', {})
         data = lab_data.get(obj.lab, None)
-        if data is not None:
-            return data.avg_rating
+        if data is not None and data.rating_data:
+            return data.rating_data.get('avg_rating')
         return None
 
     def get_pickup_charges(self, obj):

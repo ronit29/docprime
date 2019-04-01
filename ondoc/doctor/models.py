@@ -325,15 +325,8 @@ class Hospital(auth_model.TimeStampedModel, auth_model.CreatedByModel, auth_mode
             self.is_live = False
 
     def update_time_stamps(self):
-        if self.welcome_calling_done and not self.welcome_calling_done_at:
-            self.welcome_calling_done_at = timezone.now()
-        elif not self.welcome_calling_done and self.welcome_calling_done_at:
-            self.welcome_calling_done_at = None
-
-        if self.physical_agreement_signed and not self.physical_agreement_signed_at:
-            self.physical_agreement_signed_at = timezone.now()
-        elif not self.physical_agreement_signed and self.physical_agreement_signed_at:
-            self.physical_agreement_signed_at = None
+        from ondoc.api.v1.utils import update_physical_agreement_timestamp
+        update_physical_agreement_timestamp(self)
 
         if not self.enabled and not self.disabled_at:
             self.disabled_at = timezone.now()
@@ -605,7 +598,7 @@ class Doctor(auth_model.TimeStampedModel, auth_model.QCModel, SearchKey, auth_mo
     source_type = models.IntegerField(choices=SOURCE_TYPE_CHOICES, null=True, editable=False)
     avg_rating = models.DecimalField(max_digits=5, decimal_places=2, null=True, editable=False)
     remark = GenericRelation(Remark)
-
+    rating_data = JSONField(blank=True, null=True)
     qr_code = GenericRelation(QRCode, related_name="qrcode")
 
     def __str__(self):
@@ -678,12 +671,14 @@ class Doctor(auth_model.TimeStampedModel, auth_model.QCModel, SearchKey, auth_mo
 
     def get_avg_rating(self):
         # return self.rating.filter(is_live=True).aggregate(avg_rating=Avg('ratings'))
-        return self.avg_rating
+        if self.rating_data:
+            return self.rating_data.get('avg_rating')
+        return None
 
     def get_rating_count(self):
         count = 0
-        if self.rating.exists():
-            count = self.rating.count()
+        if self.rating_data and self.rating_data.get('rating_count'):
+            count = self.rating_data.get('rating_count')
         return count
 
     def update_live_status(self):
@@ -762,8 +757,17 @@ class Doctor(auth_model.TimeStampedModel, auth_model.QCModel, SearchKey, auth_mo
         content_type = ContentType.objects.get_for_model(Doctor)
         if content_type:
             cid = content_type.id
-            query = '''UPDATE doctor d set avg_rating = (select avg(ratings) from ratings_review where content_type_id={} and object_id=d.id) '''.format(cid)
+
+            query = '''update doctor d set rating_data=
+                       (
+                       select json_build_object('avg_rating', x.avg_rating,'rating_count', x.rating_count) from
+                       (select object_id as doctor_id,round(avg(ratings),1) avg_rating, count(*) rating_count from 
+                       ratings_review where content_type_id={} group by object_id
+                       )x where x.doctor_id = d.id				  
+                       ) where id in (select object_id from ratings_review where content_type_id={})
+                     '''.format(cid, cid)
             cursor.execute(query)
+
 
     def enabled_for_cod(self):
         return False
@@ -966,7 +970,7 @@ class DoctorSpecialization(auth_model.TimeStampedModel):
         unique_together = ("doctor", "specialization")
 
 
-class DoctorClinic(auth_model.TimeStampedModel):
+class DoctorClinic(auth_model.TimeStampedModel, auth_model.WelcomeCallingDone):
     doctor = models.ForeignKey(Doctor, on_delete=models.CASCADE, related_name='doctor_clinics')
     hospital = models.ForeignKey(Hospital, on_delete=models.CASCADE, related_name='hospital_doctors')
     followup_duration = models.PositiveSmallIntegerField(blank=True, null=True)
@@ -1405,7 +1409,7 @@ class DoctorEmail(auth_model.TimeStampedModel):
         unique_together = (("doctor", "email"),)
 
 
-class HospitalNetwork(auth_model.TimeStampedModel, auth_model.CreatedByModel, auth_model.QCModel, auth_model.WelcomeCallingDone):
+class HospitalNetwork(auth_model.TimeStampedModel, auth_model.CreatedByModel, auth_model.QCModel, auth_model.WelcomeCallingDone, auth_model.PhysicalAgreementSigned):
     name = models.CharField(max_length=100)
     operational_since = models.PositiveSmallIntegerField(blank=True, null=True, validators=[MinValueValidator(1900)])
     about = models.CharField(max_length=2000, blank=True)

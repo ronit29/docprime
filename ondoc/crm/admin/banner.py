@@ -51,6 +51,14 @@ class BannerForm(forms.ModelForm):
                 raise forms.ValidationError('Longitude is required')
         # if cleaned_data.slider_locate:
         #     cleaned_data.exclude('slider_locate',)
+        resp = []
+        if cleaned_data.get('url_params_included'):
+            if cleaned_data.get('url_params_excluded'):
+                for key1, value1 in cleaned_data.get('url_params_included').items():
+                    for key2, value2 in cleaned_data.get('url_params_excluded').items():
+                        if key1 == key2 and value1 == value2:
+                            resp.append(str(key1) + ':' + str(value1))
+                raise forms.ValidationError('Cannot input duplicate values in field url_params -> {}'.format(resp))
 
 
 

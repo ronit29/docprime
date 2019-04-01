@@ -227,16 +227,18 @@ class DoctorClinicInline(nested_admin.NestedTabularInline):
     inlines = [DoctorClinicTimingInline, DoctorClinicProcedureInline, DoctorClinicIpdProcedureInline, AssociatedMerchantInline]
     fields = ['hospital',
               # 'add_hospital_link',
-              'followup_duration', 'followup_charges', 'enabled_for_online_booking', 'enabled', 'priority']
+              'followup_duration', 'followup_charges', 'enabled_for_online_booking', 'enabled', 'priority', 'welcome_calling_done']
 
-    # def get_readonly_fields(self, *args, **kwargs):
-    #     read_only = super().get_readonly_fields(*args, **kwargs)
-    #     if args:
-    #         request = args[0]
-    #         if request.GET.get('AgentId', None):
-    #             self.matrix_agent_id = request.GET.get('AgentId', None)
-    #         read_only += ('add_hospital_link',)
-    #     return read_only
+    def get_readonly_fields(self, *args, **kwargs):
+        read_only = super().get_readonly_fields(*args, **kwargs)
+        request = args[0]
+        # def get_readonly_fields(self, request, obj=None):
+        #     read_only_field = super().get_readonly_fields(request, obj)
+        if not request.user.is_superuser and not request.user.groups.filter(
+                name=constants['WELCOME_CALLING_TEAM']).exists():
+            read_only = read_only + ('welcome_calling_done',)
+        #     return read_only_field
+        return read_only
     #
     # def add_hospital_link(self, obj):
     #     content_type = ContentType.objects.get_for_model(Hospital)
@@ -715,7 +717,7 @@ class DoctorForm(FormCleanMixin):
                     for indx in range(int(self.data[key + '-TOTAL_FORMS'])):
                         all_hospital_ids.append(int(self.data[key + '-{}-hospital'.format(indx)]))
                     if not Hospital.objects.filter(pk__in=all_hospital_ids, is_live=True).count():
-                        raise forms.ValidationError("Atleast one entry of " + key + " should be live for submitting to Quality Check")
+                        raise forms.ValidationError("Atleast one entry of " + key + " should be live.")
             if value == 'value_req':
                 if hasattr(self.instance, key) and not getattr(self.instance, key):
                     raise forms.ValidationError(key + " is required for Quality Check")
