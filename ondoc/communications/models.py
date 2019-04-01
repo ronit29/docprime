@@ -1033,6 +1033,10 @@ class OpdNotification(Notification):
         if notification_type == NotificationAction.DOCTOR_INVOICE:
             email_notification = EMAILNotification(notification_type, context)
             email_notification.send(all_receivers.get('email_receivers', []))
+        elif notification_type in [NotificationAction.REFUND_BREAKUP, NotificationAction.REFUND_COMPLETED] and context.get('instance').payment_type == 3:
+            # As no notification to be sent in case of insurance.
+            pass
+
         elif notification_type == NotificationAction.OPD_OTP_BEFORE_APPOINTMENT or \
                 notification_type == NotificationAction.OPD_CONFIRMATION_CHECK_AFTER_APPOINTMENT or \
                 notification_type == NotificationAction.OPD_CONFIRMATION_SECOND_CHECK_AFTER_APPOINTMENT or \
@@ -1186,6 +1190,11 @@ class LabNotification(Notification):
         if notification_type == NotificationAction.LAB_INVOICE:
             email_notification = EMAILNotification(notification_type, context)
             email_notification.send(all_receivers.get('email_receivers', []))
+
+        elif notification_type in [NotificationAction.REFUND_BREAKUP, NotificationAction.REFUND_COMPLETED] and context.get('instance').payment_type == 3:
+            # As no notification to be sent in case of insurance.
+            pass
+
         elif notification_type == NotificationAction.LAB_OTP_BEFORE_APPOINTMENT:
             sms_notification = SMSNotification(notification_type, context)
             sms_notification.send(all_receivers.get('sms_receivers', []))
