@@ -112,6 +112,7 @@ class Order(TimeStampedModel):
         from ondoc.api.v1.insurance.serializers import UserInsuranceSerializer
         from ondoc.api.v1.diagnostic.serializers import PlanTransactionModelSerializer
         from ondoc.subscription_plan.models import UserPlanMapping
+        from ondoc.insurance.models import UserInsurance, InsuranceTransaction
 
         # skip if order already processed
         if self.reference_id:
@@ -119,7 +120,9 @@ class Order(TimeStampedModel):
 
         # Initial validations for appointment data
         appointment_data = self.action_data
-        user_insurance_data = self.action_data
+        # TODO Set to null user_insurance_data
+        # user_insurance_data = self.action_data
+        user_insurance_data = None
         # Check if payment is required at all, only when payment is required we debit consumer's account
         payment_not_required = False
         if self.product_id == self.DOCTOR_PRODUCT_ID:
@@ -198,12 +201,18 @@ class Order(TimeStampedModel):
                 }
 
         elif self.action == Order.INSURANCE_CREATE:
-            appointment_obj = self.process_insurance_order(consumer_account, user_insurance_data)
-            amount = appointment_obj.premium_amount
-            order_dict = {
-                "reference_id": appointment_obj.id,
-                "payment_status": Order.PAYMENT_ACCEPTED
-            }
+            user = User.objects.get(id=self.action_data.get('user'))
+            if consumer_account.balance >= user_insurance_data['premium_amount']:
+                appointment_obj = UserInsurance.create_user_insurance(user_insurance_data, user)
+                amount = appointment_obj.premium_amount
+                order_dict = {
+                    "reference_id": appointment_obj.id,
+                    "payment_status": Order.PAYMENT_ACCEPTED
+                }
+                insurer = appointment_obj.insurance_plan.insurer
+                InsuranceTransaction.objects.create(user_insurance=appointment_obj,
+                                                    account=insurer.float.all().first(),
+                                                    transaction_type=InsuranceTransaction.DEBIT, amount=amount)
         elif self.action == Order.SUBSCRIPTION_PLAN_BUY:
             amount = Decimal(appointment_data.get('extra_details').get('deal_price', float('inf')))
             if consumer_account.balance >= amount:
@@ -236,13 +245,14 @@ class Order(TimeStampedModel):
         from ondoc.insurance.models import UserInsurance, InsuranceTransaction
         from ondoc.authentication.models import User
         user = User.objects.get(id=self.action_data.get('user'))
+        user_insurance_obj = None
         if consumer_account.balance >= user_insurance_data['premium_amount']:
             user_insurance_obj = UserInsurance.create_user_insurance(user_insurance_data, user)
             amount = user_insurance_obj.premium_amount
-            order_dict = {
-                "reference_id": user_insurance_obj.id,
-                "payment_status": Order.PAYMENT_ACCEPTED
-            }
+            # order_dict = {
+            #     "reference_id": user_insurance_obj.id,
+            #     "payment_status": Order.PAYMENT_ACCEPTED
+            # }
             insurer = user_insurance_obj.insurance_plan.insurer
             InsuranceTransaction.objects.create(user_insurance=user_insurance_obj, account=insurer.float.all().first(),
                                                 transaction_type=InsuranceTransaction.DEBIT, amount=amount)
