@@ -20,10 +20,13 @@
       <table align="center" border="0" cellpadding="0" cellspacing="0" width="500" style="width:500px; border-collapse: collapse; border: 1px solid rgba(0,0,0,0.12)">
          <tr>
             <td>
-                <table border="0" cellpadding="0" cellspacing="0" width="100%" style="background: #fa7d1f; padding: 15px;box-shadow: 0px 2px 4px 0 rgba(0, 0, 0, 0.2);">
+                <table border="0" cellpadding="0" cellspacing="0" width="100%" style="background: #fa7d1f; padding: 0px 15px;box-shadow: 0px 2px 4px 0 rgba(0, 0, 0, 0.2);">
                    <tr>
-                     <td style="width: 100%;"><a href="#"><img src="https://cdn.docprime.com/images/doc-logo-small.png" alt="logo" style="width: 52px;"></a></td>
+                     <td style="width: 100%;"><a href="#"><img src="https://cdn.docprime.com/images/doc-logo-small.png" alt="logo" style="width: 70px;"></a></td>
+
+                     <td style="width: 100%;"><a href="#"><img src="https://cdn.docprime.com/images/Apollo_logo_new.png" alt="logo" style="width: 135px;padding-top: 4px;"></a></td>
                    </tr>
+
                 </table>
             </td>
           </tr>
@@ -37,8 +40,9 @@
             <td style="padding:0 10px 10px"></td>
           </tr>
           <tr>
-            <td align="center" style="font-size:18px; color:#000; font-weight: 700;">Your Group Out-patient Insurance policy has been issued.</td>
+            <td align="center" style="font-size:18px; color:#000; font-weight: 700;">Your OPD insurance policy has been issued</td>
           </tr>
+<!--
           <tr>
             <td style="padding: 10px"></td>
           </tr>
@@ -47,16 +51,17 @@
                 <table border="0" cellpadding="0" cellspacing="0" width="100%" style="padding: 0 50px;">
                    <tr>
                       <td align="center" style="padding-right: 15px;"><img src="https://cdn.docprime.com/images/appolo.png" alt="apolo-logo"></td>
-                      <td class="opd-ins" style="font-size: 14px; text-align: left;">Group Out-patient Insurance <br> by <b> Apollo Munich </b> <span style="color: #4fc243;"><img src="https://cdn.docprime.com/images/tick.png" alt="green-tick-logo"  style="vertical-align: middle;">Active</span></td>
+                      <td class="opd-ins" style="font-size: 14px; text-align: left;">OPD Insurance <br> by <b> Apollo Munich </b> <span style="color: #4fc243;"><img src="https://cdn.docprime.com/images/tick.png" alt="green-tick-logo"  style="vertical-align: middle;">Active</span></td>
                    </tr>
                 </table>
             </td>
           </tr>
+-->
           <tr>
             <td style="padding: 10px;"></td>
           </tr>
           <tr>
-            <td style="text-align:center; font-size: 13px; font-weight: 500;">Please find attached the certificate of insurance for the issued policy</td>
+            <td style="font-size: 13px; font-weight: 500;"><img src="https://cdn.docprime.com/images/pdf-icon.png" alt="pdf-icon" style="vertical-align: middle; padding:0 10px; width: 24px;">Please find attached the certificate of insurance for the issued policy</td>
           </tr>
           <tr>
             <td style="padding: 10px;"></td>
@@ -67,7 +72,7 @@
                  <tr>
                     <td width="33.3%" style="border-right: 1px solid rgba(255, 255, 255, 0.5);">
                         <span class="info-title" style="color: rgba(255, 255, 255, 0.8); text-align: center; font-size: 12px;">Policy Issue Date</span><br>
-                        <span class="info-details" style="color: rgba(255, 255, 255, 1); text-align: center; font-size: 12px; font-weight: 700;">{{purchase_date}}</span>
+                        <span class="info-details" style="color: rgba(255, 255, 255, 1); text-align: center; font-size: 12px; font-weight: 700;">{{purchase_date}</span>
                      </td>
                      <td width="33.3%" style="border-right: 1px solid rgba(255, 255, 255, 0.5);">
                         <span class="info-title" style="color: rgba(255, 255, 255, 0.8); text-align: center; font-size: 12px;">Policy Expiry Date</span><br>
@@ -101,10 +106,9 @@
                                     <tr>
                                       <td width="45%" style="font-size: 12px;  padding-bottom: 15px; color: #757575; padding-top: 15px; vertical-align: top;">Covered Member:</td>
                                       <td style="font-weight: 500; color: #000; padding-top: 15px; font-size: 12px;">
-                                          {% for member in insured_members %}
+                                        {% for member in insured_members %}
                                           {{member.relation}} - <b>{{member.name}}</b><br>
                                           {% endfor %}
-
                                       </td>
                                     </tr>
                                 </table>
@@ -146,9 +150,3 @@
             </td>
           </tr>
        </table>
-
-
-
-
-
-
