@@ -405,16 +405,16 @@ class UserInsurance(auth_model.TimeStampedModel):
         proposer_lname = proposer.last_name if proposer.last_name else ""
         gst_state_code = proposer.state_code
 
-        proposer_name = '%s %s %s %s' % (proposer.title, proposer_fname, proposer_mname, proposer_lname)
+        proposer_name = proposer.get_full_name()
 
         member_list = list()
         count = 1
         for member in insured_members:
-            fname = member.first_name if member.first_name else ""
-            mname = member.middle_name if member.middle_name else ""
-            lname = member.last_name if member.last_name else ""
+            # fname = member.first_name if member.first_name else ""
+            # mname = member.middle_name if member.middle_name else ""
+            # lname = member.last_name if member.last_name else ""
 
-            name = '%s %s %s' % (fname, mname, lname)
+            name = member.get_full_name()
             data = {
                 'name': name.title(),
                 'member_number': count,
@@ -743,29 +743,27 @@ class UserInsurance(auth_model.TimeStampedModel):
                 not user_insurance.is_appointment_valid(appointment_data['start_date']):
             response_dict['insurance_message'] = 'Not covered under insurance'
             return response_dict
+        else:
+            response_dict['insurance_id'] = user_insurance.id
 
         insured_members = user_insurance.members.all().filter(profile=profile)
         if not insured_members.exists():
-            response_dict['insurance_id'] = user_insurance.id
             response_dict['insurance_message'] = 'Profile Not covered under insurance'
             return response_dict
 
         threshold = InsuranceThreshold.objects.filter(insurance_plan_id=user_insurance.insurance_plan_id).first()
         if not threshold:
-            response_dict['insurance_id'] = user_insurance.id
             response_dict['insurance_message'] = 'Threshold Amount Not define for plan'
             return response_dict
 
         if not 'doctor' in appointment_data:
             is_insured, insurance_id, insurance_message = user_insurance.validate_lab_insurance(appointment_data, user_insurance)
             response_dict['is_insured'] = is_insured
-            response_dict['insurance_id'] = insurance_id
             response_dict['insurance_message'] = insurance_message
 
         else:
             is_insured, insurance_id, insurance_message = user_insurance.validate_doctor_insurance(appointment_data, user_insurance)
             response_dict['is_insured'] = is_insured
-            response_dict['insurance_id'] = insurance_id
             response_dict['insurance_message'] = insurance_message
 
             doctor = appointment_data['doctor']
@@ -775,22 +773,22 @@ class UserInsurance(auth_model.TimeStampedModel):
                         user, user_insurance.id)
                     response_dict['doctor_specialization_dict'] = specialization_count_dict
 
+                    response_dict['is_insured'] = True
+                    response_dict['insurance_id'] = user_insurance.id
+                    response_dict['insurance_message'] = ""
+
                     if specialization_count_dict.get(InsuranceDoctorSpecializations.SpecializationMapping.GYNOCOLOGIST, {}) \
                             .get('count', 0) >= int(settings.INSURANCE_GYNECOLOGIST_LIMIT):
                         response_dict['is_insured'] = False
                         response_dict['insurance_id'] = None
-                        response_dict['insurance_message'] = "Gynocologist Appointment exceeded of limit 5"
+                        response_dict['insurance_message'] = "Gynocologist Appointment exceeded of limit %d" % int(settings.INSURANCE_GYNECOLOGIST_LIMIT)
 
-                    elif specialization_count_dict.get(InsuranceDoctorSpecializations.SpecializationMapping.ONCOLOGIST, {}) \
+                    if specialization_count_dict.get(InsuranceDoctorSpecializations.SpecializationMapping.ONCOLOGIST, {}) \
                             .get('count', 0) >= int(settings.INSURANCE_ONCOLOGIST_LIMIT):
                         response_dict['is_insured'] = False
                         response_dict['insurance_id'] = None
                         response_dict['insurance_message'] = "Oncologist Appointment exceeded of limit 5"
 
-                    else:
-                        response_dict['is_insured'] = True
-                        response_dict['insurance_id'] = user_insurance.id
-                        response_dict['insurance_message'] = ""
                 else:
                     response_dict['is_insured'] = True
                     response_dict['insurance_id'] = user_insurance.id
@@ -807,13 +805,13 @@ class UserInsurance(auth_model.TimeStampedModel):
         lab = appointment_data['lab']
         lab_mrp_check_list = []
         if not lab.is_insurance_enabled:
-            return False, None, 'Mrp for the test is above insurance threshold limit'
+            return False, None, 'Lab is not covered under insurance'
         threshold = InsuranceThreshold.objects.filter(insurance_plan_id=user_insurance.insurance_plan_id).first()
         threshold_lab = threshold.lab_amount_limit
         if appointment_data['test_ids']:
             for test in appointment_data['test_ids']:
                 lab_test = AvailableLabTest.objects.filter(lab_pricing_group__labs=appointment_data["lab"],
-                                                           test=test).first()
+                                                           test=test, enabled=True).first()
                 if not lab_test:
                     return False, user_insurance.id, 'Price not available for Test'
                 mrp = lab_test.mrp
@@ -1094,6 +1092,7 @@ class InsuredMembers(auth_model.TimeStampedModel):
         proposer_lname = self.last_name if self.last_name else ""
 
         proposer_name = '%s %s %s %s' % (self.title, proposer_fname, proposer_mname, proposer_lname)
+        proposer_name = " ".join(proposer_name.split())
         return proposer_name
 
     @classmethod

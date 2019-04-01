@@ -438,7 +438,16 @@ class UserProfileViewSet(mixins.CreateModelMixin, mixins.ListModelMixin,
         insured_member_profile = None
         if insured_member_obj:
             insured_member_profile = insured_member_obj.profile
-        if obj and hasattr(obj, 'id') and obj.id and insured_member_profile:
+
+        if insured_member_profile:
+            keys = data.keys()
+            for key in keys:
+                if key not in ['id','whatsapp_optin','whatsapp_is_declined']:
+                    return Response({
+                        "request_errors": {"code": "invalid",
+                                           "message": "Profile cannot be changed which are covered under insurance."
+                                           }
+                    }, status=status.HTTP_400_BAD_REQUEST)
 
             whatsapp_optin = data.get('whatsapp_optin')
             whatsapp_is_declined = data.get('whatsapp_is_declined')
@@ -452,15 +461,9 @@ class UserProfileViewSet(mixins.CreateModelMixin, mixins.ListModelMixin,
 
                 insured_member_profile.save()
                 return Response(serializer.data)
-            else:
-                return Response({
-                    "request_errors": {"code": "invalid",
-                                       "message": "Profile cannot be changed which are covered under insurance."
-                                       }
-                }, status=status.HTTP_400_BAD_REQUEST)
-
-        serializer.save()
-        return Response(serializer.data)
+        else:
+            serializer.save()
+            return Response(serializer.data)
 
     def upload(self, request, *args, **kwargs):
         instance = self.get_object()
@@ -662,9 +665,9 @@ class UserAppointmentsViewSet(OndocViewSet):
                         return resp
                     if lab_appointment.payment_type == OpdAppointment.INSURANCE and lab_appointment.insurance_id is not None:
                         user_insurance = UserInsurance.objects.get(id=lab_appointment.insurance_id)
-                        if user_insurance and user_insurance.is_valid():
+                        if user_insurance :
                             insurance_threshold = user_insurance.insurance_plan.threshold.filter().first()
-                            if time_slot_start > user_insurance.expiry_date:
+                            if time_slot_start > user_insurance.expiry_date or not user_insurance.is_valid():
                                 resp = {
                                     "status": 0,
                                     "message": "Appointment time is not covered under insurance"
@@ -1281,52 +1284,6 @@ class TransactionViewSet(viewsets.GenericViewSet):
         data['pb_gateway_name'] = response.get('pbGatewayName')
 
         return data
-
-    @transaction.atomic
-    def block_pay_schedule_transaction(self, pg_data, order_obj):
-
-        consumer_account = ConsumerAccount.objects.get_or_create(user=pg_data["user"])
-        consumer_account = ConsumerAccount.objects.select_for_update().get(user=pg_data["user"])
-
-        tx_amount = order_obj.amount
-
-        consumer_account.credit_payment(pg_data, tx_amount)
-
-        appointment_obj = None
-        insurance_data = order_obj.action_data
-        try:
-            appointment_data = order_obj.action_data
-            if order_obj.product_id == account_models.Order.DOCTOR_PRODUCT_ID:
-                serializer = OpdAppTransactionModelSerializer(data=appointment_data)
-                serializer.is_valid()
-                appointment_data = serializer.validated_data
-            elif order_obj.product_id == account_models.Order.LAB_PRODUCT_ID:
-                serializer = LabAppTransactionModelSerializer(data=appointment_data)
-                serializer.is_valid()
-                appointment_data = serializer.validated_data
-            elif order_obj.product_id == account_models.Order.INSURANCE_PRODUCT_ID:
-                transaction_dict = {}
-                transaction_dict["user"] = insurance_data.get('user')
-                transaction_dict["insurer"] = insurance_data.get('insurer').get('id')
-                transaction_dict["insurance_plan"] = insurance_data.get('insurance_plan').get('id')
-                # transaction_dict["order_id"] = order_obj.id
-                transaction_dict["amount"] = order_obj.amount
-                transaction_dict["status_type"] = InsuranceTransaction.CREATED
-                # transaction_dict["insured_members"] = insurance_data.get('members')
-                serializer = InsuranceTransactionSerializer(data=transaction_dict)
-                serializer.is_valid()
-                valid_data = serializer.validated_data
-
-            if (order_obj.product_id == account_models.Order.LAB_PRODUCT_ID) or (order_obj.product_id == account_models.Order.DOCTOR_PRODUCT_ID):
-                appointment_obj = order_obj.process_order(consumer_account, pg_data, appointment_data)
-                # appointment_obj = order_obj.process_order(consumer_account, pg_txn_obj, appointment_data)
-            elif order_obj.product_id == account_models.Order.INSURANCE_PRODUCT_ID:
-                appointment_obj = order_obj.process_insurance_order(consumer_account, pg_data, order_obj, valid_data)
-
-        except:
-            pass
-
-        return appointment_obj
 
     @transaction.atomic
     def block_schedule_transaction(self, data):

@@ -120,8 +120,6 @@ class Order(TimeStampedModel):
 
         # Initial validations for appointment data
         appointment_data = self.action_data
-        # TODO Set to null user_insurance_data
-        # user_insurance_data = self.action_data
         user_insurance_data = None
         # Check if payment is required at all, only when payment is required we debit consumer's account
         payment_not_required = False
