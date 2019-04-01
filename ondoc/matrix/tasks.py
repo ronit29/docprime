@@ -483,7 +483,7 @@ def create_or_update_lead_on_matrix(self, data):
         ct = ContentType.objects.get(model=obj_type.lower())
         model_used = ct.model_class()
         content_type = ContentType.objects.get_for_model(model_used)
-        exit_point_url = settings.ADMIN_BASE_URL + reverse('admin:{}_{}_change'.format(content_type.app_label, content_type.model), kwargs={"object_id": obj_id})
+        exit_point_url = settings.ADMIN_BASE_URL + reverse('admin:{}_{}_change'.format(content_type.app_label, content_type.model), kwargs={"object_id": obj_id}) if obj_type != ProviderSignupLead.__name__ else None
         obj = model_used.objects.filter(id=obj_id).first()
         if not obj:
             raise Exception("{} could not found against id - {}".format(obj_type, obj_id))
@@ -539,7 +539,7 @@ def create_or_update_lead_on_matrix(self, data):
             'SubProductId': sub_product_id,
             'Name': name,
             'ExitPointUrl': exit_point_url,
-            'CityId': obj.matrix_city.id if hasattr(obj, 'matrix_city') and obj.matrix_city.id else 0
+            'CityId': obj.matrix_city.id if hasattr(obj, 'matrix_city') and obj.matrix_city and obj.matrix_city.id else 0
         }
         url = settings.MATRIX_API_URL
         matrix_api_token = settings.MATRIX_API_TOKEN
