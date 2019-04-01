@@ -325,15 +325,8 @@ class Hospital(auth_model.TimeStampedModel, auth_model.CreatedByModel, auth_mode
             self.is_live = False
 
     def update_time_stamps(self):
-        if self.welcome_calling_done and not self.welcome_calling_done_at:
-            self.welcome_calling_done_at = timezone.now()
-        elif not self.welcome_calling_done and self.welcome_calling_done_at:
-            self.welcome_calling_done_at = None
-
-        if self.physical_agreement_signed and not self.physical_agreement_signed_at:
-            self.physical_agreement_signed_at = timezone.now()
-        elif not self.physical_agreement_signed and self.physical_agreement_signed_at:
-            self.physical_agreement_signed_at = None
+        from ondoc.api.v1.utils import update_physical_agreement_timestamp
+        update_physical_agreement_timestamp(self)
 
         if not self.enabled and not self.disabled_at:
             self.disabled_at = timezone.now()
@@ -764,11 +757,15 @@ class Doctor(auth_model.TimeStampedModel, auth_model.QCModel, SearchKey, auth_mo
         content_type = ContentType.objects.get_for_model(Doctor)
         if content_type:
             cid = content_type.id
-            # query = '''UPDATE doctor d set avg_rating = (select avg(ratings) from ratings_review where content_type_id={} and object_id=d.id) '''.format(cid)
-            query = '''UPDATE doctor d set rating_data = json_build_object('avg_rating', (select round(avg(ratings),1) 
-                        from ratings_review where content_type_id={} and object_id=d.id), 'rating_count',(select count(ratings) 
-                        from ratings_review where content_type_id={} and object_id=d.id))  '''.format(
-                cid, cid)
+
+            query = '''update doctor d set rating_data=
+                       (
+                       select json_build_object('avg_rating', x.avg_rating,'rating_count', x.rating_count) from
+                       (select object_id as doctor_id,round(avg(ratings),1) avg_rating, count(*) rating_count from 
+                       ratings_review where content_type_id={} group by object_id
+                       )x where x.doctor_id = d.id				  
+                       ) where id in (select object_id from ratings_review where content_type_id={})
+                     '''.format(cid, cid)
             cursor.execute(query)
 
 
@@ -973,7 +970,7 @@ class DoctorSpecialization(auth_model.TimeStampedModel):
         unique_together = ("doctor", "specialization")
 
 
-class DoctorClinic(auth_model.TimeStampedModel):
+class DoctorClinic(auth_model.TimeStampedModel, auth_model.WelcomeCallingDone):
     doctor = models.ForeignKey(Doctor, on_delete=models.CASCADE, related_name='doctor_clinics')
     hospital = models.ForeignKey(Hospital, on_delete=models.CASCADE, related_name='hospital_doctors')
     followup_duration = models.PositiveSmallIntegerField(blank=True, null=True)
@@ -1412,7 +1409,7 @@ class DoctorEmail(auth_model.TimeStampedModel):
         unique_together = (("doctor", "email"),)
 
 
-class HospitalNetwork(auth_model.TimeStampedModel, auth_model.CreatedByModel, auth_model.QCModel, auth_model.WelcomeCallingDone):
+class HospitalNetwork(auth_model.TimeStampedModel, auth_model.CreatedByModel, auth_model.QCModel, auth_model.WelcomeCallingDone, auth_model.PhysicalAgreementSigned):
     name = models.CharField(max_length=100)
     operational_since = models.PositiveSmallIntegerField(blank=True, null=True, validators=[MinValueValidator(1900)])
     about = models.CharField(max_length=2000, blank=True)

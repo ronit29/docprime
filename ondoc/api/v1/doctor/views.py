@@ -27,7 +27,7 @@ from ondoc.account import models as account_models
 from ondoc.location.models import EntityUrls, EntityAddress, DefaultRating
 from ondoc.procedure.models import Procedure, ProcedureCategory, CommonProcedureCategory, ProcedureToCategoryMapping, \
     get_selected_and_other_procedures, CommonProcedure, CommonIpdProcedure, IpdProcedure, DoctorClinicIpdProcedure, \
-    IpdProcedureFeatureMapping
+    IpdProcedureFeatureMapping, IpdProcedureDetail
 from ondoc.seo.models import NewDynamic
 from . import serializers
 from ondoc.api.v2.doctor import serializers as v2_serializers
@@ -3305,6 +3305,7 @@ class HospitalViewSet(viewsets.GenericViewSet):
         hospital_queryset = Hospital.objects.prefetch_related('hospitalcertification_set',
                                                               'hospital_documents',
                                                               'hosp_availability',
+                                                              'health_insurance_providers',
                                                               'network__hospital_network_documents',
                                                               'hospitalspeciality_set').filter(
             is_live=True,
@@ -3362,11 +3363,15 @@ class IpdProcedureViewSet(viewsets.GenericViewSet):
         validated_data = serializer.validated_data
         # ipd_procedure = IpdProcedure.objects.prefetch_related('feature_mappings__feature').filter(is_enabled=True, id=pk).first()
         ipd_procedure = IpdProcedure.objects.prefetch_related(
-            Prefetch('feature_mappings', IpdProcedureFeatureMapping.objects.select_related('feature').all().order_by('-feature__priority'))).filter(
+            Prefetch('feature_mappings',
+                     IpdProcedureFeatureMapping.objects.select_related('feature').all().order_by('-feature__priority')),
+            Prefetch('ipdproceduredetail_set',
+                     IpdProcedureDetail.objects.select_related('detail_type').all().order_by('-detail_type__priority')),
+        ).filter(
             is_enabled=True, id=pk).first()
         if ipd_procedure is None:
-            return Response(status=status.HTTP_400_BAD_REQUEST)
-        ipd_procedure_serializer = serializers.IpdProcedureDetailSerializer(ipd_procedure, context={'request': request})
+            return Response(status=status.HTTP_404_NOT_FOUND)
+
         hospital_view_set = HospitalViewSet()
         hospital_result = hospital_view_set.list(request, pk, 2)
         doctor_list_viewset = DoctorListViewSet()
@@ -3374,9 +3379,12 @@ class IpdProcedureViewSet(viewsets.GenericViewSet):
                                                                       'longitude': validated_data.get('long'),
                                                                       'latitude': validated_data.get('lat'),
                                                                       'sort_on': 'experience',
-                                                                      'restrict_result_count': 2})
+                                                                      'restrict_result_count': 3})
+        doctor_result_data = doctor_result.data
+        ipd_procedure_serializer = serializers.IpdProcedureDetailSerializer(ipd_procedure, context={'request': request,
+                                                                                                    'doctor_result_data': doctor_result_data})
         return Response(
-            {'about': ipd_procedure_serializer.data, 'hospitals': hospital_result.data, 'doctors': doctor_result.data})
+            {'about': ipd_procedure_serializer.data, 'hospitals': hospital_result.data, 'doctors': doctor_result_data})
 
     def create_lead(self, request):
         serializer = serializers.IpdProcedureLeadSerializer(data=request.data)
