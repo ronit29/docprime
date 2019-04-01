@@ -405,16 +405,16 @@ class UserInsurance(auth_model.TimeStampedModel):
         proposer_lname = proposer.last_name if proposer.last_name else ""
         gst_state_code = proposer.state_code
 
-        proposer_name = '%s %s %s %s' % (proposer.title, proposer_fname, proposer_mname, proposer_lname)
+        proposer_name = proposer.get_full_name()
 
         member_list = list()
         count = 1
         for member in insured_members:
-            fname = member.first_name if member.first_name else ""
-            mname = member.middle_name if member.middle_name else ""
-            lname = member.last_name if member.last_name else ""
+            # fname = member.first_name if member.first_name else ""
+            # mname = member.middle_name if member.middle_name else ""
+            # lname = member.last_name if member.last_name else ""
 
-            name = '%s %s %s' % (fname, mname, lname)
+            name = member.get_full_name()
             data = {
                 'name': name.title(),
                 'member_number': count,
@@ -1094,6 +1094,7 @@ class InsuredMembers(auth_model.TimeStampedModel):
         proposer_lname = self.last_name if self.last_name else ""
 
         proposer_name = '%s %s %s %s' % (self.title, proposer_fname, proposer_mname, proposer_lname)
+        proposer_name = " ".join(proposer_name.split())
         return proposer_name
 
     @classmethod
