@@ -263,7 +263,7 @@ class Thyrocare(BaseIntegrator):
                 formats = ['pdf', 'xml']
                 for booking in integrator_bookings:
                     dp_appointment = booking.content_object
-                    if dp_appointment.time_slot_start + timedelta(days=1) <= datetime.now():
+                    if dp_appointment.time_slot_start + timedelta(days=1) <= timezone.now():
                         lead_id = booking.lead_id
                         mobile = booking.content_object.profile.phone_number
                         result = dict()
