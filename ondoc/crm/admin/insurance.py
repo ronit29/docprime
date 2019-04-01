@@ -119,6 +119,15 @@ class InsuredMemberResource(resources.ModelResource):
                         ,'ifsc', 'aadhar_number', 'diabetes', 'heart_diseases', 'cancer', 'pregnancy',
                         'customer_consent_recieved', 'coi')
 
+    def dehydrate_gender(self, insured_members):
+        gender = str(insured_members.gender)
+        if gender == "m":
+            return "Male"
+        elif gender == "f":
+            return "Female"
+        else:
+            return "Other"
+
     def dehydrate_purchase_date(self, insured_members):
         return str(insured_members.user_insurance.purchase_date.date())
 
