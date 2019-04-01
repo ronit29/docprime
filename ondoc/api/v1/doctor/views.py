@@ -3013,11 +3013,11 @@ class OfflineCustomerViewSet(viewsets.GenericViewSet):
         valid_data = serializer.validated_data
         online_queryset = get_opd_pem_queryset(request.user, models.OpdAppointment)\
             .select_related('profile', 'merchant_payout')\
-            .prefetch_related('prescriptions', 'prescriptions__prescription_file', 'mask_number').distinct()
+            .prefetch_related('prescriptions', 'prescriptions__prescription_file', 'mask_number').distinct('id', 'time_slot_start')
 
         offline_queryset = get_opd_pem_queryset(request.user, models.OfflineOPDAppointments)\
             .select_related('user')\
-            .prefetch_related('user__patient_mobiles').distinct()
+            .prefetch_related('user__patient_mobiles').distinct('id')
         start_date = valid_data.get('start_date')
         end_date = valid_data.get('end_date')
         updated_at = valid_data.get('updated_at')
