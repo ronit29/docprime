@@ -318,8 +318,8 @@ def set_order_dummy_transaction(self, order_id, user_id):
             }
 
             if insurance_order_id and insurance_order_number:
-                req_data['refOrderNo'] = insurance_order_number
-                req_data['refOrderId'] = insurance_order_id
+                req_data['refOrderNo'] = str(insurance_order_number)
+                req_data['refOrderId'] = str(insurance_order_id)
 
             if insurer_code:
                 req_data['insurerCode'] = insurer_code
