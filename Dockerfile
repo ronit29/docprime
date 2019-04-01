@@ -5,6 +5,7 @@ ARG JOB
 ARG BIT_ENV_URL
 ARG COLLECTSTATIC
 ARG MIGRATE
+ARG COMMAND
 RUN apt-get update && apt-get install binutils libproj-dev gdal-bin nano apt-utils -y
 RUN apt-get update && apt-get install nginx -y
 RUN mkdir -p /home/docprime/workspace/backend
@@ -19,8 +20,10 @@ RUN git clone $BIT_ENV_URL /env
 RUN cp /env/$JOB/django/gunicorn_config.py /home/docprime/workspace/backend/
 RUN cp /env/$JOB/django/django_env /home/docprime/workspace/backend/.env
 RUN cp /env/$JOB/django/entrypoint /home/docprime/workspace/entrypoint
+RUN cp /env/$JOB/django/commands /home/docprime/workspace/entrypoint
 #RUN sed -i 's/\r//' /entrypoint
 RUN chmod +x /home/docprime/workspace/entrypoint/entrypoint
+RUN chmod +x /home/docprime/workspace/entrypoint/commands
 
 
 #NGINX CONFIGURATION
@@ -39,7 +42,10 @@ RUN if [ "$COLLECTSTATIC" = "true" ] ; then\
 fi
 RUN if [ "$MIGRATE" = "true" ] ; then\
  python manage.py migrate --no-input; \
-fi 
+fi
+RUN if [ "$COMMAND" = "true" ] ; then\
+ /home/docprime/workspace/entrypoint/commands; \
+fi
 
 EXPOSE 80
 #CMD ["sh", "/home/docprime/workspace/entrypoint/entrypoint"]
