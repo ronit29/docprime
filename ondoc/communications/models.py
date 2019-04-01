@@ -190,6 +190,9 @@ def get_title_body(notification_type, context, user):
         title = "Report Uploaded"
         body = "Report available for your appointment with Lab - {} on {}".format(
             lab_name, time_slot_start.strftime("%d/%m/%y"))
+    elif notification_type == NotificationAction.CHAT_NOTIFICATION:
+        title = context.get('title')
+        body = context.get('body')
     context.update({'title': title, 'body': body})
 
 

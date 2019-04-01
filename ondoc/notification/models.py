@@ -62,6 +62,8 @@ class NotificationAction:
 
     IPD_PROCEDURE_MAIL = 60
 
+    CHAT_NOTIFICATION = 87
+
     NOTIFICATION_TYPE_CHOICES = (
         (APPOINTMENT_ACCEPTED, "Appointment Accepted"),
         (APPOINTMENT_CANCELLED, "Appointment Cancelled"),
@@ -87,7 +89,8 @@ class NotificationAction:
 
         (REFUND_BREAKUP, 'Refund break up'),
         (REFUND_COMPLETED, 'Refund Completed'),
-        (IPD_PROCEDURE_MAIL, 'IPD Procedure Mail')
+        (IPD_PROCEDURE_MAIL, 'IPD Procedure Mail'),
+        (CHAT_NOTIFICATION, "Pus Notification from chat")
     )
 
     OPD_APPOINTMENT = "opd_appointment"
