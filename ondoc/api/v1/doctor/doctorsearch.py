@@ -164,9 +164,9 @@ class DoctorSearchHelper:
             search_key = " ".join(search_key).lower()
 
             search_key = "".join(search_key.split("."))
-            filtering_params.append("d.search_key like (%(doctor_name1)s) "
+            filtering_params.append("(d.search_key like (%(doctor_name1)s) "
                                     "or d.search_key like  %(doctor_name2)s "
-                                    "or d.search_key like %(doctor_name3)s ")
+                                    "or d.search_key like %(doctor_name3)s) ")
             # filtering_params.append(
             #     "d.search_key ilike (%(doctor_name)s)"
             #         )
