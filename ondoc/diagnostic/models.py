@@ -541,14 +541,14 @@ class Lab(TimeStampedModel, CreatedByModel, QCModel, SearchKey):
         return res_data
 
     def get_available_slots(self, is_home_pickup, pincode, date):
-        from ondoc.integrations.models import IntegratorMapping
+        from ondoc.integrations.models import IntegratorTestMapping
         from ondoc.integrations import service
 
         integration_dict = None
         lab = Lab.objects.filter(id=self.id).first()
         if lab:
             if lab.network and lab.network.id:
-                integration_dict = IntegratorMapping.get_if_third_party_integration(network_id=lab.network.id)
+                integration_dict = IntegratorTestMapping.get_if_third_party_integration(network_id=lab.network.id)
 
                 if lab.network.id == settings.THYROCARE_NETWORK_ID and settings.THYROCARE_INTEGRATION_ENABLED:
                     pass
@@ -566,11 +566,11 @@ class Lab(TimeStampedModel, CreatedByModel, QCModel, SearchKey):
         return available_slots
 
     def is_integrated(self):
-        from ondoc.integrations.models import IntegratorMapping
+        from ondoc.integrations.models import IntegratorTestMapping
 
         integration_dict = None
         if self.network and self.network.id:
-            integration_dict = IntegratorMapping.get_if_third_party_integration(network_id=self.network.id)
+            integration_dict = IntegratorTestMapping.get_if_third_party_integration(network_id=self.network.id)
         if not integration_dict:
             return False
         else:

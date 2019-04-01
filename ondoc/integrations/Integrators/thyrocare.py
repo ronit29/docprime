@@ -1,6 +1,8 @@
 from decimal import Decimal
 
 from django.core.files.uploadedfile import TemporaryUploadedFile, InMemoryUploadedFile
+from django.db.models import Q
+
 from ondoc.api.v1.utils import TimeSlotExtraction
 from .baseIntegrator import BaseIntegrator
 import requests
@@ -66,7 +68,7 @@ class Thyrocare(BaseIntegrator):
                 name_params_required = True
 
             defaults = {'integrator_product_data': result_obj, 'integrator_class_name': Thyrocare.__name__,
-                        'content_type': ContentType.objects.get(model='labnetwork'), 'service_type': IntegratorMapping.ServiceType.LabTest,
+                        'content_type': ContentType.objects.get(model='labnetwork'), 'service_type': IntegratorTestMapping.ServiceType.LabTest,
                         'name_params_required': name_params_required, 'test_type': result_obj['type']}
 
             IntegratorTestMapping.objects.update_or_create(integrator_test_name=result_obj['name'], object_id=obj_id, defaults=defaults)
@@ -172,7 +174,7 @@ class Thyrocare(BaseIntegrator):
         return None
 
     def prepare_data(self, tests, packages, lab_appointment):
-        from ondoc.integrations.models import IntegratorProfileMapping, IntegratorMapping
+        from ondoc.integrations.models import IntegratorProfileMapping, IntegratorTestMapping
 
         profile = lab_appointment.profile
         if hasattr(lab_appointment, 'address') and lab_appointment.address:
@@ -212,7 +214,7 @@ class Thyrocare(BaseIntegrator):
         rate = 0
         if tests:
             for test in tests:
-                integrator_test = IntegratorMapping.objects.filter(test_id=test.id, integrator_class_name=Thyrocare.__name__, is_active=True).first()
+                integrator_test = IntegratorTestMapping.objects.filter(test_id=test.id, integrator_class_name=Thyrocare.__name__, is_active=True, test_type='TEST').first()
                 if integrator_test:
                     if integrator_test.name_params_required:
                         product.append(integrator_test.integrator_product_data["name"])
@@ -224,9 +226,10 @@ class Thyrocare(BaseIntegrator):
 
         if packages:
             for package in packages:
-                integrator_package = IntegratorProfileMapping.objects.filter(package_id=package.id, integrator_class_name=Thyrocare.__name__, is_active=True).first()
+                # integrator_package = IntegratorTestMapping.objects.filter(test_id=package.id, integrator_class_name=Thyrocare.__name__, is_active=True).first()
+                integrator_package = IntegratorTestMapping.objects.filter(Q(test_id=package.id) & Q(integrator_class_name=Thyrocare.__name__) & Q(is_active=True) & ~Q(test_type='TEST')).first()
                 if integrator_package:
-                    if integrator_package.integrator_type == "OFFER":
+                    if integrator_package.test_type == "OFFER":
                         payload["report_code"] = integrator_package.integrator_product_data["code"]
                     if integrator_package.integrator_product_data["testnames"] == 'null':
                         name = integrator_package.integrator_product_data["name"]
@@ -373,7 +376,7 @@ class Thyrocare(BaseIntegrator):
         if integrator_history:
             status = integrator_history.status
             if dp_appointment.status != LabAppointment.CANCELLED or dp_appointment.status != LabAppointment.COMPLETED:
-                if dp_appointment.time_slot_start + timedelta(days=1) < timezone.now():
+                if dp_appointment.time_slot_start + timedelta(days=1) > timezone.now():
                     url = "%s/order.svc/%s/%s/%s/all/OrderSummary" % (settings.THYROCARE_BASE_URL, settings.THYROCARE_API_KEY,
                                                                       integrator_response.dp_order_id,
                                                                       integrator_response.response_data['MOBILE'])

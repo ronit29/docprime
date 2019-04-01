@@ -4,6 +4,7 @@ import requests
 from celery import task
 import logging
 from django.conf import settings
+from django.db.models import Q
 
 logger = logging.getLogger(__name__)
 
@@ -12,7 +13,8 @@ logger = logging.getLogger(__name__)
 def push_lab_appointment_to_integrator(self, data):
     from django.contrib.contenttypes.models import ContentType
     from ondoc.diagnostic.models import LabAppointment
-    from ondoc.integrations.models import IntegratorMapping, IntegratorProfileMapping, IntegratorResponse, IntegratorHistory
+    from ondoc.integrations.models import IntegratorMapping, IntegratorProfileMapping, IntegratorResponse, \
+                                          IntegratorHistory, IntegratorTestMapping
     from ondoc.integrations import service
 
     try:
@@ -49,9 +51,11 @@ def push_lab_appointment_to_integrator(self, data):
                 raise Exception('[ERROR] Could not find any test and packages for the appointment id %d' % appointment.id)
 
             if packages:
-                integrator_mapping = IntegratorProfileMapping.objects.filter(content_type=lab_network_content_type, object_id=lab_network.id, package=packages[0]).first()
+                # integrator_mapping = IntegratorProfileMapping.objects.filter(content_type=lab_network_content_type, object_id=lab_network.id, package=packages[0]).first()
+                integrator_mapping = IntegratorTestMapping.objects.filter(Q(content_type=lab_network_content_type) &
+                                                                          Q(object_id=lab_network.id) & Q(package=packages[0]) & ~Q(test_type='TEST')).first()
             elif tests:
-                integrator_mapping = IntegratorMapping.objects.filter(content_type=lab_network_content_type, object_id=lab_network.id, test=tests[0]).first()
+                integrator_mapping = IntegratorTestMapping.objects.filter(content_type=lab_network_content_type, object_id=lab_network.id, test_type='TEST', test=tests[0]).first()
 
             if not integrator_mapping:
                 raise Exception("[ERROR] Mapping not found for booked test or package - appointment id %d" % appointment.id)
