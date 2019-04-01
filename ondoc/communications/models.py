@@ -369,7 +369,7 @@ class SMSNotification:
         # one_time_token.save()
         appointment_type = 'opd' if appointment.__class__ == OpdAppointment else 'lab'
         # provider_login_url = settings.PROVIDER_APP_DOMAIN + "/sms/login?token=" + token + \
-        provider_login_url = "http://localhost:4000/sms/login?token=" + token + \
+        provider_login_url = "http://localhost:4000/sms/login?auth_token=" + token + \
                                         "&url=/sms-redirect/" + appointment_type + "/appointment/" + str(appointment.id)
         context['provider_login_url'] = generate_short_url(provider_login_url)
         return context
