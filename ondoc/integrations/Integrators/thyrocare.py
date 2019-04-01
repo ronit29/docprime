@@ -266,13 +266,14 @@ class Thyrocare(BaseIntegrator):
                 formats = ['pdf', 'xml']
                 for booking in integrator_bookings:
                     dp_appointment = booking.content_object
-                    if dp_appointment.time_slot_start + timedelta(days=1) <= datetime.now():
+                    if dp_appointment.time_slot_start + timedelta(days=1) <= timezone.now():
                         lead_id = booking.lead_id
                         mobile = booking.content_object.profile.phone_number
                         result = dict()
 
                         for format in formats:
-                            url = "%s/order.svc/%s/GETREPORTS/%s/%s/%s/Myreport" % (settings.THYROCARE_BASE_URL, settings.THYROCARE_API_KEY, lead_id, format, mobile)
+                            # url = "%s/order.svc/%s/GETREPORTS/%s/%s/%s/Myreport" % (settings.THYROCARE_BASE_URL, settings.THYROCARE_API_KEY, lead_id, format, mobile)
+                            url = "https://www.thyrocare.com/APIs/order.svc/Or3OLzFDGzLF7Apwjsp05KPe3Sski7)QAomi@RBhXRrVcGyko7hIzQ==/GETREPORTS/SP46826445/%s/9990786399/Myreport" % (format)
                             response = requests.get(url)
                             response = response.json()
                             if response.get('RES_ID') == 'RES0000':
