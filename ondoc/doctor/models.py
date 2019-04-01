@@ -226,7 +226,9 @@ class Hospital(auth_model.TimeStampedModel, auth_model.CreatedByModel, auth_mode
     about = models.TextField(blank=True, null=True, default="")
     opd_timings = models.CharField(max_length=150, blank=True, null=True, default="")
     always_open = models.BooleanField(verbose_name='Is hospital open 24X7', default=False)
-    city_search_key = models.CharField(db_index=True,editable=False, max_length=100, default="", null=True, blank=True)
+    city_search_key = models.CharField(db_index=True, editable=False, max_length=100, default="", null=True, blank=True)
+    enabled_for_cod = models.BooleanField(default=False)
+    enabled_for_prepaid = models.BooleanField(default=True)
 
     def __str__(self):
         return self.name
@@ -768,8 +770,7 @@ class Doctor(auth_model.TimeStampedModel, auth_model.QCModel, SearchKey, auth_mo
                      '''.format(cid, cid)
             cursor.execute(query)
 
-
-    def enabled_for_cod(self):
+    def enabled_for_cod(self):  # Not to be used
         return False
 
     def generate_qr_code(self):
