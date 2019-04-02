@@ -1537,6 +1537,8 @@ class PackageSerializer(LabTestSerializer):
 class CompareLabPackagesSerializer(serializers.Serializer):
 
     package_ids = CommaSepratedToListField(required=True, max_length=4, typecast_to=str)
+    longitude = serializers.FloatField(default=77.071848)
+    latitude = serializers.FloatField(default=28.450367)
 
     def validate_package_ids(self, attrs):
         try:
