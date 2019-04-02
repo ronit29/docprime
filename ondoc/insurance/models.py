@@ -1154,3 +1154,16 @@ class InsuranceLead(auth_model.TimeStampedModel):
         db_table = 'insurance_leads'
 
 
+class InsuranceDeal(auth_model.TimeStampedModel):
+    deal_id = models.CharField(max_length=50)
+    insurer = models.ForeignKey(Insurer, related_name='deals', on_delete=models.DO_NOTHING)
+    commission = models.FloatField(default=0)
+    tax = models.FloatField(default=0)
+    deal_start_date = models.DateField(null=False, blank=False)
+    deal_end_date = models.DateField(null=False, blank=False)
+
+    class Meta:
+        db_table = 'insurance_deals'
+
+
+
