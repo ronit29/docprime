@@ -24,22 +24,22 @@ def sync_booking_data():
         for city in cities:
             city.sync_with_booking_analytics()
 
-        states = MatrixMappedState.objects.filter(synced_analytics__isnull=True)
-        for state in states:
-            state.sync_with_booking_analytics()
-
-        opd_apps = OpdAppointment.objects.filter(synced_analytics__isnull=True)
-        for app in opd_apps:
-            app.sync_with_booking_analytics()
-
-        lab_apps = LabAppointment.objects.filter(synced_analytics__isnull=True)
-        for app in lab_apps:
-            app.sync_with_booking_analytics()
-
-        to_be_updated = SyncBookingAnalytics.objects.exclude(synced_at=F('last_updated_at'))
-        for obj in to_be_updated:
-            row = obj.content_object
-            row.sync_with_booking_analytics(obj)
+        # states = MatrixMappedState.objects.filter(synced_analytics__isnull=True)
+        # for state in states:
+        #     state.sync_with_booking_analytics()
+        #
+        # opd_apps = OpdAppointment.objects.filter(synced_analytics__isnull=True)
+        # for app in opd_apps:
+        #     app.sync_with_booking_analytics()
+        #
+        # lab_apps = LabAppointment.objects.filter(synced_analytics__isnull=True)
+        # for app in lab_apps:
+        #     app.sync_with_booking_analytics()
+        #
+        # to_be_updated = SyncBookingAnalytics.objects.exclude(synced_at=F('last_updated_at'))
+        # for obj in to_be_updated:
+        #     row = obj.content_object
+        #     row.sync_with_booking_analytics(obj)
 
     except Exception as e:
         logger.error(str(e))

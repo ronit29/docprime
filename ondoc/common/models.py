@@ -237,13 +237,14 @@ class Remark(auth_model.TimeStampedModel):
 
 
 class SyncBookingAnalytics(TimeStampedModel):
-    content_type = models.ForeignKey(ContentType, on_delete=models.SET_NULL, null=True)
-    object_id = models.PositiveIntegerField(null=True)
+    content_type = models.ForeignKey(ContentType, on_delete=models.CASCADE)
+    object_id = models.PositiveIntegerField()
     content_object = GenericForeignKey()
     synced_at = models.DateTimeField(auto_now_add=True, null=True)
     last_updated_at = models.DateTimeField(auto_now_add=True, null=True)
 
     class Meta:
+        unique_together = (('object_id', 'content_type'), )
         db_table = "sync_booking_analytics"
 
 
@@ -259,7 +260,7 @@ class MatrixMappedState(TimeStampedModel):
         verbose_name_plural = "Matrix Mapped States"
 
 
-    def sync_with_booking_analytics(self, sync_entry=None):
+    def sync_with_booking_analytics(self):
         obj = DP_StateMaster.objects.filter(StateId=self.id).first()
         if not obj:
             obj = DP_StateMaster()
@@ -267,16 +268,13 @@ class MatrixMappedState(TimeStampedModel):
             obj.StateId = self.id
         obj.StateName = self.name
         obj.save()
-        if sync_entry:
-            sync_entry.synced_at = self.updated_at
-            sync_entry.last_updated_at = self.updated_at
-            sync_entry.save()
-        else:
-            sync_analytics_object = SyncBookingAnalytics(synced_at=self.updated_at,
-                                                         last_updated_at=self.updated_at,
-                                                         content_type=ContentType.objects.get_for_model(MatrixMappedState),
-                                                         object_id=self.id)
-            sync_analytics_object.save()
+
+        try:
+            SyncBookingAnalytics.update_or_create(object_id=self.id,
+                                                  content_type=ContentType.objects.get_for_model(MatrixMappedState),
+                                                  defaults={"synced_at": self.updated_at, "last_updated_at": self.updated_at})
+        except Exception as e:
+            pass
 
         return obj
 
@@ -294,7 +292,7 @@ class MatrixMappedCity(TimeStampedModel):
         verbose_name_plural = "Matrix Mapped Cities"
 
 
-    def sync_with_booking_analytics(self, sync_entry=None):
+    def sync_with_booking_analytics(self):
         obj = DP_CityMaster.objects.filter(CityId=self.id).first()
         if not obj:
             obj = DP_CityMaster()
@@ -303,16 +301,12 @@ class MatrixMappedCity(TimeStampedModel):
         obj.CityName = self.name
         obj.save()
 
-        if sync_entry:
-            sync_entry.synced_at = self.updated_at
-            sync_entry.last_updated_at = self.updated_at
-            sync_entry.save()
-        else:
-            sync_analytics_object = SyncBookingAnalytics(synced_at=self.updated_at,
-                                                         last_updated_at=self.updated_at,
-                                                         content_type=ContentType.objects.get_for_model(MatrixMappedCity),
-                                                         object_id=self.id)
-            sync_analytics_object.save()
+        try:
+            SyncBookingAnalytics.update_or_create(object_id=self.id,
+                                                  content_type=ContentType.objects.get_for_model(MatrixMappedCity),
+                                                  defaults={"synced_at": self.updated_at, "last_updated_at": self.updated_at})
+        except Exception as e:
+            pass
 
         return obj
 

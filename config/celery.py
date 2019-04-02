@@ -80,7 +80,7 @@ def setup_periodic_tasks(sender, **kwargs):
     sender.add_periodic_task(report_time, get_thyrocare_reports.s(), name='Get Thyrocare Reports')
     sender.add_periodic_task(crontab(hour=19, minute=30), update_city_search_key.s(), name='Update Hospital City Search Key')
 
-    sender.add_periodic_task(float(5), sync_booking_data.s(), name="Sync Booking Data for analytics")
+    sender.add_periodic_task(float(50000000000), sync_booking_data.s(), name="Sync Booking Data for analytics")
 
     # doctor_search_score_creation_time = float(settings.CREATE_DOCTOR_SEARCH_SCORE) * float(3600.0)
     # sender.add_periodic_task(doctor_search_score_creation_time, create_search_score.s(), name='Doctor search score updaed')

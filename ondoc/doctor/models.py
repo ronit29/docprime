@@ -1750,16 +1750,12 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
 
         obj.save()
 
-        if sync_entry:
-            sync_entry.synced_at = self.updated_at
-            sync_entry.last_updated_at = self.updated_at
-            sync_entry.save()
-        else:
-            sync_analytics_object = SyncBookingAnalytics(synced_at=self.updated_at,
-                                                         last_updated_at=self.updated_at,
-                                                         content_type=ContentType.objects.get_for_model(OpdAppointment),
-                                                         object_id=self.id)
-            sync_analytics_object.save()
+        try:
+            SyncBookingAnalytics.update_or_create(object_id=self.id,
+                                                  content_type=ContentType.objects.get_for_model(OpdAppointment),
+                                                  defaults={"synced_at": self.updated_at, "last_updated_at": self.updated_at})
+        except Exception as e:
+            pass
 
         return obj
 
