@@ -1741,13 +1741,21 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
 
     def sync_with_booking_analytics(self, sync_entry=None):
 
+        promo_cost = self.deal_price - self.effective_price if self.deal_price and self.effective_price else None
+
+        department = self.doctor.doctorpracticespecializations.specialization.department.first().id
         obj = DP_OpdConsultsAndTests.objects.filter(Appointment_Id=self.id).first()
         if not obj:
             obj = DP_OpdConsultsAndTests()
             obj.Appointment_Id = self.id
             obj.CityId = self.get_city()
             obj.StateId = self.get_state()
-
+            obj.SpecialityId = department if department else None
+            obj.TypeId = 1
+            obj.ProviderId = self.hospital.id
+        obj.PromoCost = promo_cost
+        obj.GMValue = self.deal_price
+        obj.StatusId = self.status
         obj.save()
 
         try:

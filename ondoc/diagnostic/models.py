@@ -1431,13 +1431,26 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin)
 
     def sync_with_booking_analytics(self):
 
+        category = None
+        if self.lab_test.first():
+            if self.lab_test.first().is_package == True:
+                category = 1
+            else:
+                category = 0
+
+        promo_cost = self.deal_price - self.effective_price if self.deal_price and self.effective_price else None
+
         obj = DP_OpdConsultsAndTests.objects.filter(Appointment_Id=self.id).first()
         if not obj:
             obj = DP_OpdConsultsAndTests()
             obj.Appointment_Id = self.id
             # obj.CityId = self.get_city()
             # obj.StateId = self.get_state()
-
+            obj.ProviderId = self.lab.id
+            obj.TypeId = 2
+        obj.PromoCost = promo_cost
+        obj.GMValue = self.deal_price
+        obj.Category = category
         obj.save()
 
         try:
