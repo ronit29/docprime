@@ -1,6 +1,6 @@
 from django.core.management.base import BaseCommand
 from ondoc.doctor.models import ProviderSignupLead
-from ondoc.diagnostic.models import LabAppointment, Hospital
+from ondoc.diagnostic.models import Hospital
 from ondoc.matrix.tasks import create_or_update_lead_on_matrix
 
 
