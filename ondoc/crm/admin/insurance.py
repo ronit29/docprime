@@ -119,6 +119,10 @@ class InsuredMemberResource(resources.ModelResource):
                         ,'ifsc', 'aadhar_number', 'diabetes', 'heart_diseases', 'cancer', 'pregnancy',
                         'customer_consent_recieved', 'coi')
 
+    def dehydrate_dob(self, insured_members):
+        dob = insured_members.dob
+        return str(dob.strftime('%d/%m/%Y'))
+
     def dehydrate_gender(self, insured_members):
         gender = str(insured_members.gender)
         if gender == "m":
