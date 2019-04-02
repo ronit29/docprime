@@ -7,6 +7,7 @@ from ondoc.account.tasks import refund_curl_task
 from ondoc.notification.models import AppNotification, NotificationAction
 from ondoc.notification.tasks import process_payout
 # from ondoc.diagnostic.models import LabAppointment
+# from ondoc.matrix.tasks import push_order_to_matrix
 from django.db import transaction
 from django.db.models import Sum, Q, F, Max
 from datetime import datetime, timedelta
@@ -347,6 +348,7 @@ class Order(TimeStampedModel):
     @transaction.atomic()
     def create_order(cls, request, cart_items, use_wallet=True):
         from ondoc.doctor.models import OpdAppointment
+        from ondoc.matrix.tasks import push_order_to_matrix
 
         fulfillment_data = cls.transfrom_cart_items(request, cart_items)
 
@@ -407,7 +409,8 @@ class Order(TimeStampedModel):
                 product_id=1,  # remove later
                 visitor_info=visitor_info
             )
-
+            push_order_to_matrix.apply_async(
+                ({'order_id': pg_order.id},), countdown=5)
         # building separate orders for all fulfillments
         fulfillment_data = copy.deepcopy(fulfillment_data)
         order_list = []
