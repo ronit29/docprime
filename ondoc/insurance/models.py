@@ -76,7 +76,7 @@ class InsuranceGynocologist:
                                                   user=user).count()
 
         if count >= int(settings.INSURANCE_GYNECOLOGIST_LIMIT):
-            error = "Gynocologist limit exceeded of limit 5"
+            error = "Gynocologist limit exceeded of limit {}".format(settings.INSURANCE_GYNECOLOGIST_LIMIT)
 
         return count, error
 
@@ -100,7 +100,7 @@ class InsuranceOncologist:
                                                   insurance_id=insurance_id,
                                                   user=user).count()
         if count >= int(settings.INSURANCE_ONCOLOGIST_LIMIT):
-            error = "Oncologist limit exceeded of limit 5"
+            error = "Oncologist limit exceeded of limit {}".format(settings.INSURANCE_ONCOLOGIST_LIMIT)
 
         return count, error
 
@@ -565,7 +565,7 @@ class UserInsurance(auth_model.TimeStampedModel):
                                                                   insurance_id=self.id,
                                                                   profile_id=members.profile.id).count()
             if gynecologist_opd_count > int(settings.INSURANCE_GYNECOLOGIST_LIMIT):
-                return False, self.id, 'Gynecologist Limit of 5 exceeded'
+                return False, self.id, 'Gynecologist Limit of {} exceeded'.format(settings.INSURANCE_GYNECOLOGIST_LIMIT)
             else:
                 return True, self.id, 'Covered Under Insurance'
         elif specilization_ids_set & oncologist_set:
@@ -578,7 +578,7 @@ class UserInsurance(auth_model.TimeStampedModel):
                                                                   insurance_id=self.id,
                                                                   profile_id=members.profile.id).count()
             if oncologist_opd_count > int(settings.INSURANCE_ONCOLOGIST_LIMIT):
-                return False, self.id, 'Oncologist Limit of 5 exceeded'
+                return False, self.id, "Oncologist Limit of {} exceeded".format(settings.INSURANCE_ONCOLOGIST_LIMIT)
             else:
                 return True, self.id, 'Covered Under Insurance'
 
@@ -781,13 +781,13 @@ class UserInsurance(auth_model.TimeStampedModel):
                             .get('count', 0) >= int(settings.INSURANCE_GYNECOLOGIST_LIMIT):
                         response_dict['is_insured'] = False
                         response_dict['insurance_id'] = None
-                        response_dict['insurance_message'] = "Gynocologist Appointment exceeded of limit %d" % int(settings.INSURANCE_GYNECOLOGIST_LIMIT)
+                        response_dict['insurance_message'] = "Gynocologist Appointment exceeded of limit {}".format(settings.INSURANCE_GYNECOLOGIST_LIMIT)
 
                     if specialization_count_dict.get(InsuranceDoctorSpecializations.SpecializationMapping.ONCOLOGIST, {}) \
                             .get('count', 0) >= int(settings.INSURANCE_ONCOLOGIST_LIMIT):
                         response_dict['is_insured'] = False
                         response_dict['insurance_id'] = None
-                        response_dict['insurance_message'] = "Oncologist Appointment exceeded of limit 5"
+                        response_dict['insurance_message'] = "Oncologist Appointment exceeded of limit {}".format(settings.INSURANCE_ONCOLOGIST_LIMIT)
 
                 else:
                     response_dict['is_insured'] = True
@@ -818,7 +818,7 @@ class UserInsurance(auth_model.TimeStampedModel):
                 if mrp <= threshold_lab:
                     is_lab_insured = True
                 else:
-                    is_lab_insured = False
+                    return False, user_insurance.id, "Test mrp is higher than insurance threshold"
                 lab_mrp_check_list.append(is_lab_insured)
             if not False in lab_mrp_check_list:
                 return True, user_insurance.id, ''
@@ -922,9 +922,9 @@ class UserInsurance(auth_model.TimeStampedModel):
                     onco_count = onco_count + 1
 
                 if gyno_count >= int(settings.INSURANCE_GYNECOLOGIST_LIMIT) and specialization == InsuranceDoctorSpecializations.SpecializationMapping.GYNOCOLOGIST:
-                    return False, self.id, "Gynocologist limit exceeded of limit 5"
+                    return False, self.id, "Gynocologist limit exceeded of limit {}".format(int(settings.INSURANCE_GYNECOLOGIST_LIMIT))
                 if onco_count >= int(settings.INSURANCE_ONCOLOGIST_LIMIT) and specialization == InsuranceDoctorSpecializations.SpecializationMapping.ONCOLOGIST:
-                    return False, self.id, "Oncologist limit exceeded of limit 5"
+                    return False, self.id, "Oncologist limit exceeded of limit {}".format(int(settings.INSURANCE_ONCOLOGIST_LIMIT))
             else:
                 return is_insured, insurance_id, insurance_message
 
@@ -932,12 +932,9 @@ class UserInsurance(auth_model.TimeStampedModel):
 
     @classmethod
     def validate_cart_items(cls,cart_items, request):
-        from ondoc.doctor.models import OpdAppointment
-
         gyno_count = 0
         onco_count = 0
         user = request.user
-        res_dict = dict()
         is_process = True
         error = ""
         user_insurance = UserInsurance.objects.filter(user=user).last()
@@ -949,50 +946,43 @@ class UserInsurance(auth_model.TimeStampedModel):
                 InsuranceDoctorSpecializations.SpecializationMapping.GYNOCOLOGIST, {}).get('count', 0)
             onco_count = specialization_count_dict.get(InsuranceDoctorSpecializations.SpecializationMapping.ONCOLOGIST,
                                                        {}).get('count', 0)
-        else:
-            is_process = True
         for item in cart_items:
             validated_data = item.validate(request)
             insurance_doctor = validated_data.get('doctor', None)
             insurance_lab = validated_data.get('lab', None)
             cart_data = validated_data.get('cart_item')
             cart_data = cart_data.data
-            if cart_data.get('is_appointment_insured'):
-                if insurance_doctor:
-                    if user_insurance and user_insurance.is_valid() and specialization_count_dict:
-                        doctor_specilization_tuple = InsuranceDoctorSpecializations.get_doctor_insurance_specializations(
-                            insurance_doctor)
-                        if doctor_specilization_tuple:
-                            res, specialization = doctor_specilization_tuple[0], doctor_specilization_tuple[1]
-
-                            if specialization == InsuranceDoctorSpecializations.SpecializationMapping.GYNOCOLOGIST and item.data.get(
-                                    'is_appointment_insured'):
-                                gyno_count = gyno_count + 1
-                            if specialization == InsuranceDoctorSpecializations.SpecializationMapping.ONCOLOGIST and item.data.get(
-                                    'is_appointment_insured'):
-                                onco_count = onco_count + 1
-
-                            if gyno_count > int(
-                                    settings.INSURANCE_GYNECOLOGIST_LIMIT) and specialization == InsuranceDoctorSpecializations.SpecializationMapping.GYNOCOLOGIST:
-                                is_process = False
-                                error = "Gynecology limit exceeded"
-                            if onco_count > int(
-                                    settings.INSURANCE_ONCOLOGIST_LIMIT) and specialization == InsuranceDoctorSpecializations.SpecializationMapping.ONCOLOGIST:
-                                is_process = False
-                                error = "Oncology limit exceeded"
-                        else:
-                            is_process = True
-                    else:
-                        is_process = False
-                elif insurance_lab:
-                    is_insured, insurance_id, insurance_message = user_insurance.validate_lab_insurance(validated_data, user_insurance)
-                    if is_insured:
-                        is_process = True
-                    else:
-                        is_process = False
-                        error = insurance_message
-            else:
+            if not cart_data.get('is_appointment_insured'):
                 is_process = True
+            if insurance_lab and cart_data.get('is_appointment_insured') and (not user_insurance or not user_insurance.is_valid()):
+                return False, "Insurance expired for Lab Appointment in cart"
+            if insurance_lab and cart_data.get('is_appointment_insured') and user_insurance and user_insurance.is_valid():
+                is_process = True
+            if insurance_doctor and cart_data.get('is_appointment_insured') and (not user_insurance or not user_insurance.is_valid()):
+                return False, "Insurance expired for doctor appointment in cart"
+            if insurance_doctor and cart_data.get('is_appointment_insured') and user_insurance and user_insurance.is_valid() and not specialization_count_dict:
+                is_process = True
+            if insurance_doctor and cart_data.get(
+                    'is_appointment_insured') and user_insurance and user_insurance.is_valid() and specialization_count_dict:
+
+                doctor_specilization_tuple = InsuranceDoctorSpecializations.get_doctor_insurance_specializations(
+                    insurance_doctor)
+                if not doctor_specilization_tuple:
+                    is_process = True
+                if doctor_specilization_tuple:
+                    res, specialization = doctor_specilization_tuple[0], doctor_specilization_tuple[1]
+
+                    if specialization == InsuranceDoctorSpecializations.SpecializationMapping.GYNOCOLOGIST:
+                        gyno_count = gyno_count + 1
+                    if specialization == InsuranceDoctorSpecializations.SpecializationMapping.ONCOLOGIST:
+                        onco_count = onco_count + 1
+
+                    if gyno_count > int(
+                            settings.INSURANCE_GYNECOLOGIST_LIMIT) and specialization == InsuranceDoctorSpecializations.SpecializationMapping.GYNOCOLOGIST:
+                        return False, "Gynecology limit exceeded"
+                    if onco_count > int(
+                            settings.INSURANCE_ONCOLOGIST_LIMIT) and specialization == InsuranceDoctorSpecializations.SpecializationMapping.ONCOLOGIST:
+                        return False, "Oncology limit exceeded"
         return is_process, error
 
     def trigger_created_event(self, visitor_info):

@@ -757,15 +757,15 @@ class UserAppointmentsViewSet(OndocViewSet):
                     if doctor_hospital:
                         if opd_appointment.payment_type == OpdAppointment.INSURANCE and opd_appointment.insurance_id is not None:
                             user_insurance = UserInsurance.objects.get(id=opd_appointment.insurance_id)
-                            if user_insurance and user_insurance.is_valid():
+                            if user_insurance:
                                 insurance_threshold = user_insurance.insurance_plan.threshold.filter().first()
-                                if doctor_hospital.mrp > insurance_threshold.opd_amount_limit:
+                                if doctor_hospital.mrp > insurance_threshold.opd_amount_limit or not user_insurance.is_valid():
                                     resp = {
                                         "status": 0,
                                         "message": "Appointment amount is not covered under insurance"
                                     }
                                     return resp
-                                if time_slot_start > user_insurance.expiry_date:
+                                if time_slot_start > user_insurance.expiry_date or not user_insurance.is_valid():
                                     resp = {
                                         "status": 0,
                                         "message": "Appointment time is not covered under insurance"
