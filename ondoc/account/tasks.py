@@ -358,7 +358,7 @@ def set_order_dummy_transaction(self, order_id, user_id):
             if order_row.product_id == Order.INSURANCE_PRODUCT_ID:
                 insurer_code = appointment.insurance_plan.insurer.insurer_merchant_code
 
-            user_insurance = UserInsurance.objects.filter(user=user).last()
+            user_insurance = UserInsurance.get_user_insurance(user)
             if order_row.product_id in [Order.DOCTOR_PRODUCT_ID, Order.LAB_PRODUCT_ID] and user_insurance:
                 insurance_order = user_insurance.order
 

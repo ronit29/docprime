@@ -1791,7 +1791,7 @@ class LabAppointmentView(mixins.CreateModelMixin,
         serializer.is_valid(raise_exception=True)
         validated_data = serializer.validated_data
 
-        user_insurance = UserInsurance.objects.filter(user=request.user).last()
+        user_insurance = UserInsurance.get_user_insurance(request.user)
         if user_insurance:
             insurance_validate_dict = user_insurance.validate_insurance(validated_data)
             data['is_appointment_insured'] = insurance_validate_dict['is_insured']
@@ -2068,7 +2068,7 @@ class LabAppointmentView(mixins.CreateModelMixin,
         return pgdata, payment_required
 
     def can_use_insurance(self, user, appointment_details):
-        user_insurance_obj = UserInsurance.objects.filter(user=user).last()
+        user_insurance_obj = UserInsurance.get_user_insurance(user)
         if not user_insurance_obj:
             return False, None, ''
         insurance_validate_dict = user_insurance_obj.validate_insurance(appointment_details)

@@ -500,49 +500,34 @@ class DoctorHospitalSerializer(serializers.ModelSerializer):
 
     def get_insurance(self, obj):
         request = self.context.get("request")
-        insurance_threshold = InsuranceThreshold.objects.all().order_by('-opd_amount_limit').first()
-        resp = {
-            'is_insurance_covered': False,
-            'insurance_threshold_amount':  insurance_threshold.opd_amount_limit if insurance_threshold else 5000,
-            'is_user_insured': False
-        }
-        user_insurance = None
-        if request:
-            logged_in_user = request.user
-            if logged_in_user.is_authenticated and not logged_in_user.is_anonymous:
-                user_insurance = logged_in_user.purchased_insurance.filter().order_by('id').last()
-                if user_insurance and user_insurance.is_valid():
-                    insurance_threshold = user_insurance.insurance_plan.threshold.filter().first()
-                    if insurance_threshold:
-                        resp['insurance_threshold_amount'] = 0 if insurance_threshold.opd_amount_limit is None else \
-                            insurance_threshold.opd_amount_limit
-                        resp['is_user_insured'] = True
+        user = request.user
+        resp = Doctor.get_insurance_details(user)
 
-            # enabled for online booking check
-            doctor_clinic = obj.doctor_clinic
-            doctor = doctor_clinic.doctor
-            hospital = doctor_clinic.hospital
-            enabled_for_online_booking = doctor_clinic.enabled_for_online_booking and doctor.enabled_for_online_booking and hospital.enabled_for_online_booking
+        # enabled for online booking check
+        doctor_clinic = obj.doctor_clinic
+        doctor = doctor_clinic.doctor
+        hospital = doctor_clinic.hospital
+        enabled_for_online_booking = doctor_clinic.enabled_for_online_booking and doctor.enabled_for_online_booking and hospital.enabled_for_online_booking
 
-            if obj.mrp is not None and obj.mrp <= resp['insurance_threshold_amount'] and doctor.is_insurance_enabled and enabled_for_online_booking and \
-                    not (request.query_params.get('procedure_ids') or request.query_params.get('procedure_category_ids')) and doctor.is_insurance_enabled:
+        if obj.mrp is not None and resp['insurance_threshold_amount'] is not None and obj.mrp <= resp['insurance_threshold_amount'] and enabled_for_online_booking and \
+                not (request.query_params.get('procedure_ids') or request.query_params.get('procedure_category_ids')) and doctor.is_enabled_for_insurance:
 
-                if user_insurance and user_insurance.is_valid():
-                    doctor_specialization = InsuranceDoctorSpecializations.get_doctor_insurance_specializations(doctor)
-                    if not doctor_specialization:
-                        resp['is_insurance_covered'] = True
-                    else:
-                        specialization = doctor_specialization[1]
-                        doctor_specialization_count_dict = InsuranceDoctorSpecializations.get_already_booked_specialization_appointments(logged_in_user, user_insurance.id, doctor_specialization=specialization)
-                        if not doctor_specialization_count_dict:
-                            resp['is_insurance_covered'] = True
+            user_insurance = None if not user.is_authenticated or user.is_anonymous else user.active_insurance
+            if not user_insurance:
+                return resp
 
-                        if specialization == InsuranceDoctorSpecializations.SpecializationMapping.GYNOCOLOGIST and doctor_specialization_count_dict.get(specialization, {}).get('count') >= settings.INSURANCE_GYNECOLOGIST_LIMIT:
-                            resp['is_insurance_covered'] = False
-                        elif specialization == InsuranceDoctorSpecializations.SpecializationMapping.ONCOLOGIST and doctor_specialization_count_dict.get(specialization, {}).get('count') >= settings.INSURANCE_ONCOLOGIST_LIMIT:
-                            resp['is_insurance_covered'] = False
-                        else:
-                            resp['is_insurance_covered'] = True
+            doctor_specialization = InsuranceDoctorSpecializations.get_doctor_insurance_specializations(doctor)
+            if not doctor_specialization:
+                resp['is_insurance_covered'] = True
+            else:
+                specialization = doctor_specialization[1]
+                doctor_specialization_count_dict = InsuranceDoctorSpecializations.get_already_booked_specialization_appointments(user, user_insurance.id, doctor_specialization=specialization)
+                if not doctor_specialization_count_dict:
+                    resp['is_insurance_covered'] = True
+                if specialization == InsuranceDoctorSpecializations.SpecializationMapping.GYNOCOLOGIST and doctor_specialization_count_dict.get(specialization, {}).get('count') >= settings.INSURANCE_GYNECOLOGIST_LIMIT:
+                    resp['is_insurance_covered'] = False
+                elif specialization == InsuranceDoctorSpecializations.SpecializationMapping.ONCOLOGIST and doctor_specialization_count_dict.get(specialization, {}).get('count') >= settings.INSURANCE_ONCOLOGIST_LIMIT:
+                    resp['is_insurance_covered'] = False
                 else:
                     resp['is_insurance_covered'] = True
 
@@ -1242,18 +1227,17 @@ class AppointmentRetrieveSerializer(OpdAppointmentSerializer):
 
     def get_insurance(self, obj):
         request = self.context.get("request")
-        insurance_threshold = InsuranceThreshold.objects.all().order_by('-opd_amount_limit').first()
         resp = {
             'is_appointment_insured': False,
-            'insurance_threshold_amount': insurance_threshold.opd_amount_limit if insurance_threshold else 5000,
+            'insurance_threshold_amount': None,
             'is_user_insured': False
         }
         if request:
             logged_in_user = request.user
             if logged_in_user.is_authenticated and not logged_in_user.is_anonymous:
-                user_insurance = logged_in_user.purchased_insurance.filter().order_by('id').last()
-                if user_insurance and user_insurance.is_valid():
-                    insurance_threshold = user_insurance.insurance_plan.threshold.filter().first()
+                user_insurance = logged_in_user.active_insurance
+                if user_insurance:
+                    insurance_threshold = user_insurance.insurance_threshold
                     if insurance_threshold:
                         resp['insurance_threshold_amount'] = 0 if insurance_threshold.opd_amount_limit is None else \
                             insurance_threshold.opd_amount_limit

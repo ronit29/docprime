@@ -225,7 +225,7 @@ class DoctorAppointmentsViewSet(OndocViewSet):
         validated_data = serializer.validated_data
         data = request.data
 
-        user_insurance = UserInsurance.objects.filter(user=request.user).last()
+        user_insurance = UserInsurance.get_user_insurance(request.user)
 
         # data['is_appointment_insured'], data['insurance_id'], data[
         #     'insurance_message'] = Cart.check_for_insurance(validated_data,request)
@@ -435,7 +435,7 @@ class DoctorAppointmentsViewSet(OndocViewSet):
         return pgdata, payment_required
 
     def can_use_insurance(self, user, appointment_details):
-        user_insurance_obj = UserInsurance.objects.filter(user=user).last()
+        user_insurance_obj = UserInsurance.get_user_insurance(user)
         if not user_insurance_obj:
             return False, None, ''
 

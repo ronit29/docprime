@@ -395,6 +395,17 @@ class UserInsurance(auth_model.TimeStampedModel):
 
         return None
 
+    @classmethod
+    def get_user_insurance(cls, user):
+        return UserInsurance.objects.filter(user=user).order_by('-created_at').first()
+
+    @property
+    def insurance_threshold(self):
+        if self.is_valid():
+            return self.insurance_plan.threshold.filter().first()
+
+        return None
+
     def generate_pdf(self):
         insurer_state_code_obj = self.insurance_plan.insurer.state
         insurer_state_code = insurer_state_code_obj.gst_code
@@ -738,7 +749,7 @@ class UserInsurance(auth_model.TimeStampedModel):
 
         profile = appointment_data.get('profile', None)
         user = profile.user
-        user_insurance = UserInsurance.objects.filter(user=user).last()
+        user_insurance = UserInsurance.get_user_insurance(user)
         if not user_insurance or not user_insurance.is_valid() or \
                 not user_insurance.is_appointment_valid(appointment_data['start_date']):
             response_dict['insurance_message'] = 'Not covered under insurance'
@@ -937,7 +948,7 @@ class UserInsurance(auth_model.TimeStampedModel):
         user = request.user
         is_process = True
         error = ""
-        user_insurance = UserInsurance.objects.filter(user=user).last()
+        user_insurance = UserInsurance.get_user_insurance(user)
         specialization_count_dict = None
         if user_insurance and user_insurance.is_valid():
             specialization_count_dict = InsuranceDoctorSpecializations.get_already_booked_specialization_appointments(

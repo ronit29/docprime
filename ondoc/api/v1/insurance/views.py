@@ -36,7 +36,7 @@ class ListInsuranceViewSet(viewsets.GenericViewSet):
         resp = {}
         user = request.user
         if not user.is_anonymous:
-            user_insurance = UserInsurance.objects.filter(user_id=request.user).last()
+            user_insurance = UserInsurance.get_user_insurance(request.user)
             if user_insurance and user_insurance.is_valid():
                 return Response(data={'certificate': True}, status=status.HTTP_200_OK)
 
@@ -106,7 +106,7 @@ class InsuranceOrderViewSet(viewsets.GenericViewSet):
     @transaction.atomic
     def create_order(self, request):
         user = request.user
-        user_insurance = UserInsurance.objects.filter(user=user).last()
+        user_insurance = UserInsurance.get_user_insurance(user)
         if user_insurance and user_insurance.is_valid():
             return Response(data={'certificate': True}, status=status.HTTP_200_OK)
 
@@ -244,7 +244,7 @@ class InsuranceProfileViewSet(viewsets.GenericViewSet):
         if user_id:
 
             user = User.objects.get(id=user_id)
-            user_insurance = UserInsurance.objects.filter(user=user).last()
+            user_insurance = UserInsurance.get_user_insurance(user)
             if not user_insurance or not user_insurance.is_valid():
                 return Response({"message": "Insurance not found or expired."})
             insurer = user_insurance.insurance_plan.insurer
