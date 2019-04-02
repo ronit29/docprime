@@ -23,23 +23,28 @@ def sync_booking_data():
         cities = MatrixMappedCity.objects.filter(synced_analytics__isnull=True)
         for city in cities:
             city.sync_with_booking_analytics()
+            print('City-id : {} has been synced'.format(city.id))
 
         states = MatrixMappedState.objects.filter(synced_analytics__isnull=True)
         for state in states:
             state.sync_with_booking_analytics()
+            print('State-id : {} has been synced'.format(state.id))
 
         opd_apps = OpdAppointment.objects.filter(synced_analytics__isnull=True)
         for app in opd_apps:
             app.sync_with_booking_analytics()
+            print('OpdAppointment-id : {} has been synced'.format(app.id))
 
         lab_apps = LabAppointment.objects.filter(synced_analytics__isnull=True)
         for app in lab_apps:
             app.sync_with_booking_analytics()
+            print('lab-id : {} has been synced'.format(app.id))
 
         to_be_updated = SyncBookingAnalytics.objects.exclude(synced_at=F('last_updated_at'))
         for obj in to_be_updated:
             row = obj.content_object
             row.sync_with_booking_analytics(obj)
+            print('obj-id : {} content-type : {} has been synced'.format(obj.id, obj.content_type))
 
     except Exception as e:
         logger.error(str(e))
