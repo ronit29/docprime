@@ -1257,7 +1257,7 @@ class DoctorAdmin(AutoComplete, ImportExportMixin, VersionAdmin, ActionAdmin, QC
         return render(request, 'onboarddoctor.html', {'doctor': doctor, 'count': count, 'errors': errors})
 
     def get_onboard_link(self, obj=None):
-        if obj.data_status == Doctor.IN_PROGRESS and obj.onboarding_status in (
+        if obj.data_status in [Doctor.IN_PROGRESS, Doctor.REOPENED] and obj.onboarding_status in (
                 Doctor.NOT_ONBOARDED, Doctor.REQUEST_SENT):
             return mark_safe("<a href='/admin/doctor/doctor/onboard_admin/%s'>generate onboarding url</a>" % obj.id)
         return ""
