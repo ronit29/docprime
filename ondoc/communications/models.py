@@ -44,10 +44,10 @@ def get_spoc_email_and_number_hospital(spocs, appointment):
         if spoc.number and spoc.number in range(1000000000, 9999999999):
             admins = GenericAdmin.objects.prefetch_related('user').filter(Q(phone_number=str(spoc.number),
                                                                             hospital=spoc.content_object),
-                                                                          Q(doctor__isnull=True) | Q(doctor=appointment.doctor),
-                                                                          Q(super_user_permission=True) | Q(
-                                                                              permission_type=GenericAdmin.APPOINTMENT,
-                                                                              write_permission=True))
+                                                                          Q(super_user_permission=True) |
+                                                                          Q(Q(permission_type=GenericAdmin.APPOINTMENT,
+                                                                              write_permission=True),
+                                                                            Q(doctor__isnull=True) | Q(doctor=appointment.doctor)))
             if admins:
                 admins_with_user = admins.filter(user__isnull=False)
                 if admins_with_user.exists():
