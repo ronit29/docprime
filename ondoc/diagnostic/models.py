@@ -11,6 +11,7 @@ from ondoc.account.models import MerchantPayout, ConsumerAccount, Order, UserRef
 from ondoc.authentication.models import (TimeStampedModel, CreatedByModel, Image, Document, QCModel, UserProfile, User,
                                          UserPermission, GenericAdmin, LabUserPermission, GenericLabAdmin,
                                          BillingAccount, SPOCDetails)
+from ondoc.bookinganalytics.models import DP_OpdConsultsAndTests
 from ondoc.doctor.models import Hospital, SearchKey, CancellationReason
 from ondoc.coupon.models import Coupon
 from ondoc.location.models import EntityUrls
@@ -53,7 +54,8 @@ from ondoc.integrations.task import push_lab_appointment_to_integrator, get_inte
 from ondoc.location import models as location_models
 from ondoc.ratings_review import models as ratings_models
 from ondoc.api.v1.common import serializers as common_serializers
-from ondoc.common.models import AppointmentHistory, AppointmentMaskNumber, Remark, GlobalNonBookable
+from ondoc.common.models import AppointmentHistory, AppointmentMaskNumber, Remark, GlobalNonBookable, \
+    SyncBookingAnalytics
 import reversion
 from decimal import Decimal
 from django.utils.text import slugify
@@ -1412,6 +1414,46 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin)
     email_notification = GenericRelation(EmailNotification, related_name="lab_notification")
     user_plan_used = models.ForeignKey('subscription_plan.UserPlanMapping', null=True, on_delete=models.DO_NOTHING,
                                        related_name='appointment_using')
+    synced_analytics = GenericRelation(SyncBookingAnalytics, related_name="lab_booking_analytics")
+
+    def get_city(self):
+        if self.lab and self.lab.city:
+            return self.lab.city.id
+        else:
+            return None
+
+    def get_state(self):
+        if self.lab and self.lab.state:
+            return self.lab.state.id
+        else:
+            return None
+
+
+    def sync_with_booking_analytics(self, sync_entry=None):
+
+        obj = DP_OpdConsultsAndTests.objects.filter(Appointment_Id=self.id).first()
+        if not obj:
+            obj = DP_OpdConsultsAndTests()
+            obj.Appointment_Id = self.id
+            # obj.CityId = self.get_city()
+            # obj.StateId = self.get_state()
+
+        obj.save()
+
+        if sync_entry:
+            sync_entry.synced_at = self.updated_at
+            sync_entry.last_updated_at = self.updated_at
+            sync_entry.save()
+        else:
+            sync_analytics_object = SyncBookingAnalytics(synced_at=self.updated_at,
+                                                         last_updated_at=self.updated_at,
+                                                         content_type=ContentType.objects.get_for_model(LabAppointment),
+                                                         object_id=self.id)
+            sync_analytics_object.save()
+
+        return obj
+
+
 
     def get_tests_and_prices(self):
         test_price = []

@@ -1,7 +1,7 @@
 from django.contrib.postgres.fields import JSONField
 from django.core.validators import FileExtensionValidator
 from django.db import models
-from django.contrib.contenttypes.fields import GenericForeignKey
+from django.contrib.contenttypes.fields import GenericForeignKey, GenericRelation
 from django.contrib.contenttypes.models import ContentType
 
 from ondoc.authentication.models import TimeStampedModel
@@ -9,6 +9,7 @@ from ondoc.authentication.models import TimeStampedModel
 # from ondoc.diagnostic.models import LabAppointment
 from ondoc.authentication.models import User
 from ondoc.authentication import models as auth_model
+from ondoc.bookinganalytics.models import DP_StateMaster, DP_CityMaster
 
 
 class Cities(models.Model):
@@ -235,8 +236,20 @@ class Remark(auth_model.TimeStampedModel):
         db_table = 'remark'
 
 
-class MatrixMappedState(models.Model):
+class SyncBookingAnalytics(TimeStampedModel):
+    content_type = models.ForeignKey(ContentType, on_delete=models.SET_NULL, null=True)
+    object_id = models.PositiveIntegerField(null=True)
+    content_object = GenericForeignKey()
+    synced_at = models.DateTimeField(auto_now_add=True, null=True)
+    last_updated_at = models.DateTimeField(auto_now_add=True, null=True)
+
+    class Meta:
+        db_table = "sync_booking_analytics"
+
+
+class MatrixMappedState(TimeStampedModel):
     name = models.CharField(max_length=48, db_index=True)
+    synced_analytics = GenericRelation(SyncBookingAnalytics, related_name="state_analytics")
 
     def __str__(self):
         return "{}".format(self.name)
@@ -246,9 +259,32 @@ class MatrixMappedState(models.Model):
         verbose_name_plural = "Matrix Mapped States"
 
 
-class MatrixMappedCity(models.Model):
+    def sync_with_booking_analytics(self, sync_entry=None):
+        obj = DP_StateMaster.objects.filter(StateId=self.id).first()
+        if not obj:
+            obj = DP_StateMaster()
+            obj.CreatedOn = self.updated_at
+            obj.StateId = self.id
+        obj.StateName = self.name
+        obj.save()
+        if sync_entry:
+            sync_entry.synced_at = self.updated_at
+            sync_entry.last_updated_at = self.updated_at
+            sync_entry.save()
+        else:
+            sync_analytics_object = SyncBookingAnalytics(synced_at=self.updated_at,
+                                                         last_updated_at=self.updated_at,
+                                                         content_type=ContentType.objects.get_for_model(MatrixMappedState),
+                                                         object_id=self.id)
+            sync_analytics_object.save()
+
+        return obj
+
+
+class MatrixMappedCity(TimeStampedModel):
     name = models.CharField(max_length=48, db_index=True)
     state = models.ForeignKey(MatrixMappedState, on_delete=models.SET_NULL, null=True, blank=True)
+    synced_analytics = GenericRelation(SyncBookingAnalytics, related_name="city_analytics")
 
     def __str__(self):
         return "{}".format(self.name)
@@ -256,6 +292,29 @@ class MatrixMappedCity(models.Model):
     class Meta:
         db_table = 'matrix_mapped_city'
         verbose_name_plural = "Matrix Mapped Cities"
+
+
+    def sync_with_booking_analytics(self, sync_entry=None):
+        obj = DP_CityMaster.objects.filter(CityId=self.id).first()
+        if not obj:
+            obj = DP_CityMaster()
+            obj.CreatedOn = self.updated_at
+            obj.CityId = self.id
+        obj.CityName = self.name
+        obj.save()
+
+        if sync_entry:
+            sync_entry.synced_at = self.updated_at
+            sync_entry.last_updated_at = self.updated_at
+            sync_entry.save()
+        else:
+            sync_analytics_object = SyncBookingAnalytics(synced_at=self.updated_at,
+                                                         last_updated_at=self.updated_at,
+                                                         content_type=ContentType.objects.get_for_model(MatrixMappedCity),
+                                                         object_id=self.id)
+            sync_analytics_object.save()
+
+        return obj
 
 
 class QRCode(TimeStampedModel):
@@ -268,3 +327,4 @@ class QRCode(TimeStampedModel):
 
     class Meta:
         db_table = 'qr_code'
+
