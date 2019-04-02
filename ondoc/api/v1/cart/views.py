@@ -122,53 +122,75 @@ class CartViewSet(viewsets.GenericViewSet):
                 validated_data = item.validate(request)
                 insurance_doctor = validated_data.get('doctor', None)
                 cart_data = validated_data.get('cart_item').data
-                if insurance_doctor and cart_data.get('is_appointment_insured') and user_insurance:
-                    is_doctor_insured, insurance_id, insurance_message = user_insurance.validate_doctor_insurance(validated_data, user_insurance)
-                    if specialization_count_dict and is_doctor_insured:
-                        doctor_specilization_tuple = InsuranceDoctorSpecializations.get_doctor_insurance_specializations(insurance_doctor)
-                        if doctor_specilization_tuple:
-                            res, specialization = doctor_specilization_tuple[0], doctor_specilization_tuple[1]
-
-                            if specialization == InsuranceDoctorSpecializations.SpecializationMapping.GYNOCOLOGIST and item.data.get('is_appointment_insured'):
-                                gyno_count = gyno_count + 1
-                            if specialization == InsuranceDoctorSpecializations.SpecializationMapping.ONCOLOGIST and item.data.get('is_appointment_insured'):
-                                onco_count = onco_count + 1
-
-                            if gyno_count > int(settings.INSURANCE_GYNECOLOGIST_LIMIT) and specialization == InsuranceDoctorSpecializations.SpecializationMapping.GYNOCOLOGIST:
-                                item.data['is_appointment_insured'] = False
-                                item.data['insurance_id'] = None
-                                item.data['insurance_message'] = "Gynecologist limit exceeded of limit {}".format(settings.INSURANCE_GYNECOLOGIST_LIMIT)
-                                item.data['payment_type'] = OpdAppointment.PREPAID
-
-                            if onco_count > int(settings.INSURANCE_ONCOLOGIST_LIMIT) and specialization == InsuranceDoctorSpecializations.SpecializationMapping.ONCOLOGIST:
-                                item.data['is_appointment_insured'] = False
-                                item.data['insurance_id'] = None
-                                item.data['insurance_message'] = "Oncologist limit exceeded of limit {}".format(settings.INSURANCE_ONCOLOGIST_LIMIT)
-                                item.data['payment_type'] = OpdAppointment.PREPAID
+                if not cart_data.get('is_appointment_insured'):
+                    item.data['is_appointment_insured'] = False
+                    item.data['insurance_id'] = None
+                    item.data['insurance_message'] = ""
+                    item.data['payment_type'] = OpdAppointment.PREPAID
+                if cart_data.get('is_appointment_insured') and (not user_insurance or not user_insurance.is_valid()):
+                    item.data['is_appointment_insured'] = False
+                    item.data['insurance_id'] = None
+                    item.data['insurance_message'] = ""
+                    item.data['payment_type'] = OpdAppointment.PREPAID
+                if not insurance_doctor and cart_data.get('is_appointment_insured') and user_insurance and user_insurance.is_valid():
+                    is_lab_insured, insurance_id, insurance_message = user_insurance.validate_lab_insurance(
+                        validated_data, user_insurance)
+                    if is_lab_insured:
+                        item.data['is_appointment_insured'] = True
+                        item.data['insurance_id'] = insurance_id
+                        item.data['insurance_message'] = ""
+                        item.data['payment_type'] = OpdAppointment.INSURANCE
                     else:
                         item.data['is_appointment_insured'] = False
                         item.data['insurance_id'] = None
                         item.data['insurance_message'] = ""
                         item.data['payment_type'] = OpdAppointment.PREPAID
-                else:
-                    if cart_data.get('is_appointment_insured') and user_insurance:
-                        is_lab_insured, insurance_id, insurance_message = user_insurance.validate_lab_insurance(validated_data, user_insurance)
-
-                        if user_insurance and user_insurance.is_valid() and is_lab_insured:
+                if insurance_doctor and cart_data.get('is_appointment_insured') and user_insurance and user_insurance.is_valid():
+                    is_doctor_insured, insurance_id, insurance_message = user_insurance.validate_doctor_insurance(
+                        validated_data, user_insurance)
+                    if not is_doctor_insured:
+                        item.data['is_appointment_insured'] = False
+                        item.data['insurance_id'] = None
+                        item.data['insurance_message'] = ""
+                        item.data['payment_type'] = OpdAppointment.PREPAID
+                    if not specialization_count_dict:
+                        item.data['is_appointment_insured'] = True
+                        item.data['insurance_id'] = insurance_id
+                        item.data['insurance_message'] = ""
+                        item.data['payment_type'] = OpdAppointment.INSURANCE
+                    if specialization_count_dict and is_doctor_insured:
+                        doctor_specilization_tuple = InsuranceDoctorSpecializations.get_doctor_insurance_specializations(
+                            insurance_doctor)
+                        if not doctor_specilization_tuple:
                             item.data['is_appointment_insured'] = True
                             item.data['insurance_id'] = insurance_id
                             item.data['insurance_message'] = ""
                             item.data['payment_type'] = OpdAppointment.INSURANCE
-                        else:
-                            item.data['is_appointment_insured'] = False
-                            item.data['insurance_id'] = None
-                            item.data['insurance_message'] = ""
-                            item.data['payment_type'] = OpdAppointment.PREPAID
-                    else:
-                        item.data['is_appointment_insured'] = False
-                        item.data['insurance_id'] = None
-                        item.data['insurance_message'] = ""
-                        item.data['payment_type'] = OpdAppointment.PREPAID
+                        if doctor_specilization_tuple:
+                            res, specialization = doctor_specilization_tuple[0], doctor_specilization_tuple[1]
+
+                            if specialization == InsuranceDoctorSpecializations.SpecializationMapping.GYNOCOLOGIST and item.data.get(
+                                    'is_appointment_insured'):
+                                gyno_count = gyno_count + 1
+                            if specialization == InsuranceDoctorSpecializations.SpecializationMapping.ONCOLOGIST and item.data.get(
+                                    'is_appointment_insured'):
+                                onco_count = onco_count + 1
+
+                            if gyno_count > int(
+                                    settings.INSURANCE_GYNECOLOGIST_LIMIT) and specialization == InsuranceDoctorSpecializations.SpecializationMapping.GYNOCOLOGIST:
+                                item.data['is_appointment_insured'] = False
+                                item.data['insurance_id'] = None
+                                item.data['insurance_message'] = "Gynecologist limit exceeded of limit {}".format(
+                                    settings.INSURANCE_GYNECOLOGIST_LIMIT)
+                                item.data['payment_type'] = OpdAppointment.PREPAID
+
+                            if onco_count > int(
+                                    settings.INSURANCE_ONCOLOGIST_LIMIT) and specialization == InsuranceDoctorSpecializations.SpecializationMapping.ONCOLOGIST:
+                                item.data['is_appointment_insured'] = False
+                                item.data['insurance_id'] = None
+                                item.data['insurance_message'] = "Oncologist limit exceeded of limit {}".format(
+                                    settings.INSURANCE_ONCOLOGIST_LIMIT)
+                                item.data['payment_type'] = OpdAppointment.PREPAID
 
                 price_data = item.get_price_details(validated_data)
                 items.append({
