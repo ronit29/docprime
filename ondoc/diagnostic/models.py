@@ -2483,8 +2483,8 @@ class TestParameterNew(TimeStampedModel):
     age_from = models.PositiveIntegerField()
     age_to = models.PositiveIntegerField()
     gender = models.CharField(max_length=30, null=True, blank=True)
-    min_range = models.DecimalField(blank=True, null=True, max_digits=7,decimal_places=2)
-    max_range = models.DecimalField(blank=True, null=True, max_digits=7,decimal_places=2)
+    min_range = models.DecimalField(blank=True, null=True, max_digits=10,decimal_places=2)
+    max_range = models.DecimalField(blank=True, null=True, max_digits=10,decimal_places=2)
     test_name = models.CharField(blank=False, null=False, max_length=60)
 
     def __str__(self):

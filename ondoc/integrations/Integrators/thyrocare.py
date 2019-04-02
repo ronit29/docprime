@@ -451,7 +451,7 @@ class Thyrocare(BaseIntegrator):
             if test_parameters:
                 for parameter in test_parameters:
                     integrator_data = {'response_data': parameter}
-                    data = {'age_to': parameter['AGE_TO'], 'age_from': parameter['AGE_FROM'], 'gender': parameter['GENDER']}
+                    data = {'age_to': parameter['AGE_TO'], 'age_from': parameter['AGE_FROM'], 'gender': parameter['GENDER'], 'min_range': parameter['MIN_RANGE'], 'max_range': parameter['MAX_RANGE']}
                     if parameter['MIN_RANGE'] == '':
                         data['min_range'] = None
 
@@ -459,6 +459,7 @@ class Thyrocare(BaseIntegrator):
                         data['max_range'] = None
 
                     # Save to model
+                    print(parameter)
                     test_parameter = TestParameterNew.objects.update_or_create(test_name=parameter['TEST_NAME'], defaults=data)
                     IntegratorTestParameter.objects.update_or_create(integrator_test_name=parameter['TEST_NAME'], test_parameter_new_id=test_parameter[0].id,
                                                                      integrator_class_name=Thyrocare.__name__, defaults=integrator_data)
