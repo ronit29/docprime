@@ -106,7 +106,7 @@ class CartViewSet(viewsets.GenericViewSet):
         gyno_count = 0
         onco_count = 0
 
-        user_insurance = UserInsurance.objects.filter(user=request.user).last()
+        user_insurance = UserInsurance.get_user_insurance(request.user)
         specialization_count_dict = None
         if user_insurance and user_insurance.is_valid():
 

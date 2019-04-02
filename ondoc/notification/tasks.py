@@ -258,6 +258,8 @@ def send_opd_rating_message(appointment_id, type):
 def set_order_dummy_transaction(self, order_id, user_id):
     from ondoc.account.models import Order, DummyTransactions
     from ondoc.insurance.models import UserInsurance
+    from ondoc.doctor.models import OpdAppointment
+    from ondoc.diagnostic.models import LabAppointment
     from ondoc.account.models import User
     try:
         order_row = Order.objects.filter(id=order_id).first()
@@ -290,8 +292,16 @@ def set_order_dummy_transaction(self, order_id, user_id):
             if order_row.product_id == Order.INSURANCE_PRODUCT_ID:
                 insurer_code = appointment.insurance_plan.insurer.insurer_merchant_code
 
-            user_insurance = UserInsurance.objects.filter(user=user).last()
-            if order_row.product_id in [Order.DOCTOR_PRODUCT_ID, Order.LAB_PRODUCT_ID] and user_insurance:
+            user_insurance = UserInsurance.objects.filter(order=order_row).first()
+
+            appointment_obj = None
+            if order_row.product_id == Order.DOCTOR_PRODUCT_ID:
+                appointment_obj = OpdAppointment.objects.filter(id=order_row.reference_id).first()
+
+            if order_row.product_id == Order.LAB_PRODUCT_ID:
+                appointment_obj = LabAppointment.objects.filter(id=order_row.reference_id).first()
+
+            if appointment_obj and appointment_obj.payment_type == Order.INSURANCE_PRODUCT_ID and appointment_obj.insurance.id == user_insurance.id:
                 insurance_order = user_insurance.order
 
                 insurance_order_transactions = insurance_order.getTransactions()

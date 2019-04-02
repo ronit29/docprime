@@ -231,11 +231,35 @@ class Lab(TimeStampedModel, CreatedByModel, QCModel, SearchKey):
     class Meta:
         db_table = "lab"
 
+    @property
+    def is_enabled_for_insurance(self):
+        return self.is_insurance_enabled
+
     def open_for_communications(self):
         if (self.network and self.network.open_for_communication) or (not self.network and self.open_for_communication):
             return True
 
         return False
+
+    @classmethod
+    def get_insurance_details(cls, user):
+
+        resp = {
+            'is_insurance_covered': False,
+            'insurance_threshold_amount': None,
+            'is_user_insured': False
+        }
+
+        if user.is_authenticated and not user.is_anonymous:
+            user_insurance = user.active_insurance
+            if user_insurance:
+                insurance_threshold = user_insurance.insurance_threshold
+                if insurance_threshold:
+                    resp['insurance_threshold_amount'] = 0 if insurance_threshold.lab_amount_limit is None else \
+                        insurance_threshold.lab_amount_limit
+                    resp['is_user_insured'] = True
+
+        return resp
 
     def convert_min(self, min):
         min_str = str(min)

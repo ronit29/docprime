@@ -604,6 +604,29 @@ class Doctor(auth_model.TimeStampedModel, auth_model.QCModel, SearchKey, auth_mo
     def __str__(self):
         return '{} ({})'.format(self.name, self.id)
 
+    @property
+    def is_enabled_for_insurance(self):
+        return self.is_insurance_enabled
+
+    @classmethod
+    def get_insurance_details(cls, user):
+        resp = {
+            'is_insurance_covered': False,
+            'insurance_threshold_amount': None,
+            'is_user_insured': False
+        }
+
+        if user.is_authenticated and not user.is_anonymous:
+            user_insurance = user.active_insurance
+            if user_insurance:
+                insurance_threshold = user_insurance.insurance_threshold
+                if insurance_threshold:
+                    resp['insurance_threshold_amount'] = 0 if insurance_threshold.opd_amount_limit is None else \
+                        insurance_threshold.lab_amount_limit
+                    resp['is_user_insured'] = True
+
+        return resp
+
     def update_deal_price(self):        
         # will update only this doctor prices and will be called on save    
         query = '''update doctor_clinic_timing set deal_price = least(

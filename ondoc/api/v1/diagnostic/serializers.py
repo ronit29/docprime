@@ -260,25 +260,27 @@ class AvailableLabTestPackageSerializer(serializers.ModelSerializer):
     def get_insurance(self, obj):
         request = self.context.get("request")
         lab_obj = self.context.get("lab")
-        insurance_threshold = InsuranceThreshold.objects.all().order_by('-lab_amount_limit').first()
-        resp = {
-            'is_insurance_covered': False,
-            'insurance_threshold_amount': insurance_threshold.lab_amount_limit if insurance_threshold else 5000,
-            'is_user_insured': False
-        }
-        if request:
-            logged_in_user = request.user
-            if logged_in_user.is_authenticated and not logged_in_user.is_anonymous:
-                user_insurance = logged_in_user.purchased_insurance.filter().order_by('id').last()
-                if user_insurance and user_insurance.is_valid():
-                    insurance_threshold = user_insurance.insurance_plan.threshold.filter().first()
-                    if insurance_threshold:
-                        resp['insurance_threshold_amount'] = 0 if insurance_threshold.lab_amount_limit is None else \
-                            insurance_threshold.lab_amount_limit
-                        resp['is_user_insured'] = True
+        resp = Lab.get_insurance_details(request.user)
+        # insurance_threshold = InsuranceThreshold.objects.all().order_by('-lab_amount_limit').first()
+        # resp = {
+        #     'is_insurance_covered': False,
+        #     'insurance_threshold_amount': insurance_threshold.lab_amount_limit if insurance_threshold else 5000,
+        #     'is_user_insured': False
+        # }
+        # if request:
+        #     logged_in_user = request.user
+        #     if logged_in_user.is_authenticated and not logged_in_user.is_anonymous:
+        #         user_insurance = logged_in_user.purchased_insurance.filter().order_by('id').last()
+        #         if user_insurance and user_insurance.is_valid():
+        #             insurance_threshold = user_insurance.insurance_plan.threshold.filter().first()
+        #             if insurance_threshold:
+        #                 resp['insurance_threshold_amount'] = 0 if insurance_threshold.lab_amount_limit is None else \
+        #                     insurance_threshold.lab_amount_limit
+        #                 resp['is_user_insured'] = True
 
-            if lab_obj.is_insurance_enabled and obj.mrp is not None and obj.mrp <= resp['insurance_threshold_amount']:
-                resp['is_insurance_covered'] = True
+        if lab_obj.is_enabled_for_insurance and obj.mrp is not None and resp['insurance_threshold_amount'] is not None \
+                and obj.mrp <= resp['insurance_threshold_amount']:
+            resp['is_insurance_covered'] = True
 
         return resp
 
@@ -380,26 +382,27 @@ class AvailableLabTestSerializer(serializers.ModelSerializer):
     def get_insurance(self, obj):
         request = self.context.get("request")
         lab_obj = self.context.get("lab")
-        insurance_threshold = InsuranceThreshold.objects.all().order_by('-lab_amount_limit').first()
-        resp = {
-            'is_insurance_covered': False,
-            'insurance_threshold_amount': insurance_threshold.lab_amount_limit if insurance_threshold else 5000,
-            'is_user_insured': False
-        }
-        if request:
-            logged_in_user = request.user
-            if logged_in_user.is_authenticated and not logged_in_user.is_anonymous:
-                user_insurance = logged_in_user.purchased_insurance.filter().order_by('id').last()
-                if user_insurance and user_insurance.is_valid():
-                    insurance_threshold = user_insurance.insurance_plan.threshold.filter().first()
-                    if insurance_threshold:
-                        resp['insurance_threshold_amount'] = 0 if insurance_threshold.lab_amount_limit is None else \
-                            insurance_threshold.lab_amount_limit
-                        resp['is_user_insured'] = True
+        resp = Lab.get_insurance_details(request.user)
+        # insurance_threshold = InsuranceThreshold.objects.all().order_by('-lab_amount_limit').first()
+        # resp = {
+        #     'is_insurance_covered': False,
+        #     'insurance_threshold_amount': insurance_threshold.lab_amount_limit if insurance_threshold else 5000,
+        #     'is_user_insured': False
+        # }
+        # if request:
+        #     logged_in_user = request.user
+        #     if logged_in_user.is_authenticated and not logged_in_user.is_anonymous:
+        #         user_insurance = logged_in_user.purchased_insurance.filter().order_by('id').last()
+        #         if user_insurance and user_insurance.is_valid():
+        #             insurance_threshold = user_insurance.insurance_plan.threshold.filter().first()
+        #             if insurance_threshold:
+        #                 resp['insurance_threshold_amount'] = 0 if insurance_threshold.lab_amount_limit is None else \
+        #                     insurance_threshold.lab_amount_limit
+        #                 resp['is_user_insured'] = True
 
-            if lab_obj:
-                if lab_obj.is_insurance_enabled and obj.mrp is not None and obj.mrp <= resp['insurance_threshold_amount']:
-                    resp['is_insurance_covered'] = True
+        if lab_obj and lab_obj.is_enabled_for_insurance and obj.mrp is not None and resp['insurance_threshold_amount'] is not None \
+                and obj.mrp <= resp['insurance_threshold_amount']:
+            resp['is_insurance_covered'] = True
 
         return resp
 
@@ -461,10 +464,6 @@ class LabCustomSerializer(serializers.Serializer):
     def get_insurance(self, obj):
         insurance_data_dict = self.context.get("insurance_data_dict")
         is_insurance_covered = False
-        # lab = obj.get('lab', None)
-        # mrp = obj.get('mrp', None)
-        # if lab and mrp is not None and mrp <= insurance_data_dict['insurance_threshold_amount']:
-        #     is_insurance_covered = True
 
         return {
             "is_insurance_covered": is_insurance_covered,
