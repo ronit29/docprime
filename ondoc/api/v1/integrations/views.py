@@ -1,6 +1,6 @@
 from rest_framework.response import Response
 from rest_framework import viewsets, status
-from ondoc.integrations.models import IntegratorResponse, IntegratorReport
+from ondoc.integrations.models import IntegratorResponse, IntegratorReport, IntegratorTestParameter
 import requests
 import xmltodict
 import json
@@ -24,6 +24,7 @@ class IntegratorReportViewSet(viewsets.GenericViewSet):
         if not report:
             return Response({"error": "Thyrocare Report not found for booking"}, status=status.HTTP_404_NOT_FOUND)
 
+        # report_url = report.xml_url
         report_url = 'https://www.thyrocare.com/apis/ReportAccess.aspx?id=C/0dHN6TXsHQgg0Cu0HS7A==' \
                      ',gATDluZRCNL9f8vQX61wSw==,+kssQUPGdmE='
         data = requests.get(report_url)
@@ -60,6 +61,13 @@ class IntegratorReportViewSet(viewsets.GenericViewSet):
                            'Description': result['Description'], 'TEST_CODE': result['TEST_CODE'],
                            'PROFILE_CODE': result['PROFILE_CODE'],
                            'SDATE': result['SDATE'], 'TEST_VALUE': result['TEST_VALUE']}
+
+            inte_test_parameter = IntegratorTestParameter.objects.filter(integrator_test_name=result['Description']).first()
+
+            if inte_test_parameter:
+                test_detail['TEST_PARAMETER_ID'] = inte_test_parameter.test_parameter_new.id
+                test_detail['INTEGRATOR_PARAMETER_ID'] = inte_test_parameter.id
+
             if result['INDICATOR'] == 'RED':
                 red.append(test_detail)
             elif result['INDICATOR'] == 'WHITE':
@@ -68,6 +76,6 @@ class IntegratorReportViewSet(viewsets.GenericViewSet):
                 pass
         patient_detail['RED'] = red
         patient_detail['WHITE'] = white
-        return {'patient_detail': patient_detail}
+        return patient_detail
 
 

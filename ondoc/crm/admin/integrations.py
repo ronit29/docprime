@@ -1,6 +1,6 @@
 from django.contrib import admin
 from ondoc.integrations.models import IntegratorMapping
-from ondoc.integrations.models import IntegratorProfileMapping, IntegratorReport, IntegratorTestMapping
+from ondoc.integrations.models import IntegratorProfileMapping, IntegratorReport, IntegratorTestMapping, IntegratorTestParameter
 from ondoc.diagnostic.models import LabTest, Lab, LabPricingGroup, AvailableLabTest
 from django import forms
 from django.conf import settings
@@ -84,3 +84,8 @@ class IntegratorTestMappingAdmin(admin.ModelAdmin):
 
     def integrator_test_type(self, obj):
         return obj.test_type
+
+
+class IntegratorTestParameterAdmin(admin.ModelAdmin):
+    list_display = ['integrator_test_name', 'integrator_class_name']
+    readonly_fields = ('integrator_test_name',)

@@ -31,7 +31,8 @@ from ondoc.diagnostic.models import (LabTiming, LabImage,
                                      LabAppointment, HomePickupCharges,
                                      TestParameter, ParameterLabTest, FrequentlyAddedTogetherTests, QuestionAnswer,
                                      LabReport, LabReportFile, LabTestCategoryMapping,
-                                     LabTestRecommendedCategoryMapping, LabTestGroupTiming, LabTestGroupMapping)
+                                     LabTestRecommendedCategoryMapping, LabTestGroupTiming, LabTestGroupMapping,
+                                     TestParameterNew)
 from ondoc.integrations.models import IntegratorHistory
 from ondoc.notification.models import EmailNotification, NotificationAction
 from .common import *
@@ -1438,3 +1439,14 @@ class LabTestGroupMappingAdmin(ImportMixin, admin.ModelAdmin):
     list_display = ['test', 'lab_test_group']
     search_fields = ['test__name', 'lab_test_group__name']
 
+
+class TestParameterForm(forms.ModelForm):
+    test = forms.ModelChoiceField(
+        queryset=LabTest.objects.filter(availablelabs__lab_pricing_group__labs__network_id=int(settings.THYROCARE_NETWORK_ID),
+                                        enable_for_retail=True, availablelabs__enabled=True).distinct().order_by('name'))
+
+
+class TestParameterNewAdmin(admin.ModelAdmin):
+    form = TestParameterForm
+    list_display = ['test_name']
+    readonly_fields = ('test_name',)

@@ -2476,3 +2476,20 @@ class LabTestGroupMapping(TimeStampedModel):
 
     class Meta:
         db_table = "lab_test_group_mapping"
+
+
+class TestParameterNew(TimeStampedModel):
+    test = models.ForeignKey(LabTest, on_delete=models.CASCADE, null=True)
+    age_from = models.PositiveIntegerField()
+    age_to = models.PositiveIntegerField()
+    gender = models.CharField(max_length=30, null=True, blank=True)
+    min_range = models.DecimalField(blank=True, null=True, max_digits=7,decimal_places=2)
+    max_range = models.DecimalField(blank=True, null=True, max_digits=7,decimal_places=2)
+    test_name = models.CharField(blank=False, null=False, max_length=60)
+
+    def __str__(self):
+        return self.test_name
+
+    class Meta:
+        db_table = 'test_parameter_new'
+
