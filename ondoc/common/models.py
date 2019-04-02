@@ -10,7 +10,8 @@ from ondoc.authentication.models import TimeStampedModel
 from ondoc.authentication.models import User
 from ondoc.authentication import models as auth_model
 from ondoc.bookinganalytics.models import DP_StateMaster, DP_CityMaster
-
+import datetime
+from django.utils import timezone
 
 class Cities(models.Model):
     name = models.CharField(max_length=48, db_index=True)
@@ -240,8 +241,8 @@ class SyncBookingAnalytics(TimeStampedModel):
     content_type = models.ForeignKey(ContentType, on_delete=models.CASCADE)
     object_id = models.PositiveIntegerField()
     content_object = GenericForeignKey()
-    synced_at = models.DateTimeField(auto_now_add=True, null=True)
-    last_updated_at = models.DateTimeField(auto_now_add=True, null=True)
+    synced_at = models.DateTimeField(null=True)
+    last_updated_at = models.DateTimeField(null=True)
 
     class Meta:
         unique_together = (('object_id', 'content_type'), )
@@ -270,9 +271,10 @@ class MatrixMappedState(TimeStampedModel):
         obj.save()
 
         try:
-            SyncBookingAnalytics.update_or_create(object_id=self.id,
-                                                  content_type=ContentType.objects.get_for_model(MatrixMappedState),
-                                                  defaults={"synced_at": self.updated_at, "last_updated_at": self.updated_at})
+            dt = str(timezone.now())
+            SyncBookingAnalytics.objects.update_or_create(object_id=self.id,
+                                                          content_type=ContentType.objects.get_for_model(MatrixMappedState),
+                                                          defaults={"synced_at": dt, "last_updated_at": dt})
         except Exception as e:
             pass
 
@@ -302,9 +304,9 @@ class MatrixMappedCity(TimeStampedModel):
         obj.save()
 
         try:
-            SyncBookingAnalytics.update_or_create(object_id=self.id,
-                                                  content_type=ContentType.objects.get_for_model(MatrixMappedCity),
-                                                  defaults={"synced_at": self.updated_at, "last_updated_at": self.updated_at})
+            SyncBookingAnalytics.objects.update_or_create(object_id=self.id,
+                                                          content_type=ContentType.objects.get_for_model(MatrixMappedCity),
+                                                          defaults={"synced_at": self.updated_at, "last_updated_at": self.updated_at})
         except Exception as e:
             pass
 

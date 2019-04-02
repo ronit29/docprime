@@ -1433,7 +1433,7 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin)
 
         category = None
         if self.lab_test.first():
-            if self.lab_test.first().is_package == True:
+            if self.lab_test.first().test.is_package == True:
                 category = 1
             else:
                 category = 0
@@ -1454,7 +1454,7 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin)
         obj.save()
 
         try:
-            SyncBookingAnalytics.update_or_create(object_id=self.id,
+            SyncBookingAnalytics.objects.update_or_create(object_id=self.id,
                                                   content_type=ContentType.objects.get_for_model(LabAppointment),
                                                   defaults={"synced_at": self.updated_at, "last_updated_at": self.updated_at})
         except Exception as e:

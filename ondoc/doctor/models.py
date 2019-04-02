@@ -1743,7 +1743,7 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
 
         promo_cost = self.deal_price - self.effective_price if self.deal_price and self.effective_price else None
 
-        department = self.doctor.doctorpracticespecializations.specialization.department.first().id
+        department = self.doctor.doctorpracticespecializations.first().specialization.department.first().id
         obj = DP_OpdConsultsAndTests.objects.filter(Appointment_Id=self.id).first()
         if not obj:
             obj = DP_OpdConsultsAndTests()
@@ -1759,9 +1759,9 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
         obj.save()
 
         try:
-            SyncBookingAnalytics.update_or_create(object_id=self.id,
-                                                  content_type=ContentType.objects.get_for_model(OpdAppointment),
-                                                  defaults={"synced_at": self.updated_at, "last_updated_at": self.updated_at})
+            SyncBookingAnalytics.objects.update_or_create(object_id=self.id,
+                                                          content_type=ContentType.objects.get_for_model(OpdAppointment),
+                                                          defaults={"synced_at": self.updated_at, "last_updated_at": self.updated_at})
         except Exception as e:
             pass
 

@@ -66,8 +66,7 @@ class DP_OPDStatusMaster(models.Model):
 
 class DP_OpdConsultsAndTests(models.Model):
 
-    OpdConsultsAndTestsId = models.BigIntegerField(primary_key=True)
-    Appointment_Id = models.BigIntegerField(null=True, blank=True)
+    Appointment_Id = models.BigIntegerField(primary_key=True)
     StatusId = models.IntegerField(null=True, blank=True)
     TypeId = models.IntegerField(null=True, blank=True)
     GMValue = models.IntegerField(null=True, blank=True)
