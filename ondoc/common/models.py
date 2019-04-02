@@ -271,10 +271,9 @@ class MatrixMappedState(TimeStampedModel):
         obj.save()
 
         try:
-            dt = str(timezone.now())
             SyncBookingAnalytics.objects.update_or_create(object_id=self.id,
                                                           content_type=ContentType.objects.get_for_model(MatrixMappedState),
-                                                          defaults={"synced_at": dt, "last_updated_at": dt})
+                                                          defaults={"synced_at": self.updated_at, "last_updated_at": self.updated_at})
         except Exception as e:
             pass
 
