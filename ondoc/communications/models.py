@@ -37,13 +37,14 @@ User = get_user_model()
 logger = logging.getLogger(__name__)
 
 
-def get_spoc_email_and_number_hospital(spocs):
+def get_spoc_email_and_number_hospital(spocs, appointment):
     user_and_email = []
     user_and_number = []
     for spoc in spocs:
         if spoc.number and spoc.number in range(1000000000, 9999999999):
             admins = GenericAdmin.objects.prefetch_related('user').filter(Q(phone_number=str(spoc.number),
                                                                             hospital=spoc.content_object),
+                                                                          Q(doctor__isnull=True) | Q(doctor=appointment.doctor),
                                                                           Q(super_user_permission=True) | Q(
                                                                               permission_type=GenericAdmin.APPOINTMENT,
                                                                               write_permission=True))
@@ -51,6 +52,10 @@ def get_spoc_email_and_number_hospital(spocs):
                 admins_with_user = admins.filter(user__isnull=False)
                 if admins_with_user.exists():
                     for admin in admins_with_user:
+                        if admin.doctor and admin.doctor != appointment.doctor:
+                            user_and_number.append({'user': None, 'phone_number': spoc.number})
+                            if spoc.email:
+                                user_and_email.append({'user': None, 'email': spoc.email})
                         if int(admin.user.phone_number) == int(spoc.number):
                             user_and_number.append({'user': admin.user, 'phone_number': spoc.number})
                             if spoc.email:
@@ -59,15 +64,21 @@ def get_spoc_email_and_number_hospital(spocs):
                             user_and_number.append({'user': None, 'phone_number': spoc.number})
                             if spoc.email:
                                 user_and_email.append({'user': None, 'email': spoc.email})
+
                 admins_without_user = admins.exclude(id__in=admins_with_user)
                 if admins_without_user.exists():
                     for admin in admins_without_user:
-                        created_user = User.objects.create(phone_number=spoc.number, user_type=User.DOCTOR)
-                        admin.user = created_user
-                        admin.save()
-                        user_and_number.append({'user': created_user, 'phone_number': spoc.number})
-                        if spoc.email:
-                            user_and_email.append({'user': created_user, 'email': spoc.email})
+                        if admin.doctor and admin.doctor != appointment.doctor:
+                            user_and_number.append({'user': None, 'phone_number': spoc.number})
+                            if spoc.email:
+                                user_and_email.append({'user': None, 'email': spoc.email})
+                        else:
+                            created_user = User.objects.create(phone_number=spoc.number, user_type=User.DOCTOR)
+                            admin.user = created_user
+                            admin.save()
+                            user_and_number.append({'user': created_user, 'phone_number': spoc.number})
+                            if spoc.email:
+                                user_and_email.append({'user': created_user, 'email': spoc.email})
             else:
                 user_and_number.append({'user': None, 'phone_number': spoc.number})
         elif spoc.email:
@@ -1133,7 +1144,7 @@ class OpdNotification(Notification):
                 user_and_phone_number.append({'user': user, 'phone_number': phone_number})
             if email:
                 user_and_email.append({'user': user, 'email': email})
-        spoc_emails, spoc_numbers = get_spoc_email_and_number_hospital(spocs_to_be_communicated)
+        spoc_emails, spoc_numbers = get_spoc_email_and_number_hospital(spocs_to_be_communicated, instance)
         user_and_phone_number.extend(spoc_numbers)
         user_and_email.extend(spoc_emails)
         user_and_email = unique_emails(user_and_email)
