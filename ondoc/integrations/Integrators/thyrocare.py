@@ -438,3 +438,29 @@ class Thyrocare(BaseIntegrator):
         time_dict[date].append(am_dict)
         time_dict[date].append(pm_dict)
         return time_dict
+
+    @classmethod
+    def get_test_parameter(cls):
+        from ondoc.diagnostic.models import TestParameterChat
+        from ondoc.integrations.models import IntegratorTestParameterMapping
+
+        url = "%s/ORDER.svc/%s/ALL/GetReferenceValue" % (settings.THYROCARE_BASE_URL, settings.THYROCARE_API_KEY)
+        response = requests.get(url)
+        response = response.json()
+        if response['RES_ID'] == 'RES0000':
+            test_parameters = response['TEST_MASTER']
+            if test_parameters:
+                for parameter in test_parameters:
+                    integrator_data = {'response_data': parameter}
+                    data = {'age_to': parameter['AGE_TO'], 'age_from': parameter['AGE_FROM'], 'gender': parameter['GENDER'], 'min_range': parameter['MIN_RANGE'], 'max_range': parameter['MAX_RANGE']}
+                    if parameter['MIN_RANGE'] == '':
+                        data['min_range'] = None
+
+                    if parameter['MAX_RANGE'] == '':
+                        data['max_range'] = None
+
+                    # Save to model
+                    print(parameter)
+                    test_parameter = TestParameterChat.objects.update_or_create(test_name=parameter['TEST_NAME'], defaults=data)
+                    IntegratorTestParameterMapping.objects.update_or_create(integrator_test_name=parameter['TEST_NAME'], test_parameter_chat_id=test_parameter[0].id,
+                                                                     integrator_class_name=Thyrocare.__name__, defaults=integrator_data)
