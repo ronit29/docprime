@@ -1548,34 +1548,3 @@ class CompareLabPackagesSerializer(serializers.Serializer):
         except:
             raise serializers.ValidationError('Invalid Lab Package IDs')
         raise serializers.ValidationError('Invalid Lab Package IDs')
-
-
-    # def validate_package_ids(self, value):
-    #     request = self.context.get("request")
-    #     if not LabTest.objects.filter(id__in=value).count() == len(value):
-    #         logger.error(
-    #             "Error 'Invalid lab package Id' for Comparing Lab Packages with data - " + json.dumps(
-    #                 request.query_params))
-    #         raise serializers.ValidationError("Invalid Lab Package Id.")
-    #     return value
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
