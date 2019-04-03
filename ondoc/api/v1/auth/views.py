@@ -1181,7 +1181,7 @@ class TransactionViewSet(viewsets.GenericViewSet):
                         return
             except Exception as e:
                logger.error("Error in sending pg acknowledge - " + str(e))
-    
+
 
             # For testing only
             # response = request.data

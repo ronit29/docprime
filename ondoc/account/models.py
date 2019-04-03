@@ -532,6 +532,7 @@ class Order(TimeStampedModel):
         from ondoc.diagnostic.models import LabAppointment
         from ondoc.insurance.models import UserInsurance
         from ondoc.subscription_plan.models import UserPlanMapping
+        from ondoc.insurance.models import InsuranceDoctorSpecializations
 
         orders_to_process = []
         if self.orders.exists():
@@ -544,11 +545,45 @@ class Order(TimeStampedModel):
         lab_appointment_ids = []
         insurance_ids = []
         user_plan_ids = []
+        user = self.user
+        user_insurance_obj = user.active_insurance
+
+        gyno_count = 0
+        onco_count = 0
+        if user_insurance_obj:
+            specialization_count_dict = InsuranceDoctorSpecializations.get_already_booked_specialization_appointments(user, user_insurance_obj)
+            gyno_count = specialization_count_dict.get(InsuranceDoctorSpecializations.SpecializationMapping.GYNOCOLOGIST,{}).get('count', 0)
+            onco_count = specialization_count_dict.get(InsuranceDoctorSpecializations.SpecializationMapping.ONCOLOGIST,{}).get('count', 0)
 
         for order in orders_to_process:
             try:
-                curr_app, curr_wallet, curr_cashback = order.process_order()
+                is_process = True
+                app_data = order.action_data
+                doctor = app_data.get('doctor', None)
 
+                if doctor:
+                    if app_data.get('payment_type') == OpdAppointment.INSURANCE and not user_insurance_obj:
+                        is_process = False
+                    if user_insurance_obj and app_data.get('payment_type') == OpdAppointment.INSURANCE:
+                        doctor_specialization_tuple = InsuranceDoctorSpecializations.get_doctor_insurance_specializations(doctor)
+                        if doctor_specialization_tuple:
+                            doctor_specialization = doctor_specialization_tuple[1]
+                            if doctor_specialization == InsuranceDoctorSpecializations.SpecializationMapping.GYNOCOLOGIST:
+                               if gyno_count > settings.INSURANCE_GYNECOLOGIST_LIMIT:
+                                    is_process = False
+                               else:
+                                    gyno_count += 1
+
+                            if doctor_specialization == InsuranceDoctorSpecializations.SpecializationMapping.ONCOLOGIST:
+                                if onco_count > settings.INSURANCE_ONCOLOGIST_LIMIT:
+                                    is_process = False
+                                else:
+                                    onco_count += 1
+
+                if is_process:
+                    curr_app, curr_wallet, curr_cashback = order.process_order()
+                else:
+                    raise Exception("Insurance invalidate, Could not process entire order")
                 # appointment was not created - due to insufficient balance, do not process
                 if not curr_app:
                     continue
