@@ -41,5 +41,5 @@ RUN if [ "$MIGRATE" = "true" ] ; then\
  python manage.py migrate --no-input; \
 fi 
 
-EXPOSE 80
+EXPOSE 8080
 #CMD ["sh", "/home/docprime/workspace/entrypoint/entrypoint"]
