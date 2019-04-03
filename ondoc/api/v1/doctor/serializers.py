@@ -1591,7 +1591,7 @@ class IpdProcedureDetailSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = IpdProcedure
-        fields = ('id', 'name', 'details', 'is_enabled', 'features', 'about', 'all_details')
+        fields = ('id', 'name', 'details', 'is_enabled', 'features', 'about', 'all_details', 'show_about')
 
     def get_all_details(self, obj):
         return IpdProcedureAllDetailsSerializer(obj.ipdproceduredetail_set.all(), many=True, context=self.context).data

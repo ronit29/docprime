@@ -263,7 +263,7 @@ class Thyrocare(BaseIntegrator):
                 formats = ['pdf', 'xml']
                 for booking in integrator_bookings:
                     dp_appointment = booking.content_object
-                    if dp_appointment.time_slot_start + timedelta(days=1) <= datetime.now():
+                    if dp_appointment.time_slot_start + timedelta(days=1) <= timezone.now():
                         lead_id = booking.lead_id
                         mobile = booking.content_object.profile.phone_number
                         result = dict()
@@ -373,7 +373,7 @@ class Thyrocare(BaseIntegrator):
         if integrator_history:
             status = integrator_history.status
             if dp_appointment.status != LabAppointment.CANCELLED or dp_appointment.status != LabAppointment.COMPLETED:
-                if dp_appointment.time_slot_start + timedelta(days=1) < timezone.now():
+                if dp_appointment.time_slot_start + timedelta(days=1) > timezone.now():
                     url = "%s/order.svc/%s/%s/%s/all/OrderSummary" % (settings.THYROCARE_BASE_URL, settings.THYROCARE_API_KEY,
                                                                       integrator_response.dp_order_id,
                                                                       integrator_response.response_data['MOBILE'])

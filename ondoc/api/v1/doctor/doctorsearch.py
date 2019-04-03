@@ -164,9 +164,9 @@ class DoctorSearchHelper:
             search_key = " ".join(search_key).lower()
 
             search_key = "".join(search_key.split("."))
-            filtering_params.append("d.search_key like (%(doctor_name1)s) "
+            filtering_params.append("(d.search_key like (%(doctor_name1)s) "
                                     "or d.search_key like  %(doctor_name2)s "
-                                    "or d.search_key like %(doctor_name3)s ")
+                                    "or d.search_key like %(doctor_name3)s) ")
             # filtering_params.append(
             #     "d.search_key ilike (%(doctor_name)s)"
             #         )
@@ -273,6 +273,10 @@ class DoctorSearchHelper:
 
         specialization_ids = self.query_params.get("specialization_ids", [])
         condition_ids = self.query_params.get("condition_ids", [])
+
+        if filtering_params.get('params', {}).get('hospital_id'):
+            max_distance = 10000000
+            min_distance = 0
 
         if self.count_of_procedure:
             rank_part = "Row_number() OVER( PARTITION BY doctor_id ORDER BY " \
