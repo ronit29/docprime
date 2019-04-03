@@ -152,9 +152,9 @@ class Thyrocare(BaseIntegrator):
         from ondoc.integrations.models import IntegratorHistory
 
         tests = kwargs.get('tests', None)
-        packages = kwargs.get('packages', None)
+        # packages = kwargs.get('packages', None)
         retry_count = kwargs.get('retry_count', 0)
-        payload = self.prepare_data(tests, packages, lab_appointment)
+        payload = self.prepare_data(tests, lab_appointment)
 
         headers = {'Content-Type': "application/json"}
         url = "%s/ORDER.svc/Postorderdata" % settings.THYROCARE_BASE_URL
@@ -173,8 +173,8 @@ class Thyrocare(BaseIntegrator):
 
         return None
 
-    def prepare_data(self, tests, packages, lab_appointment):
-        from ondoc.integrations.models import IntegratorProfileMapping, IntegratorTestMapping
+    def prepare_data(self, tests, lab_appointment):
+        from ondoc.integrations.models import IntegratorTestMapping
 
         profile = lab_appointment.profile
         if hasattr(lab_appointment, 'address') and lab_appointment.address:
@@ -189,8 +189,8 @@ class Thyrocare(BaseIntegrator):
             gender = profile.gender.upper()
         else:
             gender = "M"
-        bendataxml = "<NewDataSet><Ben_details><Name>%s</Name><Age>%s</Age><Gender>%s</Gender></Ben_details></NewDataSet>" % (profile.name, self.calculate_age(profile), gender)
 
+        bendataxml = "<NewDataSet><Ben_details><Name>%s</Name><Age>%s</Age><Gender>%s</Gender></Ben_details></NewDataSet>" % (profile.name, self.calculate_age(profile), gender)
         payload = {
             "api_key": settings.THYROCARE_API_KEY,
             "orderid": order_id,
@@ -214,31 +214,29 @@ class Thyrocare(BaseIntegrator):
         rate = 0
         if tests:
             for test in tests:
-                integrator_test = IntegratorTestMapping.objects.filter(test_id=test.id, integrator_class_name=Thyrocare.__name__, is_active=True, test_type='TEST').first()
-                if integrator_test:
-                    if integrator_test.name_params_required:
-                        product.append(integrator_test.integrator_product_data["name"])
-                    else:
-                        product.append(integrator_test.integrator_product_data["code"])
-                    rate += int(integrator_test.integrator_product_data["rate"]["b2c"])
-                else:
+                integrator_test = IntegratorTestMapping.objects.filter(test_id=test.id, integrator_class_name=Thyrocare.__name__, is_active=True).first()
+                if not integrator_test:
                     logger.info("[ERROR] No tests data found in integrator.")
 
-        if packages:
-            for package in packages:
-                # integrator_package = IntegratorTestMapping.objects.filter(test_id=package.id, integrator_class_name=Thyrocare.__name__, is_active=True).first()
-                integrator_package = IntegratorTestMapping.objects.filter(Q(test_id=package.id) & Q(integrator_class_name=Thyrocare.__name__) & Q(is_active=True) & ~Q(test_type='TEST')).first()
-                if integrator_package:
-                    if integrator_package.test_type == "OFFER":
-                        payload["report_code"] = integrator_package.integrator_product_data["code"]
-                    if integrator_package.integrator_product_data["testnames"] == 'null':
-                        name = integrator_package.integrator_product_data["name"]
+                if integrator_test.test_type == "TEST":
+                    if integrator_test.name_params_required:
+                        name = integrator_test.integrator_product_data["name"]
                     else:
-                        name = integrator_package.integrator_product_data["testnames"]
+                        name = integrator_test.integrator_product_data["code"]
                     product.append(name)
-                    rate += int(integrator_package.integrator_product_data["rate"]["b2c"])
+                elif integrator_test.test_type == "OFFER":
+                    product.append(integrator_test.integrator_product_data["testnames"])
+                    payload["report_code"] = integrator_test.integrator_product_data["code"]
+                elif integrator_test.test_type == "PROFILE":
+                    product.append(integrator_test.integrator_product_data["name"])
                 else:
-                    logger.info("[ERROR] No package data found in integrator for.")
+                    if integrator_test.integrator_product_data["testnames"] == 'null':
+                        name = integrator_test.integrator_product_data["name"]
+                    else:
+                        name = integrator_test.integrator_product_data["testnames"]
+                    product.append(name)
+
+                rate += int(integrator_test.integrator_product_data["rate"]["b2c"])
 
         if product:
             product_str = ",".join(product )
@@ -272,8 +270,7 @@ class Thyrocare(BaseIntegrator):
                         result = dict()
 
                         for format in formats:
-                            # url = "%s/order.svc/%s/GETREPORTS/%s/%s/%s/Myreport" % (settings.THYROCARE_BASE_URL, settings.THYROCARE_API_KEY, lead_id, format, mobile)
-                            url = "https://www.thyrocare.com/APIs/order.svc/Or3OLzFDGzLF7Apwjsp05KPe3Sski7)QAomi@RBhXRrVcGyko7hIzQ==/GETREPORTS/SP46826445/%s/9990786399/Myreport" % (format)
+                            url = "%s/order.svc/%s/GETREPORTS/%s/%s/%s/Myreport" % (settings.THYROCARE_BASE_URL, settings.THYROCARE_API_KEY, lead_id, format, mobile)
                             response = requests.get(url)
                             response = response.json()
                             if response.get('RES_ID') == 'RES0000':
