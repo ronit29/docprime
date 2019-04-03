@@ -358,7 +358,11 @@ class LabList(viewsets.ReadOnlyModelViewSet):
                                                                 'parameter_count': parameter_count,
                                                                 'icon': icon_url}
             category_data[temp_package.id] = list(single_test_data.values())
-        all_packages_data = paginate_queryset(all_packages, request, 30)
+        all_packages_data = None
+        if parameters.get('page') and int(parameters.get('page'))>0:
+            all_packages_data = paginate_queryset(all_packages, request, 30)
+        else:
+            all_packages_data = all_packages
         serializer = CustomLabTestPackageSerializer(all_packages_data, many=True,
                                                     context={'entity_url_dict': entity_url_dict, 'lab_data': lab_data,
                                                              'request': request, 'category_data': category_data,
