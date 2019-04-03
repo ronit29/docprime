@@ -72,6 +72,8 @@ class DP_OpdConsultsAndTests(models.Model):
     GMValue = models.IntegerField(null=True, blank=True)
     PromoCost = models.IntegerField(null=True, blank=True)
     CreatedOn = models.DateTimeField(auto_now_add=True)
+    PaymentType = models.SmallIntegerField(null=True, blank=True)
+    Payout = models.IntegerField(null=True, blank=True)
     SpecialityId = models.IntegerField(null=True, blank=True)
     Category = models.IntegerField(null=True, blank=True)
     ProviderId = models.IntegerField(null=True, blank=True)

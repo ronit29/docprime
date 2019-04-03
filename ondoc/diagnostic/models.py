@@ -1448,6 +1448,8 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin)
             # obj.StateId = self.get_state()
             obj.ProviderId = self.lab.id
             obj.TypeId = 2
+            obj.PaymentType = self.payment_type if self.payment_type else None
+            obj.Payout = self.merchant_payout if self.merchant_payout else None
         obj.PromoCost = promo_cost
         obj.GMValue = self.deal_price
         obj.Category = category
@@ -1455,8 +1457,8 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin)
 
         try:
             SyncBookingAnalytics.objects.update_or_create(object_id=self.id,
-                                                  content_type=ContentType.objects.get_for_model(LabAppointment),
-                                                  defaults={"synced_at": self.updated_at, "last_updated_at": self.updated_at})
+                                                          content_type=ContentType.objects.get_for_model(LabAppointment),
+                                                          defaults={"synced_at": self.updated_at, "last_updated_at": self.updated_at})
         except Exception as e:
             pass
 

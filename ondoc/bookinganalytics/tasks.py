@@ -43,7 +43,7 @@ def sync_booking_data():
         to_be_updated = SyncBookingAnalytics.objects.exclude(synced_at=F('last_updated_at'))
         for obj in to_be_updated:
             row = obj.content_object
-            row.sync_with_booking_analytics(obj)
+            row.sync_with_booking_analytics()
             print('obj-id : {} content-type : {} has been synced'.format(obj.id, obj.content_type))
 
     except Exception as e:
