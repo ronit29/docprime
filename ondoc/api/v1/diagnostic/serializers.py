@@ -1542,7 +1542,7 @@ class CompareLabPackagesSerializer(serializers.Serializer):
 
     def validate_package_ids(self, attrs):
         try:
-            package_ids = [int(attr) for attr in attrs]
+            package_ids = list(set([int(attr) for attr in attrs]))
             if LabTest.objects.filter(id__in=package_ids, is_package=True, enable_for_retail=True, searchable=True).count() == len(package_ids):
                 return package_ids
         except:
