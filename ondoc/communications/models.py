@@ -45,8 +45,7 @@ def get_spoc_email_and_number_hospital(spocs, appointment):
             admins = GenericAdmin.objects.prefetch_related('user').filter(Q(phone_number=str(spoc.number),
                                                                             hospital=spoc.content_object),
                                                                           Q(super_user_permission=True) |
-                                                                          Q(Q(permission_type=GenericAdmin.APPOINTMENT,
-                                                                              write_permission=True),
+                                                                          Q(Q(permission_type=GenericAdmin.APPOINTMENT),
                                                                             Q(doctor__isnull=True) | Q(doctor=appointment.doctor)))
             if admins:
                 admins_with_user = admins.filter(user__isnull=False)
