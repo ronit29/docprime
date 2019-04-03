@@ -765,6 +765,11 @@ class LabAppointmentForm(forms.ModelForm):
                     if not lab.always_open and not is_lab_timing_available:
                         raise forms.ValidationError("No time slot available")
 
+        if cleaned_data.get('status') and cleaned_data.get('status') == LabAppointment.COMPLETED:
+            if not cleaned_data.get('custom_otp') == self.instance.otp:
+                raise forms.ValidationError("Entered OTP is incorrect.")
+
+
         return cleaned_data
 
 

@@ -1528,7 +1528,8 @@ class DoctorOpdAppointmentAdmin(admin.ModelAdmin):
                                     (OpdAppointment.RESCHEDULED_PATIENT, 'Rescheduled by patient'),
                                     (OpdAppointment.RESCHEDULED_DOCTOR, 'Rescheduled by doctor'),
                                     (OpdAppointment.ACCEPTED, 'Accepted'),
-                                    (OpdAppointment.CANCELLED, 'Cancelled')]
+                                    (OpdAppointment.CANCELLED, 'Cancelled'),
+                                    (OpdAppointment.COMPLETED, 'Completed')]
         if db_field.name == "status" and request.user.groups.filter(
                 name=constants['OPD_APPOINTMENT_MANAGEMENT_TEAM']).exists():
             kwargs['choices'] = allowed_status_for_agent
