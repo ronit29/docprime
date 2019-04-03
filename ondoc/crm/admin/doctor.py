@@ -1425,6 +1425,7 @@ class DoctorOpdAppointmentForm(forms.ModelForm):
     start_time = forms.CharField(widget=TimePickerWidget())
     cancel_type = forms.ChoiceField(label='Cancel Type', choices=((0, 'Cancel and Rebook'),
                                                                   (1, 'Cancel and Refund'),), initial=0, widget=forms.RadioSelect)
+    custom_otp = forms.IntegerField(required=False)
 
     def clean(self):
         super().clean()
@@ -1562,6 +1563,10 @@ class DoctorOpdAppointmentAdmin(admin.ModelAdmin):
                 'start_date', 'start_time', 'invoice_urls', 'payment_type', 'payout_info')
         if request.user.groups.filter(name=constants['APPOINTMENT_OTP_TEAM']).exists() or request.user.is_superuser:
             all_fields = all_fields + ('otp',)
+        # if obj and obj.id and obj.status == OpdAppointment.ACCEPTED:
+        #     all_fields = all_fields + ('custom_otp',)
+        all_fields = all_fields + ('custom_otp',)
+
         return all_fields
         # else:
         #     return ()
@@ -1766,8 +1771,9 @@ class DoctorOpdAppointmentAdmin(admin.ModelAdmin):
                     logger.warning("Admin Cancel started - " + str(obj.id) + " timezone - " + str(timezone.now()))
                     obj.action_cancelled(cancel_type)
                     logger.warning("Admin Cancel completed - " + str(obj.id) + " timezone - " + str(timezone.now()))
-
-            else:        
+            elif request.POST.get('status') and int(request.POST['status']) == OpdAppointment.COMPLETED:
+                    obj.action_completed
+            else:
                 super().save_model(request, obj, form, change)
 
     class Media:

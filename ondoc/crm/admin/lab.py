@@ -863,7 +863,8 @@ class LabAppointmentAdmin(nested_admin.NestedModelAdmin):
                                     (LabAppointment.RESCHEDULED_PATIENT, 'Rescheduled by patient'),
                                     (LabAppointment.RESCHEDULED_LAB, 'Rescheduled by lab'),
                                     (LabAppointment.ACCEPTED, 'Accepted'),
-                                    (LabAppointment.CANCELLED, 'Cancelled')]
+                                    (LabAppointment.CANCELLED, 'Cancelled'),
+                                    (LabAppointment.COMPLETED, 'Completed')]
         if db_field.name == "status" and request.user.groups.filter(name=constants['LAB_APPOINTMENT_MANAGEMENT_TEAM']).exists():
             kwargs['choices'] = allowed_status_for_agent
         return super().formfield_for_choice_field(db_field, request, **kwargs)
