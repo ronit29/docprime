@@ -1539,10 +1539,11 @@ class CompareLabPackagesSerializer(serializers.Serializer):
     package_ids = CommaSepratedToListField(required=True, max_length=4, typecast_to=str)
     longitude = serializers.FloatField(default=77.071848)
     latitude = serializers.FloatField(default=28.450367)
+    title = serializers.CharField(required=False, max_length=500)
 
     def validate_package_ids(self, attrs):
         try:
-            package_ids = [int(attr) for attr in attrs]
+            package_ids = list(set([int(attr) for attr in attrs]))
             if LabTest.objects.filter(id__in=package_ids, is_package=True, enable_for_retail=True, searchable=True).count() == len(package_ids):
                 return package_ids
         except:

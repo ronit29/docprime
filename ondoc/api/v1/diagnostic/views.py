@@ -1,4 +1,5 @@
 import operator
+from itertools import groupby
 
 from ondoc.api.v1.diagnostic.serializers import CustomLabTestPackageSerializer
 from ondoc.api.v1.doctor.serializers import CommaSepratedToListField
@@ -2414,138 +2415,150 @@ class LabTestCategoryListViewSet(viewsets.GenericViewSet):
                 empty.append(resp)
         return Response(empty)
 
-#
-# class CompareLabPackagesViewSet(viewsets.ReadOnlyModelViewSet):
-#
-#     def retrieve(self, request):
-#         parameters = request.query_params
-#
-#         if not parameters.get('package_ids'):
-#             return Response({})
-#
-#         serializer = serializers.CompareLabPackagesSerializer(data=parameters, context={"request": request})
-#         serializer.is_valid(raise_exception=True)
-#         validated_data = serializer.validated_data
-#
-#         if validated_data and validated_data.get('package_ids'):
-#             if len(validated_data.get('package_ids')) < 2:
-#                 return Response({})
-#         else:
-#             return Response({})
-#
-#         from django.db.models import Min
-#
-#
-#         if len(validated_data.get('package_ids')) <= 4:
-#             response = {}
-#             lab_packages = []
-#             latitude = None
-#             longitude = None
-#
-#             longitude = validated_data.get('longitude')
-#             latitude = validated_data.get('latitude')
-#
-#             tests = None
-#             total_test_ids = set()
-#             point_string = 'POINT(' + str(longitude) + ' ' + str(latitude) + ')'
-#             pnt = GEOSGeometry(point_string, srid=4326)
-#             max_distance = 10000
-#             min_distance = 0
-#
-#             packages = LabTest.objects.prefetch_related('test', 'test__recommended_categories', 'test__parameter',
-#                                                         'categories', Prefetch('availablelabs',
-#                                                                                AvailableLabTest.objects.filter(
-#                                                                                    enabled=True)),
-#                                                         Prefetch('availablelabs__lab_pricing_group__labs',
-#                                                                  Lab.objects.filter(is_live=True))).filter(
-#                 is_package=True, id__in=validated_data.get('package_ids'),
-#                 availablelabs__lab_pricing_group__labs__location__dwithin=(Point(float(longitude),
-#                                                                                  float(latitude)), D(m=max_distance))).distinct()
-#
-#             packages_price = packages.values('id').annotate(min_price = Min(Coalesce('availablelabs__custom_deal_price', 'availablelabs__computed_deal_price')))
-#
-#
-#             for tests in packages:
-#                 tests = tests.test.all()
-#                 if tests:
-#                     total_test_ids = total_test_ids.union(set(tests.values_list('id', flat=True)))
-#
-#             for data in packages:
-#                 if data.id and data.name:
-#                     package_detail = {}
-#                     labs_count = 0
-#                     tests_included = list()
-#                     tests = data.test.all()
-#                     temp_test_id = set()
-#                     tests_count = data.test.all().count()
-#                     package_detail['id'] = data.id
-#                     package_detail['name'] = data.name
-#                     package_detail['total_tests_count'] = tests_count
-#
-#                     if data.availablelabs.all():
-#
-#                         available_labs = data.availablelabs.all()
-#                         for avl_labs in available_labs:
-#
-#                             if avl_labs.lab_pricing_group and avl_labs.lab_pricing_group.labs.all():
-#                                 labs_count = labs_count + avl_labs.lab_pricing_group.labs.count()
-#                     package_detail['total_labs_available'] = labs_count
-#
-#                     if tests:
-#                         for test in tests:
-#                             temp_test_id.add(test.id)
-#                             tests_included.append({'test_id': test.id, 'available': True})
-#
-#                     if len(total_test_ids-temp_test_id) > 0:
-#                         for test_id in list(total_test_ids-temp_test_id):
-#                             tests_included.append({'test_id': test_id, 'available': False})
-#
-#                     package_detail['tests_included'] = tests_included
-#
-#                     package_detail['minimum_price'] = [price.get('min_price') for price in packages_price if price.get('id') == data.id]
-#                     lab_packages.append(package_detail)
-#
-#             response['lab_packages'] = lab_packages
-#
-#             categories_test_parameters = list()
-#             lab_tests = None
-#
-#             package_category_count = dict()
-#             for package in packages:
-#                 if package.id and package.name:
-#                     lab_tests = package.test.all()
-#                     category_parameters_count = dict()
-#
-#                     for test in lab_tests:
-#                         for category in test.recommended_categories.all():
-#                             if category.is_live:
-#
-#                                 parameters = list()
-#
-#                                 if test and test.parameter.all():
-#                                     test_parameters = test.parameter.all()
-#                                     for data in test_parameters:
-#                                         parameters.append({'parameter_id': data.id, 'parameter_name': data.name})
-#
-#                                     categories_test_parameters.append(
-#                                     {'category_id': category.id, 'category_name': category.name,
-#                                      'tests':[{'test_id': test.id, 'test_name': test.name}],
-#                                      'parameters': parameters, 'parameters_count': len(parameters)})
-#                                 if category_parameters_count.get(category.id):
-#                                     category_parameters_count[category.id] += len(parameters)
-#                                 else:
-#                                     category_parameters_count[category.id] = len(parameters)
-#
-#                 package_category_count[package.id] = category_parameters_count
-#
-#             for id in validated_data.get('package_ids'):
-#                 total_parameters_count = 0
-#                 categories_count = package_category_count[id]
-#                 total_parameters_count = sum(categories_count.values())
-#                 package_category_count[id].update({'total_parameters_count': total_parameters_count})
-#
-#             response['package_categories'] = categories_test_parameters
-#             response['category_parameters_count'] = package_category_count
-#             # response['total_parameters_count'] = total_parameters
-#
-#             return Response(response)
+
+class CompareLabPackagesViewSet(viewsets.ReadOnlyModelViewSet):
+
+    def retrieve(self, request):
+        from django.db.models import Min
+        parameters = request.query_params
+
+        serializer = serializers.CompareLabPackagesSerializer(data=parameters, context={"request": request})
+        serializer.is_valid(raise_exception=True)
+        validated_data = serializer.validated_data
+
+        if len(validated_data.get('package_ids')) < 2:
+            return Response({"msg": "Must have atleast 2 packages to compare"}, status=status.HTTP_400_BAD_REQUEST)
+        elif len(validated_data.get('package_ids')) > 4:
+            return Response({"msg": "Can have atmost 4 packages to compare"}, status=status.HTTP_400_BAD_REQUEST)
+
+        response = {}
+        lab_packages = []
+        latitude = None
+        longitude = None
+
+        longitude = validated_data.get('longitude')
+        latitude = validated_data.get('latitude')
+
+        tests = None
+        total_test_ids = set()
+        point_string = 'POINT(' + str(longitude) + ' ' + str(latitude) + ')'
+        pnt = GEOSGeometry(point_string, srid=4326)
+        max_distance = 10000
+        min_distance = 0
+        title = None
+        if validated_data.get('title'):
+            title = validated_data.get('title').replace('_', ' ').title()
+
+        response['title'] = title
+
+        packages = LabTest.objects.prefetch_related('test', 'test__recommended_categories', 'test__parameter',
+                                                    'categories', Prefetch('availablelabs',
+                                                                           AvailableLabTest.objects.filter(
+                                                                               enabled=True)),
+                                                    Prefetch('availablelabs__lab_pricing_group__labs',
+                                                             Lab.objects.filter(is_live=True))).filter(
+            is_package=True, id__in=validated_data.get('package_ids'),
+            availablelabs__lab_pricing_group__labs__location__dwithin=(Point(float(longitude),
+                                                                             float(latitude)), D(m=max_distance))).distinct()
+
+        packages_price = packages.values('id').annotate(
+            min_price=Min(Coalesce('availablelabs__custom_deal_price', 'availablelabs__computed_deal_price')))
+
+        package_test_master = {p:[x for x in p.test.all()] for p in packages}
+        category_data_master = {}
+        test_data_master = {}
+        test_without_cat = set()
+        category_parameter_count_master = defaultdict(int)
+        all_category_ids = set()
+
+        for package_temp in packages:
+            for test_temp in package_temp.test.all():
+                temp_test_id = test_temp.id
+                temp_test_name = test_temp.name
+                if temp_test_id not in test_data_master:
+                    parameters = [x.name for x in test_temp.parameter.all()]
+                    test_data_master[temp_test_id] = {"id": temp_test_id, "name": temp_test_name,
+                                                      "parameter_count": len(parameters),
+                                                      "parameters": parameters}
+
+        for temp_package in packages:
+            pack_id = temp_package.id
+            for temp_p_test in temp_package.test.all():
+                add_test = True
+                test_id = temp_p_test.id
+                test_name = temp_p_test.name
+                if len(temp_p_test.recommended_categories.all()) == 1:
+                    for temp_category in temp_p_test.recommended_categories.all():
+                        if temp_category.is_live:
+                            add_test = False
+                            cat_id = temp_category.id
+                            all_category_ids.add(cat_id)
+                            cat_name = temp_category.name
+                            cat_icon_url = util_absolute_url(temp_category.icon.url) if temp_category.icon else None
+                            if cat_id in category_data_master:
+                                if test_id not in category_data_master[cat_id]["test_ids"]:
+                                    category_data_master[cat_id]["test_ids"].append(test_id)
+                            else:
+                                category_data_master[cat_id] = {"id": cat_id,
+                                                  "icon": cat_icon_url,
+                                                  "name": cat_name,
+                                                  "test_ids": [test_id]}
+                            category_parameter_count_master[(pack_id, cat_id)] += test_data_master[test_id]["parameter_count"]
+                if add_test:
+                    test_without_cat.add(test_id)
+                    category_parameter_count_master[(pack_id, 0)] += test_data_master[test_id]["parameter_count"]
+                    all_category_ids.add(0)
+
+        category_data = list(category_data_master.values())
+        if test_without_cat:
+            category_data.append({"id": 0, "icon": None, "name": "Others", "test_ids": list(test_without_cat)})
+
+        total_test_ids = set(test_data_master.keys())
+
+        for data in packages:
+            if data.id and data.name:
+                package_detail = {}
+                labs_count = 0
+                tests_included = list()
+                available_labs = None
+                tests = data.test.all()
+                temp_test_id = set()
+                parameter_count = sum([len(x.parameter.all()) for x in data.test.all()])
+                package_detail['id'] = data.id
+                package_detail['name'] = data.name
+                package_detail['total_parameters_count'] = parameter_count
+
+                if data.availablelabs.all():
+                    available_labs = data.availablelabs.all()
+                    for avl_labs in available_labs:
+                        if avl_labs.lab_pricing_group and avl_labs.lab_pricing_group.labs.all():
+                            labs_count = labs_count + avl_labs.lab_pricing_group.labs.count()
+                package_detail['total_labs_available'] = labs_count
+
+                if tests:
+                    for test in tests:
+                        temp_test_id.add(test.id)
+                        tests_included.append({'test_id': test.id, 'available': True})
+
+                if len(total_test_ids-temp_test_id) > 0:
+                    for test_id in list(total_test_ids-temp_test_id):
+                        tests_included.append({'test_id': test_id, 'available': False})
+
+                package_detail['tests_included'] = tests_included
+                package_min_price = None
+                for price in packages_price:
+                    if price.get('id') == data.id:
+                        package_min_price = price.get('min_price')
+                package_detail['minimum_price'] = package_min_price
+                category_parameter_result = []
+                for category_id_temp in all_category_ids:
+                    category_parameter_result.append({"id": category_id_temp,
+                                                      "count": category_parameter_count_master.get(
+                                                          (data.id, category_id_temp), 0)})
+                package_detail['category_parameter_count'] = category_parameter_result
+                lab_packages.append(package_detail)
+
+        response['packages'] = lab_packages
+        response['category_info'] = category_data
+        response['test_info'] = list(test_data_master.values())
+        return Response(response)
