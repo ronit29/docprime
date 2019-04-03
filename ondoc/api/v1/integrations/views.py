@@ -1,6 +1,6 @@
 from rest_framework.response import Response
 from rest_framework import viewsets, status
-from ondoc.integrations.models import IntegratorResponse, IntegratorReport, IntegratorTestParameter
+from ondoc.integrations.models import IntegratorResponse, IntegratorReport, IntegratorTestParameterMapping
 import requests
 import xmltodict
 import json
@@ -66,9 +66,9 @@ class IntegratorReportViewSet(viewsets.GenericViewSet):
                            'PROFILE_CODE': test_results['PROFILE_CODE'],
                            'SDATE': test_results['SDATE'], 'TEST_VALUE': test_results['TEST_VALUE']}
 
-            inte_test_parameter = IntegratorTestParameter.objects.filter(integrator_test_name=test_results['Description']).first()
+            inte_test_parameter = IntegratorTestParameterMapping.objects.filter(integrator_test_name=test_results['Description']).first()
             if inte_test_parameter:
-                test_detail['TEST_PARAMETER_ID'] = inte_test_parameter.test_parameter_new.id
+                test_detail['TEST_PARAMETER_ID'] = inte_test_parameter.test_parameter_chat.id
                 test_detail['INTEGRATOR_PARAMETER_ID'] = inte_test_parameter.id
 
             if test_results['INDICATOR'] == 'RED':
@@ -88,10 +88,10 @@ class IntegratorReportViewSet(viewsets.GenericViewSet):
                                'PROFILE_CODE': result['PROFILE_CODE'],
                                'SDATE': result['SDATE'], 'TEST_VALUE': result['TEST_VALUE']}
 
-                inte_test_parameter = IntegratorTestParameter.objects.filter(integrator_test_name=result['Description']).first()
+                inte_test_parameter = IntegratorTestParameterMapping.objects.filter(integrator_test_name=result['Description']).first()
 
                 if inte_test_parameter:
-                    test_detail['TEST_PARAMETER_ID'] = inte_test_parameter.test_parameter_new.id
+                    test_detail['TEST_PARAMETER_ID'] = inte_test_parameter.test_parameter_chat.id
                     test_detail['INTEGRATOR_PARAMETER_ID'] = inte_test_parameter.id
 
                 if result['INDICATOR'] == 'RED':

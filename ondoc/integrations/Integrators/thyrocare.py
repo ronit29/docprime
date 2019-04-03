@@ -440,8 +440,8 @@ class Thyrocare(BaseIntegrator):
 
     @classmethod
     def get_test_parameter(cls):
-        from ondoc.diagnostic.models import TestParameterNew
-        from ondoc.integrations.models import IntegratorTestParameter
+        from ondoc.diagnostic.models import TestParameterChat
+        from ondoc.integrations.models import IntegratorTestParameterMapping
 
         url = "%s/ORDER.svc/%s/ALL/GetReferenceValue" % (settings.THYROCARE_BASE_URL, settings.THYROCARE_API_KEY)
         response = requests.get(url)
@@ -460,6 +460,6 @@ class Thyrocare(BaseIntegrator):
 
                     # Save to model
                     print(parameter)
-                    test_parameter = TestParameterNew.objects.update_or_create(test_name=parameter['TEST_NAME'], defaults=data)
-                    IntegratorTestParameter.objects.update_or_create(integrator_test_name=parameter['TEST_NAME'], test_parameter_new_id=test_parameter[0].id,
+                    test_parameter = TestParameterChat.objects.update_or_create(test_name=parameter['TEST_NAME'], defaults=data)
+                    IntegratorTestParameterMapping.objects.update_or_create(integrator_test_name=parameter['TEST_NAME'], test_parameter_chat_id=test_parameter[0].id,
                                                                      integrator_class_name=Thyrocare.__name__, defaults=integrator_data)

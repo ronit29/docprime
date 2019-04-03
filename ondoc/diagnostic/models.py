@@ -2478,7 +2478,7 @@ class LabTestGroupMapping(TimeStampedModel):
         db_table = "lab_test_group_mapping"
 
 
-class TestParameterNew(TimeStampedModel):
+class TestParameterChat(TimeStampedModel):
     test = models.ForeignKey(LabTest, on_delete=models.CASCADE, null=True)
     age_from = models.PositiveIntegerField()
     age_to = models.PositiveIntegerField()
@@ -2491,5 +2491,5 @@ class TestParameterNew(TimeStampedModel):
         return self.test_name
 
     class Meta:
-        db_table = 'test_parameter_new'
+        db_table = 'test_parameter_chat'
 
