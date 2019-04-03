@@ -541,14 +541,14 @@ class Lab(TimeStampedModel, CreatedByModel, QCModel, SearchKey):
         return res_data
 
     def get_available_slots(self, is_home_pickup, pincode, date):
-        from ondoc.integrations.models import IntegratorMapping
+        from ondoc.integrations.models import IntegratorTestMapping
         from ondoc.integrations import service
 
         integration_dict = None
         lab = Lab.objects.filter(id=self.id).first()
         if lab:
             if lab.network and lab.network.id:
-                integration_dict = IntegratorMapping.get_if_third_party_integration(network_id=lab.network.id)
+                integration_dict = IntegratorTestMapping.get_if_third_party_integration(network_id=lab.network.id)
 
                 if lab.network.id == settings.THYROCARE_NETWORK_ID and settings.THYROCARE_INTEGRATION_ENABLED:
                     pass
@@ -566,11 +566,11 @@ class Lab(TimeStampedModel, CreatedByModel, QCModel, SearchKey):
         return available_slots
 
     def is_integrated(self):
-        from ondoc.integrations.models import IntegratorMapping
+        from ondoc.integrations.models import IntegratorTestMapping
 
         integration_dict = None
         if self.network and self.network.id:
-            integration_dict = IntegratorMapping.get_if_third_party_integration(network_id=self.network.id)
+            integration_dict = IntegratorTestMapping.get_if_third_party_integration(network_id=self.network.id)
         if not integration_dict:
             return False
         else:
@@ -2399,7 +2399,7 @@ class LabReport(auth_model.TimeStampedModel):
 class LabReportFile(auth_model.TimeStampedModel, auth_model.Document):
     report = models.ForeignKey(LabReport, related_name='files', on_delete=models.SET_NULL, null=True, blank=True)
     name = models.FileField(upload_to='lab_reports/', blank=False, null=False, validators=[
-        FileExtensionValidator(allowed_extensions=['pdf', 'jfif', 'jpg', 'jpeg', 'png'])])
+        FileExtensionValidator(allowed_extensions=['pdf', 'jfif', 'jpg', 'jpeg', 'png', 'xml'])])
 
     def __str__(self):
 
@@ -2476,3 +2476,20 @@ class LabTestGroupMapping(TimeStampedModel):
 
     class Meta:
         db_table = "lab_test_group_mapping"
+
+
+class TestParameterChat(TimeStampedModel):
+    test = models.ForeignKey(LabTest, on_delete=models.CASCADE, null=True)
+    age_from = models.PositiveIntegerField()
+    age_to = models.PositiveIntegerField()
+    gender = models.CharField(max_length=30, null=True, blank=True)
+    min_range = models.DecimalField(blank=True, null=True, max_digits=10,decimal_places=2)
+    max_range = models.DecimalField(blank=True, null=True, max_digits=10,decimal_places=2)
+    test_name = models.CharField(blank=False, null=False, max_length=60)
+
+    def __str__(self):
+        return self.test_name
+
+    class Meta:
+        db_table = 'test_parameter_chat'
+
