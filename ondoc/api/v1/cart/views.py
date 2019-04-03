@@ -110,7 +110,7 @@ class CartViewSet(viewsets.GenericViewSet):
         specialization_count_dict = None
         if user_insurance and user_insurance.is_valid():
 
-            specialization_count_dict = InsuranceDoctorSpecializations.get_already_booked_specialization_appointments(user, user_insurance.id)
+            specialization_count_dict = InsuranceDoctorSpecializations.get_already_booked_specialization_appointments(user, user_insurance)
             gyno_count = specialization_count_dict.get(InsuranceDoctorSpecializations.SpecializationMapping.GYNOCOLOGIST, {}).get('count', 0)
             onco_count = specialization_count_dict.get(InsuranceDoctorSpecializations.SpecializationMapping.ONCOLOGIST, {}).get('count', 0)
 

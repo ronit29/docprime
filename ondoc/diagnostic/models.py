@@ -57,6 +57,7 @@ from ondoc.common.models import AppointmentHistory, AppointmentMaskNumber, Remar
 import reversion
 from decimal import Decimal
 from django.utils.text import slugify
+from django.utils.functional import cached_property
 #from ondoc.api.v1.diagnostic import serializers as diagnostic_serializers
 
 logger = logging.getLogger(__name__)
@@ -231,7 +232,7 @@ class Lab(TimeStampedModel, CreatedByModel, QCModel, SearchKey):
     class Meta:
         db_table = "lab"
 
-    @property
+    @cached_property
     def is_enabled_for_insurance(self):
         return self.is_insurance_enabled
 

@@ -516,12 +516,12 @@ class DoctorHospitalSerializer(serializers.ModelSerializer):
             if not user_insurance:
                 return resp
 
-            doctor_specialization = InsuranceDoctorSpecializations.get_doctor_insurance_specializations(doctor)
+            doctor_specialization = self.context.get('doctor_specialization',None)
             if not doctor_specialization:
                 resp['is_insurance_covered'] = True
             else:
                 specialization = doctor_specialization[1]
-                doctor_specialization_count_dict = InsuranceDoctorSpecializations.get_already_booked_specialization_appointments(user, user_insurance.id, doctor_specialization=specialization)
+                doctor_specialization_count_dict = self.context.get('doctor_specialization_count_dict', {})
                 if not doctor_specialization_count_dict:
                     resp['is_insurance_covered'] = True
                 if specialization == InsuranceDoctorSpecializations.SpecializationMapping.GYNOCOLOGIST and doctor_specialization_count_dict.get(specialization, {}).get('count') >= settings.INSURANCE_GYNECOLOGIST_LIMIT:
@@ -1159,10 +1159,20 @@ class DoctorProfileUserViewSerializer(DoctorProfileSerializer):
         return result_for_a_doctor
 
     def get_hospitals(self, obj):
+        request = self.context.get('request')
+        user = request.user
         data = DoctorClinicTiming.objects.filter(doctor_clinic__doctor=obj,
                                                  doctor_clinic__enabled=True,
                                                  doctor_clinic__hospital__is_live=True).select_related(
             "doctor_clinic__doctor", "doctor_clinic__hospital").prefetch_related("doctor_clinic__hospital__spoc_details","doctor_clinic__doctor__mobiles")
+        if obj:
+            doctor_specialization = InsuranceDoctorSpecializations.get_doctor_insurance_specializations(obj)
+            if doctor_specialization:
+                self.context['doctor_specialization'] = doctor_specialization
+                user_insurance = None if not user.is_authenticated or user.is_anonymous else user.active_insurance
+                if user_insurance:
+                    doctor_specialization_count_dict = InsuranceDoctorSpecializations.get_already_booked_specialization_appointments(user, user_insurance, doctor_specialization=doctor_specialization[1])
+                    self.context['doctor_specialization_count_dict'] = doctor_specialization_count_dict
         return DoctorHospitalSerializer(data, context=self.context, many=True).data
 
     class Meta:

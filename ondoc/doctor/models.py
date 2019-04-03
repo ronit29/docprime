@@ -1,5 +1,5 @@
 from copy import deepcopy
-
+import json
 import requests
 from PIL.Image import NEAREST, BICUBIC
 from django.contrib.staticfiles.storage import staticfiles_storage
@@ -70,6 +70,7 @@ from ondoc.api.v1.utils import RawSql
 from safedelete import SOFT_DELETE
 #from ondoc.api.v1.doctor import serializers as doctor_serializers
 import qrcode
+from django.utils.functional import cached_property
 
 logger = logging.getLogger(__name__)
 
@@ -604,7 +605,8 @@ class Doctor(auth_model.TimeStampedModel, auth_model.QCModel, SearchKey, auth_mo
     def __str__(self):
         return '{} ({})'.format(self.name, self.id)
 
-    @property
+    # @property
+    @cached_property
     def is_enabled_for_insurance(self):
         return self.is_insurance_enabled
 
