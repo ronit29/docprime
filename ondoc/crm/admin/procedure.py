@@ -1,14 +1,16 @@
-from django.contrib import messages
+from django.conf import settings
+from django.contrib import messages, admin
 from django.contrib.admin import TabularInline
 from django.contrib.contenttypes.models import ContentType
 from django.http import HttpResponseRedirect
 from django.urls import reverse
+from django.utils.safestring import mark_safe
 from reversion.admin import VersionAdmin
 
 from ondoc.common.models import Feature, Service
 from ondoc.crm.admin.doctor import AutoComplete
 from ondoc.procedure.models import Procedure, ProcedureCategory, ProcedureCategoryMapping, ProcedureToCategoryMapping, \
-    IpdProcedure, IpdProcedureFeatureMapping, IpdProcedureCategoryMapping, IpdProcedureCategory
+    IpdProcedure, IpdProcedureFeatureMapping, IpdProcedureCategoryMapping, IpdProcedureCategory, IpdProcedureDetail
 from django import forms
 
 
@@ -67,6 +69,53 @@ class ProcedureToParentCategoryInlineFormset(forms.BaseInlineFormSet):
             raise forms.ValidationError("Procedure and Category can't be on same level.")
 
 
+class IpdProcedureDetailAdminForm(forms.ModelForm):
+    value = forms.CharField(widget=forms.Textarea, required=False)
+
+    class Media:
+        extend = True
+        js = ('ckedit/js/ckeditor.js', 'ipd_procedure_detail/js/init.js')
+        css = {'all': ('ipd_procedure_detail/css/style.css',)}
+
+
+class IpdProcedureDetailAdmin(admin.ModelAdmin):
+    form = IpdProcedureDetailAdminForm
+    autocomplete_fields = ['ipd_procedure', 'detail_type']
+    list_display = ['ipd_procedure', 'detail_type']
+    # fields = ['ipd_procedure', 'detail_type']
+
+    def get_readonly_fields(self, request, obj=None):
+        read_only = super().get_readonly_fields(request, obj=None)
+        if obj and obj.id:
+            read_only += ('ipd_procedure',)
+        return read_only
+
+
+class IpdProcedureDetailTypeAdmin(admin.ModelAdmin):
+    search_fields = ['name']
+
+
+class DetailInline(AutoComplete, TabularInline):
+    model = IpdProcedureDetail
+    fk_name = 'ipd_procedure'
+    extra = 0
+    can_delete = True
+    # autocomplete_fields = ['feature']
+    verbose_name = "IPD Procedure Detail"
+    verbose_name_plural = "IPD Procedure Details"
+    fields = ['add_or_change_link', 'detail_type']
+    readonly_fields = ['detail_type', 'add_or_change_link']
+
+    def add_or_change_link(self, obj):
+        if obj and obj.id:
+            url = reverse('admin:procedure_ipdproceduredetail_change', kwargs={"object_id": obj.id})
+        else:
+            url = reverse('admin:procedure_ipdproceduredetail_add')
+        final_url = "<a href='{}' target=_blank>Click Here</a>".format(url)
+        return mark_safe(final_url)
+    add_or_change_link.short_description = "Link"
+
+
 class FeatureInline(AutoComplete, TabularInline):
     model = IpdProcedureFeatureMapping
     fk_name = 'ipd_procedure'
@@ -103,7 +152,7 @@ class IpdProcedureAdmin(VersionAdmin):
     model = IpdProcedure
     search_fields = ['search_key']
     exclude = ['search_key']
-    inlines = [IpdCategoryInline, FeatureInline]
+    inlines = [IpdCategoryInline, FeatureInline, DetailInline]
 
     def delete_view(self, request, object_id, extra_context=None):
         obj = self.model.objects.filter(id=object_id).first()
