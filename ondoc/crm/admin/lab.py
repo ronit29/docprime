@@ -689,6 +689,16 @@ class LabAdmin(ImportExportMixin, admin.GeoModelAdmin, VersionAdmin, ActionAdmin
             form.base_fields['assigned_to'].disabled = True
         return form
 
+    def get_readonly_fields(self, *args, **kwargs):
+        read_only = super().get_readonly_fields(*args, **kwargs)
+        if args:
+            request = args[0]
+            if not request.user.groups.filter(
+                    name__in=[constants['WELCOME_CALLING_TEAM'],
+                              constants['LAB_APPOINTMENT_MANAGEMENT_TEAM']]) and not request.user.is_superuser:
+                read_only += ('is_location_verified',)
+
+        return read_only
 
 class LabAppointmentForm(forms.ModelForm):
 

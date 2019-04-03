@@ -224,6 +224,7 @@ class Lab(TimeStampedModel, CreatedByModel, QCModel, SearchKey):
     open_for_communication = models.BooleanField(default=True)
     remark = GenericRelation(Remark)
     rating_data = JSONField(blank=True, null=True)
+    is_location_verified = models.BooleanField(verbose_name='Location Verified', default=False)
 
     def __str__(self):
         return self.name

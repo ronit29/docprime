@@ -535,6 +535,11 @@ class HospitalAdmin(admin.GeoModelAdmin, VersionAdmin, ActionAdmin, QCPemAdmin):
             read_only += ('add_network_link',)
         if not request.user.is_superuser and not request.user.groups.filter(name=constants['SUPER_QC_GROUP']).exists():
             read_only += ('is_listed_on_docprime',)
+        if not request.user.groups.filter(
+                name__in=[constants['WELCOME_CALLING_TEAM'],
+                          constants['OPD_APPOINTMENT_MANAGEMENT_TEAM']]) and not request.user.is_superuser:
+            read_only += ('is_location_verified',)
+
         return read_only
 
     def add_network_link(self, obj):
