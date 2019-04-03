@@ -6,7 +6,7 @@ ARG BIT_ENV_URL
 ARG COLLECTSTATIC
 ARG MIGRATE
 RUN apt-get update && apt-get install binutils libproj-dev gdal-bin nano apt-utils -y
-RUN apt-get update && apt-get install nginx -y 
+RUN apt-get update && apt-get install nginx -y
 RUN mkdir -p /home/docprime/workspace/backend
 RUN mkdir /env
 RUN mkdir -p /home/docprime/workspace/entrypoint
@@ -41,6 +41,5 @@ RUN if [ "$MIGRATE" = "true" ] ; then\
  python manage.py migrate --no-input; \
 fi 
 
-EXPOSE 80
-# RUN cp -r /env/django/supervisor_configs/.  /etc/supervisor/conf.d/
-CMD ["sh", "/home/docprime/workspace/entrypoint/entrypoint"]
+EXPOSE 8080
+#CMD ["sh", "/home/docprime/workspace/entrypoint/entrypoint"]

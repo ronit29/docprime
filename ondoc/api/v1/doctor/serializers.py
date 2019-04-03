@@ -43,7 +43,7 @@ from ondoc.authentication import models as auth_models
 from ondoc.location.models import EntityUrls, EntityAddress
 from ondoc.procedure.models import DoctorClinicProcedure, Procedure, ProcedureCategory, \
     get_included_doctor_clinic_procedure, get_procedure_categories_with_procedures, IpdProcedure, \
-    IpdProcedureFeatureMapping, IpdProcedureLead, DoctorClinicIpdProcedure
+    IpdProcedureFeatureMapping, IpdProcedureLead, DoctorClinicIpdProcedure, IpdProcedureDetail
 from ondoc.seo.models import NewDynamic
 from ondoc.ratings_review import models as rate_models
 
@@ -1561,12 +1561,33 @@ class IpdProcedureFeatureSerializer(serializers.ModelSerializer):
         return request.build_absolute_uri(photo_url)
 
 
+class IpdProcedureAllDetailsSerializer(serializers.ModelSerializer):
+    name = serializers.CharField(source='detail_type.name')
+    show_doctors = serializers.BooleanField(source='detail_type.show_doctors')
+    doctors = serializers.SerializerMethodField()
+
+    class Meta:
+        model = IpdProcedureDetail
+        fields = ('name', 'value', 'show_doctors', 'doctors')
+
+    def get_doctors(self, obj):
+        result = {}
+        if obj.detail_type.show_doctors:
+            result = self.context.get('doctor_result_data', {})
+        return result
+
+
 class IpdProcedureDetailSerializer(serializers.ModelSerializer):
     features = IpdProcedureFeatureSerializer(source='feature_mappings', read_only=True, many=True)
+    all_details = serializers.SerializerMethodField()
+    # all_details = IpdProcedureAllDetailsSerializer(source='ipdproceduredetail_set', read_only=True, many=True)
 
     class Meta:
         model = IpdProcedure
-        fields = ('id', 'name', 'details', 'is_enabled', 'features', 'about')
+        fields = ('id', 'name', 'details', 'is_enabled', 'features', 'about', 'all_details', 'show_about')
+
+    def get_all_details(self, obj):
+        return IpdProcedureAllDetailsSerializer(obj.ipdproceduredetail_set.all(), many=True, context=self.context).data
 
 
 class TopHospitalForIpdProcedureSerializer(serializers.ModelSerializer):
