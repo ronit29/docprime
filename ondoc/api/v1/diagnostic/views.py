@@ -2358,9 +2358,16 @@ class TestDetailsViewset(viewsets.GenericViewSet):
         alphabet = request.GET.get('alphabet')
         if not alphabet:
             return Response(status=status.HTTP_404_NOT_FOUND)
-        tests = LabTest.objects.filter(enable_for_retail=True, searchable=True, ).values()
+        response = {}
+        tests_count = 0
 
+        tests = list(LabTest.objects.filter(enable_for_retail=True, name__istartswith=alphabet).values('id', 'name', 'url'))
+        if tests:
+            tests_count = len(tests)
+        response['count'] = tests_count
+        response['tests'] = tests
 
+        return Response(response)
 
 
 class LabTestCategoryListViewSet(viewsets.GenericViewSet):
