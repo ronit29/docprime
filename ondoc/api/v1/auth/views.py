@@ -438,16 +438,7 @@ class UserProfileViewSet(mixins.CreateModelMixin, mixins.ListModelMixin,
         insured_member_profile = None
         if insured_member_obj:
             insured_member_profile = insured_member_obj.profile
-
-        if insured_member_profile:
-            keys = data.keys()
-            for key in keys:
-                if key not in ['id','whatsapp_optin','whatsapp_is_declined']:
-                    return Response({
-                        "request_errors": {"code": "invalid",
-                                           "message": "Profile cannot be changed which are covered under insurance."
-                                           }
-                    }, status=status.HTTP_400_BAD_REQUEST)
+        if obj and hasattr(obj, 'id') and obj.id and insured_member_profile:
 
             whatsapp_optin = data.get('whatsapp_optin')
             whatsapp_is_declined = data.get('whatsapp_is_declined')
@@ -461,9 +452,15 @@ class UserProfileViewSet(mixins.CreateModelMixin, mixins.ListModelMixin,
 
                 insured_member_profile.save()
                 return Response(serializer.data)
-        else:
-            serializer.save()
-            return Response(serializer.data)
+            else:
+                return Response({
+                    "request_errors": {"code": "invalid",
+                                       "message": "Profile cannot be changed which are covered under insurance."
+                                       }
+                }, status=status.HTTP_400_BAD_REQUEST)
+
+        serializer.save()
+        return Response(serializer.data)
 
     def upload(self, request, *args, **kwargs):
         instance = self.get_object()
