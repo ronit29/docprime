@@ -1475,6 +1475,10 @@ class DoctorOpdAppointmentForm(forms.ModelForm):
                                                      start__lte=hour, end__gt=hour).exists():
                 raise forms.ValidationError("Doctor do not sit at the given hospital in this time slot.")
 
+        if cleaned_data.get('status') and cleaned_data.get('status') == OpdAppointment.COMPLETED:
+            if not cleaned_data.get('custom_otp') == self.instance.otp:
+                raise forms.ValidationError("Entered OTP is incorrect.")
+
         # if self.instance.id:
         #     if cleaned_data.get('status') == OpdAppointment.RESCHEDULED_PATIENT or cleaned_data.get(
         #             'status') == OpdAppointment.RESCHEDULED_DOCTOR:
@@ -1773,7 +1777,7 @@ class DoctorOpdAppointmentAdmin(admin.ModelAdmin):
                     obj.action_cancelled(cancel_type)
                     logger.warning("Admin Cancel completed - " + str(obj.id) + " timezone - " + str(timezone.now()))
             elif request.POST.get('status') and int(request.POST['status']) == OpdAppointment.COMPLETED:
-                    obj.action_completed
+                    obj.action_completed()
             else:
                 super().save_model(request, obj, form, change)
 
