@@ -511,10 +511,25 @@ class DoctorSearchHelper:
             schema_specialization = sorted_spec_list[0].get('name') if sorted_spec_list and len(sorted_spec_list)>0 and sorted_spec_list[0].get('name') else None
             schema_type = None
             new_schema = OrderedDict()
+            average_rating = None
+            google_average_rating = None
+            rating_count = None
             if schema_specialization == 'Dentist':
                 schema_type = 'Dentist'
             else:
                 schema_type = 'Physician'
+
+            if doctor.rating_data and doctor.rating_data.get('rating_count')>0:
+                if doctor.rating_data.get('rating_count')<5:
+                    if doctor.rating_data.get('avg_rating') >=4:
+                        average_rating = doctor.rating_data.get('avg_rating')
+                        rating_count = doctor.rating_data.get('rating_count')
+                else:
+                    average_rating = doctor.rating_data.get('avg_rating')
+                    rating_count = doctor.rating_data.get('rating_count')
+            if not average_rating:
+                google_average_rating
+
             temp = {
                 "doctor_id": doctor.id,
                 "enabled_for_online_booking": doctor.enabled_for_online_booking,
@@ -535,8 +550,10 @@ class DoctorSearchHelper:
                 #"experiences": serializers.DoctorExperienceSerializer(doctor.experiences.all(), many=True).data,
                 "qualifications": serializers.DoctorQualificationSerializer(doctor.qualifications.all(), many=True).data,
                 # "average_rating": doctor.avg_rating,
-                "average_rating": doctor.rating_data.get('avg_rating') if doctor.rating_data else None,
-                "rating_count": doctor.rating_data.get('rating_count') if doctor.rating_data else None,
+                # "average_rating": doctor.rating_data.get('avg_rating') if doctor.rating_data else None,
+                # "rating_count": doctor.rating_data.get('rating_count') if doctor.rating_data else None,
+                "average_rating": average_rating,
+                "rating_count": rating_count,
                 # "general_specialization": serializers.DoctorPracticeSpecializationSerializer(
                 #     doctor.doctorpracticespecializations.all(),
                 #     many=True).data,
