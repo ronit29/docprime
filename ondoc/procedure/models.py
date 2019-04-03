@@ -14,6 +14,7 @@ class IpdProcedure(auth_model.TimeStampedModel, SearchKey, auth_model.SoftDelete
     is_enabled = models.BooleanField(default=False)
     features = models.ManyToManyField(Feature, through='IpdProcedureFeatureMapping',
                                       through_fields=('ipd_procedure', 'feature'), related_name='of_ipd_procedures')
+    show_about = models.BooleanField(default=False)
 
     def __str__(self):
         return '{}'.format(self.name)

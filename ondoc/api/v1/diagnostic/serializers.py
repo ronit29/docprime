@@ -1008,12 +1008,12 @@ class LabAppointmentCreateSerializer(serializers.Serializer):
         return slots
 
     def thyrocare_test_validator(self, data):
-        from ondoc.integrations.models import IntegratorMapping
+        from ondoc.integrations.models import IntegratorTestMapping
 
         test_ids = data.get("test_ids", None)
         if test_ids:
             for test in test_ids:
-                integrator_test = IntegratorMapping.objects.filter(test_id=test).first()
+                integrator_test = IntegratorTestMapping.objects.filter(test_id=test).first()
                 if integrator_test and integrator_test.integrator_product_data['code'] == 'FBS':
                     self.fbs_valid(test_ids, test)
                 elif integrator_test and integrator_test.integrator_product_data['code'] in ['PPBS', 'RBS']:
@@ -1022,7 +1022,7 @@ class LabAppointmentCreateSerializer(serializers.Serializer):
                     self.inspp_valid(test_ids, test)
 
     def fbs_valid(self, test_ids, test):
-        from ondoc.integrations.models import IntegratorMapping, IntegratorProfileMapping
+        from ondoc.integrations.models import IntegratorTestMapping
         if len(test_ids) < 2:
             raise serializers.ValidationError("FBS can be added with any fasting test or package.")
 
@@ -1032,11 +1032,11 @@ class LabAppointmentCreateSerializer(serializers.Serializer):
             pass
 
         for test in test_ids:
-            integrator_test = IntegratorMapping.objects.filter(test_id=test).first()
+            integrator_test = IntegratorTestMapping.objects.filter(test_id=test, test_type='TEST').first()
             if integrator_test and integrator_test.integrator_product_data['fasting'] == 'CF':
                 is_profile_or_fasting_added = True
             else:
-                integrator_profile = IntegratorProfileMapping.objects.filter(package_id=test).first()
+                integrator_profile = IntegratorTestMapping.objects.filter(Q(test_id=test) & ~Q(test_type='TEST')).first()
                 if integrator_profile:
                     is_profile_or_fasting_added = True
 
@@ -1046,7 +1046,7 @@ class LabAppointmentCreateSerializer(serializers.Serializer):
             raise serializers.ValidationError("FBS can be added with any fasting test or package.")
 
     def ppbs_valid(self, test_ids, test):
-        from ondoc.integrations.models import IntegratorMapping, IntegratorProfileMapping
+        from ondoc.integrations.models import IntegratorTestMapping
         if len(test_ids) < 3:
             raise serializers.ValidationError("PPBS or RBS can be added with FBS and one fasting test or package.")
 
@@ -1057,13 +1057,13 @@ class LabAppointmentCreateSerializer(serializers.Serializer):
             pass
 
         for test in test_ids:
-            integrator_test = IntegratorMapping.objects.filter(test_id=test).first()
+            integrator_test = IntegratorTestMapping.objects.filter(test_id=test, test_type='TEST').first()
             if integrator_test and integrator_test.integrator_product_data['code'] == 'FBS':
                 is_fbs_present = True
             elif integrator_test and integrator_test.integrator_product_data['fasting'] == 'CF':
                 is_profile_or_fasting_added = True
             else:
-                integrator_profile = IntegratorProfileMapping.objects.filter(package_id=test).first()
+                integrator_profile = IntegratorTestMapping.objects.filter(Q(test_id=test) & ~Q(test_type='TEST')).first()
                 if integrator_profile:
                     is_profile_or_fasting_added = True
 
@@ -1073,7 +1073,7 @@ class LabAppointmentCreateSerializer(serializers.Serializer):
             raise serializers.ValidationError("PPBS or RBS can be added with FBS and one fasting test or package.")
 
     def inspp_valid(self, test_ids, test):
-        from ondoc.integrations.models import IntegratorMapping
+        from ondoc.integrations.models import IntegratorTestMapping
         if len(test_ids) < 2:
             raise serializers.ValidationError("INSFA test is mandatory to book INSPP.")
 
@@ -1083,7 +1083,7 @@ class LabAppointmentCreateSerializer(serializers.Serializer):
             pass
 
         for test in test_ids:
-            integrator_test = IntegratorMapping.objects.filter(test_id=test).first()
+            integrator_test = IntegratorTestMapping.objects.filter(test_id=test, test_type='TEST').first()
             if integrator_test and integrator_test.integrator_product_data['code'] == 'INSFA':
                 insfa_test_present = True
 
