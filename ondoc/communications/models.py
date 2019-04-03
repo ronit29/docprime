@@ -380,10 +380,10 @@ class SMSNotification:
             template = self.get_template(receiver.get('user'))
             if receiver.get('user') and receiver.get('user').user_type == User.DOCTOR:
                 context = self.save_token_to_context(context, receiver['user'])
+            elif context.get('provider_login_url'):
+                context.pop('provider_login_url')
             if template:
                 self.trigger(receiver, template, context)
-            if context.get('provider_login_url'):
-                context.pop('provider_login_url')
 
 
 class WHTSAPPNotification:
