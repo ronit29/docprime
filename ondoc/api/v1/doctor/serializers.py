@@ -340,8 +340,11 @@ class CreateAppointmentSerializer(serializers.Serializer):
                 .exclude(status__in=[OpdAppointment.COMPLETED, OpdAppointment.CANCELLED]).exists():
             raise serializers.ValidationError("Appointment for the selected date & time already exists. Please change the date & time of the appointment.")
 
-        if data.get('doctor') and not data.get('doctor').enabled_for_cod() and data.get('payment_type') == OpdAppointment.COD:
-            raise serializers.ValidationError('Doctor not enabled for COD payment')
+        if data.get('hospital') and not data.get('hospital').enabled_for_cod and data.get('payment_type') == OpdAppointment.COD:
+            raise serializers.ValidationError('Doctor/Hospital not enabled for COD payment')
+
+        if data.get('hospital') and not data.get('hospital').enabled_for_prepaid and data.get('payment_type') == OpdAppointment.PREPAID:
+            raise serializers.ValidationError('Doctor/Hospital not enabled for PREPAID payment')
 
         if 'use_wallet' in data and data['use_wallet'] is False:
             data['use_wallet'] = False
@@ -453,6 +456,8 @@ class DoctorHospitalSerializer(serializers.ModelSerializer):
 
     enabled_for_online_booking = serializers.SerializerMethodField(read_only=True)
     show_contact = serializers.SerializerMethodField(read_only=True)
+    enabled_for_cod = serializers.BooleanField(source='doctor_clinic.hospital.enabled_for_cod')
+    enabled_for_prepaid = serializers.BooleanField(source='doctor_clinic.hospital.enabled_for_prepaid')
 
     def get_show_contact(self, obj):
         if obj.doctor_clinic and obj.doctor_clinic.hospital and obj.doctor_clinic.hospital.spoc_details.all():
@@ -536,7 +541,8 @@ class DoctorHospitalSerializer(serializers.ModelSerializer):
     class Meta:
         model = DoctorClinicTiming
         fields = ('doctor', 'hospital_name', 'address','short_address', 'hospital_id', 'start', 'end', 'day', 'deal_price',
-                  'discounted_fees', 'hospital_thumbnail', 'mrp', 'lat', 'long', 'id','enabled_for_online_booking', 'insurance', 'show_contact')
+                  'discounted_fees', 'hospital_thumbnail', 'mrp', 'lat', 'long', 'id','enabled_for_online_booking',
+                  'insurance', 'show_contact', 'enabled_for_cod', 'enabled_for_prepaid')
         # fields = ('doctor', 'hospital_name', 'address', 'hospital_id', 'start', 'end', 'day', 'deal_price', 'fees',
         #           'discounted_fees', 'hospital_thumbnail', 'mrp',)
 
@@ -1290,7 +1296,7 @@ class DoctorAppointmentRetrieveSerializer(OpdAppointmentSerializer):
         fields = ('id', 'patient_image', 'patient_name', 'type', 'profile', 'allowed_action', 'effective_price',
                   'deal_price', 'status', 'time_slot_start', 'time_slot_end',
                   'doctor', 'hospital', 'allowed_action', 'doctor_thumbnail', 'patient_thumbnail',
-                  'display_name', 'mask_data', 'payment_type', 'mrp')
+                  'display_name', 'mask_data', 'payment_type', 'mrp', 'updated_at', 'created_at')
 
 
 class HealthTipSerializer(serializers.ModelSerializer):

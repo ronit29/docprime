@@ -334,6 +334,7 @@ class LabList(viewsets.ReadOnlyModelViewSet):
                     if temp_category.is_live:
                         add_test_name = False
                         name = temp_category.name
+                        priority = temp_category.priority
                         category_id = temp_category.id
                         category_to_be_shown_in_filter_ids.add(category_id)
                         test_id = None
@@ -346,19 +347,21 @@ class LabList(viewsets.ReadOnlyModelViewSet):
                                                                         'category_id': category_id,
                                                                         'test_id': test_id,
                                                                         'parameter_count': parameter_count,
-                                                                        'icon': icon_url}
+                                                                        'icon': icon_url, 'priority': priority}
                 if add_test_name:
                     category_id = None
                     test_id = temp_test.id
                     name = temp_test.name
+                    priority = 0
                     parameter_count = len(temp_test.parameter.all()) or 1
                     icon_url = None
                     single_test_data[(category_id, test_id)] = {'name': name,
                                                                 'category_id': category_id,
                                                                 'test_id': test_id,
                                                                 'parameter_count': parameter_count,
-                                                                'icon': icon_url}
-            category_data[temp_package.id] = list(single_test_data.values())
+                                                                'icon': icon_url, 'priority': priority}
+            single_test_data_sorted = sorted(list(single_test_data.values()), key=lambda k: k['priority'], reverse= True)
+            category_data[temp_package.id] = single_test_data_sorted
         serializer = CustomLabTestPackageSerializer(all_packages, many=True,
                                                     context={'entity_url_dict': entity_url_dict, 'lab_data': lab_data,
                                                              'request': request, 'category_data': category_data,
