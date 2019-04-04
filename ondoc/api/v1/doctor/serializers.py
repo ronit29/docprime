@@ -1214,7 +1214,7 @@ class DoctorAppointmentRetrieveSerializer(OpdAppointmentSerializer):
         fields = ('id', 'patient_image', 'patient_name', 'type', 'profile', 'allowed_action', 'effective_price',
                   'deal_price', 'status', 'time_slot_start', 'time_slot_end',
                   'doctor', 'hospital', 'allowed_action', 'doctor_thumbnail', 'patient_thumbnail',
-                  'display_name', 'mask_data', 'payment_type', 'mrp')
+                  'display_name', 'mask_data', 'payment_type', 'mrp', 'updated_at', 'created_at')
 
 
 class HealthTipSerializer(serializers.ModelSerializer):
