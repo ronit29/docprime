@@ -19,13 +19,15 @@ from django.forms import model_to_dict
 from django.template.loader import render_to_string
 from django.contrib.auth import get_user_model
 from django.contrib.postgres.fields.jsonb import KeyTransform
+from django.utils.crypto import get_random_string
 import logging
 from django.conf import settings
 from django.utils import timezone
 from weasyprint import HTML
 
 from ondoc.account.models import Invoice, Order
-from ondoc.authentication.models import UserProfile, GenericAdmin, NotificationEndpoint, AgentToken, UserSecretKey
+from ondoc.authentication.models import UserProfile, GenericAdmin, NotificationEndpoint, AgentToken, UserSecretKey, \
+    ClickLoginToken
 
 from ondoc.notification.models import NotificationAction, SmsNotification, EmailNotification, AppNotification, \
     PushNotification, WhtsappNotification
@@ -63,7 +65,8 @@ def get_spoc_email_and_number_hospital(spocs, appointment):
                 admins_without_user = admins.exclude(id__in=admins_with_user)
                 if admins_without_user.exists():
                     for admin in admins_without_user:
-                        created_user = User.objects.create(phone_number=spoc.number, user_type=User.DOCTOR)
+                        created_user = User.objects.create(phone_number=spoc.number, user_type=User.DOCTOR,
+                                                           auto_created=True)
                         admin.user = created_user
                         admin.save()
                         user_and_number.append({'user': created_user, 'phone_number': spoc.number})
@@ -366,7 +369,15 @@ class SMSNotification:
         token = jwt.encode(payload, user_key[0].key)
         token = str(token, 'utf-8')
         appointment_type = 'opd' if appointment.__class__ == OpdAppointment else 'lab'
-        provider_login_url = settings.PROVIDER_APP_DOMAIN + "/sms/login?auth_token=" + token + \
+        url_key = get_random_string(length=ClickLoginToken.URL_KEY_LENGTH)
+        unique_key_found = False
+        while not unique_key_found:
+            if ClickLoginToken.objects.filter(url_key=url_key).exists():
+                url_key = get_random_string(length=30)
+            else:
+                unique_key_found = True
+        ClickLoginToken.objects.create(user=user, token=token, expiration_time=payload.exp, url_key=url_key)
+        provider_login_url = settings.PROVIDER_APP_DOMAIN + "/sms/login?key=" + url_key + \
                                         "&url=/sms-redirect/" + appointment_type + "/appointment/" + str(appointment.id)
         context['provider_login_url'] = generate_short_url(provider_login_url)
         return context

@@ -503,6 +503,10 @@ class UserLeadSerializer(serializers.ModelSerializer):
         fields = ('name', 'phone_number', 'gender', 'message')
 
 
+class TokenFromUrlKeySerializer(serializers.Serializer):
+    auth_token = serializers.CharField(max_length=100, required=False)
+    key = serializers.CharField(max_length=30, required=False)
 
-
-
+    def validate(self, attrs):
+        if not (attrs.get('auth_token') or attrs.get('key')):
+            raise serializers.ValidationError('neither auth_token nor key found')

@@ -1956,3 +1956,21 @@ class AppointmentViewSet(viewsets.GenericViewSet):
 
     def get_queryset(self):
         return OpdAppointment.objects.none()
+
+
+class TokenFromUrlKey(viewsets.GenericViewSet):
+
+    def get_token(self, request):
+        from ondoc.authentication.models import ClickLoginToken
+        serializer = serializers.TokenFromUrlKeySerializer(data=request.data)
+        serializer.is_valid()
+        data = serializer.validated_data
+        token = data.get("auth_token")
+        key = data.get("key")
+        if token:
+            return token
+        elif key:
+            obj = ClickLoginToken.objects.filter(url_key=key)
+            obj.is_consumed = True
+            obj.save()
+            return obj.token
