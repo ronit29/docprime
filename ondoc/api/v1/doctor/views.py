@@ -835,45 +835,42 @@ class DoctorProfileUserViewSet(viewsets.GenericViewSet):
                 else:
                     response_data['doctors']['doctors_url'] = None
 
-        if not response_data.get('rating'):
-            hospital = None
-            if doctor_clinics:
-                for doc_clinic in doctor_clinics:
-                    if doc_clinic and doc_clinic.hospital:
-                        hospital = doc_clinic.hospital
-                        hosp_reviews_dict = dict()
-                        hosp_reviews_dict[hospital.pk] = dict()
-                        hosp_reviews_dict[hospital.pk]['google_rating'] = list()
-                        ratings_graph = None
-                        hosp_reviews = hospital.hospital_place_details.all()
-                        if hosp_reviews:
-                            reviews_data = hosp_reviews[0].reviews
+        hospital = None
+        if doctor_clinics:
+            for doc_clinic in doctor_clinics:
+                if doc_clinic and doc_clinic.hospital:
+                    hospital = doc_clinic.hospital
+                    hosp_reviews_dict = dict()
+                    hosp_reviews_dict[hospital.pk] = dict()
+                    hosp_reviews_dict[hospital.pk]['google_rating'] = list()
+                    ratings_graph = None
+                    hosp_reviews = hospital.hospital_place_details.all()
+                    if hosp_reviews:
+                        reviews_data = hosp_reviews[0].reviews
 
-                            if reviews_data:
-                                ratings_graph = GoogleRatingsGraphSerializer(reviews_data, many=False,
-                                                                             context={"request": request})
+                        if reviews_data:
+                            ratings_graph = GoogleRatingsGraphSerializer(reviews_data, many=False,
+                                                                         context={"request": request})
 
-                                for data in reviews_data:
-                                    if data.get('time'):
-                                        date = time.strftime("%d %b %Y", time.gmtime(data.get('time')))
+                            for data in reviews_data:
+                                if data.get('time'):
+                                    date = time.strftime("%d %b %Y", time.gmtime(data.get('time')))
 
-                                    hosp_reviews_dict[hospital.pk]['google_rating'].append(
-                                        {'compliment': None, 'date': date, 'id': hosp_reviews[0].pk, 'is_live': hospital.is_live,
-                                         'ratings': data.get('rating'),
-                                         'review': data.get('text'), 'user': None, 'user_name': data.get('author_name')
-                                         })
+                                hosp_reviews_dict[hospital.pk]['google_rating'].append(
+                                    {'compliment': None, 'date': date, 'id': hosp_reviews[0].pk, 'is_live': hospital.is_live,
+                                     'ratings': data.get('rating'),
+                                     'review': data.get('text'), 'user': None, 'user_name': data.get('author_name')
+                                     })
 
-                            else:
-                                hosp_reviews_dict[hospital.pk]['google_rating'] = None
-                            hosp_reviews_dict[hospital.pk]['google_rating_graph'] = ratings_graph.data if ratings_graph else None
                         else:
                             hosp_reviews_dict[hospital.pk]['google_rating'] = None
-                            hosp_reviews_dict[hospital.pk]['google_rating_graph'] = None
+                        hosp_reviews_dict[hospital.pk]['google_rating_graph'] = ratings_graph.data if ratings_graph else None
+                    else:
+                        hosp_reviews_dict[hospital.pk]['google_rating'] = None
+                        hosp_reviews_dict[hospital.pk]['google_rating_graph'] = None
 
-                        google_rating.update(hosp_reviews_dict)
+                    google_rating.update(hosp_reviews_dict)
 
-        google_rating['google_rating'] = None
-        google_rating['google_rating_graph'] = None
         response_data['google_rating'] = google_rating
         return Response(response_data)
 
