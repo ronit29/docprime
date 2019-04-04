@@ -243,11 +243,11 @@ class CartViewSet(viewsets.GenericViewSet):
             resp = Order.create_order(request, items_to_process, use_wallet)
             return Response(resp)
         else:
-            return Response(status=400,data={"error": error})
+            error = {"code": "invalid", "message": error}
+            return Response(status=400, data={"request_errors": error})
 
 
     def remove(self, request, *args, **kwargs):
-
         user = request.user
         if not user.is_authenticated:
             return Response({"status": 0}, status.HTTP_401_UNAUTHORIZED)
