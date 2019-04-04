@@ -1962,7 +1962,7 @@ class TokenFromUrlKey(viewsets.GenericViewSet):
 
     def get_token(self, request):
         from ondoc.authentication.models import ClickLoginToken
-        serializer = serializers.TokenFromUrlKeySerializer(data=request.data)
+        serializer = serializers.TokenFromUrlKeySerializer(data=request.query_params)
         serializer.is_valid()
         data = serializer.validated_data
         token = data.get("auth_token")
