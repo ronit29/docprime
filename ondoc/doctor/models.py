@@ -718,6 +718,12 @@ class Doctor(auth_model.TimeStampedModel, auth_model.QCModel, SearchKey, auth_mo
         elif self.enabled and self.disabled_at:
             self.disabled_at = None
 
+    def display_rating_on_list(self):
+        if self.rating_data and ((self.rating_data.get('rating_count') and self.rating_data['rating_count'] > 5) or \
+                                 (self.rating_data.get('avg_rating') and self.rating_data['avg_rating'] > 4)):
+            return True
+        return False
+    
     def save(self, *args, **kwargs):
         self.update_time_stamps()
         self.update_live_status()

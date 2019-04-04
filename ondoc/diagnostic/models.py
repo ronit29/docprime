@@ -398,6 +398,12 @@ class Lab(TimeStampedModel, CreatedByModel, QCModel, SearchKey):
         if self.is_live and (self.onboarding_status != self.ONBOARDED or self.data_status != self.QC_APPROVED or self.enabled == False):
             self.is_live = False
 
+    def display_rating_on_list(self):
+        if self.rating_data and ((self.rating_data.get('rating_count') and self.rating_data['rating_count'] > 5) or \
+                                 (self.rating_data.get('avg_rating') and self.rating_data['avg_rating'] > 4)):
+            return True
+        return False
+
     def save(self, *args, **kwargs):
         self.clean()
 
