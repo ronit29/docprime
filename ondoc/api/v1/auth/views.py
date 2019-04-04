@@ -1106,7 +1106,7 @@ class TransactionViewSet(viewsets.GenericViewSet):
                     pg_txn = PgTransaction.objects.filter(order_no__iexact=response.get("orderNo")).first()
                     if pg_txn:
                         send_pg_acknowledge.apply_async((pg_txn.order_id, pg_txn.order_no,), countdown=1)
-                        return
+                        return Response({ "processed_already": True })
             except Exception as e:
                logger.error("Error in sending pg acknowledge - " + str(e))
     
