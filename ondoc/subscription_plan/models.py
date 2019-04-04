@@ -5,7 +5,7 @@ from django.db import models, transaction
 from django.db.models import Count
 from django.utils import timezone
 import logging
-from ondoc.account.models import ConsumerAccount, Order, MoneyPool
+from ondoc.account.models import ConsumerAccount, Order, MoneyPool, ConsumerRefund
 from ondoc.api.v1.utils import payment_details
 from ondoc.authentication import models as auth_model
 from ondoc.authentication.models import User
@@ -101,6 +101,9 @@ class UserPlanMapping(auth_model.TimeStampedModel):
             self.save()
             wallet_refund, cashback_refund = self.get_cancellation_breakup()
             consumer_account.credit_cancellation(self, Order.SUBSCRIPTION_PLAN_PRODUCT_ID, wallet_refund, cashback_refund)
+
+            ctx_obj = consumer_account.debit_refund()
+            ConsumerRefund.initiate_refund(self.user, ctx_obj)
 
     def get_cancellation_breakup(self):
         wallet_refund = cashback_refund = 0
