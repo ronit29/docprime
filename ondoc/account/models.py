@@ -569,21 +569,22 @@ class Order(TimeStampedModel):
                         if doctor_specialization_tuple:
                             doctor_specialization = doctor_specialization_tuple[1]
                             if doctor_specialization == InsuranceDoctorSpecializations.SpecializationMapping.GYNOCOLOGIST:
-                               if gyno_count > settings.INSURANCE_GYNECOLOGIST_LIMIT:
+                               if gyno_count >= settings.INSURANCE_GYNECOLOGIST_LIMIT:
                                     is_process = False
                                else:
                                     gyno_count += 1
 
                             if doctor_specialization == InsuranceDoctorSpecializations.SpecializationMapping.ONCOLOGIST:
-                                if onco_count > settings.INSURANCE_ONCOLOGIST_LIMIT:
+                                if onco_count >= settings.INSURANCE_ONCOLOGIST_LIMIT:
                                     is_process = False
                                 else:
                                     onco_count += 1
 
-                if is_process:
-                    curr_app, curr_wallet, curr_cashback = order.process_order()
-                else:
-                    raise Exception("Insurance invalidate, Could not process entire order")
+                    if not is_process:
+                        raise Exception("Insurance invalidate, Could not process entire order")
+
+                curr_app, curr_wallet, curr_cashback = order.process_order()
+
                 # appointment was not created - due to insufficient balance, do not process
                 if not curr_app:
                     continue
