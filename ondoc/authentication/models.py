@@ -1626,6 +1626,16 @@ class WelcomeCallingDone(models.Model):
         abstract = True
 
 
+# class ClickLoginToken(TimeStampedModel):
+#     token = models.CharField(max_length=100)
+#     user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
+#     expiration_time = models.DateTimeField()
+#     is_consumed = models.BooleanField(default=False)
+#
+#     class Meta:
+#         db_table = 'click_login_token'
+
+
 class PhysicalAgreementSigned(models.Model):
     physical_agreement_signed = models.BooleanField(default=False)
     physical_agreement_signed_at = models.DateTimeField(null=True, blank=True)

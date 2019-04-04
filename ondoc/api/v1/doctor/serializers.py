@@ -1207,7 +1207,7 @@ class DoctorAppointmentRetrieveSerializer(OpdAppointmentSerializer):
         fields = ('id', 'patient_image', 'patient_name', 'type', 'profile', 'allowed_action', 'effective_price',
                   'deal_price', 'status', 'time_slot_start', 'time_slot_end',
                   'doctor', 'hospital', 'allowed_action', 'doctor_thumbnail', 'patient_thumbnail',
-                  'display_name', 'mask_data', 'payment_type', 'mrp')
+                  'display_name', 'mask_data', 'payment_type', 'mrp', 'updated_at', 'created_at')
 
 
 class HealthTipSerializer(serializers.ModelSerializer):
@@ -1584,7 +1584,7 @@ class IpdProcedureDetailSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = IpdProcedure
-        fields = ('id', 'name', 'details', 'is_enabled', 'features', 'about', 'all_details')
+        fields = ('id', 'name', 'details', 'is_enabled', 'features', 'about', 'all_details', 'show_about')
 
     def get_all_details(self, obj):
         return IpdProcedureAllDetailsSerializer(obj.ipdproceduredetail_set.all(), many=True, context=self.context).data
