@@ -179,7 +179,7 @@ class UserProfileSerializer(serializers.ModelSerializer):
         insured_member_obj = InsuredMembers.objects.filter(profile=obj).first()
         if not insured_member_obj:
             return False
-        user_insurance_obj = UserInsurance.objects.filter(id=insured_member_obj.user_insurance.id).first()
+        user_insurance_obj = UserInsurance.objects.filter(id=insured_member_obj.user_insurance.id).last()
         if user_insurance_obj and user_insurance_obj.is_valid():
             return True
         else:
@@ -516,6 +516,11 @@ class UserLeadSerializer(serializers.ModelSerializer):
         fields = ('name', 'phone_number', 'gender', 'message')
 
 
+class TokenFromUrlKeySerializer(serializers.Serializer):
+    auth_token = serializers.CharField(max_length=100, required=False)
+    key = serializers.CharField(max_length=30, required=False)
 
-
-
+    def validate(self, attrs):
+        if not (attrs.get('auth_token') or attrs.get('key')):
+            raise serializers.ValidationError('neither auth_token nor key found')
+        return attrs

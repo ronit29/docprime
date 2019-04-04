@@ -110,7 +110,7 @@ class CartViewSet(viewsets.GenericViewSet):
         specialization_count_dict = None
         if user_insurance and user_insurance.is_valid():
 
-            specialization_count_dict = InsuranceDoctorSpecializations.get_already_booked_specialization_appointments(user, user_insurance.id)
+            specialization_count_dict = InsuranceDoctorSpecializations.get_already_booked_specialization_appointments(user, user_insurance)
             gyno_count = specialization_count_dict.get(InsuranceDoctorSpecializations.SpecializationMapping.GYNOCOLOGIST, {}).get('count', 0)
             onco_count = specialization_count_dict.get(InsuranceDoctorSpecializations.SpecializationMapping.ONCOLOGIST, {}).get('count', 0)
 
@@ -243,11 +243,11 @@ class CartViewSet(viewsets.GenericViewSet):
             resp = Order.create_order(request, items_to_process, use_wallet)
             return Response(resp)
         else:
-            return Response(status=400,data={"error": error})
+            error = {"code": "invalid", "message": error}
+            return Response(status=400, data={"request_errors": error})
 
 
     def remove(self, request, *args, **kwargs):
-
         user = request.user
         if not user.is_authenticated:
             return Response({"status": 0}, status.HTTP_401_UNAUTHORIZED)

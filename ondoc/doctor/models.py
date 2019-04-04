@@ -1,5 +1,5 @@
 from copy import deepcopy
-
+import json
 import requests
 from PIL.Image import NEAREST, BICUBIC
 from django.contrib.staticfiles.storage import staticfiles_storage
@@ -70,6 +70,7 @@ from ondoc.api.v1.utils import RawSql
 from safedelete import SOFT_DELETE
 #from ondoc.api.v1.doctor import serializers as doctor_serializers
 import qrcode
+from django.utils.functional import cached_property
 
 logger = logging.getLogger(__name__)
 
@@ -226,7 +227,9 @@ class Hospital(auth_model.TimeStampedModel, auth_model.CreatedByModel, auth_mode
     about = models.TextField(blank=True, null=True, default="")
     opd_timings = models.CharField(max_length=150, blank=True, null=True, default="")
     always_open = models.BooleanField(verbose_name='Is hospital open 24X7', default=False)
-    city_search_key = models.CharField(db_index=True,editable=False, max_length=100, default="", null=True, blank=True)
+    city_search_key = models.CharField(db_index=True, editable=False, max_length=100, default="", null=True, blank=True)
+    enabled_for_cod = models.BooleanField(default=False)
+    enabled_for_prepaid = models.BooleanField(default=True)
 
     def __str__(self):
         return self.name
@@ -604,7 +607,8 @@ class Doctor(auth_model.TimeStampedModel, auth_model.QCModel, SearchKey, auth_mo
     def __str__(self):
         return '{} ({})'.format(self.name, self.id)
 
-    @property
+    # @property
+    @cached_property
     def is_enabled_for_insurance(self):
         return self.is_insurance_enabled
 
@@ -791,8 +795,7 @@ class Doctor(auth_model.TimeStampedModel, auth_model.QCModel, SearchKey, auth_mo
                      '''.format(cid, cid)
             cursor.execute(query)
 
-
-    def enabled_for_cod(self):
+    def enabled_for_cod(self):  # Not to be used
         return False
 
     def generate_qr_code(self):
@@ -2989,7 +2992,7 @@ class ProviderSignupLead(auth_model.TimeStampedModel):
 
     def save(self, *args, **kwargs):
         super(ProviderSignupLead, self).save(*args, **kwargs)
-        if kwargs.get('is_docprime') and not self.matrix_lead_id:
+        if self.is_docprime and not self.matrix_lead_id:
             create_or_update_lead_on_matrix.apply_async(({'obj_type': self.__class__.__name__, 'obj_id': self.id}
                                                          ,), countdown=5)
 

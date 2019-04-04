@@ -340,8 +340,11 @@ class CreateAppointmentSerializer(serializers.Serializer):
                 .exclude(status__in=[OpdAppointment.COMPLETED, OpdAppointment.CANCELLED]).exists():
             raise serializers.ValidationError("Appointment for the selected date & time already exists. Please change the date & time of the appointment.")
 
-        if data.get('doctor') and not data.get('doctor').enabled_for_cod() and data.get('payment_type') == OpdAppointment.COD:
-            raise serializers.ValidationError('Doctor not enabled for COD payment')
+        if data.get('hospital') and not data.get('hospital').enabled_for_cod and data.get('payment_type') == OpdAppointment.COD:
+            raise serializers.ValidationError('Doctor/Hospital not enabled for COD payment')
+
+        if data.get('hospital') and not data.get('hospital').enabled_for_prepaid and data.get('payment_type') == OpdAppointment.PREPAID:
+            raise serializers.ValidationError('Doctor/Hospital not enabled for PREPAID payment')
 
         if 'use_wallet' in data and data['use_wallet'] is False:
             data['use_wallet'] = False
@@ -453,6 +456,8 @@ class DoctorHospitalSerializer(serializers.ModelSerializer):
 
     enabled_for_online_booking = serializers.SerializerMethodField(read_only=True)
     show_contact = serializers.SerializerMethodField(read_only=True)
+    enabled_for_cod = serializers.BooleanField(source='doctor_clinic.hospital.enabled_for_cod')
+    enabled_for_prepaid = serializers.BooleanField(source='doctor_clinic.hospital.enabled_for_prepaid')
 
     def get_show_contact(self, obj):
         if obj.doctor_clinic and obj.doctor_clinic.hospital and obj.doctor_clinic.hospital.spoc_details.all():
@@ -516,12 +521,12 @@ class DoctorHospitalSerializer(serializers.ModelSerializer):
             if not user_insurance:
                 return resp
 
-            doctor_specialization = InsuranceDoctorSpecializations.get_doctor_insurance_specializations(doctor)
+            doctor_specialization = self.context.get('doctor_specialization',None)
             if not doctor_specialization:
                 resp['is_insurance_covered'] = True
             else:
                 specialization = doctor_specialization[1]
-                doctor_specialization_count_dict = InsuranceDoctorSpecializations.get_already_booked_specialization_appointments(user, user_insurance.id, doctor_specialization=specialization)
+                doctor_specialization_count_dict = self.context.get('doctor_specialization_count_dict', {})
                 if not doctor_specialization_count_dict:
                     resp['is_insurance_covered'] = True
                 if specialization == InsuranceDoctorSpecializations.SpecializationMapping.GYNOCOLOGIST and doctor_specialization_count_dict.get(specialization, {}).get('count') >= settings.INSURANCE_GYNECOLOGIST_LIMIT:
@@ -536,7 +541,8 @@ class DoctorHospitalSerializer(serializers.ModelSerializer):
     class Meta:
         model = DoctorClinicTiming
         fields = ('doctor', 'hospital_name', 'address','short_address', 'hospital_id', 'start', 'end', 'day', 'deal_price',
-                  'discounted_fees', 'hospital_thumbnail', 'mrp', 'lat', 'long', 'id','enabled_for_online_booking', 'insurance', 'show_contact')
+                  'discounted_fees', 'hospital_thumbnail', 'mrp', 'lat', 'long', 'id','enabled_for_online_booking',
+                  'insurance', 'show_contact', 'enabled_for_cod', 'enabled_for_prepaid')
         # fields = ('doctor', 'hospital_name', 'address', 'hospital_id', 'start', 'end', 'day', 'deal_price', 'fees',
         #           'discounted_fees', 'hospital_thumbnail', 'mrp',)
 
@@ -1159,10 +1165,20 @@ class DoctorProfileUserViewSerializer(DoctorProfileSerializer):
         return result_for_a_doctor
 
     def get_hospitals(self, obj):
+        request = self.context.get('request')
+        user = request.user
         data = DoctorClinicTiming.objects.filter(doctor_clinic__doctor=obj,
                                                  doctor_clinic__enabled=True,
                                                  doctor_clinic__hospital__is_live=True).select_related(
             "doctor_clinic__doctor", "doctor_clinic__hospital").prefetch_related("doctor_clinic__hospital__spoc_details","doctor_clinic__doctor__mobiles")
+        if obj:
+            doctor_specialization = InsuranceDoctorSpecializations.get_doctor_insurance_specializations(obj)
+            if doctor_specialization:
+                self.context['doctor_specialization'] = doctor_specialization
+                user_insurance = None if not user.is_authenticated or user.is_anonymous else user.active_insurance
+                if user_insurance:
+                    doctor_specialization_count_dict = InsuranceDoctorSpecializations.get_already_booked_specialization_appointments(user, user_insurance, doctor_specialization=doctor_specialization[1])
+                    self.context['doctor_specialization_count_dict'] = doctor_specialization_count_dict
         return DoctorHospitalSerializer(data, context=self.context, many=True).data
 
     class Meta:
@@ -1280,7 +1296,7 @@ class DoctorAppointmentRetrieveSerializer(OpdAppointmentSerializer):
         fields = ('id', 'patient_image', 'patient_name', 'type', 'profile', 'allowed_action', 'effective_price',
                   'deal_price', 'status', 'time_slot_start', 'time_slot_end',
                   'doctor', 'hospital', 'allowed_action', 'doctor_thumbnail', 'patient_thumbnail',
-                  'display_name', 'mask_data', 'payment_type', 'mrp')
+                  'display_name', 'mask_data', 'payment_type', 'mrp', 'updated_at', 'created_at')
 
 
 class HealthTipSerializer(serializers.ModelSerializer):
@@ -1657,7 +1673,7 @@ class IpdProcedureDetailSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = IpdProcedure
-        fields = ('id', 'name', 'details', 'is_enabled', 'features', 'about', 'all_details')
+        fields = ('id', 'name', 'details', 'is_enabled', 'features', 'about', 'all_details', 'show_about')
 
     def get_all_details(self, obj):
         return IpdProcedureAllDetailsSerializer(obj.ipdproceduredetail_set.all(), many=True, context=self.context).data

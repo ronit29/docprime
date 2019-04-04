@@ -1,3 +1,5 @@
+from django.conf import settings
+
 from ondoc.api.v1.insurance.serializers import InsuredMemberIdSerializer, InsuranceDiseaseIdSerializer
 from ondoc.api.v1.utils import insurance_transform
 from rest_framework import viewsets
@@ -33,20 +35,23 @@ class ListInsuranceViewSet(viewsets.GenericViewSet):
         return Insurer.objects.filter(is_live=True)
 
     def list(self, request):
-        resp = {}
-        user = request.user
-        if not user.is_anonymous:
-            user_insurance = UserInsurance.get_user_insurance(request.user)
-            if user_insurance and user_insurance.is_valid():
-                return Response(data={'certificate': True}, status=status.HTTP_200_OK)
+        if settings.IS_INSURANCE_ACTIVE:
+            resp = {}
+            user = request.user
+            if not user.is_anonymous:
+                user_insurance = UserInsurance.get_user_insurance(request.user)
+                if user_insurance and user_insurance.is_valid():
+                    return Response(data={'certificate': True}, status=status.HTTP_200_OK)
 
-        insurer_data = self.get_queryset()
-        body_serializer = serializers.InsurerSerializer(insurer_data, context={'request': request}, many=True)
-        state_code = StateGSTCode.objects.filter(is_live=True)
-        state_code_serializer = serializers.StateGSTCodeSerializer(state_code, context={'request': request}, many=True)
-        resp['insurance'] = body_serializer.data
-        resp['state'] = state_code_serializer.data
-        # return Response(body_serializer.data)
+            insurer_data = self.get_queryset()
+            body_serializer = serializers.InsurerSerializer(insurer_data, context={'request': request}, many=True)
+            state_code = StateGSTCode.objects.filter(is_live=True)
+            state_code_serializer = serializers.StateGSTCodeSerializer(state_code, context={'request': request}, many=True)
+            resp['insurance'] = body_serializer.data
+            resp['state'] = state_code_serializer.data
+            # return Response(body_serializer.data)
+        else:
+            return Response(status=status.HTTP_404_NOT_FOUND)
         return Response(resp)
 
 
@@ -55,42 +60,48 @@ class InsuredMemberViewSet(viewsets.GenericViewSet):
     permission_classes = (IsAuthenticated,)
 
     def memberlist(self, request):
-        data = {}
-        result = {}
-        data['id'] = request.query_params.get('id')
-        serializer = serializers.UserInsuranceIdsSerializer(data=data)
-        if not serializer.is_valid() and serializer.errors:
-            logger.error(str(serializer.errors))
-        serializer.is_valid(raise_exception=True)
-        parameter = serializer.validated_data
-        user_insurance = UserInsurance.objects.get(id=parameter.get('id').id)
-        result['insurer_logo'] = request.build_absolute_uri(user_insurance.insurance_plan.insurer.logo.url) \
-            if user_insurance.insurance_plan.insurer.logo is not None and \
-               user_insurance.insurance_plan.insurer.logo.name else None
-        member_list = user_insurance.members.all().order_by('id').values('id', 'first_name', 'last_name', 'relation')
-        result['members'] = member_list
-        disease = InsuranceDisease.objects.filter(is_live=True).values('id', 'disease')
-        result['disease'] = disease
+        if settings.IS_INSURANCE_ACTIVE:
+            data = {}
+            result = {}
+            data['id'] = request.query_params.get('id')
+            serializer = serializers.UserInsuranceIdsSerializer(data=data)
+            if not serializer.is_valid() and serializer.errors:
+                logger.error(str(serializer.errors))
+            serializer.is_valid(raise_exception=True)
+            parameter = serializer.validated_data
+            user_insurance = UserInsurance.objects.get(id=parameter.get('id').id)
+            result['insurer_logo'] = request.build_absolute_uri(user_insurance.insurance_plan.insurer.logo.url) \
+                if user_insurance.insurance_plan.insurer.logo is not None and \
+                   user_insurance.insurance_plan.insurer.logo.name else None
+            member_list = user_insurance.members.all().order_by('id').values('id', 'first_name', 'last_name', 'relation')
+            result['members'] = member_list
+            disease = InsuranceDisease.objects.filter(is_live=True).values('id', 'disease')
+            result['disease'] = disease
+        else:
+            return Response(status=status.HTTP_404_NOT_FOUND)
         return Response(result)
 
     def update(self, request):
-        resp ={}
-        members = request.data.get('members')
-        member_serializer = InsuredMemberIdSerializer(data=members, many=True)
-        if not member_serializer.is_valid() and member_serializer.errors:
-            logger.error(str(member_serializer.errors))
-        member_serializer.is_valid(raise_exception=True)
-        for member in members:
-            member_id = member.get('id')
-            disease_list = member.get('disease')
-            disease_serializer = InsuranceDiseaseIdSerializer(data=disease_list, many=True)
-            if not disease_serializer.is_valid() and disease_serializer.errors:
-                logger.error(str(disease_serializer.errors))
+        if settings.IS_INSURANCE_ACTIVE:
+            resp ={}
+            members = request.data.get('members')
+            member_serializer = InsuredMemberIdSerializer(data=members, many=True)
+            if not member_serializer.is_valid() and member_serializer.errors:
+                logger.error(str(member_serializer.errors))
+            member_serializer.is_valid(raise_exception=True)
+            for member in members:
+                member_id = member.get('id')
+                disease_list = member.get('disease')
+                disease_serializer = InsuranceDiseaseIdSerializer(data=disease_list, many=True)
+                if not disease_serializer.is_valid() and disease_serializer.errors:
+                    logger.error(str(disease_serializer.errors))
 
-            disease_serializer.is_valid(raise_exception=True)
-            for disease in disease_list:
-                InsuranceDiseaseResponse.objects.create(disease_id=disease.get('id'), member_id=member_id,
-                                                        response=disease.get('response'))
+                disease_serializer.is_valid(raise_exception=True)
+                for disease in disease_list:
+                    InsuranceDiseaseResponse.objects.create(disease_id=disease.get('id'), member_id=member_id,
+                                                            response=disease.get('response'))
+        else:
+            return Response(status=status.HTTP_404_NOT_FOUND)
         return Response({"message": "Disease Profile Updated Successfully"}, status.HTTP_200_OK)
 
 
@@ -105,132 +116,135 @@ class InsuranceOrderViewSet(viewsets.GenericViewSet):
 
     @transaction.atomic
     def create_order(self, request):
-        user = request.user
-        user_insurance = UserInsurance.get_user_insurance(user)
-        if user_insurance and user_insurance.is_valid():
-            return Response(data={'certificate': True}, status=status.HTTP_200_OK)
-
-        serializer = serializers.InsuredMemberSerializer(data=request.data, context={'request': request})
-        if not serializer.is_valid() and serializer.errors:
-            logger.error(str(serializer.errors))
-
-        serializer.is_valid(raise_exception=True)
-        valid_data = serializer.validated_data
-        amount = None
-        members = valid_data.get("members")
-        resp = {}
-        insurance_data = {}
-        insurance_plan = request.data.get('insurance_plan')
-        if not insurance_plan:
-            return Response({"message": "Insurance Plan is not Valid"}, status=status.HTTP_404_NOT_FOUND)
-        if valid_data:
+        if settings.IS_INSURANCE_ACTIVE:
             user = request.user
-            pre_insured_members = {}
-            insured_members_list = []
+            user_insurance = UserInsurance.get_user_insurance(user)
+            if user_insurance and user_insurance.is_valid():
+                return Response(data={'certificate': True}, status=status.HTTP_200_OK)
 
-            for member in members:
-                pre_insured_members['dob'] = member['dob']
-                pre_insured_members['title'] = member['title']
-                pre_insured_members['first_name'] = member['first_name']
-                pre_insured_members['middle_name'] = member['middle_name']
-                pre_insured_members['last_name'] = member['last_name']
-                pre_insured_members['address'] = member['address']
-                pre_insured_members['pincode'] = member['pincode']
-                pre_insured_members['email'] = member['email']
-                pre_insured_members['relation'] = member['relation']
-                pre_insured_members['profile'] = member.get('profile').id if member.get('profile') is not None else None
-                pre_insured_members['gender'] = member['gender']
-                pre_insured_members['member_type'] = member['member_type']
-                pre_insured_members['town'] = member['town']
-                pre_insured_members['district'] = member['district']
-                pre_insured_members['state'] = member['state']
-                pre_insured_members['state_code'] = member['state_code']
+            serializer = serializers.InsuredMemberSerializer(data=request.data, context={'request': request})
+            if not serializer.is_valid() and serializer.errors:
+                logger.error(str(serializer.errors))
 
-                insured_members_list.append(pre_insured_members.copy())
+            serializer.is_valid(raise_exception=True)
+            valid_data = serializer.validated_data
+            amount = None
+            members = valid_data.get("members")
+            resp = {}
+            insurance_data = {}
+            insurance_plan = request.data.get('insurance_plan')
+            if not insurance_plan:
+                return Response({"message": "Insurance Plan is not Valid"}, status=status.HTTP_404_NOT_FOUND)
+            if valid_data:
+                user = request.user
+                pre_insured_members = {}
+                insured_members_list = []
 
-                if member['relation'] == 'self':
-                    if member['profile']:
-                        user_profile = UserProfile.objects.filter(id=member['profile'].id,
-                                                                  user_id=request.user.pk).values('id', 'name', 'email',
-                                                                                                'gender', 'user_id',
-                                                                                                'dob', 'phone_number').first()
+                for member in members:
+                    pre_insured_members['dob'] = member['dob']
+                    pre_insured_members['title'] = member['title']
+                    pre_insured_members['first_name'] = member['first_name']
+                    pre_insured_members['middle_name'] = member['middle_name']
+                    pre_insured_members['last_name'] = member['last_name']
+                    pre_insured_members['address'] = member['address']
+                    pre_insured_members['pincode'] = member['pincode']
+                    pre_insured_members['email'] = member['email']
+                    pre_insured_members['relation'] = member['relation']
+                    pre_insured_members['profile'] = member.get('profile').id if member.get('profile') is not None else None
+                    pre_insured_members['gender'] = member['gender']
+                    pre_insured_members['member_type'] = member['member_type']
+                    pre_insured_members['town'] = member['town']
+                    pre_insured_members['district'] = member['district']
+                    pre_insured_members['state'] = member['state']
+                    pre_insured_members['state_code'] = member['state_code']
 
-                    else:
-                        user_profile = {"name": member['first_name'] + " " + member['last_name'], "email":
-                            member['email'], "gender": member['gender'], "dob": member['dob']}
+                    insured_members_list.append(pre_insured_members.copy())
 
-        insurance_plan = InsurancePlans.objects.get(id=request.data.get('insurance_plan'))
-        transaction_date = datetime.datetime.now()
-        amount = insurance_plan.amount
+                    if member['relation'] == 'self':
+                        if member['profile']:
+                            user_profile = UserProfile.objects.filter(id=member['profile'].id,
+                                                                      user_id=request.user.pk).values('id', 'name', 'email',
+                                                                                                    'gender', 'user_id',
+                                                                                                    'dob', 'phone_number').first()
 
-        expiry_date = transaction_date + relativedelta(years=int(insurance_plan.policy_tenure))
-        expiry_date = expiry_date - timedelta(days=1)
-        expiry_date = datetime.datetime.combine(expiry_date, datetime.datetime.max.time())
-        user_insurance_data = {'insurer': insurance_plan.insurer_id, 'insurance_plan': insurance_plan.id, 'purchase_date':
-                            transaction_date, 'expiry_date': expiry_date, 'premium_amount': amount,
-                            'user': request.user.pk, "insured_members": insured_members_list}
-        insurance_data = {"profile_detail": user_profile, "insurance_plan": insurance_plan.id,
-                          "user": request.user.pk, "user_insurance": user_insurance_data}
+                        else:
+                            user_profile = {"name": member['first_name'] + " " + member['last_name'], "email":
+                                member['email'], "gender": member['gender'], "dob": member['dob']}
 
-        consumer_account = account_models.ConsumerAccount.objects.get_or_create(user=user)
-        consumer_account = account_models.ConsumerAccount.objects.select_for_update().get(user=user)
-        balance = consumer_account.balance
+            insurance_plan = InsurancePlans.objects.get(id=request.data.get('insurance_plan'))
+            transaction_date = datetime.datetime.now()
+            amount = insurance_plan.amount
 
-        visitor_info = None
-        try:
-            from ondoc.api.v1.tracking.views import EventCreateViewSet
-            with transaction.atomic():
-                event_api = EventCreateViewSet()
-                visitor_id, visit_id = event_api.get_visit(request)
-                visitor_info = {"visitor_id": visitor_id, "visit_id": visit_id}
-        except Exception as e:
-            logger.log("Could not fecth visitor info - " + str(e))
+            expiry_date = transaction_date + relativedelta(years=int(insurance_plan.policy_tenure))
+            expiry_date = expiry_date - timedelta(days=1)
+            expiry_date = datetime.datetime.combine(expiry_date, datetime.datetime.max.time())
+            user_insurance_data = {'insurer': insurance_plan.insurer_id, 'insurance_plan': insurance_plan.id, 'purchase_date':
+                                transaction_date, 'expiry_date': expiry_date, 'premium_amount': amount,
+                                'user': request.user.pk, "insured_members": insured_members_list}
+            insurance_data = {"profile_detail": user_profile, "insurance_plan": insurance_plan.id,
+                              "user": request.user.pk, "user_insurance": user_insurance_data}
 
-        resp['is_agent'] = False
-        if hasattr(request, 'agent') and request.agent:
-            resp['is_agent'] = True
+            consumer_account = account_models.ConsumerAccount.objects.get_or_create(user=user)
+            consumer_account = account_models.ConsumerAccount.objects.select_for_update().get(user=user)
+            balance = consumer_account.balance
 
-        insurance_data = insurance_transform(insurance_data)
+            visitor_info = None
+            try:
+                from ondoc.api.v1.tracking.views import EventCreateViewSet
+                with transaction.atomic():
+                    event_api = EventCreateViewSet()
+                    visitor_id, visit_id = event_api.get_visit(request)
+                    visitor_info = {"visitor_id": visitor_id, "visit_id": visit_id}
+            except Exception as e:
+                logger.log("Could not fecth visitor info - " + str(e))
 
-        if balance < amount or resp['is_agent']:
-            payable_amount = amount - balance
-            order = account_models.Order.objects.create(
-                product_id=account_models.Order.INSURANCE_PRODUCT_ID,
-                action=account_models.Order.INSURANCE_CREATE,
-                action_data=insurance_data,
-                amount=payable_amount,
-                cashback_amount=0,
-                wallet_amount=balance,
-                user=user,
-                payment_status=account_models.Order.PAYMENT_PENDING,
-                visitor_info = visitor_info
-            )
-            resp["status"] = 1
-            resp['data'], resp["payment_required"] = payment_details(request, order)
+            resp['is_agent'] = False
+            if hasattr(request, 'agent') and request.agent:
+                resp['is_agent'] = True
+
+            insurance_data = insurance_transform(insurance_data)
+
+            if balance < amount or resp['is_agent']:
+                payable_amount = amount - balance
+                order = account_models.Order.objects.create(
+                    product_id=account_models.Order.INSURANCE_PRODUCT_ID,
+                    action=account_models.Order.INSURANCE_CREATE,
+                    action_data=insurance_data,
+                    amount=payable_amount,
+                    cashback_amount=0,
+                    wallet_amount=balance,
+                    user=user,
+                    payment_status=account_models.Order.PAYMENT_PENDING,
+                    visitor_info = visitor_info
+                )
+                resp["status"] = 1
+                resp['data'], resp["payment_required"] = payment_details(request, order)
+            else:
+                wallet_amount = amount
+
+                order = account_models.Order.objects.create(
+                    product_id=account_models.Order.INSURANCE_PRODUCT_ID,
+                    action=account_models.Order.INSURANCE_CREATE,
+                    action_data=insurance_data,
+                    amount=0,
+                    wallet_amount=wallet_amount,
+                    cashback_amount=0,
+                    user=user,
+                    payment_status=account_models.Order.PAYMENT_PENDING,
+                    visitor_info=visitor_info
+                )
+
+                insurance_object, wallet_amount, cashback_amount = order.process_order()
+                resp["status"] = 1
+                resp["payment_required"] = False
+                resp["data"] = {'id': insurance_object.id}
+                resp["data"] = {
+                    "orderId": order.id,
+                    "type": "insurance",
+                    "id": insurance_object.id if insurance_object else None
+                }
         else:
-            wallet_amount = amount
-
-            order = account_models.Order.objects.create(
-                product_id=account_models.Order.INSURANCE_PRODUCT_ID,
-                action=account_models.Order.INSURANCE_CREATE,
-                action_data=insurance_data,
-                amount=0,
-                wallet_amount=wallet_amount,
-                cashback_amount=0,
-                user=user,
-                payment_status=account_models.Order.PAYMENT_PENDING,
-                visitor_info=visitor_info
-            )
-
-            insurance_object, wallet_amount, cashback_amount = order.process_order()
-            resp["status"] = 1
-            resp["payment_required"] = False
-            resp["data"] = {'id': insurance_object.id}
-            resp["data"] = {
-                "orderId": order.id,
-                "type": "insurance",
-                "id": insurance_object.id if insurance_object else None
-            }
+            return Response(status=status.HTTP_404_NOT_FOUND)
         return Response(resp)
 
 
@@ -239,32 +253,34 @@ class InsuranceProfileViewSet(viewsets.GenericViewSet):
     permission_classes = (IsAuthenticated,)
 
     def profile(self, request):
-        user_id = request.user.pk
-        resp = {}
-        if user_id:
+        if settings.IS_INSURANCE_ACTIVE:
+            user_id = request.user.pk
+            resp = {}
+            if user_id:
 
-            user = User.objects.get(id=user_id)
-            user_insurance = UserInsurance.get_user_insurance(user)
-            if not user_insurance or not user_insurance.is_valid():
-                return Response({"message": "Insurance not found or expired."})
-            insurer = user_insurance.insurance_plan.insurer
-            resp['insured_members'] = user_insurance.members.all().values('first_name', 'middle_name', 'last_name',
-                                                                          'dob', 'relation')
-            resp['purchase_date'] = user_insurance.purchase_date
-            resp['expiry_date'] = user_insurance.expiry_date
-            resp['policy_number'] = user_insurance.policy_number
-            resp['insurer_name'] = insurer.name
-            resp['insurer_img'] = request.build_absolute_uri(insurer.logo.url) if insurer.logo is not None and insurer.logo.name else None
-            resp['coi_url'] = request.build_absolute_uri(user_insurance.coi.url) if user_insurance.coi is not None and \
-                                                                                    user_insurance.coi.name else None
-            resp['premium_amount'] = user_insurance.premium_amount
-            resp['proposer_name'] = user_insurance.members.all().filter(relation='self').values('first_name',
-                                                                                                'middle_name',
-                                                                                                'last_name')
+                user = User.objects.get(id=user_id)
+                user_insurance = UserInsurance.get_user_insurance(user)
+                if not user_insurance or not user_insurance.is_valid():
+                    return Response({"message": "Insurance not found or expired."})
+                insurer = user_insurance.insurance_plan.insurer
+                resp['insured_members'] = user_insurance.members.all().values('first_name', 'middle_name', 'last_name',
+                                                                              'dob', 'relation')
+                resp['purchase_date'] = user_insurance.purchase_date
+                resp['expiry_date'] = user_insurance.expiry_date
+                resp['policy_number'] = user_insurance.policy_number
+                resp['insurer_name'] = insurer.name
+                resp['insurer_img'] = request.build_absolute_uri(insurer.logo.url) if insurer.logo is not None and insurer.logo.name else None
+                resp['coi_url'] = request.build_absolute_uri(user_insurance.coi.url) if user_insurance.coi is not None and \
+                                                                                        user_insurance.coi.name else None
+                resp['premium_amount'] = user_insurance.premium_amount
+                resp['proposer_name'] = user_insurance.members.all().filter(relation='self').values('first_name',
+                                                                                                    'middle_name',
+                                                                                                    'last_name')
+            else:
+                return Response({"message": "User is not valid"},
+                                status.HTTP_404_NOT_FOUND)
         else:
-            return Response({"message": "User is not valid"},
-                            status.HTTP_404_NOT_FOUND)
-
+            return Response(status=status.HTTP_404_NOT_FOUND)
         return Response(resp)
 
 
