@@ -40,3 +40,4 @@ geoip2
 django-safedelete
 mongoengine
 qrcode
+xmltodict

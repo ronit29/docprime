@@ -4,7 +4,7 @@ from ondoc.api.v1.diagnostic.serializers import CustomLabTestPackageSerializer
 from ondoc.authentication.backends import JWTAuthentication
 from ondoc.api.v1.diagnostic import serializers as diagnostic_serializer
 from ondoc.api.v1.auth.serializers import AddressSerializer
-from ondoc.integrations.models import IntegratorMapping
+from ondoc.integrations.models import IntegratorTestMapping
 from ondoc.cart.models import Cart
 from ondoc.common.models import UserConfig, GlobalNonBookable
 from ondoc.ratings_review import models as rating_models
@@ -2023,7 +2023,7 @@ class LabTimingListView(mixins.ListModelMixin,
         if lab:
             lab_obj = Lab.objects.filter(id=int(lab), is_live=True).first()
             if lab_obj and lab_obj.network and lab_obj.network.id:
-                integration_dict = IntegratorMapping.get_if_third_party_integration(network_id=lab_obj.network.id)
+                integration_dict = IntegratorTestMapping.get_if_third_party_integration(network_id=lab_obj.network.id)
 
                 if lab_obj.network.id == settings.THYROCARE_NETWORK_ID and settings.THYROCARE_INTEGRATION_ENABLED:
                     pass
