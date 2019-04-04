@@ -77,6 +77,8 @@ from .integrations import IntegratorProfileMapping, IntegratorProfileMappingAdmi
 from .integrations import IntegratorReport, IntegratorReportAdmin
 from .integrations import IntegratorTestMapping, IntegratorTestMappingAdmin
 from .integrations import IntegratorTestParameterMapping, IntegratorTestParameterMappingAdmin
+from .salespoint import SalesPointAdmin, SalesPointAvailableTestMappingAdmin
+from ondoc.salespoint.models import SalesPoint, SalespointTestmapping
 
 # Admin Site config
 admin.site.site_header = 'Ondoc CRM'
@@ -199,3 +201,7 @@ admin.site.register(Plan, SubscriptionPlanAdmin)
 admin.site.register(PlanFeature, SubscriptionPlanFeatureAdmin)
 admin.site.register(UserPlanMapping, UserPlanMappingAdmin)
 admin.site.register(TestParameterChat, TestParameterChatAdmin)
+
+
+admin.site.register(SalesPoint, SalesPointAdmin)
+admin.site.register(SalespointTestmapping, SalesPointAvailableTestMappingAdmin)
