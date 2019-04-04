@@ -497,6 +497,17 @@ class OtpVerifications(TimeStampedModel):
     class Meta:
         db_table = "otp_verification"
 
+    @staticmethod
+    def get_otp_message(platform, user_type, is_doc=False, version=None):
+        from packaging.version import parse
+        result = "OTP for login is {}.\nDon't share this code with others."
+        if platform == "android" and version:
+            if (user_type == 'doctor' or is_doc) and parse(version) > parse("2.100.4"):
+                result = "<#>\n" + result + "\n" + settings.PROVIDER_ANDROID_MESSAGE_HASH
+            elif parse(version) > parse("1.1"):
+                result = "<#>\n" + result + "\n" + settings.CONSUMER_ANDROID_MESSAGE_HASH
+        return result
+
 
 class NotificationEndpoint(TimeStampedModel):
     user = models.ForeignKey(User, related_name='notification_endpoints', on_delete=models.CASCADE,
