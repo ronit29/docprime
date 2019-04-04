@@ -358,12 +358,8 @@ class LabList(viewsets.ReadOnlyModelViewSet):
                                                                 'parameter_count': parameter_count,
                                                                 'icon': icon_url}
             category_data[temp_package.id] = list(single_test_data.values())
-        all_packages_data = None
-        if not parameters.get('from_app'):
-            all_packages_data = paginate_queryset(all_packages, request, 30)
-        else:
-            all_packages_data = all_packages
-        serializer = CustomLabTestPackageSerializer(all_packages_data, many=True,
+
+        serializer = CustomLabTestPackageSerializer(all_packages, many=True,
                                                     context={'entity_url_dict': entity_url_dict, 'lab_data': lab_data,
                                                              'request': request, 'category_data': category_data,
                                                              'package_free_or_not_dict': package_free_or_not_dict})
@@ -432,6 +428,15 @@ class LabList(viewsets.ReadOnlyModelViewSet):
                                                                                                  searchable=True,
                                                                                                  is_package=True)
 
+        page_size = 30
+
+        if not request.query_params.get('page') or int(request.query_params.get('page')) <1:
+            page = 1
+        else:
+            page = int(request.query_params.get('page'))
+
+        offset = (page - 1) * page_size
+
         if package_ids:
             main_queryset = main_queryset.filter(id__in=package_ids)
         valid_package_ids = None
@@ -477,10 +482,10 @@ class LabList(viewsets.ReadOnlyModelViewSet):
                 When(availablelabs__custom_deal_price__isnull=False,
                      then=F('availablelabs__custom_deal_price'))),
             rank=Window(expression=RowNumber(), order_by=F('distance').asc(),
-                        partition_by=[RawSQL('Coalesce(lab.network_id, random())', []), F('id')])[20:40]
+                        partition_by=[RawSQL('Coalesce(lab.network_id, random())', []), F('id')])
         )
 
-        all_packages_in_labs = all_packages_in_labs.distinct()
+        all_packages_in_labs = all_packages_in_labs.order_by('availablelabs__lab_pricing_group__labs__network_id').distinct()
         # all_packages_in_labs = list(all_packages_in_labs)
         # all_packages = filter(lambda x: x.rank == 1, all_packages_in_labs)
         all_packages = [package for package in all_packages_in_labs if package.rank == 1]
@@ -564,7 +569,13 @@ class LabList(viewsets.ReadOnlyModelViewSet):
                                                                 'parameter_count': parameter_count,
                                                                 'icon': icon_url}
             category_data[temp_package.id] = list(single_test_data.values())
-        serializer = CustomLabTestPackageSerializer(all_packages, many=True,
+
+        all_packages_data = None
+        if not parameters.get('from_app'):
+            all_packages_data = all_packages[offset:page * page_size]
+        else:
+            all_packages_data = all_packages
+        serializer = CustomLabTestPackageSerializer(all_packages_data, many=True,
                                                     context={'entity_url_dict': entity_url_dict, 'lab_data': lab_data,
                                                              'request': request, 'category_data': category_data})
         category_queryset = LabTestCategory.objects.filter(is_package_category=True, is_live=True)
