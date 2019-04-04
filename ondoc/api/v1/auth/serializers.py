@@ -176,6 +176,9 @@ class UserProfileSerializer(serializers.ModelSerializer):
                   , "age", "user", "dob", "is_insured", "updated_at", "whatsapp_optin", "whatsapp_is_declined")
 
     def get_is_insured(self, obj):
+        if isinstance(obj, dict):
+            return False
+
         insured_member_obj = InsuredMembers.objects.filter(profile=obj).first()
         if not insured_member_obj:
             return False
