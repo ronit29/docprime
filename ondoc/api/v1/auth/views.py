@@ -1968,9 +1968,12 @@ class TokenFromUrlKey(viewsets.GenericViewSet):
         token = data.get("auth_token")
         key = data.get("key")
         if token:
-            return token
+            return Response({'status': 1, 'token': token})
         elif key:
-            obj = ClickLoginToken.objects.filter(url_key=key)
-            obj.is_consumed = True
-            obj.save()
-            return obj.token
+            obj = ClickLoginToken.objects.filter(url_key=key).first()
+            if obj:
+                obj.is_consumed = True
+                obj.save()
+                return Response({'status': 1, 'token': obj.token})
+            else:
+                return Response({'status': 0, 'token': None, 'message': 'key not found'})
