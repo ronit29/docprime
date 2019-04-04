@@ -19,6 +19,7 @@ RUN git clone $BIT_ENV_URL /env
 RUN cp /env/$JOB/django/gunicorn_config.py /home/docprime/workspace/backend/
 RUN cp /env/$JOB/django/django_env /home/docprime/workspace/backend/.env
 RUN cp /env/$JOB/django/entrypoint /home/docprime/workspace/entrypoint
+RUN cp /env/$JOB/django/commands /home/docprime/workspace/entrypoint
 #RUN sed -i 's/\r//' /entrypoint
 RUN chmod +x /home/docprime/workspace/entrypoint/entrypoint
 
