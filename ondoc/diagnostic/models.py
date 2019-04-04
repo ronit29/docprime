@@ -223,6 +223,7 @@ class Lab(TimeStampedModel, CreatedByModel, QCModel, SearchKey):
     lab_priority = models.PositiveIntegerField(blank=False, null=False, default=1)
     open_for_communication = models.BooleanField(default=True)
     remark = GenericRelation(Remark)
+    rating_data = JSONField(blank=True, null=True)
 
     def __str__(self):
         return self.name
@@ -470,7 +471,17 @@ class Lab(TimeStampedModel, CreatedByModel, QCModel, SearchKey):
         content_type = ContentType.objects.get_for_model(Lab)
         if content_type:
             cid = content_type.id
-            query = '''UPDATE lab l set avg_rating = (select avg(ratings) from ratings_review where content_type_id={} and object_id=l.id) '''.format(cid)
+            query = '''update lab l set rating_data = 
+                        (select rating_data from
+                        (select max(l.id) lab_id,max(l.network_id) network_id,
+                        json_build_object('avg_rating', round(avg(ratings),1),'rating_count' ,count(ratings)) rating_data
+                        from ratings_review rr
+                        inner join lab l on rr.object_id = l.id 
+                        and rr.content_type_id={}
+                        group by case when l.network_id is null then l.id else l.network_id end
+                        )x where case when l.network_id is null then l.id=x.lab_id else l.network_id=x.network_id end
+                        )
+                     '''.format(cid)
             cursor.execute(query)
 
     def get_timing(self, is_home_pickup):
@@ -530,14 +541,14 @@ class Lab(TimeStampedModel, CreatedByModel, QCModel, SearchKey):
         return res_data
 
     def get_available_slots(self, is_home_pickup, pincode, date):
-        from ondoc.integrations.models import IntegratorMapping
+        from ondoc.integrations.models import IntegratorTestMapping
         from ondoc.integrations import service
 
         integration_dict = None
         lab = Lab.objects.filter(id=self.id).first()
         if lab:
             if lab.network and lab.network.id:
-                integration_dict = IntegratorMapping.get_if_third_party_integration(network_id=lab.network.id)
+                integration_dict = IntegratorTestMapping.get_if_third_party_integration(network_id=lab.network.id)
 
                 if lab.network.id == settings.THYROCARE_NETWORK_ID and settings.THYROCARE_INTEGRATION_ENABLED:
                     pass
@@ -555,11 +566,11 @@ class Lab(TimeStampedModel, CreatedByModel, QCModel, SearchKey):
         return available_slots
 
     def is_integrated(self):
-        from ondoc.integrations.models import IntegratorMapping
+        from ondoc.integrations.models import IntegratorTestMapping
 
         integration_dict = None
         if self.network and self.network.id:
-            integration_dict = IntegratorMapping.get_if_third_party_integration(network_id=self.network.id)
+            integration_dict = IntegratorTestMapping.get_if_third_party_integration(network_id=self.network.id)
         if not integration_dict:
             return False
         else:
@@ -1353,6 +1364,8 @@ class LabAppointmentInvoiceMixin(object):
 
 @reversion.register()
 class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin):
+    from ondoc.integrations.models import IntegratorResponse
+
     CREATED = 1
     BOOKED = 2
     RESCHEDULED_LAB = 3
@@ -1412,6 +1425,7 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin)
     email_notification = GenericRelation(EmailNotification, related_name="lab_notification")
     user_plan_used = models.ForeignKey('subscription_plan.UserPlanMapping', null=True, on_delete=models.DO_NOTHING,
                                        related_name='appointment_using')
+    integrator_response = GenericRelation(IntegratorResponse)
 
     def get_tests_and_prices(self):
         test_price = []
@@ -1540,7 +1554,7 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin)
                 logger.error(str(e))
 
         is_thyrocare_enabled = False
-        if not self.created_by_native() and False:
+        if not self.created_by_native():
             if push_to_integrator:
                 if self.lab.network and self.lab.network.id == settings.THYROCARE_NETWORK_ID:
                     if settings.THYROCARE_INTEGRATION_ENABLED:
@@ -1548,10 +1562,13 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin)
 
                 try:
                     if is_thyrocare_enabled:
-                        # push_lab_appointment_to_integrator.apply_async(({'appointment_id': self.id},), countdown=5)
-                        push_lab_appointment_to_integrator.apply_async(({'appointment_id': self.id},),
-                                                                       link=get_integrator_order_status.s(appointment_id=self.id),
-                                                                       countdown=5)
+                        if old_instance:
+                            if old_instance.status != self.CANCELLED and self.status == self.CANCELLED:
+                                push_lab_appointment_to_integrator.apply_async(({'appointment_id': self.id},), countdown=5)
+                        else:
+                            push_lab_appointment_to_integrator.apply_async(({'appointment_id': self.id},),
+                                                                           link=get_integrator_order_status.s(
+                                                                               appointment_id=self.id),countdown=5)
                 except Exception as e:
                     logger.error(str(e))
 
@@ -2083,6 +2100,40 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin)
         except Exception as e:
             logger.error("Could not save triggered event - " + str(e))
 
+    def integrator_order_status(self):
+        from ondoc.integrations.models import IntegratorHistory
+
+        lab_appointment_content_type = ContentType.objects.get_for_model(self)
+        integrator_history = IntegratorHistory.objects.filter(object_id=self.id,
+                                                              content_type=lab_appointment_content_type).order_by('id').last()
+        if not integrator_history:
+            return 'Not a part of Integration'
+
+        return IntegratorHistory.STATUS_CHOICES[integrator_history.status - 1][1]
+
+    def thyrocare_booking_no(self):
+        from ondoc.integrations.models import IntegratorResponse
+
+        lab_appointment_content_type = ContentType.objects.get_for_model(self)
+        integrator_response = IntegratorResponse.objects.filter(object_id=self.id,
+                                                                content_type=lab_appointment_content_type).order_by('id').last()
+        if not integrator_response:
+            return 'Not Found'
+
+        return [integrator_response.lead_id, integrator_response.integrator_order_id]
+
+
+    def accepted_through(self):
+        from ondoc.integrations.models import IntegratorHistory
+
+        lab_appointment_content_type = ContentType.objects.get_for_model(self)
+        integrator_history = IntegratorHistory.objects.filter(object_id=self.id,
+                                                              content_type=lab_appointment_content_type).order_by('id').last()
+        if not integrator_history:
+            return 'Not Found'
+
+        return integrator_history.accepted_through
+
     def __str__(self):
         return "{}, {}".format(self.profile.name if self.profile else "", self.lab.name)
 
@@ -2348,7 +2399,7 @@ class LabReport(auth_model.TimeStampedModel):
 class LabReportFile(auth_model.TimeStampedModel, auth_model.Document):
     report = models.ForeignKey(LabReport, related_name='files', on_delete=models.SET_NULL, null=True, blank=True)
     name = models.FileField(upload_to='lab_reports/', blank=False, null=False, validators=[
-        FileExtensionValidator(allowed_extensions=['pdf', 'jfif', 'jpg', 'jpeg', 'png'])])
+        FileExtensionValidator(allowed_extensions=['pdf', 'jfif', 'jpg', 'jpeg', 'png', 'xml'])])
 
     def __str__(self):
 
@@ -2425,3 +2476,20 @@ class LabTestGroupMapping(TimeStampedModel):
 
     class Meta:
         db_table = "lab_test_group_mapping"
+
+
+class TestParameterChat(TimeStampedModel):
+    test = models.ForeignKey(LabTest, on_delete=models.CASCADE, null=True)
+    age_from = models.PositiveIntegerField()
+    age_to = models.PositiveIntegerField()
+    gender = models.CharField(max_length=30, null=True, blank=True)
+    min_range = models.DecimalField(blank=True, null=True, max_digits=10,decimal_places=2)
+    max_range = models.DecimalField(blank=True, null=True, max_digits=10,decimal_places=2)
+    test_name = models.CharField(blank=False, null=False, max_length=60)
+
+    def __str__(self):
+        return self.test_name
+
+    class Meta:
+        db_table = 'test_parameter_chat'
+

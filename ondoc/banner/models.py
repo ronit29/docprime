@@ -43,7 +43,9 @@ class Banner(auth_model.TimeStampedModel):
     location = models.ForeignKey(SliderLocation, on_delete=models.CASCADE, null=True, blank=True)
     title = models.CharField(max_length=500)
     image = models.ImageField('Banner image', upload_to='banner/images')
-    url = models.URLField(max_length=10000, null=True, blank=True)
+    url = models.URLField(max_length=10000, null=True, blank=True, verbose_name='landing url')
+    url_params_included = JSONField(null=True, blank=True, help_text='JSON format example: {"specialization_id": 3667, "test_ids": 87, "is_package": True, "Name": "Stringvalue"}')
+    url_params_excluded = JSONField(null=True, blank=True, help_text='JSON format example: {"specialization_id": 3667, "test_ids": 87, "is_package": True, "Name": "Stringvalue"}')
     priority = models.PositiveIntegerField(blank=True, null=True, default=0)
     slider_locate = models.SmallIntegerField(choices=slider_location, default=1, null=True, blank=True) # Do not use
     slider_action = models.SmallIntegerField(choices=slider_choice, null=True, blank=True)
@@ -81,7 +83,8 @@ class Banner(auth_model.TimeStampedModel):
     def get_all_banners(request):
 
         queryset = Banner.objects.filter(enable=True).filter(Q(start_date__lte=timezone.now()) | Q(start_date__isnull=True)).filter(Q(end_date__gte=timezone.now()) | Q(end_date__isnull=True)).order_by('-priority')[:100]
-        # slider_locate = dict(Banner.slider_location)
+        #queryset = Banner.objects.filter(enable=True)
+        slider_locate = dict(Banner.slider_location)
         final_result = []
         for data in queryset:
             resp = dict()
@@ -95,6 +98,8 @@ class Banner(auth_model.TimeStampedModel):
             resp['start_date'] = data.start_date
             resp['end_date'] = data.end_date
             resp['priority'] = data.priority
+            resp['url_params_included'] = data.url_params_included
+            resp['url_params_excluded'] = data.url_params_excluded
             resp['show_in_app'] = data.show_in_app
             resp['app_params'] = data.app_params
             resp['app_screen'] = data.app_screen

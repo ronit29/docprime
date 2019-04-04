@@ -1461,8 +1461,8 @@ class Merchant(TimeStampedModel):
 
     def save(self, *args, **kwargs):
         if self.verified_by_finance and (self.pg_status == self.NOT_INITIATED or self.pg_status == self.FAILURE):
-            #pass
-            self.create_in_pg()
+            pass
+            #self.create_in_pg()
 
         super().save(*args, **kwargs)
 
@@ -1488,7 +1488,7 @@ class Merchant(TimeStampedModel):
 
         #request_payload["Country"] = self.country
         request_payload["Country"] = 'in'
-        request_payload["Bene_Email"] = self.email
+        request_payload["Bene_Email"] = 'payment@docprime.com'
         request_payload["Bene_Mobile"] = self.mobile
         request_payload["Bene_Tel"] = None
         request_payload["Bene_Fax"] = None
@@ -1615,6 +1615,35 @@ class WelcomeCallingDone(models.Model):
     welcome_calling_done = models.BooleanField(default=False)
     welcome_calling_done_at = models.DateTimeField(null=True, blank=True)
 
+    def save(self, *args, **kwargs):
+        if self.welcome_calling_done and not self.welcome_calling_done_at:
+            self.welcome_calling_done_at = timezone.now()
+        elif not self.welcome_calling_done and self.welcome_calling_done_at:
+            self.welcome_calling_done_at = None
+        super().save(*args, **kwargs)
+
     class Meta:
         abstract = True
 
+
+# class ClickLoginToken(TimeStampedModel):
+#     token = models.CharField(max_length=100)
+#     user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
+#     expiration_time = models.DateTimeField()
+#     is_consumed = models.BooleanField(default=False)
+#
+#     class Meta:
+#         db_table = 'click_login_token'
+
+
+class PhysicalAgreementSigned(models.Model):
+    physical_agreement_signed = models.BooleanField(default=False)
+    physical_agreement_signed_at = models.DateTimeField(null=True, blank=True)
+
+    def save(self, *args, **kwargs):
+        from ondoc.api.v1.utils import update_physical_agreement_timestamp
+        update_physical_agreement_timestamp(self)
+        super().save(*args, **kwargs)
+
+    class Meta:
+        abstract = True
