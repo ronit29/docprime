@@ -359,7 +359,7 @@ class LabList(viewsets.ReadOnlyModelViewSet):
                                                                 'icon': icon_url}
             category_data[temp_package.id] = list(single_test_data.values())
         all_packages_data = None
-        if parameters.get('page') and int(parameters.get('page'))>0:
+        if not parameters.get('from_app'):
             all_packages_data = paginate_queryset(all_packages, request, 30)
         else:
             all_packages_data = all_packages
@@ -477,7 +477,7 @@ class LabList(viewsets.ReadOnlyModelViewSet):
                 When(availablelabs__custom_deal_price__isnull=False,
                      then=F('availablelabs__custom_deal_price'))),
             rank=Window(expression=RowNumber(), order_by=F('distance').asc(),
-                        partition_by=[RawSQL('Coalesce(lab.network_id, random())', []), F('id')])
+                        partition_by=[RawSQL('Coalesce(lab.network_id, random())', []), F('id')])[20:40]
         )
 
         all_packages_in_labs = all_packages_in_labs.distinct()

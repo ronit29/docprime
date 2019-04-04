@@ -1,4 +1,5 @@
 def paginate_queryset(queryset, request, page_size=20):
+
     page = int(request.query_params.get('page', 1))
 
     if page_size < 0 or page_size > 100:
