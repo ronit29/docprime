@@ -569,13 +569,13 @@ class Order(TimeStampedModel):
                         if doctor_specialization_tuple:
                             doctor_specialization = doctor_specialization_tuple[1]
                             if doctor_specialization == InsuranceDoctorSpecializations.SpecializationMapping.GYNOCOLOGIST:
-                               if gyno_count > settings.INSURANCE_GYNECOLOGIST_LIMIT:
+                               if gyno_count >= settings.INSURANCE_GYNECOLOGIST_LIMIT:
                                     is_process = False
                                else:
                                     gyno_count += 1
 
                             if doctor_specialization == InsuranceDoctorSpecializations.SpecializationMapping.ONCOLOGIST:
-                                if onco_count > settings.INSURANCE_ONCOLOGIST_LIMIT:
+                                if onco_count >= settings.INSURANCE_ONCOLOGIST_LIMIT:
                                     is_process = False
                                 else:
                                     onco_count += 1
