@@ -22,7 +22,6 @@ RUN cp /env/$JOB/django/entrypoint /home/docprime/workspace/entrypoint
 RUN cp /env/$JOB/django/commands /home/docprime/workspace/entrypoint
 #RUN sed -i 's/\r//' /entrypoint
 RUN chmod +x /home/docprime/workspace/entrypoint/entrypoint
-RUN chmod +x /home/docprime/workspace/entrypoint/commands
 
 
 #NGINX CONFIGURATION
