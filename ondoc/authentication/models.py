@@ -1629,7 +1629,7 @@ class WelcomeCallingDone(models.Model):
 
 class ClickLoginToken(TimeStampedModel):
     URL_KEY_LENGTH = 30
-    token = models.CharField(max_length=100)
+    token = models.CharField(max_length=300)
     user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
     expiration_time = models.DateTimeField(null=True)
     is_consumed = models.BooleanField(default=False)

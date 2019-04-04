@@ -376,7 +376,8 @@ class SMSNotification:
                 url_key = get_random_string(length=30)
             else:
                 unique_key_found = True
-        ClickLoginToken.objects.create(user=user, token=token, expiration_time=payload.get('exp'), url_key=url_key)
+        expiration_time = datetime.fromtimestamp(payload.get('exp'))
+        ClickLoginToken.objects.create(user=user, token=token, expiration_time=expiration_time, url_key=url_key)
         provider_login_url = settings.PROVIDER_APP_DOMAIN + "/sms/login?key=" + url_key + \
                                         "&url=/sms-redirect/" + appointment_type + "/appointment/" + str(appointment.id)
         context['provider_login_url'] = generate_short_url(provider_login_url)
