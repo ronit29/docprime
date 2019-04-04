@@ -791,7 +791,7 @@ class Doctor(auth_model.TimeStampedModel, auth_model.QCModel, SearchKey, auth_mo
         image_file1 = InMemoryUploadedFile(tempfile_io, None, filename, 'image/jpeg', tempfile_io.tell(), None)
 
         QRCode_object = QRCode(name=image_file1, content_type=ContentType.objects.get_for_model(Doctor),
-                               object_id=self.id)
+                               object_id=self.id, data={"url": doctor_url})
         QRCode_object.save()
         return QRCode_object
 

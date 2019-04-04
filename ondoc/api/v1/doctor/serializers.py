@@ -46,6 +46,8 @@ from ondoc.procedure.models import DoctorClinicProcedure, Procedure, ProcedureCa
     IpdProcedureFeatureMapping, IpdProcedureLead, DoctorClinicIpdProcedure, IpdProcedureDetail
 from ondoc.seo.models import NewDynamic
 from ondoc.ratings_review import models as rate_models
+from rest_framework.response import Response
+
 
 logger = logging.getLogger(__name__)
 
@@ -562,7 +564,6 @@ class DoctorProfileSerializer(serializers.ModelSerializer):
     awards = DoctorAwardSerializer(read_only=True, many=True)
     display_name = serializers.ReadOnlyField(source='get_display_name')
     thumbnail = serializers.SerializerMethodField()
-
 
     def get_availability(self, obj):
         data = DoctorClinicTiming.objects.filter(doctor_clinic__doctor=obj).select_related("doctor_clinic__doctor",
@@ -1145,6 +1146,17 @@ class AppointmentRetrieveDoctorSerializer(DoctorProfileSerializer):
                   'qualifications', 'general_specialization', 'display_name')
 
 
+class QrcodeRetrieveDoctorSerializer(AppointmentRetrieveDoctorSerializer):
+    check_qr_code = serializers.SerializerMethodField()
+
+
+    def get_check_qr_code(self, obj):
+        return bool(len(obj.qr_code.all()))
+
+    class Meta(AppointmentRetrieveDoctorSerializer.Meta):
+        model = Doctor
+        fields = AppointmentRetrieveDoctorSerializer.Meta.fields + ('check_qr_code',)
+
 class OpdAppointmentBillingSerializer(OpdAppointmentSerializer):
     profile = UserProfileSerializer()
     hospital = HospitalModelSerializer()
@@ -1182,6 +1194,19 @@ class AppointmentRetrieveSerializer(OpdAppointmentSerializer):
 
     def get_cancellation_reason(self, obj):
         return obj.get_serialized_cancellation_reason()
+
+
+class NewAppointmentRetrieveSerializer(AppointmentRetrieveSerializer):
+    doctor = QrcodeRetrieveDoctorSerializer()
+
+    class Meta(AppointmentRetrieveSerializer.Meta):
+        model = OpdAppointment
+        # fields = ('id', 'patient_image', 'patient_name', 'type', 'profile', 'otp', 'is_rated', 'rating_declined',
+        #           'allowed_action', 'effective_price', 'deal_price', 'status', 'time_slot_start', 'time_slot_end',
+        #           'doctor', 'hospital', 'allowed_action', 'doctor_thumbnail', 'patient_thumbnail', 'procedures', 'mrp',
+        #           'invoices', 'cancellation_reason', 'payment_type')
+        fields = AppointmentRetrieveSerializer.Meta.fields
+
 
 
 class DoctorAppointmentRetrieveSerializer(OpdAppointmentSerializer):
