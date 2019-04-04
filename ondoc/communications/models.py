@@ -1046,8 +1046,10 @@ class OpdNotification(Notification):
             mask_number = mask_number_instance.mask_number
         email_banners_html = UserConfig.objects.filter(key__iexact="email_banners") \
                     .annotate(html_code=KeyTransform('html_code', 'data')).values_list('html_code', flat=True).first()
-        auth_token = AgentToken.objects.create_token(user=self.appointment.user)
-        booking_url = settings.BASE_URL + '/sms/booking?token={}'.format(auth_token.token)
+        # Implmented According to DOCNEW-360
+        # auth_token = AgentToken.objects.create_token(user=self.appointment.user)
+        token_object = JWTAuthentication.generate_token(self.appointment.user)
+        booking_url = settings.BASE_URL + '/sms/booking?token={}'.format(token_object['token'].decode("utf-8"))
         opd_appointment_complete_url = booking_url + "&callbackurl=opd/appointment/{}?complete=true".format(self.appointment.id)
         opd_appointment_feedback_url = booking_url + "&callbackurl=opd/appointment/{}".format(self.appointment.id)
         reschdule_appointment_bypass_url = booking_url + "&callbackurl=opd/doctor/{}/{}/book?reschedule={}".format(self.appointment.doctor.id, self.appointment.hospital.id, self.appointment.id)

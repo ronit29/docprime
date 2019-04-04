@@ -216,7 +216,7 @@ class Thyrocare(BaseIntegrator):
             for test in tests:
                 integrator_test = IntegratorTestMapping.objects.filter(test_id=test.id, integrator_class_name=Thyrocare.__name__, is_active=True).first()
                 if not integrator_test:
-                    logger.info("[ERROR] No tests data found in integrator.")
+                    raise Exception("[ERROR] No tests data found in integrator.")
 
                 if integrator_test.test_type == "TEST":
                     if integrator_test.name_params_required:

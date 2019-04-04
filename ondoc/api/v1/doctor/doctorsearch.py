@@ -557,8 +557,8 @@ class DoctorSearchHelper:
                 #"experiences": serializers.DoctorExperienceSerializer(doctor.experiences.all(), many=True).data,
                 "qualifications": serializers.DoctorQualificationSerializer(doctor.qualifications.all(), many=True).data,
                 # "average_rating": doctor.avg_rating,
-                "average_rating": doctor.rating_data.get('avg_rating') if doctor.rating_data else None,
-                "rating_count": doctor.rating_data.get('rating_count') if doctor.rating_data else None,
+                "average_rating": doctor.rating_data.get('avg_rating') if doctor.display_rating_on_list() else None,
+                "rating_count": doctor.rating_data.get('rating_count') if doctor.display_rating_on_list() else None,
                 # "general_specialization": serializers.DoctorPracticeSpecializationSerializer(
                 #     doctor.doctorpracticespecializations.all(),
                 #     many=True).data,
