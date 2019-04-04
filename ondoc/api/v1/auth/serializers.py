@@ -510,3 +510,4 @@ class TokenFromUrlKeySerializer(serializers.Serializer):
     def validate(self, attrs):
         if not (attrs.get('auth_token') or attrs.get('key')):
             raise serializers.ValidationError('neither auth_token nor key found')
+        return attrs
