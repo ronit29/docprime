@@ -5,6 +5,7 @@ from django.db.models import F
 
 from ondoc.api.v1.doctor.serializers import DoctorProfileUserViewSerializer
 from ondoc.api.v1.procedure.serializers import DoctorClinicProcedureSerializer
+from ondoc.api.v1.ratings.serializers import GoogleRatingsGraphSerializer
 from ondoc.doctor import models
 from ondoc.api.v1.utils import clinic_convert_timings
 from ondoc.api.v1.doctor import serializers
@@ -13,7 +14,7 @@ from ondoc.doctor.models import Doctor, PracticeSpecialization
 from ondoc.procedure.models import DoctorClinicProcedure, ProcedureCategory, ProcedureToCategoryMapping, \
     get_selected_and_other_procedures, get_included_doctor_clinic_procedure, \
     get_procedure_categories_with_procedures
-from datetime import datetime
+from datetime import datetime, time
 import re
 import json
 from django.contrib.staticfiles.templatetags.staticfiles import static
@@ -512,8 +513,8 @@ class DoctorSearchHelper:
             schema_type = None
             new_schema = OrderedDict()
             average_rating = None
-            google_average_rating = None
             rating_count = None
+            google_rating = None
             if schema_specialization == 'Dentist':
                 schema_type = 'Dentist'
             else:
@@ -528,7 +529,15 @@ class DoctorSearchHelper:
                     average_rating = doctor.rating_data.get('avg_rating')
                     rating_count = doctor.rating_data.get('rating_count')
             if not average_rating:
-                google_average_rating
+                 if doctor_clinic and doctor_clinic.hospital:
+                    hosp_reviews = doctor_clinic.hospital.hospital_place_details.all()
+                    if hosp_reviews:
+                        reviews_data = hosp_reviews[0].reviews
+
+                        if reviews_data:
+                            ratings_graph = GoogleRatingsGraphSerializer(reviews_data, many=False,
+                                                                         context={"request": request})
+                            google_rating = ratings_graph.data
 
             temp = {
                 "doctor_id": doctor.id,
@@ -554,6 +563,7 @@ class DoctorSearchHelper:
                 # "rating_count": doctor.rating_data.get('rating_count') if doctor.rating_data else None,
                 "average_rating": average_rating,
                 "rating_count": rating_count,
+                "google_rating": google_rating,
                 # "general_specialization": serializers.DoctorPracticeSpecializationSerializer(
                 #     doctor.doctorpracticespecializations.all(),
                 #     many=True).data,
