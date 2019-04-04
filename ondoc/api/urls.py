@@ -25,6 +25,7 @@ from .v1.screen.router import urlpatterns as screen_url
 from .v1.subscription_plan.router import urlpatterns as subscription_plan_url
 
 from .v2.doctor.router import urlpatterns as doctor_v2_url
+from .v1.integrations.router import urlpatterns as integrations_url
 
 
 urlpatterns = [
@@ -50,5 +51,6 @@ urlpatterns = [
     path('v1/cart/', include(cart_url)),
     path('v1/screen/', include(screen_url)),
     path('v1/subscription_plan/', include(subscription_plan_url)),
-    path('v2/doctor/', include(doctor_v2_url))
+    path('v2/doctor/', include(doctor_v2_url)),
+    path('v1/integrations/', include(integrations_url))
 ]

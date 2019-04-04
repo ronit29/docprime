@@ -17,7 +17,8 @@ from ondoc.doctor.models import (Doctor, Language, MedicalService, Specializatio
 
 from ondoc.diagnostic.models import (Lab, LabNetwork, LabTest, LabTestType,LabService,
                                       AvailableLabTest, LabAppointment, CommonTest, CommonDiagnosticCondition, LabPricingGroup,
-                                     TestParameter, CommonPackage, LabTestCategory, LabTestGroup, LabTestGroupMapping)
+                                     TestParameter, CommonPackage, LabTestCategory, LabTestGroup, LabTestGroupMapping,
+                                     TestParameterChat)
 from ondoc.coupon.models import Coupon, UserSpecificCoupon, RandomGeneratedCoupon
 from ondoc.lead.models import HospitalLead, DoctorLead, SearchLead
 from ondoc.account.models import ConsumerAccount, MerchantPayout
@@ -42,7 +43,8 @@ from .hospital import HospitalAdmin
 from .user import CustomUserAdmin
 from .hospital_network import HospitalNetworkAdmin
 from .lab import LabAdmin, LabTestAdmin, LabTestTypeAdmin, AvailableLabTestAdmin, CommonDiagnosticConditionAdmin, \
-    LabAppointmentAdmin, CommonTestAdmin, TestParameterAdmin, CommonPackageAdmin, LabTestCategoryAdmin, LabTestGroupAdmin, LabTestGroupMappingAdmin
+    LabAppointmentAdmin, CommonTestAdmin, TestParameterAdmin, CommonPackageAdmin, LabTestCategoryAdmin, \
+    LabTestGroupAdmin, LabTestGroupMappingAdmin, TestParameterChatAdmin
 from .lab_network import LabNetworkAdmin
 from .notification import (EmailNotificationAdmin, SmsNotificationAdmin,
                            PushNotificationAdmin, AppNotificationAdmin)
@@ -74,6 +76,7 @@ from .integrations import IntegratorMapping, IntegratorMappingAdmin
 from .integrations import IntegratorProfileMapping, IntegratorProfileMappingAdmin
 from .integrations import IntegratorReport, IntegratorReportAdmin
 from .integrations import IntegratorTestMapping, IntegratorTestMappingAdmin
+from .integrations import IntegratorTestParameterMapping, IntegratorTestParameterMappingAdmin
 
 # Admin Site config
 admin.site.site_header = 'Ondoc CRM'
@@ -189,8 +192,10 @@ admin.site.register(Service, ServiceAdmin)
 admin.site.register(HealthInsuranceProvider, HealthInsuranceProviderAdmin)
 admin.site.register(IntegratorReport, IntegratorReportAdmin)
 admin.site.register(IntegratorTestMapping, IntegratorTestMappingAdmin)
+admin.site.register(IntegratorTestParameterMapping, IntegratorTestParameterMappingAdmin)
 admin.site.register(IpdProcedureCategory, IpdProcedureCategoryAdmin)
 admin.site.register(CommonIpdProcedure)
 admin.site.register(Plan, SubscriptionPlanAdmin)
 admin.site.register(PlanFeature, SubscriptionPlanFeatureAdmin)
 admin.site.register(UserPlanMapping, UserPlanMappingAdmin)
+admin.site.register(TestParameterChat, TestParameterChatAdmin)
