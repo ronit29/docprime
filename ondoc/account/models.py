@@ -60,7 +60,7 @@ class Order(TimeStampedModel):
                    (INSURANCE_PRODUCT_ID, "INSURANCE_PRODUCT_ID"),(SUBSCRIPTION_PLAN_PRODUCT_ID, "SUBSCRIPTION_PLAN_PRODUCT_ID")]
 
     product_id = models.SmallIntegerField(choices=PRODUCT_IDS, blank=True, null=True)
-    reference_id = models.IntegerField(blank=True, null=True)
+    reference_id = models.BigIntegerField(blank=True, null=True)
     action = models.PositiveSmallIntegerField(blank=True, null=True, choices=ACTION_CHOICES)
     action_data = JSONField(blank=True, null=True)
     amount = models.DecimalField(max_digits=10, decimal_places=2, blank=True, null=True)
