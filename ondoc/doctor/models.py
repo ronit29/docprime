@@ -226,7 +226,9 @@ class Hospital(auth_model.TimeStampedModel, auth_model.CreatedByModel, auth_mode
     about = models.TextField(blank=True, null=True, default="")
     opd_timings = models.CharField(max_length=150, blank=True, null=True, default="")
     always_open = models.BooleanField(verbose_name='Is hospital open 24X7', default=False)
-    city_search_key = models.CharField(db_index=True,editable=False, max_length=100, default="", null=True, blank=True)
+    city_search_key = models.CharField(db_index=True, editable=False, max_length=100, default="", null=True, blank=True)
+    enabled_for_cod = models.BooleanField(default=False)
+    enabled_for_prepaid = models.BooleanField(default=True)
 
     def __str__(self):
         return self.name
@@ -718,6 +720,12 @@ class Doctor(auth_model.TimeStampedModel, auth_model.QCModel, SearchKey, auth_mo
         elif self.enabled and self.disabled_at:
             self.disabled_at = None
 
+    def display_rating_on_list(self):
+        if self.rating_data and ((self.rating_data.get('rating_count') and self.rating_data['rating_count'] > 5) or \
+                                 (self.rating_data.get('avg_rating') and self.rating_data['avg_rating'] > 4)):
+            return True
+        return False
+    
     def save(self, *args, **kwargs):
         self.update_time_stamps()
         self.update_live_status()
@@ -768,8 +776,7 @@ class Doctor(auth_model.TimeStampedModel, auth_model.QCModel, SearchKey, auth_mo
                      '''.format(cid, cid)
             cursor.execute(query)
 
-
-    def enabled_for_cod(self):
+    def enabled_for_cod(self):  # Not to be used
         return False
 
     def generate_qr_code(self):
@@ -2937,7 +2944,7 @@ class ProviderSignupLead(auth_model.TimeStampedModel):
 
     def save(self, *args, **kwargs):
         super(ProviderSignupLead, self).save(*args, **kwargs)
-        if kwargs.get('is_docprime') and not self.matrix_lead_id:
+        if self.is_docprime and not self.matrix_lead_id:
             create_or_update_lead_on_matrix.apply_async(({'obj_type': self.__class__.__name__, 'obj_id': self.id}
                                                          ,), countdown=5)
 
