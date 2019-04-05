@@ -1,0 +1,16 @@
+Congratulations!
+Your OPD Insurance policy has been issued.
+Please find below the details
+Policy Number:  {{policy_number}}
+Proposer Name: {{proposer_name}}
+Annual Premium: Rs {{premium}} (inclusive of GST)
+Coverage: {{total_member_covered}} Members
+{% for member in insured_members %}
+{{member.relation}}: {{member.name}}
+{% endfor %}
+Policy Issue Date: {{purchase_date}}
+Policy Expiry Date: {{expiry_date}}
+Policy Status:  Active
+For any query please call on our toll free number: 1800-123-9419
+
+Thanks for choosing Docprime.com

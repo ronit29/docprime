@@ -5,7 +5,9 @@ from collections import defaultdict
 from itertools import groupby
 from datetime import datetime
 import pytz
-from django.db.models import F
+import jwt
+from ondoc.authentication.backends import JWTAuthentication
+from django.db.models import F, Q
 # from hardcopy import bytestring_to_pdf
 
 from ondoc.api.v1.utils import util_absolute_url, util_file_name, generate_short_url
@@ -17,38 +19,64 @@ from django.forms import model_to_dict
 from django.template.loader import render_to_string
 from django.contrib.auth import get_user_model
 from django.contrib.postgres.fields.jsonb import KeyTransform
+from django.utils.crypto import get_random_string
 import logging
 from django.conf import settings
 from django.utils import timezone
 from weasyprint import HTML
 
 from ondoc.account.models import Invoice, Order
-from ondoc.authentication.models import UserProfile, GenericAdmin, NotificationEndpoint, AgentToken
+from ondoc.authentication.models import UserProfile, GenericAdmin, NotificationEndpoint, AgentToken, UserSecretKey, \
+    ClickLoginToken
 
 from ondoc.notification.models import NotificationAction, SmsNotification, EmailNotification, AppNotification, \
     PushNotification, WhtsappNotification
 # from ondoc.notification.sqs_client import publish_message
 from ondoc.notification.rabbitmq_client import publish_message
+import datetime
 from ondoc.api.v1.utils import aware_time_zone
 
 User = get_user_model()
 logger = logging.getLogger(__name__)
 
 
-def get_spoc_email_and_number_hospital(spocs):
+def get_spoc_email_and_number_hospital(spocs, appointment):
     user_and_email = []
     user_and_number = []
-    all_email = set()
-    all_phone_number = set()
     for spoc in spocs:
-        if spoc.email:
-            all_email.add(spoc.email)
         if spoc.number and spoc.number in range(1000000000, 9999999999):
-            all_phone_number.add(spoc.number)
-    for phone_number in all_phone_number:
-        user_and_number.append({'user': None, 'phone_number': phone_number})
-    for email in all_email:
-        user_and_email.append({'user': None, 'email': email})
+            admins = GenericAdmin.objects.prefetch_related('user').filter(Q(phone_number=str(spoc.number),
+                                                                            hospital=spoc.content_object),
+                                                                          Q(super_user_permission=True) |
+                                                                          Q(Q(permission_type=GenericAdmin.APPOINTMENT),
+                                                                            Q(doctor__isnull=True) | Q(doctor=appointment.doctor)))
+            if admins:
+                admins_with_user = admins.filter(user__isnull=False)
+                if admins_with_user.exists():
+                    for admin in admins_with_user:
+                        if int(admin.user.phone_number) == int(spoc.number):
+                            user_and_number.append({'user': admin.user, 'phone_number': spoc.number})
+                            if spoc.email:
+                                user_and_email.append({'user': admin.user, 'email': spoc.email})
+                        else:
+                            user_and_number.append({'user': None, 'phone_number': spoc.number})
+                            if spoc.email:
+                                user_and_email.append({'user': None, 'email': spoc.email})
+
+                admins_without_user = admins.exclude(id__in=admins_with_user)
+                if admins_without_user.exists():
+                    for admin in admins_without_user:
+                        created_user = User.objects.create(phone_number=spoc.number, user_type=User.DOCTOR,
+                                                           auto_created=True)
+                        admin.user = created_user
+                        admin.save()
+                        user_and_number.append({'user': created_user, 'phone_number': spoc.number})
+                        if spoc.email:
+                            user_and_email.append({'user': created_user, 'email': spoc.email})
+            else:
+                user_and_number.append({'user': None, 'phone_number': spoc.number})
+        elif spoc.email:
+            user_and_email.append({'user': None, 'email': spoc.email})
     return user_and_email, user_and_number
 
 
@@ -76,9 +104,8 @@ def unique_emails(list_):
     temp = set()
 
     for item in list_:
-        if item.get('email', None) and item.get('user', None):
+        if item.get('email', None) or item.get('user', None):
             temp.add((item.get('user'), item.get('email').strip().lower()))
-
     return [{'user': item[0], 'email': item[1]} for item in temp]
 
 
@@ -89,7 +116,7 @@ def unique_phone_numbers(list_):
     temp = set()
 
     for item in list_:
-        if item.get('phone_number', None) and item.get('user', None):
+        if item.get('phone_number', None) or item.get('user', None):
             temp.add((item.get('user'), str(item.get('phone_number')).strip().lower()))
 
     return [{'user': item[0], 'phone_number': item[1]} for item in temp]
@@ -268,6 +295,8 @@ class SMSNotification:
             body_template = "sms/lab/appointment_cancelled_lab.txt"
         elif notification_type == NotificationAction.LAB_REPORT_UPLOADED:
             body_template = "sms/lab/lab_report_uploaded.txt"
+        elif notification_type == NotificationAction.INSURANCE_CONFIRMED:
+            body_template = "sms/insurance/insurance_confirmed.txt"
         elif notification_type == NotificationAction.LAB_REPORT_SEND_VIA_CRM:
             body_template = "sms/lab/lab_report_send_crm.txt"
             lab_reports = []
@@ -336,12 +365,37 @@ class SMSNotification:
             if phone_number not in settings.OTP_BYPASS_NUMBERS:
                 publish_message(message)
 
+    def save_token_to_context(self, context, user):
+        appointment = context.get("instance")
+        user_key = UserSecretKey.objects.get_or_create(user=user)
+        payload = JWTAuthentication.provider_sms_payload_handler(user, appointment)
+        token = jwt.encode(payload, user_key[0].key)
+        token = str(token, 'utf-8')
+        appointment_type = 'opd' if appointment.__class__ == OpdAppointment else 'lab'
+        url_key = get_random_string(length=ClickLoginToken.URL_KEY_LENGTH)
+        unique_key_found = False
+        while not unique_key_found:
+            if ClickLoginToken.objects.filter(url_key=url_key).exists():
+                url_key = get_random_string(length=30)
+            else:
+                unique_key_found = True
+        expiration_time = datetime.fromtimestamp(payload.get('exp'))
+        ClickLoginToken.objects.create(user=user, token=token, expiration_time=expiration_time, url_key=url_key)
+        provider_login_url = settings.PROVIDER_APP_DOMAIN + "/sms/login?key=" + url_key + \
+                                        "&url=/sms-redirect/" + appointment_type + "/appointment/" + str(appointment.id)
+        context['provider_login_url'] = generate_short_url(provider_login_url)
+        return context
+
     def send(self, receivers):
         context = self.context
         if not context:
             return
         for receiver in receivers:
             template = self.get_template(receiver.get('user'))
+            if receiver.get('user') and receiver.get('user').user_type == User.DOCTOR:
+                context = self.save_token_to_context(context, receiver['user'])
+            elif context.get('provider_login_url'):
+                context.pop('provider_login_url')
             if template:
                 self.trigger(receiver, template, context)
 
@@ -794,6 +848,22 @@ class EMAILNotification:
                                   "path": util_absolute_url(invoices[0].file.url)}]})
             body_template = "email/lab_invoice/body.html"
             subject_template = "email/lab_invoice/subject.txt"
+        elif notification_type == NotificationAction.INSURANCE_CONFIRMED:
+
+            coi = context.get("instance").coi
+            if not coi:
+                logger.error("Got error while creating pdf for opd invoice")
+                return '', ''
+            context.update({"coi": coi})
+            context.update({"coi_url": coi.url})
+            context.update(
+                {"attachments": [
+                    {"filename": util_file_name(coi.url),
+                     "path": util_absolute_url(coi.url)}]})
+
+            body_template = "email/insurance_confirmed/body.html"
+            subject_template = "email/insurance_confirmed/subject.txt"
+
         elif notification_type == NotificationAction.LAB_REPORT_SEND_VIA_CRM:
             attachments = []
             for report_link in context.get('reports', []):
@@ -976,8 +1046,10 @@ class OpdNotification(Notification):
             mask_number = mask_number_instance.mask_number
         email_banners_html = UserConfig.objects.filter(key__iexact="email_banners") \
                     .annotate(html_code=KeyTransform('html_code', 'data')).values_list('html_code', flat=True).first()
-        auth_token = AgentToken.objects.create_token(user=self.appointment.user)
-        booking_url = settings.BASE_URL + '/sms/booking?token={}'.format(auth_token.token)
+        # Implmented According to DOCNEW-360
+        # auth_token = AgentToken.objects.create_token(user=self.appointment.user)
+        token_object = JWTAuthentication.generate_token(self.appointment.user)
+        booking_url = settings.BASE_URL + '/sms/booking?token={}'.format(token_object['token'].decode("utf-8"))
         opd_appointment_complete_url = booking_url + "&callbackurl=opd/appointment/{}?complete=true".format(self.appointment.id)
         opd_appointment_feedback_url = booking_url + "&callbackurl=opd/appointment/{}".format(self.appointment.id)
         reschdule_appointment_bypass_url = booking_url + "&callbackurl=opd/doctor/{}/{}/book?reschedule={}".format(self.appointment.doctor.id, self.appointment.hospital.id, self.appointment.id)
@@ -1014,6 +1086,10 @@ class OpdNotification(Notification):
         if notification_type == NotificationAction.DOCTOR_INVOICE:
             email_notification = EMAILNotification(notification_type, context)
             email_notification.send(all_receivers.get('email_receivers', []))
+        elif notification_type in [NotificationAction.REFUND_BREAKUP, NotificationAction.REFUND_COMPLETED] and context.get('instance').payment_type == 3:
+            # As no notification to be sent in case of insurance.
+            pass
+
         elif notification_type == NotificationAction.OPD_OTP_BEFORE_APPOINTMENT or \
                 notification_type == NotificationAction.OPD_CONFIRMATION_CHECK_AFTER_APPOINTMENT or \
                 notification_type == NotificationAction.OPD_CONFIRMATION_SECOND_CHECK_AFTER_APPOINTMENT or \
@@ -1097,11 +1173,11 @@ class OpdNotification(Notification):
                 user_and_phone_number.append({'user': user, 'phone_number': phone_number})
             if email:
                 user_and_email.append({'user': user, 'email': email})
-        user_and_email = unique_emails(user_and_email)
-        user_and_phone_number = unique_phone_numbers(user_and_phone_number)
-        spoc_emails, spoc_numbers = get_spoc_email_and_number_hospital(spocs_to_be_communicated)
+        spoc_emails, spoc_numbers = get_spoc_email_and_number_hospital(spocs_to_be_communicated, instance)
         user_and_phone_number.extend(spoc_numbers)
         user_and_email.extend(spoc_emails)
+        user_and_email = unique_emails(user_and_email)
+        user_and_phone_number = unique_phone_numbers(user_and_phone_number)
         all_receivers['sms_receivers'] = user_and_phone_number
         all_receivers['email_receivers'] = user_and_email
         all_receivers['app_receivers'] = app_receivers + doctor_spocs_app_recievers
@@ -1167,6 +1243,11 @@ class LabNotification(Notification):
         if notification_type == NotificationAction.LAB_INVOICE:
             email_notification = EMAILNotification(notification_type, context)
             email_notification.send(all_receivers.get('email_receivers', []))
+
+        elif notification_type in [NotificationAction.REFUND_BREAKUP, NotificationAction.REFUND_COMPLETED] and context.get('instance').payment_type == 3:
+            # As no notification to be sent in case of insurance.
+            pass
+
         elif notification_type == NotificationAction.LAB_OTP_BEFORE_APPOINTMENT:
             sms_notification = SMSNotification(notification_type, context)
             sms_notification.send(all_receivers.get('sms_receivers', []))
@@ -1257,3 +1338,96 @@ class LabNotification(Notification):
         all_receivers['push_receivers'] = user_and_tokens
 
         return all_receivers
+
+
+class InsuranceNotification(Notification):
+
+    def __init__(self, insurance, notification_type=None):
+        self.insurance = insurance
+        self.notification_type = notification_type
+
+    def get_context(self):
+        instance = self.insurance
+        insured_members = instance.members.all()
+        proposer = list(filter(lambda member: member.relation.lower() == 'self', insured_members))
+        proposer = proposer[0]
+
+        # proposer_fname = proposer.first_name if proposer.first_name else ""
+        # proposer_mname = proposer.middle_name if proposer.middle_name else ""
+        # proposer_lname = proposer.last_name if proposer.last_name else ""
+        #
+        # proposer_name = '%s %s %s %s' % (proposer.title, proposer_fname, proposer_mname, proposer_lname)
+        proposer_name = proposer.get_full_name()
+
+        member_list = list()
+        count = 1
+        for member in insured_members:
+            # fname = member.first_name if member.first_name else ""
+            # mname = member.middle_name if member.middle_name else ""
+            # lname = member.last_name if member.last_name else ""
+            #
+            # name = '%s %s %s' % (fname, mname, lname)
+            name = member.get_full_name()
+            data = {
+                'name': name.title(),
+                'member_number': count,
+                'dob': member.dob.strftime('%d-%m-%Y'),
+                'relation': member.relation.title(),
+                'id': member.id,
+                'gender': member.gender.title(),
+                'age': int((datetime.datetime.now().date() - member.dob).days/365),
+            }
+            member_list.append(data)
+            count = count + 1
+
+        context = {
+            'instance': instance,
+            'purchase_date': str(aware_time_zone(instance.purchase_date).date().strftime('%d %b %Y')),
+            'expiry_date': str(aware_time_zone(instance.expiry_date).date().strftime('%d %b %Y')),
+            'premium': instance.premium_amount,
+            'proposer_name': proposer_name.title(),
+            'current_date': timezone.now().date().strftime('%d %b %Y'),
+            'policy_number': instance.policy_number,
+            'total_member_covered': len(member_list),
+            'plan': instance.insurance_plan.name,
+            'insured_members': member_list,
+            'insurer_logo': instance.insurance_plan.insurer.logo.url,
+            'coi_url': instance.coi.url,
+            'insurer_name': instance.insurance_plan.insurer.name
+        }
+
+        return context
+
+    def get_receivers(self):
+
+        all_receivers = {}
+        instance = self.insurance
+        if not instance:
+            return {}
+
+        user_and_phone_number = []
+        user_and_email = []
+
+        insured_members = instance.members.all()
+        proposer = list(filter(lambda member: member.relation.lower() == 'self', insured_members))
+        proposer = proposer[0]
+
+        user_and_email.append({'user': instance.user, 'email': proposer.email})
+        user_and_phone_number.append({'user': instance.user, 'phone_number': proposer.phone_number})
+
+        all_receivers['sms_receivers'] = user_and_phone_number
+        all_receivers['email_receivers'] = user_and_email
+
+        return all_receivers
+
+    def send(self):
+        context = self.get_context()
+        notification_type = self.notification_type
+        all_receivers = self.get_receivers()
+
+        if notification_type == NotificationAction.INSURANCE_CONFIRMED:
+            email_notification = EMAILNotification(notification_type, context)
+            email_notification.send(all_receivers.get('email_receivers', []))
+
+            sms_notification = SMSNotification(notification_type, context)
+            sms_notification.send(all_receivers.get('sms_receivers', []))
