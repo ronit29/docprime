@@ -295,6 +295,6 @@ class UpdateHospitalConsent(serializers.Serializer):
             raise serializers.ValidationError('the flag for hospital consent needs to be true')
         if attrs.get('hospital_id').is_listed_on_docprime is None:
             raise serializers.ValidationError('hospital added through agent, not by provider')
-        if attrs.get('hospital_id').is_listed_on_docprime is True:
-            raise serializers.ValidationError('hospital already listed on docprime')
+        # if attrs.get('hospital_id').is_listed_on_docprime is True:
+        #     raise serializers.ValidationError('hospital already listed on docprime')
         return attrs

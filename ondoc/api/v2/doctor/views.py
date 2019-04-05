@@ -742,6 +742,8 @@ class ProviderSignupDataViewset(viewsets.GenericViewSet):
         valid_data = serializer.validated_data
         try:
             hospital = valid_data.get('hospital_id')
+            if hospital.is_listed_on_docprime:
+                return Response({"status": 1, "message": "already consent present for given hospital"}, status.HTTP_200_OK)
             hospital.is_listed_on_docprime = valid_data.get('is_listed_on_docprime')
             hospital.save()
             return Response({"status": 1, "message": "successfully updated"}, status.HTTP_200_OK)
