@@ -34,6 +34,7 @@ def prepare_and_hit(self, data):
     location = ''
     booking_url = ''
 
+
     if task_data.get('type') == 'OPD_APPOINTMENT':
         booking_url = '%s/admin/doctor/opdappointment/%s/change' % (settings.ADMIN_BASE_URL, appointment.id)
         kyc = 1 if DoctorDocument.objects.filter(doctor=appointment.doctor, document_type__in=[DoctorDocument.CHEQUE,
@@ -125,6 +126,7 @@ def prepare_and_hit(self, data):
         'CityId': 0,
         'ProductId': task_data.get('product_id'),
         'SubProductId': task_data.get('sub_product_id'),
+        'UtmParameters': appointment.spo_data,
         'AppointmentDetails': appointment_details
     }
 

@@ -1460,6 +1460,7 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin)
     user_plan_used = models.ForeignKey('subscription_plan.UserPlanMapping', null=True, on_delete=models.DO_NOTHING,
                                        related_name='appointment_using')
     integrator_response = GenericRelation(IntegratorResponse)
+    spo_data = JSONField(blank=True, null=True)
 
     def get_tests_and_prices(self):
         test_price = []
@@ -2132,7 +2133,8 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin)
             "discount": int(price_data.get("coupon_discount")),
             "cashback": int(price_data.get("coupon_cashback")),
             "is_appointment_insured": is_appointment_insured,
-            "insurance": insurance_id
+            "insurance": insurance_id,
+            "spo_data": data["spo_data"]
         }
 
         if data.get('included_in_user_plan', False):
