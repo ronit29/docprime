@@ -325,6 +325,8 @@ def push_signup_lead_to_matrix(self, data):
 
         utm = online_lead_obj.utm_params if online_lead_obj.utm_params else {}
 
+        continue_url = settings.ADMIN_BASE_URL + reverse('admin:doctor_doctor_add')
+
         request_data = {
             'Name': online_lead_obj.name,
             'PrimaryNo': online_lead_obj.mobile,
@@ -340,6 +342,7 @@ def push_signup_lead_to_matrix(self, data):
             'UTMMedium': utm.get('utm_medium', ''),
             'UtmSource': utm.get('utm_source', ''),
             'UtmTerm': utm.get('utm_term', ''),
+            'ExitPointUrl': continue_url
         }
 
         #logger.error(json.dumps(request_data))
