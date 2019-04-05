@@ -250,6 +250,42 @@ class IsMatrixUser(permissions.BasePermission):
         return False
 
 
+def insurance_transform(app_data):
+    """A serializer helper to serialize Insurance data"""
+    # app_data['insurance']['insurance_transaction']['transaction_date'] = str(app_data['insurance']['insurance_transaction']['transaction_date'])
+    # app_data['insurance']['profile_detail']['dob'] = str(app_data['insurance']['profile_detail']['dob'])
+    # insured_members = app_data['insurance']['insurance_transaction']['insured_members']
+    # for member in insured_members:
+    #     member['dob'] = str(member['dob'])
+    #     # member['member_profile']['dob'] = str(member['member_profile']['dob'])
+    # return app_data
+    app_data['user_insurance']['purchase_date'] = str(
+        app_data['user_insurance']['purchase_date'])
+    app_data['user_insurance']['expiry_date'] = str(
+        app_data['user_insurance']['expiry_date'])
+    app_data['profile_detail']['dob'] = str(app_data['profile_detail']['dob'])
+    insured_members = app_data['user_insurance']['insured_members']
+    for member in insured_members:
+        member['dob'] = str(member['dob'])
+        # member['member_profile']['dob'] = str(member['member_profile']['dob'])
+    return app_data
+
+
+def insurance_reverse_transform(insurance_data):
+    insurance_data['user_insurance']['purchase_date'] = \
+        datetime.datetime.strptime(insurance_data['user_insurance']['purchase_date'], "%Y-%m-%d %H:%M:%S.%f")
+    insurance_data['user_insurance']['expiry_date'] = \
+        datetime.datetime.strptime(insurance_data['user_insurance']['expiry_date'],
+                                   "%Y-%m-%d %H:%M:%S.%f")
+    insurance_data['profile_detail']['dob'] = \
+        datetime.datetime.strptime(insurance_data['profile_detail']['dob'],
+                                   "%Y-%m-%d")
+    insured_members = insurance_data['user_insurance']['insured_members']
+    for member in insured_members:
+        member['dob'] = datetime.datetime.strptime(member['dob'], "%Y-%m-%d").date()
+    return insurance_data
+
+
 def opdappointment_transform(app_data):
     """A serializer helper to serialize OpdAppointment data"""
     app_data["deal_price"] = str(app_data["deal_price"])
@@ -321,6 +357,7 @@ def is_valid_testing_lab_data(user, lab):
 
 def payment_details(request, order):
     from ondoc.authentication.models import UserProfile
+    from ondoc.insurance.models import InsurancePlans
     from ondoc.account.models import PgTransaction, Order
     payment_required = True
     user = request.user
@@ -335,11 +372,21 @@ def payment_details(request, order):
     profile_name = ""
     if profile:
         profile_name = profile.name
-    if order.product_id == Order.SUBSCRIPTION_PLAN_PRODUCT_ID:
-        #temp_product_id = Order.DOCTOR_PRODUCT_ID
-        pass
-    else:
-        temp_product_id = order.product_id
+    if not profile and order.product_id == 3:
+        if order.action_data.get('profile_detail'):
+            profile_name = order.action_data.get('profile_detail').get('name', "")
+
+    insurer_code = None
+    if order.product_id == Order.INSURANCE_PRODUCT_ID:
+        insurance_plan_id = order.action_data.get('insurance_plan')
+        insurance_plan = InsurancePlans.objects.filter(id=insurance_plan_id).first()
+        if not insurance_plan:
+            raise Exception('Invalid pg transaction as insurer plan is not found.')
+        insurer = insurance_plan.insurer
+        insurer_code = insurer.insurer_merchant_code
+
+    temp_product_id = order.product_id
+
     pgdata = {
         'custId': user.id,
         'mobile': user.phone_number,
@@ -352,6 +399,10 @@ def payment_details(request, order):
         'name': profile_name,
         'txAmount': str(order.amount),
     }
+
+    if insurer_code:
+        pgdata['insurerCode'] = insurer_code
+
     secret_key = client_key = ""
     # TODO : SHASHANK_SINGH for plan FINAL ??
     if order.product_id == Order.DOCTOR_PRODUCT_ID or order.product_id == Order.SUBSCRIPTION_PLAN_PRODUCT_ID:
@@ -360,6 +411,9 @@ def payment_details(request, order):
     elif order.product_id == Order.LAB_PRODUCT_ID:
         secret_key = settings.PG_SECRET_KEY_P2
         client_key = settings.PG_CLIENT_KEY_P2
+    elif order.product_id == Order.INSURANCE_PRODUCT_ID:
+        secret_key = settings.PG_SECRET_KEY_P3
+        client_key = settings.PG_CLIENT_KEY_P3
 
     pgdata['hash'] = PgTransaction.create_pg_hash(pgdata, secret_key, client_key)
 
