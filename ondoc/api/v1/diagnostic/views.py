@@ -243,6 +243,7 @@ class LabList(viewsets.ReadOnlyModelViewSet):
             priority_score=F('availablelabs__lab_pricing_group__labs__lab_priority') * F('priority')).annotate(
             distance=Distance('availablelabs__lab_pricing_group__labs__location', pnt)).annotate(
             lab=F('availablelabs__lab_pricing_group__labs'), mrp=F('availablelabs__mrp'),
+            network_id=F('availablelabs__lab_pricing_group__labs__network_id'),
             price=Case(
                 When(availablelabs__custom_deal_price__isnull=True,
                      then=F('availablelabs__computed_deal_price')),
@@ -265,6 +266,7 @@ class LabList(viewsets.ReadOnlyModelViewSet):
             priority_score=F('availablelabs__lab_pricing_group__labs__lab_priority') * F('priority')).annotate(
             distance=Distance('availablelabs__lab_pricing_group__labs__location', pnt)).annotate(
             lab=F('availablelabs__lab_pricing_group__labs'), mrp=F('availablelabs__mrp'),
+            network_id=F('availablelabs__lab_pricing_group__labs__network_id'),
             price=Case(
                 When(availablelabs__custom_deal_price__isnull=True,
                      then=F('availablelabs__computed_deal_price')),
@@ -485,7 +487,7 @@ class LabList(viewsets.ReadOnlyModelViewSet):
                         partition_by=[RawSQL('Coalesce(lab.network_id, random())', []), F('id')])
         )
 
-        all_packages_in_labs = all_packages_in_labs.distinct()
+        all_packages_in_labs = all_packages_in_labs.order_by('availablelabs__lab_pricing_group__labs__network_id').distinct()
         # all_packages_in_labs = list(all_packages_in_labs)
         # all_packages = filter(lambda x: x.rank == 1, all_packages_in_labs)
         all_packages = [package for package in all_packages_in_labs if package.rank == 1]
@@ -524,8 +526,10 @@ class LabList(viewsets.ReadOnlyModelViewSet):
             all_packages = sorted(all_packages, key=lambda x: x.distance if hasattr(x,
                                                                                     'distance') and x.distance is not None else -float(
                 'inf'))
-        all_packages = sorted(all_packages, key=lambda x: x.network_id if hasattr(x,
-                                                                                    'network_id') and x.network_id is not None else float('inf'))
+        # all_packages = sorted(all_packages, key=lambda x: x.network_id if hasattr(x,
+        #                                                                             'network_id') and x.network_id is not None else float('inf'))
+
+
         lab_ids = [package.lab for package in all_packages]
         entity_url_qs = EntityUrls.objects.filter(entity_id__in=lab_ids, is_valid=True, url__isnull=False,
                                                   sitemap_identifier=EntityUrls.SitemapIdentifier.LAB_PAGE).values(
