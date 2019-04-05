@@ -33,7 +33,7 @@ from ondoc.notification.models import NotificationAction, SmsNotification, Email
     PushNotification, WhtsappNotification
 # from ondoc.notification.sqs_client import publish_message
 from ondoc.notification.rabbitmq_client import publish_message
-import datetime
+# import datetime
 from ondoc.api.v1.utils import aware_time_zone
 
 User = get_user_model()
@@ -1375,7 +1375,7 @@ class InsuranceNotification(Notification):
                 'relation': member.relation.title(),
                 'id': member.id,
                 'gender': member.gender.title(),
-                'age': int((datetime.datetime.now().date() - member.dob).days/365),
+                'age': int((datetime.now().date() - member.dob).days/365),
             }
             member_list.append(data)
             count = count + 1
