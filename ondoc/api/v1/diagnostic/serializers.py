@@ -1290,11 +1290,10 @@ class CustomLabTestPackageSerializer(serializers.ModelSerializer):
     category_details = serializers.SerializerMethodField()
     tests = serializers.SerializerMethodField()
     included_in_user_plan = serializers.SerializerMethodField()
-    network_id = serializers.ReadOnlyField()
 
     class Meta:
         model = LabTest
-        fields = ('id', 'name', 'lab', 'mrp', 'network_id', 'distance', 'price', 'lab_timing', 'lab_timing_data', 'next_lab_timing',
+        fields = ('id', 'name', 'lab', 'mrp', 'distance', 'price', 'lab_timing', 'lab_timing_data', 'next_lab_timing',
                   'next_lab_timing_data', 'test_type', 'is_package', 'number_of_tests', 'why', 'pre_test_info',
                   'is_package', 'pickup_charges', 'pickup_available', 'distance_related_charges', 'priority',
                   'show_details', 'categories', 'url', 'priority_score', 'category_details', 'tests', 'included_in_user_plan')

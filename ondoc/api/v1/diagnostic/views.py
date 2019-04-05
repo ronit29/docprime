@@ -243,7 +243,6 @@ class LabList(viewsets.ReadOnlyModelViewSet):
             priority_score=F('availablelabs__lab_pricing_group__labs__lab_priority') * F('priority')).annotate(
             distance=Distance('availablelabs__lab_pricing_group__labs__location', pnt)).annotate(
             lab=F('availablelabs__lab_pricing_group__labs'), mrp=F('availablelabs__mrp'),
-            network_id=F('availablelabs__lab_pricing_group__labs__network_id'),
             price=Case(
                 When(availablelabs__custom_deal_price__isnull=True,
                      then=F('availablelabs__computed_deal_price')),
@@ -266,7 +265,6 @@ class LabList(viewsets.ReadOnlyModelViewSet):
             priority_score=F('availablelabs__lab_pricing_group__labs__lab_priority') * F('priority')).annotate(
             distance=Distance('availablelabs__lab_pricing_group__labs__location', pnt)).annotate(
             lab=F('availablelabs__lab_pricing_group__labs'), mrp=F('availablelabs__mrp'),
-            network_id=F('availablelabs__lab_pricing_group__labs__network_id'),
             price=Case(
                 When(availablelabs__custom_deal_price__isnull=True,
                      then=F('availablelabs__computed_deal_price')),
@@ -477,7 +475,6 @@ class LabList(viewsets.ReadOnlyModelViewSet):
             distance=Distance('availablelabs__lab_pricing_group__labs__location',
                               pnt)).annotate(
             lab=F('availablelabs__lab_pricing_group__labs'), mrp=F('availablelabs__mrp'),
-            network_id =F('availablelabs__lab_pricing_group__labs__network_id'),
             price=Case(
                 When(availablelabs__custom_deal_price__isnull=True,
                      then=F('availablelabs__computed_deal_price')),
