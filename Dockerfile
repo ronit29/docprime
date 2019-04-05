@@ -7,9 +7,20 @@ ARG COLLECTSTATIC
 #ARG MIGRATE
 RUN apt-get update && apt-get install binutils libproj-dev gdal-bin nano apt-utils -y
 RUN apt-get update
-RUN apt-get install -y xvfb fluxbox x11vnc dbus libasound2 libqt4-dbus libqt4-network libqtcore4 libqtgui4 libxss1 libpython2.7 libqt4-xml libaudio2 libmng1 fontconfig liblcms1 lib32stdc++6 lib32asound2 ia32-libs libc6-i386 lib32gcc1 nano
-RUN apt-get install -y python-gobject-2
-RUN apt-get install -y curl git
+
+RUN apt-get -y install xvfb unzip
+RUN apt-get -y install xserver-xorg-core
+RUN apt-get -y install xfonts-100dpi xfonts-75dpi xfonts-scalable xfonts-cyrillic
+
+RUN wget -q -O - https://dl-ssl.google.com/linux/linux_signing_key.pub | sudo apt-key add -
+RUN sh -c 'echo "deb http://dl.google.com/linux/chrome/deb/ stable main" >> /etc/apt/sources.list.d/google.list'
+RUN apt-get update
+RUN apt-get -y install google-chrome-stable
+RUN wget https://chromedriver.storage.googleapis.com/2.27/chromedriver_linux64.zip
+RUN unzip chromedriver_linux64.zip
+RUN rm chromedriver_linux64.zip
+RUN chmod +x chromedriver
+RUN mv -f chromedriver /usr/local/bin
 
 RUN mkdir -p /home/docprime/workspace/backend
 RUN mkdir /env
