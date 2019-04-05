@@ -34,11 +34,16 @@ def push_lab_appointment_to_integrator(self, data):
                 logger.error("[ERROR] Cant find lab, lab_network or lab_test")
 
             lab_network_content_type = ContentType.objects.get_for_model(lab_network)
-            integrator_mapping = None
+
             if not lab_tests:
                 raise Exception('[ERROR] Could not find any test and packages for the appointment id %d' % appointment.id)
 
-            integrator_mapping = IntegratorTestMapping.objects.filter(content_type=lab_network_content_type, object_id=lab_network.id, test=lab_tests[0]).first()
+            # check integrator mapping available for each test
+            integrator_mapping = True
+            for test in lab_tests:
+                integrator_mapping = IntegratorTestMapping.objects.filter(content_type=lab_network_content_type, object_id=lab_network.id, test=test, is_active=True).first()
+                if not integrator_mapping:
+                    integrator_mapping = False
 
             if not integrator_mapping:
                 raise Exception("[ERROR] Mapping not found for booked test or package - appointment id %d" % appointment.id)
