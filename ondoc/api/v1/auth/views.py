@@ -1774,7 +1774,7 @@ class OnlineLeadViewSet(GenericViewSet):
         elif request.user_agent.is_pc:
             source = "WEB %s" % (data.get('source', ''))
         else:
-            source = "Unknown"
+            source = "Signup"
 
         data['source'] = source
         if not data.get('city_name'):
