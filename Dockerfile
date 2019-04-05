@@ -9,17 +9,13 @@ RUN apt-get update && apt-get install binutils libproj-dev gdal-bin nano apt-uti
 RUN apt-get update
 
 
-RUN apt-get -y install libxss1 libappindicator1 libindicator7
+
+# install manually all the missing libraries
+RUN apt-get install -y gconf-service libasound2 libatk1.0-0 libcairo2 libcups2 libfontconfig1 libgdk-pixbuf2.0-0 libgtk-3-0 libnspr4 libpango-1.0-0 libxss1 fonts-liberation libappindicator1 libnss3 lsb-release xdg-utils
+
+# install chrome
 RUN wget https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb
-#RUN dpkg -i google-chrome*.deb
-#RUN apt-get -y install -f
-RUN apt-get -y install xvfb unzip
-RUN wget -N http://chromedriver.storage.googleapis.com/2.26/chromedriver_linux64.zip
-RUN unzip chromedriver_linux64.zip
-RUN chmod +x chromedriver
-RUN mv -f chromedriver /usr/local/share/chromedriver
-RUN ln -s /usr/local/share/chromedriver /usr/local/bin/chromedriver
-RUN ln -s /usr/local/share/chromedriver /usr/bin/chromedriver
+RUN dpkg -i google-chrome-stable_current_amd64.deb; apt-get -fy install
 
 
 RUN mkdir -p /home/docprime/workspace/backend
