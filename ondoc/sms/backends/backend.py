@@ -12,11 +12,12 @@ from dateutil.relativedelta import relativedelta
 class NodeJsSmsBackend(object):
 
     def send(self, message, phone_no, retry_send=False):
+        from requests.utils import quote
         payload = {
             "type": "sms",
             "data": {
                 "phone_number": phone_no,
-                "content": message,
+                "content": quote(message),
                 "retry": retry_send
             }
         }
