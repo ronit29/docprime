@@ -116,7 +116,7 @@ class UserPlanMapping(auth_model.TimeStampedModel):
         return int(float(price))
 
     def is_cancellable(self):
-        return self.appointment_using.all().count() != 0
+        return self.appointment_using.all().count() == 0
 
     def save(self, *args, **kwargs):
         if not self.expire_at:
