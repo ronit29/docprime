@@ -15,6 +15,8 @@ class TimeStampedModel():
 class TrackingEvent(DynamicDocument, TimeStampedModel):
     id = UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     name = StringField(max_length=50, null=True, blank=True)
+    visitor_id = UUIDField(editable=False)
+    visit_id = UUIDField(editable=False)
 
     @classmethod
     def save_event(cls, *args, **kwargs):
@@ -45,6 +47,7 @@ class TrackingVisit(DynamicDocument, TimeStampedModel):
     data = DictField(blank=True, null=True)
     location = DictField(blank=True, null=True)
     user_agent = StringField(max_length=500, blank=True, null=True)
+    visitor_id = UUIDField(editable=False)
 
 class TrackingVisitor(DynamicDocument, TimeStampedModel):
     id = UUIDField(primary_key=True, default=uuid.uuid4, editable=False)

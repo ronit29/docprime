@@ -20,6 +20,7 @@ from django.contrib.staticfiles.templatetags.staticfiles import static
 
 from ondoc.location.models import EntityAddress
 from collections import OrderedDict
+from ondoc.insurance.models import UserInsurance
 from collections import defaultdict
 
 
@@ -164,10 +165,18 @@ class DoctorSearchHelper:
             search_key = " ".join(search_key).lower()
 
             search_key = "".join(search_key.split("."))
-            filtering_params.append(
-                "d.search_key ilike (%(doctor_name)s)"
-                    )
-            params['doctor_name'] = '%'+search_key+'%'
+            filtering_params.append("(d.search_key like (%(doctor_name1)s) "
+                                    "or d.search_key like  %(doctor_name2)s "
+                                    "or d.search_key like %(doctor_name3)s) ")
+            # filtering_params.append(
+            #     "d.search_key ilike (%(doctor_name)s)"
+            #         )
+            # params['doctor_name'] = '%'+search_key+'%'
+            params['order_doctor'] = search_key
+            params['doctor_name1'] = search_key + ' %'
+            params['doctor_name2'] = '% ' + search_key + ' %'
+            params['doctor_name3'] = '% ' + search_key
+
         if self.query_params.get("hospital_name"):
             search_key = re.findall(r'[a-z0-9A-Z.]+', self.query_params.get("hospital_name"))
             search_key = " ".join(search_key).lower()
@@ -175,6 +184,12 @@ class DoctorSearchHelper:
             filtering_params.append(
                 "h.search_key ilike (%(hospital_name)s)")
             params['hospital_name'] = '%' + search_key + '%'
+
+        if self.query_params.get('is_insurance'):
+            filtering_params.append(
+                "mrp<=(%(insurance_threshold_amount)s) and h.enabled_for_online_booking=True and d.enabled_for_online_booking=True and d.is_insurance_enabled and dc.enabled_for_online_booking=True"
+            )
+            params['insurance_threshold_amount'] = self.query_params.get('insurance_threshold_amount')
 
         result = {}
         if not filtering_params:
@@ -192,6 +207,8 @@ class DoctorSearchHelper:
     def get_ordering_params(self):
         # order_by_field = 'is_gold desc, distance, dc.priority desc'
         # rank_by = "rank_distance=1"
+        if self.query_params and self.query_params.get('doctor_name'):
+             return ' enabled_for_online_booking DESC, position(%(order_doctor)s in search_key) ', ' rnk=1'
 
         if self.query_params.get('url') and (not self.query_params.get('sort_on') \
                                              or self.query_params.get('sort_on')=='distance'):
@@ -240,16 +257,20 @@ class DoctorSearchHelper:
         latitude = str(self.query_params["latitude"])
         ist_time = datetime.now().strftime("%H:%M:%S")
         ist_date = datetime.now().strftime("%Y-%m-%d")
+        max_distance=None
 
-        max_distance = str(
-            self.query_params.get('max_distance') * 1000 if self.query_params.get(
-                'max_distance') and self.query_params.get(
-                'max_distance') * 1000 < int(DoctorSearchHelper.MAX_DISTANCE) else DoctorSearchHelper.MAX_DISTANCE)
+        if not self.query_params.get('max_distance') == None and self.query_params.get('max_distance')*1000 == 0:
+            max_distance = self.query_params.get('max_distance')
+        else:
+            max_distance = str(
+                self.query_params.get('max_distance') * 1000 if self.query_params.get(
+                    'max_distance') and self.query_params.get(
+                    'max_distance') * 1000 < int(DoctorSearchHelper.MAX_DISTANCE) else DoctorSearchHelper.MAX_DISTANCE)
         min_distance = self.query_params.get('min_distance')*1000 if self.query_params.get('min_distance') else 0
 
-        if self.query_params and self.query_params.get('sitemap_identifier'):            
+        if self.query_params and self.query_params.get('sitemap_identifier') and self.query_params.get('max_distance')==None:
             sitemap_identifier = self.query_params.get('sitemap_identifier')
-            if sitemap_identifier in ('SPECIALIZATION_LOCALITY_CITY', 'DOCTORS_LOCALITY_CITY' ):
+            if sitemap_identifier in ('SPECIALIZATION_LOCALITY_CITY', 'DOCTORS_LOCALITY_CITY'):
                 max_distance = 5000
             if sitemap_identifier in ('SPECIALIZATION_CITY', 'DOCTORS_CITY'):
                 max_distance = 15000
@@ -260,6 +281,9 @@ class DoctorSearchHelper:
         specialization_ids = self.query_params.get("specialization_ids", [])
         condition_ids = self.query_params.get("condition_ids", [])
 
+        if filtering_params.get('params', {}).get('hospital_id'):
+            max_distance = 10000000
+            min_distance = 0
 
         if self.count_of_procedure:
             rank_part = "Row_number() OVER( PARTITION BY doctor_id ORDER BY " \
@@ -328,7 +352,7 @@ class DoctorSearchHelper:
                            "FROM (select {rank_part}, " \
                            "St_distance(St_setsrid(St_point((%(longitude)s), (%(latitude)s)), 4326), h.location) distance, " \
                            "d.id as doctor_id, " \
-                           "dc.id as doctor_clinic_id,  " \
+                           "dc.id as doctor_clinic_id,  d.search_key, " \
                            "dct.id as doctor_clinic_timing_id,practicing_since, " \
                            "d.enabled_for_online_booking and dc.enabled_for_online_booking and h.enabled_for_online_booking as enabled_for_online_booking, " \
                            "is_license_verified, priority,deal_price, h.welcome_calling_done, " \
@@ -376,7 +400,7 @@ class DoctorSearchHelper:
         current_location = Point(self.query_params.get("longitude"), self.query_params.get("latitude"),
                                 srid=4326)
         for hospital in doctor.hospitals.all():
-            if hospital.id == doctor_clinic_mapping[doctor.id]:
+            if hospital.id == doctor_clinic_mapping[doctor.id] and hospital.location:
                 return current_location.distance(hospital.location)*100
         return ""
 
@@ -389,7 +413,7 @@ class DoctorSearchHelper:
                 # return doctor_hospital.deal_price
         return None
 
-    def prepare_search_response(self, doctor_data, doctor_search_result, request):
+    def prepare_search_response(self, doctor_data, doctor_search_result, request, **kwargs):
         doctor_clinic_mapping = {data.get("doctor_id"): data.get("hospital_id") for data in doctor_search_result}
         doctor_availability_mapping = {data.get("doctor_id"): data.get("doctor_clinic_timing_id") for data in
                                        doctor_search_result}
@@ -419,6 +443,7 @@ class DoctorSearchHelper:
                         "mrp": data.mrp
                     }
             # min_fees = min([data.get("deal_price") for data in serializer.data if data.get("deal_price")])
+
             if not doctor_clinic:
                 hospitals = []
             else:
@@ -445,8 +470,22 @@ class DoctorSearchHelper:
                     if doctor.enabled_for_online_booking and doctor_clinic.hospital.enabled_for_online_booking and doctor_clinic.enabled_for_online_booking:
                         enable_online_booking = True
 
+                # We cover the insurance for only those users which have purchased the insurance and their insurance
+                # threshold value is greater than the doctor fees and if doctor is enabled for the online booking.
+                # Insurance is not valid for the procedures hence negating the procedure request.
+
+                is_insurance_covered = False
+                insurance_data_dict = kwargs.get('insurance_data')
+                if enable_online_booking and doctor.is_insurance_enabled and insurance_data_dict and min_price.get("mrp") is not None and \
+                        min_price["mrp"] <= insurance_data_dict['insurance_threshold_amount'] and \
+                        not (request.query_params.get('procedure_ids') or request.query_params.get('procedure_category_ids')):
+                    is_insurance_covered = True
+
                 hospitals = [{
                     "enabled_for_online_booking": enable_online_booking,
+                    "is_insurance_covered": is_insurance_covered,
+                    "insurance_threshold_amount": insurance_data_dict['insurance_threshold_amount'],
+                    "is_user_insured": insurance_data_dict['is_user_insured'],
                     "welcome_calling_done": doctor_clinic.hospital.welcome_calling_done,
                     "hospital_name": doctor_clinic.hospital.name,
                     "address": ", ".join(
@@ -460,7 +499,7 @@ class DoctorSearchHelper:
                     "discounted_fees": min_price["deal_price"],
                     "timings": clinic_convert_timings(doctor_clinic.availability.all(), is_day_human_readable=False),
                     "procedure_categories": final_result,
-                    "location": {'lat': doctor_clinic.hospital.location.y, 'long': doctor_clinic.hospital.location.x}
+                    "location": {'lat': doctor_clinic.hospital.location.y, 'long': doctor_clinic.hospital.location.x} if doctor_clinic.hospital and doctor_clinic.hospital.location else None
                 }]
 
             thumbnail = doctor.get_thumbnail()
@@ -517,7 +556,9 @@ class DoctorSearchHelper:
                 "experience_years": doctor.experience_years(),
                 #"experiences": serializers.DoctorExperienceSerializer(doctor.experiences.all(), many=True).data,
                 "qualifications": serializers.DoctorQualificationSerializer(doctor.qualifications.all(), many=True).data,
-                "average_rating": doctor.avg_rating,
+                # "average_rating": doctor.avg_rating,
+                "average_rating": doctor.rating_data.get('avg_rating') if doctor.display_rating_on_list() else None,
+                "rating_count": doctor.rating_data.get('rating_count') if doctor.display_rating_on_list() else None,
                 # "general_specialization": serializers.DoctorPracticeSpecializationSerializer(
                 #     doctor.doctorpracticespecializations.all(),
                 #     many=True).data,

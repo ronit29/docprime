@@ -71,7 +71,7 @@ def userlogin_via_agent(request):
     if not user and user_type==User.CONSUMER:
         user = User.objects.create(phone_number=data['phone_number'],
                                           is_phone_number_verified=False,
-                                          user_type=User.CONSUMER)
+                                          user_type=User.CONSUMER, auto_created=True)
 
     if not user:
         return Response(status=400)

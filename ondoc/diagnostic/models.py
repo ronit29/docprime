@@ -57,6 +57,7 @@ from ondoc.common.models import AppointmentHistory, AppointmentMaskNumber, Remar
 import reversion
 from decimal import Decimal
 from django.utils.text import slugify
+from django.utils.functional import cached_property
 #from ondoc.api.v1.diagnostic import serializers as diagnostic_serializers
 
 logger = logging.getLogger(__name__)
@@ -223,6 +224,7 @@ class Lab(TimeStampedModel, CreatedByModel, QCModel, SearchKey):
     lab_priority = models.PositiveIntegerField(blank=False, null=False, default=1)
     open_for_communication = models.BooleanField(default=True)
     remark = GenericRelation(Remark)
+    rating_data = JSONField(blank=True, null=True)
 
     def __str__(self):
         return self.name
@@ -230,11 +232,35 @@ class Lab(TimeStampedModel, CreatedByModel, QCModel, SearchKey):
     class Meta:
         db_table = "lab"
 
+    @cached_property
+    def is_enabled_for_insurance(self):
+        return self.is_insurance_enabled
+
     def open_for_communications(self):
         if (self.network and self.network.open_for_communication) or (not self.network and self.open_for_communication):
             return True
 
         return False
+
+    @classmethod
+    def get_insurance_details(cls, user):
+
+        resp = {
+            'is_insurance_covered': False,
+            'insurance_threshold_amount': None,
+            'is_user_insured': False
+        }
+
+        if user.is_authenticated and not user.is_anonymous:
+            user_insurance = user.active_insurance
+            if user_insurance:
+                insurance_threshold = user_insurance.insurance_threshold
+                if insurance_threshold:
+                    resp['insurance_threshold_amount'] = 0 if insurance_threshold.lab_amount_limit is None else \
+                        insurance_threshold.lab_amount_limit
+                    resp['is_user_insured'] = True
+
+        return resp
 
     def convert_min(self, min):
         min_str = str(min)
@@ -397,6 +423,12 @@ class Lab(TimeStampedModel, CreatedByModel, QCModel, SearchKey):
         if self.is_live and (self.onboarding_status != self.ONBOARDED or self.data_status != self.QC_APPROVED or self.enabled == False):
             self.is_live = False
 
+    def display_rating_on_list(self):
+        if self.rating_data and ((self.rating_data.get('rating_count') and self.rating_data['rating_count'] > 5) or \
+                                 (self.rating_data.get('avg_rating') and self.rating_data['avg_rating'] > 4)):
+            return True
+        return False
+
     def save(self, *args, **kwargs):
         self.clean()
 
@@ -470,7 +502,17 @@ class Lab(TimeStampedModel, CreatedByModel, QCModel, SearchKey):
         content_type = ContentType.objects.get_for_model(Lab)
         if content_type:
             cid = content_type.id
-            query = '''UPDATE lab l set avg_rating = (select avg(ratings) from ratings_review where content_type_id={} and object_id=l.id) '''.format(cid)
+            query = '''update lab l set rating_data = 
+                        (select rating_data from
+                        (select max(l.id) lab_id,max(l.network_id) network_id,
+                        json_build_object('avg_rating', round(avg(ratings),1),'rating_count' ,count(ratings)) rating_data
+                        from ratings_review rr
+                        inner join lab l on rr.object_id = l.id 
+                        and rr.content_type_id={}
+                        group by case when l.network_id is null then l.id else l.network_id end
+                        )x where case when l.network_id is null then l.id=x.lab_id else l.network_id=x.network_id end
+                        )
+                     '''.format(cid)
             cursor.execute(query)
 
     def get_timing(self, is_home_pickup):
@@ -530,14 +572,14 @@ class Lab(TimeStampedModel, CreatedByModel, QCModel, SearchKey):
         return res_data
 
     def get_available_slots(self, is_home_pickup, pincode, date):
-        from ondoc.integrations.models import IntegratorMapping
+        from ondoc.integrations.models import IntegratorTestMapping
         from ondoc.integrations import service
 
         integration_dict = None
         lab = Lab.objects.filter(id=self.id).first()
         if lab:
             if lab.network and lab.network.id:
-                integration_dict = IntegratorMapping.get_if_third_party_integration(network_id=lab.network.id)
+                integration_dict = IntegratorTestMapping.get_if_third_party_integration(network_id=lab.network.id)
 
                 if lab.network.id == settings.THYROCARE_NETWORK_ID and settings.THYROCARE_INTEGRATION_ENABLED:
                     pass
@@ -555,11 +597,11 @@ class Lab(TimeStampedModel, CreatedByModel, QCModel, SearchKey):
         return available_slots
 
     def is_integrated(self):
-        from ondoc.integrations.models import IntegratorMapping
+        from ondoc.integrations.models import IntegratorTestMapping
 
         integration_dict = None
         if self.network and self.network.id:
-            integration_dict = IntegratorMapping.get_if_third_party_integration(network_id=self.network.id)
+            integration_dict = IntegratorTestMapping.get_if_third_party_integration(network_id=self.network.id)
         if not integration_dict:
             return False
         else:
@@ -1353,6 +1395,8 @@ class LabAppointmentInvoiceMixin(object):
 
 @reversion.register()
 class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin):
+    from ondoc.integrations.models import IntegratorResponse
+
     CREATED = 1
     BOOKED = 2
     RESCHEDULED_LAB = 3
@@ -1390,7 +1434,7 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin)
     payment_status = models.PositiveIntegerField(choices=OpdAppointment.PAYMENT_STATUS_CHOICES,
                                                  default=OpdAppointment.PAYMENT_PENDING)
     payment_type = models.PositiveSmallIntegerField(choices=OpdAppointment.PAY_CHOICES, default=OpdAppointment.PREPAID)
-    insurance = models.ForeignKey(insurance_model.Insurance, blank=True, null=True, default=None,
+    insurance = models.ForeignKey(insurance_model.UserInsurance, blank=True, null=True, default=None,
                                   on_delete=models.DO_NOTHING)
     is_home_pickup = models.BooleanField(default=False)
     address = JSONField(blank=True, null=True)
@@ -1412,19 +1456,30 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin)
     email_notification = GenericRelation(EmailNotification, related_name="lab_notification")
     user_plan_used = models.ForeignKey('subscription_plan.UserPlanMapping', null=True, on_delete=models.DO_NOTHING,
                                        related_name='appointment_using')
+    integrator_response = GenericRelation(IntegratorResponse)
 
     def get_tests_and_prices(self):
         test_price = []
-        for test in self.test_mappings.all():
-            test_price.append({'name': test.test.name, 'mrp': test.mrp, 'deal_price': (
-                test.custom_deal_price if test.custom_deal_price else test.computed_deal_price),
-                               'discount': test.mrp - (
-                                   test.custom_deal_price if test.custom_deal_price else test.computed_deal_price)})
+        if self.payment_type == OpdAppointment.INSURANCE:
+            for test in self.test_mappings.all():
+                test_price.append({'name': test.test.name, 'mrp': test.mrp, 'deal_price': "0.00",
+                                   'discount': test.mrp})
 
-        if self.is_home_pickup:
-            test_price.append(
-                {'name': 'Home Pick Up Charges', 'mrp': self.home_pickup_charges, 'deal_price': self.home_pickup_charges,
-                 'discount': '0.00'})
+            if self.is_home_pickup:
+                test_price.append(
+                    {'name': 'Home Pick Up Charges', 'mrp': self.home_pickup_charges, 'deal_price': "0.00",
+                     'discount': self.home_pickup_charges})
+        else:
+            for test in self.test_mappings.all():
+                test_price.append({'name': test.test.name, 'mrp': test.mrp, 'deal_price': (
+                    test.custom_deal_price if test.custom_deal_price else test.computed_deal_price),
+                                   'discount': test.mrp - (
+                                       test.custom_deal_price if test.custom_deal_price else test.computed_deal_price)})
+
+            if self.is_home_pickup:
+                test_price.append(
+                    {'name': 'Home Pick Up Charges', 'mrp': self.home_pickup_charges, 'deal_price': self.home_pickup_charges,
+                     'discount': '0.00'})
 
         return test_price
 
@@ -1540,7 +1595,7 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin)
                 logger.error(str(e))
 
         is_thyrocare_enabled = False
-        if not self.created_by_native() and False:
+        if not self.created_by_native():
             if push_to_integrator:
                 if self.lab.network and self.lab.network.id == settings.THYROCARE_NETWORK_ID:
                     if settings.THYROCARE_INTEGRATION_ENABLED:
@@ -1548,10 +1603,13 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin)
 
                 try:
                     if is_thyrocare_enabled:
-                        # push_lab_appointment_to_integrator.apply_async(({'appointment_id': self.id},), countdown=5)
-                        push_lab_appointment_to_integrator.apply_async(({'appointment_id': self.id},),
-                                                                       link=get_integrator_order_status.s(appointment_id=self.id),
-                                                                       countdown=5)
+                        if old_instance:
+                            if old_instance.status != self.CANCELLED and self.status == self.CANCELLED:
+                                push_lab_appointment_to_integrator.apply_async(({'appointment_id': self.id},), countdown=5)
+                        else:
+                            push_lab_appointment_to_integrator.apply_async(({'appointment_id': self.id},),
+                                                                           link=get_integrator_order_status.s(
+                                                                               appointment_id=self.id),countdown=5)
                 except Exception as e:
                     logger.error(str(e))
 
@@ -1992,6 +2050,10 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin)
             effective_price = 0
             coupon_discount, coupon_cashback, coupon_list = 0, 0, []
 
+        if data.get("payment_type") in [OpdAppointment.INSURANCE]:
+            effective_price = effective_price
+            coupon_discount, coupon_cashback, coupon_list = 0, 0, []
+
         return {
             "deal_price" : total_deal_price,
             "mrp" : total_mrp,
@@ -2006,6 +2068,7 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin)
     @classmethod
     def create_fulfillment_data(cls, user, data, price_data):
         from ondoc.api.v1.auth.serializers import AddressSerializer
+        from ondoc.insurance.models import UserInsurance
 
         lab_test_queryset = AvailableLabTest.objects.filter(lab_pricing_group__labs=data["lab"], test__in=data['test_ids'])
         test_ids_list = list()
@@ -2028,6 +2091,23 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin)
             "gender": data["profile"].gender,
             "dob": str(data["profile"].dob),
         }
+        payment_type = data.get("payment_type")
+        effective_price = price_data.get("effective_price")
+        cart_data = data.get('cart_item').data
+        is_appointment_insured = cart_data.get('is_appointment_insured', None)
+        insurance_id = cart_data.get('insurance_id', None)
+        # user_insurance = UserInsurance.objects.filter(user=user).last()
+        # if user_insurance:
+        #     insurance_validate_dict = user_insurance.validate_insurance(data)
+        #     is_appointment_insured = insurance_validate_dict['is_insured']
+        #     insurance_id = insurance_validate_dict['insurance_id']
+        #     insurance_message = insurance_validate_dict['insurance_message']
+
+        if is_appointment_insured:
+            payment_type = OpdAppointment.INSURANCE
+            effective_price = 0.0
+        else:
+            insurance_id = None
 
         fulfillment_data = {
             "lab": data["lab"],
@@ -2036,18 +2116,20 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin)
             "price": price_data.get("mrp"),
             "agreed_price": price_data.get("fees"),
             "deal_price": price_data.get("deal_price"),
-            "effective_price": price_data.get("effective_price"),
+            "effective_price": effective_price,
             "home_pickup_charges": price_data.get("home_pickup_charges"),
             "time_slot_start": start_dt,
             "is_home_pickup": data["is_home_pickup"],
             "profile_detail": profile_detail,
             "status": LabAppointment.BOOKED,
-            "payment_type": data["payment_type"],
+            "payment_type": payment_type,
             "lab_test": test_ids_list,
             "extra_details": extra_details,
             "coupon": price_data.get("coupon_list"),
             "discount": int(price_data.get("coupon_discount")),
-            "cashback": int(price_data.get("coupon_cashback"))
+            "cashback": int(price_data.get("coupon_cashback")),
+            "is_appointment_insured": is_appointment_insured,
+            "insurance": insurance_id
         }
 
         if data.get('included_in_user_plan', False):
@@ -2082,6 +2164,40 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin)
 
         except Exception as e:
             logger.error("Could not save triggered event - " + str(e))
+
+    def integrator_order_status(self):
+        from ondoc.integrations.models import IntegratorHistory
+
+        lab_appointment_content_type = ContentType.objects.get_for_model(self)
+        integrator_history = IntegratorHistory.objects.filter(object_id=self.id,
+                                                              content_type=lab_appointment_content_type).order_by('id').last()
+        if not integrator_history:
+            return 'Not a part of Integration'
+
+        return IntegratorHistory.STATUS_CHOICES[integrator_history.status - 1][1]
+
+    def thyrocare_booking_no(self):
+        from ondoc.integrations.models import IntegratorResponse
+
+        lab_appointment_content_type = ContentType.objects.get_for_model(self)
+        integrator_response = IntegratorResponse.objects.filter(object_id=self.id,
+                                                                content_type=lab_appointment_content_type).order_by('id').last()
+        if not integrator_response:
+            return 'Not Found'
+
+        return [integrator_response.lead_id, integrator_response.integrator_order_id]
+
+
+    def accepted_through(self):
+        from ondoc.integrations.models import IntegratorHistory
+
+        lab_appointment_content_type = ContentType.objects.get_for_model(self)
+        integrator_history = IntegratorHistory.objects.filter(object_id=self.id,
+                                                              content_type=lab_appointment_content_type).order_by('id').last()
+        if not integrator_history:
+            return 'Not Found'
+
+        return integrator_history.accepted_through
 
     def __str__(self):
         return "{}, {}".format(self.profile.name if self.profile else "", self.lab.name)
@@ -2348,7 +2464,7 @@ class LabReport(auth_model.TimeStampedModel):
 class LabReportFile(auth_model.TimeStampedModel, auth_model.Document):
     report = models.ForeignKey(LabReport, related_name='files', on_delete=models.SET_NULL, null=True, blank=True)
     name = models.FileField(upload_to='lab_reports/', blank=False, null=False, validators=[
-        FileExtensionValidator(allowed_extensions=['pdf', 'jfif', 'jpg', 'jpeg', 'png'])])
+        FileExtensionValidator(allowed_extensions=['pdf', 'jfif', 'jpg', 'jpeg', 'png', 'xml'])])
 
     def __str__(self):
 
@@ -2425,3 +2541,20 @@ class LabTestGroupMapping(TimeStampedModel):
 
     class Meta:
         db_table = "lab_test_group_mapping"
+
+
+class TestParameterChat(TimeStampedModel):
+    test = models.ForeignKey(LabTest, on_delete=models.CASCADE, null=True)
+    age_from = models.PositiveIntegerField()
+    age_to = models.PositiveIntegerField()
+    gender = models.CharField(max_length=30, null=True, blank=True)
+    min_range = models.DecimalField(blank=True, null=True, max_digits=10,decimal_places=2)
+    max_range = models.DecimalField(blank=True, null=True, max_digits=10,decimal_places=2)
+    test_name = models.CharField(blank=False, null=False, max_length=60)
+
+    def __str__(self):
+        return self.test_name
+
+    class Meta:
+        db_table = 'test_parameter_chat'
+
