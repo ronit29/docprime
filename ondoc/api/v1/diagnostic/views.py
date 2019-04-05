@@ -487,7 +487,7 @@ class LabList(viewsets.ReadOnlyModelViewSet):
                         partition_by=[RawSQL('Coalesce(lab.network_id, random())', []), F('id')])
         )
 
-        all_packages_in_labs = all_packages_in_labs.order_by('availablelabs__lab_pricing_group__labs__network_id').distinct()
+        all_packages_in_labs = all_packages_in_labs.distinct()
         if not sort_on:
             all_packages_in_labs = all_packages_in_labs.order_by('-priority_score')
 
