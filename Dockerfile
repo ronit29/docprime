@@ -11,8 +11,8 @@ RUN apt-get update
 
 RUN apt-get -y install libxss1 libappindicator1 libindicator7
 RUN wget https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb
-RUN dpkg -i google-chrome*.deb
-RUN apt-get -y install -f
+#RUN dpkg -i google-chrome*.deb
+#RUN apt-get -y install -f
 RUN apt-get -y install xvfb unzip
 RUN wget -N http://chromedriver.storage.googleapis.com/2.26/chromedriver_linux64.zip
 RUN unzip chromedriver_linux64.zip
