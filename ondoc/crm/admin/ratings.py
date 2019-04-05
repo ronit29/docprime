@@ -159,10 +159,10 @@ class RatingsReviewAdmin(ImportExportMixin, admin.ModelAdmin):
         from ondoc.authentication.backends import JWTAuthentication
         if instance:
             if instance.user:
-                agent_token = AgentToken.objects.create_token(user=instance.user)
-                # login_object = JWTAuthentication.generate_token(instance.user)
-                token = agent_token.token if agent_token.token else None
-                url = settings.BASE_URL + "/myratings?id=" + str(instance.id) + "&token=" + token
+                # agent_token = AgentToken.objects.create_token(user=instance.user)
+                agent_token = JWTAuthentication.generate_token(instance.user)
+                token = agent_token['token'] if 'token' in agent_token else None
+                url = settings.BASE_URL + "/myratings?id=" + str(instance.id) + "&token=" + token.decode("utf-8")
                 short_url = v1_utils.generate_short_url(url)
                 text = msg if msg else "Please Find the url to Update your Feedback "
                 final_text = str(text) + ' ' + str(short_url)

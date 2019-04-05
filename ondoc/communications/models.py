@@ -19,13 +19,15 @@ from django.forms import model_to_dict
 from django.template.loader import render_to_string
 from django.contrib.auth import get_user_model
 from django.contrib.postgres.fields.jsonb import KeyTransform
+from django.utils.crypto import get_random_string
 import logging
 from django.conf import settings
 from django.utils import timezone
 from weasyprint import HTML
 
 from ondoc.account.models import Invoice, Order
-from ondoc.authentication.models import UserProfile, GenericAdmin, NotificationEndpoint, AgentToken, UserSecretKey
+from ondoc.authentication.models import UserProfile, GenericAdmin, NotificationEndpoint, AgentToken, UserSecretKey, \
+    ClickLoginToken
 
 from ondoc.notification.models import NotificationAction, SmsNotification, EmailNotification, AppNotification, \
     PushNotification, WhtsappNotification
@@ -63,7 +65,8 @@ def get_spoc_email_and_number_hospital(spocs, appointment):
                 admins_without_user = admins.exclude(id__in=admins_with_user)
                 if admins_without_user.exists():
                     for admin in admins_without_user:
-                        created_user = User.objects.create(phone_number=spoc.number, user_type=User.DOCTOR)
+                        created_user = User.objects.create(phone_number=spoc.number, user_type=User.DOCTOR,
+                                                           auto_created=True)
                         admin.user = created_user
                         admin.save()
                         user_and_number.append({'user': created_user, 'phone_number': spoc.number})
@@ -366,7 +369,16 @@ class SMSNotification:
         token = jwt.encode(payload, user_key[0].key)
         token = str(token, 'utf-8')
         appointment_type = 'opd' if appointment.__class__ == OpdAppointment else 'lab'
-        provider_login_url = settings.PROVIDER_APP_DOMAIN + "/sms/login?auth_token=" + token + \
+        url_key = get_random_string(length=ClickLoginToken.URL_KEY_LENGTH)
+        unique_key_found = False
+        while not unique_key_found:
+            if ClickLoginToken.objects.filter(url_key=url_key).exists():
+                url_key = get_random_string(length=30)
+            else:
+                unique_key_found = True
+        expiration_time = datetime.fromtimestamp(payload.get('exp'))
+        ClickLoginToken.objects.create(user=user, token=token, expiration_time=expiration_time, url_key=url_key)
+        provider_login_url = settings.PROVIDER_APP_DOMAIN + "/sms/login?key=" + url_key + \
                                         "&url=/sms-redirect/" + appointment_type + "/appointment/" + str(appointment.id)
         context['provider_login_url'] = generate_short_url(provider_login_url)
         return context
@@ -1015,8 +1027,10 @@ class OpdNotification(Notification):
             mask_number = mask_number_instance.mask_number
         email_banners_html = UserConfig.objects.filter(key__iexact="email_banners") \
                     .annotate(html_code=KeyTransform('html_code', 'data')).values_list('html_code', flat=True).first()
-        auth_token = AgentToken.objects.create_token(user=self.appointment.user)
-        booking_url = settings.BASE_URL + '/sms/booking?token={}'.format(auth_token.token)
+        # Implmented According to DOCNEW-360
+        # auth_token = AgentToken.objects.create_token(user=self.appointment.user)
+        token_object = JWTAuthentication.generate_token(self.appointment.user)
+        booking_url = settings.BASE_URL + '/sms/booking?token={}'.format(token_object['token'].decode("utf-8"))
         opd_appointment_complete_url = booking_url + "&callbackurl=opd/appointment/{}?complete=true".format(self.appointment.id)
         opd_appointment_feedback_url = booking_url + "&callbackurl=opd/appointment/{}".format(self.appointment.id)
         reschdule_appointment_bypass_url = booking_url + "&callbackurl=opd/doctor/{}/{}/book?reschedule={}".format(self.appointment.doctor.id, self.appointment.hospital.id, self.appointment.id)

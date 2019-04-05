@@ -1109,7 +1109,7 @@ class TransactionViewSet(viewsets.GenericViewSet):
                     pg_txn = PgTransaction.objects.filter(order_no__iexact=response.get("orderNo")).first()
                     if pg_txn:
                         send_pg_acknowledge.apply_async((pg_txn.order_id, pg_txn.order_no,), countdown=1)
-                        return
+                        return Response({ "processed_already": True })
             except Exception as e:
                logger.error("Error in sending pg acknowledge - " + str(e))
     
@@ -1957,6 +1957,7 @@ class AppointmentViewSet(viewsets.GenericViewSet):
     def get_queryset(self):
         return OpdAppointment.objects.none()
 
+
 class DoctorScanViewSet(GenericViewSet):
     authentication_classes = (JWTAuthentication, )
     permission_classes = (IsAuthenticated, IsNotAgent)
@@ -2003,3 +2004,23 @@ class DoctorScanViewSet(GenericViewSet):
         resp = AppointmentRetrieveSerializer(opdapp_obj, context={"request": request})
         return Response(resp.data)
 
+
+class TokenFromUrlKey(viewsets.GenericViewSet):
+
+    def get_token(self, request):
+        from ondoc.authentication.models import ClickLoginToken
+        serializer = serializers.TokenFromUrlKeySerializer(data=request.query_params)
+        serializer.is_valid(raise_exception=True)
+        data = serializer.validated_data
+        token = data.get("auth_token")
+        key = data.get("key")
+        if token:
+            return Response({'status': 1, 'token': token})
+        elif key:
+            obj = ClickLoginToken.objects.filter(url_key=key).first()
+            if obj:
+                obj.is_consumed = True
+                obj.save()
+                return Response({'status': 1, 'token': obj.token})
+            else:
+                return Response({'status': 0, 'token': None, 'message': 'key not found'})
