@@ -24,11 +24,10 @@ class IntegratorReportViewSet(viewsets.GenericViewSet):
         if not report:
             return Response({"error": "Thyrocare Report not found for booking"}, status=status.HTTP_404_NOT_FOUND)
 
-        # report_url = report.xml_url
-        report_url = 'https://www.thyrocare.com/apis/ReportAccess.aspx?id=C/0dHN6TXsHQgg0Cu0HS7A==' \
-                     ',gATDluZRCNL9f8vQX61wSw==,+kssQUPGdmE='
+        report_url = report.xml_url
+        if not report_url:
+            return Response({"error": "Thyrocare Report url not found for booking"}, status=status.HTTP_404_NOT_FOUND)
 
-        # report_url = 'https://www.thyrocare.com/apis/ReportAccess.aspx?id=9l012BpuOn46xL6XBUsjTQ==,ZBXkLSOGPPMc/ZGEx7yBhg==,+kssQUPGdmE='
         data = requests.get(report_url)
         xml_content = data.content
         json_content = json.loads(json.dumps(xmltodict.parse(xml_content)))
