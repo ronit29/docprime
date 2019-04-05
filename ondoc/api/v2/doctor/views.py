@@ -744,6 +744,7 @@ class ProviderSignupDataViewset(viewsets.GenericViewSet):
             hospital = valid_data.get('hospital_id')
             hospital.is_listed_on_docprime = valid_data.get('is_listed_on_docprime')
             hospital.save()
+            return Response({"status": 1, "message": "successfully updated"}, status.HTTP_200_OK)
         except Exception as e:
             logger.error('Error updating hospital consent ' + str(e))
             return Response({"status": 0, "message": "Error updating hospital consent - " + str(e)}, status.HTTP_400_BAD_REQUEST)
