@@ -6,6 +6,11 @@ ARG BIT_ENV_URL
 ARG COLLECTSTATIC
 #ARG MIGRATE
 RUN apt-get update && apt-get install binutils libproj-dev gdal-bin nano apt-utils -y
+RUN apt-get update
+RUN apt-get install -y xvfb fluxbox x11vnc dbus libasound2 libqt4-dbus libqt4-network libqtcore4 libqtgui4 libxss1 libpython2.7 libqt4-xml libaudio2 libmng1 fontconfig liblcms1 lib32stdc++6 lib32asound2 ia32-libs libc6-i386 lib32gcc1 nano
+RUN apt-get install -y python-gobject-2
+RUN apt-get install -y curl git
+
 RUN mkdir -p /home/docprime/workspace/backend
 RUN mkdir /env
 RUN mkdir -p /home/docprime/workspace/entrypoint
