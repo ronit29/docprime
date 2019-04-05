@@ -50,6 +50,7 @@ from django.db.models import Q, Value
 from django.db.models.functions import StrIndex
 
 from ondoc.location.models import EntityUrls, EntityAddress
+from ondoc.salespoint.models import SalesPoint
 from ondoc.seo.models import NewDynamic
 from ondoc.subscription_plan.models import UserPlanMapping
 from . import serializers
@@ -201,10 +202,23 @@ class LabList(viewsets.ReadOnlyModelViewSet):
 
         package_free_or_not_dict = get_package_free_or_not_dict(request)
 
-        main_queryset = LabTest.objects.prefetch_related('test', 'test__recommended_categories',
-                                                         'test__parameter', 'categories').filter(enable_for_retail=True,
-                                                                                                 searchable=True,
-                                                                                                 is_package=True)
+        salespoint_affiliates = SalesPoint.objects.filter().values_list('name', flat=True)
+        salespoint_affiliates = list(map(lambda x: x.lower(), salespoint_affiliates))
+
+        if request.query_params.get('UtmSource') in salespoint_affiliates:
+            salespoint_obj = SalesPoint.get_salespoint_via_code(request.query_params.get('UtmTerm'))
+
+            main_queryset = LabTest.objects.prefetch_related('test', 'test__recommended_categories',
+                                                             'test__parameter', 'categories',
+                                                             'test__availablelabs__active_sales_point_mappings').\
+                filter(enable_for_retail=True, searchable=True, is_package=True,
+                       availablelabs__active_sales_point_mappings__salespoint=salespoint_obj)
+
+        else:
+            main_queryset = LabTest.objects.prefetch_related('test', 'test__recommended_categories',
+                                                             'test__parameter', 'categories').filter(enable_for_retail=True,
+                                                                                                     searchable=True,
+                                                                                                     is_package=True)
 
         if package_ids:
             main_queryset = main_queryset.filter(id__in=package_ids)
