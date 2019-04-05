@@ -9,7 +9,7 @@ RUN apt-get update && apt-get install binutils libproj-dev gdal-bin nano apt-uti
 RUN apt-get update
 
 RUN apt-get -y install xvfb unzip
-RUN apt-get -y install xserver-xorg-core
+RUN apt-get -y --force-yes install xserver-xorg-core
 RUN apt-get -y install xfonts-100dpi xfonts-75dpi xfonts-scalable xfonts-cyrillic
 
 RUN wget -q -O - https://dl-ssl.google.com/linux/linux_signing_key.pub | sudo apt-key add -
