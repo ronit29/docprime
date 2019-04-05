@@ -10,7 +10,7 @@ from ondoc.authentication.models import TimeStampedModel
 from ondoc.authentication.models import NotificationEndpoint
 from ondoc.authentication.models import UserProfile
 from ondoc.account import models as account_model
-from ondoc.api.v1.utils import readable_status_choices
+from ondoc.api.v1.utils import readable_status_choices, generate_short_url
 from ondoc.notification.rabbitmq_client import publish_message
 from django.contrib.auth import get_user_model
 from django.template.loader import render_to_string
@@ -705,7 +705,8 @@ class EmailNotification(TimeStampedModel, EmailNotificationOpdMixin, EmailNotifi
     @classmethod
     def send_booking_url(cls, token, email):
         booking_url = "{}/agent/booking?token={}".format(settings.CONSUMER_APP_DOMAIN, token)
-        html_body = "Your booking url is - {} . Please pay to confirm".format(booking_url)
+        short_url = generate_short_url(booking_url)
+        html_body = "Your booking url is - {} . Please pay to confirm".format(short_url)
         email_subject = "Booking Url"
         if email:
             email_noti = {
@@ -831,7 +832,8 @@ class SmsNotification(TimeStampedModel, SmsNotificationOpdMixin, SmsNotification
     @classmethod
     def send_booking_url(cls, token, phone_number):
         booking_url = "{}/agent/booking?token={}".format(settings.CONSUMER_APP_DOMAIN, token)
-        html_body = "Your booking url is - {} . Please pay to confirm".format(booking_url)
+        short_url = generate_short_url(booking_url)
+        html_body = "Your booking url is - {} . Please pay to confirm".format(short_url)
         if phone_number:
             sms_noti = {
                 "phone_number": phone_number,
