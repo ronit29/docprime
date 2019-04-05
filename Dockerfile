@@ -8,19 +8,19 @@ ARG COLLECTSTATIC
 RUN apt-get update && apt-get install binutils libproj-dev gdal-bin nano apt-utils -y
 RUN apt-get update
 
-RUN apt-get -y install xvfb unzip
-RUN apt-get -y --force-yes install xserver-xorg-core
-RUN apt-get -y install xfonts-100dpi xfonts-75dpi xfonts-scalable xfonts-cyrillic
 
-RUN wget -q -O - https://dl-ssl.google.com/linux/linux_signing_key.pub | sudo apt-key add -
-RUN sh -c 'echo "deb http://dl.google.com/linux/chrome/deb/ stable main" >> /etc/apt/sources.list.d/google.list'
-RUN apt-get update
-RUN apt-get -y install google-chrome-stable
-RUN wget https://chromedriver.storage.googleapis.com/2.27/chromedriver_linux64.zip
+RUN apt-get -y install libxss1 libappindicator1 libindicator7
+RUN wget https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb
+RUN dpkg -i google-chrome*.deb
+RUN apt-get -y install -f
+RUN apt-get -y install xvfb unzip
+RUN wget -N http://chromedriver.storage.googleapis.com/2.26/chromedriver_linux64.zip
 RUN unzip chromedriver_linux64.zip
-RUN rm chromedriver_linux64.zip
 RUN chmod +x chromedriver
-RUN mv -f chromedriver /usr/local/bin
+RUN mv -f chromedriver /usr/local/share/chromedriver
+RUN ln -s /usr/local/share/chromedriver /usr/local/bin/chromedriver
+RUN ln -s /usr/local/share/chromedriver /usr/bin/chromedriver
+
 
 RUN mkdir -p /home/docprime/workspace/backend
 RUN mkdir /env
