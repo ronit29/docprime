@@ -284,3 +284,17 @@ class GenericAdminModelSerializer(serializers.ModelSerializer):
     class Meta:
         model = GenericAdmin
         fields = ('id', 'phone_number', 'permission_type', 'name', 'doctor', 'hospital', 'super_user_permission', 'entity_type')
+
+
+class UpdateHospitalConsent(serializers.Serializer):
+    hospital_id = serializers.PrimaryKeyRelatedField(queryset=doc_models.Hospital.objects.all())
+    is_listed_on_docprime = serializers.BooleanField()
+
+    def validate(self, attrs):
+        if attrs.get('is_listed_on_docprime') == False:
+            raise serializers.ValidationError('the flag for hospital consent needs to be true')
+        if attrs.get('hospital_id').is_listed_on_docprime is None:
+            raise serializers.ValidationError('hospital added through agent, not by provider')
+        if attrs.get('hospital_id').is_listed_on_docprime is True:
+            raise serializers.ValidationError('hospital already listed on docprime')
+        return attrs

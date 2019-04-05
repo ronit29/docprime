@@ -735,3 +735,15 @@ class ProviderSignupDataViewset(viewsets.GenericViewSet):
         except Exception as e:
             logger.error('Error adding Staffs ' + str(e))
             return Response({"status": 0, "message": "Error adding Staffs - " + str(e)}, status.HTTP_400_BAD_REQUEST)
+
+    def update_hospital_consent(self, request, *args, **kwargs):
+        serializer = serializers.UpdateHospitalConsent(data=request.data, context={'request': request})
+        serializer.is_valid(raise_exception=True)
+        valid_data = serializer.validated_data
+        try:
+            hospital = valid_data.get('hospital_id')
+            hospital.is_listed_on_docprime = valid_data.get('is_listed_on_docprime')
+            hospital.save()
+        except Exception as e:
+            logger.error('Error updating hospital consent ' + str(e))
+            return Response({"status": 0, "message": "Error updating hospital consent - " + str(e)}, status.HTTP_400_BAD_REQUEST)
