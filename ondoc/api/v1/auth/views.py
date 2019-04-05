@@ -1808,7 +1808,9 @@ class SendBookingUrlViewSet(GenericViewSet):
 
     def send_booking_url(self, request):
         type = request.data.get('type')
-        agent_token = AgentToken.objects.create_token(user=request.user)
+        # agent_token = AgentToken.objects.create_token(user=request.user)
+        user_token = JWTAuthentication.generate_token(request.user)
+        token = user_token['token'].decode("utf-8") if 'token' in user_token else None
         user_profile = None
 
         if request.user.is_authenticated:
@@ -1816,8 +1818,8 @@ class SendBookingUrlViewSet(GenericViewSet):
         if not user_profile:
             return Response({"status": 1})
 
-        booking_url = SmsNotification.send_booking_url(token=agent_token.token, phone_number=str(user_profile.phone_number))
-        EmailNotification.send_booking_url(token=agent_token.token, email=user_profile.email)
+        booking_url = SmsNotification.send_booking_url(token=token, phone_number=str(user_profile.phone_number))
+        EmailNotification.send_booking_url(token=token, email=user_profile.email)
 
         return Response({"status": 1})
 
