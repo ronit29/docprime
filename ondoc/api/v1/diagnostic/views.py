@@ -2542,10 +2542,10 @@ class CompareLabPackagesViewSet(viewsets.ReadOnlyModelViewSet):
         serializer.is_valid(raise_exception=True)
         validated_data = serializer.validated_data
 
-        if len(validated_data.get('package_ids')) < 2:
-            return Response({"msg": "Must have atleast 2 packages to compare"}, status=status.HTTP_400_BAD_REQUEST)
-        elif len(validated_data.get('package_ids')) > 4:
-            return Response({"msg": "Can have atmost 4 packages to compare"}, status=status.HTTP_400_BAD_REQUEST)
+        if len(validated_data.get('package_ids')) < 1:
+            return Response({"msg": "Must have atleast 1 package to compare"}, status=status.HTTP_400_BAD_REQUEST)
+        elif len(validated_data.get('package_ids')) > 5:
+            return Response({"msg": "Can have atmost 5 packages to compare"}, status=status.HTTP_400_BAD_REQUEST)
 
         response = {}
         lab_packages = []
