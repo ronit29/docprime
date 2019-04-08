@@ -1,4 +1,5 @@
 from django.core.management.base import BaseCommand
+from django.contrib.contenttypes.models import ContentType
 from ondoc.doctor.models import SPOCDetails
 from ondoc.diagnostic.models import LabAppointment, Hospital
 from ondoc.authentication.models import GenericAdmin
@@ -7,17 +8,18 @@ from django.db.models import Q
 
 
 class Command(BaseCommand):
-    help = 'Create matrix leads for provider signup data in database without matrix lead id'
+    help = 'create appointment admins, if not present, for existing SPOCs'
 
     def handle(self, *args, **options):
 
         for spoc in SPOCDetails.objects.all():
             try:
-                if not GenericAdmin.objects.filter(Q(phone_number=str(spoc.number), hospital=spoc.content_object),
-                                               Q(write_permission=True, permission_type=GenericAdmin.APPOINTMENT) | Q(
-                                                       super_user_permission=True)):
+                if spoc.content_type == ContentType.objects.get_for_model(Hospital) and not GenericAdmin.objects.filter(
+                        Q(phone_number=str(spoc.number), hospital=spoc.content_object),
+                        Q(permission_type=GenericAdmin.APPOINTMENT) | Q(
+                            super_user_permission=True)):
                     generic_admin = GenericAdmin(phone_number=str(spoc.number), hospital=spoc.content_object,
-                                                 write_permission=True, permission_type=GenericAdmin.APPOINTMENT)
+                                                 permission_type=GenericAdmin.APPOINTMENT)
                     generic_admin.save()
             except Exception as e:
                 print("Some error occured for SPOC with ID-{}. ERROR :: {}".format(spoc.id, str(e)))
