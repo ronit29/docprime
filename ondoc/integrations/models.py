@@ -3,7 +3,6 @@ from django.db import models
 from django.contrib.contenttypes.fields import GenericForeignKey
 from django.contrib.contenttypes.models import ContentType
 from ondoc.authentication.models import TimeStampedModel
-from ondoc.diagnostic.models import LabTest
 from ondoc.common.helper import Choices
 from django.contrib.postgres.fields import JSONField
 
@@ -11,6 +10,8 @@ from django.contrib.postgres.fields import JSONField
 
 
 class IntegratorMapping(TimeStampedModel):
+    from ondoc.diagnostic.models import LabTest
+
     class ServiceType(Choices):
         LabTest = 'LABTEST'
 
@@ -48,6 +49,8 @@ class IntegratorMapping(TimeStampedModel):
 
 
 class IntegratorProfileMapping(TimeStampedModel):
+    from ondoc.diagnostic.models import LabTest
+
     class ServiceType(Choices):
         LabTest = 'PROFILES'
 
@@ -163,3 +166,53 @@ class IntegratorHistory(TimeStampedModel):
                                              status=status, request_data=request, response_data=response, api_endpoint=url,
                                              api_name=api_name, integrator_class_name=integrator_name, api_status=api_status,
                                              accepted_through=mode)
+
+
+class IntegratorTestMapping(TimeStampedModel):
+    from ondoc.diagnostic.models import LabTest
+
+    class ServiceType(Choices):
+        LabTest = 'LABTEST'
+
+    content_type = models.ForeignKey(ContentType, on_delete=models.DO_NOTHING)
+    object_id = models.PositiveIntegerField()
+    content_object = GenericForeignKey()
+    test = models.ForeignKey(LabTest, on_delete=models.CASCADE, null=True)
+    integrator_class_name = models.CharField(max_length=40, null=False, blank=False)
+    service_type = models.CharField(max_length=30, choices=ServiceType.as_choices(), null=False, blank=False, default=None)
+    integrator_product_data = JSONField(blank=True, null=True)
+    integrator_test_name = models.CharField(max_length=60, null=False, blank=False, default=None)
+    name_params_required = models.BooleanField(default=False)
+    test_type = models.CharField(max_length=30, null=True, blank=True)
+    is_active = models.BooleanField(default=False)
+
+    @classmethod
+    def get_if_third_party_integration(cls, network_id=None):
+        if network_id:
+            mapping = cls.objects.filter(object_id=network_id, is_active=True).first()
+        else:
+            return None
+
+        # Return if no test exist over here and it depicts that it is not a part of integrations.
+        if not mapping:
+            return None
+
+        # Part of the integrations.
+        if mapping.content_type == ContentType.objects.get(model='labnetwork'):
+            return {
+                'class_name': mapping.integrator_class_name,
+                'service_type': mapping.service_type
+            }
+
+    class Meta:
+        db_table = 'integrator_test_mapping'
+
+
+class IntegratorTestParameterMapping(TimeStampedModel):
+    integrator_class_name = models.CharField(max_length=40, null=False, blank=False)
+    integrator_test_name = models.CharField(max_length=60, null=True, blank=True)
+    test_parameter_chat = models.ForeignKey('diagnostic.TestParameterChat', on_delete=models.CASCADE, null=True)
+    response_data = JSONField(blank=True, null=True)
+
+    class Meta:
+        db_table = 'integrator_test_parameter_mapping'

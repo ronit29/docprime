@@ -9,7 +9,7 @@ from ondoc.crm.admin.doctor import CreatedByFilter
 from ondoc.doctor.models import (HospitalImage, HospitalDocument, HospitalAward, Doctor,
                                  HospitalAccreditation, HospitalCertification, HospitalSpeciality, HospitalNetwork,
                                  Hospital, HospitalServiceMapping, HealthInsuranceProviderHospitalMapping,
-                                 HospitalHelpline, HospitalTiming)
+                                 HospitalHelpline, HospitalTiming, DoctorClinic)
 from .common import *
 from ondoc.crm.constants import constants
 from django.utils.safestring import mark_safe
@@ -141,6 +141,36 @@ class HospitalHelpineInlineForm(forms.ModelForm):
 
     class Meta:
         fields = '__all__'
+
+
+class HospitalDoctorInline(admin.TabularInline):
+    model = DoctorClinic
+    # form = HospitalHelpineInlineForm
+    fk_name = 'hospital'
+    extra = 0
+    can_delete = False
+    show_change_link = False
+    fields = ['doctor', 'doc_qc_status', 'doc_onboarding_status', 'welcome_calling_done']
+    readonly_fields = ['doctor', 'doc_qc_status', 'doc_onboarding_status']
+
+    def doc_qc_status(self, obj):
+        data_status_dict = dict(Doctor.DATA_STATUS_CHOICES)
+        return data_status_dict[obj.doctor.data_status]
+
+    def doc_onboarding_status(self, obj):
+        onboarding_status_dict = dict(Doctor.ONBOARDING_STATUS)
+        return onboarding_status_dict[obj.doctor.onboarding_status]
+
+    def get_queryset(self, request):
+        qs = super().get_queryset(request)
+        return qs.select_related('doctor')
+
+    def get_readonly_fields(self, request, obj=None):
+        read_only_field = super().get_readonly_fields(request, obj)
+        if not request.user.is_superuser and not request.user.groups.filter(
+            name=constants['WELCOME_CALLING_TEAM']).exists():
+            read_only_field.append('welcome_calling_done')
+        return read_only_field
 
 
 class HospitalHelplineInline(admin.TabularInline):
@@ -522,6 +552,7 @@ class HospitalAdmin(admin.GeoModelAdmin, VersionAdmin, ActionAdmin, QCPemAdmin):
     # autocomplete_fields = ['matrix_city', 'matrix_state']
     inlines = [
         # HospitalNetworkMappingInline,
+        HospitalDoctorInline,
         HospitalHelplineInline,
         HospitalServiceInline,
         HospitalTimingInline,
@@ -540,4 +571,4 @@ class HospitalAdmin(admin.GeoModelAdmin, VersionAdmin, ActionAdmin, QCPemAdmin):
 
     map_width = 200
     map_template = 'admin/gis/gmap.html'
-    extra_js = ['js/admin/GoogleMap.js','https://maps.googleapis.com/maps/api/js?key=AIzaSyA-5gVhdnhNBInTuxBxMJnGuErjQP40nNc&callback=initGoogleMap']
+    extra_js = ['js/admin/GoogleMap.js','https://maps.googleapis.com/maps/api/js?key=AIzaSyCFtb27PooaG0yujuykgvPtxi6tvS04Ek0&callback=initGoogleMap']

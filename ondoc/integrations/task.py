@@ -12,7 +12,7 @@ logger = logging.getLogger(__name__)
 def push_lab_appointment_to_integrator(self, data):
     from django.contrib.contenttypes.models import ContentType
     from ondoc.diagnostic.models import LabAppointment
-    from ondoc.integrations.models import IntegratorMapping, IntegratorProfileMapping, IntegratorResponse, IntegratorHistory
+    from ondoc.integrations.models import IntegratorResponse, IntegratorTestMapping
     from ondoc.integrations import service
 
     try:
@@ -35,33 +35,25 @@ def push_lab_appointment_to_integrator(self, data):
 
             lab_network_content_type = ContentType.objects.get_for_model(lab_network)
 
-            integrator_mapping = None
-
-            tests = list()
-            packages = list()
-            for test in lab_tests:
-                if test.is_package:
-                    packages.append(test)
-                else:
-                    tests.append(test)
-
-            if not tests and not packages:
+            if not lab_tests:
                 raise Exception('[ERROR] Could not find any test and packages for the appointment id %d' % appointment.id)
 
-            if packages:
-                integrator_mapping = IntegratorProfileMapping.objects.filter(content_type=lab_network_content_type, object_id=lab_network.id, package=packages[0]).first()
-            elif tests:
-                integrator_mapping = IntegratorMapping.objects.filter(content_type=lab_network_content_type, object_id=lab_network.id, test=tests[0]).first()
+            # check integrator mapping available for each test
+            integrator_mapping = True
+            for test in lab_tests:
+                integrator_mapping = IntegratorTestMapping.objects.filter(content_type=lab_network_content_type, object_id=lab_network.id, test=test, is_active=True).first()
+                if not integrator_mapping:
+                    integrator_mapping = False
 
             if not integrator_mapping:
-                logger.error("[ERROR] Mapping not found for booked test or package")
+                raise Exception("[ERROR] Mapping not found for booked test or package - appointment id %d" % appointment.id)
 
             integrator_obj = service.create_integrator_obj(integrator_mapping.integrator_class_name)
             retry_count = push_lab_appointment_to_integrator.request.retries
-            integrator_response = integrator_obj.post_order(appointment, tests=tests, packages=packages, retry_count=retry_count)
+            integrator_response = integrator_obj.post_order(appointment, tests=lab_tests, retry_count=retry_count)
 
             if not integrator_response:
-                countdown_time = 1 * 60
+                countdown_time = (1 ** self.request.retries) * 60
                 print(countdown_time)
                 self.retry([data], countdown=countdown_time)
 
@@ -75,14 +67,14 @@ def push_lab_appointment_to_integrator(self, data):
         elif appointment.status == LabAppointment.CANCELLED:
             saved_response = IntegratorResponse.objects.filter(object_id=appointment.id).first()
             if not saved_response:
-                logger.error("[ERROR] Cant find integrator response for appointment id " + str(appointment.id))
+                raise Exception("[ERROR] Cant find integrator response for appointment id " + str(appointment.id))
 
             integrator_obj = service.create_integrator_obj(saved_response.integrator_class_name)
             retry_count = push_lab_appointment_to_integrator.request.retries
             response = integrator_obj.cancel_integrator_order(appointment, saved_response, retry_count)
 
             if not response:
-                countdown_time = 1 * 60
+                countdown_time = (1 ** self.request.retries) * 60
                 print(countdown_time)
                 self.retry([data], countdown=countdown_time)
 
@@ -122,7 +114,7 @@ def get_integrator_order_status(self, *args, **kwargs):
                 IntegratorHistory.create_history(appointment, url, response, url, 'order_summary', 'Thyrocare',
                                                  status_code, retry_count, status, 'integrator_api')
         else:
-            countdown_time = 1 * 120
+            countdown_time = (2 ** self.request.retries) * 60 * 2
             print(countdown_time)
             status = IntegratorHistory.PUSHED_AND_NOT_ACCEPTED
             IntegratorHistory.create_history(appointment, url, response, url, 'order_summary', 'Thyrocare',
