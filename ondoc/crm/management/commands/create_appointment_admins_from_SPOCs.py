@@ -19,7 +19,7 @@ class Command(BaseCommand):
                         Q(permission_type=GenericAdmin.APPOINTMENT) | Q(
                             super_user_permission=True)):
                     generic_admin = GenericAdmin(phone_number=str(spoc.number), hospital=spoc.content_object,
-                                                 permission_type=GenericAdmin.APPOINTMENT)
+                                                 permission_type=GenericAdmin.APPOINTMENT, auto_created_from_SPOCs=True)
                     generic_admin.save()
             except Exception as e:
                 print("Some error occured for SPOC with ID-{}. ERROR :: {}".format(spoc.id, str(e)))
