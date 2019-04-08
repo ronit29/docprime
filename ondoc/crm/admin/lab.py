@@ -768,6 +768,8 @@ class LabAppointmentForm(forms.ModelForm):
                         raise forms.ValidationError("No time slot available")
 
         if cleaned_data.get('status') and cleaned_data.get('status') == LabAppointment.COMPLETED:
+            if self.instance and self.instance.id and not self.instance.status == OpdAppointment.ACCEPTED:
+                raise forms.ValidationError("Can only complete appointment if it is in accepted state.")
             if not cleaned_data.get('custom_otp') == self.instance.otp:
                 raise forms.ValidationError("Entered OTP is incorrect.")
 

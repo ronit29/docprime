@@ -1476,6 +1476,8 @@ class DoctorOpdAppointmentForm(forms.ModelForm):
                 raise forms.ValidationError("Doctor do not sit at the given hospital in this time slot.")
 
         if cleaned_data.get('status') and cleaned_data.get('status') == OpdAppointment.COMPLETED:
+            if self.instance and self.instance.id and not self.instance.status == OpdAppointment.ACCEPTED:
+                raise forms.ValidationError("Can only complete appointment if it is in accepted state.")
             if not cleaned_data.get('custom_otp') == self.instance.otp:
                 raise forms.ValidationError("Entered OTP is incorrect.")
 
