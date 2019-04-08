@@ -3082,4 +3082,4 @@ class HospitalTiming(auth_model.TimeStampedModel):
 
 
 class WalkInPatientInvoice(auth_model.TimeStampedModel):
-    appointment_id = models.ForeignKey(OpdAppointment, related_name='walk_in_patient')
+    appointment_id = models.ForeignKey(OpdAppointment, on_delete=models.CASCADE, related_name='walk_in_patient')
