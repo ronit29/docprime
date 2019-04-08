@@ -257,6 +257,9 @@ def send_opd_rating_message(appointment_id, type):
 @task(bind=True, max_retries=5)
 def set_order_dummy_transaction(self, order_id, user_id):
     from ondoc.account.models import Order, DummyTransactions
+    from ondoc.insurance.models import UserInsurance
+    from ondoc.doctor.models import OpdAppointment
+    from ondoc.diagnostic.models import LabAppointment
     from ondoc.account.models import User
     try:
         order_row = Order.objects.filter(id=order_id).first()
@@ -283,6 +286,31 @@ def set_order_dummy_transaction(self, order_id, user_id):
             }
             url = settings.PG_DUMMY_TRANSACTION_URL
 
+            insurer_code = None
+            insurance_order_id = None
+            insurance_order_number = None
+            if order_row.product_id == Order.INSURANCE_PRODUCT_ID:
+                insurer_code = appointment.insurance_plan.insurer.insurer_merchant_code
+
+            user_insurance = UserInsurance.objects.filter(order=order_row).first()
+
+            appointment_obj = None
+            if order_row.product_id == Order.DOCTOR_PRODUCT_ID:
+                appointment_obj = OpdAppointment.objects.filter(id=order_row.reference_id).first()
+
+            if order_row.product_id == Order.LAB_PRODUCT_ID:
+                appointment_obj = LabAppointment.objects.filter(id=order_row.reference_id).first()
+
+            if appointment_obj and appointment_obj.payment_type == Order.INSURANCE_PRODUCT_ID and appointment_obj.insurance.id == user_insurance.id:
+                insurance_order = user_insurance.order
+
+                insurance_order_transactions = insurance_order.getTransactions()
+                if not insurance_order_transactions:
+                    raise Exception('No transactions found for appointment insurance.')
+                insurance_order_transaction = insurance_order_transactions[0]
+                insurance_order_id = insurance_order_transaction.order_id
+                insurance_order_number = insurance_order_transaction.order_no
+
             req_data = {
                 "customerId": user_id,
                 "mobile": user.phone_number,
@@ -298,6 +326,14 @@ def set_order_dummy_transaction(self, order_id, user_id):
                 "buCallbackSuccessUrl": "",
                 "buCallbackFailureUrl": ""
             }
+
+            if insurance_order_id and insurance_order_number:
+                req_data['refOrderNo'] = str(insurance_order_number)
+                req_data['refOrderId'] = str(insurance_order_id)
+
+            if insurer_code:
+                req_data['insurerCode'] = insurer_code
+
 
             response = requests.post(url, data=json.dumps(req_data), headers=headers)
             if response.status_code == status.HTTP_200_OK:
@@ -544,9 +580,31 @@ def process_payout(payout_id):
 
             payout_data.save()
 
-
     except Exception as e:
         logger.error("Error in processing payout - with exception - " + str(e))
+
+
+@task(bind=True)
+def send_insurance_notifications(self, data):
+    from ondoc.authentication import models as auth_model
+    from ondoc.communications.models import InsuranceNotification
+    try:
+        user_id = int(data.get('user_id', 0))
+        user = auth_model.User.objects.filter(id=user_id).last()
+        if not user:
+            logger.error("Invalid user id passed for insurance email notification")
+
+        user_insurance = user.purchased_insurance.filter().last()
+        if not user_insurance or not user_insurance.is_valid():
+            logger.error("Invalid or None user insurance found for email notification")
+
+        user_insurance.generate_pdf()
+
+        insurance_notification = InsuranceNotification(user_insurance, NotificationAction.INSURANCE_CONFIRMED)
+        insurance_notification.send()
+    except Exception as e:
+        logger.error(str(e))
+
 
 def request_payout(req_data, order_data):
     from ondoc.api.v1.utils import create_payout_checksum
@@ -576,6 +634,7 @@ def request_payout(req_data, order_data):
     
     logger.error("payout failed for request data - " + str(req_data))
     return {"status" : 0, "response" : resp_data}
+
 
 @task()
 def opd_send_otp_before_appointment(appointment_id, previous_appointment_date_time):
