@@ -8,7 +8,7 @@ from datetime import date, timedelta, datetime
 class Cart(auth_model.TimeStampedModel, auth_model.SoftDeleteModel):
 
     product_id = models.IntegerField(choices=Order.PRODUCT_IDS)
-    user = models.ForeignKey(auth_model.User, on_delete=models.CASCADE)
+    user = models.ForeignKey(auth_model.User, related_name='cart_item', on_delete=models.CASCADE)
     deleted_at = models.DateTimeField(blank=True, null=True)
     data = JSONField()
 
@@ -150,3 +150,15 @@ class Cart(auth_model.TimeStampedModel, auth_model.SoftDeleteModel):
 
     def __str__(self):
         return str(self.id)
+
+    @classmethod
+    def check_for_insurance(cls, validated_data, request):
+        from ondoc.insurance.models import UserInsurance
+        user_insurance = UserInsurance.get_user_insurance(request.user)
+        is_appointment_insured = False
+        insurance_id = None
+        insurance_message = ""
+        cart_items = Cart.objects.filter(user=request.user, deleted_at__isnull=True)
+        if user_insurance and user_insurance.is_valid():
+            is_appointment_insured, insurance_id, insurance_message = user_insurance.validate_insurance_for_cart(validated_data, cart_items)
+        return is_appointment_insured, insurance_id, insurance_message

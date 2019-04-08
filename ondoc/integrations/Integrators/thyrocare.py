@@ -216,7 +216,7 @@ class Thyrocare(BaseIntegrator):
             for test in tests:
                 integrator_test = IntegratorTestMapping.objects.filter(test_id=test.id, integrator_class_name=Thyrocare.__name__, is_active=True).first()
                 if not integrator_test:
-                    logger.info("[ERROR] No tests data found in integrator.")
+                    raise Exception("[ERROR] No tests data found in integrator.")
 
                 if integrator_test.test_type == "TEST":
                     if integrator_test.name_params_required:
@@ -405,6 +405,7 @@ class Thyrocare(BaseIntegrator):
                             if not dp_appointment.status == 6:
                                 dp_appointment.status = 6
                                 dp_appointment.save()
+                                dp_appointment.action_cancelled(1)
                                 status = IntegratorHistory.CANCELLED
 
                         IntegratorHistory.create_history(dp_appointment, url, response, url, 'order_summary_cron', 'Thyrocare', status_code, 0, status, 'integrator_api')
