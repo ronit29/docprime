@@ -1,6 +1,8 @@
 from decimal import Decimal
 
 from django.core.files.uploadedfile import TemporaryUploadedFile, InMemoryUploadedFile
+from django.db.models import Q
+
 from ondoc.api.v1.utils import TimeSlotExtraction
 from .baseIntegrator import BaseIntegrator
 import requests
@@ -66,7 +68,7 @@ class Thyrocare(BaseIntegrator):
                 name_params_required = True
 
             defaults = {'integrator_product_data': result_obj, 'integrator_class_name': Thyrocare.__name__,
-                        'content_type': ContentType.objects.get(model='labnetwork'), 'service_type': IntegratorMapping.ServiceType.LabTest,
+                        'content_type': ContentType.objects.get(model='labnetwork'), 'service_type': IntegratorTestMapping.ServiceType.LabTest,
                         'name_params_required': name_params_required, 'test_type': result_obj['type']}
 
             IntegratorTestMapping.objects.update_or_create(integrator_test_name=result_obj['name'], object_id=obj_id, defaults=defaults)
@@ -150,9 +152,9 @@ class Thyrocare(BaseIntegrator):
         from ondoc.integrations.models import IntegratorHistory
 
         tests = kwargs.get('tests', None)
-        packages = kwargs.get('packages', None)
+        # packages = kwargs.get('packages', None)
         retry_count = kwargs.get('retry_count', 0)
-        payload = self.prepare_data(tests, packages, lab_appointment)
+        payload = self.prepare_data(tests, lab_appointment)
 
         headers = {'Content-Type': "application/json"}
         url = "%s/ORDER.svc/Postorderdata" % settings.THYROCARE_BASE_URL
@@ -171,8 +173,8 @@ class Thyrocare(BaseIntegrator):
 
         return None
 
-    def prepare_data(self, tests, packages, lab_appointment):
-        from ondoc.integrations.models import IntegratorProfileMapping, IntegratorMapping
+    def prepare_data(self, tests, lab_appointment):
+        from ondoc.integrations.models import IntegratorTestMapping
 
         profile = lab_appointment.profile
         if hasattr(lab_appointment, 'address') and lab_appointment.address:
@@ -187,8 +189,8 @@ class Thyrocare(BaseIntegrator):
             gender = profile.gender.upper()
         else:
             gender = "M"
-        bendataxml = "<NewDataSet><Ben_details><Name>%s</Name><Age>%s</Age><Gender>%s</Gender></Ben_details></NewDataSet>" % (profile.name, self.calculate_age(profile), gender)
 
+        bendataxml = "<NewDataSet><Ben_details><Name>%s</Name><Age>%s</Age><Gender>%s</Gender></Ben_details></NewDataSet>" % (profile.name, self.calculate_age(profile), gender)
         payload = {
             "api_key": settings.THYROCARE_API_KEY,
             "orderid": order_id,
@@ -212,30 +214,29 @@ class Thyrocare(BaseIntegrator):
         rate = 0
         if tests:
             for test in tests:
-                integrator_test = IntegratorMapping.objects.filter(test_id=test.id, integrator_class_name=Thyrocare.__name__, is_active=True).first()
-                if integrator_test:
-                    if integrator_test.name_params_required:
-                        product.append(integrator_test.integrator_product_data["name"])
-                    else:
-                        product.append(integrator_test.integrator_product_data["code"])
-                    rate += int(integrator_test.integrator_product_data["rate"]["b2c"])
-                else:
-                    logger.info("[ERROR] No tests data found in integrator.")
+                integrator_test = IntegratorTestMapping.objects.filter(test_id=test.id, integrator_class_name=Thyrocare.__name__, is_active=True).first()
+                if not integrator_test:
+                    raise Exception("[ERROR] No tests data found in integrator.")
 
-        if packages:
-            for package in packages:
-                integrator_package = IntegratorProfileMapping.objects.filter(package_id=package.id, integrator_class_name=Thyrocare.__name__, is_active=True).first()
-                if integrator_package:
-                    if integrator_package.integrator_type == "OFFER":
-                        payload["report_code"] = integrator_package.integrator_product_data["code"]
-                    if integrator_package.integrator_product_data["testnames"] == 'null':
-                        name = integrator_package.integrator_product_data["name"]
+                if integrator_test.test_type == "TEST":
+                    if integrator_test.name_params_required:
+                        name = integrator_test.integrator_product_data["name"]
                     else:
-                        name = integrator_package.integrator_product_data["testnames"]
+                        name = integrator_test.integrator_product_data["code"]
                     product.append(name)
-                    rate += int(integrator_package.integrator_product_data["rate"]["b2c"])
+                elif integrator_test.test_type == "OFFER":
+                    product.append(integrator_test.integrator_product_data["testnames"])
+                    payload["report_code"] = integrator_test.integrator_product_data["code"]
+                elif integrator_test.test_type == "PROFILE":
+                    product.append(integrator_test.integrator_product_data["name"])
                 else:
-                    logger.info("[ERROR] No package data found in integrator for.")
+                    if integrator_test.integrator_product_data["testnames"] == 'null':
+                        name = integrator_test.integrator_product_data["name"]
+                    else:
+                        name = integrator_test.integrator_product_data["testnames"]
+                    product.append(name)
+
+                rate += int(integrator_test.integrator_product_data["rate"]["b2c"])
 
         if product:
             product_str = ",".join(product )
@@ -404,6 +405,7 @@ class Thyrocare(BaseIntegrator):
                             if not dp_appointment.status == 6:
                                 dp_appointment.status = 6
                                 dp_appointment.save()
+                                dp_appointment.action_cancelled(1)
                                 status = IntegratorHistory.CANCELLED
 
                         IntegratorHistory.create_history(dp_appointment, url, response, url, 'order_summary_cron', 'Thyrocare', status_code, 0, status, 'integrator_api')
@@ -437,3 +439,29 @@ class Thyrocare(BaseIntegrator):
         time_dict[date].append(am_dict)
         time_dict[date].append(pm_dict)
         return time_dict
+
+    @classmethod
+    def get_test_parameter(cls):
+        from ondoc.diagnostic.models import TestParameterChat
+        from ondoc.integrations.models import IntegratorTestParameterMapping
+
+        url = "%s/ORDER.svc/%s/ALL/GetReferenceValue" % (settings.THYROCARE_BASE_URL, settings.THYROCARE_API_KEY)
+        response = requests.get(url)
+        response = response.json()
+        if response['RES_ID'] == 'RES0000':
+            test_parameters = response['TEST_MASTER']
+            if test_parameters:
+                for parameter in test_parameters:
+                    integrator_data = {'response_data': parameter}
+                    data = {'age_to': parameter['AGE_TO'], 'age_from': parameter['AGE_FROM'], 'gender': parameter['GENDER'], 'min_range': parameter['MIN_RANGE'], 'max_range': parameter['MAX_RANGE']}
+                    if parameter['MIN_RANGE'] == '':
+                        data['min_range'] = None
+
+                    if parameter['MAX_RANGE'] == '':
+                        data['max_range'] = None
+
+                    # Save to model
+                    print(parameter)
+                    test_parameter = TestParameterChat.objects.update_or_create(test_name=parameter['TEST_NAME'], defaults=data)
+                    IntegratorTestParameterMapping.objects.update_or_create(integrator_test_name=parameter['TEST_NAME'], test_parameter_chat_id=test_parameter[0].id,
+                                                                     integrator_class_name=Thyrocare.__name__, defaults=integrator_data)

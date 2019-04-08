@@ -512,7 +512,9 @@ class ProviderSignupDataViewset(viewsets.GenericViewSet):
         user = request.user
         is_docprime = valid_data.get("is_docprime")
         try:
-            doc_models.ProviderSignupLead.objects.filter(user=user).update(is_docprime=is_docprime)
+            provider_object = doc_models.ProviderSignupLead.objects.filter(user=user).first()
+            provider_object.is_docprime = is_docprime
+            provider_object.save()
             return Response({"status":1, "message":"consent updated"})
         except Exception as e:
             logger.error('Error updating consent: ' + str(e))
