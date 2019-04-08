@@ -3079,3 +3079,7 @@ class HospitalTiming(auth_model.TimeStampedModel):
 
     class Meta:
         db_table = "hospital_timing"
+
+
+class WalkInPatientInvoice(auth_model.TimeStampedModel):
+    appointment_id = models.ForeignKey(OpdAppointment, related_name='walk_in_patient')

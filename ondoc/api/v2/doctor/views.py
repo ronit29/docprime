@@ -750,3 +750,12 @@ class ProviderSignupDataViewset(viewsets.GenericViewSet):
         except Exception as e:
             logger.error('Error updating hospital consent ' + str(e))
             return Response({"status": 0, "message": "Error updating hospital consent - " + str(e)}, status.HTTP_400_BAD_REQUEST)
+
+
+class WalkInPatientInvoice(viewsets.GenericViewSet):
+    authentication_classes = (JWTAuthentication,)
+    permission_classes = (IsAuthenticated, DoctorPermission,)
+
+    def create(self, request):
+        invoice_url = "http://www.africau.edu/images/default/sample.pdf"
+        return Response({"invoice_url": invoice_url}, status.HTTP_200_OK)
