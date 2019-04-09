@@ -44,8 +44,8 @@ class Banner(auth_model.TimeStampedModel):
     title = models.CharField(max_length=500)
     image = models.ImageField('Banner image', upload_to='banner/images')
     url = models.URLField(max_length=10000, null=True, blank=True, verbose_name='landing url')
-    url_params_included = JSONField(null=True, blank=True, help_text='JSON format example: {"specialization_id": 3667, "test_ids": 87, "is_package": True, "Name": "Stringvalue"}')
-    url_params_excluded = JSONField(null=True, blank=True, help_text='JSON format example: {"specialization_id": 3667, "test_ids": 87, "is_package": True, "Name": "Stringvalue"}')
+    url_params_included = JSONField(null=True, blank=True, help_text='JSON format example: {"specialization_id": [3667, 4321], "test_ids": [87], "is_package": True, "Name": "Stringvalue"}')
+    url_params_excluded = JSONField(null=True, blank=True, help_text='JSON format example: {"specialization_id": [3667, 4321], "test_ids": [87], "is_package": True, "Name": "Stringvalue"}')
     priority = models.PositiveIntegerField(blank=True, null=True, default=0)
     slider_locate = models.SmallIntegerField(choices=slider_location, default=1, null=True, blank=True) # Do not use
     slider_action = models.SmallIntegerField(choices=slider_choice, null=True, blank=True)
