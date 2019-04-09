@@ -41,7 +41,7 @@ RUN chmod +x /home/docprime/workspace/entrypoint/entrypoint
 
 #DJANGO MANAGEMENT COMMANDS
 WORKDIR /home/docprime/workspace/backend
-RUN sed -e "s/\${DATABASE}/\$DATABASE/" -e "s/\${QA_SERVER}/\$JOB/" env.example > .env
+RUN sed -e "s/\${DATABASE}/$DATABASE/" -e "s/\${QA_SERVER}/$JOB/" env.example > .env
 RUN pip install -r requirements/local.txt
 ENV DJANGO_SETTINGS_MODULE=config.settings.$ENV_CG
 RUN if [ "$COLLECTSTATIC" = "true" ] ; then\
