@@ -275,7 +275,7 @@ class Insurer(auth_model.TimeStampedModel, LiveMixin):
     cgst = models.PositiveSmallIntegerField(blank=False, null=True)
     state = models.ForeignKey(StateGSTCode, on_delete=models.CASCADE, default=None, blank=False, null=True)
     insurer_merchant_code = models.CharField(max_length=100, null=True, blank=False, unique=True)
-    master_policy_number = models.CharField(max_length=50, null=True, blank=True)
+    master_policy_number = models.CharField(max_length=50)
 
     @property
     def get_active_plans(self):
@@ -797,8 +797,8 @@ class UserInsurance(auth_model.TimeStampedModel):
     @classmethod
     def create_user_insurance(cls, insurance_data, user):
         members = insurance_data['insured_members']
-        insurance_plan = InsurancePlans.objects.filter(id=insurance_data['insurance_plan']).first
-        insurer_id = insurance_plan.insurer_id
+        # insurance_plan = InsurancePlans.objects.filter(id=insurance_data['insurance_plan']).first
+        insurer_id = insurance_data['insurance_plan'].insurer_id
         # default_user_profile = list()
         for member in members:
             member['profile'] = UserInsurance.profile_create_or_update(member, user)
