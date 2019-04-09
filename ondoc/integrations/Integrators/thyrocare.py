@@ -405,6 +405,7 @@ class Thyrocare(BaseIntegrator):
                             if not dp_appointment.status == 6:
                                 dp_appointment.status = 6
                                 dp_appointment.save()
+                                dp_appointment.action_cancelled(1)
                                 status = IntegratorHistory.CANCELLED
 
                         IntegratorHistory.create_history(dp_appointment, url, response, url, 'order_summary_cron', 'Thyrocare', status_code, 0, status, 'integrator_api')

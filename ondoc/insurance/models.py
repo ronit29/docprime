@@ -375,6 +375,7 @@ class InsuranceThreshold(auth_model.TimeStampedModel, LiveMixin):
 class UserInsurance(auth_model.TimeStampedModel):
     from ondoc.account.models import MoneyPool
 
+    id = models.BigAutoField(primary_key=True)
     insurance_plan = models.ForeignKey(InsurancePlans, related_name='active_users', on_delete=models.DO_NOTHING)
     user = models.ForeignKey(auth_model.User, related_name='purchased_insurance', on_delete=models.DO_NOTHING)
     purchase_date = models.DateTimeField(blank=False, null=False)

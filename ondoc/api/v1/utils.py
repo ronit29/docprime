@@ -385,11 +385,8 @@ def payment_details(request, order):
         insurer = insurance_plan.insurer
         insurer_code = insurer.insurer_merchant_code
 
-    if order.product_id == Order.SUBSCRIPTION_PLAN_PRODUCT_ID:
-        #temp_product_id = Order.DOCTOR_PRODUCT_ID
-        pass
-    else:
-        temp_product_id = order.product_id
+    temp_product_id = order.product_id
+
     pgdata = {
         'custId': user.id,
         'mobile': user.phone_number,
