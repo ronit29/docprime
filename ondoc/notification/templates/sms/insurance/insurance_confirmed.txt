@@ -1,5 +1,5 @@
 Congratulations!
-Your OPD Insurance policy has been issued.
+Your GROUP Out Patient Insurance Policy has been issued.
 Please find below the details
 Policy Number:  {{policy_number}}
 Proposer Name: {{proposer_name}}
