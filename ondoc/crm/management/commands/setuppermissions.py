@@ -890,4 +890,4 @@ class Command(BaseCommand):
                 Q(codename='add_' + ct.model) |
                 Q(codename='change_' + ct.model))
 
-        group.permissions.add(*permissions)
+            group.permissions.add(*permissions)
