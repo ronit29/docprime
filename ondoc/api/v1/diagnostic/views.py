@@ -2649,7 +2649,7 @@ class CompareLabPackagesViewSet(viewsets.ReadOnlyModelViewSet):
                 if temp_test_id not in test_data_master:
                     parameters = [x.name for x in test_temp.parameter.all()]
                     test_data_master[temp_test_id] = {"id": temp_test_id, "name": temp_test_name,
-                                                      "parameter_count": len(parameters),
+                                                      "parameter_count": len(parameters) or 1,
                                                       "parameters": parameters}
 
         for temp_package in packages:
@@ -2694,7 +2694,7 @@ class CompareLabPackagesViewSet(viewsets.ReadOnlyModelViewSet):
                 available_labs = None
                 tests = data.test.all()
                 temp_test_id = set()
-                parameter_count = sum([len(x.parameter.all()) for x in data.test.all()])
+                parameter_count = sum([len(x.parameter.all()) or 1 for x in data.test.all()])
                 package_detail['id'] = data.id
                 package_detail['name'] = data.name
                 package_detail['total_parameters_count'] = parameter_count
