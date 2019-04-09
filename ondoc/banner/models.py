@@ -104,20 +104,20 @@ class Banner(auth_model.TimeStampedModel):
             resp['app_params'] = data.app_params
             resp['app_screen'] = data.app_screen
             resp['event_name'] = data.event_name
+            resp['url'] = None
+            resp['url_details'] = None
             if data.url:
                 path = urlparse(data.url).path
                 params = urlparse(data.url).params + '?'
                 query = urlparse(data.url).query
                 netloc = urlparse(data.url).netloc
                 if re.match(r'.*?docprime.com/?', netloc):
-
                     if path:
                         resp['url'] = path + params + query
-
                     else:
                         resp['url'] = '/'
                 else:
-                    resp['url'] = request.build_absolute_uri(data.url)
+                    resp['url'] = data.url
             if data.url:
                 data.url = re.sub('.*?\?', '', data.url)
                 qd = QueryDict(data.url, mutable=True)
