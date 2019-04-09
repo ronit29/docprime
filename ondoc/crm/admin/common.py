@@ -105,11 +105,13 @@ class FormCleanMixin(forms.ModelForm):
 
     def pin_code_qc_submit(self):
         if '_submit_for_qc' in self.data:
-            if hasattr(self.instance, 'pin_code') and self.instance.pin_code is not None:
-                pass
-            else:
-                raise forms.ValidationError(
-                        "Cannot submit for QC without pincode ")
+            # if hasattr(self.instance, 'pin_code') and self.instance.pin_code is not None:
+            if hasattr(self.instance, 'pin_code'):
+                if not self.cleaned_data.get('pin_code'):
+                    raise forms.ValidationError("Cannot submit for QC without pincode ")
+            # else:
+            #     raise forms.ValidationError(
+            #             "Cannot submit for QC without pincode ")
 
     def clean(self):
         self.pin_code_qc_submit()
