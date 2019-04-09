@@ -89,7 +89,7 @@ class RatingsReviewForm(forms.ModelForm):
 
     def __init__(self, *args, **kwargs):
         super(RatingsReviewForm, self).__init__(*args, **kwargs)
-        self.fields['compliments'].required = False
+        self.fields['compliment'].required = False
 
 
 class RatingVerificationFilter(admin.SimpleListFilter):
