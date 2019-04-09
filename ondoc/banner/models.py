@@ -110,6 +110,7 @@ class Banner(auth_model.TimeStampedModel):
                 query = urlparse(data.url).query
                 if path:
                     resp['url'] = path + params + query
+                    resp['absolute_url'] = request.build_absolute_uri(data.url)
                 else:
                     resp['url'] = '/'
             if data.url:
