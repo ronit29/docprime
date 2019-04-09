@@ -81,6 +81,13 @@ def prepare_and_hit(self, data):
     if mask_number_instance:
         mask_number = mask_number_instance.mask_number
 
+    if task_data.get('type') == 'LAB_APPOINTMENT':
+        all_appointments = appointment.lab.get_last_five_appointments()
+    elif task_data.get('type') == 'OPD_APPOINTMENT':
+        all_appointments = appointment.doctor.get_last_five_appointments()
+
+    last_five_appointments = ','.join(list(map(lambda x: str(x[0]), all_appointments)))
+
     appointment_details = {
         'AppointmentStatus': appointment.status,
         'Age': calculate_age(appointment),
@@ -111,7 +118,8 @@ def prepare_and_hit(self, data):
         'MRP': float(appointment.mrp) if task_data.get('type') == 'OPD_APPOINTMENT' else float(appointment.price),
         'DealPrice': float(appointment.deal_price),
         'DOB': dob_value,
-        'ProviderAddress': appointment.hospital.get_hos_address() if task_data.get('type') == 'OPD_APPOINTMENT' else appointment.lab.get_lab_address()
+        'ProviderAddress': appointment.hospital.get_hos_address() if task_data.get('type') == 'OPD_APPOINTMENT' else appointment.lab.get_lab_address(),
+        'LastAppointments': last_five_appointments
     }
 
     request_data = {

@@ -906,7 +906,9 @@ class Doctor(auth_model.TimeStampedModel, auth_model.QCModel, SearchKey, auth_mo
         sticker.save()
         return sticker
 
-
+    def get_last_five_appointments(self):
+        appointments = OpdAppointment.objects.filter(doctor_id=self.id).order_by('-id')[:5].values_list("id", flat=True)
+        return appointments
 
 
     class Meta:
