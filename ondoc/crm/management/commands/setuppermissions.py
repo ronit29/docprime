@@ -39,6 +39,11 @@ from ondoc.diagnostic.models import (Lab, LabTiming, LabImage, GenericLabAdmin,
                                      LabTestRecommendedCategoryMapping, QuestionAnswer, FrequentlyAddedTogetherTests,
                                      LabTestGroup, LabTestGroupMapping, LabTestGroupTiming)
 
+from ondoc.insurance.models import (Insurer, InsurancePlans, InsuranceThreshold, InsuranceCity, StateGSTCode,
+                                    InsuranceDistrict, InsuranceTransaction, InsuranceDeal, InsuranceDisease,
+                                    UserInsurance, InsurancePlanContent, InsuredMembers, InsurerAccount, InsuranceLead,
+                                    InsuranceDiseaseResponse)
+
 from ondoc.procedure.models import Procedure, ProcedureCategory, CommonProcedureCategory, DoctorClinicProcedure, \
     ProcedureCategoryMapping, ProcedureToCategoryMapping, CommonProcedure, IpdProcedure, IpdProcedureFeatureMapping, \
     DoctorClinicIpdProcedure, IpdProcedureCategoryMapping, IpdProcedureCategory, CommonIpdProcedure, \
@@ -422,6 +427,9 @@ class Command(BaseCommand):
         self.create_labtest_team()
 
         self.create_merchant_team()
+
+        #Create insurance group
+        self.create_insurance_group()
 
         #Create XL Data Export Group
         Group.objects.get_or_create(name=constants['DATA_EXPORT_GROUP'])
@@ -865,3 +873,21 @@ class Command(BaseCommand):
 
     def create_common_groups(self):
         group, created = Group.objects.get_or_create(name=constants['APPOINTMENT_OTP_TEAM'])
+
+    def create_insurance_group(self):
+        group, created = Group.objects.get_or_create(name=constants['INSURANCE_GROUP'])
+        group.permissions.clear()
+
+        content_types = ContentType.objects.get_for_models(Insurer, InsuranceDisease, InsurerAccount,
+                                                           InsurancePlanContent, InsurancePlans, InsuranceCity,
+                                                           StateGSTCode, InsuranceDistrict, InsuranceThreshold,
+                                                           UserInsurance, InsuranceDeal, InsuranceLead,
+                                                           InsuranceTransaction, InsuranceDiseaseResponse)
+
+        for cl, ct in content_types.items():
+            permissions = Permission.objects.filter(
+                Q(content_type=ct),
+                Q(codename='add_' + ct.model) |
+                Q(codename='change_' + ct.model))
+
+        group.permissions.add(*permissions)
