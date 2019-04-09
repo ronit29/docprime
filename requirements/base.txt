@@ -43,3 +43,4 @@ django-safedelete
 mongoengine
 qrcode
 xmltodict
+packaging==19.0
