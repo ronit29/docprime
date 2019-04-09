@@ -4,6 +4,7 @@ ARG ENV_CG
 ARG JOB
 ARG BIT_ENV_URL
 ARG COLLECTSTATIC
+ARG DATABASE
 
 
 RUN apt-get update && apt-get install binutils libproj-dev gdal-bin nano apt-utils -y
@@ -26,7 +27,7 @@ COPY / home/docprime/workspace/backend/
 #GET ENVIRONEMENT AND CONFIGURATIONS
 RUN git clone $BIT_ENV_URL /env
 RUN cp /env/$JOB/django/gunicorn_config.py /home/docprime/workspace/backend/
-RUN cp /env/$JOB/django/django_env /home/docprime/workspace/backend/.env
+#RUN cp /env/$JOB/django/django_env /home/docprime/workspace/backend/.env
 RUN cp /env/$JOB/django/entrypoint /home/docprime/workspace/entrypoint
 RUN chmod +x /home/docprime/workspace/entrypoint/entrypoint
 
@@ -40,6 +41,7 @@ RUN chmod +x /home/docprime/workspace/entrypoint/entrypoint
 
 #DJANGO MANAGEMENT COMMANDS
 WORKDIR /home/docprime/workspace/backend
+RUN sed -e "s/\${DATABASE}/\$DATABASE/" -e "s/\${QA_SERVER}/\$JOB/" env.example > .env
 RUN pip install -r requirements/local.txt
 ENV DJANGO_SETTINGS_MODULE=config.settings.$ENV_CG
 RUN if [ "$COLLECTSTATIC" = "true" ] ; then\
