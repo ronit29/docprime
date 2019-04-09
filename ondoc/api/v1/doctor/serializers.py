@@ -1405,6 +1405,8 @@ class DoctorFeedbackBodySerializer(serializers.Serializer):
     app_version = serializers.CharField(required=False, allow_blank=True)
     code_push_version = serializers.CharField(required=False, allow_blank=True)
     os = serializers.CharField(required=False, allow_blank=True)
+    doctor_id = serializers.PrimaryKeyRelatedField(queryset=Doctor.objects.all(), required=False)
+    hospital_id = serializers.PrimaryKeyRelatedField(queryset=Hospital.objects.all(), required=False)
 
 
 class AdminCreateBodySerializer(serializers.Serializer):
