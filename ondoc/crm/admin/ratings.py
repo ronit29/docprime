@@ -124,7 +124,7 @@ class RatingsReviewAdmin(ImportExportMixin, admin.ModelAdmin):
     def get_queryset(self, request):
         doctors = Doctor.objects.filter(rating__isnull=False).all().distinct()
         labs = Lab.objects.filter(rating__isnull=False).all().distinct()
-        hospitals = Hospital.objects.filter(ratings__isnull=False).all().distinct()
+        # hospitals = Hospital.objects.filter(ratings__isnull=False).all().distinct()
         self.docs = doctors
         self.labs = labs
         # self.hospitals = hospitals
