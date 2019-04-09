@@ -15,6 +15,17 @@ class SalesPoint(TimeStampedModel):
     def get_salespoint_via_code(cls, code):
         return cls.objects.filter(spo_code=code).first()
 
+    @classmethod
+    def is_affiliate_available(cls, name):
+        name = name.lower()
+        salespoint_affiliates = SalesPoint.objects.filter().values_list('name', flat=True)
+        salespoint_affiliates = list(map(lambda x: x.lower(), salespoint_affiliates))
+        if name in salespoint_affiliates:
+            return True
+
+        return False
+
+
     class Meta:
         db_table = 'salespoint'
 

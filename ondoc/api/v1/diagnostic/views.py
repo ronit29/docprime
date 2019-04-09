@@ -202,10 +202,8 @@ class LabList(viewsets.ReadOnlyModelViewSet):
 
         package_free_or_not_dict = get_package_free_or_not_dict(request)
 
-        salespoint_affiliates = SalesPoint.objects.filter().values_list('name', flat=True)
-        salespoint_affiliates = list(map(lambda x: x.lower(), salespoint_affiliates))
-
-        if request.query_params.get('UtmSource') in salespoint_affiliates:
+        utm_source = request.query_params.get('UtmSource')
+        if utm_source and SalesPoint.is_affiliate_available(utm_source):
             salespoint_obj = SalesPoint.get_salespoint_via_code(request.query_params.get('UtmTerm'))
 
             main_queryset = LabTest.objects.prefetch_related('test', 'test__recommended_categories',
@@ -213,7 +211,6 @@ class LabList(viewsets.ReadOnlyModelViewSet):
                                                              'test__availablelabs__active_sales_point_mappings').\
                 filter(enable_for_retail=True, searchable=True, is_package=True,
                        availablelabs__active_sales_point_mappings__salespoint=salespoint_obj)
-
         else:
             main_queryset = LabTest.objects.prefetch_related('test', 'test__recommended_categories',
                                                              'test__parameter', 'categories').filter(enable_for_retail=True,
@@ -1423,9 +1420,17 @@ class LabList(viewsets.ReadOnlyModelViewSet):
         #                                    entity_type__iexact='Lab').values('url')
         # if entity.exists():
         #     lab_serializable_data['url'] = entity.first()['url'] if len(entity) == 1 else None
+
+        # agent added for SPO work
+        agent = False
+        utm_source = request.query_params.get('UtmSource')
+        if utm_source and SalesPoint.is_affiliate_available(utm_source):
+            agent = True
+
         temp_data = dict()
         temp_data['lab'] = lab_serializable_data
         temp_data['distance_related_charges'] = distance_related_charges
+        temp_data['agent'] = agent
         temp_data['tests'] = test_serializer.data
         temp_data['lab_tests'] = lab_test_serializer.data
         temp_data['lab_timing'], temp_data["lab_timing_data"] = lab_timing, lab_timing_data
