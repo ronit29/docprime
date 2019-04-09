@@ -43,9 +43,9 @@ class BaseIntegrator(object):
             logger.error("[ERROR]" + self.__class__.__name__ + " report error." + str(e))
 
     # This method is use to cancel an order to respective integrator.
-    def cancel_integrator_order(self, appointment, integrator_response):
+    def cancel_integrator_order(self, appointment, integrator_response, retry_count):
         try:
-            order = self._cancel_order(appointment, integrator_response)
+            order = self._cancel_order(appointment, integrator_response, retry_count)
             return order
         except Exception as e:
             logger.error("[ERROR]" + self.__class__.__name__ + " cancel order error." + str(e))
