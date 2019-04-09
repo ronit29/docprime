@@ -2608,16 +2608,14 @@ class CompareLabPackagesViewSet(viewsets.ReadOnlyModelViewSet):
 
         response = {}
         lab_packages = []
-        latitude = None
-        longitude = None
-
-        longitude = validated_data.get('longitude')
-        latitude = validated_data.get('latitude')
-
+        # latitude = None
+        # longitude = None
+        # longitude = validated_data.get('longitude')
+        # latitude = validated_data.get('latitude')
+        # point_string = 'POINT(' + str(longitude) + ' ' + str(latitude) + ')'
+        # pnt = GEOSGeometry(point_string, srid=4326)
         tests = None
         total_test_ids = set()
-        point_string = 'POINT(' + str(longitude) + ' ' + str(latitude) + ')'
-        pnt = GEOSGeometry(point_string, srid=4326)
         max_distance = 10000
         min_distance = 0
         title = None
@@ -2632,9 +2630,7 @@ class CompareLabPackagesViewSet(viewsets.ReadOnlyModelViewSet):
                                                                                enabled=True)),
                                                     Prefetch('availablelabs__lab_pricing_group__labs',
                                                              Lab.objects.filter(is_live=True))).filter(
-            is_package=True, id__in=validated_data.get('package_ids'),
-            availablelabs__lab_pricing_group__labs__location__dwithin=(Point(float(longitude),
-                                                                             float(latitude)), D(m=max_distance))).distinct()
+            is_package=True, id__in=validated_data.get('package_ids')).distinct()
 
         packages_price = packages.values('id').annotate(
             min_price=Min(Coalesce('availablelabs__custom_deal_price', 'availablelabs__computed_deal_price')))
