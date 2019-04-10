@@ -2350,6 +2350,8 @@ class TestDetailsViewset(viewsets.GenericViewSet):
             seo['title'] = None
 
         result['seo'] = seo
+        result['breadcrumb'] = [{"title": "Home", "url": "/"}, {"title": "tests", "url": "api/v1/diagnostic/test/list_by_alphabet"},
+                                {"title": queryset[0].name, "url": queryset[0].url}]
         final_result.append(result)
 
         return Response(final_result)
