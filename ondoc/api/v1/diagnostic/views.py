@@ -2539,7 +2539,7 @@ class TestDetailsViewset(viewsets.GenericViewSet):
         response = {}
         tests_count = 0
 
-        tests = list(LabTest.objects.filter(enable_for_retail=True, name__istartswith=alphabet).values('id', 'name', 'url'))
+        tests = list(LabTest.objects.filter(enable_for_retail=True, name__istartswith=alphabet).order_by('name').values('id', 'name', 'url'))
         if tests:
             tests_count = len(tests)
         response['count'] = tests_count
