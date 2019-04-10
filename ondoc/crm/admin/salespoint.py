@@ -17,6 +17,6 @@ class SalesPointAvailableTestMappingAdmin(admin.ModelAdmin):
     def get_form(self, request, obj=None, **kwargs):
 
         form = super(SalesPointAvailableTestMappingAdmin, self).get_form(request, obj=obj, **kwargs)
-        form.base_fields['available_tests'].queryset = AvailableLabTest.objects.filter(test__is_package=True)
+        form.base_fields['available_tests'].queryset = AvailableLabTest.objects.filter(enabled=True, test__is_package=True, test__enable_for_retail=True)
 
         return form
