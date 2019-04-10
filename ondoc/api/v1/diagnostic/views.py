@@ -6,7 +6,7 @@ from ondoc.api.v1.diagnostic import serializers as diagnostic_serializer
 from ondoc.api.v1.auth.serializers import AddressSerializer
 from ondoc.integrations.models import IntegratorTestMapping
 from ondoc.cart.models import Cart
-from ondoc.common.models import UserConfig, GlobalNonBookable
+from ondoc.common.models import UserConfig, GlobalNonBookable, AppointmentHistory
 from ondoc.ratings_review import models as rating_models
 from ondoc.diagnostic.models import (LabTest, AvailableLabTest, Lab, LabAppointment, LabTiming, PromotedLab,
                                      CommonDiagnosticCondition, CommonTest, CommonPackage,
@@ -2370,7 +2370,10 @@ class DoctorLabAppointmentsNoAuthViewSet(viewsets.GenericViewSet):
         lab_appointment = validated_data.get('lab_appointment')
 
         lab_appointment = LabAppointment.objects.select_for_update().get(id=lab_appointment.id)
-
+        source = request.query_params.get('source', '')
+        responsible_user = request.user if request.user.is_authenticated else None
+        lab_appointment._source = source if source in [x[0] for x in AppointmentHistory.SOURCE_CHOICES] else ''
+        lab_appointment._responsible_user = responsible_user
         if lab_appointment:
             lab_appointment.action_completed()
             # lab_appointment_serializer = diagnostic_serializer.LabAppointmentRetrieveSerializer(lab_appointment,
