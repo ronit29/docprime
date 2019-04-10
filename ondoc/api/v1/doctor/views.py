@@ -15,6 +15,7 @@ from ondoc.cart.models import Cart
 from ondoc.doctor import models
 from ondoc.authentication import models as auth_models
 from ondoc.diagnostic import models as lab_models
+from ondoc.insurance.models import UserInsurance
 from ondoc.notification import tasks as notification_tasks
 #from ondoc.doctor.models import Hospital, DoctorClinic,Doctor,  OpdAppointment
 from ondoc.doctor.models import DoctorClinic, OpdAppointment, DoctorAssociation, DoctorQualification, Doctor, Hospital, \
@@ -70,11 +71,14 @@ from dal import autocomplete
 from django.contrib.staticfiles.templatetags.staticfiles import static
 from django.db.models import Avg
 from django.db.models import Count
+from ondoc.insurance.models import InsuranceThreshold
+import logging
 from ondoc.api.v1.auth import serializers as auth_serializers
 from copy import deepcopy
 from ondoc.common.models import GlobalNonBookable
 from ondoc.api.v1.common import serializers as common_serializers
 from django.utils.text import slugify
+from django.urls import reverse
 import time
 from ondoc.api.v1.ratings.serializers import GoogleRatingsGraphSerializer
 logger = logging.getLogger(__name__)
@@ -220,7 +224,23 @@ class DoctorAppointmentsViewSet(OndocViewSet):
         serializer = serializers.CreateAppointmentSerializer(data=request.data, context={'request': request, 'data' : request.data, 'use_duplicate' : True})
         serializer.is_valid(raise_exception=True)
         validated_data = serializer.validated_data
+        data = request.data
 
+        user_insurance = UserInsurance.get_user_insurance(request.user)
+
+        # data['is_appointment_insured'], data['insurance_id'], data[
+        #     'insurance_message'] = Cart.check_for_insurance(validated_data,request)
+        if user_insurance:
+            insurance_validate_dict = user_insurance.validate_insurance(validated_data)
+            data['is_appointment_insured'] = insurance_validate_dict['is_insured']
+            data['insurance_id'] = insurance_validate_dict['insurance_id']
+            data['insurance_message'] = insurance_validate_dict['insurance_message']
+
+            if data['is_appointment_insured']:
+                data['payment_type'] = OpdAppointment.INSURANCE
+        else:
+            data['is_appointment_insured'], data['insurance_id'], data[
+                'insurance_message'] = False, None, ""
         cart_item_id = validated_data.get('cart_item').id if validated_data.get('cart_item') else None
         if not models.OpdAppointment.can_book_for_free(request, validated_data, cart_item_id):
             return Response({'request_errors': {"code": "invalid",
@@ -230,11 +250,16 @@ class DoctorAppointmentsViewSet(OndocViewSet):
 
         if validated_data.get("existing_cart_item"):
             cart_item = validated_data.get("existing_cart_item")
-            cart_item.data = request.data
+            old_cart_obj = Cart.objects.filter(id=validated_data.get('existing_cart_item').id).first()
+            payment_type = old_cart_obj.data.get('payment_type')
+            if payment_type == OpdAppointment.INSURANCE and data['is_appointment_insured'] == False:
+                data['payment_type'] = OpdAppointment.PREPAID
+            # cart_item.data = request.data
+            cart_item.data = data
             cart_item.save()
         else:
             cart_item, is_new = Cart.objects.update_or_create(id=cart_item_id, deleted_at__isnull=True, product_id=account_models.Order.DOCTOR_PRODUCT_ID,
-                                                  user=request.user,defaults={"data": request.data})
+                                                  user=request.user,defaults={"data": data})
 
         if hasattr(request, 'agent') and request.agent:
             resp = { 'is_agent': True , "status" : 1 }
@@ -300,14 +325,19 @@ class DoctorAppointmentsViewSet(OndocViewSet):
 
         insurance_effective_price = appointment_details['fees']
 
-        can_use_insurance, insurance_fail_message = self.can_use_insurance(appointment_details)
+        can_use_insurance, insurance_id, insurance_fail_message = self.can_use_insurance(user, appointment_details)
         if can_use_insurance:
-            appointment_details['effective_price'] = insurance_effective_price
+            appointment_details['insurance'] = insurance_id
+            appointment_details['effective_price'] = appointment_details['fees']
             appointment_details['payment_type'] = models.OpdAppointment.INSURANCE
+
         elif appointment_details['payment_type'] == models.OpdAppointment.INSURANCE:
             resp['status'] = 0
             resp['message'] = insurance_fail_message
             return resp
+
+        else:
+            appointment_details['insurance'] = None
 
         appointment_action_data = copy.deepcopy(appointment_details)
         appointment_action_data = opdappointment_transform(appointment_action_data)
@@ -405,10 +435,20 @@ class DoctorAppointmentsViewSet(OndocViewSet):
                                                                      settings.PG_CLIENT_KEY_P1)
         return pgdata, payment_required
 
-    def can_use_insurance(self, appointment_details):
+    def can_use_insurance(self, user, appointment_details):
+        user_insurance_obj = UserInsurance.get_user_insurance(user)
+        if not user_insurance_obj:
+            return False, None, ''
+
+        insurance_validate_dict = user_insurance_obj.validate_insurance(appointment_details)
+        insurance_check = insurance_validate_dict['is_insured']
+        insurance = insurance_validate_dict['insurance_id']
+        fail_message = insurance_validate_dict['insurance_message']
+
+        return insurance_check, insurance, fail_message
         # Check if appointment can be covered under insurance
         # also return a valid message         
-        return False, 'Not covered under insurance'
+        # return False, 'Not covered under insurance'
 
     def is_insured_cod(self, app_details):
         return False
@@ -1242,6 +1282,13 @@ class DoctorListViewSet(viewsets.GenericViewSet):
 
     @transaction.non_atomic_requests
     def list(self, request, *args, **kwargs):
+        if (request.query_params.get('procedure_ids') or request.query_params.get('procedure_category_ids')) \
+                and request.query_params.get('is_insurance'):
+            return Response({"result": [], "count": 0,
+                         'specializations': [], 'conditions': [], "seo": {},
+                         "breadcrumb": [], 'search_content': "",
+                         'procedures': [], 'procedure_categories': []})
+
         parameters = request.query_params
         if kwargs.get("parameters"):
             parameters = kwargs.get("parameters")
@@ -1279,6 +1326,26 @@ class DoctorListViewSet(viewsets.GenericViewSet):
         ratings = None
         reviews = None
 
+
+        # Insurance check for logged in user
+        logged_in_user = request.user
+        insurance_threshold = InsuranceThreshold.objects.all().order_by('-opd_amount_limit').first()
+        insurance_data_dict = {
+            'is_user_insured': False,
+            'insurance_threshold_amount': insurance_threshold.opd_amount_limit if insurance_threshold else 5000
+        }
+
+        if logged_in_user.is_authenticated and not logged_in_user.is_anonymous:
+            user_insurance = logged_in_user.purchased_insurance.filter().order_by('id').last()
+            if user_insurance and user_insurance.is_valid():
+                insurance_threshold = user_insurance.insurance_plan.threshold.filter().first()
+                if insurance_threshold:
+                    insurance_data_dict['insurance_threshold_amount'] = 0 if insurance_threshold.opd_amount_limit is None else \
+                        insurance_threshold.opd_amount_limit
+                    insurance_data_dict['is_user_insured'] = True
+
+        validated_data['insurance_threshold_amount'] = insurance_data_dict['insurance_threshold_amount']
+
         doctor_search_helper = DoctorSearchHelper(validated_data)
         if not validated_data.get("search_id"):
             filtering_params = doctor_search_helper.get_filtering_params()
@@ -1305,7 +1372,7 @@ class DoctorListViewSet(viewsets.GenericViewSet):
                                                 "qualifications__qualification","qualifications__college",
                                                 "qualifications__specialization").order_by(preserved)
 
-        response = doctor_search_helper.prepare_search_response(doctor_data, doctor_search_result, request)
+        response = doctor_search_helper.prepare_search_response(doctor_data, doctor_search_result, request, insurance_data=insurance_data_dict)
 
         entity_ids = [doctor_data['id'] for doctor_data in response]
 
@@ -1881,6 +1948,26 @@ class DoctorFeedbackViewSet(viewsets.GenericViewSet):
     authentication_classes = (JWTAuthentication,)
     permission_classes = (IsAuthenticated, IsDoctor)
 
+    @staticmethod
+    def get_doctor_and_hospital_data(message, doctor=None, hospital=None):
+        if doctor:
+            message += "doctor - "
+            doc_dict = dict()
+            doc_dict['id'] = doctor.id
+            doc_dict['name'] = doctor.name
+            doc_dict['url'] = settings.ADMIN_BASE_URL + reverse('admin:doctor_doctor_change',
+                                                                kwargs={"object_id": doctor.id})
+            message += str(doc_dict) + "<br>"
+        if hospital:
+            message += "hospital - "
+            hosp_dict = dict()
+            hosp_dict['id'] = hospital.id
+            hosp_dict['name'] = hospital.name
+            hosp_dict['url'] = settings.ADMIN_BASE_URL + reverse('admin:doctor_hospital_change',
+                                                                kwargs={"object_id": hospital.id})
+            message += str(hosp_dict) + "<br>"
+        return message
+
     def feedback(self, request):
         resp = {}
         user = request.user
@@ -1892,12 +1979,16 @@ class DoctorFeedbackViewSet(viewsets.GenericViewSet):
         message = ''
         managers_string = ''
         manages_string = ''
+        doctor = valid_data.pop("doctor_id") if valid_data.get("doctor_id") else None
+        hospital = valid_data.pop("hospital_id") if valid_data.get("hospital_id") else None
         for key, value in valid_data.items():
             if isinstance(value, list):
                 val = ' '.join(map(str, value))
             else:
                 val = value
             message += str(key) + "  -  " + str(val) + "<br>"
+        if doctor or hospital:
+            message = self.get_doctor_and_hospital_data(message, doctor, hospital)
         if hasattr(user, 'doctor') and user.doctor:
             managers_list = []
             for managers in user.doctor.manageable_doctors.all():

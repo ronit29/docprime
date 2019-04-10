@@ -18,4 +18,6 @@ tests/report/
 ondoc/media/*
 deploy.sh
 /silk/
+.DS_Store
+ondoc/.DS_Store
 celerybeat-schedule
