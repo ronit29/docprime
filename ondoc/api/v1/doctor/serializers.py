@@ -1690,12 +1690,33 @@ class TopHospitalForIpdProcedureSerializer(serializers.ModelSerializer):
     logo = serializers.SerializerMethodField()
     open_today = serializers.SerializerMethodField()
     insurance_provider = serializers.SerializerMethodField()
+    established_in = serializers.SerializerMethodField()
+    longitude = serializers.SerializerMethodField()
+    latitude = serializers.SerializerMethodField()
 
     class Meta:
         model = Hospital
         fields = ('id', 'name', 'distance', 'certifications', 'bed_count', 'logo', 'avg_rating',
                   'count_of_insurance_provider', 'multi_speciality', 'address', 'open_today',
-                  'insurance_provider')
+                  'insurance_provider', 'established_in', 'longitude', 'latitude')
+
+    def get_longitude(self, obj):
+        if obj:
+            if not obj.location:
+                return None
+            return obj.location.x
+
+    def get_latitude(self, obj):
+        if obj:
+            if not obj.location:
+                return None
+            return obj.location.y
+
+    def get_established_in(self, obj):
+        if obj:
+            if not obj.operational_since:
+                return None
+            return obj.operational_since
 
     def get_count_of_insurance_provider(self, obj):
         return len(list(obj.health_insurance_providers.all()))
