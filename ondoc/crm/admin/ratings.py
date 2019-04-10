@@ -16,25 +16,25 @@ import logging
 logger = logging.getLogger(__name__)
 
 
-class RatingsReviewForm(forms.ModelForm):
-
-    def clean(self):
-        super().clean()
-        if any(self.errors):
-            return
-        cleaned_data = self.cleaned_data
-        object_id = cleaned_data.get('object_id')
-        content_type = cleaned_data.get('content_type', None)
-        if content_type==ContentType.objects.get_for_model(Lab):
-            lab = Lab.objects.filter(pk=object_id).first()
-            if not lab:
-                raise forms.ValidationError("Lab not found")
-        elif content_type == ContentType.objects.get_for_model(Doctor):
-            doc = Doctor.objects.filter(pk=object_id).first()
-            if not doc:
-                raise forms.ValidationError("Doctor not found")
-        else:
-            raise forms.ValidationError("invalid content type")
+# class RatingsReviewForm(forms.ModelForm):
+#
+#     def clean(self):
+#         super().clean()
+#         if any(self.errors):
+#             return
+#         cleaned_data = self.cleaned_data
+#         object_id = cleaned_data.get('object_id')
+#         content_type = cleaned_data.get('content_type', None)
+#         if content_type==ContentType.objects.get_for_model(Lab):
+#             lab = Lab.objects.filter(pk=object_id).first()
+#             if not lab:
+#                 raise forms.ValidationError("Lab not found")
+#         elif content_type == ContentType.objects.get_for_model(Doctor):
+#             doc = Doctor.objects.filter(pk=object_id).first()
+#             if not doc:
+#                 raise forms.ValidationError("Doctor not found")
+#         else:
+#             raise forms.ValidationError("invalid content type")
 
 
 
@@ -87,6 +87,10 @@ class RatingsReviewForm(forms.ModelForm):
     send_update_text = forms.CharField(initial='Please Find the url to Update your Feedback!', required=False)
     send_update_sms = forms.BooleanField(required=False)
 
+    def __init__(self, *args, **kwargs):
+        super(RatingsReviewForm, self).__init__(*args, **kwargs)
+        self.fields['compliment'].required = False
+
 
 class RatingVerificationFilter(admin.SimpleListFilter):
     title = "type"
@@ -124,7 +128,7 @@ class RatingsReviewAdmin(ImportExportMixin, admin.ModelAdmin):
     def get_queryset(self, request):
         doctors = Doctor.objects.filter(rating__isnull=False).all().distinct()
         labs = Lab.objects.filter(rating__isnull=False).all().distinct()
-        hospitals = Hospital.objects.filter(ratings__isnull=False).all().distinct()
+        # hospitals = Hospital.objects.filter(ratings__isnull=False).all().distinct()
         self.docs = doctors
         self.labs = labs
         # self.hospitals = hospitals
