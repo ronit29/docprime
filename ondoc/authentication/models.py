@@ -282,6 +282,12 @@ class User(AbstractBaseUser, PermissionsMixin):
         #     return self.staffprofile.name
         # return str(self.phone_number)
 
+    # @property
+    @cached_property
+    def active_insurance(self):
+        active_insurance = self.purchased_insurance.filter().order_by('id').last()
+        return active_insurance if active_insurance and active_insurance.is_valid() else None
+
     def get_phone_number_for_communication(self):
         from ondoc.communications.models import unique_phone_numbers
         receivers = []
@@ -835,6 +841,7 @@ class GenericAdmin(TimeStampedModel, CreatedByModel):
     name = models.CharField(max_length=24, blank=True, null=True)
     source_type = models.PositiveSmallIntegerField(choices=source_choices, default=CRM)
     entity_type = models.PositiveSmallIntegerField(choices=entity_choices, default=OTHER)
+    auto_created_from_SPOCs = models.BooleanField(default=False)
 
 
     class Meta:

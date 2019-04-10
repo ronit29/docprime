@@ -34,9 +34,10 @@ def show_actions(context, original):
 
     # check if member of QC Team
     if request.user.is_member_of(constants['QC_GROUP_NAME']):
-        if data_status == QCModel.IN_PROGRESS:
-            actions['_submit_for_qc'] = available_actions['_submit_for_qc']
-        elif data_status == QCModel.SUBMITTED_FOR_QC:
+        # if data_status == QCModel.IN_PROGRESS:
+        #     actions['_submit_for_qc'] = available_actions['_submit_for_qc']
+        # elif data_status == QCModel.SUBMITTED_FOR_QC:
+        if data_status == QCModel.SUBMITTED_FOR_QC:
             actions['_qc_approve'] = available_actions['_qc_approve']
             actions['_mark_in_progress'] = available_actions['_mark_in_progress']
 

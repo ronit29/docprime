@@ -5,6 +5,7 @@ from django.db.models import F
 
 from ondoc.api.v1.doctor.serializers import DoctorProfileUserViewSerializer
 from ondoc.api.v1.procedure.serializers import DoctorClinicProcedureSerializer
+from ondoc.api.v1.ratings.serializers import GoogleRatingsGraphSerializer
 from ondoc.doctor import models
 from ondoc.api.v1.utils import clinic_convert_timings
 from ondoc.api.v1.doctor import serializers
@@ -20,6 +21,7 @@ from django.contrib.staticfiles.templatetags.staticfiles import static
 
 from ondoc.location.models import EntityAddress
 from collections import OrderedDict
+from ondoc.insurance.models import UserInsurance
 from collections import defaultdict
 
 
@@ -183,6 +185,12 @@ class DoctorSearchHelper:
             filtering_params.append(
                 "h.search_key ilike (%(hospital_name)s)")
             params['hospital_name'] = '%' + search_key + '%'
+
+        if self.query_params.get('is_insurance'):
+            filtering_params.append(
+                "mrp<=(%(insurance_threshold_amount)s) and h.enabled_for_online_booking=True and d.enabled_for_online_booking=True and d.is_insurance_enabled and dc.enabled_for_online_booking=True"
+            )
+            params['insurance_threshold_amount'] = self.query_params.get('insurance_threshold_amount')
 
         result = {}
         if not filtering_params:
@@ -406,7 +414,7 @@ class DoctorSearchHelper:
                 # return doctor_hospital.deal_price
         return None
 
-    def prepare_search_response(self, doctor_data, doctor_search_result, request):
+    def prepare_search_response(self, doctor_data, doctor_search_result, request, **kwargs):
         doctor_clinic_mapping = {data.get("doctor_id"): data.get("hospital_id") for data in doctor_search_result}
         doctor_availability_mapping = {data.get("doctor_id"): data.get("doctor_clinic_timing_id") for data in
                                        doctor_search_result}
@@ -436,6 +444,7 @@ class DoctorSearchHelper:
                         "mrp": data.mrp
                     }
             # min_fees = min([data.get("deal_price") for data in serializer.data if data.get("deal_price")])
+
             if not doctor_clinic:
                 hospitals = []
             else:
@@ -462,8 +471,22 @@ class DoctorSearchHelper:
                     if doctor.enabled_for_online_booking and doctor_clinic.hospital.enabled_for_online_booking and doctor_clinic.enabled_for_online_booking:
                         enable_online_booking = True
 
+                # We cover the insurance for only those users which have purchased the insurance and their insurance
+                # threshold value is greater than the doctor fees and if doctor is enabled for the online booking.
+                # Insurance is not valid for the procedures hence negating the procedure request.
+
+                is_insurance_covered = False
+                insurance_data_dict = kwargs.get('insurance_data')
+                if enable_online_booking and doctor.is_insurance_enabled and insurance_data_dict and min_price.get("mrp") is not None and \
+                        min_price["mrp"] <= insurance_data_dict['insurance_threshold_amount'] and \
+                        not (request.query_params.get('procedure_ids') or request.query_params.get('procedure_category_ids')):
+                    is_insurance_covered = True
+
                 hospitals = [{
                     "enabled_for_online_booking": enable_online_booking,
+                    "is_insurance_covered": is_insurance_covered,
+                    "insurance_threshold_amount": insurance_data_dict['insurance_threshold_amount'],
+                    "is_user_insured": insurance_data_dict['is_user_insured'],
                     "welcome_calling_done": doctor_clinic.hospital.welcome_calling_done,
                     "hospital_name": doctor_clinic.hospital.name,
                     "address": ", ".join(
@@ -471,6 +494,8 @@ class DoctorSearchHelper:
                          value]),
                     "short_address": doctor_clinic.hospital.get_short_address(),
                     "doctor": doctor.name,
+                    "enabled_for_cod": doctor_clinic.hospital.enabled_for_cod,
+                    "enabled_for_prepaid": doctor_clinic.hospital.enabled_for_prepaid,
                     "display_name": doctor.get_display_name(),
                     "hospital_id": doctor_clinic.hospital.id,
                     "mrp": min_price["mrp"],
@@ -511,10 +536,33 @@ class DoctorSearchHelper:
             schema_specialization = sorted_spec_list[0].get('name') if sorted_spec_list and len(sorted_spec_list)>0 and sorted_spec_list[0].get('name') else None
             schema_type = None
             new_schema = OrderedDict()
+            average_rating = None
+            rating_count = None
+            google_rating = None
             if schema_specialization == 'Dentist':
                 schema_type = 'Dentist'
             else:
                 schema_type = 'Physician'
+
+            if doctor.rating_data and doctor.rating_data.get('rating_count')>0:
+                if doctor.rating_data.get('rating_count')<5:
+                    if doctor.rating_data.get('avg_rating') >=4:
+                        average_rating = doctor.rating_data.get('avg_rating')
+                        rating_count = doctor.rating_data.get('rating_count')
+                else:
+                    average_rating = doctor.rating_data.get('avg_rating')
+                    rating_count = doctor.rating_data.get('rating_count')
+            if not average_rating:
+                 if doctor_clinic and doctor_clinic.hospital:
+                    hosp_reviews = doctor_clinic.hospital.hospital_place_details.all()
+                    if hosp_reviews:
+                        reviews_data = hosp_reviews[0].reviews
+
+                        if reviews_data:
+                            ratings_graph = GoogleRatingsGraphSerializer(reviews_data, many=False,
+                                                                         context={"request": request})
+                            google_rating = ratings_graph.data
+
             temp = {
                 "doctor_id": doctor.id,
                 "enabled_for_online_booking": doctor.enabled_for_online_booking,
@@ -535,8 +583,11 @@ class DoctorSearchHelper:
                 #"experiences": serializers.DoctorExperienceSerializer(doctor.experiences.all(), many=True).data,
                 "qualifications": serializers.DoctorQualificationSerializer(doctor.qualifications.all(), many=True).data,
                 # "average_rating": doctor.avg_rating,
-                "average_rating": doctor.rating_data.get('avg_rating') if doctor.display_rating_on_list() else None,
-                "rating_count": doctor.rating_data.get('rating_count') if doctor.display_rating_on_list() else None,
+                # "average_rating": doctor.rating_data.get('avg_rating') if doctor.rating_data else None,
+                # "rating_count": doctor.rating_data.get('rating_count') if doctor.rating_data else None,
+                "average_rating": average_rating,
+                "rating_count": rating_count,
+                "google_rating": google_rating,
                 # "general_specialization": serializers.DoctorPracticeSpecializationSerializer(
                 #     doctor.doctorpracticespecializations.all(),
                 #     many=True).data,

@@ -884,12 +884,10 @@ class SearchLeadViewSet(viewsets.GenericViewSet):
 
 
 class GetPaymentOptionsViewSet(viewsets.GenericViewSet):
-
     def get_queryset(self):
         return None
 
     def return_queryset(self, request):
-        
         params = request.query_params
         from_app = params.get("from_app", False)
         if from_app:

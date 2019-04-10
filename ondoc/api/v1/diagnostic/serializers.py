@@ -24,6 +24,8 @@ import pytz
 import random
 import logging
 import json
+
+from ondoc.insurance.models import UserInsurance, InsuranceThreshold
 from ondoc.ratings_review.models import RatingsReview
 from django.db.models import Avg
 from django.db.models import Q
@@ -247,12 +249,40 @@ class AvailableLabTestPackageSerializer(serializers.ModelSerializer):
     is_home_collection_enabled = serializers.SerializerMethodField()
     package = serializers.SerializerMethodField()
     parameters = serializers.SerializerMethodField()
+    insurance = serializers.SerializerMethodField()
     hide_price = serializers.ReadOnlyField(source='test.hide_price')
     included_in_user_plan = serializers.SerializerMethodField()
 
     def get_included_in_user_plan(self, obj):
         package_free_or_not_dict = self.context.get('package_free_or_not_dict', {})
         return package_free_or_not_dict.get(obj.test.id, False)
+
+    def get_insurance(self, obj):
+        request = self.context.get("request")
+        lab_obj = self.context.get("lab")
+        resp = Lab.get_insurance_details(request.user)
+        # insurance_threshold = InsuranceThreshold.objects.all().order_by('-lab_amount_limit').first()
+        # resp = {
+        #     'is_insurance_covered': False,
+        #     'insurance_threshold_amount': insurance_threshold.lab_amount_limit if insurance_threshold else 5000,
+        #     'is_user_insured': False
+        # }
+        # if request:
+        #     logged_in_user = request.user
+        #     if logged_in_user.is_authenticated and not logged_in_user.is_anonymous:
+        #         user_insurance = logged_in_user.purchased_insurance.filter().order_by('id').last()
+        #         if user_insurance and user_insurance.is_valid():
+        #             insurance_threshold = user_insurance.insurance_plan.threshold.filter().first()
+        #             if insurance_threshold:
+        #                 resp['insurance_threshold_amount'] = 0 if insurance_threshold.lab_amount_limit is None else \
+        #                     insurance_threshold.lab_amount_limit
+        #                 resp['is_user_insured'] = True
+
+        if lab_obj.is_enabled_for_insurance and obj.mrp is not None and resp['insurance_threshold_amount'] is not None \
+                and obj.mrp <= resp['insurance_threshold_amount']:
+            resp['is_insurance_covered'] = True
+
+        return resp
 
     def get_is_home_collection_enabled(self, obj):
         if self.context.get("lab") is not None:
@@ -317,8 +347,7 @@ class AvailableLabTestPackageSerializer(serializers.ModelSerializer):
         model = AvailableLabTest
         fields = ('test_id', 'mrp', 'test', 'agreed_price', 'deal_price', 'enabled', 'is_home_collection_enabled',
                   'package', 'parameters', 'is_package', 'number_of_tests', 'why', 'pre_test_info', 'expected_tat',
-                  'hide_price', 'included_in_user_plan')
-
+                  'hide_price', 'included_in_user_plan', 'insurance')
 
 class AvailableLabTestSerializer(serializers.ModelSerializer):
     test = LabTestSerializer()
@@ -326,6 +355,7 @@ class AvailableLabTestSerializer(serializers.ModelSerializer):
     agreed_price = serializers.SerializerMethodField()
     deal_price = serializers.SerializerMethodField()
     is_home_collection_enabled = serializers.SerializerMethodField()
+    insurance = serializers.SerializerMethodField()
     is_package = serializers.SerializerMethodField()
     included_in_user_plan = serializers.SerializerMethodField()
 
@@ -349,12 +379,40 @@ class AvailableLabTestSerializer(serializers.ModelSerializer):
         deal_price = obj.computed_deal_price if obj.custom_deal_price is None else obj.custom_deal_price
         return deal_price
 
-    def get_is_package(self, obj):
-        return obj.test.is_package
+    def get_insurance(self, obj):
+        request = self.context.get("request")
+        lab_obj = self.context.get("lab")
+        resp = Lab.get_insurance_details(request.user)
+        # insurance_threshold = InsuranceThreshold.objects.all().order_by('-lab_amount_limit').first()
+        # resp = {
+        #     'is_insurance_covered': False,
+        #     'insurance_threshold_amount': insurance_threshold.lab_amount_limit if insurance_threshold else 5000,
+        #     'is_user_insured': False
+        # }
+        # if request:
+        #     logged_in_user = request.user
+        #     if logged_in_user.is_authenticated and not logged_in_user.is_anonymous:
+        #         user_insurance = logged_in_user.purchased_insurance.filter().order_by('id').last()
+        #         if user_insurance and user_insurance.is_valid():
+        #             insurance_threshold = user_insurance.insurance_plan.threshold.filter().first()
+        #             if insurance_threshold:
+        #                 resp['insurance_threshold_amount'] = 0 if insurance_threshold.lab_amount_limit is None else \
+        #                     insurance_threshold.lab_amount_limit
+        #                 resp['is_user_insured'] = True
+
+        if lab_obj and lab_obj.is_enabled_for_insurance and obj.mrp is not None and resp['insurance_threshold_amount'] is not None \
+                and obj.mrp <= resp['insurance_threshold_amount']:
+            resp['is_insurance_covered'] = True
+
+        return resp
 
     class Meta:
         model = AvailableLabTest
-        fields = ('test_id', 'mrp', 'test', 'agreed_price', 'deal_price', 'enabled', 'is_home_collection_enabled', 'is_package', 'included_in_user_plan')
+        fields = ('test_id', 'mrp', 'test', 'agreed_price', 'deal_price', 'enabled', 'is_home_collection_enabled',
+                  'insurance', 'is_package', 'included_in_user_plan')
+
+    def get_is_package(self, obj):
+        return obj.test.is_package
 
 
 class LabAppointmentTestMappingSerializer(serializers.ModelSerializer):
@@ -399,8 +457,19 @@ class LabCustomSerializer(serializers.Serializer):
     next_lab_timing = serializers.DictField()
     next_lab_timing_data = serializers.DictField()
     pickup_charges = serializers.IntegerField(default=None)
+    insurance = serializers.SerializerMethodField()
     distance_related_charges = serializers.IntegerField()
     tests = serializers.ListField(child=serializers.DictField())
+
+    def get_insurance(self, obj):
+        insurance_data_dict = self.context.get("insurance_data_dict")
+        is_insurance_covered = False
+
+        return {
+            "is_insurance_covered": is_insurance_covered,
+            "insurance_threshold_amount": insurance_data_dict['insurance_threshold_amount'],
+            "is_user_insured": insurance_data_dict['is_user_insured'],
+        }
 
 # class LabNetworkSerializer(serializers.Serializer):
 #     # lab = serializers.SerializerMethodField()
@@ -584,6 +653,8 @@ class LabAppTransactionModelSerializer(serializers.Serializer):
     address = serializers.JSONField(required=False)
     coupon = serializers.ListField(child=serializers.IntegerField(), required=False, default = [])
     discount = serializers.DecimalField(max_digits=10, decimal_places=2)
+    insurance = serializers.PrimaryKeyRelatedField(queryset=UserInsurance.objects.all(), allow_null=True)
+
     cashback = serializers.DecimalField(max_digits=10, decimal_places=2)
     extra_details = serializers.JSONField(required=False)
     user_plan = serializers.PrimaryKeyRelatedField(queryset=UserPlanMapping.objects.all(), allow_null=True)
@@ -1104,6 +1175,7 @@ class SearchLabListSerializer(serializers.Serializer):
     sort_on = serializers.CharField(required=False)
     name = serializers.CharField(required=False)
     network_id = serializers.IntegerField(required=False)
+    is_insurance = serializers.BooleanField(required=False)
 
 
 class UpdateStatusSerializer(serializers.Serializer):
@@ -1290,13 +1362,26 @@ class CustomLabTestPackageSerializer(serializers.ModelSerializer):
     category_details = serializers.SerializerMethodField()
     tests = serializers.SerializerMethodField()
     included_in_user_plan = serializers.SerializerMethodField()
+    insurance = serializers.SerializerMethodField()
+
 
     class Meta:
         model = LabTest
         fields = ('id', 'name', 'lab', 'mrp', 'distance', 'price', 'lab_timing', 'lab_timing_data', 'next_lab_timing',
                   'next_lab_timing_data', 'test_type', 'is_package', 'number_of_tests', 'why', 'pre_test_info',
                   'is_package', 'pickup_charges', 'pickup_available', 'distance_related_charges', 'priority',
-                  'show_details', 'categories', 'url', 'priority_score', 'category_details', 'tests', 'included_in_user_plan')
+                  'show_details', 'categories', 'url', 'priority_score', 'category_details', 'tests', 'included_in_user_plan', 'insurance')
+
+    def get_insurance(self, obj):
+        request = self.context.get("request")
+        resp = Lab.get_insurance_details(request.user)
+        lab_data = self.context.get('lab_data', {})
+        lab = lab_data.get(obj.lab, None)
+
+        if obj and lab and lab.is_enabled_for_insurance and obj.mrp is not None and resp['insurance_threshold_amount'] is not None and obj.mrp <= resp['insurance_threshold_amount']:
+            resp['is_insurance_covered'] = True
+
+        return resp
 
     def get_included_in_user_plan(self, obj):
         package_free_or_not_dict = self.context.get('package_free_or_not_dict', {})
