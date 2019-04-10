@@ -2518,16 +2518,20 @@ class TestDetailsViewset(viewsets.GenericViewSet):
         kwargs['test_flag'] = 1
 
         result['labs'] = lab.search(request, **kwargs)
+
         seo = dict()
-        seo['description'] = None
+        seo['description'] = 'Book ' + queryset[0].name + ' @50% off. Free Sample Collection. Know what is ' \
+                             + queryset[0].name + ', Price, Normal Range, ' + queryset[0].name + ' Results, Procedure & Preparation.'
         if queryset:
-            seo['title'] = queryset[0].name + ' Test: Types, Procedure & Normal Range of Results'
+            seo['title'] = queryset[0].name + '  - Cost & Normal Range of Results'
         else:
             seo['title'] = None
 
         result['seo'] = seo
-        result['breadcrumb'] = [{"title": "Home", "url": "/"}, {"title": "tests", "url": "api/v1/diagnostic/test/list_by_alphabet"},
+
+        result['breadcrumb'] = [{"title": "Home", "url": "/"}, {"title": "tests", "url": request.build_absolute_uri("api/v1/diagnostic/test/list_by_alphabet")},
                                 {"title": queryset[0].name, "url": queryset[0].url}]
+        result['canonical_url'] = queryset[0].url
         final_result.append(result)
 
         return Response(final_result)
