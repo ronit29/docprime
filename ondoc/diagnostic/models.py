@@ -11,7 +11,7 @@ from ondoc.account.models import MerchantPayout, ConsumerAccount, Order, UserRef
 from ondoc.authentication.models import (TimeStampedModel, CreatedByModel, Image, Document, QCModel, UserProfile, User,
                                          UserPermission, GenericAdmin, LabUserPermission, GenericLabAdmin,
                                          BillingAccount, SPOCDetails)
-from ondoc.doctor.models import Hospital, SearchKey, CancellationReason
+from ondoc.doctor.models import Hospital, SearchKey, CancellationReason, Doctor
 from ondoc.coupon.models import Coupon
 from ondoc.location.models import EntityUrls
 from ondoc.notification import models as notification_models
@@ -1118,6 +1118,8 @@ class LabTest(TimeStampedModel, SearchKey):
                                         through_fields=('lab_test', 'parent_category'),
                                         related_name='recommended_lab_tests')
     reference_code = models.CharField(max_length=150, blank=True, default='')
+    author = models.ForeignKey(Doctor, null=True, blank=True, related_name='published_tests',
+                               on_delete=models.SET_NULL)
     # test_sub_type = models.ManyToManyField(
     #     LabTestSubType,
     #     through='LabTestSubTypeMapping',
