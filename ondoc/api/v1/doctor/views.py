@@ -78,6 +78,7 @@ from copy import deepcopy
 from ondoc.common.models import GlobalNonBookable
 from ondoc.api.v1.common import serializers as common_serializers
 from django.utils.text import slugify
+from django.urls import reverse
 import time
 from ondoc.api.v1.ratings.serializers import GoogleRatingsGraphSerializer
 logger = logging.getLogger(__name__)
@@ -887,11 +888,11 @@ class DoctorProfileUserViewSet(viewsets.GenericViewSet):
                     if hosp_reviews:
                         reviews_data = hosp_reviews[0].reviews
 
-                        if reviews_data:
+                        if reviews_data and reviews_data.get('user_reviews'):
                             ratings_graph = GoogleRatingsGraphSerializer(reviews_data, many=False,
                                                                          context={"request": request})
 
-                            for data in reviews_data:
+                            for data in reviews_data.get('user_reviews'):
                                 if data.get('time'):
                                     date = time.strftime("%d %b %Y", time.gmtime(data.get('time')))
 
@@ -1369,7 +1370,9 @@ class DoctorListViewSet(viewsets.GenericViewSet):
                                                 "images",
                                                 "doctor_clinics__procedures_from_doctor_clinic__procedure__parent_categories_mapping",
                                                 "qualifications__qualification","qualifications__college",
-                                                "qualifications__specialization").order_by(preserved)
+                                                "qualifications__specialization",
+                                                "doctor_clinics__hospital__hospital_place_details"
+                                                ).order_by(preserved)
 
         response = doctor_search_helper.prepare_search_response(doctor_data, doctor_search_result, request, insurance_data=insurance_data_dict)
 
@@ -1947,6 +1950,26 @@ class DoctorFeedbackViewSet(viewsets.GenericViewSet):
     authentication_classes = (JWTAuthentication,)
     permission_classes = (IsAuthenticated, IsDoctor)
 
+    @staticmethod
+    def get_doctor_and_hospital_data(message, doctor=None, hospital=None):
+        if doctor:
+            message += "doctor - "
+            doc_dict = dict()
+            doc_dict['id'] = doctor.id
+            doc_dict['name'] = doctor.name
+            doc_dict['url'] = settings.ADMIN_BASE_URL + reverse('admin:doctor_doctor_change',
+                                                                kwargs={"object_id": doctor.id})
+            message += str(doc_dict) + "<br>"
+        if hospital:
+            message += "hospital - "
+            hosp_dict = dict()
+            hosp_dict['id'] = hospital.id
+            hosp_dict['name'] = hospital.name
+            hosp_dict['url'] = settings.ADMIN_BASE_URL + reverse('admin:doctor_hospital_change',
+                                                                kwargs={"object_id": hospital.id})
+            message += str(hosp_dict) + "<br>"
+        return message
+
     def feedback(self, request):
         resp = {}
         user = request.user
@@ -1958,12 +1981,16 @@ class DoctorFeedbackViewSet(viewsets.GenericViewSet):
         message = ''
         managers_string = ''
         manages_string = ''
+        doctor = valid_data.pop("doctor_id") if valid_data.get("doctor_id") else None
+        hospital = valid_data.pop("hospital_id") if valid_data.get("hospital_id") else None
         for key, value in valid_data.items():
             if isinstance(value, list):
                 val = ' '.join(map(str, value))
             else:
                 val = value
             message += str(key) + "  -  " + str(val) + "<br>"
+        if doctor or hospital:
+            message = self.get_doctor_and_hospital_data(message, doctor, hospital)
         if hasattr(user, 'doctor') and user.doctor:
             managers_list = []
             for managers in user.doctor.manageable_doctors.all():
