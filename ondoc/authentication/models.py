@@ -261,6 +261,7 @@ class User(AbstractBaseUser, PermissionsMixin):
 
     is_staff = models.BooleanField(verbose_name= 'Staff Status', default=False, help_text= 'Designates whether the user can log into this admin site.')
     date_joined = models.DateTimeField(auto_now_add=True)
+    auto_created = models.BooleanField(default=False)
 
     def __hash__(self):
         return self.id
@@ -280,6 +281,12 @@ class User(AbstractBaseUser, PermissionsMixin):
         # if self.user_type==1 and hasattr(self, 'staffprofile'):
         #     return self.staffprofile.name
         # return str(self.phone_number)
+
+    # @property
+    @cached_property
+    def active_insurance(self):
+        active_insurance = self.purchased_insurance.filter().order_by('id').last()
+        return active_insurance if active_insurance and active_insurance.is_valid() else None
 
     def get_phone_number_for_communication(self):
         from ondoc.communications.models import unique_phone_numbers
@@ -495,6 +502,17 @@ class OtpVerifications(TimeStampedModel):
 
     class Meta:
         db_table = "otp_verification"
+
+    @staticmethod
+    def get_otp_message(platform, user_type, is_doc=False, version=None):
+        from packaging.version import parse
+        result = "OTP for login is {}.\nDon't share this code with others."
+        if platform == "android" and version:
+            if (user_type == 'doctor' or is_doc) and parse(version) > parse("2.100.4"):
+                result = "<#>\n" + result + "\n" + settings.PROVIDER_ANDROID_MESSAGE_HASH
+            elif parse(version) > parse("1.1"):
+                result = "<#>\n" + result + "\n" + settings.CONSUMER_ANDROID_MESSAGE_HASH
+        return result
 
 
 class NotificationEndpoint(TimeStampedModel):
@@ -823,6 +841,7 @@ class GenericAdmin(TimeStampedModel, CreatedByModel):
     name = models.CharField(max_length=24, blank=True, null=True)
     source_type = models.PositiveSmallIntegerField(choices=source_choices, default=CRM)
     entity_type = models.PositiveSmallIntegerField(choices=entity_choices, default=OTHER)
+    auto_created_from_SPOCs = models.BooleanField(default=False)
 
 
     class Meta:
@@ -1626,14 +1645,16 @@ class WelcomeCallingDone(models.Model):
         abstract = True
 
 
-# class ClickLoginToken(TimeStampedModel):
-#     token = models.CharField(max_length=100)
-#     user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
-#     expiration_time = models.DateTimeField()
-#     is_consumed = models.BooleanField(default=False)
-#
-#     class Meta:
-#         db_table = 'click_login_token'
+class ClickLoginToken(TimeStampedModel):
+    URL_KEY_LENGTH = 30
+    token = models.CharField(max_length=300)
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
+    expiration_time = models.DateTimeField(null=True)
+    is_consumed = models.BooleanField(default=False)
+    url_key = models.CharField(max_length=URL_KEY_LENGTH)
+
+    class Meta:
+        db_table = 'click_login_token'
 
 
 class PhysicalAgreementSigned(models.Model):
