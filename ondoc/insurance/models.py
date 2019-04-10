@@ -280,7 +280,7 @@ class Insurer(auth_model.TimeStampedModel, LiveMixin):
     cgst = models.PositiveSmallIntegerField(blank=False, null=True)
     state = models.ForeignKey(StateGSTCode, on_delete=models.CASCADE, default=None, blank=False, null=True)
     insurer_merchant_code = models.CharField(max_length=100, null=True, blank=False, unique=True)
-    # master_policy_number = models.CharField(max_length=50, null=True, blank=False)
+    master_policy_number = models.CharField(max_length=50, null=True, blank=False)
 
     @property
     def get_active_plans(self):
