@@ -849,7 +849,7 @@ class SmsNotification(TimeStampedModel, SmsNotificationOpdMixin, SmsNotification
 
     @classmethod
     def send_cart_url(cls, token, phone_number, utm_parameters):
-        cart_url = "{}/cart?token={}&agent=True&{}".format(settings.CONSUMER_APP_DOMAIN, token, utm_parameters)
+        cart_url = "{}/cart?token={}&agent=false&{}".format(settings.CONSUMER_APP_DOMAIN, token, utm_parameters)
         short_url = generate_short_url(cart_url)
         html_body = "Your booking url is - {} . Please pay to confirm".format(short_url)
         if phone_number:
