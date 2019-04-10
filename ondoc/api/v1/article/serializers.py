@@ -104,7 +104,8 @@ class ArticleRetrieveSerializer(serializers.ModelSerializer):
         try:
             unescape_body = self.get_unescape_body(obj.body)
 
-            search_widget_tags = re.findall('<div(?:\s|\w|=|\"|\'|&nbsp;)*class\s*=(?:\s|\"|\')*search-widget(?:\s|\w|=|\"|\'|&nbsp;)*>(?:.*?|\n*?)</div>', unescape_body)
+            widget_tag_pattern = '<div(?:\s|\w|=|\"|\'|&nbsp;)*class\s*=(?:\s|\"|\')*search-widget(?:\s|\w|=|\"|\'|&nbsp;)*>(?:.*?|\n*?)</div>'
+            search_widget_tags = re.findall(widget_tag_pattern, unescape_body)
             if search_widget_tags:
                 html_body = unescape_body
                 counter = 1
