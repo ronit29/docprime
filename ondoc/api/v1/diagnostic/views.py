@@ -206,6 +206,15 @@ class LabList(viewsets.ReadOnlyModelViewSet):
                                                                                                  searchable=True,
                                                                                                  is_package=True)
 
+        page_size = 30
+
+        if not request.query_params.get('page') or int(request.query_params.get('page')) < 1:
+            page = 1
+        else:
+            page = int(request.query_params.get('page'))
+
+        offset = (page - 1) * page_size
+
         if package_ids:
             main_queryset = main_queryset.filter(id__in=package_ids)
         valid_package_ids = None
@@ -233,16 +242,63 @@ class LabList(viewsets.ReadOnlyModelViewSet):
             main_queryset = main_queryset.filter(id__in=valid_package_ids)
 
 
-        all_packages_in_network_labs = main_queryset.filter(
+        # all_packages_in_network_labs = main_queryset.filter(
+        #     availablelabs__enabled=True,
+        #     availablelabs__lab_pricing_group__labs__is_live=True,
+        #     availablelabs__lab_pricing_group__labs__network__isnull=False,
+        #     availablelabs__lab_pricing_group__labs__location__dwithin=(
+        #         Point(float(long),
+        #               float(lat)),
+        #         D(m=max_distance))).annotate(
+        #     priority_score=F('availablelabs__lab_pricing_group__labs__lab_priority') * F('priority')).annotate(
+        #     distance=Distance('availablelabs__lab_pricing_group__labs__location', pnt)).annotate(
+        #     lab=F('availablelabs__lab_pricing_group__labs'), mrp=F('availablelabs__mrp'),
+        #     price=Case(
+        #         When(availablelabs__custom_deal_price__isnull=True,
+        #              then=F('availablelabs__computed_deal_price')),
+        #         When(availablelabs__custom_deal_price__isnull=False,
+        #              then=F('availablelabs__custom_deal_price'))),
+        #     rank=Window(expression=RowNumber(), order_by=F('distance').asc(),
+        #                 partition_by=[F(
+        #                     'availablelabs__lab_pricing_group__labs__network'), F('id')]))
+        #
+        # all_packages_in_non_network_labs = main_queryset.filter(
+        #     availablelabs__enabled=True,
+        #     availablelabs__lab_pricing_group__labs__is_live=True,
+        #     availablelabs__lab_pricing_group__labs__enabled=True,
+        #     availablelabs__lab_pricing_group__labs__network__isnull=True,
+        #     availablelabs__lab_pricing_group__labs__location__dwithin=(
+        #         Point(float(long),
+        #               float(lat)),
+        #         D(
+        #             m=max_distance))).annotate(
+        #     priority_score=F('availablelabs__lab_pricing_group__labs__lab_priority') * F('priority')).annotate(
+        #     distance=Distance('availablelabs__lab_pricing_group__labs__location', pnt)).annotate(
+        #     lab=F('availablelabs__lab_pricing_group__labs'), mrp=F('availablelabs__mrp'),
+        #     price=Case(
+        #         When(availablelabs__custom_deal_price__isnull=True,
+        #              then=F('availablelabs__computed_deal_price')),
+        #         When(availablelabs__custom_deal_price__isnull=False,
+        #              then=F('availablelabs__custom_deal_price'))),
+        # )
+        #
+        # all_packages_in_non_network_labs = all_packages_in_non_network_labs.distinct()
+        # all_packages_in_network_labs = all_packages_in_network_labs.distinct()
+        # all_packages = [package for package in all_packages_in_network_labs if package.rank == 1]
+        # all_packages.extend([package for package in all_packages_in_non_network_labs])
+
+        all_packages = main_queryset.filter(
             availablelabs__enabled=True,
             availablelabs__lab_pricing_group__labs__is_live=True,
-            availablelabs__lab_pricing_group__labs__network__isnull=False,
+            availablelabs__lab_pricing_group__labs__enabled=True,
             availablelabs__lab_pricing_group__labs__location__dwithin=(
                 Point(float(long),
                       float(lat)),
                 D(m=max_distance))).annotate(
-            priority_score=F('availablelabs__lab_pricing_group__labs__lab_priority') * F('priority')).annotate(
-            distance=Distance('availablelabs__lab_pricing_group__labs__location', pnt)).annotate(
+            priority_score=F('availablelabs__lab_pricing_group__labs__lab_priority') * F(
+                'priority')).annotate(
+            distance=Distance('availablelabs__lab_pricing_group__labs__location',
+                              pnt)).annotate(
             lab=F('availablelabs__lab_pricing_group__labs'), mrp=F('availablelabs__mrp'),
             price=Case(
                 When(availablelabs__custom_deal_price__isnull=True,
@@ -250,33 +306,24 @@ class LabList(viewsets.ReadOnlyModelViewSet):
                 When(availablelabs__custom_deal_price__isnull=False,
                      then=F('availablelabs__custom_deal_price'))),
             rank=Window(expression=RowNumber(), order_by=F('distance').asc(),
-                        partition_by=[F(
-                            'availablelabs__lab_pricing_group__labs__network'), F('id')]))
-
-        all_packages_in_non_network_labs = main_queryset.filter(
-            availablelabs__enabled=True,
-            availablelabs__lab_pricing_group__labs__is_live=True,
-            availablelabs__lab_pricing_group__labs__enabled=True,
-            availablelabs__lab_pricing_group__labs__network__isnull=True,
-            availablelabs__lab_pricing_group__labs__location__dwithin=(
-                Point(float(long),
-                      float(lat)),
-                D(
-                    m=max_distance))).annotate(
-            priority_score=F('availablelabs__lab_pricing_group__labs__lab_priority') * F('priority')).annotate(
-            distance=Distance('availablelabs__lab_pricing_group__labs__location', pnt)).annotate(
-            lab=F('availablelabs__lab_pricing_group__labs'), mrp=F('availablelabs__mrp'),
-            price=Case(
-                When(availablelabs__custom_deal_price__isnull=True,
-                     then=F('availablelabs__computed_deal_price')),
-                When(availablelabs__custom_deal_price__isnull=False,
-                     then=F('availablelabs__custom_deal_price'))),
+                        partition_by=[RawSQL('Coalesce(lab.network_id, random())', []), F('id')])
         )
 
-        all_packages_in_non_network_labs = all_packages_in_non_network_labs.distinct()
-        all_packages_in_network_labs = all_packages_in_network_labs.distinct()
-        all_packages = [package for package in all_packages_in_network_labs if package.rank == 1]
-        all_packages.extend([package for package in all_packages_in_non_network_labs])
+        all_packages = [package for package in all_packages if package.rank == 1]
+
+        if not sort_on:
+            all_packages = sorted(all_packages, key=lambda x: x.priority_score if hasattr(x,
+                                                                                          'priority_score') and x.priority_score is not None else -float(
+                'inf'), reverse=True)
+        elif sort_on == 'fees':
+            all_packages = sorted(all_packages,
+                                  key=lambda x: x.price if hasattr(x, 'price') and x.price is not None else -float(
+                                      'inf'))
+        elif sort_on == 'distance':
+            all_packages = sorted(all_packages, key=lambda x: x.distance if hasattr(x,
+                                                                                    'distance') and x.distance is not None else -float(
+                'inf'))
+
         all_packages = filter(lambda x: x, all_packages)
         if min_distance:
             all_packages = filter(lambda
@@ -300,18 +347,9 @@ class LabList(viewsets.ReadOnlyModelViewSet):
             all_packages = filter(lambda x: x.home_collection_possible, all_packages)
         if package_type == 2:
             all_packages = filter(lambda x: not x.home_collection_possible, all_packages)
-        if not sort_on:
-            all_packages = sorted(all_packages, key=lambda x: x.priority_score if hasattr(x,
-                                                                                          'priority_score') and x.priority_score is not None else -float(
-                'inf'), reverse=True)
-        elif sort_on == 'fees':
-            all_packages = sorted(all_packages,
-                                  key=lambda x: x.price if hasattr(x, 'price') and x.price is not None else -float(
-                                      'inf'))
-        elif sort_on == 'distance':
-            all_packages = sorted(all_packages, key=lambda x: x.distance if hasattr(x,
-                                                                                    'distance') and x.distance is not None else -float(
-                'inf'))
+
+        all_packages = list(all_packages)
+        result_count = len(all_packages)
         lab_ids = [package.lab for package in all_packages]
         entity_url_qs = EntityUrls.objects.filter(entity_id__in=lab_ids, is_valid=True, url__isnull=False,
                                                   sitemap_identifier=EntityUrls.SitemapIdentifier.LAB_PAGE).values(
@@ -362,6 +400,10 @@ class LabList(viewsets.ReadOnlyModelViewSet):
                                                                 'icon': icon_url, 'priority': priority}
             single_test_data_sorted = sorted(list(single_test_data.values()), key=lambda k: k['priority'], reverse= True)
             category_data[temp_package.id] = single_test_data_sorted
+
+        if not parameters.get('from_app'):
+            all_packages = all_packages[offset:page * page_size]
+
         serializer = CustomLabTestPackageSerializer(all_packages, many=True,
                                                     context={'entity_url_dict': entity_url_dict, 'lab_data': lab_data,
                                                              'request': request, 'category_data': category_data,
@@ -397,7 +439,7 @@ class LabList(viewsets.ReadOnlyModelViewSet):
             bottom_content = x.bottom_content if x.bottom_content else None
             title = x.meta_title if x.meta_title else None
             description = x.meta_description if x.meta_description else None
-        return Response({'result': result, 'categories': category_result, 'count': len(all_packages),
+        return Response({'result': result, 'categories': category_result, 'count': result_count,
                          'categories_count': len(category_result), 'bottom_content': bottom_content,
                          'search_content': top_content, 'title': title, 'description': description})
 
@@ -426,10 +468,22 @@ class LabList(viewsets.ReadOnlyModelViewSet):
         pnt = GEOSGeometry(point_string, srid=4326)
         max_distance = max_distance*1000 if max_distance is not None else 10000
         min_distance = min_distance*1000 if min_distance is not None else 0
+
+        package_free_or_not_dict = get_package_free_or_not_dict(request)
+
         main_queryset = LabTest.objects.prefetch_related('test', 'test__recommended_categories',
                                                          'test__parameter', 'categories').filter(enable_for_retail=True,
                                                                                                  searchable=True,
                                                                                                  is_package=True)
+
+        page_size = 30
+
+        if not request.query_params.get('page') or int(request.query_params.get('page')) <1:
+            page = 1
+        else:
+            page = int(request.query_params.get('page'))
+
+        offset = (page - 1) * page_size
 
         if package_ids:
             main_queryset = main_queryset.filter(id__in=package_ids)
@@ -480,6 +534,15 @@ class LabList(viewsets.ReadOnlyModelViewSet):
         )
 
         all_packages_in_labs = all_packages_in_labs.distinct()
+        if not sort_on:
+            all_packages_in_labs = all_packages_in_labs.order_by('-priority_score')
+
+        if sort_on == 'fees':
+            all_packages_in_labs = all_packages_in_labs.order_by('price')
+
+        elif sort_on == 'distance':
+            all_packages_in_labs = all_packages_in_labs.order_by('distance')
+
         # all_packages_in_labs = list(all_packages_in_labs)
         # all_packages = filter(lambda x: x.rank == 1, all_packages_in_labs)
         all_packages = [package for package in all_packages_in_labs if package.rank == 1]
@@ -506,18 +569,8 @@ class LabList(viewsets.ReadOnlyModelViewSet):
             all_packages = filter(lambda x: x.home_collection_possible, all_packages)
         if package_type == 2:
             all_packages = filter(lambda x: not x.home_collection_possible, all_packages)
-        if not sort_on:
-            all_packages = sorted(all_packages, key=lambda x: x.priority_score if hasattr(x,
-                                                                                          'priority_score') and x.priority_score is not None else -float(
-                'inf'), reverse=True)
-        elif sort_on == 'fees':
-            all_packages = sorted(all_packages,
-                                  key=lambda x: x.price if hasattr(x, 'price') and x.price is not None else -float(
-                                      'inf'))
-        elif sort_on == 'distance':
-            all_packages = sorted(all_packages, key=lambda x: x.distance if hasattr(x,
-                                                                                    'distance') and x.distance is not None else -float(
-                'inf'))
+
+        all_packages = [package for package in all_packages]
         lab_ids = [package.lab for package in all_packages]
         entity_url_qs = EntityUrls.objects.filter(entity_id__in=lab_ids, is_valid=True, url__isnull=False,
                                                   sitemap_identifier=EntityUrls.SitemapIdentifier.LAB_PAGE).values(
@@ -563,7 +616,13 @@ class LabList(viewsets.ReadOnlyModelViewSet):
                                                                 'parameter_count': parameter_count,
                                                                 'icon': icon_url}
             category_data[temp_package.id] = list(single_test_data.values())
-        serializer = CustomLabTestPackageSerializer(all_packages, many=True,
+
+        all_packages_data = None
+        if not parameters.get('from_app'):
+            all_packages_data = all_packages[offset:page * page_size]
+        else:
+            all_packages_data = all_packages
+        serializer = CustomLabTestPackageSerializer(all_packages_data, many=True,
                                                     context={'entity_url_dict': entity_url_dict, 'lab_data': lab_data,
                                                              'request': request, 'category_data': category_data})
         category_queryset = LabTestCategory.objects.filter(is_package_category=True, is_live=True)

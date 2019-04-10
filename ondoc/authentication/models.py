@@ -841,6 +841,7 @@ class GenericAdmin(TimeStampedModel, CreatedByModel):
     name = models.CharField(max_length=24, blank=True, null=True)
     source_type = models.PositiveSmallIntegerField(choices=source_choices, default=CRM)
     entity_type = models.PositiveSmallIntegerField(choices=entity_choices, default=OTHER)
+    auto_created_from_SPOCs = models.BooleanField(default=False)
 
 
     class Meta:
