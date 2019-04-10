@@ -222,7 +222,7 @@ class HospitalNetworkAdmin(VersionAdmin, ActionAdmin, QCPemAdmin):
         HospitalNetworkAwardInline,
         HospitalNetworkCertificationInline,
         HospitalNetworkDocumentInline,
-        GenericAdminInline,
+        #GenericAdminInline,
         SPOCDetailsInline,
         AssociatedMerchantInline,
         RemarkInline
