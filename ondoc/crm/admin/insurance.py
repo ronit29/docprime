@@ -628,7 +628,7 @@ class InsuranceDistrictAdmin(ImportExportModelAdmin):
 class InsurerPolicyNumberAdmin(admin.ModelAdmin):
     model = InsurerPolicyNumber
     fields = ('insurer', 'insurer_policy_number')
-    list_display = ('insurer', 'insurer_policy_number')
+    list_display = ('insurer', 'insurer_policy_number', 'created_at')
 
 
 class InsuranceDealAdmin(admin.ModelAdmin):

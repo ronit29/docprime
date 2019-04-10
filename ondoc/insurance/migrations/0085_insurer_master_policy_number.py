@@ -10,7 +10,7 @@ class Migration(migrations.Migration):
     ]
 
     operations = [
-        migrations.AddField(
+        migrations.AlterField(
             model_name='insurer',
             name='master_policy_number',
             field=models.CharField(blank=False, max_length=50, null=True),

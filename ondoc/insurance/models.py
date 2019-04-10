@@ -1260,7 +1260,6 @@ class InsuranceDeal(auth_model.TimeStampedModel):
 class InsurerPolicyNumber(auth_model.TimeStampedModel):
     insurer = models.ForeignKey(Insurer, related_name='policy_number_history', on_delete=models.DO_NOTHING)
     insurer_policy_number = models.CharField(max_length=50)
-    start_date = models.CharField(max_length=20)
 
     class Meta:
         db_table = 'insurer_policy_numbers'
