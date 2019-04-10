@@ -213,13 +213,11 @@ def push_appointment_to_matrix(self, data):
                 if number:
                     number = int(number)
 
-                spoc_type = dict(spoc_obj.CONTACT_TYPE_CHOICES)[spoc_obj.contact_type]
-                spoc_name = '%s (Hospital) (%s)' % (spoc_obj.name, spoc_type)
-                if spoc_obj.details:
-                    spoc_name = spoc_name + '(%s)' % spoc_obj.details
+                # spoc_type = dict(spoc_obj.CONTACT_TYPE_CHOICES)[spoc_obj.contact_type]
+                spoc_name = spoc_obj.name
                 mobile_list.append({'MobileNo': number,
                                     'Name': spoc_name,
-                                    'Designation': spoc_type,
+                                    'Designation': spoc_obj.contact_type,
                                     'Type': spoc_obj.contact_type})
 
             # Doctor mobile numbers
@@ -243,12 +241,10 @@ def push_appointment_to_matrix(self, data):
                     number = int(number)
 
                 contact_type = dict(contact_person.CONTACT_TYPE_CHOICES)[contact_person.contact_type]
-                contact_name = '%s (Lab) (%s)' % (contact_person.name, contact_type)
-                if contact_person.details:
-                    contact_name = contact_name + '(%s)' % contact_person.details
+                contact_name = contact_person.name
                 mobile_list.append({'MobileNo': number,
                                     'Name': contact_name,
-                                    'Designation': contact_type,
+                                    'DesignationId': contact_person.contact_type,
                                     'Type': contact_person.contact_type})
 
 
