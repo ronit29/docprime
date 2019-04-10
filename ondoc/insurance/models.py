@@ -1141,7 +1141,8 @@ class InsuredMembers(auth_model.TimeStampedModel):
     MR = 'mr.'
     MISS = 'miss'
     MRS = 'mrs.'
-    TITLE_TYPE_CHOICES = [(MR, 'mr.'), (MRS, 'mrs.'), (MISS, 'miss')]
+    MAST = 'mast.'
+    TITLE_TYPE_CHOICES = [(MR, 'mr.'), (MRS, 'mrs.'), (MISS, 'miss'), (MAST, 'mast.')]
     # insurer = models.ForeignKey(Insurer, on_delete=models.DO_NOTHING)
     # insurance_plan = models.ForeignKey(InsurancePlans, on_delete=models.DO_NOTHING)
     first_name = models.CharField(max_length=50, null=False)
