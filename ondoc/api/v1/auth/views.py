@@ -1824,6 +1824,32 @@ class SendBookingUrlViewSet(GenericViewSet):
         return Response({"status": 1})
 
 
+class SendCartUrlViewSet(GenericViewSet):
+    authentication_classes = (JWTAuthentication,)
+    permission_classes = (IsAuthenticated,)
+
+    def send_cart_url(self, request):
+        utm_source = request.query_params.get('UtmSource')
+        utm_term = request.query_params.get('UtmTerm')
+        utm_medium = request.query_params.get('UtmMedium')
+        utm_campaign = request.query_params.get('UtmCampaign')
+
+        utm_parameters = "UtmSource=%s&UtmTerm=%s&UtmMedium=%s&UtmCampaign=%s" % (utm_source, utm_term, utm_medium, utm_campaign)
+        user_token = JWTAuthentication.generate_token(request.user)
+        token = user_token['token'].decode("utf-8") if 'token' in user_token else None
+        user_profile = None
+
+        if request.user.is_authenticated:
+            user_profile = request.user.get_default_profile()
+        if not user_profile:
+            return Response({"status": 1})
+
+        cart_url = SmsNotification.send_cart_url(token=token, phone_number=str(user_profile.phone_number), utm_parameters=utm_parameters)
+        # EmailNotification.send_booking_url(token=token, email=user_profile.email)
+
+        return Response({"status": 1})
+
+
 class OrderDetailViewSet(GenericViewSet):
 
     authentication_classes = (JWTAuthentication,)
