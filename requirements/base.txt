@@ -44,3 +44,4 @@ mongoengine
 qrcode
 xmltodict
 packaging==19.0
+beautifulsoup4==4.7.1
