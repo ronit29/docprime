@@ -1834,7 +1834,20 @@ class SendCartUrlViewSet(GenericViewSet):
         utm_medium = request.query_params.get('UtmMedium')
         utm_campaign = request.query_params.get('UtmCampaign')
 
-        utm_parameters = "UtmSource=%s&UtmTerm=%s&UtmMedium=%s&UtmCampaign=%s" % (utm_source, utm_term, utm_medium, utm_campaign)
+        utm_parameters = ""
+        if utm_source:
+            utm_source = "UtmSource=%s&" % utm_source
+            utm_parameters = utm_parameters + utm_source
+        if utm_term:
+            utm_term = "UtmTerm=%s&" % utm_term
+            utm_parameters = utm_parameters + utm_term
+        if utm_medium:
+            utm_medium = "UtmMedium=%s&" % utm_medium
+            utm_parameters = utm_parameters + utm_medium
+        if utm_campaign:
+            utm_campaign = "UtmCampaign=%s&" % utm_campaign
+            utm_parameters = utm_parameters + utm_campaign
+
         user_token = JWTAuthentication.generate_token(request.user)
         token = user_token['token'].decode("utf-8") if 'token' in user_token else None
         user_profile = None
