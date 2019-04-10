@@ -187,7 +187,7 @@ class Thyrocare(BaseIntegrator):
         if profile and profile.email:
             email = profile.email
         else:
-            email = "provider@docprime.com"
+            email = "provider-{}@docprime.com".format(lab_appointment.id)
 
         order_id = "DP{}".format(lab_appointment.id)
         if profile and profile.gender:
