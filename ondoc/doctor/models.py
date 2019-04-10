@@ -415,7 +415,6 @@ class HospitalPlaceDetails(auth_model.TimeStampedModel):
                 if place_searched_data.get('result'):
                     place_searched_data = place_searched_data.get('result')
                     data.place_details = place_searched_data
-                    assert isinstance(data, object)
                     data.reviews = {'user_avg_rating': place_searched_data.get('rating'), 'user_reviews': place_searched_data.get('reviews'),
                                     'user_ratings_total': place_searched_data.get('user_ratings_total')}
                     data.save()
