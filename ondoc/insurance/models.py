@@ -49,6 +49,7 @@ def generate_insurance_insurer_policy_number(insurer_id):
     if not insurer_id:
         raise Exception('Could not generate the policy number according to the insurer. Hence aborting.')
     insurer = Insurer.objects.filter(id=insurer_id).first()
+    # master_policy_number = insurer.policy_number_history.policy_number.order_by('-created_at').first()
     master_policy_number = insurer.master_policy_number
     query = '''select nextval('userinsurance_policy_num_seq') as inc'''
     seq = RawSql(query, []).fetch_all()
@@ -275,7 +276,7 @@ class Insurer(auth_model.TimeStampedModel, LiveMixin):
     cgst = models.PositiveSmallIntegerField(blank=False, null=True)
     state = models.ForeignKey(StateGSTCode, on_delete=models.CASCADE, default=None, blank=False, null=True)
     insurer_merchant_code = models.CharField(max_length=100, null=True, blank=False, unique=True)
-    master_policy_number = models.CharField(max_length=50)
+    master_policy_number = models.CharField(max_length=50, null=True, blank=True)
 
     @property
     def get_active_plans(self):
@@ -1256,13 +1257,12 @@ class InsuranceDeal(auth_model.TimeStampedModel):
         db_table = 'insurance_deals'
 
 
-# class InsurancePolicyNumberHistory(auth_model.TimeStampedModel):
-#     insurer = models.ForeignKey(Insurer, related_name='policy_number_history', on_delete=models.DO_NOTHING)
-#     policy_number = models.CharField(max_length=50)
-#     updated_month = models.CharField(max_length=20)
-#     updated_year = models.CharField(max_length=10)
-#
-#     class Meta:
-#         db_table = 'insurance_policy_number_history'
+class InsurerPolicyNumber(auth_model.TimeStampedModel):
+    insurer = models.ForeignKey(Insurer, related_name='policy_number_history', on_delete=models.DO_NOTHING)
+    insurer_policy_number = models.CharField(max_length=50)
+    start_date = models.CharField(max_length=20)
+
+    class Meta:
+        db_table = 'insurer_policy_numbers'
 
 
