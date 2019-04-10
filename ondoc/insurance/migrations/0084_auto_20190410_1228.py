@@ -24,10 +24,6 @@ class Migration(migrations.Migration):
                 'db_table': 'insurer_policy_numbers',
             },
         ),
-        migrations.RemoveField(
-            model_name='insurer',
-            name='master_policy_number',
-        ),
         migrations.AddField(
             model_name='insurerpolicynumber',
             name='insurer',

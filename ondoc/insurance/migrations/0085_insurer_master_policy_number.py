@@ -13,6 +13,6 @@ class Migration(migrations.Migration):
         migrations.AddField(
             model_name='insurer',
             name='master_policy_number',
-            field=models.CharField(blank=True, max_length=50, null=True),
+            field=models.CharField(blank=False, max_length=50, null=True),
         ),
     ]
