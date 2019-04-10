@@ -10,4 +10,4 @@ class SalesPointAdmin(admin.ModelAdmin):
 
 class SalesPointAvailableTestMappingAdmin(admin.ModelAdmin):
     model = SalespointTestmapping
-    list_display = ['salespoint', 'available_lab_test']
+    list_display = ['salespoint', 'available_tests']

@@ -32,7 +32,7 @@ class SalesPoint(TimeStampedModel):
 
 class SalespointTestmapping(TimeStampedModel):
     salespoint = models.ForeignKey(SalesPoint, on_delete=models.CASCADE)
-    available_lab_test = models.ForeignKey(AvailableLabTest, on_delete=models.CASCADE, related_name='active_sales_point_mappings')
+    available_tests = models.ForeignKey(AvailableLabTest, on_delete=models.CASCADE, related_name='active_sales_point_mappings')
     is_active = models.BooleanField(default=True)
 
     class Meta:
