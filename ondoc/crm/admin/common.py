@@ -102,7 +102,20 @@ class QCPemAdmin(admin.ModelAdmin):
 
 
 class FormCleanMixin(forms.ModelForm):
+
+    def pin_code_qc_submit(self):
+        if '_submit_for_qc' in self.data:
+            # if hasattr(self.instance, 'pin_code') and self.instance.pin_code is not None:
+            if hasattr(self.instance, 'pin_code'):
+                if not self.cleaned_data.get('pin_code'):
+                    raise forms.ValidationError("Cannot submit for QC without pincode ")
+            # else:
+            #     raise forms.ValidationError(
+            #             "Cannot submit for QC without pincode ")
+
     def clean(self):
+        self.pin_code_qc_submit()
+
         if (not self.request.user.is_superuser and not self.request.user.groups.filter(name=constants['SUPER_QC_GROUP']).exists()):
             # and (not '_reopen' in self.data and not self.request.user.groups.filter(name__in=[constants['QC_GROUP_NAME'], constants['WELCOME_CALLING_TEAM']]).exists()):
             if isinstance(self.instance, Hospital) or isinstance(self.instance, HospitalNetwork):
