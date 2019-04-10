@@ -1691,31 +1691,26 @@ class TopHospitalForIpdProcedureSerializer(serializers.ModelSerializer):
     open_today = serializers.SerializerMethodField()
     insurance_provider = serializers.SerializerMethodField()
     established_in = serializers.SerializerMethodField()
-    longitude = serializers.SerializerMethodField()
-    latitude = serializers.SerializerMethodField()
+    lat = serializers.SerializerMethodField()
+    long = serializers.SerializerMethodField()
 
     class Meta:
         model = Hospital
         fields = ('id', 'name', 'distance', 'certifications', 'bed_count', 'logo', 'avg_rating',
                   'count_of_insurance_provider', 'multi_speciality', 'address', 'open_today',
-                  'insurance_provider', 'established_in', 'longitude', 'latitude')
+                  'insurance_provider', 'established_in', 'long', 'lat')
 
-    def get_longitude(self, obj):
-        if obj:
-            if not obj.location:
-                return None
-            return obj.location.x
-
-    def get_latitude(self, obj):
-        if obj:
-            if not obj.location:
-                return None
+    def get_lat(self, obj):
+        if obj.location:
             return obj.location.y
+        return None
+
+    def get_long(self, obj):
+        if obj.location:
+            return obj.location.x
+        return None
 
     def get_established_in(self, obj):
-        if obj:
-            if not obj.operational_since:
-                return None
             return obj.operational_since
 
     def get_count_of_insurance_provider(self, obj):
@@ -1762,8 +1757,7 @@ class TopHospitalForIpdProcedureSerializer(serializers.ModelSerializer):
 
 
 class HospitalDetailIpdProcedureSerializer(TopHospitalForIpdProcedureSerializer):
-    lat = serializers.SerializerMethodField()
-    long = serializers.SerializerMethodField()
+
     about = serializers.SerializerMethodField()
     services = serializers.SerializerMethodField()
     images = serializers.SerializerMethodField()
@@ -1776,24 +1770,16 @@ class HospitalDetailIpdProcedureSerializer(TopHospitalForIpdProcedureSerializer)
     opd_timings = serializers.SerializerMethodField()
     contact_number = serializers.SerializerMethodField()
 
-    class Meta:
+    class Meta(TopHospitalForIpdProcedureSerializer.Meta):
         model = Hospital
-        fields = ('id', 'name', 'distance', 'certifications', 'bed_count', 'logo', 'avg_rating',
-                  'multi_speciality', 'address', 'open_today', 'insurance_provider',
-                  'opd_timings', 'contact_number',
-                  'lat', 'long', 'about', 'services', 'images', 'ipd_procedure_categories', 'other_network_hospitals',
-                  'doctors', 'rating_graph', 'rating', 'display_rating_widget'
-                  )
+        fields = TopHospitalForIpdProcedureSerializer.Meta.fields + ('about', 'services', 'images',
+                                                                     'ipd_procedure_categories',
+                                                                     'other_network_hospitals',
+                                                                     'doctors', 'rating_graph', 'rating',
+                                                                     'display_rating_widget', 'opd_timings',
+                                                                     'contact_number'
+                                                                     )
 
-    def get_lat(self, obj):
-        if obj.location:
-            return obj.location.y
-        return None
-
-    def get_long(self, obj):
-        if obj.location:
-            return obj.location.x
-        return None
 
     def get_about(self, obj):
         if obj.network:
