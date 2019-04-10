@@ -25,10 +25,11 @@ from django.template.loader import render_to_string
 from num2words import num2words
 from hardcopy import bytestring_to_pdf
 import math
+import reversion
 from ondoc.account.models import Order
 from decimal import  *
 logger = logging.getLogger(__name__)
-from django.utils.functional import  cached_property
+from django.utils.functional import cached_property
 
 
 def generate_insurance_policy_number():
@@ -42,6 +43,25 @@ def generate_insurance_policy_number():
         return str('120100/12001/2018/A012708/DP%.8d' % sequence)
     else:
         raise ValueError('Sequence Produced is not valid.')
+
+
+def generate_insurance_insurer_policy_number(insurer_id):
+    if not insurer_id:
+        raise Exception('Could not generate the policy number according to the insurer. Hence aborting.')
+    insurer = Insurer.objects.filter(id=insurer_id).first()
+    master_policy_number = insurer.master_policy_number
+    query = '''select nextval('userinsurance_policy_num_seq') as inc'''
+    seq = RawSql(query, []).fetch_all()
+    sequence = None
+    if seq:
+        sequence = seq[0]['inc'] if seq[0]['inc'] else None
+
+    if sequence:
+        # return str('120100/12001/2018/A012708/DP%.8d' % sequence)
+        return str(master_policy_number + '%.8d' % sequence)
+    else:
+        raise ValueError('Sequence Produced is not valid.')
+
 
 
 def generate_insurance_reciept_number():
@@ -231,6 +251,7 @@ class InsuranceDistrict(auth_model.TimeStampedModel):
         db_table = "insurance_district"
 
 
+@reversion.register()
 class Insurer(auth_model.TimeStampedModel, LiveMixin):
     name = models.CharField(max_length=100)
     min_float = models.PositiveIntegerField(default=None)
@@ -254,6 +275,7 @@ class Insurer(auth_model.TimeStampedModel, LiveMixin):
     cgst = models.PositiveSmallIntegerField(blank=False, null=True)
     state = models.ForeignKey(StateGSTCode, on_delete=models.CASCADE, default=None, blank=False, null=True)
     insurer_merchant_code = models.CharField(max_length=100, null=True, blank=False, unique=True)
+    master_policy_number = models.CharField(max_length=50)
 
     @property
     def get_active_plans(self):
@@ -380,7 +402,7 @@ class UserInsurance(auth_model.TimeStampedModel):
     user = models.ForeignKey(auth_model.User, related_name='purchased_insurance', on_delete=models.DO_NOTHING)
     purchase_date = models.DateTimeField(blank=False, null=False)
     expiry_date = models.DateTimeField(blank=False, null=False, default=timezone.now)
-    policy_number = models.CharField(max_length=100, blank=False, null=False, unique=True, default=generate_insurance_policy_number)
+    policy_number = models.CharField(max_length=100, blank=False, null=False, unique=True, default=None)
     insured_members = JSONField(blank=False, null=False)
     premium_amount = models.PositiveIntegerField(default=0)
     order = models.ForeignKey(account_model.Order, on_delete=models.DO_NOTHING)
@@ -775,19 +797,24 @@ class UserInsurance(auth_model.TimeStampedModel):
     @classmethod
     def create_user_insurance(cls, insurance_data, user):
         members = insurance_data['insured_members']
+        # insurance_plan = InsurancePlans.objects.filter(id=insurance_data['insurance_plan']).first
+        insurer_id = insurance_data['insurance_plan'].insurer_id
         # default_user_profile = list()
         for member in members:
             member['profile'] = UserInsurance.profile_create_or_update(member, user)
             member['dob'] = str(member['dob'])
             # member['profile'] = member['profile'].id if member.get('profile') else None
         insurance_data['insured_members'] = members
+
+
         user_insurance_obj = UserInsurance.objects.create(insurance_plan=insurance_data['insurance_plan'],
                                                             user=insurance_data['user'],
                                                             insured_members=json.dumps(insurance_data['insured_members']),
                                                             purchase_date=insurance_data['purchase_date'],
                                                             expiry_date=insurance_data['expiry_date'],
                                                             premium_amount=insurance_data['premium_amount'],
-                                                            order=insurance_data['order'])
+                                                            order=insurance_data['order'],
+                                                            policy_number=generate_insurance_insurer_policy_number(insurer_id))
         insured_members = InsuredMembers.create_insured_members(user_insurance_obj)
         return user_insurance_obj
 
@@ -1228,5 +1255,14 @@ class InsuranceDeal(auth_model.TimeStampedModel):
     class Meta:
         db_table = 'insurance_deals'
 
+
+# class InsurancePolicyNumberHistory(auth_model.TimeStampedModel):
+#     insurer = models.ForeignKey(Insurer, related_name='policy_number_history', on_delete=models.DO_NOTHING)
+#     policy_number = models.CharField(max_length=50)
+#     updated_month = models.CharField(max_length=20)
+#     updated_year = models.CharField(max_length=10)
+#
+#     class Meta:
+#         db_table = 'insurance_policy_number_history'
 
 
