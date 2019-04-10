@@ -128,9 +128,6 @@ S3_USE_SIGV4 = True
 AWS_DEFAULT_ACL = "public-read"
 AWS_S3_REGION_NAME='ap-south-1'
 # AWS_S3_ENCRYPTION = True
-AWS_S3_OBJECT_PARAMETERS = {
-    'CacheControl': 'max-age=86400',
-}
 AWS_S3_CUSTOM_DOMAIN = 's3.%s.amazonaws.com/%s' % (AWS_S3_REGION_NAME, AWS_STORAGE_BUCKET_NAME)
 AWS_PRELOAD_METADATA = False
 
@@ -150,6 +147,14 @@ CACHES = {
 CLOUDFRONT_DOMAIN = "cdn.docprime.com"
 #CLOUDFRONT_ID = "your cloud front id"
 AWS_S3_CUSTOM_DOMAIN = "cdn.docprime.com" # to make sure the url that the files are served from this domain
+
+AWS_HEADERS = {
+    'Cache-Control': 'max-age=31536000',
+}
+AWS_S3_OBJECT_PARAMETERS = {
+    'CacheControl': 'max-age=31536000',
+}
+
 
 RATING_SMS_NOTIF=env('RATING_SMS_NOTIF_PRD', default=86400)
 THYROCARE_NETWORK_ID = 43
