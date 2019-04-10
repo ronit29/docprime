@@ -186,5 +186,33 @@ class IntegratorTestMapping(TimeStampedModel):
     test_type = models.CharField(max_length=30, null=True, blank=True)
     is_active = models.BooleanField(default=False)
 
+    @classmethod
+    def get_if_third_party_integration(cls, network_id=None):
+        if network_id:
+            mapping = cls.objects.filter(object_id=network_id, is_active=True).first()
+        else:
+            return None
+
+        # Return if no test exist over here and it depicts that it is not a part of integrations.
+        if not mapping:
+            return None
+
+        # Part of the integrations.
+        if mapping.content_type == ContentType.objects.get(model='labnetwork'):
+            return {
+                'class_name': mapping.integrator_class_name,
+                'service_type': mapping.service_type
+            }
+
     class Meta:
         db_table = 'integrator_test_mapping'
+
+
+class IntegratorTestParameterMapping(TimeStampedModel):
+    integrator_class_name = models.CharField(max_length=40, null=False, blank=False)
+    integrator_test_name = models.CharField(max_length=60, null=True, blank=True)
+    test_parameter_chat = models.ForeignKey('diagnostic.TestParameterChat', on_delete=models.CASCADE, null=True)
+    response_data = JSONField(blank=True, null=True)
+
+    class Meta:
+        db_table = 'integrator_test_parameter_mapping'
