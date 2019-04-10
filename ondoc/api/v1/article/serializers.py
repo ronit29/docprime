@@ -6,8 +6,12 @@ from fluent_comments.models import FluentComment
 from ondoc.articles.models import Article, ArticleLinkedUrl, LinkedArticle
 from ondoc.articles.models import ArticleCategory
 from ondoc.authentication.models import User
+from ondoc.doctor.models import Specialization
 from ondoc.doctor.v1.serializers import DoctorSerializer, ArticleAuthorSerializer
 from django.db import models
+from bs4 import BeautifulSoup
+import re
+from xml.sax.saxutils import unescape
 
 
 class LinkedArticleSerializer(serializers.ModelSerializer):
@@ -41,6 +45,7 @@ class ArticleRetrieveSerializer(serializers.ModelSerializer):
     author = ArticleAuthorSerializer()
     last_updated_at = serializers.SerializerMethodField()
     comments = serializers.SerializerMethodField()
+    body_doms = serializers.SerializerMethodField()
 
     def get_comments(self, obj):
         comments = FluentComment.objects.filter(object_pk=str(obj.id), parent_id=None, is_public=True)
@@ -94,9 +99,87 @@ class ArticleRetrieveSerializer(serializers.ModelSerializer):
     def get_last_updated_at(self, obj):
         return '{:%d-%m-%Y}'.format(obj.updated_at)
 
+    def get_body_doms(self, obj):
+        html_doms = list()
+        try:
+            unescape_body = self.get_unescape_body(obj.body)
+
+            search_widget_tags = re.findall('<div(?:\s|\w|=|\"|\'|&nbsp;)*class\s*=(?:\s|\"|\')*search-widget(?:\s|\w|=|\"|\'|&nbsp;)*>(?:.*?|\n*?)</div>', unescape_body)
+            if search_widget_tags:
+                html_body = unescape_body
+                counter = 1
+                widget_count = len(search_widget_tags)
+                for search_widget_tag in search_widget_tags:
+                    search_widget_str = str(search_widget_tag)
+                    if isinstance(html_body, str):
+                        html_body = re.compile(search_widget_str).split(html_body, 1)
+                        self.add_html(html_doms, html_body[0], search_widget_tag)
+                        if len(html_body) == 2:
+                            html_body = html_body[1]
+                            if counter == widget_count:
+                                self.add_html(html_doms, html_body)
+                    counter += 1
+            else:
+                html_doms.append(self.format_html(obj.body))
+        except Exception as e:
+            print('Error in body widget format:' + str(e))
+            html_doms.clear()
+            html_doms.append(self.format_html(obj.body))
+        return html_doms
+
+    def get_unescape_body(self, body):
+        html_unescape_table = {"&gt;": ">", "&lt;": "<"}
+        unescape_body = unescape(body, html_unescape_table)
+        return unescape_body
+
+    def format_widget(self, tag):
+        search_widget = dict()
+        search_widget['type'] = 'search_widget'
+        search_widget['content'] = dict()
+        soup = BeautifulSoup(tag, 'html.parser')
+        widget_tag = soup.find('div')
+        widget_tag_attrs = widget_tag.attrs
+        if widget_tag_attrs:
+            has_specialization = False
+            if widget_tag_attrs.get('lat') and widget_tag_attrs.get('lng') and widget_tag_attrs.get('location_name'):
+                search_widget['content']['lat'] = widget_tag_attrs.get('lat')
+                search_widget['content']['lng'] = widget_tag_attrs.get('lng')
+                search_widget['content']['location_name'] = widget_tag_attrs.get('location_name')
+            else:
+                search_widget['content']['lat'] = None
+                search_widget['content']['lng'] = None
+                search_widget['content']['location_name'] = None
+            if widget_tag_attrs.get('specialization_id'):
+                specialization_results = Specialization.objects.filter(pk=widget_tag_attrs.get('specialization_id'))
+                if specialization_results:
+                    has_specialization = True
+                    specialization = specialization_results.first()
+                    search_widget['content']['specialization_id'] = specialization.id
+                    search_widget['content']['specialization_name'] = specialization.name
+                else:
+                    has_specialization = False
+            else:
+                has_specialization = False
+            if not has_specialization:
+                search_widget['content']['specialization_id'] = None
+                search_widget['content']['specialization_name'] = None
+        return search_widget
+
+    def format_html(self, tag):
+        html_tag = dict()
+        html_tag['type'] = 'html'
+        html_tag['content'] = BeautifulSoup(tag, 'html.parser').prettify()
+        return html_tag
+
+    def add_html(self, obj, html_tag, search_widget_tag=False):
+        if html_tag:
+            obj.append(self.format_html(html_tag))
+        if search_widget_tag:
+            obj.append(self.format_widget(search_widget_tag))
+
     class Meta:
         model = Article
-        fields = ('title','heading_title', 'url', 'body', 'icon', 'id', 'seo', 'header_image', 'header_image_alt', 'category',
+        fields = ('title','heading_title', 'url', 'body_doms', 'body', 'icon', 'id', 'seo', 'header_image', 'header_image_alt', 'category',
                   'linked', 'author_name', 'published_date', 'author', 'last_updated_at', 'comments')
 
 
