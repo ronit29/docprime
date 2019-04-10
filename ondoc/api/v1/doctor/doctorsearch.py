@@ -494,6 +494,8 @@ class DoctorSearchHelper:
                          value]),
                     "short_address": doctor_clinic.hospital.get_short_address(),
                     "doctor": doctor.name,
+                    "enabled_for_cod": doctor_clinic.hospital.enabled_for_cod,
+                    "enabled_for_prepaid": doctor_clinic.hospital.enabled_for_prepaid,
                     "display_name": doctor.get_display_name(),
                     "hospital_id": doctor_clinic.hospital.id,
                     "mrp": min_price["mrp"],
