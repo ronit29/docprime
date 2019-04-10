@@ -45,7 +45,7 @@ RUN chmod +x /home/docprime/workspace/entrypoint/entrypoint
 
 #DJANGO MANAGEMENT COMMANDS
 WORKDIR /home/docprime/workspace/backend
-RUN sed -e "s/\${SMS_AUTH_KEY}/$SMS_AUTH_KEY/" -e "s/\${EMAIL_HOST_PASSWORD}/$EMAIL_HOST_PASSWORD/" -e "s/\${AWS_ACCESS_KEY_ID}/$AWS_ACCESS_KEY_ID/" -e "s~\${AWS_SECRET_ACCESS_KEY}/$AWS_SECRET_ACCESS_KEY~" -e "s/\${DBUSER}/$DBUSER/" -e "s/\${DBPASS}/$DBPASS/" -e "s/\${DATABASE}/$DATABASE/" -e "s/\${QA_SERVER}/$JOB/" env.example > .env
+RUN sed -e "s/\${SMS_AUTH_KEY}/$SMS_AUTH_KEY/" -e "s/\${EMAIL_HOST_PASSWORD}/$EMAIL_HOST_PASSWORD/" -e "s/\${AWS_ACCESS_KEY_ID}/$AWS_ACCESS_KEY_ID/" -e "s~\${AWS_SECRET_ACCESS_KEY}~$AWS_SECRET_ACCESS_KEY~" -e "s/\${DBUSER}/$DBUSER/" -e "s/\${DBPASS}/$DBPASS/" -e "s/\${DATABASE}/$DATABASE/" -e "s/\${QA_SERVER}/$JOB/" env.example > .env
 RUN pip install -r requirements/local.txt
 ENV DJANGO_SETTINGS_MODULE=config.settings.$ENV_CG
 RUN if [ "$COLLECTSTATIC" = "true" ] ; then\
