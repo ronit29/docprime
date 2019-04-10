@@ -14,7 +14,7 @@ from ondoc.doctor.models import Doctor, PracticeSpecialization
 from ondoc.procedure.models import DoctorClinicProcedure, ProcedureCategory, ProcedureToCategoryMapping, \
     get_selected_and_other_procedures, get_included_doctor_clinic_procedure, \
     get_procedure_categories_with_procedures
-from datetime import datetime, time
+from datetime import datetime
 import re
 import json
 from django.contrib.staticfiles.templatetags.staticfiles import static
