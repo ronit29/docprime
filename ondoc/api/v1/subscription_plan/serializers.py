@@ -85,6 +85,6 @@ class UserSubscriptionRetrieveRequestSerializer(serializers.Serializer):
         request = self.context.get('request')
         if not request:
             raise serializers.ValidationError('Invalid request.')
-        if not UserPlanMapping.objects.filter(user=request.user).exists():
-            raise serializers.ValidationError('User has no subscription plan.')
+        if not UserPlanMapping.objects.filter(user=request.user, is_active=True, expire_at__gt=timezone.now()).exists():
+            raise serializers.ValidationError('User has no active subscription plan.')
         return attrs
