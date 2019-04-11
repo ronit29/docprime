@@ -7,7 +7,7 @@ from ondoc.api.v1.insurance.serializers import InsuranceTransactionSerializer
 from ondoc.doctor.models import OpdAppointment, DoctorPracticeSpecialization, PracticeSpecialization, Hospital
 from ondoc.diagnostic.models import LabAppointment, LabTest, Lab
 from ondoc.insurance.models import InsurancePlanContent, InsurancePlans, InsuredMembers, UserInsurance, StateGSTCode, \
-    InsuranceCity, InsuranceDistrict, InsuranceDeal
+    InsuranceCity, InsuranceDistrict, InsuranceDeal, InsurerPolicyNumber
 from import_export.admin import ImportExportMixin, ImportExportModelAdmin, base_formats
 import nested_admin
 from import_export import fields, resources
@@ -623,6 +623,12 @@ class InsuranceDistrictAdmin(ImportExportModelAdmin):
     resource_class = InsuranceDistrictResource
     fields = ('id', 'district_code', 'district_name', 'state')
     list_display = ('id', 'district_code', 'district_name', 'state')
+
+
+class InsurerPolicyNumberAdmin(admin.ModelAdmin):
+    model = InsurerPolicyNumber
+    fields = ('insurer', 'insurer_policy_number')
+    list_display = ('insurer', 'insurer_policy_number', 'created_at')
 
 
 class InsuranceDealAdmin(admin.ModelAdmin):

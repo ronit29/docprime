@@ -47,9 +47,14 @@ def generate_insurance_policy_number():
 
 def generate_insurance_insurer_policy_number(insurer_id):
     if not insurer_id:
-        raise Exception('Could not generate the policy number according to the insurer. Hence aborting.')
+        raise Exception('Could not generate policy number according to the insurer.')
     insurer = Insurer.objects.filter(id=insurer_id).first()
-    master_policy_number = insurer.master_policy_number
+    policy_number_data = InsurerPolicyNumber.objects.filter(insurer=insurer).order_by('-id').first()
+    if not policy_number_data:
+        raise Exception('Master Policy number is missing.')
+    master_policy_number = policy_number_data.insurer_policy_number
+    # master_policy_number = insurer.policy_number_history.policy_number.order_by('-created_at').first()
+    # master_policy_number = insurer.master_policy_number
     query = '''select nextval('userinsurance_policy_num_seq') as inc'''
     seq = RawSql(query, []).fetch_all()
     sequence = None
@@ -275,7 +280,7 @@ class Insurer(auth_model.TimeStampedModel, LiveMixin):
     cgst = models.PositiveSmallIntegerField(blank=False, null=True)
     state = models.ForeignKey(StateGSTCode, on_delete=models.CASCADE, default=None, blank=False, null=True)
     insurer_merchant_code = models.CharField(max_length=100, null=True, blank=False, unique=True)
-    master_policy_number = models.CharField(max_length=50)
+    # master_policy_number = models.CharField(max_length=50, null=True, blank=False)
 
     @property
     def get_active_plans(self):
@@ -1092,7 +1097,8 @@ class InsuranceTransaction(auth_model.TimeStampedModel):
     DEBIT = 2
     TRANSACTION_TYPE_CHOICES = ((CREDIT, 'CREDIT'), (DEBIT, "DEBIT"),)
 
-    user_insurance = models.ForeignKey(UserInsurance,related_name='transactions', on_delete=models.DO_NOTHING)
+    # user_insurance = models.ForeignKey(UserInsurance,related_name='transactions', on_delete=models.DO_NOTHING)
+    user_insurance = models.ForeignKey(UserInsurance,related_name='transactions', on_delete=models.DO_NOTHING, default=None)
     account = models.ForeignKey(InsurerAccount,related_name='transactions', on_delete=models.DO_NOTHING)
     transaction_type = models.PositiveSmallIntegerField(choices=TRANSACTION_TYPE_CHOICES)
     amount = models.PositiveSmallIntegerField(default=0)
@@ -1140,7 +1146,8 @@ class InsuredMembers(auth_model.TimeStampedModel):
     MR = 'mr.'
     MISS = 'miss'
     MRS = 'mrs.'
-    TITLE_TYPE_CHOICES = [(MR, 'mr.'), (MRS, 'mrs.'), (MISS, 'miss')]
+    MAST = 'mast.'
+    TITLE_TYPE_CHOICES = [(MR, 'mr.'), (MRS, 'mrs.'), (MISS, 'miss'), (MAST, 'mast.')]
     # insurer = models.ForeignKey(Insurer, on_delete=models.DO_NOTHING)
     # insurance_plan = models.ForeignKey(InsurancePlans, on_delete=models.DO_NOTHING)
     first_name = models.CharField(max_length=50, null=False)
@@ -1256,13 +1263,11 @@ class InsuranceDeal(auth_model.TimeStampedModel):
         db_table = 'insurance_deals'
 
 
-# class InsurancePolicyNumberHistory(auth_model.TimeStampedModel):
-#     insurer = models.ForeignKey(Insurer, related_name='policy_number_history', on_delete=models.DO_NOTHING)
-#     policy_number = models.CharField(max_length=50)
-#     updated_month = models.CharField(max_length=20)
-#     updated_year = models.CharField(max_length=10)
-#
-#     class Meta:
-#         db_table = 'insurance_policy_number_history'
+class InsurerPolicyNumber(auth_model.TimeStampedModel):
+    insurer = models.ForeignKey(Insurer, related_name='policy_number_history', on_delete=models.DO_NOTHING)
+    insurer_policy_number = models.CharField(max_length=50)
+
+    class Meta:
+        db_table = 'insurer_policy_numbers'
 
 
