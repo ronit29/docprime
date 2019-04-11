@@ -1341,9 +1341,11 @@ def create_payout_checksum(all_txn, product_id):
     #     secret_key = settings.PG_SECRET_KEY_P2
     #     client_key = settings.PG_CLIENT_KEY_P2
 
-    secret_key = settings.PG_SECRET_KEY_P2
-    client_key = settings.PG_CLIENT_KEY_P2
+    # secret_key = settings.PG_SECRET_KEY_P2
+    # client_key = settings.PG_CLIENT_KEY_P2
 
+    secret_key = settings.PG_PAYOUT_SECRET_KEY
+    client_key = settings.PG_PAYOUT_CLIENT_KEY
 
     all_txn = sorted(all_txn, key=lambda x : x["idx"])
     checksum = ""
