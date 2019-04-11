@@ -4,6 +4,7 @@ from uuid import UUID
 
 from django.contrib.gis.db.models.functions import Distance
 from django.contrib.gis.measure import D
+from django.utils.functional import cached_property
 
 from ondoc.api.v1.auth.serializers import UserProfileSerializer
 from ondoc.api.v1.doctor.serializers import HospitalModelSerializer, AppointmentRetrieveDoctorSerializer, \
@@ -47,7 +48,7 @@ from rest_framework.permissions import IsAuthenticated
 from ondoc.authentication.backends import JWTAuthentication
 from django.utils import timezone
 from django.db import transaction
-from django.http import Http404
+from django.http import Http404, HttpResponse
 from django.db.models import Q, Value, Case, When
 from operator import itemgetter
 from itertools import groupby,chain
@@ -1791,6 +1792,33 @@ class DoctorAvailabilityTimingViewSet(viewsets.ViewSet):
         # # timeslots = obj.get_timing_list()
         # timeslots = obj.get_doctor_timing_slots(date, total_leaves, "doctor")
         return Response({"timeslots": timeslots["time_slots"], "upcoming_slots": timeslots["upcoming_slots"], "doctor_data": doctor_serializer.data})
+
+    @transaction.non_atomic_requests
+    def list_v2(self, request, *args, **kwargs):
+        doctor_id = request.query_params.get('doctor_id')
+        hospital_id = request.query_params.get('hospital_id')
+
+        doctor_queryset = models.Doctor.objects.prefetch_related("qualifications__qualification", "qualifications__specialization")\
+                                      .filter(pk=doctor_id)
+        doctor_serializer = serializers.DoctorTimeSlotSerializer(doctor_queryset, many=True)
+        doctor = doctor_queryset.first()
+
+        dc_obj = models.DoctorClinic.objects.filter(doctor_id=doctor_id,
+                                                    hospital_id=hospital_id).first()
+        if not dc_obj:
+            return HttpResponse(status=404)
+
+        doctor_leaves = doctor.get_leaves()
+        global_non_bookables = cached_property(GlobalNonBookable.get_non_bookables(), name='global_non_bookables')
+        total_leaves = doctor_leaves + global_non_bookables.func
+
+        clinic_timings = dc_obj.get_timings_v2(total_leaves)
+
+        resp_data = {"timeslots": clinic_timings.get('timeslots', []),
+                     "upcoming_slots": clinic_timings.get('upcoming_slots', []),
+                     "doctor_data": doctor_serializer.data}
+
+        return Response(resp_data)
 
 
 class HealthTipView(viewsets.GenericViewSet):

@@ -4,6 +4,7 @@ import requests
 from PIL.Image import NEAREST, BICUBIC
 from django.contrib.staticfiles.storage import staticfiles_storage
 from django.core.files.storage import default_storage
+from django.utils.functional import cached_property
 from PIL import Image, ImageFont, ImageOps
 
 from django.contrib.gis.db import models
@@ -42,6 +43,7 @@ from ondoc.api.v1.utils import get_start_end_datetime, custom_form_datetime, Cou
     form_time_slot, util_absolute_url, html_to_pdf, TimeSlotExtraction
 from ondoc.common.models import AppointmentHistory, AppointmentMaskNumber, Service, Remark, MatrixMappedState, MatrixMappedCity, GlobalNonBookable
 from ondoc.common.models import QRCode
+
 
 from functools import reduce
 from operator import or_
@@ -874,6 +876,14 @@ class Doctor(auth_model.TimeStampedModel, auth_model.QCModel, SearchKey, auth_mo
         sticker.save()
         return sticker
 
+    def get_leaves(self):
+        leave_range = list()
+        doctor_leaves = self.leaves.filter(deleted_at__isnull=True)
+        for dl in doctor_leaves:
+            start_datetime = datetime.datetime.combine(dl.start_date, dl.start_time)
+            end_datetime = datetime.datetime.combine(dl.end_date, dl.end_time)
+            leave_range.append({'start_datetime': start_datetime, 'end_datetime': end_datetime})
+        return leave_range
 
 
 
@@ -1012,6 +1022,19 @@ class DoctorClinic(auth_model.TimeStampedModel, auth_model.WelcomeCallingDone):
         upcoming_slots = obj.get_upcoming_slots(time_slots=slots)
         res_data = {"time_slots": slots, "upcoming_slots": upcoming_slots}
         return res_data
+
+
+
+    def get_timings_v2(self, total_leaves):
+        clinic_timings = self.availability.order_by("start")
+        booking_details = dict()
+        booking_details['type'] = 'doctor'
+        timeslot_object = TimeSlotExtraction()
+        clinic_timings = timeslot_object.format_timing_to_datetime_v2(clinic_timings, total_leaves, booking_details)
+        upcoming_slots = timeslot_object.get_upcoming_slots(time_slots=clinic_timings)
+        timing_response = {"timeslots": clinic_timings, "upcoming_slots": upcoming_slots}
+        return timing_response
+
 
 
 class DoctorClinicTiming(auth_model.TimeStampedModel):

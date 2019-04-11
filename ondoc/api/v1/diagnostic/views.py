@@ -2048,6 +2048,45 @@ class LabTimingListView(mixins.ListModelMixin,
         # resp_data['global_leaves'] = global_leave_serializer.data
         return Response(resp_data)
 
+    @transaction.non_atomic_requests
+    def list_v2(self, request, *args, **kwargs):
+        params = request.query_params
+
+        for_home_pickup = True if int(params.get('pickup', 0)) else False
+        lab = params.get('lab')
+
+        # Added for Thyrocare integration
+        from ondoc.integrations import service
+        pincode = params.get('pincode')
+        date = params.get('date')
+        integration_dict = None
+
+        if lab:
+            lab_obj = Lab.objects.filter(id=int(lab), is_live=True).first()
+            if lab_obj and lab_obj.network and lab_obj.network.id:
+                if lab_obj.network.id == settings.THYROCARE_NETWORK_ID and settings.THYROCARE_INTEGRATION_ENABLED:
+                    integration_dict = IntegratorMapping.get_if_third_party_integration(network_id=lab_obj.network.id)
+
+        if not integration_dict:
+            lab_timings = lab_obj.get_timing_v2(for_home_pickup)
+        else:
+            class_name = integration_dict['class_name']
+            integrator_obj = service.create_integrator_obj(class_name)
+            lab_timings = integrator_obj.get_appointment_slots(pincode, date, is_home_pickup=for_home_pickup)
+
+        resp_data = {"timeslots": lab_timings.get('timeslots', []),
+                     "upcoming_slots": lab_timings.get('upcoming_slots', []),
+                     "is_thyrocare": lab_timings.get('is_thyrocare', False)}
+        if hasattr(request, "agent") and request.agent:
+            resp_data = {
+                "timeslots": resp_data['timeslots'],
+                "today_min": None,
+                "tomorrow_min": None,
+                "today_max": None
+            }
+
+        return Response(resp_data)
+
 
 class AvailableTestViewSet(mixins.RetrieveModelMixin,
                            viewsets.GenericViewSet):
