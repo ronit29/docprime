@@ -32,7 +32,7 @@ from ondoc.procedure.models import Procedure, ProcedureCategory, CommonProcedure
 from ondoc.seo.models import NewDynamic
 from . import serializers
 from ondoc.api.v2.doctor import serializers as v2_serializers
-from ondoc.api.pagination import paginate_queryset, paginate_raw_query
+from ondoc.api.pagination import paginate_queryset, paginate_raw_query, paginate_queryset_refactored_consumer_app
 from ondoc.api.v1.utils import convert_timings, form_time_slot, IsDoctor, payment_details, aware_time_zone, \
     TimeSlotExtraction, GenericAdminEntity, get_opd_pem_queryset, offline_form_time_slots
 from ondoc.api.v1 import insurance as insurance_utility
@@ -3417,6 +3417,7 @@ class HospitalViewSet(viewsets.GenericViewSet):
         result_count = len(hospital_queryset)
         if count:
             hospital_queryset = hospital_queryset[:count]
+        hospital_queryset = paginate_queryset_refactored_consumer_app(hospital_queryset, request)
         top_hospital_serializer = serializers.TopHospitalForIpdProcedureSerializer(hospital_queryset, many=True,
                                                                                    context={'request': request})
         return Response({'count': result_count, 'result': top_hospital_serializer.data,
