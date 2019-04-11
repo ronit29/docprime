@@ -1621,7 +1621,7 @@ class PackageSerializer(LabTestSerializer):
 
 class CompareLabPackagesSerializer(serializers.Serializer):
 
-    package_ids = CommaSepratedToListField(required=True, max_length=4, typecast_to=str)
+    package_ids = CommaSepratedToListField(required=True, max_length=5, typecast_to=str)
     longitude = serializers.FloatField(default=77.071848)
     latitude = serializers.FloatField(default=28.450367)
     title = serializers.CharField(required=False, max_length=500)
