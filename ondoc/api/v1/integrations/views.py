@@ -25,6 +25,7 @@ class IntegratorReportViewSet(viewsets.GenericViewSet):
             return Response({"error": "Thyrocare Report not found for booking"}, status=status.HTTP_404_NOT_FOUND)
 
         report_url = report.xml_url
+        pdf_url = report.pdf_url
         if not report_url:
             return Response({"error": "Thyrocare Report url not found for booking"}, status=status.HTTP_404_NOT_FOUND)
 
@@ -40,19 +41,19 @@ class IntegratorReportViewSet(viewsets.GenericViewSet):
             if lead_details:
                 test_results = lead_details['BARCODES']['BARCODE']['TESTRESULTS']['TESTDETAIL']
                 if test_results:
-                    test_data = self.get_test_result_data(lead_details, test_results)
+                    test_data = self.get_test_result_data(lead_details, test_results, pdf_url)
                     data.append(test_data)
         elif type(lead_details) is list:
             if lead_details:
                 for lead_detail in lead_details:
                     test_results = lead_detail['BARCODES']['BARCODE']['TESTRESULTS']['TESTDETAIL']
                     if test_results:
-                        test_data = self.get_test_result_data(lead_detail, test_results)
+                        test_data = self.get_test_result_data(lead_detail, test_results, pdf_url)
                         data.append(test_data)
 
-        return Response(data)
+        return Response({'pdf_report_url': pdf_url, 'data': data})
 
-    def get_test_result_data(self, lead_detail, test_results):
+    def get_test_result_data(self, lead_detail, test_results, pdf_url):
         patient_detail = {'PATIENT_NAME': lead_detail['PATIENT'], 'MOBILE': lead_detail['MOBILE'], 'EMAIL': lead_detail['EMAIL'],
                           'LEADID': lead_detail['LEADID'], 'TESTS': lead_detail['TESTS']}
         red = list()
