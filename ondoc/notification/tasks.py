@@ -592,11 +592,11 @@ def send_insurance_notifications(self, data):
         user_id = int(data.get('user_id', 0))
         user = auth_model.User.objects.filter(id=user_id).last()
         if not user:
-            logger.error("Invalid user id passed for insurance email notification")
+            raise Exception("Invalid user id passed for insurance email notification")
 
-        user_insurance = user.purchased_insurance.filter().last()
-        if not user_insurance or not user_insurance.is_valid():
-            logger.error("Invalid or None user insurance found for email notification")
+        user_insurance = user.active_insurance
+        if not user_insurance:
+            raise Exception("Invalid or None user insurance found for email notification. User id %s" % str(user_id))
 
         user_insurance.generate_pdf()
 
