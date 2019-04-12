@@ -4,6 +4,9 @@ from ondoc.common.models import PaymentOptions
 from django.core.validators import MaxValueValidator, MinValueValidator
 import datetime
 from django.utils.crypto import get_random_string
+import logging
+logger = logging.getLogger(__name__)
+
 
 class Coupon(auth_model.TimeStampedModel):
     DOCTOR = 1
@@ -206,6 +209,20 @@ class UserSpecificCoupon(auth_model.TimeStampedModel):
     phone_number = models.CharField(max_length=10, blank=False, null=False)
     user = models.ForeignKey(auth_model.User, on_delete=models.SET_NULL, null=True, blank=True)
     count = models.PositiveIntegerField(default=1)
+
+    def save(self, *args, **kwargs):
+        try:
+            '''
+            Set User for a given phone number if not assigned explicitly.
+            '''
+            if self.phone_number and not self.user:
+                user = auth_model.User.objects.filter(phone_number=self.phone_number, user_type=auth_model.User.CONSUMER).first()
+                if user:
+                    self.user = user
+        except Exception as e:
+            logger.error(str(e))
+
+        super().save(*args, **kwargs)
 
     def __str__(self):
         return self.coupon.code

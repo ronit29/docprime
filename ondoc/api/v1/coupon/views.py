@@ -186,6 +186,11 @@ class ApplicableCouponsViewSet(viewsets.GenericViewSet):
         if user and user.is_authenticated:
             payment_option_filter = Cart.get_pg_if_pgcoupon(user, cart_item_id)
 
+        obj = OpdAppointment()
+        is_first_time_user = True
+        if user:
+            is_first_time_user = obj.is_user_first_time(user)
+
         applicable_coupons = []
         for coupon in coupons:
             allowed = True
@@ -220,7 +225,7 @@ class ApplicableCouponsViewSet(viewsets.GenericViewSet):
                 allowed = False
                 valid = False
 
-            if coupon.new_user_constraint and (len(coupon.user_opd_booked)>0 or len(coupon.user_lab_booked)>0):
+            if coupon.new_user_constraint and not is_first_time_user:
                 allowed = False
                 valid = False
 

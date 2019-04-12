@@ -1257,7 +1257,7 @@ class DoctorAdmin(AutoComplete, ImportExportMixin, VersionAdmin, ActionAdmin, QC
         return render(request, 'onboarddoctor.html', {'doctor': doctor, 'count': count, 'errors': errors})
 
     def get_onboard_link(self, obj=None):
-        if obj.data_status == Doctor.IN_PROGRESS and obj.onboarding_status in (
+        if obj.data_status in [Doctor.IN_PROGRESS, Doctor.REOPENED] and obj.onboarding_status in (
                 Doctor.NOT_ONBOARDED, Doctor.REQUEST_SENT):
             return mark_safe("<a href='/admin/doctor/doctor/onboard_admin/%s'>generate onboarding url</a>" % obj.id)
         return ""
@@ -1425,6 +1425,7 @@ class DoctorOpdAppointmentForm(forms.ModelForm):
     start_time = forms.CharField(widget=TimePickerWidget())
     cancel_type = forms.ChoiceField(label='Cancel Type', choices=((0, 'Cancel and Rebook'),
                                                                   (1, 'Cancel and Refund'),), initial=0, widget=forms.RadioSelect)
+    custom_otp = forms.IntegerField(required=False)
 
     def clean(self):
         super().clean()
@@ -1473,6 +1474,12 @@ class DoctorOpdAppointmentForm(forms.ModelForm):
                                                      day=time_slot_start.weekday(),
                                                      start__lte=hour, end__gt=hour).exists():
                 raise forms.ValidationError("Doctor do not sit at the given hospital in this time slot.")
+
+        if cleaned_data.get('status') and cleaned_data.get('status') == OpdAppointment.COMPLETED:
+            if self.instance and self.instance.id and not self.instance.status == OpdAppointment.ACCEPTED:
+                raise forms.ValidationError("Can only complete appointment if it is in accepted state.")
+            if not cleaned_data.get('custom_otp') == self.instance.otp:
+                raise forms.ValidationError("Entered OTP is incorrect.")
 
         # if self.instance.id:
         #     if cleaned_data.get('status') == OpdAppointment.RESCHEDULED_PATIENT or cleaned_data.get(
@@ -1527,7 +1534,8 @@ class DoctorOpdAppointmentAdmin(admin.ModelAdmin):
                                     (OpdAppointment.RESCHEDULED_PATIENT, 'Rescheduled by patient'),
                                     (OpdAppointment.RESCHEDULED_DOCTOR, 'Rescheduled by doctor'),
                                     (OpdAppointment.ACCEPTED, 'Accepted'),
-                                    (OpdAppointment.CANCELLED, 'Cancelled')]
+                                    (OpdAppointment.CANCELLED, 'Cancelled'),
+                                    (OpdAppointment.COMPLETED, 'Completed')]
         if db_field.name == "status" and request.user.groups.filter(
                 name=constants['OPD_APPOINTMENT_MANAGEMENT_TEAM']).exists():
             kwargs['choices'] = allowed_status_for_agent
@@ -1562,6 +1570,10 @@ class DoctorOpdAppointmentAdmin(admin.ModelAdmin):
                 'start_date', 'start_time', 'invoice_urls', 'payment_type', 'payout_info')
         if request.user.groups.filter(name=constants['APPOINTMENT_OTP_TEAM']).exists() or request.user.is_superuser:
             all_fields = all_fields + ('otp',)
+        # if obj and obj.id and obj.status == OpdAppointment.ACCEPTED:
+        #     all_fields = all_fields + ('custom_otp',)
+        all_fields = all_fields + ('custom_otp',)
+
         return all_fields
         # else:
         #     return ()
@@ -1766,8 +1778,9 @@ class DoctorOpdAppointmentAdmin(admin.ModelAdmin):
                     logger.warning("Admin Cancel started - " + str(obj.id) + " timezone - " + str(timezone.now()))
                     obj.action_cancelled(cancel_type)
                     logger.warning("Admin Cancel completed - " + str(obj.id) + " timezone - " + str(timezone.now()))
-
-            else:        
+            elif request.POST.get('status') and int(request.POST['status']) == OpdAppointment.COMPLETED:
+                    obj.action_completed()
+            else:
                 super().save_model(request, obj, form, change)
 
     class Media:

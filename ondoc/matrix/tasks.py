@@ -81,7 +81,28 @@ def prepare_and_hit(self, data):
     if mask_number_instance:
         mask_number = mask_number_instance.mask_number
 
+    user_insurance = appointment.user.active_insurance
+    primary_proposer_name = None
+
+    if user_insurance:
+        primary_proposer = user_insurance.get_primary_member_profile()
+        primary_proposer_name = primary_proposer.get_full_name() if primary_proposer else None
+
+    policy_details = {
+        "ProposalNo": None,
+        "BookingId": user_insurance.id if user_insurance else None,
+        "ProposerName": primary_proposer_name,
+        "PolicyId": user_insurance.policy_number if user_insurance else None,
+        "InsurancePlanPurchased": user_insurance.insurance_plan.name if user_insurance else None,
+        "PurchaseDate": int(user_insurance.purchase_date.timestamp()) if user_insurance else None,
+        "ExpirationDate": int(user_insurance.expiry_date.timestamp()) if user_insurance else None,
+        "COILink": user_insurance.coi.url if user_insurance and  user_insurance.coi is not None and user_insurance.coi.name else None,
+        "PeopleCovered": user_insurance.insurance_plan.get_people_covered() if user_insurance else ""
+    }
+
     appointment_details = {
+        'IsInsured': 'yes' if user_insurance else 'no',
+        'PolicyId': user_insurance.policy_number if user_insurance else None,
         'AppointmentStatus': appointment.status,
         'Age': calculate_age(appointment),
         'Email': p_email,
@@ -90,6 +111,7 @@ def prepare_and_hit(self, data):
         'KYC': kyc,
         'Location': location,
         'PaymentType': appointment.payment_type,
+        'PaymentTypeID': appointment.payment_type,
         'PaymentStatus': 300,
         'OrderID': order_id if order_id else 0,
         'DocPrimeBookingID': appointment.id,
@@ -125,7 +147,8 @@ def prepare_and_hit(self, data):
         'CityId': 0,
         'ProductId': task_data.get('product_id'),
         'SubProductId': task_data.get('sub_product_id'),
-        'AppointmentDetails': appointment_details
+        'AppointmentDetails': appointment_details,
+        'PolicyDetails': policy_details
     }
 
     #logger.error(json.dumps(request_data))
@@ -323,6 +346,8 @@ def push_signup_lead_to_matrix(self, data):
 
         utm = online_lead_obj.utm_params if online_lead_obj.utm_params else {}
 
+        continue_url = settings.ADMIN_BASE_URL + reverse('admin:doctor_doctor_add')
+
         request_data = {
             'Name': online_lead_obj.name,
             'PrimaryNo': online_lead_obj.mobile,
@@ -338,6 +363,7 @@ def push_signup_lead_to_matrix(self, data):
             'UTMMedium': utm.get('utm_medium', ''),
             'UtmSource': utm.get('utm_source', ''),
             'UtmTerm': utm.get('utm_term', ''),
+            'ExitPointUrl': continue_url
         }
 
         #logger.error(json.dumps(request_data))
@@ -483,7 +509,10 @@ def create_or_update_lead_on_matrix(self, data):
         ct = ContentType.objects.get(model=obj_type.lower())
         model_used = ct.model_class()
         content_type = ContentType.objects.get_for_model(model_used)
-        exit_point_url = settings.ADMIN_BASE_URL + reverse('admin:{}_{}_change'.format(content_type.app_label, content_type.model), kwargs={"object_id": obj_id})
+        if obj_type != ProviderSignupLead.__name__:
+            exit_point_url = settings.ADMIN_BASE_URL + reverse('admin:{}_{}_change'.format(content_type.app_label, content_type.model), kwargs={"object_id": obj_id})
+        else:
+            exit_point_url = settings.ADMIN_BASE_URL + reverse('admin:doctor_doctor_add')
         obj = model_used.objects.filter(id=obj_id).first()
         if not obj:
             raise Exception("{} could not found against id - {}".format(obj_type, obj_id))
@@ -539,7 +568,7 @@ def create_or_update_lead_on_matrix(self, data):
             'SubProductId': sub_product_id,
             'Name': name,
             'ExitPointUrl': exit_point_url,
-            'CityId': obj.matrix_city.id if hasattr(obj, 'matrix_city') and obj.matrix_city.id else 0
+            'CityId': obj.matrix_city.id if hasattr(obj, 'matrix_city') and obj.matrix_city and obj.matrix_city.id else 0
         }
         url = settings.MATRIX_API_URL
         matrix_api_token = settings.MATRIX_API_TOKEN
