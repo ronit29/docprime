@@ -1281,3 +1281,9 @@ class InsurerPolicyNumber(auth_model.TimeStampedModel):
         db_table = 'insurer_policy_numbers'
 
 
+# class InsuranceReport(UserInsurance):
+#
+#     class Meta:
+#         proxy = True
+
+
