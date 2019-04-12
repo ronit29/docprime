@@ -600,21 +600,20 @@ class UserInsurance(auth_model.TimeStampedModel):
         policy_number = self.policy_number
         certificate_number = policy_number.split('/')[-1]
         filename = "{}.pdf".format(str(certificate_number))
-        try:
-            extra_args = {
-                'virtual-time-budget': 6000
-            }
-            file = TemporaryUploadedFile(filename, 'byte', 1000, 'utf-8')
-            f = open(file.temporary_file_path())
-            bytestring_to_pdf(html_body.encode(), f, **extra_args)
-            f.seek(0)
-            f.flush()
-            f.content_type = 'application/pdf'
 
-            self.coi = InMemoryUploadedFile(file, None, filename, 'application/pdf', file.tell(), None)
-            self.save()
-        except Exception as e:
-            logger.error("Got error while creating pdf for opd invoice {}".format(e))
+        extra_args = {
+            'virtual-time-budget': 6000
+        }
+        file = TemporaryUploadedFile(filename, 'byte', 1000, 'utf-8')
+        f = open(file.temporary_file_path())
+        bytestring_to_pdf(html_body.encode(), f, **extra_args)
+        f.seek(0)
+        f.flush()
+        f.content_type = 'application/pdf'
+
+        self.coi = InMemoryUploadedFile(file, None, filename, 'application/pdf', file.tell(), None)
+        self.save()
+
 
     class Meta:
         db_table = "user_insurance"
@@ -1105,11 +1104,13 @@ class InsuranceTransaction(auth_model.TimeStampedModel):
 
     def after_commit_tasks(self):
         if self.transaction_type == InsuranceTransaction.DEBIT:
-            # self.user_insurance.generate_pdf()
-            # send_insurance_notifications(self.user_insurance.user.id)
+            try:
+                self.user_insurance.generate_pdf()
+            except Exception as e:
+                logger.error('Insurance coi pdf cannot be generated. %s' % str(e))
 
             send_insurance_notifications.apply_async(({'user_id': self.user_insurance.user.id}, ),
-                                                     link=push_insurance_buy_to_matrix.s(user_id=self.user_insurance.user.id), countdown=10)
+                                                     link=push_insurance_buy_to_matrix.s(user_id=self.user_insurance.user.id), countdown=1)
 
     def save(self, *args, **kwargs):
         if self.pk:

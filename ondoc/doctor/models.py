@@ -261,8 +261,12 @@ class Hospital(auth_model.TimeStampedModel, auth_model.CreatedByModel, auth_mode
         )y where hospital.id = y.id'''
         update_alternative_value = RawSql(query, []).execute()
 
-        query1 = '''update hospital set city_search_key = lower(city) where city_search_key is null
-                        or city_search_key='' '''
+        query1 = '''update hospital set city_search_key = 
+                    case when lower(city) in ('bengaluru','bengalooru') then 'bangalore'
+                    when lower(city) in ('gurugram','gurugram rural') then 'gurgaon'
+                    else lower(city) end
+                    where city_search_key is null
+                    or city_search_key='' '''
         update_city = RawSql(query1, []).execute()
 
 
