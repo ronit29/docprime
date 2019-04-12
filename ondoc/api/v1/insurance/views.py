@@ -165,7 +165,9 @@ class InsuranceOrderViewSet(viewsets.GenericViewSet):
                             user_profile = UserProfile.objects.filter(id=member['profile'].id,
                                                                       user_id=request.user.pk).values('id', 'name', 'email',
                                                                                                     'gender', 'user_id',
-                                                                                                    'dob', 'phone_number').first()
+                                                                                                      'phone_number').first()
+
+                            user_profile['dob'] = member['dob']
 
                         else:
                             user_profile = {"name": member['first_name'] + " " + member['last_name'], "email":
