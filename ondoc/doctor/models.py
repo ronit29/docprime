@@ -1734,6 +1734,13 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
     def __str__(self):
         return self.profile.name + " (" + self.doctor.name + ")"
 
+    def can_agent_refund(self, user):
+        if self.status == obj.COMPLETED and (user.groups.filter(name=constants['APPOINTMENT_REFUND_TEAM']).exists() or user.is_superuser):
+            return True
+    
+        return False
+
+
     def allowed_action(self, user_type, request):
         allowed = []
         current_datetime = timezone.now()
