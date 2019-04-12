@@ -81,12 +81,36 @@ def prepare_and_hit(self, data):
     if mask_number_instance:
         mask_number = mask_number_instance.mask_number
 
+    provider_booking_id = ''
+    merchant_code = ''
+    provider_payment_status = ''
+    settlement_date = None
+    payment_URN = ''
+    amount = None
     if task_data.get('type') == 'LAB_APPOINTMENT':
-        all_appointments = appointment.lab.get_last_five_appointments()
-    elif task_data.get('type') == 'OPD_APPOINTMENT':
-        all_appointments = appointment.doctor.get_last_five_appointments()
+        # location_verified = appointment.lab.is_location_verified
+        provider_id = appointment.lab.id
+        merchant = appointment.lab.merchant.all().last()
+        if merchant:
+            merchant_code = merchant.id
 
-    last_five_appointments = ','.join(list(map(lambda x: str(x[0]), all_appointments)))
+        if appointment.lab and appointment.lab.network and appointment.lab.network.id == settings.THYROCARE_NETWORK_ID:
+            integrator_obj = appointment.integrator_response.all().first()
+            if integrator_obj:
+                provider_booking_id = integrator_obj.integrator_order_id
+    elif task_data.get('type') == 'OPD_APPOINTMENT':
+        # location_verified = appointment.hospital.is_location_verified
+        provider_id = appointment.doctor.id
+        merchant = appointment.doctor.merchant.all().last()
+        if merchant:
+            merchant_code = merchant.id
+
+    merchant_payout = appointment.merchant_payout
+    if merchant_payout:
+        provider_payment_status = dict(merchant_payout.STATUS_CHOICES)[merchant_payout.status]
+        settlement_date = int(merchant_payout.payout_time.timestamp()) if merchant_payout.payout_time else None
+        payment_URN = merchant_payout.utr_no
+        amount = merchant_payout.payable_amount
 
     appointment_details = {
         'AppointmentStatus': appointment.status,
@@ -119,7 +143,13 @@ def prepare_and_hit(self, data):
         'DealPrice': float(appointment.deal_price),
         'DOB': dob_value,
         'ProviderAddress': appointment.hospital.get_hos_address() if task_data.get('type') == 'OPD_APPOINTMENT' else appointment.lab.get_lab_address(),
-        'LastAppointments': last_five_appointments
+        'ProviderID': provider_id,
+        'ProviderBookingID': provider_booking_id,
+        'MerchantCode': merchant_code,
+        'ProviderPaymentStatus': provider_payment_status,
+        'PaymentURN': payment_URN,
+        'Amount': float(amount) if amount else None,
+        'SettlementDate': settlement_date
     }
 
     request_data = {
