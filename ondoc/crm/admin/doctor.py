@@ -1418,8 +1418,12 @@ class TimePickerWidget(forms.TextInput):
         htmlString +='</select></div>'
         return mark_safe(u''.join(htmlString))
 
+class RefundableAppointmentForm(forms.ModelForm):
+    refund_payment = forms.BooleanField(required=False)
+    refund_reason = forms.CharField(required=False)
 
-class DoctorOpdAppointmentForm(forms.ModelForm):
+
+class DoctorOpdAppointmentForm(RefundableAppointmentForm):
 
     start_date = forms.DateField(widget=CustomDateInput(format=('%d-%m-%Y'), attrs={'placeholder':'Select a date'}))
     start_time = forms.CharField(widget=TimePickerWidget())
@@ -1552,6 +1556,13 @@ class DoctorOpdAppointmentAdmin(admin.ModelAdmin):
             form.base_fields['start_time'].initial = time_slot_start.strftime('%H:%M')
         return form
 
+
+    def can_refund(self, request, obj):
+        if obj.status == obj.COMPLETED and  (request.user.groups.filter(name=constants['APPOINTMENT_REFUND_TEAM']).exists() or request.user.is_superuser):
+            return True
+    
+        return False
+
     def get_fields(self, request, obj=None):
         # if request.user.is_superuser and request.user.is_staff:
         #     return ('booking_id', 'doctor', 'doctor_id', 'doctor_details', 'hospital', 'hospital_details', 'kyc',
@@ -1570,6 +1581,10 @@ class DoctorOpdAppointmentAdmin(admin.ModelAdmin):
                 'start_date', 'start_time', 'invoice_urls', 'payment_type', 'payout_info')
         if request.user.groups.filter(name=constants['APPOINTMENT_OTP_TEAM']).exists() or request.user.is_superuser:
             all_fields = all_fields + ('otp',)
+
+        if self.can_refund(request, obj):
+            all_fields = all_fields + ('refund_payment','refund_reason')
+
         # if obj and obj.id and obj.status == OpdAppointment.ACCEPTED:
         #     all_fields = all_fields + ('custom_otp',)
         all_fields = all_fields + ('custom_otp',)
