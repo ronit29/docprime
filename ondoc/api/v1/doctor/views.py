@@ -1669,19 +1669,26 @@ class DoctorListViewSet(viewsets.GenericViewSet):
             canonical_url = validated_data.get('url')
         else:
             if validated_data.get('city'):
+                city = None
+                if validated_data.get('city') in ('bengaluru', 'bengalooru'):
+                    city = 'bangalore'
+                elif validated_data.get('city') in ('gurugram','gurugram rural'):
+                    city = 'gurgaon'
+                else:
+                    city = validated_data.get('city')
                 if specializations:
                     specialization_name = specializations[0].get('name')
                     if not validated_data.get('locality'):
-                        url = slugify(specialization_name + '-in-' + validated_data.get('city') + '-sptcit')
+                        url = slugify(specialization_name + '-in-' + city + '-sptcit')
                     else:
                         url = slugify(specialization_name + '-in-' + validated_data.get('locality') + '-' +
-                                                validated_data.get('city') + '-sptlitcit')
+                                                city + '-sptlitcit')
                 else:
                     if not validated_data.get('locality'):
-                        url = slugify('doctors' + '-in-' + validated_data.get('city') + '-sptcit')
+                        url = slugify('doctors' + '-in-' + city + '-sptcit')
                     else:
                         url = slugify('doctors' + '-in-' + validated_data.get('locality') + '-' +
-                                                validated_data.get('city') + '-sptlitcit')
+                                                city + '-sptlitcit')
 
                 entity = EntityUrls.objects.filter(url=url, url_type='SEARCHURL', entity_type='Doctor', is_valid=True)
                 if entity:
