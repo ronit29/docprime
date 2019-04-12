@@ -71,6 +71,8 @@ from safedelete import SOFT_DELETE
 #from ondoc.api.v1.doctor import serializers as doctor_serializers
 import qrcode
 from django.utils.functional import cached_property
+from ondoc.crm.constants import constants
+
 
 logger = logging.getLogger(__name__)
 
@@ -1735,7 +1737,7 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
         return self.profile.name + " (" + self.doctor.name + ")"
 
     def can_agent_refund(self, user):
-        if self.status == obj.COMPLETED and (user.groups.filter(name=constants['APPOINTMENT_REFUND_TEAM']).exists() or user.is_superuser):
+        if self.status == self.COMPLETED and (user.groups.filter(name=constants['APPOINTMENT_REFUND_TEAM']).exists() or user.is_superuser):
             return True
     
         return False
@@ -2002,8 +2004,6 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
         push_to_matrix = True
         if database_instance and self.status == database_instance.status and self.time_slot_start == database_instance.time_slot_start:
             push_to_matrix = False
-        else:
-            push_to_matrix = True
 
         try:
             # while completing appointment

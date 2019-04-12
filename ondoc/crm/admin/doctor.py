@@ -1429,8 +1429,7 @@ class RefundableAppointmentForm(forms.ModelForm):
         if refund_payment:
             if not refund_reason:
                 raise forms.ValidationError("Refund reason is compulsory")
-
-            self.instance
+        
         return cleaned_data
 
 
@@ -1586,7 +1585,7 @@ class DoctorOpdAppointmentAdmin(admin.ModelAdmin):
         if request.user.groups.filter(name=constants['APPOINTMENT_OTP_TEAM']).exists() or request.user.is_superuser:
             all_fields = all_fields + ('otp',)
 
-        if obj and obj.can_refund(request, obj):
+        if obj and obj.can_agent_refund(request.user):
             all_fields = all_fields + ('refund_payment',)
 
         all_fields = all_fields + ('refund_reason',)
