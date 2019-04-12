@@ -2061,18 +2061,20 @@ class LabTimingListView(mixins.ListModelMixin,
         date = params.get('date')
         integration_dict = None
 
+        lab_timings = dict()
         if lab:
             lab_obj = Lab.objects.filter(id=int(lab), is_live=True).first()
             if lab_obj and lab_obj.network and lab_obj.network.id:
                 if lab_obj.network.id == settings.THYROCARE_NETWORK_ID and settings.THYROCARE_INTEGRATION_ENABLED:
                     integration_dict = IntegratorMapping.get_if_third_party_integration(network_id=lab_obj.network.id)
 
-        if not integration_dict:
-            lab_timings = lab_obj.get_timing_v2(for_home_pickup)
-        else:
-            class_name = integration_dict['class_name']
-            integrator_obj = service.create_integrator_obj(class_name)
-            lab_timings = integrator_obj.get_appointment_slots(pincode, date, is_home_pickup=for_home_pickup)
+            if not integration_dict:
+                if lab_obj:
+                    lab_timings = lab_obj.get_timing_v2(for_home_pickup)
+            else:
+                class_name = integration_dict['class_name']
+                integrator_obj = service.create_integrator_obj(class_name)
+                lab_timings = integrator_obj.get_appointment_slots(pincode, date, is_home_pickup=for_home_pickup)
 
         resp_data = {"timeslots": lab_timings.get('timeslots', []),
                      "upcoming_slots": lab_timings.get('upcoming_slots', []),

@@ -1254,7 +1254,7 @@ class TimeSlotExtraction(object):
             will_doctor_data_append = False
             if current_date_time.date() == booking_date.date():
                 if on_call == False:
-                    if start_hour >= float(doc_minimum_time) and k <= doctor_maximum_timing:
+                    if start_hour >= float(doc_minimum_time) and start_hour <= doctor_maximum_timing:
                         will_doctor_data_append = True
                     else:
                         pass
