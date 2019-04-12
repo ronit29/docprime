@@ -5,6 +5,7 @@ from django.db.models import F
 
 from ondoc.api.v1.doctor.serializers import DoctorProfileUserViewSerializer
 from ondoc.api.v1.procedure.serializers import DoctorClinicProcedureSerializer
+from ondoc.api.v1.ratings.serializers import GoogleRatingsGraphSerializer
 from ondoc.doctor import models
 from ondoc.api.v1.utils import clinic_convert_timings
 from ondoc.api.v1.doctor import serializers
@@ -52,8 +53,8 @@ class DoctorSearchHelper:
             params['hospital_id'] = str(self.query_params.get("hospital_id"))
 
         if self.query_params.get('locality_value'):
-            filtering_params.append("h.city_search_key = (%(locality_value)s)")
-            params['locality_value'] = self.query_params.get('locality_value').lower()
+            filtering_params.append("h.city_search_key ilike (%(locality_value)s)")
+            params['locality_value'] = '%' + self.query_params.get('locality_value').lower() + '%'
 
         if len(condition_ids)>0:
             cs = list(models.MedicalConditionSpecialization.objects.filter(medical_condition_id__in=condition_ids).values_list('specialization_id', flat=True));
@@ -535,10 +536,33 @@ class DoctorSearchHelper:
             schema_specialization = sorted_spec_list[0].get('name') if sorted_spec_list and len(sorted_spec_list)>0 and sorted_spec_list[0].get('name') else None
             schema_type = None
             new_schema = OrderedDict()
+            average_rating = None
+            rating_count = None
+            google_rating = None
             if schema_specialization == 'Dentist':
                 schema_type = 'Dentist'
             else:
                 schema_type = 'Physician'
+
+            if doctor.rating_data and doctor.rating_data.get('rating_count')>0:
+                if doctor.rating_data.get('rating_count')<5:
+                    if doctor.rating_data.get('avg_rating') >=4:
+                        average_rating = doctor.rating_data.get('avg_rating')
+                        rating_count = doctor.rating_data.get('rating_count')
+                else:
+                    average_rating = doctor.rating_data.get('avg_rating')
+                    rating_count = doctor.rating_data.get('rating_count')
+            if not average_rating:
+                 if doctor_clinic and doctor_clinic.hospital:
+                    hosp_reviews = doctor_clinic.hospital.hospital_place_details.all()
+                    if hosp_reviews:
+                        reviews_data = hosp_reviews[0].reviews
+
+                        if reviews_data:
+                            ratings_graph = GoogleRatingsGraphSerializer(reviews_data, many=False,
+                                                                         context={"request": request})
+                            google_rating = ratings_graph.data
+
             temp = {
                 "doctor_id": doctor.id,
                 "enabled_for_online_booking": doctor.enabled_for_online_booking,
@@ -559,8 +583,11 @@ class DoctorSearchHelper:
                 #"experiences": serializers.DoctorExperienceSerializer(doctor.experiences.all(), many=True).data,
                 "qualifications": serializers.DoctorQualificationSerializer(doctor.qualifications.all(), many=True).data,
                 # "average_rating": doctor.avg_rating,
-                "average_rating": doctor.rating_data.get('avg_rating') if doctor.display_rating_on_list() else None,
-                "rating_count": doctor.rating_data.get('rating_count') if doctor.display_rating_on_list() else None,
+                # "average_rating": doctor.rating_data.get('avg_rating') if doctor.rating_data else None,
+                # "rating_count": doctor.rating_data.get('rating_count') if doctor.rating_data else None,
+                "average_rating": average_rating,
+                "rating_count": rating_count,
+                "google_rating": google_rating,
                 # "general_specialization": serializers.DoctorPracticeSpecializationSerializer(
                 #     doctor.doctorpracticespecializations.all(),
                 #     many=True).data,

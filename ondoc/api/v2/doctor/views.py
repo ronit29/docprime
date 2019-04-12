@@ -459,12 +459,14 @@ class DoctorDataViewset(viewsets.GenericViewSet):
 class ProviderSignupOtpViewset(viewsets.GenericViewSet):
 
     def otp_generate(self, request, *args, **kwargs):
+        from ondoc.authentication.models import OtpVerifications
         serializer = serializers.GenerateOtpSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         valid_data = serializer.validated_data
         phone_number = valid_data.get('phone_number')
         retry_send = request.query_params.get('retry', False)
-        send_otp("OTP for login is {}", phone_number, retry_send)
+        otp_message = OtpVerifications.get_otp_message(request.META.get('HTTP_PLATFORM'), None, True, version=request.META.get('HTTP_APP_VERSION'))
+        send_otp(otp_message, phone_number, retry_send)
         response = {'otp_generated': True}
         return Response(response)
 
@@ -733,3 +735,18 @@ class ProviderSignupDataViewset(viewsets.GenericViewSet):
         except Exception as e:
             logger.error('Error adding Staffs ' + str(e))
             return Response({"status": 0, "message": "Error adding Staffs - " + str(e)}, status.HTTP_400_BAD_REQUEST)
+
+    def update_hospital_consent(self, request, *args, **kwargs):
+        serializer = serializers.UpdateHospitalConsent(data=request.data, context={'request': request})
+        serializer.is_valid(raise_exception=True)
+        valid_data = serializer.validated_data
+        try:
+            hospital = valid_data.get('hospital_id')
+            if hospital.is_listed_on_docprime:
+                return Response({"status": 1, "message": "already consent present for given hospital"}, status.HTTP_200_OK)
+            hospital.is_listed_on_docprime = valid_data.get('is_listed_on_docprime')
+            hospital.save()
+            return Response({"status": 1, "message": "successfully updated"}, status.HTTP_200_OK)
+        except Exception as e:
+            logger.error('Error updating hospital consent ' + str(e))
+            return Response({"status": 0, "message": "Error updating hospital consent - " + str(e)}, status.HTTP_400_BAD_REQUEST)

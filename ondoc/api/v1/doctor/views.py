@@ -75,9 +75,10 @@ from ondoc.insurance.models import InsuranceThreshold
 import logging
 from ondoc.api.v1.auth import serializers as auth_serializers
 from copy import deepcopy
-from ondoc.common.models import GlobalNonBookable
+from ondoc.common.models import GlobalNonBookable, AppointmentHistory
 from ondoc.api.v1.common import serializers as common_serializers
 from django.utils.text import slugify
+from django.urls import reverse
 import time
 from ondoc.api.v1.ratings.serializers import GoogleRatingsGraphSerializer
 logger = logging.getLogger(__name__)
@@ -185,6 +186,8 @@ class DoctorAppointmentsViewSet(OndocViewSet):
     @transaction.atomic
     def complete(self, request):
         user = request.user
+        source = request.query_params.get('source', '')
+        responsible_user = user
         serializer = serializers.OTPFieldSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         validated_data = serializer.validated_data
@@ -192,6 +195,8 @@ class DoctorAppointmentsViewSet(OndocViewSet):
 
         if not opd_appointment:
             return Response({"message": "Invalid appointment id"}, status.HTTP_404_NOT_FOUND)
+        opd_appointment._source = source if source in [x[0] for x in AppointmentHistory.SOURCE_CHOICES] else ''
+        opd_appointment._responsible_user = responsible_user
         pem_queryset = auth_models.GenericAdmin.objects.filter(Q(user=user, is_disabled=False),
                                                                Q(Q(super_user_permission=True,
                                                                    hospital=opd_appointment.hospital,
@@ -273,11 +278,15 @@ class DoctorAppointmentsViewSet(OndocViewSet):
 
     def update(self, request, pk=None):
         user = request.user
+        source = request.query_params.get('source', '')
+        responsible_user = user
         queryset = self.get_pem_queryset(user).distinct()
         # opd_appointment = get_object_or_404(queryset, pk=pk)
         opd_appointment = models.OpdAppointment.objects.filter(id=pk).first()
         if not opd_appointment:
             return Response({'error': 'Appointment Not Found'}, status=status.HTTP_404_NOT_FOUND)
+        opd_appointment._source = source if source in [x[0] for x in AppointmentHistory.SOURCE_CHOICES] else ''
+        opd_appointment._responsible_user = responsible_user
         serializer = serializers.UpdateStatusSerializer(data=request.data,
                                             context={'request': request, 'opd_appointment': opd_appointment})
         serializer.is_valid(raise_exception=True)
@@ -887,11 +896,11 @@ class DoctorProfileUserViewSet(viewsets.GenericViewSet):
                     if hosp_reviews:
                         reviews_data = hosp_reviews[0].reviews
 
-                        if reviews_data:
+                        if reviews_data and reviews_data.get('user_reviews'):
                             ratings_graph = GoogleRatingsGraphSerializer(reviews_data, many=False,
                                                                          context={"request": request})
 
-                            for data in reviews_data:
+                            for data in reviews_data.get('user_reviews'):
                                 if data.get('time'):
                                     date = time.strftime("%d %b %Y", time.gmtime(data.get('time')))
 
@@ -1369,7 +1378,9 @@ class DoctorListViewSet(viewsets.GenericViewSet):
                                                 "images",
                                                 "doctor_clinics__procedures_from_doctor_clinic__procedure__parent_categories_mapping",
                                                 "qualifications__qualification","qualifications__college",
-                                                "qualifications__specialization").order_by(preserved)
+                                                "qualifications__specialization",
+                                                "doctor_clinics__hospital__hospital_place_details"
+                                                ).order_by(preserved)
 
         response = doctor_search_helper.prepare_search_response(doctor_data, doctor_search_result, request, insurance_data=insurance_data_dict)
 
@@ -1658,19 +1669,26 @@ class DoctorListViewSet(viewsets.GenericViewSet):
             canonical_url = validated_data.get('url')
         else:
             if validated_data.get('city'):
+                city = None
+                if validated_data.get('city') in ('bengaluru', 'bengalooru'):
+                    city = 'bangalore'
+                elif validated_data.get('city') in ('gurugram','gurugram rural'):
+                    city = 'gurgaon'
+                else:
+                    city = validated_data.get('city')
                 if specializations:
                     specialization_name = specializations[0].get('name')
                     if not validated_data.get('locality'):
-                        url = slugify(specialization_name + '-in-' + validated_data.get('city') + '-sptcit')
+                        url = slugify(specialization_name + '-in-' + city + '-sptcit')
                     else:
                         url = slugify(specialization_name + '-in-' + validated_data.get('locality') + '-' +
-                                                validated_data.get('city') + '-sptlitcit')
+                                                city + '-sptlitcit')
                 else:
                     if not validated_data.get('locality'):
-                        url = slugify('doctors' + '-in-' + validated_data.get('city') + '-sptcit')
+                        url = slugify('doctors' + '-in-' + city + '-sptcit')
                     else:
                         url = slugify('doctors' + '-in-' + validated_data.get('locality') + '-' +
-                                                validated_data.get('city') + '-sptlitcit')
+                                                city + '-sptlitcit')
 
                 entity = EntityUrls.objects.filter(url=url, url_type='SEARCHURL', entity_type='Doctor', is_valid=True)
                 if entity:
@@ -1892,7 +1910,10 @@ class DoctorAppointmentNoAuthViewSet(viewsets.GenericViewSet):
         opd_appointment = models.OpdAppointment.objects.select_for_update().filter(pk=validated_data.get('opd_appointment')).first()
         if not opd_appointment:
             return Response({"message": "Invalid appointment id"}, status.HTTP_404_NOT_FOUND)
-
+        source = request.query_params.get('source', '')
+        responsible_user = request.user if request.user.is_authenticated else None
+        opd_appointment._source = source if source in [x[0] for x in AppointmentHistory.SOURCE_CHOICES] else ''
+        opd_appointment._responsible_user = responsible_user
         if opd_appointment:
             opd_appointment.action_completed()
 
@@ -1947,6 +1968,26 @@ class DoctorFeedbackViewSet(viewsets.GenericViewSet):
     authentication_classes = (JWTAuthentication,)
     permission_classes = (IsAuthenticated, IsDoctor)
 
+    @staticmethod
+    def get_doctor_and_hospital_data(message, doctor=None, hospital=None):
+        if doctor:
+            message += "doctor - "
+            doc_dict = dict()
+            doc_dict['id'] = doctor.id
+            doc_dict['name'] = doctor.name
+            doc_dict['url'] = settings.ADMIN_BASE_URL + reverse('admin:doctor_doctor_change',
+                                                                kwargs={"object_id": doctor.id})
+            message += str(doc_dict) + "<br>"
+        if hospital:
+            message += "hospital - "
+            hosp_dict = dict()
+            hosp_dict['id'] = hospital.id
+            hosp_dict['name'] = hospital.name
+            hosp_dict['url'] = settings.ADMIN_BASE_URL + reverse('admin:doctor_hospital_change',
+                                                                kwargs={"object_id": hospital.id})
+            message += str(hosp_dict) + "<br>"
+        return message
+
     def feedback(self, request):
         resp = {}
         user = request.user
@@ -1958,12 +1999,16 @@ class DoctorFeedbackViewSet(viewsets.GenericViewSet):
         message = ''
         managers_string = ''
         manages_string = ''
+        doctor = valid_data.pop("doctor_id") if valid_data.get("doctor_id") else None
+        hospital = valid_data.pop("hospital_id") if valid_data.get("hospital_id") else None
         for key, value in valid_data.items():
             if isinstance(value, list):
                 val = ' '.join(map(str, value))
             else:
                 val = value
             message += str(key) + "  -  " + str(val) + "<br>"
+        if doctor or hospital:
+            message = self.get_doctor_and_hospital_data(message, doctor, hospital)
         if hasattr(user, 'doctor') and user.doctor:
             managers_list = []
             for managers in user.doctor.manageable_doctors.all():
