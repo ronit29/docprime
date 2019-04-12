@@ -1460,34 +1460,100 @@ class DoctorListViewSet(viewsets.GenericViewSet):
             #         specializations = validated_data.get('extras').get('specialization')
             #     else:
             #         specializations = ''
-            specializations = None
+            specialization = None
+            speciality = dict()
             if validated_data.get('specialization'):
-                specializations = validated_data.get('specialization')
+                specialization = validated_data.get('specialization')
 
             # if validated_data.get('extras') and validated_data.get('extras').get('specialization'):
             #     specializations = validated_data.get('extras').get('specialization')
 
-            if specializations:
-                title = specializations
-                description = specializations
+            if specialization and city:
+                speciality[279] = {
+                    'title': 'Best Dentist in ' + city + ' | Find Top Dentists Near Me in ' + city,
+                    'description': specialization + ' in ' + city + ': Search and find best ' + specialization + ' near you to book appointment online. Check nearby ' + specialization + ' details, address, availability & more.'}
+
+                speciality[291] = {
+                    'title': 'Best Dermatologist in ' + city + ' | Find Top Skin Specialists Near Me In ' + city,
+                    'description': specialization + ' in ' + city + ': Search and find best ' + specialization + ' near you to book appointment online. Check nearby skin specialists details, address, availability & more.'}
+                speciality[300] = {
+                    'title': 'Best Diabetologist in ' + city + ' | Find Top Diabetes Doctors Near Me in ' + city,
+                    'description': specialization + ' in ' + city + ': Search and find best ' + specialization + ' near you to book appointment online. Check nearby diabetes doctors details, address, availability & more.'}
+                speciality[384] = {
+                    'title': 'Best Dietitian in ' + city + ' | Find Top Dietitians Near Me in ' + city,
+                    'description': specialization + ' in ' + city + ': Search and find best ' + specialization + 'near you to book appointment online. Check nearby ' + specialization + ' details, address, availability & more.'}
+                speciality[304] = {
+                    'title': 'Best Endocrinologist in ' + city + ' | Find Top Endocrinologists Near Me in ' + city,
+                    'description': specialization + ' in ' + city + ': Search and find best ' + specialization + ' near you to book appointment online. Check nearby <specialists> details, address, availability & more.'}
+                speciality[270] = {
+                    'title': 'Best Cardiologist in ' + city + ' | Find Top Heart Specialists Near Me in ' + city,
+                    'description': specialization + ' in ' + city + ': Search and find best ' + specialization + ' near you to book appointment online. Check nearby heart specialists details, address, availability & more.'}
+                speciality[309] = {
+                    'title': 'Best ENT Specialist in ' + city + ' | Find Top ENT Specialists Near Me in ' + city,
+                    'description': specialization + ' in ' + city + ': Search and find best ' + specialization + ' near you to book appointment online. Check nearby ENT specialists details, address, availability & more.'}
+                speciality[315] = {
+                    'title': 'Best Gastroenterologist in ' + city + ' | Find Top Gastroenterologists Near Me in ' + city,
+                    'description': specialization + ' in ' + city + ': Search and find best ' + specialization + ' near you to book appointment online. Check nearby ' + specialization + ' details, address, availability & more.'}
+                speciality[358] = {
+                    'title': 'Best Gynecologist in ' + city + ' | Find Top Gynecologists Near Me in ' + city,
+                    'description': specialization + ' in ' + city + ': Search and find best ' + specialization + ' near you to book appointment online. Check nearby ' + specialization + ' details, address, availability & more.'}
+                speciality[376] = {
+                    'title': 'Best Nephrologist in ' + city + ' | Find Top Kidney Specialists Near Me in ' + city,
+                    'description': specialization + ' in ' + city + ': Search and find best ' + specialization + ' near you to book appointment online. Check nearby kidney specialists details, address, availability & more.'}
+                speciality[379] = {'title': 'Best Neurologist in ' + city + ' | Find Top Neurologists Near Me in ' + city,
+                                   'description': specialization + ' in ' + city + ': Search and find best ' + specialization + 'near you to book appointment online. Check nearby ' + specialization + ' details, address, availability & more.'}
+                speciality[385] = {'title': 'Best Nutritionist in ' + city + ' | Find Top Nutritionists Near Me in ' + city,
+                                   'description': specialization + ' in ' + city + ': Search and find best ' + specialization + 'near you to book appointment online. Check nearby ' + specialization + ' details, address, availability & more.'}
+                speciality[334] = {
+                    'title': 'Best Immunologist in ' + city + ' | Find Top Allergy Specialists Near Me in ' + city,
+                    'description': specialization + ' in ' + city + ': Search and find best ' + specialization + ' near you to book appointment online. Check nearby allergy specialists details, address, availability & more.'}
+                speciality[405] = {
+                    'title': 'Best Ophthalmologist in '+ city + ' | Find Top Ophthalmologists Near Me in ' + city,
+                    'description': specialization + ' in ' + city + ': Search and find best ' + specialization + ' near you to book appointment online. Check nearby ' + specialization + ' details, address, availability & more.'}
+                speciality[284] = {'title': 'Best Orthodontist in ' + city + ' | Find Top Orthodontists Near Me in ' + city,
+                                   'description': specialization + ' in ' + city + ': Search and find best ' + specialization + ' near you to book appointment online. Check nearby ' + specialization + ' details, address, availability & more.'}
+                speciality[426] = {
+                    'title': 'Best Pediatrician in ' + city + ' | Find Top Child Specialists Near Me in ' + city,
+                    'description': specialization + ' in ' + city + ': Search and find best ' + specialization + ' near you to book appointment online. Check nearby child specialists details, address, availability & more.'}
+                speciality[454] = {
+                    'title': 'Best Physiotherapist in ' + city + ' | Find Top Physiotherapists Near Me in ' + city,
+                    'description': specialization + ' in ' + city + ': Search and find best ' + specialization + ' near you to book appointment online. Check nearby ' + specialization + ' details, address, availability & more.'}
+                speciality[474] = {'title': 'Best Psychiatrist in <City> | Find Top Psychiatrists Near Me in <City>',
+                                   'description': '<Speciality> in <City>: Search and find best <speciality> near you to book appointment online. Check nearby <specialists> details, address, availability & more.'}
+                speciality[482] = {'title': 'Best Psychologist in <City> | Find Top Psychologists Near Me in <City>',
+                                   'description': '<Speciality> in <City>: Search and find best <speciality> near you to book appointment online. Check nearby <specialists> details, address, availability & more.'}
+                speciality[487] = {
+                    'title': 'Best Pulmonologist in <City> | Find Top Lung Specialists Near Me in <City>',
+                    'description': '<Speciality> in <City>: Search and find best <speciality> near you to book appointment online. Check nearby lung specialists details, address, availability & more.'}
+                speciality[501] = {'title': 'Best Sexologist in <City> | Find Top Sexologists Near Me in <City>',
+                                   'description': '<Speciality> in <City>: Search and find best <speciality> near you to book appointment online. Check nearby <specialists> details, address, availability & more.'}
+                speciality['default'] = {
+                    'title': 'Best <Specialty + s> in <City> | Find Top <Speciality> Near Me in <City>',
+                    'description': '<Speciality> in <City>: Search and find best <speciality> near you to book appointment online. Check nearby <specialists> details, address, availability & more.'}
+
+
+
+
+                # title = specializations
+                # description = specializations
 
             else:
                 title = 'Doctors'
                 description = 'Doctors'
-            if locality:
-                title += ' in '  + locality
-                description += ' in ' +locality
-            if specializations:
-
                 if locality:
-                    if sublocality == '':
-
-                        description += ': Book best ' + specializations + '\'s appointment online ' +  'in ' + city
-                    else:
-
-                        description += ': Book best ' + specializations + '\'s appointment online ' + 'in '+ locality
-
-            else:
+                    title += ' in '  + locality
+                    description += ' in ' +locality
+                # if specializations:
+                #
+                #     if locality:
+                #         if sublocality == '':
+                #
+                #             description += ': Book best ' + specializations + '\'s appointment online ' +  'in ' + city
+                #         else:
+                #
+                #             description += ': Book best ' + specializations + '\'s appointment online ' + 'in '+ locality
+                #
+                # else:
                 if locality:
                     if sublocality == '':
 
@@ -1495,20 +1561,20 @@ class DoctorListViewSet(viewsets.GenericViewSet):
                     else:
 
                         description += ': Book best ' + 'Doctor' + ' appointment online ' + 'in '+ locality
-            ratings_title = title
-            if specializations:
-                if not sublocality:
-                    title += ' - Book Best ' + specializations +' Online'
-                else:
-                    title += ' | Book & Get Best Deal'
+                ratings_title = title
+                # if specializations:
+                #     if not sublocality:
+                #         title += ' - Book Best ' + specializations +' Online'
+                #     else:
+                #         title += ' | Book & Get Best Deal'
 
-            else:
-                 title += ' | Book Doctors Online & Get Best Deal'
+                # else:
+                title += ' | Book Doctors Online & Get Best Deal'
 
-            description += ' and get upto 50% off. View Address, fees and more for doctors '
-            if locality:
-                description += 'in '+ city
-            description += '.'
+                description += ' and get upto 50% off. View Address, fees and more for doctors '
+                if locality:
+                    description += 'in '+ city
+                description += '.'
 
             breadcrumb = validated_data.get('breadcrumb')
 
