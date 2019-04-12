@@ -87,9 +87,9 @@ def push_insurance_buy_to_matrix(self, *args, **kwargs):
         if not user_obj:
             raise Exception("User could not found against id - " + str(user_id))
 
-        user_insurance = user_obj.purchased_insurance.filter().last()
-        if not user_insurance or not user_insurance.is_valid():
-            logger.error("Invalid or None user insurance found for email notification")
+        user_insurance = user_obj.active_insurance
+        if not user_insurance:
+            raise Exception("Invalid or None user insurance found for user id %s " % str(user_id))
 
         primary_proposer = user_insurance.get_primary_member_profile()
         if not primary_proposer:
