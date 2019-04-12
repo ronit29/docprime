@@ -3082,4 +3082,96 @@ class HospitalTiming(auth_model.TimeStampedModel):
 
 
 class WalkInPatientInvoice(auth_model.TimeStampedModel):
-    appointment_id = models.ForeignKey(OpdAppointment, on_delete=models.CASCADE, related_name='walk_in_patient')
+    INVOICE_ID_START = 300000
+    ONLINE = 1
+    CASH = 2
+    PAYMENT_CHOICES = ((ONLINE, 'Online'), (CASH, 'Cash'))
+    PAID = 1
+    PENDING = 2
+    PAYMENT_STATUS = ((PAID, 'Paid'), (PENDING, 'Pending'))
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    invoice_id = models.CharField(max_length=100)
+    appointment = models.ForeignKey(OpdAppointment, on_delete=models.CASCADE, related_name='walk_in_patient')
+    consultation_fees = models.DecimalField(max_digits=10, decimal_places=2)
+    selected_invoice_items = JSONField()
+    payment_status = models.IntegerField(choices=PAYMENT_STATUS)
+    payment_type = models.IntegerField(choices=PAYMENT_CHOICES, null=True, blank=True)
+    due_date = models.DateField(null=True, blank=True)
+    sub_total_amount = models.DecimalField(max_digits=10, decimal_places=2)
+    tax_amount = models.DecimalField(max_digits=10, decimal_places=2, blank=True, null=True)
+    tax_percentage = models.DecimalField(max_digits=5, decimal_places=2, blank=True, null=True,
+                                         validators=[MinValueValidator(0), MaxValueValidator(100)])
+    discount_amount = models.DecimalField(max_digits=10, decimal_places=2, blank=True, null=True)
+    discount_percentage = models.DecimalField(max_digits=5, decimal_places=2, blank=True, null=True,
+                                              validators=[MinValueValidator(0), MaxValueValidator(100)])
+    total_amount = models.DecimalField(max_digits=10, decimal_places=2)
+    is_invoice_generated = models.BooleanField(default=False)
+    is_valid = models.BooleanField(default=True)
+    is_edited = models.BooleanField(default=False)
+    # edited_invoice_id = models.ForeignKey(WalkInPatientInvoice, on_delete=models.SET_NULL, null=True, related_name='actual_invoice')
+    # edited_invoice_id = models.PositiveIntegerField(null=True, blank=True)
+
+    def __str__(self):
+        return str(self.appointment)
+
+    # def get_invoice_id(self):
+    #     last_serial = self.get_last_serial(self.appointment)
+    #     doctor = self.appointment.doctor
+    #     hospital = self.appointment.hospital
+    #     return 'INV-'+hospital.id+'-'+doctor.id+str(last_serial+1)
+
+    @classmethod
+    def last_serial(cls, appointment):
+        obj = cls.objects.filter(appointment__doctor=appointment.doctor, appointment__hospital=appointment.hospital).last()
+        if obj:
+            serial = int(obj.invoice_id[-6:])
+            return serial
+        else:
+            return cls.INVOICE_ID_START
+
+    class Meta:
+        db_table = "walk_in_patient_invoice"
+
+
+# class GeneralInvoiceItems(auth_model.TimeStampedModel, UniqueNameModel, SearchKey):
+#     item = models.CharField(max_length=200)
+#
+#     def __str__(self):
+#         return self.item
+#
+#     class Meta:
+#         db_table = "general_invoice_items"
+
+
+class GeneralInvoiceItems(auth_model.TimeStampedModel):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    item = models.CharField(max_length=200)
+    base_price = models.DecimalField(max_digits=10, decimal_places=2)
+    description = models.CharField(max_length=500, null=True, blank=True)
+    tax_amount = models.DecimalField(max_digits=10, decimal_places=2, blank=True, null=True)
+    tax_percentage = models.DecimalField(max_digits=5, decimal_places=2, blank=True, null=True,
+                                         validators=[MinValueValidator(0), MaxValueValidator(100)])
+    discount_amount = models.DecimalField(max_digits=10, decimal_places=2, blank=True, null=True)
+    discount_percentage = models.DecimalField(max_digits=5, decimal_places=2, blank=True, null=True,
+                                              validators=[MinValueValidator(0), MaxValueValidator(100)])
+    admin = models.ForeignKey(auth_model.GenericAdmin, on_delete=models.CASCADE, related_name='invoice_items')
+
+    def __str__(self):
+        return self.item + " (" + self.doctor_id + ")"
+
+    class Meta:
+        db_table = "general_invoice_items"
+
+
+class SelectedInvoiceItems(auth_model.TimeStampedModel):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    invoice_id = models.ForeignKey(Invoice, on_delete=models.CASCADE, related_name='selected_items')
+    invoice_item = models.ForeignKey(GeneralInvoiceItems, on_delete=models.CASCADE, related_name='selected')
+    quantity = models.PositiveIntegerField(validators=[MinValueValidator(1)])
+    calculated_price = models.DecimalField(max_digits=10, decimal_places=2)
+
+    def __str__(self):
+        return self.invoice_item + " (" + self.invoice_id + ")"
+
+    class Meta:
+        db_table = "selected_invoice_items"

@@ -20,6 +20,9 @@ urlpatterns = [
     path('provider-signup/add/doctor', views.ProviderSignupDataViewset.as_view({'post': 'create_doctor'}), name='create-doctor'),
     path('provider-signup/add/staffs', views.ProviderSignupDataViewset.as_view({'post': 'create_staffs'}), name='create-staffs'),
     path('provider/update/hospital/consent', views.ProviderSignupDataViewset.as_view({'post': 'update_hospital_consent'}), name='update-hospital-consent'),
-    path('invoice/create', views.WalkInPatientInvoice.as_view({'post': 'create'}), name='create-invoice')
+    path('invoice/add/item', views.WalkInPatientInvoice.as_view({'post': 'add_general_invoice_item'}), name='add-general-invoice-item'),
+    path('invoice/list/items', views.WalkInPatientInvoice.as_view({'get': 'list_invoice_items'}), name='list-invoice-items'),
+    path('invoice/create', views.WalkInPatientInvoice.as_view({'post': 'create'}), name='create-invoice'),
+    path('invoice/update', views.WalkInPatientInvoice.as_view({'post': 'update'}), name='update-invoice')
 ]
 
