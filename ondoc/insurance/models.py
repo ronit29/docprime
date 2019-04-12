@@ -1246,7 +1246,16 @@ class InsuranceLead(auth_model.TimeStampedModel):
 
     def save(self, *args, **kwargs):
         super().save(*args, **kwargs)
+
         push_insurance_banner_lead_to_matrix.apply_async(({'id': self.id}, ), countdown=10)
+
+    @classmethod
+    def get_latest_lead_id(cls, user):
+        insurance_lead = cls.objects.filter(user=user).order_by('id').last()
+        if insurance_lead:
+            return insurance_lead.matrix_lead_id
+
+        return None
 
     class Meta:
         db_table = 'insurance_leads'
