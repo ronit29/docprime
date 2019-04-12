@@ -1653,12 +1653,12 @@ class DoctorListViewSet(viewsets.GenericViewSet):
             if doctor_entity:
                 if doctor_entity.get('url'):
                     resp['url'] = doctor_entity.get('url')
-                    url = None
+                    schema_url = None
                     if doctor_entity.get('url'):
-                        url = doctor_entity.get('url') if doctor_entity.get('url').startswith('/') else '/' + doctor_entity.get('url')
+                        schema_url = doctor_entity.get('url') if doctor_entity.get('url').startswith('/') else '/' + doctor_entity.get('url')
 
-                    resp['schema']['url'] = request.build_absolute_uri(url) if url else None
-                    resp['new_schema']['url'] = request.build_absolute_uri(url) if url else None
+                    resp['schema']['url'] = request.build_absolute_uri(schema_url) if schema_url else None
+                    resp['new_schema']['url'] = request.build_absolute_uri(schema_url) if schema_url else None
                 parent_location = doctor_entity.get('location')
                 parent_url = doctor_entity.get('parent_url')
                 if parent_location and parent_url:
