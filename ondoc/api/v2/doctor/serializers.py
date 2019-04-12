@@ -302,7 +302,7 @@ class UpdateHospitalConsent(serializers.Serializer):
 
 
 class GeneralInvoiceItemsSerializer(serializers.Serializer):
-    appointment_id = serializers.PrimaryKeyRelatedField(queryset=doc_models.OpdAppointment.objects.all())
+    # appointment_id = serializers.PrimaryKeyRelatedField(queryset=doc_models.OpdAppointment.objects.all())
     item = serializers.CharField(max_length=200)
     base_price = serializers.DecimalField(max_digits=10, decimal_places=2)
     description = serializers.CharField(max_length=500, required=False, allow_null=True)
@@ -312,20 +312,37 @@ class GeneralInvoiceItemsSerializer(serializers.Serializer):
     discount_amount = serializers.DecimalField(max_digits=10, decimal_places=2, required=False, allow_null=True)
     discount_percentage = serializers.DecimalField(max_digits=5, decimal_places=2, required=False, allow_null=True,
                                                    min_value=0, max_value=100)
+    hospital_ids = serializers.ListField(child=serializers.IntegerField())
+    doctor_id = serializers.PrimaryKeyRelatedField(queryset=doc_models.Doctor.objects.all(), required=False)
 
     def validate(self, attrs):
         request = self.context.get("request")
         user = request.user if request else None
-        hospital = attrs['appointment_id'].hospital
-        doctor = attrs['appointment_id'].doctor
-        admin = GenericAdmin.objects.filter(Q(user=user, hospital=hospital),
-                                            Q(Q(super_user_permission=True) |
-                                              Q(Q(permission_type=GenericAdmin.APPOINTMENT),
-                                                Q(doctor__isnull=True) | Q(doctor=doctor)))).first()
-        if user and not admin:
-            raise serializers.ValidationError('user not admin for appointment doctor')
-        if admin:
-            attrs['admin'] = admin
+        # hospital = attrs['appointment_id'].hospital
+        # doctor = attrs['appointment_id'].doctor
+        doctor = attrs.get("doctor_id")
+        hospital_ids = set(attrs.get("hospital_ids"))
+        hospitals = doc_models.Hospital.objects.filter(id__in=hospital_ids)
+        if len(hospitals) != len(hospital_ids):
+            raise serializers.ValidationError("one or more invalid hospital ids not found")
+        manageable_hospitals = doc_models.Hospital.objects.filter(manageable_hospitals__user=request.user).distinct()
+        if not (set(hospitals) <= set(manageable_hospitals)):
+            raise serializers.ValidationError("hospital_ids include hospitals not manageable by current user")
+        if not doctor:
+            admin = GenericAdmin.objects.filter(Q(user=user, hospital__in=hospitals),
+                                                Q(Q(super_user_permission=True) |
+                                                  Q(permission_type=GenericAdmin.APPOINTMENT)))
+        else:
+            if not doc_models.DoctorClinic.objects.filter(doctor=doctor, hospital__in=hospitals).exists():
+                raise serializers.ValidationError("doctor_id not available in any of the hospital_ids")
+            admin = GenericAdmin.objects.filter(Q(user=user, hospital__in=hospitals),
+                                                Q(Q(super_user_permission=True) |
+                                                  Q(Q(permission_type=GenericAdmin.APPOINTMENT),
+                                                    Q(doctor__isnull=True) | Q(doctor=doctor))))
+        if user and not admin.exists():
+            raise serializers.ValidationError('user not admin for given hospitals or the appointment doctor_id, if present')
+        attrs['hospitals'] = hospitals
+        attrs['user'] = user if user else None
         return attrs
 
 
@@ -381,21 +398,34 @@ class WalkInPatientInvoiceModelSerialier(serializers.ModelSerializer):
 
 
 class ListInvoiceItemsSerializer(serializers.Serializer):
-    appointment_id = serializers.PrimaryKeyRelatedField(queryset=doc_models.OpdAppointment.objects.all())
+    # appointment_id = serializers.PrimaryKeyRelatedField(queryset=doc_models.OpdAppointment.objects.all())
+    hospital_id = serializers.PrimaryKeyRelatedField(queryset=doc_models.Hospital.objects.all(), required=False)
+    doctor_id = serializers.PrimaryKeyRelatedField(queryset=doc_models.Doctor.objects.all(), required=False)
 
     def validate(self, attrs):
         request = self.context.get("request")
         user = request.user if request else None
-        hospital = attrs['appointment_id'].hospital
-        doctor = attrs['appointment_id'].doctor
-        admin = GenericAdmin.objects.filter(Q(user=user, hospital=hospital),
-                                            Q(Q(super_user_permission=True) |
-                                              Q(Q(permission_type=GenericAdmin.APPOINTMENT),
-                                                Q(doctor__isnull=True) | Q(doctor=doctor)))).first()
-        if user and not admin:
-            raise serializers.ValidationError('user not admin for appointment doctor')
-        if admin:
-            attrs['admin'] = admin
+        hospital = attrs.get('hospital_id')
+        doctor = attrs.get('doctor_id')
+        # hospital = attrs['appointment_id'].hospital
+        # doctor = attrs['appointment_id'].doctor
+        if doctor and not hospital:
+            raise serializers.ValidationError("hospital_id is required if doctor_id is present")
+        if hospital and doctor:
+            if not doc_models.DoctorClinic.objects.filter(doctor=doctor, hospital=hospital).exists():
+                raise serializers.ValidationError("doctor_id not available in given hospital_id")
+            admin = GenericAdmin.objects.filter(Q(user=user, hospital=hospital),
+                                                Q(Q(super_user_permission=True) |
+                                                  Q(Q(permission_type=GenericAdmin.APPOINTMENT),
+                                                    Q(doctor__isnull=True) | Q(doctor=doctor))))
+        elif hospital:
+            admin = GenericAdmin.objects.filter(Q(user=user, hospital=hospital),
+                                                Q(Q(super_user_permission=True) |
+                                                  Q(permission_type=GenericAdmin.APPOINTMENT)))
+        if hospital and user and not admin.exists():
+            raise serializers.ValidationError('user not admin for given data')
+        # if admin.exists:
+        #     attrs['admin'] = admin
         return attrs
 
 

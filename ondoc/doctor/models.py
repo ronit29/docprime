@@ -3109,8 +3109,7 @@ class WalkInPatientInvoice(auth_model.TimeStampedModel):
     is_invoice_generated = models.BooleanField(default=False)
     is_valid = models.BooleanField(default=True)
     is_edited = models.BooleanField(default=False)
-    # edited_invoice_id = models.ForeignKey(WalkInPatientInvoice, on_delete=models.SET_NULL, null=True, related_name='actual_invoice')
-    # edited_invoice_id = models.PositiveIntegerField(null=True, blank=True)
+    edited_by = models.ForeignKey(auth_model.User, on_delete=models.SET_NULL, null=True, blank=True, related_name='walk_in_invoices')
 
     def __str__(self):
         return str(self.appointment)
@@ -3155,10 +3154,11 @@ class GeneralInvoiceItems(auth_model.TimeStampedModel):
     discount_amount = models.DecimalField(max_digits=10, decimal_places=2, blank=True, null=True)
     discount_percentage = models.DecimalField(max_digits=5, decimal_places=2, blank=True, null=True,
                                               validators=[MinValueValidator(0), MaxValueValidator(100)])
-    admin = models.ForeignKey(auth_model.GenericAdmin, on_delete=models.CASCADE, related_name='invoice_items')
+    user = models.ForeignKey(auth_model.User, on_delete=models.SET_NULL, related_name='invoice_items', null=True)
+    hospitals = models.ManyToManyField(Hospital, related_name='invoice_items')
 
     def __str__(self):
-        return self.item + " (" + self.doctor_id + ")"
+        return self.item + " (" + self.hospital_ids + ")"
 
     class Meta:
         db_table = "general_invoice_items"

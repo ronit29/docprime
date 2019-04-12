@@ -761,9 +761,10 @@ class WalkInPatientInvoice(viewsets.GenericViewSet):
             serializer = serializers.GeneralInvoiceItemsSerializer(data=request.data, context={"request": request})
             serializer.is_valid(raise_exception=True)
             valid_data = serializer.validated_data
-            appointment = valid_data.pop('appointment_id')
-            invoice_item_obj = doc_models.GeneralInvoiceItems(**valid_data)
-            invoice_item_obj.save()
+            hospital_ids = valid_data.pop('hospital_ids')
+            hospitals = valid_data.pop('hospitals')
+            invoice_item_obj = doc_models.GeneralInvoiceItems.objects.create(**valid_data)
+            invoice_item_obj.hospitals.add(*hospitals)
             return Response({"status": 1, "message": "Invoice Item added successfully"}, status.HTTP_200_OK)
         except Exception as e:
             return Response({"status":0 , "message": "Error adding Invoice Item with exception -" + str(e)},
@@ -773,8 +774,15 @@ class WalkInPatientInvoice(viewsets.GenericViewSet):
         serializer = serializers.ListInvoiceItemsSerializer(data=request.query_params, context={'request':request})
         serializer.is_valid(raise_exception=True)
         data = serializer.validated_data
-        items = doc_models.GeneralInvoiceItems.objects.filter(admin=data.get('admin'))
-        model_serializer = serializers.GeneralInvoiceItemsModelSerializer(items, many=True)
+        hospital = data.get('hospital_id')
+        if hospital:
+            items = doc_models.GeneralInvoiceItems.objects.filter(hospitals=hospital)
+            model_serializer = serializers.GeneralInvoiceItemsModelSerializer(items, many=True)
+        else:
+            admin = auth_models.GenericAdmin.objects.filter(user=request.user)
+            hospital_ids = admin.values_list('hospital', flat=True).distinct()
+            items = doc_models.GeneralInvoiceItems.objects.filter(hospitals__in=hospital_ids)
+            model_serializer = serializers.GeneralInvoiceItemsModelSerializer(items, many=True)
         return Response({"invoice_items": model_serializer.data}, status.HTTP_200_OK)
 
     def create(self, request):
