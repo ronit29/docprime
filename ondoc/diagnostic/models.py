@@ -225,6 +225,7 @@ class Lab(TimeStampedModel, CreatedByModel, QCModel, SearchKey):
     open_for_communication = models.BooleanField(default=True)
     remark = GenericRelation(Remark)
     rating_data = JSONField(blank=True, null=True)
+    is_location_verified = models.BooleanField(verbose_name='Location Verified', default=False)
 
     def __str__(self):
         return self.name
@@ -1118,6 +1119,7 @@ class LabTest(TimeStampedModel, SearchKey):
                                         through_fields=('lab_test', 'parent_category'),
                                         related_name='recommended_lab_tests')
     reference_code = models.CharField(max_length=150, blank=True, default='')
+    is_cancellable = models.BooleanField(default=True)
     # test_sub_type = models.ManyToManyField(
     #     LabTestSubType,
     #     through='LabTestSubTypeMapping',
@@ -1534,7 +1536,9 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin)
         current_datetime = timezone.now()
         if user_type == User.CONSUMER and current_datetime <= self.time_slot_start:
             if self.status in (self.BOOKED, self.ACCEPTED, self.RESCHEDULED_LAB, self.RESCHEDULED_PATIENT):
-                allowed = [self.RESCHEDULED_PATIENT, self.CANCELLED]
+                allowed = [self.RESCHEDULED_PATIENT]
+                if all([x.is_cancellable for x in self.tests.all()]):
+                    allowed += [self.CANCELLED]
         if user_type == User.DOCTOR and self.time_slot_start.date() >= current_datetime.date():
             perm_queryset = auth_model.GenericLabAdmin.objects.filter(is_disabled=False, user=request.user)
             if perm_queryset.first():

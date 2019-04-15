@@ -33,13 +33,26 @@ def push_insurance_banner_lead_to_matrix(self, data):
         plan = InsurancePlans.objects.filter(id=extras.get('plan_id', 0)).first()
 
         request_data = {
+            'LeadId': banner_obj.matrix_lead_id if banner_obj.matrix_lead_id else 0,
             'LeadSource': 'InsuranceOPD',
             'Name': 'none',
             'BookedBy': banner_obj.user.phone_number,
             'PrimaryNo': banner_obj.user.phone_number,
+            'PaymentStatus': 0,
             'ProductId': 5,
             'SubProductId': 3,
-            'InsurancePlanPurchased': plan.name if plan else None
+            'PolicyDetails': {
+                "ProposalNo": None,
+                "BookingId": None,
+                'PaymentStatus': 0,
+                "ProposerName": None,
+                "PolicyId": None,
+                "InsurancePlanPurchased": plan.name if plan else None,
+                "PurchaseDate": None,
+                "ExpirationDate": None,
+                "COILink": None,
+                "PeopleCovered": 0
+            }
         }
 
         url = settings.MATRIX_API_URL
@@ -75,7 +88,7 @@ def push_insurance_banner_lead_to_matrix(self, data):
 
 @task(bind=True, max_retries=2)
 def push_insurance_buy_to_matrix(self, *args, **kwargs):
-    from ondoc.insurance.models import UserInsurance
+    from ondoc.insurance.models import UserInsurance, InsuranceLead
     try:
         user_id = kwargs.get('user_id', None)
         if not user_id:
@@ -87,13 +100,17 @@ def push_insurance_buy_to_matrix(self, *args, **kwargs):
         if not user_obj:
             raise Exception("User could not found against id - " + str(user_id))
 
-        user_insurance = user_obj.purchased_insurance.filter().last()
-        if not user_insurance or not user_insurance.is_valid():
-            logger.error("Invalid or None user insurance found for email notification")
+        user_insurance = user_obj.active_insurance
+        if not user_insurance:
+            raise Exception("Invalid or None user insurance found for user id %s " % str(user_id))
 
         primary_proposer = user_insurance.get_primary_member_profile()
         if not primary_proposer:
             raise Exception('Insurance does not have the primary proposer. Insurance id ' + str(user_insurance.id))
+
+        if not user_insurance.matrix_lead_id:
+            user_insurance.matrix_lead_id = InsuranceLead.get_latest_lead_id(user_insurance.user)
+            user_insurance.save()
 
         request_data = {
             'LeadSource': 'InsuranceOPD',
@@ -106,6 +123,7 @@ def push_insurance_buy_to_matrix(self, *args, **kwargs):
             "PolicyDetails": {
                 "ProposalNo": None,
                 "BookingId": user_insurance.id,
+                'PaymentStatus': 300,
                 "ProposerName": primary_proposer.get_full_name(),
                 "PolicyId": user_insurance.policy_number,
                 "InsurancePlanPurchased": user_insurance.insurance_plan.name,
@@ -140,8 +158,8 @@ def push_insurance_buy_to_matrix(self, *args, **kwargs):
                 logger.error(json.dumps(request_data))
                 raise Exception("[ERROR] Id not recieved from the matrix while pushing insurance to matrix.")
 
-            user_insurance_qs = UserInsurance.objects.filter(id=user_insurance.id)
-            user_insurance_qs.update(matrix_lead_id=resp_data.get('Id'))
+            # user_insurance_qs = UserInsurance.objects.filter(id=user_insurance.id)
+            # user_insurance_qs.update(matrix_lead_id=resp_data.get('Id'))
 
     except Exception as e:
         logger.error("Error in Celery. Failed pushing insurance to the matrix- " + str(e))

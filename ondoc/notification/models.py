@@ -546,7 +546,8 @@ class EmailNotification(TimeStampedModel, EmailNotificationOpdMixin, EmailNotifi
     bcc = ArrayField(models.EmailField(), default=[], blank=[])
     attachments = JSONField(default=[], blank=[])
     content_type = models.ForeignKey(ContentType, on_delete=models.CASCADE, null=True)
-    object_id = models.PositiveIntegerField(null=True)
+    # object_id = models.PositiveIntegerField(null=True)
+    object_id = models.BigIntegerField(null=True)
     content_object = GenericForeignKey()
 
     class Meta:
