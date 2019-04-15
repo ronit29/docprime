@@ -44,7 +44,7 @@ def push_insurance_banner_lead_to_matrix(self, data):
             'PolicyDetails': {
                 "ProposalNo": None,
                 "BookingId": None,
-                'PaymentStatus': 0,
+                'PolicyPaymentSTATUS': 0,
                 "ProposerName": None,
                 "PolicyId": None,
                 "InsurancePlanPurchased": plan.name if plan else None,
@@ -123,7 +123,7 @@ def push_insurance_buy_to_matrix(self, *args, **kwargs):
             "PolicyDetails": {
                 "ProposalNo": None,
                 "BookingId": user_insurance.id,
-                'PaymentStatus': 300,
+                'PolicyPaymentSTATUS': 300,
                 "ProposerName": primary_proposer.get_full_name(),
                 "PolicyId": user_insurance.policy_number,
                 "InsurancePlanPurchased": user_insurance.insurance_plan.name,
