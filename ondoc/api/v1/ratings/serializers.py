@@ -148,11 +148,13 @@ class GoogleRatingsGraphSerializer(serializers.Serializer):
 
     def get_review_count(self, obj):
         empty_review_count = 0
-        for data in obj.get('user_reviews'):
-            if data.get('text') == '' or data.get('text') == None:
-                empty_review_count += 1
-        count = len(obj.get('user_reviews')) - empty_review_count
-        return count
+        if obj.get('user_reviews'):
+            for data in obj.get('user_reviews'):
+                if data.get('text') == '' or data.get('text') == None:
+                    empty_review_count += 1
+            count = len(obj.get('user_reviews')) - empty_review_count
+            return count
+        return None
 
     def get_star_count(self, obj):
         return None
