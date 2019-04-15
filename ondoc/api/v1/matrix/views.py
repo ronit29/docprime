@@ -7,7 +7,7 @@ from rest_framework import mixins, viewsets, status
 from ondoc.web.models import NonBookableDoctorLead
 
 logger = logging.getLogger(__name__)
-from .serializers import NumberMaskSerializer
+from .serializers import NumberMaskSerializer, IvrSerializer
 from ondoc.authentication import models as auth_models
 from ondoc.doctor import models as doctor_model
 from django.utils import timezone
@@ -16,6 +16,7 @@ import json
 from django.conf import settings
 from ondoc.diagnostic.models import LabAppointment
 from ondoc.doctor.models import OpdAppointment
+from ondoc.authentication.models import User
 
 
 class MaskNumberViewSet(viewsets.GenericViewSet):
@@ -94,6 +95,10 @@ class MaskNumberViewSet(viewsets.GenericViewSet):
 class IvrViewSet(viewsets.GenericViewSet):
 
     def update(self, request):
-        data = request.data
+        serializer = IvrSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        data = serializer.validated_data
+        User.objects.filter(data.get('phone_number')).first()
+
 
         return Response()
