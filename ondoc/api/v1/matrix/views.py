@@ -14,6 +14,8 @@ from django.utils import timezone
 import requests
 import json
 from django.conf import settings
+from ondoc.diagnostic.models import LabAppointment
+from ondoc.doctor.models import OpdAppointment
 
 
 class MaskNumberViewSet(viewsets.GenericViewSet):
@@ -87,3 +89,11 @@ class MaskNumberViewSet(viewsets.GenericViewSet):
         except Exception as e:
             logger.error("[ERROR] Could not mask the number from matrix system ", str(e))
             return None
+
+
+class IvrViewSet(viewsets.GenericViewSet):
+
+    def update(self, request):
+        data = request.data
+
+        return Response()
