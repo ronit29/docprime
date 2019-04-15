@@ -908,18 +908,36 @@ class GetSearchUrlViewSet(viewsets.GenericViewSet):
     def search_url(self, request):
         params = request.query_params
         specialization_ids = params.get("specialization", '')
+        from_app = params.get("from_app", False)
         test_ids = params.get("test", '')
         lat = params.get("lat", 28.4485)  # if no lat long then default to gurgaon
         long = params.get("long", 77.0759)
 
-        opd_search_url = "%s/opd/searchresults?specializations=%s" \
-                         "&lat=%s&long=%s" \
-                         % (settings.BASE_URL, specialization_ids, lat, long)
-        tiny_opd_search_url = generate_short_url(opd_search_url)
+        if from_app == False:
 
-        lab_search_url = "%s/lab/searchresults?test_ids=%s" \
-                         "&lat=%s&long=%s" \
-                         % (settings.BASE_URL, test_ids, lat, long)
-        tiny_lab_search_url = generate_short_url(lab_search_url)
+            opd_search_url = "%s/opd/searchresults?specializations=%s" \
+                             "&lat=%s&long=%s" \
+                             % (settings.BASE_URL, specialization_ids, lat, long)
+            tiny_opd_search_url = generate_short_url(opd_search_url)
 
-        return Response({"opd_search_url": tiny_opd_search_url, "lab_search_url": tiny_lab_search_url})
+            lab_search_url = "%s/lab/searchresults?test_ids=%s" \
+                             "&lat=%s&long=%s" \
+                             % (settings.BASE_URL, test_ids, lat, long)
+            tiny_lab_search_url = generate_short_url(lab_search_url)
+
+            return Response({"opd_search_url": tiny_opd_search_url, "lab_search_url": tiny_lab_search_url})
+
+        else:
+
+            opd_search_url = "docprm://%s/opd/searchresults?specializations=%s" \
+                             "&lat=%s&long=%s" \
+                             % (settings.BASE_URL, specialization_ids, lat, long)
+
+            lab_search_url = "docprm://%s/lab/searchresults?test_ids=%s" \
+                             "&lat=%s&long=%s" \
+                             % (settings.BASE_URL, test_ids, lat, long)
+
+            return Response({"opd_search_url": opd_search_url, "lab_search_url": lab_search_url})
+
+
+
