@@ -594,9 +594,9 @@ def send_insurance_notifications(self, data):
         if not user:
             raise Exception("Invalid user id passed for insurance email notification. Userid %s" % str(user_id))
 
-        user_insurance = user.purchased_insurance.filter().last()
-        if not user_insurance or not user_insurance.is_valid():
-            logger.error("Invalid or None user insurance found for email notification")
+        user_insurance = user.active_insurance
+        if not user_insurance:
+            raise Exception("Invalid or None user insurance found for email notification. User id %s" % str(user_id))
 
         if not user_insurance.coi:
             try:

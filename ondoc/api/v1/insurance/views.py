@@ -112,7 +112,24 @@ class InsuranceOrderViewSet(viewsets.GenericViewSet):
 
     def create_banner_lead(self, request):
         user = request.user
-        InsuranceLead(user=user, extras=request.data).save()
+        user_insurance_lead = InsuranceLead.objects.filter(user=user).order_by('id').last()
+        user_insurance = user.purchased_insurance.filter().order_by('id').last()
+
+        if user.active_insurance:
+            return Response({'success': True})
+
+        if not user_insurance_lead:
+            user_insurance_lead = InsuranceLead(user=user)
+        elif user_insurance_lead and user_insurance and not user_insurance.is_valid():
+            active_insurance_lead = InsuranceLead.objects.filter(created_at__gte=user_insurance.expiry_date).order_by('created_at').last()
+            if not active_insurance_lead:
+                user_insurance_lead = InsuranceLead(user=user)
+            else:
+                user_insurance_lead = active_insurance_lead
+
+        user_insurance_lead.extras = request.data
+        user_insurance_lead.save()
+
         return Response({'success': True})
 
     @transaction.atomic
@@ -166,7 +183,9 @@ class InsuranceOrderViewSet(viewsets.GenericViewSet):
                             user_profile = UserProfile.objects.filter(id=member['profile'].id,
                                                                       user_id=request.user.pk).values('id', 'name', 'email',
                                                                                                     'gender', 'user_id',
-                                                                                                    'dob', 'phone_number').first()
+                                                                                                      'phone_number').first()
+
+                            user_profile['dob'] = member['dob']
 
                         else:
                             user_profile = {"name": member['first_name'] + " " + member['last_name'], "email":
