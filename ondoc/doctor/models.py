@@ -230,6 +230,7 @@ class Hospital(auth_model.TimeStampedModel, auth_model.CreatedByModel, auth_mode
     city_search_key = models.CharField(db_index=True, editable=False, max_length=100, default="", null=True, blank=True)
     enabled_for_cod = models.BooleanField(default=False)
     enabled_for_prepaid = models.BooleanField(default=True)
+    is_location_verified = models.BooleanField(verbose_name='Location Verified', default=False)
 
     def __str__(self):
         return self.name

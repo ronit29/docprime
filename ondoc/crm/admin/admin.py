@@ -170,6 +170,7 @@ admin.site.register(StateGSTCode, StateGSTCodeAdmin)
 admin.site.register(InsuranceCity, InsuranceCityAdmin)
 admin.site.register(InsuranceDistrict, InsuranceDistrictAdmin)
 admin.site.register(InsuranceDeal, InsuranceDealAdmin)
+# admin.site.register(InsuranceReport, InsuranceReportAdmin)
 # admin.site.register(InsurancePlanContent, InsurancePlanContentAdmin)
 
 admin.site.register(InsuranceTransaction)
