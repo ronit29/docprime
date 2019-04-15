@@ -21,11 +21,11 @@ function initEditor(){
 
     CKEDITOR.config.allowedContent = true;
     CKEDITOR.config.height = 500;
-    CKEDITOR.config.font_names = ''
 
     CKEDITOR.replace( 'id_body', {
-            extraPlugins: ['justify', 'filebrowser'],
+            extraPlugins: ['justify', 'filebrowser', 'font'],
             filebrowserUploadUrl: url,
+            font_names: '',
         }
     );
 //    if (false)
