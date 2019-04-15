@@ -13,7 +13,8 @@ class ArticleForm(forms.ModelForm):
 
     class Media:
         extend=False
-        js = ('ckedit/js/ckeditor.js', 'articles/js/init.js')
+        # js = ('ckedit/js/ckeditor.js', 'articles/js/init.js')   # ckeditor-5 replaced with ckeditor-4.11
+        js = ('ckeditor/ckeditor.js', 'articles/js/init.js')
         css = {'all':('articles/css/style.css',)}
 
 
