@@ -11,7 +11,8 @@ from rest_framework.response import Response
 from ondoc.account import models as account_models
 from ondoc.doctor import models as doctor_models
 from ondoc.insurance.models import (Insurer, InsuredMembers, InsuranceThreshold, InsurancePlans, UserInsurance, InsuranceLead,
-                                    InsuranceTransaction, InsuranceDisease, InsuranceDiseaseResponse, StateGSTCode)
+                                    InsuranceTransaction, InsuranceDisease, InsuranceDiseaseResponse, StateGSTCode,
+                                    InsuranceDummyData)
 from ondoc.authentication.models import UserProfile
 from ondoc.authentication.backends import JWTAuthentication
 from rest_framework.permissions import IsAuthenticated
@@ -344,3 +345,22 @@ class InsuranceValidationViewSet(viewsets.GenericViewSet):
             resp['insurance_message'] = ""
         return Response(resp)
 
+
+class InsuranceDummyDataViewSet(viewsets.GenericViewSet):
+    authentication_classes = (JWTAuthentication,)
+    permission_classes = (IsAuthenticated,)
+
+    def push_dummy_data(self, request):
+        user = request.user
+        data = request.data
+        InsuranceDummyData.objects.create(user=user, data=data)
+
+    def show_dummy_data(self, request):
+        user = request.user
+        if user:
+            dummy_data = InsuranceDummyData.objects.filter(user=user).order_by('-id').first
+            response = dummy_data.data
+        if response and user:
+            return response
+        else:
+            return Response(status=status.HTTP_404_NOT_FOUND)
