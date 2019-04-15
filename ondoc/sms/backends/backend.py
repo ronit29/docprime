@@ -17,7 +17,7 @@ class NodeJsSmsBackend(object):
             "type": "sms",
             "data": {
                 "phone_number": phone_no,
-                "content": quote(message),
+                "content": message,
                 "retry": retry_send
             }
         }
