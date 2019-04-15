@@ -88,7 +88,7 @@ def prepare_and_hit(self, data):
     payment_URN = ''
     amount = None
     if task_data.get('type') == 'LAB_APPOINTMENT':
-        # location_verified = appointment.lab.is_location_verified
+        location_verified = appointment.lab.is_location_verified
         provider_id = appointment.lab.id
         merchant = appointment.lab.merchant.all().last()
         if merchant:
@@ -99,7 +99,7 @@ def prepare_and_hit(self, data):
             if integrator_obj:
                 provider_booking_id = integrator_obj.integrator_order_id
     elif task_data.get('type') == 'OPD_APPOINTMENT':
-        # location_verified = appointment.hospital.is_location_verified
+        location_verified = appointment.hospital.is_location_verified
         provider_id = appointment.doctor.id
         merchant = appointment.doctor.merchant.all().last()
         if merchant:
@@ -112,7 +112,28 @@ def prepare_and_hit(self, data):
         payment_URN = merchant_payout.utr_no
         amount = merchant_payout.payable_amount
 
+    user_insurance = appointment.user.active_insurance
+    primary_proposer_name = None
+
+    if user_insurance:
+        primary_proposer = user_insurance.get_primary_member_profile()
+        primary_proposer_name = primary_proposer.get_full_name() if primary_proposer else None
+
+    policy_details = {
+        "ProposalNo": None,
+        "BookingId": user_insurance.id if user_insurance else None,
+        "ProposerName": primary_proposer_name,
+        "PolicyId": user_insurance.policy_number if user_insurance else None,
+        "InsurancePlanPurchased": user_insurance.insurance_plan.name if user_insurance else None,
+        "PurchaseDate": int(user_insurance.purchase_date.timestamp()) if user_insurance else None,
+        "ExpirationDate": int(user_insurance.expiry_date.timestamp()) if user_insurance else None,
+        "COILink": user_insurance.coi.url if user_insurance and  user_insurance.coi is not None and user_insurance.coi.name else None,
+        "PeopleCovered": user_insurance.insurance_plan.get_people_covered() if user_insurance else ""
+    }
+
     appointment_details = {
+        'IsInsured': 'yes' if user_insurance else 'no',
+        'PolicyId': user_insurance.policy_number if user_insurance else None,
         'AppointmentStatus': appointment.status,
         'Age': calculate_age(appointment),
         'Email': p_email,
@@ -121,6 +142,7 @@ def prepare_and_hit(self, data):
         'KYC': kyc,
         'Location': location,
         'PaymentType': appointment.payment_type,
+        'PaymentTypeID': appointment.payment_type,
         'PaymentStatus': 300,
         'OrderID': order_id if order_id else 0,
         'DocPrimeBookingID': appointment.id,
@@ -149,7 +171,8 @@ def prepare_and_hit(self, data):
         'ProviderPaymentStatus': provider_payment_status,
         'PaymentURN': payment_URN,
         'Amount': float(amount) if amount else None,
-        'SettlementDate': settlement_date
+        'SettlementDate': settlement_date,
+        'LocationVerified': location_verified
     }
 
     request_data = {
@@ -163,7 +186,8 @@ def prepare_and_hit(self, data):
         'CityId': 0,
         'ProductId': task_data.get('product_id'),
         'SubProductId': task_data.get('sub_product_id'),
-        'AppointmentDetails': appointment_details
+        'AppointmentDetails': appointment_details,
+        'PolicyDetails': policy_details
     }
 
     #logger.error(json.dumps(request_data))
