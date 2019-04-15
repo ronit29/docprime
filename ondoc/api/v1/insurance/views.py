@@ -370,16 +370,21 @@ class InsuranceDummyDataViewSet(viewsets.GenericViewSet):
     permission_classes = (IsAuthenticated,)
 
     def push_dummy_data(self, request):
-        user = request.user
-        data = request.data
-        InsuranceDummyData.objects.create(user=user, data=data)
+        try:
+            user = request.user
+            data = request.data
+            InsuranceDummyData.objects.create(user=user, data=data)
+            return Response(data="save successfully!!", status=status.HTTP_200_OK )
+        except Exception as e:
+            logger.log(str(e))
+            return Response(status=status.HTTP_200_OK)
 
     def show_dummy_data(self, request):
         user = request.user
         if user:
-            dummy_data = InsuranceDummyData.objects.filter(user=user).order_by('-id').first
+            dummy_data = InsuranceDummyData.objects.filter(user=user).order_by('-id').first()
             response = dummy_data.data
         if response and user:
-            return response
+            return Response(data=response, status=status.HTTP_200_OK)
         else:
             return Response(status=status.HTTP_404_NOT_FOUND)
