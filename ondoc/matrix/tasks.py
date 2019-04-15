@@ -142,7 +142,7 @@ def prepare_and_hit(self, data):
         'KYC': kyc,
         'Location': location,
         'PaymentType': appointment.payment_type,
-        'PaymentTypeID': appointment.payment_type,
+        'PaymentTypeId': appointment.payment_type,
         'PaymentStatus': 300,
         'OrderID': order_id if order_id else 0,
         'DocPrimeBookingID': appointment.id,
