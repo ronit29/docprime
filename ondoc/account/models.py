@@ -27,7 +27,6 @@ from decimal import Decimal
 from ondoc.notification.tasks import set_order_dummy_transaction
 from django.contrib.contenttypes.fields import GenericForeignKey
 from django.contrib.contenttypes.models import ContentType
-from ondoc.matrix.tasks import push_appointment_to_matrix
 import string
 import random
 
@@ -1371,6 +1370,8 @@ class MerchantPayout(TimeStampedModel):
             self.status = self.PAID
 
         if not first_instance and not self.status == self.PENDING:
+            from ondoc.matrix.tasks import push_appointment_to_matrix
+
             appointment = self.lab_appointment.all().first()
             if not appointment:
                 appointment = self.opd_appointment.all().first()
