@@ -2556,6 +2556,11 @@ class CommonSpecialization(auth_model.TimeStampedModel):
     class Meta:
         db_table = "common_specializations"
 
+    @classmethod
+    def get_specializations(cls, count):
+        specializations = cls.objects.select_related('specialization').all().order_by("-priority")[:count]
+        return specializations
+
 
 class DoctorMapping(auth_model.TimeStampedModel):
 
