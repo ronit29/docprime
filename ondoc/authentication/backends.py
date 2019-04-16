@@ -52,7 +52,7 @@ class MatrixAuthentication(authentication.BaseAuthentication):
 
         token = base64.b64decode(token)
 
-        if token.decode('utf-8') != auth_header_prefix:
+        if token.decode('utf-8') != settings.MATRIX_DOC_AUTH_TOKEN:
             raise exceptions.AuthenticationFailed('UnAuthorized')
 
         return (None, None)
