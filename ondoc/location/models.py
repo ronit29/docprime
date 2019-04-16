@@ -33,6 +33,7 @@ def split_and_append(initial_str, spliter, appender):
     value_chunks = initial_str.split(spliter)
     return appender.join(value_chunks)
 
+
 class TempURL(TimeStampedModel):
 
     url = models.CharField(blank=False, null=True, max_length=2000, db_index=True)

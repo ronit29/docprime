@@ -1,4 +1,4 @@
-from django.db.models import Prefetch
+from django.db.models import Prefetch, Case, When, F
 from collections import OrderedDict
 from django.template.defaultfilters import slugify
 from django.contrib.gis.geos import Point
@@ -152,7 +152,7 @@ class HospitalURL():
         # set breadcrumbs to default empty array
         RawSql('''update temp_url tu set breadcrumb=json_build_array()''', []).execute()
 
-        RawSql('''update temp_url tu set breadcrumb=(select json_build_array(json_build_object('title', locality_value, 'url', url, 'link_title', concat('Hospitals in ',locality_value))) 
+        RawSql('''update temp_url tu set breadcrumb=(select json_build_array(json_build_object('title', locality_value, 'url', url, 'link_title', concat(locality_value, ' Hospitals'))) 
                    from temp_url where sitemap_identifier ='HOSPITALS_CITY' and lower(locality_value)=lower(tu.locality_value)
                    and st_dwithin(location::geography, tu.location::geography, 20000) order by st_distance(location, tu.location) asc limit 1)
                    where sitemap_identifier ='HOSPITALS_LOCALITY_CITY' ''', []).execute()
@@ -180,7 +180,10 @@ class HospitalURL():
                                                                                        is_live=True, is_test_doctor=False)
                                                                                    )).order_by('hospital_type', 'id')
 
-        hosp_obj = hosp_obj.annotate(doctors_count=Count('assoc_doctors'))
+        hosp_obj = hosp_obj.annotate(doctors_count=Count('assoc_doctors'), bookable_doctors_count=Count(Case(
+            When(assoc_doctors__enabled_for_online_booking=True, enabled_for_online_booking=True,
+                 hospital_doctors__enabled_for_online_booking=True,
+                 then=F('assoc_doctors__id')))))
 
 
         for hospital in hosp_obj:
@@ -267,6 +270,7 @@ class HospitalURL():
             extras['breadcrums'] = []
             data['extras'] = extras
             data['count'] = hospital.doctors_count if hospital.doctors_count else 0
+            data['bookable_doctors_count'] = hospital.bookable_doctors_count if hospital.bookable_doctors_count else 0
 
             new_url = url
 
