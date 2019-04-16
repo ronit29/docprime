@@ -1862,9 +1862,9 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
                 self.action_completed()
         except Exception as e:
             logger.error(str(e))
-            return False
+            return False, str(e)
 
-        return True
+        return True, ""
 
     @transaction.atomic
     def action_cancelled(self, refund_flag=1):

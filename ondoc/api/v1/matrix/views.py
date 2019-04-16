@@ -118,9 +118,9 @@ class IvrViewSet(viewsets.GenericViewSet):
         ivr_data = appointment_obj.auto_ivr_data
         ivr_data.append(request.data)
 
-        success = appointment_obj.update_ivr_status(data.get('status'))
+        success, error = appointment_obj.update_ivr_status(data.get('status'))
 
-        if not success:
-            return Response(data={'updated': False})
+        # if not success:
+        #     return Response(data={'updated': False, 'error': error})
 
-        return Response(data={'updated': True})
+        return Response(data={'updated': success, 'error': error})
