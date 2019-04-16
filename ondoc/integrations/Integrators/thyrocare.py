@@ -1,6 +1,8 @@
 from decimal import Decimal
 
 from django.core.files.uploadedfile import TemporaryUploadedFile, InMemoryUploadedFile
+from django.db.models import Q
+
 from ondoc.api.v1.utils import TimeSlotExtraction
 from .baseIntegrator import BaseIntegrator
 import requests
@@ -13,6 +15,7 @@ from datetime import datetime, date, timedelta
 from ondoc.diagnostic.models import LabReport, LabReportFile, LabAppointment
 from django.contrib.contenttypes.models import ContentType
 from ondoc.api.v1.utils import resolve_address, aware_time_zone
+from django.utils import timezone
 import time
 
 
@@ -34,7 +37,7 @@ class Thyrocare(BaseIntegrator):
 
     @classmethod
     def thyrocare_data(cls, obj_id, type):
-        from ondoc.integrations.models import IntegratorMapping, IntegratorProfileMapping
+        from ondoc.integrations.models import IntegratorMapping, IntegratorProfileMapping, IntegratorTestMapping
         response = cls.thyrocare_auth()
         api_key = response.get('api_key')
 
@@ -59,13 +62,32 @@ class Thyrocare(BaseIntegrator):
             return None
 
         for result_obj in result_array:
-            defaults = {'integrator_product_data': result_obj, 'service_type': IntegratorMapping.ServiceType.LabTest,
-                        'integrator_class_name': Thyrocare.__name__, 'content_type': ContentType.objects.get(model='labnetwork')}
+            name_required_tests = settings.THYROCARE_NAME_PARAM_REQUIRED_TESTS.split(',')
+            name_params_required = False
+            if result_obj['code'] in name_required_tests:
+                name_params_required = True
 
-            if type == 'TESTS':
-                IntegratorMapping.objects.update_or_create(integrator_test_name=result_obj['name'], object_id=obj_id, defaults=defaults)
-            else:
-                IntegratorProfileMapping.objects.update_or_create(integrator_package_name=result_obj['name'], object_id=obj_id, defaults=defaults)
+            defaults = {'integrator_product_data': result_obj, 'integrator_class_name': Thyrocare.__name__,
+                        'content_type': ContentType.objects.get(model='labnetwork'), 'service_type': IntegratorTestMapping.ServiceType.LabTest,
+                        'name_params_required': name_params_required, 'test_type': result_obj['type']}
+
+            IntegratorTestMapping.objects.update_or_create(integrator_test_name=result_obj['name'], object_id=obj_id, defaults=defaults)
+
+            # if type == 'TESTS':
+            #     name_required_tests = settings.THYROCARE_NAME_PARAM_REQUIRED_TESTS.split(',')
+            #     name_params_required = False
+            #     if result_obj['code'] in name_required_tests:
+            #         name_params_required = True
+            #
+            #     defaults = {'integrator_product_data': result_obj, 'integrator_class_name': Thyrocare.__name__,
+            #                 'content_type': ContentType.objects.get(model='labnetwork'), 'service_type': IntegratorMapping.ServiceType.LabTest,
+            #                 'name_params_required': name_params_required}
+            #     IntegratorMapping.objects.update_or_create(integrator_test_name=result_obj['name'], object_id=obj_id, defaults=defaults)
+            # else:
+            #     defaults = {'integrator_product_data': result_obj, 'integrator_class_name': Thyrocare.__name__,
+            #                 'content_type': ContentType.objects.get(model='labnetwork'), 'integrator_type': result_obj['type'],
+            #                 'service_type': IntegratorProfileMapping.ServiceType.LabTest}
+            #     IntegratorProfileMapping.objects.update_or_create(integrator_package_name=result_obj['name'], object_id=obj_id, defaults=defaults)
 
     @classmethod
     def thyrocare_product_data(cls, obj_id, type):
@@ -73,6 +95,10 @@ class Thyrocare(BaseIntegrator):
 
     @classmethod
     def thyrocare_profile_data(cls, obj_id, type):
+        cls.thyrocare_data(obj_id, type)
+
+    @classmethod
+    def thyrocare_offer_data(cls, obj_id, type):
         cls.thyrocare_data(obj_id, type)
 
     def _get_appointment_slots(self, pincode, date, **kwargs):
@@ -123,43 +149,60 @@ class Thyrocare(BaseIntegrator):
         return True if resp_data['status'] == 'Y' else False
 
     def _post_order_details(self, lab_appointment, **kwargs):
+        from ondoc.integrations.models import IntegratorHistory
+
         tests = kwargs.get('tests', None)
-        packages = kwargs.get('packages', None)
-        payload = self.prepare_data(tests, packages, lab_appointment)
+        # packages = kwargs.get('packages', None)
+        retry_count = kwargs.get('retry_count', 0)
+        payload = self.prepare_data(tests, lab_appointment)
 
         headers = {'Content-Type': "application/json"}
         url = "%s/ORDER.svc/Postorderdata" % settings.THYROCARE_BASE_URL
-
         response = requests.post(url, data=json.dumps(payload), headers=headers)
+        status_code = response.status_code
         response = response.json()
         if response.get('RES_ID') == 'RES0000':
+            # Add details to history table
+            status = IntegratorHistory.PUSHED_AND_NOT_ACCEPTED
+            IntegratorHistory.create_history(lab_appointment, payload, response, url, 'post_order', 'Thyrocare', status_code, retry_count, status, '')
             return response
         else:
+            status = IntegratorHistory.NOT_PUSHED
+            IntegratorHistory.create_history(lab_appointment, payload, response, url, 'post_order', 'Thyrocare', status_code, retry_count, status, '')
             logger.error("[ERROR] %s" % response.get('RESPONSE'))
 
         return None
 
-    def prepare_data(self, tests, packages, lab_appointment):
-        from ondoc.integrations.models import IntegratorProfileMapping, IntegratorMapping
+    def prepare_data(self, tests, lab_appointment):
+        from ondoc.integrations.models import IntegratorTestMapping
 
         profile = lab_appointment.profile
         if hasattr(lab_appointment, 'address') and lab_appointment.address:
             patient_address = resolve_address(lab_appointment.address)
             pincode = lab_appointment.address["pincode"]
         else:
-            patient_address = "Address not available"
-            pincode = "122002"
+            patient_address = ""
+            pincode = ""
+
+        if profile and profile.email:
+            email = profile.email
+        else:
+            email = "provider@docprime.com"
 
         order_id = "DP{}".format(lab_appointment.id)
-        bendataxml = "<NewDataSet><Ben_details><Name>%s</Name><Age>%s</Age><Gender>%s</Gender></Ben_details></NewDataSet>" % (profile.name, self.calculate_age(profile), profile.gender)
+        if profile and profile.gender:
+            gender = profile.gender.upper()
+        else:
+            gender = "M"
 
+        bendataxml = "<NewDataSet><Ben_details><Name>%s</Name><Age>%s</Age><Gender>%s</Gender></Ben_details></NewDataSet>" % (profile.name, self.calculate_age(profile), gender)
         payload = {
             "api_key": settings.THYROCARE_API_KEY,
             "orderid": order_id,
             "address": patient_address,
             "pincode": pincode,
             "mobile": profile.phone_number if profile else "",
-            "email": profile.email if profile else "",
+            "email": email,
             "service_type": "H",
             "order_by": profile.name if profile else "",
             "hc": "0",
@@ -176,21 +219,29 @@ class Thyrocare(BaseIntegrator):
         rate = 0
         if tests:
             for test in tests:
-                integrator_test = IntegratorMapping.objects.filter(test_id=test.id, integrator_class_name=Thyrocare.__name__, is_active=True).first()
-                if integrator_test:
-                    product.append(integrator_test.integrator_product_data["code"])
-                    rate += int(integrator_test.integrator_product_data["rate"]["b2c"])
-                else:
-                    logger.info("[ERROR] No tests data found in integrator.")
+                integrator_test = IntegratorTestMapping.objects.filter(test_id=test.id, integrator_class_name=Thyrocare.__name__, is_active=True).first()
+                if not integrator_test:
+                    raise Exception("[ERROR] No tests data found in integrator.")
 
-        if packages:
-            for package in packages:
-                integrator_package = IntegratorProfileMapping.objects.filter(package_id=package.id, integrator_class_name=Thyrocare.__name__, is_active=True).first()
-                if integrator_package:
-                    product.append(integrator_package.integrator_package_name)
-                    rate += int(integrator_package.integrator_product_data["rate"]["b2c"])
+                if integrator_test.test_type == "TEST":
+                    if integrator_test.name_params_required:
+                        name = integrator_test.integrator_product_data["name"]
+                    else:
+                        name = integrator_test.integrator_product_data["code"]
+                    product.append(name)
+                elif integrator_test.test_type == "OFFER":
+                    product.append(integrator_test.integrator_product_data["testnames"])
+                    payload["report_code"] = integrator_test.integrator_product_data["code"]
+                elif integrator_test.test_type == "PROFILE":
+                    product.append(integrator_test.integrator_product_data["name"])
                 else:
-                    logger.info("[ERROR] No package data found in integrator for.")
+                    if integrator_test.integrator_product_data["testnames"] == 'null':
+                        name = integrator_test.integrator_product_data["name"]
+                    else:
+                        name = integrator_test.integrator_product_data["testnames"]
+                    product.append(name)
+
+                rate += int(integrator_test.integrator_product_data["rate"]["b2c"])
 
         if product:
             product_str = ",".join(product )
@@ -218,7 +269,7 @@ class Thyrocare(BaseIntegrator):
                 formats = ['pdf', 'xml']
                 for booking in integrator_bookings:
                     dp_appointment = booking.content_object
-                    if dp_appointment.time_slot_start + timedelta(days=1) <= datetime.now():
+                    if dp_appointment.time_slot_start + timedelta(days=1) <= timezone.now():
                         lead_id = booking.lead_id
                         mobile = booking.content_object.profile.phone_number
                         result = dict()
@@ -282,17 +333,21 @@ class Thyrocare(BaseIntegrator):
         except Exception as e:
             logger.error(str(e))
 
-    def _cancel_order(self, appointment, integrator_response):
+    def _cancel_order(self, appointment, integrator_response, retry_count):
+        from ondoc.integrations.models import IntegratorHistory
+
         url = "%s/ORDER.svc/cancelledorder" % settings.THYROCARE_BASE_URL
-        if appointment.cancellation_comments:
+        if appointment.cancellation_comments and appointment.cancellation_reason:
             reason = appointment.cancellation_reason.name + " " + appointment.cancellation_comments
-        else:
+        elif appointment.cancellation_reason:
             reason = appointment.cancellation_reason.name
+        else:
+            reason = ""
 
         payload = {
             "UserId": 2147,
-            "OrderNo": integrator_response.dp_order_id,
-            "VisitId": integrator_response.dp_order_id,
+            "OrderNo": integrator_response.integrator_order_id,
+            "VisitId": integrator_response.integrator_order_id,
             "BTechId": 0,
             "Status": 2,
             "RemarksId": 67,
@@ -303,47 +358,66 @@ class Thyrocare(BaseIntegrator):
         }
         headers = {'Content-Type': "application/json"}
         response = requests.post(url, data=json.dumps(payload), headers=headers)
+        status_code = response.status_code
         response = response.json()
-        if response.get('RES_ID') == 'RES0000':
+        if json.loads(response['RESPONSE'])['Response'] == "SUCCESS":
+            status = IntegratorHistory.CANCELLED
+            IntegratorHistory.create_history(appointment, payload, response, url, 'cancel_order', 'Thyrocare',
+                                             status_code, retry_count, status, '')
             return response
         else:
+            status = IntegratorHistory.NOT_PUSHED
+            IntegratorHistory.create_history(appointment, payload, response, url, 'cancel_order', 'Thyrocare',
+                                             status_code, retry_count, status, '')
             logger.error("[ERROR] %s" % response.get('RESPONSE'))
 
     def _order_summary(self, integrator_response):
+        from ondoc.integrations.models import IntegratorHistory
+
         dp_appointment = integrator_response.content_object
-        if dp_appointment.status != LabAppointment.CANCELLED or dp_appointment.status != LabAppointment.COMPLETED or \
-                                            (dp_appointment.time_slot_start + timedelta(days=1) < datetime.now()):
+        lab_appointment_content_type = ContentType.objects.get_for_model(dp_appointment)
+        integrator_history = IntegratorHistory.objects.filter(object_id=dp_appointment.id,
+                                                              content_type=lab_appointment_content_type).order_by('id').last()
+        if integrator_history:
+            status = integrator_history.status
+            if dp_appointment.status != LabAppointment.CANCELLED or dp_appointment.status != LabAppointment.COMPLETED:
+                if dp_appointment.time_slot_start + timedelta(days=1) > timezone.now():
+                    url = "%s/order.svc/%s/%s/%s/all/OrderSummary" % (settings.THYROCARE_BASE_URL, settings.THYROCARE_API_KEY,
+                                                                      integrator_response.dp_order_id,
+                                                                      integrator_response.response_data['MOBILE'])
+                    response = requests.get(url)
+                    status_code = response.status_code
+                    response = response.json()
+                    if response.get('RES_ID') == 'RES0000':
+                        ## RESCHUDULE CASE AFTER DISSCUSSION
+                        # thyrocare_appointment_time = response['LEADHISORY_MASTER'][0]['APPOINT_ON'][0]['DATE']
+                        # thyrocare_appointment_time = datetime.strptime(thyrocare_appointment_time, "%d-%m-%Y %H:%M").strftime("%Y-%m-%d")
+                        # dp_appointment_time = dp_appointment.time_slot_start.strftime("%Y-%m-%d")
+                        # if not thyrocare_appointment_time == dp_appointment_time:
+                        #     dp_appointment.time_slot_start = thyrocare_appointment_time
+                        #     dp_appointment.status = 3
+                        #     dp_appointment.save()
 
-            url = "%s/order.svc/%s/%s/%s/all/OrderSummary" % (settings.THYROCARE_BASE_URL, settings.THYROCARE_API_KEY,
-                                                              integrator_response.dp_order_id,
-                                                              integrator_response.response_data['MOBILE'])
-            response = requests.get(url)
-            response = response.json()
-            if response.get('RES_ID') == 'RES0000':
-                thyrocare_appointment_time = response['LEADHISORY_MASTER'][0]['APPOINT_ON'][0]['DATE']
-                thyrocare_appointment_time = datetime.strptime(thyrocare_appointment_time, "%d-%m-%Y %H:%M").strftime("%Y-%m-%d")
-                dp_appointment_time = dp_appointment.time_slot_start.strftime("%Y-%m-%d")
-                if not thyrocare_appointment_time == dp_appointment_time:
-                    dp_appointment.time_slot_start = thyrocare_appointment_time
-                    dp_appointment.status = 3
-                    dp_appointment.save()
+                        # check integrator order status and update docprime booking
+                        if response['BEN_MASTER'][0]['STATUS'].upper() == 'YET TO ASSIGN':
+                            status = IntegratorHistory.PUSHED_AND_NOT_ACCEPTED
+                        elif response['BEN_MASTER'][0]['STATUS'].upper() == 'YET TO CONFIRM':
+                            status = IntegratorHistory.PUSHED_AND_NOT_ACCEPTED
+                        elif response['BEN_MASTER'][0]['STATUS'].upper() == "ACCEPTED":
+                            if not dp_appointment.status in [5, 6, 7]:
+                                dp_appointment.status = 5
+                                dp_appointment.save()
+                                status = IntegratorHistory.PUSHED_AND_ACCEPTED
+                        elif response['BEN_MASTER'][0]['STATUS'].upper() == 'CANCELLED':
+                            if not dp_appointment.status == 6:
+                                dp_appointment.status = 6
+                                dp_appointment.save()
+                                dp_appointment.action_cancelled(1)
+                                status = IntegratorHistory.CANCELLED
 
-                # check integrator order status and update docprime booking
-                if response['BEN_MASTER'][0]['STATUS'].upper() == 'YET TO ASSIGN':
-                    pass
-                elif response['BEN_MASTER'][0]['STATUS'].upper() == ('DELIVERY' or 'REPORTED' or 'SERVICED' or 'CREDITED'):
-                    if not dp_appointment.status == 5:
-                        dp_appointment.status = 5
-                        dp_appointment.save()
-                elif response['BEN_MASTER'][0]['STATUS'].upper() == 'DONE':
-                    pass
-                elif response['BEN_MASTER'][0]['STATUS'].upper() == ('CANCELLED' or 'REJECTED'):
-                    if not dp_appointment.status == 6:
-                        dp_appointment.status = 6
-                        dp_appointment.cancellation_type = 2
-                        dp_appointment.save()
-            else:
-                print("[ERROR] %s %s" % (integrator_response.id, response.get('RESPONSE')))
+                        IntegratorHistory.create_history(dp_appointment, url, response, url, 'order_summary_cron', 'Thyrocare', status_code, 0, status, 'integrator_api')
+                    else:
+                        print("[ERROR] %s %s" % (integrator_response.id, response.get('RESPONSE')))
 
     def time_slot_extraction(self, slots, date):
         am_timings, pm_timings = list(), list()
@@ -372,3 +446,29 @@ class Thyrocare(BaseIntegrator):
         time_dict[date].append(am_dict)
         time_dict[date].append(pm_dict)
         return time_dict
+
+    @classmethod
+    def get_test_parameter(cls):
+        from ondoc.diagnostic.models import TestParameterChat
+        from ondoc.integrations.models import IntegratorTestParameterMapping
+
+        url = "%s/ORDER.svc/%s/ALL/GetReferenceValue" % (settings.THYROCARE_BASE_URL, settings.THYROCARE_API_KEY)
+        response = requests.get(url)
+        response = response.json()
+        if response['RES_ID'] == 'RES0000':
+            test_parameters = response['TEST_MASTER']
+            if test_parameters:
+                for parameter in test_parameters:
+                    integrator_data = {'response_data': parameter}
+                    data = {'age_to': parameter['AGE_TO'], 'age_from': parameter['AGE_FROM'], 'gender': parameter['GENDER'], 'min_range': parameter['MIN_RANGE'], 'max_range': parameter['MAX_RANGE']}
+                    if parameter['MIN_RANGE'] == '':
+                        data['min_range'] = None
+
+                    if parameter['MAX_RANGE'] == '':
+                        data['max_range'] = None
+
+                    # Save to model
+                    print(parameter)
+                    test_parameter = TestParameterChat.objects.update_or_create(test_name=parameter['TEST_NAME'], defaults=data)
+                    IntegratorTestParameterMapping.objects.update_or_create(integrator_test_name=parameter['TEST_NAME'], test_parameter_chat_id=test_parameter[0].id,
+                                                                     integrator_class_name=Thyrocare.__name__, defaults=integrator_data)

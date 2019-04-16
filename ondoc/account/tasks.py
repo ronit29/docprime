@@ -231,6 +231,19 @@ def consumer_refund_update():
     ConsumerRefund.request_pending_refunds()
     ConsumerRefund.update_refund_status()
 
+@task()
+def update_ben_status_from_pg():
+    from ondoc.authentication.models import Merchant
+    Merchant.update_status_from_pg()
+    return True
+
+@task()
+def update_merchant_payout_pg_status():
+    from ondoc.account.models import MerchantPayout
+    payouts = MerchantPayout.objects.all()
+    for p in payouts:
+        p.update_status_from_pg()
+    return True
 
 @task(bind=True)
 def refund_status_update(self):
@@ -314,6 +327,7 @@ def refund_curl_task(self, req_data):
 @task(bind=True, max_retries=5)
 def set_order_dummy_transaction(self, order_id, user_id):
     from ondoc.account.models import Order, DummyTransactions
+    from ondoc.insurance.models import UserInsurance
     from ondoc.account.models import User
     try:
         if not settings.PAYOUTS_ENABLED:
@@ -338,6 +352,23 @@ def set_order_dummy_transaction(self, order_id, user_id):
             }
             url = settings.PG_DUMMY_TRANSACTION_URL
 
+            insurer_code = None
+            insurance_order_id = None
+            insurance_order_number = None
+            if order_row.product_id == Order.INSURANCE_PRODUCT_ID:
+                insurer_code = appointment.insurance_plan.insurer.insurer_merchant_code
+
+            user_insurance = UserInsurance.get_user_insurance(user)
+            if order_row.product_id in [Order.DOCTOR_PRODUCT_ID, Order.LAB_PRODUCT_ID] and user_insurance:
+                insurance_order = user_insurance.order
+
+                insurance_order_transactions = insurance_order.getTransactions()
+                if not insurance_order_transactions:
+                    raise Exception('No transactions found for appointment insurance.')
+                insurance_order_transaction = insurance_order_transactions[0]
+                insurance_order_id = insurance_order_transaction.order_id
+                insurance_order_number = insurance_order_transaction.order_no
+
             req_data = {
                 "customerId": user_id,
                 "mobile": user.phone_number,
@@ -353,6 +384,13 @@ def set_order_dummy_transaction(self, order_id, user_id):
                 "buCallbackSuccessUrl": "",
                 "buCallbackFailureUrl": ""
             }
+
+            if insurance_order_id and insurance_order_number:
+                req_data['refOrderNo'] = insurance_order_number
+                req_data['refOrderId'] = insurance_order_id
+
+            if insurer_code:
+                req_data['insurerCode'] = insurer_code
 
             response = requests.post(url, data=json.dumps(req_data), headers=headers)
             if response.status_code == status.HTTP_200_OK:

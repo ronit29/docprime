@@ -22,6 +22,12 @@ from safedelete import SOFT_DELETE
 from safedelete.models import SafeDeleteModel
 import reversion
 
+import requests
+import json
+from rest_framework import status
+from collections import OrderedDict
+from django.utils.text import slugify
+
 
 class Image(models.Model):
     # name = models.ImageField(height_field='height', width_field='width')
@@ -255,6 +261,7 @@ class User(AbstractBaseUser, PermissionsMixin):
 
     is_staff = models.BooleanField(verbose_name= 'Staff Status', default=False, help_text= 'Designates whether the user can log into this admin site.')
     date_joined = models.DateTimeField(auto_now_add=True)
+    auto_created = models.BooleanField(default=False)
 
     def __hash__(self):
         return self.id
@@ -274,6 +281,12 @@ class User(AbstractBaseUser, PermissionsMixin):
         # if self.user_type==1 and hasattr(self, 'staffprofile'):
         #     return self.staffprofile.name
         # return str(self.phone_number)
+
+    # @property
+    @cached_property
+    def active_insurance(self):
+        active_insurance = self.purchased_insurance.filter().order_by('id').last()
+        return active_insurance if active_insurance and active_insurance.is_valid() else None
 
     def get_phone_number_for_communication(self):
         from ondoc.communications.models import unique_phone_numbers
@@ -489,6 +502,17 @@ class OtpVerifications(TimeStampedModel):
 
     class Meta:
         db_table = "otp_verification"
+
+    @staticmethod
+    def get_otp_message(platform, user_type, is_doc=False, version=None):
+        from packaging.version import parse
+        result = "OTP for login is {}.\nDon't share this code with others."
+        if platform == "android" and version:
+            if (user_type == 'doctor' or is_doc) and parse(version) > parse("2.100.4"):
+                result = "<#>\n" + result + "\n" + settings.PROVIDER_ANDROID_MESSAGE_HASH
+            elif parse(version) > parse("1.1"):
+                result = "<#>\n" + result + "\n" + settings.CONSUMER_ANDROID_MESSAGE_HASH
+        return result
 
 
 class NotificationEndpoint(TimeStampedModel):
@@ -817,6 +841,7 @@ class GenericAdmin(TimeStampedModel, CreatedByModel):
     name = models.CharField(max_length=24, blank=True, null=True)
     source_type = models.PositiveSmallIntegerField(choices=source_choices, default=CRM)
     entity_type = models.PositiveSmallIntegerField(choices=entity_choices, default=OTHER)
+    auto_created_from_SPOCs = models.BooleanField(default=False)
 
 
     class Meta:
@@ -1402,8 +1427,22 @@ class DoctorNumber(TimeStampedModel):
 
 
 class Merchant(TimeStampedModel):
+
+    STATE_ABBREVIATIONS = ('Andhra Pradesh','AP'),('Arunachal Pradesh','AR'),('Assam','AS'),('Bihar','BR'),('Chhattisgarh','CG'),('Goa','GA'),('Gujarat','GJ'),('Haryana','HR'),('Himachal Pradesh','HP'),('Jammu and Kashmir','JK'),('Jharkhand','JH'),('Karnataka','KA'),('Kerala','KL'),('Madhya Pradesh','MP'),('Maharashtra','MH'),('Manipur','MN'),('Meghalaya','ML'),('Mizoram','MZ'),('Nagaland','NL'),('Orissa','OR'),('Punjab','PB'),('Rajasthan','RJ'),('Sikkim','SK'),('Tamil Nadu','TN'),('Tripura','TR'),('Uttarakhand','UK'),('Uttar Pradesh','UP'),('West Bengal','WB'),('Tamil Nadu','TN'),('Tripura','TR'),('Andaman and Nicobar Islands','AN'),('Chandigarh','CH'),('Dadra and Nagar Haveli','DH'),('Daman and Diu','DD'),('Delhi','DL'),('Lakshadweep','LD'),('Pondicherry','PY')
+
     SAVINGS = 1
     CURRENT = 2
+
+    #pg merchant creation codes
+    NOT_INITIATED = 0
+    INITIATED = 1
+    INPROCESS = 2
+    COMPLETE = 3
+    FAILURE = 4
+    CREATION_STATUS_CHOICES = ((NOT_INITIATED, 'Not Initiated'),
+        (INITIATED,'Initiated'),(INPROCESS, 'In Progress'),
+         (COMPLETE, 'Complete'), (FAILURE, 'Failure')
+        )
 
     beneficiary_name = models.CharField(max_length=128, null=True)
     account_number = models.CharField(max_length=50, null=True, default=None, blank=True)
@@ -1430,7 +1469,8 @@ class Merchant(TimeStampedModel):
     country = models.CharField(max_length=200, null=False, blank= True)
     email = models.CharField(max_length=200, null=False, blank= True)
     mobile = models.CharField(max_length=200, null=False, blank= True)
-
+    pg_status = models.PositiveIntegerField(choices=CREATION_STATUS_CHOICES, default=NOT_INITIATED, editable=False)
+    api_response = JSONField(blank=True, null=True, editable=False)
 
     class Meta:
         db_table = 'merchant'
@@ -1438,6 +1478,118 @@ class Merchant(TimeStampedModel):
     def __str__(self):
         return self.beneficiary_name+"("+self.account_number+")-("+str(self.id)+")"
 
+    def save(self, *args, **kwargs):
+        if self.verified_by_finance and (self.pg_status == self.NOT_INITIATED or self.pg_status == self.FAILURE):
+            pass
+            #self.create_in_pg()
+
+        super().save(*args, **kwargs)
+
+    def create_in_pg(self, *args, **kwargs):
+        resp_data = None
+        request_payload = dict()
+        request_payload["Bene_Code"] = str(self.id)
+        request_payload["Bene Name"] = self.beneficiary_name
+        request_payload["Bene Add 1"] = self.merchant_add_1
+        request_payload["Bene Add 2"] = self.merchant_add_2
+        request_payload["Bene Add 3"] = self.merchant_add_3
+        request_payload["Bene Add 4"] = self.merchant_add_4
+        request_payload["Bene Add 5"] = None
+        request_payload["Bene_City"] = self.city
+        request_payload["Bene_Pin"] = self.pin
+        request_payload["State"] = self.state
+
+        abbr = Merchant.get_abbreviation(self.state)
+        if abbr:
+            request_payload["State"] = abbr
+        else:
+            request_payload["State"] = self.state
+
+        #request_payload["Country"] = self.country
+        request_payload["Country"] = 'in'
+        request_payload["Bene_Email"] = 'payment@docprime.com'
+        request_payload["Bene_Mobile"] = self.mobile
+        request_payload["Bene_Tel"] = None
+        request_payload["Bene_Fax"] = None
+        request_payload["IFSC"] = self.ifsc_code
+        request_payload["Bene_A/c No"] = self.account_number
+        request_payload["Bene Bank"] = None
+        request_payload["PaymentType"] = None
+        request_payload["isBulk"] = "0"
+
+        #from ondoc.api.v1.utils import payout_checksum
+        checksum_response = Merchant.generate_checksum(request_payload)
+        request_payload["hash"] = checksum_response
+        url = settings.NODAL_BENEFICIARY_API
+
+        nodal_beneficiary_api_token = settings.NODAL_BENEFICIARY_TOKEN
+
+        response = requests.post(url, data=json.dumps(request_payload), headers={'auth': nodal_beneficiary_api_token,
+                                                                              'Content-Type': 'application/json'})
+
+        if response.status_code == status.HTTP_200_OK:
+            resp_data = response.json()
+            self.api_response = resp_data
+            if resp_data.get('StatusCode') and resp_data.get('StatusCode') in [1,2,3,4]:
+                self.pg_status = resp_data.get('StatusCode')
+
+    @classmethod
+    def get_abbreviation(cls, state_name):
+        state_slug = slugify(state_name)
+        for state,abbr in cls.STATE_ABBREVIATIONS:
+            if state_slug == slugify(state):
+                return abbr
+
+        return None
+
+    @classmethod
+    def get_states_list(cls):        
+        states = [x[0] for x in cls.STATE_ABBREVIATIONS]
+        return states
+
+    @classmethod
+    def get_states_string(cls):
+        return ", ".join(cls.get_states_list())
+
+    @classmethod
+    def generate_checksum(cls, request_payload):
+
+        secretkey = settings.PG_SECRET_KEY_P1
+        accesskey = settings.PG_CLIENT_KEY_P1
+
+        checksum = ""
+
+        curr = ''
+
+        keylist = sorted(request_payload)
+        for k in keylist:
+            if request_payload[k] is not None:
+                curr = curr + k + '=' + str(request_payload[k]) + ';'
+
+        checksum += curr
+
+        checksum = accesskey + "|" + checksum + "|" + secretkey
+        checksum_hash = hashlib.sha256(str(checksum).encode())
+        checksum_hash = checksum_hash.hexdigest()
+        return checksum_hash
+
+
+    @classmethod
+    def update_status_from_pg(cls):
+        merchant = Merchant.objects.filter(pg_status__in=[cls.NOT_INITIATED, cls.INITIATED, cls.INPROCESS, cls.FAILURE])
+        for data in merchant:
+            resp_data = None
+            request_payload = {"beneCode": str(data.pk)}
+            url = settings.BENE_STATUS_API
+            bene_status_token = settings.BENE_STATUS_TOKEN
+            response = requests.post(url, data=json.dumps(request_payload), headers={'auth': bene_status_token,
+                                                                                     'Content-Type': 'application/json'})
+            if response.status_code == status.HTTP_200_OK:
+                resp_data = response.json()
+                data.api_response = resp_data
+                if resp_data.get('statusCode') and resp_data.get('statusCode') in [cls.INITIATED, cls.INPROCESS]:
+                    data.pg_status = resp_data.get('statusCode')
+                    data.save()
 
 class AssociatedMerchant(TimeStampedModel):
 
@@ -1482,6 +1634,37 @@ class WelcomeCallingDone(models.Model):
     welcome_calling_done = models.BooleanField(default=False)
     welcome_calling_done_at = models.DateTimeField(null=True, blank=True)
 
+    def save(self, *args, **kwargs):
+        if self.welcome_calling_done and not self.welcome_calling_done_at:
+            self.welcome_calling_done_at = timezone.now()
+        elif not self.welcome_calling_done and self.welcome_calling_done_at:
+            self.welcome_calling_done_at = None
+        super().save(*args, **kwargs)
+
     class Meta:
         abstract = True
 
+
+class ClickLoginToken(TimeStampedModel):
+    URL_KEY_LENGTH = 30
+    token = models.CharField(max_length=300)
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
+    expiration_time = models.DateTimeField(null=True)
+    is_consumed = models.BooleanField(default=False)
+    url_key = models.CharField(max_length=URL_KEY_LENGTH)
+
+    class Meta:
+        db_table = 'click_login_token'
+
+
+class PhysicalAgreementSigned(models.Model):
+    physical_agreement_signed = models.BooleanField(default=False)
+    physical_agreement_signed_at = models.DateTimeField(null=True, blank=True)
+
+    def save(self, *args, **kwargs):
+        from ondoc.api.v1.utils import update_physical_agreement_timestamp
+        update_physical_agreement_timestamp(self)
+        super().save(*args, **kwargs)
+
+    class Meta:
+        abstract = True

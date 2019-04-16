@@ -120,6 +120,40 @@ class RatingsGraphSerializer(serializers.Serializer):
         return avg
 
 
+class GoogleRatingsGraphSerializer(serializers.Serializer):
+    rating_count = serializers.SerializerMethodField()
+    review_count = serializers.SerializerMethodField()
+    avg_rating = serializers.SerializerMethodField()
+    star_count = serializers.SerializerMethodField()
+    top_compliments = serializers.SerializerMethodField()
+
+    def get_top_compliments(self, obj):
+        return None
+
+    def get_rating_count(self, obj):
+        count = obj.get('user_ratings_total') if obj.get('user_ratings_total') else None
+        return count
+
+    def get_review_count(self, obj):
+        empty_review_count = 0
+        if obj.get('user_reviews'):
+            for data in obj.get('user_reviews'):
+                if data.get('text') == '' or data.get('text') == None:
+                    empty_review_count += 1
+            count = len(obj.get('user_reviews')) - empty_review_count
+            return count
+        return None
+
+    def get_star_count(self, obj):
+        return None
+
+    def get_avg_rating(self, obj):
+        avg = obj.get('user_avg_rating') if obj.get('user_avg_rating') else None
+        if avg:
+            avg = round(avg, 1)
+        return avg
+
+
 class RatingsModelSerializer(serializers.ModelSerializer):
     compliment = serializers.SerializerMethodField()
     date = serializers.SerializerMethodField()

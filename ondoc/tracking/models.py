@@ -9,6 +9,7 @@ import datetime
 class TrackingVisitor(auth_models.TimeStampedModel):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     device_info = JSONField(null=True, blank=True)
+    client_category = models.CharField(max_length=100, blank=True, null=True)
 
     def __str__(self):
         return '{}'.format(self.id)
@@ -47,10 +48,11 @@ class TrackingVisit(auth_models.TimeStampedModel):
 class TrackingEvent(auth_models.TimeStampedModel):
     DoctorAppointmentBooked = 'DoctorAppointmentBooked'
     LabAppointmentBooked = 'LabAppointmentBooked'
-
+    InsurancePurchased = 'InsurancePurchased'
     ACTION_EVENTS = {
         DoctorAppointmentBooked : 'doctor-appointment-booked',
         LabAppointmentBooked : 'lab-appointment-booked',
+        InsurancePurchased: 'insurance-purchased'
     }
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)

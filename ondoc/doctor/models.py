@@ -1,5 +1,6 @@
 from copy import deepcopy
-
+import json
+import requests
 from PIL.Image import NEAREST, BICUBIC
 from django.contrib.staticfiles.storage import staticfiles_storage
 from django.core.files.storage import default_storage
@@ -15,6 +16,7 @@ from django.core.validators import MaxValueValidator, MinValueValidator, FileExt
 from django.core.exceptions import ValidationError
 from django.core.exceptions import NON_FIELD_ERRORS
 from django.template.loader import render_to_string
+from rest_framework import status
 from rest_framework.exceptions import ValidationError as RestFrameworkValidationError
 from django.core.files.storage import get_storage_class
 from django.conf import settings
@@ -56,7 +58,7 @@ from django.contrib.contenttypes.fields import GenericRelation
 from django.contrib.contenttypes.fields import GenericForeignKey
 from django.contrib.contenttypes.models import ContentType
 from ondoc.matrix.tasks import push_appointment_to_matrix, push_onboarding_qcstatus_to_matrix, \
-    update_onboarding_qcstatus_to_matrix, create_or_update_lead_on_matrix
+    update_onboarding_qcstatus_to_matrix, create_or_update_lead_on_matrix, push_signup_lead_to_matrix
 # from ondoc.procedure.models import Procedure
 from ondoc.ratings_review import models as ratings_models
 from django.utils import timezone
@@ -68,6 +70,7 @@ from ondoc.api.v1.utils import RawSql
 from safedelete import SOFT_DELETE
 #from ondoc.api.v1.doctor import serializers as doctor_serializers
 import qrcode
+from django.utils.functional import cached_property
 
 logger = logging.getLogger(__name__)
 
@@ -102,7 +105,7 @@ class UniqueNameModel(models.Model):
 
 
 class SearchKey(models.Model):
-    search_key = models.CharField(max_length=256, blank=True, null=True)
+    search_key = models.CharField(max_length=4000, blank=True, null=True)
 
     class Meta:
         db_table = 'search_key'
@@ -224,7 +227,10 @@ class Hospital(auth_model.TimeStampedModel, auth_model.CreatedByModel, auth_mode
     about = models.TextField(blank=True, null=True, default="")
     opd_timings = models.CharField(max_length=150, blank=True, null=True, default="")
     always_open = models.BooleanField(verbose_name='Is hospital open 24X7', default=False)
-    city_search_key = models.CharField(db_index=True,editable=False, max_length=100, default="", null=True, blank=True)
+    city_search_key = models.CharField(db_index=True, editable=False, max_length=100, default="", null=True, blank=True)
+    enabled_for_cod = models.BooleanField(default=False)
+    enabled_for_prepaid = models.BooleanField(default=True)
+    is_location_verified = models.BooleanField(verbose_name='Location Verified', default=False)
 
     def __str__(self):
         return self.name
@@ -256,8 +262,12 @@ class Hospital(auth_model.TimeStampedModel, auth_model.CreatedByModel, auth_mode
         )y where hospital.id = y.id'''
         update_alternative_value = RawSql(query, []).execute()
 
-        query1 = '''update hospital set city_search_key = lower(city) where city_search_key is null
-                        or city_search_key='' '''
+        query1 = '''update hospital set city_search_key = 
+                    case when lower(city) in ('bengaluru','bengalooru') then 'bangalore'
+                    when lower(city) in ('gurugram','gurugram rural') then 'gurgaon'
+                    else lower(city) end
+                    where city_search_key is null
+                    or city_search_key='' '''
         update_city = RawSql(query1, []).execute()
 
 
@@ -323,15 +333,8 @@ class Hospital(auth_model.TimeStampedModel, auth_model.CreatedByModel, auth_mode
             self.is_live = False
 
     def update_time_stamps(self):
-        if self.welcome_calling_done and not self.welcome_calling_done_at:
-            self.welcome_calling_done_at = timezone.now()
-        elif not self.welcome_calling_done and self.welcome_calling_done_at:
-            self.welcome_calling_done_at = None
-
-        if self.physical_agreement_signed and not self.physical_agreement_signed_at:
-            self.physical_agreement_signed_at = timezone.now()
-        elif not self.physical_agreement_signed and self.physical_agreement_signed_at:
-            self.physical_agreement_signed_at = None
+        from ondoc.api.v1.utils import update_physical_agreement_timestamp
+        update_physical_agreement_timestamp(self)
 
         if not self.enabled and not self.disabled_at:
             self.disabled_at = timezone.now()
@@ -352,7 +355,7 @@ class Hospital(auth_model.TimeStampedModel, auth_model.CreatedByModel, auth_mode
             hospital_obj = Hospital.objects.filter(pk=self.id).first()
             if hospital_obj and self.data_status != hospital_obj.data_status:
                 update_status_in_matrix = True
-        if not self.matrix_lead_id:
+        if not self.matrix_lead_id and (self.is_listed_on_docprime is None or self.is_listed_on_docprime is True):
             push_to_matrix = True
         super(Hospital, self).save(*args, **kwargs)
         if self.is_appointment_manager:
@@ -381,6 +384,45 @@ class Hospital(auth_model.TimeStampedModel, auth_model.CreatedByModel, auth_mode
         if not result:
             result.extend(list(self.spoc_details.filter(contact_type=SPOCDetails.OWNER)))
         return result
+
+
+class HospitalPlaceDetails(auth_model.TimeStampedModel):
+    hospital = models.ForeignKey(Hospital, on_delete=models.CASCADE, related_name='hospital_place_details')
+    place_id = models.TextField()
+    place_details = JSONField(null=True, blank=True)
+    reviews = JSONField(null=True, blank=True)
+
+    class Meta:
+        db_table = 'hospital_place_details'
+
+    def save(self, *args, **kwargs):
+        super().save(*args, **kwargs)
+
+    @classmethod
+    def update_place_details(cls):
+        hosp_place_id = HospitalPlaceDetails.objects.all()
+        for data in hosp_place_id:
+            if not data.place_details:
+                place_searched_data = None
+                params = {'placeid': data.place_id, 'key': settings.REVERSE_GEOCODING_API_KEY}
+                place_response = requests.get('https://maps.googleapis.com/maps/api/place/details/json',
+                                          params=params)
+                if place_response.status_code != status.HTTP_200_OK or not place_response.ok:
+                    print('failure  status_code: ' + str(place_response.status_code) + ', reason: ' + str(
+                        place_response.reason))
+                    continue
+
+                place_searched_data = place_response.json()
+                if place_searched_data.get('status') == 'OVER_QUERY_LIMIT':
+                    print('OVER_QUERY_LIMIT')
+                    continue
+
+                if place_searched_data.get('result'):
+                    place_searched_data = place_searched_data.get('result')
+                    data.place_details = place_searched_data
+                    data.reviews = {'user_avg_rating': place_searched_data.get('rating'), 'user_reviews': place_searched_data.get('reviews'),
+                                    'user_ratings_total': place_searched_data.get('user_ratings_total')}
+                    data.save()
 
 
 class HospitalServiceMapping(models.Model):
@@ -565,17 +607,50 @@ class Doctor(auth_model.TimeStampedModel, auth_model.QCModel, SearchKey, auth_mo
     source_type = models.IntegerField(choices=SOURCE_TYPE_CHOICES, null=True, editable=False)
     avg_rating = models.DecimalField(max_digits=5, decimal_places=2, null=True, editable=False)
     remark = GenericRelation(Remark)
-
+    rating_data = JSONField(blank=True, null=True)
     qr_code = GenericRelation(QRCode, related_name="qrcode")
 
     def __str__(self):
         return '{} ({})'.format(self.name, self.id)
 
+    # @property
+    @cached_property
+    def is_enabled_for_insurance(self):
+        return self.is_insurance_enabled
+
+    @classmethod
+    def get_insurance_details(cls, user):
+        resp = {
+            'is_insurance_covered': False,
+            'insurance_threshold_amount': None,
+            'is_user_insured': False
+        }
+
+        if user.is_authenticated and not user.is_anonymous:
+            user_insurance = user.active_insurance
+            if user_insurance:
+                insurance_threshold = user_insurance.insurance_threshold
+                if insurance_threshold:
+                    resp['insurance_threshold_amount'] = 0 if insurance_threshold.opd_amount_limit is None else \
+                        insurance_threshold.lab_amount_limit
+                    resp['is_user_insured'] = True
+
+        return resp
+
     def update_deal_price(self):        
         # will update only this doctor prices and will be called on save    
-        query = '''update doctor_clinic_timing set 
-                    deal_price = least(greatest(floor(case when (least(fees*1.5, .8*mrp) - fees) >100 then least(fees*1.5, .8*mrp)
-                    else least(fees+100, mrp) end /5)*5, fees), mrp) where doctor_clinic_id in (
+        query = '''update doctor_clinic_timing set deal_price = least(
+                    greatest(floor(
+                    case when fees <=0 then mrp*.4 
+                    when mrp<=2000 then
+                    case when (least(fees*1.5, .8*mrp) - fees) >100 then least(fees*1.5, .8*mrp) 
+                    else least(fees+100, mrp) end
+                    else 
+                    case when (least(fees*1.5, fees+.5*(mrp-fees)) - fees )>100
+                    then least(fees*1.5, fees+.5*(mrp-fees))
+                    else
+                    least(fees+100, mrp) end 	
+                    end  /5)*5, fees), mrp) where doctor_clinic_id in (
                     select id from doctor_clinic where doctor_id= %s) '''
 
         update_doctor_deal_price = RawSql(query, [self.pk]).execute()
@@ -583,12 +658,20 @@ class Doctor(auth_model.TimeStampedModel, auth_model.QCModel, SearchKey, auth_mo
     @classmethod
     def update_all_deal_price(cls):
         # will update all doctors prices
-        query = '''update doctor_clinic_timing set 
-            deal_price = least(greatest(floor(case when (least(fees*1.5, .8*mrp) - fees) >100 then least(fees*1.5, .8*mrp)
-            else least(fees+100, mrp) end /5)*5, fees), mrp) '''
+        query = '''update doctor_clinic_timing set deal_price = least(
+                    greatest(floor(
+                    case when fees <=0 then mrp*.4 
+                    when mrp<=2000 then
+                    case when (least(fees*1.5, .8*mrp) - fees) >100 then least(fees*1.5, .8*mrp) 
+                    else least(fees+100, mrp) end
+                    else 
+                    case when (least(fees*1.5, fees+.5*(mrp-fees)) - fees )>100
+                    then least(fees*1.5, fees+.5*(mrp-fees))
+                    else
+                    least(fees+100, mrp) end 	
+                    end  /5)*5, fees), mrp) '''
 
         update_all_doctor_deal_price = RawSql(query, []).execute()
-
 
     def get_display_name(self):
         return "Dr. {}".format(self.name.title()) if self.name else None
@@ -621,12 +704,14 @@ class Doctor(auth_model.TimeStampedModel, auth_model.QCModel, SearchKey, auth_mo
 
     def get_avg_rating(self):
         # return self.rating.filter(is_live=True).aggregate(avg_rating=Avg('ratings'))
-        return self.avg_rating
+        if self.rating_data:
+            return self.rating_data.get('avg_rating')
+        return None
 
     def get_rating_count(self):
         count = 0
-        if self.rating.exists():
-            count = self.rating.count()
+        if self.rating_data and self.rating_data.get('rating_count'):
+            count = self.rating_data.get('rating_count')
         return count
 
     def update_live_status(self):
@@ -666,6 +751,12 @@ class Doctor(auth_model.TimeStampedModel, auth_model.QCModel, SearchKey, auth_mo
         elif self.enabled and self.disabled_at:
             self.disabled_at = None
 
+    def display_rating_on_list(self):
+        if self.rating_data and ((self.rating_data.get('rating_count') and self.rating_data['rating_count'] > 5) or \
+                                 (self.rating_data.get('avg_rating') and self.rating_data['avg_rating'] > 4)):
+            return True
+        return False
+    
     def save(self, *args, **kwargs):
         self.update_time_stamps()
         self.update_live_status()
@@ -705,10 +796,18 @@ class Doctor(auth_model.TimeStampedModel, auth_model.QCModel, SearchKey, auth_mo
         content_type = ContentType.objects.get_for_model(Doctor)
         if content_type:
             cid = content_type.id
-            query = '''UPDATE doctor d set avg_rating = (select avg(ratings) from ratings_review where content_type_id={} and object_id=d.id) '''.format(cid)
+
+            query = '''update doctor d set rating_data=
+                       (
+                       select json_build_object('avg_rating', x.avg_rating,'rating_count', x.rating_count) from
+                       (select object_id as doctor_id,round(avg(ratings),1) avg_rating, count(*) rating_count from 
+                       ratings_review where content_type_id={} group by object_id
+                       )x where x.doctor_id = d.id				  
+                       ) where id in (select object_id from ratings_review where content_type_id={})
+                     '''.format(cid, cid)
             cursor.execute(query)
 
-    def enabled_for_cod(self):
+    def enabled_for_cod(self):  # Not to be used
         return False
 
     def generate_qr_code(self):
@@ -909,7 +1008,7 @@ class DoctorSpecialization(auth_model.TimeStampedModel):
         unique_together = ("doctor", "specialization")
 
 
-class DoctorClinic(auth_model.TimeStampedModel):
+class DoctorClinic(auth_model.TimeStampedModel, auth_model.WelcomeCallingDone):
     doctor = models.ForeignKey(Doctor, on_delete=models.CASCADE, related_name='doctor_clinics')
     hospital = models.ForeignKey(Hospital, on_delete=models.CASCADE, related_name='hospital_doctors')
     followup_duration = models.PositiveSmallIntegerField(blank=True, null=True)
@@ -1348,7 +1447,7 @@ class DoctorEmail(auth_model.TimeStampedModel):
         unique_together = (("doctor", "email"),)
 
 
-class HospitalNetwork(auth_model.TimeStampedModel, auth_model.CreatedByModel, auth_model.QCModel, auth_model.WelcomeCallingDone):
+class HospitalNetwork(auth_model.TimeStampedModel, auth_model.CreatedByModel, auth_model.QCModel, auth_model.WelcomeCallingDone, auth_model.PhysicalAgreementSigned):
     name = models.CharField(max_length=100)
     operational_since = models.PositiveSmallIntegerField(blank=True, null=True, validators=[MinValueValidator(1900)])
     about = models.CharField(max_length=2000, blank=True)
@@ -1580,7 +1679,8 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
     PREPAID = 1
     COD = 2
     INSURANCE = 3
-    PAY_CHOICES = ((PREPAID, 'Prepaid'), (COD, 'COD'), (INSURANCE, 'Insurance'))
+    PLAN = 4
+    PAY_CHOICES = ((PREPAID, 'Prepaid'), (COD, 'COD'), (INSURANCE, 'Insurance'), (PLAN, "Subscription Plan"))
     ACTIVE_APPOINTMENT_STATUS = [BOOKED, ACCEPTED, RESCHEDULED_PATIENT, RESCHEDULED_DOCTOR]
     STATUS_CHOICES = [(CREATED, 'Created'), (BOOKED, 'Booked'),
                       (RESCHEDULED_DOCTOR, 'Rescheduled by Doctor'),
@@ -1615,7 +1715,7 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
     time_slot_start = models.DateTimeField(blank=True, null=True)
     time_slot_end = models.DateTimeField(blank=True, null=True)
     payment_type = models.PositiveSmallIntegerField(choices=PAY_CHOICES, default=PREPAID)
-    insurance = models.ForeignKey(insurance_model.Insurance, blank=True, null=True, default=None,
+    insurance = models.ForeignKey(insurance_model.UserInsurance, blank=True, null=True, default=None,
                                   on_delete=models.DO_NOTHING)
     outstanding = models.ForeignKey(Outstanding, blank=True, null=True, on_delete=models.SET_NULL)
     matrix_lead_id = models.IntegerField(null=True)
@@ -1705,6 +1805,8 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
         appointment_data["payment_status"] = OpdAppointment.PAYMENT_ACCEPTED
         appointment_data["status"] = OpdAppointment.BOOKED
         appointment_data["otp"] = otp
+        # if appointment_data["insurance_id"] :
+        #     appointment_data["insurance"] = insurance_model.UserInsurance.objects.get(id=appointment_data["insurance_id"].id)
         coupon_list = appointment_data.pop("coupon", None)
         procedure_details = appointment_data.pop('extra_details', [])
         app_obj = cls.objects.create(**appointment_data)
@@ -2051,6 +2153,11 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
                                   "deal_price": self.mrp,
                                   "agreed_price": self.mrp,
                                   "discount": 0})
+        elif self.payment_type == OpdAppointment.INSURANCE:
+            procedures.insert(0, {"name": "Consultation", "mrp": self.mrp,
+                                  "deal_price": "0.00",
+                                  "agreed_price": self.mrp,
+                                  "discount": self.mrp})
         else:
             procedure_mappings = self.procedure_mappings.select_related("procedure").all()
             procedures = [{"name": mapping.procedure.name, "mrp": mapping.mrp, "deal_price": mapping.deal_price,
@@ -2114,6 +2221,7 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
         if not procedures:
             if data.get("payment_type") == cls.INSURANCE:
                 effective_price = doctor_clinic_timing.deal_price
+                coupon_discount, coupon_cashback, coupon_list = 0, 0, []
             elif data.get("payment_type") in [cls.PREPAID]:
                 coupon_discount, coupon_cashback, coupon_list = Coupon.get_total_deduction(data,
                                                                                            doctor_clinic_timing.deal_price)
@@ -2161,6 +2269,7 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
 
     @classmethod
     def create_fulfillment_data(cls, user, data, price_data):
+        from ondoc.insurance.models import UserInsurance
         procedures = data.get('procedure_ids', [])
         selected_hospital = data.get('hospital')
         doctor = data.get('doctor')
@@ -2184,6 +2293,24 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
                           'mrp': doctor_clinic_procedure.mrp}
             extra_details.append(temp_extra)
 
+        payment_type = data.get("payment_type")
+        effective_price = price_data.get("effective_price")
+        cart_data = data.get('cart_item').data
+        is_appointment_insured = cart_data.get('is_appointment_insured', None)
+        insurance_id = cart_data.get('insurance_id', None)
+        # user_insurance = UserInsurance.objects.filter(user=user).last()
+        # if user_insurance:
+        #     insurance_validate_dict = user_insurance.validate_insurance(data)
+        #     is_appointment_insured = insurance_validate_dict['is_insured']
+        #     insurance_id = insurance_validate_dict['insurance_id']
+        #     insurance_message = insurance_validate_dict['insurance_message']
+
+        if is_appointment_insured:
+            payment_type = OpdAppointment.INSURANCE
+            effective_price = 0.0
+        else:
+            insurance_id = None
+
         return {
             "doctor": data.get("doctor"),
             "hospital": data.get("hospital"),
@@ -2193,14 +2320,16 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
             "booked_by": user,
             "fees": price_data.get("fees"),
             "deal_price": price_data.get("deal_price"),
-            "effective_price": price_data.get("effective_price"),
+            "effective_price": effective_price,
             "mrp": price_data.get("mrp"),
             "extra_details": extra_details,
             "time_slot_start": time_slot_start,
-            "payment_type": data.get("payment_type"),
+            "payment_type": payment_type,
             "coupon": price_data.get("coupon_list"),
             "discount": int(price_data.get("coupon_discount")),
-            "cashback": int(price_data.get("coupon_cashback"))
+            "cashback": int(price_data.get("coupon_cashback")),
+            "is_appointment_insured": is_appointment_insured,
+            "insurance": insurance_id
         }
 
     @staticmethod
@@ -2426,6 +2555,11 @@ class CommonSpecialization(auth_model.TimeStampedModel):
 
     class Meta:
         db_table = "common_specializations"
+
+    @classmethod
+    def get_specializations(cls, count):
+        specializations = cls.objects.select_related('specialization').all().order_by("-priority")[:count]
+        return specializations
 
 
 class DoctorMapping(auth_model.TimeStampedModel):
@@ -2871,6 +3005,13 @@ class ProviderSignupLead(auth_model.TimeStampedModel):
     email = models.EmailField()
     type = models.IntegerField(choices=TYPE_CHOICES)
     is_docprime = models.NullBooleanField(null=True, editable=False)
+    matrix_lead_id = models.IntegerField(null=True)
+
+    def save(self, *args, **kwargs):
+        super(ProviderSignupLead, self).save(*args, **kwargs)
+        if self.is_docprime and not self.matrix_lead_id:
+            create_or_update_lead_on_matrix.apply_async(({'obj_type': self.__class__.__name__, 'obj_id': self.id}
+                                                         ,), countdown=5)
 
     class Meta:
         db_table = "provider_signup_lead"

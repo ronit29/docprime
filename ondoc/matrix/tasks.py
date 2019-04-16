@@ -81,7 +81,28 @@ def prepare_and_hit(self, data):
     if mask_number_instance:
         mask_number = mask_number_instance.mask_number
 
+    user_insurance = appointment.user.active_insurance
+    primary_proposer_name = None
+
+    if user_insurance:
+        primary_proposer = user_insurance.get_primary_member_profile()
+        primary_proposer_name = primary_proposer.get_full_name() if primary_proposer else None
+
+    policy_details = {
+        "ProposalNo": None,
+        "BookingId": user_insurance.id if user_insurance else None,
+        "ProposerName": primary_proposer_name,
+        "PolicyId": user_insurance.policy_number if user_insurance else None,
+        "InsurancePlanPurchased": user_insurance.insurance_plan.name if user_insurance else None,
+        "PurchaseDate": int(user_insurance.purchase_date.timestamp()) if user_insurance else None,
+        "ExpirationDate": int(user_insurance.expiry_date.timestamp()) if user_insurance else None,
+        "COILink": user_insurance.coi.url if user_insurance and  user_insurance.coi is not None and user_insurance.coi.name else None,
+        "PeopleCovered": user_insurance.insurance_plan.get_people_covered() if user_insurance else ""
+    }
+
     appointment_details = {
+        'IsInsured': 'yes' if user_insurance else 'no',
+        'PolicyId': user_insurance.policy_number if user_insurance else None,
         'AppointmentStatus': appointment.status,
         'Age': calculate_age(appointment),
         'Email': p_email,
@@ -90,6 +111,7 @@ def prepare_and_hit(self, data):
         'KYC': kyc,
         'Location': location,
         'PaymentType': appointment.payment_type,
+        'PaymentTypeId': appointment.payment_type,
         'PaymentStatus': 300,
         'OrderID': order_id if order_id else 0,
         'DocPrimeBookingID': appointment.id,
@@ -125,7 +147,8 @@ def prepare_and_hit(self, data):
         'CityId': 0,
         'ProductId': task_data.get('product_id'),
         'SubProductId': task_data.get('sub_product_id'),
-        'AppointmentDetails': appointment_details
+        'AppointmentDetails': appointment_details,
+        'PolicyDetails': policy_details
     }
 
     #logger.error(json.dumps(request_data))
@@ -323,6 +346,8 @@ def push_signup_lead_to_matrix(self, data):
 
         utm = online_lead_obj.utm_params if online_lead_obj.utm_params else {}
 
+        continue_url = settings.ADMIN_BASE_URL + reverse('admin:doctor_doctor_add')
+
         request_data = {
             'Name': online_lead_obj.name,
             'PrimaryNo': online_lead_obj.mobile,
@@ -338,6 +363,7 @@ def push_signup_lead_to_matrix(self, data):
             'UTMMedium': utm.get('utm_medium', ''),
             'UtmSource': utm.get('utm_source', ''),
             'UtmTerm': utm.get('utm_term', ''),
+            'ExitPointUrl': continue_url
         }
 
         #logger.error(json.dumps(request_data))
@@ -471,6 +497,7 @@ def create_or_update_lead_on_matrix(self, data):
     from ondoc.doctor.models import Doctor
     from ondoc.doctor.models import Hospital
     from ondoc.doctor.models import HospitalNetwork
+    from ondoc.doctor.models import ProviderSignupLead
     try:
         obj_id = data.get('obj_id', None)
         obj_type = data.get('obj_type', None)
@@ -478,28 +505,39 @@ def create_or_update_lead_on_matrix(self, data):
             logger.error("CELERY ERROR: Incorrect values provided.")
             raise ValueError()
         product_id = matrix_product_ids.get('opd_products', 1)
-        sub_product_id = matrix_subproduct_ids.get(obj_type.lower(), 4)
+        sub_product_id = matrix_subproduct_ids.get(obj_type.lower(), 4) if obj_type != ProviderSignupLead.__name__ else matrix_subproduct_ids.get(Doctor.__name__.lower(), 4)
         ct = ContentType.objects.get(model=obj_type.lower())
         model_used = ct.model_class()
         content_type = ContentType.objects.get_for_model(model_used)
-        exit_point_url = settings.ADMIN_BASE_URL + reverse('admin:{}_{}_change'.format(content_type.app_label, content_type.model), kwargs={"object_id": obj_id})
+        if obj_type != ProviderSignupLead.__name__:
+            exit_point_url = settings.ADMIN_BASE_URL + reverse('admin:{}_{}_change'.format(content_type.app_label, content_type.model), kwargs={"object_id": obj_id})
+        else:
+            exit_point_url = settings.ADMIN_BASE_URL + reverse('admin:doctor_doctor_add')
         obj = model_used.objects.filter(id=obj_id).first()
         if not obj:
             raise Exception("{} could not found against id - {}".format(obj_type, obj_id))
 
         mobile = '0'
+        email = ''
         gender = 0
+        name = obj.name if hasattr(obj, 'name') and obj.name else ''
         if obj_type == Doctor.__name__:
+            lead_source = 'referral'
             if obj.gender and obj.gender == 'm':
                 gender = 1
             elif obj.gender and obj.gender == 'f':
                 gender = 2
         elif obj_type == Hospital.__name__:
-            spoc_details = obj.spoc_details.filter(contact_type=SPOCDetails.SPOC).first()
+            lead_source = 'ProviderApp' if obj.source_type == Hospital.PROVIDER and obj.is_listed_on_docprime else 'referral'
+            spoc_details = obj.spoc_details.filter(contact_type=SPOCDetails.SPOC, email__isnull=False).first()
+            if not spoc_details:
+                spoc_details = obj.spoc_details.filter(contact_type=SPOCDetails.SPOC).first()
             if spoc_details:
                 mobile = str(spoc_details.std_code) if spoc_details.std_code else ''
                 mobile += str(spoc_details.number) if spoc_details.number else ''
+                email = spoc_details.email if spoc_details.email else ''
         elif obj_type == HospitalNetwork.__name__:
+            lead_source = 'referral'
             spoc_details = obj.spoc_details.filter(contact_type=SPOCDetails.SPOC).first()
             if spoc_details:
                 mobile = str(spoc_details.std_code) if spoc_details.std_code else ''
@@ -507,21 +545,30 @@ def create_or_update_lead_on_matrix(self, data):
             # spoc_details = obj.hospitalnetworkmanager_set.filter(contact_type=2).first()
             # if spoc_details:
             #     mobile += str(spoc_details.number) if hasattr(spoc_details, 'number') and spoc_details.number else ''
+        elif obj_type == ProviderSignupLead.__name__:
+            lead_source = 'ProviderApp'
+            mobile = obj.phone_number
+            email = obj.email if obj.email else ''
+            if obj.type == ProviderSignupLead.DOCTOR:
+                name = obj.name + ' (Doctor)'
+            elif obj.type == ProviderSignupLead.HOSPITAL_ADMIN:
+                name = obj.name + ' (Hospital Admin)'
         mobile = int(mobile)
         # if not mobile:
         #     return
         request_data = {
-            'LeadSource': 'referral',
+            'LeadSource': lead_source,
             'LeadID': obj.matrix_lead_id if hasattr(obj, 'matrix_lead_id') and obj.matrix_lead_id else 0,
             'PrimaryNo': mobile,
-            'QcStatus': obj.data_status,
+            'EmailId': email,
+            'QcStatus': obj.data_status if hasattr(obj, 'data_status') else 0,
             'OnBoarding': obj.onboarding_status if hasattr(obj, 'onboarding_status') else 0,
             'Gender': gender,
             'ProductId': product_id,
             'SubProductId': sub_product_id,
-            'Name': obj.name if hasattr(obj, 'name') and obj.name else '',
+            'Name': name,
             'ExitPointUrl': exit_point_url,
-            'CityId': obj.matrix_city.id if hasattr(obj, 'matrix_city') and obj.matrix_city.id else 0
+            'CityId': obj.matrix_city.id if hasattr(obj, 'matrix_city') and obj.matrix_city and obj.matrix_city.id else 0
         }
         url = settings.MATRIX_API_URL
         matrix_api_token = settings.MATRIX_API_TOKEN

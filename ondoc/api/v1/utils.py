@@ -250,6 +250,42 @@ class IsMatrixUser(permissions.BasePermission):
         return False
 
 
+def insurance_transform(app_data):
+    """A serializer helper to serialize Insurance data"""
+    # app_data['insurance']['insurance_transaction']['transaction_date'] = str(app_data['insurance']['insurance_transaction']['transaction_date'])
+    # app_data['insurance']['profile_detail']['dob'] = str(app_data['insurance']['profile_detail']['dob'])
+    # insured_members = app_data['insurance']['insurance_transaction']['insured_members']
+    # for member in insured_members:
+    #     member['dob'] = str(member['dob'])
+    #     # member['member_profile']['dob'] = str(member['member_profile']['dob'])
+    # return app_data
+    app_data['user_insurance']['purchase_date'] = str(
+        app_data['user_insurance']['purchase_date'])
+    app_data['user_insurance']['expiry_date'] = str(
+        app_data['user_insurance']['expiry_date'])
+    app_data['profile_detail']['dob'] = str(app_data['profile_detail']['dob'])
+    insured_members = app_data['user_insurance']['insured_members']
+    for member in insured_members:
+        member['dob'] = str(member['dob'])
+        # member['member_profile']['dob'] = str(member['member_profile']['dob'])
+    return app_data
+
+
+def insurance_reverse_transform(insurance_data):
+    insurance_data['user_insurance']['purchase_date'] = \
+        datetime.datetime.strptime(insurance_data['user_insurance']['purchase_date'], "%Y-%m-%d %H:%M:%S.%f")
+    insurance_data['user_insurance']['expiry_date'] = \
+        datetime.datetime.strptime(insurance_data['user_insurance']['expiry_date'],
+                                   "%Y-%m-%d %H:%M:%S.%f")
+    insurance_data['profile_detail']['dob'] = \
+        datetime.datetime.strptime(insurance_data['profile_detail']['dob'],
+                                   "%Y-%m-%d")
+    insured_members = insurance_data['user_insurance']['insured_members']
+    for member in insured_members:
+        member['dob'] = datetime.datetime.strptime(member['dob'], "%Y-%m-%d").date()
+    return insurance_data
+
+
 def opdappointment_transform(app_data):
     """A serializer helper to serialize OpdAppointment data"""
     app_data["deal_price"] = str(app_data["deal_price"])
@@ -281,6 +317,8 @@ def labappointment_transform(app_data):
     app_data["home_pickup_charges"] = str(app_data.get("home_pickup_charges",0))
     if app_data.get("coupon"):
         app_data["coupon"] = list(app_data["coupon"])
+    if app_data.get("user_plan"):
+        app_data["user_plan"] = app_data["user_plan"].id
     return app_data
 
 
@@ -319,6 +357,7 @@ def is_valid_testing_lab_data(user, lab):
 
 def payment_details(request, order):
     from ondoc.authentication.models import UserProfile
+    from ondoc.insurance.models import InsurancePlans
     from ondoc.account.models import PgTransaction, Order
     payment_required = True
     user = request.user
@@ -333,11 +372,26 @@ def payment_details(request, order):
     profile_name = ""
     if profile:
         profile_name = profile.name
+    if not profile and order.product_id == 3:
+        if order.action_data.get('profile_detail'):
+            profile_name = order.action_data.get('profile_detail').get('name', "")
+
+    insurer_code = None
+    if order.product_id == Order.INSURANCE_PRODUCT_ID:
+        insurance_plan_id = order.action_data.get('insurance_plan')
+        insurance_plan = InsurancePlans.objects.filter(id=insurance_plan_id).first()
+        if not insurance_plan:
+            raise Exception('Invalid pg transaction as insurer plan is not found.')
+        insurer = insurance_plan.insurer
+        insurer_code = insurer.insurer_merchant_code
+
+    temp_product_id = order.product_id
+
     pgdata = {
         'custId': user.id,
         'mobile': user.phone_number,
         'email': uemail,
-        'productId': order.product_id,
+        'productId': temp_product_id,
         'surl': surl,
         'furl': furl,
         'referenceId': "",
@@ -345,13 +399,21 @@ def payment_details(request, order):
         'name': profile_name,
         'txAmount': str(order.amount),
     }
+
+    if insurer_code:
+        pgdata['insurerCode'] = insurer_code
+
     secret_key = client_key = ""
-    if order.product_id == Order.DOCTOR_PRODUCT_ID:
+    # TODO : SHASHANK_SINGH for plan FINAL ??
+    if order.product_id == Order.DOCTOR_PRODUCT_ID or order.product_id == Order.SUBSCRIPTION_PLAN_PRODUCT_ID:
         secret_key = settings.PG_SECRET_KEY_P1
         client_key = settings.PG_CLIENT_KEY_P1
     elif order.product_id == Order.LAB_PRODUCT_ID:
         secret_key = settings.PG_SECRET_KEY_P2
         client_key = settings.PG_CLIENT_KEY_P2
+    elif order.product_id == Order.INSURANCE_PRODUCT_ID:
+        secret_key = settings.PG_SECRET_KEY_P3
+        client_key = settings.PG_CLIENT_KEY_P3
 
     pgdata['hash'] = PgTransaction.create_pg_hash(pgdata, secret_key, client_key)
 
@@ -890,7 +952,7 @@ class TimeSlotExtraction(object):
             start_date = gl.get('start_date')
             end_date = gl.get('end_date')
             if start_date == end_date:
-                total_leaves.append(start_date)
+                total_leaves.append(datetime.datetime.strptime(start_date, '%Y-%m-%d'))
             else:
                 delta = datetime.datetime.strptime(end_date, '%Y-%m-%d') - datetime.datetime.strptime(start_date, '%Y-%m-%d')
                 for i in range(delta.days + 1):
@@ -1279,9 +1341,11 @@ def create_payout_checksum(all_txn, product_id):
     #     secret_key = settings.PG_SECRET_KEY_P2
     #     client_key = settings.PG_CLIENT_KEY_P2
 
-    secret_key = settings.PG_SECRET_KEY_P2
-    client_key = settings.PG_CLIENT_KEY_P2
+    # secret_key = settings.PG_SECRET_KEY_P2
+    # client_key = settings.PG_CLIENT_KEY_P2
 
+    secret_key = settings.PG_PAYOUT_SECRET_KEY
+    client_key = settings.PG_PAYOUT_CLIENT_KEY
 
     all_txn = sorted(all_txn, key=lambda x : x["idx"])
     checksum = ""
@@ -1346,3 +1410,52 @@ def datetime_to_formated_string(instance, time_format='%Y-%m-%d %H:%M:%S', to_zo
     formated_date = datetime.datetime.strftime(instance, time_format)
     return formated_date
 
+def payout_checksum(request_payload):
+
+    secretkey = settings.PG_SECRET_KEY_P2
+    accesskey = settings.PG_CLIENT_KEY_P2
+
+    checksum = ""
+
+    curr = ''
+
+    keylist = sorted(request_payload)
+    for k in keylist:
+        if request_payload[k] is not None:
+            curr = curr + k + '=' + str(request_payload[k]) + ';'
+
+    checksum += curr
+
+    checksum = accesskey + "|" + checksum + "|" + secretkey
+    checksum_hash = hashlib.sha256(str(checksum).encode())
+    checksum_hash = checksum_hash.hexdigest()
+    return checksum_hash
+
+def get_package_free_or_not_dict(request):
+    from ondoc.subscription_plan.models import UserPlanMapping
+    package_free_or_not_dict = defaultdict(bool)
+    if request.user and request.user.is_authenticated:
+        free_test_in_user_plan = UserPlanMapping.get_free_tests(request)
+        for temp_user_plan_package in free_test_in_user_plan:
+            package_free_or_not_dict[temp_user_plan_package] = True
+    return package_free_or_not_dict
+
+
+def update_physical_agreement_value(obj, value, time):
+    obj.assoc_hospitals.all().update(physical_agreement_signed=value, physical_agreement_signed_at=time)
+
+
+def update_physical_agreement_timestamp(obj):
+    from ondoc.doctor.models import HospitalNetwork
+    to_be_updated = False
+    time_to_be_set = None
+    if obj.physical_agreement_signed and not obj.physical_agreement_signed_at:
+        time_to_be_set = timezone.now()
+        to_be_updated = True
+    elif not obj.physical_agreement_signed and obj.physical_agreement_signed_at:
+        time_to_be_set = None
+        to_be_updated = True
+    if to_be_updated:
+        obj.physical_agreement_signed_at = time_to_be_set
+        if isinstance(obj, HospitalNetwork):
+            update_physical_agreement_value(obj, obj.physical_agreement_signed, time_to_be_set)

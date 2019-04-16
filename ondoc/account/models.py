@@ -7,19 +7,22 @@ from ondoc.account.tasks import refund_curl_task
 from ondoc.notification.models import AppNotification, NotificationAction
 from ondoc.notification.tasks import process_payout
 # from ondoc.diagnostic.models import LabAppointment
+# from ondoc.matrix.tasks import push_order_to_matrix
 from django.db import transaction
 from django.db.models import Sum, Q, F, Max
 from datetime import datetime, timedelta
 from django.utils import timezone
 from ondoc.api.v1.utils import refund_curl_request, form_pg_refund_data, opdappointment_transform, \
-    labappointment_transform, payment_details
+    labappointment_transform, payment_details, insurance_reverse_transform
 from django.conf import settings
 from rest_framework import status
+from copy import deepcopy
 import hashlib
 import copy
 import json
 import logging
 import requests
+import datetime
 from decimal import Decimal
 from ondoc.notification.tasks import set_order_dummy_transaction
 from django.contrib.contenttypes.fields import GenericForeignKey
@@ -35,6 +38,8 @@ class Order(TimeStampedModel):
     OPD_APPOINTMENT_CREATE = 2
     LAB_APPOINTMENT_RESCHEDULE = 3
     LAB_APPOINTMENT_CREATE = 4
+    INSURANCE_CREATE = 5
+    SUBSCRIPTION_PLAN_BUY = 6
     PAYMENT_ACCEPTED = 1
     PAYMENT_PENDING = 0
     PAYMENT_FAILURE = 3
@@ -47,12 +52,16 @@ class Order(TimeStampedModel):
                       (OPD_APPOINTMENT_CREATE, "Opd Create"),
                       (LAB_APPOINTMENT_CREATE, "Lab Create"),
                       (LAB_APPOINTMENT_RESCHEDULE, "Lab Reschedule"),
-                      )
+                      (INSURANCE_CREATE, "Insurance Create"),(SUBSCRIPTION_PLAN_BUY, "Subscription Plan Buy"))
     DOCTOR_PRODUCT_ID = 1
     LAB_PRODUCT_ID = 2
-    PRODUCT_IDS = [(DOCTOR_PRODUCT_ID, "Doctor Appointment"), (LAB_PRODUCT_ID, "LAB_PRODUCT_ID")]
+    INSURANCE_PRODUCT_ID = 3
+    SUBSCRIPTION_PLAN_PRODUCT_ID = 4
+    PRODUCT_IDS = [(DOCTOR_PRODUCT_ID, "Doctor Appointment"), (LAB_PRODUCT_ID, "LAB_PRODUCT_ID"),
+                   (INSURANCE_PRODUCT_ID, "INSURANCE_PRODUCT_ID"),(SUBSCRIPTION_PLAN_PRODUCT_ID, "SUBSCRIPTION_PLAN_PRODUCT_ID")]
+
     product_id = models.SmallIntegerField(choices=PRODUCT_IDS, blank=True, null=True)
-    reference_id = models.IntegerField(blank=True, null=True)
+    reference_id = models.BigIntegerField(blank=True, null=True)
     action = models.PositiveSmallIntegerField(blank=True, null=True, choices=ACTION_CHOICES)
     action_data = JSONField(blank=True, null=True)
     amount = models.DecimalField(max_digits=10, decimal_places=2, blank=True, null=True)
@@ -101,6 +110,10 @@ class Order(TimeStampedModel):
         from ondoc.diagnostic.models import LabAppointment
         from ondoc.api.v1.doctor.serializers import OpdAppTransactionModelSerializer
         from ondoc.api.v1.diagnostic.serializers import LabAppTransactionModelSerializer
+        from ondoc.api.v1.insurance.serializers import UserInsuranceSerializer
+        from ondoc.api.v1.diagnostic.serializers import PlanTransactionModelSerializer
+        from ondoc.subscription_plan.models import UserPlanMapping
+        from ondoc.insurance.models import UserInsurance, InsuranceTransaction
 
         # skip if order already processed
         if self.reference_id:
@@ -108,6 +121,7 @@ class Order(TimeStampedModel):
 
         # Initial validations for appointment data
         appointment_data = self.action_data
+        user_insurance_data = None
         # Check if payment is required at all, only when payment is required we debit consumer's account
         payment_not_required = False
         if self.product_id == self.DOCTOR_PRODUCT_ID:
@@ -126,6 +140,19 @@ class Order(TimeStampedModel):
                 payment_not_required = True
             elif appointment_data['payment_type'] == OpdAppointment.INSURANCE:
                 payment_not_required = True
+            elif appointment_data['payment_type'] == OpdAppointment.PLAN:
+                payment_not_required = True
+        elif self.product_id == self.INSURANCE_PRODUCT_ID:
+            insurance_data = deepcopy(self.action_data)
+            insurance_data = insurance_reverse_transform(insurance_data)
+            insurance_data['user_insurance']['order'] = self.id
+            serializer = UserInsuranceSerializer(data=insurance_data.get('user_insurance'))
+            serializer.is_valid(raise_exception=True)
+            user_insurance_data = serializer.validated_data
+        elif self.product_id == self.SUBSCRIPTION_PLAN_PRODUCT_ID:
+            serializer = PlanTransactionModelSerializer(data=appointment_data)
+            serializer.is_valid(raise_exception=True)
+            appointment_data = serializer.validated_data
 
         consumer_account = ConsumerAccount.objects.get_or_create(user=appointment_data['user'])
         consumer_account = ConsumerAccount.objects.select_for_update().get(user=appointment_data['user'])
@@ -172,6 +199,30 @@ class Order(TimeStampedModel):
                     "payment_status": Order.PAYMENT_ACCEPTED
                 }
 
+        elif self.action == Order.INSURANCE_CREATE:
+            user = User.objects.get(id=self.action_data.get('user'))
+            if consumer_account.balance >= user_insurance_data['premium_amount']:
+                appointment_obj = UserInsurance.create_user_insurance(user_insurance_data, user)
+                amount = appointment_obj.premium_amount
+                order_dict = {
+                    "reference_id": appointment_obj.id,
+                    "payment_status": Order.PAYMENT_ACCEPTED
+                }
+                insurer = appointment_obj.insurance_plan.insurer
+                InsuranceTransaction.objects.create(user_insurance=appointment_obj,
+                                                    account=insurer.float.all().first(),
+                                                    transaction_type=InsuranceTransaction.DEBIT, amount=amount)
+        elif self.action == Order.SUBSCRIPTION_PLAN_BUY:
+            amount = Decimal(appointment_data.get('extra_details').get('deal_price', float('inf')))
+            if consumer_account.balance >= amount:
+                new_appointment_data = appointment_data
+                appointment_obj = UserPlanMapping(**new_appointment_data)
+                appointment_obj.save()
+                order_dict = {
+                    "reference_id": appointment_obj.id,
+                    "payment_status": Order.PAYMENT_ACCEPTED
+                }
+
         if order_dict:
             self.update_order(order_dict)
 
@@ -185,6 +236,26 @@ class Order(TimeStampedModel):
             appointment_obj.save()
 
         return appointment_obj, wallet_amount, cashback_amount
+
+    @transaction.atomic
+    def process_insurance_order(self, consumer_account,user_insurance_data):
+
+        from ondoc.api.v1.insurance.serializers import UserInsuranceSerializer
+        from ondoc.insurance.models import UserInsurance, InsuranceTransaction
+        from ondoc.authentication.models import User
+        user = User.objects.get(id=self.action_data.get('user'))
+        user_insurance_obj = None
+        if consumer_account.balance >= user_insurance_data['premium_amount']:
+            user_insurance_obj = UserInsurance.create_user_insurance(user_insurance_data, user)
+            amount = user_insurance_obj.premium_amount
+            # order_dict = {
+            #     "reference_id": user_insurance_obj.id,
+            #     "payment_status": Order.PAYMENT_ACCEPTED
+            # }
+            insurer = user_insurance_obj.insurance_plan.insurer
+            InsuranceTransaction.objects.create(user_insurance=user_insurance_obj, account=insurer.float.all().first(),
+                                                transaction_type=InsuranceTransaction.DEBIT, amount=amount)
+        return user_insurance_obj
 
     def update_order(self, data):
         self.reference_id = data.get("reference_id", self.reference_id)
@@ -267,6 +338,8 @@ class Order(TimeStampedModel):
     def getAppointment(self):
         from ondoc.doctor.models import OpdAppointment
         from ondoc.diagnostic.models import LabAppointment
+        from ondoc.subscription_plan.models import UserPlanMapping
+        from ondoc.insurance.models import UserInsurance
 
         if self.orders.exists():
             completed_order = self.orders.filter(reference_id__isnull=False).first()
@@ -279,6 +352,10 @@ class Order(TimeStampedModel):
             return LabAppointment.objects.filter(id=self.reference_id).first()
         elif self.product_id == self.DOCTOR_PRODUCT_ID:
             return OpdAppointment.objects.filter(id=self.reference_id).first()
+        elif self.product_id == self.SUBSCRIPTION_PLAN_PRODUCT_ID:
+            return UserPlanMapping.objects.filter(id=self.reference_id).first()
+        elif self.product_id == self.INSURANCE_PRODUCT_ID:
+            return UserInsurance.objects.filter(id=self.reference_id).first()
         return None
 
     def get_total_price(self):
@@ -322,6 +399,7 @@ class Order(TimeStampedModel):
     @transaction.atomic()
     def create_order(cls, request, cart_items, use_wallet=True):
         from ondoc.doctor.models import OpdAppointment
+        from ondoc.matrix.tasks import push_order_to_matrix
 
         fulfillment_data = cls.transfrom_cart_items(request, cart_items)
 
@@ -346,7 +424,7 @@ class Order(TimeStampedModel):
             with transaction.atomic():
                 event_api = EventCreateViewSet()
                 visitor_id, visit_id = event_api.get_visit(request)
-                visitor_info = { "visitor_id": visitor_id, "visit_id": visit_id, "from_app": request.data.get("from_app", None) }
+                visitor_info = { "visitor_id": visitor_id, "visit_id": visit_id, "from_app": request.data.get("from_app", None), "app_version": request.data.get("app_version", None)}
         except Exception as e:
             logger.log("Could not fecth visitor info - " + str(e))
 
@@ -382,7 +460,8 @@ class Order(TimeStampedModel):
                 product_id=1,  # remove later
                 visitor_info=visitor_info
             )
-
+            push_order_to_matrix.apply_async(
+                ({'order_id': pg_order.id},), countdown=5)
         # building separate orders for all fulfillments
         fulfillment_data = copy.deepcopy(fulfillment_data)
         order_list = []
@@ -408,7 +487,7 @@ class Order(TimeStampedModel):
                     user=user
                 )
             elif appointment_detail.get('payment_type') == OpdAppointment.INSURANCE:
-                order = cls.Order.objects.create(
+                order = cls.objects.create(
                     product_id=product_id,
                     action=action,
                     action_data=appointment_detail,
@@ -417,7 +496,7 @@ class Order(TimeStampedModel):
                     cart_id=appointment_detail["cart_item_id"],
                     user=user
                 )
-            elif appointment_detail.get('payment_type') == OpdAppointment.COD:
+            elif appointment_detail.get('payment_type') == OpdAppointment.COD or appointment_detail.get('payment_type') == OpdAppointment.PLAN:
                 order = cls.objects.create(
                     product_id=product_id,
                     action=action,
@@ -454,6 +533,9 @@ class Order(TimeStampedModel):
     def process_pg_order(self):
         from ondoc.doctor.models import OpdAppointment
         from ondoc.diagnostic.models import LabAppointment
+        from ondoc.insurance.models import UserInsurance
+        from ondoc.subscription_plan.models import UserPlanMapping
+        from ondoc.insurance.models import InsuranceDoctorSpecializations
 
         orders_to_process = []
         if self.orders.exists():
@@ -464,9 +546,46 @@ class Order(TimeStampedModel):
         total_cashback_used = total_wallet_used = 0
         opd_appointment_ids = []
         lab_appointment_ids = []
+        insurance_ids = []
+        user_plan_ids = []
+        user = self.user
+        user_insurance_obj = user.active_insurance
+
+        gyno_count = 0
+        onco_count = 0
+        if user_insurance_obj:
+            specialization_count_dict = InsuranceDoctorSpecializations.get_already_booked_specialization_appointments(user, user_insurance_obj)
+            gyno_count = specialization_count_dict.get(InsuranceDoctorSpecializations.SpecializationMapping.GYNOCOLOGIST,{}).get('count', 0)
+            onco_count = specialization_count_dict.get(InsuranceDoctorSpecializations.SpecializationMapping.ONCOLOGIST,{}).get('count', 0)
 
         for order in orders_to_process:
             try:
+                is_process = True
+                app_data = order.action_data
+                doctor = app_data.get('doctor', None)
+
+                if doctor:
+                    if app_data.get('payment_type') == OpdAppointment.INSURANCE and not user_insurance_obj:
+                        is_process = False
+                    if user_insurance_obj and app_data.get('payment_type') == OpdAppointment.INSURANCE:
+                        doctor_specialization_tuple = InsuranceDoctorSpecializations.get_doctor_insurance_specializations(doctor)
+                        if doctor_specialization_tuple:
+                            doctor_specialization = doctor_specialization_tuple[1]
+                            if doctor_specialization == InsuranceDoctorSpecializations.SpecializationMapping.GYNOCOLOGIST:
+                               if gyno_count >= settings.INSURANCE_GYNECOLOGIST_LIMIT:
+                                    is_process = False
+                               else:
+                                    gyno_count += 1
+
+                            if doctor_specialization == InsuranceDoctorSpecializations.SpecializationMapping.ONCOLOGIST:
+                                if onco_count >= settings.INSURANCE_ONCOLOGIST_LIMIT:
+                                    is_process = False
+                                else:
+                                    onco_count += 1
+
+                    if not is_process:
+                        raise Exception("Insurance invalidate, Could not process entire order")
+
                 curr_app, curr_wallet, curr_cashback = order.process_order()
 
                 # appointment was not created - due to insufficient balance, do not process
@@ -476,12 +595,17 @@ class Order(TimeStampedModel):
                     opd_appointment_ids.append(curr_app.id)
                 elif order.product_id == Order.LAB_PRODUCT_ID:
                     lab_appointment_ids.append(curr_app.id)
+                elif order.product_id == Order.INSURANCE_PRODUCT_ID:
+                    insurance_ids.append(curr_app.id)
+                elif order.product_id == Order.SUBSCRIPTION_PLAN_PRODUCT_ID:
+                    user_plan_ids.append(curr_app.id)
 
                 total_cashback_used += curr_cashback
                 total_wallet_used += curr_wallet
 
                 # trigger event for new appointment creation
-                curr_app.trigger_created_event(self.visitor_info)
+                if self.visitor_info:
+                    curr_app.trigger_created_event(self.visitor_info)
 
                 # mark cart item delete after order process
                 if order.cart:
@@ -489,7 +613,7 @@ class Order(TimeStampedModel):
             except Exception as e:
                 logger.error(str(e))
 
-        if not opd_appointment_ids and not lab_appointment_ids:
+        if not opd_appointment_ids and not lab_appointment_ids and not insurance_ids and not user_plan_ids:
             raise Exception("Could not process entire order")
 
         # mark order processed:
@@ -510,13 +634,34 @@ class Order(TimeStampedModel):
             OpdAppointment.objects.filter(id__in=opd_appointment_ids).update(money_pool=money_pool)
         if lab_appointment_ids:
             LabAppointment.objects.filter(id__in=lab_appointment_ids).update(money_pool=money_pool)
+        if insurance_ids:
+            UserInsurance.objects.filter(id__in=insurance_ids).update(money_pool=money_pool)
+        if user_plan_ids:
+            UserPlanMapping.objects.filter(id__in=user_plan_ids).update(money_pool=money_pool)
 
-        resp = { "opd" : opd_appointment_ids , "lab" : lab_appointment_ids, "type" : "all", "id" : None }
+        resp = { "opd" : opd_appointment_ids , "lab" : lab_appointment_ids, "plan": user_plan_ids,
+                 "insurance": insurance_ids, "type" : "all", "id" : None }
         # Handle backward compatibility, in case of single booking, return the booking id
-        if (len(opd_appointment_ids) + len(lab_appointment_ids)) == 1:
-            resp["type"] = "doctor" if len(opd_appointment_ids) > 0 else "lab"
-            resp["id"] = opd_appointment_ids[0] if len(opd_appointment_ids) > 0 else lab_appointment_ids[0]
 
+        if (len(opd_appointment_ids) + len(lab_appointment_ids) + len(user_plan_ids) + len(insurance_ids)) == 1:
+            result_type = "all"
+            result_id = None
+            if len(opd_appointment_ids) > 0:
+                result_type = "doctor"
+                result_id = opd_appointment_ids[0]
+            elif len(lab_appointment_ids) > 0:
+                result_type = "lab"
+                result_id = lab_appointment_ids[0]
+            elif len(user_plan_ids) > 0:
+                result_type = "plan"
+                result_id = user_plan_ids[0]
+            elif len(insurance_ids) > 0:
+                result_type = "insurance"
+                result_id = insurance_ids[0]
+            # resp["type"] = "doctor" if len(opd_appointment_ids) > 0 else "lab"
+            # resp["id"] = opd_appointment_ids[0] if len(opd_appointment_ids) > 0 else lab_appointment_ids[0]
+            resp["type"] = result_type
+            resp["id"] = result_id
         return resp
 
     def validate_user(self, user=None):
@@ -642,12 +787,15 @@ class PgTransaction(TimeStampedModel):
     @classmethod
     def is_valid_hash(cls, data, product_id):
         client_key = secret_key = ""
-        if product_id == Order.DOCTOR_PRODUCT_ID:
+        if product_id == Order.DOCTOR_PRODUCT_ID or product_id == Order.SUBSCRIPTION_PLAN_PRODUCT_ID:
             client_key = settings.PG_CLIENT_KEY_P1
             secret_key = settings.PG_SECRET_KEY_P1
         elif product_id == Order.LAB_PRODUCT_ID:
             client_key = settings.PG_CLIENT_KEY_P2
             secret_key = settings.PG_SECRET_KEY_P2
+        elif product_id == Order.INSURANCE_PRODUCT_ID:
+            client_key = settings.PG_CLIENT_KEY_P3
+            secret_key = settings.PG_SECRET_KEY_P3
         pg_hash = None
         temp_data = copy.deepcopy(data)
         if temp_data.get("hash"):
@@ -819,8 +967,11 @@ class ConsumerAccount(TimeStampedModel):
         return ctx_obj
 
     def debit_schedule(self, appointment_obj, product_id, amount):
-        cashback_deducted = min(self.cashback, amount)
-        self.cashback -= cashback_deducted
+        if product_id == Order.SUBSCRIPTION_PLAN_PRODUCT_ID or product_id == Order.INSURANCE_PRODUCT_ID:
+            cashback_deducted = 0
+        else:
+            cashback_deducted = min(self.cashback, amount)
+            self.cashback -= cashback_deducted
 
         balance_deducted = min(self.balance, amount-cashback_deducted)
         self.balance -= balance_deducted
@@ -936,7 +1087,7 @@ class ConsumerTransaction(TimeStampedModel):
     ACTION_CHOICES = list(enumerate(action_list, 0))
     user = models.ForeignKey(User, on_delete=models.DO_NOTHING)
     product_id = models.SmallIntegerField(choices=Order.PRODUCT_IDS, blank=True, null=True)
-    reference_id = models.IntegerField(blank=True, null=True)
+    reference_id = models.BigIntegerField(blank=True, null=True)
     order_id = models.IntegerField(blank=True, null=True)
     transaction_id = models.CharField(max_length=100, blank=True, null=True)
     # pg_transaction = models.ForeignKey(PgTransaction, blank=True, null=True, on_delete=models.SET_NULL)
@@ -1180,9 +1331,11 @@ class MerchantPayout(TimeStampedModel):
     status = models.PositiveIntegerField(default=PENDING, choices=STATUS_CHOICES)
     payout_time = models.DateTimeField(null=True, blank=True)
     api_response = JSONField(blank=True, null=True)
+    status_api_response = JSONField(blank=True, default='', editable=False)
     retry_count = models.PositiveIntegerField(default=0)
     paid_to = models.ForeignKey(Merchant, on_delete=models.DO_NOTHING, related_name='payouts', null=True)
     utr_no = models.CharField(max_length=500, blank=True, default='')
+    pg_status = models.CharField(max_length=500, blank=True, default='')
     type = models.PositiveIntegerField(default=None, choices=TYPE_CHOICES, null=True, blank=True)
     amount_paid = models.DecimalField(max_digits=10, decimal_places=2, default=None, null=True, blank=True)
     content_type = models.ForeignKey(ContentType, on_delete=models.CASCADE, null=True, blank=True)
@@ -1190,6 +1343,7 @@ class MerchantPayout(TimeStampedModel):
     content_object = GenericForeignKey()
 
     def save(self, *args, **kwargs):
+
         first_instance = False
         if not self.id:
             first_instance = True
@@ -1221,6 +1375,19 @@ class MerchantPayout(TimeStampedModel):
             self.payout_ref_id = self.id
             self.save()
 
+    @staticmethod
+    def get_merchant_payout_info(obj):
+        """obj is either a labappointment or an opdappointment"""
+        from django.utils.safestring import mark_safe
+        result = ""
+        if obj.merchant_payout:
+            result += "Status : {}<br>".format(dict(MerchantPayout.STATUS_CHOICES)[obj.merchant_payout.status])
+            if obj.merchant_payout.utr_no:
+                result += "UTR No. : {}<br>".format(obj.merchant_payout.utr_no)
+            if obj.merchant_payout.paid_to:
+                result += "Paid To : {}<br>".format(obj.merchant_payout.paid_to)
+        return mark_safe(result)
+
     def get_appointment(self):
         if self.lab_appointment.all():
             return self.lab_appointment.all()[0]
@@ -1248,8 +1415,6 @@ class MerchantPayout(TimeStampedModel):
 
         return default_payment_mode
 
-
-
     def get_merchant(self):
         if self.paid_to:
             return self.paid_to
@@ -1271,6 +1436,66 @@ class MerchantPayout(TimeStampedModel):
 
         return bool(all_txn and all_txn.count() > 0), order_data, appointment
 
+    def get_pg_order_no(self):
+        order_no = None
+        appointment = self.get_appointment()
+        if not appointment:
+            return None
+        order_data = Order.objects.filter(reference_id=appointment.id).order_by('-id').first()
+        if not order_data:
+            dt = DummyTransactions.objects.filter(reference_id=appointment.id).order_by('-id').first()
+            if dt:
+                return dt.order_no
+        else:
+            all_txn = order_data.getTransactions()
+            if all_txn:
+                return all_txn[0].order_no
+
+    def update_status_from_pg(self):
+
+        if self.pg_status=='SETTLEMENT_COMPLETED' or self.utr_no or self.type ==self.MANUAL:
+            return
+
+        url = settings.SETTLEMENT_DETAILS_API
+        order_no = self.get_pg_order_no()
+
+        if order_no:
+            req_data = {"orderNo":order_no}
+            req_data["hash"] = self.create_checksum(req_data)
+
+            headers = {"auth": settings.SETTLEMENT_AUTH,
+                       "Content-Type": "application/json"}
+
+            response = requests.post(url, data=json.dumps(req_data), headers=headers)
+            if response.status_code == status.HTTP_200_OK:
+                resp_data = response.json()
+                self.status_api_response = resp_data
+                if resp_data.get('ok') == 1 and len(resp_data.get('settleDetails'))>0:
+                    details = resp_data.get('settleDetails')
+                    for d in details:
+                        if d.get('refNo') == str(self.payout_ref_id):
+                            self.utr_no = d.get('utrNo','')
+                            self.pg_status = d.get('txStatus','')
+                            break
+                self.save()
+
+    def create_checksum(self, data):
+
+        accesskey = settings.PG_CLIENT_KEY_P1
+        secretkey = settings.PG_SECRET_KEY_P1
+        checksum = ''
+
+        keylist = sorted(data)
+        for k in keylist:
+            if data[k] is not None:
+                curr = k + '=' + str(data[k]) + ';'
+                checksum += curr
+
+        checksum = accesskey + "|" + checksum + "|" + secretkey
+        checksum_hash = hashlib.sha256(str(checksum).encode())
+        checksum_hash = checksum_hash.hexdigest()
+        return checksum_hash
+
     class Meta:
         db_table = "merchant_payout"
 
@@ -1280,7 +1505,7 @@ class UserReferrals(TimeStampedModel):
     COMPLETION_CASHBACK = 50
 
     code = models.CharField(max_length=10, unique=True)
-    user = models.ForeignKey(User, on_delete=models.DO_NOTHING, unique=True)
+    user = models.ForeignKey(User, on_delete=models.DO_NOTHING, unique=True, related_name='referral')
 
     def save(self, *args, **kwargs):
         if not self.code:

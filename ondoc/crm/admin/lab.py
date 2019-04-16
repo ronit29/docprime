@@ -31,7 +31,9 @@ from ondoc.diagnostic.models import (LabTiming, LabImage,
                                      LabAppointment, HomePickupCharges,
                                      TestParameter, ParameterLabTest, FrequentlyAddedTogetherTests, QuestionAnswer,
                                      LabReport, LabReportFile, LabTestCategoryMapping,
-                                     LabTestRecommendedCategoryMapping, LabTestGroupTiming, LabTestGroupMapping)
+                                     LabTestRecommendedCategoryMapping, LabTestGroupTiming, LabTestGroupMapping,
+                                     TestParameterChat)
+from ondoc.integrations.models import IntegratorHistory
 from ondoc.notification.models import EmailNotification, NotificationAction
 from .common import *
 from ondoc.authentication.models import GenericAdmin, User, QCModel, GenericLabAdmin, AssociatedMerchant
@@ -688,6 +690,16 @@ class LabAdmin(ImportExportMixin, admin.GeoModelAdmin, VersionAdmin, ActionAdmin
             form.base_fields['assigned_to'].disabled = True
         return form
 
+    def get_readonly_fields(self, *args, **kwargs):
+        read_only = super().get_readonly_fields(*args, **kwargs)
+        if args:
+            request = args[0]
+            if not request.user.groups.filter(
+                    name__in=[constants['WELCOME_CALLING_TEAM'],
+                              constants['LAB_APPOINTMENT_MANAGEMENT_TEAM']]) and not request.user.is_superuser:
+                read_only += ('is_location_verified',)
+
+        return read_only
 
 class LabAppointmentForm(forms.ModelForm):
 
@@ -696,6 +708,7 @@ class LabAppointmentForm(forms.ModelForm):
     cancel_type = forms.ChoiceField(label='Cancel Type', choices=((0, 'Cancel and Rebook'),
                                                                   (1, 'Cancel and Refund'),), initial=0, widget=forms.RadioSelect)
     send_email_sms_report = forms.BooleanField(label='Send reports via message and email', initial=False, required=False)
+    custom_otp = forms.IntegerField(required=False)
 
     def clean(self):
         super().clean()
@@ -745,23 +758,31 @@ class LabAppointmentForm(forms.ModelForm):
         if not lab.lab_pricing_group:
             raise forms.ValidationError("Lab is not in any lab pricing group.")
 
-        if self.instance.id:
-            selected_test_ids = lab_test.values_list('test', flat=True)
-            is_lab_timing_available = LabTiming.objects.filter(
-                lab=lab,
-                lab__lab_pricing_group__available_lab_tests__test__in=selected_test_ids,
-                day=time_slot_start.weekday(),
-                start__lte=hour, end__gt=hour).exists()
-            # if not is_lab_timing_available:
-            #     raise forms.ValidationError("This lab test is not available on selected day and time.")
-            if self.instance.is_home_pickup or cleaned_data.get('is_home_pickup'):
-                if not lab.is_home_collection_enabled:
-                    raise forms.ValidationError("Home Pickup is disabled for the lab")
-                if hour < 7.0 or hour > 19.0:
-                    raise forms.ValidationError("No time slot available")
-            else:
-                if not lab.always_open and not is_lab_timing_available:
-                    raise forms.ValidationError("No time slot available")
+        if cleaned_data.get('status') not in [LabAppointment.CANCELLED, LabAppointment.COMPLETED, None]:
+            if self.instance.id:
+                selected_test_ids = lab_test.values_list('test', flat=True)
+                is_lab_timing_available = LabTiming.objects.filter(
+                    lab=lab,
+                    lab__lab_pricing_group__available_lab_tests__test__in=selected_test_ids,
+                    day=time_slot_start.weekday(),
+                    start__lte=hour, end__gt=hour).exists()
+                # if not is_lab_timing_available:
+                #     raise forms.ValidationError("This lab test is not available on selected day and time.")
+                if self.instance.is_home_pickup or cleaned_data.get('is_home_pickup'):
+                    if not lab.is_home_collection_enabled:
+                        raise forms.ValidationError("Home Pickup is disabled for the lab")
+                    if hour < 7.0 or hour > 19.0:
+                        raise forms.ValidationError("No time slot available")
+                else:
+                    if not lab.always_open and not is_lab_timing_available:
+                        raise forms.ValidationError("No time slot available")
+
+        if cleaned_data.get('status') and cleaned_data.get('status') == LabAppointment.COMPLETED:
+            if self.instance and self.instance.id and not self.instance.status == OpdAppointment.ACCEPTED:
+                raise forms.ValidationError("Can only complete appointment if it is in accepted state.")
+            if not cleaned_data.get('custom_otp') == self.instance.otp:
+                raise forms.ValidationError("Entered OTP is incorrect.")
+
 
         return cleaned_data
 
@@ -801,6 +822,28 @@ class LabAppointmentAdmin(nested_admin.NestedModelAdmin):
     #         temp_autocomplete_fields = super().get_autocomplete_fields(request)
     #     return temp_autocomplete_fields
 
+    def get_search_results(self, request, queryset, search_term):
+        queryset, use_distinct = super().get_search_results(request, queryset, None)
+
+        queryset = queryset.filter(Q(integrator_response__integrator_order_id__icontains=search_term) |
+         Q(id__contains=search_term)).distinct()
+
+        return queryset, use_distinct
+
+
+    def integrator_order_status(self, obj):
+        return obj.integrator_order_status()
+
+    def thyrocare_booking_id(self, obj):
+        return obj.thyrocare_booking_no()
+
+    def accepted_through(self, obj):
+        return obj.accepted_through()
+
+    def payout_info(self, obj):
+        return MerchantPayout.get_merchant_payout_info(obj)
+    payout_info.short_description = 'Merchant Payment Info'
+
     def through_app(self, obj):
         return obj.created_by_native()
 
@@ -839,7 +882,8 @@ class LabAppointmentAdmin(nested_admin.NestedModelAdmin):
                                     (LabAppointment.RESCHEDULED_PATIENT, 'Rescheduled by patient'),
                                     (LabAppointment.RESCHEDULED_LAB, 'Rescheduled by lab'),
                                     (LabAppointment.ACCEPTED, 'Accepted'),
-                                    (LabAppointment.CANCELLED, 'Cancelled')]
+                                    (LabAppointment.CANCELLED, 'Cancelled'),
+                                    (LabAppointment.COMPLETED, 'Completed')]
         if db_field.name == "status" and request.user.groups.filter(name=constants['LAB_APPOINTMENT_MANAGEMENT_TEAM']).exists():
             kwargs['choices'] = allowed_status_for_agent
         return super().formfield_for_choice_field(db_field, request, **kwargs)
@@ -865,16 +909,19 @@ class LabAppointmentAdmin(nested_admin.NestedModelAdmin):
         #             'send_email_sms_report', 'invoice_urls', 'reports_uploaded', 'email_notification_timestamp', 'payment_type'
         #             )
         # elif request.user.groups.filter(name=constants['LAB_APPOINTMENT_MANAGEMENT_TEAM']).exists():
-        all_fields = ('booking_id', 'through_app', 'order_id',  'lab_id', 'lab_name', 'get_lab_test', 'lab_contact_details',
+        all_fields = ('booking_id', 'through_app', 'integrator_order_status', 'thyrocare_booking_id', 'accepted_through', 'order_id',  'lab_id', 'lab_name', 'get_lab_test', 'lab_contact_details',
                     'used_profile_name', 'used_profile_number',
                     'default_profile_name', 'default_profile_number', 'user_id', 'user_number', 'price', 'agreed_price',
                     'deal_price', 'effective_price', 'payment_status', 'payment_type', 'insurance', 'is_home_pickup',
                     'get_pickup_address', 'get_lab_address', 'outstanding', 'status', 'cancel_type',
                     'cancellation_reason', 'cancellation_comments', 'start_date', 'start_time',
-                    'send_email_sms_report', 'invoice_urls', 'reports_uploaded', 'email_notification_timestamp', 'payment_type'
-                    )
+                    'send_email_sms_report', 'invoice_urls', 'reports_uploaded', 'email_notification_timestamp', 'payment_type',
+                     'payout_info')
         if request.user.groups.filter(name=constants['APPOINTMENT_OTP_TEAM']).exists() or request.user.is_superuser:
             all_fields = all_fields + ('otp',)
+        # if obj and obj.id and obj.status == OpdAppointment.ACCEPTED:
+        #     all_fields = all_fields + ('custom_otp',)
+        all_fields = all_fields + ('custom_otp',)
         return all_fields
         # else:
         #     return ()
@@ -883,13 +930,13 @@ class LabAppointmentAdmin(nested_admin.NestedModelAdmin):
         # if request.user.is_superuser:
         #     read_only =  ['booking_id', 'order_id', 'lab_id', 'lab_contact_details', 'get_lab_test', 'invoice_urls', 'reports_uploaded', 'email_notification_timestamp', 'payment_type']
         # elif request.user.groups.filter(name=constants['LAB_APPOINTMENT_MANAGEMENT_TEAM']).exists():
-        read_only = ['booking_id' ,'through_app', 'order_id', 'lab_name', 'lab_id', 'get_lab_test', 'invoice_urls',
+        read_only = ['booking_id' ,'through_app', 'integrator_order_status', 'accepted_through', 'thyrocare_booking_id', 'order_id', 'lab_name', 'lab_id', 'get_lab_test', 'invoice_urls',
                      'lab_contact_details', 'used_profile_name', 'used_profile_number',
                      'default_profile_name', 'default_profile_number', 'user_number', 'user_id', 'price',
                      'agreed_price',
                      'deal_price', 'effective_price', 'payment_status',
                      'payment_type', 'insurance', 'is_home_pickup', 'get_pickup_address', 'get_lab_address',
-                     'outstanding', 'reports_uploaded', 'email_notification_timestamp', 'payment_type']
+                     'outstanding', 'reports_uploaded', 'email_notification_timestamp', 'payment_type', 'payout_info']
         # else:
         #     read_only = []
         if obj and (obj.status == LabAppointment.COMPLETED or obj.status == LabAppointment.CANCELLED):
@@ -1058,8 +1105,7 @@ class LabAppointmentAdmin(nested_admin.NestedModelAdmin):
 
                 if dt_field:
                     obj.time_slot_start = dt_field
-            if request.POST.get('status') and (int(request.POST['status']) == LabAppointment.CANCELLED or \
-                int(request.POST['status']) == LabAppointment.COMPLETED):
+            if request.POST.get('status') and int(request.POST['status']) == LabAppointment.CANCELLED:
                 obj.cancellation_type = LabAppointment.AGENT_CANCELLED
                 cancel_type = int(request.POST.get('cancel_type'))
                 if cancel_type is not None:
@@ -1068,8 +1114,21 @@ class LabAppointmentAdmin(nested_admin.NestedModelAdmin):
                     logger.warning("Lab Admin Cancel completed - " + str(obj.id) + " timezone - " + str(timezone.now()))
             elif lab_app_obj and (lab_app_obj.status == LabAppointment.COMPLETED):
                 pass
+            elif request.POST.get('status') and int(request.POST['status']) == LabAppointment.COMPLETED:
+                obj.action_completed()
             else:
                 super().save_model(request, obj, form, change)
+                if request.POST.get('status') and (int(request.POST['status']) == LabAppointment.ACCEPTED):
+                    lab_appointment_content_type = ContentType.objects.get_for_model(obj)
+                    history_obj = IntegratorHistory.objects.filter(content_type=lab_appointment_content_type,
+                                                                   object_id=obj.id).order_by('id').last()
+                    if history_obj:
+                        history_obj.status = IntegratorHistory.PUSHED_AND_ACCEPTED
+                        history_obj.accepted_through = "CRM"
+                        history_obj.save()
+
+
+
             if send_email_sms_report and sum(
                     obj.reports.annotate(no_of_files=Count('files')).values_list('no_of_files', flat=True)):
                 transaction.on_commit(lambda: self.on_commit_tasks(obj.id))
@@ -1267,7 +1326,7 @@ class LabTestAdminForm(forms.ModelForm):
                 raise forms.ValidationError('Please dont enter reference code for a test')
 
 
-class LabTestAdmin(PackageAutoCompleteView, ImportExportMixin, VersionAdmin):
+class LabTestAdmin(ImportExportMixin, VersionAdmin):
     form = LabTestAdminForm
     change_list_template = 'superuser_import_export.html'
     formats = (base_formats.XLS, base_formats.XLSX,)
@@ -1403,3 +1462,14 @@ class LabTestGroupMappingAdmin(ImportMixin, admin.ModelAdmin):
     list_display = ['test', 'lab_test_group']
     search_fields = ['test__name', 'lab_test_group__name']
 
+
+class TestParameterChatForm(forms.ModelForm):
+    test = forms.ModelChoiceField(
+        queryset=LabTest.objects.filter(availablelabs__lab_pricing_group__labs__network_id=int(settings.THYROCARE_NETWORK_ID),
+                                        enable_for_retail=True, availablelabs__enabled=True).distinct().order_by('name'))
+
+
+class TestParameterChatAdmin(admin.ModelAdmin):
+    form = TestParameterChatForm
+    list_display = ['test_name']
+    readonly_fields = ('test_name',)

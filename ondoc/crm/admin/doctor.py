@@ -227,16 +227,18 @@ class DoctorClinicInline(nested_admin.NestedTabularInline):
     inlines = [DoctorClinicTimingInline, DoctorClinicProcedureInline, DoctorClinicIpdProcedureInline, AssociatedMerchantInline]
     fields = ['hospital',
               # 'add_hospital_link',
-              'followup_duration', 'followup_charges', 'enabled_for_online_booking', 'enabled', 'priority']
+              'followup_duration', 'followup_charges', 'enabled_for_online_booking', 'enabled', 'priority', 'welcome_calling_done']
 
-    # def get_readonly_fields(self, *args, **kwargs):
-    #     read_only = super().get_readonly_fields(*args, **kwargs)
-    #     if args:
-    #         request = args[0]
-    #         if request.GET.get('AgentId', None):
-    #             self.matrix_agent_id = request.GET.get('AgentId', None)
-    #         read_only += ('add_hospital_link',)
-    #     return read_only
+    def get_readonly_fields(self, *args, **kwargs):
+        read_only = super().get_readonly_fields(*args, **kwargs)
+        request = args[0]
+        # def get_readonly_fields(self, request, obj=None):
+        #     read_only_field = super().get_readonly_fields(request, obj)
+        if not request.user.is_superuser and not request.user.groups.filter(
+                name=constants['WELCOME_CALLING_TEAM']).exists():
+            read_only = read_only + ('welcome_calling_done',)
+        #     return read_only_field
+        return read_only
     #
     # def add_hospital_link(self, obj):
     #     content_type = ContentType.objects.get_for_model(Hospital)
@@ -715,7 +717,7 @@ class DoctorForm(FormCleanMixin):
                     for indx in range(int(self.data[key + '-TOTAL_FORMS'])):
                         all_hospital_ids.append(int(self.data[key + '-{}-hospital'.format(indx)]))
                     if not Hospital.objects.filter(pk__in=all_hospital_ids, is_live=True).count():
-                        raise forms.ValidationError("Atleast one entry of " + key + " should be live for submitting to Quality Check")
+                        raise forms.ValidationError("Atleast one entry of " + key + " should be live.")
             if value == 'value_req':
                 if hasattr(self.instance, key) and not getattr(self.instance, key):
                     raise forms.ValidationError(key + " is required for Quality Check")
@@ -1255,7 +1257,7 @@ class DoctorAdmin(AutoComplete, ImportExportMixin, VersionAdmin, ActionAdmin, QC
         return render(request, 'onboarddoctor.html', {'doctor': doctor, 'count': count, 'errors': errors})
 
     def get_onboard_link(self, obj=None):
-        if obj.data_status == Doctor.IN_PROGRESS and obj.onboarding_status in (
+        if obj.data_status in [Doctor.IN_PROGRESS, Doctor.REOPENED] and obj.onboarding_status in (
                 Doctor.NOT_ONBOARDED, Doctor.REQUEST_SENT):
             return mark_safe("<a href='/admin/doctor/doctor/onboard_admin/%s'>generate onboarding url</a>" % obj.id)
         return ""
@@ -1423,6 +1425,7 @@ class DoctorOpdAppointmentForm(forms.ModelForm):
     start_time = forms.CharField(widget=TimePickerWidget())
     cancel_type = forms.ChoiceField(label='Cancel Type', choices=((0, 'Cancel and Rebook'),
                                                                   (1, 'Cancel and Refund'),), initial=0, widget=forms.RadioSelect)
+    custom_otp = forms.IntegerField(required=False)
 
     def clean(self):
         super().clean()
@@ -1465,12 +1468,18 @@ class DoctorOpdAppointmentForm(forms.ModelForm):
             raise forms.ValidationError(
                 "Cancellation comments must be mentioned for selected cancellation reason.")
 
-        if cleaned_data.get('status') not in [OpdAppointment.CANCELLED, OpdAppointment.COMPLETED]:
+        if cleaned_data.get('status') not in [OpdAppointment.CANCELLED, OpdAppointment.COMPLETED, None]:
             if not DoctorClinicTiming.objects.filter(doctor_clinic__doctor=doctor,
                                                      doctor_clinic__hospital=hospital,
                                                      day=time_slot_start.weekday(),
                                                      start__lte=hour, end__gt=hour).exists():
                 raise forms.ValidationError("Doctor do not sit at the given hospital in this time slot.")
+
+        if cleaned_data.get('status') and cleaned_data.get('status') == OpdAppointment.COMPLETED:
+            if self.instance and self.instance.id and not self.instance.status == OpdAppointment.ACCEPTED:
+                raise forms.ValidationError("Can only complete appointment if it is in accepted state.")
+            if not cleaned_data.get('custom_otp') == self.instance.otp:
+                raise forms.ValidationError("Entered OTP is incorrect.")
 
         # if self.instance.id:
         #     if cleaned_data.get('status') == OpdAppointment.RESCHEDULED_PATIENT or cleaned_data.get(
@@ -1525,7 +1534,8 @@ class DoctorOpdAppointmentAdmin(admin.ModelAdmin):
                                     (OpdAppointment.RESCHEDULED_PATIENT, 'Rescheduled by patient'),
                                     (OpdAppointment.RESCHEDULED_DOCTOR, 'Rescheduled by doctor'),
                                     (OpdAppointment.ACCEPTED, 'Accepted'),
-                                    (OpdAppointment.CANCELLED, 'Cancelled')]
+                                    (OpdAppointment.CANCELLED, 'Cancelled'),
+                                    (OpdAppointment.COMPLETED, 'Completed')]
         if db_field.name == "status" and request.user.groups.filter(
                 name=constants['OPD_APPOINTMENT_MANAGEMENT_TEAM']).exists():
             kwargs['choices'] = allowed_status_for_agent
@@ -1557,9 +1567,13 @@ class DoctorOpdAppointmentAdmin(admin.ModelAdmin):
                 'fees', 'effective_price', 'mrp', 'deal_price', 'payment_status',
                 'payment_type', 'admin_information', 'insurance', 'outstanding',
                 'status', 'cancel_type', 'cancellation_reason', 'cancellation_comments',
-                'start_date', 'start_time', 'invoice_urls', 'payment_type')
+                'start_date', 'start_time', 'invoice_urls', 'payment_type', 'payout_info')
         if request.user.groups.filter(name=constants['APPOINTMENT_OTP_TEAM']).exists() or request.user.is_superuser:
             all_fields = all_fields + ('otp',)
+        # if obj and obj.id and obj.status == OpdAppointment.ACCEPTED:
+        #     all_fields = all_fields + ('custom_otp',)
+        all_fields = all_fields + ('custom_otp',)
+
         return all_fields
         # else:
         #     return ()
@@ -1575,13 +1589,16 @@ class DoctorOpdAppointmentAdmin(admin.ModelAdmin):
                      'default_profile_number', 'user_id', 'user_number', 'booked_by',
                      'fees', 'effective_price', 'mrp', 'deal_price', 'payment_status', 'payment_type',
                      'admin_information', 'insurance', 'outstanding', 'procedures_details', 'invoice_urls',
-                     'payment_type',
-                     'invoice_urls')
+                     'payment_type', 'invoice_urls', 'payout_info')
         if request.user.groups.filter(name=constants['APPOINTMENT_OTP_TEAM']).exists() or request.user.is_superuser:
             read_only = read_only + ('otp',)
         return read_only
         # else:
         #     return ('invoice_urls')
+
+    def payout_info(self, obj):
+        return MerchantPayout.get_merchant_payout_info(obj)
+    payout_info.short_description = 'Merchant Payment Info'
 
     def ratings(self, obj):
         rating_queryset = rating_models.RatingsReview.objects.filter(appointment_id=obj.id).first()
@@ -1761,8 +1778,9 @@ class DoctorOpdAppointmentAdmin(admin.ModelAdmin):
                     logger.warning("Admin Cancel started - " + str(obj.id) + " timezone - " + str(timezone.now()))
                     obj.action_cancelled(cancel_type)
                     logger.warning("Admin Cancel completed - " + str(obj.id) + " timezone - " + str(timezone.now()))
-
-            else:        
+            elif request.POST.get('status') and int(request.POST['status']) == OpdAppointment.COMPLETED:
+                    obj.action_completed()
+            else:
                 super().save_model(request, obj, form, change)
 
     class Media:
