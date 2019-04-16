@@ -1834,7 +1834,7 @@ class SendCartUrlViewSet(GenericViewSet):
     permission_classes = (IsAuthenticated,)
 
     def send_cart_url(self, request):
-        order_id = request.query_params.get('orderId', None)
+        order_id = request.data.get('orderId', None)
         # utm_source = request.query_params.get('UtmSource')
         # utm_term = request.query_params.get('UtmTerm')
         # utm_medium = request.query_params.get('UtmMedium')
