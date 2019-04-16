@@ -236,12 +236,11 @@ def push_appointment_to_matrix(self, data):
                 if number:
                     number = int(number)
 
-                spoc_type = dict(spoc_obj.CONTACT_TYPE_CHOICES)[spoc_obj.contact_type]
-                spoc_name = '%s (Hospital) (%s)' % (spoc_obj.name, spoc_type)
-                if spoc_obj.details:
-                    spoc_name = spoc_name + '(%s)' % spoc_obj.details
+                # spoc_type = dict(spoc_obj.CONTACT_TYPE_CHOICES)[spoc_obj.contact_type]
+                spoc_name = spoc_obj.name
                 mobile_list.append({'MobileNo': number,
                                     'Name': spoc_name,
+                                    'Designation': spoc_obj.contact_type,
                                     'Type': spoc_obj.contact_type})
 
             # Doctor mobile numbers
@@ -256,6 +255,22 @@ def push_appointment_to_matrix(self, data):
                 raise Exception("Appointment could not found against id - " + str(appointment_id))
 
             mobile_list = list()
+
+            for contact_person in appointment.lab.labmanager_set.all():
+                number = ''
+                if contact_person.number:
+                    number = str(contact_person.number)
+                if number:
+                    number = int(number)
+
+                contact_type = dict(contact_person.CONTACT_TYPE_CHOICES)[contact_person.contact_type]
+                contact_name = contact_person.name
+                mobile_list.append({'MobileNo': number,
+                                    'Name': contact_name,
+                                    'DesignationId': contact_person.contact_type,
+                                    'Type': contact_person.contact_type})
+
+
             # Lab mobile number
             mobile_list.append({'MobileNo': appointment.lab.primary_mobile, 'Name': appointment.lab.name, 'Type': 3})
 
