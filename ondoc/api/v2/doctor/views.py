@@ -759,7 +759,7 @@ class PartnersAppInvoice(viewsets.GenericViewSet):
     authentication_classes = (JWTAuthentication,)
     permission_classes = (IsAuthenticated, DoctorPermission,)
 
-    def add_general_invoice_item(self, request):
+    def add_or_edit_general_invoice_item(self, request):
         try:
             serializer = serializers.GeneralInvoiceItemsSerializer(data=request.data, context={"request": request})
             serializer.is_valid(raise_exception=True)
