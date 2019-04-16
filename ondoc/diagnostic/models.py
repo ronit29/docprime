@@ -1585,8 +1585,12 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin)
 
         if parent_order and parent_order.visitor_info:
             from_app = parent_order.visitor_info.get('from_app', False)
+            app_version = parent_order.visitor_info.get('app_version', None)
 
-        return from_app
+        if from_app and app_version and float(app_version) < float('1.2'):
+            return True
+        else:
+            return False
 
     def app_commit_tasks(self, old_instance, push_to_matrix, push_to_integrator):
         if push_to_matrix:
