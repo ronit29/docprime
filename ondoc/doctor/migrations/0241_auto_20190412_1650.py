@@ -27,9 +27,4 @@ class Migration(migrations.Migration):
             name='user',
             field=models.ForeignKey(null=True, on_delete=django.db.models.deletion.SET_NULL, related_name='invoice_items', to=settings.AUTH_USER_MODEL),
         ),
-        migrations.AddField(
-            model_name='walkinpatientinvoice',
-            name='edited_by',
-            field=models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.SET_NULL, related_name='walk_in_invoices', to=settings.AUTH_USER_MODEL),
-        ),
     ]

@@ -2776,6 +2776,7 @@ class OfflineCustomerViewSet(viewsets.GenericViewSet):
                                                                      booked_by=request.user,
                                                                      user=patient,
                                                                      status=models.OfflineOPDAppointments.ACCEPTED,
+                                                                     fees=data.get('fees'),
                                                                      error=data.get('error') if data.get('error') else False,
                                                                      error_message=data.get('error_message') if data.get('error_message') else None
                                                                               )

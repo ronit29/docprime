@@ -305,7 +305,7 @@ class GeneralInvoiceItemsSerializer(serializers.Serializer):
     # appointment_id = serializers.PrimaryKeyRelatedField(queryset=doc_models.OpdAppointment.objects.all())
     item = serializers.CharField(max_length=200)
     base_price = serializers.DecimalField(max_digits=10, decimal_places=2)
-    description = serializers.CharField(max_length=500, required=False, allow_null=True)
+    description = serializers.CharField(max_length=500, required=False, allow_null=True, allow_blank=True)
     tax_amount = serializers.DecimalField(max_digits=10, decimal_places=2, required=False, allow_null=True)
     tax_percentage = serializers.DecimalField(max_digits=5, decimal_places=2, required=False, allow_null=True,
                                               min_value=0, max_value=100)
@@ -355,21 +355,36 @@ class GeneralInvoiceItemsModelSerializer(serializers.ModelSerializer):
 
 
 class SelectedInvoiceItemsSerializer(serializers.Serializer):
-    invoice_id = serializers.PrimaryKeyRelatedField(queryset=doc_models.WalkInPatientInvoice.objects.all())
+    # invoice_id = serializers.PrimaryKeyRelatedField(queryset=doc_models.PartnersAppInvoice.objects.all())
     invoice_item = serializers.PrimaryKeyRelatedField(queryset=doc_models.GeneralInvoiceItems.objects.all())
     quantity = serializers.IntegerField(min_value=1)
     calculated_price = serializers.DecimalField(max_digits=10, decimal_places=2)
 
 
-class WalkInPatientInvoiceSerialier(serializers.Serializer):
+class SelectedInvoiceItemsJSONSerializer(serializers.Serializer):
+    # invoice_id = serializers.PrimaryKeyRelatedField(queryset=doc_models.PartnersAppInvoice.objects.all())
+    invoice_item = GeneralInvoiceItemsModelSerializer(many=False)
+    quantity = serializers.IntegerField(min_value=1)
+    calculated_price = serializers.DecimalField(max_digits=10, decimal_places=2)
+
+
+class SelectedInvoiceItemsModelSerializer(serializers.ModelSerializer):
+
+    class Meta:
+        model = doc_models.SelectedInvoiceItems
+        fields = '__all__'
+
+
+class PartnersAppInvoiceSerialier(serializers.Serializer):
     appointment_id = serializers.PrimaryKeyRelatedField(queryset=doc_models.OpdAppointment.objects.all())
     consultation_fees = serializers.DecimalField(max_digits=10, decimal_places=2)
     selected_invoice_items = serializers.ListField(child=SelectedInvoiceItemsSerializer(many=False), required=False,
                                                    allow_empty=True)
-    payment_status = serializers.ChoiceField(choices=doc_models.WalkInPatientInvoice.PAYMENT_STATUS)
-    payment_type = serializers.ChoiceField(choices=doc_models.WalkInPatientInvoice.PAYMENT_CHOICES, required=False)
+    payment_status = serializers.ChoiceField(choices=doc_models.PartnersAppInvoice.PAYMENT_STATUS)
+    payment_type = serializers.ChoiceField(choices=doc_models.PartnersAppInvoice.PAYMENT_CHOICES, required=False)
     due_date = serializers.DateField(required=False, allow_null=True)
     sub_total_amount = serializers.DecimalField(max_digits=10, decimal_places=2)
+    invoice_title = serializers.CharField(max_length=300)
     tax_amount = serializers.DecimalField(max_digits=10, decimal_places=2, required=False, allow_null=True)
     tax_percentage = serializers.DecimalField(max_digits=5, decimal_places=2, required=False, allow_null=True,
                                               min_value=0, max_value=100)
@@ -380,20 +395,20 @@ class WalkInPatientInvoiceSerialier(serializers.Serializer):
     generate_invoice = serializers.BooleanField(default=False)
 
     def validate(self, attrs):
-        if attrs.get('payment_status') == doc_models.WalkInPatientInvoice.PAID and not attrs.get('payment_type'):
+        if attrs.get('payment_status') == doc_models.PartnersAppInvoice.PAID and not attrs.get('payment_type'):
             raise serializers.ValidationError('payment type is required for payment status - paid')
-        if attrs.get('payment_status') == doc_models.WalkInPatientInvoice.PENDING and not attrs.get('due_date'):
+        if attrs.get('payment_status') == doc_models.PartnersAppInvoice.PENDING and not attrs.get('due_date'):
             raise serializers.ValidationError('due date is required for payment status - pending')
         if attrs.get('appointment_id'):
             attrs['appointment'] = attrs.pop('appointment_id')
         return attrs
 
 
-class WalkInPatientInvoiceModelSerialier(serializers.ModelSerializer):
+class PartnersAppInvoiceModelSerialier(serializers.ModelSerializer):
     # appointment_id = serializers.PrimaryKeyRelatedField(read_only=True)
 
     class Meta:
-        model = doc_models.WalkInPatientInvoice
+        model = doc_models.PartnersAppInvoice
         fields = '__all__'
 
 
@@ -429,9 +444,9 @@ class ListInvoiceItemsSerializer(serializers.Serializer):
         return attrs
 
 
-class UpdateWalkInPatientInvoiceSerializer(serializers.Serializer):
-    invoice_id = serializers.PrimaryKeyRelatedField(queryset=doc_models.WalkInPatientInvoice.objects.all())
-    data = WalkInPatientInvoiceSerialier(many=False)
+class UpdatePartnersAppInvoiceSerializer(serializers.Serializer):
+    invoice_id = serializers.PrimaryKeyRelatedField(queryset=doc_models.PartnersAppInvoice.objects.all())
+    data = PartnersAppInvoiceSerialier(many=False)
 
     def validate(self, attrs):
         request = self.context.get("request")

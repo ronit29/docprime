@@ -1575,6 +1575,7 @@ class OfflineAppointmentBodySerializer(serializers.Serializer):
     doctor = serializers.PrimaryKeyRelatedField(queryset=Doctor.objects.all())
     hospital = serializers.PrimaryKeyRelatedField(queryset=Hospital.objects.all())
     time_slot_start = serializers.DateTimeField()
+    fees = serializers.DecimalField(max_digits=10, decimal_places=2, required=False)
     id = serializers.CharField()
 
 

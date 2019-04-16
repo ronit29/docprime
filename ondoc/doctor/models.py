@@ -2868,6 +2868,7 @@ class OfflineOPDAppointments(auth_model.TimeStampedModel):
                                   null=True)
     status = models.PositiveSmallIntegerField(default=CREATED, choices=STATUS_CHOICES)
     time_slot_start = models.DateTimeField(blank=True, null=True)
+    fees = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
     error = models.BooleanField(default=False)
     error_message = models.CharField(max_length=256, blank=True, null=True)
 
@@ -3087,8 +3088,8 @@ class HospitalTiming(auth_model.TimeStampedModel):
         db_table = "hospital_timing"
 
 
-class WalkInPatientInvoice(auth_model.TimeStampedModel):
-    INVOICE_ID_START = 300000
+class PartnersAppInvoice(auth_model.TimeStampedModel):
+    INVOICE_SERIAL_ID_START = 300000
     ONLINE = 1
     CASH = 2
     PAYMENT_CHOICES = ((ONLINE, 'Online'), (CASH, 'Cash'))
@@ -3096,13 +3097,14 @@ class WalkInPatientInvoice(auth_model.TimeStampedModel):
     PENDING = 2
     PAYMENT_STATUS = ((PAID, 'Paid'), (PENDING, 'Pending'))
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    invoice_id = models.CharField(max_length=100)
-    appointment = models.ForeignKey(OpdAppointment, on_delete=models.CASCADE, related_name='walk_in_patient')
+    invoice_serial_id = models.CharField(max_length=100)
+    appointment = models.ForeignKey(OpdAppointment, on_delete=models.CASCADE, related_name='partners_app_invoice')
     consultation_fees = models.DecimalField(max_digits=10, decimal_places=2)
     selected_invoice_items = JSONField()
     payment_status = models.IntegerField(choices=PAYMENT_STATUS)
     payment_type = models.IntegerField(choices=PAYMENT_CHOICES, null=True, blank=True)
     due_date = models.DateField(null=True, blank=True)
+    invoice_title = models.CharField(max_length=300)
     sub_total_amount = models.DecimalField(max_digits=10, decimal_places=2)
     tax_amount = models.DecimalField(max_digits=10, decimal_places=2, blank=True, null=True)
     tax_percentage = models.DecimalField(max_digits=5, decimal_places=2, blank=True, null=True,
@@ -3112,9 +3114,11 @@ class WalkInPatientInvoice(auth_model.TimeStampedModel):
                                               validators=[MinValueValidator(0), MaxValueValidator(100)])
     total_amount = models.DecimalField(max_digits=10, decimal_places=2)
     is_invoice_generated = models.BooleanField(default=False)
+    file = models.FileField(upload_to='partners/invoice', blank=False, null=False)
+    invoice_url = models.URLField(null=True, blank=True)
     is_valid = models.BooleanField(default=True)
     is_edited = models.BooleanField(default=False)
-    edited_by = models.ForeignKey(auth_model.User, on_delete=models.SET_NULL, null=True, blank=True, related_name='walk_in_invoices')
+    edited_by = models.ForeignKey(auth_model.User, on_delete=models.SET_NULL, null=True, blank=True, related_name='patners_app_invoices')
 
     def __str__(self):
         return str(self.appointment)
@@ -3125,17 +3129,66 @@ class WalkInPatientInvoice(auth_model.TimeStampedModel):
     #     hospital = self.appointment.hospital
     #     return 'INV-'+hospital.id+'-'+doctor.id+str(last_serial+1)
 
+    def get_context(self, selected_invoice_items):
+        context = dict()
+        context["patient_name"] = self.appointment.profile.name
+        context["patient_phone_number"] = self.appointment.profile.phone_number
+        context["invoice_serial_id"] = self.invoice_serial_id
+        context["updated_at"] = self.updated_at
+        context["payment_status"] = "Paid" if self.payment_status == self.PAID else "Pending"
+        if self.payment_status == self.PAID:
+            context["payment_status"] = "Paid"
+            context["payment_type"] = "Online" if self.payment_type == self.ONLINE else "Cash"
+        elif self.payment_status == self.PENDING:
+            context["payment_status"] = "Pending"
+            context["due_date"] = self.due_date
+        context["doctor_name"] = self.appointment.doctor.name
+        context["hospital_address"] = self.appointment.hospital.get_hos_address()
+        doctor_number = self.appointment.doctor.doctor_number.first()
+        if doctor_number:
+            context["doctor_phone_number"] = doctor_number.phone_number
+        context["invoice_title"] = self.invoice_title
+        context["invoice_items"] = self.get_invoice_items(selected_invoice_items)
+        context["sub_total_amount"] = "₹" + str(self.sub_total_amount)
+        context["tax_percentage"] = self.tax_percentage.normalize() if self.tax_percentage else None
+        context["tax_amount"] = "₹" + str(self.tax_amount) if self.tax_amount else "-"
+        context["discount_percentage"] = self.discount_percentage.normalize() if self.discount_percentage else None
+        context["discount_amount"] = "₹" + str(self.discount_amount) if self.discount_amount else "-"
+        context["total_amount"] = "₹" + str(self.total_amount)
+        return context
+
+    def get_invoice_items(self, selected_invoice_items):
+        invoice_items = list()
+        # selected_invoice_items = self.selected_invoice_items
+        for item in selected_invoice_items:
+            if item['invoice_item'].tax_percentage:
+                tax = "₹" + str(item['invoice_item'].tax_amount) + ' (' + str(item['invoice_item'].tax_percentage.normalize()) + '%)'
+            else:
+                tax = "₹" + str(item['invoice_item'].tax_amount)
+            if item['invoice_item'].discount_percentage:
+                discount = "₹" + str(item['invoice_item'].discount_amount) + ' (' + str(item['invoice_item'].discount_percentage.normalize()) + '%)'
+            else:
+                discount = "₹" + str(item['invoice_item'].discount_amount)
+            invoice_items.append({"name": item['invoice_item'].item,
+                                  "base_price": "₹" + str(item['invoice_item'].base_price),
+                                  "quantity": item['quantity'],
+                                  "tax": tax,
+                                  "discount": discount,
+                                  "amount": "₹" + str(item['calculated_price'])
+                                  })
+        return invoice_items
+
     @classmethod
     def last_serial(cls, appointment):
         obj = cls.objects.filter(appointment__doctor=appointment.doctor, appointment__hospital=appointment.hospital).last()
         if obj:
-            serial = int(obj.invoice_id[-6:])
+            serial = int(obj.invoice_serial_id[-6:])
             return serial
         else:
-            return cls.INVOICE_ID_START
+            return cls.INVOICE_SERIAL_ID_START
 
     class Meta:
-        db_table = "walk_in_patient_invoice"
+        db_table = "partners_app_invoice"
 
 
 # class GeneralInvoiceItems(auth_model.TimeStampedModel, UniqueNameModel, SearchKey):
@@ -3163,7 +3216,7 @@ class GeneralInvoiceItems(auth_model.TimeStampedModel):
     hospitals = models.ManyToManyField(Hospital, related_name='invoice_items')
 
     def __str__(self):
-        return self.item + " (" + self.hospital_ids + ")"
+        return self.item
 
     class Meta:
         db_table = "general_invoice_items"
@@ -3171,13 +3224,13 @@ class GeneralInvoiceItems(auth_model.TimeStampedModel):
 
 class SelectedInvoiceItems(auth_model.TimeStampedModel):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    invoice_id = models.ForeignKey(Invoice, on_delete=models.CASCADE, related_name='selected_items')
+    invoice = models.ForeignKey(PartnersAppInvoice, on_delete=models.CASCADE, related_name='selected_items')
     invoice_item = models.ForeignKey(GeneralInvoiceItems, on_delete=models.CASCADE, related_name='selected')
     quantity = models.PositiveIntegerField(validators=[MinValueValidator(1)])
     calculated_price = models.DecimalField(max_digits=10, decimal_places=2)
 
     def __str__(self):
-        return self.invoice_item + " (" + self.invoice_id + ")"
+        return self.invoice_item + " (" + self.invoice + ")"
 
     class Meta:
         db_table = "selected_invoice_items"

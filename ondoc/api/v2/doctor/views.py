@@ -14,11 +14,14 @@ from rest_framework.permissions import IsAuthenticated
 from ondoc.authentication.backends import JWTAuthentication
 from django.db import transaction
 from django.db.models import Q, Value, Case, When, F
+from django.http import HttpResponse
+from django.template.loader import render_to_string
 from django.contrib.contenttypes.models import ContentType
 from ondoc.procedure.models import Procedure
 from django.contrib.auth import get_user_model
 from django.conf import settings
 import datetime, logging, re, random
+import json
 from django.utils import timezone
 
 from ondoc.diagnostic.models import LabAppointment
@@ -752,7 +755,7 @@ class ProviderSignupDataViewset(viewsets.GenericViewSet):
             return Response({"status": 0, "message": "Error updating hospital consent - " + str(e)}, status.HTTP_400_BAD_REQUEST)
 
 
-class WalkInPatientInvoice(viewsets.GenericViewSet):
+class PartnersAppInvoice(viewsets.GenericViewSet):
     authentication_classes = (JWTAuthentication,)
     permission_classes = (IsAuthenticated, DoctorPermission,)
 
@@ -765,7 +768,9 @@ class WalkInPatientInvoice(viewsets.GenericViewSet):
             hospitals = valid_data.pop('hospitals')
             invoice_item_obj = doc_models.GeneralInvoiceItems.objects.create(**valid_data)
             invoice_item_obj.hospitals.add(*hospitals)
-            return Response({"status": 1, "message": "Invoice Item added successfully"}, status.HTTP_200_OK)
+            model_serializer = serializers.GeneralInvoiceItemsModelSerializer(invoice_item_obj, many=False)
+            return Response({"status": 1, "message": "Invoice Item added successfully",
+                             "invoice_obj": model_serializer.data}, status.HTTP_200_OK)
         except Exception as e:
             return Response({"status":0 , "message": "Error adding Invoice Item with exception -" + str(e)},
                             status.HTTP_400_BAD_REQUEST)
@@ -785,53 +790,77 @@ class WalkInPatientInvoice(viewsets.GenericViewSet):
             model_serializer = serializers.GeneralInvoiceItemsModelSerializer(items, many=True)
         return Response({"invoice_items": model_serializer.data}, status.HTTP_200_OK)
 
+    @staticmethod
+    def bulk_create_selected_invoice_items(selected_invoice_item, invoice):
+        obj_list = list()
+        for item in selected_invoice_item:
+            obj_list.append(doc_models.SelectedInvoiceItems(invoice=invoice,
+                                                            invoice_item=item['invoice_item'],
+                                                            quantity=item['quantity'],
+                                                            calculated_price=item['calculated_price']))
+        created_objects = doc_models.SelectedInvoiceItems.objects.bulk_create(obj_list)
+        return created_objects
+
     def create(self, request):
         try:
-            serializer = serializers.WalkInPatientInvoiceSerialier(data=request.data)
+            serializer = serializers.PartnersAppInvoiceSerialier(data=request.data)
             serializer.is_valid(raise_exception=True)
             invoice_data = serializer.validated_data
             appointment = invoice_data.get('appointment')
             selected_invoice_items = invoice_data.get('selected_invoice_items')
-            if selected_invoice_items:
-                doc_models.SelectedInvoiceItems.bulk_create(selected_invoice_items)
 
             generate_invoice = invoice_data.pop("generate_invoice")
-            invoice_data['selected_invoice_items'] = {"items": selected_invoice_items}
-            invoice_obj = doc_models.WalkInPatientInvoice(**invoice_data)
+            invoice_data['selected_invoice_items'] = serializers.SelectedInvoiceItemsJSONSerializer(selected_invoice_items, many=True).data
+            invoice_obj = doc_models.PartnersAppInvoice(**invoice_data)
 
-            last_serial = doc_models.WalkInPatientInvoice.last_serial(appointment)
-            invoice_obj.invoice_id = 'INV-' + str(appointment.hospital.id) + '-' + \
-                                     str(appointment.doctor.id) + '-' + str(last_serial + 1)
+            last_serial = doc_models.PartnersAppInvoice.last_serial(appointment)
+            invoice_obj.invoice_serial_id = 'INV-' + str(appointment.hospital.id) + '-' + \
+                                            str(appointment.doctor.id) + '-' + str(last_serial + 1)
+
             if generate_invoice:
                 invoice_obj.is_invoice_generated = True
-                # render_pdf
+                context = invoice_obj.get_context(selected_invoice_items)
+                content = render_to_string("email/partners_invoice/body.html", context=context)
+                filename = invoice_obj.invoice_serial_id
+                file = v1_utils.html_to_pdf(content, filename)
+                invoice_obj.file = file
+                invoice_obj.invoice_url = "{}{}{}".format(settings.BASE_URL, "/api/v2/doctor/invoice/", filename)
             invoice_obj.save()
-            invoice_url = "http://www.africau.edu/images/default/sample.pdf"
-            invoice = serializers.WalkInPatientInvoiceModelSerialier(invoice_obj)
-            return Response({"status": 1,
-                             "invoice": invoice.data,
-                             "invoice_url": invoice_url}, status.HTTP_200_OK)
+            invoice = serializers.PartnersAppInvoiceModelSerialier(invoice_obj)
+
+            if selected_invoice_items:
+                selected_invoice_items_objects = self.bulk_create_selected_invoice_items(selected_invoice_items, invoice_obj)
+                model_serializer = serializers.SelectedInvoiceItemsModelSerializer(selected_invoice_items_objects, many=True)
+
+            return Response({"status": 1, "invoice": invoice.data,
+                             "selected_invoice_items_created": model_serializer.data}, status.HTTP_200_OK)
         except Exception as e:
             return Response({"status": 0, "message": "Error creating invoice - " + str(e)}, status.HTTP_400_BAD_REQUEST)
 
+    def download_pdf(self, request, name=None):
+        invoice = doc_models.PartnersAppInvoice.objects.filter(invoice_serial_id=name).last()
+        response = HttpResponse(invoice.file, content_type='application/pdf')
+        response['Content-Disposition'] = 'attachment; filename=%s' % invoice.name
+        return response
+
     def update(self, request):
         try:
-            serializer = serializers.UpdateWalkInPatientInvoiceSerializer(data=request.data, context={"request": request})
+            serializer = serializers.UpdatePartnersAppInvoiceSerializer(data=request.data, context={"request": request})
             serializer.is_valid(raise_exception=True)
             invoice = serializer.validated_data['invoice_id']
             data = serializer.validated_data['data']
             # appointment = data.get('appointment_id')
             if not invoice.is_invoice_generated:
-                invoice_obj = WalkInPatientInvoice.objects.filter(id=invoice.id)
+                invoice_obj = doc_models.PartnersAppInvoice.objects.filter(id=invoice.id)
                 invoice_obj.update(**data)
                 invoice_obj.is_edited = True
                 invoice_obj.save()
             else:
                 invoice.is_valid = False
                 invoice.save()
-                invoice_obj = doc_models.WalkInPatientInvoice(**data)
+                invoice_obj = doc_models.PartnersAppInvoice(**data)
                 invoice_obj.save()
-            invoice = serializers.WalkInPatientInvoiceModelSerialier(data=invoice_obj)
+            invoice = serializers.PartnersAppInvoiceModelSerialier(data=invoice_obj)
             return Response({"status": 1, "invoice": invoice}, status.HTTP_200_OK)
         except Exception as e:
             return Response({"status": 0, "message": "Error updating invoice - " + str(e)}, status.HTTP_400_BAD_REQUEST)
