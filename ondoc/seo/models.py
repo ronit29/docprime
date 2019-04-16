@@ -68,7 +68,7 @@ class NewDynamic(TimeStampedModel):
 
     def save(self, force_insert=False, force_update=False, using=None, update_fields=None):
         if not self.id:
-            if not strip_tags(self.top_content).strip("&nbsp;").strip():
+            if not strip_tags(self.top_content).strip("<p>&nbsp;</p>").strip():
                 if self.url.url_type == EntityUrls.UrlType.SEARCHURL and PracticeSpecializationContent.objects.filter(
                         specialization_id=self.url.specialization_id):
                     self.top_content = PracticeSpecializationContent.objects.filter(
