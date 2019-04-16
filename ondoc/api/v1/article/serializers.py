@@ -102,12 +102,12 @@ class ArticleRetrieveSerializer(serializers.ModelSerializer):
     def get_body_doms(self, obj):
         html_doms = list()
         try:
-            unescape_body = self.get_unescape_body(obj.body)
+            object_body = obj.body
 
             widget_tag_pattern = '<div(?:\s|\w|=|\"|\'|&nbsp;)*class\s*=(?:\s|\"|\')*search-widget(?:\s|\w|=|\"|\'|&nbsp;)*>(?:.*?|\n*?)</div>'
-            search_widget_tags = re.findall(widget_tag_pattern, unescape_body)
+            search_widget_tags = re.findall(widget_tag_pattern, object_body)
             if search_widget_tags:
-                html_body = unescape_body
+                html_body = object_body
                 counter = 1
                 widget_count = len(search_widget_tags)
                 for search_widget_tag in search_widget_tags:
@@ -127,11 +127,6 @@ class ArticleRetrieveSerializer(serializers.ModelSerializer):
             html_doms.clear()
             html_doms.append(self.format_html(obj.body))
         return html_doms
-
-    def get_unescape_body(self, body):
-        html_unescape_table = {"&gt;": ">", "&lt;": "<"}
-        unescape_body = unescape(body, html_unescape_table)
-        return unescape_body
 
     def format_widget(self, tag):
         search_widget = dict()
