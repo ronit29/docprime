@@ -1858,7 +1858,7 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin)
             elif status == LabAppointment.COMPLETED:
                 # Constraints: Check if appointment can be accepted or not.
                 if self.status in [LabAppointment.COMPLETED, LabAppointment.CANCELLED]:
-                    raise Exception('Appointment cannot be accepted as current status is %s' % str(self.status))
+                    raise Exception('Appointment cannot be completed as current status is %s' % str(self.status))
 
                 self.action_completed()
         except Exception as e:

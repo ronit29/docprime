@@ -240,7 +240,7 @@ def push_appointment_to_matrix(self, data):
                 spoc_name = spoc_obj.name
                 mobile_list.append({'MobileNo': number,
                                     'Name': spoc_name,
-                                    'Designation': spoc_obj.contact_type,
+                                    'DesignationID': spoc_obj.contact_type,
                                     'Type': spoc_obj.contact_type})
 
             # Doctor mobile numbers
