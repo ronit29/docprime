@@ -1849,6 +1849,9 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
                 if self.status in [OpdAppointment.COMPLETED, OpdAppointment.CANCELLED, OpdAppointment.ACCEPTED]:
                     raise Exception('Appointment cannot be accepted as current status is %s' % str(self.status))
 
+                if self.time_slot_start < timezone.now():
+                    raise Exception('Appointment cannot be accepted as time slot has been expired')
+
                 self.action_accepted()
 
             elif status == OpdAppointment.COMPLETED:

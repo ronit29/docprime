@@ -1853,6 +1853,9 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin)
                 if self.status in [LabAppointment.COMPLETED, LabAppointment.CANCELLED, LabAppointment.ACCEPTED]:
                     raise Exception('Appointment cannot be accepted as current status is %s' % str(self.status))
 
+                if self.time_slot_start < timezone.now():
+                    raise Exception('Appointment cannot be accepted as time slot has been expired')
+
                 self.action_accepted()
 
             elif status == LabAppointment.COMPLETED:

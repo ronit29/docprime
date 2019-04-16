@@ -32,7 +32,7 @@ class AuthBackend(ModelBackend):
 
 
 class MatrixAuthentication(authentication.BaseAuthentication):
-    authentication_header_prefix = settings.MATRIX_DOC_AUTH_TOKEN
+    authentication_header_prefix = "Token"
 
     def authenticate(self, request):
         auth_header = authentication.get_authorization_header(request).split()
@@ -41,15 +41,25 @@ class MatrixAuthentication(authentication.BaseAuthentication):
         if not auth_header:
             return None
 
-        if (len(auth_header) == 0) or (len(auth_header) > 1):
+        if (len(auth_header) == 1) or (len(auth_header) > 2):
             raise exceptions.AuthenticationFailed('UnAuthorized')
 
-        token = base64.b64decode(auth_header[0])
+        prefix = auth_header[0].decode('utf-8')
+        token = auth_header[1].decode('utf-8')
+
+        if prefix.lower() != auth_header_prefix.lower():
+            raise exceptions.AuthenticationFailed('UnAuthorized')
+
+        token = base64.b64decode(token)
 
         if token.decode('utf-8') != auth_header_prefix:
             raise exceptions.AuthenticationFailed('UnAuthorized')
 
         return (None, None)
+
+    def authenticate_header(self, request):
+        return self.authentication_header_prefix
+
 
 class JWTAuthentication(authentication.BaseAuthentication):
     authentication_header_prefix = settings.JWT_AUTH['JWT_AUTH_HEADER_PREFIX']
