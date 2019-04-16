@@ -5,6 +5,7 @@ import datetime, calendar
 from django.conf import settings
 from rest_framework import authentication, exceptions
 from ondoc.authentication.models import UserSecretKey
+import base64
 
 User = get_user_model()
 
@@ -29,6 +30,26 @@ class AuthBackend(ModelBackend):
         except User.DoesNotExist:
             return None
 
+
+class MatrixAuthentication(authentication.BaseAuthentication):
+    authentication_header_prefix = settings.MATRIX_DOC_AUTH_TOKEN
+
+    def authenticate(self, request):
+        auth_header = authentication.get_authorization_header(request).split()
+        auth_header_prefix = self.authentication_header_prefix
+
+        if not auth_header:
+            return None
+
+        if (len(auth_header) == 0) or (len(auth_header) > 1):
+            raise exceptions.AuthenticationFailed('UnAuthorized')
+
+        token = base64.b64decode(auth_header[0])
+
+        if token.decode('utf-8') != auth_header_prefix:
+            raise exceptions.AuthenticationFailed('UnAuthorized')
+
+        return (None, None)
 
 class JWTAuthentication(authentication.BaseAuthentication):
     authentication_header_prefix = settings.JWT_AUTH['JWT_AUTH_HEADER_PREFIX']

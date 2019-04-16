@@ -1735,6 +1735,7 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
     money_pool = models.ForeignKey(MoneyPool, on_delete=models.SET_NULL, null=True)
     mask_number = GenericRelation(AppointmentMaskNumber)
     email_notification = GenericRelation(EmailNotification, related_name="enotification")
+    auto_ivr_data = JSONField(default=list())
 
     def __str__(self):
         return self.profile.name + " (" + self.doctor.name + ")"
@@ -1840,6 +1841,27 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
     def action_accepted(self):
         self.status = self.ACCEPTED
         self.save()
+
+    def update_ivr_status(self, status):
+        try:
+            if status == OpdAppointment.ACCEPTED:
+                # Constraints: Check if appointment can be accepted or not.
+                if self.status in [OpdAppointment.COMPLETED, OpdAppointment.CANCELLED, OpdAppointment.ACCEPTED]:
+                    raise Exception('Appointment cannot be accepted as current status is %s' % str(self.status))
+
+                self.action_accepted()
+
+            elif status == OpdAppointment.COMPLETED:
+                # Constraints: Check if appointment can be accepted or not.
+                if self.status in [OpdAppointment.COMPLETED, OpdAppointment.CANCELLED]:
+                    raise Exception('Appointment cannot be accepted as current status is %s' % str(self.status))
+
+                self.action_completed()
+        except Exception as e:
+            logger.error(str(e))
+            return False
+
+        return True
 
     @transaction.atomic
     def action_cancelled(self, refund_flag=1):

@@ -17,6 +17,7 @@ from django.conf import settings
 from ondoc.diagnostic.models import LabAppointment
 from ondoc.doctor.models import OpdAppointment
 from ondoc.authentication.models import User
+from ondoc.authentication.backends import MatrixAuthentication
 
 
 class MaskNumberViewSet(viewsets.GenericViewSet):
@@ -94,11 +95,32 @@ class MaskNumberViewSet(viewsets.GenericViewSet):
 
 class IvrViewSet(viewsets.GenericViewSet):
 
+    authentication_classes = (MatrixAuthentication, )
+
     def update(self, request):
         serializer = IvrSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         data = serializer.validated_data
-        User.objects.filter(data.get('phone_number')).first()
 
+        user = User.objects.filter(phone_number=data.get('phone_number')).first()
+        appointment_obj = None
 
-        return Response()
+        if data.get('appointment_type') == 'DC':
+            appointment_obj = LabAppointment.objects.filter(id=data.get('appointment_id')).first()
+        elif data.get('appointment_type') == 'D':
+            appointment_obj = OpdAppointment.objects.filter(id=data.get('appointment_id')).first()
+
+        if not appointment_obj:
+            return Response(status=status.HTTP_400_BAD_REQUEST)
+
+        appointment_obj._responsible_user = user
+        appointment_obj._source = data.get('source')
+        ivr_data = appointment_obj.auto_ivr_data
+        ivr_data.append(request.data)
+
+        success = appointment_obj.update_ivr_status(data.get('status'))
+
+        if not success:
+            return Response(data={'updated': False})
+
+        return Response(data={'updated': True})

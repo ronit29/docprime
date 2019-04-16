@@ -88,8 +88,11 @@ class AppointmentHistory(TimeStampedModel):
     DOC_WEB = "d_web"
     D_WEB_URL = "d_web_url"
     D_TOKEN_URL = "d_token_url"
+    IVR = "ivr"
     SOURCE_CHOICES = ((CONSUMER_APP, "Consumer App"), (CRM, "CRM"), (WEB, "Consumer Web"), (DOC_APP, "Doctor App"),
-                      (DOC_WEB, "Provider Web"), (D_WEB_URL, "Doctor Web URL"), (D_TOKEN_URL, "Doctor Token URL"))
+                      (DOC_WEB, "Provider Web"), (D_WEB_URL, "Doctor Web URL"), (D_TOKEN_URL, "Doctor Token URL"),
+                      (IVR, "Auto IVR"))
+
     content_type = models.ForeignKey(ContentType, on_delete=models.DO_NOTHING)
     object_id = models.PositiveIntegerField()
     content_object = GenericForeignKey()
