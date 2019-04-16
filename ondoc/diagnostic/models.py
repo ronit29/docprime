@@ -2113,7 +2113,7 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin)
         # check if test mapped with affiliates
         mapped_with_affiliates = True
         if data["spo_data"]["UtmSource"]:
-            affiliate = SalesPoint.object.filter(name=data["spo_data"]["UtmSource"]).first()
+            affiliate = SalesPoint.objects.filter(name=data["spo_data"]["UtmSource"]).first()
             if affiliate:
                 for test_id in test_ids_list:
                     spo_mapping = SalespointTestmapping.objects.filter(salespoint_id=affiliate.id, available_tests_id=test_id).first()
