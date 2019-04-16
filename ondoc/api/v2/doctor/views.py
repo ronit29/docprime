@@ -766,8 +766,16 @@ class PartnersAppInvoice(viewsets.GenericViewSet):
             valid_data = serializer.validated_data
             hospital_ids = valid_data.pop('hospital_ids')
             hospitals = valid_data.pop('hospitals')
-            invoice_item_obj = doc_models.GeneralInvoiceItems.objects.create(**valid_data)
-            invoice_item_obj.hospitals.add(*hospitals)
+            general_invoice_item = valid_data.pop('general_invoice_item') if valid_data.get('general_invoice_item') else None
+            if not general_invoice_item:
+                invoice_item_obj = doc_models.GeneralInvoiceItems.objects.create(**valid_data)
+                invoice_item_obj.hospitals.add(*hospitals)
+            else:
+                invoice_items = doc_models.GeneralInvoiceItems.objects.filter(id=general_invoice_item.id)
+                invoice_items.update(**valid_data)
+                invoice_item_obj = invoice_items.first()
+                invoice_item_obj.hospitals.all().delete()
+                invoice_item_obj.hospitals.add(*hospitals)
             model_serializer = serializers.GeneralInvoiceItemsModelSerializer(invoice_item_obj, many=False)
             return Response({"status": 1, "message": "Invoice Item added successfully",
                              "invoice_obj": model_serializer.data}, status.HTTP_200_OK)

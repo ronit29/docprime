@@ -302,7 +302,7 @@ class UpdateHospitalConsent(serializers.Serializer):
 
 
 class GeneralInvoiceItemsSerializer(serializers.Serializer):
-    # appointment_id = serializers.PrimaryKeyRelatedField(queryset=doc_models.OpdAppointment.objects.all())
+    general_invoice_item = serializers.PrimaryKeyRelatedField(queryset=doc_models.GeneralInvoiceItems.objects.all(), required=False)
     item = serializers.CharField(max_length=200)
     base_price = serializers.DecimalField(max_digits=10, decimal_places=2)
     description = serializers.CharField(max_length=500, required=False, allow_null=True, allow_blank=True)
