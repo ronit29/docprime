@@ -230,6 +230,7 @@ class Hospital(auth_model.TimeStampedModel, auth_model.CreatedByModel, auth_mode
     city_search_key = models.CharField(db_index=True, editable=False, max_length=100, default="", null=True, blank=True)
     enabled_for_cod = models.BooleanField(default=False)
     enabled_for_prepaid = models.BooleanField(default=True)
+    is_location_verified = models.BooleanField(verbose_name='Location Verified', default=False)
 
     def __str__(self):
         return self.name
@@ -261,8 +262,12 @@ class Hospital(auth_model.TimeStampedModel, auth_model.CreatedByModel, auth_mode
         )y where hospital.id = y.id'''
         update_alternative_value = RawSql(query, []).execute()
 
-        query1 = '''update hospital set city_search_key = lower(city) where city_search_key is null
-                        or city_search_key='' '''
+        query1 = '''update hospital set city_search_key = 
+                    case when lower(city) in ('bengaluru','bengalooru') then 'bangalore'
+                    when lower(city) in ('gurugram','gurugram rural') then 'gurgaon'
+                    else lower(city) end
+                    where city_search_key is null
+                    or city_search_key='' '''
         update_city = RawSql(query1, []).execute()
 
 
@@ -2550,6 +2555,11 @@ class CommonSpecialization(auth_model.TimeStampedModel):
 
     class Meta:
         db_table = "common_specializations"
+
+    @classmethod
+    def get_specializations(cls, count):
+        specializations = cls.objects.select_related('specialization').all().order_by("-priority")[:count]
+        return specializations
 
 
 class DoctorMapping(auth_model.TimeStampedModel):
