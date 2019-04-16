@@ -1281,6 +1281,14 @@ class InsurerPolicyNumber(auth_model.TimeStampedModel):
         db_table = 'insurer_policy_numbers'
 
 
+class InsuranceDummyData(auth_model.TimeStampedModel):
+    user = models.ForeignKey(User, related_name='user_insurance_dummy_data', on_delete=models.DO_NOTHING)
+    data = JSONField(null=True, blank=True)
+
+    class Meta:
+        db_table = 'insurance_dummy_data'
+
+
 # class InsuranceReport(UserInsurance):
 #
 #     class Meta:
