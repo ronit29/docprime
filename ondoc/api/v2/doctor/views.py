@@ -838,16 +838,17 @@ class PartnersAppInvoice(viewsets.GenericViewSet):
             if selected_invoice_items:
                 selected_invoice_items_objects = self.bulk_create_selected_invoice_items(selected_invoice_items, invoice_obj)
                 model_serializer = serializers.SelectedInvoiceItemsModelSerializer(selected_invoice_items_objects, many=True)
+            selected_invoice_items_created = model_serializer.data if selected_invoice_items else []
 
             return Response({"status": 1, "invoice": invoice.data,
-                             "selected_invoice_items_created": model_serializer.data}, status.HTTP_200_OK)
+                             "selected_invoice_items_created": selected_invoice_items_created}, status.HTTP_200_OK)
         except Exception as e:
             return Response({"status": 0, "message": "Error creating invoice - " + str(e)}, status.HTTP_400_BAD_REQUEST)
 
     def download_pdf(self, request, invoice_serial_id=None):
         invoice = doc_models.PartnersAppInvoice.objects.filter(invoice_serial_id=invoice_serial_id).last()
         if not invoice:
-            return Response({"status": 0, "message":"File not found"}, status=status.HTTP_404_NOT_FOUND)
+            return Response({"status": 0, "message": "File not found"}, status=status.HTTP_404_NOT_FOUND)
         response = HttpResponse(invoice.file, content_type='application/pdf')
         response['Content-Disposition'] = 'attachment; filename=%s' % invoice.invoice_serial_id
         return response
