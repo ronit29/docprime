@@ -2111,8 +2111,10 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin)
         insurance_id = cart_data.get('insurance_id', None)
 
         # check if test mapped with affiliates
-        mapped_with_affiliates = True
-        if data["spo_data"]["UtmSource"]:
+        mapped_with_affiliates = None
+        source = data["spo_data"].get("UtmSource", None)
+        if source:
+            mapped_with_affiliates = True
             affiliate = SalesPoint.objects.filter(name=data["spo_data"]["UtmSource"]).first()
             if affiliate:
                 for test_id in test_ids_list:
