@@ -108,6 +108,7 @@ class DoctorURL():
 
         q2 = '''insert into temp_url (search_slug, count, sublocality_id, locality_id, 
                       sitemap_identifier, entity_type, url_type, is_valid, created_at, updated_at, bookable_doctors_count)
+                      
                     select search_slug, count, sublocality_id,locality_id,sitemap_identifier,
                     entity_type, url_type, is_valid, now(), now(),
                     json_build_object('bookable_doctors_count',bookable_doctors_count,'bookable_doctors_2km',bookable_doctors_2km)
