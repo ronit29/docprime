@@ -40,7 +40,8 @@ from ondoc.notification import tasks as notification_tasks
 from django.contrib.contenttypes.fields import GenericRelation
 from ondoc.api.v1.utils import get_start_end_datetime, custom_form_datetime, CouponsMixin, aware_time_zone, \
     form_time_slot, util_absolute_url, html_to_pdf, TimeSlotExtraction
-from ondoc.common.models import AppointmentHistory, AppointmentMaskNumber, Service, Remark, MatrixMappedState, MatrixMappedCity, GlobalNonBookable
+from ondoc.common.models import AppointmentHistory, AppointmentMaskNumber, Service, Remark, MatrixMappedState, \
+    MatrixMappedCity, GlobalNonBookable, RefundDetails
 from ondoc.common.models import QRCode
 
 from functools import reduce
@@ -1737,6 +1738,7 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
     money_pool = models.ForeignKey(MoneyPool, on_delete=models.SET_NULL, null=True)
     mask_number = GenericRelation(AppointmentMaskNumber)
     email_notification = GenericRelation(EmailNotification, related_name="enotification")
+    refund = GenericRelation(RefundDetails, related_query_name="opd_appointment")
 
     def __str__(self):
         return self.profile.name + " (" + self.doctor.name + ")"
@@ -1744,9 +1746,7 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
     def can_agent_refund(self, user):
         if self.status == self.COMPLETED and (user.groups.filter(name=constants['APPOINTMENT_REFUND_TEAM']).exists() or user.is_superuser):
             return True
-    
         return False
-
 
     def allowed_action(self, user_type, request):
         allowed = []
@@ -1851,27 +1851,29 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
         self.save()
 
     @transaction.atomic
-    def action_cancelled(self, refund_flag=1):
-
+    def action_refund(self, refund_flag=1):
         # Taking Lock first
         consumer_account = None
         if self.payment_type == self.PREPAID:
             temp_list = ConsumerAccount.objects.get_or_create(user=self.user)
             consumer_account = ConsumerAccount.objects.select_for_update().get(user=self.user)
+        product_id = Order.DOCTOR_PRODUCT_ID
+        if self.payment_type == self.PREPAID and ConsumerTransaction.valid_appointment_for_cancellation(self.id,
+                                                                                                        product_id):
+            RefundDetails.log_refund(self)
+            wallet_refund, cashback_refund = self.get_cancellation_breakup()
+            consumer_account.credit_cancellation(self, product_id, wallet_refund, cashback_refund)
+            if refund_flag:
+                ctx_obj = consumer_account.debit_refund()
+                ConsumerRefund.initiate_refund(self.user, ctx_obj)
 
+    @transaction.atomic
+    def action_cancelled(self, refund_flag=1):
         old_instance = OpdAppointment.objects.get(pk=self.id)
         if old_instance.status != self.CANCELLED:
             self.status = self.CANCELLED
             self.save()
-            product_id = Order.DOCTOR_PRODUCT_ID
-            if self.payment_type == self.PREPAID and ConsumerTransaction.valid_appointment_for_cancellation(self.id,
-                                                                                                            product_id):
-                wallet_refund, cashback_refund = self.get_cancellation_breakup()
-                consumer_account.credit_cancellation(self, product_id, wallet_refund, cashback_refund)
-
-                if refund_flag:
-                    ctx_obj = consumer_account.debit_refund()
-                    ConsumerRefund.initiate_refund(self.user, ctx_obj)
+            self.action_refund(refund_flag)
 
     def get_cancellation_breakup(self):
         wallet_refund = cashback_refund = 0

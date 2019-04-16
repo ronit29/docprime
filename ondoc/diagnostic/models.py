@@ -11,6 +11,7 @@ from ondoc.account.models import MerchantPayout, ConsumerAccount, Order, UserRef
 from ondoc.authentication.models import (TimeStampedModel, CreatedByModel, Image, Document, QCModel, UserProfile, User,
                                          UserPermission, GenericAdmin, LabUserPermission, GenericLabAdmin,
                                          BillingAccount, SPOCDetails)
+from ondoc.crm.constants import constants
 from ondoc.doctor.models import Hospital, SearchKey, CancellationReason
 from ondoc.coupon.models import Coupon
 from ondoc.location.models import EntityUrls
@@ -53,7 +54,7 @@ from ondoc.integrations.task import push_lab_appointment_to_integrator, get_inte
 from ondoc.location import models as location_models
 from ondoc.ratings_review import models as ratings_models
 from ondoc.api.v1.common import serializers as common_serializers
-from ondoc.common.models import AppointmentHistory, AppointmentMaskNumber, Remark, GlobalNonBookable
+from ondoc.common.models import AppointmentHistory, AppointmentMaskNumber, Remark, GlobalNonBookable, RefundDetails
 import reversion
 from decimal import Decimal
 from django.utils.text import slugify
@@ -1460,6 +1461,11 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin)
                                        related_name='appointment_using')
     integrator_response = GenericRelation(IntegratorResponse)
 
+    def can_agent_refund(self, user):
+        if self.status == self.COMPLETED and (user.groups.filter(name=constants['APPOINTMENT_REFUND_TEAM']).exists() or user.is_superuser):
+            return True
+        return False
+
     def get_tests_and_prices(self):
         test_price = []
         if self.payment_type == OpdAppointment.INSURANCE:
@@ -1850,29 +1856,30 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin)
         self.save()
 
     @transaction.atomic
-    def action_cancelled(self, refund_flag=1):
-
+    def action_refund(self, refund_flag=1):
         # Taking Lock first
         consumer_account = None
         if self.payment_type == OpdAppointment.PREPAID:
             temp_list = account_model.ConsumerAccount.objects.get_or_create(user=self.user)
             consumer_account = account_model.ConsumerAccount.objects.select_for_update().get(user=self.user)
+            product_id = account_model.Order.LAB_PRODUCT_ID
+            if self.payment_type == OpdAppointment.PREPAID and account_model.ConsumerTransaction.valid_appointment_for_cancellation(
+                    self.id, product_id):
+                RefundDetails.log_refund(self)
+                wallet_refund, cashback_refund = self.get_cancellation_breakup()
+                consumer_account.credit_cancellation(self, account_model.Order.LAB_PRODUCT_ID, wallet_refund,
+                                                     cashback_refund)
+                if refund_flag:
+                    ctx_obj = consumer_account.debit_refund()
+                    account_model.ConsumerRefund.initiate_refund(self.user, ctx_obj)
 
+    @transaction.atomic
+    def action_cancelled(self, refund_flag=1):
         old_instance = LabAppointment.objects.get(pk=self.id)
         if old_instance.status != self.CANCELLED:
             self.status = self.CANCELLED
             self.save()
-            product_id = account_model.Order.LAB_PRODUCT_ID
-
-            if self.payment_type == OpdAppointment.PREPAID and account_model.ConsumerTransaction.valid_appointment_for_cancellation(
-                    self.id, product_id):
-
-                wallet_refund, cashback_refund = self.get_cancellation_breakup()
-
-                consumer_account.credit_cancellation(self, account_model.Order.LAB_PRODUCT_ID, wallet_refund, cashback_refund)
-                if refund_flag:
-                    ctx_obj = consumer_account.debit_refund()
-                    account_model.ConsumerRefund.initiate_refund(self.user, ctx_obj)
+            self.action_refund(refund_flag)
 
     def get_cancellation_breakup(self):
         wallet_refund = cashback_refund = 0

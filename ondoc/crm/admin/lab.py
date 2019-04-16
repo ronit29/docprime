@@ -37,7 +37,8 @@ from ondoc.integrations.models import IntegratorHistory
 from ondoc.notification.models import EmailNotification, NotificationAction
 from .common import *
 from ondoc.authentication.models import GenericAdmin, User, QCModel, GenericLabAdmin, AssociatedMerchant
-from ondoc.crm.admin.doctor import CustomDateInput, TimePickerWidget, CreatedByFilter, AutoComplete
+from ondoc.crm.admin.doctor import CustomDateInput, TimePickerWidget, CreatedByFilter, AutoComplete, \
+    RefundableAppointmentForm
 from ondoc.crm.admin.autocomplete import PackageAutoCompleteView
 from django.contrib.contenttypes.admin import GenericTabularInline
 from ondoc.authentication import forms as auth_forms
@@ -701,8 +702,8 @@ class LabAdmin(ImportExportMixin, admin.GeoModelAdmin, VersionAdmin, ActionAdmin
 
         return read_only
 
-class LabAppointmentForm(forms.ModelForm):
 
+class LabAppointmentForm(RefundableAppointmentForm):
     start_date = forms.DateField(widget=CustomDateInput(format=('%d-%m-%Y'), attrs={'placeholder':'Select a date'}))
     start_time = forms.CharField(widget=TimePickerWidget())
     cancel_type = forms.ChoiceField(label='Cancel Type', choices=((0, 'Cancel and Rebook'),
@@ -919,9 +920,12 @@ class LabAppointmentAdmin(nested_admin.NestedModelAdmin):
                      'payout_info')
         if request.user.groups.filter(name=constants['APPOINTMENT_OTP_TEAM']).exists() or request.user.is_superuser:
             all_fields = all_fields + ('otp',)
-        # if obj and obj.id and obj.status == OpdAppointment.ACCEPTED:
-        #     all_fields = all_fields + ('custom_otp',)
-        all_fields = all_fields + ('custom_otp',)
+
+        if obj and obj.can_agent_refund(request.user):
+            all_fields = all_fields + ('refund_payment', 'refund_reason')
+
+        if obj and obj.id and obj.status == OpdAppointment.ACCEPTED:
+            all_fields = all_fields + ('custom_otp',)
         return all_fields
         # else:
         #     return ()
@@ -1112,10 +1116,11 @@ class LabAppointmentAdmin(nested_admin.NestedModelAdmin):
                     logger.warning("Lab Admin Cancel started - " + str(obj.id) + " timezone - " + str(timezone.now()))
                     obj.action_cancelled(cancel_type)
                     logger.warning("Lab Admin Cancel completed - " + str(obj.id) + " timezone - " + str(timezone.now()))
-            elif lab_app_obj and (lab_app_obj.status == LabAppointment.COMPLETED):
-                pass
-            elif request.POST.get('status') and int(request.POST['status']) == LabAppointment.COMPLETED:
+            elif request.POST.get('status') and int(request.POST['status']) == LabAppointment.COMPLETED and lab_app_obj and lab_app_obj != LabAppointment.COMPLETED:
                 obj.action_completed()
+            if form and form.cleaned_data and form.cleaned_data.get('refund_payment', False):
+                obj._refund_reason = form.cleaned_data.get('refund_reason', '')
+                obj.action_refund()
             else:
                 super().save_model(request, obj, form, change)
                 if request.POST.get('status') and (int(request.POST['status']) == LabAppointment.ACCEPTED):

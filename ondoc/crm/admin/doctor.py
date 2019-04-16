@@ -1418,20 +1418,6 @@ class TimePickerWidget(forms.TextInput):
         htmlString +='</select></div>'
         return mark_safe(u''.join(htmlString))
 
-class RefundableAppointmentForm(forms.ModelForm):
-    refund_payment = forms.BooleanField(required=False)
-    refund_reason = forms.CharField(widget=forms.Textarea,required=False)
-    def clean(self):
-        super().clean()
-        cleaned_data = self.cleaned_data
-        refund_payment = cleaned_data.get('refund_payment')
-        refund_reason = cleaned_data.get('refund_reason')
-        if refund_payment:
-            if not refund_reason:
-                raise forms.ValidationError("Refund reason is compulsory")
-        
-        return cleaned_data
-
 
 class DoctorOpdAppointmentForm(RefundableAppointmentForm):
 
@@ -1466,8 +1452,8 @@ class DoctorOpdAppointmentForm(RefundableAppointmentForm):
         else:
             raise forms.ValidationError("Doctor and hospital details not entered.")
 
-        if self.instance.status in [OpdAppointment.CANCELLED, OpdAppointment.COMPLETED] and len(cleaned_data):
-            raise forms.ValidationError("Cancelled/Completed appointment cannot be modified.")
+        # if self.instance.status in [OpdAppointment.CANCELLED, OpdAppointment.COMPLETED] and len(cleaned_data):
+        #     raise forms.ValidationError("Cancelled/Completed appointment cannot be modified.")
 
         if not cleaned_data.get('status') is OpdAppointment.CANCELLED and (cleaned_data.get(
                 'cancellation_reason') or cleaned_data.get('cancellation_comments')):
@@ -1489,7 +1475,7 @@ class DoctorOpdAppointmentForm(RefundableAppointmentForm):
                                                      start__lte=hour, end__gt=hour).exists():
                 raise forms.ValidationError("Doctor do not sit at the given hospital in this time slot.")
 
-        if cleaned_data.get('status') and cleaned_data.get('status') == OpdAppointment.COMPLETED:
+        if cleaned_data.get('status') and cleaned_data.get('status') == OpdAppointment.COMPLETED and self.instance and self.instance.status != OpdAppointment.COMPLETED:
             if self.instance and self.instance.id and not self.instance.status == OpdAppointment.ACCEPTED:
                 raise forms.ValidationError("Can only complete appointment if it is in accepted state.")
             if not cleaned_data.get('custom_otp') == self.instance.otp:
@@ -1586,13 +1572,10 @@ class DoctorOpdAppointmentAdmin(admin.ModelAdmin):
             all_fields = all_fields + ('otp',)
 
         if obj and obj.can_agent_refund(request.user):
-            all_fields = all_fields + ('refund_payment',)
+            all_fields = all_fields + ('refund_payment', 'refund_reason')
 
-        all_fields = all_fields + ('refund_reason',)
-
-        # if obj and obj.id and obj.status == OpdAppointment.ACCEPTED:
-        #     all_fields = all_fields + ('custom_otp',)
-        all_fields = all_fields + ('custom_otp',)
+        if obj and obj.id and obj.status == OpdAppointment.ACCEPTED:
+            all_fields = all_fields + ('custom_otp',)
 
         return all_fields
         # else:
@@ -1631,7 +1614,6 @@ class DoctorOpdAppointmentAdmin(admin.ModelAdmin):
                                     url))
             return response
         return ''
-
 
     def invoice_urls(self, instance):
         invoices_urls = ''
@@ -1798,8 +1780,11 @@ class DoctorOpdAppointmentAdmin(admin.ModelAdmin):
                     logger.warning("Admin Cancel started - " + str(obj.id) + " timezone - " + str(timezone.now()))
                     obj.action_cancelled(cancel_type)
                     logger.warning("Admin Cancel completed - " + str(obj.id) + " timezone - " + str(timezone.now()))
-            elif request.POST.get('status') and int(request.POST['status']) == OpdAppointment.COMPLETED:
-                    obj.action_completed()
+            elif request.POST.get('status') and int(request.POST['status']) == OpdAppointment.COMPLETED and opd_obj and opd_obj.status != OpdAppointment.COMPLETED:
+                obj.action_completed()
+            if form and form.cleaned_data and form.cleaned_data.get('refund_payment', False):
+                obj._refund_reason = form.cleaned_data.get('refund_reason', '')
+                obj.action_refund()
             else:
                 super().save_model(request, obj, form, change)
 
