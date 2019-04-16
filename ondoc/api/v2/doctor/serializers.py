@@ -351,7 +351,7 @@ class GeneralInvoiceItemsModelSerializer(serializers.ModelSerializer):
     class Meta:
         model = doc_models.GeneralInvoiceItems
         fields = ('id', 'item', 'base_price', 'description', 'tax_amount', 'tax_percentage', 'discount_amount',
-                  'discount_percentage')
+                  'discount_percentage', 'hospitals')
 
 
 class SelectedInvoiceItemsSerializer(serializers.Serializer):
