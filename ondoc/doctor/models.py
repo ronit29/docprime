@@ -1738,7 +1738,7 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
     money_pool = models.ForeignKey(MoneyPool, on_delete=models.SET_NULL, null=True)
     mask_number = GenericRelation(AppointmentMaskNumber)
     email_notification = GenericRelation(EmailNotification, related_name="enotification")
-    refund = GenericRelation(RefundDetails, related_query_name="opd_appointment")
+    refund_details = GenericRelation(RefundDetails, related_query_name="opd_appointment_detail")
 
     def __str__(self):
         return self.profile.name + " (" + self.doctor.name + ")"

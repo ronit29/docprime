@@ -1460,6 +1460,7 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin)
     user_plan_used = models.ForeignKey('subscription_plan.UserPlanMapping', null=True, on_delete=models.DO_NOTHING,
                                        related_name='appointment_using')
     integrator_response = GenericRelation(IntegratorResponse)
+    refund_details = GenericRelation(RefundDetails, related_query_name="lab_appointment_detail")
 
     def can_agent_refund(self, user):
         if self.status == self.COMPLETED and (user.groups.filter(name=constants['APPOINTMENT_REFUND_TEAM']).exists() or user.is_superuser):
