@@ -516,7 +516,7 @@ class DoctorHospitalSerializer(serializers.ModelSerializer):
         hospital = doctor_clinic.hospital
         enabled_for_online_booking = doctor_clinic.enabled_for_online_booking and doctor.enabled_for_online_booking and hospital.enabled_for_online_booking
 
-        if obj.mrp is not None and resp['insurance_threshold_amount'] is not None and obj.mrp <= resp['insurance_threshold_amount'] and enabled_for_online_booking and \
+        if hospital.enabled_for_prepaid and obj.mrp is not None and resp['insurance_threshold_amount'] is not None and obj.mrp <= resp['insurance_threshold_amount'] and enabled_for_online_booking and \
                 not (request.query_params.get('procedure_ids') or request.query_params.get('procedure_category_ids')) and doctor.is_enabled_for_insurance:
 
             user_insurance = None if not user.is_authenticated or user.is_anonymous else user.active_insurance
@@ -953,11 +953,11 @@ class DoctorProfileUserViewSerializer(DoctorProfileSerializer):
         return None
 
     def get_display_rating_widget(self, obj):
-        rate_count = obj.rating.count()
+        rate_count = obj.rating.filter(is_live=True).count()
         avg = 0
         if rate_count:
             all_rating = []
-            for rate in obj.rating.all():
+            for rate in obj.rating.filter(is_live=True):
                 all_rating.append(rate.ratings)
             if all_rating:
                 avg = sum(all_rating) / len(all_rating)

@@ -697,7 +697,10 @@ class UserAppointmentsViewSet(OndocViewSet):
                     if new_deal_price <= coupon_discount:
                         new_effective_price = 0
                     else:
-                        new_effective_price = new_deal_price - coupon_discount
+                        if lab_appointment.insurance_id is None:
+                            new_effective_price = new_deal_price - coupon_discount
+                        else:
+                            new_effective_price = 0.0
                     # new_appointment = dict()
 
                     new_appointment = {
@@ -780,8 +783,10 @@ class UserAppointmentsViewSet(OndocViewSet):
                         if coupon_discount > doctor_hospital.deal_price:
                             new_effective_price = 0
                         else:
-                            new_effective_price = doctor_hospital.deal_price - coupon_discount
-
+                            if opd_appointment.insurance_id is None:
+                                new_effective_price = doctor_hospital.deal_price - coupon_discount
+                            else:
+                                new_effective_price = 0.0
                         if opd_appointment.procedures.count():
                             doctor_details = opd_appointment.get_procedures()[0]
                             old_agreed_price = Decimal(doctor_details["agreed_price"])
@@ -1178,7 +1183,8 @@ class TransactionViewSet(viewsets.GenericViewSet):
                     pg_txn = PgTransaction.objects.filter(order_no__iexact=response.get("orderNo")).first()
                     if pg_txn:
                         send_pg_acknowledge.apply_async((pg_txn.order_id, pg_txn.order_no,), countdown=1)
-                        return Response({ "processed_already": True })
+                        REDIRECT_URL = (SUCCESS_REDIRECT_URL % pg_txn.order_id) + "?payment_success=true"
+                        return HttpResponseRedirect(redirect_to=REDIRECT_URL)
             except Exception as e:
                logger.error("Error in sending pg acknowledge - " + str(e))
 

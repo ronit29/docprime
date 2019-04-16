@@ -1,3 +1,5 @@
+import re
+
 from rest_framework.response import Response
 from rest_framework import viewsets, status
 from ondoc.integrations.models import IntegratorResponse, IntegratorReport, IntegratorTestParameterMapping
@@ -25,6 +27,7 @@ class IntegratorReportViewSet(viewsets.GenericViewSet):
             return Response({"error": "Thyrocare Report not found for booking"}, status=status.HTTP_404_NOT_FOUND)
 
         report_url = report.xml_url
+        pdf_url = report.pdf_url
         if not report_url:
             return Response({"error": "Thyrocare Report url not found for booking"}, status=status.HTTP_404_NOT_FOUND)
 
@@ -50,17 +53,22 @@ class IntegratorReportViewSet(viewsets.GenericViewSet):
                         test_data = self.get_test_result_data(lead_detail, test_results)
                         data.append(test_data)
 
-        return Response(data)
+        return Response({'pdf_report_url': pdf_url, 'data': data})
 
     def get_test_result_data(self, lead_detail, test_results):
-        patient_detail = {'PATIENT_NAME': lead_detail['PATIENT'], 'MOBILE': lead_detail['MOBILE'], 'EMAIL': lead_detail['EMAIL'],
+        separated_details = self.get_name_age_gender(lead_detail['PATIENT'])
+
+        patient_detail = {'NAME': separated_details['name'], 'AGE': separated_details['age'],
+                          'GENDER': separated_details['gender'],
+                          'MOBILE': lead_detail['MOBILE'], 'EMAIL': lead_detail['EMAIL'],
                           'LEADID': lead_detail['LEADID'], 'TESTS': lead_detail['TESTS']}
         red = list()
         white = list()
 
         if type(test_results) is dict:
+            min_max_value = self.get_min_max_value(test_results['NORMAL_VAL'])
             test_detail = {'REPORT_GROUP_ID': test_results['REPORT_GROUP_ID'], 'R3': test_results['R3'], 'UNITS': test_results['UNITS'],
-                           'REPORT_PRINT_ORDER': test_results['REPORT_PRINT_ORDER'], 'NORMAL_VAL': test_results['NORMAL_VAL'],
+                           'REPORT_PRINT_ORDER': test_results['REPORT_PRINT_ORDER'], 'MIN': min_max_value['min_val'], 'MAX': min_max_value['max_val'],
                            'Description': test_results['Description'], 'TEST_CODE': test_results['TEST_CODE'],
                            'PROFILE_CODE': test_results['PROFILE_CODE'],
                            'SDATE': test_results['SDATE'], 'TEST_VALUE': test_results['TEST_VALUE']}
@@ -81,8 +89,9 @@ class IntegratorReportViewSet(viewsets.GenericViewSet):
             return patient_detail
         elif type(test_results) is list:
             for result in test_results:
+                min_max_value = self.get_min_max_value(result['NORMAL_VAL'])
                 test_detail = {'REPORT_GROUP_ID': result['REPORT_GROUP_ID'], 'R3': result['R3'], 'UNITS': result['UNITS'],
-                               'REPORT_PRINT_ORDER': result['REPORT_PRINT_ORDER'], 'NORMAL_VAL': result['NORMAL_VAL'],
+                               'REPORT_PRINT_ORDER': result['REPORT_PRINT_ORDER'], 'MIN': min_max_value['min_val'], 'MAX': min_max_value['max_val'],
                                'Description': result['Description'], 'TEST_CODE': result['TEST_CODE'],
                                'PROFILE_CODE': result['PROFILE_CODE'],
                                'SDATE': result['SDATE'], 'TEST_VALUE': result['TEST_VALUE']}
@@ -102,5 +111,34 @@ class IntegratorReportViewSet(viewsets.GenericViewSet):
             patient_detail['RED'] = red
             patient_detail['WHITE'] = white
             return patient_detail
+
+    def get_name_age_gender(self, patient_name):
+        name, age, gender = None, None, None
+        if patient_name:
+            p_name = patient_name.split('(')
+            name = p_name[0]
+            age = p_name[1].split('/')[0]
+            gender = p_name[1].split('/')[1]
+            gender = re.sub('\W+', '', gender)
+
+        return {'name': name, 'age': age, 'gender': gender}
+
+    def get_min_max_value(self, normal_value):
+        if "-" in normal_value:
+            min_val = normal_value.split('-')[0].strip()
+            max_val = normal_value.split('-')[1].strip()
+        elif "<" in normal_value:
+            min_val = "-"
+            max_val = normal_value.split('<')[1].strip()
+        elif ">" in normal_value:
+            min_val = normal_value.split('>')[1].strip()
+            max_val = "-"
+        else:
+            min_val = None
+            max_val = None
+
+        return {'min_val': min_val, 'max_val': max_val}
+
+
 
 

@@ -11,7 +11,8 @@ from rest_framework.response import Response
 from ondoc.account import models as account_models
 from ondoc.doctor import models as doctor_models
 from ondoc.insurance.models import (Insurer, InsuredMembers, InsuranceThreshold, InsurancePlans, UserInsurance, InsuranceLead,
-                                    InsuranceTransaction, InsuranceDisease, InsuranceDiseaseResponse, StateGSTCode)
+                                    InsuranceTransaction, InsuranceDisease, InsuranceDiseaseResponse, StateGSTCode,
+                                    InsuranceDummyData)
 from ondoc.authentication.models import UserProfile
 from ondoc.authentication.backends import JWTAuthentication
 from rest_framework.permissions import IsAuthenticated
@@ -111,7 +112,24 @@ class InsuranceOrderViewSet(viewsets.GenericViewSet):
 
     def create_banner_lead(self, request):
         user = request.user
-        InsuranceLead(user=user, extras=request.data).save()
+        user_insurance_lead = InsuranceLead.objects.filter(user=user).order_by('id').last()
+        user_insurance = user.purchased_insurance.filter().order_by('id').last()
+
+        if user.active_insurance:
+            return Response({'success': True})
+
+        if not user_insurance_lead:
+            user_insurance_lead = InsuranceLead(user=user)
+        elif user_insurance_lead and user_insurance and not user_insurance.is_valid():
+            active_insurance_lead = InsuranceLead.objects.filter(created_at__gte=user_insurance.expiry_date).order_by('created_at').last()
+            if not active_insurance_lead:
+                user_insurance_lead = InsuranceLead(user=user)
+            else:
+                user_insurance_lead = active_insurance_lead
+
+        user_insurance_lead.extras = request.data
+        user_insurance_lead.save()
+
         return Response({'success': True})
 
     @transaction.atomic
@@ -165,7 +183,9 @@ class InsuranceOrderViewSet(viewsets.GenericViewSet):
                             user_profile = UserProfile.objects.filter(id=member['profile'].id,
                                                                       user_id=request.user.pk).values('id', 'name', 'email',
                                                                                                     'gender', 'user_id',
-                                                                                                    'dob', 'phone_number').first()
+                                                                                                      'phone_number').first()
+
+                            user_profile['dob'] = member['dob']
 
                         else:
                             user_profile = {"name": member['first_name'] + " " + member['last_name'], "email":
@@ -344,3 +364,27 @@ class InsuranceValidationViewSet(viewsets.GenericViewSet):
             resp['insurance_message'] = ""
         return Response(resp)
 
+
+class InsuranceDummyDataViewSet(viewsets.GenericViewSet):
+    authentication_classes = (JWTAuthentication,)
+    permission_classes = (IsAuthenticated,)
+
+    def push_dummy_data(self, request):
+        try:
+            user = request.user
+            data = request.data
+            InsuranceDummyData.objects.create(user=user, data=data)
+            return Response(data="save successfully!!", status=status.HTTP_200_OK )
+        except Exception as e:
+            logger.log(str(e))
+            return Response(status=status.HTTP_200_OK)
+
+    def show_dummy_data(self, request):
+        user = request.user
+        if user:
+            dummy_data = InsuranceDummyData.objects.filter(user=user).order_by('-id').first()
+            response = dummy_data.data
+        if response and user:
+            return Response(data=response, status=status.HTTP_200_OK)
+        else:
+            return Response(status=status.HTTP_404_NOT_FOUND)

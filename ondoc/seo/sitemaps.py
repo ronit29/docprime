@@ -1,4 +1,5 @@
 from ondoc.articles.models import ArticleCategory
+from ondoc.doctor.models import Doctor
 from ondoc.location.models import EntityUrls
 from django.contrib.sitemaps import Sitemap
 from ondoc.seo.models import SitemapManger
@@ -87,7 +88,8 @@ class DoctorPageSitemap(Sitemap):
     priority = 1
 
     def items(self):
-        return EntityUrls.objects.filter(is_valid=True, sitemap_identifier=EntityUrls.SitemapIdentifier.DOCTOR_PAGE)\
+        doctor_ids = Doctor.objects.filter(is_live=True).values_list('id', flat=True)
+        return EntityUrls.objects.filter(is_valid=True, sitemap_identifier=EntityUrls.SitemapIdentifier.DOCTOR_PAGE, entity_id__in=doctor_ids)\
             .order_by('created_at')
 
     def location(self, obj):
