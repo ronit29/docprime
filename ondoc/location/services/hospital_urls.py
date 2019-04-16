@@ -159,10 +159,9 @@ class HospitalURL():
 
         # update for hospital profile from city if null
         RawSql('''update temp_url  tu set breadcrumb = (select breadcrumb from temp_url where
-                lower(locality_value)=lower(tu.locality_value)  
-                and sitemap_identifier = 'HOSPITALS_LOCALITY_CITY' and
+                sitemap_identifier = 'HOSPITALS_LOCALITY_CITY' and lower(locality_value)=lower(tu.locality_value) and
                 st_dwithin(location::geography, tu.location::geography, 20000) order by st_distance(location, tu.location) asc
-                limit 1) where sitemap_identifier = 'HOSPITAL_PAGE'	  and breadcrumb is null  ''', []).execute()
+                limit 1) where sitemap_identifier = 'HOSPITAL_PAGE' ''', []).execute()
 
         RawSql('''update temp_url tu set breadcrumb=json_build_array() where breadcrumb is null ''', []).execute()
 
