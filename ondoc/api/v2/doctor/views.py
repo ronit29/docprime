@@ -844,10 +844,10 @@ class PartnersAppInvoice(viewsets.GenericViewSet):
         except Exception as e:
             return Response({"status": 0, "message": "Error creating invoice - " + str(e)}, status.HTTP_400_BAD_REQUEST)
 
-    def download_pdf(self, request, name=None):
-        invoice = doc_models.PartnersAppInvoice.objects.filter(invoice_serial_id=name).last()
+    def download_pdf(self, request, invoice_serial_id=None):
+        invoice = doc_models.PartnersAppInvoice.objects.filter(invoice_serial_id=invoice_serial_id).last()
         response = HttpResponse(invoice.file, content_type='application/pdf')
-        response['Content-Disposition'] = 'attachment; filename=%s' % invoice.name
+        response['Content-Disposition'] = 'attachment; filename=%s' % invoice.invoice_serial_id
         return response
 
     def update(self, request):
