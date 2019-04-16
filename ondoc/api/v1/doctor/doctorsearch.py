@@ -53,8 +53,8 @@ class DoctorSearchHelper:
             params['hospital_id'] = str(self.query_params.get("hospital_id"))
 
         if self.query_params.get('locality_value'):
-            filtering_params.append("h.city_search_key = (%(locality_value)s)")
-            params['locality_value'] = self.query_params.get('locality_value').lower()
+            filtering_params.append("h.city_search_key ilike (%(locality_value)s)")
+            params['locality_value'] = '%' + self.query_params.get('locality_value').lower() + '%'
 
         if len(condition_ids)>0:
             cs = list(models.MedicalConditionSpecialization.objects.filter(medical_condition_id__in=condition_ids).values_list('specialization_id', flat=True));
@@ -188,7 +188,7 @@ class DoctorSearchHelper:
 
         if self.query_params.get('is_insurance'):
             filtering_params.append(
-                "mrp<=(%(insurance_threshold_amount)s) and h.enabled_for_online_booking=True and d.enabled_for_online_booking=True and d.is_insurance_enabled and dc.enabled_for_online_booking=True"
+                "mrp<=(%(insurance_threshold_amount)s) and h.enabled_for_online_booking=True and h.enabled_for_prepaid and d.enabled_for_online_booking=True and d.is_insurance_enabled and dc.enabled_for_online_booking=True"
             )
             params['insurance_threshold_amount'] = self.query_params.get('insurance_threshold_amount')
 
@@ -477,7 +477,7 @@ class DoctorSearchHelper:
 
                 is_insurance_covered = False
                 insurance_data_dict = kwargs.get('insurance_data')
-                if enable_online_booking and doctor.is_insurance_enabled and insurance_data_dict and min_price.get("mrp") is not None and \
+                if doctor_clinic.hospital.enabled_for_prepaid and enable_online_booking and doctor.is_insurance_enabled and insurance_data_dict and min_price.get("mrp") is not None and \
                         min_price["mrp"] <= insurance_data_dict['insurance_threshold_amount'] and \
                         not (request.query_params.get('procedure_ids') or request.query_params.get('procedure_category_ids')):
                     is_insurance_covered = True

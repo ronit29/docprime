@@ -694,7 +694,10 @@ class UserAppointmentsViewSet(OndocViewSet):
                     if new_deal_price <= coupon_discount:
                         new_effective_price = 0
                     else:
-                        new_effective_price = new_deal_price - coupon_discount
+                        if lab_appointment.insurance_id is None:
+                            new_effective_price = new_deal_price - coupon_discount
+                        else:
+                            new_effective_price = 0.0
                     # new_appointment = dict()
 
                     new_appointment = {
@@ -777,8 +780,10 @@ class UserAppointmentsViewSet(OndocViewSet):
                         if coupon_discount > doctor_hospital.deal_price:
                             new_effective_price = 0
                         else:
-                            new_effective_price = doctor_hospital.deal_price - coupon_discount
-
+                            if opd_appointment.insurance_id is None:
+                                new_effective_price = doctor_hospital.deal_price - coupon_discount
+                            else:
+                                new_effective_price = 0.0
                         if opd_appointment.procedures.count():
                             doctor_details = opd_appointment.get_procedures()[0]
                             old_agreed_price = Decimal(doctor_details["agreed_price"])

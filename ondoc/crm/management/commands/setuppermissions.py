@@ -42,7 +42,7 @@ from ondoc.diagnostic.models import (Lab, LabTiming, LabImage, GenericLabAdmin,
 from ondoc.insurance.models import (Insurer, InsurancePlans, InsuranceThreshold, InsuranceCity, StateGSTCode,
                                     InsuranceDistrict, InsuranceTransaction, InsuranceDeal, InsuranceDisease,
                                     UserInsurance, InsurancePlanContent, InsuredMembers, InsurerAccount, InsuranceLead,
-                                    InsuranceDiseaseResponse)
+                                    InsuranceDiseaseResponse, InsurerPolicyNumber)
 
 from ondoc.procedure.models import Procedure, ProcedureCategory, CommonProcedureCategory, DoctorClinicProcedure, \
     ProcedureCategoryMapping, ProcedureToCategoryMapping, CommonProcedure, IpdProcedure, IpdProcedureFeatureMapping, \
@@ -882,7 +882,8 @@ class Command(BaseCommand):
                                                            InsurancePlanContent, InsurancePlans, InsuranceCity,
                                                            StateGSTCode, InsuranceDistrict, InsuranceThreshold,
                                                            UserInsurance, InsuranceDeal, InsuranceLead,
-                                                           InsuranceTransaction, InsuranceDiseaseResponse)
+                                                           InsuranceTransaction, InsuranceDiseaseResponse,
+                                                           InsuredMembers, InsurerPolicyNumber)
 
         for cl, ct in content_types.items():
             permissions = Permission.objects.filter(

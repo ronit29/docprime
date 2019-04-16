@@ -690,6 +690,16 @@ class LabAdmin(ImportExportMixin, admin.GeoModelAdmin, VersionAdmin, ActionAdmin
             form.base_fields['assigned_to'].disabled = True
         return form
 
+    def get_readonly_fields(self, *args, **kwargs):
+        read_only = super().get_readonly_fields(*args, **kwargs)
+        if args:
+            request = args[0]
+            if not request.user.groups.filter(
+                    name__in=[constants['WELCOME_CALLING_TEAM'],
+                              constants['LAB_APPOINTMENT_MANAGEMENT_TEAM']]) and not request.user.is_superuser:
+                read_only += ('is_location_verified',)
+
+        return read_only
 
 class LabAppointmentForm(forms.ModelForm):
 
@@ -698,6 +708,7 @@ class LabAppointmentForm(forms.ModelForm):
     cancel_type = forms.ChoiceField(label='Cancel Type', choices=((0, 'Cancel and Rebook'),
                                                                   (1, 'Cancel and Refund'),), initial=0, widget=forms.RadioSelect)
     send_email_sms_report = forms.BooleanField(label='Send reports via message and email', initial=False, required=False)
+    custom_otp = forms.IntegerField(required=False)
 
     def clean(self):
         super().clean()
@@ -765,6 +776,13 @@ class LabAppointmentForm(forms.ModelForm):
                 else:
                     if not lab.always_open and not is_lab_timing_available:
                         raise forms.ValidationError("No time slot available")
+
+        if cleaned_data.get('status') and cleaned_data.get('status') == LabAppointment.COMPLETED:
+            if self.instance and self.instance.id and not self.instance.status == OpdAppointment.ACCEPTED:
+                raise forms.ValidationError("Can only complete appointment if it is in accepted state.")
+            if not cleaned_data.get('custom_otp') == self.instance.otp:
+                raise forms.ValidationError("Entered OTP is incorrect.")
+
 
         return cleaned_data
 
@@ -864,7 +882,8 @@ class LabAppointmentAdmin(nested_admin.NestedModelAdmin):
                                     (LabAppointment.RESCHEDULED_PATIENT, 'Rescheduled by patient'),
                                     (LabAppointment.RESCHEDULED_LAB, 'Rescheduled by lab'),
                                     (LabAppointment.ACCEPTED, 'Accepted'),
-                                    (LabAppointment.CANCELLED, 'Cancelled')]
+                                    (LabAppointment.CANCELLED, 'Cancelled'),
+                                    (LabAppointment.COMPLETED, 'Completed')]
         if db_field.name == "status" and request.user.groups.filter(name=constants['LAB_APPOINTMENT_MANAGEMENT_TEAM']).exists():
             kwargs['choices'] = allowed_status_for_agent
         return super().formfield_for_choice_field(db_field, request, **kwargs)
@@ -900,6 +919,9 @@ class LabAppointmentAdmin(nested_admin.NestedModelAdmin):
                      'payout_info')
         if request.user.groups.filter(name=constants['APPOINTMENT_OTP_TEAM']).exists() or request.user.is_superuser:
             all_fields = all_fields + ('otp',)
+        # if obj and obj.id and obj.status == OpdAppointment.ACCEPTED:
+        #     all_fields = all_fields + ('custom_otp',)
+        all_fields = all_fields + ('custom_otp',)
         return all_fields
         # else:
         #     return ()
@@ -1083,8 +1105,7 @@ class LabAppointmentAdmin(nested_admin.NestedModelAdmin):
 
                 if dt_field:
                     obj.time_slot_start = dt_field
-            if request.POST.get('status') and (int(request.POST['status']) == LabAppointment.CANCELLED or \
-                int(request.POST['status']) == LabAppointment.COMPLETED):
+            if request.POST.get('status') and int(request.POST['status']) == LabAppointment.CANCELLED:
                 obj.cancellation_type = LabAppointment.AGENT_CANCELLED
                 cancel_type = int(request.POST.get('cancel_type'))
                 if cancel_type is not None:
@@ -1093,6 +1114,8 @@ class LabAppointmentAdmin(nested_admin.NestedModelAdmin):
                     logger.warning("Lab Admin Cancel completed - " + str(obj.id) + " timezone - " + str(timezone.now()))
             elif lab_app_obj and (lab_app_obj.status == LabAppointment.COMPLETED):
                 pass
+            elif request.POST.get('status') and int(request.POST['status']) == LabAppointment.COMPLETED:
+                obj.action_completed()
             else:
                 super().save_model(request, obj, form, change)
                 if request.POST.get('status') and (int(request.POST['status']) == LabAppointment.ACCEPTED):

@@ -63,10 +63,10 @@ from ondoc.geoip.models import AdwordLocationCriteria
 from .geoip import AdwordLocationCriteriaAdmin
 from ondoc.insurance.models import Insurer, InsurerAccount, InsurancePlans, InsuranceThreshold, UserInsurance, \
     InsuredMembers, InsuranceTransaction, InsurancePlanContent, InsuranceDisease, StateGSTCode, InsuranceCity, \
-    InsuranceDistrict, InsuranceDeal
+    InsuranceDistrict, InsuranceDeal, InsurerPolicyNumber
 from ondoc.crm.admin.insurance import InsurerAdmin, InsurancePlansAdmin, InsuranceThresholdAdmin, InsurerFloatAdmin, \
     UserInsuranceAdmin, InsuredMembersAdmin, InsuranceDiseaseAdmin, StateGSTCodeAdmin, InsuranceCityAdmin, \
-    InsuranceDistrictAdmin, InsuranceDealAdmin
+    InsuranceDistrictAdmin, InsuranceDealAdmin, InsurerPolicyNumberAdmin
 from ondoc.insurance import models as insurance_model
 from ondoc.ratings_review.models import RatingsReview, ReviewCompliments
 from ondoc.crm.admin.ratings import RatingsReviewAdmin, ReviewComplimentsAdmin
@@ -172,9 +172,11 @@ admin.site.register(StateGSTCode, StateGSTCodeAdmin)
 admin.site.register(InsuranceCity, InsuranceCityAdmin)
 admin.site.register(InsuranceDistrict, InsuranceDistrictAdmin)
 admin.site.register(InsuranceDeal, InsuranceDealAdmin)
+# admin.site.register(InsuranceReport, InsuranceReportAdmin)
 # admin.site.register(InsurancePlanContent, InsurancePlanContentAdmin)
 
 admin.site.register(InsuranceTransaction)
+admin.site.register(InsurerPolicyNumber, InsurerPolicyNumberAdmin)
 admin.site.register(Order)
 admin.site.register(AdwordLocationCriteria, AdwordLocationCriteriaAdmin)
 admin.site.register(ProcedureCategory, ProcedureCategoryAdmin)
