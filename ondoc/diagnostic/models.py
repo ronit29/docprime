@@ -225,6 +225,7 @@ class Lab(TimeStampedModel, CreatedByModel, QCModel, SearchKey):
     open_for_communication = models.BooleanField(default=True)
     remark = GenericRelation(Remark)
     rating_data = JSONField(blank=True, null=True)
+    is_location_verified = models.BooleanField(verbose_name='Location Verified', default=False)
 
     def __str__(self):
         return self.name
@@ -1584,8 +1585,12 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin)
 
         if parent_order and parent_order.visitor_info:
             from_app = parent_order.visitor_info.get('from_app', False)
+            app_version = parent_order.visitor_info.get('app_version', None)
 
-        return from_app
+        if from_app and app_version and float(app_version) < float('1.2'):
+            return True
+        else:
+            return False
 
     def app_commit_tasks(self, old_instance, push_to_matrix, push_to_integrator):
         if push_to_matrix:
@@ -2217,6 +2222,10 @@ class CommonTest(TimeStampedModel):
     def __str__(self):
         return "{}-{}".format(self.test.name, self.id)
 
+    @classmethod
+    def get_tests(cls, count):
+        tests = cls.objects.select_related('test').filter(test__enable_for_retail=True, test__searchable=True).order_by('-priority')[:count]
+        return tests
 
 class CommonPackage(TimeStampedModel):
     package = models.ForeignKey(LabTest, on_delete=models.CASCADE, related_name='commonpackage')
@@ -2228,6 +2237,10 @@ class CommonPackage(TimeStampedModel):
     class Meta:
         db_table = 'common_package'
 
+    @classmethod
+    def get_packages(cls, count):
+        packages = cls.objects.prefetch_related('package').filter(package__enable_for_retail=True, package__searchable=True).order_by('-priority')[:count]
+        return packages
 
 class CommonDiagnosticCondition(TimeStampedModel):
     name = models.CharField(max_length=200)

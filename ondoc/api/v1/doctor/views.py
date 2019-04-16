@@ -1203,8 +1203,7 @@ class SearchedItemsViewSet(viewsets.GenericViewSet):
         conditions_serializer = serializers.MedicalConditionSerializer(medical_conditions, many=True,
                                                                        context={'request': request})
 
-        common_specializations = models.CommonSpecialization.objects.select_related('specialization').all().order_by(
-            "-priority")[:10]
+        common_specializations = models.CommonSpecialization.get_specializations(count)
         specializations_serializer = serializers.CommonSpecializationsSerializer(common_specializations, many=True,
                                                                                  context={'request': request})
 
@@ -1653,9 +1652,12 @@ class DoctorListViewSet(viewsets.GenericViewSet):
             if doctor_entity:
                 if doctor_entity.get('url'):
                     resp['url'] = doctor_entity.get('url')
-                    resp['schema']['url'] = request.build_absolute_uri(doctor_entity.get('url')) if doctor_entity.get('url') else None
-                    resp['new_schema']['url'] = request.build_absolute_uri(doctor_entity.get('url')) if doctor_entity.get(
-                        'url') else None
+                    schema_url = None
+                    if doctor_entity.get('url'):
+                        schema_url = doctor_entity.get('url') if doctor_entity.get('url').startswith('/') else '/' + doctor_entity.get('url')
+
+                    resp['schema']['url'] = request.build_absolute_uri(schema_url) if schema_url else None
+                    resp['new_schema']['url'] = request.build_absolute_uri(schema_url) if schema_url else None
                 parent_location = doctor_entity.get('location')
                 parent_url = doctor_entity.get('parent_url')
                 if parent_location and parent_url:
@@ -1669,19 +1671,26 @@ class DoctorListViewSet(viewsets.GenericViewSet):
             canonical_url = validated_data.get('url')
         else:
             if validated_data.get('city'):
+                city = None
+                if validated_data.get('city') in ('bengaluru', 'bengalooru'):
+                    city = 'bangalore'
+                elif validated_data.get('city') in ('gurugram','gurugram rural'):
+                    city = 'gurgaon'
+                else:
+                    city = validated_data.get('city')
                 if specializations:
                     specialization_name = specializations[0].get('name')
                     if not validated_data.get('locality'):
-                        url = slugify(specialization_name + '-in-' + validated_data.get('city') + '-sptcit')
+                        url = slugify(specialization_name + '-in-' + city + '-sptcit')
                     else:
                         url = slugify(specialization_name + '-in-' + validated_data.get('locality') + '-' +
-                                                validated_data.get('city') + '-sptlitcit')
+                                                city + '-sptlitcit')
                 else:
                     if not validated_data.get('locality'):
-                        url = slugify('doctors' + '-in-' + validated_data.get('city') + '-sptcit')
+                        url = slugify('doctors' + '-in-' + city + '-sptcit')
                     else:
                         url = slugify('doctors' + '-in-' + validated_data.get('locality') + '-' +
-                                                validated_data.get('city') + '-sptlitcit')
+                                                city + '-sptlitcit')
 
                 entity = EntityUrls.objects.filter(url=url, url_type='SEARCHURL', entity_type='Doctor', is_valid=True)
                 if entity:
