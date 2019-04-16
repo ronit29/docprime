@@ -846,6 +846,8 @@ class PartnersAppInvoice(viewsets.GenericViewSet):
 
     def download_pdf(self, request, invoice_serial_id=None):
         invoice = doc_models.PartnersAppInvoice.objects.filter(invoice_serial_id=invoice_serial_id).last()
+        if not invoice:
+            return Response({"status": 0, "message":"File not found"}, status=status.HTTP_404_NOT_FOUND)
         response = HttpResponse(invoice.file, content_type='application/pdf')
         response['Content-Disposition'] = 'attachment; filename=%s' % invoice.invoice_serial_id
         return response
