@@ -60,6 +60,7 @@ class TempURL(TimeStampedModel):
     locality_location = models.PointField(geography=True, srid=4326, blank=True, null=True)
     sublocality_location = models.PointField(geography=True, srid=4326, blank=True, null=True)
     location = models.PointField(geography=True, srid=4326, blank=True, null=True)
+    bookable_doctors_count = JSONField(null=True)
 
     class Meta:
         db_table='temp_url'
@@ -623,6 +624,7 @@ class EntityUrls(TimeStampedModel):
     locality_location = models.PointField(geography=True, srid=4326, blank=True, null=True)
     sublocality_location = models.PointField(geography=True, srid=4326, blank=True, null=True)
     location = models.PointField(geography=True, srid=4326, blank=True, null=True)
+    bookable_doctors_count = JSONField(null=True)
 
     def __str__(self):
         return self.url
