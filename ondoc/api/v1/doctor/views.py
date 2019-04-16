@@ -1468,7 +1468,7 @@ class DoctorListViewSet(viewsets.GenericViewSet):
             # if validated_data.get('extras') and validated_data.get('extras').get('specialization'):
             #     specializations = validated_data.get('extras').get('specialization')
 
-            if specialization and city:
+            if validated_data.get('sitemap_identifier') == 'SPECIALIZATION_CITY':
                 specialization_metatags[279] = {
                     'title': 'Best Dentist in ' + city + ' | Find Top Dentists Near Me in ' + city,
                     'description': specialization + ' in ' + city + ': Search and find best ' + specialization + ' near you to book appointment online. Check nearby ' + specialization + ' details, address, availability & more.'}
@@ -1538,9 +1538,15 @@ class DoctorListViewSet(viewsets.GenericViewSet):
                     title = specialization_metatags['default'].get('title')
                     description = specialization_metatags['default'].get('description')
 
-
-                # title = specializations
-                # description = specializations
+            elif validated_data.get('sitemap_identifier') == 'SPECIALIZATION_LOCALITY_CITY':
+                title = specialization
+                description = specialization
+                if locality:
+                    title += ' in ' + locality
+                    description += ': Book best ' + specialization + '\'s appointment online ' + 'in ' + locality
+                    title += ' | Book & Get Best Deal'
+                    description += ' and get upto 50% off. View Address, fees and more for doctors '
+                    description += 'in ' + city + '.'
 
             else:
                 title = 'Doctors'
@@ -1548,17 +1554,6 @@ class DoctorListViewSet(viewsets.GenericViewSet):
                 if locality:
                     title += ' in '  + locality
                     description += ' in ' +locality
-                # if specializations:
-                #
-                #     if locality:
-                #         if sublocality == '':
-                #
-                #             description += ': Book best ' + specializations + '\'s appointment online ' +  'in ' + city
-                #         else:
-                #
-                #             description += ': Book best ' + specializations + '\'s appointment online ' + 'in '+ locality
-                #
-                # else:
                 if locality:
                     if sublocality == '':
 
@@ -1566,20 +1561,14 @@ class DoctorListViewSet(viewsets.GenericViewSet):
                     else:
 
                         description += ': Book best ' + 'Doctor' + ' appointment online ' + 'in '+ locality
-                ratings_title = title
-                # if specializations:
-                #     if not sublocality:
-                #         title += ' - Book Best ' + specializations +' Online'
-                #     else:
-                #         title += ' | Book & Get Best Deal'
 
-                # else:
                 title += ' | Book Doctors Online & Get Best Deal'
 
                 description += ' and get upto 50% off. View Address, fees and more for doctors '
                 if locality:
                     description += 'in '+ city
                 description += '.'
+            ratings_title = title
 
             breadcrumb = validated_data.get('breadcrumb')
 
