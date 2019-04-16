@@ -6,7 +6,7 @@ from ondoc.api.v1.diagnostic import serializers as diagnostic_serializer
 from ondoc.api.v1.auth.serializers import AddressSerializer
 from ondoc.integrations.models import IntegratorTestMapping
 from ondoc.cart.models import Cart
-from ondoc.common.models import UserConfig, GlobalNonBookable
+from ondoc.common.models import UserConfig, GlobalNonBookable, AppointmentHistory
 from ondoc.ratings_review import models as rating_models
 from ondoc.diagnostic.models import (LabTest, AvailableLabTest, Lab, LabAppointment, LabTiming, PromotedLab,
                                      CommonDiagnosticCondition, CommonTest, CommonPackage,
@@ -77,10 +77,10 @@ class SearchPageViewSet(viewsets.ReadOnlyModelViewSet):
         count = int(count)
         if count <= 0:
             count = 10
-        test_queryset = CommonTest.objects.select_related('test').filter(test__enable_for_retail=True, test__searchable=True).order_by('-priority')[:count]
+        test_queryset = CommonTest.get_tests(count)
         conditions_queryset = CommonDiagnosticCondition.objects.prefetch_related('lab_test').all().order_by('-priority')[:count]
         lab_queryset = PromotedLab.objects.select_related('lab').filter(lab__is_live=True, lab__is_test_lab=False)
-        package_queryset = CommonPackage.objects.prefetch_related('package').filter(package__enable_for_retail=True, package__searchable=True).order_by('-priority')[:count]
+        package_queryset = CommonPackage.get_packages(count)
         recommended_package_qs = LabTestCategory.objects.prefetch_related('recommended_lab_tests__parameter').filter(is_live=True,
                                                                                                           show_on_recommended_screen=True,
                                                                                                           recommended_lab_tests__searchable=True,
@@ -2372,7 +2372,10 @@ class DoctorLabAppointmentsNoAuthViewSet(viewsets.GenericViewSet):
         lab_appointment = validated_data.get('lab_appointment')
 
         lab_appointment = LabAppointment.objects.select_for_update().get(id=lab_appointment.id)
-
+        source = request.query_params.get('source', '')
+        responsible_user = request.user if request.user.is_authenticated else None
+        lab_appointment._source = source if source in [x[0] for x in AppointmentHistory.SOURCE_CHOICES] else ''
+        lab_appointment._responsible_user = responsible_user
         if lab_appointment:
             lab_appointment.action_completed()
             # lab_appointment_serializer = diagnostic_serializer.LabAppointmentRetrieveSerializer(lab_appointment,

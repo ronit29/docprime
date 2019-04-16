@@ -731,6 +731,7 @@ class LabAppointmentCreateSerializer(serializers.Serializer):
     from_app = serializers.BooleanField(required=False, default=False)
     user_plan = serializers.PrimaryKeyRelatedField(queryset=UserPlanMapping.objects.all(), required=False, allow_null=True, default=None)
     included_in_user_plan = serializers.BooleanField(required=False, default=False)
+    app_version = serializers.CharField(required=False, allow_null=True, allow_blank=True)
 
     def validate(self, data):
         MAX_APPOINTMENTS_ALLOWED = 10
@@ -830,7 +831,7 @@ class LabAppointmentCreateSerializer(serializers.Serializer):
         curr_minute = round(round(float(time_slot_start.minute) / 60, 2) * 2) / 2
         curr_time += curr_minute
 
-        if bool(data.get('from_app')):
+        if bool(data.get('from_app')) and data.get('app_version') and float(data.get('app_version')) < float('1.2'):
             available_slots = LabTiming.timing_manager.lab_booking_slots(lab__id=data.get("lab").id, lab__is_live=True, for_home_pickup=data.get("is_home_pickup"))
             is_integrated = False
             if is_today and available_slots.get("today_min") and available_slots.get("today_min") > curr_time:
