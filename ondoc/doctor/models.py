@@ -3136,8 +3136,14 @@ class PartnersAppInvoice(auth_model.TimeStampedModel):
 
     def get_context(self, selected_invoice_items):
         context = dict()
-        context["patient_name"] = self.appointment.profile.name
-        context["patient_phone_number"] = self.appointment.profile.phone_number
+        context["patient_name"] = self.appointment.user.name
+        patient_mobile_queryset = self.appointment.user.patient_mobiles.all()
+        if patient_mobile_queryset.exists():
+            patient_mobile = patient_mobile_queryset.filter(is_default=True).first() if patient_mobile_queryset.filter(
+                is_default=True).exists() else patient_mobile_queryset.first()
+        else:
+            patient_mobile = None
+        context["patient_phone_number"] = patient_mobile
         context["invoice_serial_id"] = self.invoice_serial_id
         context["updated_at"] = self.updated_at
         context["payment_status"] = "Paid" if self.payment_status == self.PAID else "Pending"

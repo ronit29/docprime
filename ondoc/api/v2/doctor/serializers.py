@@ -405,7 +405,6 @@ class PartnersAppInvoiceSerialier(serializers.Serializer):
 
 
 class PartnersAppInvoiceModelSerialier(serializers.ModelSerializer):
-    # appointment_id = serializers.PrimaryKeyRelatedField(read_only=True)
 
     class Meta:
         model = doc_models.PartnersAppInvoice
@@ -448,20 +447,5 @@ class UpdatePartnersAppInvoiceSerializer(serializers.Serializer):
     data = PartnersAppInvoiceSerialier(many=False)
 
     def validate(self, attrs):
-        request = self.context.get("request")
-        user = request.user if request else None
-        invoice_doctor = attrs['invoice_id'].appointment.doctor
-        invoice_hospital = attrs['invoice_id'].appointment.hospital
-        # doctor = attrs['data']['appointment_id'].doctor
-        # if user and not GenericAdmin.objects.filter(Q(user=user, doctor=invoice_doctor), Q(permission_type=GenericAdmin.APPOINTMENT) | Q(
-        #         super_user_permission=True)).exists():
-        admin = GenericAdmin.objects.filter(Q(user=user, hospital=invoice_hospital),
-                                                    Q(Q(super_user_permission=True) |
-                                                      Q(Q(permission_type=GenericAdmin.APPOINTMENT),
-                                                        Q(doctor__isnull=True) | Q(doctor=invoice_doctor)))).first()
-        if user and not admin:
-            raise serializers.ValidationError('user not admin for appointment doctor')
-        if admin:
-            attrs['admin'] = admin
-        # super().validate(attrs)
+        super().validate(attrs)
         return attrs
