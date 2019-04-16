@@ -2081,6 +2081,7 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin)
     def create_fulfillment_data(cls, user, data, price_data):
         from ondoc.api.v1.auth.serializers import AddressSerializer
         from ondoc.insurance.models import UserInsurance
+        from ondoc.salespoint.models import SalespointTestmapping, SalesPoint
 
         lab_test_queryset = AvailableLabTest.objects.filter(lab_pricing_group__labs=data["lab"], test__in=data['test_ids'])
         test_ids_list = list()
@@ -2108,6 +2109,22 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin)
         cart_data = data.get('cart_item').data
         is_appointment_insured = cart_data.get('is_appointment_insured', None)
         insurance_id = cart_data.get('insurance_id', None)
+
+        # check if test mapped with affiliates
+        mapped_with_affiliates = True
+        if data["spo_data"]["UtmSource"]:
+            affiliate = SalesPoint.object.filter(name=data["spo_data"]["UtmSource"]).first()
+            if affiliate:
+                for test_id in test_ids_list:
+                    spo_mapping = SalespointTestmapping.objects.filter(salespoint_id=affiliate.id, available_tests_id=test_id).first()
+                    if not spo_mapping:
+                        mapped_with_affiliates = False
+
+        if mapped_with_affiliates:
+            spo_data = data["spo_data"]
+        else:
+            spo_data = {}
+
         # user_insurance = UserInsurance.objects.filter(user=user).last()
         # if user_insurance:
         #     insurance_validate_dict = user_insurance.validate_insurance(data)
@@ -2142,7 +2159,7 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin)
             "cashback": int(price_data.get("coupon_cashback")),
             "is_appointment_insured": is_appointment_insured,
             "insurance": insurance_id,
-            "spo_data": data["spo_data"]
+            "spo_data": spo_data
         }
 
         if data.get('included_in_user_plan', False):

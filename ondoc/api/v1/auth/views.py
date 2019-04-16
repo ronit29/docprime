@@ -1834,24 +1834,25 @@ class SendCartUrlViewSet(GenericViewSet):
     permission_classes = (IsAuthenticated,)
 
     def send_cart_url(self, request):
-        utm_source = request.query_params.get('UtmSource')
-        utm_term = request.query_params.get('UtmTerm')
-        utm_medium = request.query_params.get('UtmMedium')
-        utm_campaign = request.query_params.get('UtmCampaign')
+        order_id = request.query_params.get('orderId', None)
+        # utm_source = request.query_params.get('UtmSource')
+        # utm_term = request.query_params.get('UtmTerm')
+        # utm_medium = request.query_params.get('UtmMedium')
+        # utm_campaign = request.query_params.get('UtmCampaign')
 
-        utm_parameters = ""
-        if utm_source:
-            utm_source = "UtmSource=%s&" % utm_source
-            utm_parameters = utm_parameters + utm_source
-        if utm_term:
-            utm_term = "UtmTerm=%s&" % utm_term
-            utm_parameters = utm_parameters + utm_term
-        if utm_medium:
-            utm_medium = "UtmMedium=%s&" % utm_medium
-            utm_parameters = utm_parameters + utm_medium
-        if utm_campaign:
-            utm_campaign = "UtmCampaign=%s&" % utm_campaign
-            utm_parameters = utm_parameters + utm_campaign
+        # utm_parameters = ""
+        # if utm_source:
+        #     utm_source = "UtmSource=%s&" % utm_source
+        #     utm_parameters = utm_parameters + utm_source
+        # if utm_term:
+        #     utm_term = "UtmTerm=%s&" % utm_term
+        #     utm_parameters = utm_parameters + utm_term
+        # if utm_medium:
+        #     utm_medium = "UtmMedium=%s&" % utm_medium
+        #     utm_parameters = utm_parameters + utm_medium
+        # if utm_campaign:
+        #     utm_campaign = "UtmCampaign=%s&" % utm_campaign
+        #     utm_parameters = utm_parameters + utm_campaign
 
         user_token = JWTAuthentication.generate_token(request.user)
         token = user_token['token'].decode("utf-8") if 'token' in user_token else None
@@ -1862,8 +1863,7 @@ class SendCartUrlViewSet(GenericViewSet):
         if not user_profile:
             return Response({"status": 1})
 
-        cart_url = SmsNotification.send_cart_url(token=token, phone_number=str(user_profile.phone_number), utm_parameters=utm_parameters)
-        # EmailNotification.send_booking_url(token=token, email=user_profile.email)
+        SmsNotification.send_cart_url(token=token, phone_number=str(user_profile.phone_number), order_id=order_id)
 
         return Response({"status": 1})
 
