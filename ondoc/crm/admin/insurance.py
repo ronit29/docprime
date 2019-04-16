@@ -572,8 +572,81 @@ class UserInsuranceLabResource(resources.ModelResource):
             return ""
 
 
+class UserInsuranceResource(resources.ModelResource):
+    id = fields.Field()
+    insurance_plan = fields.Field()
+    user_name = fields.Field()
+    phone_number = fields.Field()
+    purchase_date = fields.Field()
+    expiry_date = fields.Field()
+    policy_number = fields.Field()
+    amount = fields.Field()
+    receipt_number = fields.Field()
+    coi = fields.Field()
+    matrix_lead = fields.Field()
+
+    def export(self, queryset=None, *args, **kwargs):
+        queryset = self.get_queryset(**kwargs)
+        fetched_queryset = list(queryset)
+        return super().export(fetched_queryset)
+
+    def get_queryset(self, **kwargs):
+
+        request = kwargs.get('request')
+        date_range = [datetime.strptime(kwargs.get('from_date'), '%Y-%m-%d').date(), datetime.strptime(
+                                        kwargs.get('to_date'), '%Y-%m-%d').date()]
+
+        insurance = UserInsurance.objects.filter(created_at__date__range=date_range)
+        return insurance
+
+    class Meta:
+        model = UserInsurance
+        fields = ()
+        export_order = ('id', 'insurance_plan', 'user_name', 'phone_number', 'purchase_date', 'expiry_date',
+                        'policy_number', 'amount', 'receipt_number',
+                        'coi', 'matrix_lead')
+
+    def dehydrate_id(self, insurance):
+        return str(insurance.id)
+
+    def dehydrate_insurance_plan(self, insurance):
+        return str(insurance.insurance_plan.name)
+
+    def dehydrate_user_name(self, insurance):
+        from ondoc.authentication.models import UserProfile
+        profile = UserProfile.objects.filter(user=insurance.user).first()
+        if profile:
+            return str(profile.name)
+        else:
+            return ""
+
+    def dehydrate_phone_number(self, insurance):
+        return str(insurance.user.phone_number)
+
+    def dehydrate_purchase_date(self, insurance):
+        return str(insurance.purchase_date.date())
+
+    def dehydrate_expiry_date(self, insurance):
+        return str(insurance.expiry_date.date())
+
+    def dehydrate_policy_number(self, insurance):
+        return str(insurance.policy_number)
+
+    def dehydrate_amount(self, insurance):
+        return str(insurance.premium_amount)
+
+    def dehydrate_receipt_number(self, insurance):
+        return str(insurance.receipt_number)
+
+    def dehydrate_coi(self, insurance):
+        return str(insurance.coi)
+
+    def dehydrate_matrix_lead(self, insurance):
+        return str(insurance.matrix_lead_id)
+
+
 class UserInsuranceAdmin(ImportExportMixin, admin.ModelAdmin):
-    resource_class = (UserInsuranceDoctorResource, UserInsuranceLabResource)
+    resource_class = (UserInsuranceDoctorResource, UserInsuranceLabResource, UserInsuranceResource)
     export_template_name = "export_insurance_report.html"
     formats = (base_formats.XLS,)
     model = UserInsurance
@@ -608,9 +681,10 @@ class UserInsuranceAdmin(ImportExportMixin, admin.ModelAdmin):
         # data = resource_class(**self.get_export_resource_kwargs(request)).export(queryset, *args, **kwargs)
         if kwargs['appointment_type'] == 'Doctor':
             data = resource_class[0](**self.get_export_resource_kwargs(request)).export(queryset, *args, **kwargs)
-        else:
+        elif kwargs['appointment_type'] == 'Lab':
             data = resource_class[1](**self.get_export_resource_kwargs(request)).export(queryset, *args, **kwargs)
-
+        elif kwargs['appointment_type'] == 'Insurance':
+            data = resource_class[2](**self.get_export_resource_kwargs(request)).export(queryset, *args, **kwargs)
         export_data = file_format.export_data(data)
         return export_data
 
