@@ -1459,7 +1459,7 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin)
     user_plan_used = models.ForeignKey('subscription_plan.UserPlanMapping', null=True, on_delete=models.DO_NOTHING,
                                        related_name='appointment_using')
     integrator_response = GenericRelation(IntegratorResponse)
-    auto_ivr_data = JSONField(default=list())
+    auto_ivr_data = JSONField(default=list(), null=True)
 
     def get_tests_and_prices(self):
         test_price = []

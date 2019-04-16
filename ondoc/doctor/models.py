@@ -1735,7 +1735,7 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
     money_pool = models.ForeignKey(MoneyPool, on_delete=models.SET_NULL, null=True)
     mask_number = GenericRelation(AppointmentMaskNumber)
     email_notification = GenericRelation(EmailNotification, related_name="enotification")
-    auto_ivr_data = JSONField(default=list())
+    auto_ivr_data = JSONField(default=list(), null=True)
 
     def __str__(self):
         return self.profile.name + " (" + self.doctor.name + ")"
