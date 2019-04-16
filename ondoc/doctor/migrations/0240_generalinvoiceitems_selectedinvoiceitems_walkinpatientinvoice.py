@@ -84,7 +84,7 @@ class Migration(migrations.Migration):
                 ('is_edited', models.BooleanField(default=False)),
                 ('appointment',
                  models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='partners_app_invoice',
-                                   to='doctor.OpdAppointment')),
+                                   to='doctor.OfflineOPDAppointments')),
                 ('edited_by', models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.SET_NULL,
                                                 related_name='patners_app_invoices', to=settings.AUTH_USER_MODEL)),
             ],

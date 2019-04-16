@@ -376,7 +376,7 @@ class SelectedInvoiceItemsModelSerializer(serializers.ModelSerializer):
 
 
 class PartnersAppInvoiceSerialier(serializers.Serializer):
-    appointment_id = serializers.PrimaryKeyRelatedField(queryset=doc_models.OpdAppointment.objects.all())
+    appointment_id = serializers.PrimaryKeyRelatedField(queryset=doc_models.OfflineOPDAppointments.objects.all())
     consultation_fees = serializers.DecimalField(max_digits=10, decimal_places=2)
     selected_invoice_items = serializers.ListField(child=SelectedInvoiceItemsSerializer(many=False), required=False,
                                                    allow_empty=True)
@@ -413,7 +413,6 @@ class PartnersAppInvoiceModelSerialier(serializers.ModelSerializer):
 
 
 class ListInvoiceItemsSerializer(serializers.Serializer):
-    # appointment_id = serializers.PrimaryKeyRelatedField(queryset=doc_models.OpdAppointment.objects.all())
     hospital_id = serializers.PrimaryKeyRelatedField(queryset=doc_models.Hospital.objects.all(), required=False)
     doctor_id = serializers.PrimaryKeyRelatedField(queryset=doc_models.Doctor.objects.all(), required=False)
 

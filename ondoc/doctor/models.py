@@ -3103,7 +3103,7 @@ class PartnersAppInvoice(auth_model.TimeStampedModel):
     PAYMENT_STATUS = ((PAID, 'Paid'), (PENDING, 'Pending'))
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     invoice_serial_id = models.CharField(max_length=100)
-    appointment = models.ForeignKey(OpdAppointment, on_delete=models.CASCADE, related_name='partners_app_invoice')
+    appointment = models.ForeignKey(OfflineOPDAppointments, on_delete=models.CASCADE, related_name='partners_app_invoice')
     consultation_fees = models.DecimalField(max_digits=10, decimal_places=2)
     selected_invoice_items = JSONField()
     payment_status = models.IntegerField(choices=PAYMENT_STATUS)
