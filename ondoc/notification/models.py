@@ -852,8 +852,8 @@ class SmsNotification(TimeStampedModel, SmsNotificationOpdMixin, SmsNotification
     def send_cart_url(cls, token, phone_number, order_id):
         callback_url = "{}/payment/{}?refs=lab".format(settings.CONSUMER_APP_DOMAIN, order_id)
         payment_page_url = "{}/agent/booking?token={}&agent=false&callbackurl={}".format(settings.CONSUMER_APP_DOMAIN, token, callback_url)
-        short_url = generate_short_url(payment_page_url)
-        html_body = "Your booking url is - {} . Please pay to confirm".format(short_url)
+        # short_url = generate_short_url(payment_page_url)
+        html_body = "Your booking url is - {} . Please pay to confirm".format(payment_page_url)
         if phone_number:
             sms_noti = {
                 "phone_number": phone_number,
@@ -865,7 +865,7 @@ class SmsNotification(TimeStampedModel, SmsNotificationOpdMixin, SmsNotification
             }
             message = json.dumps(message)
             publish_message(message)
-        return short_url
+        return payment_page_url
 
     @classmethod
     def send_app_download_link(cls, phone_number, context):
