@@ -1659,29 +1659,30 @@ class DoctorListViewSet(viewsets.GenericViewSet):
                 "title": title,
                 "description": description,
                 "location": location,
-                "image": static('web/images/dclogo-placeholder.png'),
-                'schema': {
-                    "@context": "http://schema.org",
-                    "@type": "MedicalBusiness",
-                    "name": "%s in %s" % (specialization if specialization else 'Doctors', location),
-                    "address": {
-                        "@type": "PostalAddress",
-                        "addressLocality": location,
-                        "addressRegion": locality,
-                    },
-                    "location": {
-                        "@type": "Place",
-                        "geo": {
-                            "@type": "GeoCircle",
-                            "geoMidpoint": {
-                                "@type": "GeoCoordinates",
-                                "latitude": latitude,
-                                "longitude": longitude
-                            }
-                        }
-                    },
-                    "priceRange": "0"
-                }
+                "image": static('web/images/dclogo-placeholder.png')
+                # ,
+                # 'schema': {
+                #     "@context": "http://schema.org",
+                #     "@type": "MedicalBusiness",
+                #     "name": "%s in %s" % (specialization if specialization else 'Doctors', location),
+                #     "address": {
+                #         "@type": "PostalAddress",
+                #         "addressLocality": location,
+                #         "addressRegion": locality,
+                #     },
+                #     "location": {
+                #         "@type": "Place",
+                #         "geo": {
+                #             "@type": "GeoCircle",
+                #             "geoMidpoint": {
+                #                 "@type": "GeoCoordinates",
+                #                 "latitude": latitude,
+                #                 "longitude": longitude
+                #             }
+                #         }
+                #     },
+                #     "priceRange": "0"
+                # }
             }
 
 
