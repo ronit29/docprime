@@ -1194,11 +1194,9 @@ class SearchedItemsViewSet(viewsets.GenericViewSet):
 
     @transaction.non_atomic_requests
     def common_conditions(self, request):
-        parameters = request.query_params
-        serializer = serializers.CommonSpecParametersSerializer(data=parameters, context={"request": request})
-        serializer.is_valid(raise_exception=True)
-        validated_data = serializer.validated_data
-        city = validated_data.get('city') if validated_data.get('city') else None
+        city = None
+        if request.query_params and request.query_params.get('city'):
+            city = request.query_params.get('city')
         spec_urls = dict()
         count = request.query_params.get('count', 10)
         count = int(count)
