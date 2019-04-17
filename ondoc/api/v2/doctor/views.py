@@ -766,7 +766,7 @@ class PartnersAppInvoice(viewsets.GenericViewSet):
             valid_data = serializer.validated_data
             hospital_ids = valid_data.pop('hospital_ids')
             hospitals = valid_data.pop('hospitals')
-            general_invoice_item = valid_data.pop('general_invoice_item_id') if valid_data.get('general_invoice_item_id') else None
+            general_invoice_item = valid_data.pop('id') if valid_data.get('id') else None
             if not general_invoice_item:
                 invoice_item_obj = doc_models.GeneralInvoiceItems.objects.create(**valid_data)
                 invoice_item_obj.hospitals.add(*hospitals)
