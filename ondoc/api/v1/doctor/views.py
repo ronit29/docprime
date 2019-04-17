@@ -3178,7 +3178,10 @@ class OfflineCustomerViewSet(viewsets.GenericViewSet):
             mask_data = None
             mrp = None
             payment_type = None
+            invoice_data = None
             if instance == OFFLINE:
+                invoice = app.partners_app_invoice.filter(is_valid=True).order_by('-updated_at').first()
+                invoice_data = v2_serializers.PartnersAppInvoiceModelSerialier(invoice).data if invoice else None
                 patient_profile = OfflinePatientSerializer(app.user).data
                 is_docprime = False
                 patient_name = app.user.name if hasattr(app.user, 'name') else None
@@ -3254,6 +3257,7 @@ class OfflineCustomerViewSet(viewsets.GenericViewSet):
             ret_obj['error_message'] = error_message
             ret_obj['type'] = 'doctor'
             ret_obj['prescriptions'] = prescription
+            ret_obj['invoice'] = invoice_data
             final_result.append(ret_obj)
         return Response(final_result)
 
