@@ -759,6 +759,9 @@ class PartnersAppInvoice(viewsets.GenericViewSet):
     authentication_classes = (JWTAuthentication,)
     permission_classes = (IsAuthenticated, DoctorPermission,)
 
+    CREATE = 1
+    UPDATE = 2
+
     def add_or_edit_general_invoice_item(self, request):
         try:
             serializer = serializers.GeneralInvoiceItemsSerializer(data=request.data, context={"request": request})
@@ -797,6 +800,14 @@ class PartnersAppInvoice(viewsets.GenericViewSet):
             model_serializer = serializers.GeneralInvoiceItemsModelSerializer(items, many=True)
         return Response({"invoice_items": model_serializer.data}, status.HTTP_200_OK)
 
+    # @staticmethod
+    # def bulk_delete_selected_invoice_items(selected_invoice_item, invoice_obj):
+    #     invoice_items = list()
+    #     for item in selected_invoice_item:
+    #         invoice_items.append(item["invoice_item"])
+    #     doc_models.SelectedInvoiceItems.filter(invoice)
+    #     return
+
     @staticmethod
     def bulk_create_selected_invoice_items(selected_invoice_item, invoice):
         obj_list = list()
@@ -808,21 +819,28 @@ class PartnersAppInvoice(viewsets.GenericViewSet):
         created_objects = doc_models.SelectedInvoiceItems.objects.bulk_create(obj_list)
         return created_objects
 
-    def create(self, request):
+    def create_or_update_invoice(self, invoice_data, version, id=None):
+        invoice = selected_invoice_items_created = e = None
         try:
-            serializer = serializers.PartnersAppInvoiceSerialier(data=request.data)
-            serializer.is_valid(raise_exception=True)
-            invoice_data = serializer.validated_data
+            task = invoice_data.pop('task')
+            generate_invoice = invoice_data.pop("generate_invoice")
+
             appointment = invoice_data.get('appointment')
             selected_invoice_items = invoice_data.get('selected_invoice_items')
-
-            generate_invoice = invoice_data.pop("generate_invoice")
-            invoice_data['selected_invoice_items'] = serializers.SelectedInvoiceItemsJSONSerializer(selected_invoice_items, many=True).data
-            invoice_obj = doc_models.PartnersAppInvoice(**invoice_data)
-
-            last_serial = doc_models.PartnersAppInvoice.last_serial(appointment)
-            invoice_obj.invoice_serial_id = 'INV-' + str(appointment.hospital.id) + '-' + \
-                                            str(appointment.doctor.id) + '-' + str(last_serial + 1)
+            invoice_data['selected_invoice_items'] = serializers.SelectedInvoiceItemsJSONSerializer(
+                selected_invoice_items, many=True).data
+            if task == self.CREATE:
+                invoice_obj = doc_models.PartnersAppInvoice(**invoice_data)
+                last_serial = doc_models.PartnersAppInvoice.last_serial(appointment)
+                serial = last_serial + 1 if version == '01' else last_serial
+                invoice_obj.invoice_serial_id = 'INV-' + str(appointment.hospital.id) + '-' + \
+                                                str(appointment.doctor.id) + '-' + str(serial) + '-' + version
+            else:
+                if not id:
+                    raise Exception("invoice_id is required")
+                invoice_queryset = doc_models.PartnersAppInvoice.objects.filter(id=id)
+                invoice_queryset.update(**invoice_data)
+                invoice_obj = invoice_queryset.first()
 
             if generate_invoice:
                 invoice_obj.is_invoice_generated = True
@@ -832,13 +850,64 @@ class PartnersAppInvoice(viewsets.GenericViewSet):
                 file = v1_utils.html_to_pdf(content, filename)
                 invoice_obj.file = file
                 invoice_obj.invoice_url = "{}{}{}".format(settings.BASE_URL, "/api/v2/doctor/invoice/", filename)
+
             invoice_obj.save()
             invoice = serializers.PartnersAppInvoiceModelSerialier(invoice_obj)
 
             if selected_invoice_items:
-                selected_invoice_items_objects = self.bulk_create_selected_invoice_items(selected_invoice_items, invoice_obj)
-                model_serializer = serializers.SelectedInvoiceItemsModelSerializer(selected_invoice_items_objects, many=True)
+                if task == self.UPDATE:
+                    doc_models.SelectedInvoiceItems.objects.filter(invoice=invoice_obj.id).delete()
+                selected_invoice_items_objects = self.bulk_create_selected_invoice_items(selected_invoice_items,
+                                                                                         invoice_obj)
+                model_serializer = serializers.SelectedInvoiceItemsModelSerializer(selected_invoice_items_objects,
+                                                                                   many=True)
             selected_invoice_items_created = model_serializer.data if selected_invoice_items else []
+            return invoice, selected_invoice_items_created, e
+        except Exception as e:
+            return invoice, selected_invoice_items_created, str(e)
+
+    def update_invoice(self, invoice_data, invoice_obj):
+        try:
+
+            pass
+        except Exception as e:
+            pass
+
+    def create(self, request):
+        try:
+            serializer = serializers.PartnersAppInvoiceSerialier(data=request.data)
+            serializer.is_valid(raise_exception=True)
+            invoice_data = serializer.validated_data
+            invoice_data['task'] = self.CREATE
+
+            invoice, selected_invoice_items_created, exception = self.create_or_update_invoice(invoice_data, version='01')
+            # version = '01'
+            # appointment = invoice_data.get('appointment')
+            # selected_invoice_items = invoice_data.get('selected_invoice_items')
+            #
+            # generate_invoice = invoice_data.pop("generate_invoice")
+            # invoice_data['selected_invoice_items'] = serializers.SelectedInvoiceItemsJSONSerializer(selected_invoice_items, many=True).data
+            # invoice_obj = doc_models.PartnersAppInvoice(**invoice_data)
+            #
+            # last_serial = doc_models.PartnersAppInvoice.last_serial(appointment)
+            # invoice_obj.invoice_serial_id = 'INV-' + str(appointment.hospital.id) + '-' + \
+            #                                 str(appointment.doctor.id) + '-' + str(last_serial + 1) + '-' + version
+            #
+            # if generate_invoice:
+            #     invoice_obj.is_invoice_generated = True
+            #     context = invoice_obj.get_context(selected_invoice_items)
+            #     content = render_to_string("email/partners_invoice/body.html", context=context)
+            #     filename = invoice_obj.invoice_serial_id
+            #     file = v1_utils.html_to_pdf(content, filename)
+            #     invoice_obj.file = file
+            #     invoice_obj.invoice_url = "{}{}{}".format(settings.BASE_URL, "/api/v2/doctor/invoice/", filename)
+            # invoice_obj.save()
+            # invoice = serializers.PartnersAppInvoiceModelSerialier(invoice_obj)
+            #
+            # if selected_invoice_items:
+            #     selected_invoice_items_objects = self.bulk_create_selected_invoice_items(selected_invoice_items, invoice_obj)
+            #     model_serializer = serializers.SelectedInvoiceItemsModelSerializer(selected_invoice_items_objects, many=True)
+            # selected_invoice_items_created = model_serializer.data if selected_invoice_items else []
 
             return Response({"status": 1, "invoice": invoice.data,
                              "selected_invoice_items_created": selected_invoice_items_created}, status.HTTP_200_OK)
@@ -859,18 +928,23 @@ class PartnersAppInvoice(viewsets.GenericViewSet):
             serializer.is_valid(raise_exception=True)
             invoice = serializer.validated_data['invoice_id']
             data = serializer.validated_data['data']
+            # data['invoice'] = invoice
             # appointment = data.get('appointment_id')
             if not invoice.is_invoice_generated:
-                invoice_obj = doc_models.PartnersAppInvoice.objects.filter(id=invoice.id)
-                invoice_obj.update(**data)
-                invoice_obj.is_edited = True
-                invoice_obj.save()
+                # invoice.is_edited = True
+                # invoice.edited_by = request.user
+                # invoice.save()
+                version = invoice.invoice_serial_id[-2:]
+                data['task'] = self.UPDATE
+                invoice_data, selected_invoice_items_created, exception = self.create_or_update_invoice(data, version, invoice.id)
+
             else:
                 invoice.is_valid = False
                 invoice.save()
-                invoice_obj = doc_models.PartnersAppInvoice(**data)
-                invoice_obj.save()
-            invoice = serializers.PartnersAppInvoiceModelSerialier(data=invoice_obj)
-            return Response({"status": 1, "invoice": invoice}, status.HTTP_200_OK)
+                version = str(int(invoice.invoice_serial_id[-2:]) + 1).zfill(2)
+                data['task'] = self.CREATE
+                invoice_data, selected_invoice_items_created, exception = self.create_or_update_invoice(data, version)
+            return Response({"status": 1, "invoice": invoice_data.data,
+                             "selected_invoice_items_created": selected_invoice_items_created}, status.HTTP_200_OK)
         except Exception as e:
             return Response({"status": 0, "message": "Error updating invoice - " + str(e)}, status.HTTP_400_BAD_REQUEST)

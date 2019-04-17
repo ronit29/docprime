@@ -449,4 +449,6 @@ class UpdatePartnersAppInvoiceSerializer(serializers.Serializer):
 
     def validate(self, attrs):
         super().validate(attrs)
+        if not attrs.get('invoice_id').is_valid:
+            raise serializers.ValidationError("valid invoice id is required")
         return attrs

@@ -4,25 +4,25 @@
 		<meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
 		<title>Email Design</title>
 		<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-		<link href="https://fonts.googleapis.com/css?family=Quicksand:400,700" rel="stylesheet">
+		<link href="https://fonts.googleapis.com/css?family=Open+Sans" rel="stylesheet">
 	</head>
-	<body style="margin: 0; padding: 0;font-family: 'Quicksand', sans-serif;">
+	<body style="margin: 0; padding: 0;font-family: 'Open Sans', sans-serif;">
 		<table align="center" border="0" cellpadding="0" cellspacing="0" width="600" style="border-collapse: collapse; background: #ffffff;">
 			<tr>
 				<td>
 					<table border="0" cellpadding="0" cellspacing="0" width="600" style="padding: 10px;">
-						<tr valign="top">
-							<td style="width: 300px;">
+						<tr>
+							<td>
 								<p style="margin: 0px; color: #000000; font-size:18px; font-weight: 700; padding-bottom: 10px;">Invoice to:</p>
-								<p style="margin: 0px; color: #000000; font-size:14px; ">{{patient_name}}
+								<p style="margin: 0px; color: #000000; font-size:14px; ">{{patient_name}} <br><br>
 								    {{patient_phone_number}} </p>
 							</td>
-							<td style="width: 300px; text-align: right;">
+							<td>
 								<p style="margin: 0px; color: #000000; font-size:18px;font-weight: 700;  padding-bottom: 10px;">Invoice No: {{invoice_serial_id}}</p>
 								<p style="margin: 0px; color: #000000; font-size:14px; ">Invoice Dated: {{updated_at}} <br>
 									Payment Status: {{payment_status}} <br>
-									 {% if payment_type %} Payment Type: {{payment_type}} {% endif %}
-                                     {% if due_date %} Due Date: {{due_date}} {% endif %}</p>
+									{% if payment_type %} Payment Type: {{payment_type}} {% endif %}
+                                    {% if due_date %} Due Date: {{due_date}} {% endif %} </p>
 							</td>
 						</tr>
 					</table>
@@ -58,23 +58,23 @@
 					<table border="0" cellpadding="0" cellspacing="0" width="600" style=" border-top: 1px solid #000000;">
 						<thead>
 							<tr>
-								<th style="padding: 14px 0px; background: #f1efef;  text-align: left; padding-left: 10px;">
+								<th style="padding: 14px 0px; background: #eaeaea;  text-align: left; padding-left: 10px;">
 									Items
 								</th>
-								<th style="padding: 14px 0px; background: #f1efef; text-align: left; padding-left: 10px;">
-									Price (₹)
+								<th style="padding: 14px 0px; background: #eaeaea; text-align: left; padding-left: 10px;">
+									Price
 								</th>
-								<th style="padding: 14px 0px; background: #f1efef; text-align: left; padding-left: 10px;">
+								<th style="padding: 14px 0px; background: #eaeaea; text-align: left; padding-left: 10px;">
 									Quantity
 								</th>
-								<th style="padding: 14px 0px; background: #f1efef; text-align: left; padding-left: 10px;">
-									Tax (₹)
+								<th style="padding: 14px 0px; background: #eaeaea; text-align: left; padding-left: 10px;">
+									Tax
 								</th>
-								<th style="padding: 14px 0px; background: #f1efef; text-align: center; padding-left: 10px;">
-									Discount (₹)
+								<th style="padding: 14px 0px; background: #eaeaea; text-align: left; padding-left: 10px;">
+									Discount
 								</th>
-								<th style="padding: 14px 0px; background: #f1efef; text-align: right; padding-left: 10px; padding-right: 10px;">
-									Amount (₹)
+								<th style="padding: 14px 0px; background: #eaeaea; text-align: left; padding-left: 10px; padding-right: 10px;">
+									Amount
 								</th>
 							</tr>
 						</thead>
@@ -86,53 +86,61 @@
                                 <td style="text-align: center; font-size: 14px;padding-top: 10px; padding-bottom: 10px; ">{{item.quantity}}</td>
 								<td style="text-align: center; font-size: 14px;padding-top: 10px; padding-bottom: 10px; ">{{item.tax}}</td>
 								<td style="text-align: center; font-size: 14px;padding-top: 10px; padding-bottom: 10px; ">{{item.discount}}</td>
-								<td style="text-align: right; font-size: 14px;padding-top: 10px; padding-bottom: 10px; padding-right: 10px;">{{item.amount}}</td>
+								<td style="text-align: center; font-size: 14px;padding-top: 10px; padding-bottom: 10px; padding-right: 10px;">{{item.amount}}</td>
 							</tr>
                         {% endfor %}
-                            <tr>
+							<tr>
 								<td colspan="3">
 								</td>
-								<td colspan="2"style="text-align: left; font-size: 16px;padding-top: 10px; padding-bottom: 10px; font-weight: 700;"><b>Subtotal</b></td>
-								<td style="text-align: right; font-size: 16px;padding-top: 10px; padding-bottom: 10px;padding-right: 10px; "><b>{{sub_total_amount}}</b></td>
+								<td colspan="2"style="text-align: left; font-size: 18px;padding-top: 10px; padding-bottom: 10px; font-weight: 700;"><b>Subtotal</b></td>
+								<td style="text-align: center; font-size: 18px;padding-top: 10px; padding-bottom: 10px;padding-right: 10px; ">{{sub_total_amount}}</td>
 							</tr>
 							<tr>
 								<td colspan="3">
 								</td>
-								<td colspan="2"style="text-align: left; font-size: 14px;padding-top: 10px; padding-bottom: 10px; font-weight: 500;">
-                                    Tax {% if tax_percentage %} ({{tax_percentage}}%) {% endif %}
+								<td colspan="2"style="text-align: left; font-size: 14px;padding-top: 10px; padding-bottom: 10px; font-weight: 700;">
+                                    <b>
+                                        <!--{% if invoice.tax_percentage %} Tax Rate ({{invoice.tax_percentage}}%){% endif %}{% if invoice.tax_amount %} Tax ({{invoice.tax_amount}}%){% endif %}-->
+                                        Tax {% if tax_percentage %} ({{tax_percentage}}%) {% endif %}
+                                    </b>
                                 </td>
-								<td style="text-align: right; font-size: 14px;padding-top: 10px; padding-bottom: 10px;padding-right: 10px; ">{{tax_amount}}</td>
+								<td style="text-align: center; font-size: 14px;padding-top: 10px; padding-bottom: 10px;padding-right: 10px; ">{{tax_amount}}</td>
 							</tr>
 							<tr>
 								<td colspan="3">
 								</td>
-								<td colspan="2"style="text-align: left; font-size: 14px;padding-top: 10px; padding-bottom: 10px; font-weight: 500;">
-									Discount {% if discount_percentage %} ({{discount_percentage}}%) {% endif %}
+								<td colspan="2"style="text-align: left; font-size: 14px;padding-top: 10px; padding-bottom: 10px; font-weight: 700;">
+                                    <b>
+                                        Discount {% if discount_percentage %} ({{discount_percentage}}%) {% endif %}
+                                    </b>
                                 </td>
-								<td style="text-align: right; font-size: 14px;padding-top: 10px; padding-bottom: 10px;padding-right: 10px; ">{{discount_amount}}</td>
+								<td style="text-align: center; font-size: 14px;padding-top: 10px; padding-bottom: 10px;padding-right: 10px; ">{{discount_amount}}</td>
 							</tr>
 							<tr>
 								<td colspan="3">
 								</td>
 								<td colspan="2"style="text-align: left; font-size: 19px;padding-top: 10px; padding-bottom: 10px; font-weight: 700;border-top: 1px solid #000000;"><b>Total</b></td>
-								<td style="text-align: right; font-size: 19px;padding-top: 10px; padding-bottom: 10px;padding-right: 10px; border-top: 1px solid #000000;"><b>{{total_amount}}</b></td>
+								<td style="text-align: center; font-size: 19px;padding-top: 10px; padding-bottom: 10px;padding-right: 10px; border-top: 1px solid #000000;">{{total_amount}}</td>
 							</tr>
 							<tr>
 								<td colspan="3">
 								</td>
-								<td colspan="2"style="text-align: left; font-size: 12px;padding-top: 10px; padding-bottom: 10px; font-weight: 500;">Amount Paid</td>
-								<td style="text-align: right; font-size: 12px;padding-top: 10px; padding-bottom: 10px;padding-right: 10px; ">{% if payment_type %} {{total_amount}} {% else %} - {% endif %}</td>
+								<td colspan="2"style="text-align: left; font-size: 14px;padding-top: 10px; padding-bottom: 10px; font-weight: 700;">Amount Paid</td>
+								<td style="text-align: center; font-size: 14px;padding-top: 10px; padding-bottom: 10px;padding-right: 10px; ">{% if payment_type %} {{total_amount}} {% else %} - {% endif %}</td>
 							</tr>
 							<tr>
 								<td colspan="3">
 								</td>
-								<td colspan="2"style="text-align: left; font-size: 12px;padding-top: 10px; padding-bottom: 10px; font-weight: 500;">Amount Due</td>
-								<td style="text-align: right; font-size: 12px;padding-top: 10px; padding-bottom: 10px;padding-right: 10px; ">{% if due_date %} {{total_amount}} {% else %} - {% endif %}</td>
+								<td colspan="2"style="text-align: left; font-size: 14px;padding-top: 10px; padding-bottom: 10px; font-weight: 700;">Amount Due</td>
+								<td style="text-align: center; font-size: 14px;padding-top: 10px; padding-bottom: 10px;padding-right: 10px; ">{% if due_date %} {{total_amount}} {% else %} - {% endif %}</td>
 							</tr>
 						</tbody>
 						<tfoot>
 							<tr>
 								<td colspan="6" style="padding-top: 50px;"></td>
+							</tr>
+							<tr>
+								<td colspan="6" style="background:#f78631; color: white;text-align: center;padding: 7px 0;">Powered by Docprime.com</td>
 							</tr>
 						</tfoot>
 					</table>

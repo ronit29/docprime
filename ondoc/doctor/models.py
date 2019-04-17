@@ -3160,12 +3160,12 @@ class PartnersAppInvoice(auth_model.TimeStampedModel):
             context["doctor_phone_number"] = doctor_number.phone_number
         context["invoice_title"] = self.invoice_title
         context["invoice_items"] = self.get_invoice_items(selected_invoice_items)
-        context["sub_total_amount"] = "₹" + str(self.sub_total_amount)
+        context["sub_total_amount"] = str(self.sub_total_amount)
         context["tax_percentage"] = self.tax_percentage.normalize() if self.tax_percentage else None
-        context["tax_amount"] = "₹" + str(self.tax_amount) if self.tax_amount else "-"
+        context["tax_amount"] = str(self.tax_amount) if self.tax_amount else "-"
         context["discount_percentage"] = self.discount_percentage.normalize() if self.discount_percentage else None
-        context["discount_amount"] = "₹" + str(self.discount_amount) if self.discount_amount else "-"
-        context["total_amount"] = "₹" + str(self.total_amount)
+        context["discount_amount"] = str(self.discount_amount) if self.discount_amount else "-"
+        context["total_amount"] = str(self.total_amount)
         return context
 
     def get_invoice_items(self, selected_invoice_items):
@@ -3173,19 +3173,19 @@ class PartnersAppInvoice(auth_model.TimeStampedModel):
         # selected_invoice_items = self.selected_invoice_items
         for item in selected_invoice_items:
             if item['invoice_item'].tax_percentage:
-                tax = "₹" + str(item['invoice_item'].tax_amount) + ' (' + str(item['invoice_item'].tax_percentage.normalize()) + '%)'
+                tax = str(item['invoice_item'].tax_amount) + ' (' + str(item['invoice_item'].tax_percentage.normalize()) + '%)'
             else:
-                tax = "₹" + str(item['invoice_item'].tax_amount)
+                tax = str(item['invoice_item'].tax_amount)
             if item['invoice_item'].discount_percentage:
-                discount = "₹" + str(item['invoice_item'].discount_amount) + ' (' + str(item['invoice_item'].discount_percentage.normalize()) + '%)'
+                discount = str(item['invoice_item'].discount_amount) + ' (' + str(item['invoice_item'].discount_percentage.normalize()) + '%)'
             else:
-                discount = "₹" + str(item['invoice_item'].discount_amount)
+                discount = str(item['invoice_item'].discount_amount)
             invoice_items.append({"name": item['invoice_item'].item,
-                                  "base_price": "₹" + str(item['invoice_item'].base_price),
+                                  "base_price": str(item['invoice_item'].base_price),
                                   "quantity": item['quantity'],
                                   "tax": tax,
                                   "discount": discount,
-                                  "amount": "₹" + str(item['calculated_price'])
+                                  "amount": str(item['calculated_price'])
                                   })
         return invoice_items
 
@@ -3193,7 +3193,7 @@ class PartnersAppInvoice(auth_model.TimeStampedModel):
     def last_serial(cls, appointment):
         obj = cls.objects.filter(appointment__doctor=appointment.doctor, appointment__hospital=appointment.hospital).last()
         if obj:
-            serial = int(obj.invoice_serial_id[-6:])
+            serial = int(obj.invoice_serial_id[-9:-3])
             return serial
         else:
             return cls.INVOICE_SERIAL_ID_START
