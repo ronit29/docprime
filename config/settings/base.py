@@ -160,7 +160,8 @@ LOCAL_APPS = (
     'ondoc.integrations',
     'ondoc.screen',
     'ondoc.comments',
-    'ondoc.subscription_plan'
+    'ondoc.subscription_plan',
+    'ondoc.prescription',
 )
 
 INSTALLED_APPS = DJANGO_APPS + THIRD_PARTY_APPS + LOCAL_APPS
