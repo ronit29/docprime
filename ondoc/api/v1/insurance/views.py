@@ -381,12 +381,17 @@ class InsuranceDummyDataViewSet(viewsets.GenericViewSet):
 
     def show_dummy_data(self, request):
         user = request.user
+        res = {}
         if not user:
-            return Response(error="user not found", status=status.HTTP_200_OK)
+            res['error'] = "user not found"
+            return Response(error=res, status=status.HTTP_200_OK)
         dummy_data = InsuranceDummyData.objects.filter(user=user).order_by('-id').first()
         if not dummy_data:
-            return Response(error="data not found", status=status.HTTP_200_OK)
+            res['error'] = "data not found"
+            return Response(error=res, status=status.HTTP_200_OK)
         member_data = dummy_data.data
         if not member_data:
-            return Response(error="data not found", status=status.HTTP_200_OK)
-        return Response(data=member_data, status=status.HTTP_200_OK)
+            res['error'] = "data not found"
+            return Response(error=res, status=status.HTTP_200_OK)
+        res['data'] = member_data
+        return Response(data=res, status=status.HTTP_200_OK)
