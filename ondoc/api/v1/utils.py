@@ -104,10 +104,11 @@ def convert_timings(timings, is_day_human_readable=True):
     TIMESLOT_MAPPING = {value[0]: value[1] for value in DoctorClinicTiming.TIME_CHOICES}
     temp = defaultdict(list)
     for timing in timings:
-        temp[(timing.get('start'), timing.get('end'))].append(DAY_MAPPING.get(timing.get('day')))
+        temp[(float(timing.get('start')), float(timing.get('end')))].append(DAY_MAPPING.get(timing.get('day')))
     for key, value in temp.items():
         temp[key] = sorted(value, key=itemgetter(0))
     final_dict = defaultdict(list)
+    keys_list = list(TIMESLOT_MAPPING.keys())
     for key, value in temp.items():
         grouped_consecutive_days = group_consecutive_numbers(map(lambda x: x[0], value))
         response_keys = []
@@ -117,8 +118,17 @@ def convert_timings(timings, is_day_human_readable=True):
             else:
                 response_keys.append("{}-{}".format(DAY_MAPPING_REVERSE.get(days[0]),
                                                     DAY_MAPPING_REVERSE.get(days[1])))
-        final_dict[",".join(response_keys)].append("{} to {}".format(TIMESLOT_MAPPING.get(key[0]),
-                                                                     TIMESLOT_MAPPING.get(key[1])))
+        start_time = TIMESLOT_MAPPING.get(key[0])
+        end_time = TIMESLOT_MAPPING.get(key[1])
+        if not start_time and key[0] < keys_list[0]:
+            start_time = TIMESLOT_MAPPING.get(keys_list[0])
+        if not end_time and key[1] > keys_list[-1]:
+            end_time = TIMESLOT_MAPPING.get(keys_list[-1])
+        if not key[0] > key[1]:
+            if start_time and end_time:
+                final_dict[",".join(response_keys)].append("{} to {}".format(start_time, end_time))
+            else:
+                final_dict[",".join(response_keys)].append("")
     return final_dict
 
 
@@ -1341,9 +1351,11 @@ def create_payout_checksum(all_txn, product_id):
     #     secret_key = settings.PG_SECRET_KEY_P2
     #     client_key = settings.PG_CLIENT_KEY_P2
 
-    secret_key = settings.PG_SECRET_KEY_P2
-    client_key = settings.PG_CLIENT_KEY_P2
+    # secret_key = settings.PG_SECRET_KEY_P2
+    # client_key = settings.PG_CLIENT_KEY_P2
 
+    secret_key = settings.PG_PAYOUT_SECRET_KEY
+    client_key = settings.PG_PAYOUT_CLIENT_KEY
 
     all_txn = sorted(all_txn, key=lambda x : x["idx"])
     checksum = ""

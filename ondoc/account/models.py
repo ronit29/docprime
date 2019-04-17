@@ -424,7 +424,7 @@ class Order(TimeStampedModel):
             with transaction.atomic():
                 event_api = EventCreateViewSet()
                 visitor_id, visit_id = event_api.get_visit(request)
-                visitor_info = { "visitor_id": visitor_id, "visit_id": visit_id, "from_app": request.data.get("from_app", None) }
+                visitor_info = { "visitor_id": visitor_id, "visit_id": visit_id, "from_app": request.data.get("from_app", None), "app_version": request.data.get("app_version", None)}
         except Exception as e:
             logger.log("Could not fecth visitor info - " + str(e))
 
@@ -1087,7 +1087,7 @@ class ConsumerTransaction(TimeStampedModel):
     ACTION_CHOICES = list(enumerate(action_list, 0))
     user = models.ForeignKey(User, on_delete=models.DO_NOTHING)
     product_id = models.SmallIntegerField(choices=Order.PRODUCT_IDS, blank=True, null=True)
-    reference_id = models.IntegerField(blank=True, null=True)
+    reference_id = models.BigIntegerField(blank=True, null=True)
     order_id = models.IntegerField(blank=True, null=True)
     transaction_id = models.CharField(max_length=100, blank=True, null=True)
     # pg_transaction = models.ForeignKey(PgTransaction, blank=True, null=True, on_delete=models.SET_NULL)
