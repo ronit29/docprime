@@ -45,3 +45,4 @@ qrcode
 xmltodict
 packaging==19.0
 gevent
+beautifulsoup4==4.7.1
