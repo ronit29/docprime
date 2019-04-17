@@ -917,7 +917,7 @@ class LabAppointmentAdmin(nested_admin.NestedModelAdmin):
                     'get_pickup_address', 'get_lab_address', 'outstanding', 'status', 'cancel_type',
                     'cancellation_reason', 'cancellation_comments', 'start_date', 'start_time',
                     'send_email_sms_report', 'invoice_urls', 'reports_uploaded', 'email_notification_timestamp', 'payment_type',
-                     'payout_info')
+                     'payout_info', 'refund_initiated')
         if request.user.groups.filter(name=constants['APPOINTMENT_OTP_TEAM']).exists() or request.user.is_superuser:
             all_fields = all_fields + ('otp',)
 
@@ -940,7 +940,7 @@ class LabAppointmentAdmin(nested_admin.NestedModelAdmin):
                      'agreed_price',
                      'deal_price', 'effective_price', 'payment_status',
                      'payment_type', 'insurance', 'is_home_pickup', 'get_pickup_address', 'get_lab_address',
-                     'outstanding', 'reports_uploaded', 'email_notification_timestamp', 'payment_type', 'payout_info']
+                     'outstanding', 'reports_uploaded', 'email_notification_timestamp', 'payment_type', 'payout_info', 'refund_initiated']
         # else:
         #     read_only = []
         if obj and (obj.status == LabAppointment.COMPLETED or obj.status == LabAppointment.CANCELLED):
@@ -948,6 +948,9 @@ class LabAppointmentAdmin(nested_admin.NestedModelAdmin):
         if request.user.groups.filter(name=constants['APPOINTMENT_OTP_TEAM']).exists() or request.user.is_superuser:
             read_only = read_only + ['otp']
         return read_only
+
+    def refund_initiated(self, obj):
+        return bool(obj.get_app_consumer_trans_obj())
 
     # def get_inline_instances(self, request, obj=None):
     #     inline_instance = super().get_inline_instances(request=request, obj=obj)

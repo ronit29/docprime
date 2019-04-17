@@ -10,7 +10,7 @@ from django.template.loader import render_to_string
 from ondoc.account.models import MerchantPayout, ConsumerAccount, Order, UserReferred, MoneyPool, Invoice
 from ondoc.authentication.models import (TimeStampedModel, CreatedByModel, Image, Document, QCModel, UserProfile, User,
                                          UserPermission, GenericAdmin, LabUserPermission, GenericLabAdmin,
-                                         BillingAccount, SPOCDetails)
+                                         BillingAccount, SPOCDetails, RefundMixin)
 from ondoc.crm.constants import constants
 from ondoc.doctor.models import Hospital, SearchKey, CancellationReason
 from ondoc.coupon.models import Coupon
@@ -1397,9 +1397,9 @@ class LabAppointmentInvoiceMixin(object):
 
 
 @reversion.register()
-class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin):
+class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin, RefundMixin):
     from ondoc.integrations.models import IntegratorResponse
-
+    PRODUCT_ID = Order.LAB_PRODUCT_ID
     CREATED = 1
     BOOKED = 2
     RESCHEDULED_LAB = 3
@@ -1462,10 +1462,6 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin)
     integrator_response = GenericRelation(IntegratorResponse)
     refund_details = GenericRelation(RefundDetails, related_query_name="lab_appointment_detail")
 
-    def can_agent_refund(self, user):
-        if self.status == self.COMPLETED and (user.groups.filter(name=constants['APPOINTMENT_REFUND_TEAM']).exists() or user.is_superuser):
-            return True
-        return False
 
     def get_tests_and_prices(self):
         test_price = []
@@ -1855,24 +1851,6 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin)
     def action_accepted(self):
         self.status = self.ACCEPTED
         self.save()
-
-    @transaction.atomic
-    def action_refund(self, refund_flag=1):
-        # Taking Lock first
-        consumer_account = None
-        if self.payment_type == OpdAppointment.PREPAID:
-            temp_list = account_model.ConsumerAccount.objects.get_or_create(user=self.user)
-            consumer_account = account_model.ConsumerAccount.objects.select_for_update().get(user=self.user)
-            product_id = account_model.Order.LAB_PRODUCT_ID
-            if self.payment_type == OpdAppointment.PREPAID and account_model.ConsumerTransaction.valid_appointment_for_cancellation(
-                    self.id, product_id):
-                RefundDetails.log_refund(self)
-                wallet_refund, cashback_refund = self.get_cancellation_breakup()
-                consumer_account.credit_cancellation(self, account_model.Order.LAB_PRODUCT_ID, wallet_refund,
-                                                     cashback_refund)
-                if refund_flag:
-                    ctx_obj = consumer_account.debit_refund()
-                    account_model.ConsumerRefund.initiate_refund(self.user, ctx_obj)
 
     @transaction.atomic
     def action_cancelled(self, refund_flag=1):
