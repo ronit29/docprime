@@ -13,7 +13,7 @@ class SalesPoint(TimeStampedModel):
 
     @classmethod
     def get_salespoint_via_code(cls, code):
-        return cls.objects.filter(spo_code=code).first()
+        return cls.objects.filter(name=code).first()
 
     @classmethod
     def is_affiliate_available(cls, name):

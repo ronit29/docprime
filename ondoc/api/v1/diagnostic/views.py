@@ -204,13 +204,15 @@ class LabList(viewsets.ReadOnlyModelViewSet):
 
         utm_source = request.query_params.get('UtmSource')
         if utm_source and SalesPoint.is_affiliate_available(utm_source):
-            salespoint_obj = SalesPoint.get_salespoint_via_code(request.query_params.get('UtmTerm'))
+            salespoint_obj = SalesPoint.get_salespoint_via_code(request.query_params.get('UtmSource'))
 
             main_queryset = LabTest.objects.prefetch_related('test', 'test__recommended_categories',
                                                              'test__parameter', 'categories',
                                                              'test__availablelabs__active_sales_point_mappings').\
                 filter(enable_for_retail=True, searchable=True, is_package=True,
                        availablelabs__active_sales_point_mappings__salespoint=salespoint_obj)
+
+
         else:
             main_queryset = LabTest.objects.prefetch_related('test', 'test__recommended_categories',
                                                              'test__parameter', 'categories').filter(enable_for_retail=True,
