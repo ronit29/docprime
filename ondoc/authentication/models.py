@@ -1,5 +1,5 @@
 from django.conf import settings
-from django.db import models
+from django.db import models, transaction
 from django.contrib.gis.db import models as geo_models
 from django.db.models import Q, Prefetch
 from django.contrib.staticfiles.templatetags.staticfiles import static
@@ -1668,3 +1668,40 @@ class PhysicalAgreementSigned(models.Model):
 
     class Meta:
         abstract = True
+
+
+class RefundMixin(object):
+
+    @transaction.atomic
+    def action_refund(self, refund_flag=1):
+        from ondoc.doctor.models import OpdAppointment
+        from ondoc.account.models import ConsumerAccount
+        from ondoc.common.models import RefundDetails
+        from ondoc.account.models import ConsumerTransaction
+        from ondoc.account.models import ConsumerRefund
+        # Taking Lock first
+        consumer_account = None
+        product_id = self.PRODUCT_ID
+        if self.payment_type == OpdAppointment.PREPAID:
+            temp_list = ConsumerAccount.objects.get_or_create(user=self.user)
+            consumer_account = ConsumerAccount.objects.select_for_update().get(user=self.user)
+        if self.payment_type == OpdAppointment.PREPAID and ConsumerTransaction.valid_appointment_for_cancellation(self.id, product_id):
+            RefundDetails.log_refund(self)
+            wallet_refund, cashback_refund = self.get_cancellation_breakup()
+            consumer_account.credit_cancellation(self, product_id, wallet_refund, cashback_refund)
+            if refund_flag:
+                ctx_obj = consumer_account.debit_refund()
+                ConsumerRefund.initiate_refund(self.user, ctx_obj)
+
+    def can_agent_refund(self, user):
+        from ondoc.crm.constants import constants
+        if self.status == self.COMPLETED and (user.groups.filter(name=constants['APPOINTMENT_REFUND_TEAM']).exists() or user.is_superuser) and not self.has_app_consumer_trans():
+            return True
+        return False
+
+    def has_app_consumer_trans(self):
+        from ondoc.account.models import ConsumerTransaction
+        product_id = self.PRODUCT_ID
+        return not ConsumerTransaction.valid_appointment_for_cancellation(self.id, product_id)
+        # return ConsumerRefund.objects.filter(consumer_transaction__reference_id=self.id,
+        #                               consumer_transaction__product_id=product_id).first()
