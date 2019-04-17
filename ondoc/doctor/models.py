@@ -8,7 +8,7 @@ from PIL import Image, ImageFont, ImageOps
 
 from django.contrib.gis.db import models
 from django.db import migrations, transaction, connection
-from django.db.models import Count, Sum, When, Case, Q, F, Avg
+from django.db.models import Count, Sum, When, Case, Q, F, Avg, Max
 from django.contrib.postgres.operations import CreateExtension
 from django.contrib.staticfiles.templatetags.staticfiles import static
 from django.contrib.postgres.fields import JSONField, ArrayField
@@ -71,6 +71,7 @@ from safedelete import SOFT_DELETE
 #from ondoc.api.v1.doctor import serializers as doctor_serializers
 import qrcode
 from django.utils.functional import cached_property
+from django.utils.text import slugify
 
 logger = logging.getLogger(__name__)
 
@@ -1173,11 +1174,27 @@ class DoctorImage(auth_model.TimeStampedModel, auth_model.Image):
     def __str__(self):
         return '{}'.format(self.doctor)
 
+    def get_image_name(self):
+        name = self.doctor.name
+        doctor_spec_name = "Dr " + name
+        selected_spec = None
+        for dps in self.doctor.doctorpracticespecializations.all():
+            if not selected_spec:
+                selected_spec = dps.specialization
+            if dps.specialization.doctor_count > selected_spec.doctor_count:
+                selected_spec = dps.specialization
+
+        if selected_spec:
+            doctor_spec_name += " " + selected_spec.name
+        doctor_spec_name = doctor_spec_name.strip()
+        return slugify(doctor_spec_name)
+
     def resize_cropped_image(self, width, height):
         default_storage_class = get_storage_class()
         storage_instance = default_storage_class()
 
-        path = self.get_thumbnail_path(self.cropped_image.name,"{}x{}".format(width, height))
+        name = self.cropped_image.name
+        path = self.get_thumbnail_path(name,"{}x{}".format(width, height))
         if storage_instance.exists(path):
             return
 
@@ -1238,7 +1255,9 @@ class DoctorImage(auth_model.TimeStampedModel, auth_model.Image):
                 img = img.crop(cropping_area)
             new_image_io = BytesIO()
             img.save(new_image_io, format='JPEG')
-            md5_hash = hashlib.md5(img.tobytes()).hexdigest()
+            #md5_hash = hashlib.md5(img.tobytes()).hexdigest()
+            md5_hash = self.get_image_name()
+
             self.cropped_image = InMemoryUploadedFile(new_image_io, None, md5_hash + ".jpg", 'image/jpeg',
                                                       new_image_io.tell(), None)
             self.save()
@@ -1246,9 +1265,28 @@ class DoctorImage(auth_model.TimeStampedModel, auth_model.Image):
     def save_to_cropped_image(self, image_file):
         if image_file:
             img = Img.open(image_file)
-            md5_hash = hashlib.md5(img.tobytes()).hexdigest()
+            #md5_hash = hashlib.md5(img.tobytes()).hexdigest()
+            md5_hash = self.get_image_name()
             self.cropped_image.save(md5_hash + ".jpg", image_file, save=True)
             #self.save()
+
+    @classmethod
+    def rename_cropped_images(cls):
+        images = cls.objects.filter(cropped_image__isnull=False)
+        for img in images:
+            image_name = img.get_image_name()
+            if img.cropped_image and not img.cropped_image.name.endswith(image_name+'.jpg'):
+                new_img = Img.open(img.cropped_image)
+                if new_img.mode != 'RGB':
+                    new_img = new_img.convert('RGB')
+                new_image_io = BytesIO()
+                new_img.save(new_image_io, format='JPEG')
+                image_name = img.get_image_name()
+
+                img.cropped_image = InMemoryUploadedFile(new_image_io, None, image_name + ".jpg", 'image/jpeg',
+                                                          new_image_io.tell(), None)
+                img.save()
+
 
     class Meta:
         db_table = "doctor_image"
