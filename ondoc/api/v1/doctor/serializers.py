@@ -1939,7 +1939,8 @@ class IpdProcedureLeadSerializer(serializers.ModelSerializer):
     phone_number = serializers.IntegerField(min_value=1000000000, max_value=9999999999)
     email = serializers.EmailField(max_length=256)
     gender = serializers.ChoiceField(choices=UserProfile.GENDER_CHOICES)
-    age = serializers.IntegerField(min_value=1, max_value=120)
+    age = serializers.IntegerField(min_value=1, max_value=120, required=False, default=None)
+    dob = serializers.DateTimeField(required=False, default=None)
 
     class Meta:
         model = IpdProcedureLead
@@ -1948,6 +1949,12 @@ class IpdProcedureLeadSerializer(serializers.ModelSerializer):
     def validate(self, attrs):
         ipd_procedure = attrs.get('ipd_procedure')
         hospital = attrs.get('hospital')
+        age = attrs.get('age')
+        dob = attrs.get('dob')
+        if all([age, dob]):
+            raise serializers.ValidationError('Only one of age or DOB is required.')
+        if not any([age, dob]):
+            raise serializers.ValidationError('Either age or DOB is required.')
         if ipd_procedure and hospital:
             if not DoctorClinicIpdProcedure.objects.filter(enabled=True, ipd_procedure=ipd_procedure,
                                                            doctor_clinic__hospital=hospital):
