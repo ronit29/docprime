@@ -1,6 +1,7 @@
 from django.db import models
 from ondoc.authentication import models as auth_models
 from ondoc.doctor import models as doc_models
+from django.contrib.postgres.fields import JSONField
 # Create your models here.
 
 
@@ -42,7 +43,9 @@ class PrescriptionTests(auth_models.TimeStampedModel):
     class Meta:
         db_table = 'prescription_tests'
 
+
 class PresccriptionPdf(auth_models.TimeStampedModel):
-    pass
+    complaints = JSONField(blank=True, null=True)
+
 
 
