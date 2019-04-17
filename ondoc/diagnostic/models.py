@@ -2222,6 +2222,10 @@ class CommonTest(TimeStampedModel):
     def __str__(self):
         return "{}-{}".format(self.test.name, self.id)
 
+    @classmethod
+    def get_tests(cls, count):
+        tests = cls.objects.select_related('test').filter(test__enable_for_retail=True, test__searchable=True).order_by('-priority')[:count]
+        return tests
 
 class CommonPackage(TimeStampedModel):
     package = models.ForeignKey(LabTest, on_delete=models.CASCADE, related_name='commonpackage')
@@ -2233,6 +2237,10 @@ class CommonPackage(TimeStampedModel):
     class Meta:
         db_table = 'common_package'
 
+    @classmethod
+    def get_packages(cls, count):
+        packages = cls.objects.prefetch_related('package').filter(package__enable_for_retail=True, package__searchable=True).order_by('-priority')[:count]
+        return packages
 
 class CommonDiagnosticCondition(TimeStampedModel):
     name = models.CharField(max_length=200)

@@ -1203,8 +1203,7 @@ class SearchedItemsViewSet(viewsets.GenericViewSet):
         conditions_serializer = serializers.MedicalConditionSerializer(medical_conditions, many=True,
                                                                        context={'request': request})
 
-        common_specializations = models.CommonSpecialization.objects.select_related('specialization').all().order_by(
-            "-priority")[:10]
+        common_specializations = models.CommonSpecialization.get_specializations(count)
         specializations_serializer = serializers.CommonSpecializationsSerializer(common_specializations, many=True,
                                                                                  context={'request': request})
 
