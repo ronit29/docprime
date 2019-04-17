@@ -323,3 +323,33 @@ class QRCode(TimeStampedModel):
     class Meta:
         db_table = 'qr_code'
 
+
+class CompletedBreakupMixin(object):
+
+    def get_completion_breakup(self):
+
+        completed_appointments = [self]
+        if self.money_pool:
+            completed_appointments = self.money_pool.get_completed_appointments()
+
+        total_wallet = self.effective_price
+        total_cashback = 0
+
+        if self.money_pool:
+            total_wallet = self.money_pool.wallet
+            total_cashback = self.money_pool.cashback
+        elif self.price_data:
+            total_wallet = self.price_data["wallet_amount"]
+            total_cashback = self.price_data["cashback_amount"]
+
+        for app in completed_appointments:
+            curr_cashback = min(total_cashback, app.effective_price)
+            curr_wallet = min(total_wallet, app.effective_price - curr_cashback)
+
+            total_cashback -= curr_cashback
+            total_wallet -= curr_wallet
+
+            if app.id == self.id:
+                return curr_wallet, curr_cashback
+
+        return 0, 0

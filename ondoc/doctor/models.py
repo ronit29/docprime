@@ -43,7 +43,7 @@ from django.contrib.contenttypes.fields import GenericRelation
 from ondoc.api.v1.utils import get_start_end_datetime, custom_form_datetime, CouponsMixin, aware_time_zone, \
     form_time_slot, util_absolute_url, html_to_pdf, TimeSlotExtraction
 from ondoc.common.models import AppointmentHistory, AppointmentMaskNumber, Service, Remark, MatrixMappedState, \
-    MatrixMappedCity, GlobalNonBookable, SyncBookingAnalytics
+    MatrixMappedCity, GlobalNonBookable, SyncBookingAnalytics, CompletedBreakupMixin
 from ondoc.common.models import QRCode
 
 from functools import reduce
@@ -1626,7 +1626,7 @@ class OpdAppointmentInvoiceMixin(object):
 
 
 @reversion.register()
-class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentInvoiceMixin):
+class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentInvoiceMixin, CompletedBreakupMixin):
     CREATED = 1
     BOOKED = 2
     RESCHEDULED_DOCTOR = 3
@@ -1697,7 +1697,7 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
 
     merchant_payout = models.ForeignKey(MerchantPayout, related_name="opd_appointment", on_delete=models.SET_NULL, null=True)
     price_data = JSONField(blank=True, null=True)
-    money_pool = models.ForeignKey(MoneyPool, on_delete=models.SET_NULL, null=True)
+    money_pool = models.ForeignKey(MoneyPool, on_delete=models.SET_NULL, null=True, related_name="opd_apps")
     mask_number = GenericRelation(AppointmentMaskNumber)
     email_notification = GenericRelation(EmailNotification, related_name="enotification")
     synced_analytics = GenericRelation(SyncBookingAnalytics, related_name="opd_booking_analytics")
