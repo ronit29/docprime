@@ -725,7 +725,7 @@ class EmailNotification(TimeStampedModel, EmailNotificationOpdMixin, EmailNotifi
 
     @classmethod
     def send_insurance_booking_url(cls, token, email):
-        booking_url = "{}/agent/booking/token={}".format(settings.CONSUMER_APP_DOMAIN, token)
+        booking_url = "{}/agent/booking?token={}".format(settings.CONSUMER_APP_DOMAIN, token)
         booking_url = booking_url + "&callbackurl=insurance/insurance-user-details-review"
         short_url = generate_short_url(booking_url)
         html_body = "Your Insurance purchase url is - {} . Please pay to confirm".format(short_url)
