@@ -1695,13 +1695,13 @@ class RefundMixin(object):
 
     def can_agent_refund(self, user):
         from ondoc.crm.constants import constants
-        if self.status == self.COMPLETED and (user.groups.filter(name=constants['APPOINTMENT_REFUND_TEAM']).exists() or user.is_superuser) and not self.get_app_consumer_trans_obj():
+        if self.status == self.COMPLETED and (user.groups.filter(name=constants['APPOINTMENT_REFUND_TEAM']).exists() or user.is_superuser) and not self.has_app_consumer_trans():
             return True
         return False
 
-    def get_app_consumer_trans_obj(self):
+    def has_app_consumer_trans(self):
         from ondoc.account.models import ConsumerTransaction
         product_id = self.PRODUCT_ID
-        return ConsumerTransaction.objects.filter(product_id=product_id, reference_id=self.id, action=ConsumerTransaction.CANCELLATION)
+        return not ConsumerTransaction.valid_appointment_for_cancellation(self.id, product_id)
         # return ConsumerRefund.objects.filter(consumer_transaction__reference_id=self.id,
         #                               consumer_transaction__product_id=product_id).first()

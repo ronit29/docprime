@@ -664,6 +664,9 @@ class Command(BaseCommand):
 
             group.permissions.add(*permissions)
 
+        group, created = Group.objects.get_or_create(name=constants['APPOINTMENT_REFUND_TEAM'])
+        group.permissions.clear()
+
         self.stdout.write('Successfully created groups and permissions')
 
         self.setup_comment_group()

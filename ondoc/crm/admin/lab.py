@@ -950,7 +950,7 @@ class LabAppointmentAdmin(nested_admin.NestedModelAdmin):
         return read_only
 
     def refund_initiated(self, obj):
-        return bool(obj.get_app_consumer_trans_obj())
+        return bool(obj.has_app_consumer_trans())
 
     # def get_inline_instances(self, request, obj=None):
     #     inline_instance = super().get_inline_instances(request=request, obj=obj)

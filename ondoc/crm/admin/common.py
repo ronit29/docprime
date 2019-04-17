@@ -113,6 +113,8 @@ class RefundableAppointmentForm(forms.ModelForm):
         if refund_payment:
             if not refund_reason:
                 raise forms.ValidationError("Refund reason is compulsory")
+            if self.instance and not self.instance.status == self.instance.COMPLETED:
+                raise forms.ValidationError("Refund can be processed after Completion")
         # TODO : No refund should already be in process
         return cleaned_data
 
