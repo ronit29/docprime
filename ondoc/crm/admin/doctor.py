@@ -1567,7 +1567,7 @@ class DoctorOpdAppointmentAdmin(admin.ModelAdmin):
                 'fees', 'effective_price', 'mrp', 'deal_price', 'payment_status',
                 'payment_type', 'admin_information', 'insurance', 'outstanding',
                 'status', 'cancel_type', 'cancellation_reason', 'cancellation_comments',
-                'start_date', 'start_time', 'invoice_urls', 'payment_type', 'payout_info')
+                'start_date', 'start_time', 'invoice_urls', 'payment_type', 'payout_info', 'refund_initiated')
         if request.user.groups.filter(name=constants['APPOINTMENT_OTP_TEAM']).exists() or request.user.is_superuser:
             all_fields = all_fields + ('otp',)
 
@@ -1592,12 +1592,15 @@ class DoctorOpdAppointmentAdmin(admin.ModelAdmin):
                      'default_profile_number', 'user_id', 'user_number', 'booked_by',
                      'fees', 'effective_price', 'mrp', 'deal_price', 'payment_status', 'payment_type',
                      'admin_information', 'insurance', 'outstanding', 'procedures_details', 'invoice_urls',
-                     'payment_type', 'invoice_urls', 'payout_info')
+                     'payment_type', 'invoice_urls', 'payout_info', 'refund_initiated')
         if request.user.groups.filter(name=constants['APPOINTMENT_OTP_TEAM']).exists() or request.user.is_superuser:
             read_only = read_only + ('otp',)
         return read_only
         # else:
         #     return ('invoice_urls')
+
+    def refund_initiated(self, obj):
+        return bool(obj.get_app_consumer_trans_obj())
 
     def payout_info(self, obj):
         return MerchantPayout.get_merchant_payout_info(obj)

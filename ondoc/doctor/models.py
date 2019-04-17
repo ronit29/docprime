@@ -24,7 +24,7 @@ from datetime import timedelta
 from dateutil import tz
 from django.utils import timezone
 from ondoc.authentication import models as auth_model
-from ondoc.authentication.models import SPOCDetails
+from ondoc.authentication.models import SPOCDetails, RefundMixin
 from ondoc.location import models as location_models
 from ondoc.account.models import Order, ConsumerAccount, ConsumerTransaction, PgTransaction, ConsumerRefund, \
     MerchantPayout, UserReferred, MoneyPool, Invoice
@@ -1664,7 +1664,8 @@ class OpdAppointmentInvoiceMixin(object):
 
 
 @reversion.register()
-class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentInvoiceMixin):
+class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentInvoiceMixin, RefundMixin):
+    PRODUCT_ID = Order.DOCTOR_PRODUCT_ID
     CREATED = 1
     BOOKED = 2
     RESCHEDULED_DOCTOR = 3
@@ -1742,11 +1743,6 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
 
     def __str__(self):
         return self.profile.name + " (" + self.doctor.name + ")"
-
-    def can_agent_refund(self, user):
-        if self.status == self.COMPLETED and (user.groups.filter(name=constants['APPOINTMENT_REFUND_TEAM']).exists() or user.is_superuser):
-            return True
-        return False
 
     def allowed_action(self, user_type, request):
         allowed = []
@@ -1849,23 +1845,6 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
     def action_accepted(self):
         self.status = self.ACCEPTED
         self.save()
-
-    @transaction.atomic
-    def action_refund(self, refund_flag=1):
-        # Taking Lock first
-        consumer_account = None
-        if self.payment_type == self.PREPAID:
-            temp_list = ConsumerAccount.objects.get_or_create(user=self.user)
-            consumer_account = ConsumerAccount.objects.select_for_update().get(user=self.user)
-        product_id = Order.DOCTOR_PRODUCT_ID
-        if self.payment_type == self.PREPAID and ConsumerTransaction.valid_appointment_for_cancellation(self.id,
-                                                                                                        product_id):
-            RefundDetails.log_refund(self)
-            wallet_refund, cashback_refund = self.get_cancellation_breakup()
-            consumer_account.credit_cancellation(self, product_id, wallet_refund, cashback_refund)
-            if refund_flag:
-                ctx_obj = consumer_account.debit_refund()
-                ConsumerRefund.initiate_refund(self.user, ctx_obj)
 
     @transaction.atomic
     def action_cancelled(self, refund_flag=1):
