@@ -226,6 +226,7 @@ def push_appointment_to_matrix(self, data):
             mobile_list = list()
             # User mobile number
             mobile_list.append({'MobileNo': appointment.user.phone_number, 'Name': appointment.profile.name, 'Type': 1})
+            auto_ivr_enabled = appointment.hospital.is_auto_ivr_enabled()
             # SPOC details
             for spoc_obj in appointment.hospital.spoc_details.all():
                 number = ''
@@ -241,6 +242,7 @@ def push_appointment_to_matrix(self, data):
                 mobile_list.append({'MobileNo': number,
                                     'Name': spoc_name,
                                     'DesignationID': spoc_obj.contact_type,
+                                    'AutoIVREnable': str(auto_ivr_enabled).lower(),
                                     'Type': 2})
 
             # Doctor mobile numbers
@@ -255,6 +257,7 @@ def push_appointment_to_matrix(self, data):
                 raise Exception("Appointment could not found against id - " + str(appointment_id))
 
             mobile_list = list()
+            auto_ivr_enabled = appointment.lab.is_auto_ivr_enabled()
 
             for contact_person in appointment.lab.labmanager_set.all():
                 number = ''
@@ -268,6 +271,7 @@ def push_appointment_to_matrix(self, data):
                 mobile_list.append({'MobileNo': number,
                                     'Name': contact_name,
                                     'DesignationId': contact_person.contact_type,
+                                    'AutoIVREnable': str(auto_ivr_enabled).lower(),
                                     'Type': 3})
 
 

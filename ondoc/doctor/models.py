@@ -231,6 +231,7 @@ class Hospital(auth_model.TimeStampedModel, auth_model.CreatedByModel, auth_mode
     enabled_for_cod = models.BooleanField(default=False)
     enabled_for_prepaid = models.BooleanField(default=True)
     is_location_verified = models.BooleanField(verbose_name='Location Verified', default=False)
+    auto_ivr_enabled = models.BooleanField(default=True)
 
     def __str__(self):
         return self.name
@@ -273,6 +274,12 @@ class Hospital(auth_model.TimeStampedModel, auth_model.CreatedByModel, auth_mode
 
     def open_for_communications(self):
         if (self.network and self.network.open_for_communication) or (not self.network and self.open_for_communication):
+            return True
+
+        return False
+
+    def is_auto_ivr_enabled(self):
+        if (self.network and self.network.auto_ivr_enabled) or (not self.network and self.auto_ivr_enabled):
             return True
 
         return False
@@ -1473,6 +1480,7 @@ class HospitalNetwork(auth_model.TimeStampedModel, auth_model.CreatedByModel, au
     open_for_communication = models.BooleanField(default=True)    
     matrix_lead_id = models.BigIntegerField(blank=True, null=True, unique=True)
     remark = GenericRelation(Remark)
+    auto_ivr_enabled = models.BooleanField(default=True)
 
     def update_time_stamps(self):
         if self.welcome_calling_done and not self.welcome_calling_done_at:
@@ -1843,26 +1851,21 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
         self.save()
 
     def update_ivr_status(self, status):
-        try:
-            if status == OpdAppointment.ACCEPTED:
-                # Constraints: Check if appointment can be accepted or not.
-                if self.status in [OpdAppointment.COMPLETED, OpdAppointment.CANCELLED, OpdAppointment.ACCEPTED]:
-                    raise Exception('Appointment cannot be accepted as current status is %s' % str(self.status))
+        if status == self.status:
+            return True, ""
 
-                if self.time_slot_start < timezone.now():
-                    raise Exception('Appointment cannot be accepted as time slot has been expired')
+        if self.status in [OpdAppointment.COMPLETED, OpdAppointment.CANCELLED]:
+            return False, 'Appointment cannot be accepted as current status is %s' % str(self.status)
 
-                self.action_accepted()
+        if status == OpdAppointment.ACCEPTED:
+            # Constraints: Check if appointment can be accepted or not.
+            if self.time_slot_start < timezone.now():
+                return False, 'Appointment cannot be accepted as time slot has been expired'
 
-            elif status == OpdAppointment.COMPLETED:
-                # Constraints: Check if appointment can be accepted or not.
-                if self.status in [OpdAppointment.COMPLETED, OpdAppointment.CANCELLED]:
-                    raise Exception('Appointment cannot be completed as current status is %s' % str(self.status))
+            self.action_accepted()
 
-                self.action_completed()
-        except Exception as e:
-            logger.error(str(e))
-            return False, str(e)
+        elif status == OpdAppointment.COMPLETED:
+            self.action_completed()
 
         return True, ""
 

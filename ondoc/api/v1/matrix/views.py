@@ -18,6 +18,7 @@ from ondoc.diagnostic.models import LabAppointment
 from ondoc.doctor.models import OpdAppointment
 from ondoc.authentication.models import User
 from ondoc.authentication.backends import MatrixAuthentication
+from django.utils import timezone
 
 
 class MaskNumberViewSet(viewsets.GenericViewSet):
@@ -98,7 +99,8 @@ class IvrViewSet(viewsets.GenericViewSet):
     authentication_classes = (MatrixAuthentication, )
 
     def update(self, request):
-        serializer = IvrSerializer(data=request.data)
+        request_data = request.data
+        serializer = IvrSerializer(data=request_data)
         serializer.is_valid(raise_exception=True)
         data = serializer.validated_data
 
@@ -116,7 +118,8 @@ class IvrViewSet(viewsets.GenericViewSet):
         appointment_obj._responsible_user = user
         appointment_obj._source = data.get('source')
         ivr_data = appointment_obj.auto_ivr_data
-        ivr_data.append(request.data)
+        request_data['timestamp'] = str(timezone.now())
+        ivr_data.append(request_data)
 
         success, error = appointment_obj.update_ivr_status(data.get('status'))
 

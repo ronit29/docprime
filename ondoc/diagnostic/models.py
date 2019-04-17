@@ -226,6 +226,7 @@ class Lab(TimeStampedModel, CreatedByModel, QCModel, SearchKey):
     remark = GenericRelation(Remark)
     rating_data = JSONField(blank=True, null=True)
     is_location_verified = models.BooleanField(verbose_name='Location Verified', default=False)
+    auto_ivr_enabled = models.BooleanField(default=True)
 
     def __str__(self):
         return self.name
@@ -239,6 +240,12 @@ class Lab(TimeStampedModel, CreatedByModel, QCModel, SearchKey):
 
     def open_for_communications(self):
         if (self.network and self.network.open_for_communication) or (not self.network and self.open_for_communication):
+            return True
+
+        return False
+
+    def is_auto_ivr_enabled(self):
+        if (self.network and self.network.auto_ivr_enabled) or (not self.network and self.auto_ivr_enabled):
             return True
 
         return False
@@ -854,6 +861,7 @@ class LabNetwork(TimeStampedModel, CreatedByModel, QCModel):
     is_mask_number_required = models.BooleanField(default=True)
     open_for_communication = models.BooleanField(default=True)
     remark = GenericRelation(Remark)
+    auto_ivr_enabled = models.BooleanField(default=True)
 
     def all_associated_labs(self):
         if self.id:
@@ -1851,26 +1859,21 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin)
         self.save()
 
     def update_ivr_status(self, status):
-        try:
-            if status == LabAppointment.ACCEPTED:
-                # Constraints: Check if appointment can be accepted or not.
-                if self.status in [LabAppointment.COMPLETED, LabAppointment.CANCELLED, LabAppointment.ACCEPTED]:
-                    raise Exception('Appointment cannot be accepted as current status is %s' % str(self.status))
+        if status == self.status:
+            return True, ""
 
-                if self.time_slot_start < timezone.now():
-                    raise Exception('Appointment cannot be accepted as time slot has been expired')
+        if self.status in [LabAppointment.COMPLETED, LabAppointment.CANCELLED]:
+            return False, 'Appointment cannot be accepted as current status is %s' % str(self.status)
 
-                self.action_accepted()
+        if status == LabAppointment.ACCEPTED:
+            # Constraints: Check if appointment can be accepted or not.
+            if self.time_slot_start < timezone.now():
+                return False, 'Appointment cannot be accepted as time slot has been expired'
 
-            elif status == LabAppointment.COMPLETED:
-                # Constraints: Check if appointment can be accepted or not.
-                if self.status in [LabAppointment.COMPLETED, LabAppointment.CANCELLED]:
-                    raise Exception('Appointment cannot be completed as current status is %s' % str(self.status))
+            self.action_accepted()
 
-                self.action_completed()
-        except Exception as e:
-            logger.error(str(e))
-            return False, str(e)
+        elif status == LabAppointment.COMPLETED:
+            self.action_completed()
 
         return True, ""
 
