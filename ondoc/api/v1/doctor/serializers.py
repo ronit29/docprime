@@ -1340,11 +1340,10 @@ class CommonSpecializationsSerializer(serializers.ModelSerializer):
         return request.build_absolute_uri(obj['icon']) if obj['icon'] else None
 
     def get_url(self, obj):
-        if self.context and self.context.get('city'):
-            entity = EntityUrls.objects.filter(sitemap_identifier='SPECIALIZATION_CITY', locality_value__iexact=self.context.get('city').lower(),
-                                               is_valid=True, specialization_id=obj.specialization_id)
-            return entity[0].url if entity else None
-        return None
+        url = None
+        if self.context and self.context.get('city') and self.context.get('spec_urls'):
+            url = self.context.get('spec_urls')[obj.specialization_id]
+        return url
 
     class Meta:
         model = CommonSpecialization
