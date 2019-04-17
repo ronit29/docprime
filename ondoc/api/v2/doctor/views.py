@@ -766,7 +766,7 @@ class PartnersAppInvoice(viewsets.GenericViewSet):
             valid_data = serializer.validated_data
             hospital_ids = valid_data.pop('hospital_ids')
             hospitals = valid_data.pop('hospitals')
-            general_invoice_item = valid_data.pop('id') if valid_data.get('id') else None
+            general_invoice_item = valid_data.pop('general_invoice_item') if valid_data.get('general_invoice_item') else None
             if not general_invoice_item:
                 invoice_item_obj = doc_models.GeneralInvoiceItems.objects.create(**valid_data)
                 invoice_item_obj.hospitals.add(*hospitals)
@@ -777,7 +777,7 @@ class PartnersAppInvoice(viewsets.GenericViewSet):
                 invoice_item_obj.hospitals.set(hospitals, clear=True)
             model_serializer = serializers.GeneralInvoiceItemsModelSerializer(invoice_item_obj, many=False)
             return Response({"status": 1, "message": "Invoice Item added successfully",
-                             "invoice_obj": model_serializer.data}, status.HTTP_200_OK)
+                             "invoice_item": model_serializer.data}, status.HTTP_200_OK)
         except Exception as e:
             return Response({"status":0 , "message": "Error adding Invoice Item with exception -" + str(e)},
                             status.HTTP_400_BAD_REQUEST)

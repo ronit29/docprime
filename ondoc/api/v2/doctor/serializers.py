@@ -302,7 +302,7 @@ class UpdateHospitalConsent(serializers.Serializer):
 
 
 class GeneralInvoiceItemsSerializer(serializers.Serializer):
-    id = serializers.PrimaryKeyRelatedField(queryset=doc_models.GeneralInvoiceItems.objects.all())
+    id = serializers.CharField(max_length=300)
     item = serializers.CharField(max_length=200)
     base_price = serializers.DecimalField(max_digits=10, decimal_places=2)
     description = serializers.CharField(max_length=500, required=False, allow_null=True, allow_blank=True)
@@ -318,8 +318,6 @@ class GeneralInvoiceItemsSerializer(serializers.Serializer):
     def validate(self, attrs):
         request = self.context.get("request")
         user = request.user if request else None
-        # hospital = attrs['appointment_id'].hospital
-        # doctor = attrs['appointment_id'].doctor
         doctor = attrs.get("doctor_id")
         hospital_ids = set(attrs.get("hospital_ids"))
         hospitals = doc_models.Hospital.objects.filter(id__in=hospital_ids)
@@ -343,6 +341,9 @@ class GeneralInvoiceItemsSerializer(serializers.Serializer):
             raise serializers.ValidationError('user not admin for given hospitals or the appointment doctor_id, if present')
         attrs['hospitals'] = hospitals
         attrs['user'] = user if user else None
+        general_invoice_item = doc_models.GeneralInvoiceItems.objects.filter(id=attrs.get('id')).first()
+        if general_invoice_item:
+            attrs['general_invoice_item'] = general_invoice_item
         return attrs
 
 
