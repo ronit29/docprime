@@ -1179,7 +1179,7 @@ class DoctorImage(auth_model.TimeStampedModel, auth_model.Image):
 
     def get_image_name(self):
         name = self.doctor.name
-        doctor_spec_name = "Dr " + name
+        doctor_spec_name = "dr " + name
         selected_spec = None
         for dps in self.doctor.doctorpracticespecializations.all():
             if not selected_spec:
@@ -1274,7 +1274,7 @@ class DoctorImage(auth_model.TimeStampedModel, auth_model.Image):
 
     @classmethod
     def rename_cropped_images(cls):
-        images = cls.objects.filter(cropped_image__isnull=False)
+        images = cls.objects.filter(cropped_image__isnull=False).filter(doctor__is_live=True)[:100]
         for img in images:
             image_name = img.get_image_name()
             if img.cropped_image and not img.cropped_image.name.endswith(image_name+'.jpg'):
@@ -1283,7 +1283,6 @@ class DoctorImage(auth_model.TimeStampedModel, auth_model.Image):
                     new_img = new_img.convert('RGB')
                 new_image_io = BytesIO()
                 new_img.save(new_image_io, format='JPEG')
-                image_name = img.get_image_name()
 
                 img.cropped_image = InMemoryUploadedFile(new_image_io, None, image_name + ".jpg", 'image/jpeg',
                                                           new_image_io.tell(), None)
