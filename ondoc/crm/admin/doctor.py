@@ -1452,8 +1452,8 @@ class DoctorOpdAppointmentForm(RefundableAppointmentForm):
         else:
             raise forms.ValidationError("Doctor and hospital details not entered.")
 
-        # if self.instance.status in [OpdAppointment.CANCELLED, OpdAppointment.COMPLETED] and len(cleaned_data):
-        #     raise forms.ValidationError("Cancelled/Completed appointment cannot be modified.")
+        if self.instance.status in [OpdAppointment.CANCELLED, OpdAppointment.COMPLETED] and 'status' in cleaned_data:
+            raise forms.ValidationError("Cancelled/Completed appointment cannot be modified.")
 
         if not cleaned_data.get('status') is OpdAppointment.CANCELLED and (cleaned_data.get(
                 'cancellation_reason') or cleaned_data.get('cancellation_comments')):
@@ -1593,6 +1593,8 @@ class DoctorOpdAppointmentAdmin(admin.ModelAdmin):
                      'fees', 'effective_price', 'mrp', 'deal_price', 'payment_status', 'payment_type',
                      'admin_information', 'insurance', 'outstanding', 'procedures_details', 'invoice_urls',
                      'payment_type', 'invoice_urls', 'payout_info', 'refund_initiated')
+        if obj and (obj.status == LabAppointment.COMPLETED or obj.status == LabAppointment.CANCELLED):
+            read_only += ('status',)
         if request.user.groups.filter(name=constants['APPOINTMENT_OTP_TEAM']).exists() or request.user.is_superuser:
             read_only = read_only + ('otp',)
         return read_only
@@ -1600,7 +1602,7 @@ class DoctorOpdAppointmentAdmin(admin.ModelAdmin):
         #     return ('invoice_urls')
 
     def refund_initiated(self, obj):
-        return bool(obj.get_app_consumer_trans_obj())
+        return bool(obj.has_app_consumer_trans())
 
     def payout_info(self, obj):
         return MerchantPayout.get_merchant_payout_info(obj)

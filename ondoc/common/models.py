@@ -337,4 +337,6 @@ class RefundDetails(TimeStampedModel):
         if hasattr(appointment, '_source') and appointment._source == AppointmentHistory.CRM:
             refund_reason = appointment._refund_reason if hasattr(appointment, '_refund_reason') else None
             refund_initiated_by = appointment._responsible_user if hasattr(appointment, '_responsible_user') else None
+            if not refund_initiated_by:
+                raise Exception("Must have a responsible user.")
             cls .objects.create(refund_reason=refund_reason, refund_initiated_by=refund_initiated_by, content_object=appointment)
