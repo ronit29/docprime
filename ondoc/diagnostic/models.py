@@ -510,6 +510,7 @@ class Lab(TimeStampedModel, CreatedByModel, QCModel, SearchKey):
                         from ratings_review rr
                         inner join lab l on rr.object_id = l.id 
                         and rr.content_type_id={}
+                        where rr.is_live='true'
                         group by case when l.network_id is null then l.id else l.network_id end
                         )x where case when l.network_id is null then l.id=x.lab_id else l.network_id=x.network_id end
                         )

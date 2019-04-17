@@ -802,7 +802,7 @@ class Doctor(auth_model.TimeStampedModel, auth_model.QCModel, SearchKey, auth_mo
                        (
                        select json_build_object('avg_rating', x.avg_rating,'rating_count', x.rating_count) from
                        (select object_id as doctor_id,round(avg(ratings),1) avg_rating, count(*) rating_count from 
-                       ratings_review where content_type_id={} group by object_id
+                       ratings_review where content_type_id={} AND is_live='true' group by object_id
                        )x where x.doctor_id = d.id				  
                        ) where id in (select object_id from ratings_review where content_type_id={})
                      '''.format(cid, cid)
