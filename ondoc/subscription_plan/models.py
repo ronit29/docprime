@@ -5,7 +5,7 @@ from django.db import models, transaction
 from django.db.models import Count
 from django.utils import timezone
 import logging
-from ondoc.account.models import ConsumerAccount, Order, MoneyPool
+from ondoc.account.models import ConsumerAccount, Order, MoneyPool, ConsumerRefund
 from ondoc.api.v1.utils import payment_details
 from ondoc.authentication import models as auth_model
 from ondoc.authentication.models import User
@@ -68,15 +68,55 @@ class PlanFeatureMapping(models.Model):
 
 
 class UserPlanMapping(auth_model.TimeStampedModel):
+    CANCELLED = 2
+    BOOKED = 1
+
+    STATUS_CHOICES = [(CANCELLED, 'Cancelled'),
+                      (BOOKED, 'Booked')]
+
     plan = models.ForeignKey(Plan, on_delete=models.DO_NOTHING, related_name="subscribed_user_mapping")
     user = models.ForeignKey(User, on_delete=models.DO_NOTHING, related_name="plan_mapping", unique=True)
     is_active = models.BooleanField(default=True)
     expire_at = models.DateTimeField(null=True)
     extra_details = JSONField(blank=True, null=True)  # Snapshot of the plan when bought
     money_pool = models.ForeignKey(MoneyPool, on_delete=models.SET_NULL, null=True)
+    status = models.PositiveSmallIntegerField(default=BOOKED, choices=STATUS_CHOICES)
 
     class Meta:
         db_table = "subscription_plan_user"
+
+    def cancel(self):
+        if not self.is_cancellable():
+            raise Exception("Plan already used, cannot cancel")
+            return
+
+        # Taking Lock first
+        ConsumerAccount.objects.get_or_create(user=self.user)
+        consumer_account = ConsumerAccount.objects.select_for_update().get(user=self.user)
+
+        old_instance = UserPlanMapping.objects.get(pk=self.id)
+        if old_instance.status == self.BOOKED and old_instance.is_active:
+            self.status = self.CANCELLED
+            self.is_active = False
+            self.save()
+            wallet_refund, cashback_refund = self.get_cancellation_breakup()
+            consumer_account.credit_cancellation(self, Order.SUBSCRIPTION_PLAN_PRODUCT_ID, wallet_refund, cashback_refund)
+
+            ctx_obj = consumer_account.debit_refund()
+            ConsumerRefund.initiate_refund(self.user, ctx_obj)
+
+    def get_cancellation_breakup(self):
+        wallet_refund = cashback_refund = 0
+        if self.money_pool:
+            wallet_refund, cashback_refund = self.money_pool.get_refund_breakup(self.bought_at_price())
+        return wallet_refund, cashback_refund
+
+    def bought_at_price(self):
+        price = self.extra_details['deal_price']
+        return int(float(price))
+
+    def is_cancellable(self):
+        return self.appointment_using.all().count() == 0
 
     def save(self, *args, **kwargs):
         if not self.expire_at:

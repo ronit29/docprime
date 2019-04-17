@@ -1,6 +1,19 @@
 from django.contrib.postgres.fields import JSONField
 from django.core.validators import FileExtensionValidator
 from django.db import models
+from weasyprint import HTML, CSS
+import string
+import random
+from django.core.files.uploadedfile import SimpleUploadedFile, InMemoryUploadedFile
+from weasyprint.fonts import FontConfiguration
+from hardcopy import bytestring_to_pdf
+import io
+#from tempfile import NamedTemporaryFile
+from django.core.files.storage import default_storage
+from django.core.files.storage import FileSystemStorage
+from django.core.files.base import ContentFile
+from django.core.files import File
+from io import BytesIO
 from django.contrib.contenttypes.fields import GenericForeignKey
 from django.contrib.contenttypes.models import ContentType
 
@@ -32,13 +45,51 @@ class MatrixCityMapping(models.Model):
         db_table = 'matrix_city_mapping'
 
 
+class PDFTester(models.Model):
+    html = models.TextField(max_length=50000000)
+    css = models.TextField(max_length=50000000, blank=True)
+    file = models.FileField(upload_to='common/pdf/test', blank=True)
+
+    def save(self, *args, **kwargs):
+
+        random_string = ''.join([random.choice(string.ascii_letters + string.digits) for n in range(12)])
+        path = 'common/pdf/test/' + random_string + '.pdf'
+        fs = FileSystemStorage()
+        file = fs.open(path, 'wb')
+
+        extra_args = {
+            'virtual-time-budget': 6000
+        }
+
+        bytestring_to_pdf(self.html.encode(), file, **extra_args)
+
+        file.close()
+
+        ff = File(fs.open(path, 'rb'))
+
+        random_string = ''.join([random.choice(string.ascii_letters + string.digits) for n in range(12)])
+        name = random_string+'.pdf'
+
+        self.file = InMemoryUploadedFile(ff.file, None, 'aaa.pdf', 'application/pdf', ff.file.tell(), None)
+
+
+        super().save(*args, **kwargs)
+
+
+    class Meta:
+        db_table = 'pdftest'
+
+
 class AppointmentHistory(TimeStampedModel):
     CRM = "crm"
     WEB = "web"
     DOC_APP = "d_app"
     CONSUMER_APP = "c_app"
     DOC_WEB = "d_web"
-    SOURCE_CHOICES = ((CONSUMER_APP, "Consumer App"), (CRM, "CRM"), (WEB, "Consumer Web"), (DOC_APP, "Doctor App"), (DOC_WEB, "Provider Web"))
+    D_WEB_URL = "d_web_url"
+    D_TOKEN_URL = "d_token_url"
+    SOURCE_CHOICES = ((CONSUMER_APP, "Consumer App"), (CRM, "CRM"), (WEB, "Consumer Web"), (DOC_APP, "Doctor App"),
+                      (DOC_WEB, "Provider Web"), (D_WEB_URL, "Doctor Web URL"), (D_TOKEN_URL, "Doctor Token URL"))
     content_type = models.ForeignKey(ContentType, on_delete=models.DO_NOTHING)
     object_id = models.PositiveIntegerField()
     content_object = GenericForeignKey()

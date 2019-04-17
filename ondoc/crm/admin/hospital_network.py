@@ -101,6 +101,10 @@ class GenericAdminInline(admin.TabularInline):
     readonly_fields = ['user']
     verbose_name_plural = "Admins"
 
+    def get_queryset(self, request):
+        from ondoc.api.v1.utils import GenericAdminEntity
+        return super().get_queryset(request).select_related('doctor', 'hospital_network', 'user').filter(entity_type=GenericAdminEntity.HOSPITAL)
+
 
 class HospitalNetworkForm(FormCleanMixin):
     operational_since = forms.ChoiceField(choices=hospital_operational_since_choices, required=False)
@@ -218,7 +222,7 @@ class HospitalNetworkAdmin(VersionAdmin, ActionAdmin, QCPemAdmin):
         HospitalNetworkAwardInline,
         HospitalNetworkCertificationInline,
         HospitalNetworkDocumentInline,
-        GenericAdminInline,
+        #GenericAdminInline,
         SPOCDetailsInline,
         AssociatedMerchantInline,
         RemarkInline

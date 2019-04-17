@@ -32,22 +32,21 @@ class ScreenViewSet(viewsets.GenericViewSet):
                 force_update_version = app_update.get("force_update_version", "")
                 update_version = app_update.get("update_version", "")
 
-        common_specializations = CommonSpecialization.objects.select_related(
-            'specialization').all().order_by("priority")[:grid_size-1]
+        common_specializations = CommonSpecialization.get_specializations(grid_size-1)
         specializations_serializer = CommonSpecializationsSerializer(common_specializations, many=True,
                                                                                  context={'request': request})
 
-        test_queryset = CommonTest.objects.filter(test__enable_for_retail=True)[:grid_size-1]
+        test_queryset = CommonTest.get_tests(grid_size-1)
         test_serializer = CommonTestSerializer(test_queryset, many=True, context={'request': request})
 
-        package_queryset = CommonPackage.objects.prefetch_related('package').filter(package__enable_for_retail=True)[:grid_size-1]
+        package_queryset = CommonPackage.get_packages(grid_size-1)
         package_serializer = CommonPackageSerializer(package_queryset, many=True, context={'request': request})
 
 
         grid_list = [
             {
-                'priority': 0,
-                'title': "Find a Doctor",
+                'priority': 2,
+                'title': "Book Doctor Appointment",
                 'type': "Specialization",
                 'items': specializations_serializer.data,
                 'tag': "Upto 50% off",
@@ -55,7 +54,7 @@ class ScreenViewSet(viewsets.GenericViewSet):
                 'addSearchItem': "Doctor"
             },
             {
-                'priority': 2,
+                'priority': 0,
                 'title': "Health Packages",
                 'type': "CommonPackage",
                 'items': package_serializer.data,

@@ -4,10 +4,10 @@ from io import BytesIO, StringIO
 
 import xlrd
 from django.core.files.storage import default_storage
-from reportlab.graphics import renderPDF
-from reportlab.graphics.barcode.qr import QrCodeWidget
-from reportlab.graphics.shapes import Drawing
-from reportlab.pdfgen import canvas
+# from reportlab.graphics import renderPDF
+# from reportlab.graphics.barcode.qr import QrCodeWidget
+# from reportlab.graphics.shapes import Drawing
+# from reportlab.pdfgen import canvas
 from django.conf import settings
 from django.core.files.base import ContentFile
 from django.core.files.uploadedfile import InMemoryUploadedFile
@@ -21,7 +21,7 @@ from PIL import ImageFont
 from PIL import ImageDraw
 from ondoc.common.models import QRCode
 from ondoc.doctor.models import Doctor, DoctorImage
-import pandas as pd
+#import pandas as pd
 
 
 class Command(BaseCommand):
@@ -48,7 +48,7 @@ class Command(BaseCommand):
         #     result_data.append(data)
 
 
-        for doc in Doctor.objects.filter(id__in=id_list, is_live=True).first():
+        for doc in Doctor.objects.filter(id__in=id_list, is_live=True):
             if not doc.qr_code.all().exists():
                 doc.generate_qr_code()
                 doc.generate_sticker()
