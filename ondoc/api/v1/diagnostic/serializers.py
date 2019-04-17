@@ -96,11 +96,11 @@ class LabModelSerializer(serializers.ModelSerializer):
             network_queryset = self.context.get('rating_queryset')
             rate_count = network_queryset.count()
         else:
-            rate_count = obj.rating.count()
+            rate_count = obj.rating.filter(is_live=True).count()
         avg = 0
         if rate_count:
             all_rating = []
-            for rate in obj.rating.all():
+            for rate in obj.rating.filter(is_live=True):
                 all_rating.append(rate.ratings)
             if all_rating:
                 avg = sum(all_rating) / len(all_rating)

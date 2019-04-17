@@ -1,5 +1,12 @@
 import json
 import re
+
+from rest_framework.response import Response
+
+from ondoc.api.v1.diagnostic.serializers import LabAppointmentUpcoming
+from ondoc.api.v1.doctor.serializers import OpdAppointmentUpcoming
+from ondoc.diagnostic.models import LabAppointment
+from ondoc.doctor.models import OpdAppointment
 from ondoc.notification.rabbitmq_client import publish_message
 # from ondoc.notification.sqs_client import publish_message
 
@@ -56,4 +63,16 @@ def send_sms(text, phone_number=[]):
 
 
 
+
+def get_all_upcoming_appointments(user_id):
+    all_appointments = []
+    opd = OpdAppointment.get_upcoming_appointment(user_id)
+    opd_appointments = OpdAppointmentUpcoming(opd, many=True).data
+    lab = LabAppointment.get_upcoming_appointment(user_id)
+    lab_appointments = LabAppointmentUpcoming(lab, many=True).data
+
+    all_appointments = opd_appointments + lab_appointments
+    all_appointments = sorted(all_appointments,
+                              key=lambda x: x["time_slot_start"])
+    return all_appointments
 

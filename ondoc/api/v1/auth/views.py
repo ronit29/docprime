@@ -21,6 +21,7 @@ from django.db.models import F, Sum, Max, Q, Prefetch, Case, When, Count
 from django.forms.models import model_to_dict
 
 from ondoc.common.models import UserConfig, PaymentOptions, AppointmentHistory
+from ondoc.common.utils import get_all_upcoming_appointments
 from ondoc.coupon.models import UserSpecificCoupon, Coupon
 from ondoc.lead.models import UserLead
 from ondoc.sms.api import send_otp
@@ -40,7 +41,8 @@ from ondoc.doctor.models import OpdAppointment
 from ondoc.api.v1.doctor.serializers import (OpdAppointmentSerializer, AppointmentFilterUserSerializer,
                                              UpdateStatusSerializer, CreateAppointmentSerializer,
                                              AppointmentRetrieveSerializer, OpdAppTransactionModelSerializer,
-                                             OpdAppModelSerializer,OpdAppointmentUpcoming)
+                                             OpdAppModelSerializer, OpdAppointmentUpcoming,
+                                             NewAppointmentRetrieveSerializer)
 from ondoc.api.v1.diagnostic.serializers import (LabAppointmentModelSerializer,
                                                  LabAppointmentRetrieveSerializer, LabAppointmentCreateSerializer,
                                                  LabAppTransactionModelSerializer, LabAppRescheduleModelSerializer,
@@ -571,7 +573,8 @@ class UserAppointmentsViewSet(OndocViewSet):
             return Response(serializer.data)
         elif appointment_type == 'doctor':
             queryset = OpdAppointment.objects.filter(pk=pk, user=user)
-            serializer = AppointmentRetrieveSerializer(queryset, many=True, context={"request": request})
+            # serializer = AppointmentRetrieveSerializer(queryset, many=True, context={"request": request})
+            serializer = NewAppointmentRetrieveSerializer(queryset, many=True, context={"request": request})
             return Response(serializer.data)
         else:
             return Response({'Error': 'Invalid Request Type'})
@@ -1180,7 +1183,8 @@ class TransactionViewSet(viewsets.GenericViewSet):
                     pg_txn = PgTransaction.objects.filter(order_no__iexact=response.get("orderNo")).first()
                     if pg_txn:
                         send_pg_acknowledge.apply_async((pg_txn.order_id, pg_txn.order_no,), countdown=1)
-                        return Response({ "processed_already": True })
+                        REDIRECT_URL = (SUCCESS_REDIRECT_URL % pg_txn.order_id) + "?payment_success=true"
+                        return HttpResponseRedirect(redirect_to=REDIRECT_URL)
             except Exception as e:
                logger.error("Error in sending pg acknowledge - " + str(e))
 
@@ -1990,12 +1994,16 @@ class UserRatingViewSet(GenericViewSet):
                 cid_list = []
                 if obj.content_type == ContentType.objects.get_for_model(Doctor):
                     name = obj.content_object.get_display_name()
-                    appointment = OpdAppointment.objects.select_related('hospital').filter(id=obj.appointment_id).first()
-                    if appointment:
-                        address = appointment.hospital.get_hos_address()
-                else:
+                    if obj.appointment_id:
+                        appointment = OpdAppointment.objects.select_related('hospital').filter(id=obj.appointment_id).first()
+                        if appointment:
+                            address = appointment.hospital.get_hos_address()
+                elif obj.content_type == ContentType.objects.get_for_model(Lab):
                     name = obj.content_object.name
                     address = obj.content_object.get_lab_address()
+                else:
+                    name = obj.content_object.name
+                    address = obj.content_object.get_hos_address()
                 for cm in obj.compliment.all():
                     c_list.append(cm.message)
                     cid_list.append(cm.id)
@@ -2026,20 +2034,60 @@ class AppointmentViewSet(viewsets.GenericViewSet):
         all_appointments = []
         try:
             user_id = request.user.id
-            opd = OpdAppointment.get_upcoming_appointment(user_id)
-            opd_appointments = OpdAppointmentUpcoming(opd, many=True).data
-            lab = LabAppointment.get_upcoming_appointment(user_id)
-            lab_appointments = LabAppointmentUpcoming(lab, many=True).data
-
-            all_appointments = opd_appointments + lab_appointments
-            all_appointments = sorted(all_appointments,
-                                      key=lambda x: x["time_slot_start"])
+            get_all_upcoming_appointments(user_id)
         except Exception as e:
             logger.error(str(e))
         return Response(all_appointments)
 
     def get_queryset(self):
         return OpdAppointment.objects.none()
+
+
+class DoctorScanViewSet(GenericViewSet):
+    authentication_classes = (JWTAuthentication, )
+    permission_classes = (IsAuthenticated, IsNotAgent)
+
+    # @transaction.atomic
+    def doctor_qr_scan(self, request, pk):
+        opdapp_obj = OpdAppointment.objects.filter(pk=pk).first()
+        request_url = request.data.get('url')
+        type = request.data.get('type')
+        user = request.user
+
+        if not opdapp_obj:
+            return Response('Opd Appointment does not exist', status.HTTP_400_BAD_REQUEST)
+
+        if not user == opdapp_obj.user:    
+            return Response('Unauthorized User', status.HTTP_401_UNAUTHORIZED)
+
+        if not request_url:
+            return Response('URL not given', status.HTTP_400_BAD_REQUEST)
+
+        if not type == 'doctor':
+            return Response('Invalid type', status.HTTP_400_BAD_REQUEST)
+
+        if not len(opdapp_obj.doctor.qr_code.all()):
+            return Response('QRCode not enabled for this doctor', status.HTTP_400_BAD_REQUEST)
+
+
+        appt_status = opdapp_obj.status
+        url = opdapp_obj.doctor.qr_code.first().data
+        complete_with_qr_scanner = True
+
+        if not url:
+            return Response('URL not found', status.HTTP_400_BAD_REQUEST)
+
+        url = url.get('url', None)
+        if not request_url == url:
+            return Response('Invalid url', status.HTTP_400_BAD_REQUEST)
+
+        if not appt_status == OpdAppointment.ACCEPTED or not complete_with_qr_scanner == True:
+            return Response('Bad request', status.HTTP_400_BAD_REQUEST)
+
+
+        opdapp_obj.action_completed()
+        resp = AppointmentRetrieveSerializer(opdapp_obj, context={"request": request})
+        return Response(resp.data)
 
 
 class TokenFromUrlKey(viewsets.GenericViewSet):
