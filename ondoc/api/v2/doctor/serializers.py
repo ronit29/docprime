@@ -344,6 +344,10 @@ class GeneralInvoiceItemsSerializer(serializers.Serializer):
         general_invoice_item = doc_models.GeneralInvoiceItems.objects.filter(id=attrs.get('id')).first()
         if general_invoice_item:
             attrs['general_invoice_item'] = general_invoice_item
+        if attrs.get('tax_percentage') and not attrs.get('tax_amount'):
+            raise serializers.ValidationError("tax_amount is also required with tax_percentage")
+        if attrs.get('discount_percentage') and not attrs.get('discount_amount'):
+            raise serializers.ValidationError("discount_amount is also required with discount_percentage")
         return attrs
 
 
@@ -402,6 +406,10 @@ class PartnersAppInvoiceSerialier(serializers.Serializer):
             raise serializers.ValidationError('due date is required for payment status - pending')
         if attrs.get('appointment_id'):
             attrs['appointment'] = attrs.pop('appointment_id')
+        if attrs.get('tax_percentage') and not attrs.get('tax_amount'):
+            raise serializers.ValidationError("tax_amount is also required with tax_percentage")
+        if attrs.get('discount_percentage') and not attrs.get('discount_amount'):
+            raise serializers.ValidationError("discount_amount is also required with discount_percentage")
         return attrs
 
 
