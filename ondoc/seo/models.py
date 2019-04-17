@@ -8,6 +8,7 @@ from ondoc.diagnostic.models import LabNetwork
 
 # Create your models here.
 from ondoc.location.models import EntityUrls
+from bs4 import BeautifulSoup
 
 
 class Sitemap(TimeStampedModel):
@@ -67,13 +68,16 @@ class NewDynamic(TimeStampedModel):
         db_table = "dynamic_url_content"
 
     def save(self, force_insert=False, force_update=False, using=None, update_fields=None):
+
         if not self.id:
             if not strip_tags(self.top_content).strip("&nbsp;").strip():
                 if self.url.url_type == EntityUrls.UrlType.SEARCHURL and PracticeSpecializationContent.objects.filter(
                         specialization_id=self.url.specialization_id):
                     self.top_content = PracticeSpecializationContent.objects.filter(
                         specialization_id=self.url.specialization_id).first().content
+
         if self.url:
             self.url_value = self.url.url
+
         super().save(force_insert, force_update, using, update_fields)
 
