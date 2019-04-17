@@ -1796,7 +1796,7 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
     @classmethod
     def get_upcoming_appointment(cls, user_id):
         current_time = timezone.now()
-        appointments = OpdAppointment.objects.filter(time_slot_start__lte=current_time + timedelta(hours=48), user_id=user_id).exclude(
+        appointments = OpdAppointment.objects.filter(time_slot_start__lte=current_time + timedelta(hours=48), user_id=user_id, time_slot_start__gte=current_time).exclude(
             status__in=[OpdAppointment.CANCELLED, OpdAppointment.COMPLETED]).select_related('doctor', 'hospital','profile')
         return appointments
 
