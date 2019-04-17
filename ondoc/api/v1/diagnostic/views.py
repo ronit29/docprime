@@ -1454,8 +1454,6 @@ class LabList(viewsets.ReadOnlyModelViewSet):
         if lab_obj.network:
             rating_queryset = rating_models.RatingsReview.objects.prefetch_related('compliment')\
                                                                  .filter(is_live=True,
-                                                                         moderation_status__in=[rating_models.RatingsReview.PENDING,
-                                                                                                rating_models.RatingsReview.APPROVED],
                                                                          lab_ratings__network=lab_obj.network)
         lab_serializer = diagnostic_serializer.LabModelSerializer(lab_obj, context={"request": request,
                                                                                     "entity": entity,

@@ -230,6 +230,7 @@ class Hospital(auth_model.TimeStampedModel, auth_model.CreatedByModel, auth_mode
     about = models.TextField(blank=True, null=True, default="")
     opd_timings = models.CharField(max_length=150, blank=True, null=True, default="")
     always_open = models.BooleanField(verbose_name='Is hospital open 24X7', default=False)
+    # ratings = GenericRelation(ratings_models.RatingsReview, related_query_name='hospital_ratings')
     city_search_key = models.CharField(db_index=True, editable=False, max_length=100, default="", null=True, blank=True)
     enabled_for_cod = models.BooleanField(default=False)
     enabled_for_prepaid = models.BooleanField(default=True)
@@ -804,7 +805,7 @@ class Doctor(auth_model.TimeStampedModel, auth_model.QCModel, SearchKey, auth_mo
                        (
                        select json_build_object('avg_rating', x.avg_rating,'rating_count', x.rating_count) from
                        (select object_id as doctor_id,round(avg(ratings),1) avg_rating, count(*) rating_count from 
-                       ratings_review where content_type_id={} group by object_id
+                       ratings_review where content_type_id={} AND is_live='true' group by object_id
                        )x where x.doctor_id = d.id				  
                        ) where id in (select object_id from ratings_review where content_type_id={})
                      '''.format(cid, cid)
@@ -831,7 +832,7 @@ class Doctor(auth_model.TimeStampedModel, auth_model.QCModel, SearchKey, auth_mo
         image_file1 = InMemoryUploadedFile(tempfile_io, None, filename, 'image/jpeg', tempfile_io.tell(), None)
 
         QRCode_object = QRCode(name=image_file1, content_type=ContentType.objects.get_for_model(Doctor),
-                               object_id=self.id)
+                               object_id=self.id, data={"url": doctor_url})
         QRCode_object.save()
         return QRCode_object
 
@@ -1800,7 +1801,7 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
     @classmethod
     def get_upcoming_appointment(cls, user_id):
         current_time = timezone.now()
-        appointments = OpdAppointment.objects.filter(time_slot_start__gte=current_time, user_id=user_id).exclude(
+        appointments = OpdAppointment.objects.filter(time_slot_start__lte=current_time + timedelta(hours=48), user_id=user_id, time_slot_start__gte=current_time).exclude(
             status__in=[OpdAppointment.CANCELLED, OpdAppointment.COMPLETED]).select_related('doctor', 'hospital','profile')
         return appointments
 
