@@ -241,7 +241,7 @@ def push_appointment_to_matrix(self, data):
                 mobile_list.append({'MobileNo': number,
                                     'Name': spoc_name,
                                     'DesignationID': spoc_obj.contact_type,
-                                    'Type': spoc_obj.contact_type})
+                                    'Type': 2})
 
             # Doctor mobile numbers
             doctor_mobiles = [doctor_mobile.number for doctor_mobile in appointment.doctor.mobiles.all()]
@@ -268,7 +268,7 @@ def push_appointment_to_matrix(self, data):
                 mobile_list.append({'MobileNo': number,
                                     'Name': contact_name,
                                     'DesignationId': contact_person.contact_type,
-                                    'Type': contact_person.contact_type})
+                                    'Type': 3})
 
 
             # Lab mobile number
