@@ -69,15 +69,31 @@ class NewDynamic(TimeStampedModel):
 
     def save(self, force_insert=False, force_update=False, using=None, update_fields=None):
 
-        if not self.id:
-            if not strip_tags(self.top_content).strip("&nbsp;").strip():
-                if self.url.url_type == EntityUrls.UrlType.SEARCHURL and PracticeSpecializationContent.objects.filter(
-                        specialization_id=self.url.specialization_id):
-                    self.top_content = PracticeSpecializationContent.objects.filter(
-                        specialization_id=self.url.specialization_id).first().content
+        if self.is_html_empty(self.top_content):
+            self.top_content=''
+        if self.is_html_empty(self.bottom_content):
+            self.bottom_content=''
+        self.top_content = self.top_content.strip("&nbsp;").strip()
+
+        if (not self.id or not self.top_content) and self.url.url_type == EntityUrls.UrlType.SEARCHURL:
+            #self.top_content = if not strip_tags(self.top_content).strip("&nbsp;").strip():
+            ps_content = PracticeSpecializationContent.objects.filter(specialization_id=self.url.specialization_id).first()
+            if ps_content:
+                self.top_content = ps_content.content
+                # if self.url.url_type == EntityUrls.UrlType.SEARCHURL and PracticeSpecializationContent.objects.filter(
+                #         specialization_id=self.url.specialization_id):
+                #     self.top_content = PracticeSpecializationContent.objects.filter(
+                #         specialization_id=self.url.specialization_id).first().content
 
         if self.url:
             self.url_value = self.url.url
 
         super().save(force_insert, force_update, using, update_fields)
 
+    def is_html_empty(self, html):
+        from bs4 import BeautifulSoup
+        soup = BeautifulSoup(html, 'html.parser')
+        text = soup.get_text().strip()
+        if not text:
+            return True
+        return False
