@@ -269,6 +269,7 @@ class Service(TimeStampedModel):
     def __str__(self):
         return self.name
 
+
 class Remark(auth_model.TimeStampedModel):
     FEEDBACK = 1
     REOPEN = 2
@@ -319,3 +320,23 @@ class QRCode(TimeStampedModel):
 
     class Meta:
         db_table = 'qr_code'
+
+
+class RefundDetails(TimeStampedModel):
+    refund_reason = models.TextField(null=True, blank=True, default=None)
+    refund_initiated_by = models.ForeignKey(auth_model.User, related_name="refunds_initiated", on_delete=models.DO_NOTHING, null=True)
+    content_type = models.ForeignKey(ContentType, on_delete=models.DO_NOTHING)
+    object_id = models.PositiveIntegerField()
+    content_object = GenericForeignKey()
+
+    class Meta:
+        db_table = 'refund_details'
+
+    @classmethod
+    def log_refund(cls, appointment):
+        if hasattr(appointment, '_source') and appointment._source == AppointmentHistory.CRM:
+            refund_reason = appointment._refund_reason if hasattr(appointment, '_refund_reason') else None
+            refund_initiated_by = appointment._responsible_user if hasattr(appointment, '_responsible_user') else None
+            if not refund_initiated_by:
+                raise Exception("Must have a responsible user.")
+            cls .objects.create(refund_reason=refund_reason, refund_initiated_by=refund_initiated_by, content_object=appointment)

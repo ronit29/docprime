@@ -24,7 +24,7 @@ from datetime import timedelta
 from dateutil import tz
 from django.utils import timezone
 from ondoc.authentication import models as auth_model
-from ondoc.authentication.models import SPOCDetails
+from ondoc.authentication.models import SPOCDetails, RefundMixin
 from ondoc.location import models as location_models
 from ondoc.account.models import Order, ConsumerAccount, ConsumerTransaction, PgTransaction, ConsumerRefund, \
     MerchantPayout, UserReferred, MoneyPool, Invoice
@@ -40,7 +40,8 @@ from ondoc.notification import tasks as notification_tasks
 from django.contrib.contenttypes.fields import GenericRelation
 from ondoc.api.v1.utils import get_start_end_datetime, custom_form_datetime, CouponsMixin, aware_time_zone, \
     form_time_slot, util_absolute_url, html_to_pdf, TimeSlotExtraction
-from ondoc.common.models import AppointmentHistory, AppointmentMaskNumber, Service, Remark, MatrixMappedState, MatrixMappedCity, GlobalNonBookable
+from ondoc.common.models import AppointmentHistory, AppointmentMaskNumber, Service, Remark, MatrixMappedState, \
+    MatrixMappedCity, GlobalNonBookable, RefundDetails
 from ondoc.common.models import QRCode
 
 from functools import reduce
@@ -71,6 +72,8 @@ from safedelete import SOFT_DELETE
 #from ondoc.api.v1.doctor import serializers as doctor_serializers
 import qrcode
 from django.utils.functional import cached_property
+from ondoc.crm.constants import constants
+
 
 logger = logging.getLogger(__name__)
 
@@ -1661,7 +1664,8 @@ class OpdAppointmentInvoiceMixin(object):
 
 
 @reversion.register()
-class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentInvoiceMixin):
+class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentInvoiceMixin, RefundMixin):
+    PRODUCT_ID = Order.DOCTOR_PRODUCT_ID
     CREATED = 1
     BOOKED = 2
     RESCHEDULED_DOCTOR = 3
@@ -1735,6 +1739,7 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
     money_pool = models.ForeignKey(MoneyPool, on_delete=models.SET_NULL, null=True)
     mask_number = GenericRelation(AppointmentMaskNumber)
     email_notification = GenericRelation(EmailNotification, related_name="enotification")
+    refund_details = GenericRelation(RefundDetails, related_query_name="opd_appointment_detail")
 
     def __str__(self):
         return self.profile.name + " (" + self.doctor.name + ")"
@@ -1843,26 +1848,11 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
 
     @transaction.atomic
     def action_cancelled(self, refund_flag=1):
-
-        # Taking Lock first
-        consumer_account = None
-        if self.payment_type == self.PREPAID:
-            temp_list = ConsumerAccount.objects.get_or_create(user=self.user)
-            consumer_account = ConsumerAccount.objects.select_for_update().get(user=self.user)
-
         old_instance = OpdAppointment.objects.get(pk=self.id)
         if old_instance.status != self.CANCELLED:
             self.status = self.CANCELLED
             self.save()
-            product_id = Order.DOCTOR_PRODUCT_ID
-            if self.payment_type == self.PREPAID and ConsumerTransaction.valid_appointment_for_cancellation(self.id,
-                                                                                                            product_id):
-                wallet_refund, cashback_refund = self.get_cancellation_breakup()
-                consumer_account.credit_cancellation(self, product_id, wallet_refund, cashback_refund)
-
-                if refund_flag:
-                    ctx_obj = consumer_account.debit_refund()
-                    ConsumerRefund.initiate_refund(self.user, ctx_obj)
+            self.action_refund(refund_flag)
 
     def get_cancellation_breakup(self):
         wallet_refund = cashback_refund = 0
@@ -2000,8 +1990,6 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
         push_to_matrix = True
         if database_instance and self.status == database_instance.status and self.time_slot_start == database_instance.time_slot_start:
             push_to_matrix = False
-        else:
-            push_to_matrix = True
 
         try:
             # while completing appointment
