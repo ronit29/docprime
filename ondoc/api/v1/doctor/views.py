@@ -1194,6 +1194,10 @@ class SearchedItemsViewSet(viewsets.GenericViewSet):
 
     @transaction.non_atomic_requests
     def common_conditions(self, request):
+        parameters = request.query_params
+        serializer = serializers.CommonSpecParametersSerializer(data=parameters, context={"request": request})
+        serializer.is_valid(raise_exception=True)
+        validated_data = serializer.validated_data
         count = request.query_params.get('count', 10)
         count = int(count)
         if count <= 0:
@@ -1205,7 +1209,8 @@ class SearchedItemsViewSet(viewsets.GenericViewSet):
 
         common_specializations = models.CommonSpecialization.get_specializations(count)
         specializations_serializer = serializers.CommonSpecializationsSerializer(common_specializations, many=True,
-                                                                                 context={'request': request})
+                                                                                 context={'request': request,
+                                                                                          'city': validated_data.get('city') if validated_data.get('city') else None})
 
         common_procedure_categories = CommonProcedureCategory.objects.select_related('procedure_category').filter(
             procedure_category__is_live=True).all().order_by("-priority")[:10]

@@ -1324,19 +1324,31 @@ class MedicalConditionSerializer(serializers.ModelSerializer):
         fields = ('id', 'name', 'specialization',)
 
 
+class CommonSpecParametersSerializer(serializers.Serializer):
+    city = serializers.CharField(required=False)
+
+
 class CommonSpecializationsSerializer(serializers.ModelSerializer):
 
     id = serializers.ReadOnlyField(source='specialization.id')
     name = serializers.ReadOnlyField(source='specialization.name')
     icon = serializers.SerializerMethodField
+    url = serializers.SerializerMethodField()
 
     def get_icon(self, obj):
         request = self.context.get('request')
         return request.build_absolute_uri(obj['icon']) if obj['icon'] else None
 
+    def get_url(self, obj):
+        if self.context and self.context.get('city'):
+            entity = EntityUrls.objects.filter(sitemap_identifier='SPECIALIZATION_CITY', locality_value__iexact=self.context.get('city').lower(),
+                                               is_valid=True, specialization_id=obj.specialization_id)
+            return entity[0].url if entity else None
+        return None
+
     class Meta:
         model = CommonSpecialization
-        fields = ('id', 'name', 'icon', )
+        fields = ('id', 'name', 'icon', 'url')
 
 
 class ConfigGetSerializer(serializers.Serializer):
