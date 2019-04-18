@@ -1546,9 +1546,11 @@ class DoctorListViewSet(viewsets.GenericViewSet):
                 if specialization_id in (279, 291, 300, 384, 304, 270, 309, 315, 358, 376, 379, 385, 334, 405, 284, 426, 454, 474, 482, 487, 501):
                     title = specialization_metatags[specialization_id].get('title')
                     description = specialization_metatags[specialization_id].get('description')
+                    ratings_title = specialization + ' in ' + city
                 else:
                     title = specialization_metatags['default'].get('title')
                     description = specialization_metatags['default'].get('description')
+                    ratings_title = specialization + ' in ' + city
 
             elif validated_data.get('sitemap_identifier') == 'SPECIALIZATION_LOCALITY_CITY':
                 title = specialization
@@ -1556,6 +1558,7 @@ class DoctorListViewSet(viewsets.GenericViewSet):
                 if locality:
                     title += ' in ' + locality
                     description += ': Book best ' + specialization + '\'s appointment online ' + 'in ' + locality
+                    ratings_title = title
                     title += ' | Book & Get Best Deal'
                     description += ' and get upto 50% off. View Address, fees and more for doctors '
                     description += 'in ' + city + '.'
@@ -1574,13 +1577,14 @@ class DoctorListViewSet(viewsets.GenericViewSet):
 
                         description += ': Book best ' + 'Doctor' + ' appointment online ' + 'in '+ locality
 
+                ratings_title = title
                 title += ' | Book Doctors Online & Get Best Deal'
 
                 description += ' and get upto 50% off. View Address, fees and more for doctors '
                 if locality:
                     description += 'in '+ city
                 description += '.'
-            ratings_title = title
+
 
             breadcrumb = validated_data.get('breadcrumb')
 
