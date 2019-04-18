@@ -71,9 +71,27 @@ FILE_UPLOAD_PERMISSIONS = 0o664
 
 
 DATABASES = {
-    'default': env.db('DATABASE_URL'),
+    'default': env.db('DATABASE_URL')
 }
+
 DATABASES['default']['ENGINE'] = 'django.contrib.gis.db.backends.postgis'
+
+try:
+    if env('MSSQL_HOST') and env('MSSQL_USERNAME') and env('MSSQL_PASSWORD'):
+        DATABASES['sql_server'] = {
+             'ENGINE': 'sql_server.pyodbc',
+             'HOST': env('MSSQL_HOST'),
+             'USER': env('MSSQL_USERNAME'),
+             'PASSWORD': env('MSSQL_PASSWORD'),
+             'NAME': env('MSSQL_DB'),
+             'OPTIONS': {
+                  'driver' : 'ODBC Driver 17 for SQL Server'
+            }
+        }
+except Exception as e:
+    print(str(e))
+
+
 
 try:
     MONGO_STORE = False
@@ -90,6 +108,8 @@ except Exception as e:
     print('Failed to connect to mongo')
     MONGO_STORE = False
 
+
+DATABASE_ROUTERS = ['config.settings.db_router.DatabaseRouter']
 
 # Application definition
 
@@ -161,7 +181,8 @@ LOCAL_APPS = (
     'ondoc.screen',
     'ondoc.comments',
     'ondoc.subscription_plan',
-    'ondoc.prescription',
+    'ondoc.bookinganalytics',
+    'ondoc.prescription'
 )
 
 INSTALLED_APPS = DJANGO_APPS + THIRD_PARTY_APPS + LOCAL_APPS
