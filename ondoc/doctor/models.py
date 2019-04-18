@@ -1753,6 +1753,7 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
                 if self.doctor.doctorpracticespecializations.first().specialization.department.first():
                     department = self.doctor.doctorpracticespecializations.first().specialization.department.first().id
 
+        wallet, cashback = self.get_completion_breakup()
 
         obj = DP_OpdConsultsAndTests.objects.filter(Appointment_Id=self.id).first()
         if not obj:
@@ -1765,6 +1766,7 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
             obj.ProviderId = self.hospital.id
             obj.PaymentType = self.payment_type if self.payment_type else None
             obj.Payout = self.merchant_payout if self.merchant_payout else None
+            obj.CashbackUsed = cashback
         obj.PromoCost = promo_cost
         obj.GMValue = self.deal_price
         obj.StatusId = self.status
