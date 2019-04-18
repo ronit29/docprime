@@ -77,10 +77,10 @@ class SearchPageViewSet(viewsets.ReadOnlyModelViewSet):
         count = int(count)
         if count <= 0:
             count = 10
-        test_queryset = CommonTest.objects.select_related('test').filter(test__enable_for_retail=True, test__searchable=True).order_by('-priority')[:count]
+        test_queryset = CommonTest.get_tests(count)
         conditions_queryset = CommonDiagnosticCondition.objects.prefetch_related('lab_test').all().order_by('-priority')[:count]
         lab_queryset = PromotedLab.objects.select_related('lab').filter(lab__is_live=True, lab__is_test_lab=False)
-        package_queryset = CommonPackage.objects.prefetch_related('package').filter(package__enable_for_retail=True, package__searchable=True).order_by('-priority')[:count]
+        package_queryset = CommonPackage.get_packages(count)
         recommended_package_qs = LabTestCategory.objects.prefetch_related('recommended_lab_tests__parameter').filter(is_live=True,
                                                                                                           show_on_recommended_screen=True,
                                                                                                           recommended_lab_tests__searchable=True,
@@ -1454,8 +1454,6 @@ class LabList(viewsets.ReadOnlyModelViewSet):
         if lab_obj.network:
             rating_queryset = rating_models.RatingsReview.objects.prefetch_related('compliment')\
                                                                  .filter(is_live=True,
-                                                                         moderation_status__in=[rating_models.RatingsReview.PENDING,
-                                                                                                rating_models.RatingsReview.APPROVED],
                                                                          lab_ratings__network=lab_obj.network)
         lab_serializer = diagnostic_serializer.LabModelSerializer(lab_obj, context={"request": request,
                                                                                     "entity": entity,
