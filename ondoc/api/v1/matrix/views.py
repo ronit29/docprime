@@ -113,7 +113,7 @@ class IvrViewSet(viewsets.GenericViewSet):
             appointment_obj = OpdAppointment.objects.filter(id=data.get('appointment_id')).first()
 
         if not appointment_obj:
-            return Response(status=status.HTTP_400_BAD_REQUEST)
+            return Response(status=status.HTTP_400_BAD_REQUEST, data={'error': 'Invalid appointment id.'})
 
         appointment_obj._responsible_user = user
         appointment_obj._source = data.get('source')
