@@ -2534,10 +2534,9 @@ class TestDetailsViewset(viewsets.GenericViewSet):
         result['seo'] = seo
         result['breadcrumb'] = list()
 
-        if test_queryset.name and test_queryset.url:
-            result['breadcrumb'].append({"title": "Home", "url": "/"})
+        result['breadcrumb'].append({"title": "Home", "url": "/"})
 
-        else:
+        if test_queryset.name and test_queryset.url:
             result['breadcrumb'].append({"title": test_queryset.name, "url": test_queryset.url})
 
         result['canonical_url'] = test_queryset.url if test_queryset.url else None
