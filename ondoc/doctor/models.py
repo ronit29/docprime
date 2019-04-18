@@ -3121,6 +3121,7 @@ class PartnersAppInvoice(auth_model.TimeStampedModel):
     is_invoice_generated = models.BooleanField(default=False)
     file = models.FileField(upload_to='partners/invoice', blank=False, null=False)
     invoice_url = models.URLField(null=True, blank=True)
+    encoded_url = models.URLField(null=True, blank=True, max_length=300)
     is_valid = models.BooleanField(default=True)
     is_edited = models.BooleanField(default=False)
     edited_by = models.ForeignKey(auth_model.User, on_delete=models.SET_NULL, null=True, blank=True, related_name='patners_app_invoices')
@@ -3145,7 +3146,7 @@ class PartnersAppInvoice(auth_model.TimeStampedModel):
             patient_mobile = None
         context["patient_phone_number"] = patient_mobile
         context["invoice_serial_id"] = self.invoice_serial_id
-        context["updated_at"] = self.updated_at
+        context["updated_at"] = self.updated_at if self.updated_at else self.created_at
         context["payment_status"] = "Paid" if self.payment_status == self.PAID else "Pending"
         if self.payment_status == self.PAID:
             context["payment_status"] = "Paid"

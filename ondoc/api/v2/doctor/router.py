@@ -24,7 +24,7 @@ urlpatterns = [
     path('invoice/list/items', views.PartnersAppInvoice.as_view({'get': 'list_invoice_items'}), name='list-invoice-items'),
     path('invoice/create', views.PartnersAppInvoice.as_view({'post': 'create'}), name='create-invoice'),
     path('invoice/update', views.PartnersAppInvoice.as_view({'post': 'update'}), name='update-invoice'),
-    path('invoice/<str:invoice_serial_id>', views.PartnersAppInvoice.as_view({'get': 'download_pdf'}), name='invoice-pdf'),
+    path('invoice/<str:encoded_filename>', views.PartnersAppInvoice.as_view({'get': 'download_pdf'}), name='invoice-pdf'),
 ]
 
 

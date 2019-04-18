@@ -417,7 +417,10 @@ class PartnersAppInvoiceModelSerialier(serializers.ModelSerializer):
 
     class Meta:
         model = doc_models.PartnersAppInvoice
-        fields = '__all__'
+        fields = ('id', 'created_at', 'updated_at', 'invoice_serial_id', 'consultation_fees', 'selected_invoice_items',
+                  'payment_status', 'payment_type', 'due_date', 'invoice_title', 'sub_total_amount', 'tax_amount',
+                  'tax_percentage', 'discount_amount', 'discount_percentage', 'total_amount', 'is_invoice_generated',
+                  'is_valid', 'is_edited', 'edited_by', 'appointment_id', 'encoded_url')
 
 
 class ListInvoiceItemsSerializer(serializers.Serializer):

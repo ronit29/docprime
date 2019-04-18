@@ -20,7 +20,7 @@ from django.contrib.contenttypes.models import ContentType
 from ondoc.procedure.models import Procedure
 from django.contrib.auth import get_user_model
 from django.conf import settings
-import datetime, logging, re, random
+import datetime, logging, re, random, jwt
 import json
 from django.utils import timezone
 
@@ -848,8 +848,12 @@ class PartnersAppInvoice(viewsets.GenericViewSet):
                 content = render_to_string("email/partners_invoice/body.html", context=context)
                 filename = invoice_obj.invoice_serial_id
                 file = v1_utils.html_to_pdf(content, filename)
+
                 invoice_obj.file = file
                 invoice_obj.invoice_url = "{}{}{}".format(settings.BASE_URL, "/api/v2/doctor/invoice/", filename)
+                encoded_filename = jwt.encode({"filename":filename}, settings.PARTNERS_INVOICE_ENCODE_KEY).decode('utf-8')
+                encoded_url = "{}{}{}".format(settings.BASE_URL, "/api/v2/doctor/invoice/", encoded_filename)
+                invoice_obj.encoded_url = v1_utils.generate_short_url(encoded_url)
 
             invoice_obj.save()
             invoice = serializers.PartnersAppInvoiceModelSerialier(invoice_obj)
@@ -866,13 +870,6 @@ class PartnersAppInvoice(viewsets.GenericViewSet):
         except Exception as e:
             return invoice, selected_invoice_items_created, str(e)
 
-    def update_invoice(self, invoice_data, invoice_obj):
-        try:
-
-            pass
-        except Exception as e:
-            pass
-
     def create(self, request):
         try:
             serializer = serializers.PartnersAppInvoiceSerialier(data=request.data)
@@ -881,41 +878,18 @@ class PartnersAppInvoice(viewsets.GenericViewSet):
             invoice_data['task'] = self.CREATE
 
             invoice, selected_invoice_items_created, exception = self.create_or_update_invoice(invoice_data, version='01')
-            # version = '01'
-            # appointment = invoice_data.get('appointment')
-            # selected_invoice_items = invoice_data.get('selected_invoice_items')
-            #
-            # generate_invoice = invoice_data.pop("generate_invoice")
-            # invoice_data['selected_invoice_items'] = serializers.SelectedInvoiceItemsJSONSerializer(selected_invoice_items, many=True).data
-            # invoice_obj = doc_models.PartnersAppInvoice(**invoice_data)
-            #
-            # last_serial = doc_models.PartnersAppInvoice.last_serial(appointment)
-            # invoice_obj.invoice_serial_id = 'INV-' + str(appointment.hospital.id) + '-' + \
-            #                                 str(appointment.doctor.id) + '-' + str(last_serial + 1) + '-' + version
-            #
-            # if generate_invoice:
-            #     invoice_obj.is_invoice_generated = True
-            #     context = invoice_obj.get_context(selected_invoice_items)
-            #     content = render_to_string("email/partners_invoice/body.html", context=context)
-            #     filename = invoice_obj.invoice_serial_id
-            #     file = v1_utils.html_to_pdf(content, filename)
-            #     invoice_obj.file = file
-            #     invoice_obj.invoice_url = "{}{}{}".format(settings.BASE_URL, "/api/v2/doctor/invoice/", filename)
-            # invoice_obj.save()
-            # invoice = serializers.PartnersAppInvoiceModelSerialier(invoice_obj)
-            #
-            # if selected_invoice_items:
-            #     selected_invoice_items_objects = self.bulk_create_selected_invoice_items(selected_invoice_items, invoice_obj)
-            #     model_serializer = serializers.SelectedInvoiceItemsModelSerializer(selected_invoice_items_objects, many=True)
-            # selected_invoice_items_created = model_serializer.data if selected_invoice_items else []
 
             return Response({"status": 1, "invoice": invoice.data,
                              "selected_invoice_items_created": selected_invoice_items_created}, status.HTTP_200_OK)
         except Exception as e:
             return Response({"status": 0, "message": "Error creating invoice - " + str(e)}, status.HTTP_400_BAD_REQUEST)
 
-    def download_pdf(self, request, invoice_serial_id=None):
-        invoice = doc_models.PartnersAppInvoice.objects.filter(invoice_serial_id=invoice_serial_id).last()
+    def download_pdf(self, request, encoded_filename=None):
+        encoded_filename = jwt.decode(encoded_filename, settings.PARTNERS_INVOICE_ENCODE_KEY)
+        invoice_serial_id = encoded_filename.get('filename')
+        if not invoice_serial_id:
+            return Response({"status": 0, "message": "File not found"}, status=status.HTTP_404_NOT_FOUND)
+        invoice = doc_models.PartnersAppInvoice.objects.filter(invoice_serial_id=invoice_serial_id, is_valid=True).order_by('-updated_at').first()
         if not invoice:
             return Response({"status": 0, "message": "File not found"}, status=status.HTTP_404_NOT_FOUND)
         response = HttpResponse(invoice.file, content_type='application/pdf')
@@ -928,8 +902,6 @@ class PartnersAppInvoice(viewsets.GenericViewSet):
             serializer.is_valid(raise_exception=True)
             invoice = serializer.validated_data['invoice_id']
             data = serializer.validated_data['data']
-            # data['invoice'] = invoice
-            # appointment = data.get('appointment_id')
             if not invoice.is_invoice_generated:
                 invoice.is_edited = True
                 invoice.edited_by = request.user
