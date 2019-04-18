@@ -878,8 +878,12 @@ class PartnersAppInvoice(viewsets.GenericViewSet):
             serializer = serializers.PartnersAppInvoiceSerialier(data=request.data)
             serializer.is_valid(raise_exception=True)
             invoice_data = serializer.validated_data
-            invoice_data['task'] = self.CREATE
 
+            appointment = invoice_data.get("appointment")
+            if doc_models.PartnersAppInvoice.objects.filter(appointment=appointment, is_valid=True).exists():
+                raise Exception('Invoice for this appointment already exists, please try updating it')
+
+            invoice_data['task'] = self.CREATE
             invoice, selected_invoice_items_created, exception = self.create_or_update_invoice(invoice_data, version='01')
 
             return Response({"status": 1, "invoice": invoice.data,
