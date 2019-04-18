@@ -39,19 +39,19 @@ function initEditor(){
 	  }
     });
 
-    CKEDITOR.on('instanceReady', function (ev) {
-      ev.editor.dataProcessor.htmlFilter.addRules( {
-        elements : {
-          a : function( element ) {
-            var attr = element.attributes;
-
-            if (attr['data-cke-saved-href'] == null) {
-              element.attributes.class = 'anchor-target';
-            }
-          }
-        }
-      });
-    });
+//    CKEDITOR.on('instanceReady', function (ev) {
+//      ev.editor.dataProcessor.htmlFilter.addRules( {
+//        elements : {
+//          a : function( element ) {
+//            var attr = element.attributes;
+//
+//            if (attr['data-cke-saved-href'] == null) {
+//              element.attributes.class = 'anchor-target';
+//            }
+//          }
+//        }
+//      });
+//    });
 
     CKEDITOR.replace( 'id_body', {
             extraPlugins: ['justify', 'filebrowser', 'font'],
