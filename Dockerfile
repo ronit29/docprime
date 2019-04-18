@@ -30,7 +30,7 @@ RUN ln -s  /usr/lib/apt/methods/http /usr/lib/apt/methods/https
 RUN apt-get update && ACCEPT_EULA=Y apt-get install msodbcsql17 -y
 RUN echo 'export PATH="$PATH:/opt/mssql-tools/bin"' >> ~/.bash_profile
 RUN echo 'export PATH="$PATH:/opt/mssql-tools/bin"' >> ~/.bashrc
-RUN source ~/.bashrc
+RUN . ~/.bashrc
 RUN apt-get install unixodbc-dev
 
 
