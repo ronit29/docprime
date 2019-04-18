@@ -821,43 +821,43 @@ class PartnersAppInvoice(viewsets.GenericViewSet):
 
     def create_or_update_invoice(self, invoice_data, version, id=None):
         invoice = selected_invoice_items_created = e = None
+
+        task = invoice_data.pop('task')
+        generate_invoice = invoice_data.pop("generate_invoice")
+
+        appointment = invoice_data.get('appointment')
+        selected_invoice_items = invoice_data.get('selected_invoice_items')
+        invoice_data['selected_invoice_items'] = serializers.SelectedInvoiceItemsJSONSerializer(
+            selected_invoice_items, many=True).data
+        if task == self.CREATE:
+            invoice_obj = doc_models.PartnersAppInvoice(**invoice_data)
+            last_serial = doc_models.PartnersAppInvoice.last_serial(appointment)
+            serial = last_serial + 1 if version == '01' else last_serial
+            invoice_obj.invoice_serial_id = 'INV-' + str(appointment.hospital.id) + '-' + \
+                                            str(appointment.doctor.id) + '-' + str(serial) + '-' + version
+        else:
+            if not id:
+                raise Exception("invoice_id is required")
+            invoice_queryset = doc_models.PartnersAppInvoice.objects.filter(id=id)
+            invoice_queryset.update(**invoice_data)
+            invoice_obj = invoice_queryset.first()
+
+        if generate_invoice:
+            invoice_obj.is_invoice_generated = True
+            context = invoice_obj.get_context(selected_invoice_items)
+            content = render_to_string("email/partners_invoice/body.html", context=context)
+            filename = invoice_obj.invoice_serial_id
+            file = v1_utils.html_to_pdf(content, filename)
+
+            invoice_obj.file = file
+            file_path = os.path.join(invoice_obj.file.storage.base_location, invoice_obj.INVOICE_STORAGE_FOLDER, filename)
+            if os.path.exists(file_path):
+                os.remove(file_path)
+            invoice_obj.invoice_url = "{}{}{}".format(settings.BASE_URL, "/api/v2/doctor/invoice/", filename)
+            encoded_filename = jwt.encode({"filename":filename}, settings.PARTNERS_INVOICE_ENCODE_KEY).decode('utf-8')
+            encoded_url = "{}{}{}".format(settings.BASE_URL, "/api/v2/doctor/invoice/", encoded_filename)
+            invoice_obj.encoded_url = v1_utils.generate_short_url(encoded_url)
         try:
-            task = invoice_data.pop('task')
-            generate_invoice = invoice_data.pop("generate_invoice")
-
-            appointment = invoice_data.get('appointment')
-            selected_invoice_items = invoice_data.get('selected_invoice_items')
-            invoice_data['selected_invoice_items'] = serializers.SelectedInvoiceItemsJSONSerializer(
-                selected_invoice_items, many=True).data
-            if task == self.CREATE:
-                invoice_obj = doc_models.PartnersAppInvoice(**invoice_data)
-                last_serial = doc_models.PartnersAppInvoice.last_serial(appointment)
-                serial = last_serial + 1 if version == '01' else last_serial
-                invoice_obj.invoice_serial_id = 'INV-' + str(appointment.hospital.id) + '-' + \
-                                                str(appointment.doctor.id) + '-' + str(serial) + '-' + version
-            else:
-                if not id:
-                    raise Exception("invoice_id is required")
-                invoice_queryset = doc_models.PartnersAppInvoice.objects.filter(id=id)
-                invoice_queryset.update(**invoice_data)
-                invoice_obj = invoice_queryset.first()
-
-            if generate_invoice:
-                invoice_obj.is_invoice_generated = True
-                context = invoice_obj.get_context(selected_invoice_items)
-                content = render_to_string("email/partners_invoice/body.html", context=context)
-                filename = invoice_obj.invoice_serial_id
-                file = v1_utils.html_to_pdf(content, filename)
-
-                invoice_obj.file = file
-                file_path = os.path.join(invoice_obj.file.storage.base_location, invoice_obj.INVOICE_STORAGE_FOLDER, filename)
-                if os.path.exists(file_path):
-                    os.remove(file_path)
-                invoice_obj.invoice_url = "{}{}{}".format(settings.BASE_URL, "/api/v2/doctor/invoice/", filename)
-                encoded_filename = jwt.encode({"filename":filename}, settings.PARTNERS_INVOICE_ENCODE_KEY).decode('utf-8')
-                encoded_url = "{}{}{}".format(settings.BASE_URL, "/api/v2/doctor/invoice/", encoded_filename)
-                invoice_obj.encoded_url = v1_utils.generate_short_url(encoded_url)
-
             invoice_obj.save()
             invoice = serializers.PartnersAppInvoiceModelSerialier(invoice_obj)
 
@@ -871,6 +871,7 @@ class PartnersAppInvoice(viewsets.GenericViewSet):
             selected_invoice_items_created = model_serializer.data if selected_invoice_items else []
             return invoice, selected_invoice_items_created, e
         except Exception as e:
+            logger.error(str(e))
             return invoice, selected_invoice_items_created, str(e)
 
     def create(self, request):
@@ -885,10 +886,12 @@ class PartnersAppInvoice(viewsets.GenericViewSet):
         try:
             invoice_data['task'] = self.CREATE
             invoice, selected_invoice_items_created, exception = self.create_or_update_invoice(invoice_data, version='01')
-
-            return Response({"status": 1, "invoice": invoice.data,
-                             "selected_invoice_items_created": selected_invoice_items_created}, status.HTTP_200_OK)
+            if not exception:
+                return Response({"status": 1, "invoice": invoice.data,
+                                 "selected_invoice_items_created": selected_invoice_items_created}, status.HTTP_200_OK)
+            return Response({"status": 0, "message": "Error creating invoice - " + str(exception)}, status.HTTP_400_BAD_REQUEST)
         except Exception as e:
+            logger.error(str(e))
             return Response({"status": 0, "message": "Error creating invoice - " + str(e)}, status.HTTP_400_BAD_REQUEST)
 
     def update(self, request):
