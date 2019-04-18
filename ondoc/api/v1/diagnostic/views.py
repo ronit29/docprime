@@ -2615,8 +2615,8 @@ class CompareLabPackagesViewSet(viewsets.ReadOnlyModelViewSet):
         if validated_data.get('title'):
             title = validated_data.get('title').replace('_', ' ').title()
         response['title'] = title
-        requested_package_ids = set([x.get('package').id for x in validated_data.get('package_lab_ids', [])])
-        requested_lab_ids = set([x.get('lab').id for x in validated_data.get('package_lab_ids', [])])
+        requested_package_ids = set([x.get('package_id').id for x in validated_data.get('package_lab_ids', [])])
+        requested_lab_ids = set([x.get('lab_id').id for x in validated_data.get('package_lab_ids', [])])
 
         packages = LabTest.objects.prefetch_related('test', 'test__recommended_categories', 'test__parameter',
                                                     'categories', Prefetch('availablelabs',

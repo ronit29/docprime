@@ -1621,10 +1621,12 @@ class PackageSerializer(LabTestSerializer):
 
 
 class PackageLabCompareRequestSerializer(serializers.Serializer):
-    package = serializers.PrimaryKeyRelatedField(queryset=LabTest.objects.filter(is_package=True, enable_for_retail=True))
-    lab = serializers.PrimaryKeyRelatedField(queryset=Lab.objects.filter(is_live=True))
+    package_id = serializers.PrimaryKeyRelatedField(queryset=LabTest.objects.filter(is_package=True, enable_for_retail=True))
+    lab_id = serializers.PrimaryKeyRelatedField(queryset=Lab.objects.filter(is_live=True))
 
     def validate(self, attrs):
+        attrs['package'] = attrs['package_id']
+        attrs['lab'] = attrs['lab_id']
         if not AvailableLabTest.objects.filter(lab_pricing_group__labs=attrs.get('lab'), test=attrs.get('package'),
                                                enabled=True).exists():
             raise serializers.ValidationError('Package is not available in the lab.')
