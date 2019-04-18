@@ -10,8 +10,10 @@ from django.template.loader import render_to_string
 from ondoc.account.models import MerchantPayout, ConsumerAccount, Order, UserReferred, MoneyPool, Invoice
 from ondoc.authentication.models import (TimeStampedModel, CreatedByModel, Image, Document, QCModel, UserProfile, User,
                                          UserPermission, GenericAdmin, LabUserPermission, GenericLabAdmin,
-                                         BillingAccount, SPOCDetails)
-from ondoc.doctor.models import Hospital, SearchKey, CancellationReason
+                                         BillingAccount, SPOCDetails, RefundMixin)
+from ondoc.bookinganalytics.models import DP_OpdConsultsAndTests
+from ondoc.doctor.models import Hospital, SearchKey, CancellationReason, Doctor
+from ondoc.crm.constants import constants
 from ondoc.coupon.models import Coupon
 from ondoc.location.models import EntityUrls
 from ondoc.notification import models as notification_models
@@ -53,7 +55,8 @@ from ondoc.integrations.task import push_lab_appointment_to_integrator, get_inte
 from ondoc.location import models as location_models
 from ondoc.ratings_review import models as ratings_models
 from ondoc.api.v1.common import serializers as common_serializers
-from ondoc.common.models import AppointmentHistory, AppointmentMaskNumber, Remark, GlobalNonBookable
+from ondoc.common.models import AppointmentHistory, AppointmentMaskNumber, Remark, GlobalNonBookable, \
+    SyncBookingAnalytics, CompletedBreakupMixin, RefundDetails
 import reversion
 from decimal import Decimal
 from django.utils.text import slugify
@@ -510,6 +513,7 @@ class Lab(TimeStampedModel, CreatedByModel, QCModel, SearchKey):
                         from ratings_review rr
                         inner join lab l on rr.object_id = l.id 
                         and rr.content_type_id={}
+                        where rr.is_live='true'
                         group by case when l.network_id is null then l.id else l.network_id end
                         )x where case when l.network_id is null then l.id=x.lab_id else l.network_id=x.network_id end
                         )
@@ -607,6 +611,7 @@ class Lab(TimeStampedModel, CreatedByModel, QCModel, SearchKey):
             return False
         else:
             return True
+
 
 class LabCertification(TimeStampedModel):
     lab = models.ForeignKey(Lab, related_name = 'lab_certificate', on_delete=models.CASCADE)
@@ -1119,7 +1124,11 @@ class LabTest(TimeStampedModel, SearchKey):
                                         through_fields=('lab_test', 'parent_category'),
                                         related_name='recommended_lab_tests')
     reference_code = models.CharField(max_length=150, blank=True, default='')
+
+    author = models.ForeignKey(Doctor, null=True, blank=True, related_name='published_tests',
+                               on_delete=models.SET_NULL)
     is_cancellable = models.BooleanField(default=True)
+
     # test_sub_type = models.ManyToManyField(
     #     LabTestSubType,
     #     through='LabTestSubTypeMapping',
@@ -1396,9 +1405,9 @@ class LabAppointmentInvoiceMixin(object):
 
 
 @reversion.register()
-class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin):
+class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin, RefundMixin, CompletedBreakupMixin):
     from ondoc.integrations.models import IntegratorResponse
-
+    PRODUCT_ID = Order.LAB_PRODUCT_ID
     CREATED = 1
     BOOKED = 2
     RESCHEDULED_LAB = 3
@@ -1453,12 +1462,64 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin)
     merchant_payout = models.ForeignKey(MerchantPayout, related_name="lab_appointment", on_delete=models.SET_NULL, null=True)
     price_data = JSONField(blank=True, null=True)
     tests = models.ManyToManyField(LabTest, through='LabAppointmentTestMapping', through_fields=('appointment', 'test'))
-    money_pool = models.ForeignKey(MoneyPool, on_delete=models.SET_NULL, null=True)
+    money_pool = models.ForeignKey(MoneyPool, on_delete=models.SET_NULL, null=True, related_name='lab_apps')
     mask_number = GenericRelation(AppointmentMaskNumber)
     email_notification = GenericRelation(EmailNotification, related_name="lab_notification")
     user_plan_used = models.ForeignKey('subscription_plan.UserPlanMapping', null=True, on_delete=models.DO_NOTHING,
                                        related_name='appointment_using')
+    synced_analytics = GenericRelation(SyncBookingAnalytics, related_name="lab_booking_analytics")
     integrator_response = GenericRelation(IntegratorResponse)
+    history = GenericRelation(AppointmentHistory)
+    refund_details = GenericRelation(RefundDetails, related_query_name="lab_appointment_detail")
+
+    
+    def get_city(self):
+        if self.lab and self.lab.city:
+            return self.lab.city.id
+        else:
+            return None
+
+    def get_state(self):
+        if self.lab and self.lab.state:
+            return self.lab.state.id
+        else:
+            return None
+
+    def sync_with_booking_analytics(self):
+
+        category = None
+        if self.lab_test.first():
+            if self.lab_test.first().test.is_package == True:
+                category = 1
+            else:
+                category = 0
+
+        promo_cost = self.deal_price - self.effective_price if self.deal_price and self.effective_price else None
+
+        obj = DP_OpdConsultsAndTests.objects.filter(Appointment_Id=self.id, TypeId=2).first()
+        if not obj:
+            obj = DP_OpdConsultsAndTests()
+            obj.Appointment_Id = self.id
+            # obj.CityId = self.get_city()
+            # obj.StateId = self.get_state()
+            obj.ProviderId = self.lab.id
+            obj.TypeId = 2
+            obj.PaymentType = self.payment_type if self.payment_type else None
+            obj.Payout = self.merchant_payout if self.merchant_payout else None
+        obj.PromoCost = promo_cost
+        obj.GMValue = self.deal_price
+        obj.Category = category
+        obj.save()
+
+        try:
+            SyncBookingAnalytics.objects.update_or_create(object_id=self.id,
+                                                          content_type=ContentType.objects.get_for_model(LabAppointment),
+                                                          defaults={"synced_at": self.updated_at, "last_updated_at": self.updated_at})
+        except Exception as e:
+            pass
+
+        return obj
+
 
     def get_tests_and_prices(self):
         test_price = []
@@ -1587,7 +1648,7 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin)
             from_app = parent_order.visitor_info.get('from_app', False)
             app_version = parent_order.visitor_info.get('app_version', None)
 
-        if from_app and app_version and float(app_version) < float('1.2'):
+        if from_app and app_version and app_version < '1.2':
             return True
         else:
             return False
@@ -1851,28 +1912,11 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin)
 
     @transaction.atomic
     def action_cancelled(self, refund_flag=1):
-
-        # Taking Lock first
-        consumer_account = None
-        if self.payment_type == OpdAppointment.PREPAID:
-            temp_list = account_model.ConsumerAccount.objects.get_or_create(user=self.user)
-            consumer_account = account_model.ConsumerAccount.objects.select_for_update().get(user=self.user)
-
         old_instance = LabAppointment.objects.get(pk=self.id)
         if old_instance.status != self.CANCELLED:
             self.status = self.CANCELLED
             self.save()
-            product_id = account_model.Order.LAB_PRODUCT_ID
-
-            if self.payment_type == OpdAppointment.PREPAID and account_model.ConsumerTransaction.valid_appointment_for_cancellation(
-                    self.id, product_id):
-
-                wallet_refund, cashback_refund = self.get_cancellation_breakup()
-
-                consumer_account.credit_cancellation(self, account_model.Order.LAB_PRODUCT_ID, wallet_refund, cashback_refund)
-                if refund_flag:
-                    ctx_obj = consumer_account.debit_refund()
-                    account_model.ConsumerRefund.initiate_refund(self.user, ctx_obj)
+            self.action_refund(refund_flag)
 
     def get_cancellation_breakup(self):
         wallet_refund = cashback_refund = 0
