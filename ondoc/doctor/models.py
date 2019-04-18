@@ -73,7 +73,7 @@ from safedelete import SOFT_DELETE
 import qrcode
 from django.utils.functional import cached_property
 from ondoc.crm.constants import constants
-
+from django.utils.text import slugify
 
 logger = logging.getLogger(__name__)
 
@@ -1177,6 +1177,21 @@ class DoctorImage(auth_model.TimeStampedModel, auth_model.Image):
     def __str__(self):
         return '{}'.format(self.doctor)
 
+    def get_image_name(self):
+        name = self.doctor.name
+        doctor_spec_name = "dr " + name
+        selected_spec = None
+        for dps in self.doctor.doctorpracticespecializations.all():
+            if not selected_spec:
+                selected_spec = dps.specialization
+            if dps.specialization.doctor_count > selected_spec.doctor_count:
+                selected_spec = dps.specialization
+
+        if selected_spec:
+            doctor_spec_name += " " + selected_spec.name
+        doctor_spec_name = doctor_spec_name.strip()
+        return slugify(doctor_spec_name)
+
     def resize_cropped_image(self, width, height):
         default_storage_class = get_storage_class()
         storage_instance = default_storage_class()
@@ -1242,7 +1257,9 @@ class DoctorImage(auth_model.TimeStampedModel, auth_model.Image):
                 img = img.crop(cropping_area)
             new_image_io = BytesIO()
             img.save(new_image_io, format='JPEG')
-            md5_hash = hashlib.md5(img.tobytes()).hexdigest()
+            #md5_hash = hashlib.md5(img.tobytes()).hexdigest()
+            md5_hash = self.get_image_name()
+
             self.cropped_image = InMemoryUploadedFile(new_image_io, None, md5_hash + ".jpg", 'image/jpeg',
                                                       new_image_io.tell(), None)
             self.save()
@@ -1250,9 +1267,27 @@ class DoctorImage(auth_model.TimeStampedModel, auth_model.Image):
     def save_to_cropped_image(self, image_file):
         if image_file:
             img = Img.open(image_file)
-            md5_hash = hashlib.md5(img.tobytes()).hexdigest()
+            #md5_hash = hashlib.md5(img.tobytes()).hexdigest()
+            md5_hash = self.get_image_name()
             self.cropped_image.save(md5_hash + ".jpg", image_file, save=True)
             #self.save()
+
+    @classmethod
+    def rename_cropped_images(cls):
+        images = cls.objects.filter(cropped_image__isnull=False).filter(doctor__is_live=True).order_by('id')[:100]
+        for img in images:
+            image_name = img.get_image_name()
+            if img.cropped_image and not image_name in img.cropped_image.name:
+                new_img = Img.open(img.cropped_image)
+                if new_img.mode != 'RGB':
+                    new_img = new_img.convert('RGB')
+                new_image_io = BytesIO()
+                new_img.save(new_image_io, format='JPEG')
+
+                img.cropped_image = InMemoryUploadedFile(new_image_io, None, image_name + ".jpg", 'image/jpeg',
+                                                          new_image_io.tell(), None)
+                img.save()
+
 
     class Meta:
         db_table = "doctor_image"
