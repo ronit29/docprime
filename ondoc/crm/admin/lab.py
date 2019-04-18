@@ -406,7 +406,7 @@ class LabForm(FormCleanMixin):
             elif not is_enabled:
                 if not all([data.get('disabled_after', None), data.get('disable_reason', None)]):
                     raise forms.ValidationError("Must have disabled after/disable reason if lab is not enabled.")
-                if data.get('disable_reason', None) and data.get('disable_reason', None) == LAB.OTHERS and not data.get(
+                if data.get('disable_reason', None) and data.get('disable_reason', None) == Lab.OTHERS and not data.get(
                         'disable_comments', None):
                     raise forms.ValidationError("Must have disable comments if disable reason is others.")
 
