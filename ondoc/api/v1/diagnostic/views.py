@@ -2596,34 +2596,27 @@ class CompareLabPackagesViewSet(viewsets.ReadOnlyModelViewSet):
 
     def retrieve(self, request):
         from django.db.models import Min
-        parameters = request.query_params
-
-        serializer = serializers.CompareLabPackagesSerializer(data=parameters, context={"request": request})
+        request_parameters = request.data
+        serializer = serializers.CompareLabPackagesSerializer(data=request_parameters, context={"request": request})
         serializer.is_valid(raise_exception=True)
         validated_data = serializer.validated_data
-
-        if len(validated_data.get('package_ids')) < 1:
-            return Response({"msg": "Must have atleast 1 package to compare"}, status=status.HTTP_400_BAD_REQUEST)
-        elif len(validated_data.get('package_ids')) > 5:
-            return Response({"msg": "Can have atmost 5 packages to compare"}, status=status.HTTP_400_BAD_REQUEST)
-
         response = {}
-        lab_packages = []
         # latitude = None
         # longitude = None
         # longitude = validated_data.get('longitude')
         # latitude = validated_data.get('latitude')
         # point_string = 'POINT(' + str(longitude) + ' ' + str(latitude) + ')'
         # pnt = GEOSGeometry(point_string, srid=4326)
-        tests = None
-        total_test_ids = set()
-        max_distance = 10000
-        min_distance = 0
+        # tests = None
+        # total_test_ids = set()
+        # max_distance = 10000
+        # min_distance = 0
         title = None
         if validated_data.get('title'):
             title = validated_data.get('title').replace('_', ' ').title()
-
         response['title'] = title
+        requested_package_ids = set([x.get('package').id for x in validated_data.get('package_lab_ids', [])])
+        requested_lab_ids = set([x.get('lab').id for x in validated_data.get('package_lab_ids', [])])
 
         packages = LabTest.objects.prefetch_related('test', 'test__recommended_categories', 'test__parameter',
                                                     'categories', Prefetch('availablelabs',
@@ -2631,12 +2624,23 @@ class CompareLabPackagesViewSet(viewsets.ReadOnlyModelViewSet):
                                                                                enabled=True)),
                                                     Prefetch('availablelabs__lab_pricing_group__labs',
                                                              Lab.objects.filter(is_live=True))).filter(
-            is_package=True, id__in=validated_data.get('package_ids')).distinct()
+            is_package=True, id__in=requested_package_ids).distinct()
 
-        packages_price = packages.values('id').annotate(
-            min_price=Min(Coalesce('availablelabs__custom_deal_price', 'availablelabs__computed_deal_price')))
+        # packages_price = packages.values('id').annotate(
+        #     min_price=Min(Coalesce('availablelabs__custom_deal_price', 'availablelabs__computed_deal_price')))
 
-        package_test_master = {p:[x for x in p.test.all()] for p in packages}
+        avts = AvailableLabTest.objects.filter(enabled=True, lab_pricing_group__labs__id__in=requested_package_ids,
+                                               test_id__in=requested_package_ids).annotate(
+            requested_lab=F('lab_pricing_group__labs__id'), price=Case(
+                When(custom_deal_price__isnull=True,
+                     then=F('computed_deal_price')),
+                When(custom_deal_price__isnull=False,
+                     then=F('custom_deal_price'))), )
+        price_master = {}
+        for avt in avts:
+            price_master[(avt.test.id, avt.requested_lab)] = (avt.mrp, avt.price)
+
+        package_test_master = {p: [x for x in p.test.all()] for p in packages}
         category_data_master = {}
         test_data_master = {}
         test_without_cat = set()
@@ -2686,7 +2690,7 @@ class CompareLabPackagesViewSet(viewsets.ReadOnlyModelViewSet):
             category_data.append({"id": 0, "icon": None, "name": "Others", "test_ids": list(test_without_cat)})
 
         total_test_ids = set(test_data_master.keys())
-
+        lab_packages_all_details = {}
         for data in packages:
             if data.id and data.name:
                 package_detail = {}
@@ -2717,20 +2721,30 @@ class CompareLabPackagesViewSet(viewsets.ReadOnlyModelViewSet):
                         tests_included.append({'test_id': test_id, 'available': False})
 
                 package_detail['tests_included'] = tests_included
-                package_min_price = None
-                for price in packages_price:
-                    if price.get('id') == data.id:
-                        package_min_price = price.get('min_price')
-                package_detail['minimum_price'] = package_min_price
+                # package_min_price = None
+                # for price in packages_price:
+                #     if price.get('id') == data.id:
+                #         package_min_price = price.get('min_price')
+                # package_detail['minimum_price'] = package_min_price
                 category_parameter_result = []
                 for category_id_temp in all_category_ids:
                     category_parameter_result.append({"id": category_id_temp,
                                                       "count": category_parameter_count_master.get(
                                                           (data.id, category_id_temp), 0)})
                 package_detail['category_parameter_count'] = category_parameter_result
-                lab_packages.append(package_detail)
+                lab_packages_all_details[data.id] = package_detail
 
-        response['packages'] = lab_packages
+        final_result = []
+        for pack_lab in validated_data.get('package_lab_ids', []):
+            temp_data = {}
+            t_pack = pack_lab.get('package')
+            t_lab = pack_lab.get('lab')
+            temp_data.update(deepcopy(lab_packages_all_details.get(t_pack.id, {})))
+            temp_data['lab'] = {'id': t_lab.id, 'name': t_lab.name, 'thumbnail': t_lab.get_thumbnail()}
+            temp_data['price'], temp_data['mrp'] = price_master.get((t_pack.id, t_lab.id), (None, None))
+            final_result.append(temp_data)
+        # response['packages'] = list(lab_packages_all_details.values())
+        response['packages'] = final_result
         response['category_info'] = category_data
         response['test_info'] = list(test_data_master.values())
         return Response(response)

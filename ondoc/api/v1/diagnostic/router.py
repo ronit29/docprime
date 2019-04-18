@@ -54,5 +54,5 @@ urlpatterns = [
     path('test/details', TestDetailsViewset.as_view({'get': 'retrieve'}), name='test-details'),
     path('test/details_by_url', TestDetailsViewset.as_view({'get': 'retrieve_test_by_url'}), name='test-details-by-url'),
     path('test/category', LabTestCategoryListViewSet.as_view({'get': 'list'}), name='test-category'),
-    path('compare_lab_packages', CompareLabPackagesViewSet.as_view({'get': 'retrieve'}), name='lab_packages_comparison'),
+    path('compare_lab_packages', CompareLabPackagesViewSet.as_view({'post': 'retrieve'}), name='lab_packages_comparison'),
 ]
