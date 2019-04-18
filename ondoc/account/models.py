@@ -789,8 +789,14 @@ class MoneyPool(TimeStampedModel):
 
         completed_appointments = [*opd_apps, *lab_apps]
 
+        def compare_app(obj):
+            history = obj.history.filter(status=obj.COMPLETED).first()
+            if history:
+                return history.created_at
+            return obj.updated_at
+
         if completed_appointments:
-            completed_appointments = sorted(completed_appointments, key=lambda a: a.updated_at)
+            completed_appointments = sorted(completed_appointments, key=compare_app)
 
         return completed_appointments
 

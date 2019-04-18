@@ -1429,6 +1429,7 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin,
                                        related_name='appointment_using')
     synced_analytics = GenericRelation(SyncBookingAnalytics, related_name="lab_booking_analytics")
     integrator_response = GenericRelation(IntegratorResponse)
+    history = GenericRelation(AppointmentHistory)
 
     def get_city(self):
         if self.lab and self.lab.city:

@@ -1699,6 +1699,7 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
     price_data = JSONField(blank=True, null=True)
     money_pool = models.ForeignKey(MoneyPool, on_delete=models.SET_NULL, null=True, related_name="opd_apps")
     mask_number = GenericRelation(AppointmentMaskNumber)
+    history = GenericRelation(AppointmentHistory)
     email_notification = GenericRelation(EmailNotification, related_name="enotification")
     synced_analytics = GenericRelation(SyncBookingAnalytics, related_name="opd_booking_analytics")
 
