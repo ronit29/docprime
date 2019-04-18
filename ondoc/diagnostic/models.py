@@ -1659,7 +1659,7 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin,
             try:
                 push_appointment_to_matrix.apply_async(
                     ({'type': 'LAB_APPOINTMENT', 'appointment_id': self.id, 'product_id': 5,
-                      'sub_product_id': 2},), countdown=10)
+                      'sub_product_id': 2},), countdown=5)
             except Exception as e:
                 logger.error(str(e))
 
