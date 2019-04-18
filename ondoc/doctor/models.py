@@ -1297,7 +1297,7 @@ class DoctorImage(auth_model.TimeStampedModel, auth_model.Image):
         images = cls.objects.filter(cropped_image__isnull=False).filter(doctor__is_live=True).order_by('id')[:100]
         for img in images:
             image_name = img.get_image_name()
-            if img.cropped_image and not img.cropped_image.name.endswith(image_name+'.jpg'):
+            if img.cropped_image and not image_name in img.cropped_image.name:
                 new_img = Img.open(img.cropped_image)
                 if new_img.mode != 'RGB':
                     new_img = new_img.convert('RGB')
