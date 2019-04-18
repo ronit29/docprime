@@ -52,5 +52,6 @@ urlpatterns = [
          name='appointment-complete'),
     path('test/details', TestDetailsViewset.as_view({'get': 'retrieve'}), name='test-details'),
     path('test/details_by_url', TestDetailsViewset.as_view({'get': 'retrieve_test_by_url'}), name='test-details-by-url'),
+    path('test/list_by_alphabet', TestDetailsViewset.as_view({'get':'list_by_alphabet'}), name='list-test-by-alphabet'),
     path('test/category', LabTestCategoryListViewSet.as_view({'get': 'list'}), name='test-category'),
 ]

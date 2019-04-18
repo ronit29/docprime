@@ -12,8 +12,8 @@ from ondoc.authentication.models import (TimeStampedModel, CreatedByModel, Image
                                          UserPermission, GenericAdmin, LabUserPermission, GenericLabAdmin,
                                          BillingAccount, SPOCDetails, RefundMixin)
 from ondoc.bookinganalytics.models import DP_OpdConsultsAndTests
+from ondoc.doctor.models import Hospital, SearchKey, CancellationReason, Doctor
 from ondoc.crm.constants import constants
-from ondoc.doctor.models import Hospital, SearchKey, CancellationReason
 from ondoc.coupon.models import Coupon
 from ondoc.location.models import EntityUrls
 from ondoc.notification import models as notification_models
@@ -619,6 +619,7 @@ class Lab(TimeStampedModel, CreatedByModel, QCModel, SearchKey):
         else:
             return True
 
+
 class LabCertification(TimeStampedModel):
     lab = models.ForeignKey(Lab, related_name = 'lab_certificate', on_delete=models.CASCADE)
     name = models.CharField(max_length=200)
@@ -1131,7 +1132,11 @@ class LabTest(TimeStampedModel, SearchKey):
                                         through_fields=('lab_test', 'parent_category'),
                                         related_name='recommended_lab_tests')
     reference_code = models.CharField(max_length=150, blank=True, default='')
+
+    author = models.ForeignKey(Doctor, null=True, blank=True, related_name='published_tests',
+                               on_delete=models.SET_NULL)
     is_cancellable = models.BooleanField(default=True)
+
     # test_sub_type = models.ManyToManyField(
     #     LabTestSubType,
     #     through='LabTestSubTypeMapping',
@@ -1652,7 +1657,7 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin,
             from_app = parent_order.visitor_info.get('from_app', False)
             app_version = parent_order.visitor_info.get('app_version', None)
 
-        if from_app and app_version and float(app_version) < float('1.2'):
+        if from_app and app_version and app_version < '1.2':
             return True
         else:
             return False
