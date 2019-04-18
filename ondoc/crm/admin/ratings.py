@@ -4,7 +4,7 @@ from django.utils.safestring import mark_safe
 from import_export import fields, resources
 
 from ondoc.authentication.models import AgentToken
-from ondoc.ratings_review.models import ReviewActions, RatingsReview
+from ondoc.ratings_review.models import ReviewActions, RatingsReview, AppCompliments, AppRatings
 from ondoc.diagnostic.models import LabAppointment, Lab
 from ondoc.doctor.models import OpdAppointment, Doctor, Hospital
 from django import forms
@@ -12,6 +12,8 @@ from import_export.admin import ImportExportMixin, ImportExportActionModelAdmin
 from django.conf import settings
 from ondoc.api.v1 import utils as v1_utils
 from ondoc.notification import tasks as notification_tasks
+import nested_admin
+from import_export.admin import ImportExportMixin, ImportExportModelAdmin, base_formats
 import logging
 logger = logging.getLogger(__name__)
 
@@ -221,3 +223,39 @@ class RatingsReviewAdmin(ImportExportMixin, admin.ModelAdmin):
         #             return str(doctor_name)
         #
         # return None
+
+
+# class AppComplimentsInline(nested_admin.NestedTabularInline):
+#     model = AppRatings
+#     extra = 0
+#     can_delete = True
+#     show_change_link = True
+
+class AppRatingsResource(resources.ModelResource):
+    user_phone = fields.Field()
+    user_email = fields.Field()
+
+    def dehydrate_user_email(self, obj):
+        return obj.user.email
+
+    def dehydrate_user_phone(self, obj):
+        return obj.user.phone_number
+
+    class Meta:
+        model = AppRatings
+        fields = ('id', 'user_id', 'user_phone', 'user_email', 'app_type' 'ratings', 'app_version', 'review')
+        export_order = ('id', 'user_id', 'user_phone', 'user_email', 'app_type' 'ratings', 'app_version', 'review')
+
+
+class AppRatingsAdmin(ImportExportModelAdmin, admin.ModelAdmin):
+    list_display = ('user_phone', 'app_name', 'ratings', 'app_version', 'brand', 'model', 'platform')
+    fields = ('user_email', 'user_phone', 'app_name', 'ratings', 'app_version', 'brand', 'model', 'platform', 'review', 'app_type', 'device_id', 'user_id')
+    readonly_fields = ('user_email', 'user_phone', 'app_name', 'ratings', 'app_version', 'brand', 'model', 'platform', 'review', 'app_type', 'device_id', 'user_id')
+    resource_class = AppRatingsResource
+    # inlines = [AppComplimentsInline]
+
+    def user_email(self, obj):
+        return obj.user.email
+
+    def user_phone(self, obj):
+        return obj.user.phone_number

@@ -501,6 +501,7 @@ class ContactUsSerializer(serializers.Serializer):
     mobile = serializers.IntegerField(min_value=1000000000, max_value=9999999999)
     email = serializers.EmailField()
     message = serializers.CharField(max_length=2000)
+    from_app = serializers.BooleanField(default=False)
 
     class Meta:
         model = ContactUs
