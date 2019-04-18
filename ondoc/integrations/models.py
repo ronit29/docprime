@@ -5,7 +5,11 @@ from django.contrib.contenttypes.models import ContentType
 from ondoc.authentication.models import TimeStampedModel
 from ondoc.common.helper import Choices
 from django.contrib.postgres.fields import JSONField
+from django.db import transaction
+from ondoc.matrix.tasks import push_appointment_to_matrix
+import logging
 
+logger = logging.getLogger(__name__)
 # Create your models here.
 
 
@@ -117,6 +121,21 @@ class IntegratorResponse(TimeStampedModel):
                 integrator_obj.get_order_summary(integrator_response)
 
         print("Order Summary for Thyrocare Complete")
+
+    def save(self, *args, **kwargs):
+        super().save(*args, **kwargs)
+        push_to_matrix = True
+        transaction.on_commit(lambda: self.app_commit_tasks(push_to_matrix))
+
+    def app_commit_tasks(self, push_to_matrix):
+        if push_to_matrix:
+            # Push the appointment data to the matrix
+            try:
+                push_appointment_to_matrix.apply_async(
+                    ({'type': 'LAB_APPOINTMENT', 'appointment_id': self.object_id, 'product_id': 5,
+                      'sub_product_id': 2},), countdown=5)
+            except Exception as e:
+                logger.error(str(e))
 
 
 class IntegratorReport(TimeStampedModel):

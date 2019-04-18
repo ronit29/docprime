@@ -612,6 +612,7 @@ class Lab(TimeStampedModel, CreatedByModel, QCModel, SearchKey):
         else:
             return True
 
+
 class LabCertification(TimeStampedModel):
     lab = models.ForeignKey(Lab, related_name = 'lab_certificate', on_delete=models.CASCADE)
     name = models.CharField(max_length=200)
