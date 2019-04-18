@@ -1647,7 +1647,7 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin,
             from_app = parent_order.visitor_info.get('from_app', False)
             app_version = parent_order.visitor_info.get('app_version', None)
 
-        if from_app and app_version and float(app_version) < float('1.2'):
+        if from_app and app_version and app_version < '1.2':
             return True
         else:
             return False
