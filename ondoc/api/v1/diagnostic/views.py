@@ -2629,7 +2629,7 @@ class CompareLabPackagesViewSet(viewsets.ReadOnlyModelViewSet):
         # packages_price = packages.values('id').annotate(
         #     min_price=Min(Coalesce('availablelabs__custom_deal_price', 'availablelabs__computed_deal_price')))
 
-        avts = AvailableLabTest.objects.filter(enabled=True, lab_pricing_group__labs__id__in=requested_package_ids,
+        avts = AvailableLabTest.objects.filter(enabled=True, lab_pricing_group__labs__id__in=requested_lab_ids,
                                                test_id__in=requested_package_ids).annotate(
             requested_lab=F('lab_pricing_group__labs__id'), price=Case(
                 When(custom_deal_price__isnull=True,
