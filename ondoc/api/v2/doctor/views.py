@@ -20,7 +20,7 @@ from django.contrib.contenttypes.models import ContentType
 from ondoc.procedure.models import Procedure
 from django.contrib.auth import get_user_model
 from django.conf import settings
-import datetime, logging, re, random, jwt
+import datetime, logging, re, random, jwt, os
 import json
 from django.utils import timezone
 
@@ -850,6 +850,9 @@ class PartnersAppInvoice(viewsets.GenericViewSet):
                 file = v1_utils.html_to_pdf(content, filename)
 
                 invoice_obj.file = file
+                file_path = os.path.join(invoice_obj.file.storage.base_location, invoice_obj.INVOICE_STORAGE_FOLDER, filename)
+                if os.path.exists(file_path):
+                    os.remove(file_path)
                 invoice_obj.invoice_url = "{}{}{}".format(settings.BASE_URL, "/api/v2/doctor/invoice/", filename)
                 encoded_filename = jwt.encode({"filename":filename}, settings.PARTNERS_INVOICE_ENCODE_KEY).decode('utf-8')
                 encoded_url = "{}{}{}".format(settings.BASE_URL, "/api/v2/doctor/invoice/", encoded_filename)
@@ -884,18 +887,6 @@ class PartnersAppInvoice(viewsets.GenericViewSet):
         except Exception as e:
             return Response({"status": 0, "message": "Error creating invoice - " + str(e)}, status.HTTP_400_BAD_REQUEST)
 
-    def download_pdf(self, request, encoded_filename=None):
-        encoded_filename = jwt.decode(encoded_filename, settings.PARTNERS_INVOICE_ENCODE_KEY)
-        invoice_serial_id = encoded_filename.get('filename')
-        if not invoice_serial_id:
-            return Response({"status": 0, "message": "File not found"}, status=status.HTTP_404_NOT_FOUND)
-        invoice = doc_models.PartnersAppInvoice.objects.filter(invoice_serial_id=invoice_serial_id, is_valid=True).order_by('-updated_at').first()
-        if not invoice:
-            return Response({"status": 0, "message": "File not found"}, status=status.HTTP_404_NOT_FOUND)
-        response = HttpResponse(invoice.file, content_type='application/pdf')
-        response['Content-Disposition'] = 'attachment; filename=%s' % invoice.invoice_serial_id
-        return response
-
     def update(self, request):
         try:
             serializer = serializers.UpdatePartnersAppInvoiceSerializer(data=request.data, context={"request": request})
@@ -920,3 +911,18 @@ class PartnersAppInvoice(viewsets.GenericViewSet):
                              "selected_invoice_items_created": selected_invoice_items_created}, status.HTTP_200_OK)
         except Exception as e:
             return Response({"status": 0, "message": "Error updating invoice - " + str(e)}, status.HTTP_400_BAD_REQUEST)
+
+
+class PartnersAppInvoicePDF(viewsets.GenericViewSet):
+
+    def download_pdf(self, request, encoded_filename=None):
+        encoded_filename = jwt.decode(encoded_filename, settings.PARTNERS_INVOICE_ENCODE_KEY)
+        invoice_serial_id = encoded_filename.get('filename')
+        if not invoice_serial_id:
+            return Response({"status": 0, "message": "File not found"}, status=status.HTTP_404_NOT_FOUND)
+        invoice = doc_models.PartnersAppInvoice.objects.filter(invoice_serial_id=invoice_serial_id, is_valid=True).order_by('-updated_at').first()
+        if not invoice:
+            return Response({"status": 0, "message": "File not found"}, status=status.HTTP_404_NOT_FOUND)
+        response = HttpResponse(invoice.file, content_type='application/pdf')
+        response['Content-Disposition'] = 'attachment; filename=%s' % invoice.invoice_serial_id
+        return response

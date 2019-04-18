@@ -3176,6 +3176,7 @@ class PartnersAppInvoice(auth_model.TimeStampedModel):
     PAID = 1
     PENDING = 2
     PAYMENT_STATUS = ((PAID, 'Paid'), (PENDING, 'Pending'))
+    INVOICE_STORAGE_FOLDER = 'partners/invoice'
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     invoice_serial_id = models.CharField(max_length=100)
     appointment = models.ForeignKey(OfflineOPDAppointments, on_delete=models.CASCADE, related_name='partners_app_invoice')
@@ -3194,7 +3195,7 @@ class PartnersAppInvoice(auth_model.TimeStampedModel):
                                               validators=[MinValueValidator(0), MaxValueValidator(100)])
     total_amount = models.DecimalField(max_digits=10, decimal_places=2)
     is_invoice_generated = models.BooleanField(default=False)
-    file = models.FileField(upload_to='partners/invoice', blank=False, null=False)
+    file = models.FileField(upload_to=INVOICE_STORAGE_FOLDER, blank=False, null=False)
     invoice_url = models.URLField(null=True, blank=True)
     encoded_url = models.URLField(null=True, blank=True, max_length=300)
     is_valid = models.BooleanField(default=True)
@@ -3221,7 +3222,7 @@ class PartnersAppInvoice(auth_model.TimeStampedModel):
             patient_mobile = None
         context["patient_phone_number"] = patient_mobile
         context["invoice_serial_id"] = self.invoice_serial_id
-        context["updated_at"] = self.updated_at if self.updated_at else self.created_at
+        context["updated_at"] = self.updated_at if self.updated_at else datetime.datetime.now()
         context["payment_status"] = "Paid" if self.payment_status == self.PAID else "Pending"
         if self.payment_status == self.PAID:
             context["payment_status"] = "Paid"
