@@ -11,6 +11,7 @@ from ondoc.account.models import MerchantPayout, ConsumerAccount, Order, UserRef
 from ondoc.authentication.models import (TimeStampedModel, CreatedByModel, Image, Document, QCModel, UserProfile, User,
                                          UserPermission, GenericAdmin, LabUserPermission, GenericLabAdmin,
                                          BillingAccount, SPOCDetails, RefundMixin, WelcomeCallingDone)
+from ondoc.bookinganalytics.models import DP_OpdConsultsAndTests
 from ondoc.crm.constants import constants
 from ondoc.doctor.models import Hospital, SearchKey, CancellationReason
 from ondoc.coupon.models import Coupon
@@ -54,7 +55,8 @@ from ondoc.integrations.task import push_lab_appointment_to_integrator, get_inte
 from ondoc.location import models as location_models
 from ondoc.ratings_review import models as ratings_models
 from ondoc.api.v1.common import serializers as common_serializers
-from ondoc.common.models import AppointmentHistory, AppointmentMaskNumber, Remark, GlobalNonBookable, RefundDetails
+from ondoc.common.models import AppointmentHistory, AppointmentMaskNumber, Remark, GlobalNonBookable, \
+    SyncBookingAnalytics, CompletedBreakupMixin, RefundDetails
 import reversion
 from decimal import Decimal
 from django.utils.text import slugify
@@ -1418,7 +1420,7 @@ class LabAppointmentInvoiceMixin(object):
 
 
 @reversion.register()
-class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin, RefundMixin):
+class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin, RefundMixin, CompletedBreakupMixin):
     from ondoc.integrations.models import IntegratorResponse
     PRODUCT_ID = Order.LAB_PRODUCT_ID
     CREATED = 1
@@ -1475,13 +1477,63 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin,
     merchant_payout = models.ForeignKey(MerchantPayout, related_name="lab_appointment", on_delete=models.SET_NULL, null=True)
     price_data = JSONField(blank=True, null=True)
     tests = models.ManyToManyField(LabTest, through='LabAppointmentTestMapping', through_fields=('appointment', 'test'))
-    money_pool = models.ForeignKey(MoneyPool, on_delete=models.SET_NULL, null=True)
+    money_pool = models.ForeignKey(MoneyPool, on_delete=models.SET_NULL, null=True, related_name='lab_apps')
     mask_number = GenericRelation(AppointmentMaskNumber)
     email_notification = GenericRelation(EmailNotification, related_name="lab_notification")
     user_plan_used = models.ForeignKey('subscription_plan.UserPlanMapping', null=True, on_delete=models.DO_NOTHING,
                                        related_name='appointment_using')
+    synced_analytics = GenericRelation(SyncBookingAnalytics, related_name="lab_booking_analytics")
     integrator_response = GenericRelation(IntegratorResponse)
+    history = GenericRelation(AppointmentHistory)
     refund_details = GenericRelation(RefundDetails, related_query_name="lab_appointment_detail")
+
+    
+    def get_city(self):
+        if self.lab and self.lab.city:
+            return self.lab.city.id
+        else:
+            return None
+
+    def get_state(self):
+        if self.lab and self.lab.state:
+            return self.lab.state.id
+        else:
+            return None
+
+    def sync_with_booking_analytics(self):
+
+        category = None
+        if self.lab_test.first():
+            if self.lab_test.first().test.is_package == True:
+                category = 1
+            else:
+                category = 0
+
+        promo_cost = self.deal_price - self.effective_price if self.deal_price and self.effective_price else None
+
+        obj = DP_OpdConsultsAndTests.objects.filter(Appointment_Id=self.id, TypeId=2).first()
+        if not obj:
+            obj = DP_OpdConsultsAndTests()
+            obj.Appointment_Id = self.id
+            # obj.CityId = self.get_city()
+            # obj.StateId = self.get_state()
+            obj.ProviderId = self.lab.id
+            obj.TypeId = 2
+            obj.PaymentType = self.payment_type if self.payment_type else None
+            obj.Payout = self.merchant_payout if self.merchant_payout else None
+        obj.PromoCost = promo_cost
+        obj.GMValue = self.deal_price
+        obj.Category = category
+        obj.save()
+
+        try:
+            SyncBookingAnalytics.objects.update_or_create(object_id=self.id,
+                                                          content_type=ContentType.objects.get_for_model(LabAppointment),
+                                                          defaults={"synced_at": self.updated_at, "last_updated_at": self.updated_at})
+        except Exception as e:
+            pass
+
+        return obj
 
 
     def get_tests_and_prices(self):

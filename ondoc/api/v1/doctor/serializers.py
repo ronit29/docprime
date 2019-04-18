@@ -1349,14 +1349,21 @@ class CommonSpecializationsSerializer(serializers.ModelSerializer):
     id = serializers.ReadOnlyField(source='specialization.id')
     name = serializers.ReadOnlyField(source='specialization.name')
     icon = serializers.SerializerMethodField
+    url = serializers.SerializerMethodField()
 
     def get_icon(self, obj):
         request = self.context.get('request')
         return request.build_absolute_uri(obj['icon']) if obj['icon'] else None
 
+    def get_url(self, obj):
+        url = None
+        if self.context and self.context.get('spec_urls'):
+            url = self.context.get('spec_urls')[obj.specialization_id]
+        return url
+
     class Meta:
         model = CommonSpecialization
-        fields = ('id', 'name', 'icon', )
+        fields = ('id', 'name', 'icon', 'url')
 
 
 class ConfigGetSerializer(serializers.Serializer):
