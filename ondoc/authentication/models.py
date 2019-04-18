@@ -1528,10 +1528,17 @@ class Merchant(TimeStampedModel):
                                                                               'Content-Type': 'application/json'})
 
         if response.status_code == status.HTTP_200_OK:
-            resp_data = response.json()
-            self.api_response = resp_data
-            if resp_data.get('StatusCode') and resp_data.get('StatusCode') in [1,2,3,4]:
-                self.pg_status = resp_data.get('StatusCode')
+            self.api_response = response.json()
+            if response.json():
+                for data in response.json():
+                    if data.get('StatusCode') and data.get('StatusCode') > 0:
+                        if self.pg_status == 0:
+                            self.pg_status = data.get('StatusCode')
+                        elif data.get('StatusCode') < self.pg_status:
+                            self.pg_status = data.get('StatusCode')
+
+            # if resp_data.get('StatusCode') and resp_data.get('StatusCode') in [1,2,3,4]:
+            #     self.pg_status = resp_data.get('StatusCode')
 
     @classmethod
     def get_abbreviation(cls, state_name):
