@@ -5,6 +5,7 @@ from PIL.Image import NEAREST, BICUBIC
 from django.contrib.staticfiles.storage import staticfiles_storage
 from django.core.files.storage import default_storage
 from PIL import Image, ImageFont, ImageOps
+# from bookinganalytics.models import DP_OpdConsultsAndTests
 
 from django.contrib.gis.db import models
 from django.db import migrations, transaction, connection
@@ -25,6 +26,7 @@ from dateutil import tz
 from django.utils import timezone
 from ondoc.authentication import models as auth_model
 from ondoc.authentication.models import SPOCDetails, RefundMixin
+from ondoc.bookinganalytics.models import DP_OpdConsultsAndTests
 from ondoc.location import models as location_models
 from ondoc.account.models import Order, ConsumerAccount, ConsumerTransaction, PgTransaction, ConsumerRefund, \
     MerchantPayout, UserReferred, MoneyPool, Invoice
@@ -41,7 +43,7 @@ from django.contrib.contenttypes.fields import GenericRelation
 from ondoc.api.v1.utils import get_start_end_datetime, custom_form_datetime, CouponsMixin, aware_time_zone, \
     form_time_slot, util_absolute_url, html_to_pdf, TimeSlotExtraction
 from ondoc.common.models import AppointmentHistory, AppointmentMaskNumber, Service, Remark, MatrixMappedState, \
-    MatrixMappedCity, GlobalNonBookable, RefundDetails
+    MatrixMappedCity, GlobalNonBookable, SyncBookingAnalytics, CompletedBreakupMixin, RefundDetails
 from ondoc.common.models import QRCode
 
 from functools import reduce
@@ -1274,7 +1276,7 @@ class DoctorImage(auth_model.TimeStampedModel, auth_model.Image):
 
     @classmethod
     def rename_cropped_images(cls):
-        images = cls.objects.filter(cropped_image__isnull=False).filter(doctor__is_live=True).order_by('id')[:100]
+        images = cls.objects.prefetch_related('doctor','doctor__doctorpracticespecializations','doctor__doctorpracticespecializations__specialization').filter(cropped_image__isnull=False).order_by('id')[:100]
         for img in images:
             image_name = img.get_image_name()
             if img.cropped_image and not image_name in img.cropped_image.name:
@@ -1700,7 +1702,7 @@ class OpdAppointmentInvoiceMixin(object):
 
 
 @reversion.register()
-class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentInvoiceMixin, RefundMixin):
+class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentInvoiceMixin, RefundMixin, CompletedBreakupMixin):
     PRODUCT_ID = Order.DOCTOR_PRODUCT_ID
     CREATED = 1
     BOOKED = 2
@@ -1772,9 +1774,11 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
 
     merchant_payout = models.ForeignKey(MerchantPayout, related_name="opd_appointment", on_delete=models.SET_NULL, null=True)
     price_data = JSONField(blank=True, null=True)
-    money_pool = models.ForeignKey(MoneyPool, on_delete=models.SET_NULL, null=True)
+    money_pool = models.ForeignKey(MoneyPool, on_delete=models.SET_NULL, null=True, related_name="opd_apps")
     mask_number = GenericRelation(AppointmentMaskNumber)
+    history = GenericRelation(AppointmentHistory)
     email_notification = GenericRelation(EmailNotification, related_name="enotification")
+    synced_analytics = GenericRelation(SyncBookingAnalytics, related_name="opd_booking_analytics")
     refund_details = GenericRelation(RefundDetails, related_query_name="opd_appointment_detail")
 
     def __str__(self):
@@ -1804,6 +1808,56 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
                 allowed.append(self.COMPLETED)
 
         return allowed
+
+
+    def get_city(self):
+        if self.hospital and self.hospital.matrix_city:
+            return self.hospital.matrix_city.id
+        else:
+            return None
+
+    def get_state(self):
+        if self.hospital and self.hospital.matrix_state:
+            return self.hospital.matrix_state.id
+        else:
+            return None
+
+    def sync_with_booking_analytics(self):
+
+        promo_cost = self.deal_price - self.effective_price if self.deal_price and self.effective_price else None
+        department = None
+        if self.doctor:
+            if self.doctor.doctorpracticespecializations.first():
+                if self.doctor.doctorpracticespecializations.first().specialization.department.first():
+                    department = self.doctor.doctorpracticespecializations.first().specialization.department.first().id
+
+        wallet, cashback = self.get_completion_breakup()
+
+        obj = DP_OpdConsultsAndTests.objects.filter(Appointment_Id=self.id, TypeId=1).first()
+        if not obj:
+            obj = DP_OpdConsultsAndTests()
+            obj.Appointment_Id = self.id
+            obj.CityId = self.get_city()
+            obj.StateId = self.get_state()
+            obj.SpecialityId = department
+            obj.TypeId = 1
+            obj.ProviderId = self.hospital.id
+            obj.PaymentType = self.payment_type if self.payment_type else None
+            obj.Payout = self.merchant_payout if self.merchant_payout else None
+            obj.CashbackUsed = cashback
+        obj.PromoCost = promo_cost
+        obj.GMValue = self.deal_price
+        obj.StatusId = self.status
+        obj.save()
+
+        try:
+            SyncBookingAnalytics.objects.update_or_create(object_id=self.id,
+                                                          content_type=ContentType.objects.get_for_model(OpdAppointment),
+                                                          defaults={"synced_at": self.updated_at, "last_updated_at": self.updated_at})
+        except Exception as e:
+            pass
+
+        return obj
 
     def get_invoice_objects(self):
         return Invoice.objects.filter(reference_id=self.id, product_id=Order.DOCTOR_PRODUCT_ID)
