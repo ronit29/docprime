@@ -1,5 +1,7 @@
 from collections import defaultdict
 from django.contrib.contenttypes.models import ContentType
+from django.core.exceptions import ValidationError
+from django.core.validators import validate_email
 from django.db import transaction
 from rest_framework import mixins, viewsets, status
 from rest_framework.permissions import IsAuthenticated
@@ -152,8 +154,12 @@ class CommentViewSet(viewsets.ModelViewSet):
         parent_id = None
         comment = data['comment']
         if comment:
-            user_name = data['name']
             user_email = data['email']
+            try:
+                validate_email(user_email)
+            except ValidationError as e:
+                return Response(status=status.HTTP_404_NOT_FOUND, data={'error': format(e.messages[0])})
+            user_name = data['name']
 
             article_id = data['article']
 

@@ -14,6 +14,7 @@ class IpdProcedure(auth_model.TimeStampedModel, SearchKey, auth_model.SoftDelete
     is_enabled = models.BooleanField(default=False)
     features = models.ManyToManyField(Feature, through='IpdProcedureFeatureMapping',
                                       through_fields=('ipd_procedure', 'feature'), related_name='of_ipd_procedures')
+    show_about = models.BooleanField(default=False)
 
     def __str__(self):
         return '{}'.format(self.name)
@@ -81,6 +82,7 @@ class IpdProcedureLead(auth_model.TimeStampedModel):
     email = models.CharField(max_length=256, blank=False, null=True, default=None)
     gender = models.CharField(max_length=2, default=None, blank=True, null=True, choices=UserProfile.GENDER_CHOICES)
     age = models.PositiveIntegerField(blank=True, null=True)
+    dob = models.DateTimeField(blank=True, null=True)
 
     class Meta:
         db_table = "ipd_procedure_lead"

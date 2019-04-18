@@ -1,5 +1,5 @@
 from django.conf import settings
-from django.db import models
+from django.db import models, transaction
 from django.contrib.gis.db import models as geo_models
 from django.db.models import Q, Prefetch
 from django.contrib.staticfiles.templatetags.staticfiles import static
@@ -261,6 +261,7 @@ class User(AbstractBaseUser, PermissionsMixin):
 
     is_staff = models.BooleanField(verbose_name= 'Staff Status', default=False, help_text= 'Designates whether the user can log into this admin site.')
     date_joined = models.DateTimeField(auto_now_add=True)
+    auto_created = models.BooleanField(default=False)
 
     def __hash__(self):
         return self.id
@@ -280,6 +281,12 @@ class User(AbstractBaseUser, PermissionsMixin):
         # if self.user_type==1 and hasattr(self, 'staffprofile'):
         #     return self.staffprofile.name
         # return str(self.phone_number)
+
+    # @property
+    @cached_property
+    def active_insurance(self):
+        active_insurance = self.purchased_insurance.filter().order_by('id').last()
+        return active_insurance if active_insurance and active_insurance.is_valid() else None
 
     def get_phone_number_for_communication(self):
         from ondoc.communications.models import unique_phone_numbers
@@ -495,6 +502,17 @@ class OtpVerifications(TimeStampedModel):
 
     class Meta:
         db_table = "otp_verification"
+
+    @staticmethod
+    def get_otp_message(platform, user_type, is_doc=False, version=None):
+        from packaging.version import parse
+        result = "OTP for login is {}.\nDon't share this code with others."
+        if platform == "android" and version:
+            if (user_type == 'doctor' or is_doc) and parse(version) > parse("2.100.4"):
+                result = "<#>\n" + result + "\n" + settings.PROVIDER_ANDROID_MESSAGE_HASH
+            elif parse(version) > parse("1.1"):
+                result = "<#>\n" + result + "\n" + settings.CONSUMER_ANDROID_MESSAGE_HASH
+        return result
 
 
 class NotificationEndpoint(TimeStampedModel):
@@ -823,6 +841,7 @@ class GenericAdmin(TimeStampedModel, CreatedByModel):
     name = models.CharField(max_length=24, blank=True, null=True)
     source_type = models.PositiveSmallIntegerField(choices=source_choices, default=CRM)
     entity_type = models.PositiveSmallIntegerField(choices=entity_choices, default=OTHER)
+    auto_created_from_SPOCs = models.BooleanField(default=False)
 
 
     class Meta:
@@ -1626,6 +1645,18 @@ class WelcomeCallingDone(models.Model):
         abstract = True
 
 
+class ClickLoginToken(TimeStampedModel):
+    URL_KEY_LENGTH = 30
+    token = models.CharField(max_length=300)
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
+    expiration_time = models.DateTimeField(null=True)
+    is_consumed = models.BooleanField(default=False)
+    url_key = models.CharField(max_length=URL_KEY_LENGTH)
+
+    class Meta:
+        db_table = 'click_login_token'
+
+
 class PhysicalAgreementSigned(models.Model):
     physical_agreement_signed = models.BooleanField(default=False)
     physical_agreement_signed_at = models.DateTimeField(null=True, blank=True)
@@ -1637,3 +1668,40 @@ class PhysicalAgreementSigned(models.Model):
 
     class Meta:
         abstract = True
+
+
+class RefundMixin(object):
+
+    @transaction.atomic
+    def action_refund(self, refund_flag=1):
+        from ondoc.doctor.models import OpdAppointment
+        from ondoc.account.models import ConsumerAccount
+        from ondoc.common.models import RefundDetails
+        from ondoc.account.models import ConsumerTransaction
+        from ondoc.account.models import ConsumerRefund
+        # Taking Lock first
+        consumer_account = None
+        product_id = self.PRODUCT_ID
+        if self.payment_type == OpdAppointment.PREPAID:
+            temp_list = ConsumerAccount.objects.get_or_create(user=self.user)
+            consumer_account = ConsumerAccount.objects.select_for_update().get(user=self.user)
+        if self.payment_type == OpdAppointment.PREPAID and ConsumerTransaction.valid_appointment_for_cancellation(self.id, product_id):
+            RefundDetails.log_refund(self)
+            wallet_refund, cashback_refund = self.get_cancellation_breakup()
+            consumer_account.credit_cancellation(self, product_id, wallet_refund, cashback_refund)
+            if refund_flag:
+                ctx_obj = consumer_account.debit_refund()
+                ConsumerRefund.initiate_refund(self.user, ctx_obj)
+
+    def can_agent_refund(self, user):
+        from ondoc.crm.constants import constants
+        if self.status == self.COMPLETED and (user.groups.filter(name=constants['APPOINTMENT_REFUND_TEAM']).exists() or user.is_superuser) and not self.has_app_consumer_trans():
+            return True
+        return False
+
+    def has_app_consumer_trans(self):
+        from ondoc.account.models import ConsumerTransaction
+        product_id = self.PRODUCT_ID
+        return not ConsumerTransaction.valid_appointment_for_cancellation(self.id, product_id)
+        # return ConsumerRefund.objects.filter(consumer_transaction__reference_id=self.id,
+        #                               consumer_transaction__product_id=product_id).first()

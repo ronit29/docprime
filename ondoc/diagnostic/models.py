@@ -10,8 +10,9 @@ from django.template.loader import render_to_string
 from ondoc.account.models import MerchantPayout, ConsumerAccount, Order, UserReferred, MoneyPool, Invoice
 from ondoc.authentication.models import (TimeStampedModel, CreatedByModel, Image, Document, QCModel, UserProfile, User,
                                          UserPermission, GenericAdmin, LabUserPermission, GenericLabAdmin,
-                                         BillingAccount, SPOCDetails)
+                                         BillingAccount, SPOCDetails, RefundMixin)
 from ondoc.bookinganalytics.models import DP_OpdConsultsAndTests
+from ondoc.crm.constants import constants
 from ondoc.doctor.models import Hospital, SearchKey, CancellationReason
 from ondoc.coupon.models import Coupon
 from ondoc.location.models import EntityUrls
@@ -55,10 +56,11 @@ from ondoc.location import models as location_models
 from ondoc.ratings_review import models as ratings_models
 from ondoc.api.v1.common import serializers as common_serializers
 from ondoc.common.models import AppointmentHistory, AppointmentMaskNumber, Remark, GlobalNonBookable, \
-    SyncBookingAnalytics, CompletedBreakupMixin
+    SyncBookingAnalytics, CompletedBreakupMixin, RefundDetails
 import reversion
 from decimal import Decimal
 from django.utils.text import slugify
+from django.utils.functional import cached_property
 #from ondoc.api.v1.diagnostic import serializers as diagnostic_serializers
 
 logger = logging.getLogger(__name__)
@@ -226,6 +228,7 @@ class Lab(TimeStampedModel, CreatedByModel, QCModel, SearchKey):
     open_for_communication = models.BooleanField(default=True)
     remark = GenericRelation(Remark)
     rating_data = JSONField(blank=True, null=True)
+    is_location_verified = models.BooleanField(verbose_name='Location Verified', default=False)
 
     def __str__(self):
         return self.name
@@ -233,11 +236,35 @@ class Lab(TimeStampedModel, CreatedByModel, QCModel, SearchKey):
     class Meta:
         db_table = "lab"
 
+    @cached_property
+    def is_enabled_for_insurance(self):
+        return self.is_insurance_enabled
+
     def open_for_communications(self):
         if (self.network and self.network.open_for_communication) or (not self.network and self.open_for_communication):
             return True
 
         return False
+
+    @classmethod
+    def get_insurance_details(cls, user):
+
+        resp = {
+            'is_insurance_covered': False,
+            'insurance_threshold_amount': None,
+            'is_user_insured': False
+        }
+
+        if user.is_authenticated and not user.is_anonymous:
+            user_insurance = user.active_insurance
+            if user_insurance:
+                insurance_threshold = user_insurance.insurance_threshold
+                if insurance_threshold:
+                    resp['insurance_threshold_amount'] = 0 if insurance_threshold.lab_amount_limit is None else \
+                        insurance_threshold.lab_amount_limit
+                    resp['is_user_insured'] = True
+
+        return resp
 
     def convert_min(self, min):
         min_str = str(min)
@@ -400,6 +427,12 @@ class Lab(TimeStampedModel, CreatedByModel, QCModel, SearchKey):
         if self.is_live and (self.onboarding_status != self.ONBOARDED or self.data_status != self.QC_APPROVED or self.enabled == False):
             self.is_live = False
 
+    def display_rating_on_list(self):
+        if self.rating_data and ((self.rating_data.get('rating_count') and self.rating_data['rating_count'] > 5) or \
+                                 (self.rating_data.get('avg_rating') and self.rating_data['avg_rating'] > 4)):
+            return True
+        return False
+
     def save(self, *args, **kwargs):
         self.clean()
 
@@ -480,6 +513,7 @@ class Lab(TimeStampedModel, CreatedByModel, QCModel, SearchKey):
                         from ratings_review rr
                         inner join lab l on rr.object_id = l.id 
                         and rr.content_type_id={}
+                        where rr.is_live='true'
                         group by case when l.network_id is null then l.id else l.network_id end
                         )x where case when l.network_id is null then l.id=x.lab_id else l.network_id=x.network_id end
                         )
@@ -543,14 +577,14 @@ class Lab(TimeStampedModel, CreatedByModel, QCModel, SearchKey):
         return res_data
 
     def get_available_slots(self, is_home_pickup, pincode, date):
-        from ondoc.integrations.models import IntegratorMapping
+        from ondoc.integrations.models import IntegratorTestMapping
         from ondoc.integrations import service
 
         integration_dict = None
         lab = Lab.objects.filter(id=self.id).first()
         if lab:
             if lab.network and lab.network.id:
-                integration_dict = IntegratorMapping.get_if_third_party_integration(network_id=lab.network.id)
+                integration_dict = IntegratorTestMapping.get_if_third_party_integration(network_id=lab.network.id)
 
                 if lab.network.id == settings.THYROCARE_NETWORK_ID and settings.THYROCARE_INTEGRATION_ENABLED:
                     pass
@@ -568,11 +602,11 @@ class Lab(TimeStampedModel, CreatedByModel, QCModel, SearchKey):
         return available_slots
 
     def is_integrated(self):
-        from ondoc.integrations.models import IntegratorMapping
+        from ondoc.integrations.models import IntegratorTestMapping
 
         integration_dict = None
         if self.network and self.network.id:
-            integration_dict = IntegratorMapping.get_if_third_party_integration(network_id=self.network.id)
+            integration_dict = IntegratorTestMapping.get_if_third_party_integration(network_id=self.network.id)
         if not integration_dict:
             return False
         else:
@@ -1089,6 +1123,7 @@ class LabTest(TimeStampedModel, SearchKey):
                                         through_fields=('lab_test', 'parent_category'),
                                         related_name='recommended_lab_tests')
     reference_code = models.CharField(max_length=150, blank=True, default='')
+    is_cancellable = models.BooleanField(default=True)
     # test_sub_type = models.ManyToManyField(
     #     LabTestSubType,
     #     through='LabTestSubTypeMapping',
@@ -1365,9 +1400,9 @@ class LabAppointmentInvoiceMixin(object):
 
 
 @reversion.register()
-class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin, CompletedBreakupMixin):
+class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin, RefundMixin, CompletedBreakupMixin):
     from ondoc.integrations.models import IntegratorResponse
-
+    PRODUCT_ID = Order.LAB_PRODUCT_ID
     CREATED = 1
     BOOKED = 2
     RESCHEDULED_LAB = 3
@@ -1405,7 +1440,7 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin,
     payment_status = models.PositiveIntegerField(choices=OpdAppointment.PAYMENT_STATUS_CHOICES,
                                                  default=OpdAppointment.PAYMENT_PENDING)
     payment_type = models.PositiveSmallIntegerField(choices=OpdAppointment.PAY_CHOICES, default=OpdAppointment.PREPAID)
-    insurance = models.ForeignKey(insurance_model.Insurance, blank=True, null=True, default=None,
+    insurance = models.ForeignKey(insurance_model.UserInsurance, blank=True, null=True, default=None,
                                   on_delete=models.DO_NOTHING)
     is_home_pickup = models.BooleanField(default=False)
     address = JSONField(blank=True, null=True)
@@ -1430,7 +1465,9 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin,
     synced_analytics = GenericRelation(SyncBookingAnalytics, related_name="lab_booking_analytics")
     integrator_response = GenericRelation(IntegratorResponse)
     history = GenericRelation(AppointmentHistory)
+    refund_details = GenericRelation(RefundDetails, related_query_name="lab_appointment_detail")
 
+    
     def get_city(self):
         if self.lab and self.lab.city:
             return self.lab.city.id
@@ -1443,7 +1480,6 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin,
         else:
             return None
 
-
     def sync_with_booking_analytics(self):
 
         category = None
@@ -1455,7 +1491,7 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin,
 
         promo_cost = self.deal_price - self.effective_price if self.deal_price and self.effective_price else None
 
-        obj = DP_OpdConsultsAndTests.objects.filter(Appointment_Id=self.id).first()
+        obj = DP_OpdConsultsAndTests.objects.filter(Appointment_Id=self.id, TypeId=2).first()
         if not obj:
             obj = DP_OpdConsultsAndTests()
             obj.Appointment_Id = self.id
@@ -1482,16 +1518,26 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin,
 
     def get_tests_and_prices(self):
         test_price = []
-        for test in self.test_mappings.all():
-            test_price.append({'name': test.test.name, 'mrp': test.mrp, 'deal_price': (
-                test.custom_deal_price if test.custom_deal_price else test.computed_deal_price),
-                               'discount': test.mrp - (
-                                   test.custom_deal_price if test.custom_deal_price else test.computed_deal_price)})
+        if self.payment_type == OpdAppointment.INSURANCE:
+            for test in self.test_mappings.all():
+                test_price.append({'name': test.test.name, 'mrp': test.mrp, 'deal_price': "0.00",
+                                   'discount': test.mrp})
 
-        if self.is_home_pickup:
-            test_price.append(
-                {'name': 'Home Pick Up Charges', 'mrp': self.home_pickup_charges, 'deal_price': self.home_pickup_charges,
-                 'discount': '0.00'})
+            if self.is_home_pickup:
+                test_price.append(
+                    {'name': 'Home Pick Up Charges', 'mrp': self.home_pickup_charges, 'deal_price': "0.00",
+                     'discount': self.home_pickup_charges})
+        else:
+            for test in self.test_mappings.all():
+                test_price.append({'name': test.test.name, 'mrp': test.mrp, 'deal_price': (
+                    test.custom_deal_price if test.custom_deal_price else test.computed_deal_price),
+                                   'discount': test.mrp - (
+                                       test.custom_deal_price if test.custom_deal_price else test.computed_deal_price)})
+
+            if self.is_home_pickup:
+                test_price.append(
+                    {'name': 'Home Pick Up Charges', 'mrp': self.home_pickup_charges, 'deal_price': self.home_pickup_charges,
+                     'discount': '0.00'})
 
         return test_price
 
@@ -1546,7 +1592,9 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin,
         current_datetime = timezone.now()
         if user_type == User.CONSUMER and current_datetime <= self.time_slot_start:
             if self.status in (self.BOOKED, self.ACCEPTED, self.RESCHEDULED_LAB, self.RESCHEDULED_PATIENT):
-                allowed = [self.RESCHEDULED_PATIENT, self.CANCELLED]
+                allowed = [self.RESCHEDULED_PATIENT]
+                if all([x.is_cancellable for x in self.tests.all()]):
+                    allowed += [self.CANCELLED]
         if user_type == User.DOCTOR and self.time_slot_start.date() >= current_datetime.date():
             perm_queryset = auth_model.GenericLabAdmin.objects.filter(is_disabled=False, user=request.user)
             if perm_queryset.first():
@@ -1593,8 +1641,12 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin,
 
         if parent_order and parent_order.visitor_info:
             from_app = parent_order.visitor_info.get('from_app', False)
+            app_version = parent_order.visitor_info.get('app_version', None)
 
-        return from_app
+        if from_app and app_version and float(app_version) < float('1.2'):
+            return True
+        else:
+            return False
 
     def app_commit_tasks(self, old_instance, push_to_matrix, push_to_integrator):
         if push_to_matrix:
@@ -1855,28 +1907,11 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin,
 
     @transaction.atomic
     def action_cancelled(self, refund_flag=1):
-
-        # Taking Lock first
-        consumer_account = None
-        if self.payment_type == OpdAppointment.PREPAID:
-            temp_list = account_model.ConsumerAccount.objects.get_or_create(user=self.user)
-            consumer_account = account_model.ConsumerAccount.objects.select_for_update().get(user=self.user)
-
         old_instance = LabAppointment.objects.get(pk=self.id)
         if old_instance.status != self.CANCELLED:
             self.status = self.CANCELLED
             self.save()
-            product_id = account_model.Order.LAB_PRODUCT_ID
-
-            if self.payment_type == OpdAppointment.PREPAID and account_model.ConsumerTransaction.valid_appointment_for_cancellation(
-                    self.id, product_id):
-
-                wallet_refund, cashback_refund = self.get_cancellation_breakup()
-
-                consumer_account.credit_cancellation(self, account_model.Order.LAB_PRODUCT_ID, wallet_refund, cashback_refund)
-                if refund_flag:
-                    ctx_obj = consumer_account.debit_refund()
-                    account_model.ConsumerRefund.initiate_refund(self.user, ctx_obj)
+            self.action_refund(refund_flag)
 
     def get_cancellation_breakup(self):
         wallet_refund = cashback_refund = 0
@@ -2062,6 +2097,10 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin,
             effective_price = 0
             coupon_discount, coupon_cashback, coupon_list = 0, 0, []
 
+        if data.get("payment_type") in [OpdAppointment.INSURANCE]:
+            effective_price = effective_price
+            coupon_discount, coupon_cashback, coupon_list = 0, 0, []
+
         return {
             "deal_price" : total_deal_price,
             "mrp" : total_mrp,
@@ -2076,6 +2115,7 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin,
     @classmethod
     def create_fulfillment_data(cls, user, data, price_data):
         from ondoc.api.v1.auth.serializers import AddressSerializer
+        from ondoc.insurance.models import UserInsurance
 
         lab_test_queryset = AvailableLabTest.objects.filter(lab_pricing_group__labs=data["lab"], test__in=data['test_ids'])
         test_ids_list = list()
@@ -2098,6 +2138,23 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin,
             "gender": data["profile"].gender,
             "dob": str(data["profile"].dob),
         }
+        payment_type = data.get("payment_type")
+        effective_price = price_data.get("effective_price")
+        cart_data = data.get('cart_item').data
+        is_appointment_insured = cart_data.get('is_appointment_insured', None)
+        insurance_id = cart_data.get('insurance_id', None)
+        # user_insurance = UserInsurance.objects.filter(user=user).last()
+        # if user_insurance:
+        #     insurance_validate_dict = user_insurance.validate_insurance(data)
+        #     is_appointment_insured = insurance_validate_dict['is_insured']
+        #     insurance_id = insurance_validate_dict['insurance_id']
+        #     insurance_message = insurance_validate_dict['insurance_message']
+
+        if is_appointment_insured:
+            payment_type = OpdAppointment.INSURANCE
+            effective_price = 0.0
+        else:
+            insurance_id = None
 
         fulfillment_data = {
             "lab": data["lab"],
@@ -2106,18 +2163,20 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin,
             "price": price_data.get("mrp"),
             "agreed_price": price_data.get("fees"),
             "deal_price": price_data.get("deal_price"),
-            "effective_price": price_data.get("effective_price"),
+            "effective_price": effective_price,
             "home_pickup_charges": price_data.get("home_pickup_charges"),
             "time_slot_start": start_dt,
             "is_home_pickup": data["is_home_pickup"],
             "profile_detail": profile_detail,
             "status": LabAppointment.BOOKED,
-            "payment_type": data["payment_type"],
+            "payment_type": payment_type,
             "lab_test": test_ids_list,
             "extra_details": extra_details,
             "coupon": price_data.get("coupon_list"),
             "discount": int(price_data.get("coupon_discount")),
-            "cashback": int(price_data.get("coupon_cashback"))
+            "cashback": int(price_data.get("coupon_cashback")),
+            "is_appointment_insured": is_appointment_insured,
+            "insurance": insurance_id
         }
 
         if data.get('included_in_user_plan', False):
@@ -2202,6 +2261,10 @@ class CommonTest(TimeStampedModel):
     def __str__(self):
         return "{}-{}".format(self.test.name, self.id)
 
+    @classmethod
+    def get_tests(cls, count):
+        tests = cls.objects.select_related('test').filter(test__enable_for_retail=True, test__searchable=True).order_by('-priority')[:count]
+        return tests
 
 class CommonPackage(TimeStampedModel):
     package = models.ForeignKey(LabTest, on_delete=models.CASCADE, related_name='commonpackage')
@@ -2213,6 +2276,10 @@ class CommonPackage(TimeStampedModel):
     class Meta:
         db_table = 'common_package'
 
+    @classmethod
+    def get_packages(cls, count):
+        packages = cls.objects.prefetch_related('package').filter(package__enable_for_retail=True, package__searchable=True).order_by('-priority')[:count]
+        return packages
 
 class CommonDiagnosticCondition(TimeStampedModel):
     name = models.CharField(max_length=200)
@@ -2529,3 +2596,20 @@ class LabTestGroupMapping(TimeStampedModel):
 
     class Meta:
         db_table = "lab_test_group_mapping"
+
+
+class TestParameterChat(TimeStampedModel):
+    test = models.ForeignKey(LabTest, on_delete=models.CASCADE, null=True)
+    age_from = models.PositiveIntegerField()
+    age_to = models.PositiveIntegerField()
+    gender = models.CharField(max_length=30, null=True, blank=True)
+    min_range = models.DecimalField(blank=True, null=True, max_digits=10,decimal_places=2)
+    max_range = models.DecimalField(blank=True, null=True, max_digits=10,decimal_places=2)
+    test_name = models.CharField(blank=False, null=False, max_length=60)
+
+    def __str__(self):
+        return self.test_name
+
+    class Meta:
+        db_table = 'test_parameter_chat'
+

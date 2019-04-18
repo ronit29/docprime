@@ -31,6 +31,8 @@ openpyxl==2.5.6
 django-user-agents==0.3.2
 pymongo==3.7.2
 django-hardcopy
+docopt==0.6.2
+num2words==0.5.8
 ddtrace
 setproctitle
 django-fluent-comments
@@ -43,3 +45,7 @@ qrcode
 pyodbc==3.0.10
 django-pyodbc-azure==2.0.4.1
 django-mssql
+xmltodict
+packaging==19.0
+gevent
+beautifulsoup4==4.7.1
