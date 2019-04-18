@@ -882,6 +882,26 @@ class MoneyPool(TimeStampedModel):
     cashback = models.DecimalField(max_digits=10, decimal_places=2, default=0)
     logs = JSONField(default=[])
 
+    def get_completed_appointments(self):
+        from ondoc.doctor.models import OpdAppointment
+        from ondoc.diagnostic.models import LabAppointment
+
+        opd_apps = self.opd_apps.filter(status=OpdAppointment.COMPLETED)[:]
+        lab_apps = self.lab_apps.filter(status=LabAppointment.COMPLETED)[:]
+
+        completed_appointments = [*opd_apps, *lab_apps]
+
+        def compare_app(obj):
+            history = obj.history.filter(status=obj.COMPLETED).first()
+            if history:
+                return history.created_at
+            return obj.updated_at
+
+        if completed_appointments:
+            completed_appointments = sorted(completed_appointments, key=compare_app)
+
+        return completed_appointments
+
     @transaction.atomic()
     def get_refund_breakup(self, amount):
         # sanity if, pool is empty and refund is still required
