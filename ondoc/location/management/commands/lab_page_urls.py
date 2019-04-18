@@ -17,8 +17,6 @@ def map_lab_location_urls():
     EntityUrls.objects.filter(sitemap_identifier='LAB_PAGE', sequence__lt=sequence).update(is_valid=False)
 
 
-
-
 class Command(BaseCommand):
     def handle(self, **options):
         map_lab_location_urls()

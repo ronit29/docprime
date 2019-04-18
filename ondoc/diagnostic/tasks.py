@@ -22,3 +22,11 @@ def lab_app_auto_cancel(self, prev_app_dict):
 
     except Exception as e:
         logger.error("Error in Celery auto cancel flow - " + str(e))
+
+@task
+def update_lab_seo_urls():
+    from ondoc.diagnostic.models import Lab
+    Lab.update_labs_seo_urls()
+
+
+

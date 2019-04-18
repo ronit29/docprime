@@ -54,3 +54,13 @@ def update_city_search_key():
 def update_doctors_count():
     from ondoc.doctor.services.doctor_count_in_practice_spec import DoctorSearchScore
     DoctorSearchScore.update_doctors_count()
+
+@task
+def update_doctors_search_score():
+    from ondoc.doctor.services.update_search_score import DoctorSearchScore
+    DoctorSearchScore.calculate()
+
+@task
+def update_all_doctors_seo_urls():
+    from ondoc.doctor.models import Doctor
+    Doctor.update_doctors_seo_urls()

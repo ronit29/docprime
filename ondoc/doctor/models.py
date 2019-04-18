@@ -617,6 +617,26 @@ class Doctor(auth_model.TimeStampedModel, auth_model.QCModel, SearchKey, auth_mo
     def __str__(self):
         return '{} ({})'.format(self.name, self.id)
 
+    @classmethod
+    def update_doctors_seo_urls(cls):
+        from ondoc.location.management.commands import map_hospital_geocoding_results, map_entity_address, \
+            calculate_centroid, map_hosp_entity_location_relations, doctor_search_urls_new
+        # map hospital geocoding results
+        map_hospital_geocoding_results.map_hospital_geocoding_results()
+
+        # map entity address
+        map_entity_address.map_entity_address()
+
+        # calculate centroid
+        calculate_centroid.calculate_centroid()
+
+        # map hospital entity location relations
+        map_hosp_entity_location_relations.map_hosp_entity_location_relations()
+
+        # update search and profile urls
+        doctor_search_urls_new.doctor_urls()
+
+
     # @property
     @cached_property
     def is_enabled_for_insurance(self):
