@@ -42,7 +42,7 @@ from ondoc.diagnostic.models import (Lab, LabTiming, LabImage, GenericLabAdmin,
 from ondoc.insurance.models import (Insurer, InsurancePlans, InsuranceThreshold, InsuranceCity, StateGSTCode,
                                     InsuranceDistrict, InsuranceTransaction, InsuranceDeal, InsuranceDisease,
                                     UserInsurance, InsurancePlanContent, InsuredMembers, InsurerAccount, InsuranceLead,
-                                    InsuranceDiseaseResponse)
+                                    InsuranceDiseaseResponse, InsurerPolicyNumber)
 
 from ondoc.procedure.models import Procedure, ProcedureCategory, CommonProcedureCategory, DoctorClinicProcedure, \
     ProcedureCategoryMapping, ProcedureToCategoryMapping, CommonProcedure, IpdProcedure, IpdProcedureFeatureMapping, \
@@ -54,7 +54,7 @@ from ondoc.diagnostic.models import LabPricing
 from ondoc.integrations.models import IntegratorMapping, IntegratorProfileMapping, IntegratorReport, IntegratorTestMapping
 from ondoc.subscription_plan.models import Plan, PlanFeature, PlanFeatureMapping, UserPlanMapping
 
-from ondoc.web.models import Career, OnlineLead
+from ondoc.web.models import Career, OnlineLead, UploadImage
 from ondoc.ratings_review import models as rating_models
 from ondoc.articles.models import Article, ArticleLinkedUrl, LinkedArticle, ArticleContentBox, ArticleCategory
 
@@ -546,7 +546,7 @@ class Command(BaseCommand):
 
         content_types = ContentType.objects.get_for_models(PaymentOptions, EntityUrls, Feature, Service, Doctor,
                                                            HealthInsuranceProvider, IpdProcedureCategory, Plan,
-                                                           PlanFeature, PlanFeatureMapping, UserPlanMapping)
+                                                           PlanFeature, PlanFeatureMapping, UserPlanMapping, UploadImage)
 
         for cl, ct in content_types.items():
             permissions = Permission.objects.filter(
@@ -663,6 +663,9 @@ class Command(BaseCommand):
                 Q(codename='change_' + ct.model))
 
             group.permissions.add(*permissions)
+
+        group, created = Group.objects.get_or_create(name=constants['APPOINTMENT_REFUND_TEAM'])
+        #group.permissions.clear()
 
         self.stdout.write('Successfully created groups and permissions')
 
@@ -882,7 +885,8 @@ class Command(BaseCommand):
                                                            InsurancePlanContent, InsurancePlans, InsuranceCity,
                                                            StateGSTCode, InsuranceDistrict, InsuranceThreshold,
                                                            UserInsurance, InsuranceDeal, InsuranceLead,
-                                                           InsuranceTransaction, InsuranceDiseaseResponse)
+                                                           InsuranceTransaction, InsuranceDiseaseResponse,
+                                                           InsuredMembers, InsurerPolicyNumber)
 
         for cl, ct in content_types.items():
             permissions = Permission.objects.filter(

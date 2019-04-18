@@ -24,7 +24,7 @@ from datetime import timedelta
 from dateutil import tz
 from django.utils import timezone
 from ondoc.authentication import models as auth_model
-from ondoc.authentication.models import SPOCDetails
+from ondoc.authentication.models import SPOCDetails, RefundMixin
 from ondoc.location import models as location_models
 from ondoc.account.models import Order, ConsumerAccount, ConsumerTransaction, PgTransaction, ConsumerRefund, \
     MerchantPayout, UserReferred, MoneyPool, Invoice
@@ -40,7 +40,8 @@ from ondoc.notification import tasks as notification_tasks
 from django.contrib.contenttypes.fields import GenericRelation
 from ondoc.api.v1.utils import get_start_end_datetime, custom_form_datetime, CouponsMixin, aware_time_zone, \
     form_time_slot, util_absolute_url, html_to_pdf, TimeSlotExtraction
-from ondoc.common.models import AppointmentHistory, AppointmentMaskNumber, Service, Remark, MatrixMappedState, MatrixMappedCity, GlobalNonBookable
+from ondoc.common.models import AppointmentHistory, AppointmentMaskNumber, Service, Remark, MatrixMappedState, \
+    MatrixMappedCity, GlobalNonBookable, RefundDetails
 from ondoc.common.models import QRCode
 
 from functools import reduce
@@ -71,6 +72,8 @@ from safedelete import SOFT_DELETE
 #from ondoc.api.v1.doctor import serializers as doctor_serializers
 import qrcode
 from django.utils.functional import cached_property
+from ondoc.crm.constants import constants
+from django.utils.text import slugify
 
 logger = logging.getLogger(__name__)
 
@@ -227,9 +230,11 @@ class Hospital(auth_model.TimeStampedModel, auth_model.CreatedByModel, auth_mode
     about = models.TextField(blank=True, null=True, default="")
     opd_timings = models.CharField(max_length=150, blank=True, null=True, default="")
     always_open = models.BooleanField(verbose_name='Is hospital open 24X7', default=False)
+    # ratings = GenericRelation(ratings_models.RatingsReview, related_query_name='hospital_ratings')
     city_search_key = models.CharField(db_index=True, editable=False, max_length=100, default="", null=True, blank=True)
     enabled_for_cod = models.BooleanField(default=False)
     enabled_for_prepaid = models.BooleanField(default=True)
+    is_location_verified = models.BooleanField(verbose_name='Location Verified', default=False)
 
     def __str__(self):
         return self.name
@@ -261,8 +266,12 @@ class Hospital(auth_model.TimeStampedModel, auth_model.CreatedByModel, auth_mode
         )y where hospital.id = y.id'''
         update_alternative_value = RawSql(query, []).execute()
 
-        query1 = '''update hospital set city_search_key = lower(city) where city_search_key is null
-                        or city_search_key='' '''
+        query1 = '''update hospital set city_search_key = 
+                    case when lower(city) in ('bengaluru','bengalooru') then 'bangalore'
+                    when lower(city) in ('gurugram','gurugram rural') then 'gurgaon'
+                    else lower(city) end
+                    where city_search_key is null
+                    or city_search_key='' '''
         update_city = RawSql(query1, []).execute()
 
 
@@ -415,7 +424,8 @@ class HospitalPlaceDetails(auth_model.TimeStampedModel):
                 if place_searched_data.get('result'):
                     place_searched_data = place_searched_data.get('result')
                     data.place_details = place_searched_data
-                    data.reviews = place_searched_data.get('reviews')
+                    data.reviews = {'user_avg_rating': place_searched_data.get('rating'), 'user_reviews': place_searched_data.get('reviews'),
+                                    'user_ratings_total': place_searched_data.get('user_ratings_total')}
                     data.save()
 
 
@@ -795,7 +805,7 @@ class Doctor(auth_model.TimeStampedModel, auth_model.QCModel, SearchKey, auth_mo
                        (
                        select json_build_object('avg_rating', x.avg_rating,'rating_count', x.rating_count) from
                        (select object_id as doctor_id,round(avg(ratings),1) avg_rating, count(*) rating_count from 
-                       ratings_review where content_type_id={} group by object_id
+                       ratings_review where content_type_id={} AND is_live='true' group by object_id
                        )x where x.doctor_id = d.id				  
                        ) where id in (select object_id from ratings_review where content_type_id={})
                      '''.format(cid, cid)
@@ -822,7 +832,7 @@ class Doctor(auth_model.TimeStampedModel, auth_model.QCModel, SearchKey, auth_mo
         image_file1 = InMemoryUploadedFile(tempfile_io, None, filename, 'image/jpeg', tempfile_io.tell(), None)
 
         QRCode_object = QRCode(name=image_file1, content_type=ContentType.objects.get_for_model(Doctor),
-                               object_id=self.id)
+                               object_id=self.id, data={"url": doctor_url})
         QRCode_object.save()
         return QRCode_object
 
@@ -1167,6 +1177,21 @@ class DoctorImage(auth_model.TimeStampedModel, auth_model.Image):
     def __str__(self):
         return '{}'.format(self.doctor)
 
+    def get_image_name(self):
+        name = self.doctor.name
+        doctor_spec_name = "dr " + name
+        selected_spec = None
+        for dps in self.doctor.doctorpracticespecializations.all():
+            if not selected_spec:
+                selected_spec = dps.specialization
+            if dps.specialization.doctor_count > selected_spec.doctor_count:
+                selected_spec = dps.specialization
+
+        if selected_spec:
+            doctor_spec_name += " " + selected_spec.name
+        doctor_spec_name = doctor_spec_name.strip()
+        return slugify(doctor_spec_name)
+
     def resize_cropped_image(self, width, height):
         default_storage_class = get_storage_class()
         storage_instance = default_storage_class()
@@ -1232,7 +1257,9 @@ class DoctorImage(auth_model.TimeStampedModel, auth_model.Image):
                 img = img.crop(cropping_area)
             new_image_io = BytesIO()
             img.save(new_image_io, format='JPEG')
-            md5_hash = hashlib.md5(img.tobytes()).hexdigest()
+            #md5_hash = hashlib.md5(img.tobytes()).hexdigest()
+            md5_hash = self.get_image_name()
+
             self.cropped_image = InMemoryUploadedFile(new_image_io, None, md5_hash + ".jpg", 'image/jpeg',
                                                       new_image_io.tell(), None)
             self.save()
@@ -1240,9 +1267,27 @@ class DoctorImage(auth_model.TimeStampedModel, auth_model.Image):
     def save_to_cropped_image(self, image_file):
         if image_file:
             img = Img.open(image_file)
-            md5_hash = hashlib.md5(img.tobytes()).hexdigest()
+            #md5_hash = hashlib.md5(img.tobytes()).hexdigest()
+            md5_hash = self.get_image_name()
             self.cropped_image.save(md5_hash + ".jpg", image_file, save=True)
             #self.save()
+
+    @classmethod
+    def rename_cropped_images(cls):
+        images = cls.objects.filter(cropped_image__isnull=False).filter(doctor__is_live=True).order_by('id')[:100]
+        for img in images:
+            image_name = img.get_image_name()
+            if img.cropped_image and not img.cropped_image.name.endswith(image_name+'.jpg'):
+                new_img = Img.open(img.cropped_image)
+                if new_img.mode != 'RGB':
+                    new_img = new_img.convert('RGB')
+                new_image_io = BytesIO()
+                new_img.save(new_image_io, format='JPEG')
+
+                img.cropped_image = InMemoryUploadedFile(new_image_io, None, image_name + ".jpg", 'image/jpeg',
+                                                          new_image_io.tell(), None)
+                img.save()
+
 
     class Meta:
         db_table = "doctor_image"
@@ -1655,7 +1700,8 @@ class OpdAppointmentInvoiceMixin(object):
 
 
 @reversion.register()
-class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentInvoiceMixin):
+class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentInvoiceMixin, RefundMixin):
+    PRODUCT_ID = Order.DOCTOR_PRODUCT_ID
     CREATED = 1
     BOOKED = 2
     RESCHEDULED_DOCTOR = 3
@@ -1729,6 +1775,7 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
     money_pool = models.ForeignKey(MoneyPool, on_delete=models.SET_NULL, null=True)
     mask_number = GenericRelation(AppointmentMaskNumber)
     email_notification = GenericRelation(EmailNotification, related_name="enotification")
+    refund_details = GenericRelation(RefundDetails, related_query_name="opd_appointment_detail")
 
     def __str__(self):
         return self.profile.name + " (" + self.doctor.name + ")"
@@ -1789,7 +1836,7 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
     @classmethod
     def get_upcoming_appointment(cls, user_id):
         current_time = timezone.now()
-        appointments = OpdAppointment.objects.filter(time_slot_start__gte=current_time, user_id=user_id).exclude(
+        appointments = OpdAppointment.objects.filter(time_slot_start__lte=current_time + timedelta(hours=48), user_id=user_id, time_slot_start__gte=current_time).exclude(
             status__in=[OpdAppointment.CANCELLED, OpdAppointment.COMPLETED]).select_related('doctor', 'hospital','profile')
         return appointments
 
@@ -1837,26 +1884,11 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
 
     @transaction.atomic
     def action_cancelled(self, refund_flag=1):
-
-        # Taking Lock first
-        consumer_account = None
-        if self.payment_type == self.PREPAID:
-            temp_list = ConsumerAccount.objects.get_or_create(user=self.user)
-            consumer_account = ConsumerAccount.objects.select_for_update().get(user=self.user)
-
         old_instance = OpdAppointment.objects.get(pk=self.id)
         if old_instance.status != self.CANCELLED:
             self.status = self.CANCELLED
             self.save()
-            product_id = Order.DOCTOR_PRODUCT_ID
-            if self.payment_type == self.PREPAID and ConsumerTransaction.valid_appointment_for_cancellation(self.id,
-                                                                                                            product_id):
-                wallet_refund, cashback_refund = self.get_cancellation_breakup()
-                consumer_account.credit_cancellation(self, product_id, wallet_refund, cashback_refund)
-
-                if refund_flag:
-                    ctx_obj = consumer_account.debit_refund()
-                    ConsumerRefund.initiate_refund(self.user, ctx_obj)
+            self.action_refund(refund_flag)
 
     def get_cancellation_breakup(self):
         wallet_refund = cashback_refund = 0
@@ -1994,8 +2026,6 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
         push_to_matrix = True
         if database_instance and self.status == database_instance.status and self.time_slot_start == database_instance.time_slot_start:
             push_to_matrix = False
-        else:
-            push_to_matrix = True
 
         try:
             # while completing appointment
@@ -2549,6 +2579,11 @@ class CommonSpecialization(auth_model.TimeStampedModel):
 
     class Meta:
         db_table = "common_specializations"
+
+    @classmethod
+    def get_specializations(cls, count):
+        specializations = cls.objects.select_related('specialization').all().order_by("-priority")[:count]
+        return specializations
 
 
 class DoctorMapping(auth_model.TimeStampedModel):

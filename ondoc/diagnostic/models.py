@@ -10,7 +10,8 @@ from django.template.loader import render_to_string
 from ondoc.account.models import MerchantPayout, ConsumerAccount, Order, UserReferred, MoneyPool, Invoice
 from ondoc.authentication.models import (TimeStampedModel, CreatedByModel, Image, Document, QCModel, UserProfile, User,
                                          UserPermission, GenericAdmin, LabUserPermission, GenericLabAdmin,
-                                         BillingAccount, SPOCDetails)
+                                         BillingAccount, SPOCDetails, RefundMixin)
+from ondoc.crm.constants import constants
 from ondoc.doctor.models import Hospital, SearchKey, CancellationReason
 from ondoc.coupon.models import Coupon
 from ondoc.location.models import EntityUrls
@@ -53,7 +54,7 @@ from ondoc.integrations.task import push_lab_appointment_to_integrator, get_inte
 from ondoc.location import models as location_models
 from ondoc.ratings_review import models as ratings_models
 from ondoc.api.v1.common import serializers as common_serializers
-from ondoc.common.models import AppointmentHistory, AppointmentMaskNumber, Remark, GlobalNonBookable
+from ondoc.common.models import AppointmentHistory, AppointmentMaskNumber, Remark, GlobalNonBookable, RefundDetails
 import reversion
 from decimal import Decimal
 from django.utils.text import slugify
@@ -225,6 +226,7 @@ class Lab(TimeStampedModel, CreatedByModel, QCModel, SearchKey):
     open_for_communication = models.BooleanField(default=True)
     remark = GenericRelation(Remark)
     rating_data = JSONField(blank=True, null=True)
+    is_location_verified = models.BooleanField(verbose_name='Location Verified', default=False)
 
     def __str__(self):
         return self.name
@@ -509,6 +511,7 @@ class Lab(TimeStampedModel, CreatedByModel, QCModel, SearchKey):
                         from ratings_review rr
                         inner join lab l on rr.object_id = l.id 
                         and rr.content_type_id={}
+                        where rr.is_live='true'
                         group by case when l.network_id is null then l.id else l.network_id end
                         )x where case when l.network_id is null then l.id=x.lab_id else l.network_id=x.network_id end
                         )
@@ -1395,9 +1398,9 @@ class LabAppointmentInvoiceMixin(object):
 
 
 @reversion.register()
-class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin):
+class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin, RefundMixin):
     from ondoc.integrations.models import IntegratorResponse
-
+    PRODUCT_ID = Order.LAB_PRODUCT_ID
     CREATED = 1
     BOOKED = 2
     RESCHEDULED_LAB = 3
@@ -1458,6 +1461,8 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin)
     user_plan_used = models.ForeignKey('subscription_plan.UserPlanMapping', null=True, on_delete=models.DO_NOTHING,
                                        related_name='appointment_using')
     integrator_response = GenericRelation(IntegratorResponse)
+    refund_details = GenericRelation(RefundDetails, related_query_name="lab_appointment_detail")
+
 
     def get_tests_and_prices(self):
         test_price = []
@@ -1584,8 +1589,12 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin)
 
         if parent_order and parent_order.visitor_info:
             from_app = parent_order.visitor_info.get('from_app', False)
+            app_version = parent_order.visitor_info.get('app_version', None)
 
-        return from_app
+        if from_app and app_version and float(app_version) < float('1.2'):
+            return True
+        else:
+            return False
 
     def app_commit_tasks(self, old_instance, push_to_matrix, push_to_integrator):
         if push_to_matrix:
@@ -1846,28 +1855,11 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin)
 
     @transaction.atomic
     def action_cancelled(self, refund_flag=1):
-
-        # Taking Lock first
-        consumer_account = None
-        if self.payment_type == OpdAppointment.PREPAID:
-            temp_list = account_model.ConsumerAccount.objects.get_or_create(user=self.user)
-            consumer_account = account_model.ConsumerAccount.objects.select_for_update().get(user=self.user)
-
         old_instance = LabAppointment.objects.get(pk=self.id)
         if old_instance.status != self.CANCELLED:
             self.status = self.CANCELLED
             self.save()
-            product_id = account_model.Order.LAB_PRODUCT_ID
-
-            if self.payment_type == OpdAppointment.PREPAID and account_model.ConsumerTransaction.valid_appointment_for_cancellation(
-                    self.id, product_id):
-
-                wallet_refund, cashback_refund = self.get_cancellation_breakup()
-
-                consumer_account.credit_cancellation(self, account_model.Order.LAB_PRODUCT_ID, wallet_refund, cashback_refund)
-                if refund_flag:
-                    ctx_obj = consumer_account.debit_refund()
-                    account_model.ConsumerRefund.initiate_refund(self.user, ctx_obj)
+            self.action_refund(refund_flag)
 
     def get_cancellation_breakup(self):
         wallet_refund = cashback_refund = 0
@@ -2217,6 +2209,10 @@ class CommonTest(TimeStampedModel):
     def __str__(self):
         return "{}-{}".format(self.test.name, self.id)
 
+    @classmethod
+    def get_tests(cls, count):
+        tests = cls.objects.select_related('test').filter(test__enable_for_retail=True, test__searchable=True).order_by('-priority')[:count]
+        return tests
 
 class CommonPackage(TimeStampedModel):
     package = models.ForeignKey(LabTest, on_delete=models.CASCADE, related_name='commonpackage')
@@ -2228,6 +2224,10 @@ class CommonPackage(TimeStampedModel):
     class Meta:
         db_table = 'common_package'
 
+    @classmethod
+    def get_packages(cls, count):
+        packages = cls.objects.prefetch_related('package').filter(package__enable_for_retail=True, package__searchable=True).order_by('-priority')[:count]
+        return packages
 
 class CommonDiagnosticCondition(TimeStampedModel):
     name = models.CharField(max_length=200)

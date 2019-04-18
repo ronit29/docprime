@@ -86,7 +86,10 @@ class AppointmentHistory(TimeStampedModel):
     DOC_APP = "d_app"
     CONSUMER_APP = "c_app"
     DOC_WEB = "d_web"
-    SOURCE_CHOICES = ((CONSUMER_APP, "Consumer App"), (CRM, "CRM"), (WEB, "Consumer Web"), (DOC_APP, "Doctor App"), (DOC_WEB, "Provider Web"))
+    D_WEB_URL = "d_web_url"
+    D_TOKEN_URL = "d_token_url"
+    SOURCE_CHOICES = ((CONSUMER_APP, "Consumer App"), (CRM, "CRM"), (WEB, "Consumer Web"), (DOC_APP, "Doctor App"),
+                      (DOC_WEB, "Provider Web"), (D_WEB_URL, "Doctor Web URL"), (D_TOKEN_URL, "Doctor Token URL"))
     content_type = models.ForeignKey(ContentType, on_delete=models.DO_NOTHING)
     object_id = models.PositiveIntegerField()
     content_object = GenericForeignKey()
@@ -266,6 +269,7 @@ class Service(TimeStampedModel):
     def __str__(self):
         return self.name
 
+
 class Remark(auth_model.TimeStampedModel):
     FEEDBACK = 1
     REOPEN = 2
@@ -312,7 +316,28 @@ class QRCode(TimeStampedModel):
     content_object = GenericForeignKey()
     name = models.FileField(upload_to='qrcode', validators=[
         FileExtensionValidator(allowed_extensions=['pdf', 'jfif', 'jpg', 'jpeg', 'png'])])
+    data = JSONField(null=True, blank=True)
     # name = models.ImageField(upload_to='qrcode', blank=True, null=True)
 
     class Meta:
         db_table = 'qr_code'
+
+
+class RefundDetails(TimeStampedModel):
+    refund_reason = models.TextField(null=True, blank=True, default=None)
+    refund_initiated_by = models.ForeignKey(auth_model.User, related_name="refunds_initiated", on_delete=models.DO_NOTHING, null=True)
+    content_type = models.ForeignKey(ContentType, on_delete=models.DO_NOTHING)
+    object_id = models.PositiveIntegerField()
+    content_object = GenericForeignKey()
+
+    class Meta:
+        db_table = 'refund_details'
+
+    @classmethod
+    def log_refund(cls, appointment):
+        if hasattr(appointment, '_source') and appointment._source == AppointmentHistory.CRM:
+            refund_reason = appointment._refund_reason if hasattr(appointment, '_refund_reason') else None
+            refund_initiated_by = appointment._responsible_user if hasattr(appointment, '_responsible_user') else None
+            if not refund_initiated_by:
+                raise Exception("Must have a responsible user.")
+            cls .objects.create(refund_reason=refund_reason, refund_initiated_by=refund_initiated_by, content_object=appointment)
