@@ -23,6 +23,17 @@ RUN wget https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.d
 RUN dpkg -i google-chrome-stable_current_amd64.deb; apt-get -fy install
 RUN ln -s /usr/bin/google-chrome-stable /usr/bin/chrome
 
+#install Microsoft ODBC Driver for debian 9
+RUN curl https://packages.microsoft.com/keys/microsoft.asc | apt-key add -
+RUN curl https://packages.microsoft.com/config/debian/9/prod.list > /etc/apt/sources.list.d/mssql-release.list
+RUN ln -s  /usr/lib/apt/methods/http /usr/lib/apt/methods/https
+RUN apt-get update && ACCEPT_EULA=Y apt-get install msodbcsql17 -y
+RUN echo 'export PATH="$PATH:/opt/mssql-tools/bin"' >> ~/.bash_profile
+RUN echo 'export PATH="$PATH:/opt/mssql-tools/bin"' >> ~/.bashrc
+RUN source ~/.bashrc
+RUN apt-get install unixodbc-dev
+
+
 RUN mkdir -p /home/docprime/workspace/backend
 RUN mkdir /env
 RUN mkdir -p /home/docprime/workspace/entrypoint
