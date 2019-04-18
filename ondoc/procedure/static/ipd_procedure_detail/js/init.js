@@ -19,6 +19,23 @@ function initEditor(){
     CKEDITOR.config.allowedContent = true;
     CKEDITOR.config.height = 500;
 
+    CKEDITOR.on('dialogDefinition', function( ev ) {
+	  var diagName = ev.data.name;
+	  var diagDefn = ev.data.definition;
+
+	  if(diagName === 'table') {
+	    var infoTab = diagDefn.getContents('info');
+
+	    var width = infoTab.get('txtWidth');
+	    width['default'] = "100%";
+
+	    var cellSpacing = infoTab.get('txtCellSpace');
+        cellSpacing['default'] = "0";
+        var cellPadding = infoTab.get('txtCellPad');
+        cellPadding['default'] = "0";
+	  }
+    });
+
     CKEDITOR.replace( 'id_value', {
             extraPlugins: ['justify', 'filebrowser', 'font'],
             font_names: '',
