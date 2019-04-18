@@ -1274,7 +1274,7 @@ class DoctorImage(auth_model.TimeStampedModel, auth_model.Image):
 
     @classmethod
     def rename_cropped_images(cls):
-        images = cls.objects.filter(cropped_image__isnull=False).filter(doctor__is_live=True).order_by('id')[:100]
+        images = cls.objects.prefetch_related('doctor','doctor__doctorpracticespecializations','doctor__doctorpracticespecializations__specialization').filter(cropped_image__isnull=False).order_by('id')[:100]
         for img in images:
             image_name = img.get_image_name()
             if img.cropped_image and not image_name in img.cropped_image.name:
