@@ -377,14 +377,21 @@ class InsuranceDummyDataViewSet(viewsets.GenericViewSet):
             return Response(data="save successfully!!", status=status.HTTP_200_OK )
         except Exception as e:
             logger.log(str(e))
-            return Response(status=status.HTTP_200_OK)
+            return Response(data="could not save data", status=status.HTTP_200_OK)
 
     def show_dummy_data(self, request):
         user = request.user
-        if user:
-            dummy_data = InsuranceDummyData.objects.filter(user=user).order_by('-id').first()
-            response = dummy_data.data
-        if response and user:
-            return Response(data=response, status=status.HTTP_200_OK)
-        else:
-            return Response(status=status.HTTP_404_NOT_FOUND)
+        res = {}
+        if not user:
+            res['error'] = "user not found"
+            return Response(error=res, status=status.HTTP_200_OK)
+        dummy_data = InsuranceDummyData.objects.filter(user=user).order_by('-id').first()
+        if not dummy_data:
+            res['error'] = "data not found"
+            return Response(error=res, status=status.HTTP_200_OK)
+        member_data = dummy_data.data
+        if not member_data:
+            res['error'] = "data not found"
+            return Response(error=res, status=status.HTTP_200_OK)
+        res['data'] = member_data
+        return Response(data=res, status=status.HTTP_200_OK)

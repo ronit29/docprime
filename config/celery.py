@@ -12,7 +12,7 @@ from celery.schedules import crontab
 from ondoc.doctor.tasks import save_avg_rating, update_prices, update_city_search_key, update_doctors_count
 from ondoc.account.tasks import update_ben_status_from_pg,update_merchant_payout_pg_status
 # from ondoc.doctor.services.update_search_score import DoctorSearchScore
-
+from ondoc.bookinganalytics.tasks import sync_booking_data
 
 env = environ.Env()
 
@@ -80,6 +80,7 @@ def setup_periodic_tasks(sender, **kwargs):
     sender.add_periodic_task(report_time, get_thyrocare_reports.s(), name='Get Thyrocare Reports')
     sender.add_periodic_task(crontab(hour=19, minute=30), update_city_search_key.s(), name='Update Hospital City Search Key')
     sender.add_periodic_task(crontab(hour=20, minute=30), update_doctors_count.s(), name='Update Doctors Count')
-    
+    sender.add_periodic_task(crontab(hour=21, minute=00),  sync_booking_data.s(), name="Sync Booking Data for analytics")
+
     # doctor_search_score_creation_time = float(settings.CREATE_DOCTOR_SEARCH_SCORE) * float(3600.0)
     # sender.add_periodic_task(doctor_search_score_creation_time, create_search_score.s(), name='Doctor search score updaed')
