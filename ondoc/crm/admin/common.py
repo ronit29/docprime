@@ -101,6 +101,24 @@ class QCPemAdmin(admin.ModelAdmin):
         abstract = True
 
 
+class RefundableAppointmentForm(forms.ModelForm):
+    refund_payment = forms.BooleanField(required=False)
+    refund_reason = forms.CharField(widget=forms.Textarea,required=False)
+
+    def clean(self):
+        super().clean()
+        cleaned_data = self.cleaned_data
+        refund_payment = cleaned_data.get('refund_payment')
+        refund_reason = cleaned_data.get('refund_reason')
+        if refund_payment:
+            if not refund_reason:
+                raise forms.ValidationError("Refund reason is compulsory")
+            if self.instance and not self.instance.status == self.instance.COMPLETED:
+                raise forms.ValidationError("Refund can be processed after Completion")
+        # TODO : No refund should already be in process
+        return cleaned_data
+
+
 class FormCleanMixin(forms.ModelForm):
 
     def pin_code_qc_submit(self):

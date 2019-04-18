@@ -427,6 +427,7 @@ class DoctorSearchHelper:
         selected_procedure_ids, other_procedure_ids = get_selected_and_other_procedures(category_ids, procedure_ids)
         for doctor in doctor_data:
             enable_online_booking = False
+            should_apply_coupon = False
 
             is_gold = False #doctor.enabled_for_online_booking and doctor.is_gold
             doctor_clinics = [doctor_clinic for doctor_clinic in doctor.doctor_clinics.all() if
@@ -470,6 +471,8 @@ class DoctorSearchHelper:
                 if doctor_clinic and doctor and doctor_clinic.hospital:
                     if doctor.enabled_for_online_booking and doctor_clinic.hospital.enabled_for_online_booking and doctor_clinic.enabled_for_online_booking:
                         enable_online_booking = True
+                        if doctor_clinic.hospital.enabled_for_prepaid:
+                            should_apply_coupon = True
 
                 # We cover the insurance for only those users which have purchased the insurance and their insurance
                 # threshold value is greater than the doctor fees and if doctor is enabled for the online booking.
@@ -530,7 +533,11 @@ class DoctorSearchHelper:
                                                    doctor_clinic.availability.all()[0].end),
 
             from ondoc.coupon.models import Coupon
-            search_coupon = Coupon.get_search_coupon(request.user)
+
+            search_coupon = None
+            if should_apply_coupon:
+                search_coupon = Coupon.get_search_coupon(request.user)
+
             discounted_price = filtered_deal_price if not search_coupon else search_coupon.get_search_coupon_discounted_price(filtered_deal_price)
             schema_specialization = None
             schema_specialization = sorted_spec_list[0].get('name') if sorted_spec_list and len(sorted_spec_list)>0 and sorted_spec_list[0].get('name') else None

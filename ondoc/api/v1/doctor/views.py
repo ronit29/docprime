@@ -1194,6 +1194,10 @@ class SearchedItemsViewSet(viewsets.GenericViewSet):
 
     @transaction.non_atomic_requests
     def common_conditions(self, request):
+        city = None
+        if request.query_params and request.query_params.get('city'):
+            city = request.query_params.get('city')
+        spec_urls = dict()
         count = request.query_params.get('count', 10)
         count = int(count)
         if count <= 0:
@@ -1204,8 +1208,17 @@ class SearchedItemsViewSet(viewsets.GenericViewSet):
                                                                        context={'request': request})
 
         common_specializations = models.CommonSpecialization.get_specializations(count)
+        if city:
+            entity_urls = EntityUrls.objects.filter(sitemap_identifier='SPECIALIZATION_CITY',
+                                           locality_value__iexact=city,
+                                           is_valid=True, specialization_id__in=common_specializations.values_list('specialization_id', flat=True))
+            for data in entity_urls:
+                spec_urls[data.specialization_id] = data.url
+
         specializations_serializer = serializers.CommonSpecializationsSerializer(common_specializations, many=True,
-                                                                                 context={'request': request})
+                                                                                 context={'request': request,
+                                                                                          'city': city,
+                                                                                          'spec_urls': spec_urls})
 
         common_procedure_categories = CommonProcedureCategory.objects.select_related('procedure_category').filter(
             procedure_category__is_live=True).all().order_by("-priority")[:10]
