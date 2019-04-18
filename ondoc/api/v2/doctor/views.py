@@ -931,9 +931,9 @@ class PartnersAppInvoice(viewsets.GenericViewSet):
             # data['invoice'] = invoice
             # appointment = data.get('appointment_id')
             if not invoice.is_invoice_generated:
-                # invoice.is_edited = True
-                # invoice.edited_by = request.user
-                # invoice.save()
+                invoice.is_edited = True
+                invoice.edited_by = request.user
+                invoice.save()
                 version = invoice.invoice_serial_id[-2:]
                 data['task'] = self.UPDATE
                 invoice_data, selected_invoice_items_created, exception = self.create_or_update_invoice(data, version, invoice.id)
