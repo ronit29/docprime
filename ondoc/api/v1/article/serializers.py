@@ -6,7 +6,7 @@ from fluent_comments.models import FluentComment
 from ondoc.articles.models import Article, ArticleLinkedUrl, LinkedArticle
 from ondoc.articles.models import ArticleCategory
 from ondoc.authentication.models import User
-from ondoc.doctor.models import Specialization
+from ondoc.doctor.models import PracticeSpecialization
 from ondoc.doctor.v1.serializers import DoctorSerializer, ArticleAuthorSerializer
 from django.db import models
 from bs4 import BeautifulSoup
@@ -146,7 +146,7 @@ class ArticleRetrieveSerializer(serializers.ModelSerializer):
                 search_widget['content']['lng'] = None
                 search_widget['content']['location_name'] = None
             if widget_tag_attrs.get('specialization_id'):
-                specialization_results = Specialization.objects.filter(pk=widget_tag_attrs.get('specialization_id'))
+                specialization_results = PracticeSpecialization.objects.filter(pk=widget_tag_attrs.get('specialization_id'))
                 if specialization_results:
                     has_specialization = True
                     specialization = specialization_results.first()
