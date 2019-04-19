@@ -1691,7 +1691,7 @@ class DoctorListViewSet(viewsets.GenericViewSet):
             {"@type":"ListItem","position":17,"url":request.build_absolute_uri("/dr-aparna-jain-dentist-in-sector-15-gurgaon-dpp")},
             {"@type":"ListItem","position":18,"url":request.build_absolute_uri("/dr-pankaj-jain-dentist-in-sector-15-gurgaon-dpp")},
             {"@type":"ListItem","position":19,"url":request.build_absolute_uri("/dr-anjali-kesar-dentist-in-sector-15-gurgaon-dpp")},
-            {"@type":"ListItem","position":20,"url":request.build_absolute_uri("https://docprime.com/dr-komal-nebhnani-dentist-paedodontist-and-preventive-dentistry-specialist-childrens-teeth-specialist-in-sector-38-gurgaon-dpp")}]    	}
+            {"@type":"ListItem","position":20,"url":request.build_absolute_uri("/dr-komal-nebhnani-dentist-paedodontist-and-preventive-dentistry-specialist-childrens-teeth-specialist-in-sector-38-gurgaon-dpp")}]    	}
 
                             # ,
                 # 'schema': {
