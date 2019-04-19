@@ -1481,7 +1481,7 @@ class Merchant(TimeStampedModel):
     def save(self, *args, **kwargs):
         if self.verified_by_finance and (self.pg_status == self.NOT_INITIATED or self.pg_status == self.FAILURE):
             pass
-            #self.create_in_pg()
+            self.create_in_pg()
 
         super().save(*args, **kwargs)
 
@@ -1529,6 +1529,7 @@ class Merchant(TimeStampedModel):
 
         if response.status_code == status.HTTP_200_OK:
             self.api_response = response.json()
+
             if response.json():
                 for data in response.json():
                     if data.get('StatusCode') and data.get('StatusCode') > 0:
@@ -1592,11 +1593,20 @@ class Merchant(TimeStampedModel):
             response = requests.post(url, data=json.dumps(request_payload), headers={'auth': bene_status_token,
                                                                                      'Content-Type': 'application/json'})
             if response.status_code == status.HTTP_200_OK:
-                resp_data = response.json()
-                data.api_response = resp_data
-                if resp_data.get('statusCode') and resp_data.get('statusCode') in [cls.INITIATED, cls.INPROCESS]:
-                    data.pg_status = resp_data.get('statusCode')
+                data.api_response = response.json()
+                status_code = set()
+                if response.json():
+                    for resp in response.json():
+                        if resp.get('statusCode'):
+                            status_code.add(resp.get('statusCode'))
+                    data.pg_status = min(status_code) if status_code else data.pg_status
                     data.save()
+
+                # data.api_response = resp_data[0]
+                # if resp_data[0].get('statusCode') and resp_data[0].get('statusCode') in [cls.INITIATED, cls.INPROCESS]:
+                #     data.pg_status = resp_data[0].get('statusCode')
+                #     data.save()
+
 
 class AssociatedMerchant(TimeStampedModel):
 
