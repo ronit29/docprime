@@ -1514,7 +1514,7 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin,
             obj.ProviderId = self.lab.id
             obj.TypeId = 2
             obj.PaymentType = self.payment_type if self.payment_type else None
-            obj.Payout = self.merchant_payout if self.merchant_payout else None
+            obj.Payout = self.agreed_price
         obj.PromoCost = promo_cost
         obj.GMValue = self.deal_price
         obj.Category = category
