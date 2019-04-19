@@ -265,6 +265,7 @@ def push_appointment_to_matrix(self, data):
             mobile_list = list()
             # User mobile number
             mobile_list.append({'MobileNo': appointment.user.phone_number, 'Name': appointment.profile.name, 'Type': 1})
+            auto_ivr_enabled = appointment.hospital.is_auto_ivr_enabled()
             # SPOC details
             for spoc_obj in appointment.hospital.spoc_details.all():
                 number = ''
@@ -275,13 +276,13 @@ def push_appointment_to_matrix(self, data):
                 if number:
                     number = int(number)
 
-                spoc_type = dict(spoc_obj.CONTACT_TYPE_CHOICES)[spoc_obj.contact_type]
-                spoc_name = '%s (Hospital) (%s)' % (spoc_obj.name, spoc_type)
-                if spoc_obj.details:
-                    spoc_name = spoc_name + '(%s)' % spoc_obj.details
+                # spoc_type = dict(spoc_obj.CONTACT_TYPE_CHOICES)[spoc_obj.contact_type]
+                spoc_name = spoc_obj.name
                 mobile_list.append({'MobileNo': number,
                                     'Name': spoc_name,
-                                    'Type': spoc_obj.contact_type})
+                                    'DesignationID': spoc_obj.contact_type,
+                                    'AutoIVREnable': str(auto_ivr_enabled).lower(),
+                                    'Type': 2})
 
             # Doctor mobile numbers
             doctor_mobiles = [doctor_mobile.number for doctor_mobile in appointment.doctor.mobiles.all()]
@@ -295,6 +296,24 @@ def push_appointment_to_matrix(self, data):
                 raise Exception("Appointment could not found against id - " + str(appointment_id))
 
             mobile_list = list()
+            auto_ivr_enabled = appointment.lab.is_auto_ivr_enabled()
+
+            for contact_person in appointment.lab.labmanager_set.all():
+                number = ''
+                if contact_person.number:
+                    number = str(contact_person.number)
+                if number:
+                    number = int(number)
+
+                contact_type = dict(contact_person.CONTACT_TYPE_CHOICES)[contact_person.contact_type]
+                contact_name = contact_person.name
+                mobile_list.append({'MobileNo': number,
+                                    'Name': contact_name,
+                                    'DesignationId': contact_person.contact_type,
+                                    'AutoIVREnable': str(auto_ivr_enabled).lower(),
+                                    'Type': 3})
+
+
             # Lab mobile number
             mobile_list.append({'MobileNo': appointment.lab.primary_mobile, 'Name': appointment.lab.name, 'Type': 3})
 
