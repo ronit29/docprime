@@ -2776,7 +2776,7 @@ class CompareLabPackagesViewSet(viewsets.ReadOnlyModelViewSet):
             t_lab = pack_lab.get('lab')
             temp_data.update(deepcopy(lab_packages_all_details.get(t_pack.id, {})))
             temp_data['lab'] = {'id': t_lab.id, 'name': t_lab.name, 'thumbnail': t_lab.get_thumbnail()}
-            temp_data['price'], temp_data['mrp'] = price_master.get((t_pack.id, t_lab.id), (None, None))
+            temp_data['mrp'], temp_data['price'] = price_master.get((t_pack.id, t_lab.id), (None, None))
             final_result.append(temp_data)
         # response['packages'] = list(lab_packages_all_details.values())
         response['packages'] = final_result
