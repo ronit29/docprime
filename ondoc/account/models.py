@@ -1365,7 +1365,6 @@ class MerchantPayout(TimeStampedModel):
     def save(self, *args, **kwargs):
 
         first_instance = False
-
         if not self.id:
             first_instance = True
 
