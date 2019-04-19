@@ -850,7 +850,7 @@ class PartnersAppInvoice(viewsets.GenericViewSet):
                 file = v1_utils.html_to_pdf(content, filename)
 
                 invoice_obj.file = file
-                file_path = os.path.join(invoice_obj.file.storage.base_location, invoice_obj.INVOICE_STORAGE_FOLDER, filename)
+                file_path = os.path.join(settings.MEDIA_ROOT, invoice_obj.INVOICE_STORAGE_FOLDER, filename)
                 if os.path.exists(file_path):
                     os.remove(file_path)
                 invoice_obj.invoice_url = "{}{}{}".format(settings.BASE_URL, "/api/v2/doctor/invoice/", filename)
