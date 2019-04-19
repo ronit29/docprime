@@ -31,12 +31,14 @@ from ondoc.diagnostic.models import (LabTiming, LabImage,
                                      LabAppointment, HomePickupCharges,
                                      TestParameter, ParameterLabTest, FrequentlyAddedTogetherTests, QuestionAnswer,
                                      LabReport, LabReportFile, LabTestCategoryMapping,
-                                     LabTestRecommendedCategoryMapping, LabTestGroupTiming, LabTestGroupMapping)
+                                     LabTestRecommendedCategoryMapping, LabTestGroupTiming, LabTestGroupMapping,
+                                     TestParameterChat)
 from ondoc.integrations.models import IntegratorHistory
 from ondoc.notification.models import EmailNotification, NotificationAction
 from .common import *
 from ondoc.authentication.models import GenericAdmin, User, QCModel, GenericLabAdmin, AssociatedMerchant
-from ondoc.crm.admin.doctor import CustomDateInput, TimePickerWidget, CreatedByFilter, AutoComplete
+from ondoc.crm.admin.doctor import CustomDateInput, TimePickerWidget, CreatedByFilter, AutoComplete, \
+    RefundableAppointmentForm
 from ondoc.crm.admin.autocomplete import PackageAutoCompleteView
 from django.contrib.contenttypes.admin import GenericTabularInline
 from ondoc.authentication import forms as auth_forms
@@ -696,14 +698,25 @@ class LabAdmin(ImportExportMixin, admin.GeoModelAdmin, VersionAdmin, ActionAdmin
             form.base_fields['assigned_to'].disabled = True
         return form
 
+    def get_readonly_fields(self, *args, **kwargs):
+        read_only = super().get_readonly_fields(*args, **kwargs)
+        if args:
+            request = args[0]
+            if not request.user.groups.filter(
+                    name__in=[constants['WELCOME_CALLING_TEAM'],
+                              constants['LAB_APPOINTMENT_MANAGEMENT_TEAM']]) and not request.user.is_superuser:
+                read_only += ('is_location_verified',)
 
-class LabAppointmentForm(forms.ModelForm):
+        return read_only
 
+
+class LabAppointmentForm(RefundableAppointmentForm):
     start_date = forms.DateField(widget=CustomDateInput(format=('%d-%m-%Y'), attrs={'placeholder':'Select a date'}))
     start_time = forms.CharField(widget=TimePickerWidget())
     cancel_type = forms.ChoiceField(label='Cancel Type', choices=((0, 'Cancel and Rebook'),
                                                                   (1, 'Cancel and Refund'),), initial=0, widget=forms.RadioSelect)
     send_email_sms_report = forms.BooleanField(label='Send reports via message and email', initial=False, required=False)
+    custom_otp = forms.IntegerField(required=False)
 
     def clean(self):
         super().clean()
@@ -772,6 +785,13 @@ class LabAppointmentForm(forms.ModelForm):
                     if not lab.always_open and not is_lab_timing_available:
                         raise forms.ValidationError("No time slot available")
 
+        if cleaned_data.get('status') and cleaned_data.get('status') == LabAppointment.COMPLETED:
+            if self.instance and self.instance.id and not self.instance.status == OpdAppointment.ACCEPTED:
+                raise forms.ValidationError("Can only complete appointment if it is in accepted state.")
+            if not cleaned_data.get('custom_otp') == self.instance.otp:
+                raise forms.ValidationError("Entered OTP is incorrect.")
+
+
         return cleaned_data
 
 
@@ -809,6 +829,15 @@ class LabAppointmentAdmin(nested_admin.NestedModelAdmin):
     #     else:
     #         temp_autocomplete_fields = super().get_autocomplete_fields(request)
     #     return temp_autocomplete_fields
+
+    def get_search_results(self, request, queryset, search_term):
+        queryset, use_distinct = super().get_search_results(request, queryset, None)
+
+        queryset = queryset.filter(Q(integrator_response__integrator_order_id__icontains=search_term) |
+         Q(id__contains=search_term)).distinct()
+
+        return queryset, use_distinct
+
 
     def integrator_order_status(self, obj):
         return obj.integrator_order_status()
@@ -861,7 +890,8 @@ class LabAppointmentAdmin(nested_admin.NestedModelAdmin):
                                     (LabAppointment.RESCHEDULED_PATIENT, 'Rescheduled by patient'),
                                     (LabAppointment.RESCHEDULED_LAB, 'Rescheduled by lab'),
                                     (LabAppointment.ACCEPTED, 'Accepted'),
-                                    (LabAppointment.CANCELLED, 'Cancelled')]
+                                    (LabAppointment.CANCELLED, 'Cancelled'),
+                                    (LabAppointment.COMPLETED, 'Completed')]
         if db_field.name == "status" and request.user.groups.filter(name=constants['LAB_APPOINTMENT_MANAGEMENT_TEAM']).exists():
             kwargs['choices'] = allowed_status_for_agent
         return super().formfield_for_choice_field(db_field, request, **kwargs)
@@ -894,9 +924,15 @@ class LabAppointmentAdmin(nested_admin.NestedModelAdmin):
                     'get_pickup_address', 'get_lab_address', 'outstanding', 'status', 'cancel_type',
                     'cancellation_reason', 'cancellation_comments', 'start_date', 'start_time',
                     'send_email_sms_report', 'invoice_urls', 'reports_uploaded', 'email_notification_timestamp', 'payment_type',
-                     'payout_info')
+                     'payout_info', 'refund_initiated')
         if request.user.groups.filter(name=constants['APPOINTMENT_OTP_TEAM']).exists() or request.user.is_superuser:
             all_fields = all_fields + ('otp',)
+
+        if obj and obj.can_agent_refund(request.user):
+            all_fields = all_fields + ('refund_payment', 'refund_reason')
+
+        if obj and obj.id and obj.status == OpdAppointment.ACCEPTED:
+            all_fields = all_fields + ('custom_otp',)
         return all_fields
         # else:
         #     return ()
@@ -911,7 +947,7 @@ class LabAppointmentAdmin(nested_admin.NestedModelAdmin):
                      'agreed_price',
                      'deal_price', 'effective_price', 'payment_status',
                      'payment_type', 'insurance', 'is_home_pickup', 'get_pickup_address', 'get_lab_address',
-                     'outstanding', 'reports_uploaded', 'email_notification_timestamp', 'payment_type', 'payout_info']
+                     'outstanding', 'reports_uploaded', 'email_notification_timestamp', 'payment_type', 'payout_info', 'refund_initiated']
         # else:
         #     read_only = []
         if obj and (obj.status == LabAppointment.COMPLETED or obj.status == LabAppointment.CANCELLED):
@@ -919,6 +955,9 @@ class LabAppointmentAdmin(nested_admin.NestedModelAdmin):
         if request.user.groups.filter(name=constants['APPOINTMENT_OTP_TEAM']).exists() or request.user.is_superuser:
             read_only = read_only + ['otp']
         return read_only
+
+    def refund_initiated(self, obj):
+        return bool(obj.has_app_consumer_trans())
 
     # def get_inline_instances(self, request, obj=None):
     #     inline_instance = super().get_inline_instances(request=request, obj=obj)
@@ -1080,16 +1119,18 @@ class LabAppointmentAdmin(nested_admin.NestedModelAdmin):
 
                 if dt_field:
                     obj.time_slot_start = dt_field
-            if request.POST.get('status') and (int(request.POST['status']) == LabAppointment.CANCELLED or \
-                int(request.POST['status']) == LabAppointment.COMPLETED):
+            if request.POST.get('status') and int(request.POST['status']) == LabAppointment.CANCELLED:
                 obj.cancellation_type = LabAppointment.AGENT_CANCELLED
                 cancel_type = int(request.POST.get('cancel_type'))
                 if cancel_type is not None:
                     logger.warning("Lab Admin Cancel started - " + str(obj.id) + " timezone - " + str(timezone.now()))
                     obj.action_cancelled(cancel_type)
                     logger.warning("Lab Admin Cancel completed - " + str(obj.id) + " timezone - " + str(timezone.now()))
-            elif lab_app_obj and (lab_app_obj.status == LabAppointment.COMPLETED):
-                pass
+            elif request.POST.get('status') and int(request.POST['status']) == LabAppointment.COMPLETED and lab_app_obj and lab_app_obj != LabAppointment.COMPLETED:
+                obj.action_completed()
+            if form and form.cleaned_data and form.cleaned_data.get('refund_payment', False):
+                obj._refund_reason = form.cleaned_data.get('refund_reason', '')
+                obj.action_refund()
             else:
                 super().save_model(request, obj, form, change)
                 if request.POST.get('status') and (int(request.POST['status']) == LabAppointment.ACCEPTED):
@@ -1436,3 +1477,14 @@ class LabTestGroupMappingAdmin(ImportMixin, admin.ModelAdmin):
     list_display = ['test', 'lab_test_group']
     search_fields = ['test__name', 'lab_test_group__name']
 
+
+class TestParameterChatForm(forms.ModelForm):
+    test = forms.ModelChoiceField(
+        queryset=LabTest.objects.filter(availablelabs__lab_pricing_group__labs__network_id=int(settings.THYROCARE_NETWORK_ID),
+                                        enable_for_retail=True, availablelabs__enabled=True).distinct().order_by('name'))
+
+
+class TestParameterChatAdmin(admin.ModelAdmin):
+    form = TestParameterChatForm
+    list_display = ['test_name']
+    readonly_fields = ('test_name',)

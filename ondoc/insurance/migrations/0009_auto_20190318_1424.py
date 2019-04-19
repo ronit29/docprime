@@ -15,16 +15,16 @@ class Migration(migrations.Migration):
             name='product_id',
             field=models.PositiveSmallIntegerField(choices=[(1, 'Doctor Appointment'), (2, 'LAB_PRODUCT_ID'), (4, 'SUBSCRIPTION_PLAN_PRODUCT_ID')]),
         ),
-        migrations.AlterField(
-            model_name='pginsurance',
-            name='product_id',
-            field=models.SmallIntegerField(choices=[(1, 'Doctor Appointment'), (2, 'LAB_PRODUCT_ID'), (4, 'SUBSCRIPTION_PLAN_PRODUCT_ID')]),
-        ),
-        migrations.AlterField(
-            model_name='profileinsurance',
-            name='product_id',
-            field=models.PositiveSmallIntegerField(choices=[(1, 'Doctor Appointment'), (2, 'LAB_PRODUCT_ID'), (4, 'SUBSCRIPTION_PLAN_PRODUCT_ID')]),
-        ),
+        # migrations.AlterField(
+        #     model_name='pginsurance',
+        #     name='product_id',
+        #     field=models.SmallIntegerField(choices=[(1, 'Doctor Appointment'), (2, 'LAB_PRODUCT_ID'), (4, 'SUBSCRIPTION_PLAN_PRODUCT_ID')]),
+        # ),
+        # migrations.AlterField(
+        #     model_name='profileinsurance',
+        #     name='product_id',
+        #     field=models.PositiveSmallIntegerField(choices=[(1, 'Doctor Appointment'), (2, 'LAB_PRODUCT_ID'), (4, 'SUBSCRIPTION_PLAN_PRODUCT_ID')]),
+        # ),
         migrations.AlterField(
             model_name='userinsurance',
             name='product_id',

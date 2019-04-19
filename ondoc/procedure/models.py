@@ -14,6 +14,7 @@ class IpdProcedure(auth_model.TimeStampedModel, SearchKey, auth_model.SoftDelete
     is_enabled = models.BooleanField(default=False)
     features = models.ManyToManyField(Feature, through='IpdProcedureFeatureMapping',
                                       through_fields=('ipd_procedure', 'feature'), related_name='of_ipd_procedures')
+    show_about = models.BooleanField(default=False)
 
     def __str__(self):
         return '{}'.format(self.name)
@@ -81,6 +82,7 @@ class IpdProcedureLead(auth_model.TimeStampedModel):
     email = models.CharField(max_length=256, blank=False, null=True, default=None)
     gender = models.CharField(max_length=2, default=None, blank=True, null=True, choices=UserProfile.GENDER_CHOICES)
     age = models.PositiveIntegerField(blank=True, null=True)
+    dob = models.DateTimeField(blank=True, null=True)
 
     class Meta:
         db_table = "ipd_procedure_lead"
@@ -95,6 +97,30 @@ class IpdProcedureLead(auth_model.TimeStampedModel):
     def app_commit_tasks(self, send_lead_email):
         from ondoc.notification.tasks import send_ipd_procedure_lead_mail
         send_ipd_procedure_lead_mail(self.id)
+
+
+class IpdProcedureDetailType(auth_model.TimeStampedModel):
+    name = models.CharField(max_length=1000)
+    priority = models.PositiveIntegerField(default=0)
+    show_doctors = models.BooleanField(default=False)
+
+    def __str__(self):
+        return '{}'.format(self.name)
+
+    class Meta:
+        db_table = "ipd_procedure_detail_type"
+
+
+class IpdProcedureDetail(auth_model.TimeStampedModel):
+    ipd_procedure = models.ForeignKey(IpdProcedure, on_delete=models.CASCADE, null=True, verbose_name="IPD Procedure")
+    detail_type = models.ForeignKey(IpdProcedureDetailType, on_delete=models.SET_NULL, null=True, verbose_name="Detail Type")
+    value = models.TextField(blank=True, verbose_name="Detail")
+
+    def __str__(self):
+        return '{} - {} - {}'.format(self.ipd_procedure, self.detail_type, self.value[:25])
+
+    class Meta:
+        db_table = "ipd_procedure_details"
 
 
 class ProcedureCategory(auth_model.TimeStampedModel, SearchKey):

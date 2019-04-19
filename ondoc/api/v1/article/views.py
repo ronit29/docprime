@@ -1,5 +1,7 @@
 from collections import defaultdict
 from django.contrib.contenttypes.models import ContentType
+from django.core.exceptions import ValidationError
+from django.core.validators import validate_email
 from django.db import transaction
 from rest_framework import mixins, viewsets, status
 from rest_framework.permissions import IsAuthenticated
@@ -66,6 +68,11 @@ class ArticleViewSet(viewsets.GenericViewSet):
 
         article_start = request.GET.get('startsWith', None)
         article_contains = request.GET.get('contains', None)
+        recent_articles = None
+        recent_articles_data = None
+        recent_articles_dict = None
+
+        title_description = ArticleCategory.objects.filter(url=category_url).values('title', 'description', 'name')
 
         category_qs = article_models.ArticleCategory.objects.filter(url=category_url)
         if category_qs.exists():
@@ -78,13 +85,22 @@ class ArticleViewSet(viewsets.GenericViewSet):
             article_data = article_data.filter(title__istartswith=article_start)
         if article_contains and len(article_contains) > 2:
             article_data = article_data.filter(title__icontains=article_contains)
+
+        if title_description and title_description.first().get('name') and title_description.first().get('name').lower() == 'Medicines'.lower():
+            recent_articles_data = article_data.filter(is_published=True).order_by('-updated_at')[:10]
+
+        recent_articles = serializers.ArticleListSerializer(recent_articles_data, many=True,
+                                                            context={'request': request}).data
+        recent_articles_dict = {'title': 'Recent Articles', 'items': recent_articles}
+
         articles_count = article_data.count()
         article_data = paginate_queryset(article_data, request, 50)
         resp = serializers.ArticleListSerializer(article_data, many=True,
                                                  context={'request': request}).data
+
         title = ''
         description = ''
-        title_description = ArticleCategory.objects.filter(url=category_url).values('title', 'description')
+
         if title_description.exists():
             title = title_description.first().get('title', '')
             description = title_description.first().get('description', '')
@@ -97,12 +113,14 @@ class ArticleViewSet(viewsets.GenericViewSet):
         dynamic_content = NewDynamic.objects.filter(url__url=category_url, is_enabled=True).first()
         top_content = None
         bottom_content = None
+
         if dynamic_content:
             top_content = dynamic_content.top_content
             bottom_content = dynamic_content.bottom_content
+
         return Response(
             {'result': resp, 'seo': category_seo, 'category': category.name, 'total_articles': articles_count, 'search_content': top_content
-             , 'bottom_content': bottom_content})
+             , 'bottom_content': bottom_content, 'recent_articles': recent_articles_dict})
 
     @transaction.non_atomic_requests
     def retrieve(self, request):
@@ -136,8 +154,12 @@ class CommentViewSet(viewsets.ModelViewSet):
         parent_id = None
         comment = data['comment']
         if comment:
-            user_name = data['name']
             user_email = data['email']
+            try:
+                validate_email(user_email)
+            except ValidationError as e:
+                return Response(status=status.HTTP_404_NOT_FOUND, data={'error': format(e.messages[0])})
+            user_name = data['name']
 
             article_id = data['article']
 
