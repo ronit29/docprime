@@ -389,7 +389,7 @@ class PartnersAppInvoiceSerialier(serializers.Serializer):
     payment_type = serializers.ChoiceField(choices=doc_models.PartnersAppInvoice.PAYMENT_CHOICES, required=False)
     due_date = serializers.DateField(required=False, allow_null=True)
     sub_total_amount = serializers.DecimalField(max_digits=10, decimal_places=2)
-    invoice_title = serializers.CharField(max_length=300)
+    invoice_title = serializers.CharField(max_length=300, required=False, allow_blank=True)
     tax_amount = serializers.DecimalField(max_digits=10, decimal_places=2, required=False, allow_null=True)
     tax_percentage = serializers.DecimalField(max_digits=5, decimal_places=2, required=False, allow_null=True,
                                               min_value=0, max_value=100)
@@ -404,12 +404,14 @@ class PartnersAppInvoiceSerialier(serializers.Serializer):
             raise serializers.ValidationError('payment type is required for payment status - paid')
         if attrs.get('payment_status') == doc_models.PartnersAppInvoice.PENDING and not attrs.get('due_date'):
             raise serializers.ValidationError('due date is required for payment status - pending')
-        if attrs.get('appointment_id'):
-            attrs['appointment'] = attrs.pop('appointment_id')
+        if attrs.get('generate_invoice') and not attrs.get('invoice_title'):
+            raise serializers.ValidationError('invoice title is missing for invoice generation')
         if attrs.get('tax_percentage') and not attrs.get('tax_amount'):
             raise serializers.ValidationError("tax_amount is also required with tax_percentage")
         if attrs.get('discount_percentage') and not attrs.get('discount_amount'):
             raise serializers.ValidationError("discount_amount is also required with discount_percentage")
+        if attrs.get('appointment_id'):
+            attrs['appointment'] = attrs.pop('appointment_id')
         return attrs
 
 

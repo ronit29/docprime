@@ -3213,7 +3213,7 @@ class PartnersAppInvoice(auth_model.TimeStampedModel):
     payment_status = models.IntegerField(choices=PAYMENT_STATUS)
     payment_type = models.IntegerField(choices=PAYMENT_CHOICES, null=True, blank=True)
     due_date = models.DateField(null=True, blank=True)
-    invoice_title = models.CharField(max_length=300)
+    invoice_title = models.CharField(max_length=300, null=True, blank=True)
     sub_total_amount = models.DecimalField(max_digits=10, decimal_places=2)
     tax_amount = models.DecimalField(max_digits=10, decimal_places=2, blank=True, null=True)
     tax_percentage = models.DecimalField(max_digits=5, decimal_places=2, blank=True, null=True,
