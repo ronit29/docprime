@@ -1675,8 +1675,25 @@ class DoctorListViewSet(viewsets.GenericViewSet):
                 "title": title,
                 "description": description,
                 "location": location,
-                "image": static('web/images/dclogo-placeholder.png')
-                # ,
+                "image": static('web/images/dclogo-placeholder.png'),
+                "schema":
+                    {
+                    "@context": "http://schema.org",
+                    "@type": "ItemList",
+                    "itemListElement" : [{"@type":"ListItem","position":1,"url":request.build_absolute_uri("/dr-varun-gaur-dentist-prosthodontist-in-sector-11-gurgaon-dpp")},{"@type":"ListItem","position":2,"url":"https://docprime.com/dr-himanshu-arora-dentist-in-sector-4-gurgaon-dpp"},{"@type":"ListItem","position":3,"url":"https://docprime.com/dr-kanchan-dudeja-dentist-in-sector-31-gurgaon-dpp"},{"@type":"ListItem","position":4,"url":"https://docprime.com/dr-sudhir-yadav-dentist-in-civil-lines-gurgaon-dpp"},{"@type":"ListItem","position":5,"url":"https://docprime.com/dr-varun-dahiya-dentist-periodontist-in-civil-lines-gurgaon-dpp"},{"@type":"ListItem","position":6,"url":"https://docprime.com/dr-archna-yadav-dentist-in-civil-lines-gurgaon-dpp"},{"@type":"ListItem","position":7,"url":"https://docprime.com/dr-kunal-nischal-dentist-implantologist-in-sector-31-gurgaon-dpp"},{"@type":"ListItem","position":8,"url":"https://docprime.com/dr-parul-giri-verma-dentist-prosthodontist-in-sector-31-gurgaon-dpp"},{"@type":"ListItem","position":9,"url":"https://docprime.com/dr-aishna-sharma-dentist-in-sector-31-gurgaon-dpp"},
+             {"@type":"ListItem","position":10,"url":request.build_absolute_uri("/dr-ankita-gupta-dentist-orthodontist-in-sector-31-gurgaon-dpp")},
+            {"@type":"ListItem","position":11,"url":request.build_absolute_uri("/dr-priya-gupta-dentist-in-sector-11-gurgaon-dpp")},
+            {"@type":"ListItem","position":12,"url":request.build_absolute_uri("/opd/doctor/87358")},
+            {"@type":"ListItem","position":13,"url":request.build_absolute_uri("/dr-usha-nishal-dentist-in-sector-40-gurgaon-dpp")},
+            {"@type":"ListItem","position":14,"url":request.build_absolute_uri("/dr-major-ankit-gupta-dentist-orthodontist-in-civil-lines-gurgaon-dpp")},
+            {"@type":"ListItem","position":15,"url":request.build_absolute_uri("/dr-anil-k-sheorain-oral-maxillofacial-surgeon-dentist-in-sector-27-gurgaon-dpp")},
+            {"@type":"ListItem","position":16,"url":request.build_absolute_uri("/dr-shweta-yadav-dentist-in-sector-38-gurgaon-dpp")},
+            {"@type":"ListItem","position":17,"url":request.build_absolute_uri("/dr-aparna-jain-dentist-in-sector-15-gurgaon-dpp")},
+            {"@type":"ListItem","position":18,"url":request.build_absolute_uri("/dr-pankaj-jain-dentist-in-sector-15-gurgaon-dpp")},
+            {"@type":"ListItem","position":19,"url":request.build_absolute_uri("/dr-anjali-kesar-dentist-in-sector-15-gurgaon-dpp")},
+            {"@type":"ListItem","position":20,"url":request.build_absolute_uri("https://docprime.com/dr-komal-nebhnani-dentist-paedodontist-and-preventive-dentistry-specialist-childrens-teeth-specialist-in-sector-38-gurgaon-dpp")}]    	}
+
+                            # ,
                 # 'schema': {
                 #     "@context": "http://schema.org",
                 #     "@type": "MedicalBusiness",
