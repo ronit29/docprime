@@ -66,6 +66,7 @@ from django.db.models.expressions import Window
 from django.db.models.functions import RowNumber
 from django.db.models import Avg
 from django.db.models.expressions import RawSQL
+from ondoc.doctor.v1.serializers import ArticleAuthorSerializer
 User = get_user_model()
 
 
@@ -77,10 +78,10 @@ class SearchPageViewSet(viewsets.ReadOnlyModelViewSet):
         count = int(count)
         if count <= 0:
             count = 10
-        test_queryset = CommonTest.objects.select_related('test').filter(test__enable_for_retail=True, test__searchable=True).order_by('-priority')[:count]
+        test_queryset = CommonTest.get_tests(count)
         conditions_queryset = CommonDiagnosticCondition.objects.prefetch_related('lab_test').all().order_by('-priority')[:count]
         lab_queryset = PromotedLab.objects.select_related('lab').filter(lab__is_live=True, lab__is_test_lab=False)
-        package_queryset = CommonPackage.objects.prefetch_related('package').filter(package__enable_for_retail=True, package__searchable=True).order_by('-priority')[:count]
+        package_queryset = CommonPackage.get_packages(count)
         recommended_package_qs = LabTestCategory.objects.prefetch_related('recommended_lab_tests__parameter').filter(is_live=True,
                                                                                                           show_on_recommended_screen=True,
                                                                                                           recommended_lab_tests__searchable=True,
@@ -1454,8 +1455,6 @@ class LabList(viewsets.ReadOnlyModelViewSet):
         if lab_obj.network:
             rating_queryset = rating_models.RatingsReview.objects.prefetch_related('compliment')\
                                                                  .filter(is_live=True,
-                                                                         moderation_status__in=[rating_models.RatingsReview.PENDING,
-                                                                                                rating_models.RatingsReview.APPROVED],
                                                                          lab_ratings__network=lab_obj.network)
         lab_serializer = diagnostic_serializer.LabModelSerializer(lab_obj, context={"request": request,
                                                                                     "entity": entity,
@@ -2451,6 +2450,7 @@ class TestDetailsViewset(viewsets.GenericViewSet):
         if not queryset:
             return Response([])
         final_result = []
+        test_queryset = queryset[0]
         for data in queryset:
             result = {}
             result['name'] = data.name
@@ -2521,17 +2521,50 @@ class TestDetailsViewset(viewsets.GenericViewSet):
         kwargs['test_flag'] = 1
 
         result['labs'] = lab.search(request, **kwargs)
-        seo = dict()
-        seo['description'] = None
-        if queryset:
-            seo['title'] = queryset[0].name + ' Test: Types, Procedure & Normal Range of Results'
-        else:
-            seo['title'] = None
 
+        seo = dict()
+        author = None
+
+        if test_queryset.name:
+            seo['title'] = test_queryset.name + '  - Cost & Normal Range of Results'
+            seo['description'] = 'Book ' + test_queryset.name + ' @50% off. Free Sample Collection. Know what is ' \
+                                 + test_queryset.name + ', Price, Normal Range, ' + test_queryset.name + ' Results, Procedure & Preparation.'
+        else:
+            seo = None
         result['seo'] = seo
+        result['breadcrumb'] = list()
+
+        result['breadcrumb'].append({"title": "Home", "url": "/"})
+
+        if test_queryset.name and test_queryset.url:
+            result['breadcrumb'].append({"title": test_queryset.name, "url": test_queryset.url})
+
+        result['canonical_url'] = test_queryset.url if test_queryset.url else None
+
+        if test_queryset.author:
+            serializer = ArticleAuthorSerializer(test_queryset.author, context={'request': request})
+            author = serializer.data
+        result['author'] = author
+        result['published_date'] = test_queryset.created_at if test_queryset.created_at else None
+        result['last_updated_date'] = test_queryset.updated_at if test_queryset.updated_at else None
         final_result.append(result)
 
         return Response(final_result)
+
+    def list_by_alphabet(self, request):
+        alphabet = request.GET.get('alphabet')
+        if not alphabet:
+            return Response(status=status.HTTP_404_NOT_FOUND)
+        response = {}
+        tests_count = 0
+
+        tests = list(LabTest.objects.filter(enable_for_retail=True, name__istartswith=alphabet).order_by('name').values('id', 'name', 'url'))
+        if tests:
+            tests_count = len(tests)
+        response['count'] = tests_count
+        response['tests'] = tests
+
+        return Response(response)
 
 
 class LabTestCategoryListViewSet(viewsets.GenericViewSet):

@@ -28,7 +28,8 @@ constants = {
     'WELCOME_CALLING_TEAM': 'welcome_calling_team',
     'DOC_AVAILABILITY_TEAM_GROUP': 'doctor_availability_team',
     'APPOINTMENT_OTP_TEAM': 'appointment_otp_team',
-    'INSURANCE_GROUP': 'insurance_group'
+    'INSURANCE_GROUP': 'insurance_group',
+    'APPOINTMENT_REFUND_TEAM' : 'appointment_refund_team'
 }
 matrix_product_ids = {
     'opd_products': 1,

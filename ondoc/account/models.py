@@ -424,7 +424,7 @@ class Order(TimeStampedModel):
             with transaction.atomic():
                 event_api = EventCreateViewSet()
                 visitor_id, visit_id = event_api.get_visit(request)
-                visitor_info = { "visitor_id": visitor_id, "visit_id": visit_id, "from_app": request.data.get("from_app", None) }
+                visitor_info = { "visitor_id": visitor_id, "visit_id": visit_id, "from_app": request.data.get("from_app", None), "app_version": request.data.get("app_version", None)}
         except Exception as e:
             logger.log("Could not fecth visitor info - " + str(e))
 
@@ -881,6 +881,26 @@ class MoneyPool(TimeStampedModel):
     wallet = models.DecimalField(max_digits=10, decimal_places=2, default=0)
     cashback = models.DecimalField(max_digits=10, decimal_places=2, default=0)
     logs = JSONField(default=[])
+
+    def get_completed_appointments(self):
+        from ondoc.doctor.models import OpdAppointment
+        from ondoc.diagnostic.models import LabAppointment
+
+        opd_apps = self.opd_apps.filter(status=OpdAppointment.COMPLETED)[:]
+        lab_apps = self.lab_apps.filter(status=LabAppointment.COMPLETED)[:]
+
+        completed_appointments = [*opd_apps, *lab_apps]
+
+        def compare_app(obj):
+            history = obj.history.filter(status=obj.COMPLETED).first()
+            if history:
+                return history.created_at
+            return obj.updated_at
+
+        if completed_appointments:
+            completed_appointments = sorted(completed_appointments, key=compare_app)
+
+        return completed_appointments
 
     @transaction.atomic()
     def get_refund_breakup(self, amount):
@@ -1368,6 +1388,20 @@ class MerchantPayout(TimeStampedModel):
 
         if self.type == self.MANUAL and self.utr_no and self.status == self.PENDING:
             self.status = self.PAID
+
+        if not first_instance and self.status != self.PENDING:
+            from ondoc.matrix.tasks import push_appointment_to_matrix
+
+            appointment = self.lab_appointment.all().first()
+            if not appointment:
+                appointment = self.opd_appointment.all().first()
+
+            if appointment and appointment.__class__.__name__ == 'LabAppointment':
+                transaction.on_commit(lambda: push_appointment_to_matrix.apply_async(({'type': 'LAB_APPOINTMENT', 'appointment_id': appointment.id, 'product_id': 5,
+                                                                                       'sub_product_id': 2},), countdown=15))
+            elif appointment and appointment.__class__.__name__ == 'OpdAppointment':
+                transaction.on_commit(lambda: push_appointment_to_matrix.apply_async(({'type': 'OPD_APPOINTMENT', 'appointment_id': appointment.id, 'product_id': 5,
+                                                                                       'sub_product_id': 2},), countdown=15))
 
         super().save(*args, **kwargs)
 

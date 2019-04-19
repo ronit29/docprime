@@ -8,7 +8,7 @@ from ondoc.crm.constants import constants
 from ondoc.doctor.models import OpdAppointment, DoctorPracticeSpecialization, PracticeSpecialization, Hospital
 from ondoc.diagnostic.models import LabAppointment, LabTest, Lab
 from ondoc.insurance.models import InsurancePlanContent, InsurancePlans, InsuredMembers, UserInsurance, StateGSTCode, \
-    InsuranceCity, InsuranceDistrict, InsuranceDeal, InsurerPolicyNumber
+    InsuranceCity, InsuranceDistrict, InsuranceDeal, InsurerPolicyNumber, InsuranceLead
 from import_export.admin import ImportExportMixin, ImportExportModelAdmin, base_formats
 import nested_admin
 from import_export import fields, resources
@@ -572,8 +572,81 @@ class UserInsuranceLabResource(resources.ModelResource):
             return ""
 
 
+class UserInsuranceResource(resources.ModelResource):
+    id = fields.Field()
+    insurance_plan = fields.Field()
+    user_name = fields.Field()
+    phone_number = fields.Field()
+    purchase_date = fields.Field()
+    expiry_date = fields.Field()
+    policy_number = fields.Field()
+    amount = fields.Field()
+    receipt_number = fields.Field()
+    coi = fields.Field()
+    matrix_lead = fields.Field()
+
+    def export(self, queryset=None, *args, **kwargs):
+        queryset = self.get_queryset(**kwargs)
+        fetched_queryset = list(queryset)
+        return super().export(fetched_queryset)
+
+    def get_queryset(self, **kwargs):
+
+        request = kwargs.get('request')
+        date_range = [datetime.strptime(kwargs.get('from_date'), '%Y-%m-%d').date(), datetime.strptime(
+                                        kwargs.get('to_date'), '%Y-%m-%d').date()]
+
+        insurance = UserInsurance.objects.filter(created_at__date__range=date_range)
+        return insurance
+
+    class Meta:
+        model = UserInsurance
+        fields = ()
+        export_order = ('id', 'insurance_plan', 'user_name', 'phone_number', 'purchase_date', 'expiry_date',
+                        'policy_number', 'amount', 'receipt_number',
+                        'coi', 'matrix_lead')
+
+    def dehydrate_id(self, insurance):
+        return str(insurance.id)
+
+    def dehydrate_insurance_plan(self, insurance):
+        return str(insurance.insurance_plan.name)
+
+    def dehydrate_user_name(self, insurance):
+        from ondoc.authentication.models import UserProfile
+        profile = UserProfile.objects.filter(user=insurance.user).first()
+        if profile:
+            return str(profile.name)
+        else:
+            return ""
+
+    def dehydrate_phone_number(self, insurance):
+        return str(insurance.user.phone_number)
+
+    def dehydrate_purchase_date(self, insurance):
+        return str(insurance.purchase_date.date())
+
+    def dehydrate_expiry_date(self, insurance):
+        return str(insurance.expiry_date.date())
+
+    def dehydrate_policy_number(self, insurance):
+        return str(insurance.policy_number)
+
+    def dehydrate_amount(self, insurance):
+        return str(insurance.premium_amount)
+
+    def dehydrate_receipt_number(self, insurance):
+        return str(insurance.receipt_number)
+
+    def dehydrate_coi(self, insurance):
+        return str(insurance.coi)
+
+    def dehydrate_matrix_lead(self, insurance):
+        return str(insurance.matrix_lead_id)
+
+
 class UserInsuranceAdmin(ImportExportMixin, admin.ModelAdmin):
-    resource_class = (UserInsuranceDoctorResource, UserInsuranceLabResource)
+    resource_class = (UserInsuranceDoctorResource, UserInsuranceLabResource, UserInsuranceResource)
     export_template_name = "export_insurance_report.html"
     formats = (base_formats.XLS,)
     model = UserInsurance
@@ -608,9 +681,10 @@ class UserInsuranceAdmin(ImportExportMixin, admin.ModelAdmin):
         # data = resource_class(**self.get_export_resource_kwargs(request)).export(queryset, *args, **kwargs)
         if kwargs['appointment_type'] == 'Doctor':
             data = resource_class[0](**self.get_export_resource_kwargs(request)).export(queryset, *args, **kwargs)
-        else:
+        elif kwargs['appointment_type'] == 'Lab':
             data = resource_class[1](**self.get_export_resource_kwargs(request)).export(queryset, *args, **kwargs)
-
+        elif kwargs['appointment_type'] == 'Insurance':
+            data = resource_class[2](**self.get_export_resource_kwargs(request)).export(queryset, *args, **kwargs)
         export_data = file_format.export_data(data)
         return export_data
 
@@ -692,281 +766,27 @@ class InsuranceDealAdmin(admin.ModelAdmin):
     list_display = ('deal_id', 'insurer', 'commission', 'tax', 'deal_start_date', 'deal_end_date')
 
 
-#
-# class InsuranceReportForm(forms.ModelForm):
-#     start_date = forms.DateField(widget=CustomDateInput(format=('%d-%m-%Y'), attrs={'placeholder': 'Select a date'}))
-#     end_date = forms.DateField(widget=CustomDateInput(format=('%d-%m-%Y'), attrs={'placeholder': 'Select a date'}))
-#
-#     def clean(self):
-#         cleaned_data = super().clean()
-#         start = cleaned_data.get("start_date")
-#         end = cleaned_data.get("end_date")
-#         if start and end and start >= end:
-#             raise forms.ValidationError("Start Date should be less than end Date")
-#
-#
-# class InsuranceReportOpdResource(resources.ModelResource):
-#     appointment_id = fields.Field()
-#     policy_number = fields.Field()
-#     member_id = fields.Field()
-#     name = fields.Field()
-#     relationship_with_proposer = fields.Field()
-#     date_of_consultation = fields.Field()
-#     name_of_doctor = fields.Field()
-#     provider_code_of_doctor = fields.Field()
-#     speciality_of_doctor = fields.Field()
-#     name_of_clinic = fields.Field()
-#     amount_to_be_paid = fields.Field()
-#     booking_date = fields.Field()
-#     status = fields.Field()
-#
-#     def export(self, queryset=None, *args, **kwargs):
-#         queryset = self.get_queryset(**kwargs)
-#         fetched_queryset = list(queryset)
-#         return super().export(fetched_queryset)
-#
-#     def get_queryset(self, **kwargs):
-#
-#         date_range = [datetime.strptime(kwargs.get('from_date'), '%Y-%m-%d').date(), datetime.strptime(
-#             kwargs.get('to_date'), '%Y-%m-%d').date()]
-#
-#         appointment = OpdAppointment.objects.filter(~Q(status=LabAppointment.CANCELLED),
-#                                                     created_at__date__range=date_range,
-#                                                     insurance__isnull=False).prefetch_related('insurance')
-#         return appointment
-#
-#     class Meta:
-#         model = InsuranceReport
-#         fields = ()
-#         export_order = ('appointment_id', 'policy_number', 'member_id', 'name', 'relationship_with_proposer',
-#                         'date_of_consultation', 'name_of_doctor', 'provider_code_of_doctor', 'speciality_of_doctor',
-#                         'name_of_clinic', 'amount_to_be_paid', 'booking_date')
-#
-#     def get_insured_member(self, profile):
-#         insured_member = InsuredMembers.objects.filter(profile_id=profile).first()
-#         if insured_member:
-#             return insured_member
-#         else:
-#             return None
-#
-#     def dehydrate_appointment_type(self, appointment):
-#         return "Doctor"
-#
-#     def dehydrate_appointment_id(self, appointment):
-#         return str(appointment.id)
-#
-#     def dehydrate_policy_number(self, appointment):
-#         return str(appointment.insurance.policy_number)
-#
-#     def dehydrate_member_id(self, appointment):
-#         member = self.get_insured_member(appointment.profile_id)
-#         if member:
-#             return str(member.id)
-#         else:
-#             return ""
-#
-#     def dehydrate_name(self, appointment):
-#         member = self.get_insured_member(appointment.profile_id)
-#         if member:
-#             return str(member.first_name)
-#         else:
-#             return ""
-#
-#     def dehydrate_relationship_with_proposer(self, appointment):
-#         member = self.get_insured_member(appointment.profile_id)
-#         if member:
-#             return str(member.relation)
-#         else:
-#             return ""
-#
-#     def dehydrate_date_of_consultation(self, appointment):
-#         return str(appointment.time_slot_start.date())
-#
-#     def dehydrate_name_of_doctor(self, appointment):
-#         return str(appointment.doctor.name)
-#
-#     def dehydrate_provider_code_of_doctor(self, appointment):
-#         doctor = appointment.doctor
-#         hospital = appointment.hospital
-#         return str(doctor.id) + "-" + str(hospital.id)
-#
-#     def dehydrate_speciality_of_doctor(self, appointment):
-#         doctor = appointment.doctor
-#         doctor_specialization_ids = DoctorPracticeSpecialization.objects.filter(doctor_id=doctor).values_list(
-#             'specialization_id', flat=True)
-#         specializations = PracticeSpecialization.objects.filter(id__in=doctor_specialization_ids).values_list(
-#             'name', flat=True)
-#         spd = []
-#         for sp in specializations:
-#             spd.append(sp)
-#         doctor_specialization = ','.join(map(str, spd))
-#         return doctor_specialization
-#
-#     def dehydrate_name_of_clinic(self, appointment):
-#         return str(appointment.hospital.name)
-#
-#     def dehydrate_amount_to_be_paid(self, appointment):
-#         return str(appointment.fees)
-#
-#     def dehydrate_booking_date(self, appointment):
-#         return str(appointment.created_at.date())
-#
-#     def dehydrate_status(selfself, appointment):
-#         if appointment.status == 1:
-#             return "CREATED"
-#         elif appointment.status == 2:
-#             return "BOOKED"
-#         elif appointment.status == 3 or appointment.status == 4:
-#             return "RESCHEDULE"
-#         elif appointment.status == 5:
-#             return "ACCEPTED"
-#         elif appointment.status == 7:
-#             return "COMPLETED"
-#         else:
-#             return ""
-#
-#
-#
-# class InsuranceReportLabResource(resources.ModelResource):
-#     appointment_id = fields.Field()
-#     policy_number = fields.Field()
-#     member_id = fields.Field()
-#     name = fields.Field()
-#     relationship_with_proposer = fields.Field()
-#     date_of_consultation = fields.Field()
-#     name_of_diagnostic_center = fields.Field()
-#     provider_code_of_the_center = fields.Field()
-#     name_of_tests = fields.Field()
-#     amount_to_be_paid = fields.Field()
-#     booking_date = fields.Field()
-#     status = fields.Field()
-#
-#     def export(self, queryset=None, *args, **kwargs):
-#         queryset = self.get_queryset(**kwargs)
-#         fetched_queryset = list(queryset)
-#         return super().export(fetched_queryset)
-#
-#     def get_queryset(self, **kwargs):
-#
-#         date_range = [datetime.strptime(kwargs.get('from_date'), '%Y-%m-%d').date(), datetime.strptime(
-#             kwargs.get('to_date'), '%Y-%m-%d').date()]
-#
-#         appointment = LabAppointment.objects.filter(~Q(status=LabAppointment.CANCELLED), created_at__date__range=date_range,
-#                                                     insurance__isnull=False).prefetch_related('insurance')
-#         return appointment
-#
-#     class Meta:
-#         model = InsuranceReport
-#         fields = ()
-#         export_order = ('appointment_id', 'policy_number', 'member_id', 'name', 'relationship_with_proposer',
-#                         'date_of_consultation', 'name_of_diagnostic_center', 'provider_code_of_the_center',
-#                         'name_of_tests', 'amount_to_be_paid', 'booking_date')
-#
-#     def get_insured_member(self, profile):
-#         insured_member = InsuredMembers.objects.filter(profile_id=profile).first()
-#         if insured_member:
-#             return insured_member
-#         else:
-#             return None
-#
-#     def dehydrate_appointment_type(self, appointment):
-#         return "Lab"
-#
-#     def dehydrate_appointment_id(self, appointment):
-#         return str(appointment.id)
-#
-#     def dehydrate_policy_number(self, appointment):
-#         return str(appointment.insurance.policy_number)
-#
-#     def dehydrate_member_id(self, appointment):
-#         member = self.get_insured_member(appointment.profile_id)
-#         if member:
-#             return str(member.id)
-#         else:
-#             return ""
-#
-#     def dehydrate_name(self, appointment):
-#         member = self.get_insured_member(appointment.profile_id)
-#         if member:
-#             return str(member.first_name)
-#         else:
-#             return ""
-#
-#     def dehydrate_relationship_with_proposer(self, appointment):
-#         member = self.get_insured_member(appointment.profile_id)
-#         if member:
-#             return str(member.relation)
-#         else:
-#             return ""
-#
-#     def dehydrate_date_of_consultation(self, appointment):
-#         return str(appointment.time_slot_start.date())
-#
-#     def dehydrate_name_of_diagnostic_center(self, appointment):
-#         return str(appointment.lab.name)
-#
-#     def dehydrate_provider_code_of_the_center(self, appointment):
-#         return str(appointment.lab.id)
-#
-#     def dehydrate_name_of_tests(self, appointment):
-#         return ", ".join(list(map(lambda test: test.name, appointment.tests.all())))
-#
-#     def dehydrate_amount_to_be_paid(self, appointment):
-#         return str(appointment.agreed_price)
-#
-#     def dehydrate_booking_date(self, appointment):
-#         return str(appointment.created_at.date())
-#
-#     def dehydrate_status(self, appointment):
-#         if appointment.status == 1:
-#             return "CREATED"
-#         elif appointment.status == 2:
-#             return "BOOKED"
-#         elif appointment.status == 3 or appointment.status == 4:
-#             return "RESCHEDULE"
-#         elif appointment.status == 5:
-#             return "ACCEPTED"
-#         elif appointment.status == 7:
-#             return "COMPLETED"
-#         else:
-#             return ""
-#
-#
-# class InsuranceReportAdmin(ImportExportMixin, admin.ModelAdmin):
-#     resource_class = (InsuranceReportOpdResource, InsuranceReportLabResource)
-#     export_template_name = "export_insurance_report.html"
-#     formats = (base_formats.XLS,)
-#     model = InsuranceReport
-#     list_display = ['id', 'insurance_plan', 'user', 'policy_number', 'purchase_date']
-#     fields = ['insurance_plan', 'user', 'purchase_date', 'expiry_date', 'policy_number', 'premium_amount']
-#     readonly_fields = ('insurance_plan', 'user', 'purchase_date', 'expiry_date', 'policy_number', 'premium_amount',)
-#
-#     def has_add_permission(self, request, obj=None):
-#         return False
-#
-#     def has_delete_permission(self, request, obj=None):
-#         return False
-#
-#     def get_export_queryset(self, request):
-#         super().get_export_queryset(request)
-#
-#     def get_export_data(self, file_format, queryset, *args, **kwargs):
-#         """
-#         Returns file_format representation for given queryset.
-#         """
-#         kwargs['from_date'] = kwargs.get('request').POST.get('from_date')
-#         kwargs['to_date'] = kwargs.get('request').POST.get('to_date')
-#         kwargs['appointment_type'] = kwargs.get('request').POST.get('appointment_type')
-#         request = kwargs.pop("request")
-#         resource_class = self.get_export_resource_class()
-#         # data = resource_class(**self.get_export_resource_kwargs(request)).export(queryset, *args, **kwargs)
-#         if kwargs['appointment_type'] == 'Doctor':
-#             data = resource_class[0](**self.get_export_resource_kwargs(request)).export(queryset, *args, **kwargs)
-#         else:
-#             data = resource_class[1](**self.get_export_resource_kwargs(request)).export(queryset, *args, **kwargs)
-#
-#         export_data = file_format.export_data(data)
-#         return export_data
-#
+class InsuranceLeadAdmin(admin.ModelAdmin):
+    model = InsuranceLead
+    # fields = ('user', 'matrix_lead_id', 'extras')
 
+    def name(self, obj):
+        user = obj.user
+        from ondoc.authentication.models import UserProfile
+        user_profile = UserProfile.objects.filter(user=user).order_by('id').first()
+        if user_profile:
+            return str(user_profile.name)
+        else:
+            return ""
 
+    def phone_number(self, obj):
+        return str(obj.user.phone_number)
+
+    def status(self, obj):
+        user_insurance = UserInsurance.objects.filter(user=obj.user).order_by('-id').first()
+        if user_insurance:
+            return "Booked"
+        else:
+            return "New"
+
+    list_display = ('id', 'name',  'phone_number', 'status')

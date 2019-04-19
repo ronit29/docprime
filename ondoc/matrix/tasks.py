@@ -81,6 +81,37 @@ def prepare_and_hit(self, data):
     if mask_number_instance:
         mask_number = mask_number_instance.mask_number
 
+    provider_booking_id = ''
+    merchant_code = ''
+    provider_payment_status = ''
+    settlement_date = None
+    payment_URN = ''
+    amount = None
+    if task_data.get('type') == 'LAB_APPOINTMENT':
+        location_verified = appointment.lab.is_location_verified
+        provider_id = appointment.lab.id
+        merchant = appointment.lab.merchant.all().last()
+        if merchant:
+            merchant_code = merchant.id
+
+        if appointment.lab and appointment.lab.network and appointment.lab.network.id == settings.THYROCARE_NETWORK_ID:
+            integrator_obj = appointment.integrator_response.all().first()
+            if integrator_obj:
+                provider_booking_id = integrator_obj.integrator_order_id
+    elif task_data.get('type') == 'OPD_APPOINTMENT':
+        location_verified = appointment.hospital.is_location_verified
+        provider_id = appointment.doctor.id
+        merchant = appointment.doctor.merchant.all().last()
+        if merchant:
+            merchant_code = merchant.id
+
+    merchant_payout = appointment.merchant_payout
+    if merchant_payout:
+        provider_payment_status = dict(merchant_payout.STATUS_CHOICES)[merchant_payout.status]
+        settlement_date = int(merchant_payout.payout_time.timestamp()) if merchant_payout.payout_time else None
+        payment_URN = merchant_payout.utr_no
+        amount = merchant_payout.payable_amount
+
     user_insurance = appointment.user.active_insurance
     primary_proposer_name = None
 
@@ -111,7 +142,7 @@ def prepare_and_hit(self, data):
         'KYC': kyc,
         'Location': location,
         'PaymentType': appointment.payment_type,
-        'PaymentTypeID': appointment.payment_type,
+        'PaymentTypeId': appointment.payment_type,
         'PaymentStatus': 300,
         'OrderID': order_id if order_id else 0,
         'DocPrimeBookingID': appointment.id,
@@ -133,7 +164,15 @@ def prepare_and_hit(self, data):
         'MRP': float(appointment.mrp) if task_data.get('type') == 'OPD_APPOINTMENT' else float(appointment.price),
         'DealPrice': float(appointment.deal_price),
         'DOB': dob_value,
-        'ProviderAddress': appointment.hospital.get_hos_address() if task_data.get('type') == 'OPD_APPOINTMENT' else appointment.lab.get_lab_address()
+        'ProviderAddress': appointment.hospital.get_hos_address() if task_data.get('type') == 'OPD_APPOINTMENT' else appointment.lab.get_lab_address(),
+        'ProviderID': provider_id,
+        'ProviderBookingID': provider_booking_id,
+        'MerchantCode': merchant_code,
+        'ProviderPaymentStatus': provider_payment_status,
+        'PaymentURN': payment_URN,
+        'Amount': float(amount) if amount else None,
+        'SettlementDate': settlement_date,
+        'LocationVerified': location_verified
     }
 
     request_data = {
@@ -226,6 +265,7 @@ def push_appointment_to_matrix(self, data):
             mobile_list = list()
             # User mobile number
             mobile_list.append({'MobileNo': appointment.user.phone_number, 'Name': appointment.profile.name, 'Type': 1})
+            auto_ivr_enabled = appointment.hospital.is_auto_ivr_enabled()
             # SPOC details
             for spoc_obj in appointment.hospital.spoc_details.all():
                 number = ''
@@ -236,13 +276,13 @@ def push_appointment_to_matrix(self, data):
                 if number:
                     number = int(number)
 
-                spoc_type = dict(spoc_obj.CONTACT_TYPE_CHOICES)[spoc_obj.contact_type]
-                spoc_name = '%s (Hospital) (%s)' % (spoc_obj.name, spoc_type)
-                if spoc_obj.details:
-                    spoc_name = spoc_name + '(%s)' % spoc_obj.details
+                # spoc_type = dict(spoc_obj.CONTACT_TYPE_CHOICES)[spoc_obj.contact_type]
+                spoc_name = spoc_obj.name
                 mobile_list.append({'MobileNo': number,
                                     'Name': spoc_name,
-                                    'Type': spoc_obj.contact_type})
+                                    'DesignationID': spoc_obj.contact_type,
+                                    'AutoIVREnable': str(auto_ivr_enabled).lower(),
+                                    'Type': 2})
 
             # Doctor mobile numbers
             doctor_mobiles = [doctor_mobile.number for doctor_mobile in appointment.doctor.mobiles.all()]
@@ -256,6 +296,24 @@ def push_appointment_to_matrix(self, data):
                 raise Exception("Appointment could not found against id - " + str(appointment_id))
 
             mobile_list = list()
+            auto_ivr_enabled = appointment.lab.is_auto_ivr_enabled()
+
+            for contact_person in appointment.lab.labmanager_set.all():
+                number = ''
+                if contact_person.number:
+                    number = str(contact_person.number)
+                if number:
+                    number = int(number)
+
+                contact_type = dict(contact_person.CONTACT_TYPE_CHOICES)[contact_person.contact_type]
+                contact_name = contact_person.name
+                mobile_list.append({'MobileNo': number,
+                                    'Name': contact_name,
+                                    'DesignationId': contact_person.contact_type,
+                                    'AutoIVREnable': str(auto_ivr_enabled).lower(),
+                                    'Type': 3})
+
+
             # Lab mobile number
             mobile_list.append({'MobileNo': appointment.lab.primary_mobile, 'Name': appointment.lab.name, 'Type': 3})
 

@@ -11,7 +11,8 @@ from rest_framework.response import Response
 from ondoc.account import models as account_models
 from ondoc.doctor import models as doctor_models
 from ondoc.insurance.models import (Insurer, InsuredMembers, InsuranceThreshold, InsurancePlans, UserInsurance, InsuranceLead,
-                                    InsuranceTransaction, InsuranceDisease, InsuranceDiseaseResponse, StateGSTCode)
+                                    InsuranceTransaction, InsuranceDisease, InsuranceDiseaseResponse, StateGSTCode,
+                                    InsuranceDummyData)
 from ondoc.authentication.models import UserProfile
 from ondoc.authentication.backends import JWTAuthentication
 from rest_framework.permissions import IsAuthenticated
@@ -363,3 +364,34 @@ class InsuranceValidationViewSet(viewsets.GenericViewSet):
             resp['insurance_message'] = ""
         return Response(resp)
 
+
+class InsuranceDummyDataViewSet(viewsets.GenericViewSet):
+    authentication_classes = (JWTAuthentication,)
+    permission_classes = (IsAuthenticated,)
+
+    def push_dummy_data(self, request):
+        try:
+            user = request.user
+            data = request.data
+            InsuranceDummyData.objects.create(user=user, data=data)
+            return Response(data="save successfully!!", status=status.HTTP_200_OK )
+        except Exception as e:
+            logger.log(str(e))
+            return Response(data="could not save data", status=status.HTTP_200_OK)
+
+    def show_dummy_data(self, request):
+        user = request.user
+        res = {}
+        if not user:
+            res['error'] = "user not found"
+            return Response(error=res, status=status.HTTP_200_OK)
+        dummy_data = InsuranceDummyData.objects.filter(user=user).order_by('-id').first()
+        if not dummy_data:
+            res['error'] = "data not found"
+            return Response(error=res, status=status.HTTP_200_OK)
+        member_data = dummy_data.data
+        if not member_data:
+            res['error'] = "data not found"
+            return Response(error=res, status=status.HTTP_200_OK)
+        res['data'] = member_data
+        return Response(data=res, status=status.HTTP_200_OK)
