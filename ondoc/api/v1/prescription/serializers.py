@@ -4,6 +4,14 @@ from ondoc.prescription import models as prescription_models
 from ondoc.doctor import models as doc_models
 
 
+class PrescriptionComponents():
+    SYMPTOMS=1
+    MEDICINES = 2
+    OBSERVATIONS = 3
+    TESTS = 4
+    COMPONENT_CHOICES = [(SYMPTOMS, prescription_models.PrescriptionSymptoms)]
+
+
 class PrescriptionAppointmentValidation():
 
     @staticmethod
@@ -46,14 +54,13 @@ class PrescriptionObservationBodySerializer(serializers.Serializer):
 
 
 class PrescriptionComponentBodySerializer(serializers.Serializer):
-    SYMPTOMS = 1
-    MEDICINES = 2
-    OBSERVATIONS = 3
-    TESTS = 4
-    COMPONENT_CHOICES = [(SYMPTOMS, prescription_models.PrescriptionSymptoms)]
-
-    type = serializers.ChoiceField(choices=COMPONENT_CHOICES)
+    type = serializers.ChoiceField(choices=PrescriptionComponents.COMPONENT_CHOICES)
     name = serializers.CharField(max_length=64)
+    hospital_id = serializers.PrimaryKeyRelatedField(queryset=doc_models.Hospital.objects.all())
+
+
+class PrescriptionComponentSyncSerializer(serializers.Serializer):
+    type = serializers.ChoiceField(choices=PrescriptionComponents.COMPONENT_CHOICES)
     hospital_id = serializers.PrimaryKeyRelatedField(queryset=doc_models.Hospital.objects.all())
 
 

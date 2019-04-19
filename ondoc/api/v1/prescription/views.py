@@ -49,6 +49,7 @@ class PrescriptionGenerateViewSet(viewsets.GenericViewSet):
 
 
 class PrescriptionComponentsViewSet(viewsets.GenericViewSet):
+
     # authentication_classes = (JWTAuthentication,)
     # permission_classes = (IsAuthenticated, IsDoctor)
 
@@ -59,13 +60,27 @@ class PrescriptionComponentsViewSet(viewsets.GenericViewSet):
         serializer = serializers.PrescriptionComponentBodySerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         valid_data = serializer.validated_data
-        model = dict(serializers.PrescriptionComponentBodySerializer.COMPONENT_CHOICES)[valid_data.get('type')]
+        model = dict(serializers.PrescriptionComponents.COMPONENT_CHOICES)[valid_data.get('type')]
         object = model.objects.create(name=valid_data.get('name'), hospital=valid_data.get('hospital_id'))
         return Response({'status': 1,
                          'id': object.id,
                          'name': object.name,
                          'hospital': object.hospital_id})
 
+    def sync_component(self, request):
+        serializer = serializers.PrescriptionComponentSyncSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        valid_data = serializer.validated_data
+        model = dict(serializers.PrescriptionComponents.COMPONENT_CHOICES)[valid_data.get('type')]
+        objects = model.objects.filter(Q(hospital=valid_data.get('hospital_id')) | Q(moderated=True))
+        resp = []
+        for obj in objects.all():
+            resp_dict = {'id': obj.id,
+                         'name': obj.name,
+                         'hospital': obj.hospital_id,
+                         'moderated': obj.moderated}
+            resp.append(resp_dict)
+        return Response(resp)
 
 
 
