@@ -612,6 +612,7 @@ class Lab(TimeStampedModel, CreatedByModel, QCModel, SearchKey):
         else:
             return True
 
+
 class LabCertification(TimeStampedModel):
     lab = models.ForeignKey(Lab, related_name = 'lab_certificate', on_delete=models.CASCADE)
     name = models.CharField(max_length=200)
@@ -1636,6 +1637,7 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin,
                     if admin.user]
 
     def created_by_native(self):
+        from packaging.version import parse
         child_order = Order.objects.filter(reference_id=self.id).first()
         parent_order = None
         from_app = False
@@ -1647,7 +1649,7 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin,
             from_app = parent_order.visitor_info.get('from_app', False)
             app_version = parent_order.visitor_info.get('app_version', None)
 
-        if from_app and app_version and app_version < '1.2':
+        if from_app and app_version and parse(app_version) < parse('1.2'):
             return True
         else:
             return False
