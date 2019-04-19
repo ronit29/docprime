@@ -882,13 +882,17 @@ class PartnersAppInvoice(viewsets.GenericViewSet):
 
         appointment = invoice_data.get("appointment")
         if doc_models.PartnersAppInvoice.objects.filter(appointment=appointment, is_valid=True).exists():
-            raise Exception('Invoice for this appointment already exists, please try updating it')
+            logger.error('Invoice for this appointment already exists, please try updating it')
+            return Response(
+                {"status": 0, "message": "Invoice for this appointment already exists, please try updating it"},
+                 status.HTTP_400_BAD_REQUEST)
         try:
             invoice_data['task'] = self.CREATE
             invoice, selected_invoice_items_created, exception = self.create_or_update_invoice(invoice_data, version='01')
             if not exception:
                 return Response({"status": 1, "invoice": invoice.data,
                                  "selected_invoice_items_created": selected_invoice_items_created}, status.HTTP_200_OK)
+            logger.error(str(exception))
             return Response({"status": 0, "message": "Error creating invoice - " + str(exception)}, status.HTTP_400_BAD_REQUEST)
         except Exception as e:
             logger.error(str(e))
@@ -917,6 +921,7 @@ class PartnersAppInvoice(viewsets.GenericViewSet):
             if not exception:
                 return Response({"status": 1, "invoice": invoice_data.data,
                                  "selected_invoice_items_created": selected_invoice_items_created}, status.HTTP_200_OK)
+            logger.error(str(exception))
             return Response({"status": 0, "message": "Error creating invoice - " + str(exception)},
                             status.HTTP_400_BAD_REQUEST)
         except Exception as e:
