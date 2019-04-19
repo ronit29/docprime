@@ -8,7 +8,7 @@ from .views import (LoginOTP, UserViewset, NotificationEndpointViewSet,
                     OrderViewSet, ConsumerAccountRefundViewSet, RefreshJSONWebToken, OnlineLeadViewSet, UserLabViewSet,
                     OrderDetailViewSet, UserTokenViewSet, SendBookingUrlViewSet, ContactUsViewSet, CareerViewSet,
                     DoctorNumberAutocomplete, UserLeadViewSet, ReferralViewSet, UserRatingViewSet, AppointmentViewSet,
-                    WhatsappOptinViewSet, TokenFromUrlKey, SendCartUrlViewSet)
+                    WhatsappOptinViewSet, DoctorScanViewSet, TokenFromUrlKey, SendCartUrlViewSet)
 
 urlpatterns = [
     path('api-token-refresh', RefreshJSONWebToken.as_view({'post':'refresh'}), name='token-refresh'),
@@ -66,6 +66,7 @@ urlpatterns = [
     path('whatsapp-optin', WhatsappOptinViewSet.as_view({'post': 'update'}), name='whatsapp-optin'),
     path('upcoming/appointments',AppointmentViewSet.as_view({'get': 'upcoming_appointments'}), name='upcoming_appointments'),
     path('subscription_plan', SubscriptionPlanUserViewSet.as_view({'get': 'subscription_plan'}), name='user_subscription_plan'),
+    path('appointment_qr_scan/<int:pk>', DoctorScanViewSet.as_view({'post': 'doctor_qr_scan'}), name='doctor_qr_scan'),
     path('get-token', TokenFromUrlKey.as_view({'get': 'get_token'}), name='get-token-from-url-key')
     # path('test/', PathologyTestList.as_view({'get': 'list'}), name='test-list'),
     # path('test/<int:id>/', PathologyTestList.as_view({'get': 'retrieve'}), name='test-detail'),

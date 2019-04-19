@@ -723,6 +723,27 @@ class EmailNotification(TimeStampedModel, EmailNotificationOpdMixin, EmailNotifi
             publish_message(message)
         return booking_url
 
+    @classmethod
+    def send_insurance_booking_url(cls, token, email):
+        booking_url = "{}/agent/booking?token={}".format(settings.CONSUMER_APP_DOMAIN, token)
+        booking_url = booking_url + "&callbackurl=insurance/insurance-user-details-review"
+        short_url = generate_short_url(booking_url)
+        html_body = "Your Insurance purchase url is - {} . Please pay to confirm".format(short_url)
+        email_subject = "Insurance Purchase Url"
+        if email:
+            email_noti = {
+                "email": email,
+                "content": html_body,
+                "email_subject": email_subject
+            }
+            message = {
+                "data": email_noti,
+                "type": "email"
+            }
+            message = json.dumps(message)
+            publish_message(message)
+        return booking_url
+
 
 class SmsNotificationOpdMixin:
 
@@ -849,9 +870,29 @@ class SmsNotification(TimeStampedModel, SmsNotificationOpdMixin, SmsNotification
         return booking_url
 
     @classmethod
+    def send_insurance_booking_url(cls, token, phone_number):
+        booking_url = "{}/agent/booking?token={}".format(settings.CONSUMER_APP_DOMAIN, token)
+        booking_url = booking_url + "&callbackurl=insurance/insurance-user-details-review"
+        short_url = generate_short_url(booking_url)
+        html_body = "Your Insurance purchase url is - {} . Please pay to confirm".format(short_url)
+        if phone_number:
+            sms_notification = {
+                "phone_number": phone_number,
+                "content": html_body,
+            }
+            message = {
+                "data": sms_notification,
+                "type": "sms"
+            }
+            message = json.dumps(message)
+            publish_message(message)
+        return booking_url
+
+    @classmethod
     def send_cart_url(cls, token, phone_number, order_id):
         callback_url = "payment/{}?refs=lab".format(order_id)
-        payment_page_url = "{}/agent/booking?token={}&agent=false&callbackurl={}".format(settings.CONSUMER_APP_DOMAIN, token, callback_url)
+        payment_page_url = "{}/agent/booking?token={}&agent=false&callbackurl={}".format(settings.CONSUMER_APP_DOMAIN,
+                                                                                         token, callback_url)
         # short_url = generate_short_url(payment_page_url)
         html_body = "Your booking url is - {} . Please pay to confirm".format(payment_page_url)
         if phone_number:

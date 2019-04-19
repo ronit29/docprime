@@ -1,5 +1,10 @@
 from rest_framework import viewsets
+from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
+
+from ondoc.api.v1.auth.views import AppointmentViewSet
+from ondoc.authentication.backends import JWTAuthentication
+from ondoc.common.utils import get_all_upcoming_appointments
 from ondoc.doctor.models import CommonSpecialization
 from ondoc.diagnostic.models import CommonTest
 from ondoc.diagnostic.models import CommonPackage
@@ -15,6 +20,10 @@ from ondoc.api.v1.diagnostic.serializers import CommonPackageSerializer
 
 class ScreenViewSet(viewsets.GenericViewSet):
 
+    # authentication_classes = (JWTAuthentication,)
+    # permission_classes = (IsAuthenticated,)
+
+
     def home_page(self, request, *args, **kwargs):
 
         show_search_header = True
@@ -22,6 +31,7 @@ class ScreenViewSet(viewsets.GenericViewSet):
         grid_size = 6
         force_update_version = ""
         update_version = ""
+        app_custom_data = None
 
         params = request.query_params
         from_app = params.get("from_app", False)
@@ -31,6 +41,9 @@ class ScreenViewSet(viewsets.GenericViewSet):
             if app_update:
                 force_update_version = app_update.get("force_update_version", "")
                 update_version = app_update.get("update_version", "")
+
+        if UserConfig.objects.filter(key="app_custom_data").exists():
+            app_custom_data = UserConfig.objects.filter(key="app_custom_data").values_list('data', flat=True).first()
 
         common_specializations = CommonSpecialization.get_specializations(grid_size-1)
         specializations_serializer = CommonSpecializationsSerializer(common_specializations, many=True,
@@ -42,6 +55,11 @@ class ScreenViewSet(viewsets.GenericViewSet):
         package_queryset = CommonPackage.get_packages(grid_size-1)
         package_serializer = CommonPackageSerializer(package_queryset, many=True, context={'request': request})
 
+        # upcoming_appointment_viewset = AppointmentViewSet()
+        # upcoming_appointment_result = upcoming_appointment_viewset.upcoming_appointments(request).data
+        upcoming_appointment_result = []
+        if request.user.is_authenticated:
+            upcoming_appointment_result = get_all_upcoming_appointments(request.user.id)
 
         grid_list = [
             {
@@ -100,7 +118,9 @@ class ScreenViewSet(viewsets.GenericViewSet):
                     "grid_list": grid_list,
                     },
                 "banner": banner,
+                "upcoming_appointments": upcoming_appointment_result,
                 "payment_options": payment_options,
+                "app_custom_data": app_custom_data,
                 "app_force_update": app_version < force_update_version,
                 "app_update": app_version < update_version,
                 "ask_for_app_rating": self.ask_for_app_rating(request)
