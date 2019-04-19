@@ -42,7 +42,7 @@
 											</tr>
 											<tr>
 												<td style="color: #0b0a0a; font-size: 14px; font-weight: 500; padding-top: 4px;">
-													{{instance.updated_at|date:'M d, Y'}}
+													{{updated_at|date:'M d, Y'}}
 												</td>
 											</tr>
 										</tbody>
@@ -54,10 +54,10 @@
 				</td>
 			</tr>
 			<tr>
-				{% for med in instance.medicines %}
+				{% for med in medicines %}
 					<ul>
 						<li> {{ med.name }}</li>
-						<li> {{med.duration }} </li>
+						<li> {{ med.duration }} </li>
 					</ul>
 				{% endfor %}
 			</tr>

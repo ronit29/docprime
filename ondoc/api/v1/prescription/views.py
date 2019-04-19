@@ -28,14 +28,45 @@ class PrescriptionGenerateViewSet(viewsets.GenericViewSet):
         serializer = serializers.GeneratePrescriptionPDFBodySerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         valid_data = serializer.validated_data
+        try:
+            prescription_pdf = prescription_models.PresccriptionPdf.objects.create(medicines=valid_data.get('medicines'),
+                                                                                   observations=valid_data.get('observation'),
+                                                                                   appointment_id=valid_data.get('appointment_id'),
+                                                                                   appointment_type=valid_data.get('appointment_type'),
+                                                                                   symptoms=valid_data.get('symptoms'))
+        except Exception as e:
+            logger.error("Error Creating PDF object " + str(e))
+            return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        try:
+            file = prescription_pdf.get_pdf()
+            prescription_pdf.prescription_file = file
+            prescription_pdf.save()
+        except Exception as e:
+            logger.error("Error saving PDF object " + str(e))
+            return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        response = serializers.PrescriptionResponseSerializer(prescription_pdf, many=False, context={"request": request})
+        return Response(response.data)
 
-        prescription_pdf = prescription_models.PresccriptionPdf.objects.create(medicines=valid_data.get('medicines'),
-                                                                               observations=valid_data.get('observation'),
-                                                                               appointment_id=valid_data.get('appointment_id'),
-                                                                               appointment_type=valid_data.get('appointment_type'),
-                                                                               symptoms=valid_data.get('symptoms'))
-        file = prescription_pdf.get_pdf()
-        what = file
 
-        return Response({'status': 1})
+class PrescriptionComponentsViewSet(viewsets.GenericViewSet):
+    # authentication_classes = (JWTAuthentication,)
+    # permission_classes = (IsAuthenticated, IsDoctor)
+
+    def get_queryset(self):
+        return prescription_models.PresccriptionPdf.objects.none()
+
+    def save_component(self, request):
+        serializer = serializers.PrescriptionComponentBodySerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        valid_data = serializer.validated_data
+        model = dict(serializers.PrescriptionComponentBodySerializer.COMPONENT_CHOICES)[valid_data.get('type')]
+        object = model.objects.create(name=valid_data.get('name'), hospital=valid_data.get('hospital_id'))
+        return Response({'status': 1,
+                         'id': object.id,
+                         'name': object.name,
+                         'hospital': object.hospital_id})
+
+
+
+
 

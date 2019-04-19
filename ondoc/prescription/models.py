@@ -5,15 +5,14 @@ from django.contrib.postgres.fields import JSONField
 from django.template.loader import render_to_string
 from ondoc.api.v1 import utils
 from django.utils import timezone
+from django.core.validators import FileExtensionValidator
 import random, logging
 logger = logging.getLogger(__name__)
 
-# Create your models here.
-
 
 class PrescriptionSymptoms(auth_models.TimeStampedModel):
-    appointment = models.ForeignKey(doc_models.Hospital, on_delete=models.CASCADE)
-    symptoms = models.CharField(max_length=64)
+    hospital = models.ForeignKey(doc_models.Hospital, on_delete=models.CASCADE)
+    name = models.CharField(max_length=64)
     moderated = models.NullBooleanField(blank=True, null=True)
 
     class Meta:
@@ -21,8 +20,8 @@ class PrescriptionSymptoms(auth_models.TimeStampedModel):
 
 
 class PrescriptionObservations(auth_models.TimeStampedModel):
-    appointment = models.ForeignKey(doc_models.Hospital, on_delete=models.CASCADE)
-    observation = models.CharField(max_length=64)
+    hospital = models.ForeignKey(doc_models.Hospital, on_delete=models.CASCADE)
+    name = models.CharField(max_length=64)
     moderated = models.NullBooleanField(blank=True, null=True)
 
     class Meta:
@@ -35,7 +34,7 @@ class PrescriptionMedicine(auth_models.TimeStampedModel):
     MONTH = 3
     YEAR = 4
     DURATION_TYPE_CHOICES = [(DAY, "Day"), (WEEK, "Week"), (MONTH, "Month"), (YEAR, "Year")]
-    appointment = models.ForeignKey(doc_models.Hospital, on_delete=models.CASCADE)
+    hospital = models.ForeignKey(doc_models.Hospital, on_delete=models.CASCADE)
     name = models.CharField(max_length=64)
     quantity = models.PositiveIntegerField(null=True, blank=True)
     time = models.CharField(max_length=64, null=True)
@@ -50,8 +49,8 @@ class PrescriptionMedicine(auth_models.TimeStampedModel):
 
 
 class PrescriptionTests(auth_models.TimeStampedModel):
-    appointment = models.ForeignKey(doc_models.Hospital, on_delete=models.CASCADE)
-    test = models.CharField(max_length=64)
+    hospital = models.ForeignKey(doc_models.Hospital, on_delete=models.CASCADE)
+    name = models.CharField(max_length=64)
     instruction = models.CharField(max_length=256, null=True, blank=True)
     moderated = models.NullBooleanField(blank=True, null=True)
 
@@ -74,9 +73,14 @@ class PresccriptionPdf(auth_models.TimeStampedModel):
     followup_instructions_reason = models.CharField(max_length=256, null=True)
     appointment_id = models.CharField(max_length=64)
     appointment_type = models.PositiveSmallIntegerField(choices=APPOINTMENT_TYPE_CHOICES)
+    prescription_file = models.FileField(upload_to='prescription/pdf', validators=[FileExtensionValidator(allowed_extensions=['pdf'])], null=True)
 
     def get_pdf(self):
-        html_body = render_to_string("e-prescription/pdf_template.html", context=self)
+
+        pdf_dict = {'medicines': self.medicines,
+                    'observations': self.observations,
+                    'updated_at': self.updated_at}
+        html_body = render_to_string("e-prescription/pdf_template.html", context=pdf_dict)
         filename = "prescription_{}_{}.pdf".format(str(timezone.now().strftime("%I%M_%d%m%Y")),
                                               random.randint(1111111111, 9999999999))
         file = utils.html_to_pdf(html_body, filename)

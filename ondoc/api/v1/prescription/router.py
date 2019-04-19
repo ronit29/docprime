@@ -3,5 +3,6 @@ from . import views
 
 urlpatterns = [
     path('generate', views.PrescriptionGenerateViewSet.as_view({'post': 'generate'}), name='generate-pdf'),
+    path('save_component', views.PrescriptionComponentsViewSet.as_view({'post': 'save_component'}), name='save_component'),
 ]
 
