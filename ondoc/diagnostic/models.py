@@ -242,19 +242,19 @@ class Lab(TimeStampedModel, CreatedByModel, QCModel, SearchKey):
         from ondoc.location.management.commands import map_lab_geocoding_results, map_entity_address, \
             calculate_centroid, map_lab_entity_location_relations, lab_page_urls, map_lab_search_urls
         # map labs geocoding results
-        map_lab_geocoding_results.map_lab_geocoding_results()
+        # map_lab_geocoding_results.map_lab_geocoding_results()
 
         # map entity address
-        map_entity_address.map_entity_address()
+        # map_entity_address.map_entity_address()
 
         # calculate centroid
-        calculate_centroid.calculate_centroid()
+        # calculate_centroid.calculate_centroid()
 
         # map lab entity location relations
         map_lab_entity_location_relations.map_lab_entity_location_relations()
 
         # create lab page urls
-        lab_page_urls.map_lab_location_urls()
+        # lab_page_urls.map_lab_location_urls()
 
         # create lab search urls
         map_lab_search_urls.map_lab_search_urls()

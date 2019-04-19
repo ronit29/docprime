@@ -8,6 +8,8 @@ from django.db.models import Prefetch
 
 
 def doctor_page_urls():
+    from ondoc.diagnostic.models import Lab
+    Lab.update_labs_seo_urls()
     # query = '''select nextval('entity_url_version_seq') as inc'''
     # seq = RawSql(query,[]).fetch_all()
 
@@ -31,7 +33,7 @@ def doctor_page_urls():
 
 
     #     try:
-    DoctorPageURL.create_doctor_page_urls()
+    # DoctorPageURL.create_doctor_page_urls()
     # for doctor in doc_obj:
     #     status = DoctorPageURL.create_doctor_page_urls(doctor,sequence)
         

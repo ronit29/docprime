@@ -1225,15 +1225,35 @@ class EntityUrls(TimeStampedModel):
                        ,count(*) count from entity_address ea
                        inner join lab l on l.is_live=true 
                        and (
-                       (type_blueprint='LOCALITY' and ST_DWithin(ea.centroid,l.location,15000)) or
-                       (type_blueprint='SUBLOCALITY' and ST_DWithin(ea.centroid,l.location,5000))
+                       (type='LOCALITY' and ST_DWithin(ea.centroid,l.location,15000)) or
+                       (type='SUBLOCALITY' and ST_DWithin(ea.centroid,l.location,5000))
                        )
-                       where type_blueprint in ('LOCALITY','SUBLOCALITY')
+                       where type in ('LOCALITY','SUBLOCALITY')
                        group by ea.id)x where count>=3)y
                        left join entity_address ea on y.parent_id=ea.id 
                        ) as data 
                        ) x where rnum=1 and x.url ~* 'y*?(^[A-Za-z0-9-]+$)' 
                        ''' % (sequence)
+
+        update_locality_lat_long = '''UPDATE entity_urls 
+                        SET locality_latitude = st_y(centroid::geometry), locality_longitude = st_x(centroid::geometry),
+                        locality_value = ea.alternative_value, locality_location = centroid
+                        FROM entity_address ea
+                        WHERE locality_id = ea.id  and url_type='SEARCHURL' and entity_type='Lab' '''
+
+        update_sublocality_lat_long = '''UPDATE entity_urls 
+                        SET sublocality_latitude = st_y(centroid::geometry), sublocality_longitude = st_x(centroid::geometry),
+                        sublocality_value = ea.alternative_value, sublocality_location = centroid
+                        FROM entity_address ea
+                        WHERE sublocality_id = ea.id  and url_type='SEARCHURL' and entity_type='Lab'
+                        '''
+
+        update_location = '''update entity_urls set location = sublocality_location where sublocality_location is not null'''
+
+        update_null_location = '''update entity_urls set location = locality_location where location is null'''
+
+
+
 
         # query ='''insert into entity_urls(extras, sitemap_identifier, url, count, entity_type, url_type, is_valid, created_at, updated_at, sequence)
         #     select x.extras as extras, x.sitemap_identifier as sitemap_identifier, x.url as url,
@@ -1292,6 +1312,10 @@ class EntityUrls(TimeStampedModel):
             try:
                 cursor.execute(update_query)
                 cursor.execute(query)
+                cursor.execute(update_locality_lat_long)
+                cursor.execute(update_sublocality_lat_long)
+                cursor.execute(update_location)
+                cursor.execute(update_null_location)
 
             except Exception as e:
                 print(str(e))
@@ -1869,6 +1893,7 @@ class DoctorPageURL(object):
 
         sequence = seq[0]['inc']
 
+        from ondoc.location.services.doctor_urls import PageUrlCache
         cache = PageUrlCache(EntityUrls.SitemapIdentifier.DOCTOR_PAGE)
         #to_disable = []
         to_delete = []
@@ -2046,8 +2071,8 @@ class DoctorPageURL(object):
             # EntityUrls.objects.filter(entity_id=doctor.id,
             #                           sitemap_identifier=EntityUrls.SitemapIdentifier.DOCTOR_PAGE).filter(
             #     ~Q(url=new_url)).update(is_valid=False)
-
-            to_delete.extend(cache.get_deletions(new_url, doctor.id))
+            #
+            # to_delete.extend(cache.get_deletions(new_url, doctor.id))
             # EntityUrls.objects.filter(entity_id=doctor.id, sitemap_identifier=EntityUrls.SitemapIdentifier.DOCTOR_PAGE,
             #                           url=new_url).delete()
 
