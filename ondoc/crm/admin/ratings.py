@@ -241,8 +241,8 @@ class AppRatingsResource(resources.ModelResource):
 
 class AppRatingsAdmin(ImportExportMixin, admin.ModelAdmin):
     list_display = ('user_phone', 'app_name', 'ratings', 'app_version', 'brand', 'model', 'platform')
-    fields = ('user_email', 'user_phone', 'app_name', 'ratings', 'app_version', 'brand', 'model', 'platform', 'review', 'app_type', 'device_id', 'user_id')
-    readonly_fields = ('user_email', 'user_phone', 'app_name', 'ratings', 'app_version', 'brand', 'model', 'platform', 'review', 'app_type', 'device_id', 'user_id')
+    fields = ('user_email', 'user_phone', 'app_name', 'ratings', 'app_version', 'brand', 'model', 'platform', 'review', 'app_type', 'device_id', 'user_id', 'compliment')
+    readonly_fields = ('user_email', 'user_phone', 'app_name', 'ratings', 'app_version', 'brand', 'model', 'platform', 'review', 'app_type', 'device_id', 'user_id', 'compliment')
     formats = (base_formats.XLS, base_formats.CSV, base_formats.JSON)
     resource_class = AppRatingsResource
 
@@ -251,3 +251,8 @@ class AppRatingsAdmin(ImportExportMixin, admin.ModelAdmin):
 
     def user_phone(self, obj):
         return obj.user.phone_number
+
+
+class AppComplimentsAdmin(admin.ModelAdmin):
+    list_display = ('message', 'rating_level')
+    fields = ('message', 'rating_level')

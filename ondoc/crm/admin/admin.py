@@ -69,8 +69,8 @@ from ondoc.crm.admin.insurance import InsurerAdmin, InsurancePlansAdmin, Insuran
     UserInsuranceAdmin, InsuredMembersAdmin, InsuranceDiseaseAdmin, StateGSTCodeAdmin, InsuranceCityAdmin, \
     InsuranceDistrictAdmin, InsuranceDealAdmin, InsurerPolicyNumberAdmin, InsuranceLeadAdmin
 from ondoc.insurance import models as insurance_model
-from ondoc.ratings_review.models import RatingsReview, ReviewCompliments, AppRatings
-from ondoc.crm.admin.ratings import RatingsReviewAdmin, ReviewComplimentsAdmin, AppRatingsAdmin
+from ondoc.ratings_review.models import RatingsReview, ReviewCompliments, AppRatings, AppCompliments
+from ondoc.crm.admin.ratings import RatingsReviewAdmin, ReviewComplimentsAdmin, AppRatingsAdmin, AppComplimentsAdmin
 from ondoc.crm.admin.common import ContactUsAdmin
 from ondoc.doctor.models import GoogleDetailing
 from .doctor import GoogleDetailingAdmin
@@ -225,4 +225,5 @@ admin.site.register(PlanFeature, SubscriptionPlanFeatureAdmin)
 admin.site.register(UserPlanMapping, UserPlanMappingAdmin)
 admin.site.register(TestParameterChat, TestParameterChatAdmin)
 admin.site.register(AppRatings, AppRatingsAdmin)
+admin.site.register(AppCompliments, AppComplimentsAdmin)
 admin.site.register(ContactUs, ContactUsAdmin)
