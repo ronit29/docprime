@@ -693,7 +693,7 @@ class DoctorForm(FormCleanMixin):
     def validate_qc(self):
         qc_required = {'name': 'req', 'gender': 'req',
                        # 'practicing_since': 'req',
-                       'emails': 'count',
+                       # 'emails': 'count',
                        'doctor_clinics': 'count', 'languages': 'count',
                        'doctorpracticespecializations': 'count', 'matrix_lead_id': 'value_req'}
 
