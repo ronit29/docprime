@@ -51,7 +51,7 @@ class Command(BaseCommand):
         # storing events
         counter = 0
         try:
-            for psql_events in EventMigrateIterator(4, 6*30*10):
+            for psql_events in EventMigrateIterator(1, 6*30):
                 print('read from postgres done '+ str(datetime.now()))
                 counter += 1
                 create_objects = []
