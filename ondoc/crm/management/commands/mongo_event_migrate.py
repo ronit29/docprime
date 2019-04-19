@@ -75,7 +75,7 @@ class Command(BaseCommand):
 
                 if create_objects:
                     track_mongo_models.TrackingEvent.objects.insert(create_objects)
-                print('objects created in mongo '+len(create_objects)+' '+ str(datetime.now()))
+                print('objects created in mongo '+str(len(create_objects))+' '+ str(datetime.now()))
                 print("MIGRATED COUNT : " + str(total_migrated))
 
         except StopIteration:
