@@ -202,7 +202,7 @@ class InsuredMemberResource(resources.ModelResource):
     def dehydrate_coi(self, insured_members):
         # return insured_members.user_insurance.coi.url
 
-        return settings.BASE_URL + insured_members.user_insurance.coi.url if insured_members.user_insurance.coi is not None and \
+        return insured_members.user_insurance.coi.url if insured_members.user_insurance.coi is not None and \
                                                                           insured_members.user_insurance.coi.name else ''
 
 
@@ -789,4 +789,4 @@ class InsuranceLeadAdmin(admin.ModelAdmin):
         else:
             return "New"
 
-    list_display = ('id', 'name',  'phone_number', 'status')
+    list_display = ('id', 'name',  'phone_number', 'status', 'created_at')
