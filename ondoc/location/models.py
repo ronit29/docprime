@@ -1680,7 +1680,7 @@ class LabPageUrl(object):
             EntityUrls.objects.filter(entity_id=self.lab.id, sitemap_identifier=EntityUrls.SitemapIdentifier.LAB_PAGE, url=url).delete()
             EntityUrls.objects.create(**data)
 
-    def create_lab_page_urls(lab, sequence):
+    def create_lab_page_urls(lab, sequence, cache):
         sequence = sequence
         locality_value = None
         locality_id = None
@@ -1759,24 +1759,20 @@ class LabPageUrl(object):
 
                     new_url = url
 
-                    dup_url = EntityUrls.objects.filter(url=new_url+'-lpp',
-                                                        sitemap_identifier=EntityUrls.SitemapIdentifier.LAB_PAGE
-                                                        ).filter(~Q(entity_id=lab.id)).first()
-                    if dup_url:
+                    is_duplicate = cache.is_duplicate(new_url + '-lpp', lab.id)
+
+                    if is_duplicate:
                         new_url = new_url + '-' + str(lab.id)
+
                     new_url = new_url + '-lpp'
 
-                    EntityUrls.objects.filter(entity_id=lab.id,
-                                              sitemap_identifier=EntityUrls.SitemapIdentifier.LAB_PAGE,
-                                              is_valid=True).filter(
-                        ~Q(url=new_url)).update(is_valid=False)
-
-                    EntityUrls.objects.filter(entity_id=lab.id,
-                                              sitemap_identifier=EntityUrls.SitemapIdentifier.LAB_PAGE,
-                                              url=new_url).delete()
                     data['url'] = new_url
-                    EntityUrls.objects.create(**data)
-                    return ("success: " + str(lab.id))
+                    new_entity = EntityUrls(**data)
+
+                    cache.add(new_entity)
+
+                    return new_entity
+
 
 
 class DoctorPageURL(object):

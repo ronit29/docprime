@@ -251,13 +251,13 @@ class Lab(TimeStampedModel, CreatedByModel, QCModel, SearchKey):
         # calculate_centroid.calculate_centroid()
 
         # map lab entity location relations
-        map_lab_entity_location_relations.map_lab_entity_location_relations()
+        # map_lab_entity_location_relations.map_lab_entity_location_relations()
 
         # create lab page urls
-        # lab_page_urls.map_lab_location_urls()
+        lab_page_urls.map_lab_location_urls()
 
         # create lab search urls
-        map_lab_search_urls.map_lab_search_urls()
+        # map_lab_search_urls.map_lab_search_urls()
 
 
     @cached_property
