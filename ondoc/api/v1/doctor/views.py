@@ -1750,9 +1750,9 @@ class DoctorListViewSet(viewsets.GenericViewSet):
         else:
             if validated_data.get('city'):
                 city = None
-                if validated_data.get('city') in ('bengaluru', 'bengalooru'):
+                if validated_data.get('city').lower() in ('bengaluru', 'bengalooru'):
                     city = 'bangalore'
-                elif validated_data.get('city') in ('gurugram','gurugram rural'):
+                elif validated_data.get('city').lower() in ('gurugram','gurugram rural'):
                     city = 'gurgaon'
                 else:
                     city = validated_data.get('city')
