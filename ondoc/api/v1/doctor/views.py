@@ -816,12 +816,21 @@ class DoctorProfileUserViewSet(viewsets.GenericViewSet):
         response_data['about_web'] = None
         google_rating = dict()
         date = None
+        spec_ids = list()
+        spec_urls = None
 
         if response_data and response_data.get('hospitals'):
             hospital = response_data.get('hospitals')[0]
 
         for dps in doctor.doctorpracticespecializations.all():
             general_specialization.append(dps.specialization)
+            spec_ids.append(dps.specialization.id)
+        if spec_ids:
+            if entity:
+                spec_urls = EntityUrls.objects.filter(specialization_id__in=spec_ids, sublocality_value=entity.sublocality_value,
+                                          locality_value=entity.locality_value, is_valid=True).values(
+                    'specialization_id', 'specialization', 'url')
+        response_data['spec_urls'] = spec_urls
         if general_specialization:
             general_specialization = sorted(general_specialization, key=operator.attrgetter('doctor_count'),
                                             reverse=True)
