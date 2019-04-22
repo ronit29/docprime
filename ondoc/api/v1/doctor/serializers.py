@@ -1764,6 +1764,7 @@ class HospitalDetailIpdProcedureSerializer(TopHospitalForIpdProcedureSerializer)
                   'doctors', 'rating_graph', 'rating', 'display_rating_widget'
                   )
 
+
     def get_lat(self, obj):
         if obj.location:
             return obj.location.y

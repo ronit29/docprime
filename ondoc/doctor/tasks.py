@@ -49,3 +49,8 @@ def update_prices():
 def update_city_search_key():
     from ondoc.doctor.models import Hospital
     Hospital.update_city_search()
+
+@task
+def update_all_hospitals_seo_urls():
+    from ondoc.doctor.models import Hospital
+    Hospital.update_hospital_seo_urls()

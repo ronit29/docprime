@@ -248,6 +248,26 @@ class Hospital(auth_model.TimeStampedModel, auth_model.CreatedByModel, auth_mode
     #     return None
 
     @classmethod
+    def update_hospital_seo_urls(cls):
+
+        from ondoc.location.management.commands import map_hospital_geocoding_results, map_entity_address, \
+            calculate_centroid, map_hosp_entity_location_relations, hospital_urls
+        # map hospital geocoding results
+        map_hospital_geocoding_results.map_hospital_geocoding_results()
+
+        # map entity address
+        map_entity_address.map_entity_address()
+
+        # calculate centroid
+        calculate_centroid.calculate_centroid()
+
+        # map hospital entity location relations
+        map_hosp_entity_location_relations.map_hosp_entity_location_relations()
+
+        # update search and profile urls
+        hospital_urls.hospital_urls()
+
+    @classmethod
     def update_city_search(cls):
         query = '''  update hospital set city_search_key = alternative_value
         from 
