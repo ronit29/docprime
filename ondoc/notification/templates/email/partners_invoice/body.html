@@ -2,7 +2,7 @@
 <html xmlns="http://www.w3.org/1999/xhtml">
 	<head>
 		<meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
-		<title>Email Design</title>
+		<title></title>
 		<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
 		<link href="https://fonts.googleapis.com/css?family=Quicksand:400,700" rel="stylesheet">
 	</head>
@@ -15,7 +15,7 @@
 							<td style="width: 300px;">
 								<p style="margin: 0px; color: #000000; font-size:18px; font-weight: 700; padding-bottom: 10px;">Invoice to:</p>
 								<p style="margin: 0px; color: #000000; font-size:14px; ">{{patient_name}}<br>
-								    {{patient_phone_number}} </p>
+								    {% if patient_phone_number %} {{patient_phone_number}} {% endif %} </p>
 							</td>
 							<td style="width: 300px; text-align: right;">
 								<p style="margin: 0px; color: #000000; font-size:18px;font-weight: 700;  padding-bottom: 10px;">Invoice No: {{invoice_serial_id}}</p>
@@ -79,6 +79,14 @@
 							</tr>
 						</thead>
 						<tbody>
+							<tr>
+                                <td style="text-align: center; font-size: 14px;padding-top: 10px; padding-bottom: 10px;  text-align: left; padding-left: 10px;"> Consultation Fees </td>
+                                <td style="text-align: center; font-size: 14px;padding-top: 10px; padding-bottom: 10px; ">{{consultation_fees}}</td>
+                                <td style="text-align: center; font-size: 14px;padding-top: 10px; padding-bottom: 10px; "> - </td>
+								<td style="text-align: center; font-size: 14px;padding-top: 10px; padding-bottom: 10px; "> - </td>
+								<td style="text-align: center; font-size: 14px;padding-top: 10px; padding-bottom: 10px; "> - </td>
+								<td style="text-align: right; font-size: 14px;padding-top: 10px; padding-bottom: 10px; padding-right: 10px;">{{consultation_fees}}</td>
+							</tr>
                         {% for item in invoice_items %}
                             <tr>
                                 <td style="text-align: center; font-size: 14px;padding-top: 10px; padding-bottom: 10px;  text-align: left; padding-left: 10px;">{{item.name}}</td>

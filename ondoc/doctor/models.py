@@ -3264,6 +3264,7 @@ class PartnersAppInvoice(auth_model.TimeStampedModel):
         if doctor_number:
             context["doctor_phone_number"] = doctor_number.phone_number
         context["invoice_title"] = self.invoice_title
+        context["consultation_fees"] = self.consultation_fees
         context["invoice_items"] = self.get_invoice_items(selected_invoice_items)
         context["sub_total_amount"] = str(self.sub_total_amount)
         context["tax_percentage"] = self.tax_percentage.normalize() if self.tax_percentage else None
