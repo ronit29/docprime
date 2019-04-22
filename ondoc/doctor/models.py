@@ -237,6 +237,7 @@ class Hospital(auth_model.TimeStampedModel, auth_model.CreatedByModel, auth_mode
     enabled_for_cod = models.BooleanField(default=False)
     enabled_for_prepaid = models.BooleanField(default=True)
     is_location_verified = models.BooleanField(verbose_name='Location Verified', default=False)
+    auto_ivr_enabled = models.BooleanField(default=True)
 
     def __str__(self):
         return self.name
@@ -279,6 +280,12 @@ class Hospital(auth_model.TimeStampedModel, auth_model.CreatedByModel, auth_mode
 
     def open_for_communications(self):
         if (self.network and self.network.open_for_communication) or (not self.network and self.open_for_communication):
+            return True
+
+        return False
+
+    def is_auto_ivr_enabled(self):
+        if (self.network and self.network.auto_ivr_enabled) or (not self.network and self.auto_ivr_enabled):
             return True
 
         return False
@@ -918,9 +925,6 @@ class Doctor(auth_model.TimeStampedModel, auth_model.QCModel, SearchKey, auth_mo
         sticker.save()
         return sticker
 
-
-
-
     class Meta:
         db_table = "doctor"
 
@@ -1514,6 +1518,7 @@ class HospitalNetwork(auth_model.TimeStampedModel, auth_model.CreatedByModel, au
     open_for_communication = models.BooleanField(default=True)    
     matrix_lead_id = models.BigIntegerField(blank=True, null=True, unique=True)
     remark = GenericRelation(Remark)
+    auto_ivr_enabled = models.BooleanField(default=True)
 
     def update_time_stamps(self):
         if self.welcome_calling_done and not self.welcome_calling_done_at:
@@ -1778,6 +1783,7 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
     mask_number = GenericRelation(AppointmentMaskNumber)
     history = GenericRelation(AppointmentHistory)
     email_notification = GenericRelation(EmailNotification, related_name="enotification")
+    auto_ivr_data = JSONField(default=list(), null=True)
     synced_analytics = GenericRelation(SyncBookingAnalytics, related_name="opd_booking_analytics")
     refund_details = GenericRelation(RefundDetails, related_query_name="opd_appointment_detail")
 
@@ -1843,7 +1849,7 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
             obj.TypeId = 1
             obj.ProviderId = self.hospital.id
             obj.PaymentType = self.payment_type if self.payment_type else None
-            obj.Payout = self.merchant_payout if self.merchant_payout else None
+            obj.Payout = self.fees
             obj.CashbackUsed = cashback
         obj.PromoCost = promo_cost
         obj.GMValue = self.deal_price
@@ -1935,6 +1941,25 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
     def action_accepted(self):
         self.status = self.ACCEPTED
         self.save()
+
+    def update_ivr_status(self, status):
+        if status == self.status:
+            return True, ""
+
+        if self.status in [OpdAppointment.COMPLETED, OpdAppointment.CANCELLED]:
+            return False, 'Appointment cannot be accepted as current status is %s' % str(self.status)
+
+        if status == OpdAppointment.ACCEPTED:
+            # Constraints: Check if appointment can be accepted or not.
+            if self.time_slot_start < timezone.now():
+                return False, 'Appointment cannot be accepted as time slot has been expired'
+
+            self.action_accepted()
+
+        elif status == OpdAppointment.COMPLETED:
+            self.action_completed()
+
+        return True, ""
 
     @transaction.atomic
     def action_cancelled(self, refund_flag=1):

@@ -33,6 +33,7 @@ from ondoc.api.v1.ratings import serializers as rating_serializer
 from ondoc.location.models import EntityUrls, EntityAddress
 from ondoc.seo.models import NewDynamic
 from ondoc.subscription_plan.models import Plan, UserPlanMapping
+from packaging.version import parse
 
 logger = logging.getLogger(__name__)
 utc = pytz.UTC
@@ -831,7 +832,7 @@ class LabAppointmentCreateSerializer(serializers.Serializer):
         curr_minute = round(round(float(time_slot_start.minute) / 60, 2) * 2) / 2
         curr_time += curr_minute
 
-        if bool(data.get('from_app')) and data.get('app_version') and float(data.get('app_version')) < float('1.2'):
+        if bool(data.get('from_app')) and data.get('app_version') and parse(data.get('app_version')) < parse('1.2'):
             available_slots = LabTiming.timing_manager.lab_booking_slots(lab__id=data.get("lab").id, lab__is_live=True, for_home_pickup=data.get("is_home_pickup"))
             is_integrated = False
             if is_today and available_slots.get("today_min") and available_slots.get("today_min") > curr_time:
@@ -1214,7 +1215,8 @@ class LabAppointmentRetrieveSerializer(LabAppointmentModelSerializer):
     def get_reports(self, obj):
         reports = []
         for rep in obj.get_reports():
-            reports.append({"details": rep.report_details, "files":[file.name.url for file in rep.files.all()]})
+            # reports.append({"details": rep.report_details, "files":[file.name.url for file in rep.files.all()]})
+            reports.extend([file.name.url for file in rep.files.all()])
         return reports
 
     def get_invoices(self, obj):

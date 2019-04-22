@@ -6,7 +6,7 @@ from fluent_comments.models import FluentComment
 from ondoc.articles.models import Article, ArticleLinkedUrl, LinkedArticle
 from ondoc.articles.models import ArticleCategory
 from ondoc.authentication.models import User
-from ondoc.doctor.models import Specialization
+from ondoc.doctor.models import PracticeSpecialization
 from ondoc.doctor.v1.serializers import DoctorSerializer, ArticleAuthorSerializer
 from django.db import models
 from bs4 import BeautifulSoup
@@ -46,6 +46,7 @@ class ArticleRetrieveSerializer(serializers.ModelSerializer):
     last_updated_at = serializers.SerializerMethodField()
     comments = serializers.SerializerMethodField()
     body_doms = serializers.SerializerMethodField()
+    recent_articles = serializers.SerializerMethodField()
 
     def get_comments(self, obj):
         comments = FluentComment.objects.filter(object_pk=str(obj.id), parent_id=None, is_public=True)
@@ -146,7 +147,7 @@ class ArticleRetrieveSerializer(serializers.ModelSerializer):
                 search_widget['content']['lng'] = None
                 search_widget['content']['location_name'] = None
             if widget_tag_attrs.get('specialization_id'):
-                specialization_results = Specialization.objects.filter(pk=widget_tag_attrs.get('specialization_id'))
+                specialization_results = PracticeSpecialization.objects.filter(pk=widget_tag_attrs.get('specialization_id'))
                 if specialization_results:
                     has_specialization = True
                     specialization = specialization_results.first()
@@ -173,10 +174,17 @@ class ArticleRetrieveSerializer(serializers.ModelSerializer):
         if search_widget_tag:
             obj.append(self.format_widget(search_widget_tag))
 
+    def get_recent_articles(self, obj):
+        article_data = Article.objects.prefetch_related('category', 'author').exclude(pk=obj.id).filter(is_published=True)
+        recent_articles_data = article_data.order_by('-updated_at')[:10]
+        recent_articles = ArticleListSerializer(recent_articles_data, many=True).data
+        recent_articles_dict = {'title': 'Recent Articles', 'items': recent_articles}
+        return recent_articles_dict
+
     class Meta:
         model = Article
         fields = ('title','heading_title', 'url', 'body_doms', 'body', 'icon', 'id', 'seo', 'header_image', 'header_image_alt', 'category',
-                  'linked', 'author_name', 'published_date', 'author', 'last_updated_at', 'comments')
+                  'linked', 'author_name', 'published_date', 'author', 'last_updated_at', 'comments', 'recent_articles')
 
 
 class ArticleListSerializer(serializers.ModelSerializer):

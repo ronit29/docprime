@@ -344,7 +344,7 @@ class LabForm(FormCleanMixin):
     about = forms.CharField(widget=forms.Textarea, required=False)
     primary_mobile = forms.CharField(required=True)
     primary_email = forms.EmailField(required=True)
-    city = forms.CharField(required=True)
+    # city = forms.CharField(required=True)
     lab_priority = forms.IntegerField(required=True)
     operational_since = forms.ChoiceField(required=False, choices=hospital_operational_since_choices)
     home_pickup_charges = forms.DecimalField(required=False, initial=0)
@@ -354,6 +354,11 @@ class LabForm(FormCleanMixin):
     class Meta:
         model = Lab
         exclude = ()
+        widgets = {
+            'lab_pricing_group': autocomplete.ModelSelect2(url='admin:diagnostic_labpricinggroup_autocomplete'),
+            'matrix_state': autocomplete.ModelSelect2(url='matrix-state-autocomplete'),
+            'matrix_city': autocomplete.ModelSelect2(url='matrix-city-autocomplete', forward=['matrix_state'])
+        }
         # exclude = ('pathology_agreed_price_percentage', 'pathology_deal_price_percentage', 'radiology_agreed_price_percentage',
         #            'radiology_deal_price_percentage', )
 
@@ -371,7 +376,8 @@ class LabForm(FormCleanMixin):
 
     def validate_qc(self):
         qc_required = {'name': 'req', 'location': 'req', 'operational_since': 'req', 'parking': 'req',
-                       'license': 'req', 'building': 'req', 'locality': 'req', 'city': 'req', 'state': 'req',
+                       'license': 'req', 'building': 'req', 'locality': 'req',
+                       'matrix_city': 'req', 'matrix_state': 'req',
                        'country': 'req', 'pin_code': 'req', 'network_type': 'req', 'lab_image': 'count'}
 
         if self.instance.network and self.instance.network.data_status != QCModel.QC_APPROVED:
@@ -388,6 +394,27 @@ class LabForm(FormCleanMixin):
                 raise forms.ValidationError("Atleast one entry of "+key+" is required for Quality Check")
         if self.cleaned_data['network_type'] == 2 and not self.cleaned_data['network']:
             raise forms.ValidationError("Network cannot be empty for Network Lab")
+
+    def clean(self):
+        super().clean()
+        if any(self.errors):
+            return
+        data = self.cleaned_data
+        if self.instance and self.instance.id and self.instance.data_status == QCModel.QC_APPROVED:
+            is_enabled = data.get('enabled', None)
+            if is_enabled is None:
+                is_enabled = self.instance.enabled if self.instance else False
+            if is_enabled:
+                if any([data.get('disabled_after', None), data.get('disable_reason', None),
+                        data.get('disable_comments', None)]):
+                    raise forms.ValidationError(
+                        "Cannot have disabled after/disabled reason/disable comments if lab is enabled.")
+            elif not is_enabled:
+                if not all([data.get('disabled_after', None), data.get('disable_reason', None)]):
+                    raise forms.ValidationError("Must have disabled after/disable reason if lab is not enabled.")
+                if data.get('disable_reason', None) and data.get('disable_reason', None) == Lab.OTHERS and not data.get(
+                        'disable_comments', None):
+                    raise forms.ValidationError("Must have disable comments if disable reason is others.")
 
 
 class LabCityFilter(SimpleListFilter):
@@ -510,23 +537,21 @@ class LabTestGroupTimingInline(admin.TabularInline):
 class LabAdmin(ImportExportMixin, admin.GeoModelAdmin, VersionAdmin, ActionAdmin, QCPemAdmin):
     change_list_template = 'superuser_import_export.html'
     resource_class = LabResource
-    list_display = ('name', 'lab_logo', 'updated_at', 'onboarding_status', 'data_status', 'list_created_by', 'list_assigned_to',
-                    'get_onboard_link',)
-
+    list_display = ('name', 'lab_logo', 'updated_at', 'onboarding_status', 'data_status', 'welcome_calling_done',
+                    'list_created_by', 'list_assigned_to', 'get_onboard_link',)
     # readonly_fields=('onboarding_status', )
-    list_filter = ('data_status', 'onboarding_status', 'is_insurance_enabled', LabCityFilter, CreatedByFilter)
-
+    list_filter = ('data_status', 'welcome_calling_done', 'onboarding_status', 'is_insurance_enabled',
+                   LabCityFilter, CreatedByFilter)
     exclude = ('search_key', 'pathology_agreed_price_percentage', 'pathology_deal_price_percentage',
-               'radiology_agreed_price_percentage',
-               'radiology_deal_price_percentage', 'live_at', 'onboarded_at', 'qc_approved_at')
-
+               'radiology_agreed_price_percentage', 'radiology_deal_price_percentage', 'live_at',
+               'onboarded_at', 'qc_approved_at', 'disabled_at', 'welcome_calling_done_at')
     form = LabForm
     search_fields = ['name', 'lab_pricing_group__group_name', ]
     inlines = [LabDoctorInline, LabServiceInline, LabDoctorAvailabilityInline, LabCertificationInline, LabAwardInline,
                LabAccreditationInline,
                LabManagerInline, LabTimingInline, LabImageInline, LabDocumentInline, HomePickupChargesInline,
                GenericLabAdminInline, AssociatedMerchantInline, LabTestGroupTimingInline, RemarkInline]
-    autocomplete_fields = ['lab_pricing_group', ]
+    # autocomplete_fields = ['lab_pricing_group', ]
 
     map_width = 200
     map_template = 'admin/gis/gmap.html'
@@ -537,12 +562,24 @@ class LabAdmin(ImportExportMixin, admin.GeoModelAdmin, VersionAdmin, ActionAdmin
     def get_queryset(self, request):
         return super().get_queryset(request).prefetch_related('lab_documents')
 
+    def get_fields(self, request, obj=None):
+        all_fields = super().get_fields(request, obj)
+        if not request.user.is_superuser and not request.user.groups.filter(
+                name=constants['WELCOME_CALLING_TEAM']).exists():
+            if 'welcome_calling_done' in all_fields:
+                all_fields.remove('welcome_calling_done')
+        return all_fields
+
     def get_readonly_fields(self, request, obj=None):
-        read_only_fields = ['lead_url', 'matrix_lead_id', 'matrix_reference_id', 'is_live']
+        read_only_fields = ['lead_url', 'matrix_lead_id', 'matrix_reference_id', 'is_live', 'city', 'state']
         if (not request.user.is_member_of(constants['QC_GROUP_NAME'])) and (not request.user.is_superuser):
             read_only_fields += ['lab_pricing_group']
         if (not request.user.is_member_of(constants['SUPER_QC_GROUP'])) and (not request.user.is_superuser):
             read_only_fields += ['onboarding_status']
+        if not request.user.groups.filter(
+                name__in=[constants['WELCOME_CALLING_TEAM'],
+                          constants['LAB_APPOINTMENT_MANAGEMENT_TEAM']]) and not request.user.is_superuser:
+            read_only_fields += ['is_location_verified']
         return read_only_fields
 
     def lab_logo(self, instance):
@@ -634,6 +671,10 @@ class LabAdmin(ImportExportMixin, admin.GeoModelAdmin, VersionAdmin, ActionAdmin
     def save_model(self, request, obj, form, change):
         if not obj.created_by:
             obj.created_by = request.user
+        if not form.cleaned_data.get('enabled', False) and not obj.disabled_by:
+            obj.disabled_by = request.user
+        elif form.cleaned_data.get('enabled', False) and obj.disabled_by:
+            obj.disabled_by = None
         if not obj.assigned_to:
             obj.assigned_to = request.user
         if '_submit_for_qc' in request.POST:
@@ -644,9 +685,9 @@ class LabAdmin(ImportExportMixin, admin.GeoModelAdmin, VersionAdmin, ActionAdmin
         if '_mark_in_progress' in request.POST:
             obj.data_status = QCModel.REOPENED
         obj.status_changed_by = request.user
-
+        obj.city = obj.matrix_city.name
+        obj.state = obj.matrix_state.name
         super().save_model(request, obj, form, change)
-
 
     def save_formset(self, request, form, formset, change):
         instances = formset.save(commit=False)
@@ -691,16 +732,18 @@ class LabAdmin(ImportExportMixin, admin.GeoModelAdmin, VersionAdmin, ActionAdmin
             form.base_fields['assigned_to'].disabled = True
         return form
 
-    def get_readonly_fields(self, *args, **kwargs):
-        read_only = super().get_readonly_fields(*args, **kwargs)
-        if args:
-            request = args[0]
-            if not request.user.groups.filter(
-                    name__in=[constants['WELCOME_CALLING_TEAM'],
-                              constants['LAB_APPOINTMENT_MANAGEMENT_TEAM']]) and not request.user.is_superuser:
-                read_only += ('is_location_verified',)
+    # Method is already declared above
+    # def get_readonly_fields(self, *args, **kwargs):
+    #     read_only = super().get_readonly_fields(*args, **kwargs)
+    #     if args:
+    #         request = args[0]
+    #         if not request.user.groups.filter(
+    #                 name__in=[constants['WELCOME_CALLING_TEAM'],
+    #                           constants['LAB_APPOINTMENT_MANAGEMENT_TEAM']]) and not request.user.is_superuser:
+    #             read_only += ('is_location_verified',)
+    #
+    #     return read_only
 
-        return read_only
 
 
 class LabAppointmentForm(RefundableAppointmentForm):

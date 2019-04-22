@@ -1389,6 +1389,20 @@ class MerchantPayout(TimeStampedModel):
         if self.type == self.MANUAL and self.utr_no and self.status == self.PENDING:
             self.status = self.PAID
 
+        if not first_instance and self.status != self.PENDING:
+            from ondoc.matrix.tasks import push_appointment_to_matrix
+
+            appointment = self.lab_appointment.all().first()
+            if not appointment:
+                appointment = self.opd_appointment.all().first()
+
+            if appointment and appointment.__class__.__name__ == 'LabAppointment':
+                transaction.on_commit(lambda: push_appointment_to_matrix.apply_async(({'type': 'LAB_APPOINTMENT', 'appointment_id': appointment.id, 'product_id': 5,
+                                                                                       'sub_product_id': 2},), countdown=15))
+            elif appointment and appointment.__class__.__name__ == 'OpdAppointment':
+                transaction.on_commit(lambda: push_appointment_to_matrix.apply_async(({'type': 'OPD_APPOINTMENT', 'appointment_id': appointment.id, 'product_id': 5,
+                                                                                       'sub_product_id': 2},), countdown=15))
+
         super().save(*args, **kwargs)
 
         if first_instance:
