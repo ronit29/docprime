@@ -938,5 +938,4 @@ class GetKeyDataViewSet(viewsets.GenericViewSet):
             data_key = data_key.lower()
             data = info.data
             resp.append({'data': data, 'key': data_key})
-
             return Response(resp)
