@@ -765,6 +765,10 @@ class TimeSlotExtraction(object):
     EVENING = "PM"
     TIME_SPAN = 30  # In minutes
     TIME_SPAN_NUM = 0.5
+    DOCTOR_MAX_TIMING = 20.0
+    DOCTOR_BOOK_AFTER = 1
+    LAB_BOOK_AFTER = 2
+    LAB_HOMEPICKUP_BOOK_AFTER = 4
     timing = dict()
     price_available = dict()
     time_division = list()
@@ -1214,11 +1218,13 @@ class TimeSlotExtraction(object):
         lab_tomorrow_time = 0.0
         lab_minimum_time = None
         doc_minimum_time = None
-        doctor_maximum_timing = 20.0
+        doctor_maximum_timing = TimeSlotExtraction.DOCTOR_MAX_TIMING
+        doc_booking_minimum_time = current_date_time
+        lab_booking_minimum_time = current_date_time
 
         if is_doctor:
             if current_date_time.date() == booking_date.date():
-                doc_booking_minimum_time = current_date_time + datetime.timedelta(hours=1)
+                doc_booking_minimum_time = current_date_time + datetime.timedelta(hours=TimeSlotExtraction.DOCTOR_BOOK_AFTER)
                 doc_booking_hours = doc_booking_minimum_time.strftime('%H:%M')
                 hours, minutes = doc_booking_hours.split(':')
                 mins = int(hours) * 60 + int(minutes)
@@ -1232,7 +1238,7 @@ class TimeSlotExtraction(object):
                     if current_date_time.weekday() == 6:
                         lab_minimum_time = 24.0
                     if current_date_time.hour < 13:
-                        lab_booking_minimum_time = current_date_time + datetime.timedelta(hours=4)
+                        lab_booking_minimum_time = current_date_time + datetime.timedelta(hours=TimeSlotExtraction.LAB_HOMEPICKUP_BOOK_AFTER)
                         lab_booking_hours = lab_booking_minimum_time.strftime('%H:%M')
                         hours, minutes = lab_booking_hours.split(':')
                         mins = int(hours) * 60 + int(minutes)
@@ -1243,7 +1249,7 @@ class TimeSlotExtraction(object):
                         lab_minimum_time = 24.0
                         lab_tomorrow_time = 12.0
                 else:
-                    lab_booking_minimum_time = current_date_time + datetime.timedelta(hours=2)
+                    lab_booking_minimum_time = current_date_time + datetime.timedelta(hours=TimeSlotExtraction.LAB_BOOK_AFTER)
                     lab_booking_hours = lab_booking_minimum_time.strftime('%H:%M')
                     hours, minutes = lab_booking_hours.split(':')
                     mins = int(hours) * 60 + int(minutes)
@@ -1253,13 +1259,14 @@ class TimeSlotExtraction(object):
         if is_doctor:
             will_doctor_data_append = False
             if current_date_time.date() == booking_date.date():
-                if on_call == False:
-                    if start_hour >= float(doc_minimum_time) and start_hour <= doctor_maximum_timing:
-                        will_doctor_data_append = True
+                if doc_booking_minimum_time.date() == booking_date.date():
+                    if on_call == False:
+                        if start_hour >= float(doc_minimum_time) and start_hour <= doctor_maximum_timing:
+                            will_doctor_data_append = True
+                        else:
+                            pass
                     else:
                         pass
-                else:
-                    pass
             else:
                 if start_hour <= doctor_maximum_timing:
                     will_doctor_data_append = True
@@ -1273,10 +1280,11 @@ class TimeSlotExtraction(object):
             will_lab_data_append = False
             next_date = current_date_time + datetime.timedelta(days=1)
             if current_date_time.date() == booking_date.date():
-                if start_hour >= float(lab_minimum_time):
-                    will_lab_data_append = True
-                else:
-                    pass
+                if lab_booking_minimum_time.date() == booking_date.date():
+                    if start_hour >= float(lab_minimum_time):
+                        will_lab_data_append = True
+                    else:
+                        pass
             elif next_date.date() == booking_date.date():
                 if lab_tomorrow_time:
                     if start_hour >= float(lab_tomorrow_time):
