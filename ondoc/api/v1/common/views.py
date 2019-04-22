@@ -22,7 +22,7 @@ from ondoc.notification.rabbitmq_client import publish_message
 # from ondoc.notification.sqs_client import publish_message
 from django.template.loader import render_to_string
 from . import serializers
-from ondoc.common.models import Cities, PaymentOptions
+from ondoc.common.models import Cities, PaymentOptions, UserConfig
 from ondoc.common.utils import send_email, send_sms
 from ondoc.authentication.backends import JWTAuthentication
 from django.core.files.uploadedfile import SimpleUploadedFile, TemporaryUploadedFile, InMemoryUploadedFile
@@ -923,3 +923,20 @@ class GetSearchUrlViewSet(viewsets.GenericViewSet):
         tiny_lab_search_url = generate_short_url(lab_search_url)
 
         return Response({"opd_search_url": tiny_opd_search_url, "lab_search_url": tiny_lab_search_url})
+
+
+class GetKeyDataViewSet(viewsets.GenericViewSet):
+
+    def list(self, request):
+
+        parameters = request.query_params
+        key = parameters.get('key')
+        queryset = UserConfig.objects.filter(key__iexact=key)
+        resp = []
+        for info in queryset:
+            data_key = info.key
+            data_key = data_key.lower()
+            data = info.data
+            resp.append({'data': data, 'key': data_key})
+
+            return Response(resp)
