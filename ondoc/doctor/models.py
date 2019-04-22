@@ -1869,7 +1869,7 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
             obj.TypeId = 1
             obj.ProviderId = self.hospital.id
             obj.PaymentType = self.payment_type if self.payment_type else None
-            obj.Payout = self.merchant_payout if self.merchant_payout else None
+            obj.Payout = self.fees
             obj.CashbackUsed = cashback
         obj.PromoCost = promo_cost
         obj.GMValue = self.deal_price
