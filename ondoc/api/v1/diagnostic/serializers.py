@@ -1012,28 +1012,28 @@ class LabAppointmentCreateSerializer(serializers.Serializer):
     def thyrocare_test_validator(self, data):
         from ondoc.integrations.models import IntegratorTestMapping
 
-        test_ids = data.get("test_ids", None)
-        if test_ids:
-            for test in test_ids:
+        booked_test_ids = list(data.get("test_ids", None))
+        if booked_test_ids:
+            for test in booked_test_ids:
                 integrator_test = IntegratorTestMapping.objects.filter(test_id=test).first()
                 if integrator_test and integrator_test.integrator_product_data['code'] == 'FBS':
-                    self.fbs_valid(test_ids, test)
+                    self.fbs_valid(booked_test_ids, test)
                 elif integrator_test and integrator_test.integrator_product_data['code'] in ['PPBS', 'RBS']:
-                    self.ppbs_valid(test_ids, test)
+                    self.ppbs_valid(booked_test_ids, test)
                 elif integrator_test and integrator_test.integrator_product_data['code'] == 'INSPP':
-                    self.inspp_valid(test_ids, test)
+                    self.inspp_valid(booked_test_ids, test)
 
-    def fbs_valid(self, test_ids, test):
+    def fbs_valid(self, booked_test_ids, test):
         from ondoc.integrations.models import IntegratorTestMapping
-        if len(test_ids) < 2:
+        if len(booked_test_ids) < 2:
             raise serializers.ValidationError("FBS can be added with any fasting test or package.")
 
         is_profile_or_fasting_added = False
-        test_ids.remove(test)
-        if not test_ids:
+        booked_test_ids.remove(test)
+        if not booked_test_ids:
             pass
 
-        for test in test_ids:
+        for test in booked_test_ids:
             integrator_test = IntegratorTestMapping.objects.filter(test_id=test, test_type='TEST').first()
             if integrator_test and integrator_test.integrator_product_data['fasting'] == 'CF':
                 is_profile_or_fasting_added = True
@@ -1047,18 +1047,18 @@ class LabAppointmentCreateSerializer(serializers.Serializer):
         else:
             raise serializers.ValidationError("FBS can be added with any fasting test or package.")
 
-    def ppbs_valid(self, test_ids, test):
+    def ppbs_valid(self, booked_test_ids, test):
         from ondoc.integrations.models import IntegratorTestMapping
-        if len(test_ids) < 3:
+        if len(booked_test_ids) < 3:
             raise serializers.ValidationError("PPBS or RBS can be added with FBS and one fasting test or package.")
 
         is_fbs_present = False
         is_profile_or_fasting_added = False
-        test_ids.remove(test)
-        if not test_ids:
+        booked_test_ids.remove(test)
+        if not booked_test_ids:
             pass
 
-        for test in test_ids:
+        for test in booked_test_ids:
             integrator_test = IntegratorTestMapping.objects.filter(test_id=test, test_type='TEST').first()
             if integrator_test and integrator_test.integrator_product_data['code'] == 'FBS':
                 is_fbs_present = True
@@ -1074,17 +1074,17 @@ class LabAppointmentCreateSerializer(serializers.Serializer):
         else:
             raise serializers.ValidationError("PPBS or RBS can be added with FBS and one fasting test or package.")
 
-    def inspp_valid(self, test_ids, test):
+    def inspp_valid(self, booked_test_ids, test):
         from ondoc.integrations.models import IntegratorTestMapping
-        if len(test_ids) < 2:
+        if len(booked_test_ids) < 2:
             raise serializers.ValidationError("INSFA test is mandatory to book INSPP.")
 
         insfa_test_present = False
-        test_ids.remove(test)
-        if not test_ids:
+        booked_test_ids.remove(test)
+        if not booked_test_ids:
             pass
 
-        for test in test_ids:
+        for test in booked_test_ids:
             integrator_test = IntegratorTestMapping.objects.filter(test_id=test, test_type='TEST').first()
             if integrator_test and integrator_test.integrator_product_data['code'] == 'INSFA':
                 insfa_test_present = True
