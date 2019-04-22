@@ -33,7 +33,7 @@ from ondoc.api.v1.ratings import serializers as rating_serializer
 from ondoc.location.models import EntityUrls, EntityAddress
 from ondoc.seo.models import NewDynamic
 from ondoc.subscription_plan.models import Plan, UserPlanMapping
-#from packaging.version import parse
+from packaging.version import parse
 
 logger = logging.getLogger(__name__)
 utc = pytz.UTC
