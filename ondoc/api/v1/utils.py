@@ -1469,3 +1469,16 @@ def update_physical_agreement_timestamp(obj):
         obj.physical_agreement_signed_at = time_to_be_set
         if isinstance(obj, HospitalNetwork):
             update_physical_agreement_value(obj, obj.physical_agreement_signed, time_to_be_set)
+
+
+def ipd_query_parameters(entity, req_params):
+    params_dict = copy.deepcopy(req_params)
+    if entity.sublocality_latitude:
+        params_dict["lat"] = entity.sublocality_latitude
+    elif entity.locality_latitude:
+        params_dict["lat"] = entity.locality_latitude
+    if entity.sublocality_longitude:
+        params_dict["long"] = entity.sublocality_longitude
+    elif entity.locality_longitude:
+        params_dict["long"] = entity.locality_longitude
+    return params_dict

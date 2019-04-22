@@ -1992,6 +1992,7 @@ class HospitalDetailRequestSerializer(serializers.Serializer):
 class IpdDetailsRequestDetailRequestSerializer(serializers.Serializer):
     long = serializers.FloatField(default=77.071848)
     lat = serializers.FloatField(default=28.450367)
+    city = serializers.CharField(required=False, allow_blank=True, allow_null=True)
 
 
 class OpdAppointmentUpcoming(OpdAppointmentSerializer):

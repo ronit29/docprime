@@ -34,7 +34,7 @@ from . import serializers
 from ondoc.api.v2.doctor import serializers as v2_serializers
 from ondoc.api.pagination import paginate_queryset, paginate_raw_query, paginate_queryset_refactored_consumer_app
 from ondoc.api.v1.utils import convert_timings, form_time_slot, IsDoctor, payment_details, aware_time_zone, \
-    TimeSlotExtraction, GenericAdminEntity, get_opd_pem_queryset, offline_form_time_slots
+    TimeSlotExtraction, GenericAdminEntity, get_opd_pem_queryset, offline_form_time_slots, ipd_query_parameters
 from ondoc.api.v1 import insurance as insurance_utility
 from ondoc.api.v1.doctor.doctorsearch import DoctorSearchHelper
 from django.db.models import Min, Prefetch
@@ -1210,8 +1210,10 @@ class SearchedItemsViewSet(viewsets.GenericViewSet):
         common_specializations = models.CommonSpecialization.get_specializations(count)
         if city:
             entity_urls = EntityUrls.objects.filter(sitemap_identifier='SPECIALIZATION_CITY',
-                                           locality_value__iexact=city,
-                                           is_valid=True, specialization_id__in=common_specializations.values_list('specialization_id', flat=True))
+                                                    locality_value__iexact=city,
+                                                    is_valid=True,
+                                                    specialization_id__in=common_specializations.values_list(
+                                                        'specialization_id', flat=True))
             for data in entity_urls:
                 spec_urls[data.specialization_id] = data.url
 
@@ -1231,7 +1233,19 @@ class SearchedItemsViewSet(viewsets.GenericViewSet):
 
         common_ipd_procedures = CommonIpdProcedure.objects.select_related('ipd_procedure').filter(
             ipd_procedure__is_enabled=True).all().order_by("-priority")[:10]
-        common_ipd_procedures_serializer = CommonIpdProcedureSerializer(common_ipd_procedures, many=True)
+        common_ipd_procedures = list(common_ipd_procedures)
+        common_ipd_procedure_ids = [t.ipd_procedure.id for t in common_ipd_procedures]
+        ipd_entity_dict = {}
+        if city:
+            ipd_entity_qs = EntityUrls.objects.filter(ipd_procedure_id__in=common_ipd_procedure_ids,
+                                                      url_type='SEARCHURL',
+                                                      entity_type='IpdProcedure',
+                                                      is_valid=True,
+                                                      locality_value__iexact=city).annotate(
+                ipd_id=F('ipd_procedure_id')).values('ipd_id', 'url')
+            ipd_entity_dict = {x.get('ipd_id'): x.get('url') for x in ipd_entity_qs}
+        common_ipd_procedures_serializer = CommonIpdProcedureSerializer(common_ipd_procedures, many=True,
+                                                                        context={'entity_dict': ipd_entity_dict})
 
         return Response({"conditions": conditions_serializer.data, "specializations": specializations_serializer.data,
                          "procedure_categories": common_procedure_categories_serializer.data,
@@ -3549,20 +3563,78 @@ class HospitalViewSet(viewsets.GenericViewSet):
 
 class IpdProcedureViewSet(viewsets.GenericViewSet):
 
-    def ipd_procedure_detail(self, request, pk):
-        serializer = serializers.IpdDetailsRequestDetailRequestSerializer(data=request.query_params)
+    def ipd_procedure_detail_by_url(self, request, url, *args, **kwargs):
+        url = url.lower()
+        entity_url_qs = EntityUrls.objects.filter(url=url, url_type=EntityUrls.UrlType.SEARCHURL,
+                                                  entity_type='IpdProcedure').order_by('-sequence')
+        if not entity_url_qs.exists():
+            return Response(status=status.HTTP_404_NOT_FOUND)
+
+        entity = entity_url_qs.first()
+        if not entity.is_valid:
+            valid_qs = EntityUrls.objects.filter(is_valid=True, specialization_id=entity.ipd_procedure,
+                                                 locality_id=entity.locality_id,
+                                                 sublocality_id=entity.sublocality_id,
+                                                 sitemap_identifier=entity.sitemap_identifier).order_by('-sequence')
+
+            if valid_qs.exists():
+                corrected_url = valid_qs.first().url
+                return Response(status=status.HTTP_301_MOVED_PERMANENTLY, data={'url': corrected_url})
+            else:
+                return Response(status=status.HTTP_400_BAD_REQUEST)
+        kwargs['request_data'] = ipd_query_parameters(entity, request.query_params)
+        kwargs['entity'] = entity
+        response = self.ipd_procedure_detail(request, entity.ipd_procedure_id, **kwargs)
+        return response
+
+    def ipd_procedure_detail(self, request, pk, *args, **kwargs):
+        request_data = request.query_params
+        temp_request_data = kwargs.get('request_data')
+        if temp_request_data:
+            request_data = temp_request_data
+        serializer = serializers.IpdDetailsRequestDetailRequestSerializer(data=request_data)
         serializer.is_valid(raise_exception=True)
         validated_data = serializer.validated_data
-        # ipd_procedure = IpdProcedure.objects.prefetch_related('feature_mappings__feature').filter(is_enabled=True, id=pk).first()
         ipd_procedure = IpdProcedure.objects.prefetch_related(
-            Prefetch('feature_mappings',
-                     IpdProcedureFeatureMapping.objects.select_related('feature').all().order_by('-feature__priority')),
-            Prefetch('ipdproceduredetail_set',
-                     IpdProcedureDetail.objects.select_related('detail_type').all().order_by('-detail_type__priority')),
-        ).filter(
-            is_enabled=True, id=pk).first()
+            Prefetch('feature_mappings', IpdProcedureFeatureMapping.objects.select_related('feature').all().order_by('-feature__priority')),
+            Prefetch('ipdproceduredetail_set', IpdProcedureDetail.objects.select_related('detail_type').all().order_by('-detail_type__priority')),
+        ).filter(is_enabled=True, id=pk).first()
         if ipd_procedure is None:
             return Response(status=status.HTTP_404_NOT_FOUND)
+
+        url = canonical_url = title = description = top_content = bottom_content = city = None
+        entity = kwargs.get('entity')
+        if not entity:
+            if validated_data.get('city'):
+                if validated_data.get('city').lower() in ('bengaluru', 'bengalooru'):
+                    city = 'bangalore'
+                elif validated_data.get('city').lower() in ('gurugram', 'gurugram rural'):
+                    city = 'gurgaon'
+                else:
+                    city = validated_data.get('city')
+                # IPD_PROCEDURE_COST_IN_IPDP
+                temp_url = slugify(ipd_procedure.name + '-cost-in-' + city + '-ipdp')
+                entity = EntityUrls.objects.filter(url=temp_url, url_type='SEARCHURL', entity_type='IpdProcedure', is_valid=True,
+                                                   locality_value__iexact=city).first()
+
+        if entity:
+            city = entity.locality_value
+            url = entity.url
+            title = '{ipd_procedure_name} Cost in {city} | Book & Get Upto 50% Off'.format(
+                ipd_procedure_name=ipd_procedure.name, city=city).title()
+            canonical_url = entity.url
+
+        if url:
+            new_dynamic_object = NewDynamic.objects.filter(url_value=url, is_enabled=True).first()
+            if new_dynamic_object:
+                if new_dynamic_object.meta_title:
+                    title = new_dynamic_object.meta_title
+                if new_dynamic_object.meta_description:
+                    description = new_dynamic_object.meta_description
+                if new_dynamic_object.top_content:
+                    top_content = new_dynamic_object.top_content
+                if new_dynamic_object.bottom_content:
+                    bottom_content = new_dynamic_object.bottom_content
 
         hospital_view_set = HospitalViewSet()
         hospital_result = hospital_view_set.list(request, pk, 2)
@@ -3576,7 +3648,9 @@ class IpdProcedureViewSet(viewsets.GenericViewSet):
         ipd_procedure_serializer = serializers.IpdProcedureDetailSerializer(ipd_procedure, context={'request': request,
                                                                                                     'doctor_result_data': doctor_result_data})
         return Response(
-            {'about': ipd_procedure_serializer.data, 'hospitals': hospital_result.data, 'doctors': doctor_result_data})
+            {'about': ipd_procedure_serializer.data, 'hospitals': hospital_result.data, 'doctors': doctor_result_data,
+             'seo': {'url': url, 'canonical_url': canonical_url, 'title': title, 'description': description,
+                     'top_content': top_content, 'bottom_content': bottom_content, 'city': city}})
 
     def create_lead(self, request):
         serializer = serializers.IpdProcedureLeadSerializer(data=request.data)

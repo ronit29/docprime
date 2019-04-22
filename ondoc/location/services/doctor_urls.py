@@ -643,6 +643,7 @@ class PageUrlCache():
     #                 deletions.append(ent.id)
     #     return deletions
 
+
 class IpdProcedure:
 
     def __init__(self):
@@ -660,7 +661,7 @@ class IpdProcedure:
     def create(self):
         self.create_search_urls()
         # self.create_doctor_page_urls()
-        self.update_breadcrumbs()
+        # self.update_breadcrumbs()
         self.insert_search_urls()
 
     def insert_search_urls(self):
@@ -672,19 +673,18 @@ class IpdProcedure:
                  updated_at,  sublocality_latitude, sublocality_longitude, locality_latitude, 
                  locality_longitude, locality_id, sublocality_id,
                  locality_value, sublocality_value, is_valid, locality_location, sublocality_location, location, entity_id, 
-                 specialization_id, specialization, breadcrumb)
+                 specialization_id, specialization, breadcrumb, ipd_procedure_id, ipd_procedure)
 
-                 select %d as sequence ,a.extras, a.sitemap_identifier,getslug(a.url) as url, a.count, a.entity_type,
+                 select %d as sequence ,a.extras, a.sitemap_identifier, getslug(a.url) as a_url, a.count, a.entity_type,
                   a.url_type, now() as created_at, now() as updated_at,
                   a.sublocality_latitude, a.sublocality_longitude, a.locality_latitude, a.locality_longitude,
                   a.locality_id, a.sublocality_id, a.locality_value, a.sublocality_value, a.is_valid, 
                   a.locality_location, a.sublocality_location, a.location, entity_id, 
-                  specialization_id, specialization, breadcrumb from temp_url a
+                  specialization_id, specialization, breadcrumb, a.ipd_procedure_id, a.ipd_procedure from temp_url a
                   ''' % seq
 
         update_query = '''update entity_urls set is_valid=false where sitemap_identifier 
-                           in ('DOCTORS_LOCALITY_CITY', 'DOCTORS_CITY', 'SPECIALIZATION_CITY', 
-                           'SPECIALIZATION_LOCALITY_CITY','DOCTOR_PAGE') and sequence< %d''' % seq
+                           in ('IPD_PROCEDURE_CITY') and sequence< %d''' % seq
 
         cleanup = '''delete from entity_urls where id in (select id from 
         (select eu.*, row_number() over(partition by url order by is_valid desc, sequence desc) rownum from entity_urls eu  
@@ -695,22 +695,13 @@ class IpdProcedure:
         RawSql(update_query, []).execute()
         RawSql(cleanup, []).execute()
 
-        # from django.db import connection
-        # with connection.cursor() as cursor:
-        #     try:
-        #         cursor.execute(query)
-        #         cursor.execute(update_query)
-        #     except Exception as e:
-        #         print(str(e))
-        #         return False
-
         return True
 
     def create_search_urls(self):
 
-        q2 = '''insert into temp_url (ipd_procedure_id, ipd_procedure, search_slug, count, locality_id, 
+        q2 = '''insert into temp_url (ipd_procedure_id, ipd_procedure, search_slug, locality_id, 
                       sitemap_identifier, entity_type, url_type, is_valid, created_at, updated_at )
-                    select ipdp.id, ipdp.name, search_slug, count(distinct d.id) count,
+                    select ipdp.id, ipdp.name, search_slug,
                     case when ea.type = 'LOCALITY' then ea.id end as locality_id,
                     case when ea.type = 'LOCALITY' then 'IPD_PROCEDURE_CITY' end as sitemap_identifier,
                     'IpdProcedure' as entity_type, 'SEARCHURL' url_type, True as is_valid, now(), now()
@@ -720,10 +711,10 @@ class IpdProcedure:
                     and ea.type IN ('LOCALITY') and ea.use_in_url=true
                     inner join doctor_clinic dc on dc.hospital_id = h.id and dc.enabled=true 
                     inner join doctor_clinic_ipd_procedure dcip on dcip.doctor_clinic_id = dc.id
-                    inner join ipd_procedure ipdp on ipdp.id = dcip.ipd_procedure_id and dcip.is_enabled=True
+                    inner join ipd_procedure ipdp on ipdp.id = dcip.ipd_procedure_id and ipdp.is_enabled=True
                     inner join doctor d on dc.doctor_id= d.id and d.is_live=true
                     where ea.id>=%d and ea.id<%d
-                    group by ea.id'''
+                    group by ea.id, ipdp.id'''
 
         start = self.min_ea
         while start < self.max_ea:
@@ -765,61 +756,22 @@ class IpdProcedure:
 
         RawSql('''update temp_url set location = locality_location where location is null''', []).execute()
 
-        update_urls_query = '''update temp_url set url = case when sitemap_identifier = 'SPECIALIZATION_LOCALITY_CITY' then 
-                    slugify_url(concat(specialization,'-in-', search_slug, '-sptlitcit'))
-                    else slugify_url(concat(specialization,'-in-', search_slug, '-sptcit'))
-                    end where sitemap_identifier in ('SPECIALIZATION_LOCALITY_CITY','SPECIALIZATION_CITY')'''
+        # IPD_PROCEDURE_COST_IN_IPDP
+        update_urls_query = '''update temp_url set url =  
+                    slugify_url(concat(ipd_procedure,'-cost-in-', search_slug, '-ipdp'))
+                    where sitemap_identifier in ('IPD_PROCEDURE_CITY')'''
         update_urls = RawSql(update_urls_query, []).execute()
 
-        update_urls_query = '''update temp_url set url = case when sitemap_identifier = 'DOCTORS_CITY' then 
-                    slugify_url(concat('doctors-in-', search_slug, '-sptcit'))
-                    else slugify_url(concat('doctors-in-', search_slug, '-sptlitcit'))
-                    end where sitemap_identifier in ('DOCTORS_LOCALITY_CITY','DOCTORS_CITY')'''
-        update_urls = RawSql(update_urls_query, []).execute()
 
         update_spec_extras_query = '''update  temp_url 
-                          set extras = case when sitemap_identifier='SPECIALIZATION_CITY' then
-                           json_build_object('specialization_id', specialization_id, 'location_json',
+                          set extras = 
+                           json_build_object('ipd_procedure_id', ipd_procedure_id, 'location_json',
                            json_build_object('locality_id', locality_id, 'locality_value', locality_value, 'locality_latitude', 
-                           locality_latitude,'locality_longitude', locality_longitude), 'specialization', specialization)
-
-                          else  json_build_object('specialization_id', specialization_id,'location_json',
-                          json_build_object('sublocality_id',sublocality_id,'sublocality_value',sublocality_value,
-                           'locality_id', locality_id, 'locality_value', locality_value,
-                           'breadcrum_url',slugify_url(specialization || '-in-' || locality_value ||'-sptcit'),
-                          'sublocality_latitude',sublocality_latitude, 'sublocality_longitude',sublocality_longitude, 
-                          'locality_latitude',locality_latitude,'locality_longitude',locality_longitude),'specialization', specialization) end
-                          where sitemap_identifier in ('SPECIALIZATION_LOCALITY_CITY','SPECIALIZATION_CITY')'''
+                           locality_latitude,'locality_longitude', locality_longitude), 'ipd_procedure', ipd_procedure)
+                          where sitemap_identifier in ('IPD_PROCEDURE_CITY')'''
         update_spec_extras = RawSql(update_spec_extras_query, []).execute()
 
-        update_extras_query = '''update  temp_url 
-                               set extras = case when sitemap_identifier='DOCTORS_CITY' then
-                               json_build_object('location_json',json_build_object('locality_id',locality_id,'locality_value',locality_value, 
-                               'locality_latitude',locality_latitude,'locality_longitude',locality_longitude))
 
-                               else json_build_object('location_json',
-                               json_build_object('sublocality_id', sublocality_id,'sublocality_value', sublocality_value,
-                               'locality_id', locality_id, 'locality_value', locality_value,'breadcrum_url',slugify_url('doctors-in-' || locality_value ||'-sptcit'),
-                               'sublocality_latitude',sublocality_latitude, 'sublocality_longitude',sublocality_longitude, 'locality_latitude',locality_latitude,
-                               'locality_longitude',locality_longitude))  end
-                                where sitemap_identifier in ('DOCTORS_LOCALITY_CITY','DOCTORS_CITY')'''
-        update_extras = RawSql(update_extras_query, []).execute()
-
-        # update_locality_loc_query = '''update temp_url set locality_location = st_setsrid(st_point(locality_longitude, locality_latitude),4326)::geography where
-        #         locality_latitude is not null and locality_longitude is not null'''
-
-        # update_locality_loc = RawSql(update_locality_loc_query, []).execute()
-
-        # update_sublocality_loc_query = '''update temp_url set sublocality_location = st_setsrid(st_point(sublocality_longitude, sublocality_latitude),4326)::geography where
-        #          sublocality_latitude is not null and sublocality_longitude is not null'''
-
-        # update_sublocality_loc = RawSql(update_sublocality_loc_query, []).execute()
-
-        # update_location_query = '''update temp_url set location = case when
-        #                    sublocality_location is not null then sublocality_location  else locality_location end'''
-        # update_location = RawSql(update_location_query, []).execute()
-
-        # clean up duplicate urls
         RawSql('''delete from temp_url where id in (select id from (select tu.*,
                 row_number() over(partition by tu.url order by ea.child_count desc nulls last, tu.count desc nulls last) rownum
                 from temp_url tu inner join entity_address ea on 
@@ -828,53 +780,6 @@ class IpdProcedure:
                 ''', []).execute()
 
         return 'success'
-
-    def update_breadcrumbs(self):
-
-        # set breadcrumbs to default empty array
-        RawSql('''update temp_url tu set breadcrumb=json_build_array()''', []).execute()
-
-        # update for speciality city
-        RawSql('''update temp_url tu set breadcrumb=(select json_build_array(json_build_object('title', locality_value, 'url', url, 'link_title', concat('Doctors in ',locality_value))) 
-            from temp_url where sitemap_identifier ='DOCTORS_CITY' and lower(locality_value)=lower(tu.locality_value)
-            and st_dwithin(location::geography, tu.location::geography, 20000) order by st_distance(location, tu.location) asc limit 1)
-            where sitemap_identifier ='SPECIALIZATION_CITY' ''', []).execute()
-
-        RawSql('''update temp_url tu set breadcrumb=(select json_build_array(json_build_object('title', locality_value, 'url', url, 'link_title', concat('Doctors in ',locality_value))) 
-                   from temp_url where sitemap_identifier ='DOCTORS_CITY' and lower(locality_value)=lower(tu.locality_value)
-                   and st_dwithin(location::geography, tu.location::geography, 20000) order by st_distance(location, tu.location) asc limit 1)
-                   where sitemap_identifier ='DOCTORS_LOCALITY_CITY' ''', []).execute()
-
-        # update for speciality locality city
-        RawSql('''update temp_url tu set breadcrumb = (select  breadcrumb || jsonb_build_array(jsonb_build_object('title', specialization, 'url', url, 'link_title', concat(specialization, ' in ', locality_value)))
-            from temp_url  where sitemap_identifier ='SPECIALIZATION_CITY' and lower(locality_value)=lower(tu.locality_value)
-            and specialization_id = tu.specialization_id
-            and st_dwithin(location::geography, tu.location::geography, 20000) order by st_distance(location, tu.location) asc limit 1) 
-            where sitemap_identifier ='SPECIALIZATION_LOCALITY_CITY' 
-            ''', []).execute()
-
-        # update for doctor profile
-        RawSql('''update temp_url tu set breadcrumb = (select  breadcrumb || 
-            jsonb_build_array(jsonb_build_object('title', concat(sublocality_value,' ',locality_value), 'url', url, 'link_title', concat(specialization, ' in ', sublocality_value,' ',locality_value) ))
-            from temp_url  where sitemap_identifier ='SPECIALIZATION_LOCALITY_CITY' and lower(locality_value)=lower(tu.locality_value)
-            and lower(sublocality_value)=lower(tu.sublocality_value) and specialization_id = tu.specialization_id
-            and st_dwithin(location::geography, tu.location::geography, 10000) order by st_distance(location, tu.location) asc limit 1) 
-            where sitemap_identifier ='DOCTOR_PAGE' ''', []).execute()
-
-        # update for doctor profile from city speciality if null
-        RawSql('''update temp_url tu set breadcrumb = (select  breadcrumb 
-            from temp_url  where sitemap_identifier ='SPECIALIZATION_CITY' and lower(locality_value)=lower(tu.locality_value)
-            and specialization_id = tu.specialization_id
-            and st_dwithin(location::geography, tu.location::geography, 20000) order by st_distance(location, tu.location) asc limit 1) 
-            where sitemap_identifier ='DOCTOR_PAGE' and breadcrumb is null ''', []).execute()
-
-        # update for doctor profile from city if null
-        RawSql('''update temp_url tu set breadcrumb = (select  breadcrumb 
-            from temp_url  where sitemap_identifier ='DOCTORS_CITY' and lower(locality_value)=lower(tu.locality_value)
-            and st_dwithin(location::geography, tu.location::geography, 20000) order by st_distance(location, tu.location) asc limit 1) 
-            where sitemap_identifier ='DOCTOR_PAGE' and breadcrumb is null ''', []).execute()
-
-        RawSql('''update temp_url tu set breadcrumb=json_build_array() where breadcrumb is null ''', []).execute()
 
 
 

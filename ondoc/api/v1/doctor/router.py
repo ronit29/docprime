@@ -59,6 +59,7 @@ urlpatterns = [
     path('list_appointments', OfflineCustomerViewSet.as_view({'get': 'list_appointments'}), name='list_appointments'),
     path('list_hospital/<int:hospital_network_id>', HospitalNetworkListViewset.as_view({'get':'list'}),name='list_hospital'),
     path('send_message', AppointmentMessageViewset.as_view({'post': 'send_message'}), name='send_message'),
+    path('ipd_procedure_by_url/<str:url>', IpdProcedureViewSet.as_view({'get': 'ipd_procedure_detail_by_url'}), name='ipd_procedure_detail_by_url'),
     path('ipd_procedure/<int:pk>', IpdProcedureViewSet.as_view({'get': 'ipd_procedure_detail'}), name='ipd_procedure_detail'),
     path('ipd_procedure/<int:ipd_pk>/hospitals', HospitalViewSet.as_view({'get': 'list'}), name='ipd_procedure_hospitals'),
     path('hospital/<int:pk>', HospitalViewSet.as_view({'get': 'retrive'}), name='hospital_detail'),
