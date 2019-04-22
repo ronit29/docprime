@@ -2545,8 +2545,8 @@ class TestDetailsViewset(viewsets.GenericViewSet):
             serializer = ArticleAuthorSerializer(test_queryset.author, context={'request': request})
             author = serializer.data
         result['author'] = author
-        result['published_date'] = test_queryset.created_at.date() if test_queryset.created_at else None
-        result['last_updated_date'] = test_queryset.updated_at.date() if test_queryset.updated_at else None
+        result['published_date'] = '{:%d-%m-%Y}'.format(test_queryset.created_at.date()) if test_queryset.created_at else None
+        result['last_updated_date'] = '{:%d-%m-%Y}'.format(test_queryset.created_at.date()) if test_queryset.updated_at else None
         final_result.append(result)
 
         return Response(final_result)
