@@ -1215,7 +1215,8 @@ class LabAppointmentRetrieveSerializer(LabAppointmentModelSerializer):
     def get_reports(self, obj):
         reports = []
         for rep in obj.get_reports():
-            reports.append({"details": rep.report_details, "files":[file.name.url for file in rep.files.all()]})
+            # reports.append({"details": rep.report_details, "files":[file.name.url for file in rep.files.all()]})
+            reports.extend([file.name.url for file in rep.files.all()])
         return reports
 
     def get_invoices(self, obj):
