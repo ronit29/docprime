@@ -1248,9 +1248,9 @@ class EntityUrls(TimeStampedModel):
                         WHERE sublocality_id = ea.id  and url_type='SEARCHURL' and entity_type='Lab'
                         '''
 
-        update_location = '''update entity_urls set location = sublocality_location where sublocality_location is not null'''
+        update_location = '''update entity_urls set location = sublocality_location where sublocality_location is not null and  url_type='SEARCHURL' and entity_type='Lab' '''
 
-        update_null_location = '''update entity_urls set location = locality_location where location is null'''
+        update_null_location = '''update entity_urls set location = locality_location where location is null and  url_type='SEARCHURL' and entity_type='Lab' '''
 
 
         # query ='''insert into entity_urls(extras, sitemap_identifier, url, count, entity_type, url_type, is_valid, created_at, updated_at, sequence)
