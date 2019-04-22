@@ -33,6 +33,7 @@ def split_and_append(initial_str, spliter, appender):
     value_chunks = initial_str.split(spliter)
     return appender.join(value_chunks)
 
+
 class TempURL(TimeStampedModel):
 
     url = models.CharField(blank=False, null=True, max_length=2000, db_index=True)
@@ -61,6 +62,7 @@ class TempURL(TimeStampedModel):
     locality_location = models.PointField(geography=True, srid=4326, blank=True, null=True)
     sublocality_location = models.PointField(geography=True, srid=4326, blank=True, null=True)
     location = models.PointField(geography=True, srid=4326, blank=True, null=True)
+    bookable_doctors_count = JSONField(null=True)
 
     class Meta:
         db_table='temp_url'
@@ -589,6 +591,9 @@ class EntityUrls(TimeStampedModel):
         DOCTORS_CITY = 'DOCTORS_CITY'
         DOCTOR_PAGE = 'DOCTOR_PAGE'
         LAB_TEST = 'LAB_TEST'
+        HOSPITAL_PAGE = 'HOSPITAL_PAGE'
+        HOSPITALS_LOCALITY_CITY = 'HOSPITALS_LOCALITY_CITY'
+        HOSPITALS_CITY = 'HOSPITALS_CITY'
 
         LAB_LOCALITY_CITY = 'LAB_LOCALITY_CITY'
         LAB_CITY = 'LAB_CITY'
@@ -623,6 +628,7 @@ class EntityUrls(TimeStampedModel):
     locality_location = models.PointField(geography=True, srid=4326, blank=True, null=True)
     sublocality_location = models.PointField(geography=True, srid=4326, blank=True, null=True)
     location = models.PointField(geography=True, srid=4326, blank=True, null=True)
+    bookable_doctors_count = JSONField(null=True)
 
     def __str__(self):
         return self.url

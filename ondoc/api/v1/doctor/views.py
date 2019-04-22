@@ -3541,7 +3541,35 @@ class HospitalViewSet(viewsets.GenericViewSet):
                          'health_insurance_providers': [{'id': x.id, 'name': x.name} for x in
                                                         HealthInsuranceProvider.objects.all()]})
 
-    def retrive(self, request, pk):
+    @transaction.non_atomic_requests
+    def retrieve_by_url(self, request):
+
+        url = request.GET.get('url')
+        if not url:
+            return Response(status=status.HTTP_404_NOT_FOUND)
+
+        url = url.lower()
+        entity = EntityUrls.objects.filter(url=url, sitemap_identifier=EntityUrls.SitemapIdentifier.HOSPITAL_PAGE).order_by(
+            '-is_valid')
+        if len(entity) > 0:
+            entity = entity[0]
+            if not entity.is_valid:
+                valid_entity_url_qs = EntityUrls.objects.filter(
+                    sitemap_identifier=EntityUrls.SitemapIdentifier.HOSPITAL_PAGE, entity_id=entity.entity_id,
+                    is_valid='t')
+                if valid_entity_url_qs.exists():
+                    corrected_url = valid_entity_url_qs[0].url
+                    return Response(status=status.HTTP_301_MOVED_PERMANENTLY, data={'url': corrected_url})
+                else:
+                    return Response(status=status.HTTP_404_NOT_FOUND)
+
+            # entity_id = entity.entity_id
+            response = self.retrive(request, entity.entity_id, entity)
+            return response
+        else:
+            return Response(status=status.HTTP_404_NOT_FOUND)
+
+    def retrive(self, request, pk, entity=None):
         serializer = serializers.HospitalDetailRequestSerializer(data=request.query_params)
         serializer.is_valid(raise_exception=True)
         validated_data = serializer.validated_data
@@ -3558,9 +3586,54 @@ class HospitalViewSet(viewsets.GenericViewSet):
         if not hospital_obj:
             return Response(status=status.HTTP_400_BAD_REQUEST)
 
-        return Response(
-            serializers.HospitalDetailIpdProcedureSerializer(hospital_obj, context={'request': request,
-                                                                                    'validated_data': validated_data}).data)
+        response = {}
+        title = None
+        description = None
+        canonical_url = None
+
+        if not entity:
+            entity = EntityUrls.objects.filter(entity_id=hospital_obj.id,
+                                               sitemap_identifier=EntityUrls.SitemapIdentifier.HOSPITAL_PAGE).order_by('-is_valid')
+            if len(entity) > 0:
+                entity = entity[0]
+
+        hosp_serializer = serializers.HospitalDetailIpdProcedureSerializer(hospital_obj, context={'request': request,
+                                                                                    'validated_data': validated_data,
+                                                                                    "entity": entity}).data
+        response['hospital'] = hosp_serializer
+        if entity:
+            response['url'] = entity.url
+            if entity.breadcrumb:
+                breadcrumb = [{'url': '/', 'title': 'Home', 'link_title': 'Home'}]
+                if entity.locality_value:
+                    breadcrumb.append({'url': request.build_absolute_uri('/'+ entity.locality_value), 'title': entity.locality_value, 'link_title': entity.locality_value})
+                    breadcrumb = breadcrumb + entity.breadcrumb
+
+                if entity.sublocality_value:
+                    breadcrumb.append({'url': entity.url, 'title': entity.sublocality_value, 'link_title': 'Hospitals in ' + entity.sublocality_value + ', ' + entity.locality_value})
+                breadcrumb.append({'title':  hospital_obj.name})
+                response['breadcrumb'] = breadcrumb
+            else:
+                breadcrumb = [{'url': '/', 'title': 'Home'}, {'title':  hospital_obj.name}]
+                response['breadcrumb'] = breadcrumb
+
+            if hospital_obj.name and entity.locality_value:
+                title = hospital_obj.name + ' in '
+                description = hospital_obj.name + ' in '
+                if entity.sublocality_value:
+                    title += entity.sublocality_value + ', '
+                    description += entity.sublocality_value + ', '
+                title += entity.locality_value + ' | Contact Info & Other Details '
+
+                description += entity.locality_value + ': Check ' + hospital_obj.name + " address, doctor's list, contact number and more to book appointment."
+            canonical_url = entity.url
+        else:
+            response['breadcrumb'] = None
+        response['seo'] = {'title': title, "description": description}
+
+        response['canonical_url'] = canonical_url
+
+        return Response(response)
 
 
 class IpdProcedureViewSet(viewsets.GenericViewSet):
