@@ -202,7 +202,7 @@ class InsuredMemberResource(resources.ModelResource):
     def dehydrate_coi(self, insured_members):
         # return insured_members.user_insurance.coi.url
 
-        return settings.BASE_URL + insured_members.user_insurance.coi.url if insured_members.user_insurance.coi is not None and \
+        return insured_members.user_insurance.coi.url if insured_members.user_insurance.coi is not None and \
                                                                           insured_members.user_insurance.coi.name else ''
 
 
@@ -766,9 +766,65 @@ class InsuranceDealAdmin(admin.ModelAdmin):
     list_display = ('deal_id', 'insurer', 'commission', 'tax', 'deal_start_date', 'deal_end_date')
 
 
-class InsuranceLeadAdmin(admin.ModelAdmin):
+class InsuranceLeadResource(resources.ModelResource):
+    id = fields.Field()
+    name = fields.Field()
+    phone_number = fields.Field()
+    status = fields.Field()
+    matrix_lead_id = fields.Field()
+    created_at = fields.Field()
+
+    def export(self, queryset=None, *args, **kwargs):
+        queryset = self.get_queryset(**kwargs)
+        fetched_queryset = list(queryset)
+        return super().export(fetched_queryset)
+
+    def get_queryset(self, **kwargs):
+        date_range = [datetime.strptime(kwargs.get('from_date'), '%Y-%m-%d').date(), datetime.strptime(
+                                        kwargs.get('to_date'), '%Y-%m-%d').date()]
+
+        leads = InsuranceLead.objects.filter(created_at__date__range=date_range).order_by('-id')
+        return leads
+
+    class Meta:
+        model = InsuranceLead
+        fields = ()
+        export_order = ('id', 'name', 'phone_number', 'status', 'matrix_lead_id', 'created_at')
+
+    def dehydrate_id(self, obj):
+        return str(obj.id)
+
+    def dehydrate_matrix_lead_id(self, obj):
+        return str(obj.matrix_lead_id)
+
+    def dehydrate_created_at(self, obj):
+        return str(obj.created_at)
+
+    def dehydrate_name(self, obj):
+        user = obj.user
+        from ondoc.authentication.models import UserProfile
+        user_profile = UserProfile.objects.filter(user=user).order_by('id').first()
+        if user_profile:
+            return str(user_profile.name)
+        else:
+            return ""
+
+    def dehydrate_phone_number(self, obj):
+        return str(obj.user.phone_number)
+
+    def dehydrate_status(self, obj):
+        user_insurance = UserInsurance.objects.filter(user=obj.user).order_by('-id').first()
+        if user_insurance:
+            return "Booked"
+        else:
+            return "New"
+
+
+class InsuranceLeadAdmin(ImportExportModelAdmin, admin.ModelAdmin):
     model = InsuranceLead
-    # fields = ('user', 'matrix_lead_id', 'extras')
+    resource_class = InsuranceLeadResource
+    export_template_name = "export_insurance_lead_report.html"
+    formats = (base_formats.XLS,)
 
     def name(self, obj):
         user = obj.user
@@ -789,4 +845,35 @@ class InsuranceLeadAdmin(admin.ModelAdmin):
         else:
             return "New"
 
-    list_display = ('id', 'name',  'phone_number', 'status')
+    list_display = ('id', 'name',  'phone_number', 'status', 'matrix_lead_id', 'created_at')
+
+    def get_export_queryset(self, request):
+        super().get_export_queryset(request)
+
+    def get_export_data(self, file_format, queryset, *args, **kwargs):
+        """
+        Returns file_format representation for given queryset.
+        """
+        kwargs['from_date'] = kwargs.get('request').POST.get('from_date')
+        kwargs['to_date'] = kwargs.get('request').POST.get('to_date')
+        resource_class = self.get_export_resource_class()
+        data = resource_class(**self.get_export_resource_kwargs(kwargs.get('request'))).export(queryset, *args, **kwargs)
+        export_data = file_format.export_data(data)
+        return export_data
+
+    def has_add_permission(self, request, obj=None):
+        return False
+
+    def has_delete_permission(self, request, obj=None):
+        return False
+
+class InsuranceLeadForm(forms.ModelForm):
+    start_date = forms.DateField(widget=CustomDateInput(format=('%d-%m-%Y'), attrs={'placeholder': 'Select a date'}))
+    end_date = forms.DateField(widget=CustomDateInput(format=('%d-%m-%Y'), attrs={'placeholder': 'Select a date'}))
+
+    def clean(self):
+        cleaned_data = super().clean()
+        start = cleaned_data.get("start_date")
+        end = cleaned_data.get("end_date")
+        if start and end and start >= end:
+            raise forms.ValidationError("Start Date should be less than end Date")
