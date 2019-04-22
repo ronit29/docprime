@@ -2613,6 +2613,8 @@ class OfflineCustomerViewSet(viewsets.GenericViewSet):
         # ret_obj['mrp'] = appnt.mrp
         # ret_obj['payment_type'] = appnt.payment_type
         ret_obj['fees'] = appnt.fees
+        #RAJIV YADAV
+        ret_obj['mrp'] = appnt.fees
         ret_obj['hospital'] = HospitalModelSerializer(appnt.hospital).data
         ret_obj['doctor'] = AppointmentRetrieveDoctorSerializer(appnt.doctor).data
         ret_obj['is_docprime'] = False
