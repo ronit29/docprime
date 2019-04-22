@@ -394,9 +394,36 @@ class HospCityFilter(SimpleListFilter):
 
 class HospitalAdmin(admin.GeoModelAdmin, VersionAdmin, ActionAdmin, QCPemAdmin):
     list_filter = ('data_status', 'welcome_calling_done', HospCityFilter, CreatedByFilter)
-    readonly_fields = ('source', 'batch', 'associated_doctors', 'is_live', 'matrix_lead_id', 'city', 'state', )
-    exclude = (
-    'search_key', 'live_at', 'qc_approved_at', 'disabled_at', 'physical_agreement_signed_at', 'welcome_calling_done_at', )
+    readonly_fields = ('source', 'batch', 'associated_doctors', 'is_live', 'matrix_lead_id', 'city', 'state',)
+    exclude = ('search_key', 'live_at', 'qc_approved_at', 'disabled_at', 'physical_agreement_signed_at',
+               'welcome_calling_done_at',)
+    list_display = ('name', 'updated_at', 'data_status', 'welcome_calling_done', 'doctor_count',
+                    'list_created_by', 'list_assigned_to')
+    form = HospitalForm
+    search_fields = ['name']
+    # autocomplete_fields = ['matrix_city', 'matrix_state']
+    inlines = [
+        # HospitalNetworkMappingInline,
+        HospitalDoctorInline,
+        HospitalHelplineInline,
+        HospitalServiceInline,
+        HospitalTimingInline,
+        HospitalHealthInsuranceProviderInline,
+        HospitalSpecialityInline,
+        HospitalAwardInline,
+        HospitalAccreditationInline,
+        HospitalImageInline,
+        HospitalDocumentInline,
+        HospitalCertificationInline,
+        GenericAdminInline,
+        SPOCDetailsInline,
+        AssociatedMerchantInline,
+        RemarkInline
+    ]
+    map_width = 200
+    map_template = 'admin/gis/gmap.html'
+    extra_js = ['js/admin/GoogleMap.js',
+                'https://maps.googleapis.com/maps/api/js?key=AIzaSyCFtb27PooaG0yujuykgvPtxi6tvS04Ek0&callback=initGoogleMap']
 
     def get_fields(self, request, obj=None):
         all_fields = super().get_fields(request, obj)
@@ -549,31 +576,3 @@ class HospitalAdmin(admin.GeoModelAdmin, VersionAdmin, ActionAdmin, QCPemAdmin):
             add_network_link += '?AgentId={}'.format(self.matrix_agent_id)
         html = '''<a href='%s' target=_blank>%s</a><br>''' % (add_network_link, "Add Network")
         return mark_safe(html)
-
-
-    list_display = ('name', 'updated_at', 'data_status', 'welcome_calling_done', 'doctor_count', 'list_created_by', 'list_assigned_to')
-    form = HospitalForm
-    search_fields = ['name']
-    # autocomplete_fields = ['matrix_city', 'matrix_state']
-    inlines = [
-        # HospitalNetworkMappingInline,
-        HospitalDoctorInline,
-        HospitalHelplineInline,
-        HospitalServiceInline,
-        HospitalTimingInline,
-        HospitalHealthInsuranceProviderInline,
-        HospitalSpecialityInline,
-        HospitalAwardInline,
-        HospitalAccreditationInline,
-        HospitalImageInline,
-        HospitalDocumentInline,
-        HospitalCertificationInline,
-        GenericAdminInline,
-        SPOCDetailsInline,
-        AssociatedMerchantInline,
-        RemarkInline
-    ]
-
-    map_width = 200
-    map_template = 'admin/gis/gmap.html'
-    extra_js = ['js/admin/GoogleMap.js','https://maps.googleapis.com/maps/api/js?key=AIzaSyCFtb27PooaG0yujuykgvPtxi6tvS04Ek0&callback=initGoogleMap']

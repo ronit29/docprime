@@ -121,7 +121,7 @@ class InsuranceOrderViewSet(viewsets.GenericViewSet):
         if not user_insurance_lead:
             user_insurance_lead = InsuranceLead(user=user)
         elif user_insurance_lead and user_insurance and not user_insurance.is_valid():
-            active_insurance_lead = InsuranceLead.objects.filter(created_at__gte=user_insurance.expiry_date).order_by('created_at').last()
+            active_insurance_lead = InsuranceLead.objects.filter(created_at__gte=user_insurance.expiry_date, user=user).order_by('created_at').last()
             if not active_insurance_lead:
                 user_insurance_lead = InsuranceLead(user=user)
             else:
