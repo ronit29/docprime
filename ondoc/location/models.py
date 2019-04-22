@@ -1252,13 +1252,6 @@ class EntityUrls(TimeStampedModel):
 
         update_null_location = '''update entity_urls set location = locality_location where location is null'''
 
-        breadcrumbs = ''' update entity_urls eu set breadcrumb=(select json_build_array(json_build_object('title', locality_value, 'url', url, 'link_title', concat('Labs in ',locality_value))) 
-                   from entity_urls where sitemap_identifier ='LAB_CITY' and lower(locality_value)=lower(eu.locality_value)
-                   and st_dwithin(location::geography, tu.location::geography, 20000) order by st_distance(location, tu.location) asc limit 1)
-                   where sitemap_identifier ='DOCTORS_LOCALITY_CITY' '''
-
-
-
 
         # query ='''insert into entity_urls(extras, sitemap_identifier, url, count, entity_type, url_type, is_valid, created_at, updated_at, sequence)
         #     select x.extras as extras, x.sitemap_identifier as sitemap_identifier, x.url as url,
