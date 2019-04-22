@@ -51,6 +51,12 @@ def update_city_search_key():
     Hospital.update_city_search()
 
 @task
+def update_doctors_count():
+    from ondoc.doctor.services.doctor_count_in_practice_spec import DoctorSearchScore
+    DoctorSearchScore.update_doctors_count()
+
+
+@task
 def update_all_hospitals_seo_urls():
     from ondoc.doctor.models import Hospital
     Hospital.update_hospital_seo_urls()
