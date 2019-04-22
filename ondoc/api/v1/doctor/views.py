@@ -3051,6 +3051,7 @@ class OfflineCustomerViewSet(viewsets.GenericViewSet):
                             action_complete = True
                         appnt.doctor = data.get('doctor')
                         appnt.hospital = data.get('hospital')
+                        appnt.fees = data.get('fees')
                         appnt.error = data.get('error', False)
                         appnt.error_message = data.get('error_message')
                         if data.get("time_slot_start"):
