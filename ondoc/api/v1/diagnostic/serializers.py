@@ -817,12 +817,14 @@ class LabAppointmentCreateSerializer(serializers.Serializer):
         lab = data.get("lab")
         pincode = data.get('pincode', None)
         address = data.get("address", None)
+        check_active_appointment = True
 
         if bool(data.get("is_thyrocare")):
             if not pincode:
                 raise serializers.ValidationError("Pincode required for thyrocare.")
             if not int(pincode) == int(address.pincode):
                 raise serializers.ValidationError("Entered pincode should be same as pickup address pincode.")
+
 
         now = datetime.datetime.now()
         tomorrow = datetime.date.today() + datetime.timedelta(days=1)
@@ -855,11 +857,13 @@ class LabAppointmentCreateSerializer(serializers.Serializer):
 
             if lab.network and lab.network.id == settings.THYROCARE_NETWORK_ID:
                 self.thyrocare_test_validator(data)
+                check_active_appointment = False
 
-        if LabAppointment.objects.filter(profile=data.get("profile"), lab=data.get("lab"),
-                                         tests__in=data.get("test_ids"), time_slot_start=time_slot_start) \
-                .exclude(status__in=[LabAppointment.COMPLETED, LabAppointment.CANCELLED]).exists():
-            raise serializers.ValidationError("One active appointment for the selected date & time already exists. Please change the date & time of the appointment.")
+        if check_active_appointment:
+            if LabAppointment.objects.filter(profile=data.get("profile"), lab=data.get("lab"),
+                                             tests__in=data.get("test_ids"), time_slot_start=time_slot_start) \
+                    .exclude(status__in=[LabAppointment.COMPLETED, LabAppointment.CANCELLED]).exists():
+                raise serializers.ValidationError("One active appointment for the selected date & time already exists. Please change the date & time of the appointment.")
 
         if 'use_wallet' in data and data['use_wallet'] is False:
             data['use_wallet'] = False
