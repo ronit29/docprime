@@ -277,7 +277,7 @@ class HospitalURL():
             extras['breadcrums'] = []
             data['extras'] = extras
             data['count'] = hospital.doctors_count if hospital.doctors_count else 0
-            data['bookable_doctors_count'] = {"bookable_doctors_count": hospital.bookable_doctors_count if hospital.bookable_doctors_count else 0}
+            data['bookable_doctors_count'] = {"bookable_doctors_2km": None, "bookable_doctors_count": hospital.bookable_doctors_count if hospital.bookable_doctors_count else 0}
 
             new_url = url
 
