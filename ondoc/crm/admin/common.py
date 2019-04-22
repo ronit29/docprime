@@ -11,7 +11,8 @@ from django.conf import settings
 from django.utils.dateparse import parse_datetime
 from ondoc.authentication.models import Merchant, AssociatedMerchant, QCModel
 from ondoc.account.models import MerchantPayout
-from ondoc.common.models import Cities, MatrixCityMapping, PaymentOptions, Remark, MatrixMappedCity, MatrixMappedState, GlobalNonBookable
+from ondoc.common.models import Cities, MatrixCityMapping, PaymentOptions, Remark, MatrixMappedCity, MatrixMappedState, \
+    GlobalNonBookable, UserConfig
 from import_export import resources, fields
 from import_export.admin import ImportMixin, base_formats, ImportExportMixin, ImportExportModelAdmin, ExportMixin
 from reversion.admin import VersionAdmin
@@ -666,3 +667,7 @@ class MatrixCityAutocomplete(autocomplete.Select2QuerySetView):
 
         return queryset
 
+
+class UserConfigAdmin(admin.ModelAdmin):
+    model = UserConfig
+    list_display = ('key',)
