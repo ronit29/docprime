@@ -71,16 +71,30 @@ class PresccriptionPdf(auth_models.TimeStampedModel):
     diagnosis = JSONField(blank=True, null=True)
     followup_instructions_date = models.DateTimeField(null=True)
     followup_instructions_reason = models.CharField(max_length=256, null=True)
+    patient_details = JSONField(blank=True, null=True)
     appointment_id = models.CharField(max_length=64)
     appointment_type = models.PositiveSmallIntegerField(choices=APPOINTMENT_TYPE_CHOICES)
     prescription_file = models.FileField(upload_to='prescription/pdf', validators=[FileExtensionValidator(allowed_extensions=['pdf'])], null=True)
 
-    def get_pdf(self):
+    def get_pdf(self, appointment):
+
 
         pdf_dict = {'medicines': self.medicines,
                     'observations': self.observations,
-                    'updated_at': self.updated_at}
-        html_body = render_to_string("e-prescription/pdf_template.html", context=pdf_dict)
+                    'pres_id': self.id,
+                    'symptoms': self.symptoms,
+                    'doc_name': appointment.doctor.name,
+                    'hosp_name':  appointment.hospital.name,
+                    'tests': self.lab_tests,
+                    'patient': self.patient_details,
+                    'hosp_address': appointment.hospital.get_hos_address(),
+                    'doc_qualification': ','.join([str(h.qualification) for h in appointment.doctor.qualifications.all()]),
+                    'doc_reg': appointment.doctor.license,
+                    'date': self.created_at.strftime('%d %B %Y'),
+                    'followup_date': self.followup_instructions_date.strftime('%d %B %Y %H %i'),
+                    'followup_reason': self.followup_instructions_reason
+                    }
+        html_body = render_to_string("e-prescription/med-invoice.html", context=pdf_dict)
         filename = "prescription_{}_{}.pdf".format(str(timezone.now().strftime("%I%M_%d%m%Y")),
                                               random.randint(1111111111, 9999999999))
         file = utils.html_to_pdf(html_body, filename)

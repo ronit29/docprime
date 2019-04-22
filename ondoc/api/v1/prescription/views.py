@@ -31,14 +31,19 @@ class PrescriptionGenerateViewSet(viewsets.GenericViewSet):
         try:
             prescription_pdf = prescription_models.PresccriptionPdf.objects.create(medicines=valid_data.get('medicines'),
                                                                                    observations=valid_data.get('observation'),
+                                                                                   lab_tests=valid_data.get('tests'),
+                                                                                   diagnosis=valid_data.get('diagnosis'),
+                                                                                   symptoms=valid_data.get('symptoms'),
+                                                                                   patient_details=valid_data.get('patient_details'),
                                                                                    appointment_id=valid_data.get('appointment_id'),
                                                                                    appointment_type=valid_data.get('appointment_type'),
-                                                                                   symptoms=valid_data.get('symptoms'))
+                                                                                   followup_instructions_date=valid_data.get('followup_date'),
+                                                                                   followup_instructions_reason=valid_data.get('followup_reason'))
         except Exception as e:
             logger.error("Error Creating PDF object " + str(e))
             return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
         try:
-            file = prescription_pdf.get_pdf()
+            file = prescription_pdf.get_pdf(valid_data.get('appointment'))
             prescription_pdf.prescription_file = file
             prescription_pdf.save()
         except Exception as e:
