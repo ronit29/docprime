@@ -3531,10 +3531,11 @@ class HospitalViewSet(viewsets.GenericViewSet):
                 title += entity.locality_value + ' | Contact Info & Other Details '
 
                 description += entity.locality_value + ': Check ' + hospital_obj.name + " address, doctor's list, contact number and more to book appointment."
-
-            response['seo'] = {'title': title, "description": description}
-
             canonical_url = entity.url
+        else:
+            response['breadcrumb'] = None
+        response['seo'] = {'title': title, "description": description}
+
         response['canonical_url'] = canonical_url
 
         return Response(response)
