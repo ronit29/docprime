@@ -773,6 +773,7 @@ class InsuranceLeadResource(resources.ModelResource):
     status = fields.Field()
     matrix_lead_id = fields.Field()
     created_at = fields.Field()
+    updated_at = fields.Field()
 
     def export(self, queryset=None, *args, **kwargs):
         queryset = self.get_queryset(**kwargs)
@@ -783,13 +784,13 @@ class InsuranceLeadResource(resources.ModelResource):
         date_range = [datetime.strptime(kwargs.get('from_date'), '%Y-%m-%d').date(), datetime.strptime(
                                         kwargs.get('to_date'), '%Y-%m-%d').date()]
 
-        leads = InsuranceLead.objects.filter(created_at__date__range=date_range).order_by('-id')
+        leads = InsuranceLead.objects.filter(created_at__date__range=date_range).order_by('-updated_at')
         return leads
 
     class Meta:
         model = InsuranceLead
         fields = ()
-        export_order = ('id', 'name', 'phone_number', 'status', 'matrix_lead_id', 'created_at')
+        export_order = ('id', 'name', 'phone_number', 'status', 'matrix_lead_id', 'created_at', 'updated_at')
 
     def dehydrate_id(self, obj):
         return str(obj.id)
@@ -800,10 +801,13 @@ class InsuranceLeadResource(resources.ModelResource):
     def dehydrate_created_at(self, obj):
         return str(obj.created_at)
 
+    def dehydrate_updated_at(self, obj):
+        return str(obj.updated_at)
+
     def dehydrate_name(self, obj):
         user = obj.user
         from ondoc.authentication.models import UserProfile
-        user_profile = UserProfile.objects.filter(user=user).order_by('id').first()
+        user_profile = UserProfile.objects.filter(user=user, is_default_user=True).first()
         if user_profile:
             return str(user_profile.name)
         else:
@@ -825,11 +829,12 @@ class InsuranceLeadAdmin(ImportExportModelAdmin, admin.ModelAdmin):
     resource_class = InsuranceLeadResource
     export_template_name = "export_insurance_lead_report.html"
     formats = (base_formats.XLS,)
+    ordering = ('-updated_at',)
 
     def name(self, obj):
         user = obj.user
         from ondoc.authentication.models import UserProfile
-        user_profile = UserProfile.objects.filter(user=user).order_by('id').first()
+        user_profile = UserProfile.objects.filter(user=user, is_default_user=True).first()
         if user_profile:
             return str(user_profile.name)
         else:
@@ -845,7 +850,7 @@ class InsuranceLeadAdmin(ImportExportModelAdmin, admin.ModelAdmin):
         else:
             return "New"
 
-    list_display = ('id', 'name',  'phone_number', 'status', 'matrix_lead_id', 'created_at')
+    list_display = ('id', 'name',  'phone_number', 'status', 'matrix_lead_id', 'created_at', 'updated_at')
 
     def get_export_queryset(self, request):
         super().get_export_queryset(request)
