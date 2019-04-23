@@ -766,17 +766,29 @@ class IpdProcedure:
                 FROM entity_address ea
                 WHERE locality_id = ea.id ''', []).execute()
 
-        RawSql('''UPDATE temp_url 
-                SET sublocality_latitude = st_y(centroid::geometry), sublocality_longitude = st_x(centroid::geometry),
-                sublocality_value = ea.alternative_value, sublocality_location = centroid
-                FROM entity_address ea
-                WHERE sublocality_id = ea.id 
-                ''', []).execute()
+        # RawSql('''UPDATE temp_url
+        #         SET sublocality_latitude = st_y(centroid::geometry), sublocality_longitude = st_x(centroid::geometry),
+        #         sublocality_value = ea.alternative_value, sublocality_location = centroid
+        #         FROM entity_address ea
+        #         WHERE sublocality_id = ea.id
+        #         ''', []).execute()
 
-        RawSql('''update temp_url set location = sublocality_location where sublocality_location is not null''',
-               []).execute()
+        # RawSql('''update temp_url set location = sublocality_location where sublocality_location is not null''',
+        #        []).execute()
 
         RawSql('''update temp_url set location = locality_location where location is null''', []).execute()
+
+        update_spec_extras_query = '''update  temp_url 
+                                  set extras = 
+                                   json_build_object('ipd_procedure_id', ipd_procedure_id, 'location_json',
+                                   json_build_object('locality_id', locality_id, 'locality_value', locality_value, 'locality_latitude', 
+                                   locality_latitude,'locality_longitude', locality_longitude), 'ipd_procedure', ipd_procedure)
+                                  where sitemap_identifier in ('IPD_PROCEDURE_CITY')'''
+        update_spec_extras = RawSql(update_spec_extras_query, []).execute()
+
+
+
+        # SHASHANK_SINGH copy above data
 
         # IPD_PROCEDURE_COST_IN_IPDP
         update_urls_query = '''update temp_url set url =  
@@ -784,16 +796,7 @@ class IpdProcedure:
                     where sitemap_identifier in ('IPD_PROCEDURE_CITY')'''
         update_urls = RawSql(update_urls_query, []).execute()
 
-
-        update_spec_extras_query = '''update  temp_url 
-                          set extras = 
-                           json_build_object('ipd_procedure_id', ipd_procedure_id, 'location_json',
-                           json_build_object('locality_id', locality_id, 'locality_value', locality_value, 'locality_latitude', 
-                           locality_latitude,'locality_longitude', locality_longitude), 'ipd_procedure', ipd_procedure)
-                          where sitemap_identifier in ('IPD_PROCEDURE_CITY')'''
-        update_spec_extras = RawSql(update_spec_extras_query, []).execute()
-
-
+        # SHASHANK_SINGH Don't know what this is
         RawSql('''delete from temp_url where id in (select id from (select tu.*,
                 row_number() over(partition by tu.url order by ea.child_count desc nulls last, tu.count desc nulls last) rownum
                 from temp_url tu inner join entity_address ea on 
