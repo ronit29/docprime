@@ -906,15 +906,15 @@ class Doctor(auth_model.TimeStampedModel, auth_model.QCModel, SearchKey, auth_mo
         canvas.paste(template, (0,0))
         # doctor_image = doctor_image.resize((200, 200), Image.ANTIALIAS)
         canvas.paste(doctor_image, (390, 300), doctor_image)
-        canvas.save('overlap.png')
+        #canvas.save('overlap.png')
         qrcode_image = qrcode_image.resize((530, 530), Image.ANTIALIAS)
         canvas.paste(qrcode_image, (215, 830))
 
         blank_image = Image.new('RGBA', (1000, 1000), 'white') # this new image is created to write text and paste on canvas
         img_draw = ImageDraw.Draw(canvas)
-        font_url = staticfiles_storage.path('web/fonts/ProspectusPro-Desktop-v1-002/ProspectusSBld.otf')
+        #font_url = staticfiles_storage.path('web/fonts/ProspectusPro-Desktop-v1-002/ProspectusSBld.otf')
 
-        font = ImageFont.truetype(font_url, 40)
+        font = ImageFont.truetype(staticfiles_storage.open('web/fonts/ProspectusPro-Desktop-v1-002/ProspectusSBld.otf'), 40)
 
         w, h = img_draw.textsize(self.name, font=font)
 
