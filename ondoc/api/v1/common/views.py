@@ -931,13 +931,11 @@ class GetKeyDataViewSet(viewsets.GenericViewSet):
 
         parameters = request.query_params
         key = parameters.get('key')
-        queryset = UserConfig.objects.filter(key=key)
+        queryset = UserConfig.objects.filter(key__iexact=key)
         resp = []
         for info in queryset:
             data_key = info.key
+            data_key = data_key.lower()
             data = info.data
             resp.append({'data': data, 'key': data_key})
-
             return Response(resp)
-
-
