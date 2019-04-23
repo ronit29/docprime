@@ -82,7 +82,7 @@ class PrescriptionComponentBodySerializer(serializers.Serializer):
 
 class PrescriptionComponentSyncSerializer(serializers.Serializer):
     type = serializers.ChoiceField(choices=PrescriptionComponents.COMPONENT_CHOICES)
-    hospital_id = serializers.PrimaryKeyRelatedField(queryset=doc_models.Hospital.objects.all())
+    hospital_id = serializers.PrimaryKeyRelatedField(queryset=doc_models.Hospital.objects.all(), required=False)
 
 
 class GeneratePrescriptionPDFBodySerializer(serializers.Serializer):

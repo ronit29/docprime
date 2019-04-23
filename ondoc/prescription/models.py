@@ -1,7 +1,7 @@
 from django.db import models
 from ondoc.authentication import models as auth_models
 from ondoc.doctor import models as doc_models
-from django.contrib.postgres.fields import JSONField
+from django.contrib.postgres.fields import JSONField, ArrayField
 from django.template.loader import render_to_string
 from ondoc.api.v1 import utils
 from django.utils import timezone
@@ -10,52 +10,61 @@ import random, logging
 logger = logging.getLogger(__name__)
 
 
-class PrescriptionSymptoms(auth_models.TimeStampedModel):
-    hospital = models.ForeignKey(doc_models.Hospital, on_delete=models.CASCADE)
-    name = models.CharField(max_length=64)
+class PrescriptionEntity(auth_models.TimeStampedModel):
+    hospitals = ArrayField(models.IntegerField(), blank=True, null=True)
+    name = models.CharField(db_index=True, max_length=64)
     moderated = models.NullBooleanField(blank=True, null=True)
 
+    @classmethod
+    def create_or_update(cls, name, hospital_id):
+        obj = cls.objects.filter(name__iexact=name).first()
+        if obj:
+            if hospital_id in obj.hospitals:
+                return obj
+            obj.hospitals.append(hospital_id)
+            obj.save()
+        else:
+            obj = cls.objects.create(name=name, hospitals=[hospital_id])
+        return obj
+
     class Meta:
-        db_table = 'prescription_symptoms'
+        abstract = True
 
 
-class PrescriptionObservations(auth_models.TimeStampedModel):
-    hospital = models.ForeignKey(doc_models.Hospital, on_delete=models.CASCADE)
-    name = models.CharField(max_length=64)
-    moderated = models.NullBooleanField(blank=True, null=True)
+class PrescriptionSymptoms(PrescriptionEntity):
 
     class Meta:
-        db_table = 'prescription_observations'
+        db_table = 'eprescription_symptoms'
 
 
-class PrescriptionMedicine(auth_models.TimeStampedModel):
+class PrescriptionObservations(PrescriptionEntity):
+
+    class Meta:
+        db_table = 'eprescription_observations'
+
+
+class PrescriptionMedicine(PrescriptionEntity):
     DAY = 1
     WEEK = 2
     MONTH = 3
     YEAR = 4
     DURATION_TYPE_CHOICES = [(DAY, "Day"), (WEEK, "Week"), (MONTH, "Month"), (YEAR, "Year")]
-    hospital = models.ForeignKey(doc_models.Hospital, on_delete=models.CASCADE)
-    name = models.CharField(max_length=64)
     quantity = models.PositiveIntegerField(null=True, blank=True)
     time = models.CharField(max_length=64, null=True)
     duration_type = models.PositiveSmallIntegerField(choices=DURATION_TYPE_CHOICES, null=True, blank=True)
     duration = models.PositiveIntegerField(null=True, blank=True)
     instruction = models.CharField(max_length=256, null=True, blank=True)
     additional_notes = models.CharField(max_length=256, null=True, blank=True)
-    moderated = models.NullBooleanField(blank=True, null=True)
 
     class Meta:
-        db_table = 'prescription_medicine'
+        db_table = 'eprescription_medicine'
 
 
-class PrescriptionTests(auth_models.TimeStampedModel):
-    hospital = models.ForeignKey(doc_models.Hospital, on_delete=models.CASCADE)
-    name = models.CharField(max_length=64)
+class PrescriptionTests(PrescriptionEntity):
     instruction = models.CharField(max_length=256, null=True, blank=True)
-    moderated = models.NullBooleanField(blank=True, null=True)
 
     class Meta:
-        db_table = 'prescription_tests'
+        db_table = 'eprescription_tests'
 
 
 class PresccriptionPdf(auth_models.TimeStampedModel):
@@ -63,7 +72,7 @@ class PresccriptionPdf(auth_models.TimeStampedModel):
     DOCPRIME_LAB = 2
     OFFLINE = 3
 
-    APPOINTMENT_TYPE_CHOICES = [(DOCPRIME_OPD, "Docprime_Opd"), (DOCPRIME_LAB, "Docprime_Lab"), (OFFLINE, "OFfline")]
+    APPOINTMENT_TYPE_CHOICES = [(DOCPRIME_OPD, "Docprime_Opd"), (DOCPRIME_LAB, "Docprime_Lab"), (OFFLINE, "OFFline")]
     symptoms = JSONField(blank=True, null=True)
     observations = JSONField(blank=True, null=True)
     medicines = JSONField(blank=True, null=True)
@@ -104,6 +113,6 @@ class PresccriptionPdf(auth_models.TimeStampedModel):
         return file
 
     class Meta:
-        db_table = 'prescription_pdf'
+        db_table = 'eprescription_pdf'
 
 
