@@ -462,6 +462,14 @@ class UserProfileViewSet(mixins.CreateModelMixin, mixins.ListModelMixin,
                 }, status=status.HTTP_400_BAD_REQUEST)
         if data.get('is_default_user', None):
             UserProfile.objects.filter(user=obj.user).update(is_default_user=False)
+        else:
+            primary_profile = UserProfile.objects.filter(user=obj.user, is_default_user=True).first()
+            if not primary_profile:
+                return Response({
+                    "request_errors": {"code": "invalid",
+                                       "message": "Atleast one profile should be selected as primary."
+                                       }
+                }, status=status.HTTP_400_BAD_REQUEST)
         serializer.save()
         return Response(serializer.data)
 
