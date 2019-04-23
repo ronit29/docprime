@@ -847,29 +847,32 @@ class Doctor(auth_model.TimeStampedModel, auth_model.QCModel, SearchKey, auth_mo
 
     def generate_sticker(self):
 
-        thumbnail = None
-        for image in self.images.all():
-            if image.cropped_image:
-                thumbnail = image.cropped_image
+        # thumbnail = None
+        # for image in self.images.all():
+        #     if image.cropped_image:
+        #         thumbnail = image.cropped_image
 
-                break
-        if not thumbnail:
-            return
+        #         break
+        # if not thumbnail:
+        #     return
 
-        qrcode = None
-        for qrcode in self.qr_code.all():
-            if qrcode:
-                qrcode = default_storage.path(qrcode.name)
-                break
+        thumbnail = self.images.exclude(cropped_image__isnull=True).exclude(cropped_image__exact='').first()
 
-        template_url = staticfiles_storage.path('web/images/qr_image.png')
-        template = Image.open(template_url)
+        qrcode = self.qr_code.all().first()
+        # for qrcode in self.qr_code.all():
+        #     if qrcode:
+        #         qrcode = default_storage.path(qrcode.name)
+        #         break
 
-
-        thumbnail = default_storage.path(thumbnail)
+        #template_url = staticfiles_storage.path('web/images/qr_image.png')
+        template = Image.open(staticfiles_storage.open('web/images/qr_image.png'))
         print(thumbnail)
-        doctor_image = Image.open(thumbnail)
-        qrcode_image = Image.open(qrcode)
+
+
+        #thumbnail = default_storage.path(thumbnail)
+        #print(thumbnail)
+        doctor_image = Image.open(thumbnail.cropped_image)
+        qrcode_image = Image.open(qrcode.name)
 
         # im = Image.open('avatar.jpg')
         # im = im.resize((120, 120));
@@ -909,14 +912,24 @@ class Doctor(auth_model.TimeStampedModel, auth_model.QCModel, SearchKey, auth_mo
 
         blank_image = Image.new('RGBA', (1000, 1000), 'white') # this new image is created to write text and paste on canvas
         img_draw = ImageDraw.Draw(canvas)
-        font_url = staticfiles_storage.path('web/images/.fonts/ProspectusPro-Desktop-v1-002/ProspectusSBld.otf')
+        font_url = staticfiles_storage.path('web/fonts/ProspectusPro-Desktop-v1-002/ProspectusSBld.otf')
+
         font = ImageFont.truetype(font_url, 40)
-        img_draw.text((350, 530), self.name, fill='black', font=font)
+
+        w, h = img_draw.textsize(self.name, font=font)
+
+        img_draw.text(((992-w)/2,530), self.name, fill="black", font=font)
+        #img_draw.text((350,530), self.name, fill="black", font=font)
+        #im.save("hello.png", "PNG")
+
+
+
+        #img_draw.text((350, 530), self.name, fill='black', font=font)
         # md5_hash = hashlib.md5(canvas.tobytes()).hexdigest()
 
         tempfile_io = BytesIO()
         canvas.save(tempfile_io, format='JPEG')
-        filename = "doctor_sticker_{}_{}.jpeg".format('id:' + str(self.id),
+        filename = "doctor_sticker_{}_{}.jpeg".format(str(self.id),
                                               random.randint(1111111111, 9999999999))
 
         image_file1 = InMemoryUploadedFile(tempfile_io, None, filename, 'image/jpeg', tempfile_io.tell(), None)
