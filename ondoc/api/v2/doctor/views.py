@@ -938,8 +938,7 @@ class PartnersAppInvoicePDF(viewsets.GenericViewSet):
         encoded_filename = jwt.decode(encoded_filename, settings.PARTNERS_INVOICE_ENCODE_KEY)
         filename = encoded_filename.get('filename')
         invoice_serial_id = filename[filename.find('INV-'):].replace('.pdf', '')
-        invoice = doc_models.PartnersAppInvoice.objects.filter(invoice_serial_id=invoice_serial_id,
-                                                               is_valid=True).order_by('-updated_at').first()
+        invoice = doc_models.PartnersAppInvoice.objects.filter(invoice_serial_id=invoice_serial_id).order_by('-updated_at').first()
         if not invoice:
             return Response({"status": 0, "message": "File not found"}, status=status.HTTP_404_NOT_FOUND)
         response = HttpResponse(invoice.file, content_type='application/pdf')

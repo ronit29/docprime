@@ -3197,6 +3197,7 @@ class HospitalTiming(auth_model.TimeStampedModel):
 
 
 class PartnersAppInvoice(auth_model.TimeStampedModel):
+    DECIMAL_PLACES = 2
     INVOICE_SERIAL_ID_START = 300000
     ONLINE = 1
     CASH = 2
@@ -3208,20 +3209,20 @@ class PartnersAppInvoice(auth_model.TimeStampedModel):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     invoice_serial_id = models.CharField(max_length=100)
     appointment = models.ForeignKey(OfflineOPDAppointments, on_delete=models.CASCADE, related_name='partners_app_invoice')
-    consultation_fees = models.DecimalField(max_digits=10, decimal_places=2)
+    consultation_fees = models.DecimalField(max_digits=10, decimal_places=DECIMAL_PLACES)
     selected_invoice_items = JSONField()
     payment_status = models.IntegerField(choices=PAYMENT_STATUS)
     payment_type = models.IntegerField(choices=PAYMENT_CHOICES, null=True, blank=True)
     due_date = models.DateField(null=True, blank=True)
     invoice_title = models.CharField(max_length=300, null=True, blank=True)
-    sub_total_amount = models.DecimalField(max_digits=10, decimal_places=2)
-    tax_amount = models.DecimalField(max_digits=10, decimal_places=2, blank=True, null=True)
-    tax_percentage = models.DecimalField(max_digits=5, decimal_places=2, blank=True, null=True,
+    sub_total_amount = models.DecimalField(max_digits=10, decimal_places=DECIMAL_PLACES)
+    tax_amount = models.DecimalField(max_digits=10, decimal_places=DECIMAL_PLACES, blank=True, null=True)
+    tax_percentage = models.DecimalField(max_digits=5, decimal_places=DECIMAL_PLACES, blank=True, null=True,
                                          validators=[MinValueValidator(0), MaxValueValidator(100)])
-    discount_amount = models.DecimalField(max_digits=10, decimal_places=2, blank=True, null=True)
-    discount_percentage = models.DecimalField(max_digits=5, decimal_places=2, blank=True, null=True,
+    discount_amount = models.DecimalField(max_digits=10, decimal_places=DECIMAL_PLACES, blank=True, null=True)
+    discount_percentage = models.DecimalField(max_digits=5, decimal_places=DECIMAL_PLACES, blank=True, null=True,
                                               validators=[MinValueValidator(0), MaxValueValidator(100)])
-    total_amount = models.DecimalField(max_digits=10, decimal_places=2)
+    total_amount = models.DecimalField(max_digits=10, decimal_places=DECIMAL_PLACES)
     is_invoice_generated = models.BooleanField(default=False)
     file = models.FileField(upload_to=INVOICE_STORAGE_FOLDER, blank=False, null=False)
     invoice_url = models.URLField(null=True, blank=True)
@@ -3321,21 +3322,27 @@ class PartnersAppInvoice(auth_model.TimeStampedModel):
 
 
 class GeneralInvoiceItems(auth_model.TimeStampedModel):
+    DECIMAL_PLACES = 2
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     item = models.CharField(max_length=200)
-    base_price = models.DecimalField(max_digits=10, decimal_places=2)
+    base_price = models.DecimalField(max_digits=10, decimal_places=DECIMAL_PLACES)
     description = models.CharField(max_length=500, null=True, blank=True)
-    tax_amount = models.DecimalField(max_digits=10, decimal_places=2, blank=True, null=True)
-    tax_percentage = models.DecimalField(max_digits=5, decimal_places=2, blank=True, null=True,
+    tax_amount = models.DecimalField(max_digits=10, decimal_places=DECIMAL_PLACES, blank=True, null=True)
+    tax_percentage = models.DecimalField(max_digits=5, decimal_places=DECIMAL_PLACES, blank=True, null=True,
                                          validators=[MinValueValidator(0), MaxValueValidator(100)])
-    discount_amount = models.DecimalField(max_digits=10, decimal_places=2, blank=True, null=True)
-    discount_percentage = models.DecimalField(max_digits=5, decimal_places=2, blank=True, null=True,
+    discount_amount = models.DecimalField(max_digits=10, decimal_places=DECIMAL_PLACES, blank=True, null=True)
+    discount_percentage = models.DecimalField(max_digits=5, decimal_places=DECIMAL_PLACES, blank=True, null=True,
                                               validators=[MinValueValidator(0), MaxValueValidator(100)])
     user = models.ForeignKey(auth_model.User, on_delete=models.SET_NULL, related_name='invoice_items', null=True)
     hospitals = models.ManyToManyField(Hospital, related_name='invoice_items')
 
     def __str__(self):
         return self.item
+
+    def get_computed_price(self):
+        tax_amount = self.tax_amount if self.tax_amount else 0
+        discount_amount = self.discount_amount if self.discount_amount else 0
+        return (self.base_price + tax_amount - discount_amount)
 
     class Meta:
         db_table = "general_invoice_items"
