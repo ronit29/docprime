@@ -1051,7 +1051,7 @@ class TimeSlotExtraction(object):
                 if current_date_time.date() == booking_date.date():
                     if pa[k].get('on_call') == False:
                         if k >= float(doc_minimum_time) and k <= doctor_maximum_timing:
-                            data_list.append({"value": k, "text": v, "price": pa[k]["price"], "is_agreed_price": True if pa[k]["price"] and pa[k]["price"] > 0 else False,
+                            data_list.append({"value": k, "text": v, "price": pa[k]["price"], "is_price_zero": True if pa[k]["price"] and pa[k]["price"] == 0 else False,
                                               "mrp": pa[k]['mrp'], 'deal_price': pa[k]['deal_price'],
                                               "is_available": pa[k]["is_available"], "on_call": pa[k].get("on_call", False)})
                         else:
@@ -1060,7 +1060,7 @@ class TimeSlotExtraction(object):
                         pass
                 else:
                     if k <= doctor_maximum_timing:
-                        data_list.append({"value": k, "text": v, "price": pa[k]["price"], "is_agreed_price": True if pa[k]["price"] and pa[k]["price"] > 0 else False,
+                        data_list.append({"value": k, "text": v, "price": pa[k]["price"], "is_price_zero": True if pa[k]["price"] and pa[k]["price"] == 0 else False,
                                           "mrp": pa[k]['mrp'], 'deal_price': pa[k]['deal_price'],
                                           "is_available": pa[k]["is_available"],
                                           "on_call": pa[k].get("on_call", False)})
@@ -1070,7 +1070,7 @@ class TimeSlotExtraction(object):
                 next_date = current_date_time + datetime.timedelta(days=1)
                 if current_date_time.date() == booking_date.date():
                     if k >= float(lab_minimum_time):
-                        data_list.append({"value": k, "text": v, "price": pa[k]["price"], "is_agreed_price": True if pa[k]["price"] and pa[k]["price"] > 0 else False,
+                        data_list.append({"value": k, "text": v, "price": pa[k]["price"], "is_price_zero": True if pa[k]["price"] and pa[k]["price"] == 0 else False,
                                           "is_available": pa[k]["is_available"],
                                           "on_call": pa[k].get("on_call", False)})
                     else:
@@ -1078,18 +1078,18 @@ class TimeSlotExtraction(object):
                 elif next_date.date() == booking_date.date():
                     if lab_tomorrow_time:
                         if k >= float(lab_tomorrow_time):
-                            data_list.append({"value": k, "text": v, "price": pa[k]["price"], "is_agreed_price": True if pa[k]["price"] and pa[k]["price"] > 0 else False,
+                            data_list.append({"value": k, "text": v, "price": pa[k]["price"], "is_price_zero": True if pa[k]["price"] and pa[k]["price"] == 0 else False,
                                               "is_available": pa[k]["is_available"],
                                               "on_call": pa[k].get("on_call", False)})
                         else:
                             pass
                     else:
-                        data_list.append({"value": k, "text": v, "price": pa[k]["price"], "is_agreed_price": True if pa[k]["price"] and pa[k]["price"] > 0 else False,
+                        data_list.append({"value": k, "text": v, "price": pa[k]["price"], "is_price_zero": True if pa[k]["price"] and pa[k]["price"] == 0 else False,
                                           "is_available": pa[k]["is_available"],
                                           "on_call": pa[k].get("on_call", False)})
 
                 else:
-                    data_list.append({"value": k, "text": v, "price": pa[k]["price"], "is_agreed_price": True if pa[k]["price"] and pa[k]["price"] > 0 else False,
+                    data_list.append({"value": k, "text": v, "price": pa[k]["price"], "is_price_zero": True if pa[k]["price"] and pa[k]["price"] == 0 else False,
                                       "is_available": pa[k]["is_available"],
                                       "on_call": pa[k].get("on_call", False)})
 
