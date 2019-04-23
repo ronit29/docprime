@@ -33,7 +33,7 @@ from ondoc.api.v1.ratings import serializers as rating_serializer
 from ondoc.location.models import EntityUrls, EntityAddress
 from ondoc.seo.models import NewDynamic
 from ondoc.subscription_plan.models import Plan, UserPlanMapping
-#from packaging.version import parse
+from packaging.version import parse
 
 logger = logging.getLogger(__name__)
 utc = pytz.UTC
@@ -257,7 +257,7 @@ class AvailableLabTestPackageSerializer(serializers.ModelSerializer):
 
     def get_is_price_zero(self, obj):
         agreed_price = obj.computed_agreed_price if obj.custom_agreed_price is None else obj.custom_agreed_price
-        if agreed_price and agreed_price>0:
+        if agreed_price and agreed_price==0:
             return True
         else:
             return False
@@ -371,7 +371,7 @@ class AvailableLabTestSerializer(serializers.ModelSerializer):
 
     def get_is_price_zero(self, obj):
         agreed_price = obj.computed_agreed_price if obj.custom_agreed_price is None else obj.custom_agreed_price
-        if agreed_price and agreed_price>0:
+        if agreed_price and agreed_price == 0:
             return True
         else:
             return False

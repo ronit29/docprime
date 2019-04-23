@@ -484,6 +484,30 @@ def resolve_address(address_obj):
     return address_string
 
 
+def thyrocare_resolve_address(address_obj):
+    address_string = ""
+    address_dict = dict()
+    if not isinstance(address_obj, dict):
+        address_dict = vars(address_dict)
+    else:
+        address_dict = address_obj
+
+    if address_dict.get("address"):
+        if address_string:
+            address_string += ", "
+        address_string += str(address_dict["address"])
+    if address_dict.get("locality"):
+        if address_string:
+            address_string += ", "
+        address_string += str(address_dict["locality"])
+    if address_dict.get("pincode"):
+        if address_string:
+            address_string += ", "
+        address_string += str(address_dict["pincode"])
+
+    return address_string
+
+
 def generate_short_url(url):
     from ondoc.web import models as web_models
     random_string = ''.join([random.choice(string.ascii_letters + string.digits) for n in range(10)])
