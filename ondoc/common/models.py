@@ -24,6 +24,7 @@ from ondoc.authentication.models import User
 from ondoc.authentication import models as auth_model
 from ondoc.bookinganalytics.models import DP_StateMaster, DP_CityMaster
 import datetime
+from datetime import date
 from django.utils import timezone
 
 class Cities(models.Model):
@@ -432,3 +433,37 @@ class RefundDetails(TimeStampedModel):
             if not refund_initiated_by:
                 raise Exception("Must have a responsible user.")
             cls .objects.create(refund_reason=refund_reason, refund_initiated_by=refund_initiated_by, content_object=appointment)
+
+
+class MatrixDataMixin(object):
+
+    def get_matrix_policy_data(self):
+        user_insurance = self.user.active_insurance
+        primary_proposer_name = None
+
+        if user_insurance:
+            primary_proposer = user_insurance.get_primary_member_profile()
+            primary_proposer_name = primary_proposer.get_full_name() if primary_proposer else None
+
+        policy_details = {
+            "ProposalNo": None,
+            "BookingId": user_insurance.id if user_insurance else None,
+            "ProposerName": primary_proposer_name,
+            "PolicyId": user_insurance.policy_number if user_insurance else None,
+            "InsurancePlanPurchased": user_insurance.insurance_plan.name if user_insurance else None,
+            "PurchaseDate": int(user_insurance.purchase_date.timestamp()) if user_insurance else None,
+            "ExpirationDate": int(user_insurance.expiry_date.timestamp()) if user_insurance else None,
+            "COILink": user_insurance.coi.url if user_insurance and user_insurance.coi is not None and user_insurance.coi.name else None,
+            "PeopleCovered": user_insurance.insurance_plan.get_people_covered() if user_insurance else ""
+        }
+
+        return policy_details
+
+    def calculate_age(self):
+        if not self.profile:
+            return 0
+        if not self.profile.dob:
+            return 0
+        dob = self.profile.dob
+        today = date.today()
+        return today.year - dob.year - ((today.month, today.day) < (dob.month, dob.day))
