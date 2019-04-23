@@ -55,8 +55,8 @@ class PrescriptionGenerateViewSet(viewsets.GenericViewSet):
 
 class PrescriptionComponentsViewSet(viewsets.GenericViewSet):
 
-    # authentication_classes = (JWTAuthentication,)
-    # permission_classes = (IsAuthenticated, IsDoctor)
+    authentication_classes = (JWTAuthentication,)
+    permission_classes = (IsAuthenticated, IsDoctor)
 
     def get_queryset(self):
         return prescription_models.PresccriptionPdf.objects.none()
@@ -73,7 +73,7 @@ class PrescriptionComponentsViewSet(viewsets.GenericViewSet):
                          'hospital': object.hospital_id})
 
     def sync_component(self, request):
-        serializer = serializers.PrescriptionComponentSyncSerializer(data=request.data)
+        serializer = serializers.PrescriptionComponentSyncSerializer(data=request.query_params)
         serializer.is_valid(raise_exception=True)
         valid_data = serializer.validated_data
         model = dict(serializers.PrescriptionComponents.COMPONENT_CHOICES)[valid_data.get('type')]
