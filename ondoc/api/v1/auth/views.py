@@ -2036,7 +2036,7 @@ class AppointmentViewSet(viewsets.GenericViewSet):
         all_appointments = []
         try:
             user_id = request.user.id
-            get_all_upcoming_appointments(user_id)
+            all_appointments = get_all_upcoming_appointments(user_id)
         except Exception as e:
             logger.error(str(e))
         return Response(all_appointments)
