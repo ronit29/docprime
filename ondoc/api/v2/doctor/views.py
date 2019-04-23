@@ -846,7 +846,7 @@ class PartnersAppInvoice(viewsets.GenericViewSet):
             invoice_obj.is_invoice_generated = True
             context = invoice_obj.get_context(selected_invoice_items)
             content = render_to_string("email/partners_invoice/body.html", context=context)
-            filename = invoice_obj.invoice_serial_id
+            filename = appointment.user.name + ' ' + invoice_obj.invoice_serial_id + '.pdf'
             file = v1_utils.html_to_pdf(content, filename)
 
             invoice_obj.file = file
@@ -932,13 +932,16 @@ class PartnersAppInvoice(viewsets.GenericViewSet):
 class PartnersAppInvoicePDF(viewsets.GenericViewSet):
 
     def download_pdf(self, request, encoded_filename=None):
+        if not encoded_filename:
+            return Response({"status": 0, "message": "encoded filename is required"},
+                            status=status.HTTP_400_BAD_REQUEST)
         encoded_filename = jwt.decode(encoded_filename, settings.PARTNERS_INVOICE_ENCODE_KEY)
-        invoice_serial_id = encoded_filename.get('filename')
-        if not invoice_serial_id:
-            return Response({"status": 0, "message": "File not found"}, status=status.HTTP_404_NOT_FOUND)
-        invoice = doc_models.PartnersAppInvoice.objects.filter(invoice_serial_id=invoice_serial_id, is_valid=True).order_by('-updated_at').first()
+        filename = encoded_filename.get('filename')
+        invoice_serial_id = filename[filename.find('INV-'):].replace('.pdf', '')
+        invoice = doc_models.PartnersAppInvoice.objects.filter(invoice_serial_id=invoice_serial_id,
+                                                               is_valid=True).order_by('-updated_at').first()
         if not invoice:
             return Response({"status": 0, "message": "File not found"}, status=status.HTTP_404_NOT_FOUND)
         response = HttpResponse(invoice.file, content_type='application/pdf')
-        response['Content-Disposition'] = 'attachment; filename=%s' % invoice.invoice_serial_id
+        response['Content-Disposition'] = 'attachment; filename=%s' % filename
         return response
