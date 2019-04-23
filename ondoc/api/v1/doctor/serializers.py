@@ -460,6 +460,7 @@ class DoctorHospitalSerializer(serializers.ModelSerializer):
     show_contact = serializers.SerializerMethodField(read_only=True)
     enabled_for_cod = serializers.BooleanField(source='doctor_clinic.hospital.enabled_for_cod')
     enabled_for_prepaid = serializers.BooleanField(source='doctor_clinic.hospital.enabled_for_prepaid')
+    is_price_zero = serializers.SerializerMethodField()
 
     def get_show_contact(self, obj):
         if obj.doctor_clinic and obj.doctor_clinic.hospital and obj.doctor_clinic.hospital.spoc_details.all():
@@ -540,11 +541,17 @@ class DoctorHospitalSerializer(serializers.ModelSerializer):
 
         return resp
 
+    def get_is_price_zero(self, obj):
+        if obj.fees is not None and obj.fees == 0:
+            return True
+        else:
+            return False
+
     class Meta:
         model = DoctorClinicTiming
         fields = ('doctor', 'hospital_name', 'address','short_address', 'hospital_id', 'start', 'end', 'day', 'deal_price',
                   'discounted_fees', 'hospital_thumbnail', 'mrp', 'lat', 'long', 'id','enabled_for_online_booking',
-                  'insurance', 'show_contact', 'enabled_for_cod', 'enabled_for_prepaid')
+                  'insurance', 'show_contact', 'enabled_for_cod', 'enabled_for_prepaid', 'is_price_zero')
         # fields = ('doctor', 'hospital_name', 'address', 'hospital_id', 'start', 'end', 'day', 'deal_price', 'fees',
         #           'discounted_fees', 'hospital_thumbnail', 'mrp',)
 
