@@ -42,5 +42,10 @@ geoip2
 django-safedelete
 mongoengine
 qrcode
+pyodbc==3.0.10
+django-pyodbc-azure==2.0.4.1
+django-mssql
 xmltodict
 packaging==19.0
+gevent
+beautifulsoup4==4.7.1

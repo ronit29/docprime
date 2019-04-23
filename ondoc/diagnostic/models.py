@@ -10,8 +10,10 @@ from django.template.loader import render_to_string
 from ondoc.account.models import MerchantPayout, ConsumerAccount, Order, UserReferred, MoneyPool, Invoice
 from ondoc.authentication.models import (TimeStampedModel, CreatedByModel, Image, Document, QCModel, UserProfile, User,
                                          UserPermission, GenericAdmin, LabUserPermission, GenericLabAdmin,
-                                         BillingAccount, SPOCDetails)
-from ondoc.doctor.models import Hospital, SearchKey, CancellationReason
+                                         BillingAccount, SPOCDetails, RefundMixin, WelcomeCallingDone)
+from ondoc.bookinganalytics.models import DP_OpdConsultsAndTests
+from ondoc.doctor.models import Hospital, SearchKey, CancellationReason, Doctor
+from ondoc.crm.constants import constants
 from ondoc.coupon.models import Coupon
 from ondoc.location.models import EntityUrls
 from ondoc.notification import models as notification_models
@@ -53,7 +55,9 @@ from ondoc.integrations.task import push_lab_appointment_to_integrator, get_inte
 from ondoc.location import models as location_models
 from ondoc.ratings_review import models as ratings_models
 from ondoc.api.v1.common import serializers as common_serializers
-from ondoc.common.models import AppointmentHistory, AppointmentMaskNumber, Remark, GlobalNonBookable
+from ondoc.common.models import AppointmentHistory, AppointmentMaskNumber, Remark, GlobalNonBookable, \
+    SyncBookingAnalytics, CompletedBreakupMixin, RefundDetails, MatrixMappedState, \
+    MatrixMappedCity
 import reversion
 from decimal import Decimal
 from django.utils.text import slugify
@@ -148,12 +152,25 @@ class HomePickupCharges(models.Model):
     content_object = GenericForeignKey()
 
 
-class Lab(TimeStampedModel, CreatedByModel, QCModel, SearchKey):
+class Lab(TimeStampedModel, CreatedByModel, QCModel, SearchKey, WelcomeCallingDone):
     NOT_ONBOARDED = 1
     REQUEST_SENT = 2
     ONBOARDED = 3
     ONBOARDING_STATUS = [(NOT_ONBOARDED, "Not Onboarded"), (REQUEST_SENT, "Onboarding Request Sent"),
                          (ONBOARDED, "Onboarded")]
+    INCORRECT_CONTACT_DETAILS = 1
+    MOU_AGREEMENT_NEEDED = 2
+    LAB_NOT_INTERESTED = 3
+    CHARGES_ISSUES = 4
+    DUPLICATE = 5
+    OTHERS = 9
+    PHONE_RINGING_BUT_COULD_NOT_CONNECT = 10
+    DISABLED_REASONS_CHOICES = (
+        ("", "Select"), (INCORRECT_CONTACT_DETAILS, "Incorrect contact details"),
+        (MOU_AGREEMENT_NEEDED, "MoU agreement needed"), (LAB_NOT_INTERESTED, "Lab not interested for tie-up"),
+        (CHARGES_ISSUES, "Issue in discount % / charges"),
+        (PHONE_RINGING_BUT_COULD_NOT_CONNECT, "Phone ringing but could not connect"),
+        (DUPLICATE, "Duplicate"), (OTHERS, "Others (please specify)"))
     name = models.CharField(max_length=200)
     about = models.CharField(max_length=1000, blank=True)
     license = models.CharField(max_length=200, blank=True)
@@ -182,6 +199,10 @@ class Lab(TimeStampedModel, CreatedByModel, QCModel, SearchKey):
     locality = models.CharField(max_length=100, blank=True)
     city = models.CharField(max_length=100, blank=True)
     state = models.CharField(max_length=100, blank=True)
+    matrix_state = models.ForeignKey(MatrixMappedState, null=True, blank=False, on_delete=models.DO_NOTHING,
+                                     related_name='labs_in_state', verbose_name='State')
+    matrix_city = models.ForeignKey(MatrixMappedCity, null=True, blank=False, on_delete=models.DO_NOTHING,
+                                    related_name='labs_in_city', verbose_name='City')
     country = models.CharField(max_length=100, blank=True)
     pin_code = models.PositiveIntegerField(blank=True, null=True)
     agreed_rate_list = models.FileField(upload_to='lab/docs', max_length=200, null=True, blank=True,
@@ -216,6 +237,13 @@ class Lab(TimeStampedModel, CreatedByModel, QCModel, SearchKey):
     entity = GenericRelation(location_models.EntityLocationRelationship)
     rating = GenericRelation(ratings_models.RatingsReview, related_query_name='lab_ratings')
     enabled = models.BooleanField(verbose_name='Is Enabled', default=True, blank=True)
+    disabled_at = models.DateTimeField(null=True, blank=True)
+    disabled_after = models.PositiveIntegerField(null=True, blank=True, choices=Hospital.DISABLED_AFTER_CHOICES)
+    disable_reason = models.PositiveIntegerField(null=True, blank=True, choices=DISABLED_REASONS_CHOICES)
+    disable_comments = models.CharField(max_length=500, blank=True)
+    disabled_by = models.ForeignKey(settings.AUTH_USER_MODEL, related_name="disabled_lab", null=True,
+                                    editable=False,
+                                    on_delete=models.SET_NULL)
     booking_closing_hours_from_dayend = models.DecimalField(max_digits=10, decimal_places=2, default=0, validators=[MinValueValidator(Decimal('0.00'))])
     order_priority = models.PositiveIntegerField(blank=True, null=True, default=0)
     merchant = GenericRelation(auth_model.AssociatedMerchant)
@@ -226,6 +254,7 @@ class Lab(TimeStampedModel, CreatedByModel, QCModel, SearchKey):
     remark = GenericRelation(Remark)
     rating_data = JSONField(blank=True, null=True)
     is_location_verified = models.BooleanField(verbose_name='Location Verified', default=False)
+    auto_ivr_enabled = models.BooleanField(default=True)
 
     def __str__(self):
         return self.name
@@ -239,6 +268,12 @@ class Lab(TimeStampedModel, CreatedByModel, QCModel, SearchKey):
 
     def open_for_communications(self):
         if (self.network and self.network.open_for_communication) or (not self.network and self.open_for_communication):
+            return True
+
+        return False
+
+    def is_auto_ivr_enabled(self):
+        if (self.network and self.network.auto_ivr_enabled) or (not self.network and self.auto_ivr_enabled):
             return True
 
         return False
@@ -510,6 +545,7 @@ class Lab(TimeStampedModel, CreatedByModel, QCModel, SearchKey):
                         from ratings_review rr
                         inner join lab l on rr.object_id = l.id 
                         and rr.content_type_id={}
+                        where rr.is_live='true'
                         group by case when l.network_id is null then l.id else l.network_id end
                         )x where case when l.network_id is null then l.id=x.lab_id else l.network_id=x.network_id end
                         )
@@ -607,6 +643,7 @@ class Lab(TimeStampedModel, CreatedByModel, QCModel, SearchKey):
             return False
         else:
             return True
+
 
 class LabCertification(TimeStampedModel):
     lab = models.ForeignKey(Lab, related_name = 'lab_certificate', on_delete=models.CASCADE)
@@ -840,6 +877,10 @@ class LabNetwork(TimeStampedModel, CreatedByModel, QCModel):
     locality = models.CharField(max_length=100, blank=True)
     city = models.CharField(max_length=100)
     state = models.CharField(max_length=100)
+    matrix_state = models.ForeignKey(MatrixMappedState, null=True, blank=False, on_delete=models.DO_NOTHING,
+                                     related_name='lab_networks_in_state', verbose_name='State')
+    matrix_city = models.ForeignKey(MatrixMappedCity, null=True, blank=False, on_delete=models.DO_NOTHING,
+                                    related_name='lab_networks_in_city', verbose_name='City')
     country = models.CharField(max_length=100)
     pin_code = models.PositiveIntegerField(blank=True, null=True)
     is_billing_enabled = models.BooleanField(verbose_name='Enabled for Billing', default=False)
@@ -854,6 +895,7 @@ class LabNetwork(TimeStampedModel, CreatedByModel, QCModel):
     is_mask_number_required = models.BooleanField(default=True)
     open_for_communication = models.BooleanField(default=True)
     remark = GenericRelation(Remark)
+    auto_ivr_enabled = models.BooleanField(default=True)
 
     def all_associated_labs(self):
         if self.id:
@@ -1119,7 +1161,11 @@ class LabTest(TimeStampedModel, SearchKey):
                                         through_fields=('lab_test', 'parent_category'),
                                         related_name='recommended_lab_tests')
     reference_code = models.CharField(max_length=150, blank=True, default='')
+
+    author = models.ForeignKey(Doctor, null=True, blank=True, related_name='published_tests',
+                               on_delete=models.SET_NULL)
     is_cancellable = models.BooleanField(default=True)
+
     # test_sub_type = models.ManyToManyField(
     #     LabTestSubType,
     #     through='LabTestSubTypeMapping',
@@ -1396,9 +1442,9 @@ class LabAppointmentInvoiceMixin(object):
 
 
 @reversion.register()
-class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin):
+class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin, RefundMixin, CompletedBreakupMixin):
     from ondoc.integrations.models import IntegratorResponse
-
+    PRODUCT_ID = Order.LAB_PRODUCT_ID
     CREATED = 1
     BOOKED = 2
     RESCHEDULED_LAB = 3
@@ -1453,12 +1499,66 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin)
     merchant_payout = models.ForeignKey(MerchantPayout, related_name="lab_appointment", on_delete=models.SET_NULL, null=True)
     price_data = JSONField(blank=True, null=True)
     tests = models.ManyToManyField(LabTest, through='LabAppointmentTestMapping', through_fields=('appointment', 'test'))
-    money_pool = models.ForeignKey(MoneyPool, on_delete=models.SET_NULL, null=True)
+    money_pool = models.ForeignKey(MoneyPool, on_delete=models.SET_NULL, null=True, related_name='lab_apps')
     mask_number = GenericRelation(AppointmentMaskNumber)
     email_notification = GenericRelation(EmailNotification, related_name="lab_notification")
     user_plan_used = models.ForeignKey('subscription_plan.UserPlanMapping', null=True, on_delete=models.DO_NOTHING,
                                        related_name='appointment_using')
+    synced_analytics = GenericRelation(SyncBookingAnalytics, related_name="lab_booking_analytics")
     integrator_response = GenericRelation(IntegratorResponse)
+    auto_ivr_data = JSONField(default=list(), null=True)
+    history = GenericRelation(AppointmentHistory)
+    refund_details = GenericRelation(RefundDetails, related_query_name="lab_appointment_detail")
+
+    
+    def get_city(self):
+        if self.lab and self.lab.city:
+            return self.lab.city.id
+        else:
+            return None
+
+    def get_state(self):
+        if self.lab and self.lab.state:
+            return self.lab.state.id
+        else:
+            return None
+
+    def sync_with_booking_analytics(self):
+
+        category = None
+        if self.lab_test.first():
+            if self.lab_test.first().test.is_package == True:
+                category = 1
+            else:
+                category = 0
+
+        promo_cost = self.deal_price - self.effective_price if self.deal_price and self.effective_price else 0
+
+        obj = DP_OpdConsultsAndTests.objects.filter(Appointment_Id=self.id, TypeId=2).first()
+        if not obj:
+            obj = DP_OpdConsultsAndTests()
+            obj.Appointment_Id = self.id
+            # obj.CityId = self.get_city()
+            # obj.StateId = self.get_state()
+            obj.ProviderId = self.lab.id
+            obj.TypeId = 2
+            obj.PaymentType = self.payment_type if self.payment_type else None
+            obj.Payout = self.agreed_price
+        obj.PromoCost = max(0, promo_cost)
+        obj.GMValue = self.deal_price
+        obj.Category = category
+        obj.StatusId = self.status
+        obj.save()
+
+        try:
+            SyncBookingAnalytics.objects.update_or_create(object_id=self.id,
+                                                          content_type=ContentType.objects.get_for_model(LabAppointment),
+                                                          defaults={"synced_at": self.updated_at, "last_updated_at": self.updated_at})
+        except Exception as e:
+            pass
+
+        return obj
+
 
     def get_tests_and_prices(self):
         test_price = []
@@ -1576,6 +1676,7 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin)
                     if admin.user]
 
     def created_by_native(self):
+        from packaging.version import parse
         child_order = Order.objects.filter(reference_id=self.id).first()
         parent_order = None
         from_app = False
@@ -1587,7 +1688,7 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin)
             from_app = parent_order.visitor_info.get('from_app', False)
             app_version = parent_order.visitor_info.get('app_version', None)
 
-        if from_app and app_version and float(app_version) < float('1.2'):
+        if from_app and app_version and parse(app_version) < parse('1.2'):
             return True
         else:
             return False
@@ -1849,30 +1950,32 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin)
         self.status = self.ACCEPTED
         self.save()
 
+    def update_ivr_status(self, status):
+        if status == self.status:
+            return True, ""
+
+        if self.status in [LabAppointment.COMPLETED, LabAppointment.CANCELLED]:
+            return False, 'Appointment cannot be accepted as current status is %s' % str(self.status)
+
+        if status == LabAppointment.ACCEPTED:
+            # Constraints: Check if appointment can be accepted or not.
+            if self.time_slot_start < timezone.now():
+                return False, 'Appointment cannot be accepted as time slot has been expired'
+
+            self.action_accepted()
+
+        elif status == LabAppointment.COMPLETED:
+            self.action_completed()
+
+        return True, ""
+
     @transaction.atomic
     def action_cancelled(self, refund_flag=1):
-
-        # Taking Lock first
-        consumer_account = None
-        if self.payment_type == OpdAppointment.PREPAID:
-            temp_list = account_model.ConsumerAccount.objects.get_or_create(user=self.user)
-            consumer_account = account_model.ConsumerAccount.objects.select_for_update().get(user=self.user)
-
         old_instance = LabAppointment.objects.get(pk=self.id)
         if old_instance.status != self.CANCELLED:
             self.status = self.CANCELLED
             self.save()
-            product_id = account_model.Order.LAB_PRODUCT_ID
-
-            if self.payment_type == OpdAppointment.PREPAID and account_model.ConsumerTransaction.valid_appointment_for_cancellation(
-                    self.id, product_id):
-
-                wallet_refund, cashback_refund = self.get_cancellation_breakup()
-
-                consumer_account.credit_cancellation(self, account_model.Order.LAB_PRODUCT_ID, wallet_refund, cashback_refund)
-                if refund_flag:
-                    ctx_obj = consumer_account.debit_refund()
-                    account_model.ConsumerRefund.initiate_refund(self.user, ctx_obj)
+            self.action_refund(refund_flag)
 
     def get_cancellation_breakup(self):
         wallet_refund = cashback_refund = 0

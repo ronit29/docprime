@@ -27,8 +27,8 @@ class RatingsViewSet(viewsets.GenericViewSet):
     permission_classes = (IsAuthenticated, IsConsumer, IsNotAgent)
 
     def get_queryset(self):
-        return RatingsReview.objects.prefetch_related('compliment').filter(is_live=True, moderation_status__in=[RatingsReview.PENDING,
-                                                                                                                RatingsReview.APPROVED])
+        return RatingsReview.objects.prefetch_related('compliment').filter(is_live=True)
+
     def prompt_close(self, request):
         serializer = serializers.RatingPromptCloseBodySerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
@@ -57,25 +57,34 @@ class RatingsViewSet(viewsets.GenericViewSet):
         content_data = None
 
         if valid_data.get('appointment_type') == RatingsReview.OPD:
-            content_data = doc_models.OpdAppointment.objects.filter(id=valid_data.get('appointment_id')).first()
-            if content_data and content_data.status == doc_models.OpdAppointment.COMPLETED:
-                content_obj = content_data.doctor
+            if valid_data.get('appointment_id'):
+                content_data = doc_models.OpdAppointment.objects.filter(id=valid_data.get('appointment_id')).first()
+                if content_data and content_data.status == doc_models.OpdAppointment.COMPLETED:
+                    content_obj = content_data.doctor
+            else:
+                content_obj = doc_models.Doctor.objects.filter(id=valid_data.get('entity_id')).first()
+        elif valid_data.get('appointment_type') == RatingsReview.LAB:
+            if valid_data.get('appointment_id'):
+                content_data = lab_models.LabAppointment.objects.filter(id=valid_data.get('appointment_id')).first()
+                if content_data and content_data.status == lab_models.LabAppointment.COMPLETED:
+                    content_obj = content_data.lab
+            else:
+                content_obj = lab_models.Lab.objects.filter(id=valid_data.get('entity_id')).first()
         else:
-            content_data = lab_models.LabAppointment.objects.filter(id=valid_data.get('appointment_id')).first()
-            if content_data and content_data.status == lab_models.LabAppointment.COMPLETED:
-                content_obj = content_data.lab
+            content_obj = doc_models.Hospital.objects.filter(id=valid_data.get('entity_id')).first()
         if content_obj:
             try:
                 with transaction.atomic():
                     rating_review = RatingsReview(user=request.user, ratings=valid_data.get('rating'),
                                                   appointment_type=valid_data.get('appointment_type'),
-                                                  appointment_id=valid_data.get('appointment_id'),
-
-                                                  # review=valid_data.get('review'),
-                                                  content_object=content_obj)
+                                                  appointment_id=valid_data.get('appointment_id', None),
+                                                  is_live=True if valid_data.get('appointment_id') else False,
+                                                  content_object=content_obj,
+                                                  related_entity_id=valid_data.get('related_entity_id', None))
                     rating_review.save()
-                    content_data.is_rated = True
-                    content_data.save()
+                    if valid_data.get('appointment_id'):
+                        content_data.is_rated = True
+                        content_data.save()
 
             except Exception as e:
                 logger.error('Error Saving Appointment Rating ' + str(e))
@@ -108,14 +117,20 @@ class RatingsViewSet(viewsets.GenericViewSet):
         compliments_string= ''
         c_list = []
         cid_list = []
+        appointment_id = rating.appointment_id
         if rating.content_type == ContentType.objects.get_for_model(doc_models.Doctor):
             name = rating.content_object.get_display_name()
-            appointment = doc_models.OpdAppointment.objects.select_related('hospital').filter(id=rating.appointment_id).first()
-            if appointment:
-                address = appointment.hospital.get_hos_address()
-        else:
+            if appointment_id:
+                appointment = doc_models.OpdAppointment.objects.select_related('hospital').filter(id=rating.appointment_id).first()
+                if appointment:
+                    address = appointment.hospital.get_hos_address()
+        elif rating.content_type == ContentType.objects.get_for_model(lab_models.Lab):
             name = rating.content_object.name
             address = rating.content_object.get_lab_address()
+        else:
+            name = rating.content_object.name
+            address = rating.content_object.get_hos_address()
+
         for cm in rating.compliment.all():
             c_list.append(cm.message)
             cid_list.append(cm.id)
@@ -129,7 +144,8 @@ class RatingsViewSet(viewsets.GenericViewSet):
         rating_obj['date'] = rating.updated_at.strftime('%b %d, %Y')
         rating_obj['compliments'] = compliments_string
         rating_obj['compliments_list'] = cid_list
-        rating_obj['appointment_id'] = rating.appointment_id
+        rating_obj['appointment_id'] = appointment_id
+        rating_obj['entity_id'] = rating.object_id
         rating_obj['appointment_type'] = rating.appointment_type
         rating_obj['icon'] = request.build_absolute_uri(rating.content_object.get_thumbnail())
         return Response(rating_obj)
@@ -202,34 +218,74 @@ class AppRatingsViewSet(viewsets.GenericViewSet):
 class ListRatingViewSet(viewsets.GenericViewSet):
 
     def get_queryset(self):
-        return RatingsReview.objects.prefetch_related('compliment').filter(is_live=True,
-                                                                           moderation_status__in=[RatingsReview.PENDING,
-                                                                                                  RatingsReview.APPROVED])
+        return RatingsReview.objects.prefetch_related('compliment').filter(is_live=True)
+
+    def get_opd_ratings(self, valid_data):
+        queryset = self.get_queryset().exclude(Q(review='') | Q(review=None)) \
+            .filter(doc_ratings__id=valid_data.get('object_id')) \
+            .order_by('-updated_at')
+        graph_queryset = self.get_queryset().filter(doc_ratings__id=valid_data.get('object_id'))
+        appointment = doc_models.OpdAppointment.objects.select_related('profile').filter(
+            doctor_id=valid_data.get('object_id')).all()
+        return queryset, graph_queryset, appointment
+
+    def get_lab_ratings(self, valid_data):
+        lab = lab_models.Lab.objects.filter(id=valid_data.get('object_id')).first()
+        if lab and lab.network:
+            queryset = self.get_queryset().exclude(Q(review='') | Q(review=None)) \
+                .filter(lab_ratings__network=lab.network) \
+                .order_by('-updated_at')
+            graph_queryset = self.get_queryset().filter(lab_ratings__network=lab.network)
+            appointment = lab_models.LabAppointment.objects.select_related('profile').filter(
+                lab__network=lab.network).all()
+        else:
+            queryset = self.get_queryset().exclude(Q(review='') | Q(review=None)) \
+                .filter(lab_ratings__id=valid_data.get('object_id')) \
+                .order_by('-updated_at')
+            graph_queryset = self.get_queryset().filter(lab_ratings__id=valid_data.get('object_id'))
+            appointment = lab_models.LabAppointment.objects.select_related('profile').filter(
+                lab_id=valid_data.get('object_id')).all()
+        return queryset, graph_queryset, appointment
+
+    def get_hospital_ratings(self, valid_data):
+        object_id = valid_data.get('object_id')
+        hospital = doc_models.Hospital.objects.filter(id=object_id).first()
+        appointment = []
+        if hospital and hospital.network:
+            queryset = self.get_queryset().exclude(Q(review='') | Q(review=None)) \
+                .filter(Q(appointment_id__in=doc_models.OpdAppointment.objects.filter(hospital__network=hospital.network).values_list(
+                                       'id', flat=True), appointment_type=RatingsReview.OPD) |
+                        Q(related_entity_id=object_id, appointment_id__isnull=True)) \
+                .order_by('-updated_at')
+            graph_queryset = self.get_queryset().filter(Q(appointment_id__in=doc_models.OpdAppointment.objects.filter(hospital__network=hospital.network).values_list(
+                                       'id', flat=True), appointment_type=RatingsReview.OPD) |
+                        Q(related_entity_id=object_id, appointment_id__isnull=True)
+                        )
+        else:
+            queryset = self.get_queryset().exclude(Q(review='') | Q(review=None)) \
+                .filter(Q(appointment_id__in=doc_models.OpdAppointment.objects.filter(hospital_id=object_id).values_list(
+                                       'id', flat=True), appointment_type=RatingsReview.OPD) |
+                        Q(related_entity_id=object_id, appointment_id__isnull=True)
+                        ) \
+                .order_by('-updated_at')
+            graph_queryset = self.get_queryset().filter(Q(appointment_id__in=doc_models.OpdAppointment.objects.filter(hospital_id=object_id).values_list(
+                                       'id', flat=True), appointment_type=RatingsReview.OPD) |
+                        Q(related_entity_id=object_id, appointment_id__isnull=True)
+                        )
+
+        return queryset, graph_queryset, appointment
 
     def list(self, request):
         serializer = serializers.RatingListBodySerializerdata(data=request.query_params)
         serializer.is_valid(raise_exception=True)
         valid_data = serializer.validated_data
         if valid_data.get('content_type') == RatingsReview.OPD:
-            queryset = self.get_queryset().exclude(Q(review='') | Q(review=None))\
-                                          .filter(doc_ratings__id=valid_data.get('object_id'))\
-                                          .order_by('-updated_at')
-            graph_queryset = self.get_queryset().filter(doc_ratings__id=valid_data.get('object_id'))
-            appointment = doc_models.OpdAppointment.objects.select_related('profile').filter(doctor_id=valid_data.get('object_id')).all()
+            queryset, graph_queryset, appointment = self.get_opd_ratings(valid_data)
+        elif valid_data.get('content_type') == RatingsReview.LAB:
+            queryset, graph_queryset, appointment = self.get_lab_ratings(valid_data)
         else:
-            lab = lab_models.Lab.objects.filter(id=valid_data.get('object_id')).first()
-            if lab and lab.network:
-                queryset = self.get_queryset().exclude(Q(review='') | Q(review=None)) \
-                    .filter(lab_ratings__network=lab.network) \
-                    .order_by('-updated_at')
-                graph_queryset = self.get_queryset().filter(lab_ratings__network=lab.network)
-                appointment = lab_models.LabAppointment.objects.select_related('profile').filter(lab__network=lab.network).all()
-            else:
-                queryset = self.get_queryset().exclude(Q(review='') | Q(review=None))\
-                                              .filter(lab_ratings__id=valid_data.get('object_id'))\
-                                              .order_by('-updated_at')
-                graph_queryset = self.get_queryset().filter(lab_ratings__id=valid_data.get('object_id'))
-                appointment = lab_models.LabAppointment.objects.select_related('profile').filter(lab_id=valid_data.get('object_id')).all()
+            queryset, graph_queryset, appointment = self.get_hospital_ratings(valid_data)
+
         queryset = paginate_queryset(queryset, request)
         body_serializer = serializers.RatingsModelSerializer(queryset, many=True, context={'request': request,
                                                                                            'app': appointment})

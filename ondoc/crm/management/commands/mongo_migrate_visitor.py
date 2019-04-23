@@ -51,7 +51,7 @@ class Command(BaseCommand):
         total_migrated = 0
         # storing events
         try:
-            for visitors in VisitorMigrateIterator(720, 6):
+            for visitors in VisitorMigrateIterator(240, 30):
                 create_objects = []
                 mongo_visitors = track_mongo_models.TrackingVisitor.objects.filter(id__in=[ x.id for x in visitors ]).values_list('id')
                 psql_visitors = visitors.exclude(id__in=mongo_visitors)
@@ -73,7 +73,7 @@ class Command(BaseCommand):
         except StopIteration:
             pass
         except Exception as e:
-            print("FAILED TO MIGRATE VISITORS ")
+            print("FAILED TO MIGRATE VISITORS "+str(e))
             return
 
         print("DONE MIGRATING VISITORS")

@@ -11,7 +11,8 @@ from django.conf import settings
 from django.utils.dateparse import parse_datetime
 from ondoc.authentication.models import Merchant, AssociatedMerchant, QCModel
 from ondoc.account.models import MerchantPayout
-from ondoc.common.models import Cities, MatrixCityMapping, PaymentOptions, Remark, MatrixMappedCity, MatrixMappedState, GlobalNonBookable
+from ondoc.common.models import Cities, MatrixCityMapping, PaymentOptions, Remark, MatrixMappedCity, MatrixMappedState, \
+    GlobalNonBookable, UserConfig
 from import_export import resources, fields
 from import_export.admin import ImportMixin, base_formats, ImportExportMixin, ImportExportModelAdmin, ExportMixin
 from reversion.admin import VersionAdmin
@@ -99,6 +100,24 @@ class QCPemAdmin(admin.ModelAdmin):
 
     class Meta:
         abstract = True
+
+
+class RefundableAppointmentForm(forms.ModelForm):
+    refund_payment = forms.BooleanField(required=False)
+    refund_reason = forms.CharField(widget=forms.Textarea,required=False)
+
+    def clean(self):
+        super().clean()
+        cleaned_data = self.cleaned_data
+        refund_payment = cleaned_data.get('refund_payment')
+        refund_reason = cleaned_data.get('refund_reason')
+        if refund_payment:
+            if not refund_reason:
+                raise forms.ValidationError("Refund reason is compulsory")
+            if self.instance and not self.instance.status == self.instance.COMPLETED:
+                raise forms.ValidationError("Refund can be processed after Completion")
+        # TODO : No refund should already be in process
+        return cleaned_data
 
 
 class FormCleanMixin(forms.ModelForm):
@@ -595,8 +614,23 @@ class MatrixMappedCityResource(resources.ModelResource):
         fields = ('id', 'name', 'state_id')
 
 
+class MatrixMappedCityAdminForm(forms.ModelForm):
+    def clean(self):
+        super().clean()
+        if any(self.errors):
+            return
+        cleaned_data = self.cleaned_data
+        state = cleaned_data.get('state', None)
+        city_name = cleaned_data.get('name', '')
+        if not state:
+            raise forms.ValidationError("State is required.")
+        if state and city_name:
+            if MatrixMappedCity.objects.filter(name__iexact=city_name.strip(), state=state).exists():
+                raise forms.ValidationError("City-State combination already exists.")
+
 
 class MatrixMappedCityAdmin(ImportMixin, admin.ModelAdmin):
+    form = MatrixMappedCityAdminForm
     formats = (base_formats.XLS, base_formats.XLSX,)
     list_display = ('name', 'state')
     readonly_fields = ('name', 'state', )
@@ -607,6 +641,7 @@ class MatrixMappedCityAdmin(ImportMixin, admin.ModelAdmin):
         if not request.user.is_superuser and not request.user.groups.filter(name=constants['SUPER_QC_GROUP']).exists():
             return super().get_readonly_fields(request, obj)
         return ()
+
 
 class MatrixStateAutocomplete(autocomplete.Select2QuerySetView):
 
@@ -632,3 +667,7 @@ class MatrixCityAutocomplete(autocomplete.Select2QuerySetView):
 
         return queryset
 
+
+class UserConfigAdmin(admin.ModelAdmin):
+    model = UserConfig
+    list_display = ('key',)

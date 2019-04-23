@@ -693,7 +693,7 @@ class DoctorForm(FormCleanMixin):
     def validate_qc(self):
         qc_required = {'name': 'req', 'gender': 'req',
                        # 'practicing_since': 'req',
-                       'emails': 'count',
+                       # 'emails': 'count',
                        'doctor_clinics': 'count', 'languages': 'count',
                        'doctorpracticespecializations': 'count', 'matrix_lead_id': 'value_req'}
 
@@ -1419,7 +1419,7 @@ class TimePickerWidget(forms.TextInput):
         return mark_safe(u''.join(htmlString))
 
 
-class DoctorOpdAppointmentForm(forms.ModelForm):
+class DoctorOpdAppointmentForm(RefundableAppointmentForm):
 
     start_date = forms.DateField(widget=CustomDateInput(format=('%d-%m-%Y'), attrs={'placeholder':'Select a date'}))
     start_time = forms.CharField(widget=TimePickerWidget())
@@ -1452,7 +1452,7 @@ class DoctorOpdAppointmentForm(forms.ModelForm):
         else:
             raise forms.ValidationError("Doctor and hospital details not entered.")
 
-        if self.instance.status in [OpdAppointment.CANCELLED, OpdAppointment.COMPLETED] and len(cleaned_data):
+        if self.instance.status in [OpdAppointment.CANCELLED, OpdAppointment.COMPLETED] and 'status' in cleaned_data:
             raise forms.ValidationError("Cancelled/Completed appointment cannot be modified.")
 
         if not cleaned_data.get('status') is OpdAppointment.CANCELLED and (cleaned_data.get(
@@ -1475,7 +1475,7 @@ class DoctorOpdAppointmentForm(forms.ModelForm):
                                                      start__lte=hour, end__gt=hour).exists():
                 raise forms.ValidationError("Doctor do not sit at the given hospital in this time slot.")
 
-        if cleaned_data.get('status') and cleaned_data.get('status') == OpdAppointment.COMPLETED:
+        if cleaned_data.get('status') and cleaned_data.get('status') == OpdAppointment.COMPLETED and self.instance and self.instance.status != OpdAppointment.COMPLETED:
             if self.instance and self.instance.id and not self.instance.status == OpdAppointment.ACCEPTED:
                 raise forms.ValidationError("Can only complete appointment if it is in accepted state.")
             if not cleaned_data.get('custom_otp') == self.instance.otp:
@@ -1567,12 +1567,15 @@ class DoctorOpdAppointmentAdmin(admin.ModelAdmin):
                 'fees', 'effective_price', 'mrp', 'deal_price', 'payment_status',
                 'payment_type', 'admin_information', 'insurance', 'outstanding',
                 'status', 'cancel_type', 'cancellation_reason', 'cancellation_comments',
-                'start_date', 'start_time', 'invoice_urls', 'payment_type', 'payout_info')
+                'start_date', 'start_time', 'invoice_urls', 'payment_type', 'payout_info', 'refund_initiated')
         if request.user.groups.filter(name=constants['APPOINTMENT_OTP_TEAM']).exists() or request.user.is_superuser:
             all_fields = all_fields + ('otp',)
-        # if obj and obj.id and obj.status == OpdAppointment.ACCEPTED:
-        #     all_fields = all_fields + ('custom_otp',)
-        all_fields = all_fields + ('custom_otp',)
+
+        if obj and obj.can_agent_refund(request.user):
+            all_fields = all_fields + ('refund_payment', 'refund_reason')
+
+        if obj and obj.id and obj.status == OpdAppointment.ACCEPTED:
+            all_fields = all_fields + ('custom_otp',)
 
         return all_fields
         # else:
@@ -1589,12 +1592,17 @@ class DoctorOpdAppointmentAdmin(admin.ModelAdmin):
                      'default_profile_number', 'user_id', 'user_number', 'booked_by',
                      'fees', 'effective_price', 'mrp', 'deal_price', 'payment_status', 'payment_type',
                      'admin_information', 'insurance', 'outstanding', 'procedures_details', 'invoice_urls',
-                     'payment_type', 'invoice_urls', 'payout_info')
+                     'payment_type', 'invoice_urls', 'payout_info', 'refund_initiated')
+        if obj and (obj.status == LabAppointment.COMPLETED or obj.status == LabAppointment.CANCELLED):
+            read_only += ('status',)
         if request.user.groups.filter(name=constants['APPOINTMENT_OTP_TEAM']).exists() or request.user.is_superuser:
             read_only = read_only + ('otp',)
         return read_only
         # else:
         #     return ('invoice_urls')
+
+    def refund_initiated(self, obj):
+        return bool(obj.has_app_consumer_trans())
 
     def payout_info(self, obj):
         return MerchantPayout.get_merchant_payout_info(obj)
@@ -1611,7 +1619,6 @@ class DoctorOpdAppointmentAdmin(admin.ModelAdmin):
                                     url))
             return response
         return ''
-
 
     def invoice_urls(self, instance):
         invoices_urls = ''
@@ -1778,8 +1785,11 @@ class DoctorOpdAppointmentAdmin(admin.ModelAdmin):
                     logger.warning("Admin Cancel started - " + str(obj.id) + " timezone - " + str(timezone.now()))
                     obj.action_cancelled(cancel_type)
                     logger.warning("Admin Cancel completed - " + str(obj.id) + " timezone - " + str(timezone.now()))
-            elif request.POST.get('status') and int(request.POST['status']) == OpdAppointment.COMPLETED:
-                    obj.action_completed()
+            elif request.POST.get('status') and int(request.POST['status']) == OpdAppointment.COMPLETED and opd_obj and opd_obj.status != OpdAppointment.COMPLETED:
+                obj.action_completed()
+            if form and form.cleaned_data and form.cleaned_data.get('refund_payment', False):
+                obj._refund_reason = form.cleaned_data.get('refund_reason', '')
+                obj.action_refund()
             else:
                 super().save_model(request, obj, form, change)
 
