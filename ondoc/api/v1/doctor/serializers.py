@@ -515,7 +515,8 @@ class DoctorHospitalSerializer(serializers.ModelSerializer):
         doctor_clinic = obj.doctor_clinic
         doctor = doctor_clinic.doctor
         hospital = doctor_clinic.hospital
-        enabled_for_online_booking = doctor_clinic.enabled_for_online_booking and doctor.enabled_for_online_booking and hospital.enabled_for_online_booking
+        enabled_for_online_booking = doctor_clinic.enabled_for_online_booking and doctor.enabled_for_online_booking and \
+                                     doctor.is_doctor_specialization_insured() and hospital.enabled_for_online_booking
 
         if hospital.enabled_for_prepaid and obj.mrp is not None and resp['insurance_threshold_amount'] is not None and obj.mrp <= resp['insurance_threshold_amount'] and enabled_for_online_booking and \
                 not (request.query_params.get('procedure_ids') or request.query_params.get('procedure_category_ids')) and doctor.is_enabled_for_insurance:

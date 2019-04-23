@@ -937,7 +937,7 @@ class UserInsurance(auth_model.TimeStampedModel):
                     insurance_id = None
                     insurance_message = "Procedure Not covered under insurance"
         doctor = appointment_data['doctor']
-        if not doctor.is_insurance_enabled:
+        if not doctor.is_insurance_enabled or not doctor.is_doctor_specialization_insured():
             is_insured = False
             insurance_id = None
             insurance_message = ""

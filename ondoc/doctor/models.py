@@ -925,6 +925,18 @@ class Doctor(auth_model.TimeStampedModel, auth_model.QCModel, SearchKey, auth_mo
         sticker.save()
         return sticker
 
+    def is_doctor_specialization_insured(self):
+        doctor_specializations = DoctorPracticeSpecialization.objects.filter(doctor=self).values_list('specialization_id', flat=True)
+        if not doctor_specializations:
+            return False
+        for specialization in doctor_specializations:
+            practice_specialization = PracticeSpecialization.objects.filter(id=specialization).first()
+            if not practice_specialization:
+                return False
+            if not practice_specialization.is_insurance_enabled:
+                return False
+        return True
+
     class Meta:
         db_table = "doctor"
 
@@ -2746,6 +2758,7 @@ class PracticeSpecialization(auth_model.TimeStampedModel, SearchKey):
                                             null=True, blank=True)
     synonyms = models.CharField(max_length=4000, null=True, blank=True)
     doctor_count = models.PositiveIntegerField(default=0, null=True)
+    is_insurance_enabled = models.BooleanField(default=True)
 
     class Meta:
         db_table = 'practice_specialization'
