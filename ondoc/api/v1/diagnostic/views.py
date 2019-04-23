@@ -232,6 +232,10 @@ class LabList(viewsets.ReadOnlyModelViewSet):
                 valid_package_ids = []
             valid_package_ids.extend(package_ids)
 
+        if not valid_package_ids and valid_package_ids is not None:
+            valid_package_ids = [-1]
+
+
         package_search_query = 'select x.*, CASE WHEN "x"."custom_deal_price" IS not NULL THEN "x"."custom_deal_price"'\
                                ' else computed_deal_price END AS "price", ST_Distance(St_setsrid(St_point((%(longitude)s), (%(latitude)s)), 4326), x.location) as distance from '\
                                ' (SELECT "lab_test"."id", "lab_test"."name","lab_test"."why","lab_test"."pre_test_info",' \
