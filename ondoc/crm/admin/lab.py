@@ -32,7 +32,7 @@ from ondoc.diagnostic.models import (LabTiming, LabImage,
                                      TestParameter, ParameterLabTest, FrequentlyAddedTogetherTests, QuestionAnswer,
                                      LabReport, LabReportFile, LabTestCategoryMapping,
                                      LabTestRecommendedCategoryMapping, LabTestGroupTiming, LabTestGroupMapping,
-                                     TestParameterChat)
+                                     TestParameterChat, LabTestThresholds)
 from ondoc.integrations.models import IntegratorHistory
 from ondoc.notification.models import EmailNotification, NotificationAction
 from .common import *
@@ -1377,11 +1377,23 @@ class LabTestAdminForm(forms.ModelForm):
                 raise forms.ValidationError('Please dont enter reference code for a test')
 
 
+class LabTestReportThresholdInline(AutoComplete, TabularInline):
+    model = LabTestThresholds
+    formfield_overrides = {
+        models.TextField: {'widget': forms.Textarea(attrs={'rows': 6, 'cols': 20})},
+    }
+    fk_name = 'lab_test'
+    extra = 0
+    can_delete = True
+    autocomplete_fields = ['lab_test']
+    # formset = LabTestToParentCategoryInlineFormset
+
+
 class LabTestAdmin(ImportExportMixin, VersionAdmin):
     form = LabTestAdminForm
     change_list_template = 'superuser_import_export.html'
     formats = (base_formats.XLS, base_formats.XLSX,)
-    inlines = [LabTestCategoryInline, LabTestRecommendedCategoryInline, FAQLabTestInLine, FrequentlyBookedTogetherTestInLine]
+    inlines = [LabTestCategoryInline, LabTestRecommendedCategoryInline, FAQLabTestInLine, FrequentlyBookedTogetherTestInLine, LabTestReportThresholdInline]
     search_fields = ['name']
     list_filter = ('is_package', 'enable_for_ppc', 'enable_for_retail')
     exclude = ['search_key']

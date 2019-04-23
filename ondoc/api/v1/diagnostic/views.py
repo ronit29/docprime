@@ -2624,3 +2624,15 @@ class LabTestCategoryListViewSet(viewsets.GenericViewSet):
                 resp['tests'] = temp_tests
                 empty.append(resp)
         return Response(empty)
+
+
+class DigitalReports(viewsets.GenericViewSet):
+
+    def retrieve(self, request, booking_id=None):
+        appointment_obj = LabAppointment.objects.filter(id=booking_id).first()
+        if not appointment_obj:
+            return Response(status=status.HTTP_400_BAD_REQUEST, data={'error': 'Invalid booking_id.'})
+
+        booked_tests = appointment_obj.test_mappings.all()
+
+        return Response()

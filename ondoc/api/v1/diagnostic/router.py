@@ -1,7 +1,7 @@
 from django.urls import path
 from .views import (LabTestList, LabList, LabAppointmentView, SearchPageViewSet, LabTimingListView,
                     AvailableTestViewSet, LabReportFileViewset, DoctorLabAppointmentsViewSet,
-                    DoctorLabAppointmentsNoAuthViewSet, TestDetailsViewset, LabTestCategoryListViewSet)
+                    DoctorLabAppointmentsNoAuthViewSet, TestDetailsViewset, LabTestCategoryListViewSet, DigitalReports)
 
 # from rest_framework.routers import DefaultRouter
 #
@@ -54,4 +54,5 @@ urlpatterns = [
     path('test/details_by_url', TestDetailsViewset.as_view({'get': 'retrieve_test_by_url'}), name='test-details-by-url'),
     path('test/list_by_alphabet', TestDetailsViewset.as_view({'get':'list_by_alphabet'}), name='list-test-by-alphabet'),
     path('test/category', LabTestCategoryListViewSet.as_view({'get': 'list'}), name='test-category'),
+    path('digital/report/<int:booking_id>', DigitalReports.as_view({'get': 'retrieve'}), name='digital_report')
 ]
