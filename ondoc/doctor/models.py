@@ -857,7 +857,8 @@ class Doctor(auth_model.TimeStampedModel, auth_model.QCModel, SearchKey, auth_mo
         #     return
 
         thumbnail = self.images.exclude(cropped_image__isnull=True).exclude(cropped_image__exact='').first()
-
+        if not thumbnail:
+            return
         qrcode = self.qr_code.all().first()
         # for qrcode in self.qr_code.all():
         #     if qrcode:
