@@ -4,7 +4,10 @@ from ondoc.doctor.models import SPOCDetails
 from ondoc.diagnostic.models import LabAppointment, Hospital
 from ondoc.authentication.models import GenericAdmin
 from ondoc.matrix.tasks import create_or_update_lead_on_matrix
-from django.db.models import Q
+from django.db.models import Q, F, IntegerField, ExpressionWrapper, CharField
+from django.db.models.functions import Cast
+import logging
+logger = logging.getLogger(__name__)
 
 
 class Command(BaseCommand):
@@ -12,14 +15,24 @@ class Command(BaseCommand):
 
     def handle(self, *args, **options):
 
-        for spoc in SPOCDetails.objects.all():
-            try:
-                if spoc.content_type == ContentType.objects.get_for_model(Hospital) and not GenericAdmin.objects.filter(
-                        Q(phone_number=str(spoc.number), hospital=spoc.content_object),
-                        Q(permission_type=GenericAdmin.APPOINTMENT) | Q(
-                            super_user_permission=True)):
-                    generic_admin = GenericAdmin(phone_number=str(spoc.number), hospital=spoc.content_object,
-                                                 permission_type=GenericAdmin.APPOINTMENT, auto_created_from_SPOCs=True)
-                    generic_admin.save()
-            except Exception as e:
-                print("Some error occured for SPOC with ID-{}. ERROR :: {}".format(spoc.id, str(e)))
+        all_spocs = SPOCDetails.objects.all()
+        all_spocs_hospitals = all_spocs.filter(content_type=ContentType.objects.get_for_model(Hospital))
+        spocs_with_admins = SPOCDetails.objects.prefetch_related('content_object', 'content_object__manageable_hospitals').annotate(
+            chr_number=Cast('number', CharField())).filter(content_type=ContentType.objects.get_for_model(Hospital),
+                                                           hospital_spocs__manageable_hospitals__phone_number=F(
+                                                               'chr_number')).filter(
+            Q(hospital_spocs__manageable_hospitals__permission_type=GenericAdmin.APPOINTMENT) | Q(
+                hospital_spocs__manageable_hospitals__super_user_permission=True))
+        spocs_without_admins = all_spocs_hospitals.exclude(
+            Q(id__in=spocs_with_admins) | Q(number__isnull=True) | Q(number__lt=1000000000) | Q(number__gt=9999999999)).values('name', 'number',
+                                                                                                    'hospital_spocs')
+        admins_to_be_created = list()
+        for spoc in spocs_without_admins:
+            admins_to_be_created.append(
+                GenericAdmin(name=spoc['name'], phone_number=str(spoc['number']), hospital_id=spoc['hospital_spocs'],
+                             permission_type=GenericAdmin.APPOINTMENT, auto_created_from_SPOCs=True))
+        try:
+            GenericAdmin.objects.bulk_create(admins_to_be_created)
+        except Exception as e:
+            logger.error(str(e))
+            print("Error while bulk creating SPOCs. ERROR :: {}".format(str(e)))

@@ -66,6 +66,7 @@ from django.db.models.expressions import Window
 from django.db.models.functions import RowNumber
 from django.db.models import Avg
 from django.db.models.expressions import RawSQL
+from ondoc.doctor.v1.serializers import ArticleAuthorSerializer
 User = get_user_model()
 
 
@@ -2449,6 +2450,7 @@ class TestDetailsViewset(viewsets.GenericViewSet):
         if not queryset:
             return Response([])
         final_result = []
+        test_queryset = queryset[0]
         for data in queryset:
             result = {}
             result['name'] = data.name
@@ -2519,17 +2521,50 @@ class TestDetailsViewset(viewsets.GenericViewSet):
         kwargs['test_flag'] = 1
 
         result['labs'] = lab.search(request, **kwargs)
-        seo = dict()
-        seo['description'] = None
-        if queryset:
-            seo['title'] = queryset[0].name + ' Test: Types, Procedure & Normal Range of Results'
-        else:
-            seo['title'] = None
 
+        seo = dict()
+        author = None
+
+        if test_queryset.name:
+            seo['title'] = test_queryset.name + '  - Cost & Normal Range of Results'
+            seo['description'] = 'Book ' + test_queryset.name + ' @50% off. Free Sample Collection. Know what is ' \
+                                 + test_queryset.name + ', Price, Normal Range, ' + test_queryset.name + ' Results, Procedure & Preparation.'
+        else:
+            seo = None
         result['seo'] = seo
+        result['breadcrumb'] = list()
+
+        result['breadcrumb'].append({"title": "Home", "url": "/"})
+
+        if test_queryset.name and test_queryset.url:
+            result['breadcrumb'].append({"title": test_queryset.name, "url": test_queryset.url})
+
+        result['canonical_url'] = test_queryset.url if test_queryset.url else None
+
+        if test_queryset.author:
+            serializer = ArticleAuthorSerializer(test_queryset.author, context={'request': request})
+            author = serializer.data
+        result['author'] = author
+        result['published_date'] = '{:%d-%m-%Y}'.format(test_queryset.created_at.date()) if test_queryset.created_at else None
+        result['last_updated_date'] = '{:%d-%m-%Y}'.format(test_queryset.created_at.date()) if test_queryset.updated_at else None
         final_result.append(result)
 
         return Response(final_result)
+
+    def list_by_alphabet(self, request):
+        alphabet = request.GET.get('alphabet')
+        if not alphabet:
+            return Response(status=status.HTTP_404_NOT_FOUND)
+        response = {}
+        tests_count = 0
+
+        tests = list(LabTest.objects.filter(enable_for_retail=True, name__istartswith=alphabet).order_by('name').values('id', 'name', 'url'))
+        if tests:
+            tests_count = len(tests)
+        response['count'] = tests_count
+        response['tests'] = tests
+
+        return Response(response)
 
 
 class LabTestCategoryListViewSet(viewsets.GenericViewSet):
