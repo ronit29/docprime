@@ -253,6 +253,14 @@ class AvailableLabTestPackageSerializer(serializers.ModelSerializer):
     insurance = serializers.SerializerMethodField()
     hide_price = serializers.ReadOnlyField(source='test.hide_price')
     included_in_user_plan = serializers.SerializerMethodField()
+    is_price_zero = serializers.SerializerMethodField()
+
+    def get_is_price_zero(self, obj):
+        agreed_price = obj.computed_agreed_price if obj.custom_agreed_price is None else obj.custom_agreed_price
+        if agreed_price and agreed_price==0:
+            return True
+        else:
+            return False
 
     def get_included_in_user_plan(self, obj):
         package_free_or_not_dict = self.context.get('package_free_or_not_dict', {})
@@ -348,7 +356,7 @@ class AvailableLabTestPackageSerializer(serializers.ModelSerializer):
         model = AvailableLabTest
         fields = ('test_id', 'mrp', 'test', 'agreed_price', 'deal_price', 'enabled', 'is_home_collection_enabled',
                   'package', 'parameters', 'is_package', 'number_of_tests', 'why', 'pre_test_info', 'expected_tat',
-                  'hide_price', 'included_in_user_plan', 'insurance')
+                  'hide_price', 'included_in_user_plan', 'insurance', 'is_price_zero')
 
 class AvailableLabTestSerializer(serializers.ModelSerializer):
     test = LabTestSerializer()
@@ -359,6 +367,14 @@ class AvailableLabTestSerializer(serializers.ModelSerializer):
     insurance = serializers.SerializerMethodField()
     is_package = serializers.SerializerMethodField()
     included_in_user_plan = serializers.SerializerMethodField()
+    is_price_zero = serializers.SerializerMethodField()
+
+    def get_is_price_zero(self, obj):
+        agreed_price = obj.computed_agreed_price if obj.custom_agreed_price is None else obj.custom_agreed_price
+        if agreed_price and agreed_price == 0:
+            return True
+        else:
+            return False
 
     def get_included_in_user_plan(self, obj):
         package_free_or_not_dict = self.context.get('package_free_or_not_dict', {})
@@ -410,7 +426,7 @@ class AvailableLabTestSerializer(serializers.ModelSerializer):
     class Meta:
         model = AvailableLabTest
         fields = ('test_id', 'mrp', 'test', 'agreed_price', 'deal_price', 'enabled', 'is_home_collection_enabled',
-                  'insurance', 'is_package', 'included_in_user_plan')
+                  'insurance', 'is_package', 'included_in_user_plan', 'is_price_zero')
 
     def get_is_package(self, obj):
         return obj.test.is_package

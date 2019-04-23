@@ -205,7 +205,8 @@ class CartViewSet(viewsets.GenericViewSet):
                     "coupon_discount" : price_data["coupon_discount"],
                     "coupon_cashback" : price_data["coupon_cashback"],
                     "home_pickup_charges" : price_data.get("home_pickup_charges", 0),
-                    "consultation" : price_data.get("consultation", None)
+                    "consultation" : price_data.get("consultation", None),
+                    "is_price_zero": True if price_data['fees'] and price_data['fees']==0 else False
                 })
             except Exception as e:
                 # error = custom_exception_handler(e, None)
