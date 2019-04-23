@@ -2534,7 +2534,7 @@ class TestDetailsViewset(viewsets.GenericViewSet):
         result['seo'] = seo
         result['breadcrumb'] = list()
         result['breadcrumb'].append({"title": "Home", "url": "/"})
-        result['breadcrumb'].append({"title": "Tests", "url": request.build_absolute_uri("/tests")})
+        result['breadcrumb'].append({"title": "Tests", "url": "/tests"})
 
         if test_queryset.name and test_queryset.url:
             result['breadcrumb'].append({"title": test_queryset.name, "url": test_queryset.url})
