@@ -193,6 +193,9 @@ class UserConfig(TimeStampedModel):
     key = models.CharField(max_length=500, unique=True)
     data = JSONField(blank=True, null=True)
 
+    def __str__(self):
+        return "{}".format(self.id)
+
     class Meta:
         db_table = 'user_config'
 

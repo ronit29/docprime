@@ -197,7 +197,7 @@ class Hospital(auth_model.TimeStampedModel, auth_model.CreatedByModel, auth_mode
     assigned_to = models.ForeignKey(auth_model.User, null=True, blank=True, on_delete=models.SET_NULL, related_name='assigned_hospital')
     billing_merchant = GenericRelation(auth_model.BillingAccount)
     entity = GenericRelation(location_models.EntityLocationRelationship)
-    spoc_details = GenericRelation(auth_model.SPOCDetails)
+    spoc_details = GenericRelation(auth_model.SPOCDetails, related_query_name='hospital_spocs')
     enabled = models.BooleanField(verbose_name='Is Enabled', default=True, blank=True)
     source = models.CharField(max_length=20, blank=True)
     batch = models.CharField(max_length=20, blank=True)
