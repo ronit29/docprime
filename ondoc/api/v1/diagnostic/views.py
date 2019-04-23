@@ -375,7 +375,7 @@ class LabList(viewsets.ReadOnlyModelViewSet):
                                                              'package_free_or_not_dict': package_free_or_not_dict})
 
         category_to_be_shown_in_filter_ids = set()
-        category_queryset = LabTestCategory.objects.filter(is_package_category=True).order_by('-priority')
+        category_queryset = LabTestCategory.objects.filter(is_package_category=True, is_live=True).order_by('-priority')
         category_result = []
         for category in category_queryset:
             name = category.name
