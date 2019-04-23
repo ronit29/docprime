@@ -464,7 +464,7 @@ class UserProfileViewSet(mixins.CreateModelMixin, mixins.ListModelMixin,
             UserProfile.objects.filter(user=obj.user).update(is_default_user=False)
         else:
             primary_profile = UserProfile.objects.filter(user=obj.user, is_default_user=True).first()
-            if not primary_profile:
+            if not primary_profile or obj.id == primary_profile.id:
                 return Response({
                     "request_errors": {"code": "invalid",
                                        "message": "Atleast one profile should be selected as primary."
