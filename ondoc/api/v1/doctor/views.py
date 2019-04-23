@@ -6,6 +6,7 @@ from django.contrib.gis.db.models.functions import Distance
 from django.contrib.gis.measure import D
 
 from ondoc.api.v1.auth.serializers import UserProfileSerializer
+from ondoc.api.v1.doctor.city_match import city_match
 from ondoc.api.v1.doctor.serializers import HospitalModelSerializer, AppointmentRetrieveDoctorSerializer, \
     OfflinePatientSerializer
 from ondoc.api.v1.doctor.DoctorSearchByHospitalHelper import DoctorSearchByHospitalHelper
@@ -1196,7 +1197,8 @@ class SearchedItemsViewSet(viewsets.GenericViewSet):
     def common_conditions(self, request):
         city = None
         if request.query_params and request.query_params.get('city'):
-            city = request.query_params.get('city')
+            city = city_match(request.query_params.get('city'))
+
         spec_urls = dict()
         count = request.query_params.get('count', 10)
         count = int(count)
