@@ -6,18 +6,33 @@
 		<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
 		<link href="https://fonts.googleapis.com/css?family=Quicksand:400,700" rel="stylesheet">
 	</head>
+	<style>
+		@page{
+		margin:20px;
+		}
+		@media print{
+			footer {
+				left:0;
+				position:fixed;
+			}
+			header {
+				left:0;
+				position:fixed;
+			}
+		}
+	</style>
 	<body style="margin: 0; padding: 0;font-family: 'Quicksand', sans-serif;">
 		<table align="center" border="0" cellpadding="0" cellspacing="0" width="600" style="border-collapse: collapse; background: #ffffff;">
 			<tr>
 				<td>
 					<table border="0" cellpadding="0" cellspacing="0" width="600" style="padding: 10px;">
 						<tr valign="top">
-							<td style="width: 300px;">
+							<td style="width: 200px;">
 								<p style="margin: 0px; color: #000000; font-size:18px; font-weight: 700; padding-bottom: 10px;">Invoice to:</p>
 								<p style="margin: 0px; color: #000000; font-size:14px; ">{{patient_name}}<br>
 								    {% if patient_phone_number %} {{patient_phone_number}} {% endif %} </p>
 							</td>
-							<td style="width: 300px; text-align: right;">
+							<td style="width: 400px; text-align: right;">
 								<p style="margin: 0px; color: #000000; font-size:18px;font-weight: 700;  padding-bottom: 10px;">Invoice No: {{invoice_serial_id}}</p>
 								<p style="margin: 0px; color: #000000; font-size:14px; ">Invoice Dated: {{updated_at}} <br>
 									Payment Status: {{payment_status}} <br>
@@ -35,8 +50,8 @@
 							<td>
 								<p style="margin: 0px; color: #000000; font-size:18px; font-weight: 700; padding-bottom: 10px;">Bill to:</p>
 								<p style="margin: 0px; color: #000000; font-size:14px; ">{{doctor_name}} <br>
-									{{hospital_address}} <br>
-								    {{doctor_phone_number}} </p>
+									{{hospital_name}} <br>
+								    {% if doctor_phone_number %}{{doctor_phone_number}}{% endif %} </p>
 							</td>
 						</tr>
 					</table>
@@ -80,7 +95,7 @@
 						</thead>
 						<tbody>
 							<tr>
-                                <td style="text-align: center; font-size: 14px;padding-top: 10px; padding-bottom: 10px;  text-align: left; padding-left: 10px;"> Consultation Fees </td>
+                                <td style="text-align: center; font-size: 14px;padding-top: 10px; padding-bottom: 10px;  text-align: left; padding-left: 10px;"> Consultation Fee </td>
                                 <td style="text-align: center; font-size: 14px;padding-top: 10px; padding-bottom: 10px; ">{{consultation_fees}}</td>
                                 <td style="text-align: center; font-size: 14px;padding-top: 10px; padding-bottom: 10px; "> - </td>
 								<td style="text-align: center; font-size: 14px;padding-top: 10px; padding-bottom: 10px; "> - </td>

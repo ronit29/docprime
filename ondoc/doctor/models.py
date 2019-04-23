@@ -3259,6 +3259,7 @@ class PartnersAppInvoice(auth_model.TimeStampedModel):
             context["payment_status"] = "Pending"
             context["due_date"] = self.due_date
         context["doctor_name"] = self.appointment.doctor.name
+        context["hospital_name"] = self.appointment.hospital.name
         context["hospital_address"] = self.appointment.hospital.get_hos_address()
         doctor_number = self.appointment.doctor.doctor_number.first()
         if doctor_number:

@@ -846,7 +846,7 @@ class PartnersAppInvoice(viewsets.GenericViewSet):
             invoice_obj.is_invoice_generated = True
             context = invoice_obj.get_context(selected_invoice_items)
             content = render_to_string("email/partners_invoice/body.html", context=context)
-            filename = appointment.user.name + ' ' + invoice_obj.invoice_serial_id + '.pdf'
+            filename = (appointment.user.name + ' ' + invoice_obj.invoice_serial_id + '.pdf').replace(' ', '_')
             file = v1_utils.html_to_pdf(content, filename)
 
             invoice_obj.file = file
