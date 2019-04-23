@@ -460,7 +460,8 @@ class UserProfileViewSet(mixins.CreateModelMixin, mixins.ListModelMixin,
                                        "message": "Profile cannot be changed which are covered under insurance."
                                        }
                 }, status=status.HTTP_400_BAD_REQUEST)
-
+        if data.get('is_default_user', None):
+            UserProfile.objects.filter(user=obj.user).update(is_default_user=False)
         serializer.save()
         return Response(serializer.data)
 
