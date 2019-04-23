@@ -283,21 +283,28 @@ class LabList(viewsets.ReadOnlyModelViewSet):
         params['min_distance'] = str(min_distance)
         params['max_distance'] = str(max_distance)
         if min_price:
-            filter_query += ' case when custom_deal_price is not null then custom_deal_price>=%(min_price)s else computed_deal_price>=%(min_price)s end '
+            filter_query += ' and case when custom_deal_price is not null then custom_deal_price>=%(min_price)s else computed_deal_price>=%(min_price)s end '
             params['min_price'] = str(min_price)
         if max_price:
-            filter_query += ' case when custom_deal_price is not null then custom_deal_price<=%(max_price)s else computed_deal_price<=%(max_price)s end '
+            filter_query += ' and case when custom_deal_price is not null then custom_deal_price<=%(max_price)s else computed_deal_price<=%(max_price)s end '
             params['max_price'] = str(max_price)
         if valid_package_ids is not None:
-            filter_query += ' and lab_test.id in ( %(package_ids)s )'
-            params['package_ids'] = ", ".join([str(x) for x in valid_package_ids])
+            filter_query += ' and lab_test.id IN('
+            counter = 1
+            for t_id in valid_package_ids:
+                if not counter == 1:
+                    filter_query += ','
+                filter_query += '%(' + 'package_id' + str(counter) + ')s'
+                params['package_id' + str(counter)] = t_id
+                counter += 1
+            filter_query += ')'
         if filter_query:
-            package_count_query += ' and '+filter_query
+            package_count_query += filter_query
 
         package_count = RawSql(package_count_query, params).fetch_all()
         result_count = package_count[0].get('count', 0)
-        if filter_query:
-            filter_query = ' and '+filter_query
+        # if filter_query:
+        #     filter_query = ' and '+filter_query
         package_search_query = package_search_query.format(filter_query=filter_query, sort_query=sort_query, offset=offset, limit=page_size)
         all_packages = list(LabTest.objects.raw(package_search_query, params))
         from django.db.models import prefetch_related_objects
