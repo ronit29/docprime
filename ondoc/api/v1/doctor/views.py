@@ -796,8 +796,23 @@ class DoctorProfileUserViewSet(viewsets.GenericViewSet):
             else:
                 entity = None    
 
-        selected_procedure_ids, other_procedure_ids = get_selected_and_other_procedures(category_ids, procedure_ids,
-                                                                                        doctor, all=True)
+        selected_procedure_ids, other_procedure_ids = get_selected_and_other_procedures(category_ids, procedure_ids, doctor, all=True)
+
+
+        general_specialization = []
+        spec_ids = list()
+        spec_url_dict = dict()
+
+        for dps in doctor.doctorpracticespecializations.all():
+            general_specialization.append(dps.specialization)
+            spec_ids.append(dps.specialization.id)
+        if spec_ids and entity:
+            spec_urls = EntityUrls.objects.filter(specialization_id__in=spec_ids, sublocality_value=entity.sublocality_value,
+                                          locality_value=entity.locality_value, is_valid=True, entity_type='Doctor', url_type='SEARCHURL')
+            for su in spec_urls:
+                spec_url_dict[su.specialization_id] = su.url
+
+
         serializer = serializers.DoctorProfileUserViewSerializer(doctor, many=False,
                                                                      context={"request": request
                                                                          ,
@@ -806,31 +821,22 @@ class DoctorProfileUserViewSet(viewsets.GenericViewSet):
                                                                               "other_procedure_ids": other_procedure_ids
                                                                          , "category_ids": category_ids
                                                                          , "hospital_id": selected_hospital
-                                                                         , "entity":entity 
+                                                                         , "entity":entity
+                                                                         ,  "spec_url_dict":spec_url_dict
                                                                               })
 
         response_data = self.prepare_response(serializer.data, selected_hospital)
 
-        general_specialization = []
         hospital = None
         response_data['about_web'] = None
         google_rating = dict()
         date = None
-        spec_ids = list()
-        spec_urls = None
 
         if response_data and response_data.get('hospitals'):
             hospital = response_data.get('hospitals')[0]
 
         for dps in doctor.doctorpracticespecializations.all():
             general_specialization.append(dps.specialization)
-            spec_ids.append(dps.specialization.id)
-        if spec_ids:
-            if entity:
-                spec_urls = EntityUrls.objects.filter(specialization_id__in=spec_ids, sublocality_value=entity.sublocality_value,
-                                          locality_value=entity.locality_value, is_valid=True, entity_type='Doctor', url_type='SEARCHURL').values(
-                    'specialization_id', 'specialization', 'url')
-        response_data['spec_urls'] = spec_urls
         if general_specialization:
             general_specialization = sorted(general_specialization, key=operator.attrgetter('doctor_count'),
                                             reverse=True)
