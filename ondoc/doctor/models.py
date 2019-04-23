@@ -1830,7 +1830,7 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
 
     def sync_with_booking_analytics(self):
 
-        promo_cost = self.deal_price - self.effective_price if self.deal_price and self.effective_price else None
+        promo_cost = self.deal_price - self.effective_price if self.deal_price and self.effective_price else 0
         department = None
         if self.doctor:
             if self.doctor.doctorpracticespecializations.first():
@@ -1851,7 +1851,7 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
             obj.PaymentType = self.payment_type if self.payment_type else None
             obj.Payout = self.fees
             obj.CashbackUsed = cashback
-        obj.PromoCost = promo_cost
+        obj.PromoCost = max(0, promo_cost)
         obj.GMValue = self.deal_price
         obj.StatusId = self.status
         obj.save()
