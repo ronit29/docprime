@@ -830,7 +830,8 @@ class DoctorProfileUserViewSet(viewsets.GenericViewSet):
                 spec_urls = EntityUrls.objects.filter(specialization_id__in=spec_ids, sublocality_value=entity.sublocality_value,
                                           locality_value=entity.locality_value, is_valid=True, entity_type='Doctor', url_type='SEARCHURL').values(
                     'specialization_id', 'specialization', 'url')
-        response_data['spec_urls'] = spec_urls
+
+        response_data['general_specialization'] = spec_urls
         if general_specialization:
             general_specialization = sorted(general_specialization, key=operator.attrgetter('doctor_count'),
                                             reverse=True)
