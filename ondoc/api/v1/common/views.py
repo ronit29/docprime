@@ -929,13 +929,13 @@ class GetSearchUrlViewSet(viewsets.GenericViewSet):
 
         else:
 
-            opd_search_url = "docprm://%s/opd/searchresults?specializations=%s" \
+            opd_search_url = "docprm://docprime.com/opd/searchresults?specializations=%s" \
                              "&lat=%s&long=%s" \
-                             % (settings.BASE_URL, specialization_ids, lat, long)
+                             % (specialization_ids, lat, long)
 
-            lab_search_url = "docprm://%s/lab/searchresults?test_ids=%s" \
+            lab_search_url = "docprm://docprime.com/lab/searchresults?test_ids=%s" \
                              "&lat=%s&long=%s" \
-                             % (settings.BASE_URL, test_ids, lat, long)
+                             % (test_ids, lat, long)
 
             return Response({"opd_search_url": opd_search_url, "lab_search_url": lab_search_url})
 
