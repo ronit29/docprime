@@ -11,7 +11,7 @@ from ondoc.ratings_review import models as rating_models
 from ondoc.diagnostic.models import (LabTest, AvailableLabTest, Lab, LabAppointment, LabTiming, PromotedLab,
                                      CommonDiagnosticCondition, CommonTest, CommonPackage,
                                      FrequentlyAddedTogetherTests, TestParameter, ParameterLabTest, QuestionAnswer,
-                                     LabPricingGroup, LabTestCategory, LabTestCategoryMapping)
+                                     LabPricingGroup, LabTestCategory, LabTestCategoryMapping, LabTestThresholds)
 from ondoc.account import models as account_models
 from ondoc.authentication.models import UserProfile, Address
 from ondoc.insurance.models import UserInsurance, InsuranceThreshold
@@ -2629,10 +2629,51 @@ class LabTestCategoryListViewSet(viewsets.GenericViewSet):
 class DigitalReports(viewsets.GenericViewSet):
 
     def retrieve(self, request, booking_id=None):
+        response = dict()
         appointment_obj = LabAppointment.objects.filter(id=booking_id).first()
         if not appointment_obj:
             return Response(status=status.HTTP_400_BAD_REQUEST, data={'error': 'Invalid booking_id.'})
 
-        booked_tests = appointment_obj.test_mappings.all()
+        booked_tests = appointment_obj.test_mappings.filter().values_list('doctor', flat=True)
+        response['profiles_count'] = booked_tests.count()
+        profiles = list()
 
-        return Response()
+        response['colour_count_dict'] = {
+            LabTestThresholds.Colour.RED.lower(): 0,
+            LabTestThresholds.Colour.ORANGE.lower(): 0,
+            LabTestThresholds.Colour.GREEN.lower(): 0
+        }
+
+        for booked_test in booked_tests:
+            profile_dict = dict()
+            parameter_list = list()
+            profile_dict['name'] = booked_test.name
+            profile_dict['icon'] = ""
+            profile_dict['parameter_list'] = list()
+
+            test_parameters = booked_tests.labtests.filter().values_list('parameter', flat=True)
+            for parameter in test_parameters:
+                parameter_dict = dict()
+                parameter_dict['name'] = parameter.name
+                parameter_dict['details'] = parameter.details
+                integrator_parameter_id = parameter.integrator_mapped_parameters.filter().first()
+                #TODO: get value from report json and remove below line.
+                value = 0
+
+                threshold_qs = parameter.parameter_thresholds.all()
+                # TODO: calculate age of the userprofile and put in below condition.
+                valid_threshold = threshold_qs.filter(min_value__gte=value, max_value__lte=value, gender=appointment_obj.profile.gender).first()
+                if not valid_threshold:
+                    return Response(status=status.HTTP_400_BAD_REQUEST)
+                parameter_dict['color'] = valid_threshold.color
+                parameter_dict['what_to_do'] = valid_threshold.what_to_do
+                parameter_dict['details'] = valid_threshold.details
+                parameter_dict['ideal_range'] = '%.2f - %.2f' % (valid_threshold.min_value, valid_threshold.max_value)
+
+                response['colour_count_dict'][valid_threshold.color.lower()] += 1
+
+                profile_dict['parameter_list'].append(parameter_dict)
+
+            profiles.append(profile_dict)
+
+        return Response(data=response)

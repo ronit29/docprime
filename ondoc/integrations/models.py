@@ -233,7 +233,7 @@ class IntegratorTestParameterMapping(TimeStampedModel):
     integrator_test_name = models.CharField(max_length=60, null=True, blank=True)
     test_parameter_chat = models.ForeignKey('diagnostic.TestParameterChat', on_delete=models.CASCADE, null=True)
     response_data = JSONField(blank=True, null=True)
-    test_parameter = models.ForeignKey(TestParameter, on_delete=models.CASCADE, null=True)
+    test_parameter = models.ForeignKey(TestParameter, related_name='integrator_mapped_parameters', on_delete=models.CASCADE, null=True)
 
     class Meta:
         db_table = 'integrator_test_parameter_mapping'
