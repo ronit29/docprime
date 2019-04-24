@@ -908,9 +908,12 @@ class GetSearchUrlViewSet(viewsets.GenericViewSet):
     def search_url(self, request):
         params = request.query_params
         specialization_ids = params.get("specialization", '')
+        # from_app = params.get("from_app", False)
         test_ids = params.get("test", '')
         lat = params.get("lat", 28.4485)  # if no lat long then default to gurgaon
         long = params.get("long", 77.0759)
+
+        # if from_app == False:
 
         opd_search_url = "%s/opd/searchresults?specializations=%s" \
                          "&lat=%s&long=%s" \
@@ -923,6 +926,19 @@ class GetSearchUrlViewSet(viewsets.GenericViewSet):
         tiny_lab_search_url = generate_short_url(lab_search_url)
 
         return Response({"opd_search_url": tiny_opd_search_url, "lab_search_url": tiny_lab_search_url})
+        #
+        # else:
+        #
+        #     opd_search_url = "docprm://docprime.com/opd/searchresults?specializations=%s" \
+        #                      "&lat=%s&long=%s" \
+        #                      % (specialization_ids, lat, long)
+        #
+        #     lab_search_url = "docprm://docprime.com/lab/searchresults?test_ids=%s" \
+        #                      "&lat=%s&long=%s" \
+        #                      % (test_ids, lat, long)
+        #
+        #     return Response({"opd_search_url": opd_search_url, "lab_search_url": lab_search_url})
+
 
 
 class GetKeyDataViewSet(viewsets.GenericViewSet):
