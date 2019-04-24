@@ -9,7 +9,8 @@ class PrescriptionComponents():
     MEDICINES = 2
     OBSERVATIONS = 3
     TESTS = 4
-    COMPONENT_CHOICES = [(SYMPTOMS, prescription_models.PrescriptionSymptoms)]
+    COMPONENT_CHOICES = [(SYMPTOMS, prescription_models.PrescriptionSymptoms), (MEDICINES, prescription_models.PrescriptionMedicine),
+                         (OBSERVATIONS, prescription_models.PrescriptionObservations), (TESTS, prescription_models.PrescriptionTests)]
 
 
 class PrescriptionAppointmentValidation():
