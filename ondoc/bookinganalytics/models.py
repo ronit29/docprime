@@ -81,6 +81,7 @@ class DP_OpdConsultsAndTests(models.Model):
     StateId = models.IntegerField(null=True, blank=True)
     IsActive = models.BooleanField(default=True)
     CashbackUsed = models.IntegerField(null=True, blank=True)
+    BookingDate = models.DateTimeField(null=True, blank=True)
 
     def __str__(self):
         return str(self.Appointment_Id)
