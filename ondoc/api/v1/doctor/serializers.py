@@ -602,11 +602,19 @@ class MedicalServiceSerializer(serializers.ModelSerializer):
 
 
 class DoctorPracticeSpecializationSerializer(serializers.ModelSerializer):
+    id = serializers.CharField(read_only=True, source='specialization.id')
     name = serializers.CharField(read_only=True, source='specialization.name')
+    url = serializers.SerializerMethodField()
+
+    def get_url(self, obj):
+        url_dict = self.context.get('spec_url_dict')
+        if url_dict:
+            return url_dict.get(obj.specialization_id, None)
+        return None
 
     class Meta:
         model = DoctorPracticeSpecialization
-        fields = ('name', )
+        fields = ('id', 'name', 'url')
 
 
 class DoctorProfileSerializer(serializers.ModelSerializer):

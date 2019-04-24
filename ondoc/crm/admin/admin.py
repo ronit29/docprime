@@ -54,7 +54,7 @@ from .coupon import CouponAdmin, UserSpecificCouponAdmin, RandomGeneratedCouponA
 from ondoc.reports import models as report_models
 from ondoc.authentication.models import GenericLabAdmin
 
-from ondoc.web.models import OnlineLead, Career
+from ondoc.web.models import OnlineLead, Career, ContactUs
 from django.contrib.auth import get_user_model
 
 User = get_user_model()
@@ -69,8 +69,9 @@ from ondoc.crm.admin.insurance import InsurerAdmin, InsurancePlansAdmin, Insuran
     UserInsuranceAdmin, InsuredMembersAdmin, InsuranceDiseaseAdmin, StateGSTCodeAdmin, InsuranceCityAdmin, \
     InsuranceDistrictAdmin, InsuranceDealAdmin, InsurerPolicyNumberAdmin, InsuranceLeadAdmin
 from ondoc.insurance import models as insurance_model
-from ondoc.ratings_review.models import RatingsReview, ReviewCompliments
-from ondoc.crm.admin.ratings import RatingsReviewAdmin, ReviewComplimentsAdmin
+from ondoc.ratings_review.models import RatingsReview, ReviewCompliments, AppRatings, AppCompliments
+from ondoc.crm.admin.ratings import RatingsReviewAdmin, ReviewComplimentsAdmin, AppRatingsAdmin, AppComplimentsAdmin
+from ondoc.crm.admin.common import ContactUsAdmin
 from ondoc.doctor.models import GoogleDetailing
 from .doctor import GoogleDetailingAdmin
 from .seo import SitemapManagerAdmin, SeoSpecializationAdmin, SeoLabNetworkAdmin, NewDynamicAdmin
@@ -223,3 +224,6 @@ admin.site.register(Plan, SubscriptionPlanAdmin)
 admin.site.register(PlanFeature, SubscriptionPlanFeatureAdmin)
 admin.site.register(UserPlanMapping, UserPlanMappingAdmin)
 admin.site.register(TestParameterChat, TestParameterChatAdmin)
+admin.site.register(AppRatings, AppRatingsAdmin)
+admin.site.register(AppCompliments, AppComplimentsAdmin)
+admin.site.register(ContactUs, ContactUsAdmin)
