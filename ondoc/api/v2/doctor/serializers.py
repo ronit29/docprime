@@ -322,8 +322,8 @@ class GeneralInvoiceItemsSerializer(serializers.Serializer):
         hospital_ids = set(attrs.get("hospital_ids"))
         hospitals = doc_models.Hospital.objects.filter(id__in=hospital_ids)
         general_invoice_item = doc_models.GeneralInvoiceItems.objects.filter(id=attrs.get('id')).first()
-        received_tax_amount = round(attrs.get('tax_amount'), doc_models.GeneralInvoiceItems.DECIMAL_PLACES) if attrs.get('tax_amount') else None
-        received_discount_amount = round(attrs.get('discount_amount'), doc_models.GeneralInvoiceItems.DECIMAL_PLACES) if attrs.get('discount_amount') else None
+        received_tax_amount = attrs.get('tax_amount')
+        received_discount_amount = attrs.get('discount_amount')
 
         if len(hospitals) != len(hospital_ids):
             raise serializers.ValidationError("one or more invalid hospital ids not found")
@@ -351,27 +351,24 @@ class GeneralInvoiceItemsSerializer(serializers.Serializer):
             attrs['general_invoice_item'] = general_invoice_item
 
         if attrs.get('tax_percentage'):
-            calculated_tax_amount = attrs.get('base_price') * ('tax_percentage' in attrs) and (
-                                              attrs.get('tax_percentage') if attrs.get('tax_percentage') else 0)/100
+            calculated_tax_amount = attrs.get('base_price') * attrs.get('tax_percentage', 0) / 100
             calculated_tax_amount = round(calculated_tax_amount, doc_models.GeneralInvoiceItems.DECIMAL_PLACES)
             if not received_tax_amount:
                 raise serializers.ValidationError("tax_amount is also required with tax_percentage")
             elif received_tax_amount != calculated_tax_amount:
                 raise serializers.ValidationError("incorrect tax amount for given tax percentage")
-        attrs['tax_amount'] = received_tax_amount
 
         if attrs.get('discount_percentage'):
-            calculated_discount_amount = (attrs.get('base_price') + (('tax_amount' in attrs and attrs.get('tax_amount')) if attrs.get('tax_amount') else 0)) \
-                                         * (('discount_percentage' in attrs) and (attrs.get('discount_percentage') if attrs.get('discount_percentage') else 0)) / 100
+            calculated_discount_amount = (attrs.get('base_price') + attrs.get('tax_amount', 0)) * attrs.get('discount_percentage', 0) / 100
             calculated_discount_amount = round(calculated_discount_amount, doc_models.GeneralInvoiceItems.DECIMAL_PLACES)
             if not received_discount_amount:
                 raise serializers.ValidationError("discount_amount is also required with discount_percentage")
             elif received_discount_amount != calculated_discount_amount:
                 raise serializers.ValidationError("incorrect discount amount for given discount percentage")
-        attrs['discount_amount'] = received_discount_amount
 
         if (attrs.get('base_price') + attrs.get('tax_amount', 0) - attrs.get('discount_amount', 0)) < 0:
             raise serializers.ValidationError("calculated price is negative, too much discount")
+
         return attrs
 
 
@@ -442,10 +439,10 @@ class PartnersAppInvoiceSerialier(serializers.Serializer):
 
     def validate(self, attrs):
         selected_invoice_items = attrs.get('selected_invoice_items')
-        received_subtotal_amount = round(attrs['sub_total_amount'], doc_models.PartnersAppInvoice.DECIMAL_PLACES)
-        received_tax_amount = round(attrs.get('tax_amount'), doc_models.PartnersAppInvoice.DECIMAL_PLACES)
-        received_discount_amount = round(attrs.get('discount_amount'), doc_models.PartnersAppInvoice.DECIMAL_PLACES)
-        received_total_amount = round(attrs.get('total_amount'), doc_models.PartnersAppInvoice.DECIMAL_PLACES)
+        received_subtotal_amount = attrs['sub_total_amount']
+        received_tax_amount = attrs.get('tax_amount')
+        received_discount_amount = attrs.get('discount_amount')
+        received_total_amount = attrs['total_amount']
 
         if attrs.get('payment_status') == doc_models.PartnersAppInvoice.PAID and not attrs.get('payment_type'):
             raise serializers.ValidationError('payment type is required for payment status - paid')
@@ -460,35 +457,26 @@ class PartnersAppInvoiceSerialier(serializers.Serializer):
         if selected_invoice_items:
             for item in selected_invoice_items:
                 computed_subtotal_amount += item['calculated_price']
-        computed_subtotal_amount = round(computed_subtotal_amount, doc_models.PartnersAppInvoice.DECIMAL_PLACES)
         if received_subtotal_amount != computed_subtotal_amount:
             raise serializers.ValidationError("sub_total_amount is incorrect or not in accordance with the item's calculated_price sum")
 
-        computed_tax_amount = 0
         if attrs.get('tax_percentage'):
-            computed_tax_amount= received_subtotal_amount * (('tax_percentage' in attrs) and (attrs.get('tax_percentage') if attrs.get('tax_percentage') else 0)) / 100
+            computed_tax_amount= received_subtotal_amount * attrs.get('tax_percentage', 0) / 100
             computed_tax_amount = round(computed_tax_amount, doc_models.PartnersAppInvoice.DECIMAL_PLACES)
             if not received_tax_amount:
                 raise serializers.ValidationError("tax_amount is also required with tax_percentage")
             elif received_tax_amount != computed_tax_amount:
                 raise serializers.ValidationError("incorrect tax amount for given tax percentage")
-        attrs['tax_amount'] = received_tax_amount
 
-        computed_discount_amount = 0
         if attrs.get('discount_percentage'):
-            computed_discount_amount = (received_subtotal_amount + ('tax_amount' in attrs and attrs.get('tax_amount') if attrs.get('tax_amount') else 0)) \
-                                         * (('discount_percentage' in attrs) and (attrs.get('discount_percentage') if attrs.get('discount_percentage') else 0)) / 100
+            computed_discount_amount = (received_subtotal_amount + attrs.get('tax_amount', 0)) * attrs.get('discount_percentage', 0) / 100
             computed_discount_amount = round(computed_discount_amount, doc_models.GeneralInvoiceItems.DECIMAL_PLACES)
             if not received_discount_amount:
                 raise serializers.ValidationError("discount_amount is also required with discount_percentage")
             elif received_discount_amount != computed_discount_amount:
                 raise serializers.ValidationError("incorrect discount amount for given discount percentage")
-        attrs['discount_amount'] = received_discount_amount
 
-        tax_amount = computed_tax_amount if computed_tax_amount else received_tax_amount
-        discount_amount = computed_discount_amount if computed_discount_amount else received_discount_amount
-
-        computed_total_amount = round(computed_subtotal_amount + tax_amount - discount_amount, doc_models.PartnersAppInvoice.DECIMAL_PLACES)
+        computed_total_amount = computed_subtotal_amount + attrs.get('tax_amount') - attrs.get('discount_amount')
         if received_total_amount != computed_total_amount:
             raise serializers.ValidationError("incorrect total amount received for given data")
 
