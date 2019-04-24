@@ -542,7 +542,7 @@ class DoctorHospitalSerializer(serializers.ModelSerializer):
         return resp
 
     def get_is_price_zero(self, obj):
-        if obj.fees and obj.fees == 0:
+        if obj.fees is not None and obj.fees == 0:
             return True
         else:
             return False
