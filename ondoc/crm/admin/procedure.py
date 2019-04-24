@@ -252,11 +252,11 @@ class IpdProcedureSynonymAdmin(admin.ModelAdmin):
 
 class IpdProcedureSynonymMappingAdmin(admin.ModelAdmin):
     model = IpdProcedureSynonymMapping
-    list_display = ['get_ipd_procedure_synonym_name', 'get_ipd_procedure_name']
+    list_display = ['get_ipd_procedure_name', 'get_ipd_procedure_synonym_name']
 
     def get_ipd_procedure_synonym_name(self, obj):
         return obj.ipd_procedure_synonym.name
-    get_ipd_procedure_synonym_name.admin_order_field  = 'ipd_procedure_synonym_id'  #Allows column order sorting
+    get_ipd_procedure_synonym_name.admin_order_field = 'ipd_procedure_synonym_id'  #Allows column order sorting
     get_ipd_procedure_synonym_name.short_description = 'Ipd Procedure Synonym'
 
 
