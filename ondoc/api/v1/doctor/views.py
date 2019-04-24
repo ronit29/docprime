@@ -1610,7 +1610,7 @@ class DoctorListViewSet(viewsets.GenericViewSet):
                 "description": description,
                 "location": location,
                 "image": static('web/images/dclogo-placeholder.png'),
-                "schema": self.get_schema(request)
+                "schema": self.get_schema(request) if validated_data['url'] == 'dentist-in-gurgaon-sptcit' else None
             }
 
 
