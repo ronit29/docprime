@@ -57,7 +57,7 @@ class DoctorURL():
         cleanup = '''delete from entity_urls where id in (select id from 
         (select eu.*, row_number() over(partition by url order by is_valid desc, sequence desc) rownum from entity_urls eu  
         )x where rownum>1
-        ) '''                           
+        ) '''
 
         RawSql(query, []).execute()
         RawSql(update_query, []).execute()

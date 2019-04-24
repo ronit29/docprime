@@ -25,7 +25,16 @@ def map_lab_location_urls():
     update_query = '''update entity_urls set is_valid=false where sitemap_identifier 
                              in ('LAB_PAGE') and sequence< %d''' % sequence
     RawSql(update_query, []).execute()
-    return ("success")
+
+    cleanup = '''delete from entity_urls where id in (select id from 
+           (select eu.*, row_number() over(partition by url order by is_valid desc, sequence desc) rownum from entity_urls eu  
+           )x where rownum>1 
+           ) '''
+
+    RawSql(cleanup, []).execute()
+
+    print("success")
+    return True
     # EntityUrls.objects.filter(sitemap_identifier='LAB_PAGE', sequence__lt=sequence).update(is_valid=False)
 
 
