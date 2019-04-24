@@ -1532,7 +1532,7 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin,
             else:
                 category = 0
 
-        promo_cost = self.deal_price - self.effective_price if self.deal_price and self.effective_price else None
+        promo_cost = self.deal_price - self.effective_price if self.deal_price and self.effective_price else 0
 
         obj = DP_OpdConsultsAndTests.objects.filter(Appointment_Id=self.id, TypeId=2).first()
         if not obj:
@@ -1544,9 +1544,11 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin,
             obj.TypeId = 2
             obj.PaymentType = self.payment_type if self.payment_type else None
             obj.Payout = self.agreed_price
-        obj.PromoCost = promo_cost
+            obj.BookingDate = self.created_at
+        obj.PromoCost = max(0, promo_cost)
         obj.GMValue = self.deal_price
         obj.Category = category
+        obj.StatusId = self.status
         obj.save()
 
         try:
