@@ -33,11 +33,17 @@ class PrescriptionEntity(auth_models.TimeStampedModel):
 
 class PrescriptionSymptoms(PrescriptionEntity):
 
+    def __str__(self):
+        return self.name
+
     class Meta:
         db_table = 'eprescription_symptoms'
 
 
 class PrescriptionObservations(PrescriptionEntity):
+
+    def __str__(self):
+        return self.name
 
     class Meta:
         db_table = 'eprescription_observations'
@@ -56,12 +62,18 @@ class PrescriptionMedicine(PrescriptionEntity):
     instruction = models.CharField(max_length=256, null=True, blank=True)
     additional_notes = models.CharField(max_length=256, null=True, blank=True)
 
+    def __str__(self):
+        return self.name
+
     class Meta:
         db_table = 'eprescription_medicine'
 
 
 class PrescriptionTests(PrescriptionEntity):
     instruction = models.CharField(max_length=256, null=True, blank=True)
+
+    def __str__(self):
+        return self.name
 
     class Meta:
         db_table = 'eprescription_tests'
@@ -111,6 +123,9 @@ class PresccriptionPdf(auth_models.TimeStampedModel):
             logger.error("Got error while creating pdf for lab invoice.")
             return []
         return file
+
+    def __str__(self):
+        return self.appointment_id
 
     class Meta:
         db_table = 'eprescription_pdf'

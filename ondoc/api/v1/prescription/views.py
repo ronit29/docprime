@@ -55,8 +55,8 @@ class PrescriptionGenerateViewSet(viewsets.GenericViewSet):
 
 class PrescriptionComponentsViewSet(viewsets.GenericViewSet):
 
-    authentication_classes = (JWTAuthentication,)
-    permission_classes = (IsAuthenticated, IsDoctor)
+    # authentication_classes = (JWTAuthentication,)
+    # permission_classes = (IsAuthenticated, IsDoctor)
 
     def get_queryset(self):
         return prescription_models.PresccriptionPdf.objects.none()
@@ -77,7 +77,7 @@ class PrescriptionComponentsViewSet(viewsets.GenericViewSet):
         serializer.is_valid(raise_exception=True)
         valid_data = serializer.validated_data
         model = dict(serializers.PrescriptionComponents.COMPONENT_CHOICES)[valid_data.get('type')]
-        objects = model.objects.filter(Q(hospitals__contains=[valid_data.get('hospital_id')]) | Q(moderated=True))
+        objects = model.objects.filter(Q(hospitals__contains=[valid_data.get('hospital_id').id]) | Q(moderated=True))
         resp = []
         for obj in objects.all():
             resp_dict = {'id': obj.id,
