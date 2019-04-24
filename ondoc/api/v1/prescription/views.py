@@ -18,8 +18,8 @@ from datetime import datetime
 
 class PrescriptionGenerateViewSet(viewsets.GenericViewSet):
 
-    # authentication_classes = (JWTAuthentication,)
-    # permission_classes = (IsAuthenticated, IsDoctor)
+    authentication_classes = (JWTAuthentication,)
+    permission_classes = (IsAuthenticated, IsDoctor)
 
     def get_queryset(self):
         return prescription_models.PresccriptionPdf.objects.none()
@@ -55,8 +55,8 @@ class PrescriptionGenerateViewSet(viewsets.GenericViewSet):
 
 class PrescriptionComponentsViewSet(viewsets.GenericViewSet):
 
-    # authentication_classes = (JWTAuthentication,)
-    # permission_classes = (IsAuthenticated, IsDoctor)
+    authentication_classes = (JWTAuthentication,)
+    permission_classes = (IsAuthenticated, IsDoctor)
 
     def get_queryset(self):
         return prescription_models.PresccriptionPdf.objects.none()
