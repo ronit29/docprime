@@ -231,14 +231,3 @@ def lab_map_view(request):
     return render_to_response('lab_map.html',
                               {'labs': lab_locations, "form": form,
                                'google_map_key': settings.GOOGLE_MAPS_API_KEY})
-
-
-class LabPricingAutocomplete(autocomplete.Select2QuerySetView):
-
-    def get_queryset(self):
-        queryset = LabPricingGroup.objects.all()
-
-        if self.q:
-            queryset = queryset.filter(group_name__istartswith=self.q)
-
-        return queryset

@@ -355,7 +355,7 @@ class LabForm(FormCleanMixin):
         model = Lab
         exclude = ()
         widgets = {
-            'lab_pricing_group': autocomplete.ModelSelect2(url='/labpricing-autocomplete'),
+            'lab_pricing_group': autocomplete.ModelSelect2(url='labpricing-autocomplete'),
             'matrix_state': autocomplete.ModelSelect2(url='matrix-state-autocomplete'),
             'matrix_city': autocomplete.ModelSelect2(url='matrix-city-autocomplete', forward=['matrix_state'])
         }
