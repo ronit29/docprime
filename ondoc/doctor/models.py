@@ -1865,6 +1865,7 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
             obj.PaymentType = self.payment_type if self.payment_type else None
             obj.Payout = self.fees
             obj.CashbackUsed = cashback
+            obj.BookingDate = self.created_at
         obj.PromoCost = max(0, promo_cost)
         obj.GMValue = self.deal_price
         obj.StatusId = self.status

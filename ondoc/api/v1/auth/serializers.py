@@ -2,7 +2,7 @@ from rest_framework import serializers
 from ondoc.authentication.models import (OtpVerifications, User, UserProfile, Notification, NotificationEndpoint,
                                          DoctorNumber, Address, GenericAdmin, UserSecretKey,
                                          UserPermission, Address, GenericAdmin, GenericLabAdmin)
-from ondoc.doctor.models import DoctorMobile, ProviderSignupLead
+from ondoc.doctor.models import DoctorMobile, ProviderSignupLead, Hospital
 from ondoc.common.models import AppointmentHistory
 from ondoc.doctor.models import DoctorMobile
 from ondoc.insurance.models import InsuredMembers, UserInsurance
@@ -19,6 +19,7 @@ from django.contrib.auth import get_user_model
 from django.contrib.staticfiles.templatetags.staticfiles import static
 import jwt
 from django.conf import settings
+from django.db.models import Q
 from ondoc.authentication.backends import JWTAuthentication
 from ondoc.common import models as common_models
 
@@ -64,7 +65,8 @@ class DoctorLoginSerializer(serializers.Serializer):
             lab_admin_not_exists = provider_signup_lead_not_exists = False
             if not DoctorNumber.objects.filter(phone_number=attrs['phone_number']).exists():
                 doctor_not_exists = True
-            if not GenericAdmin.objects.filter(phone_number=attrs['phone_number'], is_disabled=False).exists():
+            admin = GenericAdmin.objects.filter(phone_number=attrs['phone_number'], is_disabled=False)
+            if not admin.exists():
                 admin_not_exists = True
             if not GenericLabAdmin.objects.filter(phone_number=attrs['phone_number'], is_disabled=False).exists():
                 lab_admin_not_exists = True
@@ -72,6 +74,12 @@ class DoctorLoginSerializer(serializers.Serializer):
                 provider_signup_lead_not_exists = True
             if doctor_not_exists and admin_not_exists and lab_admin_not_exists and provider_signup_lead_not_exists:
                 raise serializers.ValidationError('No Doctor or Admin with given phone number found')
+
+            agent_hospitals = admin.filter(Q(hospital__isnull=False, hospital__is_live=True), Q(hospital__source_type=Hospital.AGENT) | Q(hospital__source_type=None))
+            provider_hospitals = admin.filter(hospital__isnull=False, hospital__source_type=Hospital.PROVIDER)
+            if not agent_hospitals.exists():
+                if not provider_hospitals.exists():
+                    raise serializers.ValidationError("Live hospital for admin not found")
 
         return attrs
 
