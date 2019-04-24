@@ -1028,17 +1028,29 @@ class AddressViewsSet(viewsets.ModelViewSet):
         loc_position = utils.get_location(data.get('locality_location_lat'), data.get('locality_location_long'))
         land_position = utils.get_location(data.get('landmark_location_lat'), data.get('landmark_location_long'))
         address = None
-        if not Address.objects.filter(user=request.user).filter(**validated_data).filter(
-                locality_location__distance_lte=(loc_position, 0),
-                landmark_location__distance_lte=(land_position, 0)).exists():
-            validated_data["locality_location"] = loc_position
-            validated_data["landmark_location"] = land_position
-            validated_data['user'] = request.user
-            address = Address.objects.create(**validated_data)
+        if land_position is None:
+            if not Address.objects.filter(user=request.user).filter(**validated_data).filter(
+                    locality_location__distance_lte=(loc_position, 0)).exists():
+                validated_data["locality_location"] = loc_position
+                validated_data["landmark_location"] = land_position
+                validated_data['user'] = request.user
+                address = Address.objects.create(**validated_data)
         else:
-            address = Address.objects.filter(user=request.user).filter(**validated_data).filter(
-                locality_location__distance_lte=(loc_position, 0),
-                landmark_location__distance_lte=(land_position, 0)).first()
+            if not Address.objects.filter(user=request.user).filter(**validated_data).filter(
+                    locality_location__distance_lte=(loc_position, 0),
+                    landmark_location__distance_lte=(land_position, 0)).exists() and not address:
+                validated_data["locality_location"] = loc_position
+                validated_data["landmark_location"] = land_position
+                validated_data['user'] = request.user
+                address = Address.objects.create(**validated_data)
+        if not address:
+            if land_position is None:
+                address = Address.objects.filter(user=request.user).filter(**validated_data).filter(
+                    locality_location__distance_lte=(loc_position, 0)).first()
+            else:
+                address = Address.objects.filter(user=request.user).filter(**validated_data).filter(
+                    locality_location__distance_lte=(loc_position, 0),
+                    landmark_location__distance_lte=(land_position, 0)).first()
         serializer = serializers.AddressSerializer(address)
         return Response(serializer.data)
 
