@@ -351,7 +351,8 @@ class GeneralInvoiceItemsSerializer(serializers.Serializer):
             attrs['general_invoice_item'] = general_invoice_item
 
         if attrs.get('tax_percentage'):
-            calculated_tax_amount = attrs.get('base_price') * attrs.get('tax_percentage', 0)/100
+            calculated_tax_amount = attrs.get('base_price') * ('tax_percentage' in attrs) and (
+                                              attrs.get('tax_percentage') if attrs.get('tax_percentage') else 0)/100
             calculated_tax_amount = round(calculated_tax_amount, doc_models.GeneralInvoiceItems.DECIMAL_PLACES)
             if not received_tax_amount:
                 raise serializers.ValidationError("tax_amount is also required with tax_percentage")
@@ -360,13 +361,17 @@ class GeneralInvoiceItemsSerializer(serializers.Serializer):
         attrs['tax_amount'] = received_tax_amount
 
         if attrs.get('discount_percentage'):
-            calculated_discount_amount = (attrs.get('base_price') + attrs.get('tax_amount', 0)) * attrs.get('discount_percentage', 0)/100
+            calculated_discount_amount = (attrs.get('base_price') + (('tax_amount' in attrs and attrs.get('tax_amount')) if attrs.get('tax_amount') else 0)) \
+                                         * (('discount_percentage' in attrs) and (attrs.get('discount_percentage') if attrs.get('discount_percentage') else 0)) / 100
             calculated_discount_amount = round(calculated_discount_amount, doc_models.GeneralInvoiceItems.DECIMAL_PLACES)
             if not received_discount_amount:
                 raise serializers.ValidationError("discount_amount is also required with discount_percentage")
             elif received_discount_amount != calculated_discount_amount:
                 raise serializers.ValidationError("incorrect discount amount for given discount percentage")
         attrs['discount_amount'] = received_discount_amount
+
+        if (attrs.get('base_price') + attrs.get('tax_amount', 0) - attrs.get('discount_amount', 0)) < 0:
+            raise serializers.ValidationError("calculated price is negative, too much discount")
         return attrs
 
 
@@ -461,7 +466,7 @@ class PartnersAppInvoiceSerialier(serializers.Serializer):
 
         computed_tax_amount = 0
         if attrs.get('tax_percentage'):
-            computed_tax_amount= received_subtotal_amount * attrs.get('tax_percentage', 0)/100
+            computed_tax_amount= received_subtotal_amount * (('tax_percentage' in attrs) and (attrs.get('tax_percentage') if attrs.get('tax_percentage') else 0)) / 100
             computed_tax_amount = round(computed_tax_amount, doc_models.PartnersAppInvoice.DECIMAL_PLACES)
             if not received_tax_amount:
                 raise serializers.ValidationError("tax_amount is also required with tax_percentage")
@@ -471,7 +476,8 @@ class PartnersAppInvoiceSerialier(serializers.Serializer):
 
         computed_discount_amount = 0
         if attrs.get('discount_percentage'):
-            computed_discount_amount = (received_subtotal_amount * attrs.get('tax_amount', 0)) * attrs.get('discount_percentage', 0)/100
+            computed_discount_amount = (received_subtotal_amount + ('tax_amount' in attrs and attrs.get('tax_amount') if attrs.get('tax_amount') else 0)) \
+                                         * (('discount_percentage' in attrs) and (attrs.get('discount_percentage') if attrs.get('discount_percentage') else 0)) / 100
             computed_discount_amount = round(computed_discount_amount, doc_models.GeneralInvoiceItems.DECIMAL_PLACES)
             if not received_discount_amount:
                 raise serializers.ValidationError("discount_amount is also required with discount_percentage")
@@ -485,6 +491,9 @@ class PartnersAppInvoiceSerialier(serializers.Serializer):
         computed_total_amount = round(computed_subtotal_amount + tax_amount - discount_amount, doc_models.PartnersAppInvoice.DECIMAL_PLACES)
         if received_total_amount != computed_total_amount:
             raise serializers.ValidationError("incorrect total amount received for given data")
+
+        if received_total_amount < 0:
+            raise serializers.ValidationError("total amount is negative, too much discount")
 
         return attrs
 
