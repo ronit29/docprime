@@ -77,7 +77,10 @@ class PrescriptionComponentsViewSet(viewsets.GenericViewSet):
         serializer.is_valid(raise_exception=True)
         valid_data = serializer.validated_data
         model = dict(serializers.PrescriptionComponents.COMPONENT_CHOICES)[valid_data.get('type')]
-        objects = model.objects.filter(Q(hospitals__contains=[valid_data.get('hospital_id').id]) | Q(moderated=True))
+        if valid_data.get('hospital_id'):
+            objects = model.objects.filter(Q(hospitals__contains=[valid_data['hospital_id'].id]) | Q(moderated=True))
+        else:
+            objects = model.objects.filter(moderated=True)
         resp = []
         for obj in objects.all():
             resp_dict = {'id': obj.id,
