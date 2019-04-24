@@ -255,12 +255,12 @@ class IpdProcedureSynonymMappingAdmin(admin.ModelAdmin):
     list_display = ['get_ipd_procedure_name', 'get_ipd_procedure_synonym_name']
 
     def get_ipd_procedure_synonym_name(self, obj):
-        return obj.ipd_procedure_synonym.name
-    get_ipd_procedure_synonym_name.admin_order_field = 'ipd_procedure_synonym'  #Allows column order sorting
+        return obj.ipd_procedure_synonym_id.name
+    get_ipd_procedure_synonym_name.admin_order_field = 'ipd_procedure_synonym_id'  #Allows column order sorting
     get_ipd_procedure_synonym_name.short_description = 'Ipd Procedure Synonym'
 
 
     def get_ipd_procedure_name(self, obj):
-        return obj.ipd_procedure.name
-    get_ipd_procedure_name.admin_order_field  = 'ipd_procedure'  #Allows column order sorting
+        return obj.ipd_procedure_id.name
+    get_ipd_procedure_name.admin_order_field  = 'ipd_procedure_id'  #Allows column order sorting
     get_ipd_procedure_name.short_description = 'Ipd Procedure'

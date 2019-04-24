@@ -421,7 +421,7 @@ def get_procedure_categories_with_procedures(selected_procedures, other_procedur
 
 
 class IpdProcedureSynonym(auth_model.TimeStampedModel):
-    name = models.CharField(max_length=1000, null=True, blank=True)
+    name = models.CharField(max_length=1000, default='')
 
     def __str__(self):
         return self.name
@@ -431,8 +431,8 @@ class IpdProcedureSynonym(auth_model.TimeStampedModel):
 
 
 class IpdProcedureSynonymMapping(auth_model.TimeStampedModel):
-    ipd_procedure_synonym = models.ForeignKey(IpdProcedureSynonym, on_delete=models.CASCADE)
-    ipd_procedure = models.ForeignKey(IpdProcedure, on_delete=models.CASCADE)
+    ipd_procedure_synonym_id = models.ForeignKey(IpdProcedureSynonym, on_delete=models.CASCADE)
+    ipd_procedure_id = models.ForeignKey(IpdProcedure, on_delete=models.CASCADE)
     order = models.IntegerField(null=True, blank=True)
 
     def __str__(self):
