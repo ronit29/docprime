@@ -807,7 +807,7 @@ class InsuranceLeadResource(resources.ModelResource):
     def dehydrate_name(self, obj):
         user = obj.user
         from ondoc.authentication.models import UserProfile
-        user_profile = UserProfile.objects.filter(is_default_user=True).first()
+        user_profile = UserProfile.objects.filter(user=user, is_default_user=True).first()
         if user_profile:
             return str(user_profile.name)
         else:
@@ -834,7 +834,7 @@ class InsuranceLeadAdmin(ImportExportModelAdmin, admin.ModelAdmin):
     def name(self, obj):
         user = obj.user
         from ondoc.authentication.models import UserProfile
-        user_profile = UserProfile.objects.filter(is_default_user=True).first()
+        user_profile = UserProfile.objects.filter(user=user, is_default_user=True).first()
         if user_profile:
             return str(user_profile.name)
         else:
