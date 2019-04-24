@@ -237,8 +237,8 @@ class UserPermissionSerializer(serializers.ModelSerializer):
 class AddressSerializer(serializers.ModelSerializer):
     locality_location_lat = serializers.ReadOnlyField(source='locality_location.y')
     locality_location_long = serializers.ReadOnlyField(source='locality_location.x')
-    landmark_location_lat = serializers.ReadOnlyField(source='landmark_location.y')
-    landmark_location_long = serializers.ReadOnlyField(source='landmark_location.x')
+    landmark_location_lat = serializers.ReadOnlyField(source='landmark_location.y', required=False, allow_null=True, default=None)
+    landmark_location_long = serializers.ReadOnlyField(source='landmark_location.x', required=False, allow_null=True, default=None)
 
     class Meta:
         model = Address
