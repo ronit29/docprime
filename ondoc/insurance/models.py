@@ -774,6 +774,9 @@ class UserInsurance(auth_model.TimeStampedModel):
                     profile.email = member['email']
                     profile.gender = member['gender']
                     profile.dob = member['dob']
+                    if member['relation'] == "self":
+                        UserProfile.objects.filter(user=user).update(is_default_user=False)
+                        profile.is_default_user = True
                     profile.save()
 
                 profile = profile.id
