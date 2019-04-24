@@ -311,7 +311,7 @@ def push_appointment_to_matrix(self, data):
                 contact_name = contact_person.name
                 mobile_list.append({'MobileNo': number,
                                     'Name': contact_name,
-                                    'DesignationId': contact_person.contact_type,
+                                    'DesignationID': contact_person.contact_type,
                                     'AutoIVREnable': str(auto_ivr_enabled).lower(),
                                     'Type': 3})
 

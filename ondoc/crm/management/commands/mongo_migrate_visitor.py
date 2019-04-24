@@ -73,7 +73,7 @@ class Command(BaseCommand):
         except StopIteration:
             pass
         except Exception as e:
-            print("FAILED TO MIGRATE VISITORS ")
+            print("FAILED TO MIGRATE VISITORS "+str(e))
             return
 
         print("DONE MIGRATING VISITORS")

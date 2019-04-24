@@ -11,7 +11,8 @@ from django.conf import settings
 from django.utils.dateparse import parse_datetime
 from ondoc.authentication.models import Merchant, AssociatedMerchant, QCModel
 from ondoc.account.models import MerchantPayout
-from ondoc.common.models import Cities, MatrixCityMapping, PaymentOptions, Remark, MatrixMappedCity, MatrixMappedState, GlobalNonBookable
+from ondoc.common.models import Cities, MatrixCityMapping, PaymentOptions, Remark, MatrixMappedCity, MatrixMappedState, \
+    GlobalNonBookable, UserConfig
 from import_export import resources, fields
 from import_export.admin import ImportMixin, base_formats, ImportExportMixin, ImportExportModelAdmin, ExportMixin
 from reversion.admin import VersionAdmin
@@ -613,8 +614,23 @@ class MatrixMappedCityResource(resources.ModelResource):
         fields = ('id', 'name', 'state_id')
 
 
+class MatrixMappedCityAdminForm(forms.ModelForm):
+    def clean(self):
+        super().clean()
+        if any(self.errors):
+            return
+        cleaned_data = self.cleaned_data
+        state = cleaned_data.get('state', None)
+        city_name = cleaned_data.get('name', '')
+        if not state:
+            raise forms.ValidationError("State is required.")
+        if state and city_name:
+            if MatrixMappedCity.objects.filter(name__iexact=city_name.strip(), state=state).exists():
+                raise forms.ValidationError("City-State combination already exists.")
+
 
 class MatrixMappedCityAdmin(ImportMixin, admin.ModelAdmin):
+    form = MatrixMappedCityAdminForm
     formats = (base_formats.XLS, base_formats.XLSX,)
     list_display = ('name', 'state')
     readonly_fields = ('name', 'state', )
@@ -625,6 +641,7 @@ class MatrixMappedCityAdmin(ImportMixin, admin.ModelAdmin):
         if not request.user.is_superuser and not request.user.groups.filter(name=constants['SUPER_QC_GROUP']).exists():
             return super().get_readonly_fields(request, obj)
         return ()
+
 
 class MatrixStateAutocomplete(autocomplete.Select2QuerySetView):
 
@@ -650,3 +667,7 @@ class MatrixCityAutocomplete(autocomplete.Select2QuerySetView):
 
         return queryset
 
+
+class UserConfigAdmin(admin.ModelAdmin):
+    model = UserConfig
+    list_display = ('key',)
