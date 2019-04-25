@@ -11,10 +11,15 @@ logger = logging.getLogger(__name__)
 
 
 class PrescriptionEntity(auth_models.TimeStampedModel):
+    INHOUSE_CHAT = 1
+    MESH = 2
+    DOCTORS = 3
+    SOURCE_TYPE_CHOICES = (("", "Select"), (INHOUSE_CHAT, 'Inhouse Chat'), (MESH, 'Mesh'), (DOCTORS, 'Doctors'))
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     hospitals = ArrayField(models.IntegerField(), blank=True, null=True)
     name = models.CharField(db_index=True, max_length=64)
     moderated = models.NullBooleanField(blank=True, null=True)
+    source_type = models.IntegerField(choices=SOURCE_TYPE_CHOICES, null=True, blank=True, default=None, editable=False)
 
     @classmethod
     def create_or_update(cls, name, hospital_id):
@@ -125,7 +130,8 @@ class PresccriptionPdf(auth_models.TimeStampedModel):
                     'doc_reg': appointment.doctor.license,
                     'date': self.created_at.strftime('%d %B %Y'),
                     'followup_date': self.followup_instructions_date.strftime('%d %B %Y %H %i'),
-                    'followup_reason': self.followup_instructions_reason
+                    'followup_reason': self.followup_instructions_reason,
+                    'updated_at': self.updated_at
                     }
         html_body = render_to_string("e-prescription/med-invoice.html", context=pdf_dict)
         filename = "prescription_{}_{}.pdf".format(str(timezone.now().strftime("%I%M_%d%m%Y")),

@@ -120,4 +120,5 @@ class PrescriptionResponseSerializer(serializers.ModelSerializer):
     class Meta:
         model = prescription_models.PresccriptionPdf
         fields = ('medicines', 'special_instructions', 'symptoms_complaints', 'appointment_id', 'appointment_type',
-                  'pdf_file', 'diagnoses', 'lab_tests', 'followup_instructions_date', 'followup_instructions_reason')
+                  'pdf_file', 'diagnoses', 'lab_tests', 'followup_instructions_date', 'followup_instructions_reason',
+                  'updated_at')
