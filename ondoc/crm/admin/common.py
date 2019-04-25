@@ -668,6 +668,13 @@ class MatrixCityAutocomplete(autocomplete.Select2QuerySetView):
         return queryset
 
 
+class ContactUsAdmin(admin.ModelAdmin):
+    list_display = ('name', 'mobile', 'email', 'from_app')
+    fields = ('name', 'mobile', 'email', 'message', 'from_app')
+    readonly_fields = ('name', 'mobile', 'email', 'message', 'from_app')
+    list_filter = ("from_app",)
+
+
 class UserConfigAdmin(admin.ModelAdmin):
     model = UserConfig
     list_display = ('key',)
