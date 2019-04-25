@@ -1512,22 +1512,22 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin,
 
     
     def get_city(self):
-        if self.lab and self.lab.city:
-            return self.lab.city.id
+        if self.lab and self.lab.matrix_city:
+            return self.lab.matrix_city.id
         else:
             return None
 
     def get_state(self):
-        if self.lab and self.lab.state:
-            return self.lab.state.id
+        if self.lab and self.lab.matrix_state:
+            return self.lab.matrix_state.id
         else:
             return None
 
     def sync_with_booking_analytics(self):
 
         category = None
-        if self.lab_test.first():
-            if self.lab_test.first().test.is_package == True:
+        for cat in self.tests.all():
+            if cat.is_package == True:
                 category = 1
             else:
                 category = 0
@@ -1538,8 +1538,8 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin,
         if not obj:
             obj = DP_OpdConsultsAndTests()
             obj.Appointment_Id = self.id
-            # obj.CityId = self.get_city()
-            # obj.StateId = self.get_state()
+            obj.CityId = self.get_city()
+            obj.StateId = self.get_state()
             obj.ProviderId = self.lab.id
             obj.TypeId = 2
             obj.PaymentType = self.payment_type if self.payment_type else None
