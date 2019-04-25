@@ -183,7 +183,6 @@ class DoctorOnboard(View):
                 'DoctorDocument' : DoctorDocument
             })
 
-
         doc_obj = doctor_form.save()
 
         mobile_formset.save()

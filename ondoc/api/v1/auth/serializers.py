@@ -169,6 +169,7 @@ class UserProfileSerializer(serializers.ModelSerializer):
     dob = serializers.DateField(allow_null=True, required=False)
     whatsapp_optin = serializers.NullBooleanField(required=False)
     whatsapp_is_declined = serializers.BooleanField(required=False)
+    is_default_user = serializers.BooleanField(required=False)
 
     class Meta:
         model = UserProfile
@@ -237,8 +238,8 @@ class UserPermissionSerializer(serializers.ModelSerializer):
 class AddressSerializer(serializers.ModelSerializer):
     locality_location_lat = serializers.ReadOnlyField(source='locality_location.y')
     locality_location_long = serializers.ReadOnlyField(source='locality_location.x')
-    landmark_location_lat = serializers.ReadOnlyField(source='landmark_location.y')
-    landmark_location_long = serializers.ReadOnlyField(source='landmark_location.x')
+    landmark_location_lat = serializers.ReadOnlyField(source='landmark_location.y', required=False, allow_null=True, default=None)
+    landmark_location_long = serializers.ReadOnlyField(source='landmark_location.x', required=False, allow_null=True, default=None)
 
     class Meta:
         model = Address
@@ -501,6 +502,7 @@ class ContactUsSerializer(serializers.Serializer):
     mobile = serializers.IntegerField(min_value=1000000000, max_value=9999999999)
     email = serializers.EmailField()
     message = serializers.CharField(max_length=2000)
+    from_app = serializers.BooleanField(default=False)
 
     class Meta:
         model = ContactUs
