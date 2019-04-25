@@ -5,12 +5,14 @@ from ondoc.doctor import models as doc_models
 
 
 class PrescriptionComponents():
-    SYMPTOMS=1
+    SYMPTOMS_COMPLAINTS=1
     MEDICINES = 2
-    OBSERVATIONS = 3
+    SPECIAL_INSTRUCTIONS = 3
     TESTS = 4
-    COMPONENT_CHOICES = [(SYMPTOMS, prescription_models.PrescriptionSymptoms), (MEDICINES, prescription_models.PrescriptionMedicine),
-                         (OBSERVATIONS, prescription_models.PrescriptionObservations), (TESTS, prescription_models.PrescriptionTests)]
+    DIAGNOSIS = 5
+    COMPONENT_CHOICES = [(SYMPTOMS_COMPLAINTS, prescription_models.PrescriptionSymptomsComplaints), (MEDICINES, prescription_models.PrescriptionMedicine),
+                         (SPECIAL_INSTRUCTIONS, prescription_models.PrescriptionSpecialInstructions), (TESTS, prescription_models.PrescriptionTests),
+                         (DIAGNOSIS, prescription_models.PrescriptionDiagnosis)]
 
 
 class PrescriptionAppointmentValidation():
@@ -52,7 +54,7 @@ class PrescriptionMedicineBodySerializer(serializers.Serializer):
         return attrs
 
 
-class PrescriptionSymptomsBodySerializer(serializers.Serializer):
+class PrescriptionSymptomsComplaintsBodySerializer(serializers.Serializer):
     name = serializers.CharField(max_length=64)
 
 
@@ -60,7 +62,7 @@ class PrescriptionTestsBodySerializer(serializers.Serializer):
     name = serializers.CharField(max_length=64)
 
 
-class PrescriptionObservationBodySerializer(serializers.Serializer):
+class PrescriptionSpecialInstructionsBodySerializer(serializers.Serializer):
     name = serializers.CharField(max_length=64)
 
 
@@ -87,9 +89,9 @@ class PrescriptionComponentSyncSerializer(serializers.Serializer):
 
 
 class GeneratePrescriptionPDFBodySerializer(serializers.Serializer):
-    symptoms = serializers.ListField(child=PrescriptionSymptomsBodySerializer(), allow_empty=True)
+    symptoms_complaints = serializers.ListField(child=PrescriptionSymptomsComplaintsBodySerializer(), allow_empty=True)
     tests = serializers.ListField(child=PrescriptionTestsBodySerializer(),required=False, allow_empty=True)
-    observations = serializers.ListField(child=PrescriptionObservationBodySerializer(), allow_empty=True)
+    special_instructions = serializers.ListField(child=PrescriptionSpecialInstructionsBodySerializer(), allow_empty=True)
     diagnosis = serializers.ListField(child=PrescriptionDiagnosisBodySerializer(),required=False, allow_empty=True)
     patient_details = PrescriptionPatientSerializer()
     medicines = serializers.ListField(child=PrescriptionMedicineBodySerializer(),required=False, allow_empty=True)
@@ -117,5 +119,5 @@ class PrescriptionResponseSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = prescription_models.PresccriptionPdf
-        fields = ('medicines', 'observations', 'symptoms', 'appointment_id', 'appointment_type', 'pdf_file', 'diagnosis',
-                  'lab_tests', 'followup_instructions_date', 'followup_instructions_reason')
+        fields = ('medicines', 'special_instructions', 'symptoms_complaints', 'appointment_id', 'appointment_type',
+                  'pdf_file', 'diagnosis', 'lab_tests', 'followup_instructions_date', 'followup_instructions_reason')

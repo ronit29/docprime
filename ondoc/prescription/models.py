@@ -6,11 +6,12 @@ from django.template.loader import render_to_string
 from ondoc.api.v1 import utils
 from django.utils import timezone
 from django.core.validators import FileExtensionValidator
-import random, logging
+import random, logging, uuid
 logger = logging.getLogger(__name__)
 
 
 class PrescriptionEntity(auth_models.TimeStampedModel):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     hospitals = ArrayField(models.IntegerField(), blank=True, null=True)
     name = models.CharField(db_index=True, max_length=64)
     moderated = models.NullBooleanField(blank=True, null=True)
@@ -31,22 +32,31 @@ class PrescriptionEntity(auth_models.TimeStampedModel):
         abstract = True
 
 
-class PrescriptionSymptoms(PrescriptionEntity):
+class PrescriptionSymptomsComplaints(PrescriptionEntity):
 
     def __str__(self):
         return self.name
 
     class Meta:
-        db_table = 'eprescription_symptoms'
+        db_table = 'eprescription_symptoms_complaints'
 
 
-class PrescriptionObservations(PrescriptionEntity):
+class PrescriptionDiagnosis(PrescriptionEntity):
 
     def __str__(self):
         return self.name
 
     class Meta:
-        db_table = 'eprescription_observations'
+        db_table = 'eprescription_diagnosis'
+
+
+class PrescriptionSpecialInstructions(PrescriptionEntity):
+
+    def __str__(self):
+        return self.name
+
+    class Meta:
+        db_table = 'eprescription_special_instructions'
 
 
 class PrescriptionMedicine(PrescriptionEntity):
@@ -85,11 +95,12 @@ class PresccriptionPdf(auth_models.TimeStampedModel):
     OFFLINE = 3
 
     APPOINTMENT_TYPE_CHOICES = [(DOCPRIME_OPD, "Docprime_Opd"), (DOCPRIME_LAB, "Docprime_Lab"), (OFFLINE, "OFFline")]
-    symptoms = JSONField(blank=True, null=True)
-    observations = JSONField(blank=True, null=True)
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    symptoms_complaints = JSONField(blank=True, null=True)
+    diagnosis = JSONField(blank=True, null=True)
+    special_instructions = JSONField(blank=True, null=True)
     medicines = JSONField(blank=True, null=True)
     lab_tests = JSONField(blank=True, null=True)
-    diagnosis = JSONField(blank=True, null=True)
     followup_instructions_date = models.DateTimeField(null=True)
     followup_instructions_reason = models.CharField(max_length=256, null=True)
     patient_details = JSONField(blank=True, null=True)
@@ -101,9 +112,10 @@ class PresccriptionPdf(auth_models.TimeStampedModel):
 
 
         pdf_dict = {'medicines': self.medicines,
-                    'observations': self.observations,
+                    'special_instructions': self.special_instructions,
                     'pres_id': self.id,
-                    'symptoms': self.symptoms,
+                    'symptoms_complaints': self.symptoms_complaints,
+                    'diagnosis': self.diagnosis,
                     'doc_name': appointment.doctor.name,
                     'hosp_name':  appointment.hospital.name,
                     'tests': self.lab_tests,

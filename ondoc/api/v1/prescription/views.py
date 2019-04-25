@@ -30,10 +30,10 @@ class PrescriptionGenerateViewSet(viewsets.GenericViewSet):
         valid_data = serializer.validated_data
         try:
             prescription_pdf = prescription_models.PresccriptionPdf.objects.create(medicines=valid_data.get('medicines'),
-                                                                                   observations=valid_data.get('observation'),
+                                                                                   special_instructions=valid_data.get('special_instructions'),
                                                                                    lab_tests=valid_data.get('tests'),
                                                                                    diagnosis=valid_data.get('diagnosis'),
-                                                                                   symptoms=valid_data.get('symptoms'),
+                                                                                   symptoms_complaints=valid_data.get('symptoms_complaints'),
                                                                                    patient_details=valid_data.get('patient_details'),
                                                                                    appointment_id=valid_data.get('appointment_id'),
                                                                                    appointment_type=valid_data.get('appointment_type'),
