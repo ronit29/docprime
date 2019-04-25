@@ -226,7 +226,7 @@ class LabList(viewsets.ReadOnlyModelViewSet):
                 valid_package_ids = []
             valid_package_ids.extend(list(
                 LabTest.objects.filter(categories__id__in=package_category_ids).distinct().values_list('id',
-                                                                                               flat=True)))
+                                                                                                       flat=True)))
 
         if package_ids:
             if valid_package_ids is None:
@@ -236,9 +236,17 @@ class LabList(viewsets.ReadOnlyModelViewSet):
         if not valid_package_ids and valid_package_ids is not None:
             valid_package_ids = [-1]
 
+        utm_available = False
+        salespoint_query = ""
+        utm_source = request.query_params.get('UtmSource')
+        if utm_source and SalesPoint.is_affiliate_available(utm_source):
+            utm_available = True
+            salespoint_obj = SalesPoint.get_salespoint_via_code(request.query_params.get('UtmSource'))
+            salespoint_query = ' INNER JOIN "salespoint_test_mapping" ON ("available_lab_test"."id" = "salespoint_test_mapping"."available_tests_id")'
 
-        package_search_query = 'select x.*, CASE WHEN "x"."custom_deal_price" IS not NULL THEN "x"."custom_deal_price"'\
-                               ' else computed_deal_price END AS "price", ST_Distance(St_setsrid(St_point((%(longitude)s), (%(latitude)s)), 4326), x.location) as distance from '\
+
+        package_search_query = 'select x.*, CASE WHEN "x"."custom_deal_price" IS not NULL THEN "x"."custom_deal_price"' \
+                               ' else computed_deal_price END AS "price", ST_Distance(St_setsrid(St_point((%(longitude)s), (%(latitude)s)), 4326), x.location) as distance from ' \
                                ' (SELECT "lab_test"."id", "lab_test"."name","lab_test"."why","lab_test"."pre_test_info",' \
                                ' "lab_test"."test_type", "lab_test"."is_package", "lab_test"."number_of_tests", "lab_test"."category",' \
                                ' "lab_test"."sample_type", "lab_test"."home_collection_possible", "lab_test"."enable_for_ppc", "lab_test"."enable_for_retail", "lab_test"."about_test",' \
@@ -256,6 +264,7 @@ class LabList(viewsets.ReadOnlyModelViewSet):
                                ' AS "rnk"' \
                                ' FROM "lab_test" inner JOIN "available_lab_test" ON ("lab_test"."id" = "available_lab_test"."test_id")' \
                                ' inner JOIN "lab_pricing_group" ON ("available_lab_test"."lab_pricing_group_id" = "lab_pricing_group"."id")' \
+                               ' {salespoint_query} ' \
                                ' inner JOIN "lab" ON ("lab_pricing_group"."id" = "lab"."lab_pricing_group_id") WHERE' \
                                ' ("lab_test"."enable_for_retail" = true AND "lab_test"."is_package" = true AND "lab_test"."searchable" = true' \
                                ' AND "available_lab_test"."enabled" = true AND "lab"."enabled" = true AND "lab"."is_live" = true AND' \
@@ -267,12 +276,13 @@ class LabList(viewsets.ReadOnlyModelViewSet):
         package_count_query = ' SELECT count(distinct available_lab_test)' \
                               ' FROM "lab_test" inner JOIN "available_lab_test" ON ("lab_test"."id" = "available_lab_test"."test_id")' \
                               ' inner JOIN "lab_pricing_group" ON ("available_lab_test"."lab_pricing_group_id" = "lab_pricing_group"."id")' \
+                              ' {salespoint_query}' \
                               ' inner JOIN "lab" ON ("lab_pricing_group"."id" = "lab"."lab_pricing_group_id") WHERE' \
                               ' "lab_test"."enable_for_retail" = true AND "lab_test"."is_package" = true AND "lab_test"."searchable" = true' \
                               ' AND "available_lab_test"."enabled" = true AND "lab"."enabled" = true AND "lab"."is_live" = true AND' \
                               ' ST_DWithin("lab"."location", St_setsrid(St_point(%(longitude)s, %(latitude)s), 4326), %(max_distance)s)' \
                               ' and not ST_DWithin("lab"."location", St_setsrid(St_point(%(longitude)s, %(latitude)s), 4326), %(min_distance)s)'
-        
+
         params = {}
         params['latitude'] = str(lat)
         params['longitude'] = str(long)
@@ -303,21 +313,28 @@ class LabList(viewsets.ReadOnlyModelViewSet):
                 params['package_id' + str(counter)] = t_id
                 counter += 1
             filter_query += ')'
+        if utm_available:
+            filter_query += ' and salespoint_test_mapping.salespoint_id = %(s_id)s'
+            params['s_id'] = str(salespoint_obj.id)
         if filter_query:
             package_count_query += filter_query
 
+        package_count_query = package_count_query.format(salespoint_query=salespoint_query)
         package_count = RawSql(package_count_query, params).fetch_all()
         result_count = package_count[0].get('count', 0)
         # if filter_query:
         #     filter_query = ' and '+filter_query
-        package_search_query = package_search_query.format(filter_query=filter_query, sort_query=sort_query, offset=offset, limit=page_size)
+        package_search_query = package_search_query.format(filter_query=filter_query, sort_query=sort_query, offset=offset, limit=page_size, salespoint_query=salespoint_query)
         all_packages = list(LabTest.objects.raw(package_search_query, params))
+
         from django.db.models import prefetch_related_objects
-        prefetch_related_objects(all_packages, 'test', 'test__recommended_categories', 'test__parameter', 'categories')
+        if utm_available:
+            prefetch_related_objects(all_packages, 'test', 'test__recommended_categories', 'test__parameter', 'categories', 'test__availablelabs__active_sales_point_mappings')
+        else:
+            prefetch_related_objects(all_packages, 'test', 'test__recommended_categories', 'test__parameter', 'categories')
         lab_ids = [package.lab for package in all_packages]
         entity_url_qs = EntityUrls.objects.filter(entity_id__in=lab_ids, is_valid=True, url__isnull=False,
-                                                  sitemap_identifier=EntityUrls.SitemapIdentifier.LAB_PAGE).values(
-            'url', lab_id=F('entity_id'))
+                                                  sitemap_identifier=EntityUrls.SitemapIdentifier.LAB_PAGE).values('url', lab_id=F('entity_id'))
         entity_url_dict = {}
         for item in entity_url_qs:
             entity_url_dict.setdefault(item.get('lab_id'), [])
