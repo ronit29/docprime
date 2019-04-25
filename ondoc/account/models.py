@@ -1398,7 +1398,7 @@ class MerchantPayout(TimeStampedModel):
         if self.type == self.MANUAL and self.utr_no and self.status == self.PENDING:
             self.status = self.PAID
 
-        if (not first_instance and self.status != self.PENDING) and not self.booking_type == InsurancePremium:
+        if (not first_instance and self.status != self.PENDING) and not self.booking_type == self.InsurancePremium:
             from ondoc.matrix.tasks import push_appointment_to_matrix
 
             appointment = self.lab_appointment.all().first()
