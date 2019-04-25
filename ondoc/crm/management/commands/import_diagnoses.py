@@ -15,9 +15,12 @@ class Command(BaseCommand):
         csv_file = settings.ROOT_DIR.root + '/ondoc/prescription/templates/import_data/' + filename
         df = pd.read_csv(csv_file)
 
+        filtered_df = df[~df.name.isin(
+            PrescriptionDiagnoses.objects.filter(name__in=df['name']).values_list('name', flat=True))]
+
         obj_list = list()
-        for index, data in df.iterrows():
-            obj_list.append(PrescriptionDiagnoses(name=data['name'], source_type=data['source_type'], moderated=True))
+        for index, data in filtered_df.iterrows():
+            obj_list.append(PrescriptionDiagnoses(name=data.get('name'), source_type=data.get('source_type'), moderated=True))
         try:
             PrescriptionDiagnoses.objects.bulk_create(obj_list)
         except Exception as e:
