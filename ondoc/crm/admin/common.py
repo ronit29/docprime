@@ -424,7 +424,7 @@ class MerchantPayoutForm(forms.ModelForm):
             if not billed_to:
                 raise forms.ValidationError("Billing entity not defined.")
 
-            if not self.instance.booking_type == payout_data.InsurancePremium:
+            if not self.instance.booking_type == self.instance.InsurancePremium:
                 associated_merchant = billed_to.merchant.first()
                 if not associated_merchant.verified:
                     raise forms.ValidationError("Associated Merchant not verified.")
