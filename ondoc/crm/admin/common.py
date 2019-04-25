@@ -22,7 +22,7 @@ from django.utils.safestring import mark_safe
 from django.contrib.contenttypes.models import ContentType
 from import_export.admin import ImportExportMixin
 
-from ondoc.diagnostic.models import Lab, LabAppointment
+from ondoc.diagnostic.models import Lab, LabAppointment, LabPricingGroup
 from ondoc.doctor.models import Hospital, Doctor, OpdAppointment, HospitalNetwork
 from django.db.models import Q
 from django import forms
@@ -424,7 +424,7 @@ class MerchantPayoutForm(forms.ModelForm):
             if not billed_to:
                 raise forms.ValidationError("Billing entity not defined.")
 
-            if not self.instance.booking_type == payout_data.InsurancePremium:
+            if not self.instance.booking_type == self.instance.InsurancePremium:
                 associated_merchant = billed_to.merchant.first()
                 if not associated_merchant.verified:
                     raise forms.ValidationError("Associated Merchant not verified.")
@@ -684,3 +684,13 @@ class UserConfigAdmin(admin.ModelAdmin):
     model = UserConfig
     list_display = ('key',)
 
+
+class LabPricingAutocomplete(autocomplete.Select2QuerySetView):
+
+    def get_queryset(self):
+        queryset = LabPricingGroup.objects.all()
+
+        if self.q:
+            queryset = queryset.filter(group_name__istartswith=self.q)
+
+        return queryset
