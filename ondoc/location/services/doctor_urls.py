@@ -687,7 +687,6 @@ class IpdProcedure:
         self.insert_search_urls()
 
     def insert_search_urls(self):
-
         seq = self.sequence
 
         query = '''insert into entity_urls(sequence,extras, sitemap_identifier, url, count, entity_type, 
@@ -706,7 +705,8 @@ class IpdProcedure:
                   ''' % seq
 
         update_query = '''update entity_urls set is_valid=false where sitemap_identifier 
-                           in ('IPD_PROCEDURE_CITY') and sequence< %d''' % seq
+                           in ('IPD_PROCEDURE_CITY', 'IPD_PROCEDURE_HOSPITAL_CITY', 
+                           'IPD_PROCEDURE_DOCTOR_CITY') and sequence< %d''' % seq
 
         cleanup = '''delete from entity_urls where id in (select id from 
         (select eu.*, row_number() over(partition by url order by is_valid desc, sequence desc) rownum from entity_urls eu  
@@ -726,7 +726,7 @@ class IpdProcedure:
                     select ipdp.id, ipdp.name, search_slug,
                     case when ea.type = 'LOCALITY' then ea.id end as locality_id,
                     case when ea.type = 'LOCALITY' then 'IPD_PROCEDURE_CITY' end as sitemap_identifier,
-                    'IpdProcedure' as entity_type, 'SEARCHURL' url_type, True as is_valid, now(), now()
+                    'IpdProcedure' as entity_type, 'PAGEURL' url_type, True as is_valid, now(), now()
                     from entity_address ea 
                     inner join hospital h on (ea.type = 'LOCALITY' and 
                     ST_DWithin(ea.centroid::geography,h.location::geography,15000)) and h.is_live=true
@@ -765,17 +765,6 @@ class IpdProcedure:
                 locality_value = ea.alternative_value, locality_location = centroid
                 FROM entity_address ea
                 WHERE locality_id = ea.id ''', []).execute()
-
-        # RawSql('''UPDATE temp_url
-        #         SET sublocality_latitude = st_y(centroid::geometry), sublocality_longitude = st_x(centroid::geometry),
-        #         sublocality_value = ea.alternative_value, sublocality_location = centroid
-        #         FROM entity_address ea
-        #         WHERE sublocality_id = ea.id
-        #         ''', []).execute()
-
-        # RawSql('''update temp_url set location = sublocality_location where sublocality_location is not null''',
-        #        []).execute()
-
         RawSql('''update temp_url set location = locality_location where location is null''', []).execute()
 
         update_spec_extras_query = '''update  temp_url 
@@ -784,19 +773,45 @@ class IpdProcedure:
                                    json_build_object('locality_id', locality_id, 'locality_value', locality_value, 'locality_latitude', 
                                    locality_latitude,'locality_longitude', locality_longitude), 'ipd_procedure', ipd_procedure)
                                   where sitemap_identifier in ('IPD_PROCEDURE_CITY')'''
-        update_spec_extras = RawSql(update_spec_extras_query, []).execute()
+        RawSql(update_spec_extras_query, []).execute()
 
+        copy_for_hospitals = '''insert into temp_url (ipd_procedure_id, ipd_procedure, search_slug, locality_id, 
+                      sitemap_identifier, entity_type, url_type, is_valid, created_at, updated_at, 
+                      locality_latitude, locality_longitude, locality_value, locality_location, location, extras) 
+            select ipd_procedure_id, ipd_procedure, search_slug, locality_id, 
+                      'IPD_PROCEDURE_HOSPITAL_CITY' as sitemap_identifier, 'Hospital', 'SEARCHURL' as url_type, is_valid, 
+                      now(), now(), locality_latitude, locality_longitude, locality_value
+                      , locality_location, location, extras from temp_url where sitemap_identifier = 'IPD_PROCEDURE_CITY' '''
+        RawSql(copy_for_hospitals, []).execute()
 
-
-        # SHASHANK_SINGH copy above data
+        copy_for_doctors = '''insert into temp_url (ipd_procedure_id, ipd_procedure, search_slug, locality_id, 
+                              sitemap_identifier, entity_type, url_type, is_valid, created_at, updated_at, 
+                              locality_latitude, locality_longitude, locality_value, locality_location, location, extras) 
+                    select ipd_procedure_id, ipd_procedure, search_slug, locality_id, 
+                                  'IPD_PROCEDURE_DOCTOR_CITY' as sitemap_identifier, 'Doctor', 'SEARCHURL' as url_type, is_valid, 
+                              now(), now(), locality_latitude, locality_longitude, locality_value
+                              , locality_location, location, extras from temp_url where sitemap_identifier = 'IPD_PROCEDURE_CITY' '''
+        RawSql(copy_for_doctors, []).execute()
 
         # IPD_PROCEDURE_COST_IN_IPDP
         update_urls_query = '''update temp_url set url =  
                     slugify_url(concat(ipd_procedure,'-cost-in-', search_slug, '-ipdp'))
                     where sitemap_identifier in ('IPD_PROCEDURE_CITY')'''
-        update_urls = RawSql(update_urls_query, []).execute()
+        RawSql(update_urls_query, []).execute()
 
-        # SHASHANK_SINGH Don't know what this is
+        # IPD_PROCEDURE_HOSPITAL_CITY_IPDHP
+        update_urls_query_2 = '''update temp_url set url =  
+                            slugify_url(concat(ipd_procedure,'-hospitals-in-', search_slug, '-ipdhp'))
+                            where sitemap_identifier in ('IPD_PROCEDURE_HOSPITAL_CITY')'''
+        RawSql(update_urls_query_2, []).execute()
+
+        # IPD_PROCEDURE_DOCTOR_CITY_IPDDP
+        update_urls_query_3 = '''update temp_url set url =  
+                                    slugify_url(concat(ipd_procedure,'-doctors-in-', search_slug, '-ipddp'))
+                                    where sitemap_identifier in ('IPD_PROCEDURE_DOCTOR_CITY')'''
+        RawSql(update_urls_query_3, []).execute()
+
+
         RawSql('''delete from temp_url where id in (select id from (select tu.*,
                 row_number() over(partition by tu.url order by ea.child_count desc nulls last, tu.count desc nulls last) rownum
                 from temp_url tu inner join entity_address ea on 

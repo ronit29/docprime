@@ -1959,6 +1959,8 @@ class HospitalRequestSerializer(serializers.Serializer):
     min_distance = serializers.IntegerField(required=False)
     max_distance = serializers.IntegerField(required=False)
     provider_ids = CommaSepratedToListField(required=False, max_length=500, typecast_to=int)
+    city = serializers.CharField(required=False, allow_blank=True, allow_null=True)
+
 
     def validate_provider_ids(self, attrs):
         try:

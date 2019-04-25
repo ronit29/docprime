@@ -558,7 +558,8 @@ def doctor_query_parameters(entity, req_params):
         params_dict["longitude"] = entity.sublocality_longitude
     elif entity.locality_longitude:
         params_dict["longitude"] = entity.locality_longitude
-
+    if entity.ipd_procedure_id:
+        params_dict["ipd_procedure_ids"] = str(entity.ipd_procedure_id)
 
     # if entity_params.get("location_json"):
     #     if entity_params["location_json"].get("sublocality_latitude"):

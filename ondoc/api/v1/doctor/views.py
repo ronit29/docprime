@@ -1289,8 +1289,10 @@ class DoctorListViewSet(viewsets.GenericViewSet):
             entity = entity_url_qs[0]
             if not entity.is_valid:
                 valid_qs = EntityUrls.objects.filter(is_valid=True, specialization_id=entity.specialization_id,
-                                          locality_id=entity.locality_id, sublocality_id=entity.sublocality_id,
-                                          sitemap_identifier=entity.sitemap_identifier).order_by('-sequence')
+                                                     locality_id=entity.locality_id,
+                                                     sublocality_id=entity.sublocality_id,
+                                                     ipd_procedure_id=entity.ipd_procedure_id,
+                                                     sitemap_identifier=entity.sitemap_identifier).order_by('-sequence')
 
                 if valid_qs.exists():
                     corrected_url = valid_qs.first().url
@@ -1362,6 +1364,7 @@ class DoctorListViewSet(viewsets.GenericViewSet):
             validated_data['locality_longitude'] = entity.locality_longitude if entity.locality_longitude else None
             validated_data['breadcrumb'] = entity.breadcrumb if entity.breadcrumb else None
             validated_data['sitemap_identifier'] = entity.sitemap_identifier if entity.sitemap_identifier else None
+            validated_data['ipd_procedure'] = entity.ipd_procedure if entity.ipd_procedure else None
             specialization_id = entity.specialization_id if entity.specialization_id else None
 
         if kwargs.get('ratings'):
@@ -1514,6 +1517,11 @@ class DoctorListViewSet(viewsets.GenericViewSet):
             if validated_data.get('sitemap_identifier') == 'SPECIALIZATION_CITY':
                 title, description, ratings_title = self.get_spec_city_title_desc(specialization_id, city, specialization)
 
+            if validated_data.get('sitemap_identifier') == 'IPD_PROCEDURE_DOCTOR_CITY':
+                title = '{ipd_procedure_name} Doctors in {city} | Best {ipd_procedure_name} Specialists'.format(
+                    ipd_procedure_name=validated_data.get('ipd_procedure'), city=city)
+                description = '{ipd_procedure_name} Doctors in {city} : Check {ipd_procedure_name} doctors in {city}. View address, reviews, cost estimate and more at docprime.'.format(
+                    ipd_procedure_name=validated_data.get('ipd_procedure'), city=city)
 
             elif validated_data.get('sitemap_identifier') == 'SPECIALIZATION_LOCALITY_CITY':
                 title = specialization
@@ -3546,13 +3554,80 @@ class AppointmentMessageViewset(viewsets.GenericViewSet):
 
 class HospitalViewSet(viewsets.GenericViewSet):
 
-    def list(self, request, ipd_pk, count=None):
-        serializer = serializers.HospitalRequestSerializer(data=request.query_params)
+    def list_by_url(self, request, url, *args, **kwargs):
+        url = url.lower()
+        entity_url_qs = EntityUrls.objects.filter(url=url, url_type=EntityUrls.UrlType.SEARCHURL,
+                                                  entity_type='Hospital').order_by('-sequence')
+        if not entity_url_qs.exists():
+            return Response(status=status.HTTP_404_NOT_FOUND)
+
+        entity = entity_url_qs.first()
+        if not entity.is_valid:
+            valid_qs = EntityUrls.objects.filter(is_valid=True, ipd_procedure_id=entity.ipd_procedure_id,
+                                                 locality_id=entity.locality_id,
+                                                 sublocality_id=entity.sublocality_id,
+                                                 sitemap_identifier=entity.sitemap_identifier).order_by('-sequence')
+
+            if valid_qs.exists():
+                corrected_url = valid_qs.first().url
+                return Response(status=status.HTTP_301_MOVED_PERMANENTLY, data={'url': corrected_url})
+            else:
+                return Response(status=status.HTTP_400_BAD_REQUEST)
+        kwargs['request_data'] = ipd_query_parameters(entity, request.query_params)
+        kwargs['entity'] = entity
+        response = self.list(request, entity.ipd_procedure_id, **kwargs)
+        return response
+
+    def list(self, request, ipd_pk, count=None, *args, **kwargs):
+        request_data = request.query_params
+        temp_request_data = kwargs.get('request_data')
+        if temp_request_data:
+            request_data = temp_request_data
+        serializer = serializers.HospitalRequestSerializer(data=request_data)
         serializer.is_valid(raise_exception=True)
         validated_data = serializer.validated_data
         ipd_procedure_obj = IpdProcedure.objects.filter(id=ipd_pk, is_enabled=True).first()
         if not ipd_procedure_obj:
             return Response([], status=status.HTTP_400_BAD_REQUEST)
+
+        url = canonical_url = title = description = top_content = bottom_content = city = None
+        entity = kwargs.get('entity')
+        if not entity:
+            if validated_data.get('city'):
+                if validated_data.get('city').lower() in ('bengaluru', 'bengalooru'):
+                    city = 'bangalore'
+                elif validated_data.get('city').lower() in ('gurugram', 'gurugram rural'):
+                    city = 'gurgaon'
+                else:
+                    city = validated_data.get('city')
+                # IPD_PROCEDURE_COST_IN_IPDP
+                temp_url = slugify(ipd_procedure_obj.name + '-hospitals-in-' + city + '-ipdhp')
+                entity = EntityUrls.objects.filter(url=temp_url, url_type='SEARCHURL', entity_type='Hospital',
+                                                   is_valid=True,
+                                                   locality_value__iexact=city).first()
+
+        if entity:
+            city = entity.locality_value
+            url = entity.url
+            title = 'Best {ipd_procedure_name} Hospitals in {city} | Book Hospital & Get Discount'.format(
+                ipd_procedure_name=ipd_procedure_obj.name, city=city).title()
+            canonical_url = entity.url
+            description = '{ipd_procedure_name} Hospitals in {city} : Check {ipd_procedure_name} hospitals in {city}. View address, reviews, cost estimate and more at docprime.'.format(
+                ipd_procedure_name=ipd_procedure_obj.name, city=city)
+
+        if url:
+            new_dynamic_object = NewDynamic.objects.filter(url_value=url, is_enabled=True).first()
+            if new_dynamic_object:
+                if new_dynamic_object.meta_title:
+                    title = new_dynamic_object.meta_title
+                if new_dynamic_object.meta_description:
+                    description = new_dynamic_object.meta_description
+                if new_dynamic_object.top_content:
+                    top_content = new_dynamic_object.top_content
+                if new_dynamic_object.bottom_content:
+                    bottom_content = new_dynamic_object.bottom_content
+
+
         lat = validated_data.get('lat')
         long = validated_data.get('long')
         min_distance = validated_data.get('min_distance')
@@ -3592,7 +3667,10 @@ class HospitalViewSet(viewsets.GenericViewSet):
         return Response({'count': result_count, 'result': top_hospital_serializer.data,
                          'ipd_procedure': {'id': ipd_procedure_obj.id, 'name': ipd_procedure_obj.name},
                          'health_insurance_providers': [{'id': x.id, 'name': x.name} for x in
-                                                        HealthInsuranceProvider.objects.all()]})
+                                                        HealthInsuranceProvider.objects.all()],
+                         'seo': {'url': url, 'title': title, 'description': description, 'location': city},
+                         'search_content': top_content, 'bottom_content': bottom_content,
+                         'canonical_url': canonical_url})
 
     @transaction.non_atomic_requests
     def retrieve_by_url(self, request):
@@ -3693,14 +3771,14 @@ class IpdProcedureViewSet(viewsets.GenericViewSet):
 
     def ipd_procedure_detail_by_url(self, request, url, *args, **kwargs):
         url = url.lower()
-        entity_url_qs = EntityUrls.objects.filter(url=url, url_type=EntityUrls.UrlType.SEARCHURL,
+        entity_url_qs = EntityUrls.objects.filter(url=url, url_type=EntityUrls.UrlType.PAGEURL,
                                                   entity_type='IpdProcedure').order_by('-sequence')
         if not entity_url_qs.exists():
             return Response(status=status.HTTP_404_NOT_FOUND)
 
         entity = entity_url_qs.first()
         if not entity.is_valid:
-            valid_qs = EntityUrls.objects.filter(is_valid=True, specialization_id=entity.ipd_procedure,
+            valid_qs = EntityUrls.objects.filter(is_valid=True, ipd_procedure_id=entity.ipd_procedure_id,
                                                  locality_id=entity.locality_id,
                                                  sublocality_id=entity.sublocality_id,
                                                  sitemap_identifier=entity.sitemap_identifier).order_by('-sequence')
@@ -3742,15 +3820,18 @@ class IpdProcedureViewSet(viewsets.GenericViewSet):
                     city = validated_data.get('city')
                 # IPD_PROCEDURE_COST_IN_IPDP
                 temp_url = slugify(ipd_procedure.name + '-cost-in-' + city + '-ipdp')
-                entity = EntityUrls.objects.filter(url=temp_url, url_type='SEARCHURL', entity_type='IpdProcedure', is_valid=True,
+                entity = EntityUrls.objects.filter(url=temp_url, url_type=EntityUrls.UrlType.PAGEURL,
+                                                   entity_type='IpdProcedure', is_valid=True,
                                                    locality_value__iexact=city).first()
 
         if entity:
             city = entity.locality_value
             url = entity.url
             title = '{ipd_procedure_name} Cost in {city} | Book & Get Upto 50% Off'.format(
-                ipd_procedure_name=ipd_procedure.name, city=city).title()
+                ipd_procedure_name=ipd_procedure.name, city=city)
             canonical_url = entity.url
+            description = '{ipd_procedure_name} Cost in {city} : Check {ipd_procedure_name} doctors , hospitals, address & contact number in {city}.'.format(
+                ipd_procedure_name=ipd_procedure.name, city=city)
 
         if url:
             new_dynamic_object = NewDynamic.objects.filter(url_value=url, is_enabled=True).first()
@@ -3777,8 +3858,16 @@ class IpdProcedureViewSet(viewsets.GenericViewSet):
                                                                                                     'doctor_result_data': doctor_result_data})
         return Response(
             {'about': ipd_procedure_serializer.data, 'hospitals': hospital_result.data, 'doctors': doctor_result_data,
-             'seo': {'url': url, 'canonical_url': canonical_url, 'title': title, 'description': description,
-                     'top_content': top_content, 'bottom_content': bottom_content, 'city': city}})
+             'seo': {'url': url, 'title': title, 'description': description, 'location': city},
+             'search_content': top_content, 'bottom_content': bottom_content, 'canonical_url': canonical_url})
+
+
+    #                          'specializations': specializations, 'conditions': conditions, "seo": seo,
+    #                          "breadcrumb": breadcrumb, 'search_content': top_content,
+    #                          'procedures': procedures, 'procedure_categories': procedure_categories,
+    #                          'ratings':ratings, 'reviews': reviews, 'ratings_title': ratings_title,
+    #                          'bottom_content': bottom_content, 'canonical_url': canonical_url,
+    #                          'ipd_procedures': ipd_procedures})
 
     def create_lead(self, request):
         serializer = serializers.IpdProcedureLeadSerializer(data=request.data)
