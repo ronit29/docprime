@@ -89,13 +89,13 @@ LOGGING = {
         },
     },
 }
+SENTRY_DSN = env('DJANGO_SENTRY_DSN')
 
 if env('ENABLE_SENTRY', default=False):
     INSTALLED_APPS += ('raven.contrib.django.raven_compat',)
     RAVEN_MIDDLEWARE = ['raven.contrib.django.raven_compat.middleware.SentryResponseErrorIdMiddleware']
     MIDDLEWARE = RAVEN_MIDDLEWARE + MIDDLEWARE
     # Sentry Configuration
-    SENTRY_DSN = env('DJANGO_SENTRY_DSN')
     SENTRY_CLIENT = env('DJANGO_SENTRY_CLIENT', default='raven.contrib.django.raven_compat.DjangoClient')
     SENTRY_CELERY_LOGLEVEL = env.int('DJANGO_SENTRY_LOG_LEVEL', logging.INFO)
     RAVEN_CONFIG = {
