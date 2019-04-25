@@ -1437,7 +1437,7 @@ class MerchantPayout(TimeStampedModel):
         elif self.opd_appointment.all():
             return self.opd_appointment.all()[0]
         elif self.user_insurance.all():
-            self.user_insurance.all()[0]
+            return self.user_insurance.all()[0]
         return None
 
     def get_billed_to(self):

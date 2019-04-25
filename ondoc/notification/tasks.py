@@ -311,13 +311,20 @@ def set_order_dummy_transaction(self, order_id, user_id):
                 insurance_order_id = insurance_order_transaction.order_id
                 insurance_order_number = insurance_order_transaction.order_no
 
+            name  = ''
+            if isinstance(appointment, OpdAppointment) or isinstance(appointment, LabAppointment):
+                name = appointment.profile.name
+
+            if isinstance(appointment, UserInsurance):
+                name = appointment.user.full_name
+           
             req_data = {
                 "customerId": user_id,
                 "mobile": user.phone_number,
                 "email": user.email or "dummyemail@docprime.com",
                 "productId": order_row.product_id,
                 "orderId": order_id,
-                "name": appointment.profile.name,
+                "name": name,
                 "txAmount": 0,
                 "couponCode": "",
                 "couponAmt": str(total_price),
