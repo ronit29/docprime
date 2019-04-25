@@ -26,7 +26,7 @@ from num2words import num2words
 from hardcopy import bytestring_to_pdf
 import math
 import reversion
-from ondoc.account.models import Order
+from ondoc.account.models import Order, Merchant, MerchantPayout
 from decimal import  *
 logger = logging.getLogger(__name__)
 from django.utils.functional import cached_property
@@ -280,6 +280,8 @@ class Insurer(auth_model.TimeStampedModel, LiveMixin):
     cgst = models.PositiveSmallIntegerField(blank=False, null=True)
     state = models.ForeignKey(StateGSTCode, on_delete=models.CASCADE, default=None, blank=False, null=True)
     insurer_merchant_code = models.CharField(max_length=100, null=True, blank=False, unique=True)
+    merchant = models.ForeignKey(Merchant, on_delete=models.DO_NOTHING, related_name='insurer', null=True)
+
     # master_policy_number = models.CharField(max_length=50, null=True, blank=False)
 
     @property
@@ -416,9 +418,32 @@ class UserInsurance(auth_model.TimeStampedModel):
     price_data = JSONField(blank=True, null=True)
     money_pool = models.ForeignKey(MoneyPool, on_delete=models.SET_NULL, null=True)
     matrix_lead_id = models.IntegerField(null=True)
+    merchant_payout = models.ForeignKey(MerchantPayout, related_name="user_insurance", on_delete=models.DO_NOTHING, null=True)
 
     def __str__(self):
         return str(self.user)
+
+    def save(self, *args, **kwargs):
+        super().save(*args, **kwargs)
+
+    def create_payout(self):
+        if self.merchant_payout:
+            raise Exception("payout already created for this insurance purchase")
+
+
+        payout_data = {
+            "charged_amount" : self.premium_amount,
+            "payable_amount" : self.premium_amount,
+            "content_object" : self.insurance_plan.insurer,
+            "type"   : MerchantPayout.AUTOMATIC,
+            "paid_to"        : self.insurance_plan.insurer.merchant,
+            "booking_type"   : Order.INSURANCE_PRODUCT_ID
+        }
+
+        merchant_payout = MerchantPayout.objects.create(**payout_data)
+        self.merchant_payout = merchant_payout
+        self.save()
+
 
     def get_primary_member_profile(self):
         insured_members = self.members.filter().order_by('id')

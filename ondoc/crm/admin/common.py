@@ -488,6 +488,10 @@ class MerchantPayoutAdmin(ExportMixin, VersionAdmin):
         elif isinstance(appt, LabAppointment):
             if appt.lab:
                 return appt.lab.name
+        elif isinstance(appt, UserInsurance):
+            if appt.insurance_plan.insurer:
+                return appt.insurance_plan.insurer.name
+
         return ''
 
     def appointment_id(self, instance):
