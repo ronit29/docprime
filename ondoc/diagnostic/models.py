@@ -1526,9 +1526,10 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin,
     def sync_with_booking_analytics(self):
 
         category = None
-        for cat in self.tests.all():
-            if cat.is_package == True:
+        for t in self.tests.all():
+            if t.is_package == True:
                 category = 1
+                break
             else:
                 category = 0
 
