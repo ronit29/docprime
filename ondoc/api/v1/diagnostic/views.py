@@ -2634,7 +2634,12 @@ class DigitalReports(viewsets.GenericViewSet):
         if not appointment_obj:
             return Response(status=status.HTTP_400_BAD_REQUEST, data={'error': 'Invalid booking_id.'})
 
-        booked_tests = appointment_obj.test_mappings.filter().values_list('doctor', flat=True)
+        integrator_response = appointment_obj.integrator_response.all().first()
+        if not integrator_response:
+            return Response(status=status.HTTP_400_BAD_REQUEST,
+                            data={'error': 'No response found from integrator for this appointment.'})
+
+        booked_tests = appointment_obj.test_mappings.filter().values_list('test', flat=True)
         response['profiles_count'] = booked_tests.count()
         profiles = list()
 
@@ -2643,11 +2648,6 @@ class DigitalReports(viewsets.GenericViewSet):
             LabTestThresholds.Colour.ORANGE.lower(): 0,
             LabTestThresholds.Colour.GREEN.lower(): 0
         }
-
-        integrator_response = appointment_obj.integrator_response.all().first()
-        if not integrator_response:
-            return Response(status=status.HTTP_400_BAD_REQUEST,
-                            data={'error': 'No response found from integrator for this appointment.'})
 
         integrator_report = IntegratorReport.objects.filter(integrator_response_id=integrator_response.id).first()
         if not integrator_report:
