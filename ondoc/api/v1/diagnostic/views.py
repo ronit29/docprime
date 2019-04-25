@@ -4,7 +4,7 @@ from ondoc.api.v1.diagnostic.serializers import CustomLabTestPackageSerializer
 from ondoc.authentication.backends import JWTAuthentication
 from ondoc.api.v1.diagnostic import serializers as diagnostic_serializer
 from ondoc.api.v1.auth.serializers import AddressSerializer
-from ondoc.integrations.models import IntegratorTestMapping
+from ondoc.integrations.models import IntegratorTestMapping, IntegratorReport
 from ondoc.cart.models import Cart
 from ondoc.common.models import UserConfig, GlobalNonBookable, AppointmentHistory
 from ondoc.ratings_review import models as rating_models
@@ -2644,6 +2644,18 @@ class DigitalReports(viewsets.GenericViewSet):
             LabTestThresholds.Colour.GREEN.lower(): 0
         }
 
+        integrator_response = appointment_obj.integrator_response.all().first()
+        if not integrator_response:
+            return Response(status=status.HTTP_400_BAD_REQUEST,
+                            data={'error': 'No response found from integrator for this appointment.'})
+
+        integrator_report = IntegratorReport.objects.filter(integrator_response_id=integrator_response.id).first()
+        if not integrator_report:
+            return Response(status=status.HTTP_400_BAD_REQUEST,
+                            data={'error': 'No report found from integrator for this appointment.'})
+
+        report_json = integrator_report.json_data
+
         for booked_test in booked_tests:
             profile_dict = dict()
             parameter_list = list()
@@ -2656,7 +2668,8 @@ class DigitalReports(viewsets.GenericViewSet):
                 parameter_dict = dict()
                 parameter_dict['name'] = parameter.name
                 parameter_dict['details'] = parameter.details
-                integrator_parameter_id = parameter.integrator_mapped_parameters.filter().first()
+                integrator_parameter_obj = parameter.integrator_mapped_parameters.filter().first()
+
                 #TODO: get value from report json and remove below line.
                 value = 0
 
