@@ -855,7 +855,7 @@ class DummyTransactions(TimeStampedModel):
 
     user = models.ForeignKey(User, on_delete=models.DO_NOTHING)
     product_id = models.SmallIntegerField(choices=Order.PRODUCT_IDS)
-    reference_id = models.PositiveIntegerField(blank=True, null=True)
+    reference_id = models.BigIntegerField(blank=True, null=True)
     order = models.ForeignKey(Order, on_delete=models.CASCADE, null=True, related_name="dummy_txn")
     order_no = models.CharField(max_length=100, blank=True, null=True)
     type = models.SmallIntegerField(choices=TYPE_CHOICES)
