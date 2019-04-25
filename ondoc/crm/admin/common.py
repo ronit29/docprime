@@ -11,7 +11,8 @@ from django.conf import settings
 from django.utils.dateparse import parse_datetime
 from ondoc.authentication.models import Merchant, AssociatedMerchant, QCModel
 from ondoc.account.models import MerchantPayout
-from ondoc.common.models import Cities, MatrixCityMapping, PaymentOptions, Remark, MatrixMappedCity, MatrixMappedState, GlobalNonBookable
+from ondoc.common.models import Cities, MatrixCityMapping, PaymentOptions, Remark, MatrixMappedCity, MatrixMappedState, \
+    GlobalNonBookable, UserConfig
 from import_export import resources, fields
 from import_export.admin import ImportMixin, base_formats, ImportExportMixin, ImportExportModelAdmin, ExportMixin
 from reversion.admin import VersionAdmin
@@ -423,9 +424,10 @@ class MerchantPayoutForm(forms.ModelForm):
             if not billed_to:
                 raise forms.ValidationError("Billing entity not defined.")
 
-            associated_merchant = billed_to.merchant.first()
-            if not associated_merchant.verified:
-                raise forms.ValidationError("Associated Merchant not verified.")
+            if not self.instance.booking_type == payout_data.InsurancePremium:
+                associated_merchant = billed_to.merchant.first()
+                if not associated_merchant.verified:
+                    raise forms.ValidationError("Associated Merchant not verified.")
 
         if not self.instance.status == self.instance.PENDING:
             raise forms.ValidationError("This payout is already under process")
@@ -487,6 +489,10 @@ class MerchantPayoutAdmin(ExportMixin, VersionAdmin):
         elif isinstance(appt, LabAppointment):
             if appt.lab:
                 return appt.lab.name
+        elif isinstance(appt, UserInsurance):
+            if appt.insurance_plan.insurer:
+                return appt.insurance_plan.insurer.name
+
         return ''
 
     def appointment_id(self, instance):
@@ -613,8 +619,23 @@ class MatrixMappedCityResource(resources.ModelResource):
         fields = ('id', 'name', 'state_id')
 
 
+class MatrixMappedCityAdminForm(forms.ModelForm):
+    def clean(self):
+        super().clean()
+        if any(self.errors):
+            return
+        cleaned_data = self.cleaned_data
+        state = cleaned_data.get('state', None)
+        city_name = cleaned_data.get('name', '')
+        if not state:
+            raise forms.ValidationError("State is required.")
+        if state and city_name:
+            if MatrixMappedCity.objects.filter(name__iexact=city_name.strip(), state=state).exists():
+                raise forms.ValidationError("City-State combination already exists.")
+
 
 class MatrixMappedCityAdmin(ImportMixin, admin.ModelAdmin):
+    form = MatrixMappedCityAdminForm
     formats = (base_formats.XLS, base_formats.XLSX,)
     list_display = ('name', 'state')
     readonly_fields = ('name', 'state', )
@@ -625,6 +646,7 @@ class MatrixMappedCityAdmin(ImportMixin, admin.ModelAdmin):
         if not request.user.is_superuser and not request.user.groups.filter(name=constants['SUPER_QC_GROUP']).exists():
             return super().get_readonly_fields(request, obj)
         return ()
+
 
 class MatrixStateAutocomplete(autocomplete.Select2QuerySetView):
 
@@ -649,4 +671,16 @@ class MatrixCityAutocomplete(autocomplete.Select2QuerySetView):
             queryset = queryset.filter(name__istartswith=self.q)
 
         return queryset
+
+
+class ContactUsAdmin(admin.ModelAdmin):
+    list_display = ('name', 'mobile', 'email', 'from_app')
+    fields = ('name', 'mobile', 'email', 'message', 'from_app')
+    readonly_fields = ('name', 'mobile', 'email', 'message', 'from_app')
+    list_filter = ("from_app",)
+
+
+class UserConfigAdmin(admin.ModelAdmin):
+    model = UserConfig
+    list_display = ('key',)
 

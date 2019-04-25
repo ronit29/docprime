@@ -22,7 +22,7 @@ from ondoc.notification.rabbitmq_client import publish_message
 # from ondoc.notification.sqs_client import publish_message
 from django.template.loader import render_to_string
 from . import serializers
-from ondoc.common.models import Cities, PaymentOptions
+from ondoc.common.models import Cities, PaymentOptions, UserConfig
 from ondoc.common.utils import send_email, send_sms
 from ondoc.authentication.backends import JWTAuthentication
 from django.core.files.uploadedfile import SimpleUploadedFile, TemporaryUploadedFile, InMemoryUploadedFile
@@ -908,9 +908,12 @@ class GetSearchUrlViewSet(viewsets.GenericViewSet):
     def search_url(self, request):
         params = request.query_params
         specialization_ids = params.get("specialization", '')
+        # from_app = params.get("from_app", False)
         test_ids = params.get("test", '')
         lat = params.get("lat", 28.4485)  # if no lat long then default to gurgaon
         long = params.get("long", 77.0759)
+
+        # if from_app == False:
 
         opd_search_url = "%s/opd/searchresults?specializations=%s" \
                          "&lat=%s&long=%s" \
@@ -923,3 +926,32 @@ class GetSearchUrlViewSet(viewsets.GenericViewSet):
         tiny_lab_search_url = generate_short_url(lab_search_url)
 
         return Response({"opd_search_url": tiny_opd_search_url, "lab_search_url": tiny_lab_search_url})
+        #
+        # else:
+        #
+        #     opd_search_url = "docprm://docprime.com/opd/searchresults?specializations=%s" \
+        #                      "&lat=%s&long=%s" \
+        #                      % (specialization_ids, lat, long)
+        #
+        #     lab_search_url = "docprm://docprime.com/lab/searchresults?test_ids=%s" \
+        #                      "&lat=%s&long=%s" \
+        #                      % (test_ids, lat, long)
+        #
+        #     return Response({"opd_search_url": opd_search_url, "lab_search_url": lab_search_url})
+
+
+
+class GetKeyDataViewSet(viewsets.GenericViewSet):
+
+    def list(self, request):
+
+        parameters = request.query_params
+        key = parameters.get('key')
+        queryset = UserConfig.objects.filter(key__iexact=key)
+        resp = []
+        for info in queryset:
+            data_key = info.key
+            data_key = data_key.lower()
+            data = info.data
+            resp.append({'data': data, 'key': data_key})
+            return Response(resp)

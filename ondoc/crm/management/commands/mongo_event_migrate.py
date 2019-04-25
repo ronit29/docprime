@@ -51,7 +51,7 @@ class Command(BaseCommand):
         # storing events
         counter = 0
         try:
-            for psql_events in EventMigrateIterator(4, 6*30*10):
+            for psql_events in EventMigrateIterator(1, 6*30):
                 print('read from postgres done '+ str(datetime.now()))
                 counter += 1
                 create_objects = []
@@ -75,7 +75,7 @@ class Command(BaseCommand):
 
                 if create_objects:
                     track_mongo_models.TrackingEvent.objects.insert(create_objects)
-                print('objects created in mongo '+len(create_objects)+' '+ str(datetime.now()))
+                print('objects created in mongo '+str(len(create_objects))+' '+ str(datetime.now()))
                 print("MIGRATED COUNT : " + str(total_migrated))
 
         except StopIteration:

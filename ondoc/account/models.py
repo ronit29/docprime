@@ -1335,6 +1335,13 @@ class MerchantPayout(TimeStampedModel):
     AUTOMATIC = 1
     MANUAL = 2
 
+
+    DoctorPayout = Order.DOCTOR_PRODUCT_ID
+    LabPayout = Order.LAB_PRODUCT_ID
+    InsurancePremium = Order.INSURANCE_PRODUCT_ID
+    BookingTypeChoices = [(DoctorPayout,'Doctor Booking'),(LabPayout,'Lab Booking'),(InsurancePremium,'Insurance Booking')]
+
+
     NEFT = "NEFT"
     IMPS = "IMPS"
     IFT = "IFT"
@@ -1350,6 +1357,7 @@ class MerchantPayout(TimeStampedModel):
     payout_approved = models.BooleanField(default=False)
     status = models.PositiveIntegerField(default=PENDING, choices=STATUS_CHOICES)
     payout_time = models.DateTimeField(null=True, blank=True)
+    request_data = JSONField(blank=True, default='', editable=False)
     api_response = JSONField(blank=True, null=True)
     status_api_response = JSONField(blank=True, default='', editable=False)
     retry_count = models.PositiveIntegerField(default=0)
@@ -1361,6 +1369,7 @@ class MerchantPayout(TimeStampedModel):
     content_type = models.ForeignKey(ContentType, on_delete=models.CASCADE, null=True, blank=True)
     object_id = models.PositiveIntegerField(null=True, blank=True)
     content_object = GenericForeignKey()
+    booking_type = models.IntegerField(null=True, blank=True, choices=BookingTypeChoices)
 
     def save(self, *args, **kwargs):
 
@@ -1389,7 +1398,7 @@ class MerchantPayout(TimeStampedModel):
         if self.type == self.MANUAL and self.utr_no and self.status == self.PENDING:
             self.status = self.PAID
 
-        if not first_instance and self.status != self.PENDING:
+        if (not first_instance and self.status != self.PENDING) and not self.booking_type == InsurancePremium:
             from ondoc.matrix.tasks import push_appointment_to_matrix
 
             appointment = self.lab_appointment.all().first()
@@ -1427,6 +1436,8 @@ class MerchantPayout(TimeStampedModel):
             return self.lab_appointment.all()[0]
         elif self.opd_appointment.all():
             return self.opd_appointment.all()[0]
+        elif self.user_insurance.all():
+            self.user_insurance.all()[0]
         return None
 
     def get_billed_to(self):
