@@ -424,12 +424,13 @@ class UserInsurance(auth_model.TimeStampedModel):
         return str(self.user)
 
     def save(self, *args, **kwargs):
+        if not self.merchant_payout:
+            self.create_payout()
         super().save(*args, **kwargs)
 
     def create_payout(self):
         if self.merchant_payout:
             raise Exception("payout already created for this insurance purchase")
-
 
         payout_data = {
             "charged_amount" : self.premium_amount,
@@ -442,8 +443,16 @@ class UserInsurance(auth_model.TimeStampedModel):
 
         merchant_payout = MerchantPayout.objects.create(**payout_data)
         self.merchant_payout = merchant_payout
+
+    def save_payout(self):
+        self.create_payout()
         self.save()
 
+    @classmethod
+    def generate_pending_payouts(cls):
+        bookings = cls.objects.filter(merchant_payout__isnull=True)
+        for booking in bookings:
+            booking.save_payout()
 
     def get_primary_member_profile(self):
         insured_members = self.members.filter().order_by('id')
@@ -1125,11 +1134,17 @@ class InsuranceTransaction(auth_model.TimeStampedModel):
     DEBIT = 2
     TRANSACTION_TYPE_CHOICES = ((CREDIT, 'CREDIT'), (DEBIT, "DEBIT"),)
 
+    INSURANCE_PURCHASE = 1
+    PREMIUM_PAYOUT = 2
+
+    REASON_CHOICES = ((INSURANCE_PURCHASE,'Insurance purchase'),(PREMIUM_PAYOUT,'Premium payout'))
+
     # user_insurance = models.ForeignKey(UserInsurance,related_name='transactions', on_delete=models.DO_NOTHING)
     user_insurance = models.ForeignKey(UserInsurance,related_name='transactions', on_delete=models.DO_NOTHING, default=None)
     account = models.ForeignKey(InsurerAccount,related_name='transactions', on_delete=models.DO_NOTHING)
     transaction_type = models.PositiveSmallIntegerField(choices=TRANSACTION_TYPE_CHOICES)
     amount = models.PositiveSmallIntegerField(default=0)
+    reason = models.PositiveSmallIntegerField(null=True, choices=REASON_CHOICES)
 
     def after_commit_tasks(self):
         if self.transaction_type == InsuranceTransaction.DEBIT:
@@ -1142,16 +1157,19 @@ class InsuranceTransaction(auth_model.TimeStampedModel):
                                                      link=push_insurance_buy_to_matrix.s(user_id=self.user_insurance.user.id), countdown=1)
 
     def save(self, *args, **kwargs):
+        #should never be saved again
         if self.pk:
             return
 
         super().save(*args, **kwargs)
+
         transaction_amount = self.amount
         if self.transaction_type == self.DEBIT:
-            self.amount = -1*transaction_amount
+            transaction_amount = -1*transaction_amount
 
-        self.account.current_float += self.amount
-        self.account.save()
+        insurer_account = InsurerAccount.objects.select_for_update().get(insurer=self.user_insurance.insurance_plan.insurer)
+        insurer_account.current_float += transaction_amount        
+        insurer_account.save()
 
         transaction.on_commit(lambda: self.after_commit_tasks())
 
