@@ -201,6 +201,242 @@ class LabList(viewsets.ReadOnlyModelViewSet):
         min_distance = min_distance*1000 if min_distance is not None else 0
 
         package_free_or_not_dict = get_package_free_or_not_dict(request)
+        page_size = 30
+        if not request.query_params.get('page') or int(request.query_params.get('page')) < 1:
+            page = 1
+        else:
+            page = int(request.query_params.get('page'))
+        offset = (page - 1) * page_size
+        valid_package_ids = None
+
+        if test_ids:
+            valid_package_ids = list(LabTest.objects.filter(test__id__in=test_ids).annotate(
+                included_test_count=Count('test')).filter(
+                included_test_count=len(test_ids)).distinct().values_list('id', flat=True))
+        if category_ids:
+            if valid_package_ids is None:
+                valid_package_ids = []
+            valid_package_ids.extend(list(
+                LabTest.objects.filter(test__recommended_categories__id__in=category_ids).distinct().values_list('id',
+                                                                                                                 flat=True)))
+
+        if package_category_ids:
+            if valid_package_ids is None:
+                valid_package_ids = []
+            valid_package_ids.extend(list(
+                LabTest.objects.filter(categories__id__in=package_category_ids).distinct().values_list('id',
+                                                                                               flat=True)))
+
+        if package_ids:
+            if valid_package_ids is None:
+                valid_package_ids = []
+            valid_package_ids.extend(package_ids)
+
+        if not valid_package_ids and valid_package_ids is not None:
+            valid_package_ids = [-1]
+
+
+        package_search_query = 'select x.*, CASE WHEN "x"."custom_deal_price" IS not NULL THEN "x"."custom_deal_price"'\
+                               ' else computed_deal_price END AS "price", ST_Distance(St_setsrid(St_point((%(longitude)s), (%(latitude)s)), 4326), x.location) as distance from '\
+                               ' (SELECT "lab_test"."id", "lab_test"."name","lab_test"."why","lab_test"."pre_test_info",' \
+                               ' "lab_test"."test_type", "lab_test"."is_package", "lab_test"."number_of_tests", "lab_test"."category",' \
+                               ' "lab_test"."sample_type", "lab_test"."home_collection_possible", "lab_test"."enable_for_ppc", "lab_test"."enable_for_retail", "lab_test"."about_test",' \
+                               ' "lab_test"."show_details", "lab_test"."priority", "lab_test"."hide_price",' \
+                               ' "lab_test"."searchable", "lab_test"."url", "lab_test"."custom_url", "lab_test"."min_age", "lab_test"."max_age",' \
+                               ' "lab_test"."gender_type",' \
+                               ' ("lab"."lab_priority" * "lab_test"."priority") AS "priority_score",' \
+                               ' "available_lab_test"."mrp" AS "mrp",' \
+                               ' "available_lab_test"."custom_deal_price",' \
+                               ' "available_lab_test"."computed_deal_price" ,' \
+                               ' "lab"."id" AS "lab",' \
+                               ' "lab"."location",' \
+                               ' ROW_NUMBER() OVER (PARTITION BY (Coalesce(lab.network_id, random())), "lab_test"."id"' \
+                               ' ORDER BY ST_Distance(St_setsrid(St_point((%(longitude)s), (%(latitude)s)), 4326), lab.location) ASC)' \
+                               ' AS "rnk"' \
+                               ' FROM "lab_test" inner JOIN "available_lab_test" ON ("lab_test"."id" = "available_lab_test"."test_id")' \
+                               ' inner JOIN "lab_pricing_group" ON ("available_lab_test"."lab_pricing_group_id" = "lab_pricing_group"."id")' \
+                               ' inner JOIN "lab" ON ("lab_pricing_group"."id" = "lab"."lab_pricing_group_id") WHERE' \
+                               ' ("lab_test"."enable_for_retail" = true AND "lab_test"."is_package" = true AND "lab_test"."searchable" = true' \
+                               ' AND "available_lab_test"."enabled" = true AND "lab"."enabled" = true AND "lab"."is_live" = true AND' \
+                               ' ST_DWithin("lab"."location", St_setsrid(St_point((%(longitude)s), (%(latitude)s)), 4326), %(max_distance)s))' \
+                               ' and not ST_DWithin("lab"."location", St_setsrid(St_point((%(longitude)s), (%(latitude)s)), 4326), %(min_distance)s)' \
+                               ' {filter_query}' \
+                               ' )x where rnk =1 {sort_query} offset {offset} limit {limit} '
+
+        package_count_query = ' SELECT count(distinct available_lab_test)' \
+                              ' FROM "lab_test" inner JOIN "available_lab_test" ON ("lab_test"."id" = "available_lab_test"."test_id")' \
+                              ' inner JOIN "lab_pricing_group" ON ("available_lab_test"."lab_pricing_group_id" = "lab_pricing_group"."id")' \
+                              ' inner JOIN "lab" ON ("lab_pricing_group"."id" = "lab"."lab_pricing_group_id") WHERE' \
+                              ' "lab_test"."enable_for_retail" = true AND "lab_test"."is_package" = true AND "lab_test"."searchable" = true' \
+                              ' AND "available_lab_test"."enabled" = true AND "lab"."enabled" = true AND "lab"."is_live" = true AND' \
+                              ' ST_DWithin("lab"."location", St_setsrid(St_point(%(longitude)s, %(latitude)s), 4326), %(max_distance)s)' \
+                              ' and not ST_DWithin("lab"."location", St_setsrid(St_point(%(longitude)s, %(latitude)s), 4326), %(min_distance)s)'
+        
+        params = {}
+        params['latitude'] = str(lat)
+        params['longitude'] = str(long)
+        sort_query = ''
+        if not sort_on:
+            sort_query = ' order by priority_score desc '
+        elif sort_on == 'fees':
+            sort_query = ' order by price asc '
+        elif sort_on == 'distance':
+            sort_query = ' order by distance asc '
+
+        filter_query = ''
+        params['min_distance'] = str(min_distance)
+        params['max_distance'] = str(max_distance)
+        if min_price:
+            filter_query += ' and case when custom_deal_price is not null then custom_deal_price>=%(min_price)s else computed_deal_price>=%(min_price)s end '
+            params['min_price'] = str(min_price)
+        if max_price:
+            filter_query += ' and case when custom_deal_price is not null then custom_deal_price<=%(max_price)s else computed_deal_price<=%(max_price)s end '
+            params['max_price'] = str(max_price)
+        if valid_package_ids is not None:
+            filter_query += ' and lab_test.id IN('
+            counter = 1
+            for t_id in valid_package_ids:
+                if not counter == 1:
+                    filter_query += ','
+                filter_query += '%(' + 'package_id' + str(counter) + ')s'
+                params['package_id' + str(counter)] = t_id
+                counter += 1
+            filter_query += ')'
+        if filter_query:
+            package_count_query += filter_query
+
+        package_count = RawSql(package_count_query, params).fetch_all()
+        result_count = package_count[0].get('count', 0)
+        # if filter_query:
+        #     filter_query = ' and '+filter_query
+        package_search_query = package_search_query.format(filter_query=filter_query, sort_query=sort_query, offset=offset, limit=page_size)
+        all_packages = list(LabTest.objects.raw(package_search_query, params))
+        from django.db.models import prefetch_related_objects
+        prefetch_related_objects(all_packages, 'test', 'test__recommended_categories', 'test__parameter', 'categories')
+        lab_ids = [package.lab for package in all_packages]
+        entity_url_qs = EntityUrls.objects.filter(entity_id__in=lab_ids, is_valid=True, url__isnull=False,
+                                                  sitemap_identifier=EntityUrls.SitemapIdentifier.LAB_PAGE).values(
+            'url', lab_id=F('entity_id'))
+        entity_url_dict = {}
+        for item in entity_url_qs:
+            entity_url_dict.setdefault(item.get('lab_id'), [])
+            entity_url_dict[item.get('lab_id')].append(item.get('url'))
+        lab_data = Lab.objects.prefetch_related('lab_documents', 'lab_timings', 'network',
+                                                'home_collection_charges').in_bulk(lab_ids)
+        category_data = {}
+        test_package_queryset = []
+        cache = {}
+        for t_p in all_packages:
+            if t_p not in cache:
+                cache[t_p.id] = True
+                test_package_queryset.append(t_p)
+
+        # category_to_be_shown_in_filter_ids=set()
+        for temp_package in test_package_queryset:
+            single_test_data = {}
+            for temp_test in temp_package.test.all():
+                add_test_name = True
+                for temp_category in temp_test.recommended_categories.all():
+                    if temp_category.is_live:
+                        add_test_name = False
+                        name = temp_category.name
+                        priority = temp_category.priority
+                        category_id = temp_category.id
+                        # category_to_be_shown_in_filter_ids.add(category_id)
+                        test_id = None
+                        icon_url = util_absolute_url(temp_category.icon.url) if temp_category.icon else None
+                        parameter_count = len(temp_test.parameter.all()) or 1
+                        if single_test_data.get((category_id, test_id)):
+                            single_test_data[(category_id, test_id)]['parameter_count'] += parameter_count
+                        else:
+                            single_test_data[(category_id, test_id)] = {'name': name,
+                                                                        'category_id': category_id,
+                                                                        'test_id': test_id,
+                                                                        'parameter_count': parameter_count,
+                                                                        'icon': icon_url, 'priority': priority}
+                if add_test_name:
+                    category_id = None
+                    test_id = temp_test.id
+                    name = temp_test.name
+                    priority = 0
+                    parameter_count = len(temp_test.parameter.all()) or 1
+                    icon_url = None
+                    single_test_data[(category_id, test_id)] = {'name': name,
+                                                                'category_id': category_id,
+                                                                'test_id': test_id,
+                                                                'parameter_count': parameter_count,
+                                                                'icon': icon_url, 'priority': priority}
+            single_test_data_sorted = sorted(list(single_test_data.values()), key=lambda k: k['priority'], reverse= True)
+            category_data[temp_package.id] = single_test_data_sorted
+
+        serializer = CustomLabTestPackageSerializer(all_packages, many=True,
+                                                    context={'entity_url_dict': entity_url_dict, 'lab_data': lab_data,
+                                                             'request': request, 'category_data': category_data,
+                                                             'package_free_or_not_dict': package_free_or_not_dict})
+
+        category_to_be_shown_in_filter_ids = set()
+        category_queryset = LabTestCategory.objects.filter(is_package_category=True, is_live=True).order_by('-priority')
+        category_result = []
+        for category in category_queryset:
+            name = category.name
+            category_id = category.id
+            is_selected = False
+            if category_ids is not None and category_id in category_ids:
+                is_selected = True
+            category_result.append({'name': name, 'id': category_id, 'is_selected': is_selected})
+
+        result = serializer.data
+        if result:
+            from ondoc.coupon.models import Coupon
+            search_coupon = Coupon.get_search_coupon(request.user)
+
+            for package_result in result:
+                if "price" in package_result:
+                    price = int(float(package_result["price"]))
+                    discounted_price = price if not search_coupon else search_coupon.get_search_coupon_discounted_price(price)
+                    package_result["discounted_price"] = discounted_price
+
+        top_content = None
+        bottom_content = None
+        title = None
+        description = None
+        dynamic = NewDynamic.objects.filter(url__url='full-body-checkup-health-packages', is_enabled=True)
+        for x in dynamic:
+            top_content = x.top_content if x.top_content else None
+            bottom_content = x.bottom_content if x.bottom_content else None
+            title = x.meta_title if x.meta_title else None
+            description = x.meta_description if x.meta_description else None
+        return Response({'result': result, 'categories': category_result, 'count': result_count,
+                         'categories_count': len(category_result), 'bottom_content': bottom_content,
+                         'search_content': top_content, 'title': title, 'description': description})
+
+    @transaction.non_atomic_requests
+    def list_packages_v2(self, request, **kwrgs):
+        parameters = request.query_params
+        serializer = diagnostic_serializer.LabPackageListSerializer(data=parameters)
+        serializer.is_valid(raise_exception=True)
+        validated_data = serializer.validated_data
+        long = validated_data.get('long')
+        lat = validated_data.get('lat')
+        min_distance = validated_data.get('min_distance')
+        max_distance = validated_data.get('max_distance')
+        min_price = validated_data.get('min_price')
+        max_price = validated_data.get('max_price')
+        max_age = validated_data.get('max_age')
+        min_age = validated_data.get('min_age')
+        gender = validated_data.get('gender')
+        package_type = validated_data.get('package_type')
+        sort_on = validated_data.get('sort_on')
+        category_ids = validated_data.get('category_ids', [])
+        package_category_ids = validated_data.get('package_category_ids', [])
+        test_ids = validated_data.get('test_ids', [])
+        package_ids = validated_data.get('package_ids', [])
+        point_string = 'POINT(' + str(long) + ' ' + str(lat) + ')'
+        pnt = GEOSGeometry(point_string, srid=4326)
+        max_distance = max_distance*1000 if max_distance is not None else 10000
+        min_distance = min_distance*1000 if min_distance is not None else 0
+
+        package_free_or_not_dict = get_package_free_or_not_dict(request)
 
         main_queryset = LabTest.objects.prefetch_related('test', 'test__recommended_categories',
                                                          'test__parameter', 'categories').filter(enable_for_retail=True,
