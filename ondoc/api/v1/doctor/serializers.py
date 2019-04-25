@@ -515,7 +515,8 @@ class DoctorHospitalSerializer(serializers.ModelSerializer):
         doctor_clinic = obj.doctor_clinic
         doctor = doctor_clinic.doctor
         hospital = doctor_clinic.hospital
-        enabled_for_online_booking = doctor_clinic.enabled_for_online_booking and doctor.enabled_for_online_booking and hospital.enabled_for_online_booking
+        enabled_for_online_booking = doctor_clinic.enabled_for_online_booking and doctor.enabled_for_online_booking and \
+                                     doctor.is_doctor_specialization_insured() and hospital.enabled_for_online_booking
 
         if hospital.enabled_for_prepaid and obj.mrp is not None and resp['insurance_threshold_amount'] is not None and obj.mrp <= resp['insurance_threshold_amount'] and enabled_for_online_booking and \
                 not (request.query_params.get('procedure_ids') or request.query_params.get('procedure_category_ids')) and doctor.is_enabled_for_insurance:
@@ -602,11 +603,19 @@ class MedicalServiceSerializer(serializers.ModelSerializer):
 
 
 class DoctorPracticeSpecializationSerializer(serializers.ModelSerializer):
+    id = serializers.CharField(read_only=True, source='specialization.id')
     name = serializers.CharField(read_only=True, source='specialization.name')
+    url = serializers.SerializerMethodField()
+
+    def get_url(self, obj):
+        url_dict = self.context.get('spec_url_dict')
+        if url_dict:
+            return url_dict.get(obj.specialization_id, None)
+        return None
 
     class Meta:
         model = DoctorPracticeSpecialization
-        fields = ('name', )
+        fields = ('id', 'name', 'url')
 
 
 class DoctorProfileSerializer(serializers.ModelSerializer):
@@ -1253,7 +1262,7 @@ class AppointmentRetrieveSerializer(OpdAppointmentSerializer):
         fields = ('id', 'patient_image', 'patient_name', 'type', 'profile', 'otp', 'is_rated', 'rating_declined',
                   'allowed_action', 'effective_price', 'deal_price', 'status', 'time_slot_start', 'time_slot_end',
                   'doctor', 'hospital', 'allowed_action', 'doctor_thumbnail', 'patient_thumbnail', 'procedures', 'mrp',
-                  'insurance', 'invoices', 'cancellation_reason', 'payment_type')
+                  'insurance', 'invoices', 'cancellation_reason', 'payment_type', 'display_name')
 
     def get_insurance(self, obj):
         request = self.context.get("request")

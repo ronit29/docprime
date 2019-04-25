@@ -311,13 +311,20 @@ def set_order_dummy_transaction(self, order_id, user_id):
                 insurance_order_id = insurance_order_transaction.order_id
                 insurance_order_number = insurance_order_transaction.order_no
 
+            name  = ''
+            if isinstance(appointment, OpdAppointment) or isinstance(appointment, LabAppointment):
+                name = appointment.profile.name
+
+            if isinstance(appointment, UserInsurance):
+                name = appointment.user.full_name
+           
             req_data = {
                 "customerId": user_id,
                 "mobile": user.phone_number,
                 "email": user.email or "dummyemail@docprime.com",
                 "productId": order_row.product_id,
                 "orderId": order_id,
-                "name": appointment.profile.name,
+                "name": name,
                 "txAmount": 0,
                 "couponCode": "",
                 "couponAmt": str(total_price),
@@ -501,29 +508,37 @@ def process_payout(payout_id):
             raise Exception("No payout specified")
 
         payout_data = MerchantPayout.objects.filter(id=payout_id).first()
-        if not payout_data or payout_data.status == payout_data.PAID:
+        if not payout_data:
+            raise Exception("Payout not found")
+        if payout_data.status == payout_data.PAID:
             raise Exception("Payment already done for this payout")
 
 
         default_payment_mode = payout_data.get_default_payment_mode()
-
         appointment = payout_data.get_appointment()
+        if not appointment :
+            raise Exception("Insufficient Data " + str(payout_data))
+
+        if not payout_data.booking_type == payout_data.InsurancePremium:
+            if appointment.payment_type in [OpdAppointment.COD]:
+                raise Exception("Cannot process payout for COD appointments")
+
+        
         billed_to = payout_data.get_billed_to()
         merchant = payout_data.get_merchant()
         order_data = None
 
-        if not appointment or not billed_to or not merchant:
+        if not billed_to or not merchant:
             raise Exception("Insufficient Data " + str(payout_data))
-
-        if appointment.payment_type in [OpdAppointment.COD]:
-            raise Exception("Cannot process payout for COD appointments")
 
         if not merchant.verified_by_finance or not merchant.enabled:
             raise Exception("Merchant is not verified or is not enabled. " + str(payout_data))
 
-        associated_merchant = billed_to.merchant.first()
-        if not associated_merchant.verified:
-            raise Exception("Associated Merchant not verified. " + str(payout_data))
+        if not payout_data.booking_type == payout_data.InsurancePremium:
+            associated_merchant = billed_to.merchant.first()
+            if not associated_merchant.verified:
+                raise Exception("Associated Merchant not verified. " + str(payout_data))
+
 
         # assuming 1 to 1 relation between Order and Appointment
         order_data = Order.objects.filter(reference_id=appointment.id).order_by('-id').first()
@@ -566,11 +581,13 @@ def process_payout(payout_id):
         payout_status = None
         if len(req_data2.get('payload'))>0:
             payout_status = request_payout(req_data2, order_data)
+            payout_data.request_data = req_data2
 
         if not payout_status or not payout_status.get('status'):
             payout_status = request_payout(req_data, order_data)
+            payout_data.request_data = req_data
 
-        if payout_status:
+        if payout_status:            
             payout_data.api_response = payout_status.get("response")
             if payout_status.get("status"):
                 payout_data.payout_time = datetime.datetime.now()
