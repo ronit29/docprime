@@ -10,7 +10,8 @@ from reversion.admin import VersionAdmin
 from ondoc.common.models import Feature, Service
 from ondoc.crm.admin.doctor import AutoComplete
 from ondoc.procedure.models import Procedure, ProcedureCategory, ProcedureCategoryMapping, ProcedureToCategoryMapping, \
-    IpdProcedure, IpdProcedureFeatureMapping, IpdProcedureCategoryMapping, IpdProcedureCategory, IpdProcedureDetail
+    IpdProcedure, IpdProcedureFeatureMapping, IpdProcedureCategoryMapping, IpdProcedureCategory, IpdProcedureDetail, \
+    IpdProcedureSynonym, IpdProcedureSynonymMapping
 from django import forms
 
 
@@ -74,7 +75,8 @@ class IpdProcedureDetailAdminForm(forms.ModelForm):
 
     class Media:
         extend = True
-        js = ('ckedit/js/ckeditor.js', 'ipd_procedure_detail/js/init.js')
+        # js = ('ckedit/js/ckeditor.js', 'ipd_procedure_detail/js/init.js')
+        js = ('https://cdn.ckeditor.com/4.11.4/standard-all/ckeditor.js', 'ipd_procedure_detail/js/init.js')
         css = {'all': ('ipd_procedure_detail/css/style.css',)}
 
 
@@ -240,3 +242,25 @@ class ProcedureCategoryAdmin(VersionAdmin):
     inlines = [ParentProcedureCategoryInline]
     exclude = ['search_key']
     form = ProcedureCategoryForm
+
+
+
+class IpdProcedureSynonymAdmin(admin.ModelAdmin):
+    model = IpdProcedureSynonym
+    list_display = ['name']
+
+
+class IpdProcedureSynonymMappingAdmin(admin.ModelAdmin):
+    model = IpdProcedureSynonymMapping
+    list_display = ['get_ipd_procedure_name', 'get_ipd_procedure_synonym_name']
+
+    def get_ipd_procedure_synonym_name(self, obj):
+        return obj.ipd_procedure_synonym_id.name
+    get_ipd_procedure_synonym_name.admin_order_field = 'ipd_procedure_synonym_id'  #Allows column order sorting
+    get_ipd_procedure_synonym_name.short_description = 'Ipd Procedure Synonym'
+
+
+    def get_ipd_procedure_name(self, obj):
+        return obj.ipd_procedure_id.name
+    get_ipd_procedure_name.admin_order_field  = 'ipd_procedure_id'  #Allows column order sorting
+    get_ipd_procedure_name.short_description = 'Ipd Procedure'

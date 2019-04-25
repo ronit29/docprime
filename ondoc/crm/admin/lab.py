@@ -31,12 +31,14 @@ from ondoc.diagnostic.models import (LabTiming, LabImage,
                                      LabAppointment, HomePickupCharges,
                                      TestParameter, ParameterLabTest, FrequentlyAddedTogetherTests, QuestionAnswer,
                                      LabReport, LabReportFile, LabTestCategoryMapping,
-                                     LabTestRecommendedCategoryMapping, LabTestGroupTiming, LabTestGroupMapping)
+                                     LabTestRecommendedCategoryMapping, LabTestGroupTiming, LabTestGroupMapping,
+                                     TestParameterChat)
 from ondoc.integrations.models import IntegratorHistory
 from ondoc.notification.models import EmailNotification, NotificationAction
 from .common import *
 from ondoc.authentication.models import GenericAdmin, User, QCModel, GenericLabAdmin, AssociatedMerchant
-from ondoc.crm.admin.doctor import CustomDateInput, TimePickerWidget, CreatedByFilter, AutoComplete
+from ondoc.crm.admin.doctor import CustomDateInput, TimePickerWidget, CreatedByFilter, AutoComplete, \
+    RefundableAppointmentForm
 from ondoc.crm.admin.autocomplete import PackageAutoCompleteView
 from django.contrib.contenttypes.admin import GenericTabularInline
 from ondoc.authentication import forms as auth_forms
@@ -342,7 +344,7 @@ class LabForm(FormCleanMixin):
     about = forms.CharField(widget=forms.Textarea, required=False)
     primary_mobile = forms.CharField(required=True)
     primary_email = forms.EmailField(required=True)
-    city = forms.CharField(required=True)
+    # city = forms.CharField(required=True)
     lab_priority = forms.IntegerField(required=True)
     operational_since = forms.ChoiceField(required=False, choices=hospital_operational_since_choices)
     home_pickup_charges = forms.DecimalField(required=False, initial=0)
@@ -352,6 +354,11 @@ class LabForm(FormCleanMixin):
     class Meta:
         model = Lab
         exclude = ()
+        widgets = {
+            'lab_pricing_group': autocomplete.ModelSelect2(url='admin:diagnostic_labpricinggroup_autocomplete'),
+            'matrix_state': autocomplete.ModelSelect2(url='matrix-state-autocomplete'),
+            'matrix_city': autocomplete.ModelSelect2(url='matrix-city-autocomplete', forward=['matrix_state'])
+        }
         # exclude = ('pathology_agreed_price_percentage', 'pathology_deal_price_percentage', 'radiology_agreed_price_percentage',
         #            'radiology_deal_price_percentage', )
 
@@ -369,7 +376,8 @@ class LabForm(FormCleanMixin):
 
     def validate_qc(self):
         qc_required = {'name': 'req', 'location': 'req', 'operational_since': 'req', 'parking': 'req',
-                       'license': 'req', 'building': 'req', 'locality': 'req', 'city': 'req', 'state': 'req',
+                       'license': 'req', 'building': 'req', 'locality': 'req',
+                       'matrix_city': 'req', 'matrix_state': 'req',
                        'country': 'req', 'pin_code': 'req', 'network_type': 'req', 'lab_image': 'count'}
 
         if self.instance.network and self.instance.network.data_status != QCModel.QC_APPROVED:
@@ -386,6 +394,27 @@ class LabForm(FormCleanMixin):
                 raise forms.ValidationError("Atleast one entry of "+key+" is required for Quality Check")
         if self.cleaned_data['network_type'] == 2 and not self.cleaned_data['network']:
             raise forms.ValidationError("Network cannot be empty for Network Lab")
+
+    def clean(self):
+        super().clean()
+        if any(self.errors):
+            return
+        data = self.cleaned_data
+        if self.instance and self.instance.id and self.instance.data_status == QCModel.QC_APPROVED:
+            is_enabled = data.get('enabled', None)
+            if is_enabled is None:
+                is_enabled = self.instance.enabled if self.instance else False
+            if is_enabled:
+                if any([data.get('disabled_after', None), data.get('disable_reason', None),
+                        data.get('disable_comments', None)]):
+                    raise forms.ValidationError(
+                        "Cannot have disabled after/disabled reason/disable comments if lab is enabled.")
+            elif not is_enabled:
+                if not all([data.get('disabled_after', None), data.get('disable_reason', None)]):
+                    raise forms.ValidationError("Must have disabled after/disable reason if lab is not enabled.")
+                if data.get('disable_reason', None) and data.get('disable_reason', None) == Lab.OTHERS and not data.get(
+                        'disable_comments', None):
+                    raise forms.ValidationError("Must have disable comments if disable reason is others.")
 
 
 class LabCityFilter(SimpleListFilter):
@@ -508,23 +537,21 @@ class LabTestGroupTimingInline(admin.TabularInline):
 class LabAdmin(ImportExportMixin, admin.GeoModelAdmin, VersionAdmin, ActionAdmin, QCPemAdmin):
     change_list_template = 'superuser_import_export.html'
     resource_class = LabResource
-    list_display = ('name', 'lab_logo', 'updated_at', 'onboarding_status', 'data_status', 'list_created_by', 'list_assigned_to',
-                    'get_onboard_link',)
-
+    list_display = ('name', 'lab_logo', 'updated_at', 'onboarding_status', 'data_status', 'welcome_calling_done',
+                    'list_created_by', 'list_assigned_to', 'get_onboard_link',)
     # readonly_fields=('onboarding_status', )
-    list_filter = ('data_status', 'onboarding_status', 'is_insurance_enabled', LabCityFilter, CreatedByFilter)
-
+    list_filter = ('data_status', 'welcome_calling_done', 'onboarding_status', 'is_insurance_enabled',
+                   LabCityFilter, CreatedByFilter)
     exclude = ('search_key', 'pathology_agreed_price_percentage', 'pathology_deal_price_percentage',
-               'radiology_agreed_price_percentage',
-               'radiology_deal_price_percentage', 'live_at', 'onboarded_at', 'qc_approved_at')
-
+               'radiology_agreed_price_percentage', 'radiology_deal_price_percentage', 'live_at',
+               'onboarded_at', 'qc_approved_at', 'disabled_at', 'welcome_calling_done_at')
     form = LabForm
     search_fields = ['name', 'lab_pricing_group__group_name', ]
     inlines = [LabDoctorInline, LabServiceInline, LabDoctorAvailabilityInline, LabCertificationInline, LabAwardInline,
                LabAccreditationInline,
                LabManagerInline, LabTimingInline, LabImageInline, LabDocumentInline, HomePickupChargesInline,
                GenericLabAdminInline, AssociatedMerchantInline, LabTestGroupTimingInline, RemarkInline]
-    autocomplete_fields = ['lab_pricing_group', ]
+    # autocomplete_fields = ['lab_pricing_group', ]
 
     map_width = 200
     map_template = 'admin/gis/gmap.html'
@@ -535,12 +562,24 @@ class LabAdmin(ImportExportMixin, admin.GeoModelAdmin, VersionAdmin, ActionAdmin
     def get_queryset(self, request):
         return super().get_queryset(request).prefetch_related('lab_documents')
 
+    def get_fields(self, request, obj=None):
+        all_fields = super().get_fields(request, obj)
+        if not request.user.is_superuser and not request.user.groups.filter(
+                name=constants['WELCOME_CALLING_TEAM']).exists():
+            if 'welcome_calling_done' in all_fields:
+                all_fields.remove('welcome_calling_done')
+        return all_fields
+
     def get_readonly_fields(self, request, obj=None):
-        read_only_fields = ['lead_url', 'matrix_lead_id', 'matrix_reference_id', 'is_live']
+        read_only_fields = ['lead_url', 'matrix_lead_id', 'matrix_reference_id', 'is_live', 'city', 'state']
         if (not request.user.is_member_of(constants['QC_GROUP_NAME'])) and (not request.user.is_superuser):
             read_only_fields += ['lab_pricing_group']
         if (not request.user.is_member_of(constants['SUPER_QC_GROUP'])) and (not request.user.is_superuser):
             read_only_fields += ['onboarding_status']
+        if not request.user.groups.filter(
+                name__in=[constants['WELCOME_CALLING_TEAM'],
+                          constants['LAB_APPOINTMENT_MANAGEMENT_TEAM']]) and not request.user.is_superuser:
+            read_only_fields += ['is_location_verified']
         return read_only_fields
 
     def lab_logo(self, instance):
@@ -632,6 +671,10 @@ class LabAdmin(ImportExportMixin, admin.GeoModelAdmin, VersionAdmin, ActionAdmin
     def save_model(self, request, obj, form, change):
         if not obj.created_by:
             obj.created_by = request.user
+        if not form.cleaned_data.get('enabled', False) and not obj.disabled_by:
+            obj.disabled_by = request.user
+        elif form.cleaned_data.get('enabled', False) and obj.disabled_by:
+            obj.disabled_by = None
         if not obj.assigned_to:
             obj.assigned_to = request.user
         if '_submit_for_qc' in request.POST:
@@ -642,9 +685,9 @@ class LabAdmin(ImportExportMixin, admin.GeoModelAdmin, VersionAdmin, ActionAdmin
         if '_mark_in_progress' in request.POST:
             obj.data_status = QCModel.REOPENED
         obj.status_changed_by = request.user
-
+        obj.city = obj.matrix_city.name
+        obj.state = obj.matrix_state.name
         super().save_model(request, obj, form, change)
-
 
     def save_formset(self, request, form, formset, change):
         instances = formset.save(commit=False)
@@ -689,14 +732,27 @@ class LabAdmin(ImportExportMixin, admin.GeoModelAdmin, VersionAdmin, ActionAdmin
             form.base_fields['assigned_to'].disabled = True
         return form
 
+    # Method is already declared above
+    # def get_readonly_fields(self, *args, **kwargs):
+    #     read_only = super().get_readonly_fields(*args, **kwargs)
+    #     if args:
+    #         request = args[0]
+    #         if not request.user.groups.filter(
+    #                 name__in=[constants['WELCOME_CALLING_TEAM'],
+    #                           constants['LAB_APPOINTMENT_MANAGEMENT_TEAM']]) and not request.user.is_superuser:
+    #             read_only += ('is_location_verified',)
+    #
+    #     return read_only
 
-class LabAppointmentForm(forms.ModelForm):
 
+
+class LabAppointmentForm(RefundableAppointmentForm):
     start_date = forms.DateField(widget=CustomDateInput(format=('%d-%m-%Y'), attrs={'placeholder':'Select a date'}))
     start_time = forms.CharField(widget=TimePickerWidget())
     cancel_type = forms.ChoiceField(label='Cancel Type', choices=((0, 'Cancel and Rebook'),
                                                                   (1, 'Cancel and Refund'),), initial=0, widget=forms.RadioSelect)
     send_email_sms_report = forms.BooleanField(label='Send reports via message and email', initial=False, required=False)
+    custom_otp = forms.IntegerField(required=False)
 
     def clean(self):
         super().clean()
@@ -764,6 +820,13 @@ class LabAppointmentForm(forms.ModelForm):
                 else:
                     if not lab.always_open and not is_lab_timing_available:
                         raise forms.ValidationError("No time slot available")
+
+        if cleaned_data.get('status') and cleaned_data.get('status') == LabAppointment.COMPLETED:
+            if self.instance and self.instance.id and not self.instance.status == OpdAppointment.ACCEPTED:
+                raise forms.ValidationError("Can only complete appointment if it is in accepted state.")
+            if not cleaned_data.get('custom_otp') == self.instance.otp:
+                raise forms.ValidationError("Entered OTP is incorrect.")
+
 
         return cleaned_data
 
@@ -863,7 +926,8 @@ class LabAppointmentAdmin(nested_admin.NestedModelAdmin):
                                     (LabAppointment.RESCHEDULED_PATIENT, 'Rescheduled by patient'),
                                     (LabAppointment.RESCHEDULED_LAB, 'Rescheduled by lab'),
                                     (LabAppointment.ACCEPTED, 'Accepted'),
-                                    (LabAppointment.CANCELLED, 'Cancelled')]
+                                    (LabAppointment.CANCELLED, 'Cancelled'),
+                                    (LabAppointment.COMPLETED, 'Completed')]
         if db_field.name == "status" and request.user.groups.filter(name=constants['LAB_APPOINTMENT_MANAGEMENT_TEAM']).exists():
             kwargs['choices'] = allowed_status_for_agent
         return super().formfield_for_choice_field(db_field, request, **kwargs)
@@ -896,9 +960,15 @@ class LabAppointmentAdmin(nested_admin.NestedModelAdmin):
                     'get_pickup_address', 'get_lab_address', 'outstanding', 'status', 'cancel_type',
                     'cancellation_reason', 'cancellation_comments', 'start_date', 'start_time',
                     'send_email_sms_report', 'invoice_urls', 'reports_uploaded', 'email_notification_timestamp', 'payment_type',
-                     'payout_info')
+                     'payout_info', 'refund_initiated')
         if request.user.groups.filter(name=constants['APPOINTMENT_OTP_TEAM']).exists() or request.user.is_superuser:
             all_fields = all_fields + ('otp',)
+
+        if obj and obj.can_agent_refund(request.user):
+            all_fields = all_fields + ('refund_payment', 'refund_reason')
+
+        if obj and obj.id and obj.status == OpdAppointment.ACCEPTED:
+            all_fields = all_fields + ('custom_otp',)
         return all_fields
         # else:
         #     return ()
@@ -913,7 +983,7 @@ class LabAppointmentAdmin(nested_admin.NestedModelAdmin):
                      'agreed_price',
                      'deal_price', 'effective_price', 'payment_status',
                      'payment_type', 'insurance', 'is_home_pickup', 'get_pickup_address', 'get_lab_address',
-                     'outstanding', 'reports_uploaded', 'email_notification_timestamp', 'payment_type', 'payout_info']
+                     'outstanding', 'reports_uploaded', 'email_notification_timestamp', 'payment_type', 'payout_info', 'refund_initiated']
         # else:
         #     read_only = []
         if obj and (obj.status == LabAppointment.COMPLETED or obj.status == LabAppointment.CANCELLED):
@@ -921,6 +991,9 @@ class LabAppointmentAdmin(nested_admin.NestedModelAdmin):
         if request.user.groups.filter(name=constants['APPOINTMENT_OTP_TEAM']).exists() or request.user.is_superuser:
             read_only = read_only + ['otp']
         return read_only
+
+    def refund_initiated(self, obj):
+        return bool(obj.has_app_consumer_trans())
 
     # def get_inline_instances(self, request, obj=None):
     #     inline_instance = super().get_inline_instances(request=request, obj=obj)
@@ -1082,16 +1155,18 @@ class LabAppointmentAdmin(nested_admin.NestedModelAdmin):
 
                 if dt_field:
                     obj.time_slot_start = dt_field
-            if request.POST.get('status') and (int(request.POST['status']) == LabAppointment.CANCELLED or \
-                int(request.POST['status']) == LabAppointment.COMPLETED):
+            if request.POST.get('status') and int(request.POST['status']) == LabAppointment.CANCELLED:
                 obj.cancellation_type = LabAppointment.AGENT_CANCELLED
                 cancel_type = int(request.POST.get('cancel_type'))
                 if cancel_type is not None:
                     logger.warning("Lab Admin Cancel started - " + str(obj.id) + " timezone - " + str(timezone.now()))
                     obj.action_cancelled(cancel_type)
                     logger.warning("Lab Admin Cancel completed - " + str(obj.id) + " timezone - " + str(timezone.now()))
-            elif lab_app_obj and (lab_app_obj.status == LabAppointment.COMPLETED):
-                pass
+            elif request.POST.get('status') and int(request.POST['status']) == LabAppointment.COMPLETED and lab_app_obj and lab_app_obj != LabAppointment.COMPLETED:
+                obj.action_completed()
+            if form and form.cleaned_data and form.cleaned_data.get('refund_payment', False):
+                obj._refund_reason = form.cleaned_data.get('refund_reason', '')
+                obj.action_refund()
             else:
                 super().save_model(request, obj, form, change)
                 if request.POST.get('status') and (int(request.POST['status']) == LabAppointment.ACCEPTED):
@@ -1291,7 +1366,7 @@ class LabTestAdminForm(forms.ModelForm):
                 raise forms.ValidationError('Please enter gender_type')
             if cleaned_data.get('min_age') > cleaned_data.get('max_age'):
                 raise forms.ValidationError('min_age cannot be more than max_age')
-        else :
+        else:
             if cleaned_data.get('min_age'):
                 raise forms.ValidationError('Please dont enter min_age')
             if cleaned_data.get('max_age'):
@@ -1438,3 +1513,14 @@ class LabTestGroupMappingAdmin(ImportMixin, admin.ModelAdmin):
     list_display = ['test', 'lab_test_group']
     search_fields = ['test__name', 'lab_test_group__name']
 
+
+class TestParameterChatForm(forms.ModelForm):
+    test = forms.ModelChoiceField(
+        queryset=LabTest.objects.filter(availablelabs__lab_pricing_group__labs__network_id=int(settings.THYROCARE_NETWORK_ID),
+                                        enable_for_retail=True, availablelabs__enabled=True).distinct().order_by('name'))
+
+
+class TestParameterChatAdmin(admin.ModelAdmin):
+    form = TestParameterChatForm
+    list_display = ['test_name']
+    readonly_fields = ('test_name',)

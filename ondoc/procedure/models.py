@@ -9,11 +9,13 @@ from collections import deque, OrderedDict
 
 class IpdProcedure(auth_model.TimeStampedModel, SearchKey, auth_model.SoftDelete):
     name = models.CharField(max_length=500, unique=True)
+    synonyms = models.CharField(max_length=4000, null=True, blank=True)
     about = models.TextField(blank=True, verbose_name="Short description")
     details = models.TextField(blank=True)
     is_enabled = models.BooleanField(default=False)
     features = models.ManyToManyField(Feature, through='IpdProcedureFeatureMapping',
                                       through_fields=('ipd_procedure', 'feature'), related_name='of_ipd_procedures')
+    show_about = models.BooleanField(default=False)
 
     def __str__(self):
         return '{}'.format(self.name)
@@ -81,6 +83,7 @@ class IpdProcedureLead(auth_model.TimeStampedModel):
     email = models.CharField(max_length=256, blank=False, null=True, default=None)
     gender = models.CharField(max_length=2, default=None, blank=True, null=True, choices=UserProfile.GENDER_CHOICES)
     age = models.PositiveIntegerField(blank=True, null=True)
+    dob = models.DateTimeField(blank=True, null=True)
 
     class Meta:
         db_table = "ipd_procedure_lead"
@@ -415,3 +418,27 @@ def get_procedure_categories_with_procedures(selected_procedures, other_procedur
         final_result.append(value)
 
     return final_result
+
+
+class IpdProcedureSynonym(auth_model.TimeStampedModel):
+    name = models.CharField(max_length=1000, default='')
+
+    def __str__(self):
+        return self.name
+
+    class Meta:
+        db_table = "ipd_procedure_synonym"
+
+
+class IpdProcedureSynonymMapping(auth_model.TimeStampedModel):
+    ipd_procedure_synonym_id = models.ForeignKey(IpdProcedureSynonym, on_delete=models.CASCADE)
+    ipd_procedure_id = models.ForeignKey(IpdProcedure, on_delete=models.CASCADE)
+    order = models.IntegerField(null=True, blank=True)
+
+    def __str__(self):
+        return str(self.id)
+
+    class Meta:
+        db_table = "procedure_synonym_mapping"
+
+

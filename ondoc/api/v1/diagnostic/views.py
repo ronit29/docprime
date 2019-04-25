@@ -1,12 +1,12 @@
 import operator
-
+from copy import deepcopy
 from ondoc.api.v1.diagnostic.serializers import CustomLabTestPackageSerializer
 from ondoc.authentication.backends import JWTAuthentication
 from ondoc.api.v1.diagnostic import serializers as diagnostic_serializer
 from ondoc.api.v1.auth.serializers import AddressSerializer
-from ondoc.integrations.models import IntegratorMapping
+from ondoc.integrations.models import IntegratorTestMapping
 from ondoc.cart.models import Cart
-from ondoc.common.models import UserConfig, GlobalNonBookable
+from ondoc.common.models import UserConfig, GlobalNonBookable, AppointmentHistory
 from ondoc.ratings_review import models as rating_models
 from ondoc.diagnostic.models import (LabTest, AvailableLabTest, Lab, LabAppointment, LabTiming, PromotedLab,
                                      CommonDiagnosticCondition, CommonTest, CommonPackage,
@@ -14,6 +14,7 @@ from ondoc.diagnostic.models import (LabTest, AvailableLabTest, Lab, LabAppointm
                                      LabPricingGroup, LabTestCategory, LabTestCategoryMapping)
 from ondoc.account import models as account_models
 from ondoc.authentication.models import UserProfile, Address
+from ondoc.insurance.models import UserInsurance, InsuranceThreshold
 from ondoc.notification.models import EmailNotification
 from ondoc.coupon.models import Coupon
 from ondoc.doctor import models as doctor_model
@@ -65,6 +66,7 @@ from django.db.models.expressions import Window
 from django.db.models.functions import RowNumber
 from django.db.models import Avg
 from django.db.models.expressions import RawSQL
+from ondoc.doctor.v1.serializers import ArticleAuthorSerializer
 User = get_user_model()
 
 
@@ -76,10 +78,10 @@ class SearchPageViewSet(viewsets.ReadOnlyModelViewSet):
         count = int(count)
         if count <= 0:
             count = 10
-        test_queryset = CommonTest.objects.select_related('test').filter(test__enable_for_retail=True, test__searchable=True).order_by('-priority')[:count]
+        test_queryset = CommonTest.get_tests(count)
         conditions_queryset = CommonDiagnosticCondition.objects.prefetch_related('lab_test').all().order_by('-priority')[:count]
         lab_queryset = PromotedLab.objects.select_related('lab').filter(lab__is_live=True, lab__is_test_lab=False)
-        package_queryset = CommonPackage.objects.prefetch_related('package').filter(package__enable_for_retail=True, package__searchable=True).order_by('-priority')[:count]
+        package_queryset = CommonPackage.get_packages(count)
         recommended_package_qs = LabTestCategory.objects.prefetch_related('recommended_lab_tests__parameter').filter(is_live=True,
                                                                                                           show_on_recommended_screen=True,
                                                                                                           recommended_lab_tests__searchable=True,
@@ -205,6 +207,15 @@ class LabList(viewsets.ReadOnlyModelViewSet):
                                                                                                  searchable=True,
                                                                                                  is_package=True)
 
+        page_size = 30
+
+        if not request.query_params.get('page') or int(request.query_params.get('page')) < 1:
+            page = 1
+        else:
+            page = int(request.query_params.get('page'))
+
+        offset = (page - 1) * page_size
+
         if package_ids:
             main_queryset = main_queryset.filter(id__in=package_ids)
         valid_package_ids = None
@@ -232,16 +243,63 @@ class LabList(viewsets.ReadOnlyModelViewSet):
             main_queryset = main_queryset.filter(id__in=valid_package_ids)
 
 
-        all_packages_in_network_labs = main_queryset.filter(
+        # all_packages_in_network_labs = main_queryset.filter(
+        #     availablelabs__enabled=True,
+        #     availablelabs__lab_pricing_group__labs__is_live=True,
+        #     availablelabs__lab_pricing_group__labs__network__isnull=False,
+        #     availablelabs__lab_pricing_group__labs__location__dwithin=(
+        #         Point(float(long),
+        #               float(lat)),
+        #         D(m=max_distance))).annotate(
+        #     priority_score=F('availablelabs__lab_pricing_group__labs__lab_priority') * F('priority')).annotate(
+        #     distance=Distance('availablelabs__lab_pricing_group__labs__location', pnt)).annotate(
+        #     lab=F('availablelabs__lab_pricing_group__labs'), mrp=F('availablelabs__mrp'),
+        #     price=Case(
+        #         When(availablelabs__custom_deal_price__isnull=True,
+        #              then=F('availablelabs__computed_deal_price')),
+        #         When(availablelabs__custom_deal_price__isnull=False,
+        #              then=F('availablelabs__custom_deal_price'))),
+        #     rank=Window(expression=RowNumber(), order_by=F('distance').asc(),
+        #                 partition_by=[F(
+        #                     'availablelabs__lab_pricing_group__labs__network'), F('id')]))
+        #
+        # all_packages_in_non_network_labs = main_queryset.filter(
+        #     availablelabs__enabled=True,
+        #     availablelabs__lab_pricing_group__labs__is_live=True,
+        #     availablelabs__lab_pricing_group__labs__enabled=True,
+        #     availablelabs__lab_pricing_group__labs__network__isnull=True,
+        #     availablelabs__lab_pricing_group__labs__location__dwithin=(
+        #         Point(float(long),
+        #               float(lat)),
+        #         D(
+        #             m=max_distance))).annotate(
+        #     priority_score=F('availablelabs__lab_pricing_group__labs__lab_priority') * F('priority')).annotate(
+        #     distance=Distance('availablelabs__lab_pricing_group__labs__location', pnt)).annotate(
+        #     lab=F('availablelabs__lab_pricing_group__labs'), mrp=F('availablelabs__mrp'),
+        #     price=Case(
+        #         When(availablelabs__custom_deal_price__isnull=True,
+        #              then=F('availablelabs__computed_deal_price')),
+        #         When(availablelabs__custom_deal_price__isnull=False,
+        #              then=F('availablelabs__custom_deal_price'))),
+        # )
+        #
+        # all_packages_in_non_network_labs = all_packages_in_non_network_labs.distinct()
+        # all_packages_in_network_labs = all_packages_in_network_labs.distinct()
+        # all_packages = [package for package in all_packages_in_network_labs if package.rank == 1]
+        # all_packages.extend([package for package in all_packages_in_non_network_labs])
+
+        all_packages = main_queryset.filter(
             availablelabs__enabled=True,
             availablelabs__lab_pricing_group__labs__is_live=True,
-            availablelabs__lab_pricing_group__labs__network__isnull=False,
+            availablelabs__lab_pricing_group__labs__enabled=True,
             availablelabs__lab_pricing_group__labs__location__dwithin=(
                 Point(float(long),
                       float(lat)),
                 D(m=max_distance))).annotate(
-            priority_score=F('availablelabs__lab_pricing_group__labs__lab_priority') * F('priority')).annotate(
-            distance=Distance('availablelabs__lab_pricing_group__labs__location', pnt)).annotate(
+            priority_score=F('availablelabs__lab_pricing_group__labs__lab_priority') * F(
+                'priority')).annotate(
+            distance=Distance('availablelabs__lab_pricing_group__labs__location',
+                              pnt)).annotate(
             lab=F('availablelabs__lab_pricing_group__labs'), mrp=F('availablelabs__mrp'),
             price=Case(
                 When(availablelabs__custom_deal_price__isnull=True,
@@ -249,33 +307,24 @@ class LabList(viewsets.ReadOnlyModelViewSet):
                 When(availablelabs__custom_deal_price__isnull=False,
                      then=F('availablelabs__custom_deal_price'))),
             rank=Window(expression=RowNumber(), order_by=F('distance').asc(),
-                        partition_by=[F(
-                            'availablelabs__lab_pricing_group__labs__network'), F('id')]))
-
-        all_packages_in_non_network_labs = main_queryset.filter(
-            availablelabs__enabled=True,
-            availablelabs__lab_pricing_group__labs__is_live=True,
-            availablelabs__lab_pricing_group__labs__enabled=True,
-            availablelabs__lab_pricing_group__labs__network__isnull=True,
-            availablelabs__lab_pricing_group__labs__location__dwithin=(
-                Point(float(long),
-                      float(lat)),
-                D(
-                    m=max_distance))).annotate(
-            priority_score=F('availablelabs__lab_pricing_group__labs__lab_priority') * F('priority')).annotate(
-            distance=Distance('availablelabs__lab_pricing_group__labs__location', pnt)).annotate(
-            lab=F('availablelabs__lab_pricing_group__labs'), mrp=F('availablelabs__mrp'),
-            price=Case(
-                When(availablelabs__custom_deal_price__isnull=True,
-                     then=F('availablelabs__computed_deal_price')),
-                When(availablelabs__custom_deal_price__isnull=False,
-                     then=F('availablelabs__custom_deal_price'))),
+                        partition_by=[RawSQL('Coalesce(lab.network_id, random())', []), F('id')])
         )
 
-        all_packages_in_non_network_labs = all_packages_in_non_network_labs.distinct()
-        all_packages_in_network_labs = all_packages_in_network_labs.distinct()
-        all_packages = [package for package in all_packages_in_network_labs if package.rank == 1]
-        all_packages.extend([package for package in all_packages_in_non_network_labs])
+        all_packages = [package for package in all_packages if package.rank == 1]
+
+        if not sort_on:
+            all_packages = sorted(all_packages, key=lambda x: x.priority_score if hasattr(x,
+                                                                                          'priority_score') and x.priority_score is not None else -float(
+                'inf'), reverse=True)
+        elif sort_on == 'fees':
+            all_packages = sorted(all_packages,
+                                  key=lambda x: x.price if hasattr(x, 'price') and x.price is not None else -float(
+                                      'inf'))
+        elif sort_on == 'distance':
+            all_packages = sorted(all_packages, key=lambda x: x.distance if hasattr(x,
+                                                                                    'distance') and x.distance is not None else -float(
+                'inf'))
+
         all_packages = filter(lambda x: x, all_packages)
         if min_distance:
             all_packages = filter(lambda
@@ -299,18 +348,9 @@ class LabList(viewsets.ReadOnlyModelViewSet):
             all_packages = filter(lambda x: x.home_collection_possible, all_packages)
         if package_type == 2:
             all_packages = filter(lambda x: not x.home_collection_possible, all_packages)
-        if not sort_on:
-            all_packages = sorted(all_packages, key=lambda x: x.priority_score if hasattr(x,
-                                                                                          'priority_score') and x.priority_score is not None else -float(
-                'inf'), reverse=True)
-        elif sort_on == 'fees':
-            all_packages = sorted(all_packages,
-                                  key=lambda x: x.price if hasattr(x, 'price') and x.price is not None else -float(
-                                      'inf'))
-        elif sort_on == 'distance':
-            all_packages = sorted(all_packages, key=lambda x: x.distance if hasattr(x,
-                                                                                    'distance') and x.distance is not None else -float(
-                'inf'))
+
+        all_packages = list(all_packages)
+        result_count = len(all_packages)
         lab_ids = [package.lab for package in all_packages]
         entity_url_qs = EntityUrls.objects.filter(entity_id__in=lab_ids, is_valid=True, url__isnull=False,
                                                   sitemap_identifier=EntityUrls.SitemapIdentifier.LAB_PAGE).values(
@@ -333,6 +373,7 @@ class LabList(viewsets.ReadOnlyModelViewSet):
                     if temp_category.is_live:
                         add_test_name = False
                         name = temp_category.name
+                        priority = temp_category.priority
                         category_id = temp_category.id
                         category_to_be_shown_in_filter_ids.add(category_id)
                         test_id = None
@@ -345,19 +386,25 @@ class LabList(viewsets.ReadOnlyModelViewSet):
                                                                         'category_id': category_id,
                                                                         'test_id': test_id,
                                                                         'parameter_count': parameter_count,
-                                                                        'icon': icon_url}
+                                                                        'icon': icon_url, 'priority': priority}
                 if add_test_name:
                     category_id = None
                     test_id = temp_test.id
                     name = temp_test.name
+                    priority = 0
                     parameter_count = len(temp_test.parameter.all()) or 1
                     icon_url = None
                     single_test_data[(category_id, test_id)] = {'name': name,
                                                                 'category_id': category_id,
                                                                 'test_id': test_id,
                                                                 'parameter_count': parameter_count,
-                                                                'icon': icon_url}
-            category_data[temp_package.id] = list(single_test_data.values())
+                                                                'icon': icon_url, 'priority': priority}
+            single_test_data_sorted = sorted(list(single_test_data.values()), key=lambda k: k['priority'], reverse= True)
+            category_data[temp_package.id] = single_test_data_sorted
+
+        if not parameters.get('from_app'):
+            all_packages = all_packages[offset:page * page_size]
+
         serializer = CustomLabTestPackageSerializer(all_packages, many=True,
                                                     context={'entity_url_dict': entity_url_dict, 'lab_data': lab_data,
                                                              'request': request, 'category_data': category_data,
@@ -393,7 +440,7 @@ class LabList(viewsets.ReadOnlyModelViewSet):
             bottom_content = x.bottom_content if x.bottom_content else None
             title = x.meta_title if x.meta_title else None
             description = x.meta_description if x.meta_description else None
-        return Response({'result': result, 'categories': category_result, 'count': len(all_packages),
+        return Response({'result': result, 'categories': category_result, 'count': result_count,
                          'categories_count': len(category_result), 'bottom_content': bottom_content,
                          'search_content': top_content, 'title': title, 'description': description})
 
@@ -422,10 +469,22 @@ class LabList(viewsets.ReadOnlyModelViewSet):
         pnt = GEOSGeometry(point_string, srid=4326)
         max_distance = max_distance*1000 if max_distance is not None else 10000
         min_distance = min_distance*1000 if min_distance is not None else 0
+
+        package_free_or_not_dict = get_package_free_or_not_dict(request)
+
         main_queryset = LabTest.objects.prefetch_related('test', 'test__recommended_categories',
                                                          'test__parameter', 'categories').filter(enable_for_retail=True,
                                                                                                  searchable=True,
                                                                                                  is_package=True)
+
+        page_size = 30
+
+        if not request.query_params.get('page') or int(request.query_params.get('page')) <1:
+            page = 1
+        else:
+            page = int(request.query_params.get('page'))
+
+        offset = (page - 1) * page_size
 
         if package_ids:
             main_queryset = main_queryset.filter(id__in=package_ids)
@@ -476,6 +535,15 @@ class LabList(viewsets.ReadOnlyModelViewSet):
         )
 
         all_packages_in_labs = all_packages_in_labs.distinct()
+        if not sort_on:
+            all_packages_in_labs = all_packages_in_labs.order_by('-priority_score')
+
+        if sort_on == 'fees':
+            all_packages_in_labs = all_packages_in_labs.order_by('price')
+
+        elif sort_on == 'distance':
+            all_packages_in_labs = all_packages_in_labs.order_by('distance')
+
         # all_packages_in_labs = list(all_packages_in_labs)
         # all_packages = filter(lambda x: x.rank == 1, all_packages_in_labs)
         all_packages = [package for package in all_packages_in_labs if package.rank == 1]
@@ -502,18 +570,8 @@ class LabList(viewsets.ReadOnlyModelViewSet):
             all_packages = filter(lambda x: x.home_collection_possible, all_packages)
         if package_type == 2:
             all_packages = filter(lambda x: not x.home_collection_possible, all_packages)
-        if not sort_on:
-            all_packages = sorted(all_packages, key=lambda x: x.priority_score if hasattr(x,
-                                                                                          'priority_score') and x.priority_score is not None else -float(
-                'inf'), reverse=True)
-        elif sort_on == 'fees':
-            all_packages = sorted(all_packages,
-                                  key=lambda x: x.price if hasattr(x, 'price') and x.price is not None else -float(
-                                      'inf'))
-        elif sort_on == 'distance':
-            all_packages = sorted(all_packages, key=lambda x: x.distance if hasattr(x,
-                                                                                    'distance') and x.distance is not None else -float(
-                'inf'))
+
+        all_packages = [package for package in all_packages]
         lab_ids = [package.lab for package in all_packages]
         entity_url_qs = EntityUrls.objects.filter(entity_id__in=lab_ids, is_valid=True, url__isnull=False,
                                                   sitemap_identifier=EntityUrls.SitemapIdentifier.LAB_PAGE).values(
@@ -559,7 +617,13 @@ class LabList(viewsets.ReadOnlyModelViewSet):
                                                                 'parameter_count': parameter_count,
                                                                 'icon': icon_url}
             category_data[temp_package.id] = list(single_test_data.values())
-        serializer = CustomLabTestPackageSerializer(all_packages, many=True,
+
+        all_packages_data = None
+        if not parameters.get('from_app'):
+            all_packages_data = all_packages[offset:page * page_size]
+        else:
+            all_packages_data = all_packages
+        serializer = CustomLabTestPackageSerializer(all_packages_data, many=True,
                                                     context={'entity_url_dict': entity_url_dict, 'lab_data': lab_data,
                                                              'request': request, 'category_data': category_data})
         category_queryset = LabTestCategory.objects.filter(is_package_category=True, is_live=True)
@@ -671,7 +735,26 @@ class LabList(viewsets.ReadOnlyModelViewSet):
         if kwargs.get('url'):
             serializer.validated_data['url'] = kwargs['url']
 
+        # Insurance check for logged in user
+        logged_in_user = request.user
+        insurance_threshold = InsuranceThreshold.objects.all().order_by('-lab_amount_limit').first()
+        insurance_data_dict = {
+            'is_user_insured': False,
+            'insurance_threshold_amount': insurance_threshold.lab_amount_limit if insurance_threshold else 5000
+        }
+
+        if logged_in_user.is_authenticated and not logged_in_user.is_anonymous:
+            user_insurance = logged_in_user.purchased_insurance.filter().order_by('id').last()
+            if user_insurance and user_insurance.is_valid():
+                insurance_threshold = user_insurance.insurance_plan.threshold.filter().first()
+                if insurance_threshold:
+                    insurance_data_dict['insurance_threshold_amount'] = 0 if insurance_threshold.lab_amount_limit is None else \
+                        insurance_threshold.lab_amount_limit
+                    insurance_data_dict['is_user_insured'] = True
+
         parameters = serializer.validated_data
+
+        parameters['insurance_threshold_amount'] = insurance_data_dict['insurance_threshold_amount']
 
         queryset = self.get_lab_list(parameters)
         count = queryset.count()
@@ -679,7 +762,7 @@ class LabList(viewsets.ReadOnlyModelViewSet):
         response_queryset = self.form_lab_whole_data(paginated_queryset, parameters.get("ids"))
 
         serializer = diagnostic_serializer.LabCustomSerializer(response_queryset,  many=True,
-                                         context={"request": request})
+                                         context={"request": request, "insurance_data_dict": insurance_data_dict})
 
         entity_ids = [lab_data['id'] for lab_data in response_queryset]
 
@@ -690,6 +773,16 @@ class LabList(viewsets.ReadOnlyModelViewSet):
             id_url_dict[data['entity_id']] = data['url']
 
         for resp in serializer.data:
+
+            resp_tests = resp['tests']
+            bool_array = list()
+            for resp_test in resp_tests:
+                insurance_coverage = resp_test.get('mrp') <= insurance_data_dict['insurance_threshold_amount']
+                bool_array.append(insurance_coverage)
+
+            if False not in bool_array and len(bool_array) > 0:
+                resp['insurance']['is_insurance_covered'] = True
+
             if id_url_dict.get(resp['lab']['id']):
                 resp['lab']['url'] = id_url_dict[resp['lab']['id']]
             else:
@@ -780,6 +873,28 @@ class LabList(viewsets.ReadOnlyModelViewSet):
         parameters = request.query_params
         if kwargs.get('parameters'):
             parameters = kwargs.get('parameters')
+
+        # Insurance check for logged in user
+        logged_in_user = request.user
+        insurance_threshold = InsuranceThreshold.objects.all().order_by('-lab_amount_limit').first()
+        insurance_data_dict = {
+            'is_user_insured': False,
+            'insurance_threshold_amount': insurance_threshold.lab_amount_limit if insurance_threshold else 5000,
+            'is_insurance_covered' : False
+        }
+
+        is_insurance_covered = False
+
+        if logged_in_user.is_authenticated and not logged_in_user.is_anonymous:
+            user_insurance = logged_in_user.purchased_insurance.filter().order_by('id').last()
+            if user_insurance and user_insurance.is_valid():
+                insurance_threshold = user_insurance.insurance_plan.threshold.filter().first()
+                if insurance_threshold:
+                    insurance_data_dict['insurance_threshold_amount'] = 0 if insurance_threshold.lab_amount_limit is None else \
+                        insurance_threshold.lab_amount_limit
+                    insurance_data_dict['is_user_insured'] = True
+
+
         test_ids = parameters.get('ids', [])
         if test_ids:
             try:
@@ -802,6 +917,7 @@ class LabList(viewsets.ReadOnlyModelViewSet):
         parameters = serializer.validated_data
         page = int(request.query_params.get('page', 1))
 
+        parameters['insurance_threshold_amount'] = insurance_data_dict['insurance_threshold_amount']
         queryset_result = self.get_lab_search_list(parameters, page)
         count = 0
         if len(queryset_result)>0:
@@ -809,7 +925,7 @@ class LabList(viewsets.ReadOnlyModelViewSet):
 
         #count = len(queryset_result)
         #paginated_queryset = paginate_queryset(queryset_result, request)
-        result = self.form_lab_search_whole_data(queryset_result, parameters.get("ids"))
+        result = self.form_lab_search_whole_data(queryset_result, parameters.get("ids"), insurance_data_dict=insurance_data_dict)
 
         if result:
             from ondoc.coupon.models import Coupon
@@ -904,6 +1020,8 @@ class LabList(viewsets.ReadOnlyModelViewSet):
         max_price = parameters.get('max_price')
         name = parameters.get('name')
         network_id = parameters.get("network_id")
+        is_insurance = parameters.get('is_insurance')
+        insurance_threshold_amount = parameters.get('insurance_threshold_amount')
 
         #filtering_params = []
         #filtering_params_query1 = []
@@ -960,6 +1078,9 @@ class LabList(viewsets.ReadOnlyModelViewSet):
             group_filter.append("price<=(%(max_price)s)")
             filtering_params['max_price'] = max_price
 
+        if is_insurance and ids:
+            filtering_query.append("mrp<=(%(insurance_threshold_amount)s)")
+            filtering_params['insurance_threshold_amount'] = insurance_threshold_amount
 
         filter_query_string = ""    
         if len(filtering_query)>0:
@@ -972,7 +1093,6 @@ class LabList(viewsets.ReadOnlyModelViewSet):
 
         filtering_params['page_start'] = (page-1)*20
         filtering_params['page_end'] = page*20
-
 
         # filtering_result = {}
         # if filtering_params:
@@ -1085,7 +1205,7 @@ class LabList(viewsets.ReadOnlyModelViewSet):
             queryset_order_by =' order_priority desc, distance asc'
         return queryset_order_by
 
-    def form_lab_search_whole_data(self, queryset, test_ids=None):
+    def form_lab_search_whole_data(self, queryset, test_ids=None, insurance_data_dict={}):
         ids = [value.get('id') for value in queryset]
         # ids, id_details = self.extract_lab_ids(queryset)
         labs = Lab.objects.select_related('network').prefetch_related('lab_documents', 'lab_image', 'lab_timings','home_collection_charges')
@@ -1127,6 +1247,7 @@ class LabList(viewsets.ReadOnlyModelViewSet):
                         deal_price=test.computed_deal_price
                     tests[obj.id].append({"id": test.test_id, "name": test.test.name, "deal_price": deal_price, "mrp": test.mrp, "number_of_tests": test.test.number_of_tests, 'categories': test.test.get_all_categories_detail(), "url": test.test.url})
 
+
         # day_now = timezone.now().weekday()
         # days_array = [i for i in range(7)]
         # rotated_days_array = days_array[day_now:] + days_array[:day_now]
@@ -1151,8 +1272,12 @@ class LabList(viewsets.ReadOnlyModelViewSet):
 
             row['home_pickup_charges'] = lab_obj.home_pickup_charges
             row['is_home_collection_enabled'] = lab_obj.is_home_collection_enabled
-            row['avg_rating'] = lab_obj.rating_data.get('avg_rating') if lab_obj.rating_data else None
-            row['rating_count'] = lab_obj.rating_data.get('rating_count') if lab_obj.rating_data else None
+            row['is_insurance_enabled'] = lab_obj.is_insurance_enabled
+            row['avg_rating'] = lab_obj.rating_data.get('avg_rating') if lab_obj.display_rating_on_list() else None
+            row['rating_count'] = lab_obj.rating_data.get('rating_count') if lab_obj.display_rating_on_list() else None
+
+            row['avg_rating'] = lab_obj.rating_data.get('avg_rating') if lab_obj.display_rating_on_list() else None
+            row['rating_count'] = lab_obj.rating_data.get('rating_count') if lab_obj.display_rating_on_list() else None
             # if lab_obj.always_open:
             #     lab_timing = "12:00 AM - 11:45 PM"
             #     next_lab_timing_dict = {rotated_days_array[1]: "12:00 AM - 11:45 PM"}
@@ -1219,6 +1344,23 @@ class LabList(viewsets.ReadOnlyModelViewSet):
 
             if not existing:
                 res['other_labs'] = []
+
+                # Insurance logic. Add Insurance dictionary for all labs and for [0] index for
+                # lab network case as lab network have more than 1 labs under it.
+
+                res['insurance'] = deepcopy(insurance_data_dict)
+                all_tests_under_lab = res.get('tests', [])
+                bool_array = list()
+                if all_tests_under_lab and res['is_insurance_enabled']:
+                    for paticular_test_in_lab in all_tests_under_lab:
+                        insurance_coverage = paticular_test_in_lab.get('mrp', 0) <= insurance_data_dict['insurance_threshold_amount']
+                        bool_array.append(insurance_coverage)
+
+                    if False not in bool_array and len(bool_array) > 0:
+                        res['insurance']['is_insurance_covered'] = True
+                elif res['is_insurance_enabled'] and not all_tests_under_lab:
+                    res['insurance']['is_insurance_covered'] = True
+
                 #existing = res
                 key = network_id
                 if not key:
@@ -1281,14 +1423,12 @@ class LabList(viewsets.ReadOnlyModelViewSet):
             test__in=test_ids)
 
         test_serializer = diagnostic_serializer.AvailableLabTestPackageSerializer(queryset, many=True,
-                                                                                  context={"lab": lab_obj,
-                                                                                           "package_free_or_not_dict": package_free_or_not_dict})
+                                                                           context={"lab": lab_obj, "request": request, "package_free_or_not_dict": package_free_or_not_dict})
         # for Demo
         demo_lab_test = AvailableLabTest.objects.filter(test__enable_for_retail=True, lab_pricing_group=lab_obj.lab_pricing_group, enabled=True, test__searchable=True).order_by("-test__priority").prefetch_related('test')[:2]
-        lab_test_serializer = diagnostic_serializer.AvailableLabTestSerializer(demo_lab_test, many=True,
-                                                                               context={"lab": lab_obj,
-                                                                                        "package_free_or_not_dict": package_free_or_not_dict})
+        lab_test_serializer = diagnostic_serializer.AvailableLabTestSerializer(demo_lab_test, many=True, context={"lab": lab_obj, "request": request, "package_free_or_not_dict": package_free_or_not_dict})
         # day_now = timezone.now().weekday()
+
         timing_queryset = list()
         lab_serializable_data = list()
         lab_timing = None
@@ -1315,8 +1455,6 @@ class LabList(viewsets.ReadOnlyModelViewSet):
         if lab_obj.network:
             rating_queryset = rating_models.RatingsReview.objects.prefetch_related('compliment')\
                                                                  .filter(is_live=True,
-                                                                         moderation_status__in=[rating_models.RatingsReview.PENDING,
-                                                                                                rating_models.RatingsReview.APPROVED],
                                                                          lab_ratings__network=lab_obj.network)
         lab_serializer = diagnostic_serializer.LabModelSerializer(lab_obj, context={"request": request,
                                                                                     "entity": entity,
@@ -1405,6 +1543,8 @@ class LabList(viewsets.ReadOnlyModelViewSet):
         max_price = parameters.get('max_price')
         name = parameters.get('name')
         network_id = parameters.get("network_id")
+        is_insurance = parameters.get('is_insurance')
+        insurance_threshold_amount = parameters.get('insurance_threshold_amount')
 
         # queryset = AvailableLabTest.objects.select_related('lab').exclude(enabled=False).filter(lab_pricing_group__labs__is_live=True,
         #                                                                                         lab_pricing_group__labs__is_test_lab=False)
@@ -1462,6 +1602,9 @@ class LabList(viewsets.ReadOnlyModelViewSet):
                                                name=Max('name'),
                                                pickup_charges=Max(home_pickup_calculation),
                                                order_priority=Max('order_priority')).filter(count__gte=len(ids)))
+
+            if is_insurance:
+                queryset = queryset.filter(mrp__lte=insurance_threshold_amount)
 
             if min_price is not None:
                 queryset = queryset.filter(price__gte=min_price)
@@ -1701,6 +1844,7 @@ class LabAppointmentView(mixins.CreateModelMixin,
 
     @transaction.atomic
     def create(self, request, **kwargs):
+        from ondoc.doctor.models import OpdAppointment
         data = dict(request.data)
         if not data.get("is_home_pickup"):
             data.pop("address", None)
@@ -1710,11 +1854,30 @@ class LabAppointmentView(mixins.CreateModelMixin,
         serializer.is_valid(raise_exception=True)
         validated_data = serializer.validated_data
 
+        user_insurance = UserInsurance.get_user_insurance(request.user)
+        if user_insurance:
+            insurance_validate_dict = user_insurance.validate_insurance(validated_data)
+            data['is_appointment_insured'] = insurance_validate_dict['is_insured']
+            data['insurance_id'] = insurance_validate_dict['insurance_id']
+            data['insurance_message'] = insurance_validate_dict['insurance_message']
+
+            if data['is_appointment_insured']:
+                data['payment_type'] = OpdAppointment.INSURANCE
+        else:
+            data['is_appointment_insured'], data['insurance_id'], data[
+                'insurance_message'] = False, None, ""
+        # data['is_appointment_insured'], data['insurance_id'], data['insurance_message'] = Cart.check_for_insurance(validated_data, request)
+
         cart_item_id = validated_data.get('cart_item').id if validated_data.get('cart_item') else None
 
         if validated_data.get("existing_cart_item"):
             cart_item = validated_data.get("existing_cart_item")
-            cart_item.data = request.data
+            old_cart_obj = Cart.objects.filter(id=validated_data.get('existing_cart_item').id).first()
+            payment_type = old_cart_obj.data.get('payment_type')
+            if payment_type == OpdAppointment.INSURANCE and data['is_appointment_insured'] == False:
+                data['payment_type'] = OpdAppointment.PREPAID
+            # cart_item.data = request.data
+            cart_item.data = data
             cart_item.save()
         else:
             cart_item, is_new = Cart.objects.update_or_create(id=cart_item_id, deleted_at__isnull=True, product_id=account_models.Order.LAB_PRODUCT_ID,
@@ -1859,8 +2022,9 @@ class LabAppointmentView(mixins.CreateModelMixin,
             balance = 0
             resp['is_agent'] = True
 
-        can_use_insurance, insurance_fail_message = self.can_use_insurance(appointment_details)
+        can_use_insurance, insurance_id, insurance_fail_message = self.can_use_insurance(user, appointment_details)
         if can_use_insurance:
+            appointment_details['insurance'] = insurance_id
             appointment_details['effective_price'] = appointment_details['agreed_price']
             appointment_details["effective_price"] += appointment_details["home_pickup_charges"]
             appointment_details['payment_type'] = doctor_model.OpdAppointment.INSURANCE
@@ -1868,6 +2032,9 @@ class LabAppointmentView(mixins.CreateModelMixin,
             resp['status'] = 0
             resp['message'] = insurance_fail_message
             return resp
+        else:
+            appointment_details['insurance'] = None
+
 
         appointment_action_data = copy.deepcopy(appointment_details)
         appointment_action_data = labappointment_transform(appointment_action_data)
@@ -1963,10 +2130,19 @@ class LabAppointmentView(mixins.CreateModelMixin,
 
         return pgdata, payment_required
 
-    def can_use_insurance(self, appointment_details):
+    def can_use_insurance(self, user, appointment_details):
+        user_insurance_obj = UserInsurance.get_user_insurance(user)
+        if not user_insurance_obj:
+            return False, None, ''
+        insurance_validate_dict = user_insurance_obj.validate_insurance(appointment_details)
+        insurance_check = insurance_validate_dict['is_insured']
+        insurance_id = insurance_validate_dict['insurance_id']
+        fail_message = insurance_validate_dict['insurance_message']
+
+        return insurance_check, insurance_id, fail_message
         # Check if appointment can be covered under insurance
         # also return a valid message
-        return False, 'Not covered under insurance'
+        # return False, 'Not covered under insurance'
 
     def is_insured_cod(self, app_details):
         return False
@@ -2018,7 +2194,7 @@ class LabTimingListView(mixins.ListModelMixin,
         if lab:
             lab_obj = Lab.objects.filter(id=int(lab), is_live=True).first()
             if lab_obj and lab_obj.network and lab_obj.network.id:
-                integration_dict = IntegratorMapping.get_if_third_party_integration(network_id=lab_obj.network.id)
+                integration_dict = IntegratorTestMapping.get_if_third_party_integration(network_id=lab_obj.network.id)
 
                 if lab_obj.network.id == settings.THYROCARE_NETWORK_ID and settings.THYROCARE_INTEGRATION_ENABLED:
                     pass
@@ -2078,8 +2254,7 @@ class AvailableTestViewSet(mixins.RetrieveModelMixin,
         paginated_queryset = paginate_queryset(queryset, request)
         package_free_or_not_dict = get_package_free_or_not_dict(request)
         serializer = diagnostic_serializer.AvailableLabTestSerializer(paginated_queryset, many=True,
-                                                                      context={"lab": lab_obj,
-                                                                               "package_free_or_not_dict": package_free_or_not_dict})
+                                                                      context={"lab": lab_obj, 'request': request, "package_free_or_not_dict": package_free_or_not_dict})
         return Response(serializer.data)
 
 
@@ -2196,7 +2371,10 @@ class DoctorLabAppointmentsNoAuthViewSet(viewsets.GenericViewSet):
         lab_appointment = validated_data.get('lab_appointment')
 
         lab_appointment = LabAppointment.objects.select_for_update().get(id=lab_appointment.id)
-
+        source = request.query_params.get('source', '')
+        responsible_user = request.user if request.user.is_authenticated else None
+        lab_appointment._source = source if source in [x[0] for x in AppointmentHistory.SOURCE_CHOICES] else ''
+        lab_appointment._responsible_user = responsible_user
         if lab_appointment:
             lab_appointment.action_completed()
             # lab_appointment_serializer = diagnostic_serializer.LabAppointmentRetrieveSerializer(lab_appointment,
@@ -2272,6 +2450,7 @@ class TestDetailsViewset(viewsets.GenericViewSet):
         if not queryset:
             return Response([])
         final_result = []
+        test_queryset = queryset[0]
         for data in queryset:
             result = {}
             result['name'] = data.name
@@ -2342,17 +2521,50 @@ class TestDetailsViewset(viewsets.GenericViewSet):
         kwargs['test_flag'] = 1
 
         result['labs'] = lab.search(request, **kwargs)
-        seo = dict()
-        seo['description'] = None
-        if queryset:
-            seo['title'] = queryset[0].name + ' Test: Types, Procedure & Normal Range of Results'
-        else:
-            seo['title'] = None
 
+        seo = dict()
+        author = None
+
+        if test_queryset.name:
+            seo['title'] = test_queryset.name + '  - Cost & Normal Range of Results'
+            seo['description'] = 'Book ' + test_queryset.name + ' @50% off. Free Sample Collection. Know what is ' \
+                                 + test_queryset.name + ', Price, Normal Range, ' + test_queryset.name + ' Results, Procedure & Preparation.'
+        else:
+            seo = None
         result['seo'] = seo
+        result['breadcrumb'] = list()
+
+        result['breadcrumb'].append({"title": "Home", "url": "/"})
+
+        if test_queryset.name and test_queryset.url:
+            result['breadcrumb'].append({"title": test_queryset.name, "url": test_queryset.url})
+
+        result['canonical_url'] = test_queryset.url if test_queryset.url else None
+
+        if test_queryset.author:
+            serializer = ArticleAuthorSerializer(test_queryset.author, context={'request': request})
+            author = serializer.data
+        result['author'] = author
+        result['published_date'] = '{:%d-%m-%Y}'.format(test_queryset.created_at.date()) if test_queryset.created_at else None
+        result['last_updated_date'] = '{:%d-%m-%Y}'.format(test_queryset.created_at.date()) if test_queryset.updated_at else None
         final_result.append(result)
 
         return Response(final_result)
+
+    def list_by_alphabet(self, request):
+        alphabet = request.GET.get('alphabet')
+        if not alphabet:
+            return Response(status=status.HTTP_404_NOT_FOUND)
+        response = {}
+        tests_count = 0
+
+        tests = list(LabTest.objects.filter(enable_for_retail=True, name__istartswith=alphabet).order_by('name').values('id', 'name', 'url'))
+        if tests:
+            tests_count = len(tests)
+        response['count'] = tests_count
+        response['tests'] = tests
+
+        return Response(response)
 
 
 class LabTestCategoryListViewSet(viewsets.GenericViewSet):

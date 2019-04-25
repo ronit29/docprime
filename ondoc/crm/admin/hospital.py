@@ -394,9 +394,36 @@ class HospCityFilter(SimpleListFilter):
 
 class HospitalAdmin(admin.GeoModelAdmin, VersionAdmin, ActionAdmin, QCPemAdmin):
     list_filter = ('data_status', 'welcome_calling_done', HospCityFilter, CreatedByFilter)
-    readonly_fields = ('source', 'batch', 'associated_doctors', 'is_live', 'matrix_lead_id', 'city', 'state', )
-    exclude = (
-    'search_key', 'live_at', 'qc_approved_at', 'disabled_at', 'physical_agreement_signed_at', 'welcome_calling_done_at', )
+    readonly_fields = ('source', 'batch', 'associated_doctors', 'is_live', 'matrix_lead_id', 'city', 'state',)
+    exclude = ('search_key', 'live_at', 'qc_approved_at', 'disabled_at', 'physical_agreement_signed_at',
+               'welcome_calling_done_at',)
+    list_display = ('name', 'updated_at', 'data_status', 'welcome_calling_done', 'doctor_count',
+                    'list_created_by', 'list_assigned_to')
+    form = HospitalForm
+    search_fields = ['name']
+    # autocomplete_fields = ['matrix_city', 'matrix_state']
+    inlines = [
+        # HospitalNetworkMappingInline,
+        HospitalDoctorInline,
+        HospitalHelplineInline,
+        HospitalServiceInline,
+        HospitalTimingInline,
+        HospitalHealthInsuranceProviderInline,
+        HospitalSpecialityInline,
+        HospitalAwardInline,
+        HospitalAccreditationInline,
+        HospitalImageInline,
+        HospitalDocumentInline,
+        HospitalCertificationInline,
+        GenericAdminInline,
+        SPOCDetailsInline,
+        AssociatedMerchantInline,
+        RemarkInline
+    ]
+    map_width = 200
+    map_template = 'admin/gis/gmap.html'
+    extra_js = ['js/admin/GoogleMap.js',
+                'https://maps.googleapis.com/maps/api/js?key=AIzaSyCFtb27PooaG0yujuykgvPtxi6tvS04Ek0&callback=initGoogleMap']
 
     def get_fields(self, request, obj=None):
         all_fields = super().get_fields(request, obj)
@@ -443,6 +470,8 @@ class HospitalAdmin(admin.GeoModelAdmin, VersionAdmin, ActionAdmin, QCPemAdmin):
             obj.qc_approved_at = datetime.datetime.now()
         if '_mark_in_progress' in request.POST:
             obj.data_status = QCModel.REOPENED
+        if not obj.source_type:
+            obj.source_type = Hospital.AGENT
 
         obj.status_changed_by = request.user
         obj.city = obj.matrix_city.name
@@ -535,6 +564,11 @@ class HospitalAdmin(admin.GeoModelAdmin, VersionAdmin, ActionAdmin, QCPemAdmin):
             read_only += ('add_network_link',)
         if not request.user.is_superuser and not request.user.groups.filter(name=constants['SUPER_QC_GROUP']).exists():
             read_only += ('is_listed_on_docprime',)
+        if not request.user.groups.filter(
+                name__in=[constants['WELCOME_CALLING_TEAM'],
+                          constants['OPD_APPOINTMENT_MANAGEMENT_TEAM']]) and not request.user.is_superuser:
+            read_only += ('is_location_verified',)
+
         return read_only
 
     def add_network_link(self, obj):
@@ -544,31 +578,3 @@ class HospitalAdmin(admin.GeoModelAdmin, VersionAdmin, ActionAdmin, QCPemAdmin):
             add_network_link += '?AgentId={}'.format(self.matrix_agent_id)
         html = '''<a href='%s' target=_blank>%s</a><br>''' % (add_network_link, "Add Network")
         return mark_safe(html)
-
-
-    list_display = ('name', 'updated_at', 'data_status', 'welcome_calling_done', 'doctor_count', 'list_created_by', 'list_assigned_to')
-    form = HospitalForm
-    search_fields = ['name']
-    # autocomplete_fields = ['matrix_city', 'matrix_state']
-    inlines = [
-        # HospitalNetworkMappingInline,
-        HospitalDoctorInline,
-        HospitalHelplineInline,
-        HospitalServiceInline,
-        HospitalTimingInline,
-        HospitalHealthInsuranceProviderInline,
-        HospitalSpecialityInline,
-        HospitalAwardInline,
-        HospitalAccreditationInline,
-        HospitalImageInline,
-        HospitalDocumentInline,
-        HospitalCertificationInline,
-        GenericAdminInline,
-        SPOCDetailsInline,
-        AssociatedMerchantInline,
-        RemarkInline
-    ]
-
-    map_width = 200
-    map_template = 'admin/gis/gmap.html'
-    extra_js = ['js/admin/GoogleMap.js','https://maps.googleapis.com/maps/api/js?key=AIzaSyA-5gVhdnhNBInTuxBxMJnGuErjQP40nNc&callback=initGoogleMap']

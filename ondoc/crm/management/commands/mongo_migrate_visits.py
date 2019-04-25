@@ -50,7 +50,7 @@ class Command(BaseCommand):
         total_migrated = 0
         # storing events
         try:
-            for visits in VisitMigrateIterator(24, 10):
+            for visits in VisitMigrateIterator(240, 30):
                 create_objects = []
                 mongo_visits = track_mongo_models.TrackingVisit.objects.filter(id__in=[x.id for x in visits]).values_list('id')
                 psql_visits = visits.exclude(id__in=mongo_visits)
