@@ -41,13 +41,13 @@ class PrescriptionSymptomsComplaints(PrescriptionEntity):
         db_table = 'eprescription_symptoms_complaints'
 
 
-class PrescriptionDiagnosis(PrescriptionEntity):
+class PrescriptionDiagnoses(PrescriptionEntity):
 
     def __str__(self):
         return self.name
 
     class Meta:
-        db_table = 'eprescription_diagnosis'
+        db_table = 'eprescription_diagnoses'
 
 
 class PrescriptionSpecialInstructions(PrescriptionEntity):
@@ -97,7 +97,7 @@ class PresccriptionPdf(auth_models.TimeStampedModel):
     APPOINTMENT_TYPE_CHOICES = [(DOCPRIME_OPD, "Docprime_Opd"), (DOCPRIME_LAB, "Docprime_Lab"), (OFFLINE, "OFFline")]
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     symptoms_complaints = JSONField(blank=True, null=True)
-    diagnosis = JSONField(blank=True, null=True)
+    diagnoses = JSONField(blank=True, null=True)
     special_instructions = JSONField(blank=True, null=True)
     medicines = JSONField(blank=True, null=True)
     lab_tests = JSONField(blank=True, null=True)
@@ -115,7 +115,7 @@ class PresccriptionPdf(auth_models.TimeStampedModel):
                     'special_instructions': self.special_instructions,
                     'pres_id': self.id,
                     'symptoms_complaints': self.symptoms_complaints,
-                    'diagnosis': self.diagnosis,
+                    'diagnoses': self.diagnoses,
                     'doc_name': appointment.doctor.name,
                     'hosp_name':  appointment.hospital.name,
                     'tests': self.lab_tests,

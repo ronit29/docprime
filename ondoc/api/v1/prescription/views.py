@@ -32,7 +32,7 @@ class PrescriptionGenerateViewSet(viewsets.GenericViewSet):
             prescription_pdf = prescription_models.PresccriptionPdf.objects.create(medicines=valid_data.get('medicines'),
                                                                                    special_instructions=valid_data.get('special_instructions'),
                                                                                    lab_tests=valid_data.get('tests'),
-                                                                                   diagnosis=valid_data.get('diagnosis'),
+                                                                                   diagnoses=valid_data.get('diagnoses'),
                                                                                    symptoms_complaints=valid_data.get('symptoms_complaints'),
                                                                                    patient_details=valid_data.get('patient_details'),
                                                                                    appointment_id=valid_data.get('appointment_id'),

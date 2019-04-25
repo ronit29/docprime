@@ -9,10 +9,10 @@ class PrescriptionComponents():
     MEDICINES = 2
     SPECIAL_INSTRUCTIONS = 3
     TESTS = 4
-    DIAGNOSIS = 5
+    DIAGNOSES = 5
     COMPONENT_CHOICES = [(SYMPTOMS_COMPLAINTS, prescription_models.PrescriptionSymptomsComplaints), (MEDICINES, prescription_models.PrescriptionMedicine),
                          (SPECIAL_INSTRUCTIONS, prescription_models.PrescriptionSpecialInstructions), (TESTS, prescription_models.PrescriptionTests),
-                         (DIAGNOSIS, prescription_models.PrescriptionDiagnosis)]
+                         (DIAGNOSES, prescription_models.PrescriptionDiagnoses)]
 
 
 class PrescriptionAppointmentValidation():
@@ -66,7 +66,7 @@ class PrescriptionSpecialInstructionsBodySerializer(serializers.Serializer):
     name = serializers.CharField(max_length=64)
 
 
-class PrescriptionDiagnosisBodySerializer(serializers.Serializer):
+class PrescriptionDiagnosesBodySerializer(serializers.Serializer):
     name = serializers.CharField(max_length=64)
 
 
@@ -92,7 +92,7 @@ class GeneratePrescriptionPDFBodySerializer(serializers.Serializer):
     symptoms_complaints = serializers.ListField(child=PrescriptionSymptomsComplaintsBodySerializer(), allow_empty=True)
     tests = serializers.ListField(child=PrescriptionTestsBodySerializer(),required=False, allow_empty=True)
     special_instructions = serializers.ListField(child=PrescriptionSpecialInstructionsBodySerializer(), allow_empty=True)
-    diagnosis = serializers.ListField(child=PrescriptionDiagnosisBodySerializer(),required=False, allow_empty=True)
+    diagnoses = serializers.ListField(child=PrescriptionDiagnosesBodySerializer(),required=False, allow_empty=True)
     patient_details = PrescriptionPatientSerializer()
     medicines = serializers.ListField(child=PrescriptionMedicineBodySerializer(),required=False, allow_empty=True)
     appointment_id = serializers.CharField(required=False)
@@ -120,4 +120,4 @@ class PrescriptionResponseSerializer(serializers.ModelSerializer):
     class Meta:
         model = prescription_models.PresccriptionPdf
         fields = ('medicines', 'special_instructions', 'symptoms_complaints', 'appointment_id', 'appointment_type',
-                  'pdf_file', 'diagnosis', 'lab_tests', 'followup_instructions_date', 'followup_instructions_reason')
+                  'pdf_file', 'diagnoses', 'lab_tests', 'followup_instructions_date', 'followup_instructions_reason')
