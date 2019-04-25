@@ -424,7 +424,7 @@ class PartnersAppInvoiceSerialier(serializers.Serializer):
     selected_invoice_items = serializers.ListField(child=SelectedInvoiceItemsSerializer(many=False), required=False,
                                                    allow_empty=True)
     payment_status = serializers.ChoiceField(choices=doc_models.PartnersAppInvoice.PAYMENT_STATUS)
-    payment_type = serializers.ChoiceField(choices=doc_models.PartnersAppInvoice.PAYMENT_CHOICES, required=False)
+    payment_type = serializers.ChoiceField(choices=doc_models.PartnersAppInvoice.PAYMENT_CHOICES, required=False, allow_null=True)
     due_date = serializers.DateField(required=False, allow_null=True)
     sub_total_amount = serializers.DecimalField(max_digits=10, decimal_places=2)
     invoice_title = serializers.CharField(max_length=300, required=False, allow_blank=True)
