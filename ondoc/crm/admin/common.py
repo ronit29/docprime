@@ -424,9 +424,10 @@ class MerchantPayoutForm(forms.ModelForm):
             if not billed_to:
                 raise forms.ValidationError("Billing entity not defined.")
 
-            associated_merchant = billed_to.merchant.first()
-            if not associated_merchant.verified:
-                raise forms.ValidationError("Associated Merchant not verified.")
+            if not self.instance.booking_type == payout_data.InsurancePremium:
+                associated_merchant = billed_to.merchant.first()
+                if not associated_merchant.verified:
+                    raise forms.ValidationError("Associated Merchant not verified.")
 
         if not self.instance.status == self.instance.PENDING:
             raise forms.ValidationError("This payout is already under process")
@@ -488,6 +489,10 @@ class MerchantPayoutAdmin(ExportMixin, VersionAdmin):
         elif isinstance(appt, LabAppointment):
             if appt.lab:
                 return appt.lab.name
+        elif isinstance(appt, UserInsurance):
+            if appt.insurance_plan.insurer:
+                return appt.insurance_plan.insurer.name
+
         return ''
 
     def appointment_id(self, instance):
