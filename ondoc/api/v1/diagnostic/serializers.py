@@ -1442,7 +1442,7 @@ class CustomLabTestPackageSerializer(serializers.ModelSerializer):
         return None
 
     def get_distance(self, obj):
-        return int(obj.distance.m)
+        return int(obj.distance)
 
     def get_mrp(self, obj):
         return str(obj.mrp)
