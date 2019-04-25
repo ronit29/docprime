@@ -774,6 +774,10 @@ class UserInsurance(auth_model.TimeStampedModel):
                     profile.email = member['email']
                     profile.gender = member['gender']
                     profile.dob = member['dob']
+                    if member['relation'] == "self":
+                        profile.is_default_user = True
+                    else:
+                        profile.is_default_user = False
                     profile.save()
 
                 profile = profile.id
@@ -937,7 +941,7 @@ class UserInsurance(auth_model.TimeStampedModel):
                     insurance_id = None
                     insurance_message = "Procedure Not covered under insurance"
         doctor = appointment_data['doctor']
-        if not doctor.is_insurance_enabled:
+        if not doctor.is_insurance_enabled or not doctor.is_doctor_specialization_insured():
             is_insured = False
             insurance_id = None
             insurance_message = ""

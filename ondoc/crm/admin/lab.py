@@ -1366,7 +1366,7 @@ class LabTestAdminForm(forms.ModelForm):
                 raise forms.ValidationError('Please enter gender_type')
             if cleaned_data.get('min_age') > cleaned_data.get('max_age'):
                 raise forms.ValidationError('min_age cannot be more than max_age')
-        else :
+        else:
             if cleaned_data.get('min_age'):
                 raise forms.ValidationError('Please dont enter min_age')
             if cleaned_data.get('max_age'):

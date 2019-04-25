@@ -87,6 +87,7 @@ class ContactUs(TimeStampedModel):
                                                 MinValueValidator(1000000000)])
     email = models.EmailField()
     message = models.CharField(max_length=2000)
+    from_app = models.BooleanField(default=False)
 
     def __str__(self):
         return self.name
