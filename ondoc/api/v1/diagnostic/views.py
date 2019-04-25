@@ -2658,18 +2658,20 @@ class DigitalReports(viewsets.GenericViewSet):
             LabTestThresholds.Colour.GREEN.lower(): 0
         }
 
+        user_age = appointment_obj.profile.get_age()
+
         integrator_report = IntegratorReport.objects.filter(integrator_response_id=integrator_response.id).first()
         if not integrator_report:
             return Response(status=status.HTTP_400_BAD_REQUEST,
                             data={'error': 'No report found from integrator for this appointment.'})
 
         report_json = integrator_report.json_data
+        report_parameter_array = list()
 
         # booked_tests = [LabTest.objects.get(id=11361)]
 
         for booked_test in booked_tests:
             profile_dict = dict()
-            parameter_list = list()
             profile_dict['name'] = booked_test.name
             profile_dict['icon'] = ""
             profile_dict['parameter_list'] = list()
@@ -2685,10 +2687,19 @@ class DigitalReports(viewsets.GenericViewSet):
                 value = 16
 
                 threshold_qs = parameter.parameter_thresholds.all()
-                # TODO: calculate age of the userprofile and put in below condition.
-                valid_threshold = threshold_qs.filter(min_value__lte=value, max_value__gte=value, gender=appointment_obj.profile.gender).first()
+                if user_age:
+                    valid_threshold = threshold_qs.filter(min_value__lte=value, max_value__gte=value,
+                                                          min_age__lte=appointment_obj.profile.get_age(),
+                                                          max_age__gte=appointment_obj.profile.get_age(),
+                                                          gender=appointment_obj.profile.gender).first()
+                else:
+                    valid_threshold = threshold_qs.filter(min_value__lte=value,
+                                                          max_value__gte=value,
+                                                          gender=appointment_obj.profile.gender).first()
+
                 if not valid_threshold:
                     return Response(status=status.HTTP_400_BAD_REQUEST)
+
                 parameter_dict['color'] = valid_threshold.color
                 parameter_dict['what_to_do'] = valid_threshold.what_to_do
                 parameter_dict['details'] = valid_threshold.details
