@@ -143,7 +143,7 @@ class IntegratorReport(TimeStampedModel):
     integrator_response = models.ForeignKey(IntegratorResponse, on_delete=models.CASCADE, null=False)
     pdf_url = models.TextField(null=True, blank=True)
     xml_url = models.TextField(null=True, blank=True)
-    json_data = JSONField(blank=True, null=True)
+    json_data = JSONField(null=True, default={})
 
     class Meta:
         db_table = 'integrator_report'
