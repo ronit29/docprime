@@ -13,7 +13,7 @@ from ondoc.diagnostic.models import (LabTest, AvailableLabTest, Lab, LabAppointm
                                      FrequentlyAddedTogetherTests, TestParameter, ParameterLabTest, QuestionAnswer,
                                      LabPricingGroup, LabTestCategory, LabTestCategoryMapping)
 from ondoc.account import models as account_models
-from ondoc.authentication.models import UserProfile, Address
+from ondoc.authentication.models import UserProfile, Address, CouponRecommender
 from ondoc.insurance.models import UserInsurance, InsuranceThreshold
 from ondoc.notification.models import EmailNotification
 from ondoc.coupon.models import Coupon
@@ -196,6 +196,9 @@ class LabList(viewsets.ReadOnlyModelViewSet):
         test_ids = validated_data.get('test_ids', [])
         package_ids = validated_data.get('package_ids', [])
         point_string = 'POINT(' + str(long) + ' ' + str(lat) + ')'
+        profile = parameters.get("profile_id", None)
+        product_id = parameters.get("product_id", None)
+        coupon_code = parameters.get("coupon_code", None)
         pnt = GEOSGeometry(point_string, srid=4326)
         max_distance = max_distance*1000 if max_distance is not None else 10000
         min_distance = min_distance*1000 if min_distance is not None else 0
@@ -419,14 +422,22 @@ class LabList(viewsets.ReadOnlyModelViewSet):
                 is_selected = True
             category_result.append({'name': name, 'id': category_id, 'is_selected': is_selected})
 
+        coupon_recommender = CouponRecommender(request.user, profile, 'lab', product_id, coupon_code)
+        filters = dict()
+
         result = serializer.data
         if result:
             from ondoc.coupon.models import Coupon
-            search_coupon = Coupon.get_search_coupon(request.user)
+            # search_coupon = Coupon.get_search_coupon(request.user)
 
             for package_result in result:
                 if "price" in package_result:
                     price = int(float(package_result["price"]))
+
+                    filters['deal_price'] = price
+                    filters['tests'] = package_result.get('tests')
+                    search_coupon = coupon_recommender.best_coupon(**filters)
+
                     discounted_price = price if not search_coupon else search_coupon.get_search_coupon_discounted_price(price)
                     package_result["discounted_price"] = discounted_price
 
@@ -903,7 +914,7 @@ class LabList(viewsets.ReadOnlyModelViewSet):
                     new_test_ids = [x for x in test_ids if x]
                     tests = list(
                         LabTest.objects.filter(id__in=new_test_ids).values('id', 'name', 'hide_price', 'show_details',
-                                                                           'test_type', 'url'))
+                                                                           'test_type', 'url', 'categories'))
             except:
                 tests = []
             if not tests:
@@ -928,11 +939,22 @@ class LabList(viewsets.ReadOnlyModelViewSet):
         result = self.form_lab_search_whole_data(queryset_result, parameters.get("ids"), insurance_data_dict=insurance_data_dict)
 
         if result:
+            product_id = parameters.get('product_id', None)
+            coupon_code = parameters.get('coupon_code', None)
+            profile = parameters.get('profile_id', None)
+            coupon_recommender = CouponRecommender(request.user, profile, 'lab', product_id, coupon_code)
+            filters = dict()
+
             from ondoc.coupon.models import Coupon
-            search_coupon = Coupon.get_search_coupon(request.user)
+            # search_coupon = Coupon.get_search_coupon(request.user)
 
             for lab_result in result:
                 if "price" in lab_result:
+                    filters['deal_price'] = lab_result["price"]
+                    filters['lab'] = lab_result
+                    filters['tests'] = tests
+                    search_coupon = coupon_recommender.best_coupon(**filters)
+
                     discounted_price = lab_result["price"] if not search_coupon else search_coupon.get_search_coupon_discounted_price(lab_result["price"])
                     lab_result["discounted_price"] = discounted_price
 

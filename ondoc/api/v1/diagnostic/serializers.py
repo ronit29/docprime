@@ -254,6 +254,7 @@ class AvailableLabTestPackageSerializer(serializers.ModelSerializer):
     hide_price = serializers.ReadOnlyField(source='test.hide_price')
     included_in_user_plan = serializers.SerializerMethodField()
 
+
     def get_included_in_user_plan(self, obj):
         package_free_or_not_dict = self.context.get('package_free_or_not_dict', {})
         return package_free_or_not_dict.get(obj.test.id, False)
@@ -299,6 +300,7 @@ class AvailableLabTestPackageSerializer(serializers.ModelSerializer):
 
     def get_deal_price(self, obj):
         deal_price = obj.computed_deal_price if obj.custom_deal_price is None else obj.custom_deal_price
+
         return deal_price
 
     def get_package(self, obj):
@@ -1399,7 +1401,8 @@ class CustomLabTestPackageSerializer(serializers.ModelSerializer):
             parameter_count = len(temp_test.parameter.all()) or 1
             name = temp_test.name
             test_id = temp_test.id
-            return_data.append({'id': test_id, 'name': name, 'parameter_count': parameter_count})
+            categories_count = len(temp_test.categories.all())
+            return_data.append({'id': test_id, 'name': name, 'parameter_count': parameter_count, 'categories': categories_count})
         return return_data
 
     def get_categories(self, obj):

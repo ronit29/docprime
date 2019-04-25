@@ -9,7 +9,7 @@ from ondoc.api.v1.ratings.serializers import GoogleRatingsGraphSerializer
 from ondoc.doctor import models
 from ondoc.api.v1.utils import clinic_convert_timings
 from ondoc.api.v1.doctor import serializers
-from ondoc.authentication.models import QCModel
+from ondoc.authentication.models import QCModel, CouponRecommender
 from ondoc.doctor.models import Doctor, PracticeSpecialization
 from ondoc.procedure.models import DoctorClinicProcedure, ProcedureCategory, ProcedureToCategoryMapping, \
     get_selected_and_other_procedures, get_included_doctor_clinic_procedure, \
@@ -415,16 +415,25 @@ class DoctorSearchHelper:
         return None
 
     def prepare_search_response(self, doctor_data, doctor_search_result, request, **kwargs):
+        query_params = self.query_params
+
         doctor_clinic_mapping = {data.get("doctor_id"): data.get("hospital_id") for data in doctor_search_result}
         doctor_availability_mapping = {data.get("doctor_id"): data.get("doctor_clinic_timing_id") for data in
                                        doctor_search_result}
-        category_ids = self.query_params.get("procedure_category_ids", [])
-        procedure_ids = self.query_params.get("procedure_ids", [])
+        category_ids = query_params.get("procedure_category_ids", [])
+        procedure_ids = query_params.get("procedure_ids", [])
         category_ids = [int(x) for x in category_ids]
         procedure_ids = [int(x) for x in procedure_ids]
         response = []
-        specialization_ids = self.query_params.get('specialization_ids', [])
+        specialization_ids = query_params.get('specialization_ids', [])
         selected_procedure_ids, other_procedure_ids = get_selected_and_other_procedures(category_ids, procedure_ids)
+        profile = query_params.get("profile_id", None)
+        product_id = query_params.get("product_id", None)
+        coupon_code = query_params.get("coupon_code", None)
+
+        coupon_recommender = CouponRecommender(request.user, profile, 'doctor', product_id, coupon_code)
+        filters = dict()
+
         for doctor in doctor_data:
             enable_online_booking = False
             should_apply_coupon = False
@@ -514,9 +523,11 @@ class DoctorSearchHelper:
             doctor_spec_list = []
             searched_spec_list = []
             general_specialization = []
+            doctor_specializations = []
             
             for dps in doctor.doctorpracticespecializations.all():
                 general_specialization.append(dps.specialization)
+                doctor_specializations.append(dps.specialization_id)
 
             general_specialization = sorted(general_specialization, key=operator.attrgetter('doctor_count'), reverse=True)
             for spec in general_specialization:
@@ -533,10 +544,16 @@ class DoctorSearchHelper:
                                                    doctor_clinic.availability.all()[0].end),
 
             from ondoc.coupon.models import Coupon
+            from ondoc.authentication import models as auth_model
 
             search_coupon = None
             if should_apply_coupon:
-                search_coupon = Coupon.get_search_coupon(request.user)
+                # search_coupon = Coupon.get_search_coupon(request.user)
+                filters['deal_price'] = filtered_deal_price
+                filters['doctor_id'] = doctor.id
+                filters['doctor_specializations'] = doctor_specializations
+                filters['hospital'] = doctor_clinic.hospital
+                search_coupon = coupon_recommender.best_coupon(**filters)
 
             discounted_price = filtered_deal_price if not search_coupon else search_coupon.get_search_coupon_discounted_price(filtered_deal_price)
             schema_specialization = None
