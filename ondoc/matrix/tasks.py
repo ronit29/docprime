@@ -133,7 +133,7 @@ def prepare_and_hit(self, data):
 
     appointment_details = {
         'IsInsured': 'yes' if user_insurance else 'no',
-        'PolicyId': user_insurance.policy_number if user_insurance else None,
+        'InsurancePolicyNumber': str(user_insurance.policy_number) if user_insurance else None,
         'AppointmentStatus': appointment.status,
         'Age': calculate_age(appointment),
         'Email': p_email,
