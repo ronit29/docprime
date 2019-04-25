@@ -817,7 +817,7 @@ class Command(BaseCommand):
 
         group.permissions.add(*permissions)
 
-        content_types = ContentType.objects.get_for_models(MerchantPayout)
+        content_types = ContentType.objects.get_for_models(MerchantPayout, UserInsurance)
 
         for cl, ct in content_types.items():
             permissions = Permission.objects.filter(

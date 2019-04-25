@@ -1328,7 +1328,8 @@ class OrderLog(TimeStampedModel):
         db_table = "order_log"
 
 
-class MerchantPayout(TimeStampedModel):
+class MerchantPayout(TimeStampedModel):    
+
     PENDING = 1
     ATTEMPTED = 2
     PAID = 3
@@ -1339,7 +1340,7 @@ class MerchantPayout(TimeStampedModel):
     DoctorPayout = Order.DOCTOR_PRODUCT_ID
     LabPayout = Order.LAB_PRODUCT_ID
     InsurancePremium = Order.INSURANCE_PRODUCT_ID
-    BookingTypeChoices = [(DoctorPayout,'Doctor Booking'),(LabPayout,'Lab Booking'),(InsurancePremium,'Insurance Booking')]
+    BookingTypeChoices = [(DoctorPayout,'Doctor Booking'),(LabPayout,'Lab Booking'),(InsurancePremium,'Insurance Purchase')]
 
 
     NEFT = "NEFT"
@@ -1398,6 +1399,10 @@ class MerchantPayout(TimeStampedModel):
         if self.type == self.MANUAL and self.utr_no and self.status == self.PENDING:
             self.status = self.PAID
 
+        if self.utr_no and self.booking_type == self.InsurancePremium:
+            self.create_insurance_transaction()
+
+
         if (not first_instance and self.status != self.PENDING) and not self.booking_type == self.InsurancePremium:
             from ondoc.matrix.tasks import push_appointment_to_matrix
 
@@ -1417,6 +1422,39 @@ class MerchantPayout(TimeStampedModel):
         if first_instance:
             self.payout_ref_id = self.id
             self.save()
+
+    @classmethod
+    def creating_pending_insurance_transactions(cls):
+        pending = cls.objects.filter(booking_type=cls.InsurancePremium, utr_no__isnull=False)
+        for p in pending:
+            if p.utr_no:
+                p.create_insurance_transaction()
+
+    def create_insurance_transaction(self):
+        from ondoc.insurance.models import UserInsurance, InsuranceTransaction
+        if not self.get_insurance_transaction():
+            user_insurance = self.get_user_insurance()
+            InsuranceTransaction.objects.create(user_insurance = user_insurance,
+                account = user_insurance.insurance_plan.insurer.float.first(),
+                transaction_type = InsuranceTransaction.CREDIT,
+                amount = self.payable_amount,
+                reason = InsuranceTransaction.PREMIUM_PAYOUT)
+
+    def get_insurance_transaction(self):
+        from ondoc.insurance.models import UserInsurance, InsuranceTransaction
+        if not self.booking_type == self.InsurancePremium:
+            raise Exception('Not implemented for non insurance premium payouts')
+        user_insurance = self.get_user_insurance()
+        existing = user_insurance.transactions.filter(reason=InsuranceTransaction.PREMIUM_PAYOUT)
+        return existing
+
+    def get_user_insurance(self):
+        ui = self.user_insurance.all()
+        if len(ui)>1:
+            raise Exception('Multiple user insurance found for a single payout')
+
+        return ui.first()
+
 
     @staticmethod
     def get_merchant_payout_info(obj):
