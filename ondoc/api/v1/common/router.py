@@ -1,6 +1,6 @@
 from django.conf.urls import url
 from django.urls import path
-from ondoc.crm.admin.common import MatrixStateAutocomplete, MatrixCityAutocomplete
+from ondoc.crm.admin.common import MatrixStateAutocomplete, MatrixCityAutocomplete, LabPricingAutocomplete
 from .views import (CitiesViewSet, ServicesViewSet, SmsServiceViewSet, UpdateXlsViewSet, UploadDoctorViewSet,
                     UploadQualificationViewSet, UploadExperienceViewSet, UploadAwardViewSet, UploadHospitalViewSet,
                     UploadMembershipViewSet, SearchLeadViewSet, GetPaymentOptionsViewSet, GetSearchUrlViewSet,
@@ -23,6 +23,7 @@ urlpatterns = [
     path('search-lead/create', SearchLeadViewSet.as_view({'post': 'create'}, ), name='create-search-lead'),
     path('payment-options', GetPaymentOptionsViewSet.as_view({'get':'list'},), name='payment_options'),
     url(r'^matrix-state-autocomplete/$', MatrixStateAutocomplete.as_view(), name='matrix-state-autocomplete'),
+    url(r'^labpricing-autocomplete/$', LabPricingAutocomplete.as_view(), name='labpricing-autocomplete'),
     url(r'^matrix-city-autocomplete/$', MatrixCityAutocomplete.as_view(), name='matrix-city-autocomplete'),
     path('get_search_url', GetSearchUrlViewSet.as_view({'get':'search_url'}), name='get-search-url'),
     path('get_key_data', GetKeyDataViewSet.as_view({'get':'list'}), name='get-key-data'),

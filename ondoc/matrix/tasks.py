@@ -14,10 +14,95 @@ from ondoc.authentication.models import Address, SPOCDetails, QCModel
 from ondoc.api.v1.utils import resolve_address
 from ondoc.common.models import AppointmentMaskNumber
 from django.apps import apps
-from ondoc.crm.constants import matrix_product_ids, matrix_subproduct_ids
+from ondoc.crm.constants import matrix_product_ids, matrix_subproduct_ids, constants
 
 logger = logging.getLogger(__name__)
 
+
+# @task(bind=True, max_retries=2)
+# def push_appointment_to_matrix(self, data):
+#     from ondoc.doctor.models import OpdAppointment
+#     from ondoc.diagnostic.models import LabAppointment
+#     try:
+#         appointment_id = data.get('appointment_id', None)
+#         if not appointment_id:
+#             # logger.error("[CELERY ERROR: Incorrect values provided.]")
+#             raise Exception("Appointment id not found, could not push to Matrix")
+#
+#         order_product_id = 0
+#         appointment = None
+#         if data.get('type') == 'OPD_APPOINTMENT':
+#             order_product_id = 1
+#             appointment = OpdAppointment.objects.filter(pk=appointment_id).first()
+#             if not appointment:
+#                 raise Exception("Appointment could not found against id - " + str(appointment_id))
+#             mobile_list = list()
+#             # User mobile number
+#             mobile_list.append({'MobileNo': appointment.user.phone_number, 'Name': appointment.profile.name, 'Type': 1})
+#             auto_ivr_enabled = appointment.hospital.is_auto_ivr_enabled()
+#             # SPOC details
+#             for spoc_obj in appointment.hospital.spoc_details.all():
+#                 number = ''
+#                 if spoc_obj.number:
+#                     number = str(spoc_obj.number)
+#                 if spoc_obj.std_code:
+#                     number = str(spoc_obj.std_code) + number
+#                 if number:
+#                     number = int(number)
+#
+#                 # spoc_type = dict(spoc_obj.CONTACT_TYPE_CHOICES)[spoc_obj.contact_type]
+#                 spoc_name = spoc_obj.name
+#                 mobile_list.append({'MobileNo': number,
+#                                     'Name': spoc_name,
+#                                     'DesignationID': spoc_obj.contact_type,
+#                                     'AutoIVREnable': str(auto_ivr_enabled).lower(),
+#                                     'Type': 2})
+#
+#             # Doctor mobile numbers
+#             doctor_mobiles = [doctor_mobile.number for doctor_mobile in appointment.doctor.mobiles.all()]
+#             doctor_mobiles = [{'MobileNo': number, 'Name': appointment.doctor.name, 'Type': 2} for number in doctor_mobiles]
+#             mobile_list.extend(doctor_mobiles)
+#         elif data.get('type') == 'LAB_APPOINTMENT':
+#             order_product_id = 2
+#             appointment = LabAppointment.objects.filter(pk=appointment_id).first()
+#
+#             if not appointment:
+#                 raise Exception("Appointment could not found against id - " + str(appointment_id))
+#
+#             mobile_list = list()
+#             auto_ivr_enabled = appointment.lab.is_auto_ivr_enabled()
+#
+#             for contact_person in appointment.lab.labmanager_set.all():
+#                 number = ''
+#                 if contact_person.number:
+#                     number = str(contact_person.number)
+#                 if number:
+#                     number = int(number)
+#
+#                 contact_type = dict(contact_person.CONTACT_TYPE_CHOICES)[contact_person.contact_type]
+#                 contact_name = contact_person.name
+#                 mobile_list.append({'MobileNo': number,
+#                                     'Name': contact_name,
+#                                     'DesignationID': contact_person.contact_type,
+#                                     'AutoIVREnable': str(auto_ivr_enabled).lower(),
+#                                     'Type': 3})
+#
+#             # Lab mobile number
+#             mobile_list.append({'MobileNo': appointment.lab.primary_mobile, 'Name': appointment.lab.name, 'Type': 3})
+#
+#             # User mobile number
+#             mobile_list.append({'MobileNo': appointment.user.phone_number, 'Name': appointment.profile.name, 'Type': 1})
+#
+#         appointment_order = Order.objects.filter(product_id=order_product_id, reference_id=appointment_id).first()
+#
+#         # Preparing the data and now pushing the data to the matrix system.
+#         if appointment:
+#             prepare_and_hit(self, {'appointment': appointment, 'mobile_list': mobile_list, 'task_data': data, 'order_id': appointment_order.id})
+#         else:
+#             logger.error("Appointment not found for the appointment id ", appointment_id)
+#
+#     except Exception as e:
+#         logger.error("Error in Celery. Failed pushing Appointment to the matrix- " + str(e))
 
 # def prepare_and_hit(self, data):
 #     from ondoc.doctor.models import OpdAppointment
@@ -133,7 +218,7 @@ logger = logging.getLogger(__name__)
 #
 #     appointment_details = {
 #         'IsInsured': 'yes' if user_insurance else 'no',
-#         'PolicyId': user_insurance.policy_number if user_insurance else None,
+#         'InsurancePolicyNumber': str(user_insurance.policy_number) if user_insurance else None,
 #         'AppointmentStatus': appointment.status,
 #         'Age': calculate_age(appointment),
 #         'Email': p_email,
@@ -234,8 +319,7 @@ logger = logging.getLogger(__name__)
 #         pass
 #     else:
 #         logger.info("[ERROR] Appointment could not be published to the matrix system")
-
-
+#
 # def calculate_age(appointment):
 #     if not appointment.profile:
 #         return 0
@@ -244,92 +328,6 @@ logger = logging.getLogger(__name__)
 #     dob = appointment.profile.dob
 #     today = date.today()
 #     return today.year - dob.year - ((today.month, today.day) < (dob.month, dob.day))
-
-
-# @task(bind=True, max_retries=2)
-# def push_appointment_to_matrix(self, data):
-#     from ondoc.doctor.models import OpdAppointment
-#     from ondoc.diagnostic.models import LabAppointment
-#     try:
-#         appointment_id = data.get('appointment_id', None)
-#         if not appointment_id:
-#             # logger.error("[CELERY ERROR: Incorrect values provided.]")
-#             raise Exception("Appointment id not found, could not push to Matrix")
-#
-#         order_product_id = 0
-#         appointment = None
-#         if data.get('type') == 'OPD_APPOINTMENT':
-#             order_product_id = 1
-#             appointment = OpdAppointment.objects.filter(pk=appointment_id).first()
-#             if not appointment:
-#                 raise Exception("Appointment could not found against id - " + str(appointment_id))
-#             mobile_list = list()
-#             # User mobile number
-#             mobile_list.append({'MobileNo': appointment.user.phone_number, 'Name': appointment.profile.name, 'Type': 1})
-#             auto_ivr_enabled = appointment.hospital.is_auto_ivr_enabled()
-#             # SPOC details
-#             for spoc_obj in appointment.hospital.spoc_details.all():
-#                 number = ''
-#                 if spoc_obj.number:
-#                     number = str(spoc_obj.number)
-#                 if spoc_obj.std_code:
-#                     number = str(spoc_obj.std_code) + number
-#                 if number:
-#                     number = int(number)
-#
-#                 # spoc_type = dict(spoc_obj.CONTACT_TYPE_CHOICES)[spoc_obj.contact_type]
-#                 spoc_name = spoc_obj.name
-#                 mobile_list.append({'MobileNo': number,
-#                                     'Name': spoc_name,
-#                                     'DesignationID': spoc_obj.contact_type,
-#                                     'AutoIVREnable': str(auto_ivr_enabled).lower(),
-#                                     'Type': 2})
-#
-#             # Doctor mobile numbers
-#             doctor_mobiles = [doctor_mobile.number for doctor_mobile in appointment.doctor.mobiles.all()]
-#             doctor_mobiles = [{'MobileNo': number, 'Name': appointment.doctor.name, 'Type': 2} for number in doctor_mobiles]
-#             mobile_list.extend(doctor_mobiles)
-#         elif data.get('type') == 'LAB_APPOINTMENT':
-#             order_product_id = 2
-#             appointment = LabAppointment.objects.filter(pk=appointment_id).first()
-#
-#             if not appointment:
-#                 raise Exception("Appointment could not found against id - " + str(appointment_id))
-#
-#             mobile_list = list()
-#             auto_ivr_enabled = appointment.lab.is_auto_ivr_enabled()
-#
-#             for contact_person in appointment.lab.labmanager_set.all():
-#                 number = ''
-#                 if contact_person.number:
-#                     number = str(contact_person.number)
-#                 if number:
-#                     number = int(number)
-#
-#                 contact_type = dict(contact_person.CONTACT_TYPE_CHOICES)[contact_person.contact_type]
-#                 contact_name = contact_person.name
-#                 mobile_list.append({'MobileNo': number,
-#                                     'Name': contact_name,
-#                                     'DesignationID': contact_person.contact_type,
-#                                     'AutoIVREnable': str(auto_ivr_enabled).lower(),
-#                                     'Type': 3})
-#
-#             # Lab mobile number
-#             mobile_list.append({'MobileNo': appointment.lab.primary_mobile, 'Name': appointment.lab.name, 'Type': 3})
-#
-#             # User mobile number
-#             mobile_list.append({'MobileNo': appointment.user.phone_number, 'Name': appointment.profile.name, 'Type': 1})
-#
-#         appointment_order = Order.objects.filter(product_id=order_product_id, reference_id=appointment_id).first()
-#
-#         # Preparing the data and now pushing the data to the matrix system.
-#         if appointment:
-#             prepare_and_hit(self, {'appointment': appointment, 'mobile_list': mobile_list, 'task_data': data, 'order_id': appointment_order.id})
-#         else:
-#             logger.error("Appointment not found for the appointment id ", appointment_id)
-#
-#     except Exception as e:
-#         logger.error("Error in Celery. Failed pushing Appointment to the matrix- " + str(e))
 
 
 @task(bind=True, max_retries=2)
@@ -747,10 +745,19 @@ def update_onboarding_qcstatus_to_matrix(self, data):
         if data.get('assigned_matrix_user', None):
             assigned_user = data.get('assigned_user')
         else:
-            history_obj = obj.history.filter(status=QCModel.SUBMITTED_FOR_QC).order_by('-created_at').first()
-            if history_obj:
-                assigned_user = history_obj.user.staffprofile.employee_id if hasattr(history_obj.user,
-                                                                                     'staffprofile') and history_obj.user.staffprofile.employee_id else ''
+            if obj.data_status == QCModel.SUBMITTED_FOR_QC:
+                history_obj = obj.history.filter(status=QCModel.REOPENED).order_by('-created_at').first()
+                if history_obj:
+                    qc_user = history_obj.user.staffprofile.employee_id if hasattr(history_obj.user,
+                                                                                         'staffprofile') and history_obj.user.staffprofile.employee_id else ''
+                    if qc_user.is_member_of(constants['QC_GROUP_NAME']):
+                        assigned_user = qc_user
+
+            else:
+                history_obj = obj.history.filter(status=QCModel.SUBMITTED_FOR_QC).order_by('-created_at').first()
+                if history_obj:
+                    assigned_user = history_obj.user.staffprofile.employee_id if hasattr(history_obj.user,
+                                                                                         'staffprofile') and history_obj.user.staffprofile.employee_id else ''
 
         obj_matrix_lead_id = obj.matrix_lead_id if hasattr(obj, 'matrix_lead_id') and obj.matrix_lead_id else 0
         if not obj_matrix_lead_id:
