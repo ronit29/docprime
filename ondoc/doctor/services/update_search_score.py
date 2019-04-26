@@ -1,5 +1,6 @@
+from ondoc.api.v1.ratings.serializers import GoogleRatingsGraphSerializer
 from ondoc.doctor import models as doctor_models
-from django.db.models import Count
+from django.db.models import Count, Case, When, F, Prefetch
 from ondoc.api.v1.utils import RawSql
 import datetime
 from celery import task
@@ -28,9 +29,19 @@ class DoctorSearchScore:
                                                         {"min": 40, "max": 60, "score": 7},
                                                         {"min": 60, "max": 80, "score": 8},
                                                         {"min": 80, "max": 100, "score": 9}],
-                                 "weightage": [{"popularity_score": 0.50,
-                                                "years_of_experience": 0.25,
-                                                "doctors_in_clinic": 0.25}]
+                                 "weightage": [{"popularity_score": 0.0,
+                                                "years_of_experience": 0.20,
+                                                "doctors_in_clinic": 0.40,
+                                                "average_ratings": 0.10,
+                                                "ratings_count": 0.10}],
+
+                                 "average_ratings": [{"min": 0, "max": 3, "score": 0},
+                                                        {"min": 3, "max": 3.5, "score": 3},
+                                                        {"min": 3.5, "max": 4, "score": 7}],
+
+                                 "ratings_count": [{"min": 0, "max": 5, "score": 0},
+                                                        {"min": 6, "max": 10, "score": 3},
+                                                        {"min": 11, "max": 15, "score": 7}]
 
                              }
 
@@ -40,12 +51,22 @@ class DoctorSearchScore:
             self.popularity_data[dp['id']] = dp['score']
 
     def calculate(self):
-        hosp_dict = doctor_models.Hospital.objects.prefetch_related('assoc_doctors').annotate(doctors_count=Count('assoc_doctors__id')).values('id','doctors_count')
         doctor_in_hosp_count = dict()
-        for hosp in hosp_dict:
-            doctor_in_hosp_count[hosp['id']] = hosp['doctors_count']
+        hospitals_without_network = doctor_models.Hospital.objects.prefetch_related('assoc_doctors').filter(
+            network__isnull=True).annotate(doctors_count=Count('assoc_doctors__id'))
 
-        doctors = doctor_models.Doctor.objects.all().order_by('id')
+        for hosp in hospitals_without_network:
+            doctor_in_hosp_count[hosp.id] = hosp.doctors_count
+
+        hospitals_with_network = doctor_models.Hospital.objects.select_related('network').filter(
+            network__isnull=False).annotate(
+            hosp_network_doctors_count=Count(Case(When(network__isnull=False, then=F('network__assoc_hospitals__assoc_doctors')))))
+
+        for hosp in hospitals_with_network:
+            doctor_in_hosp_count[hosp.id] = hosp.hosp_network_doctors_count
+
+        doctors = doctor_models.Doctor.objects.all().prefetch_related("hospitals", "doctor_clinics", "doctor_clinics__hospital",
+                                                "doctor_clinics__hospital__hospital_place_details").order_by('id')[:10]
         final_result = dict()
         score_obj_list = []
 
@@ -54,8 +75,9 @@ class DoctorSearchScore:
             final_result[doctor.id] = result
             result.append(self.get_popularity_score(doctor))
             result.append(self.get_practice_score(doctor))
-            result.append(self.get_doctors_score(doctor_in_hosp_count,doctor))
-            result.append(self.get_final_score(result))
+            result.append(self.get_doctors_score(doctor_in_hosp_count, doctor))
+            result.append(self.get_doctor_ratings(doctor))
+            result.append(self.get_final_score(result, doctor))
 
             score_obj_list.append(doctor_models.SearchScore(doctor=doctor, popularity_score=result[0]['popularity_score'],
                                                             years_of_experience_score=result[1]['experience_score'],
@@ -66,6 +88,21 @@ class DoctorSearchScore:
             return 'success'
         else:
             return 'failure'
+
+    def get_doctor_ratings(self, doctor):
+        if doctor.avg_rating and doctor.avg_rating>=1:
+            return doctor.avg_rating
+        else:
+            if doctor.hospitals:
+                hospitals = doctor.hospitals
+                for hospital in hospitals:
+                    hosp_reviews = doctor.doctor_clinic.hospital.hospital_place_details.all()
+                if hosp_reviews:
+                    reviews_data = hosp_reviews[0].reviews
+
+                    if reviews_data:
+                        ratings_graph = GoogleRatingsGraphSerializer(reviews_data, many=False)
+                        google_rating = ratings_graph.data
 
     def get_popularity_score(self, doctor):
         pop_score = self.popularity_data.get(doctor.id)
@@ -110,11 +147,27 @@ class DoctorSearchScore:
             elif doctors_count >= score.get('min') and doctors_count < score.get('max'):
                 return {'doctors_in_clinic_score': score.get('score')}
 
-    def get_final_score(self, result):
+    def get_final_score(self, result, doctor):
         if result:
             final_score = 0
+            priority_score = 0
             final_score_list = self.scoring_data.get('weightage')[0]
             final_score = result[0]['popularity_score'] * final_score_list['popularity_score'] + result[1]['experience_score'] * final_score_list['years_of_experience'] +  result[2]['doctors_in_clinic_score'] * final_score_list['doctors_in_clinic']
+            if doctor.priority_score:
+                priority_score += doctor.priority_score
+            elif doctor.hospitals.all() and priority_score == 0 :
+                for hosp in doctor.hospitals.all():
+                    if hosp.priority_score > priority_score:
+                        priority_score = hosp.priority_score
+                final_score += priority_score
+            elif priority_score == 0:
+                network_hospitals = doctor.filter(hospitals__network__isnull=False)
+                if network_hospitals:
+                    for data in network_hospitals:
+                        if data.priority_score and data.priority_score<priority_score:
+                            priority_score = data.priority_score
+
+            # elif doctor.hospitals
             return {'final_score': final_score}
 
     def delete_search_score(self):
