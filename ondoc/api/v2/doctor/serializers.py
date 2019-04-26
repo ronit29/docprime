@@ -187,8 +187,6 @@ class ProviderSignupLeadDataSerializer(serializers.Serializer):
     phone_number = serializers.IntegerField(min_value=5000000000, max_value=9999999999)
     email = serializers.EmailField()
     type = serializers.ChoiceField(choices=doc_models.ProviderSignupLead.TYPE_CHOICES)
-    consultation_fees = serializers.DecimalField(required=False, max_digits=10, decimal_places=2, min_value=0, allow_null=True)
-    license = serializers.CharField(max_length=200, allow_blank=True, required=False)
 
     def validate(self, attrs):
         user = self.context.get('request').user if self.context.get('request') else None
@@ -197,11 +195,6 @@ class ProviderSignupLeadDataSerializer(serializers.Serializer):
             raise serializers.ValidationError("Phone number already registered. Please try logging in.")
         if not (user and int(user.phone_number) == int(phone_number)):
             raise serializers.ValidationError("either user is missing or user and phone number mismatch")
-        if attrs.get("type") == doc_models.ProviderSignupLead.DOCTOR:
-            if not attrs.get("consultation_fees"):
-                raise serializers.ValidationError("Consultation Fees is required")
-            if not attrs.get("license"):
-                raise serializers.ValidationError("Registration Number is required")
         return attrs
 
 
@@ -217,7 +210,7 @@ class ConsentIsDocprimeSerializer(serializers.Serializer):
 
 class BulkCreateDoctorSerializer(serializers.Serializer):
     name = serializers.CharField(max_length=200)
-    online_consultation_fees = serializers.IntegerField(required=False, min_value=0, allow_null=True)
+    online_consultation_fees = serializers.DecimalField(required=False, max_digits=10, decimal_places=2, min_value=0, allow_null=True)
     license = serializers.CharField(max_length=200, allow_blank=True, required=False)
     phone_number = serializers.IntegerField(required=False, min_value=5000000000, max_value=9999999999, allow_null=True)
     is_appointment = serializers.BooleanField(default=False)
