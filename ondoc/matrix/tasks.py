@@ -112,15 +112,21 @@ def prepare_and_hit(self, data):
         payment_URN = merchant_payout.utr_no
         amount = merchant_payout.payable_amount
 
-    user_insurance = appointment.user.active_insurance
+    insured_member = appointment.profile.insurance.filter().order_by('id').last()
+    user_insurance = None
+    if insured_member:
+        user_insurance = insured_member.user_insurance
+
+    # user_insurance = appointment.user.active_insurance
     primary_proposer_name = None
 
-    if user_insurance:
+    if user_insurance and user_insurance.is_valid():
         primary_proposer = user_insurance.get_primary_member_profile()
         primary_proposer_name = primary_proposer.get_full_name() if primary_proposer else None
 
     policy_details = {
         "ProposalNo": None,
+        'PolicyPaymentSTATUS': 300 if user_insurance else 0,
         "BookingId": user_insurance.id if user_insurance else None,
         "ProposerName": primary_proposer_name,
         "PolicyId": user_insurance.policy_number if user_insurance else None,
