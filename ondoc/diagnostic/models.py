@@ -2397,7 +2397,7 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin,
 
         appointment_details = {
             'IsInsured': 'yes' if user_insurance else 'no',
-            'PolicyId': user_insurance.policy_number if user_insurance else None,
+            'InsurancePolicyNumber': str(user_insurance.policy_number) if user_insurance else None,
             'AppointmentStatus': self.status,
             'Age': self.calculate_age(),
             'Email': profile_email,
