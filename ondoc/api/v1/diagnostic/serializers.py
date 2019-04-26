@@ -1640,3 +1640,23 @@ class PackageSerializer(LabTestSerializer):
             parameter_count = len(temp_test.parameter.all()) or 1
             return_data += parameter_count
         return return_data
+
+
+class PackageLabCompareRequestSerializer(serializers.Serializer):
+    package_id = serializers.PrimaryKeyRelatedField(queryset=LabTest.objects.filter(is_package=True, enable_for_retail=True))
+    lab_id = serializers.PrimaryKeyRelatedField(queryset=Lab.objects.filter(is_live=True))
+
+    def validate(self, attrs):
+        attrs['package'] = attrs['package_id']
+        attrs['lab'] = attrs['lab_id']
+        if not AvailableLabTest.objects.filter(lab_pricing_group__labs=attrs.get('lab'), test=attrs.get('package'),
+                                               enabled=True).exists():
+            raise serializers.ValidationError('Package is not available in the lab.')
+        return attrs
+
+
+class CompareLabPackagesSerializer(serializers.Serializer):
+    package_lab_ids = serializers.ListField(child=PackageLabCompareRequestSerializer(), min_length=1, max_length=5)
+    longitude = serializers.FloatField(default=77.071848)
+    latitude = serializers.FloatField(default=28.450367)
+    title = serializers.CharField(required=False, max_length=500)
