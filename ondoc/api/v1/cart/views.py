@@ -189,8 +189,10 @@ class CartViewSet(viewsets.GenericViewSet):
                                 item.data['insurance_id'] = None
                                 item.data['insurance_message'] = "Gynecologist limit exceeded of limit {}".format(
                                     settings.INSURANCE_GYNECOLOGIST_LIMIT)
-                                if cart_data.get('is_appointment_insured'):
-                                    item.data['payment_type'] = OpdAppointment.PREPAID
+
+                                raise Exception('Gynecologist limit exceeded.')
+                                # if cart_data.get('is_appointment_insured'):
+                                #     item.data['payment_type'] = OpdAppointment.PREPAID
                                 # item.data['payment_type'] = OpdAppointment.PREPAID
 
                             if onco_count > int(
@@ -199,8 +201,10 @@ class CartViewSet(viewsets.GenericViewSet):
                                 item.data['insurance_id'] = None
                                 item.data['insurance_message'] = "Oncologist limit exceeded of limit {}".format(
                                     settings.INSURANCE_ONCOLOGIST_LIMIT)
-                                if cart_data.get('is_appointment_insured'):
-                                    item.data['payment_type'] = OpdAppointment.PREPAID
+
+                                raise Exception('Oncology limit exceeded.')
+                                # if cart_data.get('is_appointment_insured'):
+                                #     item.data['payment_type'] = OpdAppointment.PREPAID
                                 # item.data['payment_type'] = OpdAppointment.PREPAID
 
                 price_data = item.get_price_details(validated_data)
