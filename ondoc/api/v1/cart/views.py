@@ -131,8 +131,8 @@ class CartViewSet(viewsets.GenericViewSet):
                     item.data['is_appointment_insured'] = False
                     item.data['insurance_id'] = None
                     item.data['insurance_message'] = ""
-                    if cart_data.get('is_appointment_insured'):
-                        item.data['payment_type'] = OpdAppointment.PREPAID
+                    item.data['payment_type'] = OpdAppointment.PREPAID
+                    raise Exception('Insurance expired.')
 
                 if not insurance_doctor and cart_data.get('is_appointment_insured') and user_insurance and user_insurance.is_valid():
                     is_lab_insured, insurance_id, insurance_message = user_insurance.validate_lab_insurance(
@@ -146,8 +146,8 @@ class CartViewSet(viewsets.GenericViewSet):
                         item.data['is_appointment_insured'] = False
                         item.data['insurance_id'] = None
                         item.data['insurance_message'] = ""
-                        if cart_data.get('is_appointment_insured'):
-                            item.data['payment_type'] = OpdAppointment.PREPAID
+                        item.data['payment_type'] = OpdAppointment.PREPAID
+                        raise Exception('Appointment is no more covered in Insurance.')
 
                 if insurance_doctor and cart_data.get('is_appointment_insured') and user_insurance and user_insurance.is_valid():
                     is_doctor_insured, insurance_id, insurance_message = user_insurance.validate_doctor_insurance(
@@ -156,8 +156,8 @@ class CartViewSet(viewsets.GenericViewSet):
                         item.data['is_appointment_insured'] = False
                         item.data['insurance_id'] = None
                         item.data['insurance_message'] = ""
-                        if cart_data.get('is_appointment_insured'):
-                            item.data['payment_type'] = OpdAppointment.PREPAID
+                        item.data['payment_type'] = OpdAppointment.PREPAID
+                        raise Exception('Appointment is no more covered in Insurance.')
 
                         # item.data['payment_type'] = OpdAppointment.PREPAID
                     if not specialization_count_dict:
