@@ -7,6 +7,7 @@ from ondoc.common.helper import Choices
 from django.contrib.postgres.fields import JSONField
 from django.db import transaction
 from ondoc.matrix.tasks import push_appointment_to_matrix
+from ondoc.diagnostic.models import TestParameter
 import logging
 
 logger = logging.getLogger(__name__)
@@ -232,6 +233,7 @@ class IntegratorTestParameterMapping(TimeStampedModel):
     integrator_test_name = models.CharField(max_length=60, null=True, blank=True)
     test_parameter_chat = models.ForeignKey('diagnostic.TestParameterChat', on_delete=models.CASCADE, null=True)
     response_data = JSONField(blank=True, null=True)
+    test_parameter = models.ForeignKey(TestParameter, on_delete=models.CASCADE, null=True)
 
     class Meta:
         db_table = 'integrator_test_parameter_mapping'

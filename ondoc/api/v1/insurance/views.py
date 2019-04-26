@@ -121,7 +121,7 @@ class InsuranceOrderViewSet(viewsets.GenericViewSet):
         if not user_insurance_lead:
             user_insurance_lead = InsuranceLead(user=user)
         elif user_insurance_lead and user_insurance and not user_insurance.is_valid():
-            active_insurance_lead = InsuranceLead.objects.filter(created_at__gte=user_insurance.expiry_date).order_by('created_at').last()
+            active_insurance_lead = InsuranceLead.objects.filter(created_at__gte=user_insurance.expiry_date, user=user).order_by('created_at').last()
             if not active_insurance_lead:
                 user_insurance_lead = InsuranceLead(user=user)
             else:
@@ -162,8 +162,8 @@ class InsuranceOrderViewSet(viewsets.GenericViewSet):
                     pre_insured_members['dob'] = member['dob']
                     pre_insured_members['title'] = member['title']
                     pre_insured_members['first_name'] = member['first_name']
-                    pre_insured_members['middle_name'] = member['middle_name']
-                    pre_insured_members['last_name'] = member['last_name']
+                    pre_insured_members['middle_name'] = member.get('middle_name', '')
+                    pre_insured_members['last_name'] = member.get('last_name', '')
                     pre_insured_members['address'] = member['address']
                     pre_insured_members['pincode'] = member['pincode']
                     pre_insured_members['email'] = member['email']
@@ -188,7 +188,7 @@ class InsuranceOrderViewSet(viewsets.GenericViewSet):
                             user_profile['dob'] = member['dob']
 
                         else:
-                            user_profile = {"name": member['first_name'] + " " + member['last_name'], "email":
+                            user_profile = {"name": member['first_name'] + " " + member.get('last_name', ''), "email":
                                 member['email'], "gender": member['gender'], "dob": member['dob']}
 
             insurance_plan = InsurancePlans.objects.get(id=request.data.get('insurance_plan'))

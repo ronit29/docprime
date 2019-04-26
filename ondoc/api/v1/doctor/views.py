@@ -6,6 +6,7 @@ from django.contrib.gis.db.models.functions import Distance
 from django.contrib.gis.measure import D
 
 from ondoc.api.v1.auth.serializers import UserProfileSerializer
+from ondoc.api.v1.doctor.city_match import city_match
 from ondoc.api.v1.doctor.serializers import HospitalModelSerializer, AppointmentRetrieveDoctorSerializer, \
     OfflinePatientSerializer
 from ondoc.api.v1.doctor.DoctorSearchByHospitalHelper import DoctorSearchByHospitalHelper
@@ -795,8 +796,23 @@ class DoctorProfileUserViewSet(viewsets.GenericViewSet):
             else:
                 entity = None    
 
-        selected_procedure_ids, other_procedure_ids = get_selected_and_other_procedures(category_ids, procedure_ids,
-                                                                                        doctor, all=True)
+        selected_procedure_ids, other_procedure_ids = get_selected_and_other_procedures(category_ids, procedure_ids, doctor, all=True)
+
+
+        general_specialization = []
+        spec_ids = list()
+        spec_url_dict = dict()
+
+        for dps in doctor.doctorpracticespecializations.all():
+            general_specialization.append(dps.specialization)
+            spec_ids.append(dps.specialization.id)
+        if spec_ids and entity:
+            spec_urls = EntityUrls.objects.filter(specialization_id__in=spec_ids, sublocality_value=entity.sublocality_value,
+                                          locality_value=entity.locality_value, is_valid=True, entity_type='Doctor', url_type='SEARCHURL')
+            for su in spec_urls:
+                spec_url_dict[su.specialization_id] = su.url
+
+
         serializer = serializers.DoctorProfileUserViewSerializer(doctor, many=False,
                                                                      context={"request": request
                                                                          ,
@@ -805,12 +821,12 @@ class DoctorProfileUserViewSet(viewsets.GenericViewSet):
                                                                               "other_procedure_ids": other_procedure_ids
                                                                          , "category_ids": category_ids
                                                                          , "hospital_id": selected_hospital
-                                                                         , "entity":entity 
+                                                                         , "entity":entity
+                                                                         ,  "spec_url_dict":spec_url_dict
                                                                               })
 
         response_data = self.prepare_response(serializer.data, selected_hospital)
 
-        general_specialization = []
         hospital = None
         response_data['about_web'] = None
         google_rating = dict()
@@ -1196,7 +1212,8 @@ class SearchedItemsViewSet(viewsets.GenericViewSet):
     def common_conditions(self, request):
         city = None
         if request.query_params and request.query_params.get('city'):
-            city = request.query_params.get('city')
+            city = city_match(request.query_params.get('city'))
+
         spec_urls = dict()
         count = request.query_params.get('count', 10)
         count = int(count)
@@ -1473,7 +1490,7 @@ class DoctorListViewSet(viewsets.GenericViewSet):
             #     else:
             #         specializations = ''
 
-            specialization_metatags = dict()
+
             if validated_data.get('specialization'):
                 specialization = validated_data.get('specialization')
 
@@ -1481,76 +1498,8 @@ class DoctorListViewSet(viewsets.GenericViewSet):
             #     specializations = validated_data.get('extras').get('specialization')
 
             if validated_data.get('sitemap_identifier') == 'SPECIALIZATION_CITY':
-                specialization_metatags[279] = {
-                    'title': 'Best Dentist in ' + city + ' | Find Top Dentists Near Me in ' + city,
-                    'description': specialization + ' in ' + city + ': Search and find best ' + specialization + ' near you to book appointment online. Check nearby ' + specialization + ' details, address, availability & more.'}
+                title, description, ratings_title = self.get_spec_city_title_desc(specialization_id, city, specialization)
 
-                specialization_metatags[291] = {
-                    'title': 'Best Dermatologist in ' + city + ' | Find Top Skin Specialists Near Me In ' + city,
-                    'description': specialization + ' in ' + city + ': Search and find best ' + specialization + ' near you to book appointment online. Check nearby skin specialists details, address, availability & more.'}
-                specialization_metatags[300] = {
-                    'title': 'Best Diabetologist in ' + city + ' | Find Top Diabetes Doctors Near Me in ' + city,
-                    'description': specialization + ' in ' + city + ': Search and find best ' + specialization + ' near you to book appointment online. Check nearby diabetes doctors details, address, availability & more.'}
-                specialization_metatags[384] = {
-                    'title': 'Best Dietitian in ' + city + ' | Find Top Dietitians Near Me in ' + city,
-                    'description': specialization + ' in ' + city + ': Search and find best ' + specialization + 'near you to book appointment online. Check nearby ' + specialization + ' details, address, availability & more.'}
-                specialization_metatags[304] = {
-                    'title': 'Best Endocrinologist in ' + city + ' | Find Top Endocrinologists Near Me in ' + city,
-                    'description': specialization + ' in ' + city + ': Search and find best ' + specialization + ' near you to book appointment online. Check nearby ' + specialization + ' details, address, availability & more.'}
-                specialization_metatags[270] = {
-                    'title': 'Best Cardiologist in ' + city + ' | Find Top Heart Specialists Near Me in ' + city,
-                    'description': specialization + ' in ' + city + ': Search and find best ' + specialization + ' near you to book appointment online. Check nearby heart specialists details, address, availability & more.'}
-                specialization_metatags[309] = {
-                    'title': 'Best ENT Specialist in ' + city + ' | Find Top ENT Specialists Near Me in ' + city,
-                    'description': specialization + ' in ' + city + ': Search and find best ' + specialization + ' near you to book appointment online. Check nearby ENT specialists details, address, availability & more.'}
-                specialization_metatags[315] = {
-                    'title': 'Best Gastroenterologist in ' + city + ' | Find Top Gastroenterologists Near Me in ' + city,
-                    'description': specialization + ' in ' + city + ': Search and find best ' + specialization + ' near you to book appointment online. Check nearby ' + specialization + ' details, address, availability & more.'}
-                specialization_metatags[358] = {
-                    'title': 'Best Gynecologist in ' + city + ' | Find Top Gynecologists Near Me in ' + city,
-                    'description': specialization + ' in ' + city + ': Search and find best ' + specialization + ' near you to book appointment online. Check nearby ' + specialization + ' details, address, availability & more.'}
-                specialization_metatags[376] = {
-                    'title': 'Best Nephrologist in ' + city + ' | Find Top Kidney Specialists Near Me in ' + city,
-                    'description': specialization + ' in ' + city + ': Search and find best ' + specialization + ' near you to book appointment online. Check nearby kidney specialists details, address, availability & more.'}
-                specialization_metatags[379] = {'title': 'Best Neurologist in ' + city + ' | Find Top Neurologists Near Me in ' + city,
-                                   'description': specialization + ' in ' + city + ': Search and find best ' + specialization + 'near you to book appointment online. Check nearby ' + specialization + ' details, address, availability & more.'}
-                specialization_metatags[385] = {'title': 'Best Nutritionist in ' + city + ' | Find Top Nutritionists Near Me in ' + city,
-                                   'description': specialization + ' in ' + city + ': Search and find best ' + specialization + 'near you to book appointment online. Check nearby ' + specialization + ' details, address, availability & more.'}
-                specialization_metatags[334] = {
-                    'title': 'Best Immunologist in ' + city + ' | Find Top Allergy Specialists Near Me in ' + city,
-                    'description': specialization + ' in ' + city + ': Search and find best ' + specialization + ' near you to book appointment online. Check nearby allergy specialists details, address, availability & more.'}
-                specialization_metatags[405] = {
-                    'title': 'Best Ophthalmologist in '+ city + ' | Find Top Ophthalmologists Near Me in ' + city,
-                    'description': specialization + ' in ' + city + ': Search and find best ' + specialization + ' near you to book appointment online. Check nearby ' + specialization + ' details, address, availability & more.'}
-                specialization_metatags[284] = {'title': 'Best Orthodontist in ' + city + ' | Find Top Orthodontists Near Me in ' + city,
-                                   'description': specialization + ' in ' + city + ': Search and find best ' + specialization + ' near you to book appointment online. Check nearby ' + specialization + ' details, address, availability & more.'}
-                specialization_metatags[426] = {
-                    'title': 'Best Pediatrician in ' + city + ' | Find Top Child Specialists Near Me in ' + city,
-                    'description': specialization + ' in ' + city + ': Search and find best ' + specialization + ' near you to book appointment online. Check nearby child specialists details, address, availability & more.'}
-                specialization_metatags[454] = {
-                    'title': 'Best Physiotherapist in ' + city + ' | Find Top Physiotherapists Near Me in ' + city,
-                    'description': specialization + ' in ' + city + ': Search and find best ' + specialization + ' near you to book appointment online. Check nearby ' + specialization + ' details, address, availability & more.'}
-                specialization_metatags[474] = {'title': 'Best Psychiatrist in ' + city + ' | Find Top Psychiatrists Near Me in ' + city,
-                                   'description': specialization + ' in ' + city + ': Search and find best ' + specialization + ' near you to book appointment online. Check nearby ' + specialization + ' details, address, availability & more.'}
-                specialization_metatags[482] = {'title': 'Best Psychologist in ' + city + ' | Find Top Psychologists Near Me in ' + city ,
-                                   'description': specialization + ' in ' + city + ': Search and find best ' + specialization + ' near you to book appointment online. Check nearby ' + specialization + ' details, address, availability & more.'}
-                specialization_metatags[487] = {
-                    'title': 'Best Pulmonologist in ' + city + ' | Find Top Lung Specialists Near Me in ' + city,
-                    'description': specialization + ' in ' + city + ': Search and find best ' + specialization + ' near you to book appointment online. Check nearby lung specialists details, address, availability & more.'}
-                specialization_metatags[501] = {'title': 'Best Sexologist in ' + city + ' | Find Top Sexologists Near Me in ' + city,
-                                   'description': specialization + ' in ' + city + ': Search and find best ' + specialization + ' near you to book appointment online. Check nearby ' + specialization + ' details, address, availability & more.'}
-                specialization_metatags['default'] = {
-                    'title': 'Best ' + specialization + 's' + ' in ' + city + ' | Find Top ' + specialization + ' Near Me in ' + city,
-                    'description': specialization + ' in ' + city + ': Search and find best ' + specialization + ' near you to book appointment online. Check nearby ' + specialization + ' details, address, availability & more.'}
-
-                if specialization_id in (279, 291, 300, 384, 304, 270, 309, 315, 358, 376, 379, 385, 334, 405, 284, 426, 454, 474, 482, 487, 501):
-                    title = specialization_metatags[specialization_id].get('title')
-                    description = specialization_metatags[specialization_id].get('description')
-                    ratings_title = specialization + ' in ' + city
-                else:
-                    title = specialization_metatags['default'].get('title')
-                    description = specialization_metatags['default'].get('description')
-                    ratings_title = specialization + ' in ' + city
 
             elif validated_data.get('sitemap_identifier') == 'SPECIALIZATION_LOCALITY_CITY':
                 title = specialization
@@ -1675,8 +1624,12 @@ class DoctorListViewSet(viewsets.GenericViewSet):
                 "title": title,
                 "description": description,
                 "location": location,
-                "image": static('web/images/dclogo-placeholder.png')
-                # ,
+                "image": static('web/images/dclogo-placeholder.png'),
+                "schema": None
+            }
+
+
+                            # ,
                 # 'schema': {
                 #     "@context": "http://schema.org",
                 #     "@type": "MedicalBusiness",
@@ -1699,7 +1652,7 @@ class DoctorListViewSet(viewsets.GenericViewSet):
                 #     },
                 #     "priceRange": "0"
                 # }
-            }
+            # }
 
 
             # if object and object.top_content:
@@ -1749,13 +1702,8 @@ class DoctorListViewSet(viewsets.GenericViewSet):
             canonical_url = validated_data.get('url')
         else:
             if validated_data.get('city'):
-                city = None
-                if validated_data.get('city') in ('bengaluru', 'bengalooru'):
-                    city = 'bangalore'
-                elif validated_data.get('city') in ('gurugram','gurugram rural'):
-                    city = 'gurgaon'
-                else:
-                    city = validated_data.get('city')
+                city = city_match(validated_data.get('city'))
+
                 if specializations:
                     specialization_name = specializations[0].get('name')
                     if not validated_data.get('locality'):
@@ -1773,6 +1721,8 @@ class DoctorListViewSet(viewsets.GenericViewSet):
                 entity = EntityUrls.objects.filter(url=url, url_type='SEARCHURL', entity_type='Doctor', is_valid=True)
                 if entity:
                     canonical_url = entity[0].url
+        if seo:
+            seo['schema'] = self.get_schema(request, response) if validated_data['url'] and validated_data['url'] == 'dentist-in-gurgaon-sptcit' else None
 
         if restrict_result_count:
             response = response[:restrict_result_count]
@@ -1797,6 +1747,7 @@ class DoctorListViewSet(viewsets.GenericViewSet):
             ratings = validated_data.get('ratings')
         if validated_data.get('reviews'):
             reviews = validated_data.get('reviews')
+
         return Response({"result": response, "count": result_count,
                          'specializations': specializations, 'conditions': conditions, "seo": seo,
                          "breadcrumb": breadcrumb, 'search_content': top_content,
@@ -1804,6 +1755,110 @@ class DoctorListViewSet(viewsets.GenericViewSet):
                          'ratings':ratings, 'reviews': reviews, 'ratings_title': ratings_title,
                          'bottom_content': bottom_content, 'canonical_url': canonical_url,
                          'ipd_procedures': ipd_procedures})
+
+    def get_schema(self, request, response):
+
+        itemListElement = list()
+        count = 1
+
+        for resp in response[:20]:
+            if resp.get('url'):
+                itemListElement.append({"@type": "ListItem", "position": count,
+                                    "url": request.build_absolute_uri("/" + resp.get('url'))})
+                count += 1
+
+        return {"@context": "http://schema.org",
+                    "@type": "ItemList",
+                 "itemListElement": itemListElement
+                 }
+
+
+    def get_spec_city_title_desc(self, specialization_id, city, specialization):
+
+        specialization_metatags = dict()
+        title=None
+        description = None
+        ratings_title = None
+
+        specialization_metatags[279] = {
+            'title': 'Best Dentist in ' + city + ' | Find Top Dentists Near Me in ' + city,
+            'description': specialization + ' in ' + city + ': Search and find best ' + specialization + ' near you to book appointment online. Check nearby ' + specialization + ' details, address, availability & more.'}
+
+        specialization_metatags[291] = {
+            'title': 'Best Dermatologist in ' + city + ' | Find Top Skin Specialists Near Me In ' + city,
+            'description': specialization + ' in ' + city + ': Search and find best ' + specialization + ' near you to book appointment online. Check nearby skin specialists details, address, availability & more.'}
+        specialization_metatags[300] = {
+            'title': 'Best Diabetologist in ' + city + ' | Find Top Diabetes Doctors Near Me in ' + city,
+            'description': specialization + ' in ' + city + ': Search and find best ' + specialization + ' near you to book appointment online. Check nearby diabetes doctors details, address, availability & more.'}
+        specialization_metatags[384] = {
+            'title': 'Best Dietitian in ' + city + ' | Find Top Dietitians Near Me in ' + city,
+            'description': specialization + ' in ' + city + ': Search and find best ' + specialization + 'near you to book appointment online. Check nearby ' + specialization + ' details, address, availability & more.'}
+        specialization_metatags[304] = {
+            'title': 'Best Endocrinologist in ' + city + ' | Find Top Endocrinologists Near Me in ' + city,
+            'description': specialization + ' in ' + city + ': Search and find best ' + specialization + ' near you to book appointment online. Check nearby ' + specialization + ' details, address, availability & more.'}
+        specialization_metatags[270] = {
+            'title': 'Best Cardiologist in ' + city + ' | Find Top Heart Specialists Near Me in ' + city,
+            'description': specialization + ' in ' + city + ': Search and find best ' + specialization + ' near you to book appointment online. Check nearby heart specialists details, address, availability & more.'}
+        specialization_metatags[309] = {
+            'title': 'Best ENT Specialist in ' + city + ' | Find Top ENT Specialists Near Me in ' + city,
+            'description': specialization + ' in ' + city + ': Search and find best ' + specialization + ' near you to book appointment online. Check nearby ENT specialists details, address, availability & more.'}
+        specialization_metatags[315] = {
+            'title': 'Best Gastroenterologist in ' + city + ' | Find Top Gastroenterologists Near Me in ' + city,
+            'description': specialization + ' in ' + city + ': Search and find best ' + specialization + ' near you to book appointment online. Check nearby ' + specialization + ' details, address, availability & more.'}
+        specialization_metatags[358] = {
+            'title': 'Best Gynecologist in ' + city + ' | Find Top Gynecologists Near Me in ' + city,
+            'description': specialization + ' in ' + city + ': Search and find best ' + specialization + ' near you to book appointment online. Check nearby ' + specialization + ' details, address, availability & more.'}
+        specialization_metatags[376] = {
+            'title': 'Best Nephrologist in ' + city + ' | Find Top Kidney Specialists Near Me in ' + city,
+            'description': specialization + ' in ' + city + ': Search and find best ' + specialization + ' near you to book appointment online. Check nearby kidney specialists details, address, availability & more.'}
+        specialization_metatags[379] = {
+            'title': 'Best Neurologist in ' + city + ' | Find Top Neurologists Near Me in ' + city,
+            'description': specialization + ' in ' + city + ': Search and find best ' + specialization + 'near you to book appointment online. Check nearby ' + specialization + ' details, address, availability & more.'}
+        specialization_metatags[385] = {
+            'title': 'Best Nutritionist in ' + city + ' | Find Top Nutritionists Near Me in ' + city,
+            'description': specialization + ' in ' + city + ': Search and find best ' + specialization + 'near you to book appointment online. Check nearby ' + specialization + ' details, address, availability & more.'}
+        specialization_metatags[334] = {
+            'title': 'Best Immunologist in ' + city + ' | Find Top Allergy Specialists Near Me in ' + city,
+            'description': specialization + ' in ' + city + ': Search and find best ' + specialization + ' near you to book appointment online. Check nearby allergy specialists details, address, availability & more.'}
+        specialization_metatags[405] = {
+            'title': 'Best Ophthalmologist in ' + city + ' | Find Top Ophthalmologists Near Me in ' + city,
+            'description': specialization + ' in ' + city + ': Search and find best ' + specialization + ' near you to book appointment online. Check nearby ' + specialization + ' details, address, availability & more.'}
+        specialization_metatags[284] = {
+            'title': 'Best Orthodontist in ' + city + ' | Find Top Orthodontists Near Me in ' + city,
+            'description': specialization + ' in ' + city + ': Search and find best ' + specialization + ' near you to book appointment online. Check nearby ' + specialization + ' details, address, availability & more.'}
+        specialization_metatags[426] = {
+            'title': 'Best Pediatrician in ' + city + ' | Find Top Child Specialists Near Me in ' + city,
+            'description': specialization + ' in ' + city + ': Search and find best ' + specialization + ' near you to book appointment online. Check nearby child specialists details, address, availability & more.'}
+        specialization_metatags[454] = {
+            'title': 'Best Physiotherapist in ' + city + ' | Find Top Physiotherapists Near Me in ' + city,
+            'description': specialization + ' in ' + city + ': Search and find best ' + specialization + ' near you to book appointment online. Check nearby ' + specialization + ' details, address, availability & more.'}
+        specialization_metatags[474] = {
+            'title': 'Best Psychiatrist in ' + city + ' | Find Top Psychiatrists Near Me in ' + city,
+            'description': specialization + ' in ' + city + ': Search and find best ' + specialization + ' near you to book appointment online. Check nearby ' + specialization + ' details, address, availability & more.'}
+        specialization_metatags[482] = {
+            'title': 'Best Psychologist in ' + city + ' | Find Top Psychologists Near Me in ' + city,
+            'description': specialization + ' in ' + city + ': Search and find best ' + specialization + ' near you to book appointment online. Check nearby ' + specialization + ' details, address, availability & more.'}
+        specialization_metatags[487] = {
+            'title': 'Best Pulmonologist in ' + city + ' | Find Top Lung Specialists Near Me in ' + city,
+            'description': specialization + ' in ' + city + ': Search and find best ' + specialization + ' near you to book appointment online. Check nearby lung specialists details, address, availability & more.'}
+        specialization_metatags[501] = {
+            'title': 'Best Sexologist in ' + city + ' | Find Top Sexologists Near Me in ' + city,
+            'description': specialization + ' in ' + city + ': Search and find best ' + specialization + ' near you to book appointment online. Check nearby ' + specialization + ' details, address, availability & more.'}
+        specialization_metatags['default'] = {
+            'title': 'Best ' + specialization + 's' + ' in ' + city + ' | Find Top ' + specialization + ' Near Me in ' + city,
+            'description': specialization + ' in ' + city + ': Search and find best ' + specialization + ' near you to book appointment online. Check nearby ' + specialization + ' details, address, availability & more.'}
+
+        if specialization_id in (
+        279, 291, 300, 384, 304, 270, 309, 315, 358, 376, 379, 385, 334, 405, 284, 426, 454, 474, 482, 487, 501):
+            title = specialization_metatags[specialization_id].get('title')
+            description = specialization_metatags[specialization_id].get('description')
+            ratings_title = specialization + ' in ' + city
+        else:
+            title = specialization_metatags['default'].get('title')
+            description = specialization_metatags['default'].get('description')
+            ratings_title = specialization + ' in ' + city
+        return title, description, ratings_title
+
 
     @transaction.non_atomic_requests
     def search_by_hospital(self, request):

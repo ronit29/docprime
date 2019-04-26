@@ -19,11 +19,9 @@ env = environ.Env()
 # os.environ.setdefault('DJANGO_SETTINGS_MODULE', env('DJANGO_SETTINGS_MODULE'))
 print('environment=='+env('DJANGO_SETTINGS_MODULE'))
 
-if os.environ.get('DJANGO_SETTINGS_MODULE') == 'config.settings.local':
+if os.environ.get('DJANGO_SETTINGS_MODULE') == 'config.settings.local' or os.environ.get('DJANGO_SETTINGS_MODULE') == 'config.settings.staging':
 
     app = celery.Celery(__name__)
-
-
 
 else:
     class Celery(celery.Celery):

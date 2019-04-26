@@ -197,7 +197,7 @@ class Hospital(auth_model.TimeStampedModel, auth_model.CreatedByModel, auth_mode
     assigned_to = models.ForeignKey(auth_model.User, null=True, blank=True, on_delete=models.SET_NULL, related_name='assigned_hospital')
     billing_merchant = GenericRelation(auth_model.BillingAccount)
     entity = GenericRelation(location_models.EntityLocationRelationship)
-    spoc_details = GenericRelation(auth_model.SPOCDetails)
+    spoc_details = GenericRelation(auth_model.SPOCDetails, related_query_name='hospital_spocs')
     enabled = models.BooleanField(verbose_name='Is Enabled', default=True, blank=True)
     source = models.CharField(max_length=20, blank=True)
     batch = models.CharField(max_length=20, blank=True)
@@ -847,29 +847,33 @@ class Doctor(auth_model.TimeStampedModel, auth_model.QCModel, SearchKey, auth_mo
 
     def generate_sticker(self):
 
-        thumbnail = None
-        for image in self.images.all():
-            if image.cropped_image:
-                thumbnail = image.cropped_image
+        # thumbnail = None
+        # for image in self.images.all():
+        #     if image.cropped_image:
+        #         thumbnail = image.cropped_image
 
-                break
+        #         break
+        # if not thumbnail:
+        #     return
+
+        thumbnail = self.images.exclude(cropped_image__isnull=True).exclude(cropped_image__exact='').first()
         if not thumbnail:
             return
+        qrcode = self.qr_code.all().first()
+        # for qrcode in self.qr_code.all():
+        #     if qrcode:
+        #         qrcode = default_storage.path(qrcode.name)
+        #         break
 
-        qrcode = None
-        for qrcode in self.qr_code.all():
-            if qrcode:
-                qrcode = default_storage.path(qrcode.name)
-                break
-
-        template_url = staticfiles_storage.path('web/images/qr_image.png')
-        template = Image.open(template_url)
-
-
-        thumbnail = default_storage.path(thumbnail)
+        #template_url = staticfiles_storage.path('web/images/qr_image.png')
+        template = Image.open(staticfiles_storage.open('web/images/qr_image.png'))
         print(thumbnail)
-        doctor_image = Image.open(thumbnail)
-        qrcode_image = Image.open(qrcode)
+
+
+        #thumbnail = default_storage.path(thumbnail)
+        #print(thumbnail)
+        doctor_image = Image.open(thumbnail.cropped_image)
+        qrcode_image = Image.open(qrcode.name)
 
         # im = Image.open('avatar.jpg')
         # im = im.resize((120, 120));
@@ -903,20 +907,30 @@ class Doctor(auth_model.TimeStampedModel, auth_model.QCModel, SearchKey, auth_mo
         canvas.paste(template, (0,0))
         # doctor_image = doctor_image.resize((200, 200), Image.ANTIALIAS)
         canvas.paste(doctor_image, (390, 300), doctor_image)
-        canvas.save('overlap.png')
+        #canvas.save('overlap.png')
         qrcode_image = qrcode_image.resize((530, 530), Image.ANTIALIAS)
         canvas.paste(qrcode_image, (215, 830))
 
         blank_image = Image.new('RGBA', (1000, 1000), 'white') # this new image is created to write text and paste on canvas
         img_draw = ImageDraw.Draw(canvas)
-        font_url = staticfiles_storage.path('web/images/.fonts/ProspectusPro-Desktop-v1-002/ProspectusSBld.otf')
-        font = ImageFont.truetype(font_url, 40)
-        img_draw.text((350, 530), self.name, fill='black', font=font)
+        #font_url = staticfiles_storage.path('web/fonts/ProspectusPro-Desktop-v1-002/ProspectusSBld.otf')
+
+        font = ImageFont.truetype(staticfiles_storage.open('web/fonts/ProspectusPro-Desktop-v1-002/ProspectusSBld.otf'), 40)
+
+        w, h = img_draw.textsize(self.name, font=font)
+
+        img_draw.text(((992-w)/2,530), self.name, fill="black", font=font)
+        #img_draw.text((350,530), self.name, fill="black", font=font)
+        #im.save("hello.png", "PNG")
+
+
+
+        #img_draw.text((350, 530), self.name, fill='black', font=font)
         # md5_hash = hashlib.md5(canvas.tobytes()).hexdigest()
 
         tempfile_io = BytesIO()
         canvas.save(tempfile_io, format='JPEG')
-        filename = "doctor_sticker_{}_{}.jpeg".format('id:' + str(self.id),
+        filename = "doctor_sticker_{}_{}.jpeg".format(str(self.id),
                                               random.randint(1111111111, 9999999999))
 
         image_file1 = InMemoryUploadedFile(tempfile_io, None, filename, 'image/jpeg', tempfile_io.tell(), None)
@@ -924,6 +938,18 @@ class Doctor(auth_model.TimeStampedModel, auth_model.QCModel, SearchKey, auth_mo
         sticker = DoctorSticker(name=image_file1, doctor=self)
         sticker.save()
         return sticker
+
+    def is_doctor_specialization_insured(self):
+        doctor_specializations = DoctorPracticeSpecialization.objects.filter(doctor=self).values_list('specialization_id', flat=True)
+        if not doctor_specializations:
+            return False
+        for specialization in doctor_specializations:
+            practice_specialization = PracticeSpecialization.objects.filter(id=specialization).first()
+            if not practice_specialization:
+                return False
+            if not practice_specialization.is_insurance_enabled:
+                return False
+        return True
 
     class Meta:
         db_table = "doctor"
@@ -1830,7 +1856,7 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
 
     def sync_with_booking_analytics(self):
 
-        promo_cost = self.deal_price - self.effective_price if self.deal_price and self.effective_price else None
+        promo_cost = self.deal_price - self.effective_price if self.deal_price and self.effective_price else 0
         department = None
         if self.doctor:
             if self.doctor.doctorpracticespecializations.first():
@@ -1849,9 +1875,10 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
             obj.TypeId = 1
             obj.ProviderId = self.hospital.id
             obj.PaymentType = self.payment_type if self.payment_type else None
-            obj.Payout = self.merchant_payout if self.merchant_payout else None
+            obj.Payout = self.fees
             obj.CashbackUsed = cashback
-        obj.PromoCost = promo_cost
+            obj.BookingDate = self.created_at
+        obj.PromoCost = max(0, promo_cost)
         obj.GMValue = self.deal_price
         obj.StatusId = self.status
         obj.save()
@@ -2144,6 +2171,7 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
         payout_data = {
             "charged_amount" : self.effective_price,
             "payable_amount" : self.fees,
+            "booking_type"   : Order.DOCTOR_PRODUCT_ID
         }
 
         merchant_payout = MerchantPayout.objects.create(**payout_data)
@@ -2746,6 +2774,7 @@ class PracticeSpecialization(auth_model.TimeStampedModel, SearchKey):
                                             null=True, blank=True)
     synonyms = models.CharField(max_length=4000, null=True, blank=True)
     doctor_count = models.PositiveIntegerField(default=0, null=True)
+    is_insurance_enabled = models.BooleanField(default=True)
 
     class Meta:
         db_table = 'practice_specialization'
