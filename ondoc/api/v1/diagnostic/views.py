@@ -2701,6 +2701,7 @@ class DigitalReports(viewsets.GenericViewSet):
                     return Response(status=status.HTTP_400_BAD_REQUEST)
 
                 parameter_dict['color'] = valid_threshold.color
+                parameter_dict['value'] = value
                 parameter_dict['what_to_do'] = valid_threshold.what_to_do
                 parameter_dict['details'] = valid_threshold.details
                 parameter_dict['ideal_range'] = '%.2f - %.2f' % (valid_threshold.min_value, valid_threshold.max_value)
