@@ -2,6 +2,10 @@ from django.db import models
 from ondoc.authentication import models as auth_model
 from ondoc.common.models import PaymentOptions
 from django.core.validators import MaxValueValidator, MinValueValidator
+from django.db.models import Prefetch, Q
+from django.utils import timezone
+from django.utils.functional import cached_property
+import sys
 import datetime
 from django.utils.crypto import get_random_string
 import logging
@@ -246,3 +250,340 @@ class RandomGeneratedCoupon(auth_model.TimeStampedModel):
     class Meta:
         db_table = "random_generated_coupon"
 
+class CouponRecommender():
+
+    def __init__(self, user, profile, type, product_id, coupon_code):
+        self.user = user
+        self.type = type
+        self.profile = profile
+        self.product_id = product_id
+        self.coupon_code = coupon_code
+        self.user_cart_counts = dict()
+        self.coupon_properties = dict()
+        self.payment_option_filter = None
+
+    @cached_property
+    def all_applicable_coupons(self):
+        from ondoc.diagnostic.models import LabAppointment
+        from ondoc.doctor.models import OpdAppointment
+        from ondoc.cart.models import Cart
+
+        user = self.user
+        search_type = self.type
+        profile = self.profile
+        product_id = self.product_id
+        coupon_code = self.coupon_code
+        user_cart_counts = self.user_cart_counts
+        types = [Coupon.ALL]
+
+        if not user.is_authenticated:
+            user = None
+
+        if search_type == 'doctor':
+            types.append(Coupon.DOCTOR)
+        elif search_type == 'lab':
+            types.append(Coupon.LAB)
+        else:
+            types.append(Coupon.DOCTOR)
+            types.append(Coupon.LAB)
+
+        total_opd_booked = Prefetch('opd_appointment_coupon',
+                                    queryset=OpdAppointment.objects.exclude(status__in=[OpdAppointment.CANCELLED]),
+                                                                            to_attr='total_opd_booked')
+
+        user_opd_booked = Prefetch('opd_appointment_coupon',
+                                   queryset=OpdAppointment.objects.filter(user=user)
+                                                                  .exclude(status__in=[OpdAppointment.CANCELLED]),
+                                                                           to_attr='user_opd_booked')
+
+        total_lab_booked = Prefetch('lab_appointment_coupon',
+                                    queryset=LabAppointment.objects.exclude(status__in=[LabAppointment.CANCELLED]),
+                                                                            to_attr='total_lab_booked')
+
+        user_lab_booked = Prefetch('lab_appointment_coupon',
+                                   queryset=LabAppointment.objects.filter(user=user)
+                                                                  .exclude(status__in=[LabAppointment.CANCELLED]),
+                                                                           to_attr='user_lab_booked')
+
+        all_coupons = Coupon.objects.prefetch_related('user_specific_coupon', 'test', 'test_categories', 'hospitals',
+                                                      'doctors', 'specializations', 'procedures',
+                                                      'lab', 'test', total_opd_booked, user_opd_booked, total_lab_booked, user_lab_booked)\
+                                    .filter(type__in=types)
+
+        if coupon_code:
+            all_coupons = all_coupons.filter(code__iexact=coupon_code)
+        else:
+            all_coupons = all_coupons.filter(is_visible=True)
+
+        if user and user.is_authenticated:
+            all_coupons = all_coupons.filter(Q(is_user_specific=False) \
+                                             | (Q(is_user_specific=True) & Q(user_specific_coupon__user=user)))
+
+            is_first_time_user = OpdAppointment().is_user_first_time(user)
+            if not is_first_time_user:
+                all_coupons = all_coupons.filter(Q(new_user_constraint=False))
+
+            if profile:
+                if profile.gender:
+                    all_coupons = all_coupons.filter(Q(gender__isnull=True) | Q(gender=profile.gender))
+                else:
+                    all_coupons = all_coupons.filter(gender__isnull=True)
+
+                user_age = profile.get_age()
+                if user_age:
+                    all_coupons = all_coupons.filter(Q(age_start__isnull=True, age_end__isnull=True)
+                                             | Q(age_start__lte=user_age, age_end__gte=user_age))
+                else:
+                    all_coupons = all_coupons.filter(age_start__isnull=True, age_end__isnull=True)
+            else:
+                all_coupons = all_coupons.filter(gender__isnull=True)
+                all_coupons = all_coupons.filter(age_start__isnull=True, age_end__isnull=True)
+
+            cart_items = user.cart_item.filter(deleted_at__isnull=True)
+            if cart_items:
+                cart_item_id = cart_items.first().id
+                self.payment_option_filter = Cart.get_pg_if_pgcoupon(user, cart_item_id)
+        else:
+            all_coupons = all_coupons.filter(Q(is_user_specific=False))
+
+        if product_id:
+            all_coupons = all_coupons.filter(is_corporate=False)
+
+        all_coupons = list(all_coupons)
+
+        if user and user.is_authenticated:
+            user_cart_purchase_items = Cart.objects.filter(user= user, deleted_at__isnull=True).exclude(id=cart_item_id).all()
+            for item in user_cart_purchase_items:
+                if item.data and item.data.get('coupon_code'):
+                    cart_code = item.data.get('coupon_code')[0]
+                    if not cart_code in user_cart_counts:
+                        user_cart_counts[cart_code] = 0
+                    user_cart_counts[cart_code] += 1
+
+        return all_coupons
+
+    def applicable_coupons(self, **filters):
+        coupons = self.all_applicable_coupons
+        user = self.user
+        user_cart_counts = self.user_cart_counts
+        deal_price = filters.get('deal_price')
+        tests = filters.get('tests')
+        lab = filters.get('lab')
+        hospital = filters.get('hospital')
+        doctor_id = filters.get('doctor_id')
+        doctor_specializations_ids = filters.get('doctor_specializations_ids', [])
+        procedures_ids = filters.get('procedures_ids')
+        show_all = filters.get('show_all', False)
+
+        if deal_price:
+            coupons = list(filter(lambda x: x.min_order_amount == None or x.min_order_amount <= deal_price, coupons))
+
+        if tests:
+            tests_ids = []
+            test_categories_ids = []
+            for test in tests:
+                test_categories = []
+                test_id = getattr(test, 'id') if hasattr(test, 'id') else test.get('id')
+                if test_id:
+                    tests_ids.append(test_id)
+
+                if hasattr(test, 'categories'):
+                    categories = getattr(test, 'categories').all()
+                    test_categories = list(map(lambda x: x.id, categories))
+                if test_categories:
+                    test_categories_ids = test_categories_ids + test_categories
+                else:
+                    if test.get('categories'):
+                        test_categories_ids.append(test.get('categories'))
+
+            tests_ids = set(tests_ids)
+            test_categories_ids = set(test_categories_ids)
+
+            # check test in coupon
+            for coupon in coupons:
+                keep_coupon = False
+                if len(coupon.test.all()) == 0:
+                    keep_coupon = True
+                else:
+                    if tests_ids:
+                        coupon_test_ids = list(map(lambda x: x.id, coupon.test.all()))
+                        for coupon_test_id in coupon_test_ids:
+                            if coupon_test_id in tests_ids:
+                                keep_coupon = True
+                                break
+
+                if not keep_coupon:
+                    coupons.remove(coupon)
+
+            # check test categories in coupon
+            for coupon in coupons:
+                keep_coupon = False
+                if len(coupon.test_categories.all()) == 0:
+                    keep_coupon = True
+                else:
+                    if test_categories_ids:
+                        coupon_test_categories_ids = list(map(lambda x: x.id, coupon.test_categories.all()))
+                        for coupon_test_categories_id in coupon_test_categories_ids:
+                            if coupon_test_categories_id in test_categories_ids:
+                                keep_coupon = True
+                                break
+
+                if not keep_coupon:
+                    coupons.remove(coupon)
+        else:
+            coupons = list(filter(lambda x: len(x.test.all()) == 0, coupons))
+            coupons = list(filter(lambda x: len(x.test_categories.all()) == 0, coupons))
+
+        if lab and lab.get('city'):
+            coupons = list(filter(lambda x: x.cities == None or lab.get('city') in x.cities, coupons))
+        else:
+            coupons = list(filter(lambda x: x.cities == None, coupons))
+
+        if hospital:
+            coupons = list(
+                filter(lambda x: len(x.hospitals.all()) == 0 or hospital.id in list(map(lambda y: y.id, x.hospitals.all())), coupons))
+            coupons = list(filter(lambda x: x.cities == None or hospital.city in x.cities, coupons))
+        else:
+            coupons = list(filter(lambda x: len(x.hospitals.all()) == 0, coupons))
+            coupons = list(filter(lambda x: x.cities == None, coupons))
+
+        if doctor_id:
+            coupons = list(filter(lambda x: len(x.doctors.all()) == 0 or doctor_id in list(map(lambda y: y.id, x.doctors.all())), coupons))
+            for coupon in coupons:
+                keep_coupon = False
+                if len(coupon.specializations.all()) == 0:
+                    keep_coupon = True
+                else:
+                    if doctor_specializations_ids:
+                        coupon_specializations_ids = list(map(lambda x: x.id, coupon.specializations.all()))
+                        for coupon_specializations_id in coupon_specializations_ids:
+                            if coupon_specializations_id in doctor_specializations_ids:
+                                keep_coupon = True
+                                break
+
+                if not keep_coupon:
+                    coupons.remove(coupon)
+        else:
+            coupons = list(filter(lambda x: len(x.doctors.all()) == 0, coupons))
+            coupons = list(filter(lambda x: len(x.specializations.all()) == 0, coupons))
+
+
+        if procedures_ids:
+            pass
+            # add filters here
+            # coupons = coupons.filter(Q(procedures__isnull=True) | Q(procedures__in=procedures))
+            # procedure_categories = set(procedures.values_list('categories', flat=True))
+            # coupons = coupons.filter(
+            #     Q(procedure_categories__isnull=True) | Q(procedure_categories__in=procedure_categories))
+        else:
+            coupons = list(filter(lambda x: len(x.procedures.all()) == 0, coupons))
+            coupons = list(filter(lambda x: len(x.procedure_categories.all()) == 0, coupons))
+
+        for coupon in coupons:
+            coupon_properties = self.coupon_properties[coupon.code] = dict()
+            remove_coupon = False
+            if coupon.total_count and (len(coupon.total_opd_booked) \
+                    + len(coupon.total_lab_booked)) >= coupon.total_count:
+                remove_coupon = True
+
+            used_coupon_count = 0
+            if not remove_coupon and coupon.count:
+                used_coupon_count = len(coupon.user_opd_booked) + len(coupon.user_lab_booked)
+                if user_cart_counts.get(coupon.code):
+                    used_coupon_count += user_cart_counts.get(coupon.code)
+
+                if used_coupon_count >= coupon.count:
+                    remove_coupon = True and not show_all
+                    coupon_properties['valid'] = False
+                    coupon_properties['invalidating_message'] = "Coupon can only be used " + str(coupon.count) + " times per user."
+                coupon_properties['used_count'] = used_coupon_count
+
+            if not remove_coupon and coupon.payment_option and self.payment_option_filter:
+                if coupon.payment_option.id != self.payment_option_filter.id:
+                    remove_coupon = True and not show_all
+                    coupon_properties['valid'] = False
+                    coupon_properties['invalidating_message'] = '2 payment gateway coupons cannot be used in the same transaction.'
+
+            # TODO - old code
+            # if ((user_opd_completed + user_lab_completed + 1) % coupon.step_count != 0 ):
+            #     allowed = False
+
+            # todo - move to cached condition with queryset
+            if not remove_coupon and coupon.start_date and (coupon.start_date > timezone.now() \
+                                                            or (coupon.start_date + datetime.timedelta(days=coupon.validity)) < timezone.now()):
+                remove_coupon = True
+
+            if not remove_coupon and coupon.is_user_specific and user:
+                # todo - check if it will query to db
+                if coupon.user_specific_coupon.exists():
+                    user_specefic = coupon.user_specific_coupon.filter(user=user).first()
+                    if user_specefic and (len(coupon.user_opd_booked)+len(coupon.user_lab_booked)) >= user_specefic.count:
+                        remove_coupon = True
+
+            if not remove_coupon and coupon.lab and lab and lab.get('id') and coupon.lab.id != lab.get('id'):
+                remove_coupon = True
+
+            if not remove_coupon and coupon.lab_network and lab and lab.get('network_id') and coupon.lab_network.id != lab.get('network_id'):
+                remove_coupon = True
+
+            if remove_coupon:
+                coupons = list(filter(lambda x: x.id != coupon.id, coupons))
+
+
+        applicable_coupons = list(set(coupons))
+
+        if applicable_coupons:
+            from ondoc.api.v1.utils import CouponsMixin
+
+            def compare_coupon(coupon):
+                obj = CouponsMixin()
+                deal_price = filters.get('deal_price')
+                deal_price = deal_price if deal_price is not None else sys.maxsize
+                discount = obj.get_discount(coupon, deal_price)
+                return (1 if coupon.is_corporate else 0, discount)
+
+            def filter_coupon(coupon):
+                obj = CouponsMixin()
+                deal_price = filters.get('deal_price')
+                if deal_price:
+                    discount = obj.get_discount(coupon, deal_price)
+                    return discount > 0
+                return True
+
+            # sort coupons on discount granted
+            applicable_coupons = sorted(applicable_coupons, key=compare_coupon, reverse=True)
+            # filter if no discount is offered
+            applicable_coupons = list(filter(filter_coupon, applicable_coupons))
+
+            # def remove_coupon_data(c):
+            #     c.pop('coupon')
+            #     if c.get("payment_option"):
+            #         c["payment_option"]["image"] = request.build_absolute_uri(c["payment_option"]["image"].url)
+            #     return c
+            # applicable_coupons = list(map(remove_coupon_data, applicable_coupons))
+
+        return applicable_coupons
+
+    def best_coupon(self, **filters):
+        best_coupon = Coupon.objects.none()
+        applicable_coupons = self.applicable_coupons(**filters)
+
+        if applicable_coupons:
+            def remove_invalid_coupon(coupon):
+                coupon_property = self.get_coupon_properties(coupon.code)
+                if coupon_property:
+                    return coupon_property.get('valid', True)
+                return True
+            applicable_coupons = list(filter(remove_invalid_coupon, applicable_coupons))
+
+            applicable_coupons = list(filter(lambda x: x.coupon_type == Coupon.DISCOUNT, applicable_coupons))
+
+            best_coupon = applicable_coupons[0]
+
+        return best_coupon
+
+    def get_coupon_properties(self, code):
+        coupon_property = None
+        if code:
+            coupon_property = self.coupon_properties[code]
+        return coupon_property

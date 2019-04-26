@@ -1340,7 +1340,8 @@ class CustomPackageLabSerializer(LabModelSerializer):
         model = Lab
         fields = ('id', 'lat', 'long', 'lab_thumbnail', 'name', 'operational_since', 'locality', 'address',
                   'sublocality', 'city', 'state', 'country', 'always_open', 'about', 'home_pickup_charges',
-                  'is_home_collection_enabled', 'seo', 'breadcrumb', 'center_visit_enabled', 'avg_rating', 'url')
+                  'is_home_collection_enabled', 'seo', 'breadcrumb', 'center_visit_enabled', 'avg_rating', 'url',
+                  'city', 'network_id')
 
     def get_url(self, obj):
         entity_url_dict = self.context.get('entity_url_dict', {})

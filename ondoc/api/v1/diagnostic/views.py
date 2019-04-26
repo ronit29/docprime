@@ -13,10 +13,10 @@ from ondoc.diagnostic.models import (LabTest, AvailableLabTest, Lab, LabAppointm
                                      FrequentlyAddedTogetherTests, TestParameter, ParameterLabTest, QuestionAnswer,
                                      LabPricingGroup, LabTestCategory, LabTestCategoryMapping)
 from ondoc.account import models as account_models
-from ondoc.authentication.models import UserProfile, Address, CouponRecommender
+from ondoc.authentication.models import UserProfile, Address
 from ondoc.insurance.models import UserInsurance, InsuranceThreshold
 from ondoc.notification.models import EmailNotification
-from ondoc.coupon.models import Coupon
+from ondoc.coupon.models import Coupon, CouponRecommender
 from ondoc.doctor import models as doctor_model
 from ondoc.api.v1 import insurance as insurance_utility
 from ondoc.api.v1.utils import form_time_slot, IsConsumer, labappointment_transform, IsDoctor, payment_details, \
@@ -436,6 +436,14 @@ class LabList(viewsets.ReadOnlyModelViewSet):
 
                     filters['deal_price'] = price
                     filters['tests'] = package_result.get('tests')
+
+                    package_result_lab = package_result.get('lab')
+                    if package_result_lab:
+                        filters['lab'] = dict()
+                        lab_obj = filters['lab']
+                        lab_obj['id'] = package_result_lab.get('id')
+                        lab_obj['network_id'] = package_result_lab.get('network_id')
+                        lab_obj['city'] = package_result_lab.get('city')
                     search_coupon = coupon_recommender.best_coupon(**filters)
 
                     discounted_price = price if not search_coupon else search_coupon.get_search_coupon_discounted_price(price)
@@ -951,8 +959,12 @@ class LabList(viewsets.ReadOnlyModelViewSet):
             for lab_result in result:
                 if "price" in lab_result:
                     filters['deal_price'] = lab_result["price"]
-                    filters['lab'] = lab_result
                     filters['tests'] = tests
+                    filters['lab'] = dict()
+                    lab_obj = filters['lab']
+                    lab_obj['id'] = lab_result.get('id')
+                    lab_obj['network_id'] = lab_result.get('network_id')
+                    lab_obj['city'] = lab_result.get('city')
                     search_coupon = coupon_recommender.best_coupon(**filters)
 
                     discounted_price = lab_result["price"] if not search_coupon else search_coupon.get_search_coupon_discounted_price(lab_result["price"])
@@ -1350,6 +1362,7 @@ class LabList(viewsets.ReadOnlyModelViewSet):
             row["next_lab_timing"] = next_lab_timing_dict
             row["next_lab_timing_data"] = next_lab_timing_data_dict
             row["tests"] = tests.get(row["id"])
+            row["city"] = lab_obj.city
 
             if lab_obj.id in id_url_dict.keys():
                 row['url'] = id_url_dict[lab_obj.id]

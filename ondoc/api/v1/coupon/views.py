@@ -1,5 +1,5 @@
 from ondoc.cart.models import Cart
-from ondoc.coupon.models import Coupon, RandomGeneratedCoupon, UserSpecificCoupon
+from ondoc.coupon.models import Coupon, RandomGeneratedCoupon, UserSpecificCoupon, CouponRecommender
 from ondoc.account.models import Order
 from ondoc.doctor.models import OpdAppointment
 from ondoc.diagnostic.models import LabAppointment, AvailableLabTest, LabTest
@@ -312,6 +312,97 @@ class ApplicableCouponsViewSet(viewsets.GenericViewSet):
                 return c
             applicable_coupons = list(map(remove_coupon_data, applicable_coupons))
 
+        return Response(applicable_coupons)
+
+    def list_v2(self, request, *args, **kwargs):
+        serializer = serializers.ProductIDSerializer(data=request.query_params)
+        serializer.is_valid(raise_exception=True)
+        input_data = serializer.validated_data
+
+        product_id = input_data.get("product_id")
+        lab = input_data.get("lab_id", None)
+        tests = input_data.get("tests", [])
+        procedures = input_data.get("procedures", [])
+        doctor = input_data.get("doctor_id", None)
+        hospital = input_data.get("hospital_id", None)
+        deal_price = input_data.get("deal_price")
+        coupon_code = input_data.get("coupon_code")
+        profile = input_data.get("profile_id", None)
+        # cart_item_id = input_data.get('cart_item').id if input_data.get('cart_item') else None
+        show_all = input_data.get('show_all', False)
+
+        coupon_type = 'both'
+
+        if (product_id and product_id == Order.DOCTOR_PRODUCT_ID) or doctor:
+            coupon_type = 'doctor'
+        elif (product_id and product_id == Order.LAB_PRODUCT_ID) or lab:
+            coupon_type = 'lab'
+
+        if deal_price==0:
+            deal_price=None
+
+        coupon_recommender = CouponRecommender(request.user, profile, coupon_type, product_id, coupon_code)
+        filters = dict()
+
+        if lab:
+            filters['lab'] = dict()
+            lab_obj = filters['lab']
+            lab_obj['id'] = lab.id
+            lab_obj['network_id'] = lab.network_id
+            lab_obj['city'] = lab.city
+        if doctor:
+            doctor_specializations = []
+            for dps in doctor.doctorpracticespecializations.all():
+                doctor_specializations.append(dps.specialization_id)
+            filters['doctor_id'] = doctor.id
+            filters['doctor_specializations_ids'] = doctor_specializations
+        filters['tests'] = tests
+        filters['hospital'] = hospital
+        filters['deal_price'] = deal_price
+        filters['procedures_ids'] = procedures
+        filters['show_all'] = show_all
+
+        coupons = coupon_recommender.applicable_coupons(**filters)
+        applicable_coupons = []
+
+        for coupon in coupons:
+            coupon_property = coupon_recommender.get_coupon_properties(coupon.code)
+            applicable_coupons.append({"is_random_generated": False,
+                                       "valid": coupon_property.get('valid', True),
+                                       "invalidating_message": coupon_property.get('invalidating_message', ''),
+                                       "coupon_type": coupon.type,
+                                       "coupon_id": coupon.id,
+                                       "code": coupon.code,
+                                       "desc": coupon.description,
+                                       "coupon_count": coupon.count,
+                                       "used_count": coupon_property.get('used_count', 0),
+                                       "heading": coupon.heading,
+                                       "is_corporate" : coupon.is_corporate,
+                                       "tests": [test.id for test in coupon.test.all()],
+                                       "network_id": coupon.lab_network.id if coupon.lab_network else None,
+                                       "is_cashback": coupon.coupon_type == Coupon.CASHBACK,
+                                       "tnc": coupon.tnc
+                                       })
+
+            # if request.user:
+            #     for random_coupon in coupon.random_generated_coupon.all():
+            #         applicable_coupons.append({"is_random_generated": True,
+            #                "valid": coupon_property.get('valid', True),
+            #                "invalidating_message": coupon_property.get('invalidating_message', ''),
+            #                 "coupon_type": coupon.type,
+            #                 "random_coupon_id": random_coupon.id,
+            #                 "coupon_id": coupon.id,
+            #                 "random_code": random_coupon.random_coupon,
+            #                 "code": coupon.code,
+            #                 "desc": coupon.description,
+            #                 "coupon_count": 1,
+            #                 "used_count": 0,
+            #                 "coupon": coupon,
+            #                 "heading": coupon.heading,
+            #                 "is_corporate": coupon.is_corporate,
+            #                 "tests": [test.id for test in coupon.test.all()],
+            #                 "network_id": coupon.lab_network.id if coupon.lab_network else None,
+            #                 "tnc": coupon.tnc})
         return Response(applicable_coupons)
 
 

@@ -6,10 +6,11 @@ from django.db.models import F
 from ondoc.api.v1.doctor.serializers import DoctorProfileUserViewSerializer
 from ondoc.api.v1.procedure.serializers import DoctorClinicProcedureSerializer
 from ondoc.api.v1.ratings.serializers import GoogleRatingsGraphSerializer
+from ondoc.coupon.models import CouponRecommender
 from ondoc.doctor import models
 from ondoc.api.v1.utils import clinic_convert_timings
 from ondoc.api.v1.doctor import serializers
-from ondoc.authentication.models import QCModel, CouponRecommender
+from ondoc.authentication.models import QCModel
 from ondoc.doctor.models import Doctor, PracticeSpecialization
 from ondoc.procedure.models import DoctorClinicProcedure, ProcedureCategory, ProcedureToCategoryMapping, \
     get_selected_and_other_procedures, get_included_doctor_clinic_procedure, \
@@ -551,7 +552,7 @@ class DoctorSearchHelper:
                 # search_coupon = Coupon.get_search_coupon(request.user)
                 filters['deal_price'] = filtered_deal_price
                 filters['doctor_id'] = doctor.id
-                filters['doctor_specializations'] = doctor_specializations
+                filters['doctor_specializations_ids'] = doctor_specializations
                 filters['hospital'] = doctor_clinic.hospital
                 search_coupon = coupon_recommender.best_coupon(**filters)
 
