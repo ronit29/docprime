@@ -76,11 +76,14 @@ class PrescriptionComponentsViewSet(viewsets.GenericViewSet):
                                         duration=valid_data.get('duration'),
                                         is_before_meal=valid_data.get('is_before_meal'),
                                         additional_notes=valid_data.get('additional_notes'))
+        if valid_data.get("type") == serializers.PrescriptionComponents.MEDICINES:
+            model_serializer = serializers.PrescriptionMedicineBodySerializer(object)
         return Response({'status': 1,
                          'id': object.id,
                          'name': object.name,
                          'hospital': object.hospitals,
-                         'source_type': object.source_type})
+                         'source_type': object.source_type,
+                         'data': model_serializer.data})
 
     # TODO - ADD SOURCE TYPE
     def sync_component(self, request):

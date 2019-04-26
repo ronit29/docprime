@@ -80,6 +80,13 @@ class PrescriptionPatientSerializer(serializers.Serializer):
     phone_number = serializers.IntegerField(required=False, allow_null=True)
 
 
+class PrescriptionMedicineModelSerializer(serializers.ModelSerializer):
+
+    class Meta:
+        model = prescription_models.PrescriptionMedicine
+        fields = "__all__"
+
+
 class PrescriptionComponentBodySerializer(serializers.Serializer):
     type = serializers.ChoiceField(choices=PrescriptionComponents.COMPONENT_CHOICES)
     name = serializers.CharField(max_length=64)
