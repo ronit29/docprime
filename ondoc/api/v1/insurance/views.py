@@ -162,8 +162,8 @@ class InsuranceOrderViewSet(viewsets.GenericViewSet):
                     pre_insured_members['dob'] = member['dob']
                     pre_insured_members['title'] = member['title']
                     pre_insured_members['first_name'] = member['first_name']
-                    pre_insured_members['middle_name'] = member['middle_name']
-                    pre_insured_members['last_name'] = member['last_name']
+                    pre_insured_members['middle_name'] = member.get('middle_name', '')
+                    pre_insured_members['last_name'] = member.get('last_name', '')
                     pre_insured_members['address'] = member['address']
                     pre_insured_members['pincode'] = member['pincode']
                     pre_insured_members['email'] = member['email']
