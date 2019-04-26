@@ -14,7 +14,7 @@ from ondoc.authentication.models import Address, SPOCDetails, QCModel
 from ondoc.api.v1.utils import resolve_address
 from ondoc.common.models import AppointmentMaskNumber
 from django.apps import apps
-from ondoc.crm.constants import matrix_product_ids, matrix_subproduct_ids
+from ondoc.crm.constants import matrix_product_ids, matrix_subproduct_ids, constants
 
 logger = logging.getLogger(__name__)
 
@@ -133,7 +133,7 @@ def prepare_and_hit(self, data):
 
     appointment_details = {
         'IsInsured': 'yes' if user_insurance else 'no',
-        'PolicyId': user_insurance.policy_number if user_insurance else None,
+        'InsurancePolicyNumber': str(user_insurance.policy_number) if user_insurance else None,
         'AppointmentStatus': appointment.status,
         'Age': calculate_age(appointment),
         'Email': p_email,
@@ -684,10 +684,19 @@ def update_onboarding_qcstatus_to_matrix(self, data):
         if data.get('assigned_matrix_user', None):
             assigned_user = data.get('assigned_user')
         else:
-            history_obj = obj.history.filter(status=QCModel.SUBMITTED_FOR_QC).order_by('-created_at').first()
-            if history_obj:
-                assigned_user = history_obj.user.staffprofile.employee_id if hasattr(history_obj.user,
-                                                                                     'staffprofile') and history_obj.user.staffprofile.employee_id else ''
+            if obj.data_status == QCModel.SUBMITTED_FOR_QC:
+                history_obj = obj.history.filter(status=QCModel.REOPENED).order_by('-created_at').first()
+                if history_obj:
+                    qc_user = history_obj.user.staffprofile.employee_id if hasattr(history_obj.user,
+                                                                                         'staffprofile') and history_obj.user.staffprofile.employee_id else ''
+                    if qc_user.is_member_of(constants['QC_GROUP_NAME']):
+                        assigned_user = qc_user
+
+            else:
+                history_obj = obj.history.filter(status=QCModel.SUBMITTED_FOR_QC).order_by('-created_at').first()
+                if history_obj:
+                    assigned_user = history_obj.user.staffprofile.employee_id if hasattr(history_obj.user,
+                                                                                         'staffprofile') and history_obj.user.staffprofile.employee_id else ''
 
         obj_matrix_lead_id = obj.matrix_lead_id if hasattr(obj, 'matrix_lead_id') and obj.matrix_lead_id else 0
         if not obj_matrix_lead_id:
