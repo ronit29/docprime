@@ -793,8 +793,8 @@ class UserInsurance(auth_model.TimeStampedModel):
     @classmethod
     def profile_create_or_update(cls, member, user):
         profile = {}
-        name = "{fname} {mname} {lname}".format(fname=member['first_name'], mname=member['middle_name'],
-                                                lname=member['last_name'])
+        name = "{fname} {mname} {lname}".format(fname=member['first_name'], mname=member.get('middle_name', ''),
+                                                lname=member.get('last_name', ''))
         if member['profile'] or UserProfile.objects.filter(name__iexact=name, user=user.id).exists():
             # Check whether Profile exist with same name
             existing_profile = UserProfile.objects.filter(name__iexact=name, user=user.id).first()

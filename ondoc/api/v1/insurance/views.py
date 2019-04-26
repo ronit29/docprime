@@ -188,7 +188,7 @@ class InsuranceOrderViewSet(viewsets.GenericViewSet):
                             user_profile['dob'] = member['dob']
 
                         else:
-                            user_profile = {"name": member['first_name'] + " " + member['last_name'], "email":
+                            user_profile = {"name": member['first_name'] + " " + member.get('last_name', ''), "email":
                                 member['email'], "gender": member['gender'], "dob": member['dob']}
 
             insurance_plan = InsurancePlans.objects.get(id=request.data.get('insurance_plan'))
