@@ -61,17 +61,28 @@ class PrescriptionComponentsViewSet(viewsets.GenericViewSet):
     def get_queryset(self):
         return prescription_models.PresccriptionPdf.objects.none()
 
+    # TODO - ADD SOURCE TYPE
     def save_component(self, request):
         serializer = serializers.PrescriptionComponentBodySerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         valid_data = serializer.validated_data
         model = dict(serializers.PrescriptionComponents.COMPONENT_CHOICES)[valid_data.get('type')]
-        object = model.create_or_update(name=valid_data.get('name'), hospital_id=valid_data.get('hospital_id').id)
+        object = model.create_or_update(name=valid_data.get('name'), hospital_id=valid_data.get('hospital_id').id,
+                                        source_type=prescription_models.PrescriptionEntity.PARTNERS_APP,
+                                        quantity=valid_data.get('quantity'),
+                                        dosage_type=valid_data.get('dosage_type'),
+                                        time=valid_data.get('time'),
+                                        duration_type=valid_data.get('duration_type'),
+                                        duration=valid_data.get('duration'),
+                                        is_before_meal=valid_data.get('is_before_meal'),
+                                        additional_notes=valid_data.get('additional_notes'))
         return Response({'status': 1,
                          'id': object.id,
                          'name': object.name,
-                         'hospital': object.hospitals})
+                         'hospital': object.hospitals,
+                         'source_type': object.source_type})
 
+    # TODO - ADD SOURCE TYPE
     def sync_component(self, request):
         serializer = serializers.PrescriptionComponentSyncSerializer(data=request.query_params)
         serializer.is_valid(raise_exception=True)
@@ -86,7 +97,8 @@ class PrescriptionComponentsViewSet(viewsets.GenericViewSet):
             resp_dict = {'id': obj.id,
                          'name': obj.name,
                          'hospital': obj.hospitals,
-                         'moderated': obj.moderated}
+                         'moderated': obj.moderated,
+                         'source_type': obj.source_type}
             resp.append(resp_dict)
         return Response(resp)
 

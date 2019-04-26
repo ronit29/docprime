@@ -41,16 +41,19 @@ class PrescriptionAppointmentValidation():
 class PrescriptionMedicineBodySerializer(serializers.Serializer):
     name = serializers.CharField(max_length=64)
     quantity = serializers.IntegerField(required=False)
-    time = serializers.CharField(max_length=64)
+    type = serializers.ChoiceField(choices=prescription_models.PrescriptionMedicine.DOSAGE_TYPE_CHOICES, required=False)
+    time = serializers.ListField(child=serializers.CharField(max_length=64), allow_empty=True, required=False)
     duration_type = serializers.ChoiceField(choices=prescription_models.PrescriptionMedicine.DURATION_TYPE_CHOICES, required=False)
     duration = serializers.IntegerField(required=False)
-    instruction = serializers.CharField(max_length=256, required=False)
+    # instruction = serializers.CharField(max_length=256, required=False)
+    is_before_meal = serializers.NullBooleanField(required=False)
     additional_notes = serializers.CharField(max_length=256, required=False)
 
     def validate(self, attrs):
         if attrs.get('duration_type'):
             attrs['durationstring'] = dict(prescription_models.PrescriptionMedicine.DURATION_TYPE_CHOICES)[attrs['duration_type']]
-
+        if attrs.get("quantity") and not attrs.get("type"):
+            raise serializers.ValidationError("dosage type is also required with quantity")
         return attrs
 
 
@@ -81,6 +84,17 @@ class PrescriptionComponentBodySerializer(serializers.Serializer):
     type = serializers.ChoiceField(choices=PrescriptionComponents.COMPONENT_CHOICES)
     name = serializers.CharField(max_length=64)
     hospital_id = serializers.PrimaryKeyRelatedField(queryset=doc_models.Hospital.objects.all())
+    source_type = serializers.ChoiceField(choices=prescription_models.PrescriptionEntity.SOURCE_TYPE_CHOICES)
+    quantity = serializers.IntegerField(required=False)
+    dosage_type = serializers.ChoiceField(choices=prescription_models.PrescriptionMedicine.DOSAGE_TYPE_CHOICES, required=False)
+    time = serializers.ListField(child=serializers.CharField(max_length=64), allow_empty=True, required=False)
+    duration_type = serializers.ChoiceField(choices=prescription_models.PrescriptionMedicine.DURATION_TYPE_CHOICES,
+                                            required=False)
+    duration = serializers.IntegerField(required=False)
+    # instruction = serializers.CharField(max_length=256, required=False)
+    is_before_meal = serializers.NullBooleanField(required=False)
+    additional_notes = serializers.CharField(max_length=256, required=False)
+
 
 
 class PrescriptionComponentSyncSerializer(serializers.Serializer):
@@ -104,6 +118,10 @@ class GeneratePrescriptionPDFBodySerializer(serializers.Serializer):
         if attrs:
             appointment = PrescriptionAppointmentValidation.validate_appointment_object(attrs)
             attrs['appointment'] = appointment
+            if not appointment.doctor.license:
+                raise serializers.ValidationError("Registration Number is required for Generating Prescription")
+            elif not appointment.doctor.is_license_verified:
+                raise serializers.ValidationError("Registration Number needs to be Verified")
         return attrs
 
 

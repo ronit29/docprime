@@ -2565,6 +2565,8 @@ class CreateAdminViewSet(viewsets.GenericViewSet):
                 if dn.first():
                     try:
                         dn.update(phone_number=valid_data.get('phone_number'))
+                        if valid_data.get("license") != dn.license:
+                            dn.update(license=valid_data.get('license'))
                     except Exception as e:
                         logger.error("Error Updating Entity Hospital " + str(e))
                         return Response({'error': 'something went wrong!'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)

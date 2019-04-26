@@ -13,8 +13,8 @@ logger = logging.getLogger(__name__)
 class PrescriptionEntity(auth_models.TimeStampedModel):
     INHOUSE_CHAT = 1
     MESH = 2
-    DOCTORS = 3
-    SOURCE_TYPE_CHOICES = (("", "Select"), (INHOUSE_CHAT, 'Inhouse Chat'), (MESH, 'Mesh'), (DOCTORS, 'Doctors'))
+    PARTNERS_APP = 3
+    SOURCE_TYPE_CHOICES = (("", "Select"), (INHOUSE_CHAT, 'Inhouse Chat'), (MESH, 'Mesh'), (PARTNERS_APP, 'Partners App'))
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     hospitals = ArrayField(models.IntegerField(), blank=True, null=True)
     name = models.CharField(db_index=True, max_length=64)
@@ -22,7 +22,7 @@ class PrescriptionEntity(auth_models.TimeStampedModel):
     source_type = models.IntegerField(choices=SOURCE_TYPE_CHOICES, null=True, blank=True, default=None, editable=False)
 
     @classmethod
-    def create_or_update(cls, name, hospital_id):
+    def create_or_update(cls, name, hospital_id, source_type, **kwargs):
         obj = cls.objects.filter(name__iexact=name).first()
         if obj:
             if hospital_id in obj.hospitals:
@@ -30,7 +30,7 @@ class PrescriptionEntity(auth_models.TimeStampedModel):
             obj.hospitals.append(hospital_id)
             obj.save()
         else:
-            obj = cls.objects.create(name=name, hospitals=[hospital_id])
+            obj = cls.objects.create(name=name, hospitals=[hospital_id], source_type=source_type)
         return obj
 
     class Meta:
@@ -70,15 +70,70 @@ class PrescriptionMedicine(PrescriptionEntity):
     MONTH = 3
     YEAR = 4
     DURATION_TYPE_CHOICES = [(DAY, "Day"), (WEEK, "Week"), (MONTH, "Month"), (YEAR, "Year")]
+    TABLET = 1
+    SYRUP = 2
+    CAPSULE = 3
+    CREAM = 4
+    DROPS = 5
+    FOAM = 6
+    GEL = 7
+    INHALER = 8
+    INJECTION = 9
+    LOTION = 10
+    OINTMENT = 11
+    POWDER = 12
+    SPRAY = 13
+    SYRINGE = 14
+    SUSPENSION = 15
+    SOLUTION = 16
+    DOSAGE_TYPE_CHOICES = [(TABLET, "Tablet"), (SYRUP, "Syrup"), (CAPSULE, "CAPSULE"), (CREAM, "Cream"),
+                           (DROPS, "Drops"), (FOAM, "Foam"), (GEL, "Gel"), (INHALER, "Inhaler"),
+                           (INJECTION, "Injection"), (LOTION, "Lotion"), (OINTMENT, "Ointment"), (POWDER, "Powder"),
+                           (SPRAY, "Spray"), (SYRINGE, "Syringe"), (SUSPENSION, "Suspension"), (SOLUTION, "Solution")]
     quantity = models.PositiveIntegerField(null=True, blank=True)
-    time = models.CharField(max_length=64, null=True)
+    dosage_type = models.PositiveIntegerField(choices=DOSAGE_TYPE_CHOICES, null=True, blank=True)
+    # time = models.CharField(max_length=64, null=True)
+    time = ArrayField(models.CharField(max_length=64), blank=True, null=True)
     duration_type = models.PositiveSmallIntegerField(choices=DURATION_TYPE_CHOICES, null=True, blank=True)
     duration = models.PositiveIntegerField(null=True, blank=True)
-    instruction = models.CharField(max_length=256, null=True, blank=True)
+    # instruction = models.CharField(max_length=256, null=True, blank=True)
+    is_before_meal = models.NullBooleanField(default=None, blank=True)
     additional_notes = models.CharField(max_length=256, null=True, blank=True)
 
     def __str__(self):
         return self.name
+
+    @classmethod
+    def create_or_update(cls, **kwargs):
+        name = kwargs.pop("name")
+        hospital_id = kwargs.pop("hospital_id")
+        source_type = kwargs.pop("source_type")
+        time = kwargs.get("time")
+        obj = super(PrescriptionMedicine, cls).create_or_update(name=name,
+                                                                hospital_id=hospital_id,
+                                                                source_type=source_type)
+        # obj = cls.objects.filter(name__iexact=name).first()
+        if obj and kwargs:
+            obj.quantity = kwargs.get("quantity")
+            obj.type = kwargs.get("type")
+            obj.duration_type = kwargs.get('duration_type')
+            obj.duration = kwargs.get("duration")
+            obj.is_before_meal = kwargs.get("is_before_meal")
+            obj.additional_notes = kwargs.get("additional_notes")
+            obj.dosage_type = kwargs.get('dosage_type')
+
+            obj_times = obj.time if obj.time else []
+            if time:
+                if set(time) < set(obj_times):
+                    obj.save()
+                    return obj
+                else:
+                    time_to_be_appended = set(time) - (set(time) & set(obj_times))
+                    if not obj.time:
+                        obj.time = list()
+                    obj.time.extend(time_to_be_appended)
+            obj.save()
+        return obj
 
     class Meta:
         db_table = 'eprescription_medicine'

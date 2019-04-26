@@ -1522,7 +1522,7 @@ class DoctorEntitySerializer(serializers.ModelSerializer):
 class AdminUpdateBodySerializer(AdminCreateBodySerializer):
     remove_list = serializers.ListField()
     old_phone_number = serializers.IntegerField(min_value=5000000000, max_value=9999999999, required=False)
-
+    license = serializers.CharField(max_length=200, required=False)
 
     def validate(self, attrs):
         if attrs['type'] == User.STAFF and 'name' not in attrs:
