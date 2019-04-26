@@ -57,7 +57,7 @@ class DoctorOnboard(View):
         temp_doc_dict = defaultdict(list)
         temp_docs = DoctorDocument.objects.filter(doctor=existing.doctor)
         for temp_doc in temp_docs:
-            temp_doc_dict[temp_doc.document_type].append()
+            temp_doc_dict[temp_doc.document_type].append(temp_doc)
 
         doc_dict = OrderedDict()
         for id, value in DoctorDocument.CHOICES:
