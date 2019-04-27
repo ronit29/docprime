@@ -1373,8 +1373,8 @@ class CommonSpecializationsSerializer(serializers.ModelSerializer):
 
     def get_url(self, obj):
         url = None
-        if self.context and self.context.get('spec_urls'):
-            url = self.context.get('spec_urls')[obj.specialization_id]
+        if self.context and self.context.get('spec_urls', {}):
+            url = self.context.get('spec_urls').get(obj.specialization_id, None)
         return url
 
     class Meta:

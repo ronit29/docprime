@@ -804,7 +804,7 @@ class Command(BaseCommand):
                 Q(codename='add_' + ct.model) |
                 Q(codename='change_' + ct.model))
 
-        group.permissions.add(*permissions)
+            group.permissions.add(*permissions)
 
         content_types = ContentType.objects.get_for_models(AssociatedMerchant)
 
@@ -815,7 +815,7 @@ class Command(BaseCommand):
                 Q(codename='change_' + ct.model) |
                 Q(codename='delete_' + ct.model))
 
-        group.permissions.add(*permissions)
+            group.permissions.add(*permissions)
 
         content_types = ContentType.objects.get_for_models(MerchantPayout, UserInsurance)
 
@@ -824,7 +824,7 @@ class Command(BaseCommand):
                 Q(content_type=ct),
                 Q(codename='change_' + ct.model))
 
-        group.permissions.add(*permissions)
+            group.permissions.add(*permissions)
 
 
     def create_elastic_group(self):
