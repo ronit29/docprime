@@ -3091,6 +3091,8 @@ class SearchScore(auth_model.TimeStampedModel):
     popularity_score = models.PositiveIntegerField(default=None, null=True)
     years_of_experience_score = models.PositiveIntegerField(default=None, null=True)
     doctors_in_clinic_score = models.PositiveIntegerField(default=None, null=True)
+    avg_ratings_score = models.PositiveIntegerField(default=None, null=True)
+    ratings_count_score = models.PositiveIntegerField(default=None, null=True)
     final_score = models.FloatField(default=None, null=True)
 
     class Meta:
