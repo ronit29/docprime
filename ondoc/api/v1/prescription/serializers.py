@@ -52,7 +52,7 @@ class PrescriptionMedicineBodySerializer(serializers.Serializer):
     def validate(self, attrs):
         if attrs.get('duration_type'):
             attrs['durationstring'] = dict(prescription_models.PrescriptionMedicine.DURATION_TYPE_CHOICES)[attrs['duration_type']]
-        if attrs.get("quantity") and not attrs.get("type"):
+        if attrs.get("quantity") and not attrs.get("dosage_type"):
             raise serializers.ValidationError("dosage type is also required with quantity")
         return attrs
 
