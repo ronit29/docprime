@@ -9,6 +9,7 @@ from ondoc.api.v1.utils import IsConsumer, IsNotAgent, IsDoctor
 from . import serializers
 from ondoc.authentication.models import User
 from ondoc.prescription import models as prescription_models
+from ondoc.diagnostic import models as diagnostic_models
 from ondoc.api.v1 import utils
 from django.utils import timezone
 import logging, random
@@ -94,6 +95,18 @@ class PrescriptionComponentsViewSet(viewsets.GenericViewSet):
             valid_data.get('type')]
         for obj in objects.all():
             resp.append(model_serializer(obj).data)
+        lab_test_queryset = diagnostic_models.LabTest.objects.all()
+        for obj in lab_test_queryset:
+            resp.append({
+                "id": obj.id,
+                "created_at": obj.created_at,
+                "updated_at": obj.updated_at,
+                "name": obj.name,
+                "moderated": True,
+                "hospitals": [],
+                "source_type": None,
+                "instruction": None,
+            })
         return Response(resp)
 
 

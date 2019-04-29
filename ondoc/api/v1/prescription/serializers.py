@@ -46,7 +46,7 @@ class PrescriptionMedicineBodySerializer(serializers.Serializer):
     duration_type = serializers.ChoiceField(choices=prescription_models.PrescriptionMedicine.DURATION_TYPE_CHOICES, required=False, allow_null=True)
     duration = serializers.IntegerField(required=False, allow_null=True)
     # instruction = serializers.CharField(max_length=256, required=False)
-    is_before_meal = serializers.NullBooleanField(required=False, allow_null=True)
+    is_before_meal = serializers.NullBooleanField(required=False)
     additional_notes = serializers.CharField(max_length=256, required=False, allow_null=True)
 
     def validate(self, attrs):
