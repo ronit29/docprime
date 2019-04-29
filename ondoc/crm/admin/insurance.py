@@ -675,6 +675,15 @@ class UserInsuranceForm(forms.ModelForm):
         if int(status) == UserInsurance.ONHOLD:
             if not onhold_reason:
                 raise forms.ValidationError("In Case of ONHOLD status, Onhold reason is mandatory")
+        elif int(status) == UserInsurance.CANCELLED:
+            insured_opd_completed_app_count = OpdAppointment.get_insured_completed_appointment(self)
+            insured_lab_completed_app_count = LabAppointment.get_insured_completed_appointment((self))
+            if insured_lab_completed_app_count > 0:
+                raise forms.ValidationError('Lab appointment with insurance have been completed, '
+                                            'Cancellation could not proceed')
+            if insured_opd_completed_app_count > 0:
+                raise forms.ValidationError('OPD appointment with insurance have been completed, '
+                                            'Cancellation could not proceed')
 
     class Meta:
         fields = '__all__'
