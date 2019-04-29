@@ -3731,7 +3731,7 @@ class HospitalViewSet(viewsets.GenericViewSet):
         hosp_serializer = serializers.HospitalDetailIpdProcedureSerializer(hospital_obj, context={'request': request,
                                                                                     'validated_data': validated_data,
                                                                                     "entity": entity}).data
-        response['hospital'] = hosp_serializer
+        response = hosp_serializer
         if entity:
             response['url'] = entity.url
             if entity.breadcrumb:
@@ -3860,14 +3860,6 @@ class IpdProcedureViewSet(viewsets.GenericViewSet):
             {'about': ipd_procedure_serializer.data, 'hospitals': hospital_result.data, 'doctors': doctor_result_data,
              'seo': {'url': url, 'title': title, 'description': description, 'location': city},
              'search_content': top_content, 'bottom_content': bottom_content, 'canonical_url': canonical_url})
-
-
-    #                          'specializations': specializations, 'conditions': conditions, "seo": seo,
-    #                          "breadcrumb": breadcrumb, 'search_content': top_content,
-    #                          'procedures': procedures, 'procedure_categories': procedure_categories,
-    #                          'ratings':ratings, 'reviews': reviews, 'ratings_title': ratings_title,
-    #                          'bottom_content': bottom_content, 'canonical_url': canonical_url,
-    #                          'ipd_procedures': ipd_procedures})
 
     def create_lead(self, request):
         serializer = serializers.IpdProcedureLeadSerializer(data=request.data)
