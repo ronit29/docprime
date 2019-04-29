@@ -127,6 +127,25 @@ class FeatureInline(AutoComplete, TabularInline):
     verbose_name = "IPD Procedure Feature"
     verbose_name_plural = "IPD Procedure Features"
 
+# class IpdProcedureSynonymInline(TabularInline):
+#     model = IpdProcedureSynonym
+#     extra = 0
+#     max_num = 1
+#     can_delete = True
+#     verbose_name = "IPD Procedure Synonyms"
+#     verbose_name_plural = "IPD Procedure Synonyms"
+
+
+
+class IpdProcedureSynonymMappingInline(TabularInline):
+    model = IpdProcedureSynonymMapping
+    extra = 0
+    max_num = 1
+    can_delete = True
+    verbose_name = "IPD Procedure Synonym Mappings"
+    verbose_name_plural = "IPD Procedure Synonym Mappings"
+
+
 
 class IpdCategoryInline(AutoComplete, TabularInline):
     model = IpdProcedureCategoryMapping
@@ -154,7 +173,7 @@ class IpdProcedureAdmin(VersionAdmin):
     model = IpdProcedure
     search_fields = ['search_key']
     exclude = ['search_key']
-    inlines = [IpdCategoryInline, FeatureInline, DetailInline]
+    inlines = [IpdCategoryInline, FeatureInline, DetailInline, IpdProcedureSynonymMappingInline]
 
     def delete_view(self, request, object_id, extra_context=None):
         obj = self.model.objects.filter(id=object_id).first()
@@ -255,12 +274,12 @@ class IpdProcedureSynonymMappingAdmin(admin.ModelAdmin):
     list_display = ['get_ipd_procedure_name', 'get_ipd_procedure_synonym_name']
 
     def get_ipd_procedure_synonym_name(self, obj):
-        return obj.ipd_procedure_synonym_id.name
-    get_ipd_procedure_synonym_name.admin_order_field = 'ipd_procedure_synonym_id'  #Allows column order sorting
+        return obj.ipd_procedure_synonym.name
+    get_ipd_procedure_synonym_name.admin_order_field = 'ipd_procedure_synonym'  #Allows column order sorting
     get_ipd_procedure_synonym_name.short_description = 'Ipd Procedure Synonym'
 
 
     def get_ipd_procedure_name(self, obj):
-        return obj.ipd_procedure_id.name
-    get_ipd_procedure_name.admin_order_field  = 'ipd_procedure_id'  #Allows column order sorting
+        return obj.ipd_procedure.name
+    get_ipd_procedure_name.admin_order_field  = 'ipd_procedure'  #Allows column order sorting
     get_ipd_procedure_name.short_description = 'Ipd Procedure'
