@@ -1535,32 +1535,32 @@ class MerchantPayout(TimeStampedModel):
                 return all_txn[0].order_no
 
     def update_status_from_pg(self):
+        with transaction.atomic():
+            if self.pg_status=='SETTLEMENT_COMPLETED' or self.utr_no or self.type ==self.MANUAL:
+                return
 
-        if self.pg_status=='SETTLEMENT_COMPLETED' or self.utr_no or self.type ==self.MANUAL:
-            return
+            url = settings.SETTLEMENT_DETAILS_API
+            order_no = self.get_pg_order_no()
 
-        url = settings.SETTLEMENT_DETAILS_API
-        order_no = self.get_pg_order_no()
+            if order_no:
+                req_data = {"orderNo":order_no}
+                req_data["hash"] = self.create_checksum(req_data)
 
-        if order_no:
-            req_data = {"orderNo":order_no}
-            req_data["hash"] = self.create_checksum(req_data)
+                headers = {"auth": settings.SETTLEMENT_AUTH,
+                           "Content-Type": "application/json"}
 
-            headers = {"auth": settings.SETTLEMENT_AUTH,
-                       "Content-Type": "application/json"}
-
-            response = requests.post(url, data=json.dumps(req_data), headers=headers)
-            if response.status_code == status.HTTP_200_OK:
-                resp_data = response.json()
-                self.status_api_response = resp_data
-                if resp_data.get('ok') == 1 and len(resp_data.get('settleDetails'))>0:
-                    details = resp_data.get('settleDetails')
-                    for d in details:
-                        if d.get('refNo') == str(self.payout_ref_id):
-                            self.utr_no = d.get('utrNo','')
-                            self.pg_status = d.get('txStatus','')
-                            break
-                self.save()
+                response = requests.post(url, data=json.dumps(req_data), headers=headers)
+                if response.status_code == status.HTTP_200_OK:
+                    resp_data = response.json()
+                    self.status_api_response = resp_data
+                    if resp_data.get('ok') == 1 and len(resp_data.get('settleDetails'))>0:
+                        details = resp_data.get('settleDetails')
+                        for d in details:
+                            if d.get('refNo') == str(self.payout_ref_id):
+                                self.utr_no = d.get('utrNo','')
+                                self.pg_status = d.get('txStatus','')
+                                break
+                    self.save()
 
     def create_checksum(self, data):
 
