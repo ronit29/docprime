@@ -32,9 +32,16 @@ class UploadImageAdmin(admin.ModelAdmin):
     fields = ('name', 'image', 'url')
     readonly_fields = ('url',)
 
+    def get_queryset(self, request):
+        qs = super().get_queryset(request)
+        self.request = request
+        return qs
+
     def url(self, instance):
         if instance and instance.id:
-            url = instance.image.path if instance.image else None
+            url = self.request.build_absolute_uri(instance.image.url) if instance.image else None
+
+            #url = instance.image.path if instance.image else None
             if url:
                 return mark_safe('''<a href="%s" target='_blank'>%s</a>''' % (url, url))
         return None
