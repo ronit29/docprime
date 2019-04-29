@@ -2,6 +2,7 @@ from rest_framework import serializers
 from django.db.models import Q
 from ondoc.prescription import models as prescription_models
 from ondoc.doctor import models as doc_models
+from ondoc.diagnostic import models as diag_models
 
 
 class PrescriptionModelComponents():
@@ -130,6 +131,12 @@ class PrescriptionComponentBodySerializer(serializers.Serializer):
     is_before_meal = serializers.NullBooleanField(required=False)
     additional_notes = serializers.CharField(max_length=256, required=False)
 
+    def validate(self, attrs):
+        model = dict(serializers.PrescriptionModelComponents.COMPONENT_CHOICES)[attrs.get('type')]
+        if model.objects.filter(name__iexact=attrs.get('name')).exists():
+            raise serializers.ValidationError("component with this name already exists")
+        if attrs.get("type") == PrescriptionModelComponents.TESTS and diag_models.LabTest.objects.filter(name__iexact=attrs.get("name")).exists():
+            raise serializers.ValidationError("Lab Test already exists")
 
 
 class PrescriptionComponentSyncSerializer(serializers.Serializer):
