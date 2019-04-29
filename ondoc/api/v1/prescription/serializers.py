@@ -4,7 +4,7 @@ from ondoc.prescription import models as prescription_models
 from ondoc.doctor import models as doc_models
 
 
-class PrescriptionComponents():
+class PrescriptionModelComponents():
     SYMPTOMS_COMPLAINTS=1
     MEDICINES = 2
     SPECIAL_INSTRUCTIONS = 3
@@ -80,6 +80,13 @@ class PrescriptionPatientSerializer(serializers.Serializer):
     phone_number = serializers.IntegerField(required=False, allow_null=True)
 
 
+class PrescriptionSymptomsComplaintsModelSerializer(serializers.ModelSerializer):
+
+    class Meta:
+        model = prescription_models.PrescriptionSymptomsComplaints
+        fields = "__all__"
+
+
 class PrescriptionMedicineModelSerializer(serializers.ModelSerializer):
 
     class Meta:
@@ -87,8 +94,29 @@ class PrescriptionMedicineModelSerializer(serializers.ModelSerializer):
         fields = "__all__"
 
 
+class PrescriptionSpecialInstructionsModelSerializer(serializers.ModelSerializer):
+
+    class Meta:
+        model = prescription_models.PrescriptionSpecialInstructions
+        fields = "__all__"
+
+
+class PrescriptionTestsModelSerializer(serializers.ModelSerializer):
+
+    class Meta:
+        model = prescription_models.PrescriptionTests
+        fields = "__all__"
+
+
+class PrescriptionDiagnosesModelSerializer(serializers.ModelSerializer):
+
+    class Meta:
+        model = prescription_models.PrescriptionDiagnoses
+        fields = "__all__"
+
+
 class PrescriptionComponentBodySerializer(serializers.Serializer):
-    type = serializers.ChoiceField(choices=PrescriptionComponents.COMPONENT_CHOICES)
+    type = serializers.ChoiceField(choices=PrescriptionModelComponents.COMPONENT_CHOICES)
     name = serializers.CharField(max_length=64)
     hospital_id = serializers.PrimaryKeyRelatedField(queryset=doc_models.Hospital.objects.all())
     source_type = serializers.ChoiceField(choices=prescription_models.PrescriptionEntity.SOURCE_TYPE_CHOICES)
@@ -105,7 +133,7 @@ class PrescriptionComponentBodySerializer(serializers.Serializer):
 
 
 class PrescriptionComponentSyncSerializer(serializers.Serializer):
-    type = serializers.ChoiceField(choices=PrescriptionComponents.COMPONENT_CHOICES)
+    type = serializers.ChoiceField(choices=PrescriptionModelComponents.COMPONENT_CHOICES)
     hospital_id = serializers.PrimaryKeyRelatedField(queryset=doc_models.Hospital.objects.all(), required=False)
 
 
@@ -147,3 +175,14 @@ class PrescriptionResponseSerializer(serializers.ModelSerializer):
         fields = ('medicines', 'special_instructions', 'symptoms_complaints', 'appointment_id', 'appointment_type',
                   'pdf_file', 'diagnoses', 'lab_tests', 'followup_instructions_date', 'followup_instructions_reason',
                   'updated_at')
+
+
+class PrescriptionModelSerializerComponents():
+    SYMPTOMS_COMPLAINTS=1
+    MEDICINES = 2
+    SPECIAL_INSTRUCTIONS = 3
+    TESTS = 4
+    DIAGNOSES = 5
+    COMPONENT_CHOICES = [(SYMPTOMS_COMPLAINTS, PrescriptionSymptomsComplaintsModelSerializer), (MEDICINES, PrescriptionMedicineModelSerializer),
+                         (SPECIAL_INSTRUCTIONS, PrescriptionSpecialInstructionsModelSerializer), (TESTS, PrescriptionTestsModelSerializer),
+                         (DIAGNOSES, PrescriptionDiagnosesModelSerializer)]

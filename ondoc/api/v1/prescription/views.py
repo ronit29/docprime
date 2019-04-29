@@ -66,7 +66,7 @@ class PrescriptionComponentsViewSet(viewsets.GenericViewSet):
         serializer = serializers.PrescriptionComponentBodySerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         valid_data = serializer.validated_data
-        model = dict(serializers.PrescriptionComponents.COMPONENT_CHOICES)[valid_data.get('type')]
+        model = dict(serializers.PrescriptionModelComponents.COMPONENT_CHOICES)[valid_data.get('type')]
         object = model.create_or_update(name=valid_data.get('name'), hospital_id=valid_data.get('hospital_id').id,
                                         source_type=prescription_models.PrescriptionEntity.PARTNERS_APP,
                                         quantity=valid_data.get('quantity'),
@@ -76,33 +76,24 @@ class PrescriptionComponentsViewSet(viewsets.GenericViewSet):
                                         duration=valid_data.get('duration'),
                                         is_before_meal=valid_data.get('is_before_meal'),
                                         additional_notes=valid_data.get('additional_notes'))
-        if valid_data.get("type") == serializers.PrescriptionComponents.MEDICINES:
-            model_serializer = serializers.PrescriptionMedicineBodySerializer(object)
-        return Response({'status': 1,
-                         'id': object.id,
-                         'name': object.name,
-                         'hospital': object.hospitals,
-                         'source_type': object.source_type,
-                         'data': model_serializer.data})
+        model_serializer = dict(serializers.PrescriptionModelSerializerComponents.COMPONENT_CHOICES)[valid_data.get('type')](object)
+        return Response({'status': 1, 'data': model_serializer.data})
 
     # TODO - ADD SOURCE TYPE
     def sync_component(self, request):
         serializer = serializers.PrescriptionComponentSyncSerializer(data=request.query_params)
         serializer.is_valid(raise_exception=True)
         valid_data = serializer.validated_data
-        model = dict(serializers.PrescriptionComponents.COMPONENT_CHOICES)[valid_data.get('type')]
+        model = dict(serializers.PrescriptionModelComponents.COMPONENT_CHOICES)[valid_data.get('type')]
         if valid_data.get('hospital_id'):
             objects = model.objects.filter(Q(hospitals__contains=[valid_data['hospital_id'].id]) | Q(moderated=True))
         else:
             objects = model.objects.filter(moderated=True)
         resp = []
+        model_serializer = dict(serializers.PrescriptionModelSerializerComponents.COMPONENT_CHOICES)[
+            valid_data.get('type')]
         for obj in objects.all():
-            resp_dict = {'id': obj.id,
-                         'name': obj.name,
-                         'hospital': obj.hospitals,
-                         'moderated': obj.moderated,
-                         'source_type': obj.source_type}
-            resp.append(resp_dict)
+            resp.append(model_serializer(obj).data)
         return Response(resp)
 
 
