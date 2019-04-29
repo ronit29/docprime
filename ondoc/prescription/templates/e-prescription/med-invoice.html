@@ -130,19 +130,19 @@
 							</tr>
 						</thead>
 						<tbody>
-						    {% for meds in medicines %}
+						    {% for medicine in medicines %}
 								<tr valign="top">
 									<td style="text-align: center; font-size: 14px;padding-top: 10px; padding-bottom: 10px;">{{ forloop.counter }}</td>
 									<td style="text-align: left; font-size: 14px;padding-top: 10px; padding-bottom: 10px; ">
-										<p style="margin: 0px;color: #000000; font-size: 14px;">{{ meds.name }}</p>
-										<p style="margin: 0px;color: #000000; font-size: 12px;">{{ meds.additional_notes }}</p>
+										<p style="margin: 0px;color: #000000; font-size: 14px;">{{ medicine.name }}</p>
+										<p style="margin: 0px;color: #000000; font-size: 12px;">{{ medicine.additional_notes }}</p>
 									</td>
-									<td style="text-align: center; font-size: 14px;padding-top: 10px; padding-bottom: 10px; ">{{ meds.quantity }}</td>
+									<td style="text-align: center; font-size: 14px;padding-top: 10px; padding-bottom: 10px; ">{{ medicine.quantity }} {{ medicine.dosage_type }}{% if medicine.quantity > 1 %}(s){% endif %}</td>
 									<td style="text-align: center; font-size: 14px;padding-top: 10px; padding-bottom: 10px; ">
-										<p style="margin: 0px;color: #000000; font-size: 14px;    padding-bottom: 2px;border-bottom: 1px solid #b5b5b5;">{{ meds.time }}</p>
-										<p style="margin: 0px;color: #000000; font-size: 12px; padding-top: 2px;">{{ meds.instruction }}</p>
+										<p style="margin: 0px;color: #000000; font-size: 14px;    padding-bottom: 2px;border-bottom: 1px solid #b5b5b5;">{{ medicine.time }}</p>
+										<p style="margin: 0px;color: #000000; font-size: 12px; padding-top: 2px;">{{ medicine.instruction }}</p>
 									</td>
-									<td style="text-align: center; font-size: 14px;padding-top: 10px; padding-bottom: 10px; ">{{ meds.duration }} {{ meds.durationstring }}</td>
+									<td style="text-align: center; font-size: 14px;padding-top: 10px; padding-bottom: 10px; ">{{ medicine.duration }} {{ medicine.durationstring }}</td>
 								</tr>
 							{% endfor %}
 

@@ -74,7 +74,7 @@ class PrescriptionMedicine(PrescriptionEntity):
     SYRUP = 2
     CAPSULE = 3
     CREAM = 4
-    DROPS = 5
+    DROP = 5
     FOAM = 6
     GEL = 7
     INHALER = 8
@@ -87,7 +87,7 @@ class PrescriptionMedicine(PrescriptionEntity):
     SUSPENSION = 15
     SOLUTION = 16
     DOSAGE_TYPE_CHOICES = [(TABLET, "Tablet"), (SYRUP, "Syrup"), (CAPSULE, "CAPSULE"), (CREAM, "Cream"),
-                           (DROPS, "Drops"), (FOAM, "Foam"), (GEL, "Gel"), (INHALER, "Inhaler"),
+                           (DROP, "Drop"), (FOAM, "Foam"), (GEL, "Gel"), (INHALER, "Inhaler"),
                            (INJECTION, "Injection"), (LOTION, "Lotion"), (OINTMENT, "Ointment"), (POWDER, "Powder"),
                            (SPRAY, "Spray"), (SYRINGE, "Syringe"), (SUSPENSION, "Suspension"), (SOLUTION, "Solution")]
     quantity = models.PositiveIntegerField(null=True, blank=True)
