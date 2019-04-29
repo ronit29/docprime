@@ -14,7 +14,7 @@ logger = logging.getLogger(__name__)
 from datetime import datetime, date, timedelta
 from ondoc.diagnostic.models import LabReport, LabReportFile, LabAppointment
 from django.contrib.contenttypes.models import ContentType
-from ondoc.api.v1.utils import resolve_address, aware_time_zone
+from ondoc.api.v1.utils import thyrocare_resolve_address, aware_time_zone
 from django.utils import timezone
 import time
 
@@ -178,11 +178,16 @@ class Thyrocare(BaseIntegrator):
 
         profile = lab_appointment.profile
         if hasattr(lab_appointment, 'address') and lab_appointment.address:
-            patient_address = resolve_address(lab_appointment.address)
+            patient_address = thyrocare_resolve_address(lab_appointment.address)
             pincode = lab_appointment.address["pincode"]
         else:
             patient_address = ""
             pincode = ""
+
+        if profile and profile.email:
+            email = profile.email
+        else:
+            email = "provider@docprime.com"
 
         order_id = "DP{}".format(lab_appointment.id)
         if profile and profile.gender:
@@ -197,7 +202,7 @@ class Thyrocare(BaseIntegrator):
             "address": patient_address,
             "pincode": pincode,
             "mobile": profile.phone_number if profile else "",
-            "email": profile.email if profile else "",
+            "email": email,
             "service_type": "H",
             "order_by": profile.name if profile else "",
             "hc": "0",
@@ -216,7 +221,7 @@ class Thyrocare(BaseIntegrator):
             for test in tests:
                 integrator_test = IntegratorTestMapping.objects.filter(test_id=test.id, integrator_class_name=Thyrocare.__name__, is_active=True).first()
                 if not integrator_test:
-                    logger.info("[ERROR] No tests data found in integrator.")
+                    raise Exception("[ERROR] No tests data found in integrator.")
 
                 if integrator_test.test_type == "TEST":
                     if integrator_test.name_params_required:
@@ -332,10 +337,12 @@ class Thyrocare(BaseIntegrator):
         from ondoc.integrations.models import IntegratorHistory
 
         url = "%s/ORDER.svc/cancelledorder" % settings.THYROCARE_BASE_URL
-        if appointment.cancellation_comments:
+        if appointment.cancellation_comments and appointment.cancellation_reason:
             reason = appointment.cancellation_reason.name + " " + appointment.cancellation_comments
-        else:
+        elif appointment.cancellation_reason:
             reason = appointment.cancellation_reason.name
+        else:
+            reason = ""
 
         payload = {
             "UserId": 2147,
@@ -398,13 +405,15 @@ class Thyrocare(BaseIntegrator):
                             status = IntegratorHistory.PUSHED_AND_NOT_ACCEPTED
                         elif response['BEN_MASTER'][0]['STATUS'].upper() == "ACCEPTED":
                             if not dp_appointment.status in [5, 6, 7]:
-                                dp_appointment.status = 5
-                                dp_appointment.save()
+                                # dp_appointment.status = 5
+                                # dp_appointment.save()
+                                dp_appointment.action_accepted()
                                 status = IntegratorHistory.PUSHED_AND_ACCEPTED
                         elif response['BEN_MASTER'][0]['STATUS'].upper() == 'CANCELLED':
                             if not dp_appointment.status == 6:
-                                dp_appointment.status = 6
-                                dp_appointment.save()
+                                # dp_appointment.status = 6
+                                # dp_appointment.save()
+                                dp_appointment.action_cancelled(1)
                                 status = IntegratorHistory.CANCELLED
 
                         IntegratorHistory.create_history(dp_appointment, url, response, url, 'order_summary_cron', 'Thyrocare', status_code, 0, status, 'integrator_api')

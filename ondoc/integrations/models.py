@@ -5,7 +5,12 @@ from django.contrib.contenttypes.models import ContentType
 from ondoc.authentication.models import TimeStampedModel
 from ondoc.common.helper import Choices
 from django.contrib.postgres.fields import JSONField
+from django.db import transaction
+from ondoc.matrix.tasks import push_appointment_to_matrix
+from ondoc.diagnostic.models import TestParameter
+import logging
 
+logger = logging.getLogger(__name__)
 # Create your models here.
 
 
@@ -118,6 +123,21 @@ class IntegratorResponse(TimeStampedModel):
 
         print("Order Summary for Thyrocare Complete")
 
+    def save(self, *args, **kwargs):
+        super().save(*args, **kwargs)
+        push_to_matrix = True
+        transaction.on_commit(lambda: self.app_commit_tasks(push_to_matrix))
+
+    def app_commit_tasks(self, push_to_matrix):
+        if push_to_matrix:
+            # Push the appointment data to the matrix
+            try:
+                push_appointment_to_matrix.apply_async(
+                    ({'type': 'LAB_APPOINTMENT', 'appointment_id': self.object_id, 'product_id': 5,
+                      'sub_product_id': 2},), countdown=5)
+            except Exception as e:
+                logger.error(str(e))
+
 
 class IntegratorReport(TimeStampedModel):
     integrator_response = models.ForeignKey(IntegratorResponse, on_delete=models.CASCADE, null=False)
@@ -213,6 +233,7 @@ class IntegratorTestParameterMapping(TimeStampedModel):
     integrator_test_name = models.CharField(max_length=60, null=True, blank=True)
     test_parameter_chat = models.ForeignKey('diagnostic.TestParameterChat', on_delete=models.CASCADE, null=True)
     response_data = JSONField(blank=True, null=True)
+    test_parameter = models.ForeignKey(TestParameter, on_delete=models.CASCADE, null=True)
 
     class Meta:
         db_table = 'integrator_test_parameter_mapping'

@@ -4,6 +4,8 @@ from ondoc.authentication.models import (OtpVerifications, User, UserProfile, No
                                          UserPermission, Address, GenericAdmin, GenericLabAdmin)
 from ondoc.doctor.models import DoctorMobile, ProviderSignupLead
 from ondoc.common.models import AppointmentHistory
+from ondoc.doctor.models import DoctorMobile
+from ondoc.insurance.models import InsuredMembers, UserInsurance
 from ondoc.diagnostic.models import AvailableLabTest
 from ondoc.account.models import ConsumerAccount, Order, ConsumerTransaction
 import datetime, calendar
@@ -32,7 +34,7 @@ class OTPVerificationSerializer(serializers.Serializer):
     otp = serializers.IntegerField(min_value=100000, max_value=999999)
 
     def validate(self, attrs):
-        if attrs.get('phone_number') in [9870395617]:
+        if attrs.get('phone_number') in []:
             return attrs
         # if not User.objects.filter(phone_number=attrs['phone_number'], user_type=User.CONSUMER).exists():
         #     raise serializers.ValidationError('User does not exist')
@@ -163,14 +165,29 @@ class UserProfileSerializer(serializers.ModelSerializer):
     gender = serializers.ChoiceField(choices=GENDER_CHOICES)
     email = serializers.EmailField(required=False, allow_null=True, allow_blank=True)
     profile_image = serializers.SerializerMethodField()
+    is_insured = serializers.SerializerMethodField()
     dob = serializers.DateField(allow_null=True, required=False)
     whatsapp_optin = serializers.NullBooleanField(required=False)
     whatsapp_is_declined = serializers.BooleanField(required=False)
+    is_default_user = serializers.BooleanField(required=False)
 
     class Meta:
         model = UserProfile
-        fields = ("id", "name", "email", "gender", "phone_number", "is_otp_verified", "is_default_user",
-                  "profile_image", "age", "user", "dob", "updated_at", "whatsapp_optin", "whatsapp_is_declined")
+        fields = ("id", "name", "email", "gender", "phone_number", "is_otp_verified", "is_default_user", "profile_image"
+                  , "age", "user", "dob", "is_insured", "updated_at", "whatsapp_optin", "whatsapp_is_declined")
+
+    def get_is_insured(self, obj):
+        if isinstance(obj, dict):
+            return False
+
+        insured_member_obj = InsuredMembers.objects.filter(profile=obj).first()
+        if not insured_member_obj:
+            return False
+        user_insurance_obj = UserInsurance.objects.filter(id=insured_member_obj.user_insurance_id).last()
+        if user_insurance_obj and user_insurance_obj.is_valid():
+            return True
+        else:
+            return False
 
     def get_age(self, obj):
         from datetime import date
@@ -221,8 +238,8 @@ class UserPermissionSerializer(serializers.ModelSerializer):
 class AddressSerializer(serializers.ModelSerializer):
     locality_location_lat = serializers.ReadOnlyField(source='locality_location.y')
     locality_location_long = serializers.ReadOnlyField(source='locality_location.x')
-    landmark_location_lat = serializers.ReadOnlyField(source='landmark_location.y')
-    landmark_location_long = serializers.ReadOnlyField(source='landmark_location.x')
+    landmark_location_lat = serializers.ReadOnlyField(source='landmark_location.y', required=False, allow_null=True, default=None)
+    landmark_location_long = serializers.ReadOnlyField(source='landmark_location.x', required=False, allow_null=True, default=None)
 
     class Meta:
         model = Address
@@ -485,6 +502,7 @@ class ContactUsSerializer(serializers.Serializer):
     mobile = serializers.IntegerField(min_value=1000000000, max_value=9999999999)
     email = serializers.EmailField()
     message = serializers.CharField(max_length=2000)
+    from_app = serializers.BooleanField(default=False)
 
     class Meta:
         model = ContactUs
@@ -503,6 +521,11 @@ class UserLeadSerializer(serializers.ModelSerializer):
         fields = ('name', 'phone_number', 'gender', 'message')
 
 
+class TokenFromUrlKeySerializer(serializers.Serializer):
+    auth_token = serializers.CharField(max_length=100, required=False)
+    key = serializers.CharField(max_length=30, required=False)
 
-
-
+    def validate(self, attrs):
+        if not (attrs.get('auth_token') or attrs.get('key')):
+            raise serializers.ValidationError('neither auth_token nor key found')
+        return attrs

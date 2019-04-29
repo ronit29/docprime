@@ -1,10 +1,11 @@
 
 from django.contrib.gis import admin
-from ondoc.common.models import PaymentOptions, UserConfig, Feature, Service, MatrixMappedState, MatrixMappedCity, GlobalNonBookable
+from ondoc.common.models import PaymentOptions, UserConfig, Feature, Service, MatrixMappedState, MatrixMappedCity, \
+    GlobalNonBookable, QRCode
 from ondoc.crm.admin.banner import BannerAdmin, SliderLocationAdmin
 from ondoc.crm.admin.procedure import ProcedureCategoryAdmin, ProcedureAdmin, IpdProcedureAdmin, FeatureAdmin, \
     ServiceAdmin, HealthInsuranceProviderAdmin, IpdProcedureCategoryAdmin, IpdProcedureDetailAdmin, \
-    IpdProcedureDetailTypeAdmin
+    IpdProcedureDetailTypeAdmin, IpdProcedureSynonymAdmin, IpdProcedureSynonymMappingAdmin
 from ondoc.crm.admin.subscription_plan import SubscriptionPlanAdmin, SubscriptionPlanFeatureAdmin, UserPlanMappingAdmin
 from ondoc.doctor.models import (Doctor, Language, MedicalService, Specialization, College, Qualification, Hospital,
                                  HospitalNetwork, DoctorOnboardingToken, OpdAppointment,
@@ -21,15 +22,16 @@ from ondoc.diagnostic.models import (Lab, LabNetwork, LabTest, LabTestType,LabSe
                                      TestParameterChat)
 from ondoc.coupon.models import Coupon, UserSpecificCoupon, RandomGeneratedCoupon
 from ondoc.lead.models import HospitalLead, DoctorLead, SearchLead
-from ondoc.account.models import ConsumerAccount, MerchantPayout
+from ondoc.account.models import ConsumerAccount, MerchantPayout, Order
 from ondoc.location.admin import EntityUrlsAdmin
 from ondoc.location.models import EntityUrls
 from ondoc.notification import models as notifcation_model
 from ondoc.procedure.models import Procedure, ProcedureCategory, CommonProcedureCategory, CommonProcedure, IpdProcedure, \
-    IpdProcedureCategory, CommonIpdProcedure, IpdProcedureDetail, IpdProcedureDetailType
+    IpdProcedureCategory, CommonIpdProcedure, IpdProcedureDetail, IpdProcedureDetailType, IpdProcedureSynonym, \
+    IpdProcedureSynonymMapping
 from ondoc.subscription_plan.models import Plan, PlanFeature, UserPlanMapping
 from .common import Cities, CitiesAdmin, MatrixCityMapping, MatrixCityAdmin, MerchantAdmin, MerchantPayoutAdmin, \
-    PaymentOptionsAdmin, MatrixMappedStateAdmin, MatrixMappedCityAdmin, GlobalNonBookableAdmin
+    PaymentOptionsAdmin, MatrixMappedStateAdmin, MatrixMappedCityAdmin, GlobalNonBookableAdmin, UserConfigAdmin
 from .lead import HospitalLeadAdmin, DoctorLeadAdmin, SearchLeadAdmin
 from .doctor import (DoctorAdmin, MedicalServiceAdmin, SpecializationAdmin, QualificationAdmin, LanguageAdmin,
                      CollegeAdmin, MedicalConditionAdmin, HealthTipAdmin, DoctorClinicAdmin,
@@ -53,7 +55,7 @@ from .coupon import CouponAdmin, UserSpecificCouponAdmin, RandomGeneratedCouponA
 from ondoc.reports import models as report_models
 from ondoc.authentication.models import GenericLabAdmin
 
-from ondoc.web.models import OnlineLead, Career
+from ondoc.web.models import OnlineLead, Career, ContactUs
 from django.contrib.auth import get_user_model
 
 User = get_user_model()
@@ -61,8 +63,16 @@ from ondoc.authentication.models import OtpVerifications, UserProfile, Merchant,
 
 from ondoc.geoip.models import AdwordLocationCriteria
 from .geoip import AdwordLocationCriteriaAdmin
-from ondoc.ratings_review.models import RatingsReview, ReviewCompliments
-from ondoc.crm.admin.ratings import RatingsReviewAdmin, ReviewComplimentsAdmin
+from ondoc.insurance.models import Insurer, InsurerAccount, InsurancePlans, InsuranceThreshold, UserInsurance, \
+    InsuredMembers, InsuranceTransaction, InsurancePlanContent, InsuranceDisease, StateGSTCode, InsuranceCity, \
+    InsuranceDistrict, InsuranceDeal, InsurerPolicyNumber, InsuranceLead
+from ondoc.crm.admin.insurance import InsurerAdmin, InsurancePlansAdmin, InsuranceThresholdAdmin, InsurerFloatAdmin, \
+    UserInsuranceAdmin, InsuredMembersAdmin, InsuranceDiseaseAdmin, StateGSTCodeAdmin, InsuranceCityAdmin, \
+    InsuranceDistrictAdmin, InsuranceDealAdmin, InsurerPolicyNumberAdmin, InsuranceLeadAdmin
+from ondoc.insurance import models as insurance_model
+from ondoc.ratings_review.models import RatingsReview, ReviewCompliments, AppRatings, AppCompliments
+from ondoc.crm.admin.ratings import RatingsReviewAdmin, ReviewComplimentsAdmin, AppRatingsAdmin, AppComplimentsAdmin
+from ondoc.crm.admin.common import ContactUsAdmin
 from ondoc.doctor.models import GoogleDetailing
 from .doctor import GoogleDetailingAdmin
 from .seo import SitemapManagerAdmin, SeoSpecializationAdmin, SeoLabNetworkAdmin, NewDynamicAdmin
@@ -152,10 +162,26 @@ admin.site.register(ConsumerAccount)
 admin.site.register(TestParameter, TestParameterAdmin)
 admin.site.register(CompetitorInfo, CompetitorInfoImportAdmin)
 admin.site.register(Procedure, ProcedureAdmin)
-admin.site.register(ProcedureCategory, ProcedureCategoryAdmin)
+admin.site.register(Insurer, InsurerAdmin)
+admin.site.register(InsuranceThreshold, InsuranceThresholdAdmin)
+admin.site.register(InsurancePlans, InsurancePlansAdmin)
+admin.site.register(InsurerAccount, InsurerFloatAdmin)
+admin.site.register(UserInsurance, UserInsuranceAdmin)
+admin.site.register(InsuredMembers, InsuredMembersAdmin)
+admin.site.register(InsuranceDisease, InsuranceDiseaseAdmin)
+admin.site.register(StateGSTCode, StateGSTCodeAdmin)
+admin.site.register(InsuranceCity, InsuranceCityAdmin)
+admin.site.register(InsuranceDistrict, InsuranceDistrictAdmin)
+admin.site.register(InsuranceDeal, InsuranceDealAdmin)
+admin.site.register(InsuranceLead, InsuranceLeadAdmin)
+# admin.site.register(InsuranceReport, InsuranceReportAdmin)
+# admin.site.register(InsurancePlanContent, InsurancePlanContentAdmin)
 
-
+admin.site.register(InsuranceTransaction)
+admin.site.register(InsurerPolicyNumber, InsurerPolicyNumberAdmin)
+admin.site.register(Order)
 admin.site.register(AdwordLocationCriteria, AdwordLocationCriteriaAdmin)
+admin.site.register(ProcedureCategory, ProcedureCategoryAdmin)
 admin.site.register(RatingsReview, RatingsReviewAdmin)
 admin.site.register(SitemapManger, SitemapManagerAdmin)
 admin.site.register(GoogleDetailing, GoogleDetailingAdmin)
@@ -178,13 +204,15 @@ admin.site.register(DoctorMobileOtp)
 admin.site.register(NewDynamic, NewDynamicAdmin)
 admin.site.register(EntityUrls, EntityUrlsAdmin)
 admin.site.register(PaymentOptions, PaymentOptionsAdmin)
-admin.site.register(UserConfig)
+admin.site.register(UserConfig, UserConfigAdmin)
 admin.site.register(UploadDoctorData, UploadDoctorDataAdmin)
 admin.site.register(SliderLocation, SliderLocationAdmin)
 admin.site.register(IntegratorMapping, IntegratorMappingAdmin)
 admin.site.register(IntegratorProfileMapping, IntegratorProfileMappingAdmin)
 admin.site.register(GlobalNonBookable, GlobalNonBookableAdmin)
 admin.site.register(IpdProcedure, IpdProcedureAdmin)
+admin.site.register(IpdProcedureSynonym, IpdProcedureSynonymAdmin)
+admin.site.register(IpdProcedureSynonymMapping, IpdProcedureSynonymMappingAdmin)
 admin.site.register(IpdProcedureDetailType, IpdProcedureDetailTypeAdmin)
 admin.site.register(IpdProcedureDetail, IpdProcedureDetailAdmin)
 admin.site.register(Feature, FeatureAdmin)
@@ -199,3 +227,6 @@ admin.site.register(Plan, SubscriptionPlanAdmin)
 admin.site.register(PlanFeature, SubscriptionPlanFeatureAdmin)
 admin.site.register(UserPlanMapping, UserPlanMappingAdmin)
 admin.site.register(TestParameterChat, TestParameterChatAdmin)
+admin.site.register(AppRatings, AppRatingsAdmin)
+admin.site.register(AppCompliments, AppComplimentsAdmin)
+admin.site.register(ContactUs, ContactUsAdmin)

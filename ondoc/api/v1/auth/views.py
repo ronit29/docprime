@@ -21,6 +21,7 @@ from django.db.models import F, Sum, Max, Q, Prefetch, Case, When, Count
 from django.forms.models import model_to_dict
 
 from ondoc.common.models import UserConfig, PaymentOptions, AppointmentHistory
+from ondoc.common.utils import get_all_upcoming_appointments
 from ondoc.coupon.models import UserSpecificCoupon, Coupon
 from ondoc.lead.models import UserLead
 from ondoc.sms.api import send_otp
@@ -40,11 +41,13 @@ from ondoc.doctor.models import OpdAppointment
 from ondoc.api.v1.doctor.serializers import (OpdAppointmentSerializer, AppointmentFilterUserSerializer,
                                              UpdateStatusSerializer, CreateAppointmentSerializer,
                                              AppointmentRetrieveSerializer, OpdAppTransactionModelSerializer,
-                                             OpdAppModelSerializer,OpdAppointmentUpcoming)
+                                             OpdAppModelSerializer, OpdAppointmentUpcoming,
+                                             NewAppointmentRetrieveSerializer)
 from ondoc.api.v1.diagnostic.serializers import (LabAppointmentModelSerializer,
                                                  LabAppointmentRetrieveSerializer, LabAppointmentCreateSerializer,
                                                  LabAppTransactionModelSerializer, LabAppRescheduleModelSerializer,
                                                  LabAppointmentUpcoming)
+from ondoc.api.v1.insurance.serializers import (InsuranceTransactionSerializer)
 from ondoc.api.v1.diagnostic.views import LabAppointmentView
 from ondoc.diagnostic.models import (Lab, LabAppointment, AvailableLabTest, LabNetwork)
 from ondoc.payout.models import Outstanding
@@ -56,6 +59,7 @@ from collections import defaultdict
 import copy
 import logging
 import jwt
+from ondoc.insurance.models import InsuranceTransaction, UserInsurance, InsuredMembers
 from decimal import Decimal
 from ondoc.web.models import ContactUs
 from ondoc.notification.tasks import send_pg_acknowledge
@@ -93,7 +97,7 @@ class LoginOTP(GenericViewSet):
         phone_number = data['phone_number']
         req_type = request.query_params.get('type')
         retry_send = request.query_params.get('retry', False)
-
+        otp_message = OtpVerifications.get_otp_message(request.META.get('HTTP_PLATFORM'), req_type, version=request.META.get('HTTP_APP_VERSION'))
         if req_type == 'doctor':
             doctor_queryset = GenericAdmin.objects.select_related('doctor', 'hospital').filter(phone_number=phone_number, is_disabled=False)
             lab_queryset = GenericLabAdmin.objects.select_related('lab', 'lab_network').filter(
@@ -108,14 +112,14 @@ class LoginOTP(GenericViewSet):
 
             if lab_queryset.exists() or doctor_queryset.exists() or provider_signup_queryset.exists():
                 response['exists'] = 1
-                send_otp("OTP for login is {}", phone_number, retry_send)
+                send_otp(otp_message, phone_number, retry_send)
 
             # if queryset.exists():
             #     response['exists'] = 1
             #     send_otp("OTP for DocPrime login is {}", phone_number)
 
         else:
-            send_otp("OTP for login is {}", phone_number, retry_send)
+            send_otp(otp_message, phone_number, retry_send)
             if User.objects.filter(phone_number=phone_number, user_type=User.CONSUMER).exists():
                 response['exists'] = 1
 
@@ -428,6 +432,44 @@ class UserProfileViewSet(mixins.CreateModelMixin, mixins.ListModelMixin,
             }, status=status.HTTP_400_BAD_REQUEST)
         serializer = serializers.UserProfileSerializer(obj, data=data, partial=True, context={"request": request})
         serializer.is_valid(raise_exception=True)
+
+        # Insurance work. User is made to update only whatsapp_optin and whatsapp_is_declined in case if userprofile
+        # is covered under insuranc. Else profile under insurance  cannot be updated in any case.
+
+        insured_member_obj = InsuredMembers.objects.filter(profile__id=obj.id).last()
+        insured_member_profile = None
+        if insured_member_obj:
+            insured_member_profile = insured_member_obj.profile
+        if obj and hasattr(obj, 'id') and obj.id and insured_member_profile:
+
+            whatsapp_optin = data.get('whatsapp_optin')
+            whatsapp_is_declined = data.get('whatsapp_is_declined')
+
+            if (whatsapp_optin and whatsapp_optin in [True, False] and whatsapp_optin != insured_member_profile.whatsapp_optin) or \
+                    (whatsapp_is_declined and whatsapp_is_declined in [True, False] and whatsapp_is_declined != insured_member_profile.whatsapp_is_declined):
+                if whatsapp_optin:
+                    insured_member_profile.whatsapp_optin = whatsapp_optin
+                if whatsapp_is_declined:
+                    insured_member_profile.whatsapp_is_declined = whatsapp_is_declined
+
+                insured_member_profile.save()
+                return Response(serializer.data)
+            else:
+                return Response({
+                    "request_errors": {"code": "invalid",
+                                       "message": "Profile cannot be changed which are covered under insurance."
+                                       }
+                }, status=status.HTTP_400_BAD_REQUEST)
+        if data.get('is_default_user', None):
+            UserProfile.objects.filter(user=obj.user).update(is_default_user=False)
+        else:
+            primary_profile = UserProfile.objects.filter(user=obj.user, is_default_user=True).first()
+            if not primary_profile or obj.id == primary_profile.id:
+                return Response({
+                    "request_errors": {"code": "invalid",
+                                       "message": "Atleast one profile should be selected as primary."
+                                       }
+                }, status=status.HTTP_400_BAD_REQUEST)
         serializer.save()
         return Response(serializer.data)
 
@@ -540,7 +582,8 @@ class UserAppointmentsViewSet(OndocViewSet):
             return Response(serializer.data)
         elif appointment_type == 'doctor':
             queryset = OpdAppointment.objects.filter(pk=pk, user=user)
-            serializer = AppointmentRetrieveSerializer(queryset, many=True, context={"request": request})
+            # serializer = AppointmentRetrieveSerializer(queryset, many=True, context={"request": request})
+            serializer = NewAppointmentRetrieveSerializer(queryset, many=True, context={"request": request})
             return Response(serializer.data)
         else:
             return Response({'Error': 'Invalid Request Type'})
@@ -629,6 +672,16 @@ class UserAppointmentsViewSet(OndocViewSet):
                             "message": "Cannot Reschedule for same timeslot"
                         }
                         return resp
+                    if lab_appointment.payment_type == OpdAppointment.INSURANCE and lab_appointment.insurance_id is not None:
+                        user_insurance = UserInsurance.objects.get(id=lab_appointment.insurance_id)
+                        if user_insurance :
+                            insurance_threshold = user_insurance.insurance_plan.threshold.filter().first()
+                            if time_slot_start > user_insurance.expiry_date or not user_insurance.is_valid():
+                                resp = {
+                                    "status": 0,
+                                    "message": "Appointment time is not covered under insurance"
+                                }
+                                return resp
 
                     test_ids = lab_appointment.lab_test.values_list('test__id', flat=True)
                     lab_test_queryset = AvailableLabTest.objects.select_related('lab_pricing_group__labs').filter(
@@ -653,7 +706,10 @@ class UserAppointmentsViewSet(OndocViewSet):
                     if new_deal_price <= coupon_discount:
                         new_effective_price = 0
                     else:
-                        new_effective_price = new_deal_price - coupon_discount
+                        if lab_appointment.insurance_id is None:
+                            new_effective_price = new_deal_price - coupon_discount
+                        else:
+                            new_effective_price = 0.0
                     # new_appointment = dict()
 
                     new_appointment = {
@@ -711,14 +767,35 @@ class UserAppointmentsViewSet(OndocViewSet):
                                                                         start__lte=time_slot_start.hour,
                                                                         end__gte=time_slot_start.hour).first()
                     if doctor_hospital:
+                        if opd_appointment.payment_type == OpdAppointment.INSURANCE and opd_appointment.insurance_id is not None:
+                            user_insurance = UserInsurance.objects.get(id=opd_appointment.insurance_id)
+                            if user_insurance:
+                                insurance_threshold = user_insurance.insurance_plan.threshold.filter().first()
+                                if doctor_hospital.mrp > insurance_threshold.opd_amount_limit or not user_insurance.is_valid():
+                                    resp = {
+                                        "status": 0,
+                                        "message": "Appointment amount is not covered under insurance"
+                                    }
+                                    return resp
+                                if time_slot_start > user_insurance.expiry_date or not user_insurance.is_valid():
+                                    resp = {
+                                        "status": 0,
+                                        "message": "Appointment time is not covered under insurance"
+                                    }
+                                    return resp
+
+
+
                         old_deal_price = opd_appointment.deal_price
                         old_effective_price = opd_appointment.effective_price
                         coupon_discount = opd_appointment.discount
                         if coupon_discount > doctor_hospital.deal_price:
                             new_effective_price = 0
                         else:
-                            new_effective_price = doctor_hospital.deal_price - coupon_discount
-
+                            if opd_appointment.insurance_id is None:
+                                new_effective_price = doctor_hospital.deal_price - coupon_discount
+                            else:
+                                new_effective_price = 0.0
                         if opd_appointment.procedures.count():
                             doctor_details = opd_appointment.get_procedures()[0]
                             old_agreed_price = Decimal(doctor_details["agreed_price"])
@@ -951,17 +1028,29 @@ class AddressViewsSet(viewsets.ModelViewSet):
         loc_position = utils.get_location(data.get('locality_location_lat'), data.get('locality_location_long'))
         land_position = utils.get_location(data.get('landmark_location_lat'), data.get('landmark_location_long'))
         address = None
-        if not Address.objects.filter(user=request.user).filter(**validated_data).filter(
-                locality_location__distance_lte=(loc_position, 0),
-                landmark_location__distance_lte=(land_position, 0)).exists():
-            validated_data["locality_location"] = loc_position
-            validated_data["landmark_location"] = land_position
-            validated_data['user'] = request.user
-            address = Address.objects.create(**validated_data)
+        if land_position is None:
+            if not Address.objects.filter(user=request.user).filter(**validated_data).filter(
+                    locality_location__distance_lte=(loc_position, 0)).exists():
+                validated_data["locality_location"] = loc_position
+                validated_data["landmark_location"] = land_position
+                validated_data['user'] = request.user
+                address = Address.objects.create(**validated_data)
         else:
-            address = Address.objects.filter(user=request.user).filter(**validated_data).filter(
-                locality_location__distance_lte=(loc_position, 0),
-                landmark_location__distance_lte=(land_position, 0)).first()
+            if not Address.objects.filter(user=request.user).filter(**validated_data).filter(
+                    locality_location__distance_lte=(loc_position, 0),
+                    landmark_location__distance_lte=(land_position, 0)).exists() and not address:
+                validated_data["locality_location"] = loc_position
+                validated_data["landmark_location"] = land_position
+                validated_data['user'] = request.user
+                address = Address.objects.create(**validated_data)
+        if not address:
+            if land_position is None:
+                address = Address.objects.filter(user=request.user).filter(**validated_data).filter(
+                    locality_location__distance_lte=(loc_position, 0)).first()
+            else:
+                address = Address.objects.filter(user=request.user).filter(**validated_data).filter(
+                    locality_location__distance_lte=(loc_position, 0),
+                    landmark_location__distance_lte=(land_position, 0)).first()
         serializer = serializers.AddressSerializer(address)
         return Response(serializer.data)
 
@@ -1071,6 +1160,15 @@ class TransactionViewSet(viewsets.GenericViewSet):
 
     @transaction.atomic()
     def save(self, request):
+#         LAB_REDIRECT_URL = settings.BASE_URL + "/lab/appointment"
+#         OPD_REDIRECT_URL = settings.BASE_URL + "/opd/appointment"
+#         INSURANCE_REDIRECT_URL = settings.BASE_URL + "/insurance/complete"
+#         INSURANCE_FAILURE_REDIRECT_URL = settings.BASE_URL + "/insurancereviews"
+#         LAB_FAILURE_REDIRECT_URL = settings.BASE_URL + "/lab/%s/book?error_code=%s"
+#         OPD_FAILURE_REDIRECT_URL = settings.BASE_URL + "/opd/doctor/%s/%s/bookdetails?error_code=%s"
+#         ERROR_REDIRECT_URL = settings.BASE_URL + "/error?error_code=%s"
+#         REDIRECT_URL = ERROR_REDIRECT_URL % ErrorCodeMapping.IVALID_APPOINTMENT_ORDER
+
         ERROR_REDIRECT_URL = settings.BASE_URL + "/cart?error_code=1&error_message=%s"
         REDIRECT_URL = ERROR_REDIRECT_URL % "Error processing payment, please try again."
         SUCCESS_REDIRECT_URL = settings.BASE_URL + "/order/summary/%s"
@@ -1106,10 +1204,11 @@ class TransactionViewSet(viewsets.GenericViewSet):
                     pg_txn = PgTransaction.objects.filter(order_no__iexact=response.get("orderNo")).first()
                     if pg_txn:
                         send_pg_acknowledge.apply_async((pg_txn.order_id, pg_txn.order_no,), countdown=1)
-                        return
+                        REDIRECT_URL = (SUCCESS_REDIRECT_URL % pg_txn.order_id) + "?payment_success=true"
+                        return HttpResponseRedirect(redirect_to=REDIRECT_URL)
             except Exception as e:
                logger.error("Error in sending pg acknowledge - " + str(e))
-    
+
 
             # For testing only
             # response = request.data
@@ -1128,9 +1227,10 @@ class TransactionViewSet(viewsets.GenericViewSet):
                 resp_serializer = serializers.TransactionSerializer(data=response)
                 if resp_serializer.is_valid():
                     response_data = self.form_pg_transaction_data(resp_serializer.validated_data, order_obj)
+                    # For Testing
                     if PgTransaction.is_valid_hash(response, product_id=order_obj.product_id):
                         pg_tx_queryset = None
-
+                    # if True:
                         try:
                             with transaction.atomic():
                                 pg_tx_queryset = PgTransaction.objects.create(**response_data)
@@ -1165,7 +1265,9 @@ class TransactionViewSet(viewsets.GenericViewSet):
                 elif processed_data.get("type") == "doctor":
                     REDIRECT_URL = OPD_REDIRECT_URL + "/" + str(processed_data.get("id", "")) + "?payment_success=true"
                 elif processed_data.get("type") == "lab":
-                    REDIRECT_URL = LAB_REDIRECT_URL + "/" + str(processed_data.get("id", "")) + "?payment_success=true"
+                    REDIRECT_URL = LAB_REDIRECT_URL + "/" + str(processed_data.get("id","")) + "?payment_success=true"
+                elif processed_data.get("type") == "insurance":
+                    REDIRECT_URL = settings.BASE_URL + "/insurance/complete?payment_success=true&id=" + str(processed_data.get("id", ""))
                 elif processed_data.get("type") == "plan":
                     REDIRECT_URL = PLAN_REDIRECT_URL + str(processed_data.get("id", "")) + "&payment_success=true"
         except Exception as e:
@@ -1702,7 +1804,7 @@ class OnlineLeadViewSet(GenericViewSet):
         elif request.user_agent.is_pc:
             source = "WEB %s" % (data.get('source', ''))
         else:
-            source = "Unknown"
+            source = "Signup"
 
         data['source'] = source
         if not data.get('city_name'):
@@ -1736,16 +1838,23 @@ class SendBookingUrlViewSet(GenericViewSet):
 
     def send_booking_url(self, request):
         type = request.data.get('type')
-        agent_token = AgentToken.objects.create_token(user=request.user)
+        purchase_type = request.data.get('purchase_type', None)
+
+        # agent_token = AgentToken.objects.create_token(user=request.user)
+        user_token = JWTAuthentication.generate_token(request.user)
+        token = user_token['token'].decode("utf-8") if 'token' in user_token else None
         user_profile = None
 
         if request.user.is_authenticated:
             user_profile = request.user.get_default_profile()
         if not user_profile:
             return Response({"status": 1})
-
-        booking_url = SmsNotification.send_booking_url(token=agent_token.token, phone_number=str(user_profile.phone_number))
-        EmailNotification.send_booking_url(token=agent_token.token, email=user_profile.email)
+        if purchase_type == 'insurance':
+            SmsNotification.send_insurance_booking_url(token=token, phone_number=str(user_profile.phone_number))
+            EmailNotification.send_insurance_booking_url(token=token, email=user_profile.email)
+        else:
+            booking_url = SmsNotification.send_booking_url(token=token, phone_number=str(user_profile.phone_number))
+            EmailNotification.send_booking_url(token=token, email=user_profile.email)
 
         return Response({"status": 1})
 
@@ -1906,12 +2015,16 @@ class UserRatingViewSet(GenericViewSet):
                 cid_list = []
                 if obj.content_type == ContentType.objects.get_for_model(Doctor):
                     name = obj.content_object.get_display_name()
-                    appointment = OpdAppointment.objects.select_related('hospital').filter(id=obj.appointment_id).first()
-                    if appointment:
-                        address = appointment.hospital.get_hos_address()
-                else:
+                    if obj.appointment_id:
+                        appointment = OpdAppointment.objects.select_related('hospital').filter(id=obj.appointment_id).first()
+                        if appointment:
+                            address = appointment.hospital.get_hos_address()
+                elif obj.content_type == ContentType.objects.get_for_model(Lab):
                     name = obj.content_object.name
                     address = obj.content_object.get_lab_address()
+                else:
+                    name = obj.content_object.name
+                    address = obj.content_object.get_hos_address()
                 for cm in obj.compliment.all():
                     c_list.append(cm.message)
                     cid_list.append(cm.id)
@@ -1942,17 +2055,78 @@ class AppointmentViewSet(viewsets.GenericViewSet):
         all_appointments = []
         try:
             user_id = request.user.id
-            opd = OpdAppointment.get_upcoming_appointment(user_id)
-            opd_appointments = OpdAppointmentUpcoming(opd, many=True).data
-            lab = LabAppointment.get_upcoming_appointment(user_id)
-            lab_appointments = LabAppointmentUpcoming(lab, many=True).data
-
-            all_appointments = opd_appointments + lab_appointments
-            all_appointments = sorted(all_appointments,
-                                      key=lambda x: x["time_slot_start"])
+            all_appointments = get_all_upcoming_appointments(user_id)
         except Exception as e:
             logger.error(str(e))
         return Response(all_appointments)
 
     def get_queryset(self):
         return OpdAppointment.objects.none()
+
+
+class DoctorScanViewSet(GenericViewSet):
+    authentication_classes = (JWTAuthentication, )
+    permission_classes = (IsAuthenticated, IsNotAgent)
+
+    # @transaction.atomic
+    def doctor_qr_scan(self, request, pk):
+        opdapp_obj = OpdAppointment.objects.filter(pk=pk).first()
+        request_url = request.data.get('url')
+        type = request.data.get('type')
+        user = request.user
+
+        if not opdapp_obj:
+            return Response('Opd Appointment does not exist', status.HTTP_400_BAD_REQUEST)
+
+        if not user == opdapp_obj.user:    
+            return Response('Unauthorized User', status.HTTP_401_UNAUTHORIZED)
+
+        if not request_url:
+            return Response('URL not given', status.HTTP_400_BAD_REQUEST)
+
+        if not type == 'doctor':
+            return Response('Invalid type', status.HTTP_400_BAD_REQUEST)
+
+        if not len(opdapp_obj.doctor.qr_code.all()):
+            return Response('QRCode not enabled for this doctor', status.HTTP_400_BAD_REQUEST)
+
+
+        appt_status = opdapp_obj.status
+        url = opdapp_obj.doctor.qr_code.first().data
+        complete_with_qr_scanner = True
+
+        if not url:
+            return Response('URL not found', status.HTTP_400_BAD_REQUEST)
+
+        url = url.get('url', None)
+        if not request_url == url:
+            return Response('Invalid url', status.HTTP_400_BAD_REQUEST)
+
+        if not appt_status == OpdAppointment.ACCEPTED or not complete_with_qr_scanner == True:
+            return Response('Bad request', status.HTTP_400_BAD_REQUEST)
+
+
+        opdapp_obj.action_completed()
+        resp = AppointmentRetrieveSerializer(opdapp_obj, context={"request": request})
+        return Response(resp.data)
+
+
+class TokenFromUrlKey(viewsets.GenericViewSet):
+
+    def get_token(self, request):
+        from ondoc.authentication.models import ClickLoginToken
+        serializer = serializers.TokenFromUrlKeySerializer(data=request.query_params)
+        serializer.is_valid(raise_exception=True)
+        data = serializer.validated_data
+        token = data.get("auth_token")
+        key = data.get("key")
+        if token:
+            return Response({'status': 1, 'token': token})
+        elif key:
+            obj = ClickLoginToken.objects.filter(url_key=key).first()
+            if obj:
+                obj.is_consumed = True
+                obj.save()
+                return Response({'status': 1, 'token': obj.token})
+            else:
+                return Response({'status': 0, 'token': None, 'message': 'key not found'})

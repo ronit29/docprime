@@ -257,6 +257,9 @@ def send_opd_rating_message(appointment_id, type):
 @task(bind=True, max_retries=5)
 def set_order_dummy_transaction(self, order_id, user_id):
     from ondoc.account.models import Order, DummyTransactions
+    from ondoc.insurance.models import UserInsurance
+    from ondoc.doctor.models import OpdAppointment
+    from ondoc.diagnostic.models import LabAppointment
     from ondoc.account.models import User
     try:
         order_row = Order.objects.filter(id=order_id).first()
@@ -283,13 +286,45 @@ def set_order_dummy_transaction(self, order_id, user_id):
             }
             url = settings.PG_DUMMY_TRANSACTION_URL
 
+            insurer_code = None
+            insurance_order_id = None
+            insurance_order_number = None
+            if order_row.product_id == Order.INSURANCE_PRODUCT_ID:
+                insurer_code = appointment.insurance_plan.insurer.insurer_merchant_code
+
+            user_insurance = UserInsurance.objects.filter(order=order_row).first()
+
+            appointment_obj = None
+            if order_row.product_id == Order.DOCTOR_PRODUCT_ID:
+                appointment_obj = OpdAppointment.objects.filter(id=order_row.reference_id).first()
+
+            if order_row.product_id == Order.LAB_PRODUCT_ID:
+                appointment_obj = LabAppointment.objects.filter(id=order_row.reference_id).first()
+
+            if appointment_obj and appointment_obj.payment_type == Order.INSURANCE_PRODUCT_ID and appointment_obj.insurance.id == user_insurance.id:
+                insurance_order = user_insurance.order
+
+                insurance_order_transactions = insurance_order.getTransactions()
+                if not insurance_order_transactions:
+                    raise Exception('No transactions found for appointment insurance.')
+                insurance_order_transaction = insurance_order_transactions[0]
+                insurance_order_id = insurance_order_transaction.order_id
+                insurance_order_number = insurance_order_transaction.order_no
+
+            name  = ''
+            if isinstance(appointment, OpdAppointment) or isinstance(appointment, LabAppointment):
+                name = appointment.profile.name
+
+            if isinstance(appointment, UserInsurance):
+                name = appointment.user.full_name
+           
             req_data = {
                 "customerId": user_id,
                 "mobile": user.phone_number,
                 "email": user.email or "dummyemail@docprime.com",
                 "productId": order_row.product_id,
                 "orderId": order_id,
-                "name": appointment.profile.name,
+                "name": name,
                 "txAmount": 0,
                 "couponCode": "",
                 "couponAmt": str(total_price),
@@ -298,6 +333,14 @@ def set_order_dummy_transaction(self, order_id, user_id):
                 "buCallbackSuccessUrl": "",
                 "buCallbackFailureUrl": ""
             }
+
+            if insurance_order_id and insurance_order_number:
+                req_data['refOrderNo'] = str(insurance_order_number)
+                req_data['refOrderId'] = str(insurance_order_id)
+
+            if insurer_code:
+                req_data['insurerCode'] = insurer_code
+
 
             response = requests.post(url, data=json.dumps(req_data), headers=headers)
             if response.status_code == status.HTTP_200_OK:
@@ -465,29 +508,37 @@ def process_payout(payout_id):
             raise Exception("No payout specified")
 
         payout_data = MerchantPayout.objects.filter(id=payout_id).first()
-        if not payout_data or payout_data.status == payout_data.PAID:
+        if not payout_data:
+            raise Exception("Payout not found")
+        if payout_data.status == payout_data.PAID:
             raise Exception("Payment already done for this payout")
 
 
         default_payment_mode = payout_data.get_default_payment_mode()
-
         appointment = payout_data.get_appointment()
+        if not appointment :
+            raise Exception("Insufficient Data " + str(payout_data))
+
+        if not payout_data.booking_type == payout_data.InsurancePremium:
+            if appointment.payment_type in [OpdAppointment.COD]:
+                raise Exception("Cannot process payout for COD appointments")
+
+        
         billed_to = payout_data.get_billed_to()
         merchant = payout_data.get_merchant()
         order_data = None
 
-        if not appointment or not billed_to or not merchant:
+        if not billed_to or not merchant:
             raise Exception("Insufficient Data " + str(payout_data))
-
-        if appointment.payment_type in [OpdAppointment.COD]:
-            raise Exception("Cannot process payout for COD appointments")
 
         if not merchant.verified_by_finance or not merchant.enabled:
             raise Exception("Merchant is not verified or is not enabled. " + str(payout_data))
 
-        associated_merchant = billed_to.merchant.first()
-        if not associated_merchant.verified:
-            raise Exception("Associated Merchant not verified. " + str(payout_data))
+        if not payout_data.booking_type == payout_data.InsurancePremium:
+            associated_merchant = billed_to.merchant.first()
+            if not associated_merchant.verified:
+                raise Exception("Associated Merchant not verified. " + str(payout_data))
+
 
         # assuming 1 to 1 relation between Order and Appointment
         order_data = Order.objects.filter(reference_id=appointment.id).order_by('-id').first()
@@ -530,11 +581,13 @@ def process_payout(payout_id):
         payout_status = None
         if len(req_data2.get('payload'))>0:
             payout_status = request_payout(req_data2, order_data)
+            payout_data.request_data = req_data2
 
         if not payout_status or not payout_status.get('status'):
             payout_status = request_payout(req_data, order_data)
+            payout_data.request_data = req_data
 
-        if payout_status:
+        if payout_status:            
             payout_data.api_response = payout_status.get("response")
             if payout_status.get("status"):
                 payout_data.payout_time = datetime.datetime.now()
@@ -544,9 +597,39 @@ def process_payout(payout_id):
 
             payout_data.save()
 
-
     except Exception as e:
         logger.error("Error in processing payout - with exception - " + str(e))
+
+
+@task(bind=True, max_retries=3)
+def send_insurance_notifications(self, data):
+    from ondoc.authentication import models as auth_model
+    from ondoc.communications.models import InsuranceNotification
+    try:
+        user_id = int(data.get('user_id', 0))
+        user = auth_model.User.objects.filter(id=user_id).last()
+        if not user:
+            raise Exception("Invalid user id passed for insurance email notification. Userid %s" % str(user_id))
+
+        user_insurance = user.active_insurance
+        if not user_insurance:
+            raise Exception("Invalid or None user insurance found for email notification. User id %s" % str(user_id))
+
+        if not user_insurance.coi:
+            try:
+                user_insurance.generate_pdf()
+            except Exception as e:
+                logger.error('Insurance coi pdf cannot be generated. %s' % str(e))
+
+                countdown_time = (2 ** self.request.retries) * 60 * 10
+                print(countdown_time)
+                self.retry([data], countdown=countdown_time)
+
+        insurance_notification = InsuranceNotification(user_insurance, NotificationAction.INSURANCE_CONFIRMED)
+        insurance_notification.send()
+    except Exception as e:
+        logger.error(str(e))
+
 
 def request_payout(req_data, order_data):
     from ondoc.api.v1.utils import create_payout_checksum
@@ -576,6 +659,7 @@ def request_payout(req_data, order_data):
     
     logger.error("payout failed for request data - " + str(req_data))
     return {"status" : 0, "response" : resp_data}
+
 
 @task()
 def opd_send_otp_before_appointment(appointment_id, previous_appointment_date_time):

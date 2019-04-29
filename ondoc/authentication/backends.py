@@ -5,6 +5,7 @@ import datetime, calendar
 from django.conf import settings
 from rest_framework import authentication, exceptions
 from ondoc.authentication.models import UserSecretKey
+import base64
 
 User = get_user_model()
 
@@ -28,6 +29,36 @@ class AuthBackend(ModelBackend):
             return User.objects.get(pk=user_id)
         except User.DoesNotExist:
             return None
+
+
+class MatrixAuthentication(authentication.BaseAuthentication):
+    authentication_header_prefix = "Token"
+
+    def authenticate(self, request):
+        auth_header = authentication.get_authorization_header(request).split()
+        auth_header_prefix = self.authentication_header_prefix
+
+        if not auth_header:
+            return None
+
+        if (len(auth_header) == 1) or (len(auth_header) > 2):
+            raise exceptions.AuthenticationFailed('UnAuthorized')
+
+        prefix = auth_header[0].decode('utf-8')
+        token = auth_header[1].decode('utf-8')
+
+        if prefix.lower() != auth_header_prefix.lower():
+            raise exceptions.AuthenticationFailed('UnAuthorized')
+
+        token = base64.b64decode(token)
+
+        if token.decode('utf-8') != settings.MATRIX_DOC_AUTH_TOKEN:
+            raise exceptions.AuthenticationFailed('UnAuthorized')
+
+        return (None, None)
+
+    def authenticate_header(self, request):
+        return self.authentication_header_prefix
 
 
 class JWTAuthentication(authentication.BaseAuthentication):
@@ -124,3 +155,13 @@ class JWTAuthentication(authentication.BaseAuthentication):
         return {'token': token,
                 'payload': payload}
 
+    @classmethod
+    def provider_sms_payload_handler(cls, user, appointment):
+        return {
+            'user_id': user.pk,
+            'exp': appointment.time_slot_start + datetime.timedelta(hours=24),
+            'orig_iat': calendar.timegm(
+                datetime.datetime.utcnow().utctimetuple()
+            ),
+            'refresh': False
+        }

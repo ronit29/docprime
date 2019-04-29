@@ -1,6 +1,6 @@
 from django.shortcuts import render, redirect, HttpResponse
 from django.views import View
-from collections import OrderedDict
+from collections import OrderedDict, defaultdict
 
 from .forms import  DoctorClinicFormSet, DoctorLanguageFormSet, DoctorAwardFormSet, \
                      DoctorAssociationFormSet, DoctorExperienceFormSet, DoctorForm, \
@@ -54,15 +54,20 @@ class DoctorOnboard(View):
             Q(hospital__network__is_billing_enabled=False, hospital__is_billing_enabled=False, doctor=existing.doctor) |
             Q(hospital__network__isnull=True, hospital__is_billing_enabled=False, doctor=existing.doctor)).exists()
 
+        temp_doc_dict = defaultdict(list)
+        temp_docs = DoctorDocument.objects.filter(doctor=existing.doctor)
+        for temp_doc in temp_docs:
+            temp_doc_dict[temp_doc.document_type].append(temp_doc)
+
         doc_dict = OrderedDict()
         for id, value in DoctorDocument.CHOICES:
-            results = DoctorDocument.objects.filter(doctor=existing.doctor, document_type=id)
-            if len(results)>0:
+            results = temp_doc_dict.get(id, [])
+            if len(results) > 0:
                 doc_dict[id] = (id, value, results)
             else:
                 doc_dict[id] = (id, value, None)
 
-        message = request.session.get('message','')
+        message = request.session.get('message', '')
         request.session['message'] = ''
 
 
@@ -182,7 +187,6 @@ class DoctorOnboard(View):
                 'doc_dict' :doc_dict,
                 'DoctorDocument' : DoctorDocument
             })
-
 
         doc_obj = doctor_form.save()
 

@@ -104,10 +104,11 @@ def convert_timings(timings, is_day_human_readable=True):
     TIMESLOT_MAPPING = {value[0]: value[1] for value in DoctorClinicTiming.TIME_CHOICES}
     temp = defaultdict(list)
     for timing in timings:
-        temp[(timing.get('start'), timing.get('end'))].append(DAY_MAPPING.get(timing.get('day')))
+        temp[(float(timing.get('start')), float(timing.get('end')))].append(DAY_MAPPING.get(timing.get('day')))
     for key, value in temp.items():
         temp[key] = sorted(value, key=itemgetter(0))
     final_dict = defaultdict(list)
+    keys_list = list(TIMESLOT_MAPPING.keys())
     for key, value in temp.items():
         grouped_consecutive_days = group_consecutive_numbers(map(lambda x: x[0], value))
         response_keys = []
@@ -117,8 +118,17 @@ def convert_timings(timings, is_day_human_readable=True):
             else:
                 response_keys.append("{}-{}".format(DAY_MAPPING_REVERSE.get(days[0]),
                                                     DAY_MAPPING_REVERSE.get(days[1])))
-        final_dict[",".join(response_keys)].append("{} to {}".format(TIMESLOT_MAPPING.get(key[0]),
-                                                                     TIMESLOT_MAPPING.get(key[1])))
+        start_time = TIMESLOT_MAPPING.get(key[0])
+        end_time = TIMESLOT_MAPPING.get(key[1])
+        if not start_time and key[0] < keys_list[0]:
+            start_time = TIMESLOT_MAPPING.get(keys_list[0])
+        if not end_time and key[1] > keys_list[-1]:
+            end_time = TIMESLOT_MAPPING.get(keys_list[-1])
+        if not key[0] > key[1]:
+            if start_time and end_time:
+                final_dict[",".join(response_keys)].append("{} to {}".format(start_time, end_time))
+            else:
+                final_dict[",".join(response_keys)].append("")
     return final_dict
 
 
@@ -250,6 +260,42 @@ class IsMatrixUser(permissions.BasePermission):
         return False
 
 
+def insurance_transform(app_data):
+    """A serializer helper to serialize Insurance data"""
+    # app_data['insurance']['insurance_transaction']['transaction_date'] = str(app_data['insurance']['insurance_transaction']['transaction_date'])
+    # app_data['insurance']['profile_detail']['dob'] = str(app_data['insurance']['profile_detail']['dob'])
+    # insured_members = app_data['insurance']['insurance_transaction']['insured_members']
+    # for member in insured_members:
+    #     member['dob'] = str(member['dob'])
+    #     # member['member_profile']['dob'] = str(member['member_profile']['dob'])
+    # return app_data
+    app_data['user_insurance']['purchase_date'] = str(
+        app_data['user_insurance']['purchase_date'])
+    app_data['user_insurance']['expiry_date'] = str(
+        app_data['user_insurance']['expiry_date'])
+    app_data['profile_detail']['dob'] = str(app_data['profile_detail']['dob'])
+    insured_members = app_data['user_insurance']['insured_members']
+    for member in insured_members:
+        member['dob'] = str(member['dob'])
+        # member['member_profile']['dob'] = str(member['member_profile']['dob'])
+    return app_data
+
+
+def insurance_reverse_transform(insurance_data):
+    insurance_data['user_insurance']['purchase_date'] = \
+        datetime.datetime.strptime(insurance_data['user_insurance']['purchase_date'], "%Y-%m-%d %H:%M:%S.%f")
+    insurance_data['user_insurance']['expiry_date'] = \
+        datetime.datetime.strptime(insurance_data['user_insurance']['expiry_date'],
+                                   "%Y-%m-%d %H:%M:%S.%f")
+    insurance_data['profile_detail']['dob'] = \
+        datetime.datetime.strptime(insurance_data['profile_detail']['dob'],
+                                   "%Y-%m-%d")
+    insured_members = insurance_data['user_insurance']['insured_members']
+    for member in insured_members:
+        member['dob'] = datetime.datetime.strptime(member['dob'], "%Y-%m-%d").date()
+    return insurance_data
+
+
 def opdappointment_transform(app_data):
     """A serializer helper to serialize OpdAppointment data"""
     app_data["deal_price"] = str(app_data["deal_price"])
@@ -321,6 +367,7 @@ def is_valid_testing_lab_data(user, lab):
 
 def payment_details(request, order):
     from ondoc.authentication.models import UserProfile
+    from ondoc.insurance.models import InsurancePlans
     from ondoc.account.models import PgTransaction, Order
     payment_required = True
     user = request.user
@@ -335,10 +382,21 @@ def payment_details(request, order):
     profile_name = ""
     if profile:
         profile_name = profile.name
-    if order.product_id == Order.SUBSCRIPTION_PLAN_PRODUCT_ID:
-        temp_product_id = Order.DOCTOR_PRODUCT_ID
-    else:
-        temp_product_id = order.product_id
+    if not profile and order.product_id == 3:
+        if order.action_data.get('profile_detail'):
+            profile_name = order.action_data.get('profile_detail').get('name', "")
+
+    insurer_code = None
+    if order.product_id == Order.INSURANCE_PRODUCT_ID:
+        insurance_plan_id = order.action_data.get('insurance_plan')
+        insurance_plan = InsurancePlans.objects.filter(id=insurance_plan_id).first()
+        if not insurance_plan:
+            raise Exception('Invalid pg transaction as insurer plan is not found.')
+        insurer = insurance_plan.insurer
+        insurer_code = insurer.insurer_merchant_code
+
+    temp_product_id = order.product_id
+
     pgdata = {
         'custId': user.id,
         'mobile': user.phone_number,
@@ -351,6 +409,10 @@ def payment_details(request, order):
         'name': profile_name,
         'txAmount': str(order.amount),
     }
+
+    if insurer_code:
+        pgdata['insurerCode'] = insurer_code
+
     secret_key = client_key = ""
     # TODO : SHASHANK_SINGH for plan FINAL ??
     if order.product_id == Order.DOCTOR_PRODUCT_ID or order.product_id == Order.SUBSCRIPTION_PLAN_PRODUCT_ID:
@@ -359,6 +421,9 @@ def payment_details(request, order):
     elif order.product_id == Order.LAB_PRODUCT_ID:
         secret_key = settings.PG_SECRET_KEY_P2
         client_key = settings.PG_CLIENT_KEY_P2
+    elif order.product_id == Order.INSURANCE_PRODUCT_ID:
+        secret_key = settings.PG_SECRET_KEY_P3
+        client_key = settings.PG_CLIENT_KEY_P3
 
     pgdata['hash'] = PgTransaction.create_pg_hash(pgdata, secret_key, client_key)
 
@@ -407,6 +472,30 @@ def resolve_address(address_obj):
         if address_string:
             address_string += ", "
         address_string += str(address_dict["land_mark"])
+    if address_dict.get("locality"):
+        if address_string:
+            address_string += ", "
+        address_string += str(address_dict["locality"])
+    if address_dict.get("pincode"):
+        if address_string:
+            address_string += ", "
+        address_string += str(address_dict["pincode"])
+
+    return address_string
+
+
+def thyrocare_resolve_address(address_obj):
+    address_string = ""
+    address_dict = dict()
+    if not isinstance(address_obj, dict):
+        address_dict = vars(address_dict)
+    else:
+        address_dict = address_obj
+
+    if address_dict.get("address"):
+        if address_string:
+            address_string += ", "
+        address_string += str(address_dict["address"])
     if address_dict.get("locality"):
         if address_string:
             address_string += ", "
@@ -986,7 +1075,7 @@ class TimeSlotExtraction(object):
                 if current_date_time.date() == booking_date.date():
                     if pa[k].get('on_call') == False:
                         if k >= float(doc_minimum_time) and k <= doctor_maximum_timing:
-                            data_list.append({"value": k, "text": v, "price": pa[k]["price"],
+                            data_list.append({"value": k, "text": v, "price": pa[k]["price"], "is_price_zero": True if pa[k]["price"] is not None and pa[k]["price"] == 0 else False,
                                               "mrp": pa[k]['mrp'], 'deal_price': pa[k]['deal_price'],
                                               "is_available": pa[k]["is_available"], "on_call": pa[k].get("on_call", False)})
                         else:
@@ -995,7 +1084,7 @@ class TimeSlotExtraction(object):
                         pass
                 else:
                     if k <= doctor_maximum_timing:
-                        data_list.append({"value": k, "text": v, "price": pa[k]["price"],
+                        data_list.append({"value": k, "text": v, "price": pa[k]["price"], "is_price_zero": True if pa[k]["price"] is not None and pa[k]["price"] == 0 else False,
                                           "mrp": pa[k]['mrp'], 'deal_price': pa[k]['deal_price'],
                                           "is_available": pa[k]["is_available"],
                                           "on_call": pa[k].get("on_call", False)})
@@ -1005,7 +1094,7 @@ class TimeSlotExtraction(object):
                 next_date = current_date_time + datetime.timedelta(days=1)
                 if current_date_time.date() == booking_date.date():
                     if k >= float(lab_minimum_time):
-                        data_list.append({"value": k, "text": v, "price": pa[k]["price"],
+                        data_list.append({"value": k, "text": v, "price": pa[k]["price"], "is_price_zero": True if pa[k]["price"] is not None and pa[k]["price"] == 0 else False,
                                           "is_available": pa[k]["is_available"],
                                           "on_call": pa[k].get("on_call", False)})
                     else:
@@ -1013,18 +1102,18 @@ class TimeSlotExtraction(object):
                 elif next_date.date() == booking_date.date():
                     if lab_tomorrow_time:
                         if k >= float(lab_tomorrow_time):
-                            data_list.append({"value": k, "text": v, "price": pa[k]["price"],
+                            data_list.append({"value": k, "text": v, "price": pa[k]["price"], "is_price_zero": True if pa[k]["price"] is not None and pa[k]["price"] == 0 else False,
                                               "is_available": pa[k]["is_available"],
                                               "on_call": pa[k].get("on_call", False)})
                         else:
                             pass
                     else:
-                        data_list.append({"value": k, "text": v, "price": pa[k]["price"],
+                        data_list.append({"value": k, "text": v, "price": pa[k]["price"], "is_price_zero": True if pa[k]["price"] is not None and pa[k]["price"] == 0 else False,
                                           "is_available": pa[k]["is_available"],
                                           "on_call": pa[k].get("on_call", False)})
 
                 else:
-                    data_list.append({"value": k, "text": v, "price": pa[k]["price"],
+                    data_list.append({"value": k, "text": v, "price": pa[k]["price"], "is_price_zero": True if pa[k]["price"] is not None and pa[k]["price"] == 0 else False,
                                       "is_available": pa[k]["is_available"],
                                       "on_call": pa[k].get("on_call", False)})
 
@@ -1286,9 +1375,11 @@ def create_payout_checksum(all_txn, product_id):
     #     secret_key = settings.PG_SECRET_KEY_P2
     #     client_key = settings.PG_CLIENT_KEY_P2
 
-    secret_key = settings.PG_SECRET_KEY_P2
-    client_key = settings.PG_CLIENT_KEY_P2
+    # secret_key = settings.PG_SECRET_KEY_P2
+    # client_key = settings.PG_CLIENT_KEY_P2
 
+    secret_key = settings.PG_PAYOUT_SECRET_KEY
+    client_key = settings.PG_PAYOUT_CLIENT_KEY
 
     all_txn = sorted(all_txn, key=lambda x : x["idx"])
     checksum = ""

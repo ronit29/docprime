@@ -12,11 +12,12 @@ from dateutil.relativedelta import relativedelta
 class NodeJsSmsBackend(object):
 
     def send(self, message, phone_no, retry_send=False):
+        from requests.utils import quote
         payload = {
             "type": "sms",
             "data": {
                 "phone_number": phone_no,
-                "content": message,
+                "content": quote(message),
                 "retry": retry_send
             }
         }
@@ -26,11 +27,12 @@ class NodeJsSmsBackend(object):
 class BaseSmsBackend(NodeJsSmsBackend):
 
     def send(self, message, phone_no, retry_send=False):
+        from requests.utils import quote
         if settings.SEND_THROUGH_NODEJS_ENABLED:
             super().send(message, phone_no, retry_send)
             return True
         payload = {'sender': 'DOCPRM', 'route': '4','authkey':settings.SMS_AUTH_KEY}
-        payload['message'] = message
+        payload['message'] = quote(message)
         payload['mobiles'] = '91' + str(phone_no)
         r = requests.get('http://api.msg91.com/api/sendhttp.php', params=payload)
         if r.status_code == requests.codes.ok:
