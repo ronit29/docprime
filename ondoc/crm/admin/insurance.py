@@ -14,6 +14,7 @@ import nested_admin
 from import_export import fields, resources
 from datetime import datetime
 from ondoc.insurance.models import InsuranceDisease
+from django.core.exceptions import ValidationError
 from django.conf import settings
 
 
@@ -660,8 +661,8 @@ class UserInsuranceAdmin(ImportExportMixin, admin.ModelAdmin):
         return str(user_profile.name)
 
     list_display = ['id', 'insurance_plan', 'user_name', 'user', 'policy_number', 'purchase_date','merchant_payout']
-    fields = ['insurance_plan', 'user', 'purchase_date', 'expiry_date', 'policy_number', 'premium_amount','merchant_payout']
-    readonly_fields = ('insurance_plan', 'user', 'purchase_date', 'expiry_date', 'policy_number', 'premium_amount','merchant_payout')
+    fields = ['insurance_plan', 'user', 'purchase_date', 'expiry_date', 'policy_number', 'premium_amount', 'merchant_payout', 'status']
+    readonly_fields = ('insurance_plan', 'user', 'purchase_date', 'expiry_date', 'policy_number', 'premium_amount', 'merchant_payout')
     inlines = [InsuredMembersInline]
     # form = UserInsuranceForm
 
@@ -693,6 +694,19 @@ class UserInsuranceAdmin(ImportExportMixin, admin.ModelAdmin):
 
     def has_delete_permission(self, request, obj=None):
         return False
+
+    def save_model(self, request, obj, form, change):
+        print('data is here')
+        # if request.user.is_member_of(constants['INSURANCE_GROUP']):
+        if obj.status == UserInsurance.ACTIVE:
+            super(UserInsuranceAdmin, self).save_model(request, obj, form, change)
+        elif obj.status == UserInsurance.ONHOLD:
+
+            super(UserInsuranceAdmin, self).save_model(request, obj, form, change)
+        elif obj.status == UserInsurance.CANCELLED:
+            response = obj.process_cancellation()
+            if response['success']:
+                super(UserInsuranceAdmin, self).save_model(request, obj, form, change)
 
 
 class CustomDateInput(forms.DateInput):

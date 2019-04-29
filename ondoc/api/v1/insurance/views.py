@@ -6,6 +6,8 @@ from rest_framework import viewsets
 from django.core import serializers as core_serializer
 
 from ondoc.api.v1.utils import payment_details
+from ondoc.diagnostic.models import LabAppointment
+from ondoc.doctor.models import OpdAppointment
 from . import serializers
 from rest_framework.response import Response
 from ondoc.account import models as account_models
@@ -395,3 +397,44 @@ class InsuranceDummyDataViewSet(viewsets.GenericViewSet):
             return Response(error=res, status=status.HTTP_200_OK)
         res['data'] = member_data
         return Response(data=res, status=status.HTTP_200_OK)
+
+
+class InsuranceCancelViewSet(viewsets.GenericViewSet):
+    authentication_classes = (JWTAuthentication,)
+    permission_classes = (IsAuthenticated,)
+
+    @transaction.atomic()
+    def insurance_cancel(self, request):
+        user = request.user
+        user_insurance = UserInsurance.objects.filter(user=user).last()
+        res = {}
+        if not user_insurance:
+            res['error'] = "Insurance not found"
+            return Response(data=res, status=status.HTTP_400_BAD_REQUEST)
+        if not user.active_insurance():
+            res['error'] = "Insurance is not active"
+            return Response(data=res, status=status.HTTP_400_BAD_REQUEST)
+
+        response = user_insurance.process_cancellation()
+        # opd_appointment_count = OpdAppointment.get_insured_completed_appointment(user_insurance)
+        # lab_appointment_count = LabAppointment.get_insured_completed_appointment(user_insurance)
+        # if opd_appointment_count > 0 or lab_appointment_count > 0:
+        #     res['error'] = "One of the OPD or LAB Appointment have been completed, Cancellation could not be processed"
+        #     return Response(data=res, status=status.HTTP_400_BAD_REQUEST)
+        # opd_active_appointment = OpdAppointment.get_insured_active_appointment(user_insurance)
+        # lab_active_appointment = LabAppointment.get_insured_active_appointment(user_insurance)
+        # for appointment in opd_active_appointment:
+        #     appointment.status = OpdAppointment.CANCELLED
+        #     appointment.save()
+        # for appointment in lab_active_appointment:
+        #     appointment.status = LabAppointment.CANCELLED
+        #     appointment.save()
+        # user_insurance.status = UserInsurance.CANCELLED
+        # user_insurance.save()
+        # InsuranceTransaction.objects.create(user_insurance=user_insurance,
+        #                                     account=user_insurance.insurance_plan.insurer.float.all().first(),
+        #                                     transaction_type=InsuranceTransaction.CREDIT,
+        #                                     amount=user_insurance.premium_amount)
+        # res['success'] = "Cancellation request recieved, refund will be credited in your account in 10-15 working days"
+        # return Response(data=res, status=status.HTTP_200_OK)
+        return Response(data=response, status=status.HTTP_200_OK)

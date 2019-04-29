@@ -2316,6 +2316,17 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin,
     def __str__(self):
         return "{}, {}".format(self.profile.name if self.profile else "", self.lab.name)
 
+    @classmethod
+    def get_insured_completed_appointment(cls, insurance_obj):
+        count = cls.objects.filter(user=insurance_obj.user, insurance=insurance_obj, status=cls.COMPLETED).count()
+        return count
+
+    @classmethod
+    def get_insured_active_appointment(cls, insurance_obj):
+        appointments = cls.objects.filter(~Q(status=cls.COMPLETED), ~Q(status=cls.CANCELLED), user=insurance_obj.user,
+                                          insurance=insurance_obj)
+        return appointments
+
     class Meta:
         db_table = "lab_appointment"
 

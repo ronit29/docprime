@@ -2524,6 +2524,17 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
         except Exception as e:
             logger.error("Could not save triggered event - " + str(e))
 
+    @classmethod
+    def get_insured_completed_appointment(cls, insurance_obj):
+        count = cls.objects.filter(user=insurance_obj.user, insurance=insurance_obj, status=cls.COMPLETED).count()
+        return count
+
+    @classmethod
+    def get_insured_active_appointment(cls, insurance_obj):
+        appointments = cls.objects.filter(~Q(status=cls.COMPLETED), ~Q(status=cls.CANCELLED), user=insurance_obj.user,
+                                          insurance=insurance_obj)
+        return appointments
+
 
 class OpdAppointmentProcedureMapping(models.Model):
     opd_appointment = models.ForeignKey(OpdAppointment, on_delete=models.CASCADE, related_name='procedure_mappings')

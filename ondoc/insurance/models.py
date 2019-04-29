@@ -1,6 +1,5 @@
 import datetime
 from django.core.validators import FileExtensionValidator
-
 from ondoc.notification.tasks import send_insurance_notifications
 from ondoc.insurance.tasks import push_insurance_buy_to_matrix, push_insurance_banner_lead_to_matrix
 import json
@@ -404,6 +403,12 @@ class InsuranceThreshold(auth_model.TimeStampedModel, LiveMixin):
 class UserInsurance(auth_model.TimeStampedModel):
     from ondoc.account.models import MoneyPool
 
+    ACTIVE = 1
+    CANCELLED = 2
+    EXPIRED = 3
+    ONHOLD = 4
+    STATUS_CHOICES = [(ACTIVE, "Active"), (CANCELLED, "Cancelled"), (EXPIRED, "Expired"), (ONHOLD, "Onhold")]
+
     id = models.BigAutoField(primary_key=True)
     insurance_plan = models.ForeignKey(InsurancePlans, related_name='active_users', on_delete=models.DO_NOTHING)
     user = models.ForeignKey(auth_model.User, related_name='purchased_insurance', on_delete=models.DO_NOTHING)
@@ -418,6 +423,7 @@ class UserInsurance(auth_model.TimeStampedModel):
     price_data = JSONField(blank=True, null=True)
     money_pool = models.ForeignKey(MoneyPool, on_delete=models.SET_NULL, null=True)
     matrix_lead_id = models.IntegerField(null=True)
+    status = models.PositiveIntegerField(choices=STATUS_CHOICES, default=ACTIVE)
     merchant_payout = models.ForeignKey(MerchantPayout, related_name="user_insurance", on_delete=models.DO_NOTHING, null=True)
 
     def __str__(self):
@@ -1127,6 +1133,33 @@ class UserInsurance(auth_model.TimeStampedModel):
                                              user=self.user, triggered_at=datetime.datetime.utcnow())
         except Exception as e:
             logger.error("Could not save triggered event - " + str(e))
+
+    def process_cancellation(self):
+        from ondoc.doctor.models import OpdAppointment
+        from ondoc.diagnostic.models import LabAppointment
+        res = {}
+        opd_appointment_count = OpdAppointment.get_insured_completed_appointment(self)
+        lab_appointment_count = LabAppointment.get_insured_completed_appointment(self)
+        if opd_appointment_count > 0 or lab_appointment_count > 0:
+            res['error'] = "One of the OPD or LAB Appointment have been completed, Cancellation could not be processed"
+            return res
+            # return Response(data=res, status=status.HTTP_400_BAD_REQUEST)
+        opd_active_appointment = OpdAppointment.get_insured_active_appointment(self)
+        lab_active_appointment = LabAppointment.get_insured_active_appointment(self)
+        for appointment in opd_active_appointment:
+            appointment.status = OpdAppointment.CANCELLED
+            appointment.save()
+        for appointment in lab_active_appointment:
+            appointment.status = LabAppointment.CANCELLED
+            appointment.save()
+        self.status = UserInsurance.CANCELLED
+        self.save()
+        InsuranceTransaction.objects.create(user_insurance=self,
+                                            account=self.insurance_plan.insurer.float.all().first(),
+                                            transaction_type=InsuranceTransaction.CREDIT,
+                                            amount=self.premium_amount)
+        res['success'] = "Cancellation request recieved, refund will be credited in your account in 10-15 working days"
+        return res
 
 
 class InsuranceTransaction(auth_model.TimeStampedModel):
