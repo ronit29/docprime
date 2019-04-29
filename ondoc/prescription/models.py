@@ -171,21 +171,21 @@ class PresccriptionPdf(auth_models.TimeStampedModel):
     def get_pdf(self, appointment):
 
 
-        pdf_dict = {'medicines': self.medicines,
-                    'special_instructions': self.special_instructions,
+        pdf_dict = {'medicines': self.medicines if self.medicines else [],
+                    'special_instructions': self.special_instructions if self.special_instructions else [],
                     'pres_id': self.id,
-                    'symptoms_complaints': self.symptoms_complaints,
-                    'diagnoses': self.diagnoses,
+                    'symptoms_complaints': self.symptoms_complaints if self.symptoms_complaints else [],
+                    'diagnoses': self.diagnoses if self.diagnoses else [],
                     'doc_name': appointment.doctor.name,
                     'hosp_name':  appointment.hospital.name,
-                    'tests': self.lab_tests,
+                    'tests': self.lab_tests if self.lab_tests else [],
                     'patient': self.patient_details,
                     'hosp_address': appointment.hospital.get_hos_address(),
                     'doc_qualification': ','.join([str(h.qualification) for h in appointment.doctor.qualifications.all()]),
                     'doc_reg': appointment.doctor.license,
                     'date': self.created_at.strftime('%d %B %Y'),
-                    'followup_date': self.followup_instructions_date.strftime('%d %B %Y %H %i'),
-                    'followup_reason': self.followup_instructions_reason,
+                    'followup_date': self.followup_instructions_date.strftime('%d %B %Y %H %i') if self.followup_instructions_date else '',
+                    'followup_reason': self.followup_instructions_reason if self.followup_instructions_reason else '',
                     'updated_at': self.updated_at
                     }
         html_body = render_to_string("e-prescription/med-invoice.html", context=pdf_dict)

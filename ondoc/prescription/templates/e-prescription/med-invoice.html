@@ -6,6 +6,21 @@
 		<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
 		<link href="https://fonts.googleapis.com/css?family=Quicksand:400,700" rel="stylesheet">
 	</head>
+	<style>
+		@page{
+		margin:20px;
+		}
+		@media print{
+			footer {
+				left:0;
+				position:fixed;
+			}
+			header {
+				left:0;
+				position:fixed;
+			}
+		}
+	</style>
 	<body style="margin: 0; padding: 0;font-family: 'Quicksand', sans-serif;">
 		<table align="center" border="0" cellpadding="0" cellspacing="0" width="600" style="border-collapse: collapse; background: #ffffff;">
 			<tr>
@@ -45,6 +60,7 @@
 			<tr>
 				<td>
 					<table border="0" cellpadding="0" cellspacing="0" width="600" style="  border-collapse: collapse;">
+						{% if symptoms_complaints %}
 						<tr>
 							<td style="padding: 6px; background:#f1efef;border: 1px solid #000000; ">
 								Symptoms/Complaints
@@ -57,6 +73,7 @@
 								</ul>
 							</td>
 						</tr>
+						{% endif %}{% if diagnoses %}
 						<tr>
 							<td style="padding: 6px; background:#f1efef;border: 1px solid #000000; ">
 								Diagnoses
@@ -69,6 +86,7 @@
 								</ul>
 							</td>
 						</tr>
+						{% endif %}{% if special_instructions %}
 						<tr>
 							<td style="padding: 6px; background:#f1efef;border: 1px solid #000000; ">
 								Special Instructions
@@ -81,12 +99,14 @@
 								</ul>
 							</td>
 						</tr>
+						{% endif %}
 					</table>
 				</td>
 			</tr>
 			<tr>
 				<td style="padding: 10px;"></td>
 			</tr>
+			{% if medicines %}
 			<tr>
 				<td>
 					<table border="0" cellpadding="0" cellspacing="0" width="600" style=" border-top: 1px solid #000000; border-bottom: 1px solid #000000;">
@@ -130,6 +150,7 @@
 					</table>
 				</td>
 			</tr>
+			{% endif %}{% if tests %}
 			<tr>
 				<td style="padding: 10px;">
 					
@@ -154,6 +175,7 @@
 					</table>
 				</td>
 			</tr>
+			{% endif %}
 			<tr>
 				<td style="padding: 60px;"></td>
 			</tr>
@@ -161,15 +183,18 @@
 				<td>
 					<table border="0" cellpadding="0" cellspacing="0" width="600" style="border-top: 1px solid #000000;">
 						<tr>
+							{% if followup_date %}
 							<td style="padding: 6px; background:#f1efef;width: 150px; text-align: center;">
 								<p style="margin: 0px;color: #000000; font-size: 12px;">Next Follow Up Date:</p>
 								<p style="margin: 0px;color: #000000; font-size: 12px;">{{ followup_date }}</p>
 							</td>
+							{% endif %}{% if followup_reason %}
 							<td style="border-left: 1px solid #000000;">
 								<div style="padding: 6px 10px 6px 20px; margin: 0">
-									<p style="margin: 0px;color: #000000; font-size: 12px;">{{  followup_reason }}</p>
+									<p style="margin: 0px;color: #000000; font-size: 12px;">{{ followup_reason }}</p>
 								</div>
 							</td>
+							{% endif %}
 						</tr>
 					</table>
 				</td>

@@ -151,6 +151,8 @@ class GeneratePrescriptionPDFBodySerializer(serializers.Serializer):
 
     def validate(self, attrs):
         if attrs:
+            if not (attrs.get('tests') or attrs.get('medicines')):
+                raise serializers.ValidationError("Either one of test or medicines is required for prescription generation")
             appointment = PrescriptionAppointmentValidation.validate_appointment_object(attrs)
             attrs['appointment'] = appointment
             if not appointment.doctor.license:
