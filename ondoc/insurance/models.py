@@ -660,7 +660,7 @@ class UserInsurance(auth_model.TimeStampedModel):
         db_table = "user_insurance"
 
     def is_valid(self):
-        if self.expiry_date >= timezone.now():
+        if self.expiry_date >= timezone.now() and self.status == self.ACTIVE:
             return True
         else:
             return False
