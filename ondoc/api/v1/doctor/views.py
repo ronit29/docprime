@@ -1255,7 +1255,7 @@ class SearchedItemsViewSet(viewsets.GenericViewSet):
         ipd_entity_dict = {}
         if city:
             ipd_entity_qs = EntityUrls.objects.filter(ipd_procedure_id__in=common_ipd_procedure_ids,
-                                                      url_type='SEARCHURL',
+                                                      url_type=EntityUrls.UrlType.PAGEURL,
                                                       entity_type='IpdProcedure',
                                                       is_valid=True,
                                                       locality_value__iexact=city).annotate(
@@ -3594,12 +3594,7 @@ class HospitalViewSet(viewsets.GenericViewSet):
         entity = kwargs.get('entity')
         if not entity:
             if validated_data.get('city'):
-                if validated_data.get('city').lower() in ('bengaluru', 'bengalooru'):
-                    city = 'bangalore'
-                elif validated_data.get('city').lower() in ('gurugram', 'gurugram rural'):
-                    city = 'gurgaon'
-                else:
-                    city = validated_data.get('city')
+                city = city_match(validated_data.get('city'))
                 # IPD_PROCEDURE_COST_IN_IPDP
                 temp_url = slugify(ipd_procedure_obj.name + '-hospitals-in-' + city + '-ipdhp')
                 entity = EntityUrls.objects.filter(url=temp_url, url_type='SEARCHURL', entity_type='Hospital',
@@ -3812,12 +3807,7 @@ class IpdProcedureViewSet(viewsets.GenericViewSet):
         entity = kwargs.get('entity')
         if not entity:
             if validated_data.get('city'):
-                if validated_data.get('city').lower() in ('bengaluru', 'bengalooru'):
-                    city = 'bangalore'
-                elif validated_data.get('city').lower() in ('gurugram', 'gurugram rural'):
-                    city = 'gurgaon'
-                else:
-                    city = validated_data.get('city')
+                city = city_match(validated_data.get('city'))
                 # IPD_PROCEDURE_COST_IN_IPDP
                 temp_url = slugify(ipd_procedure.name + '-cost-in-' + city + '-ipdp')
                 entity = EntityUrls.objects.filter(url=temp_url, url_type=EntityUrls.UrlType.PAGEURL,
