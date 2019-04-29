@@ -140,10 +140,9 @@ class FeatureInline(AutoComplete, TabularInline):
 class IpdProcedureSynonymMappingInline(TabularInline):
     model = IpdProcedureSynonymMapping
     extra = 0
-    max_num = 1
     can_delete = True
-    verbose_name = "IPD Procedure Synonym Mappings"
-    verbose_name_plural = "IPD Procedure Synonym Mappings"
+    verbose_name = "IPD Procedure Synonym"
+    verbose_name_plural = "IPD Procedure Synonyms"
 
 
 
