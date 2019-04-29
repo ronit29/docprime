@@ -1,7 +1,7 @@
 import datetime
 from django.core.validators import FileExtensionValidator
 
-from ondoc.notification.tasks import send_insurance_notifications
+from ondoc.notification.tasks import send_insurance_notifications, send_insurance_float_limit_notifications
 from ondoc.insurance.tasks import push_insurance_buy_to_matrix, push_insurance_banner_lead_to_matrix
 import json
 
@@ -1147,6 +1147,11 @@ class InsuranceTransaction(auth_model.TimeStampedModel):
     reason = models.PositiveSmallIntegerField(null=True, choices=REASON_CHOICES)
 
     def after_commit_tasks(self):
+
+        # Trigger Email if insurer account current float get lower.
+        if self.account.current_float < self.account.insurer.min_float:
+            send_insurance_float_limit_notifications.apply_asunc(({'insurer_id': self.account.insurer.id},))
+
         if self.transaction_type == InsuranceTransaction.DEBIT:
             try:
                 self.user_insurance.generate_pdf()

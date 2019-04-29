@@ -25,6 +25,7 @@ class InsurerAdmin(admin.ModelAdmin):
 
 class InsurerFloatAdmin(admin.ModelAdmin):
     list_display = ['insurer']
+    readonly_fields = ['insurer', 'current_float']
 
 
 class InsurancePlanContentInline(admin.TabularInline):

@@ -59,6 +59,7 @@ class NotificationAction:
     LAB_INVOICE = 11
 
     INSURANCE_CONFIRMED=15
+    INSURANCE_FLOAT_LIMIT=70
     OPD_OTP_BEFORE_APPOINTMENT = 30
     LAB_OTP_BEFORE_APPOINTMENT = 31
     OPD_CONFIRMATION_CHECK_AFTER_APPOINTMENT = 32
@@ -743,6 +744,26 @@ class EmailNotification(TimeStampedModel, EmailNotificationOpdMixin, EmailNotifi
             message = json.dumps(message)
             publish_message(message)
         return booking_url
+
+    @classmethod
+    def send_insurance_float_alert_email(cls, email, html_body):
+        email_subject = 'ALERT!!! Insurance Float amount is on the limit.'
+        if email:
+            email_obj = cls.objects.create(email=email, notification_type=NotificationAction.INSURANCE_FLOAT_LIMIT,
+                                                          content=html_body,email_subject=email_subject, cc=[], bcc=[])
+            email_obj.save()
+
+            email_noti = {
+                "email": email,
+                "content": html_body,
+                "email_subject": email_subject
+            }
+            message = {
+                "data": email_noti,
+                "type": "email"
+            }
+            message = json.dumps(message)
+            publish_message(message)
 
 
 class SmsNotificationOpdMixin:
