@@ -425,6 +425,7 @@ class UserInsurance(auth_model.TimeStampedModel):
     matrix_lead_id = models.IntegerField(null=True)
     status = models.PositiveIntegerField(choices=STATUS_CHOICES, default=ACTIVE)
     merchant_payout = models.ForeignKey(MerchantPayout, related_name="user_insurance", on_delete=models.DO_NOTHING, null=True)
+    onhold_reason = models.CharField(max_length=200, blank=True, null=True, default=None)
 
     def __str__(self):
         return str(self.user)

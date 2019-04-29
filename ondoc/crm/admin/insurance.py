@@ -14,7 +14,7 @@ import nested_admin
 from import_export import fields, resources
 from datetime import datetime
 from ondoc.insurance.models import InsuranceDisease
-from django.core.exceptions import ValidationError
+from django.db import transaction
 from django.conf import settings
 
 
@@ -646,6 +646,40 @@ class UserInsuranceResource(resources.ModelResource):
         return str(insurance.matrix_lead_id)
 
 
+class CustomDateInput(forms.DateInput):
+    input_type = 'date'
+
+
+# class UserInsuranceForm(forms.ModelForm):
+#     start_date = forms.DateField(widget=CustomDateInput(format=('%d-%m-%Y'), attrs={'placeholder': 'Select a date'}))
+#     end_date = forms.DateField(widget=CustomDateInput(format=('%d-%m-%Y'), attrs={'placeholder': 'Select a date'}))
+#
+#     def clean(self):
+#         cleaned_data = super().clean()
+#         start = cleaned_data.get("start_date")
+#         end = cleaned_data.get("end_date")
+#         if start and end and start >= end:
+#             raise forms.ValidationError("Start Date should be less than end Date")
+
+class UserInsuranceForm(forms.ModelForm):
+
+    status_choices = [(UserInsurance.ACTIVE, "Active"), (UserInsurance.CANCELLED, "Cancelled"), (UserInsurance.ONHOLD, "Onhold")]
+    status = forms.ChoiceField(choices=status_choices, required=True)
+    onhold_reason = forms.CharField(max_length=400, required=False)
+
+    def clean(self):
+        super().clean()
+        data = self.cleaned_data
+        status = data.get('status')
+        onhold_reason = data.get('onhold_reason')
+        if int(status) == UserInsurance.ONHOLD:
+            if not onhold_reason:
+                raise forms.ValidationError("In Case of ONHOLD status, Onhold reason is mandatory")
+
+    class Meta:
+        fields = '__all__'
+
+
 class UserInsuranceAdmin(ImportExportMixin, admin.ModelAdmin):
     resource_class = (UserInsuranceDoctorResource, UserInsuranceLabResource, UserInsuranceResource)
     export_template_name = "export_insurance_report.html"
@@ -660,11 +694,15 @@ class UserInsuranceAdmin(ImportExportMixin, admin.ModelAdmin):
         user_profile = UserProfile.objects.filter(user=obj.user).first()
         return str(user_profile.name)
 
+    # def city_name(self, obj):
+    #     cities = InsuranceCity.objects.all().values_list('name', flat=True)
+    #     return cities
+
     list_display = ['id', 'insurance_plan', 'user_name', 'user', 'policy_number', 'purchase_date','merchant_payout']
-    fields = ['insurance_plan', 'user', 'purchase_date', 'expiry_date', 'policy_number', 'premium_amount', 'merchant_payout', 'status']
+    fields = ['insurance_plan', 'user', 'purchase_date', 'expiry_date', 'policy_number', 'premium_amount', 'merchant_payout', 'status', 'onhold_reason']
     readonly_fields = ('insurance_plan', 'user', 'purchase_date', 'expiry_date', 'policy_number', 'premium_amount', 'merchant_payout')
     inlines = [InsuredMembersInline]
-    # form = UserInsuranceForm
+    form = UserInsuranceForm
 
     def get_export_queryset(self, request):
         super().get_export_queryset(request)
@@ -695,34 +733,19 @@ class UserInsuranceAdmin(ImportExportMixin, admin.ModelAdmin):
     def has_delete_permission(self, request, obj=None):
         return False
 
+    @transaction.atomic
     def save_model(self, request, obj, form, change):
         print('data is here')
         # if request.user.is_member_of(constants['INSURANCE_GROUP']):
         if obj.status == UserInsurance.ACTIVE:
             super(UserInsuranceAdmin, self).save_model(request, obj, form, change)
         elif obj.status == UserInsurance.ONHOLD:
-
-            super(UserInsuranceAdmin, self).save_model(request, obj, form, change)
+            if obj.onhold_reason:
+                super(UserInsuranceAdmin, self).save_model(request, obj, form, change)
         elif obj.status == UserInsurance.CANCELLED:
             response = obj.process_cancellation()
-            if response['success']:
+            if response.get('success', None):
                 super(UserInsuranceAdmin, self).save_model(request, obj, form, change)
-
-
-class CustomDateInput(forms.DateInput):
-    input_type = 'date'
-
-
-class UserInsuranceForm(forms.ModelForm):
-    start_date = forms.DateField(widget=CustomDateInput(format=('%d-%m-%Y'), attrs={'placeholder': 'Select a date'}))
-    end_date = forms.DateField(widget=CustomDateInput(format=('%d-%m-%Y'), attrs={'placeholder': 'Select a date'}))
-
-    def clean(self):
-        cleaned_data = super().clean()
-        start = cleaned_data.get("start_date")
-        end = cleaned_data.get("end_date")
-        if start and end and start >= end:
-            raise forms.ValidationError("Start Date should be less than end Date")
 
 
 class InsuranceDiseaseAdmin(admin.ModelAdmin):
