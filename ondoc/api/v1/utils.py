@@ -1506,4 +1506,6 @@ def ipd_query_parameters(entity, req_params):
         params_dict["long"] = entity.sublocality_longitude
     elif entity.locality_longitude:
         params_dict["long"] = entity.locality_longitude
+    if req_params.get('city'):
+        params_dict['city'] = req_params.get('city')
     return params_dict
