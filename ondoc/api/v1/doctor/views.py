@@ -3856,3 +3856,31 @@ class IpdProcedureViewSet(viewsets.GenericViewSet):
         serializer.is_valid(raise_exception=True)
         obj_created = serializer.save()
         return Response(serializers.IpdProcedureLeadSerializer(obj_created).data)
+
+    def list_by_alphabet(self, request):
+        import re
+        alphabet = request.query_params.get('alphabet')
+        city = request.query_params.get('city')
+        if city:
+            city_match(city)
+        if not alphabet or not re.match(r'^[a-zA-Z]$', alphabet):
+            return Response(status=status.HTTP_400_BAD_REQUEST)
+        response = {}
+        ipdp_count = 0
+        entity_dict = {}
+        ipd_procedures = list(IpdProcedure.objects.filter(is_enabled=True, name__istartswith=alphabet).order_by('name').values('id', 'name'))
+        ipd_procedure_ids = [x.get('id') for x in ipd_procedures]
+        entity_qs = EntityUrls.objects.filter(url_type=EntityUrls.UrlType.PAGEURL,
+                                              entity_type='IpdProcedure',
+                                              is_valid=True,
+                                              ipd_procedure_id__in=ipd_procedure_ids,
+                                              locality_value__iexact=city)
+        if entity_qs:
+            entity_dict = {x.ipd_procedure_id: x.url for x in entity_qs}
+        for ipd_procedure in ipd_procedures:
+            ipd_procedure['url'] = entity_dict.get(ipd_procedure.get('id'), None)
+        ipdp_count = len(ipd_procedures)
+        response['count'] = ipdp_count
+        response['ipd_procedures'] = ipd_procedures
+
+        return Response(response)
