@@ -47,7 +47,7 @@ from ondoc.insurance.models import (Insurer, InsurancePlans, InsuranceThreshold,
 from ondoc.procedure.models import Procedure, ProcedureCategory, CommonProcedureCategory, DoctorClinicProcedure, \
     ProcedureCategoryMapping, ProcedureToCategoryMapping, CommonProcedure, IpdProcedure, IpdProcedureFeatureMapping, \
     DoctorClinicIpdProcedure, IpdProcedureCategoryMapping, IpdProcedureCategory, CommonIpdProcedure, \
-    IpdProcedureDetailType, IpdProcedureDetail
+    IpdProcedureDetailType, IpdProcedureDetail, IpdProcedureSynonym, IpdProcedureSynonymMapping
 from ondoc.reports import models as report_models
 
 from ondoc.diagnostic.models import LabPricing
@@ -534,7 +534,7 @@ class Command(BaseCommand):
                                                            DoctorClinic, DoctorClinicIpdProcedure,
                                                            HealthInsuranceProviderHospitalMapping, IpdProcedureCategoryMapping, CommonIpdProcedure,
                                                            HospitalHelpline, IpdProcedure, HospitalTiming,
-                                                           IpdProcedureDetailType, IpdProcedureDetail)
+                                                           IpdProcedureDetailType, IpdProcedureDetail, IpdProcedureSynonym, IpdProcedureSynonymMapping)
         for cl, ct in content_types.items():
             permissions = Permission.objects.filter(
                 Q(content_type=ct),
@@ -804,7 +804,7 @@ class Command(BaseCommand):
                 Q(codename='add_' + ct.model) |
                 Q(codename='change_' + ct.model))
 
-        group.permissions.add(*permissions)
+            group.permissions.add(*permissions)
 
         content_types = ContentType.objects.get_for_models(AssociatedMerchant)
 
@@ -815,16 +815,16 @@ class Command(BaseCommand):
                 Q(codename='change_' + ct.model) |
                 Q(codename='delete_' + ct.model))
 
-        group.permissions.add(*permissions)
+            group.permissions.add(*permissions)
 
-        content_types = ContentType.objects.get_for_models(MerchantPayout)
+        content_types = ContentType.objects.get_for_models(MerchantPayout, UserInsurance)
 
         for cl, ct in content_types.items():
             permissions = Permission.objects.filter(
                 Q(content_type=ct),
                 Q(codename='change_' + ct.model))
 
-        group.permissions.add(*permissions)
+            group.permissions.add(*permissions)
 
 
     def create_elastic_group(self):

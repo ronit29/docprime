@@ -1625,7 +1625,7 @@ class DoctorListViewSet(viewsets.GenericViewSet):
                 "description": description,
                 "location": location,
                 "image": static('web/images/dclogo-placeholder.png'),
-                "schema": self.get_schema(request) if validated_data['url'] == 'dentist-in-gurgaon-sptcit' else None
+                "schema": None
             }
 
 
@@ -1721,6 +1721,8 @@ class DoctorListViewSet(viewsets.GenericViewSet):
                 entity = EntityUrls.objects.filter(url=url, url_type='SEARCHURL', entity_type='Doctor', is_valid=True)
                 if entity:
                     canonical_url = entity[0].url
+        if seo:
+            seo['schema'] = self.get_schema(request, response) if validated_data['url'] and validated_data['url'] == 'dentist-in-gurgaon-sptcit' else None
 
         if restrict_result_count:
             response = response[:restrict_result_count]
@@ -1745,6 +1747,7 @@ class DoctorListViewSet(viewsets.GenericViewSet):
             ratings = validated_data.get('ratings')
         if validated_data.get('reviews'):
             reviews = validated_data.get('reviews')
+
         return Response({"result": response, "count": result_count,
                          'specializations': specializations, 'conditions': conditions, "seo": seo,
                          "breadcrumb": breadcrumb, 'search_content': top_content,
@@ -1752,50 +1755,23 @@ class DoctorListViewSet(viewsets.GenericViewSet):
                          'ratings':ratings, 'reviews': reviews, 'ratings_title': ratings_title,
                          'bottom_content': bottom_content, 'canonical_url': canonical_url,
                          'ipd_procedures': ipd_procedures})
-    def get_schema(self, request):
-        return  {
-                    "@context": "http://schema.org",
+
+    def get_schema(self, request, response):
+
+        itemListElement = list()
+        count = 1
+
+        for resp in response[:20]:
+            if resp.get('url'):
+                itemListElement.append({"@type": "ListItem", "position": count,
+                                    "url": request.build_absolute_uri("/" + resp.get('url'))})
+                count += 1
+
+        return {"@context": "http://schema.org",
                     "@type": "ItemList",
-                        "itemListElement": [{"@type": "ListItem", "position": 1, "url": request.build_absolute_uri(
-                            "/dr-varun-gaur-dentist-prosthodontist-in-sector-11-gurgaon-dpp")},
-                                            {"@type": "ListItem", "position": 2,
-                                             "url": request.build_absolute_uri("/dr-himanshu-arora-dentist-in-sector-4-gurgaon-dpp")},
-                                            {"@type": "ListItem", "position": 3,
-                                             "url": request.build_absolute_uri("/dr-kanchan-dudeja-dentist-in-sector-31-gurgaon-dpp")},
-                                            {"@type": "ListItem", "position": 4,
-                                             "url": request.build_absolute_uri("/dr-sudhir-yadav-dentist-in-civil-lines-gurgaon-dpp")},
-                                            {"@type": "ListItem", "position": 5,
-                                             "url": request.build_absolute_uri("/dr-varun-dahiya-dentist-periodontist-in-civil-lines-gurgaon-dpp")},
-                                            {"@type": "ListItem", "position": 6,
-                                             "url": request.build_absolute_uri("/dr-archna-yadav-dentist-in-civil-lines-gurgaon-dpp")},
-                                            {"@type": "ListItem", "position": 7,
-                                             "url": request.build_absolute_uri("/dr-kunal-nischal-dentist-implantologist-in-sector-31-gurgaon-dpp")},
-                                            {"@type": "ListItem", "position": 8,
-                                             "url": request.build_absolute_uri("/dr-parul-giri-verma-dentist-prosthodontist-in-sector-31-gurgaon-dpp")},
-                                            {"@type": "ListItem", "position": 9,
-                                             "url": request.build_absolute_uri("/dr-aishna-sharma-dentist-in-sector-31-gurgaon-dpp")},
-                                            {"@type": "ListItem", "position": 10, "url": request.build_absolute_uri(
-                                                "/dr-ankita-gupta-dentist-orthodontist-in-sector-31-gurgaon-dpp")},
-                                            {"@type": "ListItem", "position": 11, "url": request.build_absolute_uri(
-                                                "/dr-priya-gupta-dentist-in-sector-11-gurgaon-dpp")},
-                                            {"@type": "ListItem", "position": 12,
-                                             "url": request.build_absolute_uri("/opd/doctor/87358")},
-                                            {"@type": "ListItem", "position": 13, "url": request.build_absolute_uri(
-                                                "/dr-usha-nishal-dentist-in-sector-40-gurgaon-dpp")},
-                                            {"@type": "ListItem", "position": 14, "url": request.build_absolute_uri(
-                                                "/dr-major-ankit-gupta-dentist-orthodontist-in-civil-lines-gurgaon-dpp")},
-                                            {"@type": "ListItem", "position": 15, "url": request.build_absolute_uri(
-                                                "/dr-anil-k-sheorain-oral-maxillofacial-surgeon-dentist-in-sector-27-gurgaon-dpp")},
-                                            {"@type": "ListItem", "position": 16, "url": request.build_absolute_uri(
-                                                "/dr-shweta-yadav-dentist-in-sector-38-gurgaon-dpp")},
-                                            {"@type": "ListItem", "position": 17, "url": request.build_absolute_uri(
-                                                "/dr-aparna-jain-dentist-in-sector-15-gurgaon-dpp")},
-                                            {"@type": "ListItem", "position": 18, "url": request.build_absolute_uri(
-                                                "/dr-pankaj-jain-dentist-in-sector-15-gurgaon-dpp")},
-                                            {"@type": "ListItem", "position": 19, "url": request.build_absolute_uri(
-                                                "/dr-anjali-kesar-dentist-in-sector-15-gurgaon-dpp")},
-                                            {"@type": "ListItem", "position": 20, "url": request.build_absolute_uri(
-                                                "/dr-komal-nebhnani-dentist-paedodontist-and-preventive-dentistry-specialist-childrens-teeth-specialist-in-sector-38-gurgaon-dpp")}]}
+                 "itemListElement": itemListElement
+                 }
+
 
     def get_spec_city_title_desc(self, specialization_id, city, specialization):
 
