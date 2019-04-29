@@ -1280,7 +1280,7 @@ class LabTestToRecommendedCategoryInlineForm(forms.ModelForm):
         if any(self.errors):
             return
         cleaned_data = self.cleaned_data
-        if self.instance and self.instance.lab_test and self.instance.lab_test.is_package:
+        if self.instance and self.instance.id and self.instance.lab_test and self.instance.lab_test.is_package:
             raise forms.ValidationError("Recommended category can only be added on lab test.")
         temp_recommended_category = cleaned_data.get('parent_category')
         if temp_recommended_category and not temp_recommended_category.is_package_category:

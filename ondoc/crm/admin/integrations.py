@@ -90,3 +90,4 @@ class IntegratorTestParameterMappingAdmin(admin.ModelAdmin):
     model = IntegratorTestParameterMapping
     list_display = ['integrator_test_name', 'integrator_class_name']
     readonly_fields = ('integrator_test_name',)
+    autocomplete_fields = ['test_parameter']
