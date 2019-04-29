@@ -431,8 +431,8 @@ class IpdProcedureSynonym(auth_model.TimeStampedModel):
 
 
 class IpdProcedureSynonymMapping(auth_model.TimeStampedModel):
-    ipd_procedure_synonym_id = models.ForeignKey(IpdProcedureSynonym, on_delete=models.CASCADE)
-    ipd_procedure_id = models.ForeignKey(IpdProcedure, on_delete=models.CASCADE)
+    ipd_procedure_synonym = models.ForeignKey(IpdProcedureSynonym, on_delete=models.CASCADE)
+    ipd_procedure = models.ForeignKey(IpdProcedure, on_delete=models.CASCADE)
     order = models.IntegerField(null=True, blank=True)
 
     def __str__(self):

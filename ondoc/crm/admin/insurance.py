@@ -659,9 +659,9 @@ class UserInsuranceAdmin(ImportExportMixin, admin.ModelAdmin):
         user_profile = UserProfile.objects.filter(user=obj.user).first()
         return str(user_profile.name)
 
-    list_display = ['id', 'insurance_plan', 'user_name', 'user', 'policy_number', 'purchase_date']
-    fields = ['insurance_plan', 'user', 'purchase_date', 'expiry_date', 'policy_number', 'premium_amount']
-    readonly_fields = ('insurance_plan', 'user', 'purchase_date', 'expiry_date', 'policy_number', 'premium_amount',)
+    list_display = ['id', 'insurance_plan', 'user_name', 'user', 'policy_number', 'purchase_date','merchant_payout']
+    fields = ['insurance_plan', 'user', 'purchase_date', 'expiry_date', 'policy_number', 'premium_amount','merchant_payout']
+    readonly_fields = ('insurance_plan', 'user', 'purchase_date', 'expiry_date', 'policy_number', 'premium_amount','merchant_payout')
     inlines = [InsuredMembersInline]
     # form = UserInsuranceForm
 
