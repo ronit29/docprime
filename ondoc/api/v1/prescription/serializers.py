@@ -40,14 +40,14 @@ class PrescriptionAppointmentValidation():
 
 class PrescriptionMedicineBodySerializer(serializers.Serializer):
     name = serializers.CharField(max_length=64)
-    quantity = serializers.IntegerField(required=False)
-    dosage_type = serializers.ChoiceField(choices=prescription_models.PrescriptionMedicine.DOSAGE_TYPE_CHOICES, required=False)
+    quantity = serializers.IntegerField(required=False, allow_null=True)
+    dosage_type = serializers.ChoiceField(choices=prescription_models.PrescriptionMedicine.DOSAGE_TYPE_CHOICES, required=False, allow_null=True)
     time = serializers.ListField(child=serializers.CharField(max_length=64), allow_empty=True, required=False)
-    duration_type = serializers.ChoiceField(choices=prescription_models.PrescriptionMedicine.DURATION_TYPE_CHOICES, required=False)
-    duration = serializers.IntegerField(required=False)
+    duration_type = serializers.ChoiceField(choices=prescription_models.PrescriptionMedicine.DURATION_TYPE_CHOICES, required=False, allow_null=True)
+    duration = serializers.IntegerField(required=False, allow_null=True)
     # instruction = serializers.CharField(max_length=256, required=False)
-    is_before_meal = serializers.NullBooleanField(required=False)
-    additional_notes = serializers.CharField(max_length=256, required=False)
+    is_before_meal = serializers.NullBooleanField(required=False, allow_null=True)
+    additional_notes = serializers.CharField(max_length=256, required=False, allow_null=True)
 
     def validate(self, attrs):
         if attrs.get('duration_type'):
