@@ -41,7 +41,7 @@ class PrescriptionAppointmentValidation():
 class PrescriptionMedicineBodySerializer(serializers.Serializer):
     name = serializers.CharField(max_length=64)
     quantity = serializers.IntegerField(required=False)
-    type = serializers.ChoiceField(choices=prescription_models.PrescriptionMedicine.DOSAGE_TYPE_CHOICES, required=False)
+    dosage_type = serializers.ChoiceField(choices=prescription_models.PrescriptionMedicine.DOSAGE_TYPE_CHOICES, required=False)
     time = serializers.ListField(child=serializers.CharField(max_length=64), allow_empty=True, required=False)
     duration_type = serializers.ChoiceField(choices=prescription_models.PrescriptionMedicine.DURATION_TYPE_CHOICES, required=False)
     duration = serializers.IntegerField(required=False)
@@ -75,7 +75,7 @@ class PrescriptionDiagnosesBodySerializer(serializers.Serializer):
 
 class PrescriptionPatientSerializer(serializers.Serializer):
     name = serializers.CharField(max_length=64)
-    age = serializers.IntegerField(required=False)
+    age = serializers.IntegerField(required=False, allow_null=True)
     gender = serializers.CharField(max_length=6)
     phone_number = serializers.IntegerField(required=False, allow_null=True)
 
@@ -138,10 +138,10 @@ class PrescriptionComponentSyncSerializer(serializers.Serializer):
 
 
 class GeneratePrescriptionPDFBodySerializer(serializers.Serializer):
-    symptoms_complaints = serializers.ListField(child=PrescriptionSymptomsComplaintsBodySerializer(), allow_empty=True)
+    symptoms_complaints = serializers.ListField(child=PrescriptionSymptomsComplaintsBodySerializer(), allow_empty=True, required=False)
     tests = serializers.ListField(child=PrescriptionTestsBodySerializer(),required=False, allow_empty=True)
-    special_instructions = serializers.ListField(child=PrescriptionSpecialInstructionsBodySerializer(), allow_empty=True)
-    diagnoses = serializers.ListField(child=PrescriptionDiagnosesBodySerializer(),required=False, allow_empty=True)
+    special_instructions = serializers.ListField(child=PrescriptionSpecialInstructionsBodySerializer(), allow_empty=True, required=False)
+    diagnoses = serializers.ListField(child=PrescriptionDiagnosesBodySerializer(), required=False, allow_empty=True)
     patient_details = PrescriptionPatientSerializer()
     medicines = serializers.ListField(child=PrescriptionMedicineBodySerializer(),required=False, allow_empty=True)
     appointment_id = serializers.CharField(required=False)
