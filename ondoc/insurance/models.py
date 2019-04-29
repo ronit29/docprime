@@ -428,6 +428,14 @@ class UserInsurance(auth_model.TimeStampedModel):
             self.create_payout()
         super().save(*args, **kwargs)
 
+        try:
+            self.generate_pdf()
+        except Exception as e:
+            logger.error('Insurance coi pdf cannot be generated. %s' % str(e))
+
+        send_insurance_notifications.apply_async(({'user_id': self.user.id}, ),
+                                                 link=push_insurance_buy_to_matrix.s(user_id=self.user.id), countdown=1)
+
     def create_payout(self):
         if self.merchant_payout:
             raise Exception("payout already created for this insurance purchase")
@@ -1149,17 +1157,18 @@ class InsuranceTransaction(auth_model.TimeStampedModel):
     def after_commit_tasks(self):
 
         # Trigger Email if insurer account current float get lower.
-        if self.account.current_float < self.account.insurer.min_float:
-            send_insurance_float_limit_notifications.apply_asunc(({'insurer_id': self.account.insurer.id},))
+        insurer_account = InsurerAccount.objects.filter(id=self.account.id).first()
+        if insurer_account.current_float < self.account.insurer.min_float:
+            send_insurance_float_limit_notifications.apply_async(({'insurer_id': self.account.insurer.id},))
 
-        if self.transaction_type == InsuranceTransaction.DEBIT:
-            try:
-                self.user_insurance.generate_pdf()
-            except Exception as e:
-                logger.error('Insurance coi pdf cannot be generated. %s' % str(e))
-
-            send_insurance_notifications.apply_async(({'user_id': self.user_insurance.user.id}, ),
-                                                     link=push_insurance_buy_to_matrix.s(user_id=self.user_insurance.user.id), countdown=1)
+        # if self.transaction_type == InsuranceTransaction.DEBIT:
+        #     try:
+        #         self.user_insurance.generate_pdf()
+        #     except Exception as e:
+        #         logger.error('Insurance coi pdf cannot be generated. %s' % str(e))
+        #
+        #     send_insurance_notifications.apply_async(({'user_id': self.user_insurance.user.id}, ),
+        #                                              link=push_insurance_buy_to_matrix.s(user_id=self.user_insurance.user.id), countdown=1)
 
     def save(self, *args, **kwargs):
         #should never be saved again
