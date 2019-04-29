@@ -1262,7 +1262,7 @@ class AppointmentRetrieveSerializer(OpdAppointmentSerializer):
         fields = ('id', 'patient_image', 'patient_name', 'type', 'profile', 'otp', 'is_rated', 'rating_declined',
                   'allowed_action', 'effective_price', 'deal_price', 'status', 'time_slot_start', 'time_slot_end',
                   'doctor', 'hospital', 'allowed_action', 'doctor_thumbnail', 'patient_thumbnail', 'procedures', 'mrp',
-                  'insurance', 'invoices', 'cancellation_reason', 'payment_type')
+                  'insurance', 'invoices', 'cancellation_reason', 'payment_type', 'display_name')
 
     def get_insurance(self, obj):
         request = self.context.get("request")
@@ -1373,8 +1373,8 @@ class CommonSpecializationsSerializer(serializers.ModelSerializer):
 
     def get_url(self, obj):
         url = None
-        if self.context and self.context.get('spec_urls'):
-            url = self.context.get('spec_urls')[obj.specialization_id]
+        if self.context and self.context.get('spec_urls', {}):
+            url = self.context.get('spec_urls').get(obj.specialization_id, None)
         return url
 
     class Meta:

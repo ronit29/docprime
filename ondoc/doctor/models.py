@@ -2174,6 +2174,7 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
         payout_data = {
             "charged_amount" : self.effective_price,
             "payable_amount" : self.fees,
+            "booking_type"   : Order.DOCTOR_PRODUCT_ID
         }
 
         merchant_payout = MerchantPayout.objects.create(**payout_data)

@@ -527,6 +527,28 @@ class WHTSAPPNotification:
             data.append(self.context.get('doctor_name'))
             data.append(self.context.get('patient_name'))
 
+        elif notification_type == NotificationAction.OPD_CONFIRMATION_CHECK_AFTER_APPOINTMENT:
+            body_template = 'appointment_confirmation_check'
+
+            data.append(self.context.get('patient_name'))
+            data.append(self.context.get('instance').id)
+            data.append(self.context.get('doctor_name'))
+            data.append(datetime.strftime(aware_time_zone(self.context.get('instance').time_slot_start), '%d-%m-%Y'))
+            data.append(datetime.strftime(aware_time_zone(self.context.get('instance').time_slot_start), '%H:%M'))
+            data.append(self.context.get('opd_appointment_complete_url'))
+            data.append(self.context.get('reschdule_appointment_bypass_url'))
+
+        elif notification_type == NotificationAction.OPD_CONFIRMATION_SECOND_CHECK_AFTER_APPOINTMENT:
+            body_template = 'appointment_confirmation_second_check'
+
+            data.append(self.context.get('patient_name'))
+            data.append(self.context.get('instance').id)
+            data.append(self.context.get('doctor_name'))
+            data.append(datetime.strftime(aware_time_zone(self.context.get('instance').time_slot_start), '%d-%m-%Y'))
+            data.append(datetime.strftime(aware_time_zone(self.context.get('instance').time_slot_start), '%H:%M'))
+            data.append(self.context.get('opd_appointment_complete_url'))
+            data.append(self.context.get('reschdule_appointment_bypass_url'))
+
         elif notification_type == NotificationAction.LAB_APPOINTMENT_ACCEPTED or \
                 notification_type == NotificationAction.LAB_OTP_BEFORE_APPOINTMENT:
             body_template = "appointment_accepted"
