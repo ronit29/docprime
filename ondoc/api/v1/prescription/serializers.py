@@ -137,6 +137,7 @@ class PrescriptionComponentBodySerializer(serializers.Serializer):
             raise serializers.ValidationError("component with this name already exists")
         if attrs.get("type") == PrescriptionModelComponents.TESTS and diag_models.LabTest.objects.filter(name__iexact=attrs.get("name")).exists():
             raise serializers.ValidationError("Lab Test already exists")
+        return attrs
 
 
 class PrescriptionComponentSyncSerializer(serializers.Serializer):
@@ -145,6 +146,7 @@ class PrescriptionComponentSyncSerializer(serializers.Serializer):
 
 
 class GeneratePrescriptionPDFBodySerializer(serializers.Serializer):
+    id = serializers.UUIDField()
     symptoms_complaints = serializers.ListField(child=PrescriptionSymptomsComplaintsBodySerializer(), allow_empty=True, required=False)
     tests = serializers.ListField(child=PrescriptionTestsBodySerializer(),required=False, allow_empty=True)
     special_instructions = serializers.ListField(child=PrescriptionSpecialInstructionsBodySerializer(), allow_empty=True, required=False)
@@ -164,9 +166,30 @@ class GeneratePrescriptionPDFBodySerializer(serializers.Serializer):
             attrs['appointment'] = appointment
             if not appointment.doctor.license:
                 raise serializers.ValidationError("Registration Number is required for Generating Prescription")
-            elif not appointment.doctor.is_license_verified:
-                raise serializers.ValidationError("Registration Number needs to be Verified")
+            serial_id = prescription_models.PresccriptionPdf.get_serial(appointment)
+            prescription_queryset = prescription_models.PresccriptionPdf.objects.filter(appointment_id=appointment.id)
+            if prescription_queryset.exists():
+                queryset = prescription_queryset.filter(id=attrs.get("id"))
+                if queryset.exists():
+                    attrs['task'] = prescription_models.PresccriptionPdf.UPDATE
+                    obj = queryset.first()
+                    version = str(int(obj.serial_id[-2:]) + 1).zfill(2)
+                    attrs['serial_id'] = serial_id[-12:-2] + version
+                else:
+                    attrs['task'] = prescription_models.PresccriptionPdf.CREATE
+                    file_no = str(int(serial_id[-5:-3]) + 1).zfill(2)
+                    attrs['serial_id'] = serial_id[-12:-5] + file_no + serial_id[-3:]
+            else:
+                attrs['task'] = prescription_models.PresccriptionPdf.CREATE
+                attrs['serial_id'] = str(int(serial_id[-12:-6]) + 1) + serial_id[-6:]
         return attrs
+
+
+class PrescriptionPdfModelSerializer(serializers.ModelSerializer):
+
+    class Meta:
+        model = prescription_models.PresccriptionPdf
+        fields = '__all__'
 
 
 class PrescriptionResponseSerializer(serializers.ModelSerializer):

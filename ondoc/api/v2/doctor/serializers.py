@@ -160,6 +160,7 @@ class ProviderSignupValidations:
         lab_admin_exists = ProviderSignupValidations.lab_admin_exists(attrs)
         return (admin_exists or lab_admin_exists or provider_signup_lead_exists)
 
+
 class GenerateOtpSerializer(serializers.Serializer):
     phone_number = serializers.IntegerField(min_value=5000000000,max_value=9999999999)
 

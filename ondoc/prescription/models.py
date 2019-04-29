@@ -150,10 +150,17 @@ class PrescriptionTests(PrescriptionEntity):
 
 
 class PresccriptionPdf(auth_models.TimeStampedModel):
+
+    SERIAL_ID_START = 600000
+
+    CREATE = 1
+    UPDATE = 2
+
     DOCPRIME_OPD = 1
     DOCPRIME_LAB = 2
     OFFLINE = 3
 
+    PRESCRIPTION_STORAGE_FOLDER = 'prescription/pdf'
     APPOINTMENT_TYPE_CHOICES = [(DOCPRIME_OPD, "Docprime_Opd"), (DOCPRIME_LAB, "Docprime_Lab"), (OFFLINE, "OFFline")]
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     symptoms_complaints = JSONField(blank=True, null=True)
@@ -166,7 +173,8 @@ class PresccriptionPdf(auth_models.TimeStampedModel):
     patient_details = JSONField(blank=True, null=True)
     appointment_id = models.CharField(max_length=64)
     appointment_type = models.PositiveSmallIntegerField(choices=APPOINTMENT_TYPE_CHOICES)
-    prescription_file = models.FileField(upload_to='prescription/pdf', validators=[FileExtensionValidator(allowed_extensions=['pdf'])], null=True)
+    prescription_file = models.FileField(upload_to=PRESCRIPTION_STORAGE_FOLDER, validators=[FileExtensionValidator(allowed_extensions=['pdf'])], null=True)
+    serial_id = models.CharField(max_length=100)
 
     def get_pdf(self, appointment):
 
@@ -189,13 +197,24 @@ class PresccriptionPdf(auth_models.TimeStampedModel):
                     'updated_at': self.updated_at
                     }
         html_body = render_to_string("e-prescription/med-invoice.html", context=pdf_dict)
-        filename = "prescription_{}_{}.pdf".format(str(timezone.now().strftime("%I%M_%d%m%Y")),
-                                              random.randint(1111111111, 9999999999))
+        filename = "{}_{}_{}_{}.pdf".format(self.patient_details['name'].partition(' ')[0], self.serial_id,
+                                            str(timezone.now().strftime("%H%M%S")), random.randint(11111, 99999))
         file = utils.html_to_pdf(html_body, filename)
         if not file:
             logger.error("Got error while creating pdf for lab invoice.")
             return []
         return file
+
+    @classmethod
+    def get_serial(cls, appointment):
+        doctor_id = appointment.doctor.id
+        hospital_id = appointment.hospital.id
+        obj = cls.objects.filter(serial_id__contains=str(hospital_id)+'-'+str(doctor_id)).order_by('-serial_id').first()
+        if obj:
+            serial = obj.invoice_serial_id[-12:]
+            return serial
+        else:
+            return str(cls.SERIAL_ID_START) + '-01-01'
 
     def __str__(self):
         return self.appointment_id
@@ -204,3 +223,13 @@ class PresccriptionPdf(auth_models.TimeStampedModel):
         db_table = 'eprescription_pdf'
 
 
+class PrescriptionHistory(auth_models.TimeStampedModel):
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    data = JSONField()
+
+    def __str__(self):
+        return self.id
+
+    class Meta:
+        db_table = 'eprescription_history'
