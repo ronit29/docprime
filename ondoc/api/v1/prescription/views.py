@@ -33,10 +33,15 @@ class PrescriptionGenerateViewSet(viewsets.GenericViewSet):
         valid_data = serializer.validated_data
         task = valid_data.pop("task")
         appointment = valid_data.pop("appointment")
+        appointment_id = valid_data.pop("appointment_id")
         valid_data['serial_id'] = str(appointment.hospital.id) + '-' + str(appointment.doctor.id) + '-' + valid_data["serial_id"]
         try:
             if task == prescription_models.PresccriptionPdf.CREATE:
-                prescription_pdf = prescription_models.PresccriptionPdf.objects.create(**valid_data)
+                prescription_pdf = prescription_models.PresccriptionPdf.objects.create(**valid_data,
+                                                                                       opd_appointment=appointment if valid_data.get(
+                                                                                           'appointment_type') == prescription_models.PresccriptionPdf.DOCPRIME_OPD else None,
+                                                                                       offline_opd_appointment=appointment if valid_data.get(
+                                                                                           'appointment_type') == prescription_models.PresccriptionPdf.OFFLINE else None)
             else:
                 prescription_pdf = valid_data.pop("prescription_pdf")
                 # prescription_pdf_queryset = prescription_models.PresccriptionPdf.objects.filter(id=valid_data.get("id"),
@@ -46,15 +51,17 @@ class PrescriptionGenerateViewSet(viewsets.GenericViewSet):
                                                                        data=model_serializer.data)
                 # prescription_pdf_queryset.update(**valid_data)
                 # prescription_pdf = prescription_pdf_queryset.first()
+                prescription_pdf.serial_id = valid_data.get('serial_id')
                 prescription_pdf.symptoms_complaints = valid_data.get('symptoms_complaints')
                 prescription_pdf.tests = valid_data.get('tests')
                 prescription_pdf.special_instructions = valid_data.get('special_instructions')
                 prescription_pdf.diagnoses = valid_data.get('diagnoses')
                 prescription_pdf.patient_details = valid_data.get('patient_details')
                 prescription_pdf.medicines = valid_data.get('medicines')
-
-                prescription_pdf.opd_appointment = valid_data.get('opd_appointment')
-                prescription_pdf.offline_opd_appointment = valid_data.get('offline_opd_appointment')
+                if valid_data.get('appointment_type') == prescription_models.PresccriptionPdf.DOCPRIME_OPD:
+                    prescription_pdf.opd_appointment = appointment
+                else:
+                    prescription_pdf.offline_opd_appointment = appointment
                 prescription_pdf.appointment_type = valid_data.get('appointment_type')
                 prescription_pdf.followup_date = valid_data.get('followup_date')
                 prescription_pdf.followup_reason = valid_data.get('followup_reason')

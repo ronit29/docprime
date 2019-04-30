@@ -85,7 +85,7 @@ from ondoc.api.v1.ratings.serializers import GoogleRatingsGraphSerializer
 logger = logging.getLogger(__name__)
 import random
 from ondoc.prescription import models as pres_models
-
+from ondoc.api.v1.prescription import serializers as pres_serializers
 
 class CreateAppointmentPermission(permissions.BasePermission):
     message = 'creating appointment is not allowed.'
@@ -3293,11 +3293,11 @@ class OfflineCustomerViewSet(viewsets.GenericViewSet):
         online_queryset = get_opd_pem_queryset(request.user, models.OpdAppointment)\
             .select_related('profile', 'merchant_payout')\
             .prefetch_related('prescriptions', 'prescriptions__prescription_file', 'mask_number',
-                              'profile__insurance', 'profile__insurance__user_insurance').distinct('id', 'time_slot_start')
+                              'profile__insurance', 'profile__insurance__user_insurance', 'eprescription').distinct('id', 'time_slot_start')
 
         offline_queryset = get_opd_pem_queryset(request.user, models.OfflineOPDAppointments)\
             .select_related('user')\
-            .prefetch_related('user__patient_mobiles').distinct('id')
+            .prefetch_related('user__patient_mobiles', 'eprescription', 'offline_prescription', 'partners_app_invoice').distinct('id')
         start_date = valid_data.get('start_date')
         end_date = valid_data.get('end_date')
         updated_at = valid_data.get('updated_at')
@@ -3344,9 +3344,12 @@ class OfflineCustomerViewSet(viewsets.GenericViewSet):
             mask_data = None
             mrp = None
             payment_type = None
-            invoice_data = None
+            invoice_data = invoice = None
             if instance == OFFLINE:
-                invoice = app.partners_app_invoice.filter(is_valid=True).order_by('-updated_at').first()
+                for inv in app.partners_app_invoice.all():
+                    if inv.is_valid:
+                        invoice = inv
+                        break
                 invoice_data = v2_serializers.PartnersAppInvoiceModelSerialier(invoice).data if invoice else None
                 patient_profile = OfflinePatientSerializer(app.user).data
                 is_docprime = False
@@ -3360,6 +3363,8 @@ class OfflineCustomerViewSet(viewsets.GenericViewSet):
                 patient_profile['patient_numbers'] = phone_number
                 error_flag = app.error if app.error else False
                 error_message = app.error_message if app.error_message else ''
+                prescription = app.get_prescriptions(request)
+
             else:
                 is_docprime = True
                 effective_price = app.effective_price
@@ -3423,6 +3428,7 @@ class OfflineCustomerViewSet(viewsets.GenericViewSet):
             ret_obj['error_message'] = error_message
             ret_obj['type'] = 'doctor'
             ret_obj['prescriptions'] = prescription
+            ret_obj['e-prescriptions'] = pres_serializers.PrescriptionPDFModelSerializer(app.eprescription, many=True, context={"request": request}).data
             ret_obj['invoice'] = invoice_data
             final_result.append(ret_obj)
         return Response(final_result)

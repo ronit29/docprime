@@ -25,18 +25,18 @@ class PrescriptionAppointmentValidation():
             raise serializers.ValidationError('Appointment data invalid')
         return attrs
 
-    # @staticmethod
-    # def validate_appointment_object(attrs):
-    #     if attrs and attrs.get('appointment_type') == prescription_models.PresccriptionPdf.OFFLINE:
-    #         queryset = doc_models.OfflineOPDAppointments.objects.select_related('doctor', 'hospital', 'user').filter(id=attrs.get('appointment_id'))
-    #     elif attrs.get('appointment_type') == prescription_models.PresccriptionPdf.DOCPRIME_OPD:
-    #         queryset = doc_models.OpdAppointment.objects.select_related('doctor', 'hospital', 'profile').filter(id=attrs.get('appointment_id'))
-    #     appointment_object = queryset.first()
-    #     if not appointment_object:
-    #         raise serializers.ValidationError('No Appointment found')
-    #     if not appointment_object.status == doc_models.OpdAppointment.COMPLETED:
-    #         raise serializers.ValidationError('Appointment not completed')
-    #     return appointment_object
+    @staticmethod
+    def validate_appointment_object(attrs):
+        if attrs and attrs.get('appointment_type') == prescription_models.PresccriptionPdf.OFFLINE:
+            queryset = doc_models.OfflineOPDAppointments.objects.select_related('doctor', 'hospital', 'user').filter(id=attrs.get('appointment_id'))
+        elif attrs.get('appointment_type') == prescription_models.PresccriptionPdf.DOCPRIME_OPD:
+            queryset = doc_models.OpdAppointment.objects.select_related('doctor', 'hospital', 'profile').filter(id=attrs.get('appointment_id'))
+        appointment_object = queryset.first()
+        if not appointment_object:
+            raise serializers.ValidationError('No Appointment found')
+        if not appointment_object.status == doc_models.OpdAppointment.COMPLETED:
+            raise serializers.ValidationError('Appointment not completed')
+        return appointment_object
 
 
 class PrescriptionMedicineBodySerializer(serializers.Serializer):
@@ -153,9 +153,9 @@ class GeneratePrescriptionPDFBodySerializer(serializers.Serializer):
     diagnoses = serializers.ListField(child=PrescriptionDiagnosesBodySerializer(), required=False, allow_empty=True)
     patient_details = PrescriptionPatientSerializer()
     medicines = serializers.ListField(child=PrescriptionMedicineBodySerializer(),required=False, allow_empty=True)
-    # appointment_id = serializers.CharField(required=False)
-    opd_appointment_id = serializers.PrimaryKeyRelatedField(queryset=doc_models.OpdAppointment.objects.all(), required=False, allow_null=True)
-    offline_opd_appointment_id = serializers.PrimaryKeyRelatedField(queryset=doc_models.OfflineOPDAppointments.objects.all(), required=False, allow_null=True)
+    appointment_id = serializers.CharField()
+    # opd_appointment_id = serializers.PrimaryKeyRelatedField(queryset=doc_models.OpdAppointment.objects.all(), required=False, allow_null=True)
+    # offline_opd_appointment_id = serializers.PrimaryKeyRelatedField(queryset=doc_models.OfflineOPDAppointments.objects.all(), required=False, allow_null=True)
     appointment_type = serializers.ChoiceField(choices=prescription_models.PresccriptionPdf.APPOINTMENT_TYPE_CHOICES, required=False)
     followup_date = serializers.DateTimeField(required=False, allow_null=True)
     followup_reason = serializers.CharField(required=False, allow_null=True)
@@ -164,20 +164,20 @@ class GeneratePrescriptionPDFBodySerializer(serializers.Serializer):
         if attrs:
             if not (attrs.get('tests') or attrs.get('medicines')):
                 raise serializers.ValidationError("Either one of test or medicines is required for prescription generation")
-            if (not (attrs.get('opd_appointment_id') or attrs.get('offline_opd_appointment_id'))) or \
-                    (attrs.get('opd_appointment_id') and attrs.get('offline_opd_appointment_id')):
-                raise serializers.ValidationError("Either one of opd_appointment or offline_opd_appointment is required")
-            if attrs.get('appointment_type') == prescription_models.PresccriptionPdf.OFFLINE and attrs.get("opd_appointment_id"):
-                raise serializers.ValidationError("opd_appointment given for appointment type Offline")
-            if attrs.get('appointment_type') == prescription_models.PresccriptionPdf.DOCPRIME_OPD and attrs.get("offline_opd_appointment_id"):
-                raise serializers.ValidationError("offline_opd_appointment given for appointment type Docprime OPD")
-            # appointment = PrescriptionAppointmentValidation.validate_appointment_object(attrs)
-            if attrs.get('opd_appointment_id'):
-                appointment = attrs.get('opd_appointment_id')
-                attrs['opd_appointment'] = attrs.pop('opd_appointment_id')
-            else:
-                appointment = attrs.get('offline_opd_appointment_id')
-                attrs['offline_opd_appointment'] = attrs.pop('offline_opd_appointment_id')
+            # if (not (attrs.get('opd_appointment_id') or attrs.get('offline_opd_appointment_id'))) or \
+            #         (attrs.get('opd_appointment_id') and attrs.get('offline_opd_appointment_id')):
+            #     raise serializers.ValidationError("Either one of opd_appointment or offline_opd_appointment is required")
+            # if attrs.get('appointment_type') == prescription_models.PresccriptionPdf.OFFLINE and attrs.get("opd_appointment_id"):
+            #     raise serializers.ValidationError("opd_appointment given for appointment type Offline")
+            # if attrs.get('appointment_type') == prescription_models.PresccriptionPdf.DOCPRIME_OPD and attrs.get("offline_opd_appointment_id"):
+            #     raise serializers.ValidationError("offline_opd_appointment given for appointment type Docprime OPD")
+            appointment = PrescriptionAppointmentValidation.validate_appointment_object(attrs)
+            # if attrs.get('opd_appointment_id'):
+            #     appointment = attrs.get('opd_appointment_id')
+            #     attrs['opd_appointment'] = attrs.pop('opd_appointment_id')
+            # else:
+            #     appointment = attrs.get('offline_opd_appointment_id')
+            #     attrs['offline_opd_appointment'] = attrs.pop('offline_opd_appointment_id')
             attrs['appointment'] = appointment
             if not appointment.doctor.license:
                 raise serializers.ValidationError("Registration Number is required for Generating Prescription")
