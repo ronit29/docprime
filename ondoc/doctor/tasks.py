@@ -60,3 +60,8 @@ def update_doctors_count():
 def update_all_hospitals_seo_urls():
     from ondoc.doctor.models import Hospital
     Hospital.update_hospital_seo_urls()
+
+@task
+def update_all_ipd_seo_urls():
+    from ondoc.procedure.models import IpdProcedure
+    IpdProcedure.update_ipd_seo_urls()

@@ -1457,6 +1457,9 @@ class DoctorListViewSet(viewsets.GenericViewSet):
         canonical_url = None
         url = None
         # if False and (validated_data.get('extras') or validated_data.get('specialization_ids')):
+        temp_ipd_procedures = []
+        if validated_data.get('ipd_procedure_ids'):
+            temp_ipd_procedures = IpdProcedure.objects.filter(id__in=validated_data.get('ipd_procedure_ids', []))
         if validated_data.get('locality_value') or validated_data.get('sublocality_value'):
             location = None
             # breadcrumb_sublocality = None
@@ -1506,9 +1509,6 @@ class DoctorListViewSet(viewsets.GenericViewSet):
             #         specializations = validated_data.get('extras').get('specialization')
             #     else:
             #         specializations = ''
-            temp_ipd_procedures = []
-            if validated_data.get('ipd_procedure_ids'):
-                temp_ipd_procedures = IpdProcedure.objects.filter(id__in=validated_data.get('ipd_procedure_ids', []))
 
             if validated_data.get('specialization'):
                 specialization = validated_data.get('specialization')

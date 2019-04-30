@@ -23,6 +23,12 @@ class IpdProcedure(auth_model.TimeStampedModel, SearchKey, auth_model.SoftDelete
     class Meta:
         db_table = "ipd_procedure"
 
+    @classmethod
+    def update_ipd_seo_urls(cls):
+        from ondoc.location.services.doctor_urls import IpdProcedureSeo
+        ipd_procedure = IpdProcedureSeo()
+        ipd_procedure.create()
+
 
 class IpdProcedureFeatureMapping(models.Model):
     ipd_procedure = models.ForeignKey(IpdProcedure, on_delete=models.CASCADE,

@@ -666,7 +666,7 @@ class PageUrlCache():
     #     return deletions
 
 
-class IpdProcedure:
+class IpdProcedureSeo:
 
     def __init__(self):
         query = '''select nextval('entity_url_version_seq') as inc;'''
