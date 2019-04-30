@@ -2215,9 +2215,7 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin,
         insurance_id = None
         user_insurance = UserInsurance.objects.filter(user=user).order_by('-id').first()
         if user_insurance and user_insurance.is_valid():
-            insurance_validate_dict = user_insurance.validate_lab_insurance(data)
-            is_appointment_insured = insurance_validate_dict['is_insured']
-            insurance_id = insurance_validate_dict['insurance_id']
+            is_appointment_insured, insurance_id, insurance_message = user_insurance.validate_lab_insurance(data)
 
         if is_appointment_insured and cart_data.get('is_appointment_insured', None):
             payment_type = OpdAppointment.INSURANCE

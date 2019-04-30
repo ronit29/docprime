@@ -2434,9 +2434,7 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
         insurance_id = None
         user_insurance = UserInsurance.objects.filter(user=user).last()
         if user_insurance and user_insurance.is_valid():
-            insurance_validate_dict = user_insurance.validate_doctor_insurance(data, user_insurance)
-            is_appointment_insured = insurance_validate_dict['is_insured']
-            insurance_id = insurance_validate_dict['insurance_id']
+            is_appointment_insured, insurance_id, insurance_message = user_insurance.validate_doctor_insurance(data, user_insurance)
 
         if is_appointment_insured and cart_data.get('is_appointment_insured', None):
             payment_type = OpdAppointment.INSURANCE
