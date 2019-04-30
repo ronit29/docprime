@@ -36,22 +36,13 @@ class PrescriptionGenerateViewSet(viewsets.GenericViewSet):
         valid_data['serial_id'] = str(appointment.hospital.id) + '-' + str(appointment.doctor.id) + '-' + valid_data["serial_id"]
         try:
             if task == prescription_models.PresccriptionPdf.CREATE:
-                # prescription_pdf = prescription_models.PresccriptionPdf.objects.create(id=valid_data.get("id"),
-                #                                                                        medicines=valid_data.get('medicines'),
-                #                                                                        special_instructions=valid_data.get('special_instructions'),
-                #                                                                        lab_tests=valid_data.get('tests'),
-                #                                                                        diagnoses=valid_data.get('diagnoses'),
-                #                                                                        symptoms_complaints=valid_data.get('symptoms_complaints'),
-                #                                                                        patient_details=valid_data.get('patient_details'),
-                #                                                                        appointment_id=valid_data.get('appointment_id'),
-                #                                                                        appointment_type=valid_data.get('appointment_type'),
-                #                                                                        followup_instructions_date=valid_data.get('followup_date'),
-                #                                                                        followup_instructions_reason=valid_data.get('followup_reason'))
                 prescription_pdf = prescription_models.PresccriptionPdf.objects.create(**valid_data)
             else:
-                prescription_pdf_queryset = prescription_models.PresccriptionPdf.objects.filter(id=valid_data.get("id"), appointment_id=valid_data.get("appointment_id"))
+                prescription_pdf_queryset = prescription_models.PresccriptionPdf.objects.filter(id=valid_data.get("id"),
+                                                                                                appointment_id=valid_data.get("appointment_id"))
                 model_serializer = serializers.PrescriptionPdfModelSerializer(prescription_pdf_queryset.first())
-                prescription_models.PrescriptionHistory.objects.create(data=model_serializer.data)
+                prescription_models.PrescriptionHistory.objects.create(prescription_id=valid_data.get("id"),
+                                                                       data=model_serializer.data)
                 prescription_pdf_queryset.update(**valid_data)
                 prescription_pdf = prescription_pdf_queryset.first()
         except Exception as e:
