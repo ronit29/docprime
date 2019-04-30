@@ -180,7 +180,7 @@ class UserProfileSerializer(serializers.ModelSerializer):
         if isinstance(obj, dict):
             return False
 
-        insured_member_obj = InsuredMembers.objects.filter(profile=obj).first()
+        insured_member_obj = InsuredMembers.objects.filter(profile=obj).order_by('-id').first()
         if not insured_member_obj:
             return False
         user_insurance_obj = UserInsurance.objects.filter(id=insured_member_obj.user_insurance_id).last()

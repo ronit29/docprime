@@ -2,6 +2,7 @@ from django.conf import settings
 
 from ondoc.api.v1.insurance.serializers import InsuredMemberIdSerializer, InsuranceDiseaseIdSerializer
 from ondoc.api.v1.utils import insurance_transform
+from django.core.serializers import serialize
 from rest_framework import viewsets
 from django.core import serializers as core_serializer
 
@@ -14,7 +15,7 @@ from ondoc.account import models as account_models
 from ondoc.doctor import models as doctor_models
 from ondoc.insurance.models import (Insurer, InsuredMembers, InsuranceThreshold, InsurancePlans, UserInsurance, InsuranceLead,
                                     InsuranceTransaction, InsuranceDisease, InsuranceDiseaseResponse, StateGSTCode,
-                                    InsuranceDummyData)
+                                    InsuranceDummyData, InsuranceCancelMaster)
 from ondoc.authentication.models import UserProfile
 from ondoc.authentication.backends import JWTAuthentication
 from rest_framework.permissions import IsAuthenticated
@@ -438,9 +439,9 @@ class InsuranceCancelViewSet(viewsets.GenericViewSet):
         policy_purchase_date = user_insurance.purchase_date
         policy_expiry_date = user_insurance.expiry_date
         policy_number = user_insurance.policy_number
-        cancel_master = InsuranceCancelViewSet.objects.filter(insurer=user_insurance.insurer).values_list('min_days',
-                                                                                                          'max_days',
-                                                                                                          'refund_percentage')
+        cancel_master = InsuranceCancelMaster.objects.filter(insurer=user_insurance.insurance_plan.insurer).order_by(
+            '-refund_percentage')
+        cancel_master = serialize('json', cancel_master)
         if not cancel_master:
             res['error'] = "Insurance Cancel Master not found"
             return Response(data=res, status=status.HTTP_400_BAD_REQUEST)
