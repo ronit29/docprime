@@ -2405,9 +2405,9 @@ class CreateAdminViewSet(viewsets.GenericViewSet):
                                     entity_type=GenericAdminEntity.DOCTOR
                                     ) \
                             .annotate(hospital_ids=F('hospital__id'), hospital_ids_count=Count('hospital__hospital_doctors__doctor'),
-                                      license=F('doctor__license'), consultation_fees=F('doctor__online_consultation_fees'))\
+                                      license=F('doctor__license'), online_consultation_fees=F('doctor__online_consultation_fees'))\
                             .values('id', 'phone_number', 'name', 'is_disabled', 'permission_type', 'super_user_permission', 'hospital_ids',
-                                    'hospital_ids_count', 'updated_at', 'license', 'consultation_fees')
+                                    'hospital_ids_count', 'updated_at', 'license', 'online_consultation_fees')
             for x in query:
                 if temp.get(x['phone_number']):
                     if x['hospital_ids'] not in temp[x['phone_number']]['hospital_ids']:
@@ -2453,7 +2453,7 @@ class CreateAdminViewSet(viewsets.GenericViewSet):
                             x['id'] = doc.get('id')
                             x['assigned'] = doc.get('assigned')
                             x['license'] = doc.get('license')
-                            x['consultation_fees'] = doc.get('online_consultation_fees')
+                            x['online_consultation_fees'] = doc.get('online_consultation_fees')
                             break
                     if not x.get('is_doctor'):
                         x['is_doctor'] = False
@@ -2569,12 +2569,13 @@ class CreateAdminViewSet(viewsets.GenericViewSet):
                 if dn.first():
                     try:
                         dn.update(phone_number=valid_data.get('phone_number'))
-                        doctor = dn.first().doctor
-                        if doctor.license:
-                            return Response({"error": "License for given doctor already exists"}, status=status.HTTP_400_BAD_REQUEST)
-                        doctor.license = valid_data.get('license')
-                        if valid_data.get("consultation_fees"):
-                            doctor.online_consultation_fees = valid_data.get("consultation_fees")
+                        doctor = valid_data.get('doc_profile')
+                        if valid_data.get('license'):
+                            if doctor.license:
+                                return Response({"error": "License for given doctor already exists"}, status=status.HTTP_400_BAD_REQUEST)
+                            doctor.license = valid_data.get('license')
+                        if valid_data.get("online_consultation_fees"):
+                            doctor.online_consultation_fees = valid_data.get("online_consultation_fees")
                         doctor.save()
                     except Exception as e:
                         logger.error("Error Updating Entity Hospital " + str(e))
