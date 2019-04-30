@@ -947,11 +947,15 @@ class GetKeyDataViewSet(viewsets.GenericViewSet):
 
         parameters = request.query_params
         key = parameters.get('key')
+        if not key:
+            return Response(status=status.HTTP_400_BAD_REQUEST)
         queryset = UserConfig.objects.filter(key__iexact=key)
+        if not queryset:
+            return Response(status=status.HTTP_404_NOT_FOUND)
         resp = []
         for info in queryset:
             data_key = info.key
             data_key = data_key.lower()
             data = info.data
             resp.append({'data': data, 'key': data_key})
-            return Response(resp)
+        return Response(resp)
