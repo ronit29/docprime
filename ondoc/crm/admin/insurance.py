@@ -664,7 +664,7 @@ class CustomDateInput(forms.DateInput):
 
 class UserInsuranceForm(forms.ModelForm):
 
-    status_choices = [(UserInsurance.ACTIVE, "Active"), (UserInsurance.CANCELLED, "Cancelled"), (UserInsurance.ONHOLD, "Onhold")]
+    status_choices = [(UserInsurance.ACTIVE, "Active"), (UserInsurance.CANCELLED, "Cancelled")]
     status = forms.ChoiceField(choices=status_choices, required=True)
     onhold_reason = forms.CharField(max_length=400, required=False)
 
@@ -746,16 +746,16 @@ class UserInsuranceAdmin(ImportExportMixin, admin.ModelAdmin):
     @transaction.atomic
     def save_model(self, request, obj, form, change):
         print('data is here')
-        # if request.user.is_member_of(constants['INSURANCE_GROUP']):
-        if obj.status == UserInsurance.ACTIVE:
-            super(UserInsuranceAdmin, self).save_model(request, obj, form, change)
-        elif obj.status == UserInsurance.ONHOLD:
-            if obj.onhold_reason:
+        if request.user.is_member_of(constants['INSURANCE_GROUP']):
+            if obj.status == UserInsurance.ACTIVE:
                 super(UserInsuranceAdmin, self).save_model(request, obj, form, change)
-        elif obj.status == UserInsurance.CANCELLED:
-            response = obj.process_cancellation()
-            if response.get('success', None):
-                super(UserInsuranceAdmin, self).save_model(request, obj, form, change)
+            elif obj.status == UserInsurance.ONHOLD:
+                if obj.onhold_reason:
+                    super(UserInsuranceAdmin, self).save_model(request, obj, form, change)
+            elif obj.status == UserInsurance.CANCELLED:
+                response = obj.process_cancellation()
+                if response.get('success', None):
+                    super(UserInsuranceAdmin, self).save_model(request, obj, form, change)
 
 
 class InsuranceDiseaseAdmin(admin.ModelAdmin):
