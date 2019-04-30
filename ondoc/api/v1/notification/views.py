@@ -82,13 +82,12 @@ class ChatNotificationViewSet(viewsets.GenericViewSet):
 
         data = request.data
 
-        if not data or not data.get('title') or not data.get('body') or not data.get('room_id') or not data.get('user_id'):
+        if not data or not data.get('title') or not data.get('body') or not data.get('room_id') or not data.get('device_id'):
             return Response({"message":"Insufficient Data"}, status=status.HTTP_400_BAD_REQUEST)
 
-        user_id = data.get('user_id')
         user_and_tokens = []
         user_and_token = [{'user': token.user, 'token': token.token, 'app_name': token.app_name} for token in
-                          NotificationEndpoint.objects.filter(user__in=[user_id]).order_by('user')]
+                          NotificationEndpoint.objects.filter(device_id__icontains=str(data.get('device_id')).lower()).order_by('user')]
         for user, user_token_group in groupby(user_and_token, key=lambda x: x['user']):
             user_and_tokens.append(
                 {'user': user, 'tokens': [{"token": t['token'], "app_name": t["app_name"]} for t in user_token_group]})
