@@ -157,11 +157,13 @@ class PresccriptionPdf(auth_models.TimeStampedModel):
     UPDATE = 2
 
     DOCPRIME_OPD = 1
-    DOCPRIME_LAB = 2
+    # DOCPRIME_LAB = 2
     OFFLINE = 3
 
     PRESCRIPTION_STORAGE_FOLDER = 'prescription/pdf'
-    APPOINTMENT_TYPE_CHOICES = [(DOCPRIME_OPD, "Docprime_Opd"), (DOCPRIME_LAB, "Docprime_Lab"), (OFFLINE, "OFFline")]
+    APPOINTMENT_TYPE_CHOICES = [(DOCPRIME_OPD, "Docprime_Opd"),
+                                # (DOCPRIME_LAB, "Docprime_Lab"),
+                                (OFFLINE, "OFFline")]
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     symptoms_complaints = JSONField(blank=True, null=True)
     diagnoses = JSONField(blank=True, null=True)
@@ -171,7 +173,9 @@ class PresccriptionPdf(auth_models.TimeStampedModel):
     followup_instructions_date = models.DateTimeField(null=True)
     followup_instructions_reason = models.CharField(max_length=256, null=True)
     patient_details = JSONField(blank=True, null=True)
-    appointment_id = models.CharField(max_length=64)
+    # appointment_id = models.CharField(max_length=64)
+    opd_appointment = models.ForeignKey(doc_models.OpdAppointment, on_delete=models.CASCADE, related_name="prescription", null=True, blank=True)
+    offline_opd_appointment = models.ForeignKey(doc_models.OfflineOPDAppointments, on_delete=models.CASCADE, related_name="prescription", null=True, blank=True)
     appointment_type = models.PositiveSmallIntegerField(choices=APPOINTMENT_TYPE_CHOICES)
     prescription_file = models.FileField(upload_to=PRESCRIPTION_STORAGE_FOLDER, validators=[FileExtensionValidator(allowed_extensions=['pdf'])], null=True)
     serial_id = models.CharField(max_length=100)
@@ -217,7 +221,7 @@ class PresccriptionPdf(auth_models.TimeStampedModel):
             return str(cls.SERIAL_ID_START) + '-01-01'
 
     def __str__(self):
-        return self.appointment_id
+        return self.id
 
     class Meta:
         db_table = 'eprescription_pdf'

@@ -38,13 +38,27 @@ class PrescriptionGenerateViewSet(viewsets.GenericViewSet):
             if task == prescription_models.PresccriptionPdf.CREATE:
                 prescription_pdf = prescription_models.PresccriptionPdf.objects.create(**valid_data)
             else:
-                prescription_pdf_queryset = prescription_models.PresccriptionPdf.objects.filter(id=valid_data.get("id"),
-                                                                                                appointment_id=valid_data.get("appointment_id"))
-                model_serializer = serializers.PrescriptionPdfModelSerializer(prescription_pdf_queryset.first())
-                prescription_models.PrescriptionHistory.objects.create(prescription=prescription_pdf_queryset.first(),
+                prescription_pdf = valid_data.pop("prescription_pdf")
+                # prescription_pdf_queryset = prescription_models.PresccriptionPdf.objects.filter(id=valid_data.get("id"),
+                #                                                                                 appointment_id=valid_data.get("appointment_id"))
+                model_serializer = serializers.PrescriptionPDFModelSerializer(prescription_pdf)
+                prescription_models.PrescriptionHistory.objects.create(prescription=prescription_pdf,
                                                                        data=model_serializer.data)
-                prescription_pdf_queryset.update(**valid_data)
-                prescription_pdf = prescription_pdf_queryset.first()
+                # prescription_pdf_queryset.update(**valid_data)
+                # prescription_pdf = prescription_pdf_queryset.first()
+                prescription_pdf.symptoms_complaints = valid_data.get('symptoms_complaints')
+                prescription_pdf.tests = valid_data.get('tests')
+                prescription_pdf.special_instructions = valid_data.get('special_instructions')
+                prescription_pdf.diagnoses = valid_data.get('diagnoses')
+                prescription_pdf.patient_details = valid_data.get('patient_details')
+                prescription_pdf.medicines = valid_data.get('medicines')
+
+                prescription_pdf.opd_appointment = valid_data.get('opd_appointment')
+                prescription_pdf.offline_opd_appointment = valid_data.get('offline_opd_appointment')
+                prescription_pdf.appointment_type = valid_data.get('appointment_type')
+                prescription_pdf.followup_date = valid_data.get('followup_date')
+                prescription_pdf.followup_reason = valid_data.get('followup_reason')
+                prescription_pdf.save()
         except Exception as e:
             logger.error("Error Creating PDF object " + str(e))
             return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
