@@ -3,6 +3,7 @@ import json
 from django.contrib.contenttypes.fields import GenericForeignKey
 from django.contrib.contenttypes.models import ContentType
 from django.core.files.uploadedfile import SimpleUploadedFile
+from django.core.validators import FileExtensionValidator
 from django.db import models
 from django.contrib.postgres.fields import JSONField, ArrayField
 from django.forms.models import model_to_dict
@@ -19,6 +20,7 @@ from weasyprint import HTML
 from django.conf import settings
 from num2words import num2words
 import datetime
+from datetime import timedelta
 import pytz
 import logging
 import string
@@ -60,6 +62,7 @@ class NotificationAction:
 
     INSURANCE_CONFIRMED=15
     INSURANCE_FLOAT_LIMIT=70
+    INSURANCE_MIS=71
     OPD_OTP_BEFORE_APPOINTMENT = 30
     LAB_OTP_BEFORE_APPOINTMENT = 31
     OPD_CONFIRMATION_CHECK_AFTER_APPOINTMENT = 32
@@ -764,6 +767,24 @@ class EmailNotification(TimeStampedModel, EmailNotificationOpdMixin, EmailNotifi
             }
             message = json.dumps(message)
             publish_message(message)
+
+    @classmethod
+    def send_insurance_mis(cls, attachment):
+        email_subject = 'Insurance MIS'
+        html_body = 'Insurance MIS. Please find the attached MIS.'
+        emails = settings.INSURANCE_MIS_EMAILS
+        to_email = emails[0]
+        cc_emails = emails[1:]
+        email_obj = cls.objects.create(attachments=attachment, email=to_email, notification_type=NotificationAction.INSURANCE_FLOAT_LIMIT,
+                                       content=html_body, email_subject=email_subject, cc=cc_emails, bcc=[])
+        email_obj.save()
+
+        message = {
+            "data": model_to_dict(email_obj),
+            "type": "email"
+        }
+        message = json.dumps(message)
+        publish_message(message)
 
 
 class SmsNotificationOpdMixin:
