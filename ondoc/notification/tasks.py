@@ -339,7 +339,7 @@ def set_order_dummy_transaction(self, order_id, user_id):
                 req_data['refOrderId'] = str(insurance_order_id)
 
             if insurer_code:
-                req_data['insurerCode'] = insurer_code
+                req_data['merchCode'] = insurer_code
 
 
             response = requests.post(url, data=json.dumps(req_data), headers=headers)
@@ -629,6 +629,32 @@ def send_insurance_notifications(self, data):
         insurance_notification.send()
     except Exception as e:
         logger.error(str(e))
+
+@task(bind=True, max_retries=3)
+def send_insurance_float_limit_notifications(self, data):
+    from ondoc.notification.models import EmailNotification
+    from ondoc.insurance.models import Insurer
+    try:
+        insurer_id = int(data.get('insurer_id', 0))
+        insurer = Insurer.objects.filter(id=insurer_id).first()
+        if not insurer:
+            raise Exception('Insurer not found against the id %d' % insurer_id)
+
+        insurer_account = insurer.float.filter().first()
+        if not insurer_account:
+            raise Exception('Insurer Account not found against the insurer id %d' % insurer_id)
+
+        emails = settings.INSURANCE_FLOAT_LIMIT_ALERT_EMAIL
+        html_body = "Insurer {insurer} current float amount is being getting exhausted and reached {limit}."\
+            .format(insurer=insurer.name, limit=insurer_account.current_float)
+        for email in emails:
+            EmailNotification.send_insurance_float_alert_email(email, html_body)
+
+    except Exception as e:
+        logger.error(str(e))
+        countdown_time = (2 ** self.request.retries) * 60 * 10
+        print(countdown_time)
+        self.retry([data], countdown=countdown_time)
 
 
 def request_payout(req_data, order_data):

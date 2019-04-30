@@ -39,6 +39,10 @@ def push_insurance_banner_lead_to_matrix(self, data):
             'BookedBy': banner_obj.user.phone_number,
             'PrimaryNo': banner_obj.user.phone_number,
             'PaymentStatus': 0,
+            'UtmCampaign': extras.get('utm_campaign', ''),
+            'UTMMedium': extras.get('utm_medium', ''),
+            'UtmSource': extras.get('utm_source', ''),
+            'UtmTerm': extras.get('utm_term', ''),
             'ProductId': 5,
             'SubProductId': 3,
             'PolicyDetails': {

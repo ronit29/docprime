@@ -1,6 +1,6 @@
 import datetime
 from django.core.validators import FileExtensionValidator
-from ondoc.notification.tasks import send_insurance_notifications
+from ondoc.notification.tasks import send_insurance_notifications, send_insurance_float_limit_notifications
 from ondoc.insurance.tasks import push_insurance_buy_to_matrix, push_insurance_banner_lead_to_matrix
 import json
 
@@ -800,8 +800,9 @@ class UserInsurance(auth_model.TimeStampedModel):
     @classmethod
     def profile_create_or_update(cls, member, user):
         profile = {}
-        name = "{fname} {mname} {lname}".format(fname=member['first_name'], mname=member.get('middle_name', ''),
-                                                lname=member.get('last_name', ''))
+        m_name = member.get('middle_name') if member.get('middle_name') else ''
+        l_name = member.get('last_name') if member.get('last_name') else ''
+        name = "{fname} {mname} {lname}".format(fname=member['first_name'], mname=m_name, lname=l_name)
         if member['profile'] or UserProfile.objects.filter(name__iexact=name, user=user.id).exists():
             # Check whether Profile exist with same name
             existing_profile = UserProfile.objects.filter(name__iexact=name, user=user.id).first()
@@ -1181,6 +1182,12 @@ class InsuranceTransaction(auth_model.TimeStampedModel):
     reason = models.PositiveSmallIntegerField(null=True, choices=REASON_CHOICES)
 
     def after_commit_tasks(self):
+
+        # Trigger Email if insurer account current float get lower.
+        insurer_account = InsurerAccount.objects.filter(id=self.account.id).first()
+        if insurer_account.current_float < self.account.insurer.min_float:
+            send_insurance_float_limit_notifications.apply_async(({'insurer_id': self.account.insurer.id},))
+
         if self.transaction_type == InsuranceTransaction.DEBIT:
             try:
                 self.user_insurance.generate_pdf()

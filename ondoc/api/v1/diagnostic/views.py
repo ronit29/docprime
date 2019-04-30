@@ -2762,7 +2762,7 @@ class TestDetailsViewset(viewsets.GenericViewSet):
         seo = dict()
         author = None
 
-        if test_queryset.name:
+        if test_queryset.name and test_queryset.url:
             seo['title'] = test_queryset.name + '  - Cost & Normal Range of Results'
             seo['description'] = 'Book ' + test_queryset.name + ' @50% off. Free Sample Collection. Know what is ' \
                                  + test_queryset.name + ', Price, Normal Range, ' + test_queryset.name + ' Results, Procedure & Preparation.'
@@ -2770,8 +2770,8 @@ class TestDetailsViewset(viewsets.GenericViewSet):
             seo = None
         result['seo'] = seo
         result['breadcrumb'] = list()
-
         result['breadcrumb'].append({"title": "Home", "url": "/"})
+        result['breadcrumb'].append({"title": "Tests", "url": "/tests"})
 
         if test_queryset.name and test_queryset.url:
             result['breadcrumb'].append({"title": test_queryset.name, "url": test_queryset.url})
@@ -2795,11 +2795,13 @@ class TestDetailsViewset(viewsets.GenericViewSet):
         response = {}
         tests_count = 0
 
-        tests = list(LabTest.objects.filter(enable_for_retail=True, name__istartswith=alphabet).order_by('name').values('id', 'name', 'url'))
+        tests = list(LabTest.objects.filter(enable_for_retail=True, name__istartswith=alphabet, show_details=True).exclude(url__exact='').order_by('name').values('id', 'name', 'url'))
+
         if tests:
             tests_count = len(tests)
         response['count'] = tests_count
         response['tests'] = tests
+        response['key'] = alphabet
 
         return Response(response)
 
