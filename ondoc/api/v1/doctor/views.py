@@ -1574,7 +1574,7 @@ class DoctorListViewSet(viewsets.GenericViewSet):
             elif validated_data.get('sitemap_identifier') == 'DOCTORS_LOCALITY_CITY':
                 breadcrumb.append({'title': 'Doctors in ' + validated_data.get('sublocality_value') + ' ' + validated_data.get('locality_value'), 'url': None})
             elif validated_data.get('sitemap_identifier') == 'IPD_PROCEDURE_DOCTOR_CITY':
-                breadcrumb.append({'title': 'Procedures', 'url': '/ipd-procedures'})
+                breadcrumb.append({'title': 'Procedures', 'url': 'ipd-procedures'})
                 breadcrumb.append({'title': '{} Doctors in {}'.format(validated_data.get('ipd_procedure'),
                                                                       validated_data.get('locality_value')),
                                    'url': None})
@@ -3635,7 +3635,7 @@ class HospitalViewSet(viewsets.GenericViewSet):
 
         breadcrumb = list()
         breadcrumb.append({"title": "Home", "url": "/"})
-        breadcrumb.append({"title": "Procedures", "url": "/ipd-procedures"})
+        breadcrumb.append({"title": "Procedures", "url": "ipd-procedures"})
         if city:
             breadcrumb.append({"title": "{} hospitals in {}".format(ipd_procedure_obj.name, city), "url": None})
 
@@ -3854,7 +3854,7 @@ class IpdProcedureViewSet(viewsets.GenericViewSet):
 
         breadcrumb = list()
         breadcrumb.append({"title": "Home", "url": "/"})
-        breadcrumb.append({"title": "Procedures", "url": "/ipd-procedures"})
+        breadcrumb.append({"title": "Procedures", "url": "ipd-procedures"})
         if city:
             breadcrumb.append({"title": "{} cost in {}".format(ipd_procedure.name, city), "url": None})
 
