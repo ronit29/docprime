@@ -439,9 +439,8 @@ class InsuranceCancelViewSet(viewsets.GenericViewSet):
         policy_purchase_date = user_insurance.purchase_date
         policy_expiry_date = user_insurance.expiry_date
         policy_number = user_insurance.policy_number
-        cancel_master = InsuranceCancelMaster.objects.filter(insurer=user_insurance.insurance_plan.insurer).order_by(
-            '-refund_percentage')
-        cancel_master = serialize('json', cancel_master)
+        cancel_master = list(InsuranceCancelMaster.objects.filter(insurer=user_insurance.insurance_plan.insurer).order_by(
+            '-refund_percentage').values('min_days', 'max_days', 'refund_percentage'))
         if not cancel_master:
             res['error'] = "Insurance Cancel Master not found"
             return Response(data=res, status=status.HTTP_400_BAD_REQUEST)
