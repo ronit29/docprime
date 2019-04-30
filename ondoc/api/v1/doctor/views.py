@@ -84,6 +84,7 @@ import time
 from ondoc.api.v1.ratings.serializers import GoogleRatingsGraphSerializer
 logger = logging.getLogger(__name__)
 import random
+from ondoc.prescription import models as pres_models
 
 
 class CreateAppointmentPermission(permissions.BasePermission):
@@ -1112,29 +1113,43 @@ class PrescriptionFileViewset(OndocViewSet):
         serializer.is_valid(raise_exception=True)
         validated_data = serializer.validated_data
         #resp_data = list()
-        if not self.prescription_permission(request.user, validated_data.get('appointment')):
-            return Response({'msg': "You don't have permissions to manage this appointment"},
-                            status=status.HTTP_403_FORBIDDEN)
+        if validated_data.get('type') == serializers.PrescriptionSerializer.OPD:
+            if not self.prescription_permission(request.user, validated_data.get('appointment')):
+                return Response({'msg': "You don't have permissions to manage this appointment"}, status=status.HTTP_403_FORBIDDEN)
 
-        if models.Prescription.objects.filter(appointment=validated_data.get('appointment')).exists():
-            prescription = models.Prescription.objects.filter(appointment=validated_data.get('appointment')).first()
+            prescription_obj = models.Prescription.objects.filter(appointment=validated_data.get('appointment')).first()
+            if prescription_obj:
+                prescription = prescription_obj
+            else:
+                prescription = models.Prescription.objects.create(appointment=validated_data.get('appointment_obj'),
+                                                                      prescription_details=validated_data.get(
+                                                                          'prescription_details'))
+            prescription_file_data = {
+                "prescription": prescription.id,
+                "name": validated_data.get('name')
+            }
+            prescription_file_serializer = serializers.PrescriptionFileSerializer(data=prescription_file_data,
+                                                                                      context={"request": request})
+            prescription_file_serializer.is_valid(raise_exception=True)
+            prescription_file_serializer.save()
+            # resp_data = prescription_file_serializer.data
+            resp_data = serializers.DoctorAppointmentRetrieveSerializer(validated_data.get('appointment'),
+                                                                             context={'request': request}).data
+            if validated_data.get('appointment'):
+                resp_data['prescriptions'] = validated_data.get('appointment').get_prescriptions(request)
         else:
-            prescription = models.Prescription.objects.create(appointment=validated_data.get('appointment'),
-                                                                  prescription_details=validated_data.get(
-                                                                      'prescription_details'))
-        prescription_file_data = {
-            "prescription": prescription.id,
-            "name": validated_data.get('name')
-        }
-        prescription_file_serializer = serializers.PrescriptionFileSerializer(data=prescription_file_data,
-                                                                                  context={"request": request})
-        prescription_file_serializer.is_valid(raise_exception=True)
-        prescription_file_serializer.save()
-        # resp_data = prescription_file_serializer.data
-        resp_data = serializers.DoctorAppointmentRetrieveSerializer(validated_data.get('appointment'),
-                                                                         context={'request': request}).data
-        if validated_data.get('appointment'):
-            resp_data['prescriptions'] = validated_data.get('appointment').get_prescriptions(request)
+            pres_models.OfflinePrescription.objects.create(
+                name=validated_data.get('name'),
+                prescription_details = validated_data.get('prescription_details'),
+                appointment= validated_data.get('appointment_obj')
+            )
+            app = validated_data['appointment_obj']
+            resp_data = {'doctor': serializers.AppointmentRetrieveDoctorSerializer(app.doctor).data,
+                    'time_slot_start': app.time_slot_start,
+                    'hospital': serializers.HospitalModelSerializer(app.hospital).data,
+                    'profile': OfflinePatientSerializer(app.user).data,
+                    'prescriptions': app.get_prescriptions(request)
+            }
 
         return Response(resp_data)
 

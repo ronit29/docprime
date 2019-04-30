@@ -234,3 +234,15 @@ class PrescriptionHistory(auth_models.TimeStampedModel):
 
     class Meta:
         db_table = 'eprescription_history'
+
+
+class OfflinePrescription(auth_models.TimeStampedModel, auth_models.Document):
+    appointment = models.ForeignKey(doc_models.OfflineOPDAppointments, related_name='offline_prescription', on_delete=models.CASCADE)
+    name = models.FileField(upload_to='prescriptions', blank=False, null=False)
+    prescription_details = models.TextField(max_length=300, blank=True, null=True)
+
+    def __str__(self):
+        return self.id
+
+    class Meta:
+        db_table = 'offline_prescription'
