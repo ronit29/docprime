@@ -3428,7 +3428,7 @@ class OfflineCustomerViewSet(viewsets.GenericViewSet):
             ret_obj['error_message'] = error_message
             ret_obj['type'] = 'doctor'
             ret_obj['prescriptions'] = prescription
-            ret_obj['e-prescriptions'] = pres_serializers.PrescriptionPDFModelSerializer(app.eprescription, many=True, context={"request": request}).data
+            ret_obj['e_prescriptions'] = pres_serializers.PrescriptionPDFModelSerializer(app.eprescription, many=True, context={"request": request}).data
             ret_obj['invoice'] = invoice_data
             final_result.append(ret_obj)
         return Response(final_result)
