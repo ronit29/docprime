@@ -798,7 +798,7 @@ class PrescriptionSerializer(serializers.Serializer):
     def validate(self, attrs):
         request = self.context.get('request')
         query = None
-        if 'type' in attrs and attrs.get('type') == self.OPD:
+        if 'type' in attrs and attrs.get('type') == self.OFFLINE:
             query = OfflineOPDAppointments.objects.filter(id=attrs['appointment'])
         else:
             query = OpdAppointment.objects.filter(id=attrs['appointment'])

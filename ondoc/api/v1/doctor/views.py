@@ -1113,7 +1113,7 @@ class PrescriptionFileViewset(OndocViewSet):
         serializer.is_valid(raise_exception=True)
         validated_data = serializer.validated_data
         #resp_data = list()
-        if validated_data.get('type') == serializers.PrescriptionSerializer.OPD:
+        if validated_data.get('type') == serializers.PrescriptionSerializer.OFFLINE:
             pres_models.OfflinePrescription.objects.create(
                 name=validated_data.get('name'),
                 prescription_details=validated_data.get('prescription_details'),
