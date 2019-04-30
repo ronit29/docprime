@@ -41,7 +41,7 @@ class PrescriptionGenerateViewSet(viewsets.GenericViewSet):
                 prescription_pdf_queryset = prescription_models.PresccriptionPdf.objects.filter(id=valid_data.get("id"),
                                                                                                 appointment_id=valid_data.get("appointment_id"))
                 model_serializer = serializers.PrescriptionPdfModelSerializer(prescription_pdf_queryset.first())
-                prescription_models.PrescriptionHistory.objects.create(prescription_id=valid_data.get("id"),
+                prescription_models.PrescriptionHistory.objects.create(prescription_id=prescription_pdf_queryset.first(),
                                                                        data=model_serializer.data)
                 prescription_pdf_queryset.update(**valid_data)
                 prescription_pdf = prescription_pdf_queryset.first()

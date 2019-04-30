@@ -226,7 +226,7 @@ class PresccriptionPdf(auth_models.TimeStampedModel):
 class PrescriptionHistory(auth_models.TimeStampedModel):
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    prescription_id = models.ForeignKey(PresccriptionPdf, on_delete=models.SET_NULL, related_name="history", null=True)
+    prescription = models.ForeignKey(PresccriptionPdf, on_delete=models.SET_NULL, related_name="history", null=True)
     data = JSONField()
 
     def __str__(self):
