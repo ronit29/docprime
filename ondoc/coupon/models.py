@@ -440,9 +440,11 @@ class CouponRecommender():
             coupons = list(filter(lambda x: x.cities == None, coupons))
 
         if hospital:
+            hospital_id = getattr(hospital, 'id') if hasattr(hospital, 'id') else hospital.get('id')
+            hospital_city = getattr(hospital, 'city') if hasattr(hospital, 'city') else hospital.get('city')
             coupons = list(
-                filter(lambda x: len(x.hospitals.all()) == 0 or hospital.id in list(map(lambda y: y.id, x.hospitals.all())), coupons))
-            coupons = list(filter(lambda x: x.cities == None or hospital.city in x.cities, coupons))
+                filter(lambda x: len(x.hospitals.all()) == 0 or hospital_id in list(map(lambda y: y.id, x.hospitals.all())), coupons))
+            coupons = list(filter(lambda x: x.cities == None or hospital_city in x.cities, coupons))
         else:
             coupons = list(filter(lambda x: len(x.hospitals.all()) == 0, coupons))
             coupons = list(filter(lambda x: x.cities == None, coupons))
