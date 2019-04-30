@@ -24,6 +24,7 @@ from import_export.admin import ImportExportMixin
 
 from ondoc.diagnostic.models import Lab, LabAppointment, LabPricingGroup
 from ondoc.doctor.models import Hospital, Doctor, OpdAppointment, HospitalNetwork
+from ondoc.insurance.models import UserInsurance
 from django.db.models import Q
 from django import forms
 
@@ -448,11 +449,11 @@ class MerchantPayoutAdmin(ExportMixin, VersionAdmin):
     resource_class = MerchantPayoutResource
     form = MerchantPayoutForm
     model = MerchantPayout
-    fields = ['id', 'payment_mode','charged_amount', 'updated_at', 'created_at', 'payable_amount', 'status', 'payout_time', 'paid_to',
+    fields = ['id','booking_type', 'payment_mode','charged_amount', 'updated_at', 'created_at', 'payable_amount', 'status', 'payout_time', 'paid_to',
               'appointment_id', 'get_billed_to', 'get_merchant', 'process_payout', 'type', 'utr_no', 'amount_paid','api_response','pg_status','status_api_response']
-    list_display = ('id', 'status', 'payable_amount', 'appointment_id', 'doc_lab_name')
+    list_display = ('id', 'status', 'payable_amount', 'appointment_id', 'doc_lab_name','booking_type')
     search_fields = ['name']
-    list_filter = ['status']
+    list_filter = ['status','booking_type']
 
     def get_queryset(self, request):
         return super().get_queryset(request).filter(payable_amount__gt=0).order_by('-id').prefetch_related('lab_appointment__lab',
@@ -460,14 +461,14 @@ class MerchantPayoutAdmin(ExportMixin, VersionAdmin):
 
     def get_search_results(self, request, queryset, search_term):
         queryset, use_distinct = super().get_search_results(request, queryset, None)
-
-        queryset = queryset.filter(Q(opd_appointment__doctor__name__icontains=search_term) |
-         Q(lab_appointment__lab__name__icontains=search_term))
+        if search_term:
+            queryset = queryset.filter(Q(opd_appointment__doctor__name__icontains=search_term) |
+             Q(lab_appointment__lab__name__icontains=search_term))
 
         return queryset, use_distinct
 
     def get_readonly_fields(self, request, obj=None):
-        base = ['appointment_id', 'get_billed_to', 'get_merchant']
+        base = ['appointment_id', 'get_billed_to', 'get_merchant','booking_type']
         editable_fields = ['payout_approved']
         if obj and obj.status == MerchantPayout.PENDING:
             editable_fields += ['type', 'amount_paid','payment_mode']

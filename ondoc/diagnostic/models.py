@@ -1881,6 +1881,7 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin,
         payout_data = {
             "charged_amount" : self.effective_price,
             "payable_amount" : payout_amount,
+            "booking_type": Order.LAB_PRODUCT_ID
         }
 
         merchant_payout = MerchantPayout.objects.create(**payout_data)

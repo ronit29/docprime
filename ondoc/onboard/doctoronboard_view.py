@@ -1,6 +1,6 @@
 from django.shortcuts import render, redirect, HttpResponse
 from django.views import View
-from collections import OrderedDict
+from collections import OrderedDict, defaultdict
 
 from .forms import  DoctorClinicFormSet, DoctorLanguageFormSet, DoctorAwardFormSet, \
                      DoctorAssociationFormSet, DoctorExperienceFormSet, DoctorForm, \
@@ -54,15 +54,20 @@ class DoctorOnboard(View):
             Q(hospital__network__is_billing_enabled=False, hospital__is_billing_enabled=False, doctor=existing.doctor) |
             Q(hospital__network__isnull=True, hospital__is_billing_enabled=False, doctor=existing.doctor)).exists()
 
+        temp_doc_dict = defaultdict(list)
+        temp_docs = DoctorDocument.objects.filter(doctor=existing.doctor)
+        for temp_doc in temp_docs:
+            temp_doc_dict[temp_doc.document_type].append(temp_doc)
+
         doc_dict = OrderedDict()
         for id, value in DoctorDocument.CHOICES:
-            results = DoctorDocument.objects.filter(doctor=existing.doctor, document_type=id)
-            if len(results)>0:
+            results = temp_doc_dict.get(id, [])
+            if len(results) > 0:
                 doc_dict[id] = (id, value, results)
             else:
                 doc_dict[id] = (id, value, None)
 
-        message = request.session.get('message','')
+        message = request.session.get('message', '')
         request.session['message'] = ''
 
 
@@ -152,36 +157,41 @@ class DoctorOnboard(View):
             x.min_num = min_num
             x.validate_min = validate_min
 
-        if not all([doctor_form.is_valid(), mobile_formset.is_valid(), email_formset.is_valid(), qualification_formset.is_valid()
-                       , language_formset.is_valid(), award_formset.is_valid(),
-            association_formset.is_valid(), experience_formset.is_valid()]):
+        if not all([doctor_form.is_valid(), mobile_formset.is_valid(), email_formset.is_valid(),
+                    qualification_formset.is_valid(), language_formset.is_valid(), award_formset.is_valid(),
+                    association_formset.is_valid(), experience_formset.is_valid()]):
 
             doc_images = DoctorImage.objects.filter(doctor=doctor_obj)
 
+            temp_doc_dict = defaultdict(list)
+            temp_docs = DoctorDocument.objects.filter(doctor=doctor_obj)
+            for temp_doc in temp_docs:
+                temp_doc_dict[temp_doc.document_type].append(temp_doc)
+
             doc_dict = OrderedDict()
-            for id, value in DoctorDocument.CHOICES:
-                results = DoctorDocument.objects.filter(doctor=doctor_obj, document_type=id)
-                if len(results)>0:
-                    doc_dict[id] = (id, value, results)
+            for type_id, value in DoctorDocument.CHOICES:
+                results = temp_doc_dict.get(type_id, [])
+                if len(results) > 0:
+                    doc_dict[type_id] = (type_id, value, results)
                 else:
-                    doc_dict[id] = (id, value, None)
+                    doc_dict[type_id] = (type_id, value, None)
 
             return render(request, 'onboard/doctor.html', {'doctor_form': doctor_form,
-                'mobile_formset': mobile_formset,
-                'email_formset': email_formset,
-                'qualification_formset': qualification_formset,
-                'hospital_formset': hospital_formset,
-                'hospitaltiming_formset': hospitaltiming_formset,
-                'language_formset': language_formset,
-                'award_formset': award_formset,
-                'association_formset': association_formset,
-                'experience_formset': experience_formset,
-                # 'medicalservice_formset': medicalservice_formset,
-                'error_message' : 'Please fill all required fields',
-                'doc_images' : doc_images,
-                'doc_dict' :doc_dict,
-                'DoctorDocument' : DoctorDocument
-            })
+                                                           'mobile_formset': mobile_formset,
+                                                           'email_formset': email_formset,
+                                                           'qualification_formset': qualification_formset,
+                                                           'hospital_formset': hospital_formset,
+                                                           'hospitaltiming_formset': hospitaltiming_formset,
+                                                           'language_formset': language_formset,
+                                                           'award_formset': award_formset,
+                                                           'association_formset': association_formset,
+                                                           'experience_formset': experience_formset,
+                                                           # 'medicalservice_formset': medicalservice_formset,
+                                                           'error_message': 'Please fill all required fields',
+                                                           'doc_images': doc_images,
+                                                           'doc_dict': doc_dict,
+                                                           'DoctorDocument': DoctorDocument
+                                                           })
 
         doc_obj = doctor_form.save()
 
