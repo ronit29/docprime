@@ -784,18 +784,29 @@ class PrescriptionFileDeleteSerializer(serializers.Serializer):
 
 
 class PrescriptionSerializer(serializers.Serializer):
-    appointment = serializers.PrimaryKeyRelatedField(queryset=OpdAppointment.objects.all())
+
+    OPD = 1
+    OFFLINE = 2
+    APPOINTMENT_TYPE = [(OPD, "OPD"), (OFFLINE, "Offline")]
+
+    # appointment = serializers.PrimaryKeyRelatedField(queryset=OpdAppointment.objects.all())
+    appointment = serializers.CharField(max_length=128)
     prescription_details = serializers.CharField(allow_blank=True, allow_null=True, required=False, max_length=300)
     name = serializers.FileField()
+    type = serializers.ChoiceField(choices=APPOINTMENT_TYPE, required=False)
 
-    # def validate_appointment(self, value):
-    #     request = self.context.get('request')
-    #     if not OpdAppointment.objects.filter(doctor=request.user.doctor).exists():
-    #         logger.error(
-    #             "Error 'Appointment is not correct' for Prescription create with data - " + json.dumps(
-    #                 request.data.get('appointment')))
-    #         raise serializers.ValidationError("Appointment is not correct.")
-    #     return value
+    def validate(self, attrs):
+        request = self.context.get('request')
+        query = None
+        if 'type' in attrs and attrs.get('type') == self.OFFLINE:
+            query = OfflineOPDAppointments.objects.filter(id=attrs['appointment'])
+        else:
+            query = OpdAppointment.objects.filter(id=attrs['appointment'])
+        app_obj = query.first()
+        if not app_obj:
+            raise serializers.ValidationError("Appointment is not correct.")
+        attrs['appointment_obj'] = app_obj
+        return attrs
 
 
 class DoctorListSerializer(serializers.Serializer):

@@ -3084,6 +3084,17 @@ class OfflineOPDAppointments(auth_model.TimeStampedModel):
                 elif sms_obj.get('action_reschedule') and sms_obj['action_reschedule']:
                     OfflineOPDAppointments.appointment_reschedule_sms(sms_obj)
 
+    def get_prescriptions(self, request):
+        resp = []
+        for pres in self.offline_prescription.all():
+            resp.append({
+                'updated_at': pres.updated_at,
+                'file': request.build_absolute_uri(pres.name.url),
+                'details': pres.prescription_details
+            })
+        return resp
+
+
 
 class SearchScore(auth_model.TimeStampedModel):
     doctor = models.ForeignKey(Doctor, on_delete=models.CASCADE)
