@@ -1162,10 +1162,10 @@ class UserInsurance(auth_model.TimeStampedModel):
             appointment.save()
         self.status = UserInsurance.CANCELLED
         self.save()
-        InsuranceTransaction.objects.create(user_insurance=self,
-                                            account=self.insurance_plan.insurer.float.all().first(),
-                                            transaction_type=InsuranceTransaction.CREDIT,
-                                            amount=self.premium_amount)
+        # InsuranceTransaction.objects.create(user_insurance=self,
+        #                                     account=self.insurance_plan.insurer.float.all().first(),
+        #                                     transaction_type=InsuranceTransaction.CREDIT,
+        #                                     amount=self.premium_amount)
         res['success'] = "Cancellation request recieved, refund will be credited in your account in 10-15 working days"
         return res
 

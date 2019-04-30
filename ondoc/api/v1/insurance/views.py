@@ -421,7 +421,7 @@ class InsuranceCancelViewSet(viewsets.GenericViewSet):
         if not user_insurance:
             res['error'] = "Insurance not found"
             return Response(data=res, status=status.HTTP_400_BAD_REQUEST)
-        if not user.active_insurance():
+        if not user.active_insurance:
             res['error'] = "Insurance is not active"
             return Response(data=res, status=status.HTTP_400_BAD_REQUEST)
 
