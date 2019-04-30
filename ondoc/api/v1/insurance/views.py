@@ -299,6 +299,15 @@ class InsuranceProfileViewSet(viewsets.GenericViewSet):
                 resp['proposer_name'] = user_insurance.members.all().filter(relation='self').values('first_name',
                                                                                                     'middle_name',
                                                                                                     'last_name')
+                resp['insurance_status'] = user_insurance.status
+                opd_appointment_count = OpdAppointment.get_insured_completed_appointment(user_insurance)
+                lab_appointment_count = LabAppointment.get_insured_completed_appointment(user_insurance)
+                if opd_appointment_count > 0 or lab_appointment_count > 0:
+                    resp['is_cancel_allowed'] = False
+                    resp['is_endorsement_allowed'] = False
+                else:
+                    resp['is_cancel_allowed'] = True
+                    resp['is_endorsement_allowed'] = True
             else:
                 return Response({"message": "User is not valid"},
                                 status.HTTP_404_NOT_FOUND)
