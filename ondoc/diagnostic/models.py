@@ -2515,10 +2515,26 @@ class LabDocument(TimeStampedModel, Document):
             self.resize_image(width, height)
 
     def save(self, *args, **kwargs):
+        database_instance = LabDocument.objects.filter(pk=self.id).first()
         super().save(*args, **kwargs)
         if self.document_type == LabDocument.LOGO:
             self.create_all_images()
 
+            if database_instance and database_instance.name == self.name:
+                pass
+            else:
+                self.send_change_logo_email()
+
+    def send_change_logo_email(self):
+        from ondoc.communications.models import EMAILNotification
+        try:
+            emails = settings.LOGO_CHANGE_EMAIL_RECIPIENTS
+            user_and_email = [{'user': None, 'email': email} for email in emails]
+            email_notification = EMAILNotification(notification_type=NotificationAction.LAB_LOGO_CHANGE_MAIL,
+                                                   context={'instance': self})
+            email_notification.send(user_and_email)
+        except Exception as e:
+            logger.error(str(e))
 
     # def __str__(self):
         # return self.name
