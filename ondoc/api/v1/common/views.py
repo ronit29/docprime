@@ -950,6 +950,8 @@ class GetKeyDataViewSet(viewsets.GenericViewSet):
         if not key:
             return Response(status=status.HTTP_400_BAD_REQUEST)
         queryset = UserConfig.objects.filter(key__iexact=key)
+        if not queryset:
+            return Response(status=status.HTTP_404_NOT_FOUND)
         resp = []
         for info in queryset:
             data_key = info.key
