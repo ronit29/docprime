@@ -58,7 +58,7 @@ app.autodiscover_tasks()
 def setup_periodic_tasks(sender, **kwargs):
     polling_time = float(settings.PG_REFUND_STATUS_POLL_TIME) * float(60.0)
     sender.add_periodic_task(polling_time, consumer_refund_update.s(), name='Refund and update consumer account balance')
-    sender.add_periodic_task(crontab(hour=12, minute=10), push_mis.s(), name='Send insurance mis via mail.')
+    sender.add_periodic_task(crontab(hour=12, minute=40), push_mis.s(), name='Send insurance mis via mail.')
 
     elastic_sync_cron_schedule = crontab(hour=19, minute=00)
     elastic_sync_post_cron_schedule = crontab(hour=20, minute=00)
