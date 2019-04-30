@@ -5,6 +5,9 @@ from django.core.validators import MaxValueValidator, MinValueValidator
 import datetime
 from django.utils.crypto import get_random_string
 import logging
+
+from ondoc.corporate_booking.models import CorporateDeal
+
 logger = logging.getLogger(__name__)
 
 
@@ -55,6 +58,7 @@ class Coupon(auth_model.TimeStampedModel):
     new_user_constraint = models.BooleanField(default=False)
     coupon_type = models.IntegerField(choices=COUPON_TYPE_CHOICES, default=DISCOUNT)
     payment_option = models.ForeignKey(PaymentOptions, on_delete=models.SET_NULL, blank=True, null=True)
+    corporate_deal = models.ForeignKey(CorporateDeal, on_delete=models.SET_NULL, null=True, blank=True)
 
     def save(self, *args, **kwargs):
         if not self.id:
