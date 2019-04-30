@@ -116,6 +116,14 @@
                     <th style="border: 1px solid black;">
                         MRP
                     </th>
+                    {% if not instance.fees %}
+                    <th style="border: 1px solid black;">
+                        Docprime Price
+                    </th>
+                    <th style="border: 1px solid black;">
+                        Convenience Charges
+                    </th>
+                    {% endif %}
                     <th style="border: 1px solid black;">
                         Discount
                     </th>
@@ -136,6 +144,14 @@
                     <td style="border: 1px solid black;text-align: center;">
                         {{procedure.mrp}}
                     </td>
+                    {% if not instance.fees %}
+                    <td style="border: 1px solid black;text-align: center;">
+                        {{procedure.dp_price}}
+                    </td>
+                    <td style="border: 1px solid black;text-align: center;">
+                        {{procedure.convenience_charges}}
+                    </td>
+                    {% endif %}
                     <td style="border: 1px solid black;text-align: center;">
                         {{procedure.discount}}
                     </td>
@@ -146,7 +162,7 @@
                 {% endfor %}
                 {% if coupon_discount %}
                 <tr>
-                    <td colspan="4" style="border: 1px solid black;text-align: center;">
+                    <td colspan="{% if not instance.fees %}6{% else %}4{% endif %}" style="border: 1px solid black;text-align: center;">
                         Coupon Discount
                     </td>
                     <td style="border: 1px solid black;text-align: center;">
@@ -155,7 +171,7 @@
                 </tr>
                 {% endif %}
                 <tr>
-                    <td colspan="4" style="border: 1px solid black;text-align: center;">
+                    <td colspan="{% if not instance.fees %}6{% else %}4{% endif %}" style="border: 1px solid black;text-align: center;">
                         Amount Paid
                     </td>
                     <td style="border: 1px solid black;text-align: center;">
