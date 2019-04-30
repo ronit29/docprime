@@ -268,7 +268,7 @@ class UserInsuranceDoctorResource(resources.ModelResource):
         request = kwargs.get('request')
         date_range = [datetime.strptime(kwargs.get('from_date'), '%Y-%m-%d').date(), datetime.strptime(
                                         kwargs.get('to_date'), '%Y-%m-%d').date()]
-        if request.user.is_member_of(constants['INSURANCE_GROUP']):
+        if request and request.user.is_member_of(constants['INSURANCE_GROUP']):
             appointment = OpdAppointment.objects.filter(~Q(status=OpdAppointment.CANCELLED),
                                                         created_at__date__range=date_range,
                                                         insurance__isnull=False).prefetch_related('insurance')
@@ -448,7 +448,7 @@ class UserInsuranceLabResource(resources.ModelResource):
         request = kwargs.get('request')
         date_range = [datetime.strptime(kwargs.get('from_date'), '%Y-%m-%d').date(), datetime.strptime(
                                         kwargs.get('to_date'), '%Y-%m-%d').date()]
-        if request.user.is_member_of(constants['INSURANCE_GROUP']):
+        if request and request.user.is_member_of(constants['INSURANCE_GROUP']):
             appointment = LabAppointment.objects.filter(~Q(status=LabAppointment.CANCELLED),
                                                         created_at__date__range=date_range,
                                                         insurance__isnull=False).prefetch_related('insurance')
@@ -887,6 +887,10 @@ class InsuranceLeadAdmin(ImportExportModelAdmin, admin.ModelAdmin):
         else:
             return ""
 
+    def source(self, obj):
+        extras = obj.extras
+        return extras.get('source', '')
+
     def phone_number(self, obj):
         return str(obj.user.phone_number)
 
@@ -897,7 +901,7 @@ class InsuranceLeadAdmin(ImportExportModelAdmin, admin.ModelAdmin):
         else:
             return "New"
 
-    list_display = ('id', 'name',  'phone_number', 'status', 'matrix_lead_id', 'created_at', 'updated_at')
+    list_display = ('id', 'name',  'phone_number', 'status', 'matrix_lead_id', 'source', 'created_at', 'updated_at')
 
     def get_export_queryset(self, request):
         super().get_export_queryset(request)

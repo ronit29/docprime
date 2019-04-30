@@ -2,6 +2,7 @@ from __future__ import absolute_import, unicode_literals
 
 import copy
 import datetime
+from datetime import timedelta
 import json
 import math
 import traceback
@@ -647,8 +648,14 @@ def send_insurance_float_limit_notifications(self, data):
         emails = settings.INSURANCE_FLOAT_LIMIT_ALERT_EMAIL
         html_body = "Insurer {insurer} current float amount is being getting exhausted and reached {limit}."\
             .format(insurer=insurer.name, limit=insurer_account.current_float)
-        for email in emails:
-            EmailNotification.send_insurance_float_alert_email(email, html_body)
+
+        date = timezone.now() - timedelta(days=1)
+        is_already_sent = EmailNotification.objects.filter(created_at__gte=date,
+                                             notification_type=NotificationAction.INSURANCE_FLOAT_LIMIT).exists()
+
+        if not is_already_sent:
+            for email in emails:
+                EmailNotification.send_insurance_float_alert_email(email, html_body)
 
     except Exception as e:
         logger.error(str(e))

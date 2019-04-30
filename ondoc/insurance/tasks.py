@@ -1,10 +1,11 @@
 from __future__ import absolute_import, unicode_literals
+
+from django.core.files.uploadedfile import TemporaryUploadedFile, InMemoryUploadedFile
 from rest_framework import status
 from django.conf import settings
 from celery import task
 import requests
 
-from ondoc.authentication.models import User
 import json
 import logging
 
@@ -14,6 +15,7 @@ logger = logging.getLogger(__name__)
 
 @task(bind=True, max_retries=2)
 def push_insurance_banner_lead_to_matrix(self, data):
+    from ondoc.authentication.models import User
     from ondoc.insurance.models import InsuranceLead, InsurancePlans
     try:
         if not data:
@@ -92,6 +94,7 @@ def push_insurance_banner_lead_to_matrix(self, data):
 
 @task(bind=True, max_retries=2)
 def push_insurance_buy_to_matrix(self, *args, **kwargs):
+    from ondoc.authentication.models import User
     from ondoc.insurance.models import UserInsurance, InsuranceLead
     try:
         user_id = kwargs.get('user_id', None)
@@ -168,3 +171,45 @@ def push_insurance_buy_to_matrix(self, *args, **kwargs):
     except Exception as e:
         logger.error("Error in Celery. Failed pushing insurance to the matrix- " + str(e))
 
+@task()
+def push_mis():
+    from ondoc.insurance.models import InsuranceMIS
+    from ondoc.notification.models import EmailNotification
+    from ondoc.api.v1.utils import util_absolute_url
+    from ondoc.crm.admin.insurance import UserInsuranceResource, UserInsuranceDoctorResource, UserInsuranceLabResource
+    from datetime import datetime, timedelta
+
+    resources = [
+        (UserInsuranceResource, InsuranceMIS.AttachmentType.USER_INSURANCE_RESOURCE),
+        (UserInsuranceDoctorResource, InsuranceMIS.AttachmentType.USER_INSURANCE_DOCTOR_RESOURCE),
+        (UserInsuranceLabResource, InsuranceMIS.AttachmentType.USER_INSURANCE_LAB_RESOURCE)
+    ]
+
+    from_date = str(datetime.now().date() - timedelta(days=1))
+    to_date = str(datetime.now().date())
+    arguments = {
+        'from_date': from_date,
+        'to_date': to_date,
+    }
+
+    email_attachments = []
+
+    for resource in resources:
+        resource_obj = resource[0]()
+
+        dataset = resource_obj.export(**arguments)
+        filename = "%s_%s_%s.xlsx" % (resource_obj.__class__.__name__ , from_date, to_date)
+        file = TemporaryUploadedFile(filename, 'byte', 1000, 'utf-8')
+        f = open(file.temporary_file_path(), 'wb')
+        f.write(dataset.xls)
+        f.seek(0)
+        f.flush()
+        f.content_type = 'application/vnd.ms-excel'
+
+        attachment = InMemoryUploadedFile(file, None, filename, 'application/vnd.ms-excel', file.tell(), None)
+        insurance_mis_obj = InsuranceMIS(attachment_file=attachment, attachment_type=resource[1])
+        insurance_mis_obj.save()
+        print(insurance_mis_obj.attachment_file.url)
+        email_attachments.append({'filename': filename, 'path': util_absolute_url(insurance_mis_obj.attachment_file.url)})
+
+    EmailNotification.send_insurance_mis(email_attachments)
