@@ -31,6 +31,8 @@ from ondoc.account.models import Order, Merchant, MerchantPayout
 from decimal import  *
 logger = logging.getLogger(__name__)
 from django.utils.functional import cached_property
+from ondoc.notification import tasks as notification_tasks
+
 
 
 def generate_insurance_policy_number():
@@ -1164,12 +1166,22 @@ class UserInsurance(auth_model.TimeStampedModel):
             appointment.save()
         self.status = UserInsurance.CANCELLED
         self.save()
+        transaction.on_commit(lambda: self.after_commit_tasks())
         # InsuranceTransaction.objects.create(user_insurance=self,
         #                                     account=self.insurance_plan.insurer.float.all().first(),
         #                                     transaction_type=InsuranceTransaction.CREDIT,
         #                                     amount=self.premium_amount)
         res['success'] = "Cancellation request recieved, refund will be credited in your account in 10-15 working days"
         return res
+
+    def after_commit_task(self):
+        if self.status == UserInsurance.CANCELLED:
+            try:
+                notification_tasks.send_insurance_cancellation.apply_async(self.id)
+            except Exception as e:
+                logger.error(str(e))
+
+
 
 
 class InsuranceTransaction(auth_model.TimeStampedModel):
