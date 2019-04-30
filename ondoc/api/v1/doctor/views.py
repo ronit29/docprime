@@ -1114,6 +1114,20 @@ class PrescriptionFileViewset(OndocViewSet):
         validated_data = serializer.validated_data
         #resp_data = list()
         if validated_data.get('type') == serializers.PrescriptionSerializer.OPD:
+            pres_models.OfflinePrescription.objects.create(
+                name=validated_data.get('name'),
+                prescription_details=validated_data.get('prescription_details'),
+                appointment=validated_data.get('appointment_obj')
+            )
+            app = validated_data['appointment_obj']
+            resp_data = {'doctor': serializers.AppointmentRetrieveDoctorSerializer(app.doctor).data,
+                         'time_slot_start': app.time_slot_start,
+                         'hospital': serializers.HospitalModelSerializer(app.hospital).data,
+                         'profile': OfflinePatientSerializer(app.user).data,
+                         'prescriptions': app.get_prescriptions(request)
+                         }
+
+        else:
             if not self.prescription_permission(request.user, validated_data.get('appointment')):
                 return Response({'msg': "You don't have permissions to manage this appointment"}, status=status.HTTP_403_FORBIDDEN)
 
@@ -1137,19 +1151,6 @@ class PrescriptionFileViewset(OndocViewSet):
                                                                              context={'request': request}).data
             if validated_data.get('appointment'):
                 resp_data['prescriptions'] = validated_data.get('appointment').get_prescriptions(request)
-        else:
-            pres_models.OfflinePrescription.objects.create(
-                name=validated_data.get('name'),
-                prescription_details = validated_data.get('prescription_details'),
-                appointment= validated_data.get('appointment_obj')
-            )
-            app = validated_data['appointment_obj']
-            resp_data = {'doctor': serializers.AppointmentRetrieveDoctorSerializer(app.doctor).data,
-                    'time_slot_start': app.time_slot_start,
-                    'hospital': serializers.HospitalModelSerializer(app.hospital).data,
-                    'profile': OfflinePatientSerializer(app.user).data,
-                    'prescriptions': app.get_prescriptions(request)
-            }
 
         return Response(resp_data)
 

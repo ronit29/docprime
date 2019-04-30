@@ -793,15 +793,15 @@ class PrescriptionSerializer(serializers.Serializer):
     appointment = serializers.CharField(max_length=128)
     prescription_details = serializers.CharField(allow_blank=True, allow_null=True, required=False, max_length=300)
     name = serializers.FileField()
-    type = serializers.ChoiceField(choices=APPOINTMENT_TYPE)
+    type = serializers.ChoiceField(choices=APPOINTMENT_TYPE, required=False)
 
     def validate(self, attrs):
         request = self.context.get('request')
         query = None
-        if attrs.get('type') == self.OPD:
-            query = OpdAppointment.objects.filter(id=attrs['appointment'])
-        else:
+        if 'type' in attrs and attrs.get('type') == self.OPD:
             query = OfflineOPDAppointments.objects.filter(id=attrs['appointment'])
+        else:
+            query = OpdAppointment.objects.filter(id=attrs['appointment'])
         app_obj = query.first()
         if not app_obj:
             raise serializers.ValidationError("Appointment is not correct.")
