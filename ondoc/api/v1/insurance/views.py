@@ -43,7 +43,7 @@ class ListInsuranceViewSet(viewsets.GenericViewSet):
             user = request.user
             if not user.is_anonymous:
                 user_insurance = UserInsurance.get_user_insurance(request.user)
-                if user_insurance and user_insurance.is_valid():
+                if user_insurance and user_insurance.is_profile_valid():
                     return Response(data={'certificate': True}, status=status.HTTP_200_OK)
 
             insurer_data = self.get_queryset()

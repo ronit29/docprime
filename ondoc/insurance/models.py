@@ -665,6 +665,12 @@ class UserInsurance(auth_model.TimeStampedModel):
         else:
             return False
 
+    def is_profile_valid(self):
+        if self.expiry_date >= timezone.now() and (self.status == self.ACTIVE or self.status == self.ONHOLD):
+            return True
+        else:
+            return False
+
     def is_appointment_valid(self, appointment_time):
         if self.expiry_date >= appointment_time:
             return True
