@@ -1506,7 +1506,9 @@ class DoctorListViewSet(viewsets.GenericViewSet):
             #         specializations = validated_data.get('extras').get('specialization')
             #     else:
             #         specializations = ''
-
+            temp_ipd_procedures = []
+            if validated_data.get('ipd_procedure_ids'):
+                temp_ipd_procedures = IpdProcedure.objects.filter(id__in=validated_data.get('ipd_procedure_ids', []))
 
             if validated_data.get('specialization'):
                 specialization = validated_data.get('specialization')
@@ -1571,6 +1573,11 @@ class DoctorListViewSet(viewsets.GenericViewSet):
                                  validated_data.get('sublocality_value') + ' ' + validated_data.get('locality_value'), 'url': None})
             elif validated_data.get('sitemap_identifier') == 'DOCTORS_LOCALITY_CITY':
                 breadcrumb.append({'title': 'Doctors in ' + validated_data.get('sublocality_value') + ' ' + validated_data.get('locality_value'), 'url': None})
+            elif validated_data.get('sitemap_identifier') == 'IPD_PROCEDURE_DOCTOR_CITY':
+                breadcrumb.append({'title': 'Procedures', 'url': '/ipd-procedures'})
+                breadcrumb.append({'title': '{} Doctors in {}'.format(validated_data.get('ipd_procedure'),
+                                                                      validated_data.get('locality_value')),
+                                   'url': None})
             else:
                 breadcrumb.append({'title': 'Doctors in ' + validated_data.get('locality_value'), 'url': None})
 
@@ -1719,7 +1726,7 @@ class DoctorListViewSet(viewsets.GenericViewSet):
                         if hospital_location.distance(parent_location)*100 < 1:
                             resp['parent_url'] = parent_url
 
-        specializations = list(models.PracticeSpecialization.objects.filter(id__in=validated_data.get('specialization_ids',[])).values('id','name'));
+        specializations = list(models.PracticeSpecialization.objects.filter(id__in=validated_data.get('specialization_ids',[])).values('id','name'))
         if validated_data.get('url'):
             canonical_url = validated_data.get('url')
         else:
@@ -1733,8 +1740,8 @@ class DoctorListViewSet(viewsets.GenericViewSet):
                     else:
                         url = slugify(specialization_name + '-in-' + validated_data.get('locality') + '-' +
                                                 city + '-sptlitcit')
-                elif validated_data.get('ipd_procedure_ids'):
-                    temp_ipd = IpdProcedure.objects.filter(id__in=validated_data.get('ipd_procedure_ids', [])).first()
+                elif temp_ipd_procedures:
+                    temp_ipd = temp_ipd_procedures[0]
                     if temp_ipd:
                         url = slugify(temp_ipd.name + '-doctors-in-' + city + '-ipddp')
                 else:
@@ -1778,7 +1785,7 @@ class DoctorListViewSet(viewsets.GenericViewSet):
                          'specializations': specializations, 'conditions': conditions, "seo": seo,
                          "breadcrumb": breadcrumb, 'search_content': top_content,
                          'procedures': procedures, 'procedure_categories': procedure_categories,
-                         'ratings':ratings, 'reviews': reviews, 'ratings_title': ratings_title,
+                         'ratings': ratings, 'reviews': reviews, 'ratings_title': ratings_title,
                          'bottom_content': bottom_content, 'canonical_url': canonical_url,
                          'ipd_procedures': ipd_procedures})
 
@@ -3594,7 +3601,7 @@ class HospitalViewSet(viewsets.GenericViewSet):
         if not ipd_procedure_obj:
             return Response([], status=status.HTTP_400_BAD_REQUEST)
 
-        url = canonical_url = title = description = top_content = bottom_content = city = None
+        url = canonical_url = title = description = top_content = bottom_content = city = breadcrumb = None
         entity = kwargs.get('entity')
         if not entity:
             if validated_data.get('city'):
@@ -3626,6 +3633,11 @@ class HospitalViewSet(viewsets.GenericViewSet):
                 if new_dynamic_object.bottom_content:
                     bottom_content = new_dynamic_object.bottom_content
 
+        breadcrumb = list()
+        breadcrumb.append({"title": "Home", "url": "/"})
+        breadcrumb.append({"title": "Procedures", "url": "/ipd-procedures"})
+        if city:
+            breadcrumb.append({"title": "{} hospitals in {}".format(ipd_procedure_obj.name, city), "url": None})
 
         lat = validated_data.get('lat')
         long = validated_data.get('long')
@@ -3669,7 +3681,7 @@ class HospitalViewSet(viewsets.GenericViewSet):
                                                         HealthInsuranceProvider.objects.all()],
                          'seo': {'url': url, 'title': title, 'description': description, 'location': city},
                          'search_content': top_content, 'bottom_content': bottom_content,
-                         'canonical_url': canonical_url})
+                         'canonical_url': canonical_url, 'breadcrumb': breadcrumb})
 
     @transaction.non_atomic_requests
     def retrieve_by_url(self, request):
@@ -3807,7 +3819,8 @@ class IpdProcedureViewSet(viewsets.GenericViewSet):
         if ipd_procedure is None:
             return Response(status=status.HTTP_404_NOT_FOUND)
 
-        url = canonical_url = title = description = top_content = bottom_content = city = None
+        url = canonical_url = title = description = top_content = bottom_content = city = breadcrumb = None
+
         entity = kwargs.get('entity')
         if not entity:
             if validated_data.get('city'):
@@ -3839,6 +3852,12 @@ class IpdProcedureViewSet(viewsets.GenericViewSet):
                 if new_dynamic_object.bottom_content:
                     bottom_content = new_dynamic_object.bottom_content
 
+        breadcrumb = list()
+        breadcrumb.append({"title": "Home", "url": "/"})
+        breadcrumb.append({"title": "Procedures", "url": "/ipd-procedures"})
+        if city:
+            breadcrumb.append({"title": "{} cost in {}".format(ipd_procedure.name, city), "url": None})
+
         hospital_view_set = HospitalViewSet()
         hospital_result = hospital_view_set.list(request, pk, 2)
         doctor_list_viewset = DoctorListViewSet()
@@ -3854,7 +3873,8 @@ class IpdProcedureViewSet(viewsets.GenericViewSet):
         return Response(
             {'about': ipd_procedure_serializer.data, 'hospitals': hospital_result.data, 'doctors': doctor_result_data,
              'seo': {'url': url, 'title': title, 'description': description, 'location': city},
-             'search_content': top_content, 'bottom_content': bottom_content, 'canonical_url': canonical_url})
+             'search_content': top_content, 'bottom_content': bottom_content, 'canonical_url': canonical_url,
+             'breadcrumb': breadcrumb})
 
     def create_lead(self, request):
         serializer = serializers.IpdProcedureLeadSerializer(data=request.data)
