@@ -919,6 +919,7 @@ class InsuranceLeadAdmin(ImportExportModelAdmin, admin.ModelAdmin):
     def has_delete_permission(self, request, obj=None):
         return False
 
+
 class InsuranceLeadForm(forms.ModelForm):
     start_date = forms.DateField(widget=CustomDateInput(format=('%d-%m-%Y'), attrs={'placeholder': 'Select a date'}))
     end_date = forms.DateField(widget=CustomDateInput(format=('%d-%m-%Y'), attrs={'placeholder': 'Select a date'}))
@@ -929,3 +930,7 @@ class InsuranceLeadForm(forms.ModelForm):
         end = cleaned_data.get("end_date")
         if start and end and start >= end:
             raise forms.ValidationError("Start Date should be less than end Date")
+
+
+class InsuranceCancelMasterAdmin(admin.ModelAdmin):
+    list_display = ['insurer', 'min_days', 'max_days', 'refund_percentage']

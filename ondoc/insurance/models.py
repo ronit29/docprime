@@ -1383,9 +1383,11 @@ class InsuranceDummyData(auth_model.TimeStampedModel):
         db_table = 'insurance_dummy_data'
 
 
-# class InsuranceReport(UserInsurance):
-#
-#     class Meta:
-#         proxy = True
+class InsuranceCancelMaster(auth_model.TimeStampedModel):
+    insurer = models.ForeignKey(Insurer, related_name='insurance_cancel_master', on_delete=models.DO_NOTHING)
+    min_days = models.PositiveIntegerField(default=0)
+    max_days = models.PositiveIntegerField(default=0)
+    refund_percentage = models.PositiveIntegerField(default=0)
 
-
+    class Meta:
+        db_table = 'insurance_cancel_master'

@@ -426,25 +426,28 @@ class InsuranceCancelViewSet(viewsets.GenericViewSet):
             return Response(data=res, status=status.HTTP_400_BAD_REQUEST)
 
         response = user_insurance.process_cancellation()
-        # opd_appointment_count = OpdAppointment.get_insured_completed_appointment(user_insurance)
-        # lab_appointment_count = LabAppointment.get_insured_completed_appointment(user_insurance)
-        # if opd_appointment_count > 0 or lab_appointment_count > 0:
-        #     res['error'] = "One of the OPD or LAB Appointment have been completed, Cancellation could not be processed"
-        #     return Response(data=res, status=status.HTTP_400_BAD_REQUEST)
-        # opd_active_appointment = OpdAppointment.get_insured_active_appointment(user_insurance)
-        # lab_active_appointment = LabAppointment.get_insured_active_appointment(user_insurance)
-        # for appointment in opd_active_appointment:
-        #     appointment.status = OpdAppointment.CANCELLED
-        #     appointment.save()
-        # for appointment in lab_active_appointment:
-        #     appointment.status = LabAppointment.CANCELLED
-        #     appointment.save()
-        # user_insurance.status = UserInsurance.CANCELLED
-        # user_insurance.save()
-        # InsuranceTransaction.objects.create(user_insurance=user_insurance,
-        #                                     account=user_insurance.insurance_plan.insurer.float.all().first(),
-        #                                     transaction_type=InsuranceTransaction.CREDIT,
-        #                                     amount=user_insurance.premium_amount)
-        # res['success'] = "Cancellation request recieved, refund will be credited in your account in 10-15 working days"
-        # return Response(data=res, status=status.HTTP_200_OK)
         return Response(data=response, status=status.HTTP_200_OK)
+
+    def cancel_master(self,request):
+        user = request.user
+        res = {}
+        user_insurance = user.active_insurance
+        if not user_insurance:
+            res['error'] = "Insurance not found for the user"
+            return Response(data=res, status=status.HTTP_400_BAD_REQUEST)
+        policy_purchase_date = user_insurance.purchase_date
+        policy_expiry_date = user_insurance.expiry_date
+        policy_number = user_insurance.policy_number
+        cancel_master = InsuranceCancelViewSet.objects.filter(insurer=user_insurance.insurer).values_list('min_days',
+                                                                                                          'max_days',
+                                                                                                          'refund_percentage')
+        if not cancel_master:
+            res['error'] = "Insurance Cancel Master not found"
+            return Response(data=res, status=status.HTTP_400_BAD_REQUEST)
+
+        res['purchase_date'] = policy_purchase_date
+        res['expiry_date'] = policy_expiry_date
+        res['policy_number'] = policy_number
+        res['cancel_master'] = cancel_master
+
+        return Response(data=res, status=status.HTTP_200_OK)
