@@ -132,7 +132,7 @@ class PrescriptionComponentBodySerializer(serializers.Serializer):
     additional_notes = serializers.CharField(max_length=256, required=False)
 
     def validate(self, attrs):
-        model = dict(serializers.PrescriptionModelComponents.COMPONENT_CHOICES)[attrs.get('type')]
+        model = dict(PrescriptionModelComponents.COMPONENT_CHOICES)[attrs.get('type')]
         if model.objects.filter(name__iexact=attrs.get('name')).exists():
             raise serializers.ValidationError("component with this name already exists")
         if attrs.get("type") == PrescriptionModelComponents.TESTS and diag_models.LabTest.objects.filter(name__iexact=attrs.get("name")).exists():

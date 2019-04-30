@@ -211,7 +211,7 @@ class PresccriptionPdf(auth_models.TimeStampedModel):
         hospital_id = appointment.hospital.id
         obj = cls.objects.filter(serial_id__contains=str(hospital_id)+'-'+str(doctor_id)).order_by('-serial_id').first()
         if obj:
-            serial = obj.invoice_serial_id[-12:]
+            serial = obj.serial_id[-12:]
             return serial
         else:
             return str(cls.SERIAL_ID_START) + '-01-01'
