@@ -339,7 +339,7 @@ def set_order_dummy_transaction(self, order_id, user_id):
                 req_data['refOrderId'] = str(insurance_order_id)
 
             if insurer_code:
-                req_data['insurerCode'] = insurer_code
+                req_data['merchCode'] = insurer_code
 
 
             response = requests.post(url, data=json.dumps(req_data), headers=headers)
