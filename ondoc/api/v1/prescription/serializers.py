@@ -133,8 +133,8 @@ class PrescriptionComponentBodySerializer(serializers.Serializer):
 
     def validate(self, attrs):
         model = dict(PrescriptionModelComponents.COMPONENT_CHOICES)[attrs.get('type')]
-        if model.objects.filter(name__iexact=attrs.get('name')).exists():
-            raise serializers.ValidationError("component with this name already exists")
+        if model.objects.filter(name__iexact=attrs.get('name'), hospitals__contains=[attrs.get('hospital_id').id]).exists():
+            raise serializers.ValidationError("component with this name for given hospital already exists")
         if attrs.get("type") == PrescriptionModelComponents.TESTS and diag_models.LabTest.objects.filter(name__iexact=attrs.get("name")).exists():
             raise serializers.ValidationError("Lab Test already exists")
         return attrs
