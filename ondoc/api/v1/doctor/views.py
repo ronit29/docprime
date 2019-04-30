@@ -2414,14 +2414,15 @@ class CreateAdminViewSet(viewsets.GenericViewSet):
         serializer = serializers.EntityListQuerySerializer(data=request.query_params)
         serializer.is_valid(raise_exception=True)
         valid_data = serializer.validated_data
-        queryset = auth_models.GenericAdmin.objects.select_related('doctor', 'hospital').prefetch_related('doctor__doctor_clinic')
+        queryset = auth_models.GenericAdmin.objects.select_related('doctor', 'hospital').prefetch_related('doctor__doctor_clinics')
         if valid_data.get('entity_type') == GenericAdminEntity.DOCTOR:
             query = queryset.exclude(user=request.user).filter(doctor_id=valid_data.get('id'),
                                     entity_type=GenericAdminEntity.DOCTOR
                                     ) \
-                            .annotate(hospital_ids=F('hospital__id'), hospital_ids_count=Count('hospital__hospital_doctors__doctor'))\
+                            .annotate(hospital_ids=F('hospital__id'), hospital_ids_count=Count('hospital__hospital_doctors__doctor'),
+                                      license=F('doctor__license'), online_consultation_fees=F('doctor__online_consultation_fees'))\
                             .values('id', 'phone_number', 'name', 'is_disabled', 'permission_type', 'super_user_permission', 'hospital_ids',
-                                    'hospital_ids_count', 'updated_at')
+                                    'hospital_ids_count', 'updated_at', 'license', 'online_consultation_fees')
             for x in query:
                 if temp.get(x['phone_number']):
                     if x['hospital_ids'] not in temp[x['phone_number']]['hospital_ids']:
@@ -2450,7 +2451,8 @@ class CreateAdminViewSet(viewsets.GenericViewSet):
                     'assigned': 'CASE WHEN  ((SELECT COUNT(*) FROM doctor_number WHERE doctor_id = doctor.id) = 0) THEN 0 ELSE 1  END',
                     'phone_number': 'SELECT phone_number FROM doctor_number WHERE doctor_id = doctor.id',
                     'enabled': 'SELECT enabled FROM doctor_clinic WHERE doctor_id = doctor.id AND hospital_id='+str(hos_obj.id)})\
-                    .values('name', 'id', 'assigned', 'phone_number', 'enabled', 'is_live', 'source_type')
+                    .values('name', 'id', 'assigned', 'phone_number', 'enabled', 'is_live', 'source_type', 'license',
+                            'online_consultation_fees')
 
             for x in response:
                 if temp.get(x['phone_number']):
@@ -2465,6 +2467,8 @@ class CreateAdminViewSet(viewsets.GenericViewSet):
                             x['name'] = doc.get('name')
                             x['id'] = doc.get('id')
                             x['assigned'] = doc.get('assigned')
+                            x['license'] = doc.get('license')
+                            x['online_consultation_fees'] = doc.get('online_consultation_fees')
                             break
                     if not x.get('is_doctor'):
                         x['is_doctor'] = False
@@ -2580,8 +2584,14 @@ class CreateAdminViewSet(viewsets.GenericViewSet):
                 if dn.first():
                     try:
                         dn.update(phone_number=valid_data.get('phone_number'))
-                        if valid_data.get("license") != dn.license:
-                            dn.update(license=valid_data.get('license'))
+                        doctor = valid_data.get('doc_profile')
+                        if valid_data.get('license'):
+                            if doctor.license:
+                                return Response({"error": "License for given doctor already exists"}, status=status.HTTP_400_BAD_REQUEST)
+                            doctor.license = valid_data.get('license')
+                        if valid_data.get("online_consultation_fees"):
+                            doctor.online_consultation_fees = valid_data.get("online_consultation_fees")
+                        doctor.save()
                     except Exception as e:
                         logger.error("Error Updating Entity Hospital " + str(e))
                         return Response({'error': 'something went wrong!'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)

@@ -1534,6 +1534,7 @@ class AdminUpdateBodySerializer(AdminCreateBodySerializer):
     remove_list = serializers.ListField()
     old_phone_number = serializers.IntegerField(min_value=5000000000, max_value=9999999999, required=False)
     license = serializers.CharField(max_length=200, required=False)
+    online_consultation_fees = serializers.DecimalField(max_digits=10, decimal_places=2, min_value=0, required=False)
 
     def validate(self, attrs):
         if attrs['type'] == User.STAFF and 'name' not in attrs:
@@ -1552,8 +1553,9 @@ class AdminUpdateBodySerializer(AdminCreateBodySerializer):
             raise serializers.ValidationError("Associated Doctors are Required.")
         if attrs['entity_type'] == GenericAdminEntity.HOSPITAL and attrs.get('type') == User.DOCTOR:
             dquery = DoctorNumber.objects.select_related('doctor', 'hospital').filter(phone_number=attrs['phone_number'], hospital_id=attrs.get('id'))
-            if dquery.exists():
-                raise serializers.ValidationError("Phone number already assigned to Doctor " + dquery.first().doctor.name +". Add number as admin to manage multiple doctors.")
+            dn_obj = dquery.first()
+            if dn_obj and dn_obj.hospital_id != attrs.get('id'):
+                raise serializers.ValidationError("Phone number already assigned to Doctor " + dn_obj.doctor.name +". Add number as admin to manage multiple doctors.")
         return attrs
 
 class AdminDeleteBodySerializer(serializers.Serializer):

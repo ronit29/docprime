@@ -533,7 +533,7 @@ class ProviderSignupDataViewset(viewsets.GenericViewSet):
             license = doctor.get('license', '')
             doc_obj_list.append(doc_models.Doctor(name=name, online_consultation_fees=online_consultation_fees,
                                                   enabled=False, source_type=doc_models.Hospital.PROVIDER,
-                                                  license=license if license else None))
+                                                  license=license if license else ''))
         created_doctors = doc_models.Doctor.objects.bulk_create(doc_obj_list)
         return created_doctors
 
