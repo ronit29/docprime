@@ -896,6 +896,9 @@ class EMAILNotification:
         elif notification_type == NotificationAction.IPD_PROCEDURE_MAIL:
             body_template = "email/ipd_lead/body.html"
             subject_template = "email/ipd_lead/subject.txt"
+        elif notification_type == NotificationAction.PRICING_ALERT_EMAIL:
+            body_template = "email/lab/lab_pricing_change/body.html"
+            subject_template = "email/lab/lab_pricing_change/subject.txt"
 
         return subject_template, body_template
 
@@ -910,7 +913,6 @@ class EMAILNotification:
         notification_type = self.notification_type
         context = copy.deepcopy(context)
         instance = context.get('instance', None)
-
         receiver_user = receiver.get('user')
 
         # Hospital and labs which has the flag open to communication, send notificaiton to them only.
