@@ -821,7 +821,7 @@ class DoctorListSerializer(serializers.Serializer):
     is_insurance = serializers.BooleanField(required=False)
     hospital_id = serializers.IntegerField(required=False, allow_null=True)
     locality = serializers.CharField(required=False)
-    city = serializers.CharField(required=False)
+    city = serializers.CharField(required=False, allow_null=True)
     ipd_procedure_ids = CommaSepratedToListField(required=False, max_length=500, typecast_to=str)
 
     def validate_ipd_procedure_ids(self, attrs):

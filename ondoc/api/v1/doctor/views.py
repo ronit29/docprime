@@ -1733,6 +1733,10 @@ class DoctorListViewSet(viewsets.GenericViewSet):
                     else:
                         url = slugify(specialization_name + '-in-' + validated_data.get('locality') + '-' +
                                                 city + '-sptlitcit')
+                elif validated_data.get('ipd_procedure_ids'):
+                    temp_ipd = IpdProcedure.objects.filter(id__in=validated_data.get('ipd_procedure_ids', [])).first()
+                    if temp_ipd:
+                        url = slugify(temp_ipd.name + '-doctors-in-' + city + '-ipddp')
                 else:
                     if not validated_data.get('locality'):
                         url = slugify('doctors' + '-in-' + city + '-sptcit')
@@ -3842,6 +3846,7 @@ class IpdProcedureViewSet(viewsets.GenericViewSet):
                                                                       'longitude': validated_data.get('long'),
                                                                       'latitude': validated_data.get('lat'),
                                                                       'sort_on': 'experience',
+                                                                      'city': city,
                                                                       'restrict_result_count': 3})
         doctor_result_data = doctor_result.data
         ipd_procedure_serializer = serializers.IpdProcedureDetailSerializer(ipd_procedure, context={'request': request,
