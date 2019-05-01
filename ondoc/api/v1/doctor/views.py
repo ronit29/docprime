@@ -3772,12 +3772,10 @@ class HospitalViewSet(viewsets.GenericViewSet):
                     breadcrumb.append({'url': request.build_absolute_uri('/'+ entity.locality_value), 'title': entity.locality_value, 'link_title': entity.locality_value})
                     breadcrumb = breadcrumb + entity.breadcrumb
 
-                if entity.sublocality_value:
-                    breadcrumb.append({'url': entity.url, 'title': entity.sublocality_value, 'link_title': 'Hospitals in ' + entity.sublocality_value + ', ' + entity.locality_value})
-                breadcrumb.append({'title':  hospital_obj.name})
+                breadcrumb.append({'title':  hospital_obj.name, 'url': None, 'link_title': None})
                 response['breadcrumb'] = breadcrumb
             else:
-                breadcrumb = [{'url': '/', 'title': 'Home'}, {'title':  hospital_obj.name}]
+                breadcrumb = [{'url': '/', 'title': 'Home', 'link_title': 'Home'}, {'title':  hospital_obj.name, 'url': None, 'link_title': None}]
                 response['breadcrumb'] = breadcrumb
 
             if hospital_obj.name and entity.locality_value:
