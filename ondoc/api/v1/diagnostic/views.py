@@ -2891,6 +2891,7 @@ class CompareLabPackagesViewSet(viewsets.ReadOnlyModelViewSet):
         compare_package_details['package_lab_ids'] = package_lab_ids
         compare_package_details['lat'] = request.GET.get('lat') if request.GET.get('lat') else None
         compare_package_details['long'] = request.GET.get('long') if request.GET.get('long') else None
+        compare_package_details['title'] = compare_seo_url.title if compare_seo_url.title else None
         kwargs['compare_package_details'] = compare_package_details
         kwargs['compare_seo_url'] = compare_seo_url
 

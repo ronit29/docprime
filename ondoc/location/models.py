@@ -38,6 +38,7 @@ def split_and_append(initial_str, spliter, appender):
 
 class CompareSEOUrls(TimeStampedModel):
     url = models.SlugField(blank=False, null=True, max_length=2000, db_index=True, unique=True)
+    title = models.CharField(blank=True, null=True, max_length=2000)
 
     class Meta:
         db_table = 'compare_seo_urls'
