@@ -166,6 +166,7 @@ class UserProfileSerializer(serializers.ModelSerializer):
     email = serializers.EmailField(required=False, allow_null=True, allow_blank=True)
     profile_image = serializers.SerializerMethodField()
     is_insured = serializers.SerializerMethodField()
+    insurance_status = serializers.SerializerMethodField()
     dob = serializers.DateField(allow_null=True, required=False)
     whatsapp_optin = serializers.NullBooleanField(required=False)
     whatsapp_is_declined = serializers.BooleanField(required=False)
@@ -188,6 +189,18 @@ class UserProfileSerializer(serializers.ModelSerializer):
             return True
         else:
             return False
+
+    def insurance_status(self, obj):
+        if isinstance(obj, dict):
+            return False
+        insured_member_obj = InsuredMembers.objects.filter(profile=obj).order_by('-id').first()
+        if not insured_member_obj:
+            return 0
+        user_insurance_obj = UserInsurance.objects.filter(id=insured_member_obj.user_insurance_id).last()
+        if user_insurance_obj and user_insurance_obj.is_profile_valid():
+            user_insurance_obj.status
+        else:
+            return 0
 
     def get_age(self, obj):
         from datetime import date
