@@ -2867,7 +2867,7 @@ class LabTestCategoryListViewSet(viewsets.GenericViewSet):
 
 class CompareLabPackagesViewSet(viewsets.ReadOnlyModelViewSet):
 
-    def retrieve_by_url(self, request):
+    def retrieve_by_url(self, request, *args, **kwargs):
         url = request.GET.get('url')
         if not url:
             return Response(status=status.HTTP_404_NOT_FOUND)
@@ -2891,14 +2891,16 @@ class CompareLabPackagesViewSet(viewsets.ReadOnlyModelViewSet):
         compare_package_details['package_lab_ids'] = package_lab_ids
         compare_package_details['lat'] = request.GET.get('lat') if request.GET.get('lat') else None
         compare_package_details['long'] = request.GET.get('long') if request.GET.get('long') else None
+        kwargs['compare_package_details'] = compare_package_details
+        kwargs['compare_seo_url'] = compare_seo_url
 
-        response = self.retrieve(request, compare_package_details)
+        response = self.retrieve(request, **kwargs)
         return response
 
-    def retrieve(self, request, compare_package_details= None):
+    def retrieve(self, request, *args, **kwargs):
         from django.db.models import Min
-        if compare_package_details:
-            request_parameters = compare_package_details
+        if kwargs and kwargs['compare_package_details']:
+            request_parameters = kwargs['compare_package_details']
         else:
             request_parameters = request.data
         serializer = serializers.CompareLabPackagesSerializer(data=request_parameters, context={"request": request})
@@ -3051,4 +3053,9 @@ class CompareLabPackagesViewSet(viewsets.ReadOnlyModelViewSet):
         response['packages'] = final_result
         response['category_info'] = category_data
         response['test_info'] = list(test_data_master.values())
+        response['meta_tags'] = None
+        if kwargs and kwargs['compare_seo_url']:
+            new_dynamic = NewDynamic.objects.filter(url_value=kwargs['compare_seo_url'].url)
+            if new_dynamic:
+                response['meta_tags'] = {"meta_title": new_dynamic.first().meta_title, "meta_description": new_dynamic.first().meta_description}
         return Response(response)
