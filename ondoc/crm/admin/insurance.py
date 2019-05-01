@@ -689,7 +689,7 @@ class UserInsuranceForm(forms.ModelForm):
         if int(status) == UserInsurance.CANCELLED and not self.instance.status == UserInsurance.CANCEL_INITIATE:
             raise forms.ValidationError('Cancellation is only allowed for cancel initiate status')
         if self.instance.status == UserInsurance.CANCELLED:
-            raise forms.ValidationError('Cancelled Insurance can be changed')
+            raise forms.ValidationError('Cancelled Insurance could not be changed')
 
     class Meta:
         fields = '__all__'
@@ -751,18 +751,18 @@ class UserInsuranceAdmin(ImportExportMixin, admin.ModelAdmin):
     @transaction.atomic
     def save_model(self, request, obj, form, change):
         print('data is here')
-        # if request.user.is_member_of(constants['INSURANCE_GROUP']):
-        if obj.status == UserInsurance.ACTIVE:
-            super(UserInsuranceAdmin, self).save_model(request, obj, form, change)
-        elif obj.status == UserInsurance.ONHOLD:
-            if obj.onhold_reason:
+        if request.user.is_member_of(constants['INSURANCE_GROUP']):
+            if obj.status == UserInsurance.ACTIVE:
                 super(UserInsuranceAdmin, self).save_model(request, obj, form, change)
-        elif obj.status == UserInsurance.CANCEL_INITIATE:
-            response = obj.process_cancellation()
-            if response.get('success', None):
+            elif obj.status == UserInsurance.ONHOLD:
+                if obj.onhold_reason:
+                    super(UserInsuranceAdmin, self).save_model(request, obj, form, change)
+            elif obj.status == UserInsurance.CANCEL_INITIATE:
+                response = obj.process_cancellation()
+                if response.get('success', None):
+                    super(UserInsuranceAdmin, self).save_model(request, obj, form, change)
+            elif obj.status == UserInsurance.CANCELLED:
                 super(UserInsuranceAdmin, self).save_model(request, obj, form, change)
-        elif obj.status == UserInsurance.CANCELLED:
-            super(UserInsuranceAdmin, self).save_model(request, obj, form, change)
 
 
 class InsuranceDiseaseAdmin(admin.ModelAdmin):
