@@ -2,7 +2,9 @@
 from django.contrib.gis import admin
 from ondoc.common.models import PaymentOptions, UserConfig, Feature, Service, MatrixMappedState, MatrixMappedCity, \
     GlobalNonBookable, QRCode
+from ondoc.corporate_booking.models import CorporateBooking, CorporateDeal, CorporateDocument
 from ondoc.crm.admin.banner import BannerAdmin, SliderLocationAdmin
+from ondoc.crm.admin.corporate_booking import CorporateBookingAdmin, CorporateDealAdmin
 from ondoc.crm.admin.procedure import ProcedureCategoryAdmin, ProcedureAdmin, IpdProcedureAdmin, FeatureAdmin, \
     ServiceAdmin, HealthInsuranceProviderAdmin, IpdProcedureCategoryAdmin, IpdProcedureDetailAdmin, \
     IpdProcedureDetailTypeAdmin, IpdProcedureSynonymAdmin, IpdProcedureSynonymMappingAdmin
@@ -230,3 +232,6 @@ admin.site.register(TestParameterChat, TestParameterChatAdmin)
 admin.site.register(AppRatings, AppRatingsAdmin)
 admin.site.register(AppCompliments, AppComplimentsAdmin)
 admin.site.register(ContactUs, ContactUsAdmin)
+admin.site.register(CorporateBooking, CorporateBookingAdmin)
+admin.site.register(CorporateDeal, CorporateDealAdmin)
+admin.site.register(CorporateDocument)
