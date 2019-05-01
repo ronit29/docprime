@@ -4,14 +4,14 @@ from django.utils.safestring import mark_safe
 from import_export import fields, resources
 
 from ondoc.authentication.models import AgentToken
-from ondoc.ratings_review.models import ReviewActions, RatingsReview
+from ondoc.ratings_review.models import ReviewActions, RatingsReview, AppRatings
 from ondoc.diagnostic.models import LabAppointment, Lab
 from ondoc.doctor.models import OpdAppointment, Doctor, Hospital
 from django import forms
-from import_export.admin import ImportExportMixin, ImportExportActionModelAdmin
 from django.conf import settings
 from ondoc.api.v1 import utils as v1_utils
 from ondoc.notification import tasks as notification_tasks
+from import_export.admin import ImportExportMixin, base_formats
 import logging
 logger = logging.getLogger(__name__)
 
@@ -221,3 +221,38 @@ class RatingsReviewAdmin(ImportExportMixin, admin.ModelAdmin):
         #             return str(doctor_name)
         #
         # return None
+
+
+class AppRatingsResource(resources.ModelResource):
+    user_phone = fields.Field()
+    user_email = fields.Field()
+
+    def dehydrate_user_email(self, obj):
+        return obj.user.email
+
+    def dehydrate_user_phone(self, obj):
+        return obj.user.phone_number
+
+    class Meta:
+        model = AppRatings
+        fields = ('id', 'user_phone', 'user_email', 'app_type', 'ratings', 'app_version', 'review')
+        export_order = ('id', 'user_phone', 'user_email', 'app_type', 'ratings', 'app_version', 'review')
+
+
+class AppRatingsAdmin(ImportExportMixin, admin.ModelAdmin):
+    list_display = ('user_phone', 'app_name', 'ratings', 'app_version', 'review', 'platform')
+    fields = ('user_email', 'user_phone', 'app_name', 'ratings', 'app_version', 'brand', 'model', 'platform', 'review', 'app_type', 'device_id', 'user_id', 'compliment')
+    readonly_fields = ('user_email', 'user_phone', 'app_name', 'ratings', 'app_version', 'brand', 'model', 'platform', 'review', 'app_type', 'device_id', 'user_id', 'compliment')
+    formats = (base_formats.XLS, base_formats.CSV, base_formats.JSON)
+    resource_class = AppRatingsResource
+
+    def user_email(self, obj):
+        return obj.user.email
+
+    def user_phone(self, obj):
+        return obj.user.phone_number
+
+
+class AppComplimentsAdmin(admin.ModelAdmin):
+    list_display = ('message', 'rating_level')
+    fields = ('message', 'rating_level')

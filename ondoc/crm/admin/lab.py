@@ -355,7 +355,7 @@ class LabForm(FormCleanMixin):
         model = Lab
         exclude = ()
         widgets = {
-            'lab_pricing_group': autocomplete.ModelSelect2(url='admin:diagnostic_labpricinggroup_autocomplete'),
+            'lab_pricing_group': autocomplete.ModelSelect2(url='labpricing-autocomplete'),
             'matrix_state': autocomplete.ModelSelect2(url='matrix-state-autocomplete'),
             'matrix_city': autocomplete.ModelSelect2(url='matrix-city-autocomplete', forward=['matrix_state'])
         }
@@ -1280,7 +1280,7 @@ class LabTestToRecommendedCategoryInlineForm(forms.ModelForm):
         if any(self.errors):
             return
         cleaned_data = self.cleaned_data
-        if self.instance and self.instance.lab_test and self.instance.lab_test.is_package:
+        if self.instance and self.instance.id and self.instance.lab_test and self.instance.lab_test.is_package:
             raise forms.ValidationError("Recommended category can only be added on lab test.")
         temp_recommended_category = cleaned_data.get('parent_category')
         if temp_recommended_category and not temp_recommended_category.is_package_category:
@@ -1366,7 +1366,7 @@ class LabTestAdminForm(forms.ModelForm):
                 raise forms.ValidationError('Please enter gender_type')
             if cleaned_data.get('min_age') > cleaned_data.get('max_age'):
                 raise forms.ValidationError('min_age cannot be more than max_age')
-        else :
+        else:
             if cleaned_data.get('min_age'):
                 raise forms.ValidationError('Please dont enter min_age')
             if cleaned_data.get('max_age'):

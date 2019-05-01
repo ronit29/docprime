@@ -840,7 +840,7 @@ class GenericAdmin(TimeStampedModel, CreatedByModel):
     super_user_permission = models.BooleanField(default=False)
     read_permission = models.BooleanField(default=False)
     write_permission = models.BooleanField(default=False)
-    name = models.CharField(max_length=24, blank=True, null=True)
+    name = models.CharField(max_length=100, blank=True, null=True)
     source_type = models.PositiveSmallIntegerField(choices=source_choices, default=CRM)
     entity_type = models.PositiveSmallIntegerField(choices=entity_choices, default=OTHER)
     auto_created_from_SPOCs = models.BooleanField(default=False)

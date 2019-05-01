@@ -14,7 +14,7 @@ logger = logging.getLogger(__name__)
 from datetime import datetime, date, timedelta
 from ondoc.diagnostic.models import LabReport, LabReportFile, LabAppointment
 from django.contrib.contenttypes.models import ContentType
-from ondoc.api.v1.utils import resolve_address, aware_time_zone
+from ondoc.api.v1.utils import thyrocare_resolve_address, aware_time_zone
 from django.utils import timezone
 import time
 
@@ -178,7 +178,7 @@ class Thyrocare(BaseIntegrator):
 
         profile = lab_appointment.profile
         if hasattr(lab_appointment, 'address') and lab_appointment.address:
-            patient_address = resolve_address(lab_appointment.address)
+            patient_address = thyrocare_resolve_address(lab_appointment.address)
             pincode = lab_appointment.address["pincode"]
         else:
             patient_address = ""
@@ -405,13 +405,14 @@ class Thyrocare(BaseIntegrator):
                             status = IntegratorHistory.PUSHED_AND_NOT_ACCEPTED
                         elif response['BEN_MASTER'][0]['STATUS'].upper() == "ACCEPTED":
                             if not dp_appointment.status in [5, 6, 7]:
-                                dp_appointment.status = 5
-                                dp_appointment.save()
+                                # dp_appointment.status = 5
+                                # dp_appointment.save()
+                                dp_appointment.action_accepted()
                                 status = IntegratorHistory.PUSHED_AND_ACCEPTED
                         elif response['BEN_MASTER'][0]['STATUS'].upper() == 'CANCELLED':
                             if not dp_appointment.status == 6:
-                                dp_appointment.status = 6
-                                dp_appointment.save()
+                                # dp_appointment.status = 6
+                                # dp_appointment.save()
                                 dp_appointment.action_cancelled(1)
                                 status = IntegratorHistory.CANCELLED
 

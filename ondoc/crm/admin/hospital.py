@@ -425,6 +425,12 @@ class HospitalAdmin(admin.GeoModelAdmin, VersionAdmin, ActionAdmin, QCPemAdmin):
     extra_js = ['js/admin/GoogleMap.js',
                 'https://maps.googleapis.com/maps/api/js?key=AIzaSyCFtb27PooaG0yujuykgvPtxi6tvS04Ek0&callback=initGoogleMap']
 
+    # def get_inline_instances(self, request, obj=None):
+    #     res = super().get_inline_instances(request, obj)
+    #     if obj and obj.id and obj.data_status == obj.QC_APPROVED:
+    #         res = [x for x in res if not isinstance(x, RemarkInline)]
+    #     return res
+
     def get_fields(self, request, obj=None):
         all_fields = super().get_fields(request, obj)
         if not request.user.is_superuser and not request.user.groups.filter(name=constants['WELCOME_CALLING_TEAM']).exists():
@@ -470,6 +476,8 @@ class HospitalAdmin(admin.GeoModelAdmin, VersionAdmin, ActionAdmin, QCPemAdmin):
             obj.qc_approved_at = datetime.datetime.now()
         if '_mark_in_progress' in request.POST:
             obj.data_status = QCModel.REOPENED
+        if not obj.source_type:
+            obj.source_type = Hospital.AGENT
 
         obj.status_changed_by = request.user
         obj.city = obj.matrix_city.name

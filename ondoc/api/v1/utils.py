@@ -484,6 +484,30 @@ def resolve_address(address_obj):
     return address_string
 
 
+def thyrocare_resolve_address(address_obj):
+    address_string = ""
+    address_dict = dict()
+    if not isinstance(address_obj, dict):
+        address_dict = vars(address_dict)
+    else:
+        address_dict = address_obj
+
+    if address_dict.get("address"):
+        if address_string:
+            address_string += ", "
+        address_string += str(address_dict["address"])
+    if address_dict.get("locality"):
+        if address_string:
+            address_string += ", "
+        address_string += str(address_dict["locality"])
+    if address_dict.get("pincode"):
+        if address_string:
+            address_string += ", "
+        address_string += str(address_dict["pincode"])
+
+    return address_string
+
+
 def generate_short_url(url):
     from ondoc.web import models as web_models
     random_string = ''.join([random.choice(string.ascii_letters + string.digits) for n in range(10)])
@@ -1051,7 +1075,7 @@ class TimeSlotExtraction(object):
                 if current_date_time.date() == booking_date.date():
                     if pa[k].get('on_call') == False:
                         if k >= float(doc_minimum_time) and k <= doctor_maximum_timing:
-                            data_list.append({"value": k, "text": v, "price": pa[k]["price"],
+                            data_list.append({"value": k, "text": v, "price": pa[k]["price"], "is_price_zero": True if pa[k]["price"] is not None and pa[k]["price"] == 0 else False,
                                               "mrp": pa[k]['mrp'], 'deal_price': pa[k]['deal_price'],
                                               "is_available": pa[k]["is_available"], "on_call": pa[k].get("on_call", False)})
                         else:
@@ -1060,7 +1084,7 @@ class TimeSlotExtraction(object):
                         pass
                 else:
                     if k <= doctor_maximum_timing:
-                        data_list.append({"value": k, "text": v, "price": pa[k]["price"],
+                        data_list.append({"value": k, "text": v, "price": pa[k]["price"], "is_price_zero": True if pa[k]["price"] is not None and pa[k]["price"] == 0 else False,
                                           "mrp": pa[k]['mrp'], 'deal_price': pa[k]['deal_price'],
                                           "is_available": pa[k]["is_available"],
                                           "on_call": pa[k].get("on_call", False)})
@@ -1070,7 +1094,7 @@ class TimeSlotExtraction(object):
                 next_date = current_date_time + datetime.timedelta(days=1)
                 if current_date_time.date() == booking_date.date():
                     if k >= float(lab_minimum_time):
-                        data_list.append({"value": k, "text": v, "price": pa[k]["price"],
+                        data_list.append({"value": k, "text": v, "price": pa[k]["price"], "is_price_zero": True if pa[k]["price"] is not None and pa[k]["price"] == 0 else False,
                                           "is_available": pa[k]["is_available"],
                                           "on_call": pa[k].get("on_call", False)})
                     else:
@@ -1078,18 +1102,18 @@ class TimeSlotExtraction(object):
                 elif next_date.date() == booking_date.date():
                     if lab_tomorrow_time:
                         if k >= float(lab_tomorrow_time):
-                            data_list.append({"value": k, "text": v, "price": pa[k]["price"],
+                            data_list.append({"value": k, "text": v, "price": pa[k]["price"], "is_price_zero": True if pa[k]["price"] is not None and pa[k]["price"] == 0 else False,
                                               "is_available": pa[k]["is_available"],
                                               "on_call": pa[k].get("on_call", False)})
                         else:
                             pass
                     else:
-                        data_list.append({"value": k, "text": v, "price": pa[k]["price"],
+                        data_list.append({"value": k, "text": v, "price": pa[k]["price"], "is_price_zero": True if pa[k]["price"] is not None and pa[k]["price"] == 0 else False,
                                           "is_available": pa[k]["is_available"],
                                           "on_call": pa[k].get("on_call", False)})
 
                 else:
-                    data_list.append({"value": k, "text": v, "price": pa[k]["price"],
+                    data_list.append({"value": k, "text": v, "price": pa[k]["price"], "is_price_zero": True if pa[k]["price"] is not None and pa[k]["price"] == 0 else False,
                                       "is_available": pa[k]["is_available"],
                                       "on_call": pa[k].get("on_call", False)})
 

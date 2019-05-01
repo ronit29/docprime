@@ -1512,41 +1512,44 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin,
 
     
     def get_city(self):
-        if self.lab and self.lab.city:
-            return self.lab.city.id
+        if self.lab and self.lab.matrix_city:
+            return self.lab.matrix_city.id
         else:
             return None
 
     def get_state(self):
-        if self.lab and self.lab.state:
-            return self.lab.state.id
+        if self.lab and self.lab.matrix_state:
+            return self.lab.matrix_state.id
         else:
             return None
 
     def sync_with_booking_analytics(self):
 
         category = None
-        if self.lab_test.first():
-            if self.lab_test.first().test.is_package == True:
+        for t in self.tests.all():
+            if t.is_package == True:
                 category = 1
+                break
             else:
                 category = 0
 
-        promo_cost = self.deal_price - self.effective_price if self.deal_price and self.effective_price else None
+        promo_cost = self.deal_price - self.effective_price if self.deal_price and self.effective_price else 0
 
         obj = DP_OpdConsultsAndTests.objects.filter(Appointment_Id=self.id, TypeId=2).first()
         if not obj:
             obj = DP_OpdConsultsAndTests()
             obj.Appointment_Id = self.id
-            # obj.CityId = self.get_city()
-            # obj.StateId = self.get_state()
+            obj.CityId = self.get_city()
+            obj.StateId = self.get_state()
             obj.ProviderId = self.lab.id
             obj.TypeId = 2
             obj.PaymentType = self.payment_type if self.payment_type else None
             obj.Payout = self.agreed_price
-        obj.PromoCost = promo_cost
+            obj.BookingDate = self.created_at
+        obj.PromoCost = max(0, promo_cost)
         obj.GMValue = self.deal_price
         obj.Category = category
+        obj.StatusId = self.status
         obj.save()
 
         try:
@@ -1878,6 +1881,7 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin,
         payout_data = {
             "charged_amount" : self.effective_price,
             "payable_amount" : payout_amount,
+            "booking_type": Order.LAB_PRODUCT_ID
         }
 
         merchant_payout = MerchantPayout.objects.create(**payout_data)
