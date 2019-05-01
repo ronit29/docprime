@@ -1,3 +1,45 @@
+$ = django.jQuery;
+$( document ).ready(function() {
+    var div = document.createElement("ul");
+    div.setAttribute("id", "custom_dropdown");
+    var div_elem = document.getElementsByClassName('field-url_value');
+    div_elem[0].appendChild(div);
+    console.log($('ul#custom_dropdown li'));
+    $(document).on('click', 'ul#custom_dropdown li',function(e){
+        var clicked_li = $(this).html();
+        $('input#id_url_value').val(clicked_li);
+        document.getElementById('custom_dropdown').innerHTML = '';
+    });
+
+    $("#id_url_value").on('keypress', function(e){
+    var query = $(this).val();
+
+        $.ajax({
+                    type: "GET",
+                    url:  '/api/v1/common/entity-compare-autocomplete',
+                    data: {"query": query},
+                    success: function(response) {
+                        document.getElementById('custom_dropdown').innerHTML = '';
+                         if(response){
+
+
+                             var data = response;
+                              $.each(data, function(k, v) {
+                               var li_elem = '<li>'+v+'</li>';
+                                $(li_elem).appendTo('#custom_dropdown');
+    //                            dropdown.append('<option value="' + v.id + '">' + v.name + '</option>');
+                              });
+
+                          }
+                    },
+                    error: function (request, status, error) {
+                        console.log(error);
+                    }
+               });
+    } );
+
+});
+
 function getCookie(name) {
    var cookieValue = null;
    if (document.cookie && document.cookie !== '') {
@@ -49,3 +91,8 @@ function initEditor(){
 }
 
 document.addEventListener('DOMContentLoaded', initEditor, false);
+
+//border: 1px solid #f2f2f2;
+//    height: 200px;
+//    overflow: auto;
+//    width: 320px;

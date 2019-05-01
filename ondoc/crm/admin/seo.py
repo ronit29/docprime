@@ -35,7 +35,9 @@ class SeoLabNetworkAdmin(admin.ModelAdmin):
 class NewDynamicAdminForm(forms.ModelForm):
     top_content = forms.CharField(widget=forms.Textarea, required=False)
     bottom_content = forms.CharField(widget=forms.Textarea, required=False)
-    url_value = forms.ModelChoiceField(queryset=EntityUrls.objects.all(), widget=autocomplete.ListSelect2(url='entity-compare-autocomplete'))
+    # url_value = forms.ModelChoiceField(queryset=EntityUrls.objects.all(), widget=autocomplete.ListSelect2(url='entity-compare-autocomplete'))
+    url_value = forms.CharField()
+    dropdown = forms.CharField(widget=forms.HiddenInput, required=False)
 
     class Media:
         extend = True
@@ -54,6 +56,7 @@ class NewDynamicAdmin(admin.ModelAdmin):
     # search_fields = ['url__url', 'url_value__url']
     # exclude = ['url_value']
     # readonly_fields = ['url_value']
+    readonly_fields = ['url']
 
 
 
