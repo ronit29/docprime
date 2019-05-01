@@ -1736,12 +1736,17 @@ class TopHospitalForIpdProcedureSerializer(serializers.ModelSerializer):
     established_in = serializers.SerializerMethodField()
     lat = serializers.SerializerMethodField()
     long = serializers.SerializerMethodField()
+    url = serializers.SerializerMethodField()
 
     class Meta:
         model = Hospital
         fields = ('id', 'name', 'distance', 'certifications', 'bed_count', 'logo', 'avg_rating',
                   'count_of_insurance_provider', 'multi_speciality', 'address', 'open_today',
-                  'insurance_provider', 'established_in', 'long', 'lat')
+                  'insurance_provider', 'established_in', 'long', 'lat', 'url')
+
+    def get_url(self, obj):
+        entity_url = self.context.get('hosp_entity_entity', {})
+        return entity_url.get(obj.id)
 
     def get_lat(self, obj):
         if obj.location:

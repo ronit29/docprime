@@ -3616,16 +3616,26 @@ class HospitalViewSet(viewsets.GenericViewSet):
                                                    is_valid=True,
                                                    locality_value__iexact=city).first()
 
-        if entity :
+        if entity:
+            locality = entity.sublocality_value
             city = entity.locality_value
             url = entity.url
             canonical_url = entity.url
-            if ipd_procedure_obj_name:
+            if entity.sitemap_identifier == EntityUrls.SitemapIdentifier.IPD_PROCEDURE_HOSPITAL_CITY and ipd_procedure_obj_name:
                 title = 'Best {ipd_procedure_name} Hospitals in {city} | Book Hospital & Get Discount'.format(
-                    ipd_procedure_name=ipd_procedure_obj_name, city=city).title()
+                    ipd_procedure_name=ipd_procedure_obj_name, city=city)
 
                 description = '{ipd_procedure_name} Hospitals in {city} : Check {ipd_procedure_name} hospitals in {city}. View address, reviews, cost estimate and more at docprime.'.format(
                     ipd_procedure_name=ipd_procedure_obj_name, city=city)
+            elif entity.sitemap_identifier == EntityUrls.SitemapIdentifier.HOSPITALS_CITY:
+                title = 'Best Hospitals in {city} | Find Top Hospitals Near Me in {city}'.format(city=city)
+                description = 'Best Hospitals in {city}: Find list of verified top hospitals near me in {city}. View details, address, reviews, bed availability, cost and more at docprime.'.format(
+                    city=city)
+            elif entity.sitemap_identifier == EntityUrls.SitemapIdentifier.HOSPITALS_LOCALITY_CITY:
+                title = 'Best Hospitals in {locality}, {city} | List of Top Hospitals in {locality}'.format(
+                    locality=locality, city=city)
+                description = 'Best Hospitals in {locality}, {city}: Check List of verified Top hospitals in {locality}, {city}. View details, address, reviews, bed availability, cost and more at docprime.'.format(
+                    locality=locality, city=city)
 
         if url:
             new_dynamic_object = NewDynamic.objects.filter(url_value=url, is_enabled=True).first()
@@ -3678,11 +3688,12 @@ class HospitalViewSet(viewsets.GenericViewSet):
         if min_distance:  # TODO : SHASHANK_SINGH add it in query
             hospital_queryset = filter(lambda x: x.distance.m >= min_distance if x.distance is not None and x.distance.m is not None else False, hospital_queryset)
 
-        hospital_queryset = list(hospital_queryset.distinct())
-        result_count = len(hospital_queryset)
+        hospital_queryset = hospital_queryset.distinct()
+        result_count = hospital_queryset.count()
+        hospital_queryset = paginate_queryset_refactored_consumer_app(hospital_queryset, request, 50)
+        hospital_queryset = list(hospital_queryset)
         if count:
             hospital_queryset = hospital_queryset[:count]
-        hospital_queryset = paginate_queryset_refactored_consumer_app(hospital_queryset, request)
         top_hospital_serializer = serializers.TopHospitalForIpdProcedureSerializer(hospital_queryset, many=True,
                                                                                    context={'request': request})
         return Response({'count': result_count, 'result': top_hospital_serializer.data,
