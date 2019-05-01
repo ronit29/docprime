@@ -120,13 +120,17 @@ class PrescriptionComponentsViewSet(viewsets.GenericViewSet):
         serializer.is_valid(raise_exception=True)
         valid_data = serializer.validated_data
         model = dict(serializers.PrescriptionModelComponents.COMPONENT_CHOICES)[valid_data.get('type')]
-        if valid_data.get('hospital_id'):
-            objects = model.objects.filter(Q(hospitals__contains=[valid_data['hospital_id'].id]) | Q(moderated=True))
+        updated_at = valid_data.get('updated_at')
+        if updated_at:
+            objects = model.objects.filter(updated_at__gte=updated_at)
         else:
-            objects = model.objects.filter(moderated=True)
+            objects = model.objects.all()
+        if valid_data.get('hospital_id'):
+            objects = objects.filter(Q(hospitals__contains=[valid_data['hospital_id'].id]) | Q(moderated=True))
+        else:
+            objects = objects.filter(moderated=True)
         resp = []
-        model_serializer = dict(serializers.PrescriptionModelSerializerComponents.COMPONENT_CHOICES)[
-            valid_data.get('type')]
+        model_serializer = dict(serializers.PrescriptionModelSerializerComponents.COMPONENT_CHOICES)[valid_data.get('type')]
         for obj in objects.all():
             resp.append(model_serializer(obj).data)
         if model == prescription_models.PrescriptionTests:

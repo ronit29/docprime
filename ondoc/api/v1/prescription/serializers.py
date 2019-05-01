@@ -150,6 +150,7 @@ class BulkCreatePrescriptionComponentSerializer(serializers.Serializer):
 class PrescriptionComponentSyncSerializer(serializers.Serializer):
     type = serializers.ChoiceField(choices=PrescriptionModelComponents.COMPONENT_CHOICES)
     hospital_id = serializers.PrimaryKeyRelatedField(queryset=doc_models.Hospital.objects.all(), required=False)
+    updated_at = serializers.DateField(format="%Y-%m-%d", required=False)
 
 
 class GeneratePrescriptionPDFBodySerializer(serializers.Serializer):
