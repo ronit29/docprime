@@ -121,18 +121,19 @@ class PrescriptionComponentsViewSet(viewsets.GenericViewSet):
             valid_data.get('type')]
         for obj in objects.all():
             resp.append(model_serializer(obj).data)
-        lab_test_queryset = diagnostic_models.LabTest.objects.all()
-        for obj in lab_test_queryset:
-            resp.append({
-                "id": obj.id,
-                "created_at": obj.created_at,
-                "updated_at": obj.updated_at,
-                "name": obj.name,
-                "moderated": True,
-                "hospitals": [],
-                "source_type": None,
-                "instructions": None,
-            })
+        if model == prescription_models.PrescriptionTests:
+            lab_test_queryset = diagnostic_models.LabTest.objects.all()
+            for obj in lab_test_queryset:
+                resp.append({
+                    "id": obj.id,
+                    "created_at": obj.created_at,
+                    "updated_at": obj.updated_at,
+                    "name": obj.name,
+                    "moderated": True,
+                    "hospitals": [],
+                    "source_type": None,
+                    "instructions": None,
+                })
         return Response(resp)
 
 
