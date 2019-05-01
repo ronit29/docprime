@@ -174,14 +174,11 @@ def push_insurance_buy_to_matrix(self, *args, **kwargs):
 @task()
 def push_mis():
     from ondoc.insurance.models import InsuranceMIS
+    import pyminizip
     from ondoc.notification.models import EmailNotification
     from ondoc.api.v1.utils import util_absolute_url
     from ondoc.crm.admin.insurance import UserInsuranceResource, UserInsuranceDoctorResource, UserInsuranceLabResource
     from datetime import datetime, timedelta
-    from io import StringIO, BytesIO
-    import zipfile
-    in_memory = BytesIO()
-    zip = zipfile.ZipFile(in_memory, "a", zipfile.ZIP_DEFLATED, False)
 
     resources = [
         (UserInsuranceResource, InsuranceMIS.AttachmentType.USER_INSURANCE_RESOURCE),
@@ -197,43 +194,34 @@ def push_mis():
     }
 
     email_attachments = []
+    mis_temporary_file = []
+    mis_temporary_file_paths = []
 
     for resource in resources:
         resource_obj = resource[0]()
-
         dataset = resource_obj.export(**arguments)
-        filename = "%s_%s_%s.xls" % (resource_obj.__class__.__name__ , from_date, to_date)
-        zip.writestr(filename, dataset.xls)
+        filename = "%s_%s_%s.xls" % (resource_obj.__class__.__name__, from_date, to_date)
+        mis_temporary_file.append(TemporaryUploadedFile(filename, 'byte', 1000, 'utf-8'))
+        f = open(mis_temporary_file[len(mis_temporary_file)-1].temporary_file_path(), 'wb')
+        f.write(dataset.xls)
+        f.seek(0)
+        mis_temporary_file_paths.append(mis_temporary_file[len(mis_temporary_file)-1].temporary_file_path())
 
-    # zip.setpassword("akusaini".encode('utf-8'))
-    for zfile in zip.filelist:
-        zfile.create_system = 0
+    zipfilename = "All_MIS_%s_%s.zip" % (from_date, to_date)
+    zipfile = TemporaryUploadedFile(zipfilename, 'byte', 1000, 'utf-8')
+    zf = open(zipfile.temporary_file_path(), 'wb')
 
-    zip.setpassword("akusaini".encode('utf-8'))
-    zip.close()
+    pyminizip.compress_multiple(mis_temporary_file_paths, [], zipfile.temporary_file_path(), settings.INSURANCE_MIS_PASSWORD, int(8))
 
-    in_memory.seek(0)
-    data = in_memory.read()
-    pos = data.find('\x50\x4b\x05\x06'.encode())  # End of central directory signature
-    if (pos > 0):
-        in_memory.seek(pos + 22)  # size of 'ZIP end of central directory record'
-        in_memory.truncate()
-        # in_memory.close()
+    for tf in mis_temporary_file:
+        tf.close()
 
-    in_memory.seek(0)
-    filename = "All_MIS_%s_%s.zip" % (from_date, to_date)
-    file = TemporaryUploadedFile(filename, 'byte', 1000, 'utf-8')
-    f = open(file.temporary_file_path(), 'wb')
-    f.write(in_memory.read())
-    f.seek(0)
-    f.flush()
-    f.content_type = 'application/zip'
-
-    attachment = InMemoryUploadedFile(file, None, filename, 'application/zip', file.tell(), None)
+    attachment = InMemoryUploadedFile(zipfile, None, zipfilename, 'application/zip', zipfile.tell(), None)
     insurance_mis_obj = InsuranceMIS(attachment_file=attachment, attachment_type=InsuranceMIS.AttachmentType.ALL_MIS_ZIP)
     insurance_mis_obj.save()
 
-    print(insurance_mis_obj.attachment_file.url)
-    email_attachments.append({'filename': filename, 'path': util_absolute_url(insurance_mis_obj.attachment_file.url)})
+    zf.close()
+
+    email_attachments.append({'filename': zipfilename, 'path': util_absolute_url(insurance_mis_obj.attachment_file.url)})
 
     EmailNotification.send_insurance_mis(email_attachments)
