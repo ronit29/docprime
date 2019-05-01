@@ -88,23 +88,31 @@ class PrescriptionComponentsViewSet(viewsets.GenericViewSet):
     def get_queryset(self):
         return prescription_models.PresccriptionPdf.objects.none()
 
-    # TODO - ADD SOURCE TYPE
-    def save_component(self, request):
-        serializer = serializers.PrescriptionComponentBodySerializer(data=request.data)
-        serializer.is_valid(raise_exception=True)
-        valid_data = serializer.validated_data
-        model = dict(serializers.PrescriptionModelComponents.COMPONENT_CHOICES)[valid_data.get('type')]
-        object = model.create_or_update(name=valid_data.get('name'), hospital_id=valid_data.get('hospital_id').id,
+    @staticmethod
+    def create_objects(data):
+        model = dict(serializers.PrescriptionModelComponents.COMPONENT_CHOICES)[data.get('type')]
+        object = model.create_or_update(name=data.get('name'), hospital_id=data.get('hospital_id').id,
                                         source_type=prescription_models.PrescriptionEntity.PARTNERS_APP,
-                                        quantity=valid_data.get('quantity'),
-                                        dosage_type=valid_data.get('dosage_type'),
-                                        time=valid_data.get('time'),
-                                        duration_type=valid_data.get('duration_type'),
-                                        duration=valid_data.get('duration'),
-                                        is_before_meal=valid_data.get('is_before_meal'),
-                                        additional_notes=valid_data.get('additional_notes'))
-        model_serializer = dict(serializers.PrescriptionModelSerializerComponents.COMPONENT_CHOICES)[valid_data.get('type')](object)
-        return Response({'status': 1, 'data': model_serializer.data})
+                                        quantity=data.get('quantity'),
+                                        dosage_type=data.get('dosage_type'),
+                                        time=data.get('time'),
+                                        duration_type=data.get('duration_type'),
+                                        duration=data.get('duration'),
+                                        is_before_meal=data.get('is_before_meal'),
+                                        additional_notes=data.get('additional_notes'))
+        model_serializer = dict(serializers.PrescriptionModelSerializerComponents.COMPONENT_CHOICES)[data.get('type')](object)
+        return model_serializer.data
+
+    # TODO - ADD SOURCE TYPE
+    def save_components(self, request):
+        serializer = serializers.BulkCreatePrescriptionComponentSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        valid_data = serializer.validated_data['data']
+        resp = list()
+        for data in valid_data:
+            created_object = self.create_objects(data)
+            resp.append(created_object)
+        return Response({'status': 1, 'data': resp})
 
     # TODO - ADD SOURCE TYPE
     def sync_component(self, request):

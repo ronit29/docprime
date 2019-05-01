@@ -143,6 +143,10 @@ class PrescriptionComponentBodySerializer(serializers.Serializer):
         return attrs
 
 
+class BulkCreatePrescriptionComponentSerializer(serializers.Serializer):
+    data = serializers.ListField(child=PrescriptionComponentBodySerializer(many=False))
+
+
 class PrescriptionComponentSyncSerializer(serializers.Serializer):
     type = serializers.ChoiceField(choices=PrescriptionModelComponents.COMPONENT_CHOICES)
     hospital_id = serializers.PrimaryKeyRelatedField(queryset=doc_models.Hospital.objects.all(), required=False)
