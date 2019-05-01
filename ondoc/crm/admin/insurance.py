@@ -664,7 +664,8 @@ class CustomDateInput(forms.DateInput):
 
 class UserInsuranceForm(forms.ModelForm):
 
-    status_choices = [(UserInsurance.ACTIVE, "Active"), (UserInsurance.CANCELLED, "Cancelled")]
+    status_choices = [(UserInsurance.ACTIVE, "Active"), (UserInsurance.CANCEL_INITIATE, 'Cancel Initiate'),
+                      (UserInsurance.CANCELLED, "Cancelled")]
     status = forms.ChoiceField(choices=status_choices, required=True)
     onhold_reason = forms.CharField(max_length=400, required=False)
 
@@ -676,7 +677,7 @@ class UserInsuranceForm(forms.ModelForm):
         if int(status) == UserInsurance.ONHOLD:
             if not onhold_reason:
                 raise forms.ValidationError("In Case of ONHOLD status, Onhold reason is mandatory")
-        elif int(status) == UserInsurance.CANCELLED:
+        elif int(status) == UserInsurance.CANCEL_INITIATE or int(status) == UserInsurance.CANCELLED:
             insured_opd_completed_app_count = OpdAppointment.get_insured_completed_appointment(self.instance)
             insured_lab_completed_app_count = LabAppointment.get_insured_completed_appointment(self.instance)
             if insured_lab_completed_app_count > 0:
@@ -746,16 +747,20 @@ class UserInsuranceAdmin(ImportExportMixin, admin.ModelAdmin):
     @transaction.atomic
     def save_model(self, request, obj, form, change):
         print('data is here')
-        if request.user.is_member_of(constants['INSURANCE_GROUP']):
-            if obj.status == UserInsurance.ACTIVE:
+        # if request.user.is_member_of(constants['INSURANCE_GROUP']):
+        if obj.status == UserInsurance.ACTIVE:
+            super(UserInsuranceAdmin, self).save_model(request, obj, form, change)
+        elif obj.status == UserInsurance.ONHOLD:
+            if obj.onhold_reason:
                 super(UserInsuranceAdmin, self).save_model(request, obj, form, change)
-            elif obj.status == UserInsurance.ONHOLD:
-                if obj.onhold_reason:
-                    super(UserInsuranceAdmin, self).save_model(request, obj, form, change)
-            elif obj.status == UserInsurance.CANCELLED:
-                response = obj.process_cancellation()
-                if response.get('success', None):
-                    super(UserInsuranceAdmin, self).save_model(request, obj, form, change)
+        elif obj.status == UserInsurance.CANCEL_INITIATE:
+            response = obj.process_cancellation()
+            if response.get('success', None):
+                super(UserInsuranceAdmin, self).save_model(request, obj, form, change)
+        elif obj.status == UserInsurance.CANCELLED and self.status == UserInsurance.CANCEL_INITIATE:
+            # response = obj.process_cancellation()
+            # if response.get('success', None):
+            super(UserInsuranceAdmin, self).save_model(request, obj, form, change)
 
 
 class InsuranceDiseaseAdmin(admin.ModelAdmin):

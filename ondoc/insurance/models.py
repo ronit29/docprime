@@ -411,7 +411,10 @@ class UserInsurance(auth_model.TimeStampedModel):
     CANCELLED = 2
     EXPIRED = 3
     ONHOLD = 4
-    STATUS_CHOICES = [(ACTIVE, "Active"), (CANCELLED, "Cancelled"), (EXPIRED, "Expired"), (ONHOLD, "Onhold")]
+    CANCEL_INITIATE = 5
+
+    STATUS_CHOICES = [(ACTIVE, "Active"), (CANCELLED, "Cancelled"), (EXPIRED, "Expired"), (ONHOLD, "Onhold"),
+                      (CANCEL_INITIATE, 'Cancel Initiate')]
 
     id = models.BigAutoField(primary_key=True)
     insurance_plan = models.ForeignKey(InsurancePlans, related_name='active_users', on_delete=models.DO_NOTHING)
@@ -670,7 +673,8 @@ class UserInsurance(auth_model.TimeStampedModel):
             return False
 
     def is_profile_valid(self):
-        if self.expiry_date >= timezone.now() and (self.status == self.ACTIVE or self.status == self.ONHOLD):
+        if self.expiry_date >= timezone.now() and (self.status == self.ACTIVE or self.status == self.ONHOLD or
+                                                       self.status == self.CANCEL_INITIATE):
             return True
         else:
             return False
@@ -1164,7 +1168,7 @@ class UserInsurance(auth_model.TimeStampedModel):
         for appointment in lab_active_appointment:
             appointment.status = LabAppointment.CANCELLED
             appointment.save()
-        self.status = UserInsurance.CANCELLED
+        self.status = UserInsurance.CANCEL_INITIATE
         self.save()
         transaction.on_commit(lambda: self.after_commit_task())
         # InsuranceTransaction.objects.create(user_insurance=self,
@@ -1175,10 +1179,10 @@ class UserInsurance(auth_model.TimeStampedModel):
         return res
 
     def after_commit_task(self):
-        if self.status == UserInsurance.CANCELLED:
+        if self.status == UserInsurance.CANCEL_INITIATE:
             try:
                 # notification_tasks.send_insurance_cancellation.apply_async(self.id)
-                send_insurance_notifications.apply_async(({'user_id': self.user.id, 'status': UserInsurance.CANCELLED}, ), countdown=1)
+                send_insurance_notifications.apply_async(({'user_id': self.user.id, 'status': UserInsurance.CANCEL_INITIATE}, ), countdown=1)
             except Exception as e:
                 logger.error(str(e))
 
