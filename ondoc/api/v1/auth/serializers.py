@@ -191,7 +191,7 @@ class UserProfileSerializer(serializers.ModelSerializer):
         else:
             return False
 
-    def insurance_status(self, obj):
+    def get_insurance_status(self, obj):
         if isinstance(obj, dict):
             return False
         insured_member_obj = InsuredMembers.objects.filter(profile=obj).order_by('-id').first()
