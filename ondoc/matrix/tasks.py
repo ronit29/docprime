@@ -695,7 +695,7 @@ def update_onboarding_qcstatus_to_matrix(self, data):
                 if history_obj:
                     qc_user = history_obj.user.staffprofile.employee_id if hasattr(history_obj.user,
                                                                                          'staffprofile') and history_obj.user.staffprofile.employee_id else ''
-                    if qc_user.is_member_of(constants['QC_GROUP_NAME']):
+                    if qc_user and qc_user.is_member_of(constants['QC_GROUP_NAME']):
                         assigned_user = qc_user
 
             else:
