@@ -297,7 +297,7 @@ class SMSNotification:
             body_template = "sms/lab/lab_report_uploaded.txt"
         elif notification_type == NotificationAction.INSURANCE_CONFIRMED:
             body_template = "sms/insurance/insurance_confirmed.txt"
-        elif notification_type == NotificationAction.INSURANCE_CANCELLATION:
+        elif notification_type == NotificationAction.INSURANCE_CANCEL_INITIATE:
             body_template = "sms/insurance/insurance_cancellation.txt"
         elif notification_type == NotificationAction.LAB_REPORT_SEND_VIA_CRM:
             body_template = "sms/lab/lab_report_send_crm.txt"
@@ -898,7 +898,7 @@ class EMAILNotification:
         elif notification_type == NotificationAction.IPD_PROCEDURE_MAIL:
             body_template = "email/ipd_lead/body.html"
             subject_template = "email/ipd_lead/subject.txt"
-        elif notification_type == NotificationAction.INSURANCE_CANCELLATION:
+        elif notification_type == NotificationAction.INSURANCE_CANCEL_INITIATE:
             body_template = "email/insurance_cancelled/body.html"
             subject_template = "email/insurance_cancelled/subject.txt"
 
