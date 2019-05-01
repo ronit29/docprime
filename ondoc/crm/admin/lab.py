@@ -1484,14 +1484,18 @@ class AvailableLabTestAdmin(VersionAdmin):
         transaction.on_commit(lambda: self.on_commit_tasks(obj, responsible_user))
 
     def on_commit_tasks(self, obj, responsible_user):
-        if obj.custom_deal_price and obj.custom_agreed_price:
-            if obj.custom_deal_price < obj.custom_agreed_price:
-                obj.send_pricing_alert_email(responsible_user)
-        elif obj.computed_deal_price and obj.computed_agreed_price:
-            if obj.computed_deal_price < obj.computed_agreed_price:
-                obj.send_pricing_alert_email(responsible_user)
+        if obj.custom_deal_price:
+            deal_price = obj.custom_deal_price
         else:
-            pass
+            deal_price = obj.computed_deal_price if obj.computed_deal_price else 0
+
+        if obj.custom_agreed_price:
+            agreed_price = obj.custom_agreed_price
+        else:
+            agreed_price = obj.computed_agreed_price if obj.computed_agreed_price else 0
+
+        if deal_price < agreed_price:
+            obj.send_pricing_alert_email(responsible_user)
 
 
 class DiagnosticConditionLabTestInline(admin.TabularInline):
