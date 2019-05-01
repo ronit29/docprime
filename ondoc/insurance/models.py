@@ -1166,7 +1166,7 @@ class UserInsurance(auth_model.TimeStampedModel):
             appointment.save()
         self.status = UserInsurance.CANCELLED
         self.save()
-        transaction.on_commit(lambda: self.after_commit_tasks())
+        transaction.on_commit(lambda: self.after_commit_task())
         # InsuranceTransaction.objects.create(user_insurance=self,
         #                                     account=self.insurance_plan.insurer.float.all().first(),
         #                                     transaction_type=InsuranceTransaction.CREDIT,
