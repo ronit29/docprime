@@ -606,28 +606,40 @@ def process_payout(payout_id):
 def send_insurance_notifications(self, data):
     from ondoc.authentication import models as auth_model
     from ondoc.communications.models import InsuranceNotification
+    from ondoc.insurance.models import UserInsurance
     try:
         user_id = int(data.get('user_id', 0))
         user = auth_model.User.objects.filter(id=user_id).last()
         if not user:
             raise Exception("Invalid user id passed for insurance email notification. Userid %s" % str(user_id))
 
-        user_insurance = user.active_insurance
-        if not user_insurance:
-            raise Exception("Invalid or None user insurance found for email notification. User id %s" % str(user_id))
+        insurance_status = int(data.get('status', 0))
+        # Cancellation
+        if insurance_status and insurance_status == UserInsurance.CANCELLED:
+            user_insurance = UserInsurance.get_user_insurance(user)
+            if not user_insurance:
+                raise Exception("Invalid or None user insurance found for email notification. User id %s" % str(user_id))
 
-        if not user_insurance.coi:
-            try:
-                user_insurance.generate_pdf()
-            except Exception as e:
-                logger.error('Insurance coi pdf cannot be generated. %s' % str(e))
+            insurance_notification = InsuranceNotification(user_insurance, NotificationAction.INSURANCE_CANCELLATION)
+            insurance_notification.send()
 
-                countdown_time = (2 ** self.request.retries) * 60 * 10
-                print(countdown_time)
-                self.retry([data], countdown=countdown_time)
+        else:
+            user_insurance = user.active_insurance
+            if not user_insurance:
+                raise Exception("Invalid or None user insurance found for email notification. User id %s" % str(user_id))
 
-        insurance_notification = InsuranceNotification(user_insurance, NotificationAction.INSURANCE_CONFIRMED)
-        insurance_notification.send()
+            if not user_insurance.coi:
+                try:
+                    user_insurance.generate_pdf()
+                except Exception as e:
+                    logger.error('Insurance coi pdf cannot be generated. %s' % str(e))
+
+                    countdown_time = (2 ** self.request.retries) * 60 * 10
+                    print(countdown_time)
+                    self.retry([data], countdown=countdown_time)
+
+            insurance_notification = InsuranceNotification(user_insurance, NotificationAction.INSURANCE_CONFIRMED)
+            insurance_notification.send()
     except Exception as e:
         logger.error(str(e))
 
