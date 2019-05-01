@@ -197,7 +197,7 @@ class GeneratePrescriptionPDFBodySerializer(serializers.Serializer):
         if attrs:
             if not PrescriptionAppointmentValidation.validate_uuid(attrs.get("id")):
                 raise serializers.ValidationError("Invalid UUID - {}".format(attrs.get('id')))
-            if not (attrs.get('tests') or attrs.get('medicines')):
+            if not (attrs.get('lab_tests') or attrs.get('medicines')):
                 raise serializers.ValidationError("Either one of test or medicines is required for prescription generation")
             appointment = PrescriptionAppointmentValidation.validate_appointment_object(attrs)
             attrs['appointment'] = appointment
