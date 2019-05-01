@@ -63,6 +63,7 @@ from decimal import Decimal
 from django.utils.text import slugify
 from django.utils.functional import cached_property
 #from ondoc.api.v1.diagnostic import serializers as diagnostic_serializers
+from ondoc.common.helper import Choices
 
 logger = logging.getLogger(__name__)
 
@@ -2707,3 +2708,24 @@ class TestParameterChat(TimeStampedModel):
     class Meta:
         db_table = 'test_parameter_chat'
 
+
+class LabTestThresholds(TimeStampedModel):
+    class Colour(Choices):
+        RED = 'RED'
+        GREEN = 'GREEN'
+        ORANGE = 'ORANGE'
+
+    lab_test = models.ForeignKey(LabTest, on_delete=models.CASCADE, related_name='tests_parameter_thresholds')
+    test_parameter = models.ForeignKey(TestParameter, on_delete=models.CASCADE, related_name='parameter_thresholds', blank=False, null=True)
+    color = models.CharField(max_length=50, null=True, default=None, blank=False, choices=Colour.as_choices())
+    details = models.TextField(blank=True, null=True)
+    what_to_do = models.TextField(blank=True, null=True)
+    min_value = models.FloatField(null=True, default=0)
+    max_value = models.FloatField(null=True, default=0)
+    min_age = models.PositiveIntegerField(null=True, default=0)
+    max_age = models.PositiveIntegerField(null=True, default=0)
+    gender = models.CharField(choices=UserProfile.GENDER_CHOICES, max_length=50, default=None, null=True)
+
+
+    class Meta:
+        db_table = 'lab_test_thresholds'
