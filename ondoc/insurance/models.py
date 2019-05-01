@@ -1166,7 +1166,7 @@ class UserInsurance(auth_model.TimeStampedModel):
             appointment.save()
         self.status = UserInsurance.CANCELLED
         self.save()
-        transaction.on_commit(lambda: self.after_commit_tasks())
+        transaction.on_commit(lambda: self.after_commit_task())
         # InsuranceTransaction.objects.create(user_insurance=self,
         #                                     account=self.insurance_plan.insurer.float.all().first(),
         #                                     transaction_type=InsuranceTransaction.CREDIT,
@@ -1178,7 +1178,7 @@ class UserInsurance(auth_model.TimeStampedModel):
         if self.status == UserInsurance.CANCELLED:
             try:
                 # notification_tasks.send_insurance_cancellation.apply_async(self.id)
-                send_insurance_notifications.apply_async(({'user_id': self.user_insurance.user.id, 'status': UserInsurance.CANCELLED}, ), countdown=1)
+                send_insurance_notifications.apply_async(({'user_id': self.user.id, 'status': UserInsurance.CANCELLED}, ), countdown=1)
             except Exception as e:
                 logger.error(str(e))
 
