@@ -178,6 +178,10 @@ def push_mis():
     from ondoc.api.v1.utils import util_absolute_url
     from ondoc.crm.admin.insurance import UserInsuranceResource, UserInsuranceDoctorResource, UserInsuranceLabResource
     from datetime import datetime, timedelta
+    from io import StringIO, BytesIO
+    import zipfile
+    in_memory = BytesIO()
+    zip = zipfile.ZipFile(in_memory, "a", zipfile.ZIP_DEFLATED, False)
 
     resources = [
         (UserInsuranceResource, InsuranceMIS.AttachmentType.USER_INSURANCE_RESOURCE),
@@ -198,18 +202,38 @@ def push_mis():
         resource_obj = resource[0]()
 
         dataset = resource_obj.export(**arguments)
-        filename = "%s_%s_%s.xlsx" % (resource_obj.__class__.__name__ , from_date, to_date)
-        file = TemporaryUploadedFile(filename, 'byte', 1000, 'utf-8')
-        f = open(file.temporary_file_path(), 'wb')
-        f.write(dataset.xls)
-        f.seek(0)
-        f.flush()
-        f.content_type = 'application/vnd.ms-excel'
+        filename = "%s_%s_%s.xls" % (resource_obj.__class__.__name__ , from_date, to_date)
+        zip.writestr(filename, dataset.xls)
 
-        attachment = InMemoryUploadedFile(file, None, filename, 'application/vnd.ms-excel', file.tell(), None)
-        insurance_mis_obj = InsuranceMIS(attachment_file=attachment, attachment_type=resource[1])
-        insurance_mis_obj.save()
-        print(insurance_mis_obj.attachment_file.url)
-        email_attachments.append({'filename': filename, 'path': util_absolute_url(insurance_mis_obj.attachment_file.url)})
+    # zip.setpassword("akusaini".encode('utf-8'))
+    for zfile in zip.filelist:
+        zfile.create_system = 0
+
+    zip.setpassword("akusaini".encode('utf-8'))
+    zip.close()
+
+    in_memory.seek(0)
+    data = in_memory.read()
+    pos = data.find('\x50\x4b\x05\x06'.encode())  # End of central directory signature
+    if (pos > 0):
+        in_memory.seek(pos + 22)  # size of 'ZIP end of central directory record'
+        in_memory.truncate()
+        # in_memory.close()
+
+    in_memory.seek(0)
+    filename = "All_MIS_%s_%s.zip" % (from_date, to_date)
+    file = TemporaryUploadedFile(filename, 'byte', 1000, 'utf-8')
+    f = open(file.temporary_file_path(), 'wb')
+    f.write(in_memory.read())
+    f.seek(0)
+    f.flush()
+    f.content_type = 'application/zip'
+
+    attachment = InMemoryUploadedFile(file, None, filename, 'application/zip', file.tell(), None)
+    insurance_mis_obj = InsuranceMIS(attachment_file=attachment, attachment_type=InsuranceMIS.AttachmentType.ALL_MIS_ZIP)
+    insurance_mis_obj.save()
+
+    print(insurance_mis_obj.attachment_file.url)
+    email_attachments.append({'filename': filename, 'path': util_absolute_url(insurance_mis_obj.attachment_file.url)})
 
     EmailNotification.send_insurance_mis(email_attachments)

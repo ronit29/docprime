@@ -1400,9 +1400,10 @@ class InsuranceMIS(auth_model.TimeStampedModel):
         USER_INSURANCE_DOCTOR_RESOURCE = "USER_INSURANCE_DOCTOR_RESOURCE"
         USER_INSURANCE_LAB_RESOURCE = "USER_INSURANCE_LAB_RESOURCE"
         USER_INSURANCE_RESOURCE = "USER_INSURANCE_RESOURCE"
+        ALL_MIS_ZIP = "ALL_MIS_ZIP"
 
     attachment_type = models.CharField(max_length=100, null=False, blank=False, choices=AttachmentType.as_choices())
-    attachment_file = models.FileField(default=None, null=True, upload_to='insurance/mis', validators=[FileExtensionValidator(allowed_extensions=['pdf', 'xls', 'xlsx'])])
+    attachment_file = models.FileField(default=None, null=True, upload_to='insurance/mis', validators=[FileExtensionValidator(allowed_extensions=['zip' ,'pdf', 'xls', 'xlsx'])])
 
     class Meta:
         db_table = 'insurance_mis'
