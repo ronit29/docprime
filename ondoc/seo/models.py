@@ -75,9 +75,10 @@ class NewDynamic(TimeStampedModel):
             self.bottom_content=''
         self.top_content = self.top_content.strip("&nbsp;").strip()
 
-        if (not self.id or not self.top_content) and self.url.url_type == EntityUrls.UrlType.SEARCHURL:
-            #self.top_content = if not strip_tags(self.top_content).strip("&nbsp;").strip():
-            ps_content = PracticeSpecializationContent.objects.filter(specialization_id=self.url.specialization_id).first()
+        if (not self.id or not self.top_content) and self.url and self.url.url_type == EntityUrls.UrlType.SEARCHURL:
+            # self.top_content = if not strip_tags(self.top_content).strip("&nbsp;").strip():
+            ps_content = PracticeSpecializationContent.objects.filter(
+                specialization_id=self.url.specialization_id).first()
             if ps_content:
                 self.top_content = ps_content.content
                 # if self.url.url_type == EntityUrls.UrlType.SEARCHURL and PracticeSpecializationContent.objects.filter(
