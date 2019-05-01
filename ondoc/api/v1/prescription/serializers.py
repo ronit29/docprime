@@ -47,7 +47,7 @@ class PrescriptionMedicineBodySerializer(serializers.Serializer):
     time = serializers.ListField(child=serializers.CharField(max_length=64), allow_empty=True, required=False)
     duration_type = serializers.ChoiceField(choices=prescription_models.PrescriptionMedicine.DURATION_TYPE_CHOICES, required=False, allow_null=True)
     duration = serializers.IntegerField(required=False, allow_null=True)
-    instruction = serializers.CharField(max_length=256, required=False)
+    instructions = serializers.CharField(max_length=256, required=False)
     is_before_meal = serializers.NullBooleanField(required=False)
     additional_notes = serializers.CharField(max_length=256, required=False, allow_null=True)
 
@@ -65,7 +65,7 @@ class PrescriptionSymptomsComplaintsBodySerializer(serializers.Serializer):
 
 class PrescriptionTestsBodySerializer(serializers.Serializer):
     name = serializers.CharField(max_length=64)
-    instruction = serializers.CharField(max_length=256, required=False)
+    instructions = serializers.CharField(max_length=256, required=False)
 
 
 class PrescriptionSpecialInstructionsBodySerializer(serializers.Serializer):

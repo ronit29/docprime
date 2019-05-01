@@ -131,7 +131,7 @@ class PrescriptionComponentsViewSet(viewsets.GenericViewSet):
                 "moderated": True,
                 "hospitals": [],
                 "source_type": None,
-                "instruction": None,
+                "instructions": None,
             })
         return Response(resp)
 

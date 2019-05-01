@@ -97,7 +97,7 @@ class PrescriptionMedicine(PrescriptionEntity):
     time = ArrayField(models.CharField(max_length=64), blank=True, null=True)
     duration_type = models.PositiveSmallIntegerField(choices=DURATION_TYPE_CHOICES, null=True, blank=True)
     duration = models.PositiveIntegerField(null=True, blank=True)
-    instruction = models.CharField(max_length=256, null=True, blank=True)
+    instructions = models.CharField(max_length=256, null=True, blank=True)
     is_before_meal = models.NullBooleanField(default=None, blank=True)
     additional_notes = models.CharField(max_length=256, null=True, blank=True)
 
@@ -141,7 +141,7 @@ class PrescriptionMedicine(PrescriptionEntity):
 
 
 class PrescriptionTests(PrescriptionEntity):
-    instruction = models.CharField(max_length=256, null=True, blank=True)
+    instructions = models.CharField(max_length=256, null=True, blank=True)
 
     def __str__(self):
         return self.name
