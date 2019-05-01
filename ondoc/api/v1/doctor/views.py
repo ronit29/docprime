@@ -3616,6 +3616,8 @@ class HospitalViewSet(viewsets.GenericViewSet):
                                                    is_valid=True,
                                                    locality_value__iexact=city).first()
 
+        breadcrumb = deepcopy(entity.breadcrumb) if entity and isinstance(entity.breadcrumb, list) else []
+        breadcrumb.insert(0, {"title": "Home", "url": "/", "link_title": "Home"})
         if entity:
             locality = entity.sublocality_value
             city = entity.locality_value
@@ -3627,15 +3629,22 @@ class HospitalViewSet(viewsets.GenericViewSet):
 
                 description = '{ipd_procedure_name} Hospitals in {city} : Check {ipd_procedure_name} hospitals in {city}. View address, reviews, cost estimate and more at docprime.'.format(
                     ipd_procedure_name=ipd_procedure_obj_name, city=city)
+                breadcrumb.append({"title": "Procedures", "url": "ipd-procedures", "link_title": "Procedures"})
+                temp = "{} Hospitals in {}".format(ipd_procedure_obj_name, city)
+                breadcrumb.append({"title": temp, "url": None, "link_title": temp})
             elif entity.sitemap_identifier == EntityUrls.SitemapIdentifier.HOSPITALS_CITY:
                 title = 'Best Hospitals in {city} | Find Top Hospitals Near Me in {city}'.format(city=city)
                 description = 'Best Hospitals in {city}: Find list of verified top hospitals near me in {city}. View details, address, reviews, bed availability, cost and more at docprime.'.format(
                     city=city)
+                temp = "{} Hospitals".format(city)
+                breadcrumb.append({"title": temp, "url": None, "link_title": temp})
             elif entity.sitemap_identifier == EntityUrls.SitemapIdentifier.HOSPITALS_LOCALITY_CITY:
                 title = 'Best Hospitals in {locality}, {city} | List of Top Hospitals in {locality}'.format(
                     locality=locality, city=city)
                 description = 'Best Hospitals in {locality}, {city}: Check List of verified Top hospitals in {locality}, {city}. View details, address, reviews, bed availability, cost and more at docprime.'.format(
                     locality=locality, city=city)
+                temp = "Hospitals in {}, {}".format(entity.sublocality_value, entity.locality_value)
+                breadcrumb.append({"title": temp, "url": None, "link_title": temp})
 
         if url:
             new_dynamic_object = NewDynamic.objects.filter(url_value=url, is_enabled=True).first()
@@ -3648,14 +3657,6 @@ class HospitalViewSet(viewsets.GenericViewSet):
                     top_content = new_dynamic_object.top_content
                 if new_dynamic_object.bottom_content:
                     bottom_content = new_dynamic_object.bottom_content
-
-        breadcrumb = deepcopy(entity.breadcrumb) if entity and isinstance(entity.breadcrumb, list) else []
-        breadcrumb.insert(0, {"title": "Home", "url": "/", "link_title": "Home"})
-        if ipd_procedure_obj_name:
-            breadcrumb.append({"title": "Procedures", "url": "ipd-procedures", "link_title": "Procedures"})
-            if city:
-                breadcrumb.append({"title": "{} Hospitals in {}".format(ipd_procedure_obj_name, city), "url": None})
-
 
         lat = validated_data.get('lat')
         long = validated_data.get('long')
@@ -3694,8 +3695,13 @@ class HospitalViewSet(viewsets.GenericViewSet):
         hospital_queryset = list(hospital_queryset)
         if count:
             hospital_queryset = hospital_queryset[:count]
+        hosp_entity_qs = EntityUrls.objects.filter(is_valid=True,
+                                                   sitemap_identifier=EntityUrls.SitemapIdentifier.HOSPITAL_PAGE,
+                                                   entity_id__in=[x.id for x in hospital_queryset])
+        hosp_entity_entity = {x.entity_id: x.url for x in hosp_entity_qs}
         top_hospital_serializer = serializers.TopHospitalForIpdProcedureSerializer(hospital_queryset, many=True,
-                                                                                   context={'request': request})
+                                                                                   context={'request': request,
+                                                                                            'hosp_entity_entity': hosp_entity_entity})
         return Response({'count': result_count, 'result': top_hospital_serializer.data,
                          'ipd_procedure': {'id': ipd_procedure_obj_id, 'name': ipd_procedure_obj_name},
                          'health_insurance_providers': [{'id': x.id, 'name': x.name} for x in
@@ -3879,6 +3885,7 @@ class IpdProcedureViewSet(viewsets.GenericViewSet):
 
         hospital_view_set = HospitalViewSet()
         hospital_result = hospital_view_set.list(request, pk, 2)
+        doctor_result_data = {}
         doctor_list_viewset = DoctorListViewSet()
         doctor_result = doctor_list_viewset.list(request, parameters={'ipd_procedure_ids': str(pk),
                                                                       'longitude': validated_data.get('long'),
