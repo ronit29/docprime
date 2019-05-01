@@ -187,7 +187,7 @@ def push_mis():
     ]
 
     from_date = str(datetime.now().date() - timedelta(days=1))
-    to_date = str(datetime.now().date())
+    to_date = from_date
     arguments = {
         'from_date': from_date,
         'to_date': to_date,
