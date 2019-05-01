@@ -1498,14 +1498,17 @@ def update_physical_agreement_timestamp(obj):
 
 def ipd_query_parameters(entity, req_params):
     params_dict = copy.deepcopy(req_params)
+    params_dict["max_distance"] = None
     if entity.sublocality_latitude:
         params_dict["lat"] = entity.sublocality_latitude
+        params_dict["max_distance"] = 5  # In KMs
     elif entity.locality_latitude:
         params_dict["lat"] = entity.locality_latitude
+        params_dict["max_distance"] = 15  # In KMs
     if entity.sublocality_longitude:
         params_dict["long"] = entity.sublocality_longitude
     elif entity.locality_longitude:
         params_dict["long"] = entity.locality_longitude
-    if req_params.get('city'):
-        params_dict['city'] = req_params.get('city')
+    if entity.locality_value:
+        params_dict['city'] = entity.locality_value
     return params_dict

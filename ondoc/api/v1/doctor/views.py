@@ -3567,12 +3567,11 @@ class HospitalViewSet(viewsets.GenericViewSet):
 
     def list_by_url(self, request, url, *args, **kwargs):
         url = url.lower()
-        entity_url_qs = EntityUrls.objects.filter(url=url, url_type=EntityUrls.UrlType.SEARCHURL,
-                                                  entity_type='Hospital').order_by('-sequence')
-        if not entity_url_qs.exists():
+        entity = EntityUrls.objects.filter(url=url, url_type=EntityUrls.UrlType.SEARCHURL,
+                                           entity_type='Hospital').order_by('-sequence').first()
+        if not entity:
             return Response(status=status.HTTP_404_NOT_FOUND)
 
-        entity = entity_url_qs.first()
         if not entity.is_valid:
             valid_qs = EntityUrls.objects.filter(is_valid=True, ipd_procedure_id=entity.ipd_procedure_id,
                                                  locality_id=entity.locality_id,
@@ -3589,7 +3588,7 @@ class HospitalViewSet(viewsets.GenericViewSet):
         response = self.list(request, entity.ipd_procedure_id, **kwargs)
         return response
 
-    def list(self, request, ipd_pk, count=None, *args, **kwargs):
+    def list(self, request, ipd_pk=None, count=None, *args, **kwargs):
         request_data = request.query_params
         temp_request_data = kwargs.get('request_data')
         if temp_request_data:
@@ -3597,29 +3596,36 @@ class HospitalViewSet(viewsets.GenericViewSet):
         serializer = serializers.HospitalRequestSerializer(data=request_data)
         serializer.is_valid(raise_exception=True)
         validated_data = serializer.validated_data
-        ipd_procedure_obj = IpdProcedure.objects.filter(id=ipd_pk, is_enabled=True).first()
-        if not ipd_procedure_obj:
-            return Response([], status=status.HTTP_400_BAD_REQUEST)
+        ipd_procedure_obj = ipd_procedure_obj_id = ipd_procedure_obj_name = None
+        if ipd_pk:
+            ipd_procedure_obj = IpdProcedure.objects.filter(id=ipd_pk, is_enabled=True).first()
+        if ipd_pk and not ipd_procedure_obj:
+            return Response([], status=status.HTTP_404_NOT_FOUND)
+        if ipd_procedure_obj:
+            ipd_procedure_obj_id = ipd_procedure_obj.id
+            ipd_procedure_obj_name = ipd_procedure_obj.name
 
         url = canonical_url = title = description = top_content = bottom_content = city = breadcrumb = None
         entity = kwargs.get('entity')
-        if not entity:
+        if not entity and ipd_procedure_obj_name:
             if validated_data.get('city'):
                 city = city_match(validated_data.get('city'))
                 # IPD_PROCEDURE_COST_IN_IPDP
-                temp_url = slugify(ipd_procedure_obj.name + '-hospitals-in-' + city + '-ipdhp')
+                temp_url = slugify(ipd_procedure_obj_name + '-hospitals-in-' + city + '-ipdhp')
                 entity = EntityUrls.objects.filter(url=temp_url, url_type='SEARCHURL', entity_type='Hospital',
                                                    is_valid=True,
                                                    locality_value__iexact=city).first()
 
-        if entity:
+        if entity :
             city = entity.locality_value
             url = entity.url
-            title = 'Best {ipd_procedure_name} Hospitals in {city} | Book Hospital & Get Discount'.format(
-                ipd_procedure_name=ipd_procedure_obj.name, city=city).title()
             canonical_url = entity.url
-            description = '{ipd_procedure_name} Hospitals in {city} : Check {ipd_procedure_name} hospitals in {city}. View address, reviews, cost estimate and more at docprime.'.format(
-                ipd_procedure_name=ipd_procedure_obj.name, city=city)
+            if ipd_procedure_obj_name:
+                title = 'Best {ipd_procedure_name} Hospitals in {city} | Book Hospital & Get Discount'.format(
+                    ipd_procedure_name=ipd_procedure_obj_name, city=city).title()
+
+                description = '{ipd_procedure_name} Hospitals in {city} : Check {ipd_procedure_name} hospitals in {city}. View address, reviews, cost estimate and more at docprime.'.format(
+                    ipd_procedure_name=ipd_procedure_obj_name, city=city)
 
         if url:
             new_dynamic_object = NewDynamic.objects.filter(url_value=url, is_enabled=True).first()
@@ -3633,11 +3639,13 @@ class HospitalViewSet(viewsets.GenericViewSet):
                 if new_dynamic_object.bottom_content:
                     bottom_content = new_dynamic_object.bottom_content
 
-        breadcrumb = list()
-        breadcrumb.append({"title": "Home", "url": "/"})
-        breadcrumb.append({"title": "Procedures", "url": "ipd-procedures"})
-        if city:
-            breadcrumb.append({"title": "{} hospitals in {}".format(ipd_procedure_obj.name, city), "url": None})
+        breadcrumb = deepcopy(entity.breadcrumb) if entity and isinstance(entity.breadcrumb, list) else []
+        breadcrumb.insert(0, {"title": "Home", "url": "/", "link_title": "Home"})
+        if ipd_procedure_obj_name:
+            breadcrumb.append({"title": "Procedures", "url": "ipd-procedures", "link_title": "Procedures"})
+            if city:
+                breadcrumb.append({"title": "{} Hospitals in {}".format(ipd_procedure_obj_name, city), "url": None})
+
 
         lat = validated_data.get('lat')
         long = validated_data.get('long')
@@ -3656,19 +3664,21 @@ class HospitalViewSet(viewsets.GenericViewSet):
                                                               'hospitalspeciality_set').filter(
             is_live=True,
             hospital_doctors__enabled=True,
-            hospital_doctors__ipd_procedure_clinic_mappings__enabled=True,
             location__dwithin=(
                 Point(float(long),
                       float(lat)),
-                D(m=max_distance)),
-            hospital_doctors__ipd_procedure_clinic_mappings__ipd_procedure_id=ipd_pk).annotate(
-            distance=Distance('location', pnt)).distinct()
+                D(m=max_distance))).annotate(
+            distance=Distance('location', pnt))
         if provider_ids:
             hospital_queryset = hospital_queryset.filter(health_insurance_providers__id__in=provider_ids)
-        if min_distance:
+        if ipd_pk:
+            hospital_queryset = hospital_queryset.filter(
+                hospital_doctors__ipd_procedure_clinic_mappings__ipd_procedure_id=ipd_pk,
+                hospital_doctors__ipd_procedure_clinic_mappings__enabled=True)
+        if min_distance:  # TODO : SHASHANK_SINGH add it in query
             hospital_queryset = filter(lambda x: x.distance.m >= min_distance if x.distance is not None and x.distance.m is not None else False, hospital_queryset)
 
-        hospital_queryset = list(hospital_queryset)
+        hospital_queryset = list(hospital_queryset.distinct())
         result_count = len(hospital_queryset)
         if count:
             hospital_queryset = hospital_queryset[:count]
@@ -3676,7 +3686,7 @@ class HospitalViewSet(viewsets.GenericViewSet):
         top_hospital_serializer = serializers.TopHospitalForIpdProcedureSerializer(hospital_queryset, many=True,
                                                                                    context={'request': request})
         return Response({'count': result_count, 'result': top_hospital_serializer.data,
-                         'ipd_procedure': {'id': ipd_procedure_obj.id, 'name': ipd_procedure_obj.name},
+                         'ipd_procedure': {'id': ipd_procedure_obj_id, 'name': ipd_procedure_obj_name},
                          'health_insurance_providers': [{'id': x.id, 'name': x.name} for x in
                                                         HealthInsuranceProvider.objects.all()],
                          'seo': {'url': url, 'title': title, 'description': description, 'location': city},
@@ -3853,10 +3863,10 @@ class IpdProcedureViewSet(viewsets.GenericViewSet):
                     bottom_content = new_dynamic_object.bottom_content
 
         breadcrumb = list()
-        breadcrumb.append({"title": "Home", "url": "/"})
-        breadcrumb.append({"title": "Procedures", "url": "ipd-procedures"})
+        breadcrumb.append({"title": "Home", "url": "/", "link_title": "Home"})
+        breadcrumb.append({"title": "Procedures", "url": "ipd-procedures", "link_title": "Procedures"})
         if city:
-            breadcrumb.append({"title": "{} cost in {}".format(ipd_procedure.name, city), "url": None})
+            breadcrumb.append({"title": "{} Cost in {}".format(ipd_procedure.name, city), "url": None, "link_title": None})
 
         hospital_view_set = HospitalViewSet()
         hospital_result = hospital_view_set.list(request, pk, 2)
