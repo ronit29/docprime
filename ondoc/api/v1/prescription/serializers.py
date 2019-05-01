@@ -42,19 +42,20 @@ class PrescriptionAppointmentValidation():
 class PrescriptionMedicineBodySerializer(serializers.Serializer):
     name = serializers.CharField(max_length=64)
     quantity = serializers.IntegerField(required=False, allow_null=True)
-    dosage_type = serializers.ChoiceField(choices=prescription_models.PrescriptionMedicine.DOSAGE_TYPE_CHOICES, required=False, allow_null=True)
+    # dosage_type = serializers.ChoiceField(choices=prescription_models.PrescriptionMedicine.DOSAGE_TYPE_CHOICES, required=False, allow_null=True)
+    dosage_type = serializers.CharField(max_length=100, required=False)
     time = serializers.ListField(child=serializers.CharField(max_length=64), allow_empty=True, required=False)
     duration_type = serializers.ChoiceField(choices=prescription_models.PrescriptionMedicine.DURATION_TYPE_CHOICES, required=False, allow_null=True)
     duration = serializers.IntegerField(required=False, allow_null=True)
-    # instruction = serializers.CharField(max_length=256, required=False)
+    instruction = serializers.CharField(max_length=256, required=False)
     is_before_meal = serializers.NullBooleanField(required=False)
     additional_notes = serializers.CharField(max_length=256, required=False, allow_null=True)
 
     def validate(self, attrs):
         if attrs.get('duration_type'):
             attrs['durationstring'] = dict(prescription_models.PrescriptionMedicine.DURATION_TYPE_CHOICES)[attrs['duration_type']]
-        if attrs.get("quantity") and not attrs.get("dosage_type"):
-            raise serializers.ValidationError("dosage type is also required with quantity")
+        if not (attrs.get("quantity") and attrs.get("dosage_type")):
+            raise serializers.ValidationError("dosage quantity and type both are required together")
         return attrs
 
 
@@ -64,6 +65,7 @@ class PrescriptionSymptomsComplaintsBodySerializer(serializers.Serializer):
 
 class PrescriptionTestsBodySerializer(serializers.Serializer):
     name = serializers.CharField(max_length=64)
+    instruction = serializers.CharField(max_length=256, required=False)
 
 
 class PrescriptionSpecialInstructionsBodySerializer(serializers.Serializer):
@@ -122,7 +124,8 @@ class PrescriptionComponentBodySerializer(serializers.Serializer):
     hospital_id = serializers.PrimaryKeyRelatedField(queryset=doc_models.Hospital.objects.all())
     source_type = serializers.ChoiceField(choices=prescription_models.PrescriptionEntity.SOURCE_TYPE_CHOICES)
     quantity = serializers.IntegerField(required=False)
-    dosage_type = serializers.ChoiceField(choices=prescription_models.PrescriptionMedicine.DOSAGE_TYPE_CHOICES, required=False)
+    # dosage_type = serializers.ChoiceField(choices=prescription_models.PrescriptionMedicine.DOSAGE_TYPE_CHOICES, required=False)
+    dosage_type = serializers.CharField(max_length=100, required=False)
     time = serializers.ListField(child=serializers.CharField(max_length=64), allow_empty=True, required=False)
     duration_type = serializers.ChoiceField(choices=prescription_models.PrescriptionMedicine.DURATION_TYPE_CHOICES,
                                             required=False)
@@ -148,7 +151,7 @@ class PrescriptionComponentSyncSerializer(serializers.Serializer):
 class GeneratePrescriptionPDFBodySerializer(serializers.Serializer):
     id = serializers.UUIDField()
     symptoms_complaints = serializers.ListField(child=PrescriptionSymptomsComplaintsBodySerializer(), allow_empty=True, required=False)
-    tests = serializers.ListField(child=PrescriptionTestsBodySerializer(),required=False, allow_empty=True)
+    lab_tests = serializers.ListField(child=PrescriptionTestsBodySerializer(),required=False, allow_empty=True)
     special_instructions = serializers.ListField(child=PrescriptionSpecialInstructionsBodySerializer(), allow_empty=True, required=False)
     diagnoses = serializers.ListField(child=PrescriptionDiagnosesBodySerializer(), required=False, allow_empty=True)
     patient_details = PrescriptionPatientSerializer()

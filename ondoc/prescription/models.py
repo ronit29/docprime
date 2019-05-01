@@ -70,33 +70,34 @@ class PrescriptionMedicine(PrescriptionEntity):
     MONTH = 3
     YEAR = 4
     DURATION_TYPE_CHOICES = [(DAY, "Day"), (WEEK, "Week"), (MONTH, "Month"), (YEAR, "Year")]
-    TABLET = 1
-    SYRUP = 2
-    CAPSULE = 3
-    CREAM = 4
-    DROP = 5
-    FOAM = 6
-    GEL = 7
-    INHALER = 8
-    INJECTION = 9
-    LOTION = 10
-    OINTMENT = 11
-    POWDER = 12
-    SPRAY = 13
-    SYRINGE = 14
-    SUSPENSION = 15
-    SOLUTION = 16
-    DOSAGE_TYPE_CHOICES = [(TABLET, "Tablet"), (SYRUP, "Syrup"), (CAPSULE, "CAPSULE"), (CREAM, "Cream"),
-                           (DROP, "Drop"), (FOAM, "Foam"), (GEL, "Gel"), (INHALER, "Inhaler"),
-                           (INJECTION, "Injection"), (LOTION, "Lotion"), (OINTMENT, "Ointment"), (POWDER, "Powder"),
-                           (SPRAY, "Spray"), (SYRINGE, "Syringe"), (SUSPENSION, "Suspension"), (SOLUTION, "Solution")]
+    # TABLET = 1
+    # SYRUP = 2
+    # CAPSULE = 3
+    # CREAM = 4
+    # DROP = 5
+    # FOAM = 6
+    # GEL = 7
+    # INHALER = 8
+    # INJECTION = 9
+    # LOTION = 10
+    # OINTMENT = 11
+    # POWDER = 12
+    # SPRAY = 13
+    # SYRINGE = 14
+    # SUSPENSION = 15
+    # SOLUTION = 16
+    # DOSAGE_TYPE_CHOICES = [(TABLET, "Tablet"), (SYRUP, "Syrup"), (CAPSULE, "CAPSULE"), (CREAM, "Cream"),
+    #                        (DROP, "Drop"), (FOAM, "Foam"), (GEL, "Gel"), (INHALER, "Inhaler"),
+    #                        (INJECTION, "Injection"), (LOTION, "Lotion"), (OINTMENT, "Ointment"), (POWDER, "Powder"),
+    #                        (SPRAY, "Spray"), (SYRINGE, "Syringe"), (SUSPENSION, "Suspension"), (SOLUTION, "Solution")]
     quantity = models.PositiveIntegerField(null=True, blank=True)
-    dosage_type = models.PositiveIntegerField(choices=DOSAGE_TYPE_CHOICES, null=True, blank=True)
+    # dosage_type = models.PositiveIntegerField(choices=DOSAGE_TYPE_CHOICES, null=True, blank=True)
+    dosage_type = models.CharField(max_length=100, null=True, blank=True)
     # time = models.CharField(max_length=64, null=True)
     time = ArrayField(models.CharField(max_length=64), blank=True, null=True)
     duration_type = models.PositiveSmallIntegerField(choices=DURATION_TYPE_CHOICES, null=True, blank=True)
     duration = models.PositiveIntegerField(null=True, blank=True)
-    # instruction = models.CharField(max_length=256, null=True, blank=True)
+    instruction = models.CharField(max_length=256, null=True, blank=True)
     is_before_meal = models.NullBooleanField(default=None, blank=True)
     additional_notes = models.CharField(max_length=256, null=True, blank=True)
 
@@ -201,7 +202,7 @@ class PresccriptionPdf(auth_models.TimeStampedModel):
                     'updated_at': self.updated_at
                     }
         html_body = render_to_string("e-prescription/med-invoice.html", context=pdf_dict)
-        filename = "{}_{}_{}_{}.pdf".format(self.patient_details['name'].partition(' ')[0], self.serial_id,
+        filename = "{}_{}_{}_{}.pdf".format(self.patient_details['name'].split(' ')[0], self.serial_id,
                                             str(timezone.now().strftime("%H%M%S")), random.randint(11111, 99999))
         file = utils.html_to_pdf(html_body, filename)
         if not file:

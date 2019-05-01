@@ -53,7 +53,7 @@ class PrescriptionGenerateViewSet(viewsets.GenericViewSet):
                 # prescription_pdf = prescription_pdf_queryset.first()
                 prescription_pdf.serial_id = valid_data.get('serial_id')
                 prescription_pdf.symptoms_complaints = valid_data.get('symptoms_complaints')
-                prescription_pdf.tests = valid_data.get('tests')
+                prescription_pdf.lab_tests = valid_data.get('lab_tests')
                 prescription_pdf.special_instructions = valid_data.get('special_instructions')
                 prescription_pdf.diagnoses = valid_data.get('diagnoses')
                 prescription_pdf.patient_details = valid_data.get('patient_details')
