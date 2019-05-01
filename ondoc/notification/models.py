@@ -72,6 +72,9 @@ class NotificationAction:
 
     IPD_PROCEDURE_MAIL = 60
 
+    LAB_LOGO_CHANGE_MAIL = 70
+    PRICING_ALERT_EMAIL = 72
+
     NOTIFICATION_TYPE_CHOICES = (
         (APPOINTMENT_ACCEPTED, "Appointment Accepted"),
         (APPOINTMENT_CANCELLED, "Appointment Cancelled"),
@@ -97,7 +100,9 @@ class NotificationAction:
         (CASHBACK_CREDITED, "Cashback Credited"),
         (REFUND_BREAKUP, 'Refund break up'),
         (REFUND_COMPLETED, 'Refund Completed'),
-        (IPD_PROCEDURE_MAIL, 'IPD Procedure Mail')
+        (IPD_PROCEDURE_MAIL, 'IPD Procedure Mail'),
+        (PRICING_ALERT_EMAIL, 'Pricing Change Mail'),
+        (LAB_LOGO_CHANGE_MAIL, 'Lab Logo Change Mail')
     )
 
     OPD_APPOINTMENT = "opd_appointment"

@@ -32,7 +32,7 @@ from ondoc.diagnostic.models import (LabTiming, LabImage,
                                      TestParameter, ParameterLabTest, FrequentlyAddedTogetherTests, QuestionAnswer,
                                      LabReport, LabReportFile, LabTestCategoryMapping,
                                      LabTestRecommendedCategoryMapping, LabTestGroupTiming, LabTestGroupMapping,
-                                     TestParameterChat)
+                                     TestParameterChat, LabTestThresholds)
 from ondoc.integrations.models import IntegratorHistory
 from ondoc.notification.models import EmailNotification, NotificationAction
 from .common import *
@@ -1178,8 +1178,6 @@ class LabAppointmentAdmin(nested_admin.NestedModelAdmin):
                         history_obj.accepted_through = "CRM"
                         history_obj.save()
 
-
-
             if send_email_sms_report and sum(
                     obj.reports.annotate(no_of_files=Count('files')).values_list('no_of_files', flat=True)):
                 transaction.on_commit(lambda: self.on_commit_tasks(obj.id))
@@ -1377,11 +1375,23 @@ class LabTestAdminForm(forms.ModelForm):
                 raise forms.ValidationError('Please dont enter reference code for a test')
 
 
+class LabTestReportThresholdInline(AutoComplete, TabularInline):
+    model = LabTestThresholds
+    formfield_overrides = {
+        models.TextField: {'widget': forms.Textarea(attrs={'rows': 6, 'cols': 20})},
+    }
+    fk_name = 'lab_test'
+    extra = 0
+    can_delete = True
+    autocomplete_fields = ['lab_test']
+    # formset = LabTestToParentCategoryInlineFormset
+
+
 class LabTestAdmin(ImportExportMixin, VersionAdmin):
     form = LabTestAdminForm
     change_list_template = 'superuser_import_export.html'
     formats = (base_formats.XLS, base_formats.XLSX,)
-    inlines = [LabTestCategoryInline, LabTestRecommendedCategoryInline, FAQLabTestInLine, FrequentlyBookedTogetherTestInLine]
+    inlines = [LabTestCategoryInline, LabTestRecommendedCategoryInline, FAQLabTestInLine, FrequentlyBookedTogetherTestInLine, LabTestReportThresholdInline]
     search_fields = ['name']
     list_filter = ('is_package', 'enable_for_ppc', 'enable_for_retail')
     exclude = ['search_key']
@@ -1463,6 +1473,29 @@ class AvailableLabTestAdmin(VersionAdmin):
                     'custom_agreed_price', 'computed_deal_price', 'custom_deal_price', 'enabled']
     search_fields = ['test__name', 'lab_pricing_group__group_name', 'lab_pricing_group__labs__name']
     # autocomplete_fields = ['test']
+
+    class Media:
+        js = ('js/admin/ondoc.js',)
+
+    @transaction.atomic
+    def save_model(self, request, obj, form, change):
+        super().save_model(request, obj, form, change)
+        responsible_user = request.user
+        transaction.on_commit(lambda: self.on_commit_tasks(obj, responsible_user))
+
+    def on_commit_tasks(self, obj, responsible_user):
+        if obj.custom_deal_price:
+            deal_price = obj.custom_deal_price
+        else:
+            deal_price = obj.computed_deal_price if obj.computed_deal_price else 0
+
+        if obj.custom_agreed_price:
+            agreed_price = obj.custom_agreed_price
+        else:
+            agreed_price = obj.computed_agreed_price if obj.computed_agreed_price else 0
+
+        if deal_price < agreed_price:
+            obj.send_pricing_alert_email(responsible_user)
 
 
 class DiagnosticConditionLabTestInline(admin.TabularInline):

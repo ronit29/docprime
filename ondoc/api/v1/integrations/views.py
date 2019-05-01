@@ -28,32 +28,38 @@ class IntegratorReportViewSet(viewsets.GenericViewSet):
 
         report_url = report.xml_url
         pdf_url = report.pdf_url
-        if not report_url:
-            return Response({"error": "Thyrocare Report url not found for booking"}, status=status.HTTP_404_NOT_FOUND)
 
-        data = requests.get(report_url)
-        xml_content = data.content
-        json_content = json.loads(json.dumps(xmltodict.parse(xml_content)))
+        if report.json_data:
+            return Response({'pdf_report_url': pdf_url, 'data': report.json_data})
+        else:
+            if not report_url:
+                return Response({"error": "Thyrocare Report url not found for booking"}, status=status.HTTP_404_NOT_FOUND)
 
-        lead_details = json_content['ThyrocareResult']['DATES']['DATE']['ORDERS']['ORDERNO']['LEADS']['LEADDETAILS']
-        # red = list()
-        # white = list()
-        data = list()
-        if type(lead_details) is dict:
-            if lead_details:
-                test_results = lead_details['BARCODES']['BARCODE']['TESTRESULTS']['TESTDETAIL']
-                if test_results:
-                    test_data = self.get_test_result_data(lead_details, test_results)
-                    data.append(test_data)
-        elif type(lead_details) is list:
-            if lead_details:
-                for lead_detail in lead_details:
-                    test_results = lead_detail['BARCODES']['BARCODE']['TESTRESULTS']['TESTDETAIL']
+            data = requests.get(report_url)
+            xml_content = data.content
+            json_content = json.loads(json.dumps(xmltodict.parse(xml_content)))
+
+            lead_details = json_content['ThyrocareResult']['DATES']['DATE']['ORDERS']['ORDERNO']['LEADS']['LEADDETAILS']
+            # red = list()
+            # white = list()
+            data = list()
+            if type(lead_details) is dict:
+                if lead_details:
+                    test_results = lead_details['BARCODES']['BARCODE']['TESTRESULTS']['TESTDETAIL']
                     if test_results:
-                        test_data = self.get_test_result_data(lead_detail, test_results)
+                        test_data = self.get_test_result_data(lead_details, test_results)
                         data.append(test_data)
+            elif type(lead_details) is list:
+                if lead_details:
+                    for lead_detail in lead_details:
+                        test_results = lead_detail['BARCODES']['BARCODE']['TESTRESULTS']['TESTDETAIL']
+                        if test_results:
+                            test_data = self.get_test_result_data(lead_detail, test_results)
+                            data.append(test_data)
 
-        return Response({'pdf_report_url': pdf_url, 'data': data})
+            report.json_data = data
+            report.save()
+            return Response({'pdf_report_url': pdf_url, 'data': data})
 
     def get_test_result_data(self, lead_detail, test_results):
         separated_details = self.get_name_age_gender(lead_detail['PATIENT'])
