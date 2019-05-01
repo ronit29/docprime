@@ -246,6 +246,7 @@ class PrescriptionPDFModelSerializer(serializers.ModelSerializer):
 class PrescriptionResponseSerializer(serializers.ModelSerializer):
 
     pdf_file = serializers.SerializerMethodField()
+    appointment_id = serializers.SerializerMethodField()
 
     def get_pdf_file(self, obj):
         request = self.context.get('request')
@@ -253,11 +254,14 @@ class PrescriptionResponseSerializer(serializers.ModelSerializer):
             return request.build_absolute_uri(obj.prescription_file.url)
         return None
 
+    def get_appointment_id(self, obj):
+        return obj.opd_appointment.id if obj.opd_appointment else obj.offline_opd_appointment.id
+
     class Meta:
         model = prescription_models.PresccriptionPdf
         fields = ('medicines', 'special_instructions', 'symptoms_complaints', 'appointment_type', 'pdf_file',
                   'diagnoses', 'lab_tests', 'followup_instructions_date', 'followup_instructions_reason', 'updated_at',
-                  'opd_appointment', 'offline_opd_appointment', 'id', 'serial_id')
+                  'appointment_id', 'id', 'serial_id')
 
 
 class PrescriptionModelSerializerComponents():
