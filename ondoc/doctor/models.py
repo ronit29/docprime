@@ -1841,9 +1841,11 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
 
         return allowed
 
-    # def get_corporate_deal_id(self):
-    #     if self.
-    #
+    def get_corporate_deal_id(self):
+        if self.coupon.all():
+            if self.coupon.first().corporate_deal:
+                return self.coupon.first().corporate_deal
+
 
     def get_city(self):
         if self.hospital and self.hospital.matrix_city:
