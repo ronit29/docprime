@@ -1,6 +1,7 @@
 from django.conf.urls import url
 from django.urls import path
-from ondoc.crm.admin.common import MatrixStateAutocomplete, MatrixCityAutocomplete, LabPricingAutocomplete
+from ondoc.crm.admin.common import MatrixStateAutocomplete, MatrixCityAutocomplete, LabPricingAutocomplete, \
+    EntityUrlViewset
 from .views import (CitiesViewSet, ServicesViewSet, SmsServiceViewSet, UpdateXlsViewSet, UploadDoctorViewSet,
                     UploadQualificationViewSet, UploadExperienceViewSet, UploadAwardViewSet, UploadHospitalViewSet,
                     UploadMembershipViewSet, SearchLeadViewSet, GetPaymentOptionsViewSet, GetSearchUrlViewSet,
@@ -27,4 +28,5 @@ urlpatterns = [
     url(r'^matrix-city-autocomplete/$', MatrixCityAutocomplete.as_view(), name='matrix-city-autocomplete'),
     path('get_search_url', GetSearchUrlViewSet.as_view({'get':'search_url'}), name='get-search-url'),
     path('get_key_data', GetKeyDataViewSet.as_view({'get':'list'}), name='get-key-data'),
+    path('entity-compare-autocomplete', EntityUrlViewset.as_view(), name='entity-compare-autocomplete'),
 ]

@@ -56,4 +56,5 @@ urlpatterns = [
     path('test/list_by_alphabet', TestDetailsViewset.as_view({'get':'list_by_alphabet'}), name='list-test-by-alphabet'),
     path('test/category', LabTestCategoryListViewSet.as_view({'get': 'list'}), name='test-category'),
     path('compare_lab_packages', CompareLabPackagesViewSet.as_view({'post': 'retrieve'}), name='lab_packages_comparison'),
+    path('compare_lab_packages_by_url', CompareLabPackagesViewSet.as_view({'get': 'retrieve_by_url'}), name='lab_packages_comparison_by_url'),
 ]

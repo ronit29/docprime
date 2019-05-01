@@ -660,6 +660,18 @@ class MatrixStateAutocomplete(autocomplete.Select2QuerySetView):
             return queryset
 
 
+class EntityUrlViewset(autocomplete.Select2QuerySetView):
+
+    def get_queryset(self):
+        from ondoc.location.models import EntityUrls, CompareSEOUrls
+        queryset = CompareSEOUrls.objects.filter()
+
+        if self.q:
+            queryset = queryset.filter(url=self.q)
+
+        return queryset
+
+
 class MatrixCityAutocomplete(autocomplete.Select2QuerySetView):
 
     def get_queryset(self):

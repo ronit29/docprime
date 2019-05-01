@@ -51,7 +51,7 @@ from ondoc.authentication import models as auth_models
 from django.db.models import Q, Value
 from django.db.models.functions import StrIndex, Coalesce
 
-from ondoc.location.models import EntityUrls, EntityAddress
+from ondoc.location.models import EntityUrls, EntityAddress, CompareSEOUrls, CompareLabPackagesSeoUrls
 from ondoc.seo.models import NewDynamic
 from ondoc.subscription_plan.models import UserPlanMapping
 from . import serializers
@@ -2867,9 +2867,40 @@ class LabTestCategoryListViewSet(viewsets.GenericViewSet):
 
 class CompareLabPackagesViewSet(viewsets.ReadOnlyModelViewSet):
 
-    def retrieve(self, request):
+    def retrieve_by_url(self, request):
+        url = request.GET.get('url')
+        if not url:
+            return Response(status=status.HTTP_404_NOT_FOUND)
+
+        url = url.lower()
+        compare_seo_url = CompareSEOUrls.objects.filter(url=url)
+        if len(compare_seo_url) > 0:
+            compare_seo_url = compare_seo_url[0]
+
+        else:
+            return Response(status=status.HTTP_404_NOT_FOUND)
+
+        package_lab_ids = list()
+        compare_package_details = dict()
+        compare_lab_packages = CompareLabPackagesSeoUrls.objects.filter(url=compare_seo_url)
+
+        if compare_lab_packages and len(compare_lab_packages)>1 and len(compare_lab_packages) <=5:
+            for data in compare_lab_packages:
+                package_lab_ids.append({'package_id': data.package_id, 'lab_id': data.lab_id})
+
+        compare_package_details['package_lab_ids'] = package_lab_ids
+        compare_package_details['lat'] = request.GET.get('lat') if request.GET.get('lat') else None
+        compare_package_details['long'] = request.GET.get('long') if request.GET.get('long') else None
+
+        response = self.retrieve(request, compare_package_details)
+        return response
+
+    def retrieve(self, request, compare_package_details= None):
         from django.db.models import Min
-        request_parameters = request.data
+        if compare_package_details:
+            request_parameters = compare_package_details
+        else:
+            request_parameters = request.data
         serializer = serializers.CompareLabPackagesSerializer(data=request_parameters, context={"request": request})
         serializer.is_valid(raise_exception=True)
         validated_data = serializer.validated_data
