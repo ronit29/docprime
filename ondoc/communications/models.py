@@ -898,6 +898,9 @@ class EMAILNotification:
         elif notification_type == NotificationAction.IPD_PROCEDURE_MAIL:
             body_template = "email/ipd_lead/body.html"
             subject_template = "email/ipd_lead/subject.txt"
+        elif notification_type == NotificationAction.INSURANCE_CANCELLATION:
+            body_template = "email/insurance_cancelled/body.html"
+            subject_template = "email/insurance_cancelled/subject.txt"
 
         return subject_template, body_template
 
