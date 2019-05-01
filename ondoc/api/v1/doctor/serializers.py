@@ -2029,3 +2029,13 @@ class OpdAppointmentUpcoming(OpdAppointmentSerializer):
 
     def get_address(self, obj):
         return obj.hospital.get_hos_address()
+
+
+class DoctorLicenceBodySerializer(serializers.Serializer):
+    doctor_id = serializers.PrimaryKeyRelatedField(queryset=Doctor.objects.all())
+    licence = serializers.CharField(max_length=32)
+
+    def validate(self, attrs):
+        if attrs['doctor_id'].license:
+            raise serializers.ValidationError('Licence Exists')
+        return attrs

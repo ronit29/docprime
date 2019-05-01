@@ -570,6 +570,28 @@ class DoctorProfileView(viewsets.GenericViewSet):
 
         return Response(resp_data)
 
+    def licence_update(self, request):
+        serializer = serializers.DoctorLicenceBodySerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        valid_data = serializer.validated_data
+        doctor = Doctor.objects.filter(Q(id=valid_data['doctor_id'].id,
+                                       doctor_clinics__hospital__manageable_hospitals__user=request.user,
+                                       doctor_clinics__hospital__manageable_hospitals__is_disabled=False),
+                                       (Q(doctor_clinics__hospital__manageable_hospitals__permission_type=auth_models.GenericAdmin.APPOINTMENT)
+                                        |
+                                        Q(doctor_clinics__hospital__manageable_hospitals__super_user_permission=True))
+                                       ).first()
+        if not doctor:
+            return Response({'error': 1}, status=status.HTTP_403_FORBIDDEN)
+
+        try:
+            doctor.license = valid_data['licence']
+            doctor.save()
+        except Exception as e :
+            logger.error(str(e))
+            return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        return Response({'status':1})
+
 
 class DoctorProfileUserViewSet(viewsets.GenericViewSet):
 
