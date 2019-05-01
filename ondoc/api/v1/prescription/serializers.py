@@ -40,14 +40,13 @@ class PrescriptionAppointmentValidation():
 
 
 class PrescriptionMedicineBodySerializer(serializers.Serializer):
+    id = serializers.UUIDField()
     name = serializers.CharField(max_length=64)
     quantity = serializers.IntegerField(required=False, allow_null=True)
-    # dosage_type = serializers.ChoiceField(choices=prescription_models.PrescriptionMedicine.DOSAGE_TYPE_CHOICES, required=False, allow_null=True)
     dosage_type = serializers.CharField(max_length=100, required=False)
     time = serializers.ListField(child=serializers.CharField(max_length=64), allow_empty=True, required=False)
     duration_type = serializers.ChoiceField(choices=prescription_models.PrescriptionMedicine.DURATION_TYPE_CHOICES, required=False, allow_null=True)
     duration = serializers.IntegerField(required=False, allow_null=True)
-    instructions = serializers.CharField(max_length=256, required=False)
     is_before_meal = serializers.NullBooleanField(required=False)
     additional_notes = serializers.CharField(max_length=256, required=False, allow_null=True)
 
@@ -60,23 +59,28 @@ class PrescriptionMedicineBodySerializer(serializers.Serializer):
 
 
 class PrescriptionSymptomsComplaintsBodySerializer(serializers.Serializer):
+    id = serializers.UUIDField()
     name = serializers.CharField(max_length=64)
 
 
 class PrescriptionTestsBodySerializer(serializers.Serializer):
+    id = serializers.UUIDField()
     name = serializers.CharField(max_length=64)
     instructions = serializers.CharField(max_length=256, required=False)
 
 
 class PrescriptionSpecialInstructionsBodySerializer(serializers.Serializer):
+    id = serializers.UUIDField()
     name = serializers.CharField(max_length=64)
 
 
 class PrescriptionDiagnosesBodySerializer(serializers.Serializer):
+    id = serializers.UUIDField()
     name = serializers.CharField(max_length=64)
 
 
 class PrescriptionPatientSerializer(serializers.Serializer):
+    id = serializers.UUIDField()
     name = serializers.CharField(max_length=64)
     age = serializers.IntegerField(required=False, allow_null=True)
     gender = serializers.CharField(max_length=6)
@@ -123,16 +127,6 @@ class PrescriptionComponentBodySerializer(serializers.Serializer):
     name = serializers.CharField(max_length=64)
     hospital_id = serializers.PrimaryKeyRelatedField(queryset=doc_models.Hospital.objects.all())
     source_type = serializers.ChoiceField(choices=prescription_models.PrescriptionEntity.SOURCE_TYPE_CHOICES)
-    quantity = serializers.IntegerField(required=False)
-    # dosage_type = serializers.ChoiceField(choices=prescription_models.PrescriptionMedicine.DOSAGE_TYPE_CHOICES, required=False)
-    dosage_type = serializers.CharField(max_length=100, required=False)
-    time = serializers.ListField(child=serializers.CharField(max_length=64), allow_empty=True, required=False)
-    duration_type = serializers.ChoiceField(choices=prescription_models.PrescriptionMedicine.DURATION_TYPE_CHOICES,
-                                            required=False)
-    duration = serializers.IntegerField(required=False)
-    # instruction = serializers.CharField(max_length=256, required=False)
-    is_before_meal = serializers.NullBooleanField(required=False)
-    additional_notes = serializers.CharField(max_length=256, required=False)
 
     def validate(self, attrs):
         model = dict(PrescriptionModelComponents.COMPONENT_CHOICES)[attrs.get('type')]
@@ -159,11 +153,9 @@ class GeneratePrescriptionPDFBodySerializer(serializers.Serializer):
     lab_tests = serializers.ListField(child=PrescriptionTestsBodySerializer(),required=False, allow_empty=True)
     special_instructions = serializers.ListField(child=PrescriptionSpecialInstructionsBodySerializer(), allow_empty=True, required=False)
     diagnoses = serializers.ListField(child=PrescriptionDiagnosesBodySerializer(), required=False, allow_empty=True)
-    patient_details = PrescriptionPatientSerializer()
     medicines = serializers.ListField(child=PrescriptionMedicineBodySerializer(),required=False, allow_empty=True)
+    patient_details = PrescriptionPatientSerializer()
     appointment_id = serializers.CharField()
-    # opd_appointment_id = serializers.PrimaryKeyRelatedField(queryset=doc_models.OpdAppointment.objects.all(), required=False, allow_null=True)
-    # offline_opd_appointment_id = serializers.PrimaryKeyRelatedField(queryset=doc_models.OfflineOPDAppointments.objects.all(), required=False, allow_null=True)
     appointment_type = serializers.ChoiceField(choices=prescription_models.PresccriptionPdf.APPOINTMENT_TYPE_CHOICES, required=False)
     followup_date = serializers.DateTimeField(required=False, allow_null=True)
     followup_reason = serializers.CharField(required=False, allow_null=True)
@@ -172,20 +164,7 @@ class GeneratePrescriptionPDFBodySerializer(serializers.Serializer):
         if attrs:
             if not (attrs.get('tests') or attrs.get('medicines')):
                 raise serializers.ValidationError("Either one of test or medicines is required for prescription generation")
-            # if (not (attrs.get('opd_appointment_id') or attrs.get('offline_opd_appointment_id'))) or \
-            #         (attrs.get('opd_appointment_id') and attrs.get('offline_opd_appointment_id')):
-            #     raise serializers.ValidationError("Either one of opd_appointment or offline_opd_appointment is required")
-            # if attrs.get('appointment_type') == prescription_models.PresccriptionPdf.OFFLINE and attrs.get("opd_appointment_id"):
-            #     raise serializers.ValidationError("opd_appointment given for appointment type Offline")
-            # if attrs.get('appointment_type') == prescription_models.PresccriptionPdf.DOCPRIME_OPD and attrs.get("offline_opd_appointment_id"):
-            #     raise serializers.ValidationError("offline_opd_appointment given for appointment type Docprime OPD")
             appointment = PrescriptionAppointmentValidation.validate_appointment_object(attrs)
-            # if attrs.get('opd_appointment_id'):
-            #     appointment = attrs.get('opd_appointment_id')
-            #     attrs['opd_appointment'] = attrs.pop('opd_appointment_id')
-            # else:
-            #     appointment = attrs.get('offline_opd_appointment_id')
-            #     attrs['offline_opd_appointment'] = attrs.pop('offline_opd_appointment_id')
             attrs['appointment'] = appointment
             if not appointment.doctor.license:
                 raise serializers.ValidationError("Registration Number is required for Generating Prescription")
@@ -234,14 +213,6 @@ class OPDAppointmentModelSerializer(serializers.ModelSerializer):
 class PrescriptionPDFModelSerializer(serializers.ModelSerializer):
     offline_opd_appointment = OfflineOPDAppointmentModelSerializer()
     opd_appointment = OPDAppointmentModelSerializer()
-
-    # def get_offline_opd_appointment(self, obj):
-    #     if obj.offline_opd_appointment:
-    #         return str(obj.offline_opd_appointment.id)
-    #
-    # def get_opd_appointment(self, obj):
-    #     if obj.opd_appointment:
-    #         return str(obj.opd_appointment.id)
 
     class Meta:
         model = prescription_models.PresccriptionPdf

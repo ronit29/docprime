@@ -44,13 +44,9 @@ class PrescriptionGenerateViewSet(viewsets.GenericViewSet):
                                                                                            'appointment_type') == prescription_models.PresccriptionPdf.OFFLINE else None)
             else:
                 prescription_pdf = valid_data.pop("prescription_pdf")
-                # prescription_pdf_queryset = prescription_models.PresccriptionPdf.objects.filter(id=valid_data.get("id"),
-                #                                                                                 appointment_id=valid_data.get("appointment_id"))
                 model_serializer = serializers.PrescriptionPDFModelSerializer(prescription_pdf)
                 prescription_models.PrescriptionHistory.objects.create(prescription=prescription_pdf,
                                                                        data=model_serializer.data)
-                # prescription_pdf_queryset.update(**valid_data)
-                # prescription_pdf = prescription_pdf_queryset.first()
                 prescription_pdf.serial_id = valid_data.get('serial_id')
                 prescription_pdf.symptoms_complaints = valid_data.get('symptoms_complaints')
                 prescription_pdf.lab_tests = valid_data.get('lab_tests')
@@ -92,14 +88,7 @@ class PrescriptionComponentsViewSet(viewsets.GenericViewSet):
     def create_objects(data):
         model = dict(serializers.PrescriptionModelComponents.COMPONENT_CHOICES)[data.get('type')]
         object = model.create_or_update(name=data.get('name'), hospital_id=data.get('hospital_id').id,
-                                        source_type=prescription_models.PrescriptionEntity.PARTNERS_APP,
-                                        quantity=data.get('quantity'),
-                                        dosage_type=data.get('dosage_type'),
-                                        time=data.get('time'),
-                                        duration_type=data.get('duration_type'),
-                                        duration=data.get('duration'),
-                                        is_before_meal=data.get('is_before_meal'),
-                                        additional_notes=data.get('additional_notes'))
+                                        source_type=prescription_models.PrescriptionEntity.PARTNERS_APP)
         model_serializer = dict(serializers.PrescriptionModelSerializerComponents.COMPONENT_CHOICES)[data.get('type')](object)
         return model_serializer.data
 
