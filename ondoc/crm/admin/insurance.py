@@ -336,7 +336,7 @@ class UserInsuranceDoctorResource(resources.ModelResource):
             return ""
 
     def dehydrate_date_of_consultation(self, appointment):
-        return str(appointment.time_slot_start.date())
+        return str(appointment.time_slot_start)
 
     def dehydrate_name_of_doctor(self, appointment):
         return str(appointment.doctor.name)
@@ -504,7 +504,7 @@ class UserInsuranceLabResource(resources.ModelResource):
             return ""
 
     def dehydrate_date_of_consultation(self, appointment):
-        return str(appointment.time_slot_start.date())
+        return str(appointment.time_slot_start)
 
     def dehydrate_name_of_diagnostic_center(self, appointment):
         return str(appointment.lab.name)
@@ -686,6 +686,10 @@ class UserInsuranceForm(forms.ModelForm):
             if insured_opd_completed_app_count > 0:
                 raise forms.ValidationError('OPD appointment with insurance have been completed, '
                                             'Cancellation could not proceed')
+        if int(status) == UserInsurance.CANCELLED and not self.instance.status == UserInsurance.CANCEL_INITIATE:
+            raise forms.ValidationError('Cancellation is only allowed for cancel initiate status')
+        if self.instance.status == UserInsurance.CANCELLED:
+            raise forms.ValidationError('Cancelled Insurance can be changed')
 
     class Meta:
         fields = '__all__'
@@ -757,9 +761,7 @@ class UserInsuranceAdmin(ImportExportMixin, admin.ModelAdmin):
             response = obj.process_cancellation()
             if response.get('success', None):
                 super(UserInsuranceAdmin, self).save_model(request, obj, form, change)
-        elif obj.status == UserInsurance.CANCELLED and self.status == UserInsurance.CANCEL_INITIATE:
-            # response = obj.process_cancellation()
-            # if response.get('success', None):
+        elif obj.status == UserInsurance.CANCELLED:
             super(UserInsuranceAdmin, self).save_model(request, obj, form, change)
 
 
