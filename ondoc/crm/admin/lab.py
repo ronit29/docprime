@@ -1178,8 +1178,6 @@ class LabAppointmentAdmin(nested_admin.NestedModelAdmin):
                         history_obj.accepted_through = "CRM"
                         history_obj.save()
 
-
-
             if send_email_sms_report and sum(
                     obj.reports.annotate(no_of_files=Count('files')).values_list('no_of_files', flat=True)):
                 transaction.on_commit(lambda: self.on_commit_tasks(obj.id))
@@ -1475,6 +1473,25 @@ class AvailableLabTestAdmin(VersionAdmin):
                     'custom_agreed_price', 'computed_deal_price', 'custom_deal_price', 'enabled']
     search_fields = ['test__name', 'lab_pricing_group__group_name', 'lab_pricing_group__labs__name']
     # autocomplete_fields = ['test']
+
+    class Media:
+        js = ('js/admin/ondoc.js',)
+
+    @transaction.atomic
+    def save_model(self, request, obj, form, change):
+        super().save_model(request, obj, form, change)
+        responsible_user = request.user
+        transaction.on_commit(lambda: self.on_commit_tasks(obj, responsible_user))
+
+    def on_commit_tasks(self, obj, responsible_user):
+        if obj.custom_deal_price and obj.custom_agreed_price:
+            if obj.custom_deal_price < obj.custom_agreed_price:
+                obj.send_pricing_alert_email(responsible_user)
+        elif obj.computed_deal_price and obj.computed_agreed_price:
+            if obj.computed_deal_price < obj.computed_agreed_price:
+                obj.send_pricing_alert_email(responsible_user)
+        else:
+            pass
 
 
 class DiagnosticConditionLabTestInline(admin.TabularInline):

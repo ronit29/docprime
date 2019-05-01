@@ -29,7 +29,7 @@ from django.db.models import F, Sum, When, Case, Q, Avg
 from django.db import transaction
 from django.contrib.postgres.fields import JSONField
 from ondoc.doctor.models import OpdAppointment
-from ondoc.notification.models import EmailNotification
+from ondoc.notification.models import EmailNotification, NotificationAction
 from ondoc.payout.models import Outstanding
 from ondoc.authentication import models as auth_model
 from django.core.files.uploadedfile import InMemoryUploadedFile, TemporaryUploadedFile
@@ -1371,6 +1371,17 @@ class AvailableLabTest(TimeStampedModel):
     def app_commit_tasks(self):
         self.update_deal_price()
 
+    def send_pricing_alert_email(self, responsible_user):
+        from ondoc.communications.models import EMAILNotification
+        try:
+            emails = settings.DEAL_AGREED_PRICE_CHANGE_EMAILS
+            user_and_email = [{'user': None, 'email': email} for email in emails]
+            email_notification = EMAILNotification(notification_type=NotificationAction.PRICING_ALERT_EMAIL,
+                                                   context={'instance': self, 'responsible_user': responsible_user})
+            email_notification.send(user_and_email)
+        except Exception as e:
+            logger.error(str(e))
+
     def get_computed_deal_price(self):
         if self.test.test_type == LabTest.RADIOLOGY:
             deal_percent = self.lab_pricing_group.radiology_deal_price_percentage if self.lab_pricing_group.radiology_deal_price_percentage else None
@@ -2505,10 +2516,26 @@ class LabDocument(TimeStampedModel, Document):
             self.resize_image(width, height)
 
     def save(self, *args, **kwargs):
+        database_instance = LabDocument.objects.filter(pk=self.id).first()
         super().save(*args, **kwargs)
         if self.document_type == LabDocument.LOGO:
             self.create_all_images()
 
+            if database_instance and database_instance.name == self.name:
+                pass
+            else:
+                self.send_change_logo_email()
+
+    def send_change_logo_email(self):
+        from ondoc.communications.models import EMAILNotification
+        try:
+            emails = settings.LOGO_CHANGE_EMAIL_RECIPIENTS
+            user_and_email = [{'user': None, 'email': email} for email in emails]
+            email_notification = EMAILNotification(notification_type=NotificationAction.LAB_LOGO_CHANGE_MAIL,
+                                                   context={'instance': self})
+            email_notification.send(user_and_email)
+        except Exception as e:
+            logger.error(str(e))
 
     # def __str__(self):
         # return self.name
