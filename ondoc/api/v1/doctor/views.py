@@ -3668,7 +3668,7 @@ class HospitalViewSet(viewsets.GenericViewSet):
         if min_distance:
             hospital_queryset = filter(lambda x: x.distance.m >= min_distance if x.distance is not None and x.distance.m is not None else False, hospital_queryset)
 
-        hospital_queryset = list(hospital_queryset) * 30 # SHASHANK_SINGH Remove this muliplication only for testing purpose
+        hospital_queryset = list(hospital_queryset)
         result_count = len(hospital_queryset)
         if count:
             hospital_queryset = hospital_queryset[:count]
