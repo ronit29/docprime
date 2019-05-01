@@ -3,6 +3,7 @@ from django.db.models import Q
 from ondoc.prescription import models as prescription_models
 from ondoc.doctor import models as doc_models
 from ondoc.diagnostic import models as diag_models
+import re
 
 
 class PrescriptionModelComponents():
@@ -17,6 +18,11 @@ class PrescriptionModelComponents():
 
 
 class PrescriptionAppointmentValidation():
+
+    @staticmethod
+    def validate_uuid(uuid):
+        pattern = re.compile(r'^[\da-f]{8}-([\da-f]{4}-){3}[\da-f]{12}$', re.IGNORECASE)
+        return True if pattern.match(uuid) else False
 
     @staticmethod
     def validate_appointment_key(parent, attrs):
@@ -40,7 +46,7 @@ class PrescriptionAppointmentValidation():
 
 
 class PrescriptionMedicineBodySerializer(serializers.Serializer):
-    id = serializers.UUIDField()
+    id = serializers.CharField(max_length=100)
     name = serializers.CharField(max_length=64)
     quantity = serializers.IntegerField(required=False, allow_null=True)
     dosage_type = serializers.CharField(max_length=100, required=False)
@@ -51,40 +57,67 @@ class PrescriptionMedicineBodySerializer(serializers.Serializer):
     additional_notes = serializers.CharField(max_length=256, required=False, allow_null=True)
 
     def validate(self, attrs):
+        if not PrescriptionAppointmentValidation.validate_uuid(attrs.get("id")):
+            raise serializers.ValidationError("Invalid UUID - {}".format(attrs.get('id')))
         if attrs.get('duration_type'):
             attrs['durationstring'] = dict(prescription_models.PrescriptionMedicine.DURATION_TYPE_CHOICES)[attrs['duration_type']]
-        if not (attrs.get("quantity") and attrs.get("dosage_type")):
+        if (attrs.get("quantity") or attrs.get("dosage_type")) and not (attrs.get("quantity") and attrs.get("dosage_type")):
             raise serializers.ValidationError("dosage quantity and type both are required together")
         return attrs
 
 
 class PrescriptionSymptomsComplaintsBodySerializer(serializers.Serializer):
-    id = serializers.UUIDField()
+    id = serializers.CharField(max_length=100)
     name = serializers.CharField(max_length=64)
+
+    def validate(self, attrs):
+        if not PrescriptionAppointmentValidation.validate_uuid(attrs.get("id")):
+            raise serializers.ValidationError("Invalid UUID - {}".format(attrs.get('id')))
+        return attrs
 
 
 class PrescriptionTestsBodySerializer(serializers.Serializer):
-    id = serializers.UUIDField()
+    id = serializers.CharField(max_length=100)
     name = serializers.CharField(max_length=64)
     instructions = serializers.CharField(max_length=256, required=False)
 
+    def validate(self, attrs):
+        if not PrescriptionAppointmentValidation.validate_uuid(attrs.get("id")):
+            raise serializers.ValidationError("Invalid UUID - {}".format(attrs.get('id')))
+        return attrs
+
 
 class PrescriptionSpecialInstructionsBodySerializer(serializers.Serializer):
-    id = serializers.UUIDField()
+    id = serializers.CharField(max_length=100)
     name = serializers.CharField(max_length=64)
+
+    def validate(self, attrs):
+        if not PrescriptionAppointmentValidation.validate_uuid(attrs.get("id")):
+            raise serializers.ValidationError("Invalid UUID - {}".format(attrs.get('id')))
+        return attrs
 
 
 class PrescriptionDiagnosesBodySerializer(serializers.Serializer):
-    id = serializers.UUIDField()
+    id = serializers.CharField(max_length=100)
     name = serializers.CharField(max_length=64)
+
+    def validate(self, attrs):
+        if not PrescriptionAppointmentValidation.validate_uuid(attrs.get("id")):
+            raise serializers.ValidationError("Invalid UUID - {}".format(attrs.get('id')))
+        return attrs
 
 
 class PrescriptionPatientSerializer(serializers.Serializer):
-    id = serializers.UUIDField()
+    id = serializers.CharField(max_length=100)
     name = serializers.CharField(max_length=64)
     age = serializers.IntegerField(required=False, allow_null=True)
     gender = serializers.CharField(max_length=6)
     phone_number = serializers.IntegerField(required=False, allow_null=True)
+
+    def validate(self, attrs):
+        if not PrescriptionAppointmentValidation.validate_uuid(attrs.get("id")):
+            raise serializers.ValidationError("Invalid UUID - {}".format(attrs.get('id')))
+        return attrs
 
 
 class PrescriptionSymptomsComplaintsModelSerializer(serializers.ModelSerializer):
@@ -148,7 +181,7 @@ class PrescriptionComponentSyncSerializer(serializers.Serializer):
 
 
 class GeneratePrescriptionPDFBodySerializer(serializers.Serializer):
-    id = serializers.UUIDField()
+    id = serializers.CharField(max_length=100)
     symptoms_complaints = serializers.ListField(child=PrescriptionSymptomsComplaintsBodySerializer(), allow_empty=True, required=False)
     lab_tests = serializers.ListField(child=PrescriptionTestsBodySerializer(),required=False, allow_empty=True)
     special_instructions = serializers.ListField(child=PrescriptionSpecialInstructionsBodySerializer(), allow_empty=True, required=False)
@@ -162,6 +195,8 @@ class GeneratePrescriptionPDFBodySerializer(serializers.Serializer):
 
     def validate(self, attrs):
         if attrs:
+            if not PrescriptionAppointmentValidation.validate_uuid(attrs.get("id")):
+                raise serializers.ValidationError("Invalid UUID - {}".format(attrs.get('id')))
             if not (attrs.get('tests') or attrs.get('medicines')):
                 raise serializers.ValidationError("Either one of test or medicines is required for prescription generation")
             appointment = PrescriptionAppointmentValidation.validate_appointment_object(attrs)
