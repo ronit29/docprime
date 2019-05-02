@@ -76,8 +76,8 @@ class PrescriptionGenerateViewSet(viewsets.GenericViewSet):
 
 class PrescriptionComponentsViewSet(viewsets.GenericViewSet):
 
-    # authentication_classes = (JWTAuthentication,)
-    # permission_classes = (IsAuthenticated, IsDoctor)
+    authentication_classes = (JWTAuthentication,)
+    permission_classes = (IsAuthenticated, IsDoctor)
 
     def get_queryset(self):
         return prescription_models.PresccriptionPdf.objects.none()
@@ -106,31 +106,26 @@ class PrescriptionComponentsViewSet(viewsets.GenericViewSet):
         valid_data = serializer.validated_data
         model = dict(serializers.PrescriptionModelComponents.COMPONENT_CHOICES)[valid_data.get('type')]
         updated_at = valid_data.get('updated_at')
+        obj = model.objects
         if updated_at:
-            objects = model.objects.filter(updated_at__gte=updated_at)
-        else:
-            objects = model.objects.all()
+            obj = obj.filter(updated_at__gte=updated_at)
+
         if valid_data.get('hospital_id'):
-            objects = objects.filter(Q(hospitals__contains=[valid_data['hospital_id'].id]) | Q(moderated=True))
+            obj = obj.filter(Q(hospitals__contains=[valid_data['hospital_id'].id]) | Q(moderated=True))
         else:
-            objects = objects.filter(moderated=True)
+            obj = obj.filter(moderated=True)
         resp = []
         model_serializer = dict(serializers.PrescriptionModelSerializerComponents.COMPONENT_CHOICES)[valid_data.get('type')]
-        for obj in objects.all():
-            resp.append(model_serializer(obj).data)
+
+        resp = model_serializer(obj, many=True).data
         if model == prescription_models.PrescriptionTests:
-            lab_test_queryset = diagnostic_models.LabTest.objects.all()
-            for obj in lab_test_queryset:
-                resp.append({
-                    "id": obj.id,
-                    "created_at": obj.created_at,
-                    "updated_at": obj.updated_at,
-                    "name": obj.name,
-                    "moderated": True,
-                    "hospitals": [],
-                    "source_type": None,
-                    "instructions": None,
-                })
+            if updated_at:
+                lab_test_queryset = diagnostic_models.LabTest.objects.filter(updated_at__gte=updated_at)
+            else:
+                lab_test_queryset = diagnostic_models.LabTest.objects.all()
+            test_serializer = serializers.PrescriptionLabTestSerializer(lab_test_queryset, many=True)
+            resp = resp + test_serializer.data
+
         return Response(resp)
 
 
