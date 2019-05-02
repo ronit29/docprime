@@ -1227,6 +1227,7 @@ class FrequentlyBookedTogetherTestInLine(admin.StackedInline):
     fk_name = 'original_test'
     fields = ['original_test', 'booked_together_test']
     extra = 0
+    autocomplete_fields = ['booked_together_test',]
 
 class TestPackageFormSet(forms.BaseInlineFormSet):
     def clean(self):
