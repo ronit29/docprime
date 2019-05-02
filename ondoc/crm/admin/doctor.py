@@ -1509,7 +1509,7 @@ class DoctorOpdAppointmentAdmin(admin.ModelAdmin):
     form = DoctorOpdAppointmentForm
     search_fields = ['id']
     list_display = ('booking_id', 'get_doctor', 'get_profile', 'status', 'time_slot_start', 'effective_price', 'created_at', 'updated_at')
-    list_filter = ('status', 'insurance')
+    list_filter = ('status', 'payment_type')
     date_hierarchy = 'created_at'
 
     def get_queryset(self, request):

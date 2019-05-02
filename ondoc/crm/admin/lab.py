@@ -852,7 +852,7 @@ class LabAppointmentAdmin(nested_admin.NestedModelAdmin):
     list_display = (
         'booking_id', 'get_profile', 'get_lab', 'status', 'reports_uploaded', 'time_slot_start', 'effective_price', 'get_profile_email',
         'get_profile_age', 'created_at', 'updated_at', 'get_lab_test_name')
-    list_filter = ('status', 'insurance')
+    list_filter = ('status', 'payment_type')
     date_hierarchy = 'created_at'
 
     inlines = [
