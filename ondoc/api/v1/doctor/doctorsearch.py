@@ -272,7 +272,7 @@ class DoctorSearchHelper:
         if self.query_params and self.query_params.get('sitemap_identifier') and self.query_params.get('max_distance')==None:
             sitemap_identifier = self.query_params.get('sitemap_identifier')
             if sitemap_identifier in ('SPECIALIZATION_LOCALITY_CITY', 'DOCTORS_LOCALITY_CITY'):
-                max_distance = 5000
+                max_distance = 3000
             if sitemap_identifier in ('SPECIALIZATION_CITY', 'DOCTORS_CITY'):
                 max_distance = 15000
 
