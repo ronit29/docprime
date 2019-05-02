@@ -359,7 +359,7 @@ class CouponRecommender():
         if product_id:
             all_coupons = all_coupons.filter(is_corporate=False)
 
-        all_coupons = list(all_coupons)
+        all_coupons = list(set(all_coupons))
 
         return all_coupons
 
