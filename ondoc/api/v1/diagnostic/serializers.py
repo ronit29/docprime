@@ -547,7 +547,7 @@ class CommonPackageSerializer(serializers.ModelSerializer):
         if obj.package.availablelabs:
             available_test = obj.package.availablelabs.filter(lab_pricing_group__labs__id=obj.lab_id).first()
             if available_test:
-                agreed_price = available_test.computed_agreed_price
+                agreed_price = available_test.get_deal_price()
         return agreed_price
 
     def get_mrp(self, obj):

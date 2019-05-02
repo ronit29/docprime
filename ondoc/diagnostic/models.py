@@ -1296,6 +1296,8 @@ class AvailableLabTest(TimeStampedModel):
     desired_docprime_price = models.DecimalField(default=None, max_digits=10, decimal_places=2, null=True, blank=True)
     rating = GenericRelation(ratings_models.RatingsReview)
 
+    def get_deal_price(self):
+        return self.custom_deal_price if self.custom_deal_price else self.computed_deal_price
 
     def update_deal_price(self):
         # will update only this available lab test prices and will be called on save
