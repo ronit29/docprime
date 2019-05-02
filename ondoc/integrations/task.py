@@ -87,39 +87,35 @@ def get_integrator_order_status(self, *args, **kwargs):
     from ondoc.diagnostic.models import LabAppointment
     from ondoc.integrations.models import IntegratorResponse, IntegratorHistory
 
-    try:
-        appointment_id = kwargs.get('appointment_id', None)
-        appointment = LabAppointment.objects.filter(pk=appointment_id).first()
+    appointment_id = kwargs.get('appointment_id', None)
+    appointment = LabAppointment.objects.filter(pk=appointment_id).first()
 
-        if not appointment:
-            raise Exception("Appointment could not found against id - " + str(appointment_id))
+    if not appointment:
+        raise Exception("Appointment could not found against id - " + str(appointment_id))
 
-        integrator_response = IntegratorResponse.objects.filter(object_id=appointment.id).first()
+    integrator_response = IntegratorResponse.objects.filter(object_id=appointment.id).first()
 
-        if not integrator_response:
-            raise Exception("Integrator Response not found for appointment id - " + str(appointment_id))
+    if not integrator_response:
+        raise Exception("Integrator Response not found for appointment id - " + str(appointment_id))
 
-        url = "%s/order.svc/%s/%s/%s/all/OrderSummary" % (settings.THYROCARE_BASE_URL, settings.THYROCARE_API_KEY,
-                                                          integrator_response.dp_order_id,
-                                                          integrator_response.response_data['MOBILE'])
-        response = requests.get(url)
-        status_code = response.status_code
-        response = response.json()
-        retry_count = get_integrator_order_status.request.retries
-        if response.get('RES_ID') == 'RES0000' and response['BEN_MASTER'][0]['STATUS'].upper() == "ACCEPTED":
-            if not appointment.status in [5, 6, 7]:
-                appointment.status = 5
-                appointment.save()
-                status = IntegratorHistory.PUSHED_AND_ACCEPTED
-                IntegratorHistory.create_history(appointment, url, response, url, 'order_summary', 'Thyrocare',
-                                                 status_code, retry_count, status, 'integrator_api')
-        else:
-            countdown_time = (2 ** self.request.retries) * 60 * 2
-            print(countdown_time)
-            status = IntegratorHistory.PUSHED_AND_NOT_ACCEPTED
+    url = "%s/order.svc/%s/%s/%s/all/OrderSummary" % (settings.THYROCARE_BASE_URL, settings.THYROCARE_API_KEY,
+                                                      integrator_response.dp_order_id,
+                                                      integrator_response.response_data['MOBILE'])
+    response = requests.get(url)
+    status_code = response.status_code
+    response = response.json()
+    retry_count = get_integrator_order_status.request.retries
+    if response.get('RES_ID') == 'RES0000' and response['BEN_MASTER'][0]['STATUS'].upper() == "ACCEPTED":
+        if not appointment.status in [5, 6, 7]:
+            appointment.status = 5
+            appointment.save()
+            status = IntegratorHistory.PUSHED_AND_ACCEPTED
             IntegratorHistory.create_history(appointment, url, response, url, 'order_summary', 'Thyrocare',
-                                             status_code, retry_count, status, '')
-            self.retry(**kwargs, countdown=countdown_time)
-
-    except Exception as e:
-        logger.error(str(e))
+                                             status_code, retry_count, status, 'integrator_api')
+    else:
+        countdown_time = (2 ** self.request.retries) * 60 * 2
+        print(countdown_time)
+        status = IntegratorHistory.PUSHED_AND_NOT_ACCEPTED
+        IntegratorHistory.create_history(appointment, url, response, url, 'order_summary', 'Thyrocare',
+                                         status_code, retry_count, status, '')
+        self.retry(**kwargs, countdown=countdown_time)
