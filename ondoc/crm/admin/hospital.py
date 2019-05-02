@@ -31,6 +31,7 @@ class HospitalImageInline(admin.TabularInline):
     model = HospitalImage
     # template = 'imageinline.html'
     # exclude = ['cropped_image']
+    readonly_fields = ['cropped_image']
     extra = 0
     can_delete = True
     show_change_link = False
