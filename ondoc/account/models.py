@@ -87,7 +87,7 @@ class Order(TimeStampedModel):
         if self.product_id == Order.INSURANCE_PRODUCT_ID:
             user_insurance = UserInsurance.objects.filter(order=self).first()
             if user_insurance:
-                data['insurerCode'] = str(user_insurance.insurance_plan.insurer.insurer_merchant_code)
+                data['merchCode'] = str(user_insurance.insurance_plan.insurer.insurer_merchant_code)
         elif (self.product_id in (self.DOCTOR_PRODUCT_ID,self.LAB_PRODUCT_ID)):
             if not self.is_parent() and self.booked_using_insurance():
             # if self.is_parent():
@@ -101,7 +101,7 @@ class Order(TimeStampedModel):
                     insurance_order_transaction = transactions[0]
                     data['refOrderId'] = str(insurance_order_transaction.order_id)
                     data['refOrderNo'] = str(insurance_order_transaction.order_no)
-                    data['insurerCode'] = str(user_insurance.insurance_plan.insurer.insurer_merchant_code)
+                    data['merchCode'] = str(user_insurance.insurance_plan.insurer.insurer_merchant_code)
 
         return data
 
