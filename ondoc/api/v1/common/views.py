@@ -971,6 +971,6 @@ class AllUrlsViewset(viewsets.GenericViewSet):
         from ondoc.location.models import EntityUrls
         from ondoc.location.models import CompareSEOUrls
         e_urls = list(EntityUrls.objects.filter(url__icontains=key, is_valid=True).values_list('url', flat=True))[:5]
-        c_urls = list(CompareSEOUrls.objects.filter(url=key).values_list('url', flat=True))[:5]
+        c_urls = list(CompareSEOUrls.objects.filter(url__icontains=key).values_list('url', flat=True))[:5]
         result = e_urls + c_urls
         return Response(dict(enumerate(result)))
