@@ -339,10 +339,20 @@ class CouponRecommender():
                 all_coupons = all_coupons.filter(gender__isnull=True)
                 all_coupons = all_coupons.filter(age_start__isnull=True, age_end__isnull=True)
 
+            user_cart_purchase_items = Cart.objects.filter(user=user, deleted_at__isnull=True)
             cart_items = user.cart_item.filter(deleted_at__isnull=True)
             if cart_items:
                 cart_item_id = cart_items.first().id
                 self.payment_option_filter = Cart.get_pg_if_pgcoupon(user, cart_item_id)
+
+                user_cart_purchase_items = user_cart_purchase_items.exclude(id=cart_item_id)
+
+            for item in user_cart_purchase_items:
+                if item.data and item.data.get('coupon_code'):
+                    cart_code = item.data.get('coupon_code')[0]
+                    if not cart_code in user_cart_counts:
+                        user_cart_counts[cart_code] = 0
+                    user_cart_counts[cart_code] += 1
         else:
             all_coupons = all_coupons.filter(Q(is_user_specific=False))
 
@@ -350,15 +360,6 @@ class CouponRecommender():
             all_coupons = all_coupons.filter(is_corporate=False)
 
         all_coupons = list(all_coupons)
-
-        if user and user.is_authenticated:
-            user_cart_purchase_items = Cart.objects.filter(user= user, deleted_at__isnull=True).exclude(id=cart_item_id).all()
-            for item in user_cart_purchase_items:
-                if item.data and item.data.get('coupon_code'):
-                    cart_code = item.data.get('coupon_code')[0]
-                    if not cart_code in user_cart_counts:
-                        user_cart_counts[cart_code] = 0
-                    user_cart_counts[cart_code] += 1
 
         return all_coupons
 
