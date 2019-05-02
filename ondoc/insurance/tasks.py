@@ -173,6 +173,7 @@ def push_insurance_buy_to_matrix(self, *args, **kwargs):
 
 @task()
 def push_mis():
+    from ondoc.api.v1.utils import CustomTemporaryUploadedFile
     from ondoc.insurance.models import InsuranceMIS
     import pyminizip
     from ondoc.notification.models import EmailNotification
@@ -201,7 +202,9 @@ def push_mis():
         resource_obj = resource[0]()
         dataset = resource_obj.export(**arguments)
         filename = "%s_%s_%s.xls" % (resource_obj.__class__.__name__, from_date, to_date)
-        mis_temporary_file.append(TemporaryUploadedFile(filename, 'byte', 1000, 'utf-8'))
+        filename_prefix = "%s_%s_%s_" % (resource_obj.__class__.__name__, from_date, to_date)
+        filename_suffix = ".xls"
+        mis_temporary_file.append(CustomTemporaryUploadedFile(filename, 'byte', 1000, 'utf-8', filename_prefix, filename_suffix))
         f = open(mis_temporary_file[len(mis_temporary_file)-1].temporary_file_path(), 'wb')
         f.write(dataset.xls)
         f.seek(0)
