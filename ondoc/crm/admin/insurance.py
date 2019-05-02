@@ -723,6 +723,14 @@ class UserInsuranceAdmin(ImportExportMixin, admin.ModelAdmin):
     readonly_fields = ('insurance_plan', 'user', 'purchase_date', 'expiry_date', 'policy_number', 'premium_amount', 'merchant_payout')
     inlines = [InsuredMembersInline]
     form = UserInsuranceForm
+    search_fields = ['id']
+
+    def get_search_results(self, request, queryset, search_term):
+        queryset, use_distinct = super().get_search_results(request, queryset, None)
+
+        queryset = queryset.filter(Q(user__profiles__name__icontains=search_term)).distinct()
+
+        return queryset, use_distinct
 
     def get_export_queryset(self, request):
         super().get_export_queryset(request)

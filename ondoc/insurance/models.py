@@ -1359,7 +1359,7 @@ class InsuranceLead(auth_model.TimeStampedModel):
         transaction.on_commit(lambda: self.after_commit())
 
     def after_commit(self):
-        push_insurance_banner_lead_to_matrix.apply_async(({'id': self.id}, ), countdown=10)
+        push_insurance_banner_lead_to_matrix.apply_async(({'id': self.id}, ))
 
     @classmethod
     def get_latest_lead_id(cls, user):
