@@ -641,7 +641,7 @@ class UserInsuranceResource(resources.ModelResource):
         return str(insurance.receipt_number)
 
     def dehydrate_coi(self, insurance):
-        return str(insurance.coi)
+        return insurance.coi.url if insurance.coi is not None and insurance.coi.name else ''
 
     def dehydrate_matrix_lead(self, insurance):
         return str(insurance.matrix_lead_id)
