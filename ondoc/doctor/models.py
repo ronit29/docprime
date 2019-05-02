@@ -2843,6 +2843,8 @@ class SourceIdentifier(auth_model.TimeStampedModel):
 class GoogleDetailing(auth_model.TimeStampedModel):
 
     identifier = models.CharField(max_length=255, null=True, blank=False)
+    hospital_id = models.PositiveIntegerField(null=True, blank=True)
+
     name = models.CharField(max_length=500, null=True, blank=False)
     clinic_hospital_name = models.CharField(max_length=128, null=True, blank=False)
     address = models.TextField(null=True, blank=False)
