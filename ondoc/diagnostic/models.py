@@ -2360,6 +2360,8 @@ class CommonPackage(TimeStampedModel):
     package = models.ForeignKey(LabTest, on_delete=models.CASCADE, related_name='commonpackage')
     icon = models.ImageField(upload_to='diagnostic/common_package_icons', null=True)
     priority = models.PositiveIntegerField(default=0)
+    lab = models.ForeignKey(Lab, on_delete=models.CASCADE, related_name='packagelab', null=True)
+
     def __str__(self):
         return "{}-{}".format(self.package.name, self.id)
 

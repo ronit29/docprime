@@ -3,7 +3,8 @@ from django.core.validators import FileExtensionValidator
 
 from ondoc.notification.models import EmailNotification
 from ondoc.notification.tasks import send_insurance_notifications, send_insurance_float_limit_notifications
-from ondoc.insurance.tasks import push_insurance_buy_to_matrix, push_insurance_banner_lead_to_matrix
+from ondoc.insurance.tasks import push_insurance_buy_to_matrix
+from ondoc.notification.tasks import push_insurance_banner_lead_to_matrix
 import json
 
 from django.db import models, transaction
@@ -1362,7 +1363,7 @@ class InsuranceLead(auth_model.TimeStampedModel):
         transaction.on_commit(lambda: self.after_commit())
 
     def after_commit(self):
-        push_insurance_banner_lead_to_matrix.apply_async(({'id': self.id}, ), countdown=10)
+        push_insurance_banner_lead_to_matrix.apply_async(({'id': self.id}, ))
 
     @classmethod
     def get_latest_lead_id(cls, user):
