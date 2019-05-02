@@ -1715,13 +1715,20 @@ class IpdProcedureDetailSerializer(serializers.ModelSerializer):
     features = IpdProcedureFeatureSerializer(source='feature_mappings', read_only=True, many=True)
     all_details = serializers.SerializerMethodField()
     # all_details = IpdProcedureAllDetailsSerializer(source='ipdproceduredetail_set', read_only=True, many=True)
+    similar_ipd_procedures = serializers.SerializerMethodField()
 
     class Meta:
         model = IpdProcedure
-        fields = ('id', 'name', 'details', 'is_enabled', 'features', 'about', 'all_details', 'show_about')
+        fields = ('id', 'name', 'details', 'is_enabled', 'features', 'about', 'all_details', 'show_about',
+                  'similar_ipd_procedures')
 
     def get_all_details(self, obj):
         return IpdProcedureAllDetailsSerializer(obj.ipdproceduredetail_set.all(), many=True, context=self.context).data
+
+    def get_similar_ipd_procedures(self, obj):
+        similar_ipds_entity_dict = self.context.get('similar_ipds_entity_dict', {})
+        return [{'id': x.similar_ipd_procedure.id, 'name': x.similar_ipd_procedure.name,
+                 'url': similar_ipds_entity_dict.get(x.similar_ipd_procedure.id)} for x in obj.similar_ipds.all()]
 
 
 class TopHospitalForIpdProcedureSerializer(serializers.ModelSerializer):

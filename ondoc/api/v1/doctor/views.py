@@ -29,7 +29,7 @@ from ondoc.account import models as account_models
 from ondoc.location.models import EntityUrls, EntityAddress, DefaultRating
 from ondoc.procedure.models import Procedure, ProcedureCategory, CommonProcedureCategory, ProcedureToCategoryMapping, \
     get_selected_and_other_procedures, CommonProcedure, CommonIpdProcedure, IpdProcedure, DoctorClinicIpdProcedure, \
-    IpdProcedureFeatureMapping, IpdProcedureDetail
+    IpdProcedureFeatureMapping, IpdProcedureDetail, SimilarIpdProcedureMapping
 from ondoc.seo.models import NewDynamic
 from . import serializers
 from ondoc.api.v2.doctor import serializers as v2_serializers
@@ -3840,6 +3840,7 @@ class IpdProcedureViewSet(viewsets.GenericViewSet):
         ipd_procedure = IpdProcedure.objects.prefetch_related(
             Prefetch('feature_mappings', IpdProcedureFeatureMapping.objects.select_related('feature').all().order_by('-feature__priority')),
             Prefetch('ipdproceduredetail_set', IpdProcedureDetail.objects.select_related('detail_type').all().order_by('-detail_type__priority')),
+            Prefetch('similar_ipds', SimilarIpdProcedureMapping.objects.select_related('similar_ipd_procedure').all().order_by('-order')),
         ).filter(is_enabled=True, id=pk).first()
         if ipd_procedure is None:
             return Response(status=status.HTTP_404_NOT_FOUND)
@@ -3864,7 +3865,11 @@ class IpdProcedureViewSet(viewsets.GenericViewSet):
             canonical_url = entity.url
             description = '{ipd_procedure_name} Cost in {city} : Check {ipd_procedure_name} doctors , hospitals, address & contact number in {city}.'.format(
                 ipd_procedure_name=ipd_procedure.name, city=city)
-
+        similar_ipds_entity_dict = {}
+        if city:
+            similar_ipd_ids = [x.similar_ipd_procedure.id for x in ipd_procedure.similar_ipds.all()]
+            temp_qs = EntityUrls.objects.filter(ipd_procedure_id__in=similar_ipd_ids, is_valid=True, locality_value=city)
+            similar_ipds_entity_dict = {x.ipd_procedure_id: x.url for x in temp_qs}
         if url:
             new_dynamic_object = NewDynamic.objects.filter(url_value=url, is_enabled=True).first()
             if new_dynamic_object:
@@ -3895,6 +3900,7 @@ class IpdProcedureViewSet(viewsets.GenericViewSet):
                                                                       'restrict_result_count': 3})
         doctor_result_data = doctor_result.data
         ipd_procedure_serializer = serializers.IpdProcedureDetailSerializer(ipd_procedure, context={'request': request,
+                                                                                                    'similar_ipds_entity_dict': similar_ipds_entity_dict,
                                                                                                     'doctor_result_data': doctor_result_data})
         return Response(
             {'about': ipd_procedure_serializer.data, 'hospitals': hospital_result.data, 'doctors': doctor_result_data,

@@ -448,3 +448,11 @@ class IpdProcedureSynonymMapping(auth_model.TimeStampedModel):
         db_table = "procedure_synonym_mapping"
 
 
+class SimilarIpdProcedureMapping(auth_model.TimeStampedModel):
+    ipd_procedure = models.ForeignKey(IpdProcedure, on_delete=models.CASCADE, related_name='similar_ipds')
+    similar_ipd_procedure = models.ForeignKey(IpdProcedure, on_delete=models.CASCADE, related_name='similar_ipds_2')
+    order = models.IntegerField(null=True, blank=True)
+
+    class Meta:
+        db_table = "similar_ipd_procedure_mapping"
+        unique_together = (('ipd_procedure', 'similar_ipd_procedure'),)
