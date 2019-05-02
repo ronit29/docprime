@@ -297,6 +297,8 @@ class SMSNotification:
             body_template = "sms/lab/lab_report_uploaded.txt"
         elif notification_type == NotificationAction.INSURANCE_CONFIRMED:
             body_template = "sms/insurance/insurance_confirmed.txt"
+        elif notification_type == NotificationAction.INSURANCE_CANCEL_INITIATE:
+            body_template = "sms/insurance/insurance_cancellation.txt"
         elif notification_type == NotificationAction.LAB_REPORT_SEND_VIA_CRM:
             body_template = "sms/lab/lab_report_send_crm.txt"
             lab_reports = []
@@ -896,6 +898,9 @@ class EMAILNotification:
         elif notification_type == NotificationAction.IPD_PROCEDURE_MAIL:
             body_template = "email/ipd_lead/body.html"
             subject_template = "email/ipd_lead/subject.txt"
+        elif notification_type == NotificationAction.INSURANCE_CANCEL_INITIATE:
+            body_template = "email/insurance_cancelled/body.html"
+            subject_template = "email/insurance_cancelled/subject.txt"
         elif notification_type == NotificationAction.PRICING_ALERT_EMAIL:
             body_template = "email/lab/lab_pricing_change/body.html"
             subject_template = "email/lab/lab_pricing_change/subject.txt"
@@ -1465,7 +1470,7 @@ class InsuranceNotification(Notification):
         notification_type = self.notification_type
         all_receivers = self.get_receivers()
 
-        if notification_type == NotificationAction.INSURANCE_CONFIRMED:
+        if notification_type in [NotificationAction.INSURANCE_CONFIRMED, NotificationAction.INSURANCE_CANCEL_INITIATE]:
             email_notification = EMAILNotification(notification_type, context)
             email_notification.send(all_receivers.get('email_receivers', []))
 
