@@ -3096,13 +3096,17 @@ class OfflineOPDAppointments(auth_model.TimeStampedModel):
                     OfflineOPDAppointments.appointment_reschedule_sms(sms_obj)
 
     def get_prescriptions(self, request):
-        resp = []
+
+        files=[]
         for pres in self.offline_prescription.all():
-            resp.append({
+            resp = {
                 'updated_at': pres.updated_at,
-                'file': request.build_absolute_uri(pres.name.url),
                 'details': pres.prescription_details
-            })
+            }
+            if pres.name and pres.name.url:
+                files.append(request.build_absolute_uri(pres.name.url))
+        resp['files']= files
+
         return resp
 
 

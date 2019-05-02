@@ -282,3 +282,15 @@ class PrescriptionModelSerializerComponents():
     COMPONENT_CHOICES = [(SYMPTOMS_COMPLAINTS, PrescriptionSymptomsComplaintsModelSerializer), (MEDICINES, PrescriptionMedicineModelSerializer),
                          (SPECIAL_INSTRUCTIONS, PrescriptionSpecialInstructionsModelSerializer), (TESTS, PrescriptionTestsModelSerializer),
                          (DIAGNOSES, PrescriptionDiagnosesModelSerializer)]
+
+
+class PrescriptionLabTestSerializer(serializers.ModelSerializer):
+
+    moderated = serializers.ReadOnlyField(default=True)
+    hospitals = serializers.ReadOnlyField(default=[])
+    source_type = serializers.ReadOnlyField(default=None)
+    instructions = serializers.ReadOnlyField(default=None)
+
+    class Meta:
+        model = diag_models.LabTest
+        fields = ('id', 'name', 'created_at', 'updated_at', 'moderated', 'hospitals', 'source_type', 'instructions')
