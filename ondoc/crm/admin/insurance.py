@@ -665,7 +665,7 @@ class CustomDateInput(forms.DateInput):
 class UserInsuranceForm(forms.ModelForm):
 
     status_choices = [(UserInsurance.ACTIVE, "Active"), (UserInsurance.CANCEL_INITIATE, 'Cancel Initiate'),
-                      (UserInsurance.CANCELLED, "Cancelled")]
+                      (UserInsurance.CANCELLED, "Cancelled"), (UserInsurance.ONHOLD, 'Onhold')]
     status = forms.ChoiceField(choices=status_choices, required=True)
     onhold_reason = forms.CharField(max_length=400, required=False)
 
