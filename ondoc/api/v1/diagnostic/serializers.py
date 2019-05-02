@@ -533,14 +533,34 @@ class CommonPackageSerializer(serializers.ModelSerializer):
     show_details = serializers.ReadOnlyField(source='package.show_details')
     icon = serializers.SerializerMethodField()
     url = serializers.ReadOnlyField(source='package.url')
+    no_of_tests = serializers.ReadOnlyField(source='package.number_of_tests')
+    agreed_price = serializers.SerializerMethodField()
+    mrp = serializers.SerializerMethodField()
+    lab = LabModelSerializer()
 
     def get_icon(self, obj):
         request = self.context.get('request')
         return request.build_absolute_uri(obj.icon.url) if obj.icon else None
 
+    def get_agreed_price(self, obj):
+        agreed_price = None
+        if obj.package.availablelabs:
+            available_test = obj.package.availablelabs.filter(lab_pricing_group__labs__id=obj.lab_id).first()
+            if available_test:
+                agreed_price = available_test.computed_agreed_price
+        return agreed_price
+
+    def get_mrp(self, obj):
+        mrp = None
+        if obj.package.availablelabs:
+            available_test = obj.package.availablelabs.filter(lab_pricing_group__labs__id=obj.lab_id).first()
+            if available_test:
+                mrp = available_test.mrp
+        return mrp
+
     class Meta:
         model = CommonPackage
-        fields = ('id', 'name', 'icon', 'show_details', 'url')
+        fields = ('id', 'name', 'icon', 'show_details', 'url', 'no_of_tests', 'mrp', 'agreed_price', 'lab')
 
 
 class CommonConditionsSerializer(serializers.ModelSerializer):

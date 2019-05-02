@@ -238,6 +238,7 @@ class Hospital(auth_model.TimeStampedModel, auth_model.CreatedByModel, auth_mode
     enabled_for_prepaid = models.BooleanField(default=True)
     is_location_verified = models.BooleanField(verbose_name='Location Verified', default=False)
     auto_ivr_enabled = models.BooleanField(default=True)
+    priority_score = models.IntegerField(default=0, null=False, blank=False)
 
     def __str__(self):
         return self.name
@@ -622,6 +623,7 @@ class Doctor(auth_model.TimeStampedModel, auth_model.QCModel, SearchKey, auth_mo
     remark = GenericRelation(Remark)
     rating_data = JSONField(blank=True, null=True)
     qr_code = GenericRelation(QRCode, related_name="qrcode")
+    priority_score = models.IntegerField(default=0, null=False, blank=False)
 
     def __str__(self):
         return '{} ({})'.format(self.name, self.id)
@@ -1545,6 +1547,7 @@ class HospitalNetwork(auth_model.TimeStampedModel, auth_model.CreatedByModel, au
     matrix_lead_id = models.BigIntegerField(blank=True, null=True, unique=True)
     remark = GenericRelation(Remark)
     auto_ivr_enabled = models.BooleanField(default=True)
+    priority_score = models.IntegerField(default=0, null=False, blank=False)
 
     def update_time_stamps(self):
         if self.welcome_calling_done and not self.welcome_calling_done_at:
@@ -2840,6 +2843,8 @@ class SourceIdentifier(auth_model.TimeStampedModel):
 class GoogleDetailing(auth_model.TimeStampedModel):
 
     identifier = models.CharField(max_length=255, null=True, blank=False)
+    hospital_id = models.PositiveIntegerField(null=True, blank=True)
+
     name = models.CharField(max_length=500, null=True, blank=False)
     clinic_hospital_name = models.CharField(max_length=128, null=True, blank=False)
     address = models.TextField(null=True, blank=False)
@@ -3097,9 +3102,11 @@ class OfflineOPDAppointments(auth_model.TimeStampedModel):
 
 class SearchScore(auth_model.TimeStampedModel):
     doctor = models.ForeignKey(Doctor, on_delete=models.CASCADE)
-    popularity_score = models.PositiveIntegerField(default=None, null=True)
+    popularity_score = models.FloatField(default=None, null=True)
     years_of_experience_score = models.PositiveIntegerField(default=None, null=True)
     doctors_in_clinic_score = models.PositiveIntegerField(default=None, null=True)
+    avg_ratings_score = models.PositiveIntegerField(default=None, null=True)
+    ratings_count_score = models.PositiveIntegerField(default=None, null=True)
     final_score = models.FloatField(default=None, null=True)
 
     class Meta:
