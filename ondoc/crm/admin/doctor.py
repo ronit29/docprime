@@ -1507,7 +1507,7 @@ class DoctorOpdAppointmentForm(RefundableAppointmentForm):
 
 class DoctorOpdAppointmentAdmin(admin.ModelAdmin):
     form = DoctorOpdAppointmentForm
-    search_fields = ['id']
+    search_fields = ['id', 'profile__name', 'profile__phone_number', 'doctor__name', 'hospital__name']
     list_display = ('booking_id', 'get_doctor', 'get_profile', 'status', 'time_slot_start', 'effective_price', 'created_at', 'updated_at')
     list_filter = ('status', 'insurance')
     date_hierarchy = 'created_at'
