@@ -1522,7 +1522,7 @@ class DoctorListViewSet(viewsets.GenericViewSet):
             if validated_data.get('sitemap_identifier') == 'IPD_PROCEDURE_DOCTOR_CITY':
                 title = '{ipd_procedure_name} Doctors in {city} | Best {ipd_procedure_name} Specialists'.format(
                     ipd_procedure_name=validated_data.get('ipd_procedure'), city=city)
-                description = '{ipd_procedure_name} Doctors in {city} : Check {ipd_procedure_name} doctors in {city}. View address, reviews, cost estimate and more at docprime.'.format(
+                description = '{ipd_procedure_name} Doctors in {city} : Check {ipd_procedure_name} doctors in {city}. View address, reviews, cost estimate and more at Docprime.'.format(
                     ipd_procedure_name=validated_data.get('ipd_procedure'), city=city)
 
             elif validated_data.get('sitemap_identifier') == 'SPECIALIZATION_LOCALITY_CITY':
@@ -3627,21 +3627,21 @@ class HospitalViewSet(viewsets.GenericViewSet):
                 title = 'Best {ipd_procedure_name} Hospitals in {city} | Book Hospital & Get Discount'.format(
                     ipd_procedure_name=ipd_procedure_obj_name, city=city)
 
-                description = '{ipd_procedure_name} Hospitals in {city} : Check {ipd_procedure_name} hospitals in {city}. View address, reviews, cost estimate and more at docprime.'.format(
+                description = '{ipd_procedure_name} Hospitals in {city} : Check {ipd_procedure_name} hospitals in {city}. View address, reviews, cost estimate and more at Docprime.'.format(
                     ipd_procedure_name=ipd_procedure_obj_name, city=city)
                 breadcrumb.append({"title": "Procedures", "url": "ipd-procedures", "link_title": "Procedures"})
                 temp = "{} Hospitals in {}".format(ipd_procedure_obj_name, city)
                 breadcrumb.append({"title": temp, "url": None, "link_title": temp})
             elif entity.sitemap_identifier == EntityUrls.SitemapIdentifier.HOSPITALS_CITY:
                 title = 'Best Hospitals in {city} | Find Top Hospitals Near Me in {city}'.format(city=city)
-                description = 'Best Hospitals in {city}: Find list of verified top hospitals near me in {city}. View details, address, reviews, bed availability, cost and more at docprime.'.format(
+                description = 'Best Hospitals in {city}: Find list of verified top hospitals near me in {city}. View details, address, reviews, bed availability, cost and more at Docprime.'.format(
                     city=city)
                 temp = "{} Hospitals".format(city)
                 breadcrumb.append({"title": temp, "url": None, "link_title": temp})
             elif entity.sitemap_identifier == EntityUrls.SitemapIdentifier.HOSPITALS_LOCALITY_CITY:
                 title = 'Best Hospitals in {locality}, {city} | List of Top Hospitals in {locality}'.format(
                     locality=locality, city=city)
-                description = 'Best Hospitals in {locality}, {city}: Check List of verified Top hospitals in {locality}, {city}. View details, address, reviews, bed availability, cost and more at docprime.'.format(
+                description = 'Best Hospitals in {locality}, {city}: Check List of verified Top hospitals in {locality}, {city}. View details, address, reviews, bed availability, cost and more at Docprime.'.format(
                     locality=locality, city=city)
                 temp = "Hospitals in {}, {}".format(entity.sublocality_value, entity.locality_value)
                 breadcrumb.append({"title": temp, "url": None, "link_title": temp})
