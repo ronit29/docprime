@@ -1705,3 +1705,16 @@ class RefundMixin(object):
         return not ConsumerTransaction.valid_appointment_for_cancellation(self.id, product_id)
         # return ConsumerRefund.objects.filter(consumer_transaction__reference_id=self.id,
         #                               consumer_transaction__product_id=product_id).first()
+
+
+class LastLoginTimestamp(TimeStampedModel):
+
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name="last_login_timestamp")
+    last_login = models.DateTimeField(auto_now=True)
+    source = models.CharField(max_length=100)
+
+    def __str__(self):
+        return self.user
+
+    class Meta:
+        db_table = "last_login_timestamp"
