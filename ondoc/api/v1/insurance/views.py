@@ -24,7 +24,6 @@ from django.db.models import F
 import datetime
 from django.db import transaction
 from ondoc.authentication.models import User
-from ondoc.insurance.tasks import push_insurance_banner_lead_to_matrix
 from datetime import timedelta
 from django.utils import timezone
 import logging
