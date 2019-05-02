@@ -47,7 +47,7 @@ class PrescriptionAppointmentValidation():
 
 class PrescriptionMedicineBodySerializer(serializers.Serializer):
     id = serializers.CharField(max_length=100)
-    name = serializers.CharField(max_length=64)
+    name = serializers.CharField(max_length=128)
     quantity = serializers.IntegerField(required=False, allow_null=True)
     dosage_type = serializers.CharField(max_length=100, required=False)
     time = serializers.ListField(child=serializers.CharField(max_length=64), allow_empty=True, required=False)
@@ -68,7 +68,7 @@ class PrescriptionMedicineBodySerializer(serializers.Serializer):
 
 class PrescriptionSymptomsComplaintsBodySerializer(serializers.Serializer):
     id = serializers.CharField(max_length=100)
-    name = serializers.CharField(max_length=64)
+    name = serializers.CharField(max_length=128)
 
     def validate(self, attrs):
         if not PrescriptionAppointmentValidation.validate_uuid(attrs.get("id")):
@@ -78,18 +78,18 @@ class PrescriptionSymptomsComplaintsBodySerializer(serializers.Serializer):
 
 class PrescriptionTestsBodySerializer(serializers.Serializer):
     id = serializers.CharField(max_length=100)
-    name = serializers.CharField(max_length=64)
-    instructions = serializers.CharField(max_length=256, required=False)
+    name = serializers.CharField(max_length=128)
+    instructions = serializers.CharField(max_length=256, required=False, allow_blank=True)
 
     def validate(self, attrs):
-        if not PrescriptionAppointmentValidation.validate_uuid(attrs.get("id")):
-            raise serializers.ValidationError("Invalid UUID - {}".format(attrs.get('id')))
+        if not (PrescriptionAppointmentValidation.validate_uuid(attrs.get("id")) or attrs.get('id').isdigit()):
+            raise serializers.ValidationError("Invalid UUID or not a number- {}".format(attrs.get('id')))
         return attrs
 
 
 class PrescriptionSpecialInstructionsBodySerializer(serializers.Serializer):
     id = serializers.CharField(max_length=100)
-    name = serializers.CharField(max_length=64)
+    name = serializers.CharField(max_length=128)
 
     def validate(self, attrs):
         if not PrescriptionAppointmentValidation.validate_uuid(attrs.get("id")):
@@ -99,7 +99,7 @@ class PrescriptionSpecialInstructionsBodySerializer(serializers.Serializer):
 
 class PrescriptionDiagnosesBodySerializer(serializers.Serializer):
     id = serializers.CharField(max_length=100)
-    name = serializers.CharField(max_length=64)
+    name = serializers.CharField(max_length=128)
 
     def validate(self, attrs):
         if not PrescriptionAppointmentValidation.validate_uuid(attrs.get("id")):

@@ -17,7 +17,7 @@ class PrescriptionEntity(auth_models.TimeStampedModel):
     SOURCE_TYPE_CHOICES = (("", "Select"), (INHOUSE_CHAT, 'Inhouse Chat'), (MESH, 'Mesh'), (PARTNERS_APP, 'Partners App'))
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     hospitals = ArrayField(models.IntegerField(), blank=True, null=True)
-    name = models.CharField(db_index=True, max_length=64)
+    name = models.CharField(db_index=True, max_length=128)
     moderated = models.NullBooleanField(blank=True, null=True)
     source_type = models.IntegerField(choices=SOURCE_TYPE_CHOICES, null=True, blank=True, default=None, editable=False)
 
