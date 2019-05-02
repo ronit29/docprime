@@ -1744,15 +1744,20 @@ class TopHospitalForIpdProcedureSerializer(serializers.ModelSerializer):
     lat = serializers.SerializerMethodField()
     long = serializers.SerializerMethodField()
     url = serializers.SerializerMethodField()
+    locality_url = serializers.SerializerMethodField()
 
     class Meta:
         model = Hospital
         fields = ('id', 'name', 'distance', 'certifications', 'bed_count', 'logo', 'avg_rating',
                   'count_of_insurance_provider', 'multi_speciality', 'address', 'open_today',
-                  'insurance_provider', 'established_in', 'long', 'lat', 'url')
+                  'insurance_provider', 'established_in', 'long', 'lat', 'url', 'locality_url')
+
+    def get_locality_url(self, obj):
+        entity_url = self.context.get('hosp_locality_entity_dict', {})
+        return entity_url.get(obj.id)
 
     def get_url(self, obj):
-        entity_url = self.context.get('hosp_entity_entity', {})
+        entity_url = self.context.get('hosp_entity_dict', {})
         return entity_url.get(obj.id)
 
     def get_lat(self, obj):

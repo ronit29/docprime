@@ -3665,7 +3665,7 @@ class HospitalViewSet(viewsets.GenericViewSet):
         min_distance = validated_data.get('min_distance')
         max_distance = validated_data.get('max_distance')
         max_distance = max_distance * 1000 if max_distance is not None else 10000
-        min_distance = min_distance * 1000 if min_distance is not None else 0
+        min_distance = min_distance * 1000 if min_distance is not None else -1
         provider_ids = validated_data.get('provider_ids')
         point_string = 'POINT(' + str(long) + ' ' + str(lat) + ')'
         pnt = GEOSGeometry(point_string, srid=4326)
@@ -3684,7 +3684,7 @@ class HospitalViewSet(viewsets.GenericViewSet):
                 Point(float(long),
                       float(lat)),
                 D(m=max_distance))).annotate(
-            distance=Distance('location', pnt))
+            distance=Distance('location', pnt)).order_by('distance')
         if provider_ids:
             hospital_queryset = hospital_queryset.filter(health_insurance_providers__id__in=provider_ids)
         if ipd_pk:
@@ -3700,13 +3700,30 @@ class HospitalViewSet(viewsets.GenericViewSet):
         hospital_queryset = list(hospital_queryset)
         if count:
             hospital_queryset = hospital_queryset[:count]
-        hosp_entity_qs = EntityUrls.objects.filter(is_valid=True,
-                                                   sitemap_identifier=EntityUrls.SitemapIdentifier.HOSPITAL_PAGE,
-                                                   entity_id__in=[x.id for x in hospital_queryset])
-        hosp_entity_entity = {x.entity_id: x.url for x in hosp_entity_qs}
+        hosp_entity_qs = list(EntityUrls.objects.filter(is_valid=True,
+                                                        sitemap_identifier=EntityUrls.SitemapIdentifier.HOSPITAL_PAGE,
+                                                        entity_id__in=[x.id for x in hospital_queryset]))
+
+        locality_city_dict = {(x.sublocality_value.lower(), x.locality_value.lower()): None for x in hosp_entity_qs if
+                              x.sublocality_value and x.locality_value}
+        hosp_locality_entity_qs = list(EntityUrls.objects.filter(is_valid=True,
+                                                                 sitemap_identifier=EntityUrls.SitemapIdentifier.HOSPITALS_LOCALITY_CITY,
+                                                                 sublocality_value__iregex=r'(' + '|'.join(
+                                                                     [x[0] for x in locality_city_dict.keys()]) + ')',
+                                                                 locality_value__iregex=r'(' + '|'.join(
+                                                                     [x[1] for x in locality_city_dict.keys()]) + ')'))
+        for x in hosp_locality_entity_qs:
+            if x.sublocality_value and x.locality_value:
+                locality_city_dict[(x.sublocality_value.lower(), x.locality_value.lower())] = x.url
+        hosp_entity_dict = {x.entity_id: x.url for x in hosp_entity_qs}
+        hosp_locality_entity_dict = {
+            x.entity_id: locality_city_dict.get((x.sublocality_value.lower(), x.locality_value.lower()), None) for x in
+            hosp_entity_qs if x.sublocality_value and x.locality_value}
+
         top_hospital_serializer = serializers.TopHospitalForIpdProcedureSerializer(hospital_queryset, many=True,
                                                                                    context={'request': request,
-                                                                                            'hosp_entity_entity': hosp_entity_entity})
+                                                                                            'hosp_locality_entity_dict': hosp_locality_entity_dict,
+                                                                                            'hosp_entity_dict': hosp_entity_dict})
         return Response({'count': result_count, 'result': top_hospital_serializer.data,
                          'ipd_procedure': {'id': ipd_procedure_obj_id, 'name': ipd_procedure_obj_name},
                          'health_insurance_providers': [{'id': x.id, 'name': x.name} for x in

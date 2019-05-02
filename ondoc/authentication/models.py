@@ -49,7 +49,7 @@ class Image(models.Model):
         # default_storage_class = get_storage_class()
         # storage_instance = default_storage_class()
 
-        path = "{}-{}-{}".format(width, height, self.get_image_name())
+        path = "{}".format(self.get_image_name())
         # if storage_instance.exists(path):
         #     return
         if self.name.closed:
@@ -74,10 +74,10 @@ class Image(models.Model):
         if self.cropped_image:
             return
         from ondoc.doctor.models import DoctorImage
-        for size in DoctorImage.image_sizes:
-            width = size[0]
-            height = size[1]
-            self.crop_existing_image(width, height)
+        size = DoctorImage.image_sizes[0]
+        width = size[0]
+        height = size[1]
+        self.crop_existing_image(width, height)
 
     def get_thumbnail_path(self, path, prefix):
         first, last = path.rsplit('/', 1)
