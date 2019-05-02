@@ -9,7 +9,7 @@ from raven.contrib.celery import register_signal, register_logger_signal
 from ondoc.account.tasks import refund_status_update, consumer_refund_update, dump_to_elastic, integrator_order_summary,\
     get_thyrocare_reports, elastic_alias_switch
 from celery.schedules import crontab
-from ondoc.doctor.tasks import save_avg_rating, update_prices, update_city_search_key, update_doctors_count
+from ondoc.doctor.tasks import save_avg_rating, update_prices, update_city_search_key, update_doctors_count, update_search_score
 from ondoc.account.tasks import update_ben_status_from_pg,update_merchant_payout_pg_status
 from ondoc.insurance.tasks import push_mis
 # from ondoc.doctor.services.update_search_score import DoctorSearchScore
@@ -62,8 +62,10 @@ def setup_periodic_tasks(sender, **kwargs):
 
     elastic_sync_cron_schedule = crontab(hour=19, minute=00)
     elastic_sync_post_cron_schedule = crontab(hour=20, minute=00)
-    update_ben_status_cron_schedule = crontab(hour=21, minute=00)
-    update_merchant_payout_pg_status_cron_schedule = crontab(hour=22, minute=30)
+    # update_ben_status_cron_schedule = crontab(hour=21, minute=00)
+    # update_merchant_payout_pg_status_cron_schedule = crontab(hour=22, minute=30)
+    update_ben_status_cron_schedule = float(2*3600)
+    update_merchant_payout_pg_status_cron_schedule = float(2*3600)
 
     sender.add_periodic_task(elastic_sync_cron_schedule, dump_to_elastic.s(), name='Sync Elastic')
     sender.add_periodic_task(elastic_sync_post_cron_schedule, elastic_alias_switch.s(), name='Sync Elastic alias')
@@ -82,5 +84,5 @@ def setup_periodic_tasks(sender, **kwargs):
     sender.add_periodic_task(crontab(hour=20, minute=30), update_doctors_count.s(), name='Update Doctors Count')
     sender.add_periodic_task(crontab(hour=21, minute=00),  sync_booking_data.s(), name="Sync Booking Data for analytics")
 
-    # doctor_search_score_creation_time = float(settings.CREATE_DOCTOR_SEARCH_SCORE) * float(3600.0)
-    # sender.add_periodic_task(doctor_search_score_creation_time, create_search_score.s(), name='Doctor search score updaed')
+    doctor_search_score_creation_time = crontab(hour=21, minute=30)
+    sender.add_periodic_task(doctor_search_score_creation_time, update_search_score.s(), name='Update Doctor search score')
