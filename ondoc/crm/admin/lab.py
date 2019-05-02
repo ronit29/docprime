@@ -1396,6 +1396,7 @@ class LabTestAdmin(ImportExportMixin, VersionAdmin):
     list_filter = ('is_package', 'enable_for_ppc', 'enable_for_retail')
     exclude = ['search_key']
     readonly_fields = ['url',]
+    autocomplete_fields = ['author',]
 
     def get_fields(self, request, obj=None):
         fields = super().get_fields(request, obj)
