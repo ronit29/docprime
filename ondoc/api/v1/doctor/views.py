@@ -1134,6 +1134,8 @@ class PrescriptionFileViewset(OndocViewSet):
         serializer = serializers.PrescriptionSerializer(data=request.data, context={"request": request})
         serializer.is_valid(raise_exception=True)
         validated_data = serializer.validated_data
+        app = validated_data['appointment_obj']
+
         #resp_data = list()
         if validated_data.get('type') == serializers.PrescriptionSerializer.OFFLINE:
             pres_models.OfflinePrescription.objects.create(
@@ -1141,7 +1143,6 @@ class PrescriptionFileViewset(OndocViewSet):
                 prescription_details=validated_data.get('prescription_details'),
                 appointment=validated_data.get('appointment_obj')
             )
-            app = validated_data['appointment_obj']
             resp_data = {'id': app.id,
                          'doctor': serializers.AppointmentRetrieveDoctorSerializer(app.doctor).data,
                          'time_slot_start': app.time_slot_start,
@@ -1151,10 +1152,10 @@ class PrescriptionFileViewset(OndocViewSet):
                          }
 
         else:
-            if not self.prescription_permission(request.user, validated_data.get('appointment')):
+            if not self.prescription_permission(request.user, app):
                 return Response({'msg': "You don't have permissions to manage this appointment"}, status=status.HTTP_403_FORBIDDEN)
 
-            prescription_obj = models.Prescription.objects.filter(appointment=validated_data.get('appointment')).first()
+            prescription_obj = models.Prescription.objects.filter(appointment=app).first()
             if prescription_obj:
                 prescription = prescription_obj
             else:
@@ -1172,8 +1173,8 @@ class PrescriptionFileViewset(OndocViewSet):
             # resp_data = prescription_file_serializer.data
             resp_data = serializers.DoctorAppointmentRetrieveSerializer(validated_data.get('appointment'),
                                                                              context={'request': request}).data
-            if validated_data.get('appointment'):
-                resp_data['prescriptions'] = validated_data.get('appointment').get_prescriptions(request)
+            if validated_data.get('appointment_obj'):
+                resp_data['prescriptions'] = validated_data.get('appointment_obj').get_prescriptions(request)
 
         return Response(resp_data)
 
