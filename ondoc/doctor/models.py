@@ -1229,6 +1229,9 @@ class DoctorImage(auth_model.TimeStampedModel, auth_model.Image):
     def __str__(self):
         return '{}'.format(self.doctor)
 
+    def use_image_name(self):
+        return False
+
     def get_image_name(self):
         name = self.doctor.name
         doctor_spec_name = "dr " + name
@@ -1374,10 +1377,27 @@ class DoctorDocument(auth_model.TimeStampedModel, auth_model.Document):
 class HospitalImage(auth_model.TimeStampedModel, auth_model.Image):
     hospital = models.ForeignKey(Hospital, on_delete=models.CASCADE)
     name = models.ImageField(upload_to='hospital/images', height_field='height', width_field='width')
+    cropped_image = models.ImageField(upload_to='hospital/images', height_field='height', width_field='width',
+                                      blank=True, null=True)
     cover_image = models.BooleanField(default=False, verbose_name="Can be used as Hospital's cover image?")
 
     class Meta:
         db_table = "hospital_image"
+
+    def use_image_name(self):
+        return True
+
+    def get_image_name(self):
+        name = self.hospital.name
+        return slugify(name)
+
+    def auto_generate_thumbnails(self):
+        return True
+
+    def save(self, *args, **kwargs):
+        super().save(*args, **kwargs)
+        self.create_thumbnail()
+
 
 
 class HospitalDocument(auth_model.TimeStampedModel, auth_model.Document):

@@ -1855,8 +1855,9 @@ class HospitalDetailIpdProcedureSerializer(TopHospitalForIpdProcedureSerializer)
 
     def get_images(self, obj):
         request = self.context.get('request')
-        # TODO: SHASHANK_SINGH Thumbnail to be added or not
-        return [{'original': request.build_absolute_uri(img.name.url), "thumbnail": None, "cover_image": img.cover_image} for img in
+        return [{'original': request.build_absolute_uri(img.name.url),
+                 "thumbnail": request.build_absolute_uri(img.cropped_image.url) if img.cropped_image else None,
+                 "cover_image": img.cover_image} for img in
                 obj.hospitalimage_set.all() if img.name]
 
     def get_ipd_procedure_categories(self, obj):

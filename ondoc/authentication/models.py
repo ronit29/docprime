@@ -38,6 +38,47 @@ class Image(models.Model):
         super().__init__(*args, **kwargs)
         self.__original_name = self.name
 
+    def crop_existing_image(self, width, height):
+        if not hasattr(self, 'name'):
+            return
+        if not self.name:
+            return
+        if not hasattr(self, 'get_image_name'):
+            return
+        # from django.core.files.storage import get_storage_class
+        # default_storage_class = get_storage_class()
+        # storage_instance = default_storage_class()
+
+        path = "{}-{}-{}".format(width, height, self.get_image_name())
+        # if storage_instance.exists(path):
+        #     return
+        if self.name.closed:
+            self.name.open()
+        with Img.open(self.name) as img:
+            img = img.copy()
+            img.thumbnail(tuple([width, height]), Img.LANCZOS)
+            if img.mode != 'RGB':
+                img = img.convert('RGB')
+            new_image_io = BytesIO()
+            img.save(new_image_io, format='JPEG')
+            in_memory_file = InMemoryUploadedFile(new_image_io, None, path + ".jpg", 'image/jpeg', new_image_io.tell(),
+                                                  None)
+            self.cropped_image = in_memory_file
+            self.save()
+
+    def create_thumbnail(self):
+        if not hasattr(self, 'cropped_image'):
+            return
+        if not (hasattr(self, 'auto_generate_thumbnails') and self.auto_generate_thumbnails()):
+            return
+        if self.cropped_image:
+            return
+        from ondoc.doctor.models import DoctorImage
+        for size in DoctorImage.image_sizes:
+            width = size[0]
+            height = size[1]
+            self.crop_existing_image(width, height)
+
     def get_thumbnail_path(self, path, prefix):
         first, last = path.rsplit('/', 1)
         return "{}/{}/{}".format(first, prefix, last)
@@ -60,8 +101,8 @@ class Image(models.Model):
             size = img.size
             #new_size = ()
 
-            if max(size)>max_allowed:
-                size = tuple(math.floor(ti/(max(size)/max_allowed)) for ti in size)
+            if max(size) > max_allowed:
+                size = tuple(math.floor(ti / (max(size) / max_allowed)) for ti in size)
 
             img = img.resize(size, Img.ANTIALIAS)
 
@@ -69,7 +110,9 @@ class Image(models.Model):
                 img = img.convert('RGB')
 
             md5_hash = hashlib.md5(img.tobytes()).hexdigest()
-            #if img.multiple_chunks():
+            if hasattr(self, 'use_image_name') and self.use_image_name() and hasattr(self, 'get_image_name'):
+                md5_hash = self.get_image_name()
+            # if img.multiple_chunks():
             #    for chunk in img.chunks():
             #       hash.update(chunk)
             # else:    
@@ -77,15 +120,12 @@ class Image(models.Model):
 
             new_image_io = BytesIO()
             img.save(new_image_io, format='JPEG')
-
-
-            #im = img.save(md5_hash+'.jpg')
+            # im = img.save(md5_hash+'.jpg')
             self.name = InMemoryUploadedFile(new_image_io, None, md5_hash+".jpg", 'image/jpeg',
                                   new_image_io.tell(), None)
 
             # self.name = InMemoryUploadedFile(output, 'ImageField', md5_hash+".jpg", 'image/jpeg',
             #                                     output.len, None)
-
             # self.name = img
             # img.thumbnail((self.image.width/1.5,self.image.height/1.5), Img.ANTIALIAS)
             # output = StringIO.StringIO()

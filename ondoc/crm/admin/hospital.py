@@ -26,9 +26,11 @@ from django.http import HttpResponseRedirect
 import logging
 logger = logging.getLogger(__name__)
 
+
 class HospitalImageInline(admin.TabularInline):
     model = HospitalImage
     # template = 'imageinline.html'
+    # exclude = ['cropped_image']
     extra = 0
     can_delete = True
     show_change_link = False
