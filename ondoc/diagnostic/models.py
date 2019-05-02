@@ -29,7 +29,7 @@ from django.db.models import F, Sum, When, Case, Q, Avg
 from django.db import transaction
 from django.contrib.postgres.fields import JSONField
 from ondoc.doctor.models import OpdAppointment
-from ondoc.notification.models import EmailNotification
+from ondoc.notification.models import EmailNotification, NotificationAction
 from ondoc.payout.models import Outstanding
 from ondoc.authentication import models as auth_model
 from django.core.files.uploadedfile import InMemoryUploadedFile, TemporaryUploadedFile
@@ -63,6 +63,7 @@ from decimal import Decimal
 from django.utils.text import slugify
 from django.utils.functional import cached_property
 #from ondoc.api.v1.diagnostic import serializers as diagnostic_serializers
+from ondoc.common.helper import Choices
 
 logger = logging.getLogger(__name__)
 
@@ -1370,6 +1371,17 @@ class AvailableLabTest(TimeStampedModel):
     def app_commit_tasks(self):
         self.update_deal_price()
 
+    def send_pricing_alert_email(self, responsible_user):
+        from ondoc.communications.models import EMAILNotification
+        try:
+            emails = settings.DEAL_AGREED_PRICE_CHANGE_EMAILS
+            user_and_email = [{'user': None, 'email': email} for email in emails]
+            email_notification = EMAILNotification(notification_type=NotificationAction.PRICING_ALERT_EMAIL,
+                                                   context={'instance': self, 'responsible_user': responsible_user})
+            email_notification.send(user_and_email)
+        except Exception as e:
+            logger.error(str(e))
+
     def get_computed_deal_price(self):
         if self.test.test_type == LabTest.RADIOLOGY:
             deal_percent = self.lab_pricing_group.radiology_deal_price_percentage if self.lab_pricing_group.radiology_deal_price_percentage else None
@@ -2208,16 +2220,16 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin,
         payment_type = data.get("payment_type")
         effective_price = price_data.get("effective_price")
         cart_data = data.get('cart_item').data
-        is_appointment_insured = cart_data.get('is_appointment_insured', None)
-        insurance_id = cart_data.get('insurance_id', None)
-        # user_insurance = UserInsurance.objects.filter(user=user).last()
-        # if user_insurance:
-        #     insurance_validate_dict = user_insurance.validate_insurance(data)
-        #     is_appointment_insured = insurance_validate_dict['is_insured']
-        #     insurance_id = insurance_validate_dict['insurance_id']
-        #     insurance_message = insurance_validate_dict['insurance_message']
+        # is_appointment_insured = cart_data.get('is_appointment_insured', None)
+        # insurance_id = cart_data.get('insurance_id', None)
 
-        if is_appointment_insured:
+        is_appointment_insured = False
+        insurance_id = None
+        user_insurance = UserInsurance.objects.filter(user=user).order_by('-id').first()
+        if user_insurance and user_insurance.is_valid():
+            is_appointment_insured, insurance_id, insurance_message = user_insurance.validate_lab_insurance(data, user_insurance)
+
+        if is_appointment_insured and cart_data.get('is_appointment_insured', None):
             payment_type = OpdAppointment.INSURANCE
             effective_price = 0.0
         else:
@@ -2315,6 +2327,17 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin,
 
     def __str__(self):
         return "{}, {}".format(self.profile.name if self.profile else "", self.lab.name)
+
+    @classmethod
+    def get_insured_completed_appointment(cls, insurance_obj):
+        count = cls.objects.filter(user=insurance_obj.user, insurance=insurance_obj, status=cls.COMPLETED).count()
+        return count
+
+    @classmethod
+    def get_insured_active_appointment(cls, insurance_obj):
+        appointments = cls.objects.filter(~Q(status=cls.COMPLETED), ~Q(status=cls.CANCELLED), user=insurance_obj.user,
+                                          insurance=insurance_obj)
+        return appointments
 
     class Meta:
         db_table = "lab_appointment"
@@ -2506,10 +2529,26 @@ class LabDocument(TimeStampedModel, Document):
             self.resize_image(width, height)
 
     def save(self, *args, **kwargs):
+        database_instance = LabDocument.objects.filter(pk=self.id).first()
         super().save(*args, **kwargs)
         if self.document_type == LabDocument.LOGO:
             self.create_all_images()
 
+            if database_instance and database_instance.name == self.name:
+                pass
+            else:
+                self.send_change_logo_email()
+
+    def send_change_logo_email(self):
+        from ondoc.communications.models import EMAILNotification
+        try:
+            emails = settings.LOGO_CHANGE_EMAIL_RECIPIENTS
+            user_and_email = [{'user': None, 'email': email} for email in emails]
+            email_notification = EMAILNotification(notification_type=NotificationAction.LAB_LOGO_CHANGE_MAIL,
+                                                   context={'instance': self})
+            email_notification.send(user_and_email)
+        except Exception as e:
+            logger.error(str(e))
 
     # def __str__(self):
         # return self.name
@@ -2682,3 +2721,24 @@ class TestParameterChat(TimeStampedModel):
     class Meta:
         db_table = 'test_parameter_chat'
 
+
+class LabTestThresholds(TimeStampedModel):
+    class Colour(Choices):
+        RED = 'RED'
+        GREEN = 'GREEN'
+        ORANGE = 'ORANGE'
+
+    lab_test = models.ForeignKey(LabTest, on_delete=models.CASCADE, related_name='tests_parameter_thresholds')
+    test_parameter = models.ForeignKey(TestParameter, on_delete=models.CASCADE, related_name='parameter_thresholds', blank=False, null=True)
+    color = models.CharField(max_length=50, null=True, default=None, blank=False, choices=Colour.as_choices())
+    details = models.TextField(blank=True, null=True)
+    what_to_do = models.TextField(blank=True, null=True)
+    min_value = models.FloatField(null=True, default=0)
+    max_value = models.FloatField(null=True, default=0)
+    min_age = models.PositiveIntegerField(null=True, default=0)
+    max_age = models.PositiveIntegerField(null=True, default=0)
+    gender = models.CharField(choices=UserProfile.GENDER_CHOICES, max_length=50, default=None, null=True)
+
+
+    class Meta:
+        db_table = 'lab_test_thresholds'

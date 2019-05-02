@@ -42,7 +42,7 @@ from ondoc.diagnostic.models import (Lab, LabTiming, LabImage, GenericLabAdmin,
 from ondoc.insurance.models import (Insurer, InsurancePlans, InsuranceThreshold, InsuranceCity, StateGSTCode,
                                     InsuranceDistrict, InsuranceTransaction, InsuranceDeal, InsuranceDisease,
                                     UserInsurance, InsurancePlanContent, InsuredMembers, InsurerAccount, InsuranceLead,
-                                    InsuranceDiseaseResponse, InsurerPolicyNumber)
+                                    InsuranceDiseaseResponse, InsurerPolicyNumber, InsuranceCancelMaster)
 
 from ondoc.procedure.models import Procedure, ProcedureCategory, CommonProcedureCategory, DoctorClinicProcedure, \
     ProcedureCategoryMapping, ProcedureToCategoryMapping, CommonProcedure, IpdProcedure, IpdProcedureFeatureMapping, \
@@ -51,7 +51,7 @@ from ondoc.procedure.models import Procedure, ProcedureCategory, CommonProcedure
 from ondoc.reports import models as report_models
 
 from ondoc.diagnostic.models import LabPricing
-from ondoc.integrations.models import IntegratorMapping, IntegratorProfileMapping, IntegratorReport, IntegratorTestMapping
+from ondoc.integrations.models import IntegratorMapping, IntegratorProfileMapping, IntegratorReport, IntegratorTestMapping, IntegratorTestParameterMapping
 from ondoc.subscription_plan.models import Plan, PlanFeature, PlanFeatureMapping, UserPlanMapping
 
 from ondoc.web.models import Career, OnlineLead, UploadImage
@@ -561,7 +561,7 @@ class Command(BaseCommand):
         group.permissions.clear()
 
         content_types = ContentType.objects.get_for_models(IntegratorMapping, IntegratorProfileMapping, LabTest, LabNetwork,
-                                                           IntegratorReport, IntegratorTestMapping)
+                                                           IntegratorReport, IntegratorTestMapping, IntegratorTestParameterMapping)
 
         for cl, ct in content_types.items():
             permissions = Permission.objects.filter(
@@ -886,7 +886,7 @@ class Command(BaseCommand):
                                                            StateGSTCode, InsuranceDistrict, InsuranceThreshold,
                                                            UserInsurance, InsuranceDeal, InsuranceLead,
                                                            InsuranceTransaction, InsuranceDiseaseResponse,
-                                                           InsuredMembers, InsurerPolicyNumber)
+                                                           InsuredMembers, InsurerPolicyNumber, InsuranceCancelMaster)
 
         for cl, ct in content_types.items():
             permissions = Permission.objects.filter(

@@ -4,7 +4,7 @@ Please find below the details
 Policy Number:  {{policy_number}}
 Proposer Name: {{proposer_name}}
 Annual Premium: Rs {{premium}} (inclusive of GST)
-Coverage: {{total_member_covered}} Members
+Coverage:{%if total_member_covered > 1%} {{total_member_covered}} Members {% else %} {{total_member_covered}} Member {% endif %}
 {% for member in insured_members %}
 {{member.relation}}: {{member.name}}
 {% endfor %}
