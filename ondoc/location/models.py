@@ -43,6 +43,13 @@ class CompareSEOUrls(TimeStampedModel):
     class Meta:
         db_table = 'compare_seo_urls'
 
+    def save(self, *args, **kwargs):
+        self.url = self.url.lower()
+        if not self.url.endswith('hpcp'):
+            self.url = self.url + '-hpcp'
+
+        super(CompareSEOUrls, self).save(*args, **kwargs)
+
 
 class CompareLabPackagesSeoUrls(TimeStampedModel):
     url = models.ForeignKey(CompareSEOUrls, related_name="compare_url", on_delete=models.CASCADE)
