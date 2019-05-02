@@ -1259,9 +1259,6 @@ class DoctorImage(auth_model.TimeStampedModel, auth_model.Image):
     def __str__(self):
         return '{}'.format(self.doctor)
 
-    def use_image_name(self):
-        return False
-
     def get_image_name(self):
         name = self.doctor.name
         doctor_spec_name = "dr " + name
@@ -1450,6 +1447,13 @@ class HospitalDocument(auth_model.TimeStampedModel, auth_model.Document):
 
     class Meta:
         db_table = "hospital_document"
+
+    def use_image_name(self):
+        return True
+
+    def get_image_name(self):
+        name = self.hospital.name
+        return slugify(name)
 
 
 class Language(auth_model.TimeStampedModel, UniqueNameModel):

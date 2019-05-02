@@ -3696,8 +3696,6 @@ class HospitalViewSet(viewsets.GenericViewSet):
             hospital_queryset = hospital_queryset.filter(
                 hospital_doctors__ipd_procedure_clinic_mappings__ipd_procedure_id=ipd_pk,
                 hospital_doctors__ipd_procedure_clinic_mappings__enabled=True)
-        # if min_distance:  # TODO : SHASHANK_SINGH add it in query
-        #     hospital_queryset = filter(lambda x: x.distance.m >= min_distance if x.distance is not None and x.distance.m is not None else False, hospital_queryset)
 
         hospital_queryset = hospital_queryset.distinct()
         result_count = hospital_queryset.count()

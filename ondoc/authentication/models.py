@@ -38,6 +38,12 @@ class Image(models.Model):
         super().__init__(*args, **kwargs)
         self.__original_name = self.name
 
+    def use_image_name(self):
+        return False
+
+    def auto_generate_thumbnails(self):
+        return False
+
     def crop_existing_image(self, width, height):
         if not hasattr(self, 'name'):
             return
@@ -140,6 +146,9 @@ class Image(models.Model):
 
 class Document(models.Model):
 
+    def use_image_name(self):
+        return False
+
     def get_thumbnail_path(self, path, prefix):
         first, last = path.rsplit('/', 1)
         return "{}/{}/{}".format(first,prefix,last)
@@ -176,6 +185,8 @@ class Document(models.Model):
                     img = img.convert('RGB')
 
                 md5_hash = hashlib.md5(img.tobytes()).hexdigest()
+                if hasattr(self, 'use_image_name') and self.use_image_name() and hasattr(self, 'get_image_name'):
+                    md5_hash = self.get_image_name()
                 #if img.multiple_chunks():
                 #    for chunk in img.chunks():
                 #       hash.update(chunk)
@@ -198,7 +209,6 @@ class Document(models.Model):
                 name, extension = os.path.splitext(self.name.name)
                 filename = hash+extension
                 self.name.file.seek(0,2)
-
                 self.name = InMemoryUploadedFile(self.name.file, None, filename, None,
                     self.name.file.tell(), None)
 

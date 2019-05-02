@@ -1737,6 +1737,7 @@ class TopHospitalForIpdProcedureSerializer(serializers.ModelSerializer):
     certifications = serializers.SerializerMethodField()
     multi_speciality = serializers.SerializerMethodField()
     address = serializers.SerializerMethodField()
+    short_address = serializers.SerializerMethodField()
     logo = serializers.SerializerMethodField()
     open_today = serializers.SerializerMethodField()
     insurance_provider = serializers.SerializerMethodField()
@@ -1749,7 +1750,7 @@ class TopHospitalForIpdProcedureSerializer(serializers.ModelSerializer):
     class Meta:
         model = Hospital
         fields = ('id', 'name', 'distance', 'certifications', 'bed_count', 'logo', 'avg_rating',
-                  'count_of_insurance_provider', 'multi_speciality', 'address', 'open_today',
+                  'count_of_insurance_provider', 'multi_speciality', 'address', 'short_address','open_today',
                   'insurance_provider', 'established_in', 'long', 'lat', 'url', 'locality_url')
 
     def get_locality_url(self, obj):
@@ -1792,6 +1793,9 @@ class TopHospitalForIpdProcedureSerializer(serializers.ModelSerializer):
 
     def get_address(self, obj):
         return obj.get_hos_address()
+
+    def get_short_address(self, obj):
+        return obj.get_short_address()
 
     def get_logo(self, obj):
         request = self.context.get('request')
