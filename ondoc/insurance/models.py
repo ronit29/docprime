@@ -1359,7 +1359,9 @@ class InsuranceLead(auth_model.TimeStampedModel):
 
     def save(self, *args, **kwargs):
         super().save(*args, **kwargs)
+        transaction.on_commit(lambda: self.after_commit())
 
+    def after_commit(self):
         push_insurance_banner_lead_to_matrix.apply_async(({'id': self.id}, ), countdown=10)
 
     @classmethod
