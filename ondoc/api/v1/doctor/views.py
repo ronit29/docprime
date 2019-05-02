@@ -1416,6 +1416,8 @@ class DoctorListViewSet(viewsets.GenericViewSet):
         else:
             saved_search_result = get_object_or_404(models.DoctorSearchResult, pk=validated_data.get("search_id"))
         doctor_ids = paginate_queryset([data.get("doctor_id") for data in doctor_search_result], request)
+        temp_hospital_ids = paginate_queryset([data.get("hospital_id") for data in doctor_search_result], request)
+        hosp_entity_dict, hosp_locality_entity_dict = Hospital.get_hosp_and_locality_dict(temp_hospital_ids)
         preserved = Case(*[When(pk=pk, then=pos) for pos, pk in enumerate(doctor_ids)])
         doctor_data = models.Doctor.objects.filter(
             id__in=doctor_ids).prefetch_related("hospitals", "doctor_clinics", "doctor_clinics__availability",
@@ -1428,7 +1430,10 @@ class DoctorListViewSet(viewsets.GenericViewSet):
                                                 "doctor_clinics__hospital__hospital_place_details"
                                                 ).order_by(preserved)
 
-        response = doctor_search_helper.prepare_search_response(doctor_data, doctor_search_result, request, insurance_data=insurance_data_dict)
+        response = doctor_search_helper.prepare_search_response(doctor_data, doctor_search_result, request,
+                                                                insurance_data=insurance_data_dict,
+                                                                hosp_entity_dict=hosp_entity_dict,
+                                                                hosp_locality_entity_dict=hosp_locality_entity_dict)
 
         entity_ids = [doctor_data['id'] for doctor_data in response]
 
@@ -3700,30 +3705,12 @@ class HospitalViewSet(viewsets.GenericViewSet):
         hospital_queryset = list(hospital_queryset)
         if count:
             hospital_queryset = hospital_queryset[:count]
-        hosp_entity_qs = list(EntityUrls.objects.filter(is_valid=True,
-                                                        sitemap_identifier=EntityUrls.SitemapIdentifier.HOSPITAL_PAGE,
-                                                        entity_id__in=[x.id for x in hospital_queryset]))
-
-        locality_city_dict = {(x.sublocality_value.lower(), x.locality_value.lower()): None for x in hosp_entity_qs if
-                              x.sublocality_value and x.locality_value}
-        hosp_locality_entity_qs = list(EntityUrls.objects.filter(is_valid=True,
-                                                                 sitemap_identifier=EntityUrls.SitemapIdentifier.HOSPITALS_LOCALITY_CITY,
-                                                                 sublocality_value__iregex=r'(' + '|'.join(
-                                                                     [x[0] for x in locality_city_dict.keys()]) + ')',
-                                                                 locality_value__iregex=r'(' + '|'.join(
-                                                                     [x[1] for x in locality_city_dict.keys()]) + ')'))
-        for x in hosp_locality_entity_qs:
-            if x.sublocality_value and x.locality_value:
-                locality_city_dict[(x.sublocality_value.lower(), x.locality_value.lower())] = x.url
-        hosp_entity_dict = {x.entity_id: x.url for x in hosp_entity_qs}
-        hosp_locality_entity_dict = {
-            x.entity_id: locality_city_dict.get((x.sublocality_value.lower(), x.locality_value.lower()), None) for x in
-            hosp_entity_qs if x.sublocality_value and x.locality_value}
-
+        temp_hospital_ids = [x.id for x in hospital_queryset]
+        hosp_entity_dict, hosp_locality_entity_dict = Hospital.get_hosp_and_locality_dict(temp_hospital_ids)
         top_hospital_serializer = serializers.TopHospitalForIpdProcedureSerializer(hospital_queryset, many=True,
                                                                                    context={'request': request,
-                                                                                            'hosp_locality_entity_dict': hosp_locality_entity_dict,
-                                                                                            'hosp_entity_dict': hosp_entity_dict})
+                                                                                            'hosp_entity_dict': hosp_entity_dict,
+                                                                                            'hosp_locality_entity_dict': hosp_locality_entity_dict})
         return Response({'count': result_count, 'result': top_hospital_serializer.data,
                          'ipd_procedure': {'id': ipd_procedure_obj_id, 'name': ipd_procedure_obj_name},
                          'health_insurance_providers': [{'id': x.id, 'name': x.name} for x in

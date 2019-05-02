@@ -254,6 +254,34 @@ class Hospital(auth_model.TimeStampedModel, auth_model.CreatedByModel, auth_mode
     #         self.city_search_key = search_city
     #         return self.city
     #     return None
+    @classmethod
+    def get_hosp_and_locality_dict(cls, temp_hospital_ids):
+        if not temp_hospital_ids:
+            return {}, {}
+        from ondoc.location.models import EntityUrls
+        hosp_entity_qs = list(EntityUrls.objects.filter(is_valid=True,
+                                                        sitemap_identifier=EntityUrls.SitemapIdentifier.HOSPITAL_PAGE,
+                                                        entity_id__in=temp_hospital_ids))
+        locality_city_dict = {(x.sublocality_value.lower(), x.locality_value.lower()): None for x in hosp_entity_qs if
+                              x.sublocality_value and x.locality_value}
+        hosp_locality_entity_qs = []
+        if locality_city_dict:
+            hosp_locality_entity_qs = list(EntityUrls.objects.filter(is_valid=True,
+                                                                     sitemap_identifier=EntityUrls.SitemapIdentifier.HOSPITALS_LOCALITY_CITY,
+                                                                     sublocality_value__iregex=r'(' + '|'.join(
+                                                                         [x[0] for x in
+                                                                          locality_city_dict.keys()]) + ')',
+                                                                     locality_value__iregex=r'(' + '|'.join(
+                                                                         [x[1] for x in
+                                                                          locality_city_dict.keys()]) + ')'))
+        for x in hosp_locality_entity_qs:
+            if x.sublocality_value and x.locality_value:
+                locality_city_dict[(x.sublocality_value.lower(), x.locality_value.lower())] = x.url
+        hosp_entity_dict = {x.entity_id: x.url for x in hosp_entity_qs}
+        hosp_locality_entity_dict = {
+            x.entity_id: locality_city_dict.get((x.sublocality_value.lower(), x.locality_value.lower()), None) for x in
+            hosp_entity_qs if x.sublocality_value and x.locality_value}
+        return hosp_entity_dict, hosp_locality_entity_dict
 
     @classmethod
     def update_hospital_seo_urls(cls):
