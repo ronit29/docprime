@@ -3612,13 +3612,15 @@ class HospitalViewSet(viewsets.GenericViewSet):
                 city = city_match(validated_data.get('city'))
                 # IPD_PROCEDURE_COST_IN_IPDP
                 temp_url = slugify(ipd_procedure_obj_name + '-hospitals-in-' + city + '-ipdhp')
-                entity = EntityUrls.objects.filter(url=temp_url, url_type='SEARCHURL', entity_type='Hospital',
+                entity = EntityUrls.objects.filter(url=temp_url, url_type=EntityUrls.UrlType.SEARCHURL,
+                                                   entity_type='Hospital',
                                                    is_valid=True,
                                                    locality_value__iexact=city).first()
 
-        breadcrumb = deepcopy(entity.breadcrumb) if entity and isinstance(entity.breadcrumb, list) else []
-        breadcrumb.insert(0, {"title": "Home", "url": "/", "link_title": "Home"})
+
         if entity:
+            breadcrumb = deepcopy(entity.breadcrumb) if isinstance(entity.breadcrumb, list) else []
+            breadcrumb.insert(0, {"title": "Home", "url": "/", "link_title": "Home"})
             locality = entity.sublocality_value
             city = entity.locality_value
             url = entity.url
@@ -3672,7 +3674,10 @@ class HospitalViewSet(viewsets.GenericViewSet):
                                                               'hosp_availability',
                                                               'health_insurance_providers',
                                                               'network__hospital_network_documents',
-                                                              'hospitalspeciality_set').filter(
+                                                              'hospitalspeciality_set').exclude(location__dwithin=(
+            Point(float(long),
+                  float(lat)),
+            D(m=min_distance))).filter(
             is_live=True,
             hospital_doctors__enabled=True,
             location__dwithin=(
@@ -3686,8 +3691,8 @@ class HospitalViewSet(viewsets.GenericViewSet):
             hospital_queryset = hospital_queryset.filter(
                 hospital_doctors__ipd_procedure_clinic_mappings__ipd_procedure_id=ipd_pk,
                 hospital_doctors__ipd_procedure_clinic_mappings__enabled=True)
-        if min_distance:  # TODO : SHASHANK_SINGH add it in query
-            hospital_queryset = filter(lambda x: x.distance.m >= min_distance if x.distance is not None and x.distance.m is not None else False, hospital_queryset)
+        # if min_distance:  # TODO : SHASHANK_SINGH add it in query
+        #     hospital_queryset = filter(lambda x: x.distance.m >= min_distance if x.distance is not None and x.distance.m is not None else False, hospital_queryset)
 
         hospital_queryset = hospital_queryset.distinct()
         result_count = hospital_queryset.count()
