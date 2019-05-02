@@ -1,9 +1,10 @@
-from rest_framework import serializers
-from django.db.models import Q
-from ondoc.prescription import models as prescription_models
-from ondoc.doctor import models as doc_models
-from ondoc.diagnostic import models as diag_models
 import re
+
+from rest_framework import serializers
+
+from ondoc.diagnostic import models as diag_models
+from ondoc.doctor import models as doc_models
+from ondoc.prescription import models as prescription_models
 
 
 class PrescriptionModelComponents():
@@ -34,9 +35,9 @@ class PrescriptionAppointmentValidation():
     @staticmethod
     def validate_appointment_object(attrs):
         if attrs and attrs.get('appointment_type') == prescription_models.PresccriptionPdf.OFFLINE:
-            queryset = doc_models.OfflineOPDAppointments.objects.select_related('doctor', 'hospital', 'user').filter(id=attrs.get('appointment_id'))
+            queryset = doc_models.OfflineOPDAppointments.objects.select_related('doctor', 'hospital', 'user').prefetch_related('eprescription').filter(id=attrs.get('appointment_id'))
         elif attrs.get('appointment_type') == prescription_models.PresccriptionPdf.DOCPRIME_OPD:
-            queryset = doc_models.OpdAppointment.objects.select_related('doctor', 'hospital', 'profile').filter(id=attrs.get('appointment_id'))
+            queryset = doc_models.OpdAppointment.objects.select_related('doctor', 'hospital', 'profile').prefetch_related('eprescription').filter(id=attrs.get('appointment_id'))
         appointment_object = queryset.first()
         if not appointment_object:
             raise serializers.ValidationError('No Appointment found')
@@ -201,26 +202,27 @@ class GeneratePrescriptionPDFBodySerializer(serializers.Serializer):
             attrs['appointment'] = appointment
             if not appointment.doctor.license:
                 raise serializers.ValidationError("Registration Number is required for Generating Prescription")
+
             serial_id = prescription_models.PresccriptionPdf.get_serial(appointment)
-            if attrs.get('appointment_type') == prescription_models.PresccriptionPdf.OFFLINE:
-                prescription_queryset = prescription_models.PresccriptionPdf.objects.filter(offline_opd_appointment=appointment)
-            else:
-                prescription_queryset = prescription_models.PresccriptionPdf.objects.filter(opd_appointment=appointment)
-            if prescription_queryset.exists():
-                queryset = prescription_queryset.filter(id=attrs.get("id"))
-                if queryset.exists():
+            exists = False
+            i=0
+            for pres in appointment.eprescription.all():
+                i=+1
+                if str(pres.id) == attrs.get("id"):
                     attrs['task'] = prescription_models.PresccriptionPdf.UPDATE
-                    obj = queryset.first()
-                    attrs['prescription_pdf'] = obj
-                    version = str(int(obj.serial_id[-2:]) + 1).zfill(2)
+                    attrs['prescription_pdf'] = pres
+                    version = str(int(pres.serial_id[-2:]) + 1).zfill(2)
                     attrs['serial_id'] = serial_id[-12:-2] + version
-                else:
+                    exists = True
+                    break
+            if not exists:
+                if i!=0:
                     attrs['task'] = prescription_models.PresccriptionPdf.CREATE
                     file_no = str(int(serial_id[-5:-3]) + 1).zfill(2)
-                    attrs['serial_id'] = serial_id[-12:-5] + file_no + serial_id[-3:]
-            else:
-                attrs['task'] = prescription_models.PresccriptionPdf.CREATE
-                attrs['serial_id'] = str(int(serial_id[-12:-6]) + 1) + serial_id[-6:]
+                    attrs['serial_id'] = serial_id[-12:-5] + file_no + '-01'
+                else:
+                    attrs['task'] = prescription_models.PresccriptionPdf.CREATE
+                    attrs['serial_id'] = str(int(serial_id[-12:-6]) + 1) + '-01-01'
         return attrs
 
 
