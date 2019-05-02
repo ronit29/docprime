@@ -13,7 +13,6 @@ $( document ).ready(function() {
 
     $("#id_url_value").on('keypress', function(e){
     var query = $(this).val();
-
         $.ajax({
                     type: "GET",
                     url:  '/api/v1/common/entity-compare-autocomplete',
@@ -21,15 +20,11 @@ $( document ).ready(function() {
                     success: function(response) {
                         document.getElementById('custom_dropdown').innerHTML = '';
                          if(response){
-
-
                              var data = response;
                               $.each(data, function(k, v) {
                                var li_elem = '<li>'+v+'</li>';
                                 $(li_elem).appendTo('#custom_dropdown');
-    //                            dropdown.append('<option value="' + v.id + '">' + v.name + '</option>');
                               });
-
                           }
                     },
                     error: function (request, status, error) {
@@ -37,7 +32,6 @@ $( document ).ready(function() {
                     }
                });
     } );
-
 });
 
 function getCookie(name) {

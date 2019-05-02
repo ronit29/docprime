@@ -64,27 +64,28 @@ class NewDynamic(TimeStampedModel):
     is_enabled = models.BooleanField(default=False)
     meta_title = models.CharField(max_length=5000, default='', blank=True)
     meta_description = models.CharField(max_length=5000, default='', blank=True)
+
     class Meta:
         db_table = "dynamic_url_content"
 
     def save(self, force_insert=False, force_update=False, using=None, update_fields=None):
-
         if self.is_html_empty(self.top_content):
-            self.top_content=''
+            self.top_content = ''
         if self.is_html_empty(self.bottom_content):
-            self.bottom_content=''
+            self.bottom_content = ''
         self.top_content = self.top_content.strip("&nbsp;").strip()
-
+        entity_to_be_used = None
         if (not self.id or not self.top_content) and self.url and self.url.url_type == EntityUrls.UrlType.SEARCHURL:
-            # self.top_content = if not strip_tags(self.top_content).strip("&nbsp;").strip():
+            entity_to_be_used = self.url
+        if (not self.id or not self.top_content) and self.url_value:
+            entity_to_be_used = EntityUrls.objects.filter(url_type=EntityUrls.UrlType.SEARCHURL, url=self.url_value,
+                                                          is_valid=True).first()
+
+        if entity_to_be_used:
             ps_content = PracticeSpecializationContent.objects.filter(
-                specialization_id=self.url.specialization_id).first()
+                specialization_id=entity_to_be_used.specialization_id).first()
             if ps_content:
                 self.top_content = ps_content.content
-                # if self.url.url_type == EntityUrls.UrlType.SEARCHURL and PracticeSpecializationContent.objects.filter(
-                #         specialization_id=self.url.specialization_id):
-                #     self.top_content = PracticeSpecializationContent.objects.filter(
-                #         specialization_id=self.url.specialization_id).first().content
 
         if self.url:
             self.url_value = self.url.url
