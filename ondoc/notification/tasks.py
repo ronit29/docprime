@@ -262,6 +262,7 @@ def set_order_dummy_transaction(self, order_id, user_id):
     from ondoc.doctor.models import OpdAppointment
     from ondoc.diagnostic.models import LabAppointment
     from ondoc.account.models import User
+    req_data = dict()
     try:
         order_row = Order.objects.filter(id=order_id).first()
         user = User.objects.filter(id=user_id).first()
@@ -285,7 +286,7 @@ def set_order_dummy_transaction(self, order_id, user_id):
             "Content-Type": "application/json"
         }
         url = settings.PG_DUMMY_TRANSACTION_URL
-        insurance_data = self.get_insurance_data_for_pg()
+        insurance_data = order_row.get_insurance_data_for_pg()
 
         name  = ''
         if isinstance(appointment, OpdAppointment) or isinstance(appointment, LabAppointment):
