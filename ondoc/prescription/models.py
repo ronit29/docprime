@@ -201,6 +201,7 @@ class PresccriptionPdf(auth_models.TimeStampedModel):
         pdf_dict = {'medicines': self.medicines if self.medicines else [],
                     'special_instructions': self.special_instructions if self.special_instructions else [],
                     'pres_id': self.id,
+                    'serial_id': self.serial_id,
                     'symptoms_complaints': self.symptoms_complaints if self.symptoms_complaints else [],
                     'diagnoses': self.diagnoses if self.diagnoses else [],
                     'doc_name': appointment.doctor.name,
