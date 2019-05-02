@@ -1142,7 +1142,8 @@ class PrescriptionFileViewset(OndocViewSet):
                 appointment=validated_data.get('appointment_obj')
             )
             app = validated_data['appointment_obj']
-            resp_data = {'doctor': serializers.AppointmentRetrieveDoctorSerializer(app.doctor).data,
+            resp_data = {'id': app.id,
+                         'doctor': serializers.AppointmentRetrieveDoctorSerializer(app.doctor).data,
                          'time_slot_start': app.time_slot_start,
                          'hospital': serializers.HospitalModelSerializer(app.hospital).data,
                          'profile': OfflinePatientSerializer(app.user).data,
