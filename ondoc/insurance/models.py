@@ -1155,11 +1155,11 @@ class UserInsurance(auth_model.TimeStampedModel):
         from ondoc.doctor.models import OpdAppointment
         from ondoc.diagnostic.models import LabAppointment
         res = {}
-        opd_appointment_count = OpdAppointment.get_insured_completed_appointment(self)
-        lab_appointment_count = LabAppointment.get_insured_completed_appointment(self)
-        if opd_appointment_count > 0 or lab_appointment_count > 0:
-            res['error'] = "One of the OPD or LAB Appointment have been completed, Cancellation could not be processed"
-            return res
+        # opd_appointment_count = OpdAppointment.get_insured_completed_appointment(self)
+        # lab_appointment_count = LabAppointment.get_insured_completed_appointment(self)
+        # if opd_appointment_count > 0 or lab_appointment_count > 0:
+        #     res['error'] = "One of the OPD or LAB Appointment have been completed, Cancellation could not be processed"
+        #     return res
             # return Response(data=res, status=status.HTTP_400_BAD_REQUEST)
         opd_active_appointment = OpdAppointment.get_insured_active_appointment(self)
         lab_active_appointment = LabAppointment.get_insured_active_appointment(self)
@@ -1172,11 +1172,7 @@ class UserInsurance(auth_model.TimeStampedModel):
         self.status = UserInsurance.CANCEL_INITIATE
         self.save()
         transaction.on_commit(lambda: self.after_commit_task())
-        # InsuranceTransaction.objects.create(user_insurance=self,
-        #                                     account=self.insurance_plan.insurer.float.all().first(),
-        #                                     transaction_type=InsuranceTransaction.CREDIT,
-        #                                     amount=self.premium_amount)
-        res['success'] = "Cancellation request recieved, refund will be credited in your account in 10-15 working days"
+        res['success'] = "Cancellation request received, refund will be credited in your account in 10-15 working days"
         return res
 
     def after_commit_task(self):

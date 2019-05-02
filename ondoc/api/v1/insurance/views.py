@@ -424,7 +424,11 @@ class InsuranceCancelViewSet(viewsets.GenericViewSet):
         if not user.active_insurance:
             res['error'] = "Insurance is not active"
             return Response(data=res, status=status.HTTP_400_BAD_REQUEST)
-
+        opd_appointment_count = OpdAppointment.get_insured_completed_appointment(user_insurance)
+        lab_appointment_count = LabAppointment.get_insured_completed_appointment(user_insurance)
+        if opd_appointment_count > 0 or lab_appointment_count > 0:
+            res['error'] = "One of the OPD or LAB Appointment have been completed, Cancellation could not be processed"
+            return Response(data=res, status=status.HTTP_400_BAD_REQUEST)
         response = user_insurance.process_cancellation()
         return Response(data=response, status=status.HTTP_200_OK)
 
