@@ -1,7 +1,6 @@
 from ondoc.api.pagination import paginate_queryset
 from django.db import transaction
 from django.db.models import Q
-from django.conf import settings
 from rest_framework.response import Response
 from rest_framework import viewsets, mixins, status
 from ondoc.authentication.backends import JWTAuthentication
@@ -13,7 +12,6 @@ from ondoc.prescription import models as prescription_models
 from ondoc.diagnostic import models as diagnostic_models
 from ondoc.api.v1 import utils
 from django.utils import timezone
-from django.core import serializers as django_serializers
 import logging, random
 logger = logging.getLogger(__name__)
 from datetime import datetime
@@ -92,7 +90,6 @@ class PrescriptionComponentsViewSet(viewsets.GenericViewSet):
         model_serializer = dict(serializers.PrescriptionModelSerializerComponents.COMPONENT_CHOICES)[data.get('type')](object)
         return model_serializer.data
 
-    # TODO - ADD SOURCE TYPE
     def save_components(self, request):
         serializer = serializers.BulkCreatePrescriptionComponentSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
@@ -103,7 +100,6 @@ class PrescriptionComponentsViewSet(viewsets.GenericViewSet):
             resp.append(created_object)
         return Response({'status': 1, 'data': resp})
 
-    # TODO - ADD SOURCE TYPE
     def sync_component(self, request):
         serializer = serializers.PrescriptionComponentSyncSerializer(data=request.query_params)
         serializer.is_valid(raise_exception=True)
