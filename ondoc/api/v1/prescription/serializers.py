@@ -115,8 +115,8 @@ class PrescriptionPatientSerializer(serializers.Serializer):
     phone_number = serializers.IntegerField(required=False, allow_null=True)
 
     def validate(self, attrs):
-        if not PrescriptionAppointmentValidation.validate_uuid(attrs.get("id")):
-            raise serializers.ValidationError("Invalid UUID - {}".format(attrs.get('id')))
+        if not (PrescriptionAppointmentValidation.validate_uuid(attrs.get("id")) or attrs.get('id').isdigit()):
+            raise serializers.ValidationError("Invalid UUID or not a number- {}".format(attrs.get('id')))
         return attrs
 
 
