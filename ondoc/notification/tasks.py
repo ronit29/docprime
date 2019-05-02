@@ -262,118 +262,76 @@ def set_order_dummy_transaction(self, order_id, user_id):
     from ondoc.doctor.models import OpdAppointment
     from ondoc.diagnostic.models import LabAppointment
     from ondoc.account.models import User
+    req_data = dict()
     try:
         order_row = Order.objects.filter(id=order_id).first()
         user = User.objects.filter(id=user_id).first()
 
-        if order_row and order_row.parent:
+        if not order_row or not user:
+            raise Exception('order and user are required')
+        if order_row.getTransactions():
+            return
+        if not order_row.dummy_transaction_allowed():
             raise Exception("Cannot create dummy payout for a child order.")
 
-        if order_row and user:
-            if order_row.getTransactions():
-                #print("dummy Transaction already set")
-                return
+        appointment = order_row.getAppointment()
+        if not appointment:
+            raise Exception("No Appointment/UserPlanMapping found.")
 
-            appointment = order_row.getAppointment()
-            if not appointment:
-                raise Exception("No Appointment/UserPlanMapping found.")
+        total_price = order_row.get_total_price()
 
-            total_price = order_row.get_total_price()
+        token = settings.PG_DUMMY_TRANSACTION_TOKEN
+        headers = {
+            "auth": token,
+            "Content-Type": "application/json"
+        }
+        url = settings.PG_DUMMY_TRANSACTION_URL
+        insurance_data = order_row.get_insurance_data_for_pg()
 
-            token = settings.PG_DUMMY_TRANSACTION_TOKEN
-            headers = {
-                "auth": token,
-                "Content-Type": "application/json"
-            }
-            url = settings.PG_DUMMY_TRANSACTION_URL
+        name  = ''
+        if isinstance(appointment, OpdAppointment) or isinstance(appointment, LabAppointment):
+            name = appointment.profile.name
 
-            insurer_code = None
-            insurance_order_id = None
-            insurance_order_number = None
-            if order_row.product_id == Order.INSURANCE_PRODUCT_ID:
-                insurer_code = appointment.insurance_plan.insurer.insurer_merchant_code
+        if isinstance(appointment, UserInsurance):
+            name = appointment.user.full_name
 
-            user_insurance = UserInsurance.objects.filter(order=order_row).first()
+        req_data = {
+            "customerId": user_id,
+            "mobile": user.phone_number,
+            "email": user.email or "dummyemail@docprime.com",
+            "productId": order_row.product_id,
+            "orderId": order_id,
+            "name": name,
+            "txAmount": 0,
+            "couponCode": "",
+            "couponAmt": str(total_price),
+            "paymentMode": "DC",
+            "AppointmentId": appointment.id,
+            "buCallbackSuccessUrl": "",
+            "buCallbackFailureUrl": ""
+        }
 
-            appointment_obj = None
-            if order_row.product_id == Order.DOCTOR_PRODUCT_ID:
-                appointment_obj = OpdAppointment.objects.filter(id=order_row.reference_id).first()
+        req_data.update(insurance_data)
 
-            if order_row.product_id == Order.LAB_PRODUCT_ID:
-                appointment_obj = LabAppointment.objects.filter(id=order_row.reference_id).first()
+        response = requests.post(url, data=json.dumps(req_data), headers=headers)
+        if response.status_code == status.HTTP_200_OK:
+            resp_data = response.json()
+            #logger.error(resp_data)
+            if resp_data.get("ok") is not None and resp_data.get("ok") == 1:
+                tx_data = {}
+                tx_data['user'] = user
+                tx_data['product_id'] = order_row.product_id
+                tx_data['order_no'] = resp_data.get('orderNo')
+                tx_data['order_id'] = order_row.id
+                tx_data['reference_id'] = appointment.id
+                tx_data['type'] = DummyTransactions.CREDIT
+                tx_data['amount'] = total_price
+                tx_data['payment_mode'] = "DC"
 
-            if appointment_obj and appointment_obj.payment_type == Order.INSURANCE_PRODUCT_ID and appointment_obj.insurance.id == user_insurance.id:
-                insurance_order = user_insurance.order
-
-                insurance_order_transactions = insurance_order.getTransactions()
-                if not insurance_order_transactions:
-                    raise Exception('No transactions found for appointment insurance.')
-                insurance_order_transaction = insurance_order_transactions[0]
-                insurance_order_id = insurance_order_transaction.order_id
-                insurance_order_number = insurance_order_transaction.order_no
-
-            name  = ''
-            if isinstance(appointment, OpdAppointment) or isinstance(appointment, LabAppointment):
-                name = appointment.profile.name
-
-            if isinstance(appointment, UserInsurance):
-                name = appointment.user.full_name
-           
-            req_data = {
-                "customerId": user_id,
-                "mobile": user.phone_number,
-                "email": user.email or "dummyemail@docprime.com",
-                "productId": order_row.product_id,
-                "orderId": order_id,
-                "name": name,
-                "txAmount": 0,
-                "couponCode": "",
-                "couponAmt": str(total_price),
-                "paymentMode": "DC",
-                "AppointmentId": appointment.id,
-                "buCallbackSuccessUrl": "",
-                "buCallbackFailureUrl": ""
-            }
-
-            if insurance_order_id and insurance_order_number:
-                req_data['refOrderNo'] = str(insurance_order_number)
-                req_data['refOrderId'] = str(insurance_order_id)
-
-            if insurer_code:
-                req_data['merchCode'] = insurer_code
-
-
-            response = requests.post(url, data=json.dumps(req_data), headers=headers)
-            if response.status_code == status.HTTP_200_OK:
-                resp_data = response.json()
-                #logger.error(resp_data)
-                if resp_data.get("ok") is not None and resp_data.get("ok") == 1:
-                    tx_data = {}
-                    tx_data['user'] = user
-                    tx_data['product_id'] = order_row.product_id
-                    tx_data['order_no'] = resp_data.get('orderNo')
-                    tx_data['order_id'] = order_row.id
-                    tx_data['reference_id'] = appointment.id
-                    tx_data['type'] = DummyTransactions.CREDIT
-                    tx_data['amount'] = total_price
-                    tx_data['payment_mode'] = "DC"
-
-                    # tx_data['transaction_id'] = resp_data.get('orderNo')
-                    # tx_data['response_code'] = response.get('responseCode')
-                    # tx_data['bank_id'] = response.get('bankTxId')
-                    # transaction_time = parse(response.get("txDate"))
-                    # tx_data['transaction_date'] = transaction_time
-                    # tx_data['bank_name'] = response.get('bankName')
-                    # tx_data['currency'] = response.get('currency')
-                    # tx_data['status_code'] = response.get('statusCode')
-                    # tx_data['pg_name'] = response.get('pgGatewayName')
-                    # tx_data['status_type'] = response.get('txStatus')
-                    # tx_data['pb_gateway_name'] = response.get('pbGatewayName')
-
-                    DummyTransactions.objects.create(**tx_data)
-                    #print("SAVED DUMMY TRANSACTION")
-            else:
-                raise Exception("Retry on invalid Http response status - " + str(response.content))
+                DummyTransactions.objects.create(**tx_data)
+                #print("SAVED DUMMY TRANSACTION")
+        else:
+            raise Exception("Retry on invalid Http response status - " + str(response.content))
 
     except Exception as e:
         logger.error("Error in Setting Dummy Transaction of user with data - " + json.dumps(req_data) + " with exception - " + str(e))
@@ -879,3 +837,83 @@ def refund_breakup_sms_task(obj_id):
         sms_notification.send(receivers)
     except Exception as e:
         logger.error(str(e))
+
+
+@task(bind=True, max_retries=2)
+def push_insurance_banner_lead_to_matrix(self, data):
+    from ondoc.insurance.models import InsuranceLead, InsurancePlans
+    try:
+        if not data:
+            raise Exception('Data not received for banner lead.')
+
+        id = data.get('id', None)
+        if not id:
+            logger.error("[CELERY ERROR: Incorrect values provided.]")
+            raise ValueError()
+
+        banner_obj = InsuranceLead.objects.filter(id=id).first()
+
+        if not banner_obj:
+            raise Exception("Banner object could not found against id - " + str(id))
+
+        extras = banner_obj.extras
+        plan_id = extras.get('plan_id', None)
+        plan = None
+        if plan_id and type(plan_id).__name__ == 'int':
+            plan = InsurancePlans.objects.filter(id=plan_id).first()
+
+        request_data = {
+            'LeadID': banner_obj.matrix_lead_id if banner_obj.matrix_lead_id else 0,
+            'LeadSource': 'InsuranceOPD',
+            'Name': 'none',
+            'BookedBy': banner_obj.user.phone_number,
+            'PrimaryNo': banner_obj.user.phone_number,
+            'PaymentStatus': 0,
+            'UtmCampaign': extras.get('utm_campaign', ''),
+            'UTMMedium': extras.get('utm_medium', ''),
+            'UtmSource': extras.get('utm_source', ''),
+            'UtmTerm': extras.get('utm_term', ''),
+            'ProductId': 5,
+            'SubProductId': 3,
+            'PolicyDetails': {
+                "ProposalNo": None,
+                "BookingId": None,
+                'PolicyPaymentSTATUS': 0,
+                "ProposerName": None,
+                "PolicyId": None,
+                "InsurancePlanPurchased": plan.name if plan else None,
+                "PurchaseDate": None,
+                "ExpirationDate": None,
+                "COILink": None,
+                "PeopleCovered": 0
+            }
+        }
+
+        url = settings.MATRIX_API_URL
+        matrix_api_token = settings.MATRIX_API_TOKEN
+        response = requests.post(url, data=json.dumps(request_data), headers={'Authorization': matrix_api_token,
+                                                                              'Content-Type': 'application/json'})
+
+        if response.status_code != status.HTTP_200_OK or not response.ok:
+            logger.error(json.dumps(request_data))
+            logger.info("[ERROR] Insurance banner lead could not be published to the matrix system")
+            logger.info("[ERROR] %s", response.reason)
+
+            countdown_time = (2 ** self.request.retries) * 60 * 10
+            logging.error("Lead sync with the Matrix System failed with response - " + str(response.content))
+            print(countdown_time)
+            self.retry([data], countdown=countdown_time)
+        else:
+            resp_data = response.json()
+            if not resp_data:
+                raise Exception('Data received from matrix is null or empty.')
+
+            if not resp_data.get('Id', None):
+                logger.error(json.dumps(request_data))
+                raise Exception("[ERROR] Id not recieved from the matrix while pushing insurance banner lead to matrix.")
+
+            insurance_banner_qs = InsuranceLead.objects.filter(id=id)
+            insurance_banner_qs.update(matrix_lead_id=resp_data.get('Id'))
+
+    except Exception as e:
+        logger.error("Error in Celery. Failed pushing insurance banner lead to the matrix- " + str(e))

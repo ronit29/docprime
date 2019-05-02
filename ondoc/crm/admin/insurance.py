@@ -641,7 +641,7 @@ class UserInsuranceResource(resources.ModelResource):
         return str(insurance.receipt_number)
 
     def dehydrate_coi(self, insurance):
-        return str(insurance.coi)
+        return insurance.coi.url if insurance.coi is not None and insurance.coi.name else ''
 
     def dehydrate_matrix_lead(self, insurance):
         return str(insurance.matrix_lead_id)
@@ -666,18 +666,22 @@ class UserInsuranceForm(forms.ModelForm):
 
     status_choices = [(UserInsurance.ACTIVE, "Active"), (UserInsurance.CANCEL_INITIATE, 'Cancel Initiate'),
                       (UserInsurance.CANCELLED, "Cancelled")]
+    # case_choices = [("REFUND", "Refundable"), ("NON-REFUND", "Non-Refundable")]
+    cancel_after_utilize_choices = [('YES', 'Yes'), ('NO', 'No')]
     status = forms.ChoiceField(choices=status_choices, required=True)
+    cancel_after_utilize_insurance = forms.ChoiceField(choices=cancel_after_utilize_choices, initial='NO',  widget=forms.RadioSelect())
     onhold_reason = forms.CharField(max_length=400, required=False)
 
     def clean(self):
         super().clean()
         data = self.cleaned_data
         status = data.get('status')
+        case_type = data.get('cancel_after_utilize_insurance')
         onhold_reason = data.get('onhold_reason')
         if int(status) == UserInsurance.ONHOLD:
             if not onhold_reason:
                 raise forms.ValidationError("In Case of ONHOLD status, Onhold reason is mandatory")
-        elif int(status) == UserInsurance.CANCEL_INITIATE or int(status) == UserInsurance.CANCELLED:
+        elif case_type=="NO" and int(status) == UserInsurance.CANCEL_INITIATE or int(status) == UserInsurance.CANCELLED:
             insured_opd_completed_app_count = OpdAppointment.get_insured_completed_appointment(self.instance)
             insured_lab_completed_app_count = LabAppointment.get_insured_completed_appointment(self.instance)
             if insured_lab_completed_app_count > 0:
@@ -714,10 +718,19 @@ class UserInsuranceAdmin(ImportExportMixin, admin.ModelAdmin):
     #     return cities
 
     list_display = ['id', 'insurance_plan', 'user_name', 'user', 'policy_number', 'purchase_date','merchant_payout']
-    fields = ['insurance_plan', 'user', 'purchase_date', 'expiry_date', 'policy_number', 'premium_amount', 'merchant_payout', 'status', 'onhold_reason']
+    fields = ['insurance_plan', 'user', 'purchase_date', 'expiry_date', 'policy_number', 'premium_amount',
+              'merchant_payout', 'status', 'onhold_reason', 'cancel_after_utilize_insurance']
     readonly_fields = ('insurance_plan', 'user', 'purchase_date', 'expiry_date', 'policy_number', 'premium_amount', 'merchant_payout')
     inlines = [InsuredMembersInline]
     form = UserInsuranceForm
+    search_fields = ['id']
+
+    def get_search_results(self, request, queryset, search_term):
+        queryset, use_distinct = super().get_search_results(request, queryset, None)
+
+        queryset = queryset.filter(Q(user__profiles__name__icontains=search_term)).distinct()
+
+        return queryset, use_distinct
 
     def get_export_queryset(self, request):
         super().get_export_queryset(request)
@@ -750,8 +763,7 @@ class UserInsuranceAdmin(ImportExportMixin, admin.ModelAdmin):
 
     @transaction.atomic
     def save_model(self, request, obj, form, change):
-        print('data is here')
-        if request.user.is_member_of(constants['INSURANCE_GROUP']):
+        if request.user.is_member_of(constants['SUPER_INSURANCE_GROUP']):
             if obj.status == UserInsurance.ACTIVE:
                 super(UserInsuranceAdmin, self).save_model(request, obj, form, change)
             elif obj.status == UserInsurance.ONHOLD:
