@@ -857,7 +857,10 @@ def push_insurance_banner_lead_to_matrix(self, data):
             raise Exception("Banner object could not found against id - " + str(id))
 
         extras = banner_obj.extras
-        plan = InsurancePlans.objects.filter(id=extras.get('plan_id', 0)).first()
+        plan_id = extras.get('plan_id', None)
+        plan = None
+        if plan_id and type(plan_id).__name__ == 'int':
+            plan = InsurancePlans.objects.filter(id=plan_id).first()
 
         request_data = {
             'LeadID': banner_obj.matrix_lead_id if banner_obj.matrix_lead_id else 0,
