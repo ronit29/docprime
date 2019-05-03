@@ -1341,6 +1341,7 @@ class InsuranceDisease(auth_model.TimeStampedModel):
     disease = models.CharField(max_length=100)
     enabled = models.BooleanField()
     is_live = models.BooleanField()
+    is_female_related = models.BooleanField(default=False)
 
     class Meta:
         db_table = "insurance_disease"
