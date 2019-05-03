@@ -2104,6 +2104,10 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
                     eta=self.time_slot_start + datetime.timedelta(
                         minutes=settings.TIME_AFTER_APPOINTMENT_TO_SEND_SECOND_CONFIRMATION), )
                 # notification_tasks.opd_send_otp_before_appointment(self.id, self.time_slot_start)
+                notification_tasks.appointment_reminder_sms_provider.apply_async(
+                    (self.id, self.updated_at),
+                    eta=self.time_slot_start - datetime.timedelta(
+                        minutes=settings.PROVIDER_SMS_APPOINTMENT_REMINDER_TIME), )
             except Exception as e:
                 logger.error(str(e))
 
