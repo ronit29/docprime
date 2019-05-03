@@ -666,12 +666,12 @@ class UserInsuranceForm(forms.ModelForm):
 
     status_choices = [(UserInsurance.ACTIVE, "Active"), (UserInsurance.CANCEL_INITIATE, 'Cancel Initiate'),
                       (UserInsurance.CANCELLED, "Cancelled")]
-    case_choices = [("REFUND", "Refundable"), ("NON-REFUND", "Non-Refundable")]
+    case_choices = [(UserInsurance.REFUND, "Refundable"), (UserInsurance.NO_REFUND, "Non-Refundable")]
     cancel_after_utilize_choices = [('YES', 'Yes'), ('NO', 'No')]
     status = forms.ChoiceField(choices=status_choices, required=True)
     cancel_after_utilize_insurance = forms.ChoiceField(choices=cancel_after_utilize_choices, initial='NO',  widget=forms.RadioSelect())
     onhold_reason = forms.CharField(max_length=400, required=False)
-    cancel_case_type = forms.ChoiceField(choices=case_choices, initial='REFUND')
+    cancel_case_type = forms.ChoiceField(choices=case_choices, initial=UserInsurance.REFUND)
 
 
     def clean(self):
