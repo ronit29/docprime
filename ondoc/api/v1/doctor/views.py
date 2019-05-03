@@ -1417,7 +1417,8 @@ class DoctorListViewSet(viewsets.GenericViewSet):
             saved_search_result = get_object_or_404(models.DoctorSearchResult, pk=validated_data.get("search_id"))
         doctor_ids = paginate_queryset([data.get("doctor_id") for data in doctor_search_result], request)
         temp_hospital_ids = paginate_queryset([data.get("hospital_id") for data in doctor_search_result], request)
-        hosp_entity_dict, hosp_locality_entity_dict = Hospital.get_hosp_and_locality_dict(temp_hospital_ids)
+        hosp_entity_dict, hosp_locality_entity_dict = Hospital.get_hosp_and_locality_dict(temp_hospital_ids,
+                                                                                          EntityUrls.SitemapIdentifier.DOCTORS_LOCALITY_CITY)
         preserved = Case(*[When(pk=pk, then=pos) for pos, pk in enumerate(doctor_ids)])
         doctor_data = models.Doctor.objects.filter(
             id__in=doctor_ids).prefetch_related("hospitals", "doctor_clinics", "doctor_clinics__availability",
@@ -3704,7 +3705,8 @@ class HospitalViewSet(viewsets.GenericViewSet):
         if count:
             hospital_queryset = hospital_queryset[:count]
         temp_hospital_ids = [x.id for x in hospital_queryset]
-        hosp_entity_dict, hosp_locality_entity_dict = Hospital.get_hosp_and_locality_dict(temp_hospital_ids)
+        hosp_entity_dict, hosp_locality_entity_dict = Hospital.get_hosp_and_locality_dict(temp_hospital_ids,
+                                                                                          EntityUrls.SitemapIdentifier.HOSPITALS_LOCALITY_CITY)
         top_hospital_serializer = serializers.TopHospitalForIpdProcedureSerializer(hospital_queryset, many=True,
                                                                                    context={'request': request,
                                                                                             'hosp_entity_dict': hosp_entity_dict,

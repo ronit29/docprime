@@ -255,7 +255,7 @@ class Hospital(auth_model.TimeStampedModel, auth_model.CreatedByModel, auth_mode
     #         return self.city
     #     return None
     @classmethod
-    def get_hosp_and_locality_dict(cls, temp_hospital_ids):
+    def get_hosp_and_locality_dict(cls, temp_hospital_ids, required_identifier):
         if not temp_hospital_ids:
             return {}, {}
         from ondoc.location.models import EntityUrls
@@ -267,7 +267,7 @@ class Hospital(auth_model.TimeStampedModel, auth_model.CreatedByModel, auth_mode
         hosp_locality_entity_qs = []
         if locality_city_dict:
             hosp_locality_entity_qs = list(EntityUrls.objects.filter(is_valid=True,
-                                                                     sitemap_identifier=EntityUrls.SitemapIdentifier.HOSPITALS_LOCALITY_CITY,
+                                                                     sitemap_identifier=required_identifier,
                                                                      sublocality_value__iregex=r'(' + '|'.join(
                                                                          [x[0] for x in
                                                                           locality_city_dict.keys()]) + ')',
