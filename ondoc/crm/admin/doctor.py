@@ -46,7 +46,7 @@ from ondoc.doctor.models import (Doctor, DoctorQualification,
                                  DoctorPracticeSpecialization, CompetitorMonthlyVisit,
                                  GoogleDetailing, VisitReason, VisitReasonMapping, PracticeSpecializationContent,
                                  PatientMobile, DoctorMobileOtp,
-                                 UploadDoctorData, CancellationReason)
+                                 UploadDoctorData, CancellationReason, Prescription, PrescriptionFile)
 
 from ondoc.authentication.models import User
 from .common import *
@@ -1505,12 +1505,30 @@ class DoctorOpdAppointmentForm(RefundableAppointmentForm):
         return cleaned_data
 
 
+
+class PrescriptionFileInline(nested_admin.NestedTabularInline):
+    model = PrescriptionFile
+    extra = 0
+    can_delete = True
+    show_change_link = True
+
+
+class PrescriptionInline(nested_admin.NestedTabularInline):
+    model = Prescription
+    extra = 0
+    can_delete = True
+    show_change_link = True
+    inlines = [PrescriptionFileInline]
+
+
+
 class DoctorOpdAppointmentAdmin(admin.ModelAdmin):
     form = DoctorOpdAppointmentForm
     search_fields = ['id', 'profile__name', 'profile__phone_number', 'doctor__name', 'hospital__name']
     list_display = ('booking_id', 'get_doctor', 'get_profile', 'status', 'time_slot_start', 'effective_price', 'created_at', 'updated_at')
     list_filter = ('status', 'payment_type')
     date_hierarchy = 'created_at'
+    inlines = [PrescriptionInline]
 
     def get_queryset(self, request):
         return super(DoctorOpdAppointmentAdmin, self).get_queryset(request).select_related('doctor', 'hospital', 'hospital__network')

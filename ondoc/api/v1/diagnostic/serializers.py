@@ -601,13 +601,13 @@ class LabAppointmentModelSerializer(serializers.ModelSerializer):
     lab_test = serializers.SerializerMethodField()
     invoices = serializers.SerializerMethodField()
     reports = serializers.SerializerMethodField()
-    report_type = serializers.SerializerMethodField()
+    report_files = serializers.SerializerMethodField()
     prescription = serializers.SerializerMethodField()
 
     def get_prescription(self, obj):
         return []
 
-    def get_report_type(self, obj):
+    def get_report_files(self, obj):
         if obj:
             return obj.get_report_type()
 
@@ -643,7 +643,7 @@ class LabAppointmentModelSerializer(serializers.ModelSerializer):
     class Meta:
         model = LabAppointment
         fields = ('id', 'lab', 'lab_test', 'profile', 'type', 'lab_name', 'status', 'deal_price', 'effective_price', 'time_slot_start', 'time_slot_end',
-                   'is_home_pickup', 'lab_thumbnail', 'lab_image', 'patient_thumbnail', 'patient_name', 'allowed_action', 'address', 'invoices', 'reports', 'report_type',
+                   'is_home_pickup', 'lab_thumbnail', 'lab_image', 'patient_thumbnail', 'patient_name', 'allowed_action', 'address', 'invoices', 'reports', 'report_files',
                   'prescription')
 
 
