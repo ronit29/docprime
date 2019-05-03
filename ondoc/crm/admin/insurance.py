@@ -14,6 +14,7 @@ import nested_admin
 from import_export import fields, resources
 from datetime import datetime
 from ondoc.insurance.models import InsuranceDisease
+from django.db import transaction
 from django.conf import settings
 
 
@@ -25,6 +26,7 @@ class InsurerAdmin(admin.ModelAdmin):
 
 class InsurerFloatAdmin(admin.ModelAdmin):
     list_display = ['insurer']
+    readonly_fields = ['insurer', 'current_float']
 
 
 class InsurancePlanContentInline(admin.TabularInline):
@@ -266,7 +268,7 @@ class UserInsuranceDoctorResource(resources.ModelResource):
         request = kwargs.get('request')
         date_range = [datetime.strptime(kwargs.get('from_date'), '%Y-%m-%d').date(), datetime.strptime(
                                         kwargs.get('to_date'), '%Y-%m-%d').date()]
-        if request.user.is_member_of(constants['INSURANCE_GROUP']):
+        if request and request.user.is_member_of(constants['INSURANCE_GROUP']):
             appointment = OpdAppointment.objects.filter(~Q(status=OpdAppointment.CANCELLED),
                                                         created_at__date__range=date_range,
                                                         insurance__isnull=False).prefetch_related('insurance')
@@ -334,7 +336,7 @@ class UserInsuranceDoctorResource(resources.ModelResource):
             return ""
 
     def dehydrate_date_of_consultation(self, appointment):
-        return str(appointment.time_slot_start.date())
+        return str(appointment.time_slot_start)
 
     def dehydrate_name_of_doctor(self, appointment):
         return str(appointment.doctor.name)
@@ -446,7 +448,7 @@ class UserInsuranceLabResource(resources.ModelResource):
         request = kwargs.get('request')
         date_range = [datetime.strptime(kwargs.get('from_date'), '%Y-%m-%d').date(), datetime.strptime(
                                         kwargs.get('to_date'), '%Y-%m-%d').date()]
-        if request.user.is_member_of(constants['INSURANCE_GROUP']):
+        if request and request.user.is_member_of(constants['INSURANCE_GROUP']):
             appointment = LabAppointment.objects.filter(~Q(status=LabAppointment.CANCELLED),
                                                         created_at__date__range=date_range,
                                                         insurance__isnull=False).prefetch_related('insurance')
@@ -502,7 +504,7 @@ class UserInsuranceLabResource(resources.ModelResource):
             return ""
 
     def dehydrate_date_of_consultation(self, appointment):
-        return str(appointment.time_slot_start.date())
+        return str(appointment.time_slot_start)
 
     def dehydrate_name_of_diagnostic_center(self, appointment):
         return str(appointment.lab.name)
@@ -639,10 +641,62 @@ class UserInsuranceResource(resources.ModelResource):
         return str(insurance.receipt_number)
 
     def dehydrate_coi(self, insurance):
-        return str(insurance.coi)
+        return insurance.coi.url if insurance.coi is not None and insurance.coi.name else ''
 
     def dehydrate_matrix_lead(self, insurance):
         return str(insurance.matrix_lead_id)
+
+
+class CustomDateInput(forms.DateInput):
+    input_type = 'date'
+
+
+# class UserInsuranceForm(forms.ModelForm):
+#     start_date = forms.DateField(widget=CustomDateInput(format=('%d-%m-%Y'), attrs={'placeholder': 'Select a date'}))
+#     end_date = forms.DateField(widget=CustomDateInput(format=('%d-%m-%Y'), attrs={'placeholder': 'Select a date'}))
+#
+#     def clean(self):
+#         cleaned_data = super().clean()
+#         start = cleaned_data.get("start_date")
+#         end = cleaned_data.get("end_date")
+#         if start and end and start >= end:
+#             raise forms.ValidationError("Start Date should be less than end Date")
+
+class UserInsuranceForm(forms.ModelForm):
+
+    status_choices = [(UserInsurance.ACTIVE, "Active"), (UserInsurance.CANCEL_INITIATE, 'Cancel Initiate'),
+                      (UserInsurance.CANCELLED, "Cancelled")]
+    # case_choices = [("REFUND", "Refundable"), ("NON-REFUND", "Non-Refundable")]
+    cancel_after_utilize_choices = [('YES', 'Yes'), ('NO', 'No')]
+    status = forms.ChoiceField(choices=status_choices, required=True)
+    cancel_after_utilize_insurance = forms.ChoiceField(choices=cancel_after_utilize_choices, initial='NO',  widget=forms.RadioSelect())
+    onhold_reason = forms.CharField(max_length=400, required=False)
+
+    def clean(self):
+        super().clean()
+        data = self.cleaned_data
+        status = data.get('status')
+        case_type = data.get('cancel_after_utilize_insurance')
+        onhold_reason = data.get('onhold_reason')
+        if int(status) == UserInsurance.ONHOLD:
+            if not onhold_reason:
+                raise forms.ValidationError("In Case of ONHOLD status, Onhold reason is mandatory")
+        elif case_type=="NO" and int(status) == UserInsurance.CANCEL_INITIATE or int(status) == UserInsurance.CANCELLED:
+            insured_opd_completed_app_count = OpdAppointment.get_insured_completed_appointment(self.instance)
+            insured_lab_completed_app_count = LabAppointment.get_insured_completed_appointment(self.instance)
+            if insured_lab_completed_app_count > 0:
+                raise forms.ValidationError('Lab appointment with insurance have been completed, '
+                                            'Cancellation could not proceed')
+            if insured_opd_completed_app_count > 0:
+                raise forms.ValidationError('OPD appointment with insurance have been completed, '
+                                            'Cancellation could not proceed')
+        if int(status) == UserInsurance.CANCELLED and not self.instance.status == UserInsurance.CANCEL_INITIATE:
+            raise forms.ValidationError('Cancellation is only allowed for cancel initiate status')
+        if self.instance.status == UserInsurance.CANCELLED:
+            raise forms.ValidationError('Cancelled Insurance could not be changed')
+
+    class Meta:
+        fields = '__all__'
 
 
 class UserInsuranceAdmin(ImportExportMixin, admin.ModelAdmin):
@@ -659,11 +713,24 @@ class UserInsuranceAdmin(ImportExportMixin, admin.ModelAdmin):
         user_profile = UserProfile.objects.filter(user=obj.user).first()
         return str(user_profile.name)
 
+    # def city_name(self, obj):
+    #     cities = InsuranceCity.objects.all().values_list('name', flat=True)
+    #     return cities
+
     list_display = ['id', 'insurance_plan', 'user_name', 'user', 'policy_number', 'purchase_date','merchant_payout']
-    fields = ['insurance_plan', 'user', 'purchase_date', 'expiry_date', 'policy_number', 'premium_amount','merchant_payout']
-    readonly_fields = ('insurance_plan', 'user', 'purchase_date', 'expiry_date', 'policy_number', 'premium_amount','merchant_payout')
+    fields = ['insurance_plan', 'user', 'purchase_date', 'expiry_date', 'policy_number', 'premium_amount',
+              'merchant_payout', 'status', 'onhold_reason', 'cancel_after_utilize_insurance']
+    readonly_fields = ('insurance_plan', 'user', 'purchase_date', 'expiry_date', 'policy_number', 'premium_amount', 'merchant_payout')
     inlines = [InsuredMembersInline]
-    # form = UserInsuranceForm
+    form = UserInsuranceForm
+    search_fields = ['id']
+
+    def get_search_results(self, request, queryset, search_term):
+        queryset, use_distinct = super().get_search_results(request, queryset, None)
+
+        queryset = queryset.filter(Q(user__profiles__name__icontains=search_term)).distinct()
+
+        return queryset, use_distinct
 
     def get_export_queryset(self, request):
         super().get_export_queryset(request)
@@ -694,21 +761,20 @@ class UserInsuranceAdmin(ImportExportMixin, admin.ModelAdmin):
     def has_delete_permission(self, request, obj=None):
         return False
 
-
-class CustomDateInput(forms.DateInput):
-    input_type = 'date'
-
-
-class UserInsuranceForm(forms.ModelForm):
-    start_date = forms.DateField(widget=CustomDateInput(format=('%d-%m-%Y'), attrs={'placeholder': 'Select a date'}))
-    end_date = forms.DateField(widget=CustomDateInput(format=('%d-%m-%Y'), attrs={'placeholder': 'Select a date'}))
-
-    def clean(self):
-        cleaned_data = super().clean()
-        start = cleaned_data.get("start_date")
-        end = cleaned_data.get("end_date")
-        if start and end and start >= end:
-            raise forms.ValidationError("Start Date should be less than end Date")
+    @transaction.atomic
+    def save_model(self, request, obj, form, change):
+        if request.user.is_member_of(constants['SUPER_INSURANCE_GROUP']):
+            if obj.status == UserInsurance.ACTIVE:
+                super(UserInsuranceAdmin, self).save_model(request, obj, form, change)
+            elif obj.status == UserInsurance.ONHOLD:
+                if obj.onhold_reason:
+                    super(UserInsuranceAdmin, self).save_model(request, obj, form, change)
+            elif obj.status == UserInsurance.CANCEL_INITIATE:
+                response = obj.process_cancellation()
+                if response.get('success', None):
+                    super(UserInsuranceAdmin, self).save_model(request, obj, form, change)
+            elif obj.status == UserInsurance.CANCELLED:
+                super(UserInsuranceAdmin, self).save_model(request, obj, form, change)
 
 
 class InsuranceDiseaseAdmin(admin.ModelAdmin):
@@ -840,6 +906,10 @@ class InsuranceLeadAdmin(ImportExportModelAdmin, admin.ModelAdmin):
         else:
             return ""
 
+    def source(self, obj):
+        extras = obj.extras
+        return extras.get('source', '')
+
     def phone_number(self, obj):
         return str(obj.user.phone_number)
 
@@ -850,7 +920,7 @@ class InsuranceLeadAdmin(ImportExportModelAdmin, admin.ModelAdmin):
         else:
             return "New"
 
-    list_display = ('id', 'name',  'phone_number', 'status', 'matrix_lead_id', 'created_at', 'updated_at')
+    list_display = ('id', 'name',  'phone_number', 'status', 'matrix_lead_id', 'source', 'created_at', 'updated_at')
 
     def get_export_queryset(self, request):
         super().get_export_queryset(request)
@@ -872,6 +942,7 @@ class InsuranceLeadAdmin(ImportExportModelAdmin, admin.ModelAdmin):
     def has_delete_permission(self, request, obj=None):
         return False
 
+
 class InsuranceLeadForm(forms.ModelForm):
     start_date = forms.DateField(widget=CustomDateInput(format=('%d-%m-%Y'), attrs={'placeholder': 'Select a date'}))
     end_date = forms.DateField(widget=CustomDateInput(format=('%d-%m-%Y'), attrs={'placeholder': 'Select a date'}))
@@ -882,3 +953,7 @@ class InsuranceLeadForm(forms.ModelForm):
         end = cleaned_data.get("end_date")
         if start and end and start >= end:
             raise forms.ValidationError("Start Date should be less than end Date")
+
+
+class InsuranceCancelMasterAdmin(admin.ModelAdmin):
+    list_display = ['insurer', 'min_days', 'max_days', 'refund_percentage']

@@ -6,14 +6,14 @@ from ondoc.api.v1.doctor.serializers import CommaSepratedToListField
 from ondoc.authentication.backends import JWTAuthentication
 from ondoc.api.v1.diagnostic import serializers as diagnostic_serializer
 from ondoc.api.v1.auth.serializers import AddressSerializer
-from ondoc.integrations.models import IntegratorTestMapping
+from ondoc.integrations.models import IntegratorTestMapping, IntegratorReport
 from ondoc.cart.models import Cart
 from ondoc.common.models import UserConfig, GlobalNonBookable, AppointmentHistory
 from ondoc.ratings_review import models as rating_models
 from ondoc.diagnostic.models import (LabTest, AvailableLabTest, Lab, LabAppointment, LabTiming, PromotedLab,
                                      CommonDiagnosticCondition, CommonTest, CommonPackage,
                                      FrequentlyAddedTogetherTests, TestParameter, ParameterLabTest, QuestionAnswer,
-                                     LabPricingGroup, LabTestCategory, LabTestCategoryMapping)
+                                     LabPricingGroup, LabTestCategory, LabTestCategoryMapping, LabTestThresholds)
 from ondoc.account import models as account_models
 from ondoc.authentication.models import UserProfile, Address
 from ondoc.insurance.models import UserInsurance, InsuranceThreshold
@@ -1709,7 +1709,7 @@ class LabList(viewsets.ReadOnlyModelViewSet):
 
         distance_related_charges = 1 if lab_obj.home_collection_charges.all().exists() else 0
         if lab_obj.always_open:
-            lab_timing = "12:00 AM - 23:45 PM"
+            lab_timing = "12:00 AM - 11:45 PM"
             lab_timing_data = [{
                 "start": 0.0,
                 "end": 23.75
@@ -2898,6 +2898,97 @@ class LabTestCategoryListViewSet(viewsets.GenericViewSet):
                 resp['tests'] = temp_tests
                 empty.append(resp)
         return Response(empty)
+
+
+class DigitalReports(viewsets.GenericViewSet):
+
+    def retrieve(self, request, booking_id=None):
+        response = dict()
+        appointment_obj = LabAppointment.objects.filter(id=booking_id).first()
+        if not appointment_obj:
+            return Response(status=status.HTTP_400_BAD_REQUEST, data={'error': 'Invalid booking_id.'})
+
+        integrator_response = appointment_obj.integrator_response.all().first()
+        if not integrator_response:
+            return Response(status=status.HTTP_400_BAD_REQUEST,
+                            data={'error': 'No response found from integrator for this appointment.'})
+
+        booked_tests_or_packages = appointment_obj.test_mappings.all()
+        booked_tests_or_packages = list(map(lambda tp: tp.test, booked_tests_or_packages))
+        booked_tests = list()
+
+        for lt in booked_tests_or_packages:
+            if lt.is_package:
+                booked_tests.extend(lt.test.all())
+            else:
+                booked_tests.append(lt)
+
+        response['profiles_count'] = len(booked_tests)
+        profiles = list()
+
+        response['colour_count_dict'] = {
+            LabTestThresholds.Colour.RED.lower(): 0,
+            LabTestThresholds.Colour.ORANGE.lower(): 0,
+            LabTestThresholds.Colour.GREEN.lower(): 0
+        }
+
+        user_age = appointment_obj.profile.get_age()
+
+        integrator_report = IntegratorReport.objects.filter(integrator_response_id=integrator_response.id).first()
+        if not integrator_report:
+            return Response(status=status.HTTP_400_BAD_REQUEST,
+                            data={'error': 'No report found from integrator for this appointment.'})
+
+        report_json = integrator_report.json_data
+        report_parameter_array = list()
+
+        # booked_tests = [LabTest.objects.get(id=11361)]
+
+        for booked_test in booked_tests:
+            profile_dict = dict()
+            profile_dict['name'] = booked_test.name
+            profile_dict['icon'] = ""
+            profile_dict['parameter_list'] = list()
+
+            test_parameters = booked_test.parameter.all()
+            for parameter in test_parameters:
+                parameter_dict = dict()
+                parameter_dict['name'] = parameter.name
+                parameter_dict['details'] = parameter.details
+                integrator_parameter_obj = parameter.integrator_mapped_parameters.filter().first()
+
+                #TODO: get value from report json and remove below line.
+                value = 16
+
+                threshold_qs = parameter.parameter_thresholds.all()
+                if user_age:
+                    valid_threshold = threshold_qs.filter(min_value__lte=value, max_value__gte=value,
+                                                          min_age__lte=appointment_obj.profile.get_age(),
+                                                          max_age__gte=appointment_obj.profile.get_age(),
+                                                          gender=appointment_obj.profile.gender).first()
+                else:
+                    valid_threshold = threshold_qs.filter(min_value__lte=value,
+                                                          max_value__gte=value,
+                                                          gender=appointment_obj.profile.gender).first()
+
+                if not valid_threshold:
+                    return Response(status=status.HTTP_400_BAD_REQUEST)
+
+                parameter_dict['color'] = valid_threshold.color
+                parameter_dict['value'] = value
+                parameter_dict['what_to_do'] = valid_threshold.what_to_do
+                parameter_dict['details'] = valid_threshold.details
+                parameter_dict['ideal_range'] = '%.2f - %.2f' % (valid_threshold.min_value, valid_threshold.max_value)
+
+                response['colour_count_dict'][valid_threshold.color.lower()] += 1
+
+                profile_dict['parameter_list'].append(parameter_dict)
+
+            profiles.append(profile_dict)
+
+        response['profiles'] = profiles
+
+        return Response(data=response)
 
 
 class CompareLabPackagesViewSet(viewsets.ReadOnlyModelViewSet):

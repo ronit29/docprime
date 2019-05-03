@@ -238,6 +238,7 @@ class Hospital(auth_model.TimeStampedModel, auth_model.CreatedByModel, auth_mode
     enabled_for_prepaid = models.BooleanField(default=True)
     is_location_verified = models.BooleanField(verbose_name='Location Verified', default=False)
     auto_ivr_enabled = models.BooleanField(default=True)
+    priority_score = models.IntegerField(default=0, null=False, blank=False)
 
     def __str__(self):
         return self.name
@@ -622,6 +623,7 @@ class Doctor(auth_model.TimeStampedModel, auth_model.QCModel, SearchKey, auth_mo
     remark = GenericRelation(Remark)
     rating_data = JSONField(blank=True, null=True)
     qr_code = GenericRelation(QRCode, related_name="qrcode")
+    priority_score = models.IntegerField(default=0, null=False, blank=False)
 
     def __str__(self):
         return '{} ({})'.format(self.name, self.id)
@@ -1545,6 +1547,7 @@ class HospitalNetwork(auth_model.TimeStampedModel, auth_model.CreatedByModel, au
     matrix_lead_id = models.BigIntegerField(blank=True, null=True, unique=True)
     remark = GenericRelation(Remark)
     auto_ivr_enabled = models.BooleanField(default=True)
+    priority_score = models.IntegerField(default=0, null=False, blank=False)
 
     def update_time_stamps(self):
         if self.welcome_calling_done and not self.welcome_calling_done_at:
@@ -2427,16 +2430,16 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
         payment_type = data.get("payment_type")
         effective_price = price_data.get("effective_price")
         cart_data = data.get('cart_item').data
-        is_appointment_insured = cart_data.get('is_appointment_insured', None)
-        insurance_id = cart_data.get('insurance_id', None)
-        # user_insurance = UserInsurance.objects.filter(user=user).last()
-        # if user_insurance:
-        #     insurance_validate_dict = user_insurance.validate_insurance(data)
-        #     is_appointment_insured = insurance_validate_dict['is_insured']
-        #     insurance_id = insurance_validate_dict['insurance_id']
-        #     insurance_message = insurance_validate_dict['insurance_message']
+        # is_appointment_insured = cart_data.get('is_appointment_insured', None)
+        # insurance_id = cart_data.get('insurance_id', None)
 
-        if is_appointment_insured:
+        is_appointment_insured = False
+        insurance_id = None
+        user_insurance = UserInsurance.objects.filter(user=user).last()
+        if user_insurance and user_insurance.is_valid():
+            is_appointment_insured, insurance_id, insurance_message = user_insurance.validate_doctor_insurance(data, user_insurance)
+
+        if is_appointment_insured and cart_data.get('is_appointment_insured', None):
             payment_type = OpdAppointment.INSURANCE
             effective_price = 0.0
         else:
@@ -2523,6 +2526,17 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
                                                  user=self.user, triggered_at=datetime.datetime.utcnow())
         except Exception as e:
             logger.error("Could not save triggered event - " + str(e))
+
+    @classmethod
+    def get_insured_completed_appointment(cls, insurance_obj):
+        count = cls.objects.filter(user=insurance_obj.user, insurance=insurance_obj, status=cls.COMPLETED).count()
+        return count
+
+    @classmethod
+    def get_insured_active_appointment(cls, insurance_obj):
+        appointments = cls.objects.filter(~Q(status=cls.COMPLETED), ~Q(status=cls.CANCELLED), user=insurance_obj.user,
+                                          insurance=insurance_obj)
+        return appointments
 
 
 class OpdAppointmentProcedureMapping(models.Model):
@@ -2829,6 +2843,8 @@ class SourceIdentifier(auth_model.TimeStampedModel):
 class GoogleDetailing(auth_model.TimeStampedModel):
 
     identifier = models.CharField(max_length=255, null=True, blank=False)
+    hospital_id = models.PositiveIntegerField(null=True, blank=True)
+
     name = models.CharField(max_length=500, null=True, blank=False)
     clinic_hospital_name = models.CharField(max_length=128, null=True, blank=False)
     address = models.TextField(null=True, blank=False)
@@ -3086,9 +3102,11 @@ class OfflineOPDAppointments(auth_model.TimeStampedModel):
 
 class SearchScore(auth_model.TimeStampedModel):
     doctor = models.ForeignKey(Doctor, on_delete=models.CASCADE)
-    popularity_score = models.PositiveIntegerField(default=None, null=True)
+    popularity_score = models.FloatField(default=None, null=True)
     years_of_experience_score = models.PositiveIntegerField(default=None, null=True)
     doctors_in_clinic_score = models.PositiveIntegerField(default=None, null=True)
+    avg_ratings_score = models.PositiveIntegerField(default=None, null=True)
+    ratings_count_score = models.PositiveIntegerField(default=None, null=True)
     final_score = models.FloatField(default=None, null=True)
 
     class Meta:

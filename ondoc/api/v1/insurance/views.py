@@ -2,17 +2,20 @@ from django.conf import settings
 
 from ondoc.api.v1.insurance.serializers import InsuredMemberIdSerializer, InsuranceDiseaseIdSerializer
 from ondoc.api.v1.utils import insurance_transform
+from django.core.serializers import serialize
 from rest_framework import viewsets
 from django.core import serializers as core_serializer
 
 from ondoc.api.v1.utils import payment_details
+from ondoc.diagnostic.models import LabAppointment
+from ondoc.doctor.models import OpdAppointment
 from . import serializers
 from rest_framework.response import Response
 from ondoc.account import models as account_models
 from ondoc.doctor import models as doctor_models
 from ondoc.insurance.models import (Insurer, InsuredMembers, InsuranceThreshold, InsurancePlans, UserInsurance, InsuranceLead,
                                     InsuranceTransaction, InsuranceDisease, InsuranceDiseaseResponse, StateGSTCode,
-                                    InsuranceDummyData)
+                                    InsuranceDummyData, InsuranceCancelMaster)
 from ondoc.authentication.models import UserProfile
 from ondoc.authentication.backends import JWTAuthentication
 from rest_framework.permissions import IsAuthenticated
@@ -21,7 +24,6 @@ from django.db.models import F
 import datetime
 from django.db import transaction
 from ondoc.authentication.models import User
-from ondoc.insurance.tasks import push_insurance_banner_lead_to_matrix
 from datetime import timedelta
 from django.utils import timezone
 import logging
@@ -41,7 +43,7 @@ class ListInsuranceViewSet(viewsets.GenericViewSet):
             user = request.user
             if not user.is_anonymous:
                 user_insurance = UserInsurance.get_user_insurance(request.user)
-                if user_insurance and user_insurance.is_valid():
+                if user_insurance and user_insurance.is_profile_valid():
                     return Response(data={'certificate': True}, status=status.HTTP_200_OK)
 
             insurer_data = self.get_queryset()
@@ -162,8 +164,8 @@ class InsuranceOrderViewSet(viewsets.GenericViewSet):
                     pre_insured_members['dob'] = member['dob']
                     pre_insured_members['title'] = member['title']
                     pre_insured_members['first_name'] = member['first_name']
-                    pre_insured_members['middle_name'] = member.get('middle_name', '')
-                    pre_insured_members['last_name'] = member.get('last_name', '')
+                    pre_insured_members['middle_name'] = member.get('middle_name') if member.get('middle_name') else ''
+                    pre_insured_members['last_name'] = member.get('last_name') if member.get('last_name') else ''
                     pre_insured_members['address'] = member['address']
                     pre_insured_members['pincode'] = member['pincode']
                     pre_insured_members['email'] = member['email']
@@ -188,7 +190,8 @@ class InsuranceOrderViewSet(viewsets.GenericViewSet):
                             user_profile['dob'] = member['dob']
 
                         else:
-                            user_profile = {"name": member['first_name'] + " " + member.get('last_name', ''), "email":
+                            last_name = member.get('last_name') if member.get('last_name') else ''
+                            user_profile = {"name": member['first_name'] + " " + last_name, "email":
                                 member['email'], "gender": member['gender'], "dob": member['dob']}
 
             insurance_plan = InsurancePlans.objects.get(id=request.data.get('insurance_plan'))
@@ -280,7 +283,7 @@ class InsuranceProfileViewSet(viewsets.GenericViewSet):
 
                 user = User.objects.get(id=user_id)
                 user_insurance = UserInsurance.get_user_insurance(user)
-                if not user_insurance or not user_insurance.is_valid():
+                if not user_insurance or not user_insurance.is_profile_valid():
                     return Response({"message": "Insurance not found or expired."})
                 insurer = user_insurance.insurance_plan.insurer
                 resp['insured_members'] = user_insurance.members.all().values('first_name', 'middle_name', 'last_name',
@@ -296,6 +299,15 @@ class InsuranceProfileViewSet(viewsets.GenericViewSet):
                 resp['proposer_name'] = user_insurance.members.all().filter(relation='self').values('first_name',
                                                                                                     'middle_name',
                                                                                                     'last_name')
+                resp['insurance_status'] = user_insurance.status
+                opd_appointment_count = OpdAppointment.get_insured_completed_appointment(user_insurance)
+                lab_appointment_count = LabAppointment.get_insured_completed_appointment(user_insurance)
+                if opd_appointment_count > 0 or lab_appointment_count > 0:
+                    resp['is_cancel_allowed'] = False
+                    resp['is_endorsement_allowed'] = False
+                else:
+                    resp['is_cancel_allowed'] = True
+                    resp['is_endorsement_allowed'] = True
             else:
                 return Response({"message": "User is not valid"},
                                 status.HTTP_404_NOT_FOUND)
@@ -394,4 +406,51 @@ class InsuranceDummyDataViewSet(viewsets.GenericViewSet):
             res['error'] = "data not found"
             return Response(error=res, status=status.HTTP_200_OK)
         res['data'] = member_data
+        return Response(data=res, status=status.HTTP_200_OK)
+
+
+class InsuranceCancelViewSet(viewsets.GenericViewSet):
+    authentication_classes = (JWTAuthentication,)
+    permission_classes = (IsAuthenticated,)
+
+    @transaction.atomic()
+    def insurance_cancel(self, request):
+        user = request.user
+        user_insurance = UserInsurance.objects.filter(user=user).last()
+        res = {}
+        if not user_insurance:
+            res['error'] = "Insurance not found"
+            return Response(data=res, status=status.HTTP_400_BAD_REQUEST)
+        if not user.active_insurance:
+            res['error'] = "Insurance is not active"
+            return Response(data=res, status=status.HTTP_400_BAD_REQUEST)
+        opd_appointment_count = OpdAppointment.get_insured_completed_appointment(user_insurance)
+        lab_appointment_count = LabAppointment.get_insured_completed_appointment(user_insurance)
+        if opd_appointment_count > 0 or lab_appointment_count > 0:
+            res['error'] = "One of the OPD or LAB Appointment have been completed, Cancellation could not be processed"
+            return Response(data=res, status=status.HTTP_400_BAD_REQUEST)
+        response = user_insurance.process_cancellation()
+        return Response(data=response, status=status.HTTP_200_OK)
+
+    def cancel_master(self,request):
+        user = request.user
+        res = {}
+        user_insurance = user.active_insurance
+        if not user_insurance:
+            res['error'] = "Insurance not found for the user"
+            return Response(data=res, status=status.HTTP_400_BAD_REQUEST)
+        policy_purchase_date = user_insurance.purchase_date
+        policy_expiry_date = user_insurance.expiry_date
+        policy_number = user_insurance.policy_number
+        cancel_master = list(InsuranceCancelMaster.objects.filter(insurer=user_insurance.insurance_plan.insurer).order_by(
+            '-refund_percentage').values('min_days', 'max_days', 'refund_percentage'))
+        if not cancel_master:
+            res['error'] = "Insurance Cancel Master not found"
+            return Response(data=res, status=status.HTTP_400_BAD_REQUEST)
+
+        res['purchase_date'] = policy_purchase_date
+        res['expiry_date'] = policy_expiry_date
+        res['policy_number'] = policy_number
+        res['cancel_master'] = cancel_master
+
         return Response(data=res, status=status.HTTP_200_OK)
