@@ -255,6 +255,12 @@ class Hospital(auth_model.TimeStampedModel, auth_model.CreatedByModel, auth_mode
     #         return self.city
     #     return None
 
+    def enable_for_cod(self):
+        if self.enabled_for_cod:
+            return True
+        else:
+            return False
+
     @classmethod
     def update_city_search(cls):
         query = '''  update hospital set city_search_key = alternative_value
@@ -1078,9 +1084,10 @@ class DoctorClinic(auth_model.TimeStampedModel, auth_model.WelcomeCallingDone):
         timeslots = dict()
         obj = TimeSlotExtraction()
 
+
         for data in clinic_timings:
-            obj.form_time_slots(data.day, data.start, data.end, data.fees, True,
-                                data.deal_price, data.mrp, True, on_call=data.type)
+            obj.form_time_slots( data.day, data.start, data.end, self.hospital, data.fees, True,
+                                data.deal_price, data.mrp, data.cod_deal_price, True, on_call=data.type)
 
         date = datetime.datetime.today().strftime('%Y-%m-%d')
         booking_details = {"type": "doctor"}

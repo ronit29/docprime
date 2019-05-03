@@ -887,7 +887,7 @@ class DoctorProfileUserViewSerializer(DoctorProfileSerializer):
     unrated_appointment = serializers.SerializerMethodField()
     is_gold = serializers.SerializerMethodField()
     search_data = serializers.SerializerMethodField()
-    enabled_for_cod = serializers.SerializerMethodField()
+    # enabled_for_cod = serializers.SerializerMethodField()
 
     def get_enabled_for_cod(self, obj):
         return obj.enabled_for_cod()
