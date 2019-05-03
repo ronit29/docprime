@@ -240,7 +240,7 @@ def update_ben_status_from_pg():
 @task()
 def update_merchant_payout_pg_status():
     from ondoc.account.models import MerchantPayout
-    payouts = MerchantPayout.objects.all()
+    payouts = MerchantPayout.objects.all().order_by('-id')
     for p in payouts:
         p.update_status_from_pg()
     return True
