@@ -670,7 +670,7 @@ class UserInsuranceForm(forms.ModelForm):
     cancel_after_utilize_choices = [('YES', 'Yes'), ('NO', 'No')]
     status = forms.ChoiceField(choices=status_choices, required=True)
     cancel_after_utilize_insurance = forms.ChoiceField(choices=cancel_after_utilize_choices, initial='NO',  widget=forms.RadioSelect())
-    onhold_reason = forms.CharField(max_length=400, required=False)
+    cancel_reason = forms.CharField(max_length=400, required=False)
     cancel_case_type = forms.ChoiceField(choices=case_choices, initial=UserInsurance.REFUND)
 
 
@@ -679,12 +679,14 @@ class UserInsuranceForm(forms.ModelForm):
         data = self.cleaned_data
         status = data.get('status')
         case_type = data.get('cancel_after_utilize_insurance')
-        onhold_reason = data.get('onhold_reason')
+        cancel_reason = data.get('cancel_reason')
         cancel_case_type = data.get('cancel_case_type')
-        if int(status) == UserInsurance.ONHOLD:
-            if not onhold_reason:
-                raise forms.ValidationError("In Case of ONHOLD status, Onhold reason is mandatory")
-        elif case_type=="NO" and int(status) == UserInsurance.CANCEL_INITIATE or int(status) == UserInsurance.CANCELLED:
+        # if int(status) == UserInsurance.ONHOLD:
+        #     if not onhold_reason:
+        #         raise forms.ValidationError("In Case of ONHOLD status, Onhold reason is mandatory")
+        if case_type=="NO" and int(status) == UserInsurance.CANCEL_INITIATE or int(status) == UserInsurance.CANCELLED:
+            if not cancel_reason:
+                raise forms.ValidationError('For Cancel Initiation, Cancel reason is mandatory')
             insured_opd_completed_app_count = OpdAppointment.get_insured_completed_appointment(self.instance)
             insured_lab_completed_app_count = LabAppointment.get_insured_completed_appointment(self.instance)
             if insured_lab_completed_app_count > 0:
@@ -693,6 +695,9 @@ class UserInsuranceForm(forms.ModelForm):
             if insured_opd_completed_app_count > 0:
                 raise forms.ValidationError('OPD appointment with insurance have been completed, '
                                             'Cancellation could not proceed')
+        if case_type == "YES" and int(status) == UserInsurance.CANCEL_INITIATE or int(status) == UserInsurance.CANCELLED:
+            if not cancel_reason:
+                raise forms.ValidationError('For Cancel Initiation, Cancel reason is mandatory')
         if int(status) == UserInsurance.CANCELLED and not self.instance.status == UserInsurance.CANCEL_INITIATE:
             raise forms.ValidationError('Cancellation is only allowed for cancel initiate status')
         if self.instance.status == UserInsurance.CANCELLED:
