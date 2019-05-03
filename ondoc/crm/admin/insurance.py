@@ -716,6 +716,7 @@ class UserInsuranceAdmin(ImportExportMixin, admin.ModelAdmin):
     export_template_name = "export_insurance_report.html"
     formats = (base_formats.XLS,)
     model = UserInsurance
+    date_hierarchy = 'created_at'
 
     def user_policy_number(self, obj):
         return str(obj.policy_number)
@@ -908,6 +909,7 @@ class InsuranceLeadAdmin(ImportExportModelAdmin, admin.ModelAdmin):
     export_template_name = "export_insurance_lead_report.html"
     formats = (base_formats.XLS,)
     ordering = ('-updated_at',)
+    date_hierarchy = 'created_at'
 
     def name(self, obj):
         user = obj.user

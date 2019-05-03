@@ -76,7 +76,7 @@ class InsuredMemberViewSet(viewsets.GenericViewSet):
             result['insurer_logo'] = request.build_absolute_uri(user_insurance.insurance_plan.insurer.logo.url) \
                 if user_insurance.insurance_plan.insurer.logo is not None and \
                    user_insurance.insurance_plan.insurer.logo.name else None
-            member_list = user_insurance.members.all().order_by('id').values('id', 'first_name', 'last_name', 'relation')
+            member_list = user_insurance.members.all().order_by('id').values('id', 'first_name', 'last_name', 'relation', 'gender')
             result['members'] = member_list
             disease = InsuranceDisease.objects.filter(is_live=True).values('id', 'disease')
             result['disease'] = disease
