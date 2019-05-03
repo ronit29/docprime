@@ -390,14 +390,30 @@ class LabList(viewsets.ReadOnlyModelViewSet):
                 is_selected = True
             category_result.append({'name': name, 'id': category_id, 'is_selected': is_selected})
 
+        coupon_recommender = CouponRecommender(request.user, profile, 'lab', product_id, coupon_code)
+        filters = dict()
+
         result = serializer.data
         if result:
             from ondoc.coupon.models import Coupon
-            search_coupon = Coupon.get_search_coupon(request.user)
+            # search_coupon = Coupon.get_search_coupon(request.user)
 
             for package_result in result:
                 if "price" in package_result:
                     price = int(float(package_result["price"]))
+
+                    filters['deal_price'] = price
+                    filters['tests'] = package_result.get('tests')
+
+                    package_result_lab = package_result.get('lab')
+                    if package_result_lab:
+                        filters['lab'] = dict()
+                        lab_obj = filters['lab']
+                        lab_obj['id'] = package_result_lab.get('id')
+                        lab_obj['network_id'] = package_result_lab.get('network_id')
+                        lab_obj['city'] = package_result_lab.get('city')
+                    search_coupon = coupon_recommender.best_coupon(**filters)
+
                     discounted_price = price if not search_coupon else search_coupon.get_search_coupon_discounted_price(price)
                     package_result["discounted_price"] = discounted_price
 
@@ -436,6 +452,9 @@ class LabList(viewsets.ReadOnlyModelViewSet):
         package_category_ids = validated_data.get('package_category_ids', [])
         test_ids = validated_data.get('test_ids', [])
         package_ids = validated_data.get('package_ids', [])
+        profile = parameters.get("profile_id", None)
+        product_id = parameters.get("product_id", None)
+        coupon_code = parameters.get("coupon_code", None)
         point_string = 'POINT(' + str(long) + ' ' + str(lat) + ')'
         pnt = GEOSGeometry(point_string, srid=4326)
         max_distance = max_distance*1000 if max_distance is not None else 10000
