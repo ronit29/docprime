@@ -12,7 +12,7 @@ from ondoc.api.v1.auth.serializers import AddressSerializer, UserProfileSerializ
 from ondoc.api.v1.utils import form_time_slot, GenericAdminEntity, util_absolute_url
 from ondoc.doctor.models import OpdAppointment, CancellationReason
 from ondoc.account.models import Order, Invoice
-from ondoc.coupon.models import Coupon, RandomGeneratedCoupon
+from ondoc.coupon.models import Coupon, RandomGeneratedCoupon, CouponRecommender
 from django.db.models import Count, Sum, When, Case, Q, F, ExpressionWrapper, DateTimeField
 from django.contrib.auth import get_user_model
 from collections import OrderedDict
@@ -539,6 +539,7 @@ class CommonPackageSerializer(serializers.ModelSerializer):
     agreed_price = serializers.SerializerMethodField()
     mrp = serializers.SerializerMethodField()
     lab = LabModelSerializer()
+    discounted_price = serializers.SerializerMethodField()
 
     def get_icon(self, obj):
         request = self.context.get('request')
@@ -560,9 +561,35 @@ class CommonPackageSerializer(serializers.ModelSerializer):
                 mrp = available_test.mrp
         return mrp
 
+    def get_discounted_price(self, obj):
+        discounted_price = None
+        coupon_recommender = self.context.get('coupon_recommender')
+        filters = dict()
+
+        if obj.package.availablelabs:
+            available_test = obj.package.availablelabs.filter(lab_pricing_group__labs__id=obj.lab_id).first()
+            if available_test:
+                deal_price = available_test.get_deal_price()
+                if coupon_recommender:
+                    filters['deal_price'] = deal_price
+                    filters['tests'] = [available_test.test]
+
+                    package_result_lab = getattr(obj, 'lab') if hasattr(obj, 'lab') else None
+                    if package_result_lab and isinstance(package_result_lab, Lab):
+                        filters['lab'] = dict()
+                        lab_obj = filters['lab']
+                        lab_obj['id'] = package_result_lab.id
+                        lab_obj['network_id'] = package_result_lab.network_id
+                        lab_obj['city'] = package_result_lab.city
+                search_coupon = coupon_recommender.best_coupon(**filters) if coupon_recommender else None
+
+                discounted_price = deal_price if not search_coupon else search_coupon.get_search_coupon_discounted_price(deal_price)
+
+        return discounted_price
+
     class Meta:
         model = CommonPackage
-        fields = ('id', 'name', 'icon', 'show_details', 'url', 'no_of_tests', 'mrp', 'agreed_price', 'lab')
+        fields = ('id', 'name', 'icon', 'show_details', 'url', 'no_of_tests', 'mrp', 'agreed_price', 'discounted_price', 'lab')
 
 
 class CommonConditionsSerializer(serializers.ModelSerializer):

@@ -76,6 +76,9 @@ class SearchPageViewSet(viewsets.ReadOnlyModelViewSet):
 
     @transaction.non_atomic_requests
     def list(self, request, *args, **kwargs):
+        coupon_code = request.query_params.get('coupon_code')
+        profile = request.query_params.get('profile_id')
+        product_id = request.query_params.get('product_id')
         count = request.query_params.get('count', 10)
         count = int(count)
         if count <= 0:
@@ -89,7 +92,8 @@ class SearchPageViewSet(viewsets.ReadOnlyModelViewSet):
                                                                                                           recommended_lab_tests__searchable=True,
                                                                                                           recommended_lab_tests__enable_for_retail=True).order_by('-priority').distinct()[:count]
         test_serializer = diagnostic_serializer.CommonTestSerializer(test_queryset, many=True, context={'request': request})
-        package_serializer = diagnostic_serializer.CommonPackageSerializer(package_queryset, many=True, context={'request': request})
+        coupon_recommender = CouponRecommender(request.user, profile, 'lab', product_id, coupon_code)
+        package_serializer = diagnostic_serializer.CommonPackageSerializer(package_queryset, many=True, context={'request': request, 'coupon_recommender':coupon_recommender})
         lab_serializer = diagnostic_serializer.PromotedLabsSerializer(lab_queryset, many=True)
         condition_serializer = diagnostic_serializer.CommonConditionsSerializer(conditions_queryset, many=True)
         recommended_package = diagnostic_serializer.RecommendedPackageCategoryList(recommended_package_qs, many=True, context={'request': request})
