@@ -339,13 +339,9 @@ class CouponRecommender():
                 all_coupons = all_coupons.filter(gender__isnull=True)
                 all_coupons = all_coupons.filter(age_start__isnull=True, age_end__isnull=True)
 
-            user_cart_purchase_items = Cart.objects.filter(user=user, deleted_at__isnull=True)
-            cart_items = user.cart_item.filter(deleted_at__isnull=True)
-            if cart_items:
-                cart_item_id = cart_items.first().id
-                self.payment_option_filter = Cart.get_pg_if_pgcoupon(user, cart_item_id)
-
-                user_cart_purchase_items = user_cart_purchase_items.exclude(id=cart_item_id)
+            cart_items = None
+            self.payment_option_filter = Cart.get_pg_if_pgcoupon(user, cart_items)
+            user_cart_purchase_items = user.cart_item.filter(deleted_at__isnull=True)
 
             for item in user_cart_purchase_items:
                 if item.data and item.data.get('coupon_code'):
