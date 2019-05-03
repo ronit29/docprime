@@ -3098,6 +3098,7 @@ class OfflineOPDAppointments(auth_model.TimeStampedModel):
     def get_prescriptions(self, request):
 
         files=[]
+        resp = dict()
         for pres in self.offline_prescription.all():
             resp = {
                 'updated_at': pres.updated_at,
