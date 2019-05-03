@@ -125,8 +125,8 @@ def push_insurance_buy_to_matrix(self, *args, **kwargs):
             'BookedBy': user_obj.phone_number,
             'LeadID': user_insurance.matrix_lead_id if user_insurance.matrix_lead_id else 0,
             'PrimaryNo': user_obj.phone_number,
-            'ProductId': 8,
-            'SubProductId': 0,
+            'ProductId': 5,
+            'SubProductId': 3,
             "PolicyDetails": {
                 "ProposalNo": None,
                 "BookingId": user_insurance.id,
