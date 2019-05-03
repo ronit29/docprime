@@ -1,6 +1,5 @@
 import json
 import re
-
 from rest_framework.response import Response
 
 from ondoc.api.v1.diagnostic.serializers import LabAppointmentUpcoming
@@ -76,3 +75,17 @@ def get_all_upcoming_appointments(user_id):
                               key=lambda x: x["time_slot_start"])
     return all_appointments
 
+
+def get_file_mime_type(file):
+
+    import mimetypes
+    type = None
+    if file and file.url:
+        try:
+            file_url = file.url
+            type = mimetypes.MimeTypes().guess_type(file_url)[0]
+
+        except:
+            pass
+
+    return type

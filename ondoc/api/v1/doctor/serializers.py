@@ -7,6 +7,7 @@ from ondoc.api.v1.procedure.serializers import DoctorClinicProcedureSerializer, 
 from ondoc.api.v1.ratings.serializers import RatingsGraphSerializer
 from ondoc.cart.models import Cart
 from ondoc.common.models import Feature
+from ondoc.common.utils import get_file_mime_type
 from ondoc.doctor.models import (OpdAppointment, Doctor, Hospital, DoctorHospital, DoctorClinicTiming,
                                  DoctorAssociation,
                                  DoctorAward, DoctorDocument, DoctorEmail, DoctorExperience, DoctorImage,
@@ -119,6 +120,11 @@ class OpdAppointmentSerializer(serializers.ModelSerializer):
     type = serializers.ReadOnlyField(default='doctor')
     allowed_action = serializers.SerializerMethodField()
     reports = serializers.SerializerMethodField()
+    prescription = serializers.SerializerMethodField()
+
+    def get_prescription(self, obj):
+        if obj:
+            return obj.get_all_prescriptions()
 
     def get_allowed_action(self, obj):
         request = self.context.get('request')
@@ -128,7 +134,7 @@ class OpdAppointmentSerializer(serializers.ModelSerializer):
         model = OpdAppointment
         fields = ('id', 'doctor_name', 'hospital_name', 'patient_name', 'patient_image', 'type',
                   'allowed_action', 'effective_price', 'deal_price', 'status', 'time_slot_start',
-                  'time_slot_end', 'doctor_thumbnail', 'patient_thumbnail', 'display_name', 'invoices', 'reports')
+                  'time_slot_end', 'doctor_thumbnail', 'patient_thumbnail', 'display_name', 'invoices', 'reports', 'prescription')
 
     def get_patient_image(self, obj):
         if obj.profile and obj.profile.profile_image:
