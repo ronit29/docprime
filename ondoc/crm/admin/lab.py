@@ -852,7 +852,7 @@ class LabAppointmentAdmin(nested_admin.NestedModelAdmin):
     list_display = (
         'booking_id', 'get_profile', 'get_lab', 'status', 'reports_uploaded', 'time_slot_start', 'effective_price', 'get_profile_email',
         'get_profile_age', 'created_at', 'updated_at', 'get_lab_test_name')
-    list_filter = ('status', 'insurance')
+    list_filter = ('status', 'payment_type')
     date_hierarchy = 'created_at'
 
     inlines = [
@@ -870,10 +870,9 @@ class LabAppointmentAdmin(nested_admin.NestedModelAdmin):
         queryset, use_distinct = super().get_search_results(request, queryset, None)
 
         queryset = queryset.filter(Q(integrator_response__integrator_order_id__icontains=search_term) |
-         Q(id__contains=search_term)).distinct()
+         Q(id__contains=search_term) | Q(lab__name__icontains=search_term) | Q(profile__name__icontains=search_term) | Q(profile__phone_number__icontains=search_term)).distinct()
 
         return queryset, use_distinct
-
 
     def integrator_order_status(self, obj):
         return obj.integrator_order_status()

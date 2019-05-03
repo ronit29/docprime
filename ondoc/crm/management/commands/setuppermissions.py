@@ -431,6 +431,9 @@ class Command(BaseCommand):
         #Create insurance group
         self.create_insurance_group()
 
+        #creating super insurance group
+        self.create_super_insurance_group()
+
         #Create XL Data Export Group
         Group.objects.get_or_create(name=constants['DATA_EXPORT_GROUP'])
 
@@ -879,6 +882,34 @@ class Command(BaseCommand):
 
     def create_insurance_group(self):
         group, created = Group.objects.get_or_create(name=constants['INSURANCE_GROUP'])
+        group.permissions.clear()
+
+        content_types = ContentType.objects.get_for_models(Insurer, InsuranceDisease, InsurerAccount,
+                                                           InsurancePlanContent, InsurancePlans, InsuranceCity,
+                                                           StateGSTCode, InsuranceDistrict, InsuranceThreshold,
+                                                           UserInsurance, InsuranceDeal, InsuranceLead,
+                                                           InsuranceTransaction, InsuranceDiseaseResponse,
+                                                           InsuredMembers, InsurerPolicyNumber, InsuranceCancelMaster)
+
+        for cl, ct in content_types.items():
+            permissions = Permission.objects.filter(
+                Q(content_type=ct),
+                Q(codename='add_' + ct.model) |
+                Q(codename='change_' + ct.model))
+
+            group.permissions.add(*permissions)
+
+        content_types = ContentType.objects.get_for_models(UserInsurance)
+
+        for cl, ct in content_types.items():
+            permissions = Permission.objects.filter(
+                Q(content_type=ct),
+                Q(codename='add_' + ct.model))
+
+            group.permissions.add(*permissions)
+
+    def create_super_insurance_group(self):
+        group, created = Group.objects.get_or_create(name=constants['SUPER_INSURANCE_GROUP'])
         group.permissions.clear()
 
         content_types = ContentType.objects.get_for_models(Insurer, InsuranceDisease, InsurerAccount,

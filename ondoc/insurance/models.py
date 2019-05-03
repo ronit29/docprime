@@ -3,7 +3,8 @@ from django.core.validators import FileExtensionValidator
 
 from ondoc.notification.models import EmailNotification
 from ondoc.notification.tasks import send_insurance_notifications, send_insurance_float_limit_notifications
-from ondoc.insurance.tasks import push_insurance_buy_to_matrix, push_insurance_banner_lead_to_matrix
+from ondoc.insurance.tasks import push_insurance_buy_to_matrix
+from ondoc.notification.tasks import push_insurance_banner_lead_to_matrix
 import json
 
 from django.db import models, transaction
@@ -1154,11 +1155,11 @@ class UserInsurance(auth_model.TimeStampedModel):
         from ondoc.doctor.models import OpdAppointment
         from ondoc.diagnostic.models import LabAppointment
         res = {}
-        opd_appointment_count = OpdAppointment.get_insured_completed_appointment(self)
-        lab_appointment_count = LabAppointment.get_insured_completed_appointment(self)
-        if opd_appointment_count > 0 or lab_appointment_count > 0:
-            res['error'] = "One of the OPD or LAB Appointment have been completed, Cancellation could not be processed"
-            return res
+        # opd_appointment_count = OpdAppointment.get_insured_completed_appointment(self)
+        # lab_appointment_count = LabAppointment.get_insured_completed_appointment(self)
+        # if opd_appointment_count > 0 or lab_appointment_count > 0:
+        #     res['error'] = "One of the OPD or LAB Appointment have been completed, Cancellation could not be processed"
+        #     return res
             # return Response(data=res, status=status.HTTP_400_BAD_REQUEST)
         opd_active_appointment = OpdAppointment.get_insured_active_appointment(self)
         lab_active_appointment = LabAppointment.get_insured_active_appointment(self)
@@ -1171,18 +1172,15 @@ class UserInsurance(auth_model.TimeStampedModel):
         self.status = UserInsurance.CANCEL_INITIATE
         self.save()
         transaction.on_commit(lambda: self.after_commit_task())
-        # InsuranceTransaction.objects.create(user_insurance=self,
-        #                                     account=self.insurance_plan.insurer.float.all().first(),
-        #                                     transaction_type=InsuranceTransaction.CREDIT,
-        #                                     amount=self.premium_amount)
-        res['success'] = "Cancellation request recieved, refund will be credited in your account in 10-15 working days"
+        res['success'] = "Cancellation request received, refund will be credited in your account in 10-15 working days"
         return res
 
     def after_commit_task(self):
         if self.status == UserInsurance.CANCEL_INITIATE:
             try:
                 # notification_tasks.send_insurance_cancellation.apply_async(self.id)
-                send_insurance_notifications.apply_async(({'user_id': self.user.id, 'status': UserInsurance.CANCEL_INITIATE}, ), countdown=1)
+                # send_insurance_notifications.apply_async(({'user_id': self.user.id, 'status': UserInsurance.CANCEL_INITIATE}, ), countdown=1)
+                pass
             except Exception as e:
                 logger.error(str(e))
 
@@ -1362,7 +1360,7 @@ class InsuranceLead(auth_model.TimeStampedModel):
         transaction.on_commit(lambda: self.after_commit())
 
     def after_commit(self):
-        push_insurance_banner_lead_to_matrix.apply_async(({'id': self.id}, ), countdown=10)
+        push_insurance_banner_lead_to_matrix.apply_async(({'id': self.id}, ))
 
     @classmethod
     def get_latest_lead_id(cls, user):
