@@ -466,6 +466,7 @@ class DoctorHospitalSerializer(serializers.ModelSerializer):
     def get_enabled_for_cod(self, obj):
         if obj.doctor_clinic and obj.doctor_clinic.hospital:
             return obj.doctor_clinic.hospital.enable_for_cod()
+        return False
 
     def get_show_contact(self, obj):
         if obj.doctor_clinic and obj.doctor_clinic.hospital and obj.doctor_clinic.hospital.spoc_details.all():
@@ -892,7 +893,7 @@ class DoctorProfileUserViewSerializer(DoctorProfileSerializer):
     unrated_appointment = serializers.SerializerMethodField()
     is_gold = serializers.SerializerMethodField()
     search_data = serializers.SerializerMethodField()
-    # enabled_for_cod = serializers.SerializerMethodField()
+    enabled_for_cod = serializers.SerializerMethodField()
 
     def get_enabled_for_cod(self, obj):
         return obj.enabled_for_cod()
