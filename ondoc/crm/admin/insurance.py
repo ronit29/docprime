@@ -437,6 +437,7 @@ class UserInsuranceLabResource(resources.ModelResource):
     gst_number_of_center = fields.Field()
     booking_date = fields.Field()
     status = fields.Field()
+    number_of_tests = fields.Field()
 
     def export(self, queryset=None, *args, **kwargs):
         queryset = self.get_queryset(**kwargs)
@@ -463,7 +464,7 @@ class UserInsuranceLabResource(resources.ModelResource):
         fields = ()
         export_order = ('appointment_id', 'policy_number', 'member_id', 'name', 'relationship_with_proposer',
                         'date_of_consultation', 'name_of_diagnostic_center', 'provider_code_of_the_center',
-                        'name_of_tests', 'address_of_center', 'amount_to_be_paid', 'booking_date', 'status',
+                        'name_of_tests', 'number_of_tests', 'address_of_center', 'amount_to_be_paid', 'booking_date', 'status',
                         'bank_detail_of_center', 'gst_number_of_center', 'pan_card_of_center', 'existing_condition')
 
     def get_insured_member(self, profile):
@@ -514,6 +515,9 @@ class UserInsuranceLabResource(resources.ModelResource):
 
     def dehydrate_name_of_tests(self, appointment):
         return ", ".join(list(map(lambda test: test.name, appointment.tests.all())))
+
+    def dehydrate_number_of_tests(self, appointment):
+        return str(appointment.tests.all().count())
 
     def dehydrate_address_of_center(self, appointment):
         building = str(appointment.lab.building)
@@ -626,7 +630,7 @@ class UserInsuranceResource(resources.ModelResource):
         return str(insurance.user.phone_number)
 
     def dehydrate_purchase_date(self, insurance):
-        return str(insurance.purchase_date.date())
+        return str(insurance.purchase_date)
 
     def dehydrate_expiry_date(self, insurance):
         return str(insurance.expiry_date.date())
@@ -727,7 +731,7 @@ class UserInsuranceAdmin(ImportExportMixin, admin.ModelAdmin):
 
     list_display = ['id', 'insurance_plan', 'user_name', 'user', 'policy_number', 'purchase_date','merchant_payout']
     fields = ['insurance_plan', 'user', 'purchase_date', 'expiry_date', 'policy_number', 'premium_amount',
-              'merchant_payout', 'status', 'onhold_reason', 'cancel_after_utilize_insurance', 'cancel_case_type']
+              'merchant_payout', 'status', 'cancel_reason', 'cancel_after_utilize_insurance', 'cancel_case_type']
     readonly_fields = ('insurance_plan', 'user', 'purchase_date', 'expiry_date', 'policy_number', 'premium_amount', 'merchant_payout')
     inlines = [InsuredMembersInline]
     form = UserInsuranceForm
@@ -774,9 +778,9 @@ class UserInsuranceAdmin(ImportExportMixin, admin.ModelAdmin):
         if request.user.is_member_of(constants['SUPER_INSURANCE_GROUP']):
             if obj.status == UserInsurance.ACTIVE:
                 super(UserInsuranceAdmin, self).save_model(request, obj, form, change)
-            elif obj.status == UserInsurance.ONHOLD:
-                if obj.onhold_reason:
-                    super(UserInsuranceAdmin, self).save_model(request, obj, form, change)
+            # elif obj.status == UserInsurance.ONHOLD:
+            #     if obj.onhold_reason:
+            #         super(UserInsuranceAdmin, self).save_model(request, obj, form, change)
             elif obj.status == UserInsurance.CANCEL_INITIATE:
                 response = obj.process_cancellation()
                 if response.get('success', None):
