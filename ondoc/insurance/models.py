@@ -414,8 +414,12 @@ class UserInsurance(auth_model.TimeStampedModel):
     ONHOLD = 4
     CANCEL_INITIATE = 5
 
+    REFUND = 1
+    NO_REFUND = 2
+
     STATUS_CHOICES = [(ACTIVE, "Active"), (CANCELLED, "Cancelled"), (EXPIRED, "Expired"), (ONHOLD, "Onhold"),
                       (CANCEL_INITIATE, 'Cancel Initiate')]
+    CANCEL_CASE_CHOICES = [(REFUND, "Refund"), (NO_REFUND, "Non-Refund")]
 
     id = models.BigAutoField(primary_key=True)
     insurance_plan = models.ForeignKey(InsurancePlans, related_name='active_users', on_delete=models.DO_NOTHING)
@@ -433,7 +437,8 @@ class UserInsurance(auth_model.TimeStampedModel):
     matrix_lead_id = models.IntegerField(null=True)
     status = models.PositiveIntegerField(choices=STATUS_CHOICES, default=ACTIVE)
     merchant_payout = models.ForeignKey(MerchantPayout, related_name="user_insurance", on_delete=models.DO_NOTHING, null=True)
-    onhold_reason = models.CharField(max_length=200, blank=True, null=True, default=None)
+    cancel_reason = models.CharField(max_length=200, blank=True, null=True, default=None)
+    cancel_case_type = models.PositiveIntegerField(choices=CANCEL_CASE_CHOICES, default=REFUND)
 
     def __str__(self):
         return str(self.user)
