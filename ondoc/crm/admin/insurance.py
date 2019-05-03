@@ -666,11 +666,13 @@ class UserInsuranceForm(forms.ModelForm):
 
     status_choices = [(UserInsurance.ACTIVE, "Active"), (UserInsurance.CANCEL_INITIATE, 'Cancel Initiate'),
                       (UserInsurance.CANCELLED, "Cancelled")]
-    # case_choices = [("REFUND", "Refundable"), ("NON-REFUND", "Non-Refundable")]
+    case_choices = [("REFUND", "Refundable"), ("NON-REFUND", "Non-Refundable")]
     cancel_after_utilize_choices = [('YES', 'Yes'), ('NO', 'No')]
     status = forms.ChoiceField(choices=status_choices, required=True)
     cancel_after_utilize_insurance = forms.ChoiceField(choices=cancel_after_utilize_choices, initial='NO',  widget=forms.RadioSelect())
     onhold_reason = forms.CharField(max_length=400, required=False)
+    cancel_case_type = forms.ChoiceField(choices=case_choices, initial='REFUND')
+
 
     def clean(self):
         super().clean()
@@ -678,6 +680,7 @@ class UserInsuranceForm(forms.ModelForm):
         status = data.get('status')
         case_type = data.get('cancel_after_utilize_insurance')
         onhold_reason = data.get('onhold_reason')
+        cancel_case_type = data.get('cancel_case_type')
         if int(status) == UserInsurance.ONHOLD:
             if not onhold_reason:
                 raise forms.ValidationError("In Case of ONHOLD status, Onhold reason is mandatory")
