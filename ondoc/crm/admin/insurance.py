@@ -776,6 +776,8 @@ class UserInsuranceAdmin(ImportExportMixin, admin.ModelAdmin):
 
     @transaction.atomic
     def save_model(self, request, obj, form, change):
+        responsible_user = request.user
+        obj._responsible_user = responsible_user if responsible_user and not responsible_user.is_anonymous else None
         if request.user.is_member_of(constants['SUPER_INSURANCE_GROUP']):
             if obj.status == UserInsurance.ACTIVE:
                 super(UserInsuranceAdmin, self).save_model(request, obj, form, change)
