@@ -888,7 +888,7 @@ class TimeSlotExtraction(object):
             self.timing[i] = dict()
             self.price_available[i] = dict()
 
-    def form_time_slots(self, day, start, end, doctor=None, price=None, is_available=True,
+    def form_time_slots(self, day, start, end, hospital=None, price=None, is_available=True,
                         deal_price=None, mrp=None, cod_deal_price=None, is_doctor=False, on_call=1):
         start = Decimal(str(start))
         end = Decimal(str(end))
@@ -913,7 +913,7 @@ class TimeSlotExtraction(object):
                     "mrp": mrp,
                     "deal_price": deal_price,
                     "cod_deal_price": cod_deal_price,
-                    "enabled_for_cod": doctor.enable_for_cod()
+                    "enabled_for_cod": hospital.enable_for_cod()
 
                 })
             price_available.update({

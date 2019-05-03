@@ -1084,9 +1084,8 @@ class DoctorClinic(auth_model.TimeStampedModel, auth_model.WelcomeCallingDone):
         timeslots = dict()
         obj = TimeSlotExtraction()
 
-
         for data in clinic_timings:
-            obj.form_time_slots( data.day, data.start, data.end, self.hospital, data.fees, True,
+            obj.form_time_slots( data.day, data.start, data.end, self.hospital if self.hospital else None, data.fees, True,
                                 data.deal_price, data.mrp, data.cod_deal_price, True, on_call=data.type)
 
         date = datetime.datetime.today().strftime('%Y-%m-%d')
