@@ -186,14 +186,16 @@ sitemap_identifier_mapping = {
     'ARTICLES': ArticleSitemap,
     'LAB_TEST': LabTestSitemap
 
+
 }
 
 
 def get_sitemap_urls(sitemap_identifier, customized_dict=None):
-    sitemap_class = sitemap_identifier_mapping[sitemap_identifier]
-    sitemap_obj = sitemap_class()
-    sitemap_obj.protocol = 'https'
-    if sitemap_identifier == 'ARTICLES':
-        sitemap_obj.customized_query = customized_dict['query']
-        sitemap_obj.customized_name = customized_dict['name']
-    return sitemap_obj
+    if sitemap_identifier_mapping.get(sitemap_identifier):
+        sitemap_class = sitemap_identifier_mapping[sitemap_identifier]
+        sitemap_obj = sitemap_class()
+        sitemap_obj.protocol = 'https'
+        if sitemap_identifier == 'ARTICLES':
+            sitemap_obj.customized_query = customized_dict['query']
+            sitemap_obj.customized_name = customized_dict['name']
+        return sitemap_obj

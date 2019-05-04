@@ -26,6 +26,9 @@ def map_sitemaps():
 
 
 def processor(sitemap_identifier, sitemap_obj):
+    if not sitemap_obj:
+        return
+    import gzip
     template = loader.get_template('sitemap.xml')
     filename = ''
     paginator = sitemap_obj.paginator
