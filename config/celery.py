@@ -66,7 +66,7 @@ def setup_periodic_tasks(sender, **kwargs):
     update_ben_status_cron_schedule = crontab(hour=21, minute=00)
     # update_merchant_payout_pg_status_cron_schedule = crontab(hour=22, minute=30)
     # update_ben_status_cron_schedule = float(2*3600)
-    update_merchant_payout_pg_status_cron_schedule = float(2*3600)
+    update_merchant_payout_pg_status_cron_schedule = float(4*3600)
 
     sender.add_periodic_task(elastic_sync_cron_schedule, dump_to_elastic.s(), name='Sync Elastic')
     sender.add_periodic_task(elastic_sync_post_cron_schedule, elastic_alias_switch.s(), name='Sync Elastic alias')

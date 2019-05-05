@@ -58,7 +58,8 @@ def update_doctors_count():
 @task
 def update_search_score():
     from ondoc.doctor.services.update_search_score import DoctorSearchScore
-    DoctorSearchScore.create_search_score()
+    obj = DoctorSearchScore()
+    obj.create_search_score()
 
 @task
 def update_all_hospitals_seo_urls():

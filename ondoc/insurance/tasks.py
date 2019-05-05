@@ -178,13 +178,14 @@ def push_mis():
     import pyminizip
     from ondoc.notification.models import EmailNotification
     from ondoc.api.v1.utils import util_absolute_url
-    from ondoc.crm.admin.insurance import UserInsuranceResource, UserInsuranceDoctorResource, UserInsuranceLabResource
+    from ondoc.crm.admin.insurance import UserInsuranceResource, UserInsuranceDoctorResource, UserInsuranceLabResource, InsuredMemberResource
     from datetime import datetime, timedelta
 
     resources = [
         (UserInsuranceResource, InsuranceMIS.AttachmentType.USER_INSURANCE_RESOURCE),
         (UserInsuranceDoctorResource, InsuranceMIS.AttachmentType.USER_INSURANCE_DOCTOR_RESOURCE),
-        (UserInsuranceLabResource, InsuranceMIS.AttachmentType.USER_INSURANCE_LAB_RESOURCE)
+        (UserInsuranceLabResource, InsuranceMIS.AttachmentType.USER_INSURANCE_LAB_RESOURCE),
+        (InsuredMemberResource, InsuranceMIS.AttachmentType.INSURED_MEMBERS_RESOURCE)
     ]
 
     from_date = str(datetime.now().date() - timedelta(days=1))
