@@ -833,6 +833,7 @@ class DoctorListSerializer(serializers.Serializer):
     sort_order = serializers.ChoiceField(choices=SORT_ORDER, required=False)
     gender = serializers.ChoiceField(choices=GENDER_CHOICES, required=False)
     availability = CommaSepratedToListField(required=False,  max_length=50, typecast_to=str)
+    avg_ratings = CommaSepratedToListField(required=False,  max_length=50, typecast_to=str)
 
     def validate_ipd_procedure_ids(self, attrs):
         try:
@@ -878,10 +879,10 @@ class DoctorListSerializer(serializers.Serializer):
             raise serializers.ValidationError("Not a Valid Choice")
         return value
 
-    def validate_availability(self, value):
-        if not set(value).issubset(set(self.AVAILABILITY_CHOICES)):
-            raise serializers.ValidationError("Not a Valid Availability Choice")
-        return value
+    # def validate_availability(self, value):
+    #     if not set(value).issubset(set(self.AVAILABILITY_CHOICES)):
+    #         raise serializers.ValidationError("Not a Valid Availability Choice")
+    #     return value
 
 
 class DoctorProfileUserViewSerializer(DoctorProfileSerializer):

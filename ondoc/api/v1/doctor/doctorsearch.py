@@ -1,4 +1,5 @@
 import operator
+from pyodbc import Date
 
 from django.contrib.gis.geos import Point
 from django.db.models import F
@@ -14,7 +15,7 @@ from ondoc.doctor.models import Doctor, PracticeSpecialization
 from ondoc.procedure.models import DoctorClinicProcedure, ProcedureCategory, ProcedureToCategoryMapping, \
     get_selected_and_other_procedures, get_included_doctor_clinic_procedure, \
     get_procedure_categories_with_procedures
-from datetime import datetime
+from datetime import datetime, timedelta
 import re
 import json
 from django.contrib.staticfiles.templatetags.staticfiles import static
@@ -147,6 +148,33 @@ class DoctorSearchHelper:
                 'dl.id is NULL and dct.day=(%(current_time)s) and dct.end>=(%(current_hour)s)')
             params['current_time'] = str(current_time.weekday())
             params['current_hour'] = str(current_hour)
+
+        if self.query_params.get('availability'):
+            availability = self.query_params.get('availability')
+            start_day = Date.today().weekday()
+            avail_days = max(map(int, availability))
+            days = list()
+            if avail_days == serializers.DoctorListSerializer.TODAY:
+                days.append(start_day)
+            elif avail_days == serializers.DoctorListSerializer.TOMORROW:
+                days.append(start_day)
+                days.append(0 if start_day == 6 else start_day + 1)
+            elif avail_days == serializers.DoctorListSerializer.NEXT_3_DAYS:
+                for day in range(4):
+                    days.append(0 if start_day == 6 else start_day + 1)
+
+            counter = 1
+            if len(days) > 0:
+                dct_days_str = 'dct.day IN ('
+                for day in days:
+                    if not counter == 1:
+                        dct_days_str += ','
+                    dct_days_str = dct_days_str + '%(' + 'dct_day' + str(counter) + ')s'
+                    params['dct_day' + str(counter)] = day
+                    counter += 1
+                filtering_params.append(
+                    dct_days_str + ')'
+                )
 
         if self.query_params.get("doctor_name"):
             name = self.query_params.get("doctor_name").lower().strip()

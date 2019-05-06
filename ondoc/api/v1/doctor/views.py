@@ -1413,6 +1413,9 @@ class DoctorListViewSet(viewsets.GenericViewSet):
 
         response = doctor_search_helper.prepare_search_response(doctor_data, doctor_search_result, request, insurance_data=insurance_data_dict)
 
+        if validated_data.get('avg_ratings'):
+            ratings = max(validated_data.get('avg_ratings'))
+
         entity_ids = [doctor_data['id'] for doctor_data in response]
 
         entity_data = dict()
