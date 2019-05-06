@@ -829,6 +829,7 @@ class DoctorListSerializer(serializers.Serializer):
     locality = serializers.CharField(required=False)
     city = serializers.CharField(required=False)
     ipd_procedure_ids = CommaSepratedToListField(required=False, max_length=500, typecast_to=str)
+    sort_order = serializers.ChoiceField(choices=SORT_ORDER, required=False)
     # availability = serializers.ChoiceField(choices=AVAILABILITY_CHOICES, required=False)
 
     def validate_ipd_procedure_ids(self, attrs):
