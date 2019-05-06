@@ -2959,7 +2959,7 @@ class DigitalReports(viewsets.GenericViewSet):
 class CompareLabPackagesViewSet(viewsets.ReadOnlyModelViewSet):
 
     def retrieve_by_url(self, request, *args, **kwargs):
-        url = request.GET.get('url')
+        url = request.data.get('url')
         if not url:
             return Response(status=status.HTTP_404_NOT_FOUND)
 
