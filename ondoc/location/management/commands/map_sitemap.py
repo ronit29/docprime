@@ -53,19 +53,35 @@ def processor(sitemap_identifier, sitemap_obj):
             filename = sitemap_obj.customized_name
         elif sitemap_identifier == 'LAB_TEST':
             filename = 'lab-test'
+        elif sitemap_identifier in ['HOSPITAL_PAGE', 'HOSPITALS_LOCALITY_CITY', 'HOSPITALS_CITY', 'IPD_PROCEDURE_CITY',
+                                    'IPD_PROCEDURE_HOSPITAL_CITY', 'IPD_PROCEDURE_DOCTOR_CITY']:
+            filename = sitemap_identifier.lower().replace('_', '-')
 
         filename = slugify(filename)
 
         count = len(sitemap_obj.get_urls())
         file = template.render({'urlset': sitemap_obj.get_urls(page_num)}).encode()
         relative_name = '%s-%s' % (filename, page_num)
-        name = '%s-sitemap.xml' % (relative_name)
-        string_io_obj = BytesIO()
-        string_io_obj.write(file)
-        string_io_obj.seek(0)
+        # name = '%s-sitemap.xml' % (relative_name)
+        # string_io_obj = BytesIO()
+        # string_io_obj.write(file)
+        # string_io_obj.seek(0)
+        # file_obj = InMemoryUploadedFile(string_io_obj, None, name, 'text/xml',
+        #                                 string_io_obj.tell(), None)
 
-        file_obj = InMemoryUploadedFile(string_io_obj, None, name, 'text/xml',
+        name = '%s-sitemap.xml.gz' % (relative_name)
+        string_io_obj = BytesIO()
+        gzip_handler = gzip.GzipFile(
+            fileobj=string_io_obj,
+            mode='wb',
+            compresslevel=9
+        )
+        gzip_handler.write(file)
+        gzip_handler.flush()
+        gzip_handler.close()
+        file_obj = InMemoryUploadedFile(string_io_obj, None, name, 'application/gzip',
                                   string_io_obj.tell(), None)
+
 
         print("Generating sitemap_index.xml %s" % filename)
         existing_sitemap = SitemapManger.objects.filter(file__contains=relative_name, valid=True)

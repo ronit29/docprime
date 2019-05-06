@@ -174,6 +174,90 @@ class LabTestSitemap(Sitemap):
         return datetime.datetime.today() - datetime.timedelta(days=datetime.datetime.today().isoweekday() % 7)
 
 
+class HospitalPageSitemap(Sitemap):
+    changefreq = "weekly"
+    priority = 1
+
+    def items(self):
+        return EntityUrls.objects.filter(is_valid=True, sitemap_identifier=EntityUrls.SitemapIdentifier.HOSPITAL_PAGE).order_by('created_at')
+
+    def location(self, obj):
+        return "/%s" % obj.url
+
+    def lastmod(self, obj):
+        return datetime.datetime.today() - datetime.timedelta(days=datetime.datetime.today().isoweekday() % 7)
+
+
+class HospitalLocalityCitySitemap(Sitemap):
+    changefreq = "weekly"
+    priority = 1
+
+    def items(self):
+        return EntityUrls.objects.filter(is_valid=True, sitemap_identifier=EntityUrls.SitemapIdentifier.HOSPITALS_LOCALITY_CITY).order_by('created_at')
+
+    def location(self, obj):
+        return "/%s" % obj.url
+
+    def lastmod(self, obj):
+        return datetime.datetime.today() - datetime.timedelta(days=datetime.datetime.today().isoweekday() % 7)
+
+
+class HospitalCitySitemap(Sitemap):
+    changefreq = "weekly"
+    priority = 1
+
+    def items(self):
+        return EntityUrls.objects.filter(is_valid=True, sitemap_identifier=EntityUrls.SitemapIdentifier.HOSPITALS_CITY).order_by('created_at')
+
+    def location(self, obj):
+        return "/%s" % obj.url
+
+    def lastmod(self, obj):
+        return datetime.datetime.today() - datetime.timedelta(days=datetime.datetime.today().isoweekday() % 7)
+
+
+class IpdProcedureCitySitemap(Sitemap):
+    changefreq = "weekly"
+    priority = 1
+
+    def items(self):
+        return EntityUrls.objects.filter(is_valid=True, sitemap_identifier=EntityUrls.SitemapIdentifier.IPD_PROCEDURE_CITY).order_by('created_at')
+
+    def location(self, obj):
+        return "/%s" % obj.url
+
+    def lastmod(self, obj):
+        return datetime.datetime.today() - datetime.timedelta(days=datetime.datetime.today().isoweekday() % 7)
+
+
+class IpdProcedureHospitalCitySitemap(Sitemap):
+    changefreq = "weekly"
+    priority = 1
+
+    def items(self):
+        return EntityUrls.objects.filter(is_valid=True, sitemap_identifier=EntityUrls.SitemapIdentifier.IPD_PROCEDURE_HOSPITAL_CITY).order_by('created_at')
+
+    def location(self, obj):
+        return "/%s" % obj.url
+
+    def lastmod(self, obj):
+        return datetime.datetime.today() - datetime.timedelta(days=datetime.datetime.today().isoweekday() % 7)
+
+
+class IpdProcedureDoctorCitySitemap(Sitemap):
+    changefreq = "weekly"
+    priority = 1
+
+    def items(self):
+        return EntityUrls.objects.filter(is_valid=True, sitemap_identifier=EntityUrls.SitemapIdentifier.IPD_PROCEDURE_DOCTOR_CITY).order_by('created_at')
+
+    def location(self, obj):
+        return "/%s" % obj.url
+
+    def lastmod(self, obj):
+        return datetime.datetime.today() - datetime.timedelta(days=datetime.datetime.today().isoweekday() % 7)
+
+
 sitemap_identifier_mapping = {
     'SPECIALIZATION_LOCALITY_CITY': SpecializationLocalityCitySitemap,
     'SPECIALIZATION_CITY': SpecializationCitySitemap,
@@ -184,8 +268,14 @@ sitemap_identifier_mapping = {
     'LAB_CITY': LabCitySitemap,
     'LAB_PAGE': LabPageSitemap,
     'ARTICLES': ArticleSitemap,
-    'LAB_TEST': LabTestSitemap
+    'LAB_TEST': LabTestSitemap,
 
+    'HOSPITAL_PAGE': HospitalPageSitemap,
+    'HOSPITALS_LOCALITY_CITY': HospitalLocalityCitySitemap,
+    'HOSPITALS_CITY': HospitalCitySitemap,
+    'IPD_PROCEDURE_CITY': IpdProcedureCitySitemap,
+    'IPD_PROCEDURE_HOSPITAL_CITY': IpdProcedureHospitalCitySitemap,
+    'IPD_PROCEDURE_DOCTOR_CITY': IpdProcedureDoctorCitySitemap,
 
 }
 
