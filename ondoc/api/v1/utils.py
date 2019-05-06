@@ -676,6 +676,14 @@ class CouponsMixin(object):
                 if user_specefic and count >= user_specefic.count:
                     return {"is_valid": False, "used_count": count}
 
+            # if coupon is random coupon
+            if hasattr(coupon_obj, 'is_random') and coupon_obj.is_random:
+                random_count = coupon_obj.random_coupon_used_count(user, coupon_obj.random_coupon_code, cart_item)
+                if random_count > 0:
+                    return {"is_valid": False, "used_count": random_count}
+                else:
+                    return {"is_valid": True, "used_count": random_count}
+
             if (coupon_obj.count is None or count < coupon_obj.count) and (coupon_obj.total_count is None or total_used_count < coupon_obj.total_count):
                 return {"is_valid": True, "used_count": count}
             else:

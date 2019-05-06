@@ -72,7 +72,8 @@ class ApplicableCouponsViewSet(viewsets.GenericViewSet):
 
         # check if request is made to fetch a specific coupon, if not only return visible coupons
         if coupon_code:
-            coupons = coupons.filter(code__iexact=coupon_code)
+            coupons = RandomGeneratedCoupon.get_coupons([coupon_code])
+            # coupons = coupons.filter(code__iexact=coupon_code)
         else:
             coupons = coupons.filter(is_visible=True)
 
@@ -80,15 +81,15 @@ class ApplicableCouponsViewSet(viewsets.GenericViewSet):
             coupons = coupons.filter(Q(is_user_specific=False) \
                 | (Q(is_user_specific=True) & Q(user_specific_coupon__user=user)))
 
-            expression = F('sent_at') + datetime.timedelta(days=1) * F('validity')
-
-            annotate_expression = ExpressionWrapper(expression, DateTimeField())
-            coupons = coupons.prefetch_related(Prefetch('random_generated_coupon',
-                                      queryset=RandomGeneratedCoupon.objects.annotate(last_date=annotate_expression)
-                                      .filter(user=user,
-                                              sent_at__isnull=False,
-                                              consumed_at__isnull=True,
-                                              last_date__gte=datetime.datetime.now())))
+            # expression = F('sent_at') + datetime.timedelta(days=1) * F('validity')
+            #
+            # annotate_expression = ExpressionWrapper(expression, DateTimeField())
+            # coupons = coupons.prefetch_related(Prefetch('random_generated_coupon',
+            #                           queryset=RandomGeneratedCoupon.objects.annotate(last_date=annotate_expression)
+            #                           .filter(user=user,
+            #                                   sent_at__isnull=False,
+            #                                   consumed_at__isnull=True,
+            #                                   last_date__gte=datetime.datetime.now())))
 
             if profile:
                 if profile.gender:
@@ -246,13 +247,21 @@ class ApplicableCouponsViewSet(viewsets.GenericViewSet):
                 allowed = False
                 valid = False
 
+            is_random_generated = False
+            random_coupon_code = None
+            if hasattr(coupon, 'is_random') and coupon.is_random:
+                is_random_generated = True
+                random_coupon_code = coupon.random_coupon_code
+
             if allowed:
-                applicable_coupons.append({"is_random_generated": False,
+                applicable_coupons.append({
+                            "is_random_generated": is_random_generated,
+                            "random_coupon_code": random_coupon_code,
                             "valid": valid,
                             "invalidating_message": invalidating_message,
                             "coupon_type": coupon.type,
                             "coupon_id": coupon.id,
-                            "code": coupon.code,
+                            "code": random_coupon_code or coupon.code,
                             "desc": coupon.description,
                             "coupon_count": coupon.count,
                             "used_count": len(coupon.user_opd_booked)+len(coupon.user_lab_booked)+coupon.cart_count,
@@ -264,24 +273,25 @@ class ApplicableCouponsViewSet(viewsets.GenericViewSet):
                             "is_cashback": coupon.coupon_type == Coupon.CASHBACK,
                             "tnc": coupon.tnc})
                 if user:
-                    for random_coupon in coupon.random_generated_coupon.all():
-                        applicable_coupons.append({"is_random_generated": True,
-                               "valid": valid,
-                               "invalidating_message": invalidating_message,
-                                "coupon_type": coupon.type,
-                                "random_coupon_id": random_coupon.id,
-                                "coupon_id": coupon.id,
-                                "random_code": random_coupon.random_coupon,
-                                "code": coupon.code,
-                                "desc": coupon.description,
-                                "coupon_count": 1,
-                                "used_count": 0,
-                                "coupon": coupon,
-                                "heading": coupon.heading,
-                                "is_corporate": coupon.is_corporate,
-                                "tests": [test.id for test in coupon.test.all()],
-                                "network_id": coupon.lab_network.id if coupon.lab_network else None,
-                                "tnc": coupon.tnc})
+                    pass
+                    # for random_coupon in coupon.random_generated_coupon.all():
+                    #     applicable_coupons.append({"is_random_generated": True,
+                    #            "valid": valid,
+                    #            "invalidating_message": invalidating_message,
+                    #             "coupon_type": coupon.type,
+                    #             "random_coupon_id": random_coupon.id,
+                    #             "coupon_id": coupon.id,
+                    #             "random_code": random_coupon.random_coupon,
+                    #             "code": coupon.code,
+                    #             "desc": coupon.description,
+                    #             "coupon_count": 1,
+                    #             "used_count": 0,
+                    #             "coupon": coupon,
+                    #             "heading": coupon.heading,
+                    #             "is_corporate": coupon.is_corporate,
+                    #             "tests": [test.id for test in coupon.test.all()],
+                    #             "network_id": coupon.lab_network.id if coupon.lab_network else None,
+                    #             "tnc": coupon.tnc})
 
 
         if applicable_coupons:
