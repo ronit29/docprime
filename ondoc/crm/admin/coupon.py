@@ -297,7 +297,7 @@ class CouponAdmin(admin.ModelAdmin):
     def save_model(self, request, obj, form, change):
         from ondoc.coupon.tasks import generate_random_coupons
         if form.cleaned_data.get('create_random_coupon') and form.cleaned_data.get('random_coupon_count', 0) > 0 and obj and obj.id:
-            generate_random_coupons(form.cleaned_data.get('random_coupon_count', 0), obj.id)
+            generate_random_coupons.apply_async((form.cleaned_data.get('random_coupon_count', 0), obj.id), countdown=1)
         super().save_model(request, obj, form, change)
 
 
@@ -371,10 +371,10 @@ class UserSpecificCouponAdmin(ImportExportModelAdmin):
     resource_class = UserSpecificCouponResource
 
 
-class RandomGeneratedCouponAdmin(admin.ModelAdmin):
+class RandomGeneratedCouponAdmin(ImportExportModelAdmin):
 
     readonly_fields = ('random_coupon', 'sent_at', 'consumed_at')
-
+    search_fields = ('coupon__code', )
     list_display = ('id', 'random_coupon', 'coupon', 'user', 'sent_at', 'consumed_at', 'created_at', 'updated_at')
 
     def save_model(self, request, obj, form, change):
