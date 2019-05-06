@@ -257,6 +257,7 @@ class CouponForm(forms.ModelForm):
         if any(self.errors):
             return
         cleaned_data = self.cleaned_data
+        code = cleaned_data.get('code')
         type = cleaned_data.get('type')
         age_start = cleaned_data.get('age_start')
         age_end = cleaned_data.get('age_end')
@@ -269,6 +270,8 @@ class CouponForm(forms.ModelForm):
         specializations = cleaned_data.get('specializations')
         procedures = cleaned_data.get('procedures')
         procedure_categories = cleaned_data.get('procedure_categories')
+        if code and Coupon.objects.filter(code=code)[:1]:
+            raise forms.ValidationError('Coupon is already there. Please create unique coupon.')
         if age_end and not age_start:
             age_start = 0
         if age_start and not age_end:
