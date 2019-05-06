@@ -802,10 +802,10 @@ class DoctorListSerializer(serializers.Serializer):
     SORT_CHOICES = ('fees', 'experience', 'distance', )
     SORT_ORDER = ('asc', 'desc')
     GENDER_CHOICES = [("m", "Male"), ("f", "Female")]
-    # TODAY = 1
-    # TOMORROW = 2
-    # NEXT_3_DAYS = 3
-    # AVAILABILITY_CHOICES = (TODAY, TOMORROW, NEXT_3_DAYS)
+    TODAY = 1
+    TOMORROW = 2
+    NEXT_3_DAYS = 3
+    AVAILABILITY_CHOICES = ((TODAY, 'Today'), (TOMORROW, "Tomorrow"), (NEXT_3_DAYS, "Next 3 days"),)
 
     SITTING_CHOICES = [type_choice[1] for type_choice in Hospital.HOSPITAL_TYPE_CHOICES]
     specialization_ids = CommaSepratedToListField(required=False, max_length=500, typecast_to=str)
@@ -832,7 +832,7 @@ class DoctorListSerializer(serializers.Serializer):
     ipd_procedure_ids = CommaSepratedToListField(required=False, max_length=500, typecast_to=str)
     sort_order = serializers.ChoiceField(choices=SORT_ORDER, required=False)
     gender = serializers.ChoiceField(choices=GENDER_CHOICES, required=False)
-    # availability = serializers.ChoiceField(choices=AVAILABILITY_CHOICES, required=False)
+    availability = CommaSepratedToListField(required=False,  max_length=50, typecast_to=str)
 
     def validate_ipd_procedure_ids(self, attrs):
         try:
@@ -876,6 +876,11 @@ class DoctorListSerializer(serializers.Serializer):
     def validate_sits_at(self, value):
         if not set(value).issubset(set(self.SITTING_CHOICES)):
             raise serializers.ValidationError("Not a Valid Choice")
+        return value
+
+    def validate_availability(self, value):
+        if not set(value).issubset(set(self.AVAILABILITY_CHOICES)):
+            raise serializers.ValidationError("Not a Valid Availability Choice")
         return value
 
 
