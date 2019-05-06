@@ -800,6 +800,12 @@ class PrescriptionSerializer(serializers.Serializer):
 
 class DoctorListSerializer(serializers.Serializer):
     SORT_CHOICES = ('fees', 'experience', 'distance', )
+    SORT_ORDER = ('asc', 'desc')
+    # TODAY = 1
+    # TOMORROW = 2
+    # NEXT_3_DAYS = 3
+    # AVAILABILITY_CHOICES = (TODAY, TOMORROW, NEXT_3_DAYS)
+
     SITTING_CHOICES = [type_choice[1] for type_choice in Hospital.HOSPITAL_TYPE_CHOICES]
     specialization_ids = CommaSepratedToListField(required=False, max_length=500, typecast_to=str)
     condition_ids = CommaSepratedToListField(required=False, max_length=500, typecast_to=str)
@@ -823,6 +829,7 @@ class DoctorListSerializer(serializers.Serializer):
     locality = serializers.CharField(required=False)
     city = serializers.CharField(required=False)
     ipd_procedure_ids = CommaSepratedToListField(required=False, max_length=500, typecast_to=str)
+    # availability = serializers.ChoiceField(choices=AVAILABILITY_CHOICES, required=False)
 
     def validate_ipd_procedure_ids(self, attrs):
         try:
