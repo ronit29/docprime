@@ -3147,6 +3147,7 @@ class CompareLabPackagesViewSet(viewsets.ReadOnlyModelViewSet):
         response['test_info'] = list(test_data_master.values())
         response['search_content'] = None
         response['bottom_content'] = None
+        response['description'] = None
         if kwargs and kwargs['compare_seo_url']:
             new_dynamic = NewDynamic.objects.filter(url_value=kwargs['compare_seo_url'].url)
             if new_dynamic:
