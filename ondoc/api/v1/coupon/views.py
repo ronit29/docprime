@@ -252,6 +252,10 @@ class ApplicableCouponsViewSet(viewsets.GenericViewSet):
             if hasattr(coupon, 'is_random') and coupon.is_random:
                 is_random_generated = True
                 random_coupon_code = coupon.random_coupon_code
+                random_count = coupon.random_coupon_used_count(user, coupon.random_coupon_code, cart_item_id)
+                if random_count > 0:
+                    allowed = False
+                    valid = False
 
             if allowed:
                 applicable_coupons.append({
