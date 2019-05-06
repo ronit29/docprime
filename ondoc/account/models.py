@@ -79,6 +79,49 @@ class Order(TimeStampedModel):
     def __str__(self):
         return "{}".format(self.id)
 
+    def get_insurance_data_for_pg(self):
+        from ondoc.insurance.models import UserInsurance
+
+        data = {}
+        user_insurance = None
+        if self.product_id == Order.INSURANCE_PRODUCT_ID:
+            user_insurance = UserInsurance.objects.filter(order=self).first()
+            if user_insurance:
+                data['merchCode'] = str(user_insurance.insurance_plan.insurer.insurer_merchant_code)
+        elif (self.product_id in (self.DOCTOR_PRODUCT_ID,self.LAB_PRODUCT_ID)):
+            if not self.is_parent() and self.booked_using_insurance():
+            # if self.is_parent():
+            #     raise Exception('cannot get insurance for parent order')
+                appt = self.getAppointment()
+                if appt and appt.insurance:
+                    user_insurance = appt.insurance
+                    transactions = user_insurance.order.getTransactions()
+                    if not transactions:
+                        raise Exception('No transactions found for appointment insurance.')
+                    insurance_order_transaction = transactions[0]
+                    data['refOrderId'] = str(insurance_order_transaction.order_id)
+                    data['refOrderNo'] = str(insurance_order_transaction.order_no)
+                    data['merchCode'] = str(user_insurance.insurance_plan.insurer.insurer_merchant_code)
+
+        return data
+
+    def dummy_transaction_allowed(self):
+        if (not self.is_parent() and not self.booked_using_insurance()) or self.getTransactions():
+            return False
+
+        return True
+
+    def booked_using_insurance(self):
+        if self.is_parent():
+            raise Exception('Not implemented for parent orders')
+        appt = self.getAppointment()
+        if appt and appt.insurance_id:
+            return True
+        return False
+
+    def is_parent(self):
+        return self.parent_id is None
+
     @classmethod
     def disable_pending_orders(cls, appointment_details, product_id, action):
         if product_id == Order.DOCTOR_PRODUCT_ID:
@@ -359,6 +402,9 @@ class Order(TimeStampedModel):
         return None
 
     def get_total_price(self):
+        if not self.is_parent() and self.booked_using_insurance():
+            return 0
+
         if self.parent:
             raise Exception("Cannot calculate price on a child order")
 
@@ -366,7 +412,10 @@ class Order(TimeStampedModel):
 
     def getTransactions(self):
         # if trying to get txn on a child order, recurse for its parent instead
-        if self.parent:
+
+        # for insurance dummy transaction should be created on child order
+        # for other bookings it should be created on parent order
+        if not self.is_parent() and not self.booked_using_insurance():
             return self.parent.getTransactions()
 
         all_txn = None
