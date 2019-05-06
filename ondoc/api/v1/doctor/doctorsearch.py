@@ -178,6 +178,10 @@ class DoctorSearchHelper:
             params['doctor_name2'] = '% ' + search_key + ' %'
             params['doctor_name3'] = '% ' + search_key
 
+        if self.query_params.get('gender'):
+            filtering_params.append("d.gender=(%(gender)s)")
+            params['gender'] = self.query_params.get('gender')
+
         if self.query_params.get("hospital_name"):
             search_key = re.findall(r'[a-z0-9A-Z.]+', self.query_params.get("hospital_name"))
             search_key = " ".join(search_key).lower()
@@ -240,7 +244,10 @@ class DoctorSearchHelper:
                     order_by_field = ' practicing_since ASC, distance ASC, priority desc '
                     rank_by = " rnk=1 "
                 elif self.query_params.get('sort_on') == 'fees':
-                    order_by_field = " deal_price ASC, distance ASC, priority desc "
+                    if self.query_params.get('sort_order') and self.query_params.get('sort_order') == 'desc':
+                        order_by_field = " deal_price DESC, distance ASC, priority desc "
+                    else:
+                        order_by_field = " deal_price ASC, distance ASC, priority desc "
                     rank_by = " rnk=1 "
                 elif self.query_params.get('sort_on') == 'distance':
                     order_by_field = " distance ASC, deal_price ASC, priority desc "

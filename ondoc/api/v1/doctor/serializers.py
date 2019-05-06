@@ -801,6 +801,7 @@ class PrescriptionSerializer(serializers.Serializer):
 class DoctorListSerializer(serializers.Serializer):
     SORT_CHOICES = ('fees', 'experience', 'distance', )
     SORT_ORDER = ('asc', 'desc')
+    GENDER_CHOICES = [("m", "Male"), ("f", "Female")]
     # TODAY = 1
     # TOMORROW = 2
     # NEXT_3_DAYS = 3
@@ -830,6 +831,7 @@ class DoctorListSerializer(serializers.Serializer):
     city = serializers.CharField(required=False)
     ipd_procedure_ids = CommaSepratedToListField(required=False, max_length=500, typecast_to=str)
     sort_order = serializers.ChoiceField(choices=SORT_ORDER, required=False)
+    gender = serializers.ChoiceField(choices=GENDER_CHOICES, required=False)
     # availability = serializers.ChoiceField(choices=AVAILABILITY_CHOICES, required=False)
 
     def validate_ipd_procedure_ids(self, attrs):
