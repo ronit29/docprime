@@ -24,6 +24,6 @@ def getsitemap(request):
 
     sitemap_manager_qs = SitemapManger.objects.filter(file__contains=request_partial_path_list[len(request_partial_path_list)-1]).order_by('-created_at')
     if sitemap_manager_qs.exists():
-        return HttpResponse(sitemap_manager_qs.first().file, content_type='text/xml')
+        return HttpResponse(sitemap_manager_qs.first().file, content_type='application/gzip')
     else:
         return HttpResponse(status=status.HTTP_404_NOT_FOUND)

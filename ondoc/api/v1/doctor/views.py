@@ -29,7 +29,7 @@ from ondoc.account import models as account_models
 from ondoc.location.models import EntityUrls, EntityAddress, DefaultRating
 from ondoc.procedure.models import Procedure, ProcedureCategory, CommonProcedureCategory, ProcedureToCategoryMapping, \
     get_selected_and_other_procedures, CommonProcedure, CommonIpdProcedure, IpdProcedure, DoctorClinicIpdProcedure, \
-    IpdProcedureFeatureMapping, IpdProcedureDetail
+    IpdProcedureFeatureMapping, IpdProcedureDetail, SimilarIpdProcedureMapping
 from ondoc.seo.models import NewDynamic
 from . import serializers
 from ondoc.api.v2.doctor import serializers as v2_serializers
@@ -1416,6 +1416,9 @@ class DoctorListViewSet(viewsets.GenericViewSet):
         else:
             saved_search_result = get_object_or_404(models.DoctorSearchResult, pk=validated_data.get("search_id"))
         doctor_ids = paginate_queryset([data.get("doctor_id") for data in doctor_search_result], request)
+        temp_hospital_ids = paginate_queryset([data.get("hospital_id") for data in doctor_search_result], request)
+        hosp_entity_dict, hosp_locality_entity_dict = Hospital.get_hosp_and_locality_dict(temp_hospital_ids,
+                                                                                          EntityUrls.SitemapIdentifier.DOCTORS_LOCALITY_CITY)
         preserved = Case(*[When(pk=pk, then=pos) for pos, pk in enumerate(doctor_ids)])
         doctor_data = models.Doctor.objects.filter(
             id__in=doctor_ids).prefetch_related("hospitals", "doctor_clinics", "doctor_clinics__availability",
@@ -1428,7 +1431,10 @@ class DoctorListViewSet(viewsets.GenericViewSet):
                                                 "doctor_clinics__hospital__hospital_place_details"
                                                 ).order_by(preserved)
 
-        response = doctor_search_helper.prepare_search_response(doctor_data, doctor_search_result, request, insurance_data=insurance_data_dict)
+        response = doctor_search_helper.prepare_search_response(doctor_data, doctor_search_result, request,
+                                                                insurance_data=insurance_data_dict,
+                                                                hosp_entity_dict=hosp_entity_dict,
+                                                                hosp_locality_entity_dict=hosp_locality_entity_dict)
 
         entity_ids = [doctor_data['id'] for doctor_data in response]
 
@@ -1522,7 +1528,7 @@ class DoctorListViewSet(viewsets.GenericViewSet):
             if validated_data.get('sitemap_identifier') == 'IPD_PROCEDURE_DOCTOR_CITY':
                 title = '{ipd_procedure_name} Doctors in {city} | Best {ipd_procedure_name} Specialists'.format(
                     ipd_procedure_name=validated_data.get('ipd_procedure'), city=city)
-                description = '{ipd_procedure_name} Doctors in {city} : Check {ipd_procedure_name} doctors in {city}. View address, reviews, cost estimate and more at docprime.'.format(
+                description = '{ipd_procedure_name} Doctors in {city} : Check {ipd_procedure_name} doctors in {city}. View address, reviews, cost estimate and more at Docprime.'.format(
                     ipd_procedure_name=validated_data.get('ipd_procedure'), city=city)
 
             elif validated_data.get('sitemap_identifier') == 'SPECIALIZATION_LOCALITY_CITY':
@@ -3612,20 +3618,41 @@ class HospitalViewSet(viewsets.GenericViewSet):
                 city = city_match(validated_data.get('city'))
                 # IPD_PROCEDURE_COST_IN_IPDP
                 temp_url = slugify(ipd_procedure_obj_name + '-hospitals-in-' + city + '-ipdhp')
-                entity = EntityUrls.objects.filter(url=temp_url, url_type='SEARCHURL', entity_type='Hospital',
+                entity = EntityUrls.objects.filter(url=temp_url, url_type=EntityUrls.UrlType.SEARCHURL,
+                                                   entity_type='Hospital',
                                                    is_valid=True,
                                                    locality_value__iexact=city).first()
 
-        if entity :
+
+        if entity:
+            breadcrumb = deepcopy(entity.breadcrumb) if isinstance(entity.breadcrumb, list) else []
+            breadcrumb.insert(0, {"title": "Home", "url": "/", "link_title": "Home"})
+            locality = entity.sublocality_value
             city = entity.locality_value
             url = entity.url
             canonical_url = entity.url
-            if ipd_procedure_obj_name:
+            if entity.sitemap_identifier == EntityUrls.SitemapIdentifier.IPD_PROCEDURE_HOSPITAL_CITY and ipd_procedure_obj_name:
                 title = 'Best {ipd_procedure_name} Hospitals in {city} | Book Hospital & Get Discount'.format(
-                    ipd_procedure_name=ipd_procedure_obj_name, city=city).title()
-
-                description = '{ipd_procedure_name} Hospitals in {city} : Check {ipd_procedure_name} hospitals in {city}. View address, reviews, cost estimate and more at docprime.'.format(
                     ipd_procedure_name=ipd_procedure_obj_name, city=city)
+
+                description = '{ipd_procedure_name} Hospitals in {city} : Check {ipd_procedure_name} hospitals in {city}. View address, reviews, cost estimate and more at Docprime.'.format(
+                    ipd_procedure_name=ipd_procedure_obj_name, city=city)
+                breadcrumb.append({"title": "Procedures", "url": "ipd-procedures", "link_title": "Procedures"})
+                temp = "{} Hospitals in {}".format(ipd_procedure_obj_name, city)
+                breadcrumb.append({"title": temp, "url": None, "link_title": temp})
+            elif entity.sitemap_identifier == EntityUrls.SitemapIdentifier.HOSPITALS_CITY:
+                title = 'Best Hospitals in {city} | Find Top Hospitals Near Me in {city}'.format(city=city)
+                description = 'Best Hospitals in {city}: Find list of verified top hospitals near me in {city}. View details, address, reviews, bed availability, cost and more at Docprime.'.format(
+                    city=city)
+                temp = "{} Hospitals".format(city)
+                breadcrumb.append({"title": temp, "url": None, "link_title": temp})
+            elif entity.sitemap_identifier == EntityUrls.SitemapIdentifier.HOSPITALS_LOCALITY_CITY:
+                title = 'Best Hospitals in {locality}, {city} | List of Top Hospitals in {locality}'.format(
+                    locality=locality, city=city)
+                description = 'Best Hospitals in {locality}, {city}: Check List of verified Top hospitals in {locality}, {city}. View details, address, reviews, bed availability, cost and more at Docprime.'.format(
+                    locality=locality, city=city)
+                temp = "Hospitals in {}, {}".format(entity.sublocality_value, entity.locality_value)
+                breadcrumb.append({"title": temp, "url": None, "link_title": temp})
 
         if url:
             new_dynamic_object = NewDynamic.objects.filter(url_value=url, is_enabled=True).first()
@@ -3639,20 +3666,12 @@ class HospitalViewSet(viewsets.GenericViewSet):
                 if new_dynamic_object.bottom_content:
                     bottom_content = new_dynamic_object.bottom_content
 
-        breadcrumb = deepcopy(entity.breadcrumb) if entity and isinstance(entity.breadcrumb, list) else []
-        breadcrumb.insert(0, {"title": "Home", "url": "/", "link_title": "Home"})
-        if ipd_procedure_obj_name:
-            breadcrumb.append({"title": "Procedures", "url": "ipd-procedures", "link_title": "Procedures"})
-            if city:
-                breadcrumb.append({"title": "{} Hospitals in {}".format(ipd_procedure_obj_name, city), "url": None})
-
-
         lat = validated_data.get('lat')
         long = validated_data.get('long')
         min_distance = validated_data.get('min_distance')
         max_distance = validated_data.get('max_distance')
         max_distance = max_distance * 1000 if max_distance is not None else 10000
-        min_distance = min_distance * 1000 if min_distance is not None else 0
+        min_distance = min_distance * 1000 if min_distance is not None else -1
         provider_ids = validated_data.get('provider_ids')
         point_string = 'POINT(' + str(long) + ' ' + str(lat) + ')'
         pnt = GEOSGeometry(point_string, srid=4326)
@@ -3661,30 +3680,37 @@ class HospitalViewSet(viewsets.GenericViewSet):
                                                               'hosp_availability',
                                                               'health_insurance_providers',
                                                               'network__hospital_network_documents',
-                                                              'hospitalspeciality_set').filter(
+                                                              'hospitalspeciality_set').exclude(location__dwithin=(
+            Point(float(long),
+                  float(lat)),
+            D(m=min_distance))).filter(
             is_live=True,
             hospital_doctors__enabled=True,
             location__dwithin=(
                 Point(float(long),
                       float(lat)),
                 D(m=max_distance))).annotate(
-            distance=Distance('location', pnt))
+            distance=Distance('location', pnt)).order_by('distance')
         if provider_ids:
             hospital_queryset = hospital_queryset.filter(health_insurance_providers__id__in=provider_ids)
         if ipd_pk:
             hospital_queryset = hospital_queryset.filter(
                 hospital_doctors__ipd_procedure_clinic_mappings__ipd_procedure_id=ipd_pk,
                 hospital_doctors__ipd_procedure_clinic_mappings__enabled=True)
-        if min_distance:  # TODO : SHASHANK_SINGH add it in query
-            hospital_queryset = filter(lambda x: x.distance.m >= min_distance if x.distance is not None and x.distance.m is not None else False, hospital_queryset)
 
-        hospital_queryset = list(hospital_queryset.distinct())
-        result_count = len(hospital_queryset)
+        hospital_queryset = hospital_queryset.distinct()
+        result_count = hospital_queryset.count()
+        hospital_queryset = paginate_queryset_refactored_consumer_app(hospital_queryset, request, 50)
+        hospital_queryset = list(hospital_queryset)
         if count:
             hospital_queryset = hospital_queryset[:count]
-        hospital_queryset = paginate_queryset_refactored_consumer_app(hospital_queryset, request)
+        temp_hospital_ids = [x.id for x in hospital_queryset]
+        hosp_entity_dict, hosp_locality_entity_dict = Hospital.get_hosp_and_locality_dict(temp_hospital_ids,
+                                                                                          EntityUrls.SitemapIdentifier.HOSPITALS_LOCALITY_CITY)
         top_hospital_serializer = serializers.TopHospitalForIpdProcedureSerializer(hospital_queryset, many=True,
-                                                                                   context={'request': request})
+                                                                                   context={'request': request,
+                                                                                            'hosp_entity_dict': hosp_entity_dict,
+                                                                                            'hosp_locality_entity_dict': hosp_locality_entity_dict})
         return Response({'count': result_count, 'result': top_hospital_serializer.data,
                          'ipd_procedure': {'id': ipd_procedure_obj_id, 'name': ipd_procedure_obj_name},
                          'health_insurance_providers': [{'id': x.id, 'name': x.name} for x in
@@ -3823,6 +3849,7 @@ class IpdProcedureViewSet(viewsets.GenericViewSet):
         ipd_procedure = IpdProcedure.objects.prefetch_related(
             Prefetch('feature_mappings', IpdProcedureFeatureMapping.objects.select_related('feature').all().order_by('-feature__priority')),
             Prefetch('ipdproceduredetail_set', IpdProcedureDetail.objects.select_related('detail_type').all().order_by('-detail_type__priority')),
+            Prefetch('similar_ipds', SimilarIpdProcedureMapping.objects.select_related('similar_ipd_procedure').all().order_by('-order')),
         ).filter(is_enabled=True, id=pk).first()
         if ipd_procedure is None:
             return Response(status=status.HTTP_404_NOT_FOUND)
@@ -3847,7 +3874,11 @@ class IpdProcedureViewSet(viewsets.GenericViewSet):
             canonical_url = entity.url
             description = '{ipd_procedure_name} Cost in {city} : Check {ipd_procedure_name} doctors , hospitals, address & contact number in {city}.'.format(
                 ipd_procedure_name=ipd_procedure.name, city=city)
-
+        similar_ipds_entity_dict = {}
+        if city:
+            similar_ipd_ids = [x.similar_ipd_procedure.id for x in ipd_procedure.similar_ipds.all()]
+            temp_qs = EntityUrls.objects.filter(ipd_procedure_id__in=similar_ipd_ids, is_valid=True, locality_value=city)
+            similar_ipds_entity_dict = {x.ipd_procedure_id: x.url for x in temp_qs}
         if url:
             new_dynamic_object = NewDynamic.objects.filter(url_value=url, is_enabled=True).first()
             if new_dynamic_object:
@@ -3868,6 +3899,7 @@ class IpdProcedureViewSet(viewsets.GenericViewSet):
 
         hospital_view_set = HospitalViewSet()
         hospital_result = hospital_view_set.list(request, pk, 2)
+        doctor_result_data = {}
         doctor_list_viewset = DoctorListViewSet()
         doctor_result = doctor_list_viewset.list(request, parameters={'ipd_procedure_ids': str(pk),
                                                                       'longitude': validated_data.get('long'),
@@ -3877,6 +3909,7 @@ class IpdProcedureViewSet(viewsets.GenericViewSet):
                                                                       'restrict_result_count': 3})
         doctor_result_data = doctor_result.data
         ipd_procedure_serializer = serializers.IpdProcedureDetailSerializer(ipd_procedure, context={'request': request,
+                                                                                                    'similar_ipds_entity_dict': similar_ipds_entity_dict,
                                                                                                     'doctor_result_data': doctor_result_data})
         return Response(
             {'about': ipd_procedure_serializer.data, 'hospitals': hospital_result.data, 'doctors': doctor_result_data,

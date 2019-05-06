@@ -1715,13 +1715,20 @@ class IpdProcedureDetailSerializer(serializers.ModelSerializer):
     features = IpdProcedureFeatureSerializer(source='feature_mappings', read_only=True, many=True)
     all_details = serializers.SerializerMethodField()
     # all_details = IpdProcedureAllDetailsSerializer(source='ipdproceduredetail_set', read_only=True, many=True)
+    similar_ipd_procedures = serializers.SerializerMethodField()
 
     class Meta:
         model = IpdProcedure
-        fields = ('id', 'name', 'details', 'is_enabled', 'features', 'about', 'all_details', 'show_about')
+        fields = ('id', 'name', 'details', 'is_enabled', 'features', 'about', 'all_details', 'show_about',
+                  'similar_ipd_procedures')
 
     def get_all_details(self, obj):
         return IpdProcedureAllDetailsSerializer(obj.ipdproceduredetail_set.all(), many=True, context=self.context).data
+
+    def get_similar_ipd_procedures(self, obj):
+        similar_ipds_entity_dict = self.context.get('similar_ipds_entity_dict', {})
+        return [{'id': x.similar_ipd_procedure.id, 'name': x.similar_ipd_procedure.name,
+                 'url': similar_ipds_entity_dict.get(x.similar_ipd_procedure.id)} for x in obj.similar_ipds.all()]
 
 
 class TopHospitalForIpdProcedureSerializer(serializers.ModelSerializer):
@@ -1730,18 +1737,29 @@ class TopHospitalForIpdProcedureSerializer(serializers.ModelSerializer):
     certifications = serializers.SerializerMethodField()
     multi_speciality = serializers.SerializerMethodField()
     address = serializers.SerializerMethodField()
+    short_address = serializers.SerializerMethodField()
     logo = serializers.SerializerMethodField()
     open_today = serializers.SerializerMethodField()
     insurance_provider = serializers.SerializerMethodField()
     established_in = serializers.SerializerMethodField()
     lat = serializers.SerializerMethodField()
     long = serializers.SerializerMethodField()
+    url = serializers.SerializerMethodField()
+    locality_url = serializers.SerializerMethodField()
 
     class Meta:
         model = Hospital
         fields = ('id', 'name', 'distance', 'certifications', 'bed_count', 'logo', 'avg_rating',
-                  'count_of_insurance_provider', 'multi_speciality', 'address', 'open_today',
-                  'insurance_provider', 'established_in', 'long', 'lat')
+                  'count_of_insurance_provider', 'multi_speciality', 'address', 'short_address','open_today',
+                  'insurance_provider', 'established_in', 'long', 'lat', 'url', 'locality_url')
+
+    def get_locality_url(self, obj):
+        entity_url = self.context.get('hosp_locality_entity_dict', {})
+        return entity_url.get(obj.id)
+
+    def get_url(self, obj):
+        entity_url = self.context.get('hosp_entity_dict', {})
+        return entity_url.get(obj.id)
 
     def get_lat(self, obj):
         if obj.location:
@@ -1775,6 +1793,9 @@ class TopHospitalForIpdProcedureSerializer(serializers.ModelSerializer):
 
     def get_address(self, obj):
         return obj.get_hos_address()
+
+    def get_short_address(self, obj):
+        return obj.get_short_address()
 
     def get_logo(self, obj):
         request = self.context.get('request')
@@ -1843,8 +1864,9 @@ class HospitalDetailIpdProcedureSerializer(TopHospitalForIpdProcedureSerializer)
 
     def get_images(self, obj):
         request = self.context.get('request')
-        # TODO: SHASHANK_SINGH Thumbnail to be added or not
-        return [{'original': request.build_absolute_uri(img.name.url), "thumbnail": None, "cover_image": img.cover_image} for img in
+        return [{'original': request.build_absolute_uri(img.name.url),
+                 "thumbnail": request.build_absolute_uri(img.cropped_image.url) if img.cropped_image else None,
+                 "cover_image": img.cover_image} for img in
                 obj.hospitalimage_set.all() if img.name]
 
     def get_ipd_procedure_categories(self, obj):

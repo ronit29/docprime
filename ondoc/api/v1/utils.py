@@ -1,4 +1,6 @@
 from urllib.parse import urlparse
+
+from django.core.files.uploadedfile import TemporaryUploadedFile, UploadedFile
 from rest_framework.views import exception_handler
 from rest_framework import permissions
 from collections import defaultdict
@@ -31,10 +33,35 @@ import hashlib
 from ondoc.authentication import models as auth_models
 import logging
 from datetime import timedelta
+import os
+import tempfile
 
 logger = logging.getLogger(__name__)
 
 User = get_user_model()
+
+
+class CustomTemporaryUploadedFile(UploadedFile):
+    """
+    A file uploaded to a temporary location (i.e. stream-to-disk).
+    """
+    def __init__(self, name, content_type, size, charset, prefix, suffix, content_type_extra=None):
+        _, ext = os.path.splitext(name)
+        file = tempfile.NamedTemporaryFile(suffix=suffix, prefix=prefix, dir=settings.FILE_UPLOAD_TEMP_DIR)
+        super().__init__(file, name, content_type, size, charset, content_type_extra)
+
+    def temporary_file_path(self):
+        """Return the full path of this file."""
+        return self.file.name
+
+    def close(self):
+        try:
+            return self.file.close()
+        except FileNotFoundError:
+            # The file was moved or deleted before the tempfile could unlink
+            # it. Still sets self.file.close_called and calls
+            # self.file.file.close() before the exception.
+            pass
 
 
 def flatten_dict(d):

@@ -400,6 +400,7 @@ class DoctorURL():
                                     (Prefetch('hospitals', queryset=Hospital.objects.filter(is_live=True).order_by('hospital_type', 'id')))
                                     ).prefetch_related('hospitals__entity','hospitals__entity__location','hospitals__entity__location__parent').filter(is_live=True, is_test_doctor=False).order_by('id')
 
+
         for doctor in doc_obj:
             #status = DoctorPageURL.create_doctor_page_urls(doctor,sequence)
 
