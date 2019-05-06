@@ -3022,6 +3022,9 @@ class CompareLabPackagesViewSet(viewsets.ReadOnlyModelViewSet):
         serializer = serializers.CompareLabPackagesSerializer(data=request_parameters, context={"request": request})
         serializer.is_valid(raise_exception=True)
         validated_data = serializer.validated_data
+        profile = request_parameters.get('profile_id')
+        product_id = request_parameters.get('product_id')
+        coupon_code = request_parameters.get('coupon_code')
         response = {}
         # latitude = None
         # longitude = None
@@ -3113,6 +3116,7 @@ class CompareLabPackagesViewSet(viewsets.ReadOnlyModelViewSet):
 
         total_test_ids = set(test_data_master.keys())
         lab_packages_all_details = {}
+        available_tests_included_data = dict()
         for data in packages:
             if data.id and data.name:
                 package_detail = {}
@@ -3133,10 +3137,13 @@ class CompareLabPackagesViewSet(viewsets.ReadOnlyModelViewSet):
                             labs_count = labs_count + avl_labs.lab_pricing_group.labs.count()
                 package_detail['total_labs_available'] = labs_count
 
+                available_tests_included = list()
                 if tests:
                     for test in tests:
                         temp_test_id.add(test.id)
                         tests_included.append({'test_id': test.id, 'available': True})
+                        available_tests_included.append(test)
+                available_tests_included_data[data.id] = available_tests_included
 
                 if len(total_test_ids-temp_test_id) > 0:
                     for test_id in list(total_test_ids-temp_test_id):
@@ -3156,6 +3163,7 @@ class CompareLabPackagesViewSet(viewsets.ReadOnlyModelViewSet):
                 package_detail['category_parameter_count'] = category_parameter_result
                 lab_packages_all_details[data.id] = package_detail
 
+        coupon_recommender = CouponRecommender(request.user, profile, 'lab', product_id, coupon_code)
         final_result = []
         for pack_lab in validated_data.get('package_lab_ids', []):
             temp_data = {}
@@ -3164,9 +3172,30 @@ class CompareLabPackagesViewSet(viewsets.ReadOnlyModelViewSet):
             temp_data.update(deepcopy(lab_packages_all_details.get(t_pack.id, {})))
             temp_data['lab'] = {'id': t_lab.id, 'name': t_lab.name, 'thumbnail': t_lab.get_thumbnail()}
             temp_data['mrp'], temp_data['price'] = price_master.get((t_pack.id, t_lab.id), (None, None))
+
+            temp_data['discounted_price'] = self.get_discounted_price(coupon_recommender, temp_data['price'], available_tests_included_data[t_pack.id], t_lab)
+
             final_result.append(temp_data)
         # response['packages'] = list(lab_packages_all_details.values())
         response['packages'] = final_result
         response['category_info'] = category_data
         response['test_info'] = list(test_data_master.values())
         return Response(response)
+
+    def get_discounted_price(self, coupon_recommender, deal_price=0, tests_included=None, lab=None, ):
+        filters = dict()
+        if coupon_recommender:
+            filters['deal_price'] = deal_price
+            filters['tests'] = tests_included if tests_included else []
+
+            if lab and isinstance(lab, Lab):
+                filters['lab'] = dict()
+                lab_obj = filters['lab']
+                lab_obj['id'] = lab.id
+                lab_obj['network_id'] = lab.network_id
+                lab_obj['city'] = lab.city
+
+            search_coupon = coupon_recommender.best_coupon(**filters) if coupon_recommender else None
+            discounted_price = deal_price if not search_coupon else search_coupon.get_search_coupon_discounted_price(deal_price)
+
+        return discounted_price

@@ -378,6 +378,7 @@ class CouponRecommender():
         if tests:
             tests_ids = []
             test_categories_ids = []
+            categories_check = False
             for test in tests:
                 test_categories = []
                 test_id = getattr(test, 'id') if hasattr(test, 'id') else test.get('id')
@@ -387,10 +388,11 @@ class CouponRecommender():
                 if hasattr(test, 'categories'):
                     categories = getattr(test, 'categories').all()
                     test_categories = list(map(lambda x: x.id, categories))
+                    categories_check = True
                 if test_categories:
                     test_categories_ids = test_categories_ids + test_categories
                 else:
-                    if test.get('categories'):
+                    if not categories_check and test.get('categories'):
                         test_categories_ids.append(test.get('categories'))
 
             tests_ids = set(tests_ids)
