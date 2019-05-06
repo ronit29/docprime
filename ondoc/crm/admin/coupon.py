@@ -295,7 +295,7 @@ class CouponAdmin(admin.ModelAdmin):
     form = CouponForm
 
     def save_model(self, request, obj, form, change):
-        from ondoc.coupon.tasks import generate_random_coupons
+        from ondoc.notification.tasks import generate_random_coupons
         if form.cleaned_data.get('create_random_coupon') and form.cleaned_data.get('random_coupon_count', 0) > 0 and obj and obj.id:
             generate_random_coupons.apply_async((form.cleaned_data.get('random_coupon_count', 0), obj.id), countdown=1)
         super().save_model(request, obj, form, change)
