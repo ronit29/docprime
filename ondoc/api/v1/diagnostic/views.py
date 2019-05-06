@@ -3145,9 +3145,14 @@ class CompareLabPackagesViewSet(viewsets.ReadOnlyModelViewSet):
         response['packages'] = final_result
         response['category_info'] = category_data
         response['test_info'] = list(test_data_master.values())
-        response['meta_tags'] = None
+        response['search_content'] = None
+        response['bottom_content'] = None
         if kwargs and kwargs['compare_seo_url']:
             new_dynamic = NewDynamic.objects.filter(url_value=kwargs['compare_seo_url'].url)
             if new_dynamic:
-                response['meta_tags'] = {"meta_title": new_dynamic.first().meta_title, "meta_description": new_dynamic.first().meta_description}
+                response['search_content'] = new_dynamic.first().top_content
+                response['bottom_content'] = new_dynamic.first().bottom_content
+                response['description'] = new_dynamic.first().meta_description
+                if response['title'] is None:
+                    response['title'] = new_dynamic.first().meta_title
         return Response(response)
