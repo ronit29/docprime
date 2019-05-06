@@ -648,7 +648,7 @@ class DoctorProfileUserViewSet(viewsets.GenericViewSet):
         if doctor.name and general_specialization:
             about_doctor = 'Dr. ' + doctor.name
             if len(general_specialization) == 1:
-                about_doctor += ' is a proficient ' + general_specialization[0].name
+                about_doctor += ' is a practising ' + general_specialization[0].name
             elif len(general_specialization) > 1:
                 for data in general_specialization:
                     specializations.append(data.name)
@@ -659,7 +659,7 @@ class DoctorProfileUserViewSet(viewsets.GenericViewSet):
                     startswith = 'an'
                 else:
                     startswith = 'a'
-                about_doctor += ' is a proficient ' + doc_spec + ' and ' + startswith + ' ' + specializations[-1]
+                about_doctor += ' is a practising ' + doc_spec + ' and ' + startswith + ' ' + specializations[-1]
             if doctor.experience_years() and doctor.experience_years() > 0:
                 about_doctor += ' with an experience of ' + str(doctor.experience_years()) + ' years'
             about_doctor += '.'
@@ -854,8 +854,8 @@ class DoctorProfileUserViewSet(viewsets.GenericViewSet):
         if response_data and response_data.get('hospitals'):
             hospital = response_data.get('hospitals')[0]
 
-        for dps in doctor.doctorpracticespecializations.all():
-            general_specialization.append(dps.specialization)
+        # for dps in doctor.doctorpracticespecializations.all():
+        #     general_specialization.append(dps.specialization)
         if general_specialization:
             general_specialization = sorted(general_specialization, key=operator.attrgetter('doctor_count'),
                                             reverse=True)

@@ -437,6 +437,7 @@ class UserInsuranceLabResource(resources.ModelResource):
     gst_number_of_center = fields.Field()
     booking_date = fields.Field()
     status = fields.Field()
+    number_of_tests = fields.Field()
 
     def export(self, queryset=None, *args, **kwargs):
         queryset = self.get_queryset(**kwargs)
@@ -463,7 +464,7 @@ class UserInsuranceLabResource(resources.ModelResource):
         fields = ()
         export_order = ('appointment_id', 'policy_number', 'member_id', 'name', 'relationship_with_proposer',
                         'date_of_consultation', 'name_of_diagnostic_center', 'provider_code_of_the_center',
-                        'name_of_tests', 'address_of_center', 'amount_to_be_paid', 'booking_date', 'status',
+                        'name_of_tests', 'number_of_tests', 'address_of_center', 'amount_to_be_paid', 'booking_date', 'status',
                         'bank_detail_of_center', 'gst_number_of_center', 'pan_card_of_center', 'existing_condition')
 
     def get_insured_member(self, profile):
@@ -514,6 +515,9 @@ class UserInsuranceLabResource(resources.ModelResource):
 
     def dehydrate_name_of_tests(self, appointment):
         return ", ".join(list(map(lambda test: test.name, appointment.tests.all())))
+
+    def dehydrate_number_of_tests(self, appointment):
+        return str(appointment.tests.all().count())
 
     def dehydrate_address_of_center(self, appointment):
         building = str(appointment.lab.building)
@@ -626,7 +630,7 @@ class UserInsuranceResource(resources.ModelResource):
         return str(insurance.user.phone_number)
 
     def dehydrate_purchase_date(self, insurance):
-        return str(insurance.purchase_date.date())
+        return str(insurance.purchase_date)
 
     def dehydrate_expiry_date(self, insurance):
         return str(insurance.expiry_date.date())
@@ -666,22 +670,27 @@ class UserInsuranceForm(forms.ModelForm):
 
     status_choices = [(UserInsurance.ACTIVE, "Active"), (UserInsurance.CANCEL_INITIATE, 'Cancel Initiate'),
                       (UserInsurance.CANCELLED, "Cancelled")]
-    # case_choices = [("REFUND", "Refundable"), ("NON-REFUND", "Non-Refundable")]
+    case_choices = [(UserInsurance.REFUND, "Refundable"), (UserInsurance.NO_REFUND, "Non-Refundable")]
     cancel_after_utilize_choices = [('YES', 'Yes'), ('NO', 'No')]
     status = forms.ChoiceField(choices=status_choices, required=True)
     cancel_after_utilize_insurance = forms.ChoiceField(choices=cancel_after_utilize_choices, initial='NO',  widget=forms.RadioSelect())
-    onhold_reason = forms.CharField(max_length=400, required=False)
+    cancel_reason = forms.CharField(max_length=400, required=False)
+    cancel_case_type = forms.ChoiceField(choices=case_choices, initial=UserInsurance.REFUND)
+
 
     def clean(self):
         super().clean()
         data = self.cleaned_data
         status = data.get('status')
         case_type = data.get('cancel_after_utilize_insurance')
-        onhold_reason = data.get('onhold_reason')
-        if int(status) == UserInsurance.ONHOLD:
-            if not onhold_reason:
-                raise forms.ValidationError("In Case of ONHOLD status, Onhold reason is mandatory")
-        elif case_type=="NO" and int(status) == UserInsurance.CANCEL_INITIATE or int(status) == UserInsurance.CANCELLED:
+        cancel_reason = data.get('cancel_reason')
+        cancel_case_type = data.get('cancel_case_type')
+        # if int(status) == UserInsurance.ONHOLD:
+        #     if not onhold_reason:
+        #         raise forms.ValidationError("In Case of ONHOLD status, Onhold reason is mandatory")
+        if case_type=="NO" and int(status) == UserInsurance.CANCEL_INITIATE or int(status) == UserInsurance.CANCELLED:
+            if not cancel_reason:
+                raise forms.ValidationError('For Cancel Initiation, Cancel reason is mandatory')
             insured_opd_completed_app_count = OpdAppointment.get_insured_completed_appointment(self.instance)
             insured_lab_completed_app_count = LabAppointment.get_insured_completed_appointment(self.instance)
             if insured_lab_completed_app_count > 0:
@@ -690,6 +699,9 @@ class UserInsuranceForm(forms.ModelForm):
             if insured_opd_completed_app_count > 0:
                 raise forms.ValidationError('OPD appointment with insurance have been completed, '
                                             'Cancellation could not proceed')
+        if case_type == "YES" and int(status) == UserInsurance.CANCEL_INITIATE or int(status) == UserInsurance.CANCELLED:
+            if not cancel_reason:
+                raise forms.ValidationError('For Cancel Initiation, Cancel reason is mandatory')
         if int(status) == UserInsurance.CANCELLED and not self.instance.status == UserInsurance.CANCEL_INITIATE:
             raise forms.ValidationError('Cancellation is only allowed for cancel initiate status')
         if self.instance.status == UserInsurance.CANCELLED:
@@ -704,6 +716,7 @@ class UserInsuranceAdmin(ImportExportMixin, admin.ModelAdmin):
     export_template_name = "export_insurance_report.html"
     formats = (base_formats.XLS,)
     model = UserInsurance
+    date_hierarchy = 'created_at'
 
     def user_policy_number(self, obj):
         return str(obj.policy_number)
@@ -719,7 +732,7 @@ class UserInsuranceAdmin(ImportExportMixin, admin.ModelAdmin):
 
     list_display = ['id', 'insurance_plan', 'user_name', 'user', 'policy_number', 'purchase_date','merchant_payout']
     fields = ['insurance_plan', 'user', 'purchase_date', 'expiry_date', 'policy_number', 'premium_amount',
-              'merchant_payout', 'status', 'onhold_reason', 'cancel_after_utilize_insurance']
+              'merchant_payout', 'status', 'cancel_reason', 'cancel_after_utilize_insurance', 'cancel_case_type']
     readonly_fields = ('insurance_plan', 'user', 'purchase_date', 'expiry_date', 'policy_number', 'premium_amount', 'merchant_payout')
     inlines = [InsuredMembersInline]
     form = UserInsuranceForm
@@ -763,12 +776,14 @@ class UserInsuranceAdmin(ImportExportMixin, admin.ModelAdmin):
 
     @transaction.atomic
     def save_model(self, request, obj, form, change):
+        responsible_user = request.user
+        obj._responsible_user = responsible_user if responsible_user and not responsible_user.is_anonymous else None
         if request.user.is_member_of(constants['SUPER_INSURANCE_GROUP']):
             if obj.status == UserInsurance.ACTIVE:
                 super(UserInsuranceAdmin, self).save_model(request, obj, form, change)
-            elif obj.status == UserInsurance.ONHOLD:
-                if obj.onhold_reason:
-                    super(UserInsuranceAdmin, self).save_model(request, obj, form, change)
+            # elif obj.status == UserInsurance.ONHOLD:
+            #     if obj.onhold_reason:
+            #         super(UserInsuranceAdmin, self).save_model(request, obj, form, change)
             elif obj.status == UserInsurance.CANCEL_INITIATE:
                 response = obj.process_cancellation()
                 if response.get('success', None):
@@ -896,6 +911,7 @@ class InsuranceLeadAdmin(ImportExportModelAdmin, admin.ModelAdmin):
     export_template_name = "export_insurance_lead_report.html"
     formats = (base_formats.XLS,)
     ordering = ('-updated_at',)
+    date_hierarchy = 'created_at'
 
     def name(self, obj):
         user = obj.user
