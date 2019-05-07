@@ -254,6 +254,54 @@ class Hospital(auth_model.TimeStampedModel, auth_model.CreatedByModel, auth_mode
     #         self.city_search_key = search_city
     #         return self.city
     #     return None
+    @classmethod
+    def get_hosp_and_locality_dict(cls, temp_hospital_ids, required_identifier):
+        if not temp_hospital_ids:
+            return {}, {}
+        from ondoc.location.models import EntityUrls
+        hosp_entity_qs = list(EntityUrls.objects.filter(is_valid=True,
+                                                        sitemap_identifier=EntityUrls.SitemapIdentifier.HOSPITAL_PAGE,
+                                                        entity_id__in=temp_hospital_ids))
+        locality_city_dict = {(x.sublocality_value.lower(), x.locality_value.lower()): None for x in hosp_entity_qs if
+                              x.sublocality_value and x.locality_value}
+        hosp_locality_entity_qs = []
+        if locality_city_dict:
+            hosp_locality_entity_qs = list(EntityUrls.objects.filter(is_valid=True,
+                                                                     sitemap_identifier=required_identifier,
+                                                                     sublocality_value__iregex=r'(' + '|'.join(
+                                                                         [x[0] for x in
+                                                                          locality_city_dict.keys()]) + ')',
+                                                                     locality_value__iregex=r'(' + '|'.join(
+                                                                         [x[1] for x in
+                                                                          locality_city_dict.keys()]) + ')'))
+        for x in hosp_locality_entity_qs:
+            if x.sublocality_value and x.locality_value:
+                locality_city_dict[(x.sublocality_value.lower(), x.locality_value.lower())] = x.url
+        hosp_entity_dict = {x.entity_id: x.url for x in hosp_entity_qs}
+        hosp_locality_entity_dict = {
+            x.entity_id: locality_city_dict.get((x.sublocality_value.lower(), x.locality_value.lower()), None) for x in
+            hosp_entity_qs if x.sublocality_value and x.locality_value}
+        return hosp_entity_dict, hosp_locality_entity_dict
+
+    @classmethod
+    def update_hospital_seo_urls(cls):
+
+        from ondoc.location.management.commands import map_hospital_geocoding_results, map_entity_address, \
+            calculate_centroid, map_hosp_entity_location_relations, hospital_urls
+        # map hospital geocoding results
+        #map_hospital_geocoding_results.map_hospital_geocoding_results()
+
+        # map entity address
+        #map_entity_address.map_entity_address()
+
+        # calculate centroid
+        #calculate_centroid.calculate_centroid()
+
+        # map hospital entity location relations
+        #map_hosp_entity_location_relations.map_hosp_entity_location_relations()
+
+        # update search and profile urls
+        hospital_urls.hospital_urls()
 
     @classmethod
     def update_city_search(cls):
@@ -1356,10 +1404,27 @@ class DoctorDocument(auth_model.TimeStampedModel, auth_model.Document):
 class HospitalImage(auth_model.TimeStampedModel, auth_model.Image):
     hospital = models.ForeignKey(Hospital, on_delete=models.CASCADE)
     name = models.ImageField(upload_to='hospital/images', height_field='height', width_field='width')
+    cropped_image = models.ImageField(upload_to='hospital/images', height_field='height', width_field='width',
+                                      blank=True, null=True)
     cover_image = models.BooleanField(default=False, verbose_name="Can be used as Hospital's cover image?")
 
     class Meta:
         db_table = "hospital_image"
+
+    def use_image_name(self):
+        return True
+
+    def get_image_name(self):
+        name = self.hospital.name
+        return slugify(name)
+
+    def auto_generate_thumbnails(self):
+        return True
+
+    def save(self, *args, **kwargs):
+        super().save(*args, **kwargs)
+        self.create_thumbnail()
+
 
 
 class HospitalDocument(auth_model.TimeStampedModel, auth_model.Document):
@@ -1382,6 +1447,13 @@ class HospitalDocument(auth_model.TimeStampedModel, auth_model.Document):
 
     class Meta:
         db_table = "hospital_document"
+
+    def use_image_name(self):
+        return True
+
+    def get_image_name(self):
+        name = self.hospital.name
+        return slugify(name)
 
 
 class Language(auth_model.TimeStampedModel, UniqueNameModel):

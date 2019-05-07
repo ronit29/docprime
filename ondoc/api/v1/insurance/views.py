@@ -76,9 +76,10 @@ class InsuredMemberViewSet(viewsets.GenericViewSet):
             result['insurer_logo'] = request.build_absolute_uri(user_insurance.insurance_plan.insurer.logo.url) \
                 if user_insurance.insurance_plan.insurer.logo is not None and \
                    user_insurance.insurance_plan.insurer.logo.name else None
-            member_list = user_insurance.members.all().order_by('id').values('id', 'first_name', 'last_name', 'relation')
+            member_list = user_insurance.members.all().order_by('id').values('id', 'first_name', 'last_name', 'relation'
+                                                                             , 'gender')
             result['members'] = member_list
-            disease = InsuranceDisease.objects.filter(is_live=True).values('id', 'disease')
+            disease = InsuranceDisease.objects.filter(is_live=True).values('id', 'disease', 'is_female_related')
             result['disease'] = disease
         else:
             return Response(status=status.HTTP_404_NOT_FOUND)
@@ -424,6 +425,10 @@ class InsuranceCancelViewSet(viewsets.GenericViewSet):
         if not user.active_insurance:
             res['error'] = "Insurance is not active"
             return Response(data=res, status=status.HTTP_400_BAD_REQUEST)
+
+        responsible_user = request.user
+        user_insurance._responsible_user = responsible_user if responsible_user and not responsible_user.is_anonymous else None
+
         opd_appointment_count = OpdAppointment.get_insured_completed_appointment(user_insurance)
         lab_appointment_count = LabAppointment.get_insured_completed_appointment(user_insurance)
         if opd_appointment_count > 0 or lab_appointment_count > 0:
