@@ -1296,6 +1296,8 @@ class AvailableLabTest(TimeStampedModel):
     desired_docprime_price = models.DecimalField(default=None, max_digits=10, decimal_places=2, null=True, blank=True)
     rating = GenericRelation(ratings_models.RatingsReview)
 
+    def get_deal_price(self):
+        return self.custom_deal_price if self.custom_deal_price else self.computed_deal_price
 
     def update_deal_price(self):
         # will update only this available lab test prices and will be called on save
@@ -2360,6 +2362,8 @@ class CommonPackage(TimeStampedModel):
     package = models.ForeignKey(LabTest, on_delete=models.CASCADE, related_name='commonpackage')
     icon = models.ImageField(upload_to='diagnostic/common_package_icons', null=True)
     priority = models.PositiveIntegerField(default=0)
+    lab = models.ForeignKey(Lab, on_delete=models.CASCADE, related_name='packagelab', null=True)
+
     def __str__(self):
         return "{}-{}".format(self.package.name, self.id)
 
@@ -2726,6 +2730,12 @@ class LabTestThresholds(TimeStampedModel):
         GREEN = 'GREEN'
         ORANGE = 'ORANGE'
 
+    MALE = 'm'
+    FEMALE = 'f'
+    OTHER = 'o'
+    NULL = ''
+    GENDER_CHOICES = [(MALE,"Male"), (FEMALE,"Female"), (OTHER,"Other"), (NULL, "Null")]
+
     lab_test = models.ForeignKey(LabTest, on_delete=models.CASCADE, related_name='tests_parameter_thresholds')
     test_parameter = models.ForeignKey(TestParameter, on_delete=models.CASCADE, related_name='parameter_thresholds', blank=False, null=True)
     color = models.CharField(max_length=50, null=True, default=None, blank=False, choices=Colour.as_choices())
@@ -2735,7 +2745,7 @@ class LabTestThresholds(TimeStampedModel):
     max_value = models.FloatField(null=True, default=0)
     min_age = models.PositiveIntegerField(null=True, default=0)
     max_age = models.PositiveIntegerField(null=True, default=0)
-    gender = models.CharField(choices=UserProfile.GENDER_CHOICES, max_length=50, default=None, null=True)
+    gender = models.CharField(choices=GENDER_CHOICES, max_length=50, default=None, null=True, blank=True)
 
 
     class Meta:

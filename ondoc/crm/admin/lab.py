@@ -852,7 +852,7 @@ class LabAppointmentAdmin(nested_admin.NestedModelAdmin):
     list_display = (
         'booking_id', 'get_profile', 'get_lab', 'status', 'reports_uploaded', 'time_slot_start', 'effective_price', 'get_profile_email',
         'get_profile_age', 'created_at', 'updated_at', 'get_lab_test_name')
-    list_filter = ('status', 'insurance')
+    list_filter = ('status', 'payment_type')
     date_hierarchy = 'created_at'
 
     inlines = [
@@ -870,10 +870,9 @@ class LabAppointmentAdmin(nested_admin.NestedModelAdmin):
         queryset, use_distinct = super().get_search_results(request, queryset, None)
 
         queryset = queryset.filter(Q(integrator_response__integrator_order_id__icontains=search_term) |
-         Q(id__contains=search_term)).distinct()
+         Q(id__contains=search_term) | Q(lab__name__icontains=search_term) | Q(profile__name__icontains=search_term) | Q(profile__phone_number__icontains=search_term)).distinct()
 
         return queryset, use_distinct
-
 
     def integrator_order_status(self, obj):
         return obj.integrator_order_status()
@@ -1227,6 +1226,7 @@ class FrequentlyBookedTogetherTestInLine(admin.StackedInline):
     fk_name = 'original_test'
     fields = ['original_test', 'booked_together_test']
     extra = 0
+    autocomplete_fields = ['booked_together_test',]
 
 class TestPackageFormSet(forms.BaseInlineFormSet):
     def clean(self):
@@ -1396,6 +1396,7 @@ class LabTestAdmin(ImportExportMixin, VersionAdmin):
     list_filter = ('is_package', 'enable_for_ppc', 'enable_for_retail')
     exclude = ['search_key']
     readonly_fields = ['url',]
+    autocomplete_fields = ['author',]
 
     def get_fields(self, request, obj=None):
         fields = super().get_fields(request, obj)
