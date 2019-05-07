@@ -2730,6 +2730,12 @@ class LabTestThresholds(TimeStampedModel):
         GREEN = 'GREEN'
         ORANGE = 'ORANGE'
 
+    MALE = 'm'
+    FEMALE = 'f'
+    OTHER = 'o'
+    NULL = ''
+    GENDER_CHOICES = [(MALE,"Male"), (FEMALE,"Female"), (OTHER,"Other"), (NULL, "Null")]
+
     lab_test = models.ForeignKey(LabTest, on_delete=models.CASCADE, related_name='tests_parameter_thresholds')
     test_parameter = models.ForeignKey(TestParameter, on_delete=models.CASCADE, related_name='parameter_thresholds', blank=False, null=True)
     color = models.CharField(max_length=50, null=True, default=None, blank=False, choices=Colour.as_choices())
@@ -2739,7 +2745,7 @@ class LabTestThresholds(TimeStampedModel):
     max_value = models.FloatField(null=True, default=0)
     min_age = models.PositiveIntegerField(null=True, default=0)
     max_age = models.PositiveIntegerField(null=True, default=0)
-    gender = models.CharField(choices=UserProfile.GENDER_CHOICES, max_length=50, default=None, null=True)
+    gender = models.CharField(choices=GENDER_CHOICES, max_length=50, default=None, null=True, blank=True)
 
 
     class Meta:
