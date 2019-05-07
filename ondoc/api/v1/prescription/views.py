@@ -57,8 +57,8 @@ class PrescriptionGenerateViewSet(viewsets.GenericViewSet):
                 else:
                     prescription_pdf.offline_opd_appointment = appointment
                 prescription_pdf.appointment_type = valid_data.get('appointment_type')
-                prescription_pdf.followup_date = valid_data.get('followup_date')
-                prescription_pdf.followup_reason = valid_data.get('followup_reason')
+                prescription_pdf.followup_instructions_date = valid_data.get('followup_instructions_date')
+                prescription_pdf.followup_instructions_reason = valid_data.get('followup_instructions_reason')
                 prescription_pdf.save()
         except Exception as e:
             logger.error("Error Creating PDF object " + str(e))

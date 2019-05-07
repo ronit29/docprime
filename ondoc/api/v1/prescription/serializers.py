@@ -49,7 +49,8 @@ class PrescriptionAppointmentValidation():
 class PrescriptionMedicineBodySerializer(serializers.Serializer):
     id = serializers.CharField(max_length=100)
     name = serializers.CharField(max_length=128)
-    quantity = serializers.IntegerField(required=False, allow_null=True)
+    # quantity = serializers.IntegerField(required=False, allow_null=True)
+    quantity = serializers.DecimalField(max_digits=10, decimal_places=2, required=False, allow_null=True)
     dosage_type = serializers.CharField(max_length=100, required=False, allow_blank=True)
     time = serializers.ListField(child=serializers.CharField(max_length=64), allow_empty=True, required=False)
     duration_type = serializers.ChoiceField(choices=prescription_models.PrescriptionMedicine.DURATION_TYPE_CHOICES, required=False, allow_null=True)
@@ -64,6 +65,8 @@ class PrescriptionMedicineBodySerializer(serializers.Serializer):
             attrs['durationstring'] = dict(prescription_models.PrescriptionMedicine.DURATION_TYPE_CHOICES)[attrs['duration_type']]
         if (attrs.get("quantity") or attrs.get("dosage_type")) and not (attrs.get("quantity") and attrs.get("dosage_type")):
             raise serializers.ValidationError("dosage quantity and type both are required together")
+        if attrs.get("quantity"):
+            attrs["quantity"] = str(attrs["quantity"].normalize())
         return attrs
 
 
@@ -189,8 +192,8 @@ class GeneratePrescriptionPDFBodySerializer(serializers.Serializer):
     patient_details = PrescriptionPatientSerializer()
     appointment_id = serializers.CharField()
     appointment_type = serializers.ChoiceField(choices=prescription_models.PresccriptionPdf.APPOINTMENT_TYPE_CHOICES, required=False)
-    followup_date = serializers.DateTimeField(required=False, allow_null=True)
-    followup_reason = serializers.CharField(required=False, allow_null=True)
+    followup_instructions_date = serializers.DateTimeField(required=False, allow_null=True)
+    followup_instructions_reason = serializers.CharField(required=False, allow_null=True)
 
     def validate(self, attrs):
         if attrs:
@@ -198,6 +201,7 @@ class GeneratePrescriptionPDFBodySerializer(serializers.Serializer):
                 raise serializers.ValidationError("Invalid UUID - {}".format(attrs.get('id')))
             if not (attrs.get('lab_tests') or attrs.get('medicines')):
                 raise serializers.ValidationError("Either one of test or medicines is required for prescription generation")
+
             appointment = PrescriptionAppointmentValidation.validate_appointment_object(attrs)
             attrs['appointment'] = appointment
             if not appointment.doctor.license:
@@ -212,7 +216,7 @@ class GeneratePrescriptionPDFBodySerializer(serializers.Serializer):
                     attrs['task'] = prescription_models.PresccriptionPdf.UPDATE
                     attrs['prescription_pdf'] = pres
                     version = str(int(pres.serial_id[-2:]) + 1).zfill(2)
-                    attrs['serial_id'] = serial_id[-12:-2] + version
+                    attrs['serial_id'] = pres.serial_id[-12:-2] + version
                     exists = True
                     break
             if not exists:
