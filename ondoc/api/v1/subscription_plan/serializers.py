@@ -85,7 +85,7 @@ class UserSubscriptionBuyRequestSerializer(serializers.Serializer):
 
             if coupon_obj:
                 for coupon in coupon_obj:
-                    obj = OpdAppointment()
+                    obj = UserPlanMapping()
                     if obj.validate_user_coupon(user=request.user, coupon_obj=coupon).get("is_valid"):
                         if not obj.validate_product_coupon(coupon_obj=coupon,
                                                            plan=data.get('plan'),

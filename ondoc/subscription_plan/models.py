@@ -6,7 +6,7 @@ from django.db.models import Count
 from django.utils import timezone
 import logging
 from ondoc.account.models import ConsumerAccount, Order, MoneyPool, ConsumerRefund
-from ondoc.api.v1.utils import payment_details
+from ondoc.api.v1.utils import payment_details, CouponsMixin
 from ondoc.authentication import models as auth_model
 from ondoc.authentication.models import User
 from ondoc.coupon.models import Coupon
@@ -68,7 +68,7 @@ class PlanFeatureMapping(models.Model):
         unique_together = (('plan', 'feature'),)
 
 
-class UserPlanMapping(auth_model.TimeStampedModel):
+class UserPlanMapping(auth_model.TimeStampedModel, CouponsMixin):
     CANCELLED = 2
     BOOKED = 1
 
@@ -189,17 +189,17 @@ class UserPlanMapping(auth_model.TimeStampedModel):
                          "name": plan.name,
                          "mrp": str(plan.mrp),
                          "deal_price": str(plan.deal_price),
+                         "payable_amount": str(payable_amount),
                          "unlimited_online_consultation": plan.unlimited_online_consultation,
                          "priority_queue": plan.priority_queue,
-                         "coupon": coupon_list,
-                         "coupon_data": {"random_coupon_list": random_coupon_list},
                          "features": [{"id": feature_mapping.feature.id, "name": feature_mapping.feature.name,
                                        "count": feature_mapping.count, "test":
                                            feature_mapping.feature.test.id,
                                        "test_name": feature_mapping.feature.test.name} for feature_mapping in
                                       plan.feature_mappings.filter(enabled=True)]}
 
-        action_data = {"user": user.id, "plan": plan.id, "extra_details": extra_details}
+        action_data = {"user": user.id, "plan": plan.id, "extra_details": extra_details, "coupon": coupon_list,
+                       "coupon_data": {"random_coupon_list": random_coupon_list}}
         child_order = Order.objects.create(
             product_id=product_id,
             action=action,

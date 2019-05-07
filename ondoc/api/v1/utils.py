@@ -634,6 +634,7 @@ class CouponsMixin(object):
         from ondoc.coupon.models import Coupon
         from ondoc.doctor.models import OpdAppointment
         from ondoc.diagnostic.models import LabAppointment
+        from ondoc.subscription_plan.models import UserPlanMapping
 
         user = kwargs.get("user")
         coupon_obj = kwargs.get("coupon_obj")
@@ -647,6 +648,8 @@ class CouponsMixin(object):
             if isinstance(self, OpdAppointment) and coupon_obj.type not in [Coupon.DOCTOR, Coupon.ALL]:
                 return {"is_valid": False, "used_count": None}
             elif isinstance(self, LabAppointment) and coupon_obj.type not in [Coupon.LAB, Coupon.ALL]:
+                return {"is_valid": False, "used_count": None}
+            elif isinstance(self, UserPlanMapping) and coupon_obj.type not in [Coupon.SUBSCRIPTION_PLAN, Coupon.ALL]:
                 return {"is_valid": False, "used_count": None}
 
             diff_days = (timezone.now() - (coupon_obj.start_date or coupon_obj.created_at)).days

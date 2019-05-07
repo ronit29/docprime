@@ -256,19 +256,19 @@ class Order(TimeStampedModel):
                                                     account=insurer.float.all().first(),
                                                     transaction_type=InsuranceTransaction.DEBIT, amount=amount)
         elif self.action == Order.SUBSCRIPTION_PLAN_BUY:
-            amount = Decimal(appointment_data.get('extra_details').get('deal_price', float('inf')))
+            amount = Decimal(appointment_data.get('extra_details').get('payable_amount', float('inf')))
             if consumer_account.balance >= amount:
                 new_appointment_data = appointment_data
                 coupon = appointment_data.pop('coupon', [])
                 coupon_data = {
-                    "random_coupons": appointment_data.pop("coupon_data", [])
+                    "random_coupons": new_appointment_data.pop("coupon_data", [])
                 }
                 appointment_obj = UserPlanMapping(**new_appointment_data)
                 appointment_obj.coupon_data = coupon_data
                 appointment_obj.save()
 
                 if coupon:
-                    appointment_data.coupon.add(*coupon)
+                    appointment_obj.coupon.add(*coupon)
                 order_dict = {
                     "reference_id": appointment_obj.id,
                     "payment_status": Order.PAYMENT_ACCEPTED

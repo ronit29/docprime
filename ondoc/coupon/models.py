@@ -308,13 +308,13 @@ class RandomGeneratedCoupon(auth_model.TimeStampedModel):
                                                                 ).all()
 
         if random_coupons:
-            shubham = ','.join(["'" + str(c) + "'" for c in coupon_codes])
+            c_list = ','.join(["'" + str(c) + "'" for c in coupon_codes])
             coupon_obj = Coupon.objects\
                 .prefetch_related('random_generated_coupon')\
                 .annotate(is_random=models.Value(True, models.BooleanField()),
                           random_count=models.Value(1, models.IntegerField()))\
                 .filter(id__in=random_coupons.values_list('coupon', flat=True)) \
-                .extra(select={'random_coupon_code': 'SELECT random_coupon FROM random_generated_coupon where coupon_id = coupon.id AND random_coupon IN ('+shubham+')'})
+                .extra(select={'random_coupon_code': 'SELECT random_coupon FROM random_generated_coupon where coupon_id = coupon.id AND random_coupon IN ('+c_list+')'})
 
         if not coupon_obj:
             coupon_obj = Coupon.objects \
