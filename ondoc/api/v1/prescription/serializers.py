@@ -192,8 +192,8 @@ class GeneratePrescriptionPDFBodySerializer(serializers.Serializer):
     patient_details = PrescriptionPatientSerializer()
     appointment_id = serializers.CharField()
     appointment_type = serializers.ChoiceField(choices=prescription_models.PresccriptionPdf.APPOINTMENT_TYPE_CHOICES, required=False)
-    followup_date = serializers.DateTimeField(required=False, allow_null=True)
-    followup_reason = serializers.CharField(required=False, allow_null=True)
+    followup_instructions_date = serializers.DateTimeField(required=False, allow_null=True)
+    followup_instructions_reason = serializers.CharField(required=False, allow_null=True)
 
     def validate(self, attrs):
         if attrs:
