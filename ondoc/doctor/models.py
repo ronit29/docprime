@@ -2094,7 +2094,7 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
                 notification_tasks.appointment_reminder_sms_provider.apply_async(
                     (self.id, self.updated_at),
                     eta=self.time_slot_start - datetime.timedelta(
-                        minutes=settings.PROVIDER_SMS_APPOINTMENT_REMINDER_TIME), )
+                        minutes=int(settings.PROVIDER_SMS_APPOINTMENT_REMINDER_TIME)), )
                 notification_tasks.opd_send_otp_before_appointment.apply_async(
                     (self.id, str(math.floor(self.time_slot_start.timestamp()))),
                     eta=self.time_slot_start - datetime.timedelta(
