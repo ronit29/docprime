@@ -52,7 +52,9 @@ class PrescriptionMedicineBodySerializer(serializers.Serializer):
     # quantity = serializers.IntegerField(required=False, allow_null=True)
     quantity = serializers.DecimalField(max_digits=10, decimal_places=2, required=False, allow_null=True)
     dosage_type = serializers.CharField(max_length=100, required=False, allow_blank=True)
-    time = serializers.ListField(child=serializers.CharField(max_length=64), allow_empty=True, required=False)
+    # time = serializers.ListField(child=serializers.CharField(max_length=64), allow_empty=True, required=False)
+    time = serializers.ListField(child=serializers.ChoiceField(prescription_models.PrescriptionMedicine.TIME_CHOICES), allow_null=True, required=False)
+    custom_time = serializers.CharField(max_length=20, required=False, allow_null=True)
     duration_type = serializers.ChoiceField(choices=prescription_models.PrescriptionMedicine.DURATION_TYPE_CHOICES, required=False, allow_null=True)
     duration = serializers.IntegerField(required=False, allow_null=True)
     is_before_meal = serializers.NullBooleanField(required=False)
@@ -67,6 +69,8 @@ class PrescriptionMedicineBodySerializer(serializers.Serializer):
             raise serializers.ValidationError("dosage quantity and type both are required together")
         if attrs.get("quantity"):
             attrs["quantity"] = str(attrs["quantity"].normalize())
+        if attrs.get("time") and attrs.get("custom_time"):
+            raise serializers.ValidationError("only one of the time and custom_time is required")
         return attrs
 
 

@@ -70,6 +70,10 @@ class PrescriptionMedicine(PrescriptionEntity):
     MONTH = 3
     YEAR = 4
     DURATION_TYPE_CHOICES = [(DAY, "Day"), (WEEK, "Week"), (MONTH, "Month"), (YEAR, "Year")]
+    MORNING = 1
+    AFTERNOON = 2
+    NIGHT = 3
+    TIME_CHOICES = [(MORNING, "MORNING"), (AFTERNOON, "AFTERNOON"), (NIGHT, "NIGHT")]
 
     def __str__(self):
         return self.name
@@ -118,10 +122,35 @@ class PresccriptionPdf(auth_models.TimeStampedModel):
     prescription_file = models.FileField(upload_to=PRESCRIPTION_STORAGE_FOLDER, validators=[FileExtensionValidator(allowed_extensions=['pdf'])], null=True)
     serial_id = models.CharField(max_length=100)
 
+    def get_medicines(self):
+        if not self.medicines:
+            return []
+        for medicine in self.medicines:
+
+            if medicine.get("custom_time"):
+                medicine['pres_time'] = medicine.get("custom_time")
+            elif medicine.get("time"):
+                time = medicine.get("time")
+                pres_time = ''
+                pres_time = pres_time + '1' if PrescriptionMedicine.MORNING in time else pres_time + '0'
+                pres_time = pres_time + '-1' if PrescriptionMedicine.AFTERNOON in time else pres_time + '-0'
+                pres_time = pres_time + '-1' if PrescriptionMedicine.NIGHT in time else pres_time + '-0'
+                medicine['pres_time'] = pres_time
+            else:
+                medicine['pres_time'] = ''
+
+            if "is_before_meal" not in medicine.keys():
+                medicine['meal'] = None
+            elif medicine.get("is_before_meal"):
+                medicine['meal'] = "Before meal"
+            else:
+                medicine['meal'] = "After meal"
+
+        return self.medicines
+
     def get_pdf(self, appointment):
-
-
-        pdf_dict = {'medicines': self.medicines if self.medicines else [],
+        pdf_dict = {'medicines': self.get_medicines(),
+                    # 'medicines': self.medicines if self.medicines else [],
                     'special_instructions': self.special_instructions if self.special_instructions else [],
                     'pres_id': self.id,
                     'serial_id': self.serial_id,
@@ -135,7 +164,7 @@ class PresccriptionPdf(auth_models.TimeStampedModel):
                     'doc_qualification': ','.join([str(h.qualification) for h in appointment.doctor.qualifications.all()]),
                     'doc_reg': appointment.doctor.license,
                     'date': self.created_at.strftime('%d %B %Y'),
-                    'followup_date': self.followup_instructions_date.strftime('%d %B %Y %H %i') if self.followup_instructions_date else '',
+                    'followup_date': self.followup_instructions_date.strftime('%d %B %Y %H:%I') if self.followup_instructions_date else '',
                     'followup_reason': self.followup_instructions_reason if self.followup_instructions_reason else '',
                     'updated_at': self.updated_at
                     }
