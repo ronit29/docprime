@@ -65,6 +65,8 @@ class PrescriptionMedicineBodySerializer(serializers.Serializer):
             attrs['durationstring'] = dict(prescription_models.PrescriptionMedicine.DURATION_TYPE_CHOICES)[attrs['duration_type']]
         if (attrs.get("quantity") or attrs.get("dosage_type")) and not (attrs.get("quantity") and attrs.get("dosage_type")):
             raise serializers.ValidationError("dosage quantity and type both are required together")
+        if attrs.get("quantity"):
+            attrs["quantity"] = str(attrs["quantity"].normalize())
         return attrs
 
 
@@ -199,6 +201,7 @@ class GeneratePrescriptionPDFBodySerializer(serializers.Serializer):
                 raise serializers.ValidationError("Invalid UUID - {}".format(attrs.get('id')))
             if not (attrs.get('lab_tests') or attrs.get('medicines')):
                 raise serializers.ValidationError("Either one of test or medicines is required for prescription generation")
+
             appointment = PrescriptionAppointmentValidation.validate_appointment_object(attrs)
             attrs['appointment'] = appointment
             if not appointment.doctor.license:
@@ -213,7 +216,7 @@ class GeneratePrescriptionPDFBodySerializer(serializers.Serializer):
                     attrs['task'] = prescription_models.PresccriptionPdf.UPDATE
                     attrs['prescription_pdf'] = pres
                     version = str(int(pres.serial_id[-2:]) + 1).zfill(2)
-                    attrs['serial_id'] = serial_id[-12:-2] + version
+                    attrs['serial_id'] = pres.serial_id[-12:-2] + version
                     exists = True
                     break
             if not exists:
