@@ -77,8 +77,7 @@ class UserSubscriptionBuyRequestSerializer(serializers.Serializer):
         request = self.context.get('request')
         if not request:
             raise serializers.ValidationError('Invalid request.')
-        if UserPlanMapping.objects.filter(user=request.user, is_active=True, expire_at__gte=timezone.now()).exists():
-            raise serializers.ValidationError('User already has a subscription plan.')
+
         if data.get("coupon_code"):
             coupon_codes = data.get("coupon_code", [])
             coupon_obj = RandomGeneratedCoupon.get_coupons(coupon_codes)
@@ -94,6 +93,10 @@ class UserSubscriptionBuyRequestSerializer(serializers.Serializer):
                     else:
                         raise serializers.ValidationError('Invalid coupon code - ' + str(coupon))
                 data["coupon_obj"] = list(coupon_obj)
+
+        if UserPlanMapping.objects.filter(user=request.user, is_active=True, expire_at__gte=timezone.now()).exists():
+            raise serializers.ValidationError('User already has a subscription plan.')
+
         return data
 
 
