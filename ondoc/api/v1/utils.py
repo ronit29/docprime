@@ -721,6 +721,8 @@ class CouponsMixin(object):
     def validate_product_coupon(self, **kwargs):
         from ondoc.diagnostic.models import Lab
         from ondoc.account.models import Order
+        from ondoc.coupon.models import Coupon
+
         import re
 
         coupon_obj = kwargs.get("coupon_obj")
@@ -738,6 +740,14 @@ class CouponsMixin(object):
         doctor = kwargs.get("doctor")
         hospital = kwargs.get("hospital")
         procedures = kwargs.get("procedures", [])
+        plan = kwargs.get("plan")
+
+        if plan:
+            if coupon_obj.type in [Coupon.ALL, Coupon.SUBSCRIPTION_PLAN] \
+                and coupon_obj.plan.filter(id=plan.id).exists():
+                    return True
+            return False
+
 
         if coupon_obj.lab and coupon_obj.lab != lab:
             return False

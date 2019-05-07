@@ -14,11 +14,12 @@ class Coupon(auth_model.TimeStampedModel):
     DOCTOR = 1
     LAB = 2
     ALL = 3
+    SUBSCRIPTION_PLAN = 4
 
     DISCOUNT = 1
     CASHBACK = 2
 
-    TYPE_CHOICES = (("", "Select"), (DOCTOR, "Doctor"), (LAB, "Lab"), (ALL, "All"),)
+    TYPE_CHOICES = (("", "Select"), (DOCTOR, "Doctor"), (LAB, "Lab"), (ALL, "All"), (SUBSCRIPTION_PLAN, "SUBSCRIPTION_PLAN"),)
     COUPON_TYPE_CHOICES = ((DISCOUNT, "Discount"), (CASHBACK, "Cashback"),)
 
     code = models.CharField(max_length=50)
@@ -58,6 +59,7 @@ class Coupon(auth_model.TimeStampedModel):
     coupon_type = models.IntegerField(choices=COUPON_TYPE_CHOICES, default=DISCOUNT)
     payment_option = models.ForeignKey(PaymentOptions, on_delete=models.SET_NULL, blank=True, null=True)
     random_coupon_count = models.PositiveIntegerField(null=True, blank=True)
+    plan = models.ManyToManyField("subscription_plan.Plan", blank=True, null=True)
 
     def save(self, *args, **kwargs):
         if not self.id:
@@ -91,6 +93,7 @@ class Coupon(auth_model.TimeStampedModel):
         from ondoc.doctor.models import OpdAppointment
         from ondoc.diagnostic.models import LabAppointment
         from ondoc.cart.models import Cart
+        from ondoc.subscription_plan.models import UserPlanMapping
 
         if not user.is_authenticated:
             return 0
@@ -112,6 +115,10 @@ class Coupon(auth_model.TimeStampedModel):
                                                                LabAppointment.RESCHEDULED_PATIENT,
                                                                LabAppointment.ACCEPTED,
                                                                LabAppointment.COMPLETED],
+                                                   coupon=self).count()
+        if str(self.type) == str(self.SUBSCRIPTION_PLAN) or str(self.type) == str(self.ALL):
+            count += UserPlanMapping.objects.filter(user=user,
+                                                   status__in=[UserPlanMapping.BOOKED],
                                                    coupon=self).count()
 
         count += Cart.objects.filter(user=user, deleted_at__isnull=True, data__coupon_code__contains=self.code).exclude(id=cart_item).count()
@@ -121,6 +128,7 @@ class Coupon(auth_model.TimeStampedModel):
         from ondoc.doctor.models import OpdAppointment
         from ondoc.diagnostic.models import LabAppointment
         from ondoc.cart.models import Cart
+        from ondoc.subscription_plan.models import UserPlanMapping
 
         if not user.is_authenticated:
             return 0
@@ -144,6 +152,11 @@ class Coupon(auth_model.TimeStampedModel):
                                                                LabAppointment.COMPLETED],
                                                    coupon=self,
                                                    coupon_data__random_coupons__random_coupon_list__contains=[code]).count()
+        if str(self.type) == str(self.SUBSCRIPTION_PLAN) or str(self.type) == str(self.ALL):
+            count += UserPlanMapping.objects.filter(user=user,
+                                                    status__in=[UserPlanMapping.BOOKED],
+                                                    coupon=self,
+                                                    coupon_data__random_coupons__random_coupon_list__contains=[code]).count()
 
         count += Cart.objects.filter(user=user, deleted_at__isnull=True, data__coupon_code__contains=code).exclude(id=cart_item).count()
         return count
