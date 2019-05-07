@@ -2003,7 +2003,7 @@ class IpdProcedureLeadSerializer(serializers.ModelSerializer):
     email = serializers.EmailField(max_length=256)
     gender = serializers.ChoiceField(choices=UserProfile.GENDER_CHOICES)
     age = serializers.IntegerField(min_value=1, max_value=120, required=False, default=None)
-    dob = serializers.DateTimeField(required=False, default=None)
+    dob = serializers.DateField(required=False, default=None)
     lat = serializers.FloatField(required=False, allow_null=True)
     long = serializers.FloatField(required=False, allow_null=True)
     city = serializers.CharField(required=False, allow_null=True, allow_blank=True)
