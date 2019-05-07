@@ -203,6 +203,7 @@ class LabList(viewsets.ReadOnlyModelViewSet):
         pnt = GEOSGeometry(point_string, srid=4326)
         max_distance = max_distance*1000 if max_distance is not None else 10000
         min_distance = min_distance*1000 if min_distance is not None else 0
+        sort_order = validated_data.get('sort_order', 'asc')
 
         package_free_or_not_dict = get_package_free_or_not_dict(request)
         page_size = 30
@@ -283,7 +284,7 @@ class LabList(viewsets.ReadOnlyModelViewSet):
         if not sort_on:
             sort_query = ' order by priority_score desc '
         elif sort_on == 'fees':
-            sort_query = ' order by price asc '
+            sort_query = ' order by price %s ' %sort_order
         elif sort_on == 'distance':
             sort_query = ' order by distance asc '
 
@@ -1257,7 +1258,7 @@ class LabList(viewsets.ReadOnlyModelViewSet):
         long = parameters.get('long', default_long)
         lat = parameters.get('lat', default_lat)
         ids = parameters.get('ids', [])
-        min_price = parameters.get('min_price',0)
+        min_price = parameters.get('min_price', 0)
         max_price = parameters.get('max_price')
         name = parameters.get('name')
         network_id = parameters.get("network_id")
@@ -1265,6 +1266,8 @@ class LabList(viewsets.ReadOnlyModelViewSet):
         insurance_threshold_amount = parameters.get('insurance_threshold_amount')
         availability = parameters.get('availability', None)
         avg_ratings = parameters.get('avg_ratings', None)
+        home_visit = parameters.get('home_visit', False)
+        lab_visit = parameters.get('lab_visit', False)
 
         #filtering_params = []
         #filtering_params_query1 = []
@@ -1272,7 +1275,7 @@ class LabList(viewsets.ReadOnlyModelViewSet):
         filtering_params = {}
         #params = {}
         if not min_distance:
-            min_distance=0
+            min_distance = 0
 
         filtering_params['min_distance'] = min_distance
         filtering_params['max_distance'] = max_distance
@@ -1328,6 +1331,12 @@ class LabList(viewsets.ReadOnlyModelViewSet):
         if avg_ratings:
             filtering_query.append("(case when rating_data is not null then(rating_data->> 'avg_rating')::float > (%(avg_ratings)s) end)")
             filtering_params['avg_ratings'] = max(avg_ratings)
+
+        if home_visit:
+            filtering_query.append("is_home_collection_enabled = True")
+
+        if lab_visit:
+            filtering_query.append("is_home_collection_enabled = False")
 
         if availability:
             start_day = Date.today().weekday()

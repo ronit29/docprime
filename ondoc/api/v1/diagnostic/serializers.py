@@ -1227,6 +1227,8 @@ class SearchLabListSerializer(serializers.Serializer):
     sort_order = serializers.ChoiceField(choices=SORT_ORDER, required=False)
     availability = CommaSepratedToListField(required=False, max_length=50, typecast_to=str)
     avg_ratings = CommaSepratedToListField(required=False, max_length=50, typecast_to=str)
+    lab_visit = serializers.BooleanField(required=False)
+    home_visit = serializers.BooleanField(required=False)
 
     def validate_availability(self, value):
         if not set(value).issubset(set([str(avl_choice[0]) for avl_choice in self.AVAILABILITY_CHOICES])):
@@ -1544,6 +1546,7 @@ class CustomLabTestPackageSerializer(serializers.ModelSerializer):
 
 
 class LabPackageListSerializer(serializers.Serializer):
+    SORT_ORDER = ('asc', 'desc')
     long = serializers.FloatField(default=77.071848)
     lat = serializers.FloatField(default=28.450367)
     min_distance = serializers.IntegerField(required=False)
@@ -1559,6 +1562,7 @@ class LabPackageListSerializer(serializers.Serializer):
     gender = serializers.ChoiceField(choices=LabTest.GENDER_TYPE_CHOICES, required=False)
     package_type = serializers.IntegerField(required=False)
     package_ids = CommaSepratedToListField(required=False, max_length=500, typecast_to=int)
+    sort_order = serializers.ChoiceField(choices=SORT_ORDER, required=False)
 
     def validate_package_ids(self, attrs):
         try:
