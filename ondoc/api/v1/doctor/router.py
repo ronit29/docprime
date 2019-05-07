@@ -59,8 +59,12 @@ urlpatterns = [
     path('list_appointments', OfflineCustomerViewSet.as_view({'get': 'list_appointments'}), name='list_appointments'),
     path('list_hospital/<int:hospital_network_id>', HospitalNetworkListViewset.as_view({'get':'list'}),name='list_hospital'),
     path('send_message', AppointmentMessageViewset.as_view({'post': 'send_message'}), name='send_message'),
+    path('ipd_procedure/list_by_alphabet', IpdProcedureViewSet.as_view({'get': 'list_by_alphabet'}), name='list_ipd_procedure_by_alphabet'),
+    path('ipd_procedure_by_url/<str:url>', IpdProcedureViewSet.as_view({'get': 'ipd_procedure_detail_by_url'}), name='ipd_procedure_detail_by_url'),
     path('ipd_procedure/<int:pk>', IpdProcedureViewSet.as_view({'get': 'ipd_procedure_detail'}), name='ipd_procedure_detail'),
+    path('hospitalsearch_by_url/<str:url>', HospitalViewSet.as_view({'get': 'list_by_url'}), name='hospitals_by_url'),
     path('ipd_procedure/<int:ipd_pk>/hospitals', HospitalViewSet.as_view({'get': 'list'}), name='ipd_procedure_hospitals'),
     path('hospital/<int:pk>', HospitalViewSet.as_view({'get': 'retrive'}), name='hospital_detail'),
+    path('hospital_by_url', HospitalViewSet.as_view({'get': 'retrieve_by_url'}), name='hospital_detail_by_url'),
     path('ipd_procedure/create_lead', IpdProcedureViewSet.as_view({'post': 'create_lead'}), name='ipd_procedure_lead'),
 ]
