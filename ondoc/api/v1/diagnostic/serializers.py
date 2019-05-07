@@ -1563,6 +1563,9 @@ class LabPackageListSerializer(serializers.Serializer):
     package_type = serializers.IntegerField(required=False)
     package_ids = CommaSepratedToListField(required=False, max_length=500, typecast_to=int)
     sort_order = serializers.ChoiceField(choices=SORT_ORDER, required=False)
+    home_visit = serializers.BooleanField(default=False)
+    lab_visit = serializers.BooleanField(default=False)
+    avg_ratings = CommaSepratedToListField(required=False, max_length=500, typecast_to=int)
 
     def validate_package_ids(self, attrs):
         try:

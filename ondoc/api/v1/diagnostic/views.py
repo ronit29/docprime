@@ -204,6 +204,9 @@ class LabList(viewsets.ReadOnlyModelViewSet):
         max_distance = max_distance*1000 if max_distance is not None else 10000
         min_distance = min_distance*1000 if min_distance is not None else 0
         sort_order = validated_data.get('sort_order', 'asc')
+        avg_ratings = validated_data.get('avg_ratings', [])
+        home_visit = validated_data.get('home_visit')
+        lab_visit = validated_data.get('lab_visit')
 
         package_free_or_not_dict = get_package_free_or_not_dict(request)
         page_size = 30
@@ -469,9 +472,10 @@ class LabList(viewsets.ReadOnlyModelViewSet):
         if category_ids:
             if valid_package_ids is None:
                 valid_package_ids = []
-            valid_package_ids.extend(list(
-                LabTest.objects.filter(test__recommended_categories__id__in=category_ids).distinct().values_list('id',
-                                                                                                                 flat=True)))
+                lab_categories = None
+                lab_categories = LabTest.objects.filter(test__recommended_categories__id__in=category_ids).distinct().values_list('id',
+                                                                                                                 flat=True)
+            valid_package_ids.extend(list(lab_categories if len(lab_categories) == len(category_ids) else None))
 
         if package_category_ids:
             if valid_package_ids is None:
