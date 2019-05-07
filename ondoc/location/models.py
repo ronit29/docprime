@@ -626,7 +626,7 @@ class EntityUrls(TimeStampedModel):
     sublocality_id = models.PositiveIntegerField(default=None, null=True)
     specialization = models.TextField(default='', null=True)
     specialization_id = models.PositiveIntegerField(default=None, null=True)
-    ipd_procedure = models.TextField(default='', null=True)
+    ipd_procedure = models.TextField(default=None, null=True)
     ipd_procedure_id = models.PositiveIntegerField(default=None, null=True)
     locality_location = models.PointField(geography=True, srid=4326, blank=True, null=True)
     sublocality_location = models.PointField(geography=True, srid=4326, blank=True, null=True)
