@@ -60,3 +60,13 @@ def update_search_score():
     from ondoc.doctor.services.update_search_score import DoctorSearchScore
     obj = DoctorSearchScore()
     obj.create_search_score()
+
+@task
+def update_all_hospitals_seo_urls():
+    from ondoc.doctor.models import Hospital
+    Hospital.update_hospital_seo_urls()
+
+@task
+def update_all_ipd_seo_urls():
+    from ondoc.procedure.models import IpdProcedure
+    IpdProcedure.update_ipd_seo_urls()

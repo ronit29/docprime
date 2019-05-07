@@ -515,7 +515,10 @@ class DoctorSearchHelper:
                     "discounted_fees": min_price["deal_price"],
                     "timings": clinic_convert_timings(doctor_clinic.availability.all(), is_day_human_readable=False),
                     "procedure_categories": final_result,
-                    "location": {'lat': doctor_clinic.hospital.location.y, 'long': doctor_clinic.hospital.location.x} if doctor_clinic.hospital and doctor_clinic.hospital.location else None
+                    "location": {'lat': doctor_clinic.hospital.location.y,
+                                 'long': doctor_clinic.hospital.location.x} if doctor_clinic.hospital and doctor_clinic.hospital.location else None,
+                    "url": kwargs.get('hosp_entity_dict', {}).get(doctor_clinic.hospital.id),
+                    "locality_url": kwargs.get('hosp_locality_entity_dict', {}).get(doctor_clinic.hospital.id)
                 }]
 
             thumbnail = doctor.get_thumbnail()
