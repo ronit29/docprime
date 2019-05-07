@@ -669,6 +669,8 @@ class PlanTransactionModelSerializer(serializers.Serializer):
     plan = serializers.PrimaryKeyRelatedField(queryset=Plan.objects.all())
     user = serializers.PrimaryKeyRelatedField(queryset=User.objects.all())
     extra_details = serializers.JSONField(required=False)
+    coupon = serializers.ListField(child=serializers.IntegerField(), required=False, default=[])
+    coupon_data = serializers.JSONField(required=False)
 
 
 class LabAppTransactionModelSerializer(serializers.Serializer):

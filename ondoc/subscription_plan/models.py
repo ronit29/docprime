@@ -9,6 +9,7 @@ from ondoc.account.models import ConsumerAccount, Order, MoneyPool, ConsumerRefu
 from ondoc.api.v1.utils import payment_details
 from ondoc.authentication import models as auth_model
 from ondoc.authentication.models import User
+from ondoc.coupon.models import Coupon
 from ondoc.diagnostic.models import LabNetwork, Lab, LabTest, LabAppointment
 
 # Create your models here.
@@ -81,6 +82,8 @@ class UserPlanMapping(auth_model.TimeStampedModel):
     extra_details = JSONField(blank=True, null=True)  # Snapshot of the plan when bought
     money_pool = models.ForeignKey(MoneyPool, on_delete=models.SET_NULL, null=True)
     status = models.PositiveSmallIntegerField(default=BOOKED, choices=STATUS_CHOICES)
+    coupon = models.ManyToManyField(Coupon, blank=True, null=True, related_name="plan_coupon")
+    coupon_data = JSONField(blank=True, null=True)
 
     class Meta:
         db_table = "subscription_plan_user"
@@ -140,7 +143,11 @@ class UserPlanMapping(auth_model.TimeStampedModel):
         # cashback_balance = consumer_account.cashback
         # total_balance = balance + cashback_balance
         total_balance = balance
-        payable_amount = plan.deal_price
+        deal_price = plan.deal_price
+
+        coupon_discount, coupon_cashback, coupon_list, random_coupon_list = Coupon.get_total_deduction(data, deal_price)
+        payable_amount = max(0, deal_price - coupon_discount - coupon_cashback)
+
         product_id = Order.SUBSCRIPTION_PLAN_PRODUCT_ID
         if total_balance >= payable_amount:
             # cashback_amount = min(cashback_balance, payable_amount)
@@ -184,6 +191,8 @@ class UserPlanMapping(auth_model.TimeStampedModel):
                          "deal_price": str(plan.deal_price),
                          "unlimited_online_consultation": plan.unlimited_online_consultation,
                          "priority_queue": plan.priority_queue,
+                         "coupon": coupon_list,
+                         "coupon_data": {"random_coupon_list": random_coupon_list},
                          "features": [{"id": feature_mapping.feature.id, "name": feature_mapping.feature.name,
                                        "count": feature_mapping.count, "test":
                                            feature_mapping.feature.test.id,
