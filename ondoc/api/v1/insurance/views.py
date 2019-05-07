@@ -48,9 +48,9 @@ class InsuranceNetworkViewSet(viewsets.GenericViewSet):
         if not type or not latitude or not longitude or not starts_with:
             return Response({'count':0,'total_count':0, 'results':[]})
 
-        starts_with = starts_with.lower()+'%'
+        starts_with = starts_with.lower()
 
-        params = {'type':type,'latitude':latitude,'longitude':longitude,'starts_with':starts_with}
+        params = {'type':type,'latitude':latitude,'longitude':longitude,'starts_with':starts_with+'%'}
 
         query_string = "select * from (select x.*, rank() over(partition by entity_id order by distance) "\
         " rnk from (select mt.*, st_distance(location,st_setsrid(st_point((%(longitude)s),(%(latitude)s)), 4326))/1000 "\
