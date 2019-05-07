@@ -66,9 +66,10 @@ class InsuranceNetworkViewSet(viewsets.GenericViewSet):
         data_list = []
         for r in results:
             data_list.append({'name':r.get('name'), 'distance;':math.ceil(r.get('distance')), 'id':r.get('entity_id'),\
-            type:r.get('type'), 'city':r.get('data',{}).get('city'),'url':r.get('data',{}).get('url')})
+            'type':r.get('type'), 'city':r.get('data',{}).get('city'),'url':r.get('data',{}).get('url')})
 
         resp = dict()
+        resp["starts_with"] = starts_with
         resp["count"] = len(data_list)
         resp["total_count"] = total_count
         resp["results"] = data_list
