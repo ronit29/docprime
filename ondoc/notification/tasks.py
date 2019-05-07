@@ -894,8 +894,8 @@ def push_insurance_banner_lead_to_matrix(self, data):
             'UTMMedium': extras.get('utm_medium', ''),
             'UtmSource': extras.get('utm_source', ''),
             'UtmTerm': extras.get('utm_term', ''),
-            'ProductId': 5,
-            'SubProductId': 3,
+            'ProductId': 8,
+            'SubProductId': 0,
             'PolicyDetails': {
                 "ProposalNo": None,
                 "BookingId": None,

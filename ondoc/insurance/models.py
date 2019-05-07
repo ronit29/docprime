@@ -414,8 +414,12 @@ class UserInsurance(auth_model.TimeStampedModel):
     ONHOLD = 4
     CANCEL_INITIATE = 5
 
+    REFUND = 1
+    NO_REFUND = 2
+
     STATUS_CHOICES = [(ACTIVE, "Active"), (CANCELLED, "Cancelled"), (EXPIRED, "Expired"), (ONHOLD, "Onhold"),
                       (CANCEL_INITIATE, 'Cancel Initiate')]
+    CANCEL_CASE_CHOICES = [(REFUND, "Refund"), (NO_REFUND, "Non-Refund")]
 
     id = models.BigAutoField(primary_key=True)
     insurance_plan = models.ForeignKey(InsurancePlans, related_name='active_users', on_delete=models.DO_NOTHING)
@@ -433,7 +437,8 @@ class UserInsurance(auth_model.TimeStampedModel):
     matrix_lead_id = models.IntegerField(null=True)
     status = models.PositiveIntegerField(choices=STATUS_CHOICES, default=ACTIVE)
     merchant_payout = models.ForeignKey(MerchantPayout, related_name="user_insurance", on_delete=models.DO_NOTHING, null=True)
-    onhold_reason = models.CharField(max_length=200, blank=True, null=True, default=None)
+    cancel_reason = models.CharField(max_length=200, blank=True, null=True, default=None)
+    cancel_case_type = models.PositiveIntegerField(choices=CANCEL_CASE_CHOICES, default=REFUND)
 
     def __str__(self):
         return str(self.user)
@@ -1171,20 +1176,21 @@ class UserInsurance(auth_model.TimeStampedModel):
             appointment.save()
         self.status = UserInsurance.CANCEL_INITIATE
         self.save()
-        transaction.on_commit(lambda: self.after_commit_task())
+
+        send_cancellation_notification = True if self.user and hasattr(self, '_responsible_user') and self._responsible_user == self.user else None
+
+        transaction.on_commit(lambda: self.after_commit_task(send_cancellation_notification))
         res['success'] = "Cancellation request received, refund will be credited in your account in 10-15 working days"
         return res
 
-    def after_commit_task(self):
+    def after_commit_task(self, send_cancellation_notification):
         if self.status == UserInsurance.CANCEL_INITIATE:
             try:
                 # notification_tasks.send_insurance_cancellation.apply_async(self.id)
-                # send_insurance_notifications.apply_async(({'user_id': self.user.id, 'status': UserInsurance.CANCEL_INITIATE}, ), countdown=1)
-                pass
+                if send_cancellation_notification:
+                    send_insurance_notifications.apply_async(({'user_id': self.user.id, 'status': UserInsurance.CANCEL_INITIATE}, ))
             except Exception as e:
                 logger.error(str(e))
-
-
 
 
 class InsuranceTransaction(auth_model.TimeStampedModel):
@@ -1336,6 +1342,7 @@ class InsuranceDisease(auth_model.TimeStampedModel):
     disease = models.CharField(max_length=100)
     enabled = models.BooleanField()
     is_live = models.BooleanField()
+    is_female_related = models.BooleanField(default=False)
 
     class Meta:
         db_table = "insurance_disease"
@@ -1354,6 +1361,7 @@ class InsuranceLead(auth_model.TimeStampedModel):
     matrix_lead_id = models.IntegerField(null=True)
     extras = JSONField(default={})
     user = models.ForeignKey(User, on_delete=models.CASCADE)
+    # phone_number = models.BigIntegerField(blank=True, null=True, validators=[MaxValueValidator(9999999999), MinValueValidator(1000000000)])
 
     def save(self, *args, **kwargs):
         super().save(*args, **kwargs)
@@ -1417,6 +1425,7 @@ class InsuranceMIS(auth_model.TimeStampedModel):
         USER_INSURANCE_DOCTOR_RESOURCE = "USER_INSURANCE_DOCTOR_RESOURCE"
         USER_INSURANCE_LAB_RESOURCE = "USER_INSURANCE_LAB_RESOURCE"
         USER_INSURANCE_RESOURCE = "USER_INSURANCE_RESOURCE"
+        INSURED_MEMBERS_RESOURCE = "INSURED_MEMBERS_RESOURCE"
         ALL_MIS_ZIP = "ALL_MIS_ZIP"
 
     attachment_type = models.CharField(max_length=100, null=False, blank=False, choices=AttachmentType.as_choices())
