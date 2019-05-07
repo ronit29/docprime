@@ -1995,7 +1995,8 @@ class HospitalRequestSerializer(serializers.Serializer):
 
 
 class IpdProcedureLeadSerializer(serializers.ModelSerializer):
-    ipd_procedure = serializers.PrimaryKeyRelatedField(queryset=IpdProcedure.objects.filter(is_enabled=True))
+    ipd_procedure = serializers.PrimaryKeyRelatedField(queryset=IpdProcedure.objects.filter(is_enabled=True),
+                                                       required=False, allow_null=True)
     hospital = serializers.PrimaryKeyRelatedField(queryset=Hospital.objects.filter(is_live=True), required=False)
     name = serializers.CharField(max_length=100)
     phone_number = serializers.IntegerField(min_value=1000000000, max_value=9999999999)
@@ -2003,6 +2004,9 @@ class IpdProcedureLeadSerializer(serializers.ModelSerializer):
     gender = serializers.ChoiceField(choices=UserProfile.GENDER_CHOICES)
     age = serializers.IntegerField(min_value=1, max_value=120, required=False, default=None)
     dob = serializers.DateTimeField(required=False, default=None)
+    lat = serializers.FloatField(required=False, allow_null=True)
+    long = serializers.FloatField(required=False, allow_null=True)
+    city = serializers.CharField(required=False, allow_null=True, allow_blank=True)
 
     class Meta:
         model = IpdProcedureLead

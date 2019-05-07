@@ -90,6 +90,9 @@ class IpdProcedureLead(auth_model.TimeStampedModel):
     gender = models.CharField(max_length=2, default=None, blank=True, null=True, choices=UserProfile.GENDER_CHOICES)
     age = models.PositiveIntegerField(blank=True, null=True)
     dob = models.DateTimeField(blank=True, null=True)
+    lat = models.FloatField(null=True, default=None)
+    long = models.FloatField(null=True, default=None)
+    city = models.CharField(null=True, default=None, blank=True, max_length=150)
 
     class Meta:
         db_table = "ipd_procedure_lead"
