@@ -135,14 +135,20 @@
 									<td style="text-align: center; font-size: 14px;padding-top: 10px; padding-bottom: 10px;">{{ forloop.counter }}</td>
 									<td style="text-align: left; font-size: 14px;padding-top: 10px; padding-bottom: 10px; ">
 										<p style="margin: 0px;color: #000000; font-size: 14px;">{{ medicine.name }}</p>
+										{% if medicine.additional_notes %}
 										<p style="margin: 0px;color: #000000; font-size: 12px;">{{ medicine.additional_notes }}</p>
+										{% endif %}
 									</td>
 									<td style="text-align: center; font-size: 14px;padding-top: 10px; padding-bottom: 10px; ">{{ medicine.quantity }} {{ medicine.dosage_type }}{% if medicine.quantity > 1 %}(s){% endif %}</td>
 									<td style="text-align: center; font-size: 14px;padding-top: 10px; padding-bottom: 10px; ">
-										<p style="margin: 0px;color: #000000; font-size: 14px;    padding-bottom: 2px;border-bottom: 1px solid #b5b5b5;">{{ medicine.time }}</p>
-										<p style="margin: 0px;color: #000000; font-size: 12px; padding-top: 2px;">{{ medicine.instruction }}</p>
+										<p style="margin: 0px;color: #000000; font-size: 14px;    padding-bottom: 2px;border-bottom: 1px solid #b5b5b5;"> {{ medicine.pres_time }} </p>
+										{% if medicine.meal %}
+										<p style="margin: 0px;color: #000000; font-size: 12px; padding-top: 2px;"> {{ medicine.meal }} </p>
+										{% endif %}
 									</td>
+									{% if medicine.duration %}
 									<td style="text-align: center; font-size: 14px;padding-top: 10px; padding-bottom: 10px; ">{{ medicine.duration }} {{ medicine.durationstring }}</td>
+									{% endif %}
 								</tr>
 							{% endfor %}
 
