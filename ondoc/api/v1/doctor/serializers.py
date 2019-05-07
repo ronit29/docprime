@@ -1331,6 +1331,7 @@ class DoctorAppointmentRetrieveSerializer(OpdAppointmentSerializer):
     doctor = AppointmentRetrieveDoctorSerializer()
     mask_data = serializers.SerializerMethodField()
     mrp = serializers.ReadOnlyField(source='fees')
+    is_docprime = serializers.SerializerMethodField()
 
     def get_mask_data(self, obj):
         mask_number = obj.mask_number.first()
@@ -1338,10 +1339,13 @@ class DoctorAppointmentRetrieveSerializer(OpdAppointmentSerializer):
             return mask_number.build_data()
         return None
 
+    def get_is_docprime(self, obj):
+        return True if isinstance(obj, OpdAppointment) else False
+
     class Meta:
         model = OpdAppointment
         fields = ('id', 'patient_image', 'patient_name', 'type', 'profile', 'allowed_action', 'effective_price',
-                  'deal_price', 'status', 'time_slot_start', 'time_slot_end',
+                  'deal_price', 'status', 'time_slot_start', 'time_slot_end', 'is_docprime',
                   'doctor', 'hospital', 'allowed_action', 'doctor_thumbnail', 'patient_thumbnail',
                   'display_name', 'mask_data', 'payment_type', 'mrp', 'updated_at', 'created_at')
 
