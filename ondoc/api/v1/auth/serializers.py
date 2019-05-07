@@ -52,6 +52,7 @@ class OTPVerificationSerializer(serializers.Serializer):
 class DoctorLoginSerializer(serializers.Serializer):
     phone_number = serializers.IntegerField(min_value=5000000000,max_value=9999999999)
     otp = serializers.IntegerField(min_value=100000,max_value=999999)
+    source = serializers.CharField(max_length=100, required=False)
 
     def validate(self, attrs):
         if attrs['phone_number'] == 9582557400:

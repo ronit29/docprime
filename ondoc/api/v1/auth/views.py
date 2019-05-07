@@ -29,7 +29,7 @@ from ondoc.doctor.models import DoctorMobile, Doctor, HospitalNetwork, Hospital,
                                 DoctorClinicTiming, ProviderSignupLead
 from ondoc.authentication.models import (OtpVerifications, NotificationEndpoint, Notification, UserProfile,
                                          Address, AppointmentTransaction, GenericAdmin, UserSecretKey, GenericLabAdmin,
-                                         AgentToken, DoctorNumber)
+                                         AgentToken, DoctorNumber, LastLoginTimestamp)
 from ondoc.notification.models import SmsNotification, EmailNotification
 from ondoc.account.models import PgTransaction, ConsumerAccount, ConsumerTransaction, Order, ConsumerRefund, OrderLog, \
     UserReferrals, UserReferred, PgLogs
@@ -235,6 +235,9 @@ class UserViewset(GenericViewSet):
 
         token_object = JWTAuthentication.generate_token(user)
         expire_otp(data['phone_number'])
+
+        if data.get("source"):
+            LastLoginTimestamp.objects.create(user=user, source=data.get("source"))
 
         response = {
             "login": 1,
@@ -2132,6 +2135,7 @@ class TokenFromUrlKey(viewsets.GenericViewSet):
             if obj:
                 obj.is_consumed = True
                 obj.save()
+                LastLoginTimestamp.objects.create(user=obj.user, source="d_sms")
                 return Response({'status': 1, 'token': obj.token})
             else:
                 return Response({'status': 0, 'token': None, 'message': 'key not found'})
