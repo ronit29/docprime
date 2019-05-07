@@ -1189,8 +1189,6 @@ class LabAppointmentAdmin(nested_admin.NestedModelAdmin):
             logger.error(str(e))
         # send_lab_reports(obj_id)
 
-
-
     class Media:
         js = (
             '//ajax.googleapis.com/ajax/libs/jquery/3.3.1/jquery.min.js',

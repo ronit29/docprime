@@ -1258,6 +1258,11 @@ class LabNotification(Notification):
         mask_number = ''
         if mask_number_instance:
             mask_number = mask_number_instance.mask_number
+
+        is_thyrocare_report = False
+        if instance and instance.lab and instance.lab.network and instance.lab.network.id == settings.THYROCARE_NETWORK_ID:
+            is_thyrocare_report = True
+
         context = {
             "lab_name": lab_name,
             "patient_name": patient_name,
@@ -1276,7 +1281,8 @@ class LabNotification(Notification):
             "screen": "appointment",
             "type": "lab",
             "mask_number": mask_number,
-            "email_banners": email_banners_html if email_banners_html is not None else ""
+            "email_banners": email_banners_html if email_banners_html is not None else "",
+            "is_thyrocare_report": is_thyrocare_report
         }
         return context
 
