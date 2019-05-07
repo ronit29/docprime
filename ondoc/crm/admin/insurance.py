@@ -589,6 +589,7 @@ class UserInsuranceResource(resources.ModelResource):
     amount = fields.Field()
     receipt_number = fields.Field()
     coi = fields.Field()
+    status = fields.Field()
     matrix_lead = fields.Field()
 
     def export(self, queryset=None, *args, **kwargs):
@@ -610,7 +611,7 @@ class UserInsuranceResource(resources.ModelResource):
         fields = ()
         export_order = ('id', 'insurance_plan', 'user_name', 'phone_number', 'purchase_date', 'expiry_date',
                         'policy_number', 'amount', 'receipt_number',
-                        'coi', 'matrix_lead')
+                        'coi', 'status', 'matrix_lead')
 
     def dehydrate_id(self, insurance):
         return str(insurance.id)
@@ -646,6 +647,18 @@ class UserInsuranceResource(resources.ModelResource):
 
     def dehydrate_coi(self, insurance):
         return insurance.coi.url if insurance.coi is not None and insurance.coi.name else ''
+
+    def dehydrate_status(self, insurance):
+        if insurance.status == 1:
+            return "ACTIVE"
+        elif insurance.status == 2:
+            return "CANCELLED"
+        elif insurance.status == 3:
+            return "EXPIRED"
+        elif insurance.status == 4:
+            return "ONHOLD"
+        elif insurance.status == 5:
+            return "CANCEL_INITIATE"
 
     def dehydrate_matrix_lead(self, insurance):
         return str(insurance.matrix_lead_id)
@@ -717,6 +730,7 @@ class UserInsuranceAdmin(ImportExportMixin, admin.ModelAdmin):
     formats = (base_formats.XLS,)
     model = UserInsurance
     date_hierarchy = 'created_at'
+    list_filter = ['status']
 
     def user_policy_number(self, obj):
         return str(obj.policy_number)
