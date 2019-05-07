@@ -236,6 +236,7 @@ class ProcedureCategoriesAutocomplete(autocomplete.Select2QuerySetView):
 
 
 class CouponForm(forms.ModelForm):
+    create_random_coupon = forms.BooleanField(required=False)
 
     class Meta:
         model = Coupon
@@ -290,9 +291,14 @@ class CouponAdmin(admin.ModelAdmin):
         'id', 'code', 'is_user_specific', 'type', 'count', 'created_at', 'updated_at')
 
     autocomplete_fields = ['payment_option']
-
     search_fields = ['code']
     form = CouponForm
+
+    def save_model(self, request, obj, form, change):
+        from ondoc.notification.tasks import generate_random_coupons
+        if form.cleaned_data.get('create_random_coupon') and form.cleaned_data.get('random_coupon_count', 0) > 0 and obj and obj.id:
+            generate_random_coupons.apply_async((form.cleaned_data.get('random_coupon_count', 0), obj.id), countdown=1)
+        super().save_model(request, obj, form, change)
 
 
 class UserSpecificCouponResource(resources.ModelResource):
@@ -365,18 +371,13 @@ class UserSpecificCouponAdmin(ImportExportModelAdmin):
     resource_class = UserSpecificCouponResource
 
 
-class RandomGeneratedCouponAdmin(admin.ModelAdmin):
+class RandomGeneratedCouponAdmin(ImportExportModelAdmin):
 
     readonly_fields = ('random_coupon', 'sent_at', 'consumed_at')
-
+    search_fields = ('coupon__code', )
     list_display = ('id', 'random_coupon', 'coupon', 'user', 'sent_at', 'consumed_at', 'created_at', 'updated_at')
 
     def save_model(self, request, obj, form, change):
-
-        if not obj.random_coupon:
-            obj.random_coupon = get_random_string(length=10).upper()
-            while RandomGeneratedCoupon.objects.filter(random_coupon=obj.random_coupon).exists():
-                obj.random_coupon = get_random_string(length=10).upper()
         super().save_model(request, obj, form, change)
 
     class Meta:
