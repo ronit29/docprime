@@ -257,7 +257,10 @@ class DoctorSearchHelper:
                     order_by_field = ' practicing_since ASC, distance ASC '
                     rank_by = "rnk=1"
                 elif self.query_params.get('sort_on') == 'fees':
-                    order_by_field = " total_price ASC, distance ASC "
+                    if self.query_params.get('sort_order') and self.query_params.get('sort_order') == 'desc':
+                        order_by_field = " deal_price DESC, distance ASC, priority desc "
+                    else:
+                        order_by_field = " total_price ASC, distance ASC "
                     rank_by = "rnk=1"
                 elif self.query_params.get('sort_on') == 'distance':
                     order_by_field = " distance ASC, total_price ASC "

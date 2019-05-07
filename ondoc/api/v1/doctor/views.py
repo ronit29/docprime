@@ -1415,6 +1415,9 @@ class DoctorListViewSet(viewsets.GenericViewSet):
 
         if validated_data.get('avg_ratings'):
             ratings = max(validated_data.get('avg_ratings'))
+            response = [data for data in response if
+                        data['average_rating'] and data['average_rating'] > float(ratings) or data['google_rating'] and
+                        data['google_rating'] > float(ratings)]
 
         entity_ids = [doctor_data['id'] for doctor_data in response]
 

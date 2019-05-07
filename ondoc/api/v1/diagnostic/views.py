@@ -1,6 +1,8 @@
 import operator
 from copy import deepcopy
 from itertools import groupby
+from pyodbc import Date
+
 from ondoc.api.v1.diagnostic.serializers import CustomLabTestPackageSerializer
 from ondoc.api.v1.doctor.serializers import CommaSepratedToListField
 from ondoc.authentication.backends import JWTAuthentication
@@ -1165,6 +1167,7 @@ class LabList(viewsets.ReadOnlyModelViewSet):
         #paginated_queryset = paginate_queryset(queryset_result, request)
         result = self.form_lab_search_whole_data(queryset_result, parameters.get("ids"), insurance_data_dict=insurance_data_dict)
 
+
         if result:
             from ondoc.coupon.models import Coupon
             search_coupon = Coupon.get_search_coupon(request.user)
@@ -1260,6 +1263,8 @@ class LabList(viewsets.ReadOnlyModelViewSet):
         network_id = parameters.get("network_id")
         is_insurance = parameters.get('is_insurance')
         insurance_threshold_amount = parameters.get('insurance_threshold_amount')
+        availability = parameters.get('availability', None)
+        avg_ratings = parameters.get('avg_ratings', None)
 
         #filtering_params = []
         #filtering_params_query1 = []
@@ -1320,8 +1325,36 @@ class LabList(viewsets.ReadOnlyModelViewSet):
             filtering_query.append("mrp<=(%(insurance_threshold_amount)s)")
             filtering_params['insurance_threshold_amount'] = insurance_threshold_amount
 
-        filter_query_string = ""    
-        if len(filtering_query)>0:
+        if avg_ratings:
+            filtering_query.append("(case when rating_data is not null then(rating_data->> 'avg_rating')::float > (%(avg_ratings)s) end)")
+            filtering_params['avg_ratings'] = max(avg_ratings)
+
+        if availability:
+            start_day = Date.today().weekday()
+            avail_days = max(map(int, availability))
+            days = list()
+            if avail_days == serializers.SearchLabListSerializer.TODAY:
+                days.append(start_day)
+            elif avail_days == serializers.SearchLabListSerializer.TOMORROW:
+                days.append(start_day)
+                days.append(0 if start_day == 6 else start_day + 1)
+            elif avail_days == serializers.SearchLabListSerializer.NEXT_3_DAYS:
+                for day in range(4):
+                    days.append(0 if start_day == 6 else start_day + 1)
+
+            counter = 1
+            if len(days) > 0:
+                lab_days_str = 'lt.day IN ('
+                for day in days:
+                    if not counter == 1:
+                        lab_days_str += ','
+                    lab_days_str = lab_days_str + '%(' + 'lab_day' + str(counter) + ')s'
+                    filtering_params['lab_day' + str(counter)] = day
+                    counter += 1
+                filtering_query.append(lab_days_str + ')')
+
+        filter_query_string = ""
+        if len(filtering_query) > 0:
             filter_query_string = " and "+" and ".join(filtering_query)
         
         group_filter_query_string = ""
@@ -1382,7 +1415,7 @@ class LabList(viewsets.ReadOnlyModelViewSet):
                         sum(case when custom_deal_price is null then computed_deal_price else custom_deal_price end)as price,
                         max(ST_Distance(location,St_setsrid(St_point((%(longitude)s), (%(latitude)s)), 4326))) as distance,
                         max(order_priority) as max_order_priority from lab lb inner join available_lab_test avlt on
-                        lb.lab_pricing_group_id = avlt.lab_pricing_group_id 
+                        lb.lab_pricing_group_id = avlt.lab_pricing_group_id  inner join lab_timing lt on lb.id=lt.lab_id
                         and lb.is_test_lab = False and lb.is_live = True and lb.lab_pricing_group_id is not null 
                         and St_dwithin( St_setsrid(St_point((%(longitude)s), (%(latitude)s)), 4326),lb.location, (%(max_distance)s)) 
                         and St_dwithin(St_setsrid(St_point((%(longitude)s), (%(latitude)s)), 4326), lb.location,  (%(min_distance)s)) = false 
@@ -1432,7 +1465,10 @@ class LabList(viewsets.ReadOnlyModelViewSet):
         order_by = parameters.get("sort_on")
         if order_by is not None:
             if order_by == "fees" and parameters.get('ids'):
-                queryset_order_by = ' order_priority desc, price + pickup_charges asc, distance asc'
+                if parameters.get('sort_order') == 'desc':
+                    queryset_order_by = ' order_priority desc, price + pickup_charges desc, distance asc'
+                else:
+                    queryset_order_by = ' order_priority desc, price + pickup_charges asc, distance asc'
             elif order_by == 'distance':
                 queryset_order_by = ' order_priority desc, distance asc'
             elif order_by == 'name':

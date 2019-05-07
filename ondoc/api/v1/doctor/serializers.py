@@ -879,10 +879,10 @@ class DoctorListSerializer(serializers.Serializer):
             raise serializers.ValidationError("Not a Valid Choice")
         return value
 
-    # def validate_availability(self, value):
-    #     if not set(value).issubset(set(self.AVAILABILITY_CHOICES)):
-    #         raise serializers.ValidationError("Not a Valid Availability Choice")
-    #     return value
+    def validate_availability(self, value):
+        if not set(value).issubset(set([str(avl_choice[0]) for avl_choice in self.AVAILABILITY_CHOICES])):
+            raise serializers.ValidationError("Not a Valid Availability Choice")
+        return value
 
 
 class DoctorProfileUserViewSerializer(DoctorProfileSerializer):
