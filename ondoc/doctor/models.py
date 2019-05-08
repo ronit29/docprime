@@ -2092,7 +2092,7 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
         if old_instance and old_instance.status != self.ACCEPTED and self.status == self.ACCEPTED:
             try:
                 notification_tasks.appointment_reminder_sms_provider.apply_async(
-                    (self.id, self.updated_at),
+                    (self.id, str(math.floor(self.updated_at.timestamp()))),
                     eta=self.time_slot_start - datetime.timedelta(
                         minutes=int(settings.PROVIDER_SMS_APPOINTMENT_REMINDER_TIME)), )
                 notification_tasks.opd_send_otp_before_appointment.apply_async(

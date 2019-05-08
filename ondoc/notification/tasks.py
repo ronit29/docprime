@@ -692,18 +692,18 @@ def appointment_reminder_sms_provider(appointment_id, appointment_updated_at):
         instance = OpdAppointment.objects.filter(id=appointment_id).first()
         if not instance or \
                 not instance.user or \
-                instance.updated_at != appointment_updated_at \
+                str(math.floor(instance.updated_at.timestamp())) != appointment_updated_at \
                 or instance.status != OpdAppointment.ACCEPTED:
             # logger.error(
             #     'instance : {}, time : {}, str: {}'.format(str(model_to_dict(instance)),
             #                                                previous_appointment_date_time,
             #                                                str(math.floor(instance.time_slot_start.timestamp()))))
             return
-        # opd_notification = OpdNotification(instance, NotificationAction.OPD_OTP_BEFORE_APPOINTMENT)
         opd_notification = OpdNotification(instance, NotificationAction.APPOINTMENT_REMINDER_PROVIDER_SMS)
         opd_notification.send()
     except Exception as e:
         logger.error(str(e))
+
 
 @task()
 def opd_send_after_appointment_confirmation(appointment_id, previous_appointment_date_time, second=False):
