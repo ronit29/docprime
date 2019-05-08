@@ -93,6 +93,8 @@ class UserSubscriptionBuyRequestSerializer(serializers.Serializer):
                     else:
                         raise serializers.ValidationError('Invalid coupon code - ' + str(coupon))
                 data["coupon_obj"] = list(coupon_obj)
+            else:
+                raise serializers.ValidationError('Invalid coupon code.')
 
         if UserPlanMapping.objects.filter(user=request.user, is_active=True, expire_at__gte=timezone.now()).exists():
             raise serializers.ValidationError('User already has a subscription plan.')
