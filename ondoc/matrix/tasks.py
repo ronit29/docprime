@@ -112,30 +112,32 @@ def prepare_and_hit(self, data):
         payment_URN = merchant_payout.utr_no
         amount = merchant_payout.payable_amount
 
-    insured_member = appointment.profile.insurance.filter().order_by('id').last()
-    user_insurance = None
-    if insured_member:
-        user_insurance = insured_member.user_insurance
+    # insured_member = appointment.profile.insurance.filter().order_by('id').last()
+    # user_insurance = None
+    # if insured_member:
+    #     user_insurance = insured_member.user_insurance
+
+    user_insurance = appointment.insurance
 
     # user_insurance = appointment.user.active_insurance
     primary_proposer_name = None
 
-    if user_insurance and user_insurance.is_valid():
-        primary_proposer = user_insurance.get_primary_member_profile()
-        primary_proposer_name = primary_proposer.get_full_name() if primary_proposer else None
+    # if user_insurance and user_insurance.is_valid():
+    #     primary_proposer = user_insurance.get_primary_member_profile()
+    #     primary_proposer_name = primary_proposer.get_full_name() if primary_proposer else None
 
-    policy_details = {
-        "ProposalNo": None,
-        'PolicyPaymentSTATUS': 300 if user_insurance else 0,
-        "BookingId": user_insurance.id if user_insurance else None,
-        "ProposerName": primary_proposer_name,
-        "PolicyId": user_insurance.policy_number if user_insurance else None,
-        "InsurancePlanPurchased": user_insurance.insurance_plan.name if user_insurance else None,
-        "PurchaseDate": int(user_insurance.purchase_date.timestamp()) if user_insurance else None,
-        "ExpirationDate": int(user_insurance.expiry_date.timestamp()) if user_insurance else None,
-        "COILink": user_insurance.coi.url if user_insurance and  user_insurance.coi is not None and user_insurance.coi.name else None,
-        "PeopleCovered": user_insurance.insurance_plan.get_people_covered() if user_insurance else ""
-    }
+    # policy_details = {
+    #     "ProposalNo": None,
+    #     'PolicyPaymentSTATUS': 300 if user_insurance else 0,
+    #     "BookingId": user_insurance.id if user_insurance else None,
+    #     "ProposerName": primary_proposer_name,
+    #     "PolicyId": user_insurance.policy_number if user_insurance else None,
+    #     "InsurancePlanPurchased": user_insurance.insurance_plan.name if user_insurance else None,
+    #     "PurchaseDate": int(user_insurance.purchase_date.timestamp()) if user_insurance else None,
+    #     "ExpirationDate": int(user_insurance.expiry_date.timestamp()) if user_insurance else None,
+    #     "COILink": user_insurance.coi.url if user_insurance and  user_insurance.coi is not None and user_insurance.coi.name else None,
+    #     "PeopleCovered": user_insurance.insurance_plan.get_people_covered() if user_insurance else ""
+    # }
 
     appointment_details = {
         'IsInsured': 'yes' if user_insurance else 'no',
@@ -192,8 +194,7 @@ def prepare_and_hit(self, data):
         'CityId': 0,
         'ProductId': task_data.get('product_id'),
         'SubProductId': task_data.get('sub_product_id'),
-        'AppointmentDetails': appointment_details,
-        'PolicyDetails': policy_details
+        'AppointmentDetails': appointment_details
     }
 
     #logger.error(json.dumps(request_data))
@@ -283,12 +284,13 @@ def push_appointment_to_matrix(self, data):
                     number = int(number)
 
                 # spoc_type = dict(spoc_obj.CONTACT_TYPE_CHOICES)[spoc_obj.contact_type]
-                spoc_name = spoc_obj.name
-                mobile_list.append({'MobileNo': number,
-                                    'Name': spoc_name,
-                                    'DesignationID': spoc_obj.contact_type,
-                                    'AutoIVREnable': str(auto_ivr_enabled).lower(),
-                                    'Type': 2})
+                if number:
+                    spoc_name = spoc_obj.name
+                    mobile_list.append({'MobileNo': number,
+                                        'Name': spoc_name,
+                                        'DesignationID': spoc_obj.contact_type,
+                                        'AutoIVREnable': str(auto_ivr_enabled).lower(),
+                                        'Type': 2})
 
             # Doctor mobile numbers
             doctor_mobiles = [doctor_mobile.number for doctor_mobile in appointment.doctor.mobiles.all()]
@@ -311,13 +313,14 @@ def push_appointment_to_matrix(self, data):
                 if number:
                     number = int(number)
 
-                contact_type = dict(contact_person.CONTACT_TYPE_CHOICES)[contact_person.contact_type]
-                contact_name = contact_person.name
-                mobile_list.append({'MobileNo': number,
-                                    'Name': contact_name,
-                                    'DesignationID': contact_person.contact_type,
-                                    'AutoIVREnable': str(auto_ivr_enabled).lower(),
-                                    'Type': 3})
+                if number:
+                    contact_type = dict(contact_person.CONTACT_TYPE_CHOICES)[contact_person.contact_type]
+                    contact_name = contact_person.name
+                    mobile_list.append({'MobileNo': number,
+                                        'Name': contact_name,
+                                        'DesignationID': contact_person.contact_type,
+                                        'AutoIVREnable': str(auto_ivr_enabled).lower(),
+                                        'Type': 3})
 
 
             # Lab mobile number

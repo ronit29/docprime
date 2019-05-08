@@ -5,6 +5,7 @@ from ondoc.api.v1.utils import insurance_transform
 from django.core.serializers import serialize
 from rest_framework import viewsets
 from django.core import serializers as core_serializer
+import math
 
 from ondoc.api.v1.utils import payment_details
 from ondoc.diagnostic.models import LabAppointment
@@ -18,6 +19,7 @@ from ondoc.insurance.models import (Insurer, InsuredMembers, InsuranceThreshold,
                                     InsuranceDummyData, InsuranceCancelMaster)
 from ondoc.authentication.models import UserProfile
 from ondoc.authentication.backends import JWTAuthentication
+from ondoc.api.v1.utils import RawSql
 from rest_framework.permissions import IsAuthenticated
 from rest_framework import status, permissions
 from django.db.models import F
@@ -29,6 +31,51 @@ from django.utils import timezone
 import logging
 logger = logging.getLogger(__name__)
 from dateutil.relativedelta import relativedelta
+
+class InsuranceNetworkViewSet(viewsets.GenericViewSet):
+
+    def get_queryset(self):
+        return None
+
+    def list(self, request):
+
+        type = request.query_params.get('type')
+        if type not in ('doctor','lab'):
+            type = None
+        latitude = request.query_params.get('latitude')
+        longitude = request.query_params.get('longitude')
+        starts_with = request.query_params.get('starts_with')
+        if not type or not latitude or not longitude or not starts_with:
+            return Response({'count':0,'total_count':0, 'results':[]})
+
+        starts_with = starts_with.lower()
+
+        params = {'type':type,'latitude':latitude,'longitude':longitude,'starts_with':starts_with+'%'}
+
+        query_string = "select * from (select x.*, rank() over(partition by entity_id order by distance) "\
+        " rnk from (select mt.*, st_distance(location,st_setsrid(st_point((%(longitude)s),(%(latitude)s)), 4326))/1000 "\
+        " distance from  insurance_covered_entity mt where type=%(type)s and search_key like (%(starts_with)s) and "\
+        " st_dwithin(location,st_setsrid(st_point((%(longitude)s),(%(latitude)s)), 4326),15000) "\
+        " )x )y where rnk=1 order by name"
+
+        results = RawSql(query_string, params).fetch_all()
+
+        total_count_query= "select count(distinct entity_id) from insurance_covered_entity where type= %(type)s"
+        total_count = RawSql(total_count_query, {'type':type}).fetch_all()[0].get('count')
+
+        data_list = []
+        for r in results:
+            data_list.append({'name':r.get('name'), 'distance':math.ceil(r.get('distance')), 'id':r.get('entity_id'),\
+            'type':r.get('type'), 'city':r.get('data',{}).get('city'),'url':r.get('data',{}).get('url')})
+
+        resp = dict()
+        resp["starts_with"] = starts_with
+        resp["count"] = len(data_list)
+        resp["total_count"] = total_count
+        resp["results"] = data_list
+
+        return Response(resp)
+
 
 class ListInsuranceViewSet(viewsets.GenericViewSet):
     # authentication_classes = (JWTAuthentication,)
