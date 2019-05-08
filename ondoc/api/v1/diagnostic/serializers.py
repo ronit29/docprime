@@ -253,6 +253,14 @@ class AvailableLabTestPackageSerializer(serializers.ModelSerializer):
     insurance = serializers.SerializerMethodField()
     hide_price = serializers.ReadOnlyField(source='test.hide_price')
     included_in_user_plan = serializers.SerializerMethodField()
+    is_price_zero = serializers.SerializerMethodField()
+
+    def get_is_price_zero(self, obj):
+        agreed_price = obj.computed_agreed_price if obj.custom_agreed_price is None else obj.custom_agreed_price
+        if agreed_price is not None and agreed_price==0:
+            return True
+        else:
+            return False
 
     def get_included_in_user_plan(self, obj):
         package_free_or_not_dict = self.context.get('package_free_or_not_dict', {})
@@ -348,7 +356,7 @@ class AvailableLabTestPackageSerializer(serializers.ModelSerializer):
         model = AvailableLabTest
         fields = ('test_id', 'mrp', 'test', 'agreed_price', 'deal_price', 'enabled', 'is_home_collection_enabled',
                   'package', 'parameters', 'is_package', 'number_of_tests', 'why', 'pre_test_info', 'expected_tat',
-                  'hide_price', 'included_in_user_plan', 'insurance')
+                  'hide_price', 'included_in_user_plan', 'insurance', 'is_price_zero')
 
 class AvailableLabTestSerializer(serializers.ModelSerializer):
     test = LabTestSerializer()
@@ -359,6 +367,14 @@ class AvailableLabTestSerializer(serializers.ModelSerializer):
     insurance = serializers.SerializerMethodField()
     is_package = serializers.SerializerMethodField()
     included_in_user_plan = serializers.SerializerMethodField()
+    is_price_zero = serializers.SerializerMethodField()
+
+    def get_is_price_zero(self, obj):
+        agreed_price = obj.computed_agreed_price if obj.custom_agreed_price is None else obj.custom_agreed_price
+        if agreed_price is not None and agreed_price == 0:
+            return True
+        else:
+            return False
 
     def get_included_in_user_plan(self, obj):
         package_free_or_not_dict = self.context.get('package_free_or_not_dict', {})
@@ -410,7 +426,7 @@ class AvailableLabTestSerializer(serializers.ModelSerializer):
     class Meta:
         model = AvailableLabTest
         fields = ('test_id', 'mrp', 'test', 'agreed_price', 'deal_price', 'enabled', 'is_home_collection_enabled',
-                  'insurance', 'is_package', 'included_in_user_plan')
+                  'insurance', 'is_package', 'included_in_user_plan', 'is_price_zero')
 
     def get_is_package(self, obj):
         return obj.test.is_package
@@ -517,14 +533,34 @@ class CommonPackageSerializer(serializers.ModelSerializer):
     show_details = serializers.ReadOnlyField(source='package.show_details')
     icon = serializers.SerializerMethodField()
     url = serializers.ReadOnlyField(source='package.url')
+    no_of_tests = serializers.ReadOnlyField(source='package.number_of_tests')
+    agreed_price = serializers.SerializerMethodField()
+    mrp = serializers.SerializerMethodField()
+    lab = LabModelSerializer()
 
     def get_icon(self, obj):
         request = self.context.get('request')
         return request.build_absolute_uri(obj.icon.url) if obj.icon else None
 
+    def get_agreed_price(self, obj):
+        agreed_price = None
+        if obj.package.availablelabs:
+            available_test = obj.package.availablelabs.filter(lab_pricing_group__labs__id=obj.lab_id).first()
+            if available_test:
+                agreed_price = available_test.get_deal_price()
+        return agreed_price
+
+    def get_mrp(self, obj):
+        mrp = None
+        if obj.package.availablelabs:
+            available_test = obj.package.availablelabs.filter(lab_pricing_group__labs__id=obj.lab_id).first()
+            if available_test:
+                mrp = available_test.mrp
+        return mrp
+
     class Meta:
         model = CommonPackage
-        fields = ('id', 'name', 'icon', 'show_details', 'url')
+        fields = ('id', 'name', 'icon', 'show_details', 'url', 'no_of_tests', 'mrp', 'agreed_price', 'lab')
 
 
 class CommonConditionsSerializer(serializers.ModelSerializer):
@@ -817,12 +853,14 @@ class LabAppointmentCreateSerializer(serializers.Serializer):
         lab = data.get("lab")
         pincode = data.get('pincode', None)
         address = data.get("address", None)
+        check_active_appointment = True
 
         if bool(data.get("is_thyrocare")):
             if not pincode:
                 raise serializers.ValidationError("Pincode required for thyrocare.")
             if not int(pincode) == int(address.pincode):
                 raise serializers.ValidationError("Entered pincode should be same as pickup address pincode.")
+
 
         now = datetime.datetime.now()
         tomorrow = datetime.date.today() + datetime.timedelta(days=1)
@@ -855,11 +893,13 @@ class LabAppointmentCreateSerializer(serializers.Serializer):
 
             if lab.network and lab.network.id == settings.THYROCARE_NETWORK_ID:
                 self.thyrocare_test_validator(data)
+                check_active_appointment = False
 
-        if LabAppointment.objects.filter(profile=data.get("profile"), lab=data.get("lab"),
-                                         tests__in=data.get("test_ids"), time_slot_start=time_slot_start) \
-                .exclude(status__in=[LabAppointment.COMPLETED, LabAppointment.CANCELLED]).exists():
-            raise serializers.ValidationError("One active appointment for the selected date & time already exists. Please change the date & time of the appointment.")
+        if check_active_appointment:
+            if LabAppointment.objects.filter(profile=data.get("profile"), lab=data.get("lab"),
+                                             tests__in=data.get("test_ids"), time_slot_start=time_slot_start) \
+                    .exclude(status__in=[LabAppointment.COMPLETED, LabAppointment.CANCELLED]).exists():
+                raise serializers.ValidationError("One active appointment for the selected date & time already exists. Please change the date & time of the appointment.")
 
         if 'use_wallet' in data and data['use_wallet'] is False:
             data['use_wallet'] = False
@@ -1012,28 +1052,28 @@ class LabAppointmentCreateSerializer(serializers.Serializer):
     def thyrocare_test_validator(self, data):
         from ondoc.integrations.models import IntegratorTestMapping
 
-        test_ids = data.get("test_ids", None)
-        if test_ids:
-            for test in test_ids:
+        booked_test_ids = list(data.get("test_ids", None))
+        if booked_test_ids:
+            for test in booked_test_ids:
                 integrator_test = IntegratorTestMapping.objects.filter(test_id=test).first()
                 if integrator_test and integrator_test.integrator_product_data['code'] == 'FBS':
-                    self.fbs_valid(test_ids, test)
+                    self.fbs_valid(booked_test_ids, test)
                 elif integrator_test and integrator_test.integrator_product_data['code'] in ['PPBS', 'RBS']:
-                    self.ppbs_valid(test_ids, test)
+                    self.ppbs_valid(booked_test_ids, test)
                 elif integrator_test and integrator_test.integrator_product_data['code'] == 'INSPP':
-                    self.inspp_valid(test_ids, test)
+                    self.inspp_valid(booked_test_ids, test)
 
-    def fbs_valid(self, test_ids, test):
+    def fbs_valid(self, booked_test_ids, test):
         from ondoc.integrations.models import IntegratorTestMapping
-        if len(test_ids) < 2:
+        if len(booked_test_ids) < 2:
             raise serializers.ValidationError("FBS can be added with any fasting test or package.")
 
         is_profile_or_fasting_added = False
-        test_ids.remove(test)
-        if not test_ids:
+        booked_test_ids.remove(test)
+        if not booked_test_ids:
             pass
 
-        for test in test_ids:
+        for test in booked_test_ids:
             integrator_test = IntegratorTestMapping.objects.filter(test_id=test, test_type='TEST').first()
             if integrator_test and integrator_test.integrator_product_data['fasting'] == 'CF':
                 is_profile_or_fasting_added = True
@@ -1047,18 +1087,18 @@ class LabAppointmentCreateSerializer(serializers.Serializer):
         else:
             raise serializers.ValidationError("FBS can be added with any fasting test or package.")
 
-    def ppbs_valid(self, test_ids, test):
+    def ppbs_valid(self, booked_test_ids, test):
         from ondoc.integrations.models import IntegratorTestMapping
-        if len(test_ids) < 3:
+        if len(booked_test_ids) < 3:
             raise serializers.ValidationError("PPBS or RBS can be added with FBS and one fasting test or package.")
 
         is_fbs_present = False
         is_profile_or_fasting_added = False
-        test_ids.remove(test)
-        if not test_ids:
+        booked_test_ids.remove(test)
+        if not booked_test_ids:
             pass
 
-        for test in test_ids:
+        for test in booked_test_ids:
             integrator_test = IntegratorTestMapping.objects.filter(test_id=test, test_type='TEST').first()
             if integrator_test and integrator_test.integrator_product_data['code'] == 'FBS':
                 is_fbs_present = True
@@ -1074,17 +1114,17 @@ class LabAppointmentCreateSerializer(serializers.Serializer):
         else:
             raise serializers.ValidationError("PPBS or RBS can be added with FBS and one fasting test or package.")
 
-    def inspp_valid(self, test_ids, test):
+    def inspp_valid(self, booked_test_ids, test):
         from ondoc.integrations.models import IntegratorTestMapping
-        if len(test_ids) < 2:
+        if len(booked_test_ids) < 2:
             raise serializers.ValidationError("INSFA test is mandatory to book INSPP.")
 
         insfa_test_present = False
-        test_ids.remove(test)
-        if not test_ids:
+        booked_test_ids.remove(test)
+        if not booked_test_ids:
             pass
 
-        for test in test_ids:
+        for test in booked_test_ids:
             integrator_test = IntegratorTestMapping.objects.filter(test_id=test, test_type='TEST').first()
             if integrator_test and integrator_test.integrator_product_data['code'] == 'INSFA':
                 insfa_test_present = True
@@ -1420,7 +1460,7 @@ class CustomLabTestPackageSerializer(serializers.ModelSerializer):
         return None
 
     def get_distance(self, obj):
-        return int(obj.distance.m)
+        return int(obj.distance)
 
     def get_mrp(self, obj):
         return str(obj.mrp)
@@ -1620,3 +1660,23 @@ class PackageSerializer(LabTestSerializer):
             parameter_count = len(temp_test.parameter.all()) or 1
             return_data += parameter_count
         return return_data
+
+
+class PackageLabCompareRequestSerializer(serializers.Serializer):
+    package_id = serializers.PrimaryKeyRelatedField(queryset=LabTest.objects.filter(is_package=True, enable_for_retail=True))
+    lab_id = serializers.PrimaryKeyRelatedField(queryset=Lab.objects.filter(is_live=True))
+
+    def validate(self, attrs):
+        attrs['package'] = attrs['package_id']
+        attrs['lab'] = attrs['lab_id']
+        if not AvailableLabTest.objects.filter(lab_pricing_group__labs=attrs.get('lab'), test=attrs.get('package'),
+                                               enabled=True).exists():
+            raise serializers.ValidationError('Package is not available in the lab.')
+        return attrs
+
+
+class CompareLabPackagesSerializer(serializers.Serializer):
+    package_lab_ids = serializers.ListField(child=PackageLabCompareRequestSerializer(), min_length=1, max_length=5)
+    longitude = serializers.FloatField(default=77.071848)
+    latitude = serializers.FloatField(default=28.450367)
+    title = serializers.CharField(required=False, max_length=500)

@@ -32,7 +32,7 @@ from ondoc.diagnostic.models import (LabTiming, LabImage,
                                      TestParameter, ParameterLabTest, FrequentlyAddedTogetherTests, QuestionAnswer,
                                      LabReport, LabReportFile, LabTestCategoryMapping,
                                      LabTestRecommendedCategoryMapping, LabTestGroupTiming, LabTestGroupMapping,
-                                     TestParameterChat)
+                                     TestParameterChat, LabTestThresholds)
 from ondoc.integrations.models import IntegratorHistory
 from ondoc.notification.models import EmailNotification, NotificationAction
 from .common import *
@@ -355,7 +355,7 @@ class LabForm(FormCleanMixin):
         model = Lab
         exclude = ()
         widgets = {
-            'lab_pricing_group': autocomplete.ModelSelect2(url='admin:diagnostic_labpricinggroup_autocomplete'),
+            'lab_pricing_group': autocomplete.ModelSelect2(url='labpricing-autocomplete'),
             'matrix_state': autocomplete.ModelSelect2(url='matrix-state-autocomplete'),
             'matrix_city': autocomplete.ModelSelect2(url='matrix-city-autocomplete', forward=['matrix_state'])
         }
@@ -852,7 +852,7 @@ class LabAppointmentAdmin(nested_admin.NestedModelAdmin):
     list_display = (
         'booking_id', 'get_profile', 'get_lab', 'status', 'reports_uploaded', 'time_slot_start', 'effective_price', 'get_profile_email',
         'get_profile_age', 'created_at', 'updated_at', 'get_lab_test_name')
-    list_filter = ('status', )
+    list_filter = ('status', 'payment_type')
     date_hierarchy = 'created_at'
 
     inlines = [
@@ -870,10 +870,9 @@ class LabAppointmentAdmin(nested_admin.NestedModelAdmin):
         queryset, use_distinct = super().get_search_results(request, queryset, None)
 
         queryset = queryset.filter(Q(integrator_response__integrator_order_id__icontains=search_term) |
-         Q(id__contains=search_term)).distinct()
+         Q(id__contains=search_term) | Q(lab__name__icontains=search_term) | Q(profile__name__icontains=search_term) | Q(profile__phone_number__icontains=search_term)).distinct()
 
         return queryset, use_distinct
-
 
     def integrator_order_status(self, obj):
         return obj.integrator_order_status()
@@ -1178,8 +1177,6 @@ class LabAppointmentAdmin(nested_admin.NestedModelAdmin):
                         history_obj.accepted_through = "CRM"
                         history_obj.save()
 
-
-
             if send_email_sms_report and sum(
                     obj.reports.annotate(no_of_files=Count('files')).values_list('no_of_files', flat=True)):
                 transaction.on_commit(lambda: self.on_commit_tasks(obj.id))
@@ -1229,6 +1226,7 @@ class FrequentlyBookedTogetherTestInLine(admin.StackedInline):
     fk_name = 'original_test'
     fields = ['original_test', 'booked_together_test']
     extra = 0
+    autocomplete_fields = ['booked_together_test',]
 
 class TestPackageFormSet(forms.BaseInlineFormSet):
     def clean(self):
@@ -1280,7 +1278,7 @@ class LabTestToRecommendedCategoryInlineForm(forms.ModelForm):
         if any(self.errors):
             return
         cleaned_data = self.cleaned_data
-        if self.instance and self.instance.lab_test and self.instance.lab_test.is_package:
+        if self.instance and self.instance.id and self.instance.lab_test and self.instance.lab_test.is_package:
             raise forms.ValidationError("Recommended category can only be added on lab test.")
         temp_recommended_category = cleaned_data.get('parent_category')
         if temp_recommended_category and not temp_recommended_category.is_package_category:
@@ -1366,7 +1364,7 @@ class LabTestAdminForm(forms.ModelForm):
                 raise forms.ValidationError('Please enter gender_type')
             if cleaned_data.get('min_age') > cleaned_data.get('max_age'):
                 raise forms.ValidationError('min_age cannot be more than max_age')
-        else :
+        else:
             if cleaned_data.get('min_age'):
                 raise forms.ValidationError('Please dont enter min_age')
             if cleaned_data.get('max_age'):
@@ -1377,15 +1375,28 @@ class LabTestAdminForm(forms.ModelForm):
                 raise forms.ValidationError('Please dont enter reference code for a test')
 
 
+class LabTestReportThresholdInline(AutoComplete, TabularInline):
+    model = LabTestThresholds
+    formfield_overrides = {
+        models.TextField: {'widget': forms.Textarea(attrs={'rows': 6, 'cols': 20})},
+    }
+    fk_name = 'lab_test'
+    extra = 0
+    can_delete = True
+    autocomplete_fields = ['lab_test']
+    # formset = LabTestToParentCategoryInlineFormset
+
+
 class LabTestAdmin(ImportExportMixin, VersionAdmin):
     form = LabTestAdminForm
     change_list_template = 'superuser_import_export.html'
     formats = (base_formats.XLS, base_formats.XLSX,)
-    inlines = [LabTestCategoryInline, LabTestRecommendedCategoryInline, FAQLabTestInLine, FrequentlyBookedTogetherTestInLine]
+    inlines = [LabTestCategoryInline, LabTestRecommendedCategoryInline, FAQLabTestInLine, FrequentlyBookedTogetherTestInLine, LabTestReportThresholdInline]
     search_fields = ['name']
     list_filter = ('is_package', 'enable_for_ppc', 'enable_for_retail')
     exclude = ['search_key']
     readonly_fields = ['url',]
+    autocomplete_fields = ['author',]
 
     def get_fields(self, request, obj=None):
         fields = super().get_fields(request, obj)
@@ -1463,6 +1474,29 @@ class AvailableLabTestAdmin(VersionAdmin):
                     'custom_agreed_price', 'computed_deal_price', 'custom_deal_price', 'enabled']
     search_fields = ['test__name', 'lab_pricing_group__group_name', 'lab_pricing_group__labs__name']
     # autocomplete_fields = ['test']
+
+    class Media:
+        js = ('js/admin/ondoc.js',)
+
+    @transaction.atomic
+    def save_model(self, request, obj, form, change):
+        super().save_model(request, obj, form, change)
+        responsible_user = request.user
+        transaction.on_commit(lambda: self.on_commit_tasks(obj, responsible_user))
+
+    def on_commit_tasks(self, obj, responsible_user):
+        if obj.custom_deal_price:
+            deal_price = obj.custom_deal_price
+        else:
+            deal_price = obj.computed_deal_price if obj.computed_deal_price else 0
+
+        if obj.custom_agreed_price:
+            agreed_price = obj.custom_agreed_price
+        else:
+            agreed_price = obj.computed_agreed_price if obj.computed_agreed_price else 0
+
+        if deal_price < agreed_price:
+            obj.send_pricing_alert_email(responsible_user)
 
 
 class DiagnosticConditionLabTestInline(admin.TabularInline):

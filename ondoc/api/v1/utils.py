@@ -1,4 +1,6 @@
 from urllib.parse import urlparse
+
+from django.core.files.uploadedfile import TemporaryUploadedFile, UploadedFile
 from rest_framework.views import exception_handler
 from rest_framework import permissions
 from collections import defaultdict
@@ -31,10 +33,35 @@ import hashlib
 from ondoc.authentication import models as auth_models
 import logging
 from datetime import timedelta
+import os
+import tempfile
 
 logger = logging.getLogger(__name__)
 
 User = get_user_model()
+
+
+class CustomTemporaryUploadedFile(UploadedFile):
+    """
+    A file uploaded to a temporary location (i.e. stream-to-disk).
+    """
+    def __init__(self, name, content_type, size, charset, prefix, suffix, content_type_extra=None):
+        _, ext = os.path.splitext(name)
+        file = tempfile.NamedTemporaryFile(suffix=suffix, prefix=prefix, dir=settings.FILE_UPLOAD_TEMP_DIR)
+        super().__init__(file, name, content_type, size, charset, content_type_extra)
+
+    def temporary_file_path(self):
+        """Return the full path of this file."""
+        return self.file.name
+
+    def close(self):
+        try:
+            return self.file.close()
+        except FileNotFoundError:
+            # The file was moved or deleted before the tempfile could unlink
+            # it. Still sets self.file.close_called and calls
+            # self.file.file.close() before the exception.
+            pass
 
 
 def flatten_dict(d):
@@ -484,6 +511,30 @@ def resolve_address(address_obj):
     return address_string
 
 
+def thyrocare_resolve_address(address_obj):
+    address_string = ""
+    address_dict = dict()
+    if not isinstance(address_obj, dict):
+        address_dict = vars(address_dict)
+    else:
+        address_dict = address_obj
+
+    if address_dict.get("address"):
+        if address_string:
+            address_string += ", "
+        address_string += str(address_dict["address"])
+    if address_dict.get("locality"):
+        if address_string:
+            address_string += ", "
+        address_string += str(address_dict["locality"])
+    if address_dict.get("pincode"):
+        if address_string:
+            address_string += ", "
+        address_string += str(address_dict["pincode"])
+
+    return address_string
+
+
 def generate_short_url(url):
     from ondoc.web import models as web_models
     random_string = ''.join([random.choice(string.ascii_letters + string.digits) for n in range(10)])
@@ -534,7 +585,8 @@ def doctor_query_parameters(entity, req_params):
         params_dict["longitude"] = entity.sublocality_longitude
     elif entity.locality_longitude:
         params_dict["longitude"] = entity.locality_longitude
-
+    if entity.ipd_procedure_id:
+        params_dict["ipd_procedure_ids"] = str(entity.ipd_procedure_id)
 
     # if entity_params.get("location_json"):
     #     if entity_params["location_json"].get("sublocality_latitude"):
@@ -1051,7 +1103,7 @@ class TimeSlotExtraction(object):
                 if current_date_time.date() == booking_date.date():
                     if pa[k].get('on_call') == False:
                         if k >= float(doc_minimum_time) and k <= doctor_maximum_timing:
-                            data_list.append({"value": k, "text": v, "price": pa[k]["price"],
+                            data_list.append({"value": k, "text": v, "price": pa[k]["price"], "is_price_zero": True if pa[k]["price"] is not None and pa[k]["price"] == 0 else False,
                                               "mrp": pa[k]['mrp'], 'deal_price': pa[k]['deal_price'],
                                               "is_available": pa[k]["is_available"], "on_call": pa[k].get("on_call", False)})
                         else:
@@ -1060,7 +1112,7 @@ class TimeSlotExtraction(object):
                         pass
                 else:
                     if k <= doctor_maximum_timing:
-                        data_list.append({"value": k, "text": v, "price": pa[k]["price"],
+                        data_list.append({"value": k, "text": v, "price": pa[k]["price"], "is_price_zero": True if pa[k]["price"] is not None and pa[k]["price"] == 0 else False,
                                           "mrp": pa[k]['mrp'], 'deal_price': pa[k]['deal_price'],
                                           "is_available": pa[k]["is_available"],
                                           "on_call": pa[k].get("on_call", False)})
@@ -1070,7 +1122,7 @@ class TimeSlotExtraction(object):
                 next_date = current_date_time + datetime.timedelta(days=1)
                 if current_date_time.date() == booking_date.date():
                     if k >= float(lab_minimum_time):
-                        data_list.append({"value": k, "text": v, "price": pa[k]["price"],
+                        data_list.append({"value": k, "text": v, "price": pa[k]["price"], "is_price_zero": True if pa[k]["price"] is not None and pa[k]["price"] == 0 else False,
                                           "is_available": pa[k]["is_available"],
                                           "on_call": pa[k].get("on_call", False)})
                     else:
@@ -1078,18 +1130,18 @@ class TimeSlotExtraction(object):
                 elif next_date.date() == booking_date.date():
                     if lab_tomorrow_time:
                         if k >= float(lab_tomorrow_time):
-                            data_list.append({"value": k, "text": v, "price": pa[k]["price"],
+                            data_list.append({"value": k, "text": v, "price": pa[k]["price"], "is_price_zero": True if pa[k]["price"] is not None and pa[k]["price"] == 0 else False,
                                               "is_available": pa[k]["is_available"],
                                               "on_call": pa[k].get("on_call", False)})
                         else:
                             pass
                     else:
-                        data_list.append({"value": k, "text": v, "price": pa[k]["price"],
+                        data_list.append({"value": k, "text": v, "price": pa[k]["price"], "is_price_zero": True if pa[k]["price"] is not None and pa[k]["price"] == 0 else False,
                                           "is_available": pa[k]["is_available"],
                                           "on_call": pa[k].get("on_call", False)})
 
                 else:
-                    data_list.append({"value": k, "text": v, "price": pa[k]["price"],
+                    data_list.append({"value": k, "text": v, "price": pa[k]["price"], "is_price_zero": True if pa[k]["price"] is not None and pa[k]["price"] == 0 else False,
                                       "is_available": pa[k]["is_available"],
                                       "on_call": pa[k].get("on_call", False)})
 
@@ -1469,3 +1521,21 @@ def update_physical_agreement_timestamp(obj):
         obj.physical_agreement_signed_at = time_to_be_set
         if isinstance(obj, HospitalNetwork):
             update_physical_agreement_value(obj, obj.physical_agreement_signed, time_to_be_set)
+
+
+def ipd_query_parameters(entity, req_params):
+    params_dict = copy.deepcopy(req_params)
+    params_dict["max_distance"] = None
+    if entity.sublocality_latitude:
+        params_dict["lat"] = entity.sublocality_latitude
+        params_dict["max_distance"] = 5  # In KMs
+    elif entity.locality_latitude:
+        params_dict["lat"] = entity.locality_latitude
+        params_dict["max_distance"] = 15  # In KMs
+    if entity.sublocality_longitude:
+        params_dict["long"] = entity.sublocality_longitude
+    elif entity.locality_longitude:
+        params_dict["long"] = entity.locality_longitude
+    if entity.locality_value:
+        params_dict['city'] = entity.locality_value
+    return params_dict

@@ -11,7 +11,8 @@ from django.conf import settings
 from django.utils.dateparse import parse_datetime
 from ondoc.authentication.models import Merchant, AssociatedMerchant, QCModel
 from ondoc.account.models import MerchantPayout
-from ondoc.common.models import Cities, MatrixCityMapping, PaymentOptions, Remark, MatrixMappedCity, MatrixMappedState, GlobalNonBookable
+from ondoc.common.models import Cities, MatrixCityMapping, PaymentOptions, Remark, MatrixMappedCity, MatrixMappedState, \
+    GlobalNonBookable, UserConfig
 from import_export import resources, fields
 from import_export.admin import ImportMixin, base_formats, ImportExportMixin, ImportExportModelAdmin, ExportMixin
 from reversion.admin import VersionAdmin
@@ -21,8 +22,9 @@ from django.utils.safestring import mark_safe
 from django.contrib.contenttypes.models import ContentType
 from import_export.admin import ImportExportMixin
 
-from ondoc.diagnostic.models import Lab, LabAppointment
+from ondoc.diagnostic.models import Lab, LabAppointment, LabPricingGroup
 from ondoc.doctor.models import Hospital, Doctor, OpdAppointment, HospitalNetwork
+from ondoc.insurance.models import UserInsurance
 from django.db.models import Q
 from django import forms
 
@@ -423,9 +425,10 @@ class MerchantPayoutForm(forms.ModelForm):
             if not billed_to:
                 raise forms.ValidationError("Billing entity not defined.")
 
-            associated_merchant = billed_to.merchant.first()
-            if not associated_merchant.verified:
-                raise forms.ValidationError("Associated Merchant not verified.")
+            if not self.instance.booking_type == self.instance.InsurancePremium:
+                associated_merchant = billed_to.merchant.first()
+                if not associated_merchant.verified:
+                    raise forms.ValidationError("Associated Merchant not verified.")
 
         if not self.instance.status == self.instance.PENDING:
             raise forms.ValidationError("This payout is already under process")
@@ -446,11 +449,11 @@ class MerchantPayoutAdmin(ExportMixin, VersionAdmin):
     resource_class = MerchantPayoutResource
     form = MerchantPayoutForm
     model = MerchantPayout
-    fields = ['id', 'payment_mode','charged_amount', 'updated_at', 'created_at', 'payable_amount', 'status', 'payout_time', 'paid_to',
+    fields = ['id','booking_type', 'payment_mode','charged_amount', 'updated_at', 'created_at', 'payable_amount', 'status', 'payout_time', 'paid_to',
               'appointment_id', 'get_billed_to', 'get_merchant', 'process_payout', 'type', 'utr_no', 'amount_paid','api_response','pg_status','status_api_response']
-    list_display = ('id', 'status', 'payable_amount', 'appointment_id', 'doc_lab_name')
+    list_display = ('id', 'status', 'payable_amount', 'appointment_id', 'doc_lab_name','booking_type')
     search_fields = ['name']
-    list_filter = ['status']
+    list_filter = ['status','booking_type']
 
     def get_queryset(self, request):
         return super().get_queryset(request).filter(payable_amount__gt=0).order_by('-id').prefetch_related('lab_appointment__lab',
@@ -458,14 +461,14 @@ class MerchantPayoutAdmin(ExportMixin, VersionAdmin):
 
     def get_search_results(self, request, queryset, search_term):
         queryset, use_distinct = super().get_search_results(request, queryset, None)
-
-        queryset = queryset.filter(Q(opd_appointment__doctor__name__icontains=search_term) |
-         Q(lab_appointment__lab__name__icontains=search_term))
+        if search_term:
+            queryset = queryset.filter(Q(opd_appointment__doctor__name__icontains=search_term) |
+             Q(lab_appointment__lab__name__icontains=search_term))
 
         return queryset, use_distinct
 
     def get_readonly_fields(self, request, obj=None):
-        base = ['appointment_id', 'get_billed_to', 'get_merchant']
+        base = ['appointment_id', 'get_billed_to', 'get_merchant','booking_type']
         editable_fields = ['payout_approved']
         if obj and obj.status == MerchantPayout.PENDING:
             editable_fields += ['type', 'amount_paid','payment_mode']
@@ -487,6 +490,10 @@ class MerchantPayoutAdmin(ExportMixin, VersionAdmin):
         elif isinstance(appt, LabAppointment):
             if appt.lab:
                 return appt.lab.name
+        elif isinstance(appt, UserInsurance):
+            if appt.insurance_plan.insurer:
+                return appt.insurance_plan.insurer.name
+
         return ''
 
     def appointment_id(self, instance):
@@ -666,3 +673,25 @@ class MatrixCityAutocomplete(autocomplete.Select2QuerySetView):
 
         return queryset
 
+
+class ContactUsAdmin(admin.ModelAdmin):
+    list_display = ('name', 'mobile', 'email', 'from_app')
+    fields = ('name', 'mobile', 'email', 'message', 'from_app')
+    readonly_fields = ('name', 'mobile', 'email', 'message', 'from_app')
+    list_filter = ("from_app",)
+
+
+class UserConfigAdmin(admin.ModelAdmin):
+    model = UserConfig
+    list_display = ('key',)
+
+
+class LabPricingAutocomplete(autocomplete.Select2QuerySetView):
+
+    def get_queryset(self):
+        queryset = LabPricingGroup.objects.all()
+
+        if self.q:
+            queryset = queryset.filter(group_name__istartswith=self.q)
+
+        return queryset

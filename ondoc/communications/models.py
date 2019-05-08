@@ -297,6 +297,8 @@ class SMSNotification:
             body_template = "sms/lab/lab_report_uploaded.txt"
         elif notification_type == NotificationAction.INSURANCE_CONFIRMED:
             body_template = "sms/insurance/insurance_confirmed.txt"
+        elif notification_type == NotificationAction.INSURANCE_CANCEL_INITIATE:
+            body_template = "sms/insurance/insurance_cancellation.txt"
         elif notification_type == NotificationAction.LAB_REPORT_SEND_VIA_CRM:
             body_template = "sms/lab/lab_report_send_crm.txt"
             lab_reports = []
@@ -526,6 +528,28 @@ class WHTSAPPNotification:
 
             data.append(self.context.get('doctor_name'))
             data.append(self.context.get('patient_name'))
+
+        elif notification_type == NotificationAction.OPD_CONFIRMATION_CHECK_AFTER_APPOINTMENT:
+            body_template = 'appointment_confirmation_check'
+
+            data.append(self.context.get('patient_name'))
+            data.append(self.context.get('instance').id)
+            data.append(self.context.get('doctor_name'))
+            data.append(datetime.strftime(aware_time_zone(self.context.get('instance').time_slot_start), '%d-%m-%Y'))
+            data.append(datetime.strftime(aware_time_zone(self.context.get('instance').time_slot_start), '%H:%M'))
+            data.append(self.context.get('opd_appointment_complete_url'))
+            data.append(self.context.get('reschdule_appointment_bypass_url'))
+
+        elif notification_type == NotificationAction.OPD_CONFIRMATION_SECOND_CHECK_AFTER_APPOINTMENT:
+            body_template = 'appointment_confirmation_second_check'
+
+            data.append(self.context.get('patient_name'))
+            data.append(self.context.get('instance').id)
+            data.append(self.context.get('doctor_name'))
+            data.append(datetime.strftime(aware_time_zone(self.context.get('instance').time_slot_start), '%d-%m-%Y'))
+            data.append(datetime.strftime(aware_time_zone(self.context.get('instance').time_slot_start), '%H:%M'))
+            data.append(self.context.get('opd_appointment_complete_url'))
+            data.append(self.context.get('reschdule_appointment_bypass_url'))
 
         elif notification_type == NotificationAction.LAB_APPOINTMENT_ACCEPTED or \
                 notification_type == NotificationAction.LAB_OTP_BEFORE_APPOINTMENT:
@@ -874,6 +898,28 @@ class EMAILNotification:
         elif notification_type == NotificationAction.IPD_PROCEDURE_MAIL:
             body_template = "email/ipd_lead/body.html"
             subject_template = "email/ipd_lead/subject.txt"
+        elif notification_type == NotificationAction.INSURANCE_CANCEL_INITIATE:
+            body_template = "email/insurance_cancelled/body.html"
+            subject_template = "email/insurance_cancelled/subject.txt"
+        elif notification_type == NotificationAction.PRICING_ALERT_EMAIL:
+            body_template = "email/lab/lab_pricing_change/body.html"
+            subject_template = "email/lab/lab_pricing_change/subject.txt"
+        elif notification_type == NotificationAction.LAB_LOGO_CHANGE_MAIL:
+            instance = context.get("instance", None)
+            if instance:
+                logo = context.get("instance").name
+                if not logo:
+                    logger.error("No logo found for logo change mail")
+                    return '', ''
+                context.update({"logo": logo})
+                context.update({"coi_url": logo.url})
+                context.update(
+                    {"attachments": [
+                        {"filename": util_file_name(logo.url),
+                         "path": util_absolute_url(logo.url)}]})
+
+                body_template = "email/lab_document_logo/body.html"
+                subject_template = "email/lab_document_logo/subject.txt"
 
         return subject_template, body_template
 
@@ -888,7 +934,6 @@ class EMAILNotification:
         notification_type = self.notification_type
         context = copy.deepcopy(context)
         instance = context.get('instance', None)
-
         receiver_user = receiver.get('user')
 
         # Hospital and labs which has the flag open to communication, send notificaiton to them only.
@@ -1425,7 +1470,7 @@ class InsuranceNotification(Notification):
         notification_type = self.notification_type
         all_receivers = self.get_receivers()
 
-        if notification_type == NotificationAction.INSURANCE_CONFIRMED:
+        if notification_type in [NotificationAction.INSURANCE_CONFIRMED, NotificationAction.INSURANCE_CANCEL_INITIATE]:
             email_notification = EMAILNotification(notification_type, context)
             email_notification.send(all_receivers.get('email_receivers', []))
 

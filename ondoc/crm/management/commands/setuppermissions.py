@@ -42,16 +42,16 @@ from ondoc.diagnostic.models import (Lab, LabTiming, LabImage, GenericLabAdmin,
 from ondoc.insurance.models import (Insurer, InsurancePlans, InsuranceThreshold, InsuranceCity, StateGSTCode,
                                     InsuranceDistrict, InsuranceTransaction, InsuranceDeal, InsuranceDisease,
                                     UserInsurance, InsurancePlanContent, InsuredMembers, InsurerAccount, InsuranceLead,
-                                    InsuranceDiseaseResponse, InsurerPolicyNumber)
+                                    InsuranceDiseaseResponse, InsurerPolicyNumber, InsuranceCancelMaster)
 
 from ondoc.procedure.models import Procedure, ProcedureCategory, CommonProcedureCategory, DoctorClinicProcedure, \
     ProcedureCategoryMapping, ProcedureToCategoryMapping, CommonProcedure, IpdProcedure, IpdProcedureFeatureMapping, \
     DoctorClinicIpdProcedure, IpdProcedureCategoryMapping, IpdProcedureCategory, CommonIpdProcedure, \
-    IpdProcedureDetailType, IpdProcedureDetail
+    IpdProcedureDetailType, IpdProcedureDetail, IpdProcedureSynonym, IpdProcedureSynonymMapping
 from ondoc.reports import models as report_models
 
 from ondoc.diagnostic.models import LabPricing
-from ondoc.integrations.models import IntegratorMapping, IntegratorProfileMapping, IntegratorReport, IntegratorTestMapping
+from ondoc.integrations.models import IntegratorMapping, IntegratorProfileMapping, IntegratorReport, IntegratorTestMapping, IntegratorTestParameterMapping
 from ondoc.subscription_plan.models import Plan, PlanFeature, PlanFeatureMapping, UserPlanMapping
 
 from ondoc.web.models import Career, OnlineLead, UploadImage
@@ -431,6 +431,9 @@ class Command(BaseCommand):
         #Create insurance group
         self.create_insurance_group()
 
+        #creating super insurance group
+        self.create_super_insurance_group()
+
         #Create XL Data Export Group
         Group.objects.get_or_create(name=constants['DATA_EXPORT_GROUP'])
 
@@ -534,7 +537,7 @@ class Command(BaseCommand):
                                                            DoctorClinic, DoctorClinicIpdProcedure,
                                                            HealthInsuranceProviderHospitalMapping, IpdProcedureCategoryMapping, CommonIpdProcedure,
                                                            HospitalHelpline, IpdProcedure, HospitalTiming,
-                                                           IpdProcedureDetailType, IpdProcedureDetail)
+                                                           IpdProcedureDetailType, IpdProcedureDetail, IpdProcedureSynonym, IpdProcedureSynonymMapping)
         for cl, ct in content_types.items():
             permissions = Permission.objects.filter(
                 Q(content_type=ct),
@@ -561,7 +564,7 @@ class Command(BaseCommand):
         group.permissions.clear()
 
         content_types = ContentType.objects.get_for_models(IntegratorMapping, IntegratorProfileMapping, LabTest, LabNetwork,
-                                                           IntegratorReport, IntegratorTestMapping)
+                                                           IntegratorReport, IntegratorTestMapping, IntegratorTestParameterMapping)
 
         for cl, ct in content_types.items():
             permissions = Permission.objects.filter(
@@ -804,7 +807,7 @@ class Command(BaseCommand):
                 Q(codename='add_' + ct.model) |
                 Q(codename='change_' + ct.model))
 
-        group.permissions.add(*permissions)
+            group.permissions.add(*permissions)
 
         content_types = ContentType.objects.get_for_models(AssociatedMerchant)
 
@@ -815,16 +818,16 @@ class Command(BaseCommand):
                 Q(codename='change_' + ct.model) |
                 Q(codename='delete_' + ct.model))
 
-        group.permissions.add(*permissions)
+            group.permissions.add(*permissions)
 
-        content_types = ContentType.objects.get_for_models(MerchantPayout)
+        content_types = ContentType.objects.get_for_models(MerchantPayout, UserInsurance)
 
         for cl, ct in content_types.items():
             permissions = Permission.objects.filter(
                 Q(content_type=ct),
                 Q(codename='change_' + ct.model))
 
-        group.permissions.add(*permissions)
+            group.permissions.add(*permissions)
 
 
     def create_elastic_group(self):
@@ -886,7 +889,35 @@ class Command(BaseCommand):
                                                            StateGSTCode, InsuranceDistrict, InsuranceThreshold,
                                                            UserInsurance, InsuranceDeal, InsuranceLead,
                                                            InsuranceTransaction, InsuranceDiseaseResponse,
-                                                           InsuredMembers, InsurerPolicyNumber)
+                                                           InsuredMembers, InsurerPolicyNumber, InsuranceCancelMaster)
+
+        for cl, ct in content_types.items():
+            permissions = Permission.objects.filter(
+                Q(content_type=ct),
+                Q(codename='add_' + ct.model) |
+                Q(codename='change_' + ct.model))
+
+            group.permissions.add(*permissions)
+
+        content_types = ContentType.objects.get_for_models(UserInsurance)
+
+        for cl, ct in content_types.items():
+            permissions = Permission.objects.filter(
+                Q(content_type=ct),
+                Q(codename='add_' + ct.model))
+
+            group.permissions.add(*permissions)
+
+    def create_super_insurance_group(self):
+        group, created = Group.objects.get_or_create(name=constants['SUPER_INSURANCE_GROUP'])
+        group.permissions.clear()
+
+        content_types = ContentType.objects.get_for_models(Insurer, InsuranceDisease, InsurerAccount,
+                                                           InsurancePlanContent, InsurancePlans, InsuranceCity,
+                                                           StateGSTCode, InsuranceDistrict, InsuranceThreshold,
+                                                           UserInsurance, InsuranceDeal, InsuranceLead,
+                                                           InsuranceTransaction, InsuranceDiseaseResponse,
+                                                           InsuredMembers, InsurerPolicyNumber, InsuranceCancelMaster)
 
         for cl, ct in content_types.items():
             permissions = Permission.objects.filter(

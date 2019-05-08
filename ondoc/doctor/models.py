@@ -238,6 +238,7 @@ class Hospital(auth_model.TimeStampedModel, auth_model.CreatedByModel, auth_mode
     enabled_for_prepaid = models.BooleanField(default=True)
     is_location_verified = models.BooleanField(verbose_name='Location Verified', default=False)
     auto_ivr_enabled = models.BooleanField(default=True)
+    priority_score = models.IntegerField(default=0, null=False, blank=False)
 
     def __str__(self):
         return self.name
@@ -253,6 +254,54 @@ class Hospital(auth_model.TimeStampedModel, auth_model.CreatedByModel, auth_mode
     #         self.city_search_key = search_city
     #         return self.city
     #     return None
+    @classmethod
+    def get_hosp_and_locality_dict(cls, temp_hospital_ids, required_identifier):
+        if not temp_hospital_ids:
+            return {}, {}
+        from ondoc.location.models import EntityUrls
+        hosp_entity_qs = list(EntityUrls.objects.filter(is_valid=True,
+                                                        sitemap_identifier=EntityUrls.SitemapIdentifier.HOSPITAL_PAGE,
+                                                        entity_id__in=temp_hospital_ids))
+        locality_city_dict = {(x.sublocality_value.lower(), x.locality_value.lower()): None for x in hosp_entity_qs if
+                              x.sublocality_value and x.locality_value}
+        hosp_locality_entity_qs = []
+        if locality_city_dict:
+            hosp_locality_entity_qs = list(EntityUrls.objects.filter(is_valid=True,
+                                                                     sitemap_identifier=required_identifier,
+                                                                     sublocality_value__iregex=r'(' + '|'.join(
+                                                                         [x[0] for x in
+                                                                          locality_city_dict.keys()]) + ')',
+                                                                     locality_value__iregex=r'(' + '|'.join(
+                                                                         [x[1] for x in
+                                                                          locality_city_dict.keys()]) + ')'))
+        for x in hosp_locality_entity_qs:
+            if x.sublocality_value and x.locality_value:
+                locality_city_dict[(x.sublocality_value.lower(), x.locality_value.lower())] = x.url
+        hosp_entity_dict = {x.entity_id: x.url for x in hosp_entity_qs}
+        hosp_locality_entity_dict = {
+            x.entity_id: locality_city_dict.get((x.sublocality_value.lower(), x.locality_value.lower()), None) for x in
+            hosp_entity_qs if x.sublocality_value and x.locality_value}
+        return hosp_entity_dict, hosp_locality_entity_dict
+
+    @classmethod
+    def update_hospital_seo_urls(cls):
+
+        from ondoc.location.management.commands import map_hospital_geocoding_results, map_entity_address, \
+            calculate_centroid, map_hosp_entity_location_relations, hospital_urls
+        # map hospital geocoding results
+        #map_hospital_geocoding_results.map_hospital_geocoding_results()
+
+        # map entity address
+        #map_entity_address.map_entity_address()
+
+        # calculate centroid
+        #calculate_centroid.calculate_centroid()
+
+        # map hospital entity location relations
+        #map_hosp_entity_location_relations.map_hosp_entity_location_relations()
+
+        # update search and profile urls
+        hospital_urls.hospital_urls()
 
     @classmethod
     def update_city_search(cls):
@@ -622,6 +671,7 @@ class Doctor(auth_model.TimeStampedModel, auth_model.QCModel, SearchKey, auth_mo
     remark = GenericRelation(Remark)
     rating_data = JSONField(blank=True, null=True)
     qr_code = GenericRelation(QRCode, related_name="qrcode")
+    priority_score = models.IntegerField(default=0, null=False, blank=False)
 
     def __str__(self):
         return '{} ({})'.format(self.name, self.id)
@@ -630,6 +680,32 @@ class Doctor(auth_model.TimeStampedModel, auth_model.QCModel, SearchKey, auth_mo
     @cached_property
     def is_enabled_for_insurance(self):
         return self.is_insurance_enabled
+
+    @classmethod
+    def update_insured_doctors(cls):
+
+        delete_query = RawSql(''' delete from insurance_covered_entity where type='doctor' ''', []).execute()
+
+        query = '''  insert into insurance_covered_entity(entity_id,name ,location, type, search_key, data,created_at,updated_at) 
+        select doctor_id as entity_id, doctor_name as name, location ,'doctor' as type,search_key,
+        json_build_object('id',doctor_id, 'type','doctor','name', doctor_name,'city', city,'url', url,'hospital_name',hospital_name), now(), now() from
+        (select distinct d.id doctor_id, h.id hospital_id, d.name doctor_name, h.city, eu.url, h.name hospital_name,
+        h.location, d.search_key
+        from doctor d 
+        inner join entity_urls eu on eu.entity_id = d.id and sitemap_identifier = 'DOCTOR_PAGE' and eu.is_valid=true
+        inner join doctor_practice_specialization dps on dps.doctor_id = d.id 
+        inner join practice_specialization ps on ps.id = dps.specialization_id and ps.is_insurance_enabled=true
+        inner join doctor_clinic dc on d.id = dc.doctor_id 
+        inner join doctor_clinic_timing dct on dct.doctor_clinic_id = dc.id and dct.mrp<=1500
+        inner join hospital h on h.id = dc.hospital_id 
+        where d.is_live=true and  d.enabled_for_online_booking=true 
+        and  d.is_test_doctor=false and d.is_internal=false and d.is_insurance_enabled=true
+        and dc.enabled=true and dc.enabled_for_online_booking=true
+        and h.enabled_for_online_booking=true and h.enabled_for_prepaid=true and h.is_live=true
+        and h.location is not null
+        )x '''
+
+        update_insured_doctors = RawSql(query, []).execute()
 
     @classmethod
     def get_insurance_details(cls, user):
@@ -847,29 +923,33 @@ class Doctor(auth_model.TimeStampedModel, auth_model.QCModel, SearchKey, auth_mo
 
     def generate_sticker(self):
 
-        thumbnail = None
-        for image in self.images.all():
-            if image.cropped_image:
-                thumbnail = image.cropped_image
+        # thumbnail = None
+        # for image in self.images.all():
+        #     if image.cropped_image:
+        #         thumbnail = image.cropped_image
 
-                break
+        #         break
+        # if not thumbnail:
+        #     return
+
+        thumbnail = self.images.exclude(cropped_image__isnull=True).exclude(cropped_image__exact='').first()
         if not thumbnail:
             return
+        qrcode = self.qr_code.all().first()
+        # for qrcode in self.qr_code.all():
+        #     if qrcode:
+        #         qrcode = default_storage.path(qrcode.name)
+        #         break
 
-        qrcode = None
-        for qrcode in self.qr_code.all():
-            if qrcode:
-                qrcode = default_storage.path(qrcode.name)
-                break
-
-        template_url = staticfiles_storage.path('web/images/qr_image.png')
-        template = Image.open(template_url)
-
-
-        thumbnail = default_storage.path(thumbnail)
+        #template_url = staticfiles_storage.path('web/images/qr_image.png')
+        template = Image.open(staticfiles_storage.open('web/images/qr_image.png'))
         print(thumbnail)
-        doctor_image = Image.open(thumbnail)
-        qrcode_image = Image.open(qrcode)
+
+
+        #thumbnail = default_storage.path(thumbnail)
+        #print(thumbnail)
+        doctor_image = Image.open(thumbnail.cropped_image)
+        qrcode_image = Image.open(qrcode.name)
 
         # im = Image.open('avatar.jpg')
         # im = im.resize((120, 120));
@@ -903,20 +983,30 @@ class Doctor(auth_model.TimeStampedModel, auth_model.QCModel, SearchKey, auth_mo
         canvas.paste(template, (0,0))
         # doctor_image = doctor_image.resize((200, 200), Image.ANTIALIAS)
         canvas.paste(doctor_image, (390, 300), doctor_image)
-        canvas.save('overlap.png')
+        #canvas.save('overlap.png')
         qrcode_image = qrcode_image.resize((530, 530), Image.ANTIALIAS)
         canvas.paste(qrcode_image, (215, 830))
 
         blank_image = Image.new('RGBA', (1000, 1000), 'white') # this new image is created to write text and paste on canvas
         img_draw = ImageDraw.Draw(canvas)
-        font_url = staticfiles_storage.path('web/images/.fonts/ProspectusPro-Desktop-v1-002/ProspectusSBld.otf')
-        font = ImageFont.truetype(font_url, 40)
-        img_draw.text((350, 530), self.name, fill='black', font=font)
+        #font_url = staticfiles_storage.path('web/fonts/ProspectusPro-Desktop-v1-002/ProspectusSBld.otf')
+
+        font = ImageFont.truetype(staticfiles_storage.open('web/fonts/ProspectusPro-Desktop-v1-002/ProspectusSBld.otf'), 40)
+
+        w, h = img_draw.textsize(self.name, font=font)
+
+        img_draw.text(((992-w)/2,530), self.name, fill="black", font=font)
+        #img_draw.text((350,530), self.name, fill="black", font=font)
+        #im.save("hello.png", "PNG")
+
+
+
+        #img_draw.text((350, 530), self.name, fill='black', font=font)
         # md5_hash = hashlib.md5(canvas.tobytes()).hexdigest()
 
         tempfile_io = BytesIO()
         canvas.save(tempfile_io, format='JPEG')
-        filename = "doctor_sticker_{}_{}.jpeg".format('id:' + str(self.id),
+        filename = "doctor_sticker_{}_{}.jpeg".format(str(self.id),
                                               random.randint(1111111111, 9999999999))
 
         image_file1 = InMemoryUploadedFile(tempfile_io, None, filename, 'image/jpeg', tempfile_io.tell(), None)
@@ -924,6 +1014,18 @@ class Doctor(auth_model.TimeStampedModel, auth_model.QCModel, SearchKey, auth_mo
         sticker = DoctorSticker(name=image_file1, doctor=self)
         sticker.save()
         return sticker
+
+    def is_doctor_specialization_insured(self):
+        doctor_specializations = DoctorPracticeSpecialization.objects.filter(doctor=self).values_list('specialization_id', flat=True)
+        if not doctor_specializations:
+            return False
+        for specialization in doctor_specializations:
+            practice_specialization = PracticeSpecialization.objects.filter(id=specialization).first()
+            if not practice_specialization:
+                return False
+            if not practice_specialization.is_insurance_enabled:
+                return False
+        return True
 
     class Meta:
         db_table = "doctor"
@@ -1328,10 +1430,27 @@ class DoctorDocument(auth_model.TimeStampedModel, auth_model.Document):
 class HospitalImage(auth_model.TimeStampedModel, auth_model.Image):
     hospital = models.ForeignKey(Hospital, on_delete=models.CASCADE)
     name = models.ImageField(upload_to='hospital/images', height_field='height', width_field='width')
+    cropped_image = models.ImageField(upload_to='hospital/images', height_field='height', width_field='width',
+                                      blank=True, null=True)
     cover_image = models.BooleanField(default=False, verbose_name="Can be used as Hospital's cover image?")
 
     class Meta:
         db_table = "hospital_image"
+
+    def use_image_name(self):
+        return True
+
+    def get_image_name(self):
+        name = self.hospital.name
+        return slugify(name)
+
+    def auto_generate_thumbnails(self):
+        return True
+
+    def save(self, *args, **kwargs):
+        super().save(*args, **kwargs)
+        self.create_thumbnail()
+
 
 
 class HospitalDocument(auth_model.TimeStampedModel, auth_model.Document):
@@ -1354,6 +1473,13 @@ class HospitalDocument(auth_model.TimeStampedModel, auth_model.Document):
 
     class Meta:
         db_table = "hospital_document"
+
+    def use_image_name(self):
+        return True
+
+    def get_image_name(self):
+        name = self.hospital.name
+        return slugify(name)
 
 
 class Language(auth_model.TimeStampedModel, UniqueNameModel):
@@ -1519,6 +1645,7 @@ class HospitalNetwork(auth_model.TimeStampedModel, auth_model.CreatedByModel, au
     matrix_lead_id = models.BigIntegerField(blank=True, null=True, unique=True)
     remark = GenericRelation(Remark)
     auto_ivr_enabled = models.BooleanField(default=True)
+    priority_score = models.IntegerField(default=0, null=False, blank=False)
 
     def update_time_stamps(self):
         if self.welcome_calling_done and not self.welcome_calling_done_at:
@@ -1830,7 +1957,7 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
 
     def sync_with_booking_analytics(self):
 
-        promo_cost = self.deal_price - self.effective_price if self.deal_price and self.effective_price else None
+        promo_cost = self.deal_price - self.effective_price if self.deal_price and self.effective_price else 0
         department = None
         if self.doctor:
             if self.doctor.doctorpracticespecializations.first():
@@ -1851,7 +1978,8 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
             obj.PaymentType = self.payment_type if self.payment_type else None
             obj.Payout = self.fees
             obj.CashbackUsed = cashback
-        obj.PromoCost = promo_cost
+            obj.BookingDate = self.created_at
+        obj.PromoCost = max(0, promo_cost)
         obj.GMValue = self.deal_price
         obj.StatusId = self.status
         obj.save()
@@ -2144,6 +2272,7 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
         payout_data = {
             "charged_amount" : self.effective_price,
             "payable_amount" : self.fees,
+            "booking_type"   : Order.DOCTOR_PRODUCT_ID
         }
 
         merchant_payout = MerchantPayout.objects.create(**payout_data)
@@ -2399,16 +2528,16 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
         payment_type = data.get("payment_type")
         effective_price = price_data.get("effective_price")
         cart_data = data.get('cart_item').data
-        is_appointment_insured = cart_data.get('is_appointment_insured', None)
-        insurance_id = cart_data.get('insurance_id', None)
-        # user_insurance = UserInsurance.objects.filter(user=user).last()
-        # if user_insurance:
-        #     insurance_validate_dict = user_insurance.validate_insurance(data)
-        #     is_appointment_insured = insurance_validate_dict['is_insured']
-        #     insurance_id = insurance_validate_dict['insurance_id']
-        #     insurance_message = insurance_validate_dict['insurance_message']
+        # is_appointment_insured = cart_data.get('is_appointment_insured', None)
+        # insurance_id = cart_data.get('insurance_id', None)
 
-        if is_appointment_insured:
+        is_appointment_insured = False
+        insurance_id = None
+        user_insurance = UserInsurance.objects.filter(user=user).last()
+        if user_insurance and user_insurance.is_valid():
+            is_appointment_insured, insurance_id, insurance_message = user_insurance.validate_doctor_insurance(data, user_insurance)
+
+        if is_appointment_insured and cart_data.get('is_appointment_insured', None):
             payment_type = OpdAppointment.INSURANCE
             effective_price = 0.0
         else:
@@ -2495,6 +2624,17 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
                                                  user=self.user, triggered_at=datetime.datetime.utcnow())
         except Exception as e:
             logger.error("Could not save triggered event - " + str(e))
+
+    @classmethod
+    def get_insured_completed_appointment(cls, insurance_obj):
+        count = cls.objects.filter(user=insurance_obj.user, insurance=insurance_obj, status=cls.COMPLETED).count()
+        return count
+
+    @classmethod
+    def get_insured_active_appointment(cls, insurance_obj):
+        appointments = cls.objects.filter(~Q(status=cls.COMPLETED), ~Q(status=cls.CANCELLED), user=insurance_obj.user,
+                                          insurance=insurance_obj)
+        return appointments
 
 
 class OpdAppointmentProcedureMapping(models.Model):
@@ -2746,6 +2886,7 @@ class PracticeSpecialization(auth_model.TimeStampedModel, SearchKey):
                                             null=True, blank=True)
     synonyms = models.CharField(max_length=4000, null=True, blank=True)
     doctor_count = models.PositiveIntegerField(default=0, null=True)
+    is_insurance_enabled = models.BooleanField(default=True)
 
     class Meta:
         db_table = 'practice_specialization'
@@ -2800,6 +2941,8 @@ class SourceIdentifier(auth_model.TimeStampedModel):
 class GoogleDetailing(auth_model.TimeStampedModel):
 
     identifier = models.CharField(max_length=255, null=True, blank=False)
+    hospital_id = models.PositiveIntegerField(null=True, blank=True)
+
     name = models.CharField(max_length=500, null=True, blank=False)
     clinic_hospital_name = models.CharField(max_length=128, null=True, blank=False)
     address = models.TextField(null=True, blank=False)
@@ -3057,9 +3200,11 @@ class OfflineOPDAppointments(auth_model.TimeStampedModel):
 
 class SearchScore(auth_model.TimeStampedModel):
     doctor = models.ForeignKey(Doctor, on_delete=models.CASCADE)
-    popularity_score = models.PositiveIntegerField(default=None, null=True)
+    popularity_score = models.FloatField(default=None, null=True)
     years_of_experience_score = models.PositiveIntegerField(default=None, null=True)
     doctors_in_clinic_score = models.PositiveIntegerField(default=None, null=True)
+    avg_ratings_score = models.PositiveIntegerField(default=None, null=True)
+    ratings_count_score = models.PositiveIntegerField(default=None, null=True)
     final_score = models.FloatField(default=None, null=True)
 
     class Meta:

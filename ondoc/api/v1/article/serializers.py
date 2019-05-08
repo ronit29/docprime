@@ -46,6 +46,7 @@ class ArticleRetrieveSerializer(serializers.ModelSerializer):
     last_updated_at = serializers.SerializerMethodField()
     comments = serializers.SerializerMethodField()
     body_doms = serializers.SerializerMethodField()
+    recent_articles = serializers.SerializerMethodField()
 
     def get_comments(self, obj):
         comments = FluentComment.objects.filter(object_pk=str(obj.id), parent_id=None, is_public=True)
@@ -82,7 +83,7 @@ class ArticleRetrieveSerializer(serializers.ModelSerializer):
 
     def get_icon(self, obj):
         request = self.context.get('request')
-        return request.build_absolute_uri(obj.icon.url) if hasattr(obj, 'icon') and obj.icon.name else None
+        return request.build_absolute_uri(obj.icon.url) if hasattr(obj, 'icon') and obj.icon and obj.icon.url else None
 
     def get_seo(self, obj):
         request = self.context.get('request')
@@ -173,10 +174,18 @@ class ArticleRetrieveSerializer(serializers.ModelSerializer):
         if search_widget_tag:
             obj.append(self.format_widget(search_widget_tag))
 
+    def get_recent_articles(self, obj):
+        request = self.context.get('request')
+        article_data = Article.objects.prefetch_related('category', 'author').exclude(pk=obj.id).filter(is_published=True)
+        recent_articles_data = article_data.order_by('-updated_at')[:10]
+        recent_articles = ArticleListSerializer(recent_articles_data, many=True,context={'request': request}).data
+        recent_articles_dict = {'title': 'Recent Articles', 'items': recent_articles}
+        return recent_articles_dict
+
     class Meta:
         model = Article
         fields = ('title','heading_title', 'url', 'body_doms', 'body', 'icon', 'id', 'seo', 'header_image', 'header_image_alt', 'category',
-                  'linked', 'author_name', 'published_date', 'author', 'last_updated_at', 'comments')
+                  'linked', 'author_name', 'published_date', 'author', 'last_updated_at', 'comments', 'recent_articles')
 
 
 class ArticleListSerializer(serializers.ModelSerializer):
@@ -187,7 +196,7 @@ class ArticleListSerializer(serializers.ModelSerializer):
 
     def get_icon(self, obj):
         request = self.context.get('request')
-        return request.build_absolute_uri(obj.icon.url) if hasattr(obj, 'icon') and obj.icon.name else None
+        return request.build_absolute_uri(obj.icon.url) if hasattr(obj, 'icon') and obj.icon and obj.icon.url else None
 
     def get_url(self, obj):
         return obj.url if hasattr(obj, 'url') else None
