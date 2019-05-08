@@ -300,6 +300,14 @@ class LabList(viewsets.ReadOnlyModelViewSet):
         if max_price:
             filter_query += ' and case when custom_deal_price is not null then custom_deal_price<=%(max_price)s else computed_deal_price<=%(max_price)s end '
             params['max_price'] = str(max_price)
+        if home_visit and not lab_visit:
+            filter_query += ' and is_home_collection_enabled = True and home_collection_possible = True '
+        if lab_visit and not home_visit:
+            filter_query += ' and is_home_collection_enabled = False and home_collection_possible = False '
+        if avg_ratings:
+            filter_query += " and (case when rating_data is not null then(rating_data->> 'avg_rating')::float > (%(avg_ratings)s) end) "
+            params['avg_ratings'] = max(avg_ratings)
+
         if valid_package_ids is not None:
             filter_query += ' and lab_test.id IN('
             counter = 1
@@ -1336,11 +1344,11 @@ class LabList(viewsets.ReadOnlyModelViewSet):
             filtering_query.append("(case when rating_data is not null then(rating_data->> 'avg_rating')::float > (%(avg_ratings)s) end)")
             filtering_params['avg_ratings'] = max(avg_ratings)
 
-        if home_visit:
-            filtering_query.append("is_home_collection_enabled = True")
-
-        if lab_visit:
-            filtering_query.append("is_home_collection_enabled = False")
+        if ids:
+            if home_visit and not lab_visit:
+                filtering_query.append('  is_home_collection_enabled = True and home_collection_possible = True ')
+            if lab_visit and not home_visit:
+                filtering_query.append('  is_home_collection_enabled = False and home_collection_possible = False ')
 
         if availability:
             start_day = Date.today().weekday()
@@ -1433,7 +1441,7 @@ class LabList(viewsets.ReadOnlyModelViewSet):
                         and St_dwithin( St_setsrid(St_point((%(longitude)s), (%(latitude)s)), 4326),lb.location, (%(max_distance)s)) 
                         and St_dwithin(St_setsrid(St_point((%(longitude)s), (%(latitude)s)), 4326), lb.location,  (%(min_distance)s)) = false 
                         and avlt.enabled = True 
-                        inner join lab_test lt on lt.id = avlt.test_id and lt.enable_for_retail=True 
+                        inner join lab_test lbt on lbt.id = avlt.test_id and lbt.enable_for_retail=True 
                          where 1=1 {filter_query_string}
 
                         group by lb.id having count(*)=(%(length)s))a
