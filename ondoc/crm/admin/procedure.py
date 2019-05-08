@@ -11,7 +11,7 @@ from ondoc.common.models import Feature, Service
 from ondoc.crm.admin.doctor import AutoComplete
 from ondoc.procedure.models import Procedure, ProcedureCategory, ProcedureCategoryMapping, ProcedureToCategoryMapping, \
     IpdProcedure, IpdProcedureFeatureMapping, IpdProcedureCategoryMapping, IpdProcedureCategory, IpdProcedureDetail, \
-    IpdProcedureSynonym, IpdProcedureSynonymMapping
+    IpdProcedureSynonym, IpdProcedureSynonymMapping, SimilarIpdProcedureMapping
 from django import forms
 
 
@@ -145,6 +145,15 @@ class IpdProcedureSynonymMappingInline(TabularInline):
     verbose_name_plural = "IPD Procedure Synonyms"
 
 
+class SimilarIpdProcedureMappingInline(TabularInline):
+    model = SimilarIpdProcedureMapping
+    autocomplete_fields = ['similar_ipd_procedure']
+    fk_name = 'ipd_procedure'
+    extra = 0
+    can_delete = True
+    verbose_name = "Similar IPD Procedure"
+    verbose_name_plural = "Similar IPD Procedure Synonyms"
+
 
 class IpdCategoryInline(AutoComplete, TabularInline):
     model = IpdProcedureCategoryMapping
@@ -172,7 +181,8 @@ class IpdProcedureAdmin(VersionAdmin):
     model = IpdProcedure
     search_fields = ['search_key']
     exclude = ['search_key']
-    inlines = [IpdCategoryInline, FeatureInline, DetailInline, IpdProcedureSynonymMappingInline]
+    inlines = [IpdCategoryInline, FeatureInline, DetailInline, IpdProcedureSynonymMappingInline,
+               SimilarIpdProcedureMappingInline]
 
     def delete_view(self, request, object_id, extra_context=None):
         obj = self.model.objects.filter(id=object_id).first()
