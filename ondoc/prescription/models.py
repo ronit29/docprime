@@ -149,6 +149,16 @@ class PresccriptionPdf(auth_models.TimeStampedModel):
         return self.medicines
 
     def get_pdf(self, appointment):
+
+        doctor_number = ''
+        if appointment.doctor.doctor_number:
+            doctor_numbers = appointment.doctor.doctor_number.all()
+            hospital = appointment.hospital
+            for number in doctor_numbers:
+                if number.hospital == hospital:
+                    doctor_number = number.phone_number
+                    break
+
         pdf_dict = {'medicines': self.get_medicines(),
                     # 'medicines': self.medicines if self.medicines else [],
                     'special_instructions': self.special_instructions if self.special_instructions else [],
@@ -156,11 +166,12 @@ class PresccriptionPdf(auth_models.TimeStampedModel):
                     'serial_id': self.serial_id,
                     'symptoms_complaints': self.symptoms_complaints if self.symptoms_complaints else [],
                     'diagnoses': self.diagnoses if self.diagnoses else [],
-                    'doc_name': appointment.doctor.name,
-                    'hosp_name':  appointment.hospital.name,
+                    'doc_name': appointment.doctor.name if appointment.doctor.name else '',
+                    'doctor_number': doctor_number,
+                    'hosp_name':  appointment.hospital.name if appointment.hospital.name else '',
                     'tests': self.lab_tests if self.lab_tests else [],
                     'patient': self.patient_details,
-                    'hosp_address': appointment.hospital.get_hos_address(),
+                    'hosp_address': appointment.hospital.get_hos_address() if appointment.hospital.get_hos_address() else '',
                     'doc_qualification': ','.join([str(h.qualification) for h in appointment.doctor.qualifications.all()]),
                     'doc_reg': appointment.doctor.license,
                     'date': self.created_at.strftime('%d %B %Y'),

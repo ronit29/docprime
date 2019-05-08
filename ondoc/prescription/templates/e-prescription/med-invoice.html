@@ -30,9 +30,9 @@
 							<td style="width: 300px;">
 								<p style="margin: 0px; color: #000000; font-size:18px; font-weight: 700; padding-bottom: 10px;">Dr. {{ doc_name }}</p>
 								<p style="margin: 0px; color: #000000; font-size:14px; "></p>
-								<p style="margin: 0px; color: #000000; font-size:14px; ">{{ doc_qualification }} </p>
+								<p style="margin: 0px; color: #000000; font-size:14px; ">{% if doc_qualification %}{{ doc_qualification }}{% endif %} </p>
 								<p style="margin: 0px; color: #000000; font-size:14px; ">Registration No: {{ doc_reg }}</p>
-								<p style="margin: 0px; color: #000000; font-size:14px; ">+91- 987654321</p>
+								<p style="margin: 0px; color: #000000; font-size:14px; ">{{ doctor_number }}</p>
 								<p style="margin: 0px; color: #000000; font-size:14px; ">{{ hosp_name }}</p>
 								<p style="margin: 0px; color: #000000; font-size:14px; ">{{ hosp_address }}</p>
 							</td>
@@ -46,8 +46,8 @@
 					<table border="0" cellpadding="0" cellspacing="0" width="600" style="padding: 10px; border-top: 1px solid #b9b6b6;">
 						<tr>
 							<td style="width: 70%">
-								<p style="margin: 0px;color: #000000; font-size: 16px; font-weight: 600;padding-bottom: 3px;">Mr. {{ patient.name }}, {{ patient.age }}, {{ patient.gender }}</p>
-								<p style="margin: 0px;color: #000000; font-size: 14px;">+91- {{ patient.phone_number }}</p>
+								<p style="margin: 0px;color: #000000; font-size: 16px; font-weight: 600;padding-bottom: 3px;">{% if patient.name %}{{ patient.name }}{% endif %}{% if patient.age %}, {{ patient.age }}{% endif %}{% if patient.gender %}, {{ patient.gender }}{% endif %}</p>
+								<p style="margin: 0px;color: #000000; font-size: 14px;">{% if patient.phone_number %}{{ patient.phone_number }}{% endif %}</p>
 							</td>
 							<td style="width: 30%">
 								<p style="margin: 0px;color: #000000; font-size: 16px; font-weight: 600;padding-bottom: 3px;">{{ date }}</p>
