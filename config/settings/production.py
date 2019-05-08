@@ -51,7 +51,7 @@ LOGGING = {
     'disable_existing_loggers': True,
     'root': {
         'level': 'WARNING',
-        'handlers': ['sentry', ],
+        'handlers': ['console', ],
     },
     'formatters': {
         'verbose': {
@@ -89,13 +89,13 @@ LOGGING = {
         },
     },
 }
+SENTRY_DSN = env('DJANGO_SENTRY_DSN')
 
 if env('ENABLE_SENTRY', default=False):
     INSTALLED_APPS += ('raven.contrib.django.raven_compat',)
     RAVEN_MIDDLEWARE = ['raven.contrib.django.raven_compat.middleware.SentryResponseErrorIdMiddleware']
     MIDDLEWARE = RAVEN_MIDDLEWARE + MIDDLEWARE
     # Sentry Configuration
-    SENTRY_DSN = env('DJANGO_SENTRY_DSN')
     SENTRY_CLIENT = env('DJANGO_SENTRY_CLIENT', default='raven.contrib.django.raven_compat.DjangoClient')
     SENTRY_CELERY_LOGLEVEL = env.int('DJANGO_SENTRY_LOG_LEVEL', logging.INFO)
     RAVEN_CONFIG = {
@@ -108,6 +108,7 @@ if env('ENABLE_SENTRY', default=False):
                                     'class': 'raven.contrib.django.raven_compat.handlers.SentryHandler',
                                      }
     LOGGING['loggers']['django.security.DisallowedHost']['handlers'] = ['console', 'sentry', ]
+    LOGGING['root']['handlers'] = ['sentry', ]
 
 
 EMAIL_HOST = env('EMAIL_HOST')
@@ -151,7 +152,6 @@ AWS_HEADERS = {
 AWS_S3_OBJECT_PARAMETERS = {
     'CacheControl': 'max-age=31536000',
 }
-
 
 RATING_SMS_NOTIF=env('RATING_SMS_NOTIF_PRD', default=86400)
 THYROCARE_NETWORK_ID = 43

@@ -29,7 +29,7 @@ from django.db.models import F, Sum, When, Case, Q, Avg
 from django.db import transaction
 from django.contrib.postgres.fields import JSONField
 from ondoc.doctor.models import OpdAppointment
-from ondoc.notification.models import EmailNotification
+from ondoc.notification.models import EmailNotification, NotificationAction
 from ondoc.payout.models import Outstanding
 from ondoc.authentication import models as auth_model
 from django.core.files.uploadedfile import InMemoryUploadedFile, TemporaryUploadedFile
@@ -63,6 +63,7 @@ from decimal import Decimal
 from django.utils.text import slugify
 from django.utils.functional import cached_property
 #from ondoc.api.v1.diagnostic import serializers as diagnostic_serializers
+from ondoc.common.helper import Choices
 
 logger = logging.getLogger(__name__)
 
@@ -288,6 +289,25 @@ class Lab(TimeStampedModel, CreatedByModel, QCModel, SearchKey, WelcomeCallingDo
     @cached_property
     def is_enabled_for_insurance(self):
         return self.is_insurance_enabled
+
+    @classmethod
+    def update_insured_labs(cls):
+
+        delete_query = RawSql(''' delete from insurance_covered_entity where type='lab' ''', []).execute()
+
+        query = '''
+                    insert into insurance_covered_entity(entity_id,name ,location, type, search_key, data,created_at,updated_at)
+                    select lab_id as entity_id, lab_name as name, location ,'lab' as type,search_key,
+                    json_build_object('id', lab_id, 'type','lab','name', lab_name, 'city', city,'url', url), now(), now() from
+                    (select distinct lb.id lab_id, lb.name lab_name, lb.city, eu.url,
+                    lb.location, lb.search_key
+                    from lab lb inner join available_lab_test avlt on
+                    lb.lab_pricing_group_id = avlt.lab_pricing_group_id  and avlt.enabled = True and avlt.mrp<=1500
+                    and lb.is_test_lab = False and lb.is_live = True and lb.lab_pricing_group_id is not null 
+                    inner join lab_test lt on lt.id = avlt.test_id and lt.enable_for_retail=True 
+                    inner join entity_urls eu on eu.entity_id = lb.id and sitemap_identifier = 'LAB_PAGE' and eu.is_valid=true
+                    )x '''
+        update_insured_labs = RawSql(query, []).execute()
 
     def open_for_communications(self):
         if (self.network and self.network.open_for_communication) or (not self.network and self.open_for_communication):
@@ -1318,6 +1338,8 @@ class AvailableLabTest(TimeStampedModel):
     desired_docprime_price = models.DecimalField(default=None, max_digits=10, decimal_places=2, null=True, blank=True)
     rating = GenericRelation(ratings_models.RatingsReview)
 
+    def get_deal_price(self):
+        return self.custom_deal_price if self.custom_deal_price else self.computed_deal_price
 
     def update_deal_price(self):
         # will update only this available lab test prices and will be called on save
@@ -1392,6 +1414,17 @@ class AvailableLabTest(TimeStampedModel):
 
     def app_commit_tasks(self):
         self.update_deal_price()
+
+    def send_pricing_alert_email(self, responsible_user):
+        from ondoc.communications.models import EMAILNotification
+        try:
+            emails = settings.DEAL_AGREED_PRICE_CHANGE_EMAILS
+            user_and_email = [{'user': None, 'email': email} for email in emails]
+            email_notification = EMAILNotification(notification_type=NotificationAction.PRICING_ALERT_EMAIL,
+                                                   context={'instance': self, 'responsible_user': responsible_user})
+            email_notification.send(user_and_email)
+        except Exception as e:
+            logger.error(str(e))
 
     def get_computed_deal_price(self):
         if self.test.test_type == LabTest.RADIOLOGY:
@@ -1535,23 +1568,24 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin,
 
     
     def get_city(self):
-        if self.lab and self.lab.city:
-            return self.lab.city.id
+        if self.lab and self.lab.matrix_city:
+            return self.lab.matrix_city.id
         else:
             return None
 
     def get_state(self):
-        if self.lab and self.lab.state:
-            return self.lab.state.id
+        if self.lab and self.lab.matrix_state:
+            return self.lab.matrix_state.id
         else:
             return None
 
     def sync_with_booking_analytics(self):
 
         category = None
-        if self.lab_test.first():
-            if self.lab_test.first().test.is_package == True:
+        for t in self.tests.all():
+            if t.is_package == True:
                 category = 1
+                break
             else:
                 category = 0
 
@@ -1561,8 +1595,8 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin,
         if not obj:
             obj = DP_OpdConsultsAndTests()
             obj.Appointment_Id = self.id
-            # obj.CityId = self.get_city()
-            # obj.StateId = self.get_state()
+            obj.CityId = self.get_city()
+            obj.StateId = self.get_state()
             obj.ProviderId = self.lab.id
             obj.TypeId = 2
             obj.PaymentType = self.payment_type if self.payment_type else None
@@ -1903,6 +1937,7 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin,
         payout_data = {
             "charged_amount" : self.effective_price,
             "payable_amount" : payout_amount,
+            "booking_type": Order.LAB_PRODUCT_ID
         }
 
         merchant_payout = MerchantPayout.objects.create(**payout_data)
@@ -2229,16 +2264,16 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin,
         payment_type = data.get("payment_type")
         effective_price = price_data.get("effective_price")
         cart_data = data.get('cart_item').data
-        is_appointment_insured = cart_data.get('is_appointment_insured', None)
-        insurance_id = cart_data.get('insurance_id', None)
-        # user_insurance = UserInsurance.objects.filter(user=user).last()
-        # if user_insurance:
-        #     insurance_validate_dict = user_insurance.validate_insurance(data)
-        #     is_appointment_insured = insurance_validate_dict['is_insured']
-        #     insurance_id = insurance_validate_dict['insurance_id']
-        #     insurance_message = insurance_validate_dict['insurance_message']
+        # is_appointment_insured = cart_data.get('is_appointment_insured', None)
+        # insurance_id = cart_data.get('insurance_id', None)
 
-        if is_appointment_insured:
+        is_appointment_insured = False
+        insurance_id = None
+        user_insurance = UserInsurance.objects.filter(user=user).order_by('-id').first()
+        if user_insurance and user_insurance.is_valid():
+            is_appointment_insured, insurance_id, insurance_message = user_insurance.validate_lab_insurance(data, user_insurance)
+
+        if is_appointment_insured and cart_data.get('is_appointment_insured', None):
             payment_type = OpdAppointment.INSURANCE
             effective_price = 0.0
         else:
@@ -2337,6 +2372,17 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin,
     def __str__(self):
         return "{}, {}".format(self.profile.name if self.profile else "", self.lab.name)
 
+    @classmethod
+    def get_insured_completed_appointment(cls, insurance_obj):
+        count = cls.objects.filter(user=insurance_obj.user, insurance=insurance_obj, status=cls.COMPLETED).count()
+        return count
+
+    @classmethod
+    def get_insured_active_appointment(cls, insurance_obj):
+        appointments = cls.objects.filter(~Q(status=cls.COMPLETED), ~Q(status=cls.CANCELLED), user=insurance_obj.user,
+                                          insurance=insurance_obj)
+        return appointments
+
     class Meta:
         db_table = "lab_appointment"
 
@@ -2358,6 +2404,8 @@ class CommonPackage(TimeStampedModel):
     package = models.ForeignKey(LabTest, on_delete=models.CASCADE, related_name='commonpackage')
     icon = models.ImageField(upload_to='diagnostic/common_package_icons', null=True)
     priority = models.PositiveIntegerField(default=0)
+    lab = models.ForeignKey(Lab, on_delete=models.CASCADE, related_name='packagelab', null=True)
+
     def __str__(self):
         return "{}-{}".format(self.package.name, self.id)
 
@@ -2525,10 +2573,26 @@ class LabDocument(TimeStampedModel, Document):
             self.resize_image(width, height)
 
     def save(self, *args, **kwargs):
+        database_instance = LabDocument.objects.filter(pk=self.id).first()
         super().save(*args, **kwargs)
         if self.document_type == LabDocument.LOGO:
             self.create_all_images()
 
+            if database_instance and database_instance.name == self.name:
+                pass
+            else:
+                self.send_change_logo_email()
+
+    def send_change_logo_email(self):
+        from ondoc.communications.models import EMAILNotification
+        try:
+            emails = settings.LOGO_CHANGE_EMAIL_RECIPIENTS
+            user_and_email = [{'user': None, 'email': email} for email in emails]
+            email_notification = EMAILNotification(notification_type=NotificationAction.LAB_LOGO_CHANGE_MAIL,
+                                                   context={'instance': self})
+            email_notification.send(user_and_email)
+        except Exception as e:
+            logger.error(str(e))
 
     # def __str__(self):
         # return self.name
@@ -2701,3 +2765,30 @@ class TestParameterChat(TimeStampedModel):
     class Meta:
         db_table = 'test_parameter_chat'
 
+
+class LabTestThresholds(TimeStampedModel):
+    class Colour(Choices):
+        RED = 'RED'
+        GREEN = 'GREEN'
+        ORANGE = 'ORANGE'
+
+    MALE = 'm'
+    FEMALE = 'f'
+    OTHER = 'o'
+    NULL = ''
+    GENDER_CHOICES = [(MALE,"Male"), (FEMALE,"Female"), (OTHER,"Other"), (NULL, "Null")]
+
+    lab_test = models.ForeignKey(LabTest, on_delete=models.CASCADE, related_name='tests_parameter_thresholds')
+    test_parameter = models.ForeignKey(TestParameter, on_delete=models.CASCADE, related_name='parameter_thresholds', blank=False, null=True)
+    color = models.CharField(max_length=50, null=True, default=None, blank=False, choices=Colour.as_choices())
+    details = models.TextField(blank=True, null=True)
+    what_to_do = models.TextField(blank=True, null=True)
+    min_value = models.FloatField(null=True, default=0)
+    max_value = models.FloatField(null=True, default=0)
+    min_age = models.PositiveIntegerField(null=True, default=0)
+    max_age = models.PositiveIntegerField(null=True, default=0)
+    gender = models.CharField(choices=GENDER_CHOICES, max_length=50, default=None, null=True, blank=True)
+
+
+    class Meta:
+        db_table = 'lab_test_thresholds'

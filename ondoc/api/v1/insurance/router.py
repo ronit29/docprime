@@ -1,6 +1,6 @@
 from django.urls import path
 from .views import (ListInsuranceViewSet, InsuredMemberViewSet, InsuranceProfileViewSet, InsuranceOrderViewSet,
-                    InsuranceValidationViewSet, InsuranceDummyDataViewSet)
+                    InsuranceValidationViewSet, InsuranceDummyDataViewSet, InsuranceCancelViewSet, InsuranceNetworkViewSet)
 
 
 urlpatterns = [
@@ -14,4 +14,7 @@ urlpatterns = [
     path('push_insurance_data', InsuranceDummyDataViewSet.as_view({'post': 'push_dummy_data'}), name='push-dummy-data'),
     path('show_insurance_data', InsuranceDummyDataViewSet.as_view({'get': 'show_dummy_data'}), name='show-dummy-data'),
     path('check_insurance', InsuranceValidationViewSet.as_view({'post': 'validation'}), name='insurance-validation'),
+    path('cancel', InsuranceCancelViewSet.as_view({'get': 'insurance_cancel'}), name='insurance-cancel'),
+    path('cancel-master', InsuranceCancelViewSet.as_view({'get': 'cancel_master'}), name='insurance-cancel-master'),
+    path('network/search', InsuranceNetworkViewSet.as_view({'get': 'list'}), name='insurance-network')
 ]

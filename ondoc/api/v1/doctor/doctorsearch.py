@@ -272,7 +272,7 @@ class DoctorSearchHelper:
         if self.query_params and self.query_params.get('sitemap_identifier') and self.query_params.get('max_distance')==None:
             sitemap_identifier = self.query_params.get('sitemap_identifier')
             if sitemap_identifier in ('SPECIALIZATION_LOCALITY_CITY', 'DOCTORS_LOCALITY_CITY'):
-                max_distance = 5000
+                max_distance = 3000
             if sitemap_identifier in ('SPECIALIZATION_CITY', 'DOCTORS_CITY'):
                 max_distance = 15000
 
@@ -480,7 +480,7 @@ class DoctorSearchHelper:
 
                 is_insurance_covered = False
                 insurance_data_dict = kwargs.get('insurance_data')
-                if doctor_clinic.hospital.enabled_for_prepaid and enable_online_booking and doctor.is_insurance_enabled and insurance_data_dict and min_price.get("mrp") is not None and \
+                if doctor_clinic.hospital.enabled_for_prepaid and enable_online_booking and doctor.is_insurance_enabled and doctor.is_doctor_specialization_insured() and insurance_data_dict and min_price.get("mrp") is not None and \
                         min_price["mrp"] <= insurance_data_dict['insurance_threshold_amount'] and \
                         not (request.query_params.get('procedure_ids') or request.query_params.get('procedure_category_ids')):
                     is_insurance_covered = True
@@ -505,7 +505,10 @@ class DoctorSearchHelper:
                     "discounted_fees": min_price["deal_price"],
                     "timings": clinic_convert_timings(doctor_clinic.availability.all(), is_day_human_readable=False),
                     "procedure_categories": final_result,
-                    "location": {'lat': doctor_clinic.hospital.location.y, 'long': doctor_clinic.hospital.location.x} if doctor_clinic.hospital and doctor_clinic.hospital.location else None
+                    "location": {'lat': doctor_clinic.hospital.location.y,
+                                 'long': doctor_clinic.hospital.location.x} if doctor_clinic.hospital and doctor_clinic.hospital.location else None,
+                    "url": kwargs.get('hosp_entity_dict', {}).get(doctor_clinic.hospital.id),
+                    "locality_url": kwargs.get('hosp_locality_entity_dict', {}).get(doctor_clinic.hospital.id)
                 }]
 
             thumbnail = doctor.get_thumbnail()

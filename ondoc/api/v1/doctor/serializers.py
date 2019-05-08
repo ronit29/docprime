@@ -515,7 +515,8 @@ class DoctorHospitalSerializer(serializers.ModelSerializer):
         doctor_clinic = obj.doctor_clinic
         doctor = doctor_clinic.doctor
         hospital = doctor_clinic.hospital
-        enabled_for_online_booking = doctor_clinic.enabled_for_online_booking and doctor.enabled_for_online_booking and hospital.enabled_for_online_booking
+        enabled_for_online_booking = doctor_clinic.enabled_for_online_booking and doctor.enabled_for_online_booking and \
+                                     doctor.is_doctor_specialization_insured() and hospital.enabled_for_online_booking
 
         if hospital.enabled_for_prepaid and obj.mrp is not None and resp['insurance_threshold_amount'] is not None and obj.mrp <= resp['insurance_threshold_amount'] and enabled_for_online_booking and \
                 not (request.query_params.get('procedure_ids') or request.query_params.get('procedure_category_ids')) and doctor.is_enabled_for_insurance:
@@ -602,11 +603,19 @@ class MedicalServiceSerializer(serializers.ModelSerializer):
 
 
 class DoctorPracticeSpecializationSerializer(serializers.ModelSerializer):
+    id = serializers.CharField(read_only=True, source='specialization.id')
     name = serializers.CharField(read_only=True, source='specialization.name')
+    url = serializers.SerializerMethodField()
+
+    def get_url(self, obj):
+        url_dict = self.context.get('spec_url_dict')
+        if url_dict:
+            return url_dict.get(obj.specialization_id, None)
+        return None
 
     class Meta:
         model = DoctorPracticeSpecialization
-        fields = ('name', )
+        fields = ('id', 'name', 'url')
 
 
 class DoctorProfileSerializer(serializers.ModelSerializer):
@@ -812,7 +821,7 @@ class DoctorListSerializer(serializers.Serializer):
     is_insurance = serializers.BooleanField(required=False)
     hospital_id = serializers.IntegerField(required=False, allow_null=True)
     locality = serializers.CharField(required=False)
-    city = serializers.CharField(required=False)
+    city = serializers.CharField(required=False, allow_null=True)
     ipd_procedure_ids = CommaSepratedToListField(required=False, max_length=500, typecast_to=str)
 
     def validate_ipd_procedure_ids(self, attrs):
@@ -1253,7 +1262,7 @@ class AppointmentRetrieveSerializer(OpdAppointmentSerializer):
         fields = ('id', 'patient_image', 'patient_name', 'type', 'profile', 'otp', 'is_rated', 'rating_declined',
                   'allowed_action', 'effective_price', 'deal_price', 'status', 'time_slot_start', 'time_slot_end',
                   'doctor', 'hospital', 'allowed_action', 'doctor_thumbnail', 'patient_thumbnail', 'procedures', 'mrp',
-                  'insurance', 'invoices', 'cancellation_reason', 'payment_type')
+                  'insurance', 'invoices', 'cancellation_reason', 'payment_type', 'display_name')
 
     def get_insurance(self, obj):
         request = self.context.get("request")
@@ -1364,8 +1373,8 @@ class CommonSpecializationsSerializer(serializers.ModelSerializer):
 
     def get_url(self, obj):
         url = None
-        if self.context and self.context.get('spec_urls'):
-            url = self.context.get('spec_urls')[obj.specialization_id]
+        if self.context and self.context.get('spec_urls', {}):
+            url = self.context.get('spec_urls').get(obj.specialization_id, None)
         return url
 
     class Meta:
@@ -1706,13 +1715,20 @@ class IpdProcedureDetailSerializer(serializers.ModelSerializer):
     features = IpdProcedureFeatureSerializer(source='feature_mappings', read_only=True, many=True)
     all_details = serializers.SerializerMethodField()
     # all_details = IpdProcedureAllDetailsSerializer(source='ipdproceduredetail_set', read_only=True, many=True)
+    similar_ipd_procedures = serializers.SerializerMethodField()
 
     class Meta:
         model = IpdProcedure
-        fields = ('id', 'name', 'details', 'is_enabled', 'features', 'about', 'all_details', 'show_about')
+        fields = ('id', 'name', 'details', 'is_enabled', 'features', 'about', 'all_details', 'show_about',
+                  'similar_ipd_procedures')
 
     def get_all_details(self, obj):
         return IpdProcedureAllDetailsSerializer(obj.ipdproceduredetail_set.all(), many=True, context=self.context).data
+
+    def get_similar_ipd_procedures(self, obj):
+        similar_ipds_entity_dict = self.context.get('similar_ipds_entity_dict', {})
+        return [{'id': x.similar_ipd_procedure.id, 'name': x.similar_ipd_procedure.name,
+                 'url': similar_ipds_entity_dict.get(x.similar_ipd_procedure.id)} for x in obj.similar_ipds.all()]
 
 
 class TopHospitalForIpdProcedureSerializer(serializers.ModelSerializer):
@@ -1721,15 +1737,42 @@ class TopHospitalForIpdProcedureSerializer(serializers.ModelSerializer):
     certifications = serializers.SerializerMethodField()
     multi_speciality = serializers.SerializerMethodField()
     address = serializers.SerializerMethodField()
+    short_address = serializers.SerializerMethodField()
     logo = serializers.SerializerMethodField()
     open_today = serializers.SerializerMethodField()
     insurance_provider = serializers.SerializerMethodField()
+    established_in = serializers.SerializerMethodField()
+    lat = serializers.SerializerMethodField()
+    long = serializers.SerializerMethodField()
+    url = serializers.SerializerMethodField()
+    locality_url = serializers.SerializerMethodField()
 
     class Meta:
         model = Hospital
         fields = ('id', 'name', 'distance', 'certifications', 'bed_count', 'logo', 'avg_rating',
-                  'count_of_insurance_provider', 'multi_speciality', 'address', 'open_today',
-                  'insurance_provider')
+                  'count_of_insurance_provider', 'multi_speciality', 'address', 'short_address','open_today',
+                  'insurance_provider', 'established_in', 'long', 'lat', 'url', 'locality_url')
+
+    def get_locality_url(self, obj):
+        entity_url = self.context.get('hosp_locality_entity_dict', {})
+        return entity_url.get(obj.id)
+
+    def get_url(self, obj):
+        entity_url = self.context.get('hosp_entity_dict', {})
+        return entity_url.get(obj.id)
+
+    def get_lat(self, obj):
+        if obj.location:
+            return obj.location.y
+        return None
+
+    def get_long(self, obj):
+        if obj.location:
+            return obj.location.x
+        return None
+
+    def get_established_in(self, obj):
+            return obj.operational_since
 
     def get_count_of_insurance_provider(self, obj):
         return len(list(obj.health_insurance_providers.all()))
@@ -1750,6 +1793,9 @@ class TopHospitalForIpdProcedureSerializer(serializers.ModelSerializer):
 
     def get_address(self, obj):
         return obj.get_hos_address()
+
+    def get_short_address(self, obj):
+        return obj.get_short_address()
 
     def get_logo(self, obj):
         request = self.context.get('request')
@@ -1775,8 +1821,7 @@ class TopHospitalForIpdProcedureSerializer(serializers.ModelSerializer):
 
 
 class HospitalDetailIpdProcedureSerializer(TopHospitalForIpdProcedureSerializer):
-    lat = serializers.SerializerMethodField()
-    long = serializers.SerializerMethodField()
+
     about = serializers.SerializerMethodField()
     services = serializers.SerializerMethodField()
     images = serializers.SerializerMethodField()
@@ -1789,24 +1834,16 @@ class HospitalDetailIpdProcedureSerializer(TopHospitalForIpdProcedureSerializer)
     opd_timings = serializers.SerializerMethodField()
     contact_number = serializers.SerializerMethodField()
 
-    class Meta:
+    class Meta(TopHospitalForIpdProcedureSerializer.Meta):
         model = Hospital
-        fields = ('id', 'name', 'distance', 'certifications', 'bed_count', 'logo', 'avg_rating',
-                  'multi_speciality', 'address', 'open_today', 'insurance_provider',
-                  'opd_timings', 'contact_number',
-                  'lat', 'long', 'about', 'services', 'images', 'ipd_procedure_categories', 'other_network_hospitals',
-                  'doctors', 'rating_graph', 'rating', 'display_rating_widget'
-                  )
+        fields = TopHospitalForIpdProcedureSerializer.Meta.fields + ('about', 'services', 'images',
+                                                                     'ipd_procedure_categories',
+                                                                     'other_network_hospitals',
+                                                                     'doctors', 'rating_graph', 'rating',
+                                                                     'display_rating_widget', 'opd_timings',
+                                                                     'contact_number'
+                                                                     )
 
-    def get_lat(self, obj):
-        if obj.location:
-            return obj.location.y
-        return None
-
-    def get_long(self, obj):
-        if obj.location:
-            return obj.location.x
-        return None
 
     def get_about(self, obj):
         if obj.network:
@@ -1827,8 +1864,9 @@ class HospitalDetailIpdProcedureSerializer(TopHospitalForIpdProcedureSerializer)
 
     def get_images(self, obj):
         request = self.context.get('request')
-        # TODO: SHASHANK_SINGH Thumbnail to be added or not
-        return [{'original': request.build_absolute_uri(img.name.url), "thumbnail": None, "cover_image": img.cover_image} for img in
+        return [{'original': request.build_absolute_uri(img.name.url),
+                 "thumbnail": request.build_absolute_uri(img.cropped_image.url) if img.cropped_image else None,
+                 "cover_image": img.cover_image} for img in
                 obj.hospitalimage_set.all() if img.name]
 
     def get_ipd_procedure_categories(self, obj):
@@ -1943,6 +1981,8 @@ class HospitalRequestSerializer(serializers.Serializer):
     min_distance = serializers.IntegerField(required=False)
     max_distance = serializers.IntegerField(required=False)
     provider_ids = CommaSepratedToListField(required=False, max_length=500, typecast_to=int)
+    city = serializers.CharField(required=False, allow_blank=True, allow_null=True)
+
 
     def validate_provider_ids(self, attrs):
         try:
@@ -1955,14 +1995,18 @@ class HospitalRequestSerializer(serializers.Serializer):
 
 
 class IpdProcedureLeadSerializer(serializers.ModelSerializer):
-    ipd_procedure = serializers.PrimaryKeyRelatedField(queryset=IpdProcedure.objects.filter(is_enabled=True))
+    ipd_procedure = serializers.PrimaryKeyRelatedField(queryset=IpdProcedure.objects.filter(is_enabled=True),
+                                                       required=False, allow_null=True)
     hospital = serializers.PrimaryKeyRelatedField(queryset=Hospital.objects.filter(is_live=True), required=False)
     name = serializers.CharField(max_length=100)
     phone_number = serializers.IntegerField(min_value=1000000000, max_value=9999999999)
     email = serializers.EmailField(max_length=256)
     gender = serializers.ChoiceField(choices=UserProfile.GENDER_CHOICES)
     age = serializers.IntegerField(min_value=1, max_value=120, required=False, default=None)
-    dob = serializers.DateTimeField(required=False, default=None)
+    dob = serializers.DateField(required=False, default=None)
+    lat = serializers.FloatField(required=False, allow_null=True)
+    long = serializers.FloatField(required=False, allow_null=True)
+    city = serializers.CharField(required=False, allow_null=True, allow_blank=True)
 
     class Meta:
         model = IpdProcedureLead
@@ -1992,6 +2036,7 @@ class HospitalDetailRequestSerializer(serializers.Serializer):
 class IpdDetailsRequestDetailRequestSerializer(serializers.Serializer):
     long = serializers.FloatField(default=77.071848)
     lat = serializers.FloatField(default=28.450367)
+    city = serializers.CharField(required=False, allow_blank=True, allow_null=True)
 
 
 class OpdAppointmentUpcoming(OpdAppointmentSerializer):

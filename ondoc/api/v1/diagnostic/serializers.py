@@ -533,14 +533,34 @@ class CommonPackageSerializer(serializers.ModelSerializer):
     show_details = serializers.ReadOnlyField(source='package.show_details')
     icon = serializers.SerializerMethodField()
     url = serializers.ReadOnlyField(source='package.url')
+    no_of_tests = serializers.ReadOnlyField(source='package.number_of_tests')
+    agreed_price = serializers.SerializerMethodField()
+    mrp = serializers.SerializerMethodField()
+    lab = LabModelSerializer()
 
     def get_icon(self, obj):
         request = self.context.get('request')
         return request.build_absolute_uri(obj.icon.url) if obj.icon else None
 
+    def get_agreed_price(self, obj):
+        agreed_price = None
+        if obj.package.availablelabs:
+            available_test = obj.package.availablelabs.filter(lab_pricing_group__labs__id=obj.lab_id).first()
+            if available_test:
+                agreed_price = available_test.get_deal_price()
+        return agreed_price
+
+    def get_mrp(self, obj):
+        mrp = None
+        if obj.package.availablelabs:
+            available_test = obj.package.availablelabs.filter(lab_pricing_group__labs__id=obj.lab_id).first()
+            if available_test:
+                mrp = available_test.mrp
+        return mrp
+
     class Meta:
         model = CommonPackage
-        fields = ('id', 'name', 'icon', 'show_details', 'url')
+        fields = ('id', 'name', 'icon', 'show_details', 'url', 'no_of_tests', 'mrp', 'agreed_price', 'lab')
 
 
 class CommonConditionsSerializer(serializers.ModelSerializer):
@@ -1440,7 +1460,7 @@ class CustomLabTestPackageSerializer(serializers.ModelSerializer):
         return None
 
     def get_distance(self, obj):
-        return int(obj.distance.m)
+        return int(obj.distance)
 
     def get_mrp(self, obj):
         return str(obj.mrp)
@@ -1640,3 +1660,23 @@ class PackageSerializer(LabTestSerializer):
             parameter_count = len(temp_test.parameter.all()) or 1
             return_data += parameter_count
         return return_data
+
+
+class PackageLabCompareRequestSerializer(serializers.Serializer):
+    package_id = serializers.PrimaryKeyRelatedField(queryset=LabTest.objects.filter(is_package=True, enable_for_retail=True))
+    lab_id = serializers.PrimaryKeyRelatedField(queryset=Lab.objects.filter(is_live=True))
+
+    def validate(self, attrs):
+        attrs['package'] = attrs['package_id']
+        attrs['lab'] = attrs['lab_id']
+        if not AvailableLabTest.objects.filter(lab_pricing_group__labs=attrs.get('lab'), test=attrs.get('package'),
+                                               enabled=True).exists():
+            raise serializers.ValidationError('Package is not available in the lab.')
+        return attrs
+
+
+class CompareLabPackagesSerializer(serializers.Serializer):
+    package_lab_ids = serializers.ListField(child=PackageLabCompareRequestSerializer(), min_length=1, max_length=5)
+    longitude = serializers.FloatField(default=77.071848)
+    latitude = serializers.FloatField(default=28.450367)
+    title = serializers.CharField(required=False, max_length=500)

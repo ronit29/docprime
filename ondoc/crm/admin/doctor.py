@@ -1085,6 +1085,12 @@ class DoctorAdmin(AutoComplete, ImportExportMixin, VersionAdmin, ActionAdmin, QC
         'data_status', 'onboarding_status', 'is_live', 'enabled', 'is_insurance_enabled', 'doctorpracticespecializations__specialization',
         CityFilter, CreatedByFilter)
 
+    # def get_inline_instances(self, request, obj=None):
+    #     res = super().get_inline_instances(request, obj)
+    #     if obj and obj.id and obj.data_status == obj.QC_APPROVED:
+    #         res = [x for x in res if not isinstance(x, RemarkInline)]
+    #     return res
+
     def has_delete_permission(self, request, obj=None):
         return super().has_delete_permission(request, obj)
 
@@ -1501,9 +1507,9 @@ class DoctorOpdAppointmentForm(RefundableAppointmentForm):
 
 class DoctorOpdAppointmentAdmin(admin.ModelAdmin):
     form = DoctorOpdAppointmentForm
-    search_fields = ['id']
+    search_fields = ['id', 'profile__name', 'profile__phone_number', 'doctor__name', 'hospital__name']
     list_display = ('booking_id', 'get_doctor', 'get_profile', 'status', 'time_slot_start', 'effective_price', 'created_at', 'updated_at')
-    list_filter = ('status', )
+    list_filter = ('status', 'payment_type')
     date_hierarchy = 'created_at'
 
     def get_queryset(self, request):
