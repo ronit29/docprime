@@ -53,7 +53,7 @@ from ondoc.authentication import models as auth_models
 from django.db.models import Q, Value
 from django.db.models.functions import StrIndex, Coalesce
 
-from ondoc.location.models import EntityUrls, EntityAddress
+from ondoc.location.models import EntityUrls, EntityAddress, CompareSEOUrls, CompareLabPackagesSeoUrls
 from ondoc.seo.models import NewDynamic
 from ondoc.subscription_plan.models import UserPlanMapping
 from . import serializers
@@ -3028,9 +3028,43 @@ class DigitalReports(viewsets.GenericViewSet):
 
 class CompareLabPackagesViewSet(viewsets.ReadOnlyModelViewSet):
 
-    def retrieve(self, request):
+    def retrieve_by_url(self, request, *args, **kwargs):
+        url = request.data.get('url')
+        if not url:
+            return Response(status=status.HTTP_404_NOT_FOUND)
+
+        url = url.lower()
+        compare_seo_url = CompareSEOUrls.objects.filter(url=url)
+        if len(compare_seo_url) > 0:
+            compare_seo_url = compare_seo_url[0]
+
+        else:
+            return Response(status=status.HTTP_404_NOT_FOUND)
+
+        package_lab_ids = list()
+        compare_package_details = dict()
+        compare_lab_packages = CompareLabPackagesSeoUrls.objects.filter(url=compare_seo_url)
+
+        if compare_lab_packages and len(compare_lab_packages)>1 and len(compare_lab_packages) <=5:
+            for data in compare_lab_packages:
+                package_lab_ids.append({'package_id': data.package_id, 'lab_id': data.lab_id})
+
+        compare_package_details['package_lab_ids'] = package_lab_ids
+        compare_package_details['lat'] = request.GET.get('lat') if request.GET.get('lat') else None
+        compare_package_details['long'] = request.GET.get('long') if request.GET.get('long') else None
+        compare_package_details['title'] = compare_seo_url.title if compare_seo_url.title else None
+        kwargs['compare_package_details'] = compare_package_details
+        kwargs['compare_seo_url'] = compare_seo_url
+
+        response = self.retrieve(request, **kwargs)
+        return response
+
+    def retrieve(self, request, *args, **kwargs):
         from django.db.models import Min
-        request_parameters = request.data
+        if kwargs and kwargs['compare_package_details']:
+            request_parameters = kwargs['compare_package_details']
+        else:
+            request_parameters = request.data
         serializer = serializers.CompareLabPackagesSerializer(data=request_parameters, context={"request": request})
         serializer.is_valid(raise_exception=True)
         validated_data = serializer.validated_data
@@ -3181,4 +3215,15 @@ class CompareLabPackagesViewSet(viewsets.ReadOnlyModelViewSet):
         response['packages'] = final_result
         response['category_info'] = category_data
         response['test_info'] = list(test_data_master.values())
+        response['search_content'] = None
+        response['bottom_content'] = None
+        response['description'] = None
+        if kwargs and kwargs['compare_seo_url']:
+            new_dynamic = NewDynamic.objects.filter(url_value=kwargs['compare_seo_url'].url)
+            if new_dynamic:
+                response['search_content'] = new_dynamic.first().top_content
+                response['bottom_content'] = new_dynamic.first().bottom_content
+                response['description'] = new_dynamic.first().meta_description
+                if response['title'] is None:
+                    response['title'] = new_dynamic.first().meta_title
         return Response(response)
