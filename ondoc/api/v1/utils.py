@@ -709,7 +709,7 @@ class CouponsMixin(object):
 
             # if coupon is random coupon
             if hasattr(coupon_obj, 'is_random') and coupon_obj.is_random:
-                random_count = coupon_obj.random_coupon_used_count(user, coupon_obj.random_coupon_code, cart_item)
+                random_count = coupon_obj.random_coupon_used_count(None, coupon_obj.random_coupon_code, cart_item)
                 if random_count > 0:
                     return {"is_valid": False, "used_count": random_count}
                 else:

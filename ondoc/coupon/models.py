@@ -130,35 +130,47 @@ class Coupon(auth_model.TimeStampedModel):
         from ondoc.cart.models import Cart
         from ondoc.subscription_plan.models import UserPlanMapping
 
-        if not user.is_authenticated:
+        if user and not user.is_authenticated:
             return 0
 
         count = 0
         if str(self.type) == str(self.DOCTOR) or str(self.type) == str(self.ALL):
-            count += OpdAppointment.objects.filter(user=user,
-                                                   status__in=[OpdAppointment.CREATED, OpdAppointment.BOOKED,
+            qs = OpdAppointment.objects.filter(status__in=[OpdAppointment.CREATED, OpdAppointment.BOOKED,
                                                                OpdAppointment.RESCHEDULED_DOCTOR,
                                                                OpdAppointment.RESCHEDULED_PATIENT,
                                                                OpdAppointment.ACCEPTED,
                                                                OpdAppointment.COMPLETED],
                                                    coupon=self,
-                                                   coupon_data__random_coupons__random_coupon_list__contains=[code]).count()
-        if str(self.type) == str(self.LAB) or str(self.type) == str(self.ALL):
-            count += LabAppointment.objects.filter(user=user,
-                                                   status__in=[LabAppointment.CREATED, LabAppointment.BOOKED,
-                                                               LabAppointment.RESCHEDULED_LAB,
-                                                               LabAppointment.RESCHEDULED_PATIENT,
-                                                               LabAppointment.ACCEPTED,
-                                                               LabAppointment.COMPLETED],
-                                                   coupon=self,
-                                                   coupon_data__random_coupons__random_coupon_list__contains=[code]).count()
-        if str(self.type) == str(self.SUBSCRIPTION_PLAN) or str(self.type) == str(self.ALL):
-            count += UserPlanMapping.objects.filter(user=user,
-                                                    status__in=[UserPlanMapping.BOOKED],
-                                                    coupon=self,
-                                                    coupon_data__random_coupons__random_coupon_list__contains=[code]).count()
+                                                   coupon_data__random_coupons__random_coupon_list__contains=[code])
+            if user:
+                qs = qs.filter(user=user)
+            count += qs.count()
 
-        count += Cart.objects.filter(user=user, deleted_at__isnull=True, data__coupon_code__contains=code).exclude(id=cart_item).count()
+
+        if str(self.type) == str(self.LAB) or str(self.type) == str(self.ALL):
+            qs = LabAppointment.objects.filter(status__in=[LabAppointment.CREATED, LabAppointment.BOOKED,
+                                                           LabAppointment.RESCHEDULED_LAB,
+                                                           LabAppointment.RESCHEDULED_PATIENT,
+                                                           LabAppointment.ACCEPTED,
+                                                           LabAppointment.COMPLETED],
+                                               coupon=self,
+                                               coupon_data__random_coupons__random_coupon_list__contains=[code])
+            if user:
+                qs = qs.filter(user=user)
+            count += qs.count()
+        if str(self.type) == str(self.SUBSCRIPTION_PLAN) or str(self.type) == str(self.ALL):
+            qs = UserPlanMapping.objects.filter(status__in=[UserPlanMapping.BOOKED],
+                                                coupon=self,
+                                                coupon_data__random_coupons__random_coupon_list__contains=[code])
+            if user:
+                qs = qs.filter(user=user)
+            count += qs.count()
+
+        qs = Cart.objects.filter(deleted_at__isnull=True, data__coupon_code__contains=code).exclude(id=cart_item)
+        if user:
+            qs = qs.filter(user=user)
+        count += qs.count()
+
         return count
 
     def total_used_coupon_count(self):
