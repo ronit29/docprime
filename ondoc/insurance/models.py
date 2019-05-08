@@ -1383,14 +1383,16 @@ class InsuranceLead(auth_model.TimeStampedModel):
     @classmethod
     def create_lead_by_phone_number(cls, request):
         phone_number = request.data.get('phone_number', None)
-        if phone_number:
-            user_insurance_lead = InsuranceLead.objects.filter(phone_number=phone_number).order_by('id').last()
-            if not user_insurance_lead:
-                user_insurance_lead = InsuranceLead(phone_number=phone_number)
+        if not phone_number:
+            return None
 
-            user_insurance_lead.extras = request.data
-            user_insurance_lead.save()
-            return True
+        user_insurance_lead = InsuranceLead.objects.filter(phone_number=phone_number).order_by('id').last()
+        if not user_insurance_lead:
+            user_insurance_lead = InsuranceLead(phone_number=phone_number)
+
+        user_insurance_lead.extras = request.data
+        user_insurance_lead.save()
+        return True
 
     class Meta:
         db_table = 'insurance_leads'

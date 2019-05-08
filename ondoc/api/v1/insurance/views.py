@@ -163,7 +163,7 @@ class InsuranceOrderViewSet(viewsets.GenericViewSet):
     def create_banner_lead(self, request):
         phone_number = request.data.get('phone_number', None)
         if phone_number:
-            user = User.objects.filter(phone_number=phone_number).first()
+            user = User.objects.filter(phone_number=phone_number, user_type=User.CONSUMER).first()
             if not user:
                 user = request.user
 
@@ -189,8 +189,11 @@ class InsuranceOrderViewSet(viewsets.GenericViewSet):
             return Response({'success': True})
         else:
             lead = InsuranceLead.create_lead_by_phone_number(request)
-            if lead:
-                return Response({'success': True})
+            if not lead:
+                return Response({'success': False})
+
+            return Response({'success': True})
+
 
     @transaction.atomic
     def create_order(self, request):
