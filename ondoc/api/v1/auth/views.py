@@ -2138,4 +2138,4 @@ class TokenFromUrlKey(viewsets.GenericViewSet):
                 LastLoginTimestamp.objects.create(user=obj.user, source="d_sms")
                 return Response({'status': 1, 'token': obj.token})
             else:
-                return Response({'status': 0, 'token': None, 'message': 'key not found'})
+                return Response({'status': 0, 'token': None, 'message': 'key not found'}, status=status.HTTP_404_NOT_FOUND)
