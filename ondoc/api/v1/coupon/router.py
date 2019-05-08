@@ -6,7 +6,6 @@ from ondoc.crm.admin.coupon import LabNetworkAutocomplete, LabAutocomplete, Test
     SpecializationsAutocomplete, DoctorsAutocomplete, HospitalsAutocomplete
 
 urlpatterns = [
-    # path('applicablecoupons', ApplicableCouponsViewSet.as_view({'get': 'list'}), name='applicable-coupons'),
     path('applicablecoupons', ApplicableCouponsViewSet.as_view({'get': 'list_v2'}), name='applicable-coupons'),
     path('discount', CouponDiscountViewSet.as_view({'post':'coupon_discount'}), name='coupon-discount'),
     url(r'^lab-network-autocomplete/$', LabNetworkAutocomplete.as_view(), name='lab-network-autocomplete'),

@@ -12,7 +12,6 @@ from django.core.files.uploadedfile import InMemoryUploadedFile
 from io import BytesIO
 import math
 import os
-import sys
 import hashlib
 import random, string
 from django.contrib.contenttypes.fields import GenericForeignKey, GenericRelation
@@ -423,7 +422,6 @@ class User(AbstractBaseUser, PermissionsMixin):
     class Meta:
         unique_together = (("email", "user_type"), ("phone_number","user_type"))
         db_table = "auth_user"
-
 
 
 class StaffProfile(models.Model):

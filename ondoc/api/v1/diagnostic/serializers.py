@@ -262,7 +262,6 @@ class AvailableLabTestPackageSerializer(serializers.ModelSerializer):
         else:
             return False
 
-
     def get_included_in_user_plan(self, obj):
         package_free_or_not_dict = self.context.get('package_free_or_not_dict', {})
         return package_free_or_not_dict.get(obj.test.id, False)
@@ -308,7 +307,6 @@ class AvailableLabTestPackageSerializer(serializers.ModelSerializer):
 
     def get_deal_price(self, obj):
         deal_price = obj.computed_deal_price if obj.custom_deal_price is None else obj.custom_deal_price
-
         return deal_price
 
     def get_package(self, obj):
