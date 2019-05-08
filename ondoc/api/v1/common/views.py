@@ -959,3 +959,18 @@ class GetKeyDataViewSet(viewsets.GenericViewSet):
             data = info.data
             resp.append({'data': data, 'key': data_key})
         return Response(resp)
+
+
+class AllUrlsViewset(viewsets.GenericViewSet):
+
+    def list(self, request):
+        parameters = request.query_params
+        key = parameters.get('query')
+        if not key:
+            return Response(status=status.HTTP_400_BAD_REQUEST)
+        from ondoc.location.models import EntityUrls
+        from ondoc.location.models import CompareSEOUrls
+        e_urls = list(EntityUrls.objects.filter(url__icontains=key, is_valid=True).values_list('url', flat=True))[:5]
+        c_urls = list(CompareSEOUrls.objects.filter(url__icontains=key).values_list('url', flat=True))[:5]
+        result = e_urls + c_urls
+        return Response(dict(enumerate(result)))
