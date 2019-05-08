@@ -8,6 +8,8 @@ from ondoc.notification.tasks import push_insurance_banner_lead_to_matrix
 import json
 
 from django.db import models, transaction
+from django.contrib.gis.db.models import PointField
+
 from django.db.models import Q
 import logging
 from ondoc.authentication import models as auth_model
@@ -1433,3 +1435,16 @@ class InsuranceMIS(auth_model.TimeStampedModel):
 
     class Meta:
         db_table = 'insurance_mis'
+
+
+class InsuranceCoveredEntity(auth_model.TimeStampedModel):
+
+    entity_id = models.PositiveIntegerField()
+    name = models.CharField(max_length=1000)
+    location = PointField(geography=True, srid=4326, blank=True, null=True)
+    type = models.CharField(max_length=50)
+    search_key = models.CharField(max_length=1000, null=True, blank=True)
+    data = JSONField(null=True, blank=True)
+
+    class Meta:
+        db_table = 'insurance_covered_entity'
