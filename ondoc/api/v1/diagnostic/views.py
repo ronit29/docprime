@@ -271,14 +271,26 @@ class LabList(viewsets.ReadOnlyModelViewSet):
                                ' {filter_query}' \
                                ' )x where rnk =1 {sort_query} offset {offset} limit {limit} '
 
-        package_count_query = ' SELECT count(distinct available_lab_test)' \
-                              ' FROM "lab_test" inner JOIN "available_lab_test" ON ("lab_test"."id" = "available_lab_test"."test_id")' \
-                              ' inner JOIN "lab_pricing_group" ON ("available_lab_test"."lab_pricing_group_id" = "lab_pricing_group"."id")' \
-                              ' inner JOIN "lab" ON ("lab_pricing_group"."id" = "lab"."lab_pricing_group_id") WHERE' \
-                              ' "lab_test"."enable_for_retail" = true AND "lab_test"."is_package" = true AND "lab_test"."searchable" = true' \
-                              ' AND "available_lab_test"."enabled" = true AND "lab"."enabled" = true AND "lab"."is_live" = true AND' \
-                              ' ST_DWithin("lab"."location", St_setsrid(St_point(%(longitude)s, %(latitude)s), 4326), %(max_distance)s)' \
-                              ' and not ST_DWithin("lab"."location", St_setsrid(St_point(%(longitude)s, %(latitude)s), 4326), %(min_distance)s)'
+        package_count_query = '''select count(distinct available_lab_test), array_agg( distinct category_id ) from (
+                                select available_lab_test, ltc.id as category_id FROM "lab_test"
+                                left JOIN labtest_package ltp on ltp.package_id = lab_test.id
+                                inner JOIN "available_lab_test" ON ("lab_test"."id" = "available_lab_test"."test_id") 
+                                inner JOIN "lab_pricing_group" ON ("available_lab_test"."lab_pricing_group_id" = "lab_pricing_group"."id") 
+                                inner JOIN "lab" ON ("lab_pricing_group"."id" = "lab"."lab_pricing_group_id") 
+                                left JOIN "lab_test_recommended_category_mapping" ltrc on ltrc.lab_test_id = ltp.lab_test_id
+                                left JOIN "lab_test_category" ltc on ltrc.parent_category_id = ltc.id 
+                                WHERE "lab_test"."enable_for_retail" = true AND "lab_test"."is_package" = true 
+                                AND "lab_test"."searchable" = true AND "available_lab_test"."enabled" = true 
+                                AND "lab"."enabled" = true AND "lab"."is_live" = true) a '''
+        # package_count_query = ' SELECT count(distinct available_lab_test)' \
+        #                       ' FROM "lab_test" inner JOIN "available_lab_test" ON ("lab_test"."id" = "available_lab_test"."test_id")' \
+        #                       ' inner JOIN "lab_pricing_group" ON ("available_lab_test"."lab_pricing_group_id" = "lab_pricing_group"."id")' \
+        #                       ' inner JOIN "lab" ON ("lab_pricing_group"."id" = "lab"."lab_pricing_group_id") WHERE' \
+        #                       ' "lab_test"."enable_for_retail" = true AND "lab_test"."is_package" = true AND "lab_test"."searchable" = true' \
+        #                       ' AND "available_lab_test"."enabled" = true AND "lab"."enabled" = true AND "lab"."is_live" = true AND' \
+        #                       ' ST_DWithin("lab"."location", St_setsrid(St_point(%(longitude)s, %(latitude)s), 4326), %(max_distance)s)' \
+        #                       ' and not ST_DWithin("lab"."location", St_setsrid(St_point(%(longitude)s, %(latitude)s), 4326), %(min_distance)s)'
+
         
         params = {}
         params['latitude'] = str(lat)
