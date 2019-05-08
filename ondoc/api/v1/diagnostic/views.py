@@ -271,8 +271,8 @@ class LabList(viewsets.ReadOnlyModelViewSet):
                                ' {filter_query}' \
                                ' )x where rnk =1 {sort_query} offset {offset} limit {limit} '
 
-        package_count_query = '''select count(distinct available_lab_test), array_agg( distinct category_id ) from (
-                                select available_lab_test, ltc.id as category_id FROM "lab_test"
+        package_count_query = '''
+                                select count(distinct available_lab_test), array_agg( distinct ltc.id ) as category_ids FROM "lab_test"
                                 left JOIN labtest_package ltp on ltp.package_id = lab_test.id
                                 inner JOIN "available_lab_test" ON ("lab_test"."id" = "available_lab_test"."test_id") 
                                 inner JOIN "lab_pricing_group" ON ("available_lab_test"."lab_pricing_group_id" = "lab_pricing_group"."id") 
@@ -281,7 +281,7 @@ class LabList(viewsets.ReadOnlyModelViewSet):
                                 left JOIN "lab_test_category" ltc on ltrc.parent_category_id = ltc.id 
                                 WHERE "lab_test"."enable_for_retail" = true AND "lab_test"."is_package" = true 
                                 AND "lab_test"."searchable" = true AND "available_lab_test"."enabled" = true 
-                                AND "lab"."enabled" = true AND "lab"."is_live" = true) a '''
+                                AND "lab"."enabled" = true AND "lab"."is_live" = true '''
         # package_count_query = ' SELECT count(distinct available_lab_test)' \
         #                       ' FROM "lab_test" inner JOIN "available_lab_test" ON ("lab_test"."id" = "available_lab_test"."test_id")' \
         #                       ' inner JOIN "lab_pricing_group" ON ("available_lab_test"."lab_pricing_group_id" = "lab_pricing_group"."id")' \
@@ -335,6 +335,7 @@ class LabList(viewsets.ReadOnlyModelViewSet):
 
         package_count = RawSql(package_count_query, params).fetch_all()
         result_count = package_count[0].get('count', 0)
+        categories_ids = package_count[0].get('category_ids', [])
         # if filter_query:
         #     filter_query = ' and '+filter_query
         package_search_query = package_search_query.format(filter_query=filter_query, sort_query=sort_query, offset=offset, limit=page_size)
@@ -403,7 +404,7 @@ class LabList(viewsets.ReadOnlyModelViewSet):
                                                              'package_free_or_not_dict': package_free_or_not_dict})
 
         category_to_be_shown_in_filter_ids = set()
-        category_queryset = LabTestCategory.objects.filter(is_package_category=True, is_live=True).order_by('-priority')
+        category_queryset = LabTestCategory.objects.filter(is_package_category=True, is_live=True, id__in=categories_ids).order_by('-priority')
         category_result = []
         for category in category_queryset:
             name = category.name
@@ -1362,7 +1363,7 @@ class LabList(viewsets.ReadOnlyModelViewSet):
             if lab_visit and not home_visit:
                 filtering_query.append('  is_home_collection_enabled = False and home_collection_possible = False ')
 
-        if availability:
+        if ids and availability:
             start_day = Date.today().weekday()
             avail_days = max(map(int, availability))
             days = list()
