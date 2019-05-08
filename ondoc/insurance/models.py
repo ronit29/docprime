@@ -1362,8 +1362,8 @@ class InsuranceDiseaseResponse(auth_model.TimeStampedModel):
 class InsuranceLead(auth_model.TimeStampedModel):
     matrix_lead_id = models.IntegerField(null=True)
     extras = JSONField(default={})
-    user = models.ForeignKey(User, on_delete=models.CASCADE)
-    # phone_number = models.BigIntegerField(blank=True, null=True, validators=[MaxValueValidator(9999999999), MinValueValidator(1000000000)])
+    user = models.ForeignKey(User, on_delete=models.CASCADE, null=True, blank=True)
+    phone_number = models.BigIntegerField(blank=True, null=True, validators=[MaxValueValidator(9999999999), MinValueValidator(1000000000)])
 
     def save(self, *args, **kwargs):
         super().save(*args, **kwargs)
@@ -1379,6 +1379,18 @@ class InsuranceLead(auth_model.TimeStampedModel):
             return insurance_lead.matrix_lead_id
 
         return None
+
+    @classmethod
+    def create_lead_by_phone_number(cls, request):
+        phone_number = request.data.get('phone_number', None)
+        if phone_number:
+            user_insurance_lead = InsuranceLead.objects.filter(phone_number=phone_number).order_by('id').last()
+            if not user_insurance_lead:
+                user_insurance_lead = InsuranceLead(phone_number=phone_number)
+
+            user_insurance_lead.extras = request.data
+            user_insurance_lead.save()
+            return True
 
     class Meta:
         db_table = 'insurance_leads'
