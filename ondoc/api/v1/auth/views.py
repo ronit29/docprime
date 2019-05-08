@@ -2129,4 +2129,4 @@ class TokenFromUrlKey(viewsets.GenericViewSet):
                 obj.save()
                 return Response({'status': 1, 'token': obj.token})
             else:
-                return Response({'status': 0, 'token': None, 'message': 'key not found'})
+                return Response({'status': 0, 'token': None, 'message': 'key not found'}, status=status.HTTP_404_NOT_FOUND)
