@@ -42,12 +42,15 @@ class ScreenViewSet(viewsets.GenericViewSet):
                 force_update_version = app_update.get("force_update_version", "")
                 update_version = app_update.get("update_version", "")
 
-
+<<<<<<< HEAD
         if UserConfig.objects.filter(key="app_custom_data").exists():
             app_custom_data = UserConfig.objects.filter(key="app_custom_data").values_list('data', flat=True).first()
 
+        common_specializations = CommonSpecialization.objects.select_related(
+            'specialization').all().order_by("priority")[:grid_size-1]
+=======
         common_specializations = CommonSpecialization.get_specializations(grid_size-1)
-
+>>>>>>> 4-april
         specializations_serializer = CommonSpecializationsSerializer(common_specializations, many=True,
                                                                                  context={'request': request})
 
