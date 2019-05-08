@@ -23,6 +23,12 @@ class IpdProcedure(auth_model.TimeStampedModel, SearchKey, auth_model.SoftDelete
     class Meta:
         db_table = "ipd_procedure"
 
+    @classmethod
+    def update_ipd_seo_urls(cls):
+        from ondoc.location.services.doctor_urls import IpdProcedureSeo
+        ipd_procedure = IpdProcedureSeo()
+        ipd_procedure.create()
+
 
 class IpdProcedureFeatureMapping(models.Model):
     ipd_procedure = models.ForeignKey(IpdProcedure, on_delete=models.CASCADE,
@@ -84,6 +90,9 @@ class IpdProcedureLead(auth_model.TimeStampedModel):
     gender = models.CharField(max_length=2, default=None, blank=True, null=True, choices=UserProfile.GENDER_CHOICES)
     age = models.PositiveIntegerField(blank=True, null=True)
     dob = models.DateTimeField(blank=True, null=True)
+    lat = models.FloatField(null=True, default=None)
+    long = models.FloatField(null=True, default=None)
+    city = models.CharField(null=True, default=None, blank=True, max_length=150)
 
     class Meta:
         db_table = "ipd_procedure_lead"
@@ -442,3 +451,11 @@ class IpdProcedureSynonymMapping(auth_model.TimeStampedModel):
         db_table = "procedure_synonym_mapping"
 
 
+class SimilarIpdProcedureMapping(auth_model.TimeStampedModel):
+    ipd_procedure = models.ForeignKey(IpdProcedure, on_delete=models.CASCADE, related_name='similar_ipds')
+    similar_ipd_procedure = models.ForeignKey(IpdProcedure, on_delete=models.CASCADE, related_name='similar_ipds_2')
+    order = models.IntegerField(null=True, blank=True)
+
+    class Meta:
+        db_table = "similar_ipd_procedure_mapping"
+        unique_together = (('ipd_procedure', 'similar_ipd_procedure'),)
