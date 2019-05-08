@@ -35,9 +35,9 @@ class PrescriptionAppointmentValidation():
     @staticmethod
     def validate_appointment_object(attrs):
         if attrs and attrs.get('appointment_type') == prescription_models.PresccriptionPdf.OFFLINE:
-            queryset = doc_models.OfflineOPDAppointments.objects.select_related('doctor', 'hospital', 'user').prefetch_related('eprescription').filter(id=attrs.get('appointment_id'))
+            queryset = doc_models.OfflineOPDAppointments.objects.select_related('doctor', 'hospital', 'user').prefetch_related('eprescription', 'doctor__doctor_number').filter(id=attrs.get('appointment_id'))
         elif attrs.get('appointment_type') == prescription_models.PresccriptionPdf.DOCPRIME_OPD:
-            queryset = doc_models.OpdAppointment.objects.select_related('doctor', 'hospital', 'profile').prefetch_related('eprescription').filter(id=attrs.get('appointment_id'))
+            queryset = doc_models.OpdAppointment.objects.select_related('doctor', 'hospital', 'profile').prefetch_related('eprescription', 'doctor__doctor_number').filter(id=attrs.get('appointment_id'))
         appointment_object = queryset.first()
         if not appointment_object:
             raise serializers.ValidationError('No Appointment found')
