@@ -447,6 +447,7 @@ class MatrixDataMixin(object):
 
         policy_details = {
             "ProposalNo": None,
+            "PolicyPaymentSTATUS": 300 if user_insurance else 0,
             "BookingId": user_insurance.id if user_insurance else None,
             "ProposerName": primary_proposer_name,
             "PolicyId": user_insurance.policy_number if user_insurance else None,

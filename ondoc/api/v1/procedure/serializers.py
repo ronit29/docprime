@@ -104,7 +104,13 @@ class CommonProcedureSerializer(serializers.ModelSerializer):
 class CommonIpdProcedureSerializer(serializers.ModelSerializer):
     id = serializers.ReadOnlyField(source='ipd_procedure.id')
     name = serializers.ReadOnlyField(source='ipd_procedure.name')
+    url = serializers.SerializerMethodField()
 
     class Meta:
         model = CommonIpdProcedure
-        fields = ['id', 'name']
+        fields = ['id', 'name', 'url']
+
+    def get_url(self, obj):
+        entity_dict = self.context.get('entity_dict', {})
+        url = entity_dict.get(obj.ipd_procedure.id, None)
+        return url
