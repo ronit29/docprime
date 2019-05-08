@@ -33,6 +33,7 @@ def split_and_append(initial_str, spliter, appender):
     value_chunks = initial_str.split(spliter)
     return appender.join(value_chunks)
 
+
 class TempURL(TimeStampedModel):
 
     url = models.CharField(blank=False, null=True, max_length=2000, db_index=True)
@@ -46,19 +47,22 @@ class TempURL(TimeStampedModel):
     count = models.IntegerField(max_length=30, null=True, default=0)
     sitemap_identifier = models.CharField(max_length=28, null=True)
     sequence = models.PositiveIntegerField(default=0, null=True)
-    locality_latitude = models.DecimalField(null=True, max_digits=10, decimal_places=8)
-    locality_longitude = models.DecimalField(null=True, max_digits=10, decimal_places=8)
+    locality_latitude = models.DecimalField(null=True, max_digits=11, decimal_places=8)
+    locality_longitude = models.DecimalField(null=True, max_digits=11, decimal_places=8)
     sublocality_value = models.TextField(default='', null=True)
     locality_value = models.TextField(default='', null=True)
-    sublocality_latitude = models.DecimalField(null=True, max_digits=10, decimal_places=8, blank=True)
-    sublocality_longitude = models.DecimalField(null=True, max_digits=10, decimal_places=8, blank=True)
+    sublocality_latitude = models.DecimalField(null=True, max_digits=11, decimal_places=8, blank=True)
+    sublocality_longitude = models.DecimalField(null=True, max_digits=11, decimal_places=8, blank=True)
     locality_id = models.PositiveIntegerField(default=None,null=True)
     sublocality_id = models.PositiveIntegerField(default=None, null=True)
     specialization = models.TextField(default='', null=True)
     specialization_id = models.PositiveIntegerField(default=None, null=True)
+    ipd_procedure = models.TextField(default='', null=True)
+    ipd_procedure_id = models.PositiveIntegerField(default=None, null=True)
     locality_location = models.PointField(geography=True, srid=4326, blank=True, null=True)
     sublocality_location = models.PointField(geography=True, srid=4326, blank=True, null=True)
     location = models.PointField(geography=True, srid=4326, blank=True, null=True)
+    bookable_doctors_count = JSONField(null=True)
 
     class Meta:
         db_table='temp_url'
@@ -587,10 +591,16 @@ class EntityUrls(TimeStampedModel):
         DOCTORS_CITY = 'DOCTORS_CITY'
         DOCTOR_PAGE = 'DOCTOR_PAGE'
         LAB_TEST = 'LAB_TEST'
-
         LAB_LOCALITY_CITY = 'LAB_LOCALITY_CITY'
         LAB_CITY = 'LAB_CITY'
         LAB_PAGE = 'LAB_PAGE'
+
+        HOSPITAL_PAGE = 'HOSPITAL_PAGE'
+        HOSPITALS_LOCALITY_CITY = 'HOSPITALS_LOCALITY_CITY'
+        HOSPITALS_CITY = 'HOSPITALS_CITY'
+        IPD_PROCEDURE_CITY = 'IPD_PROCEDURE_CITY'
+        IPD_PROCEDURE_HOSPITAL_CITY = 'IPD_PROCEDURE_HOSPITAL_CITY'
+        IPD_PROCEDURE_DOCTOR_CITY = 'IPD_PROCEDURE_DOCTOR_CITY'
 
     class UrlType(Choices):
         PAGEURL = 'PAGEURL'
@@ -606,19 +616,22 @@ class EntityUrls(TimeStampedModel):
     count = models.IntegerField(max_length=30, null=True, default=0)
     sitemap_identifier = models.CharField(max_length=28, null=True, choices=SitemapIdentifier.as_choices())
     sequence = models.PositiveIntegerField(default=0)
-    locality_latitude = models.DecimalField(null=True, max_digits=10, decimal_places=8)
-    locality_longitude = models.DecimalField(null=True, max_digits=10, decimal_places=8)
+    locality_latitude = models.DecimalField(null=True, max_digits=11, decimal_places=8)
+    locality_longitude = models.DecimalField(null=True, max_digits=11, decimal_places=8)
     sublocality_value = models.TextField(default='', null=True)
     locality_value = models.TextField(default='', null=True)
-    sublocality_latitude = models.DecimalField(null=True, max_digits=10, decimal_places=8, blank=True)
-    sublocality_longitude = models.DecimalField(null=True, max_digits=10, decimal_places=8, blank=True)
+    sublocality_latitude = models.DecimalField(null=True, max_digits=11, decimal_places=8, blank=True)
+    sublocality_longitude = models.DecimalField(null=True, max_digits=11, decimal_places=8, blank=True)
     locality_id = models.PositiveIntegerField(default=None,null=True)
     sublocality_id = models.PositiveIntegerField(default=None, null=True)
     specialization = models.TextField(default='', null=True)
     specialization_id = models.PositiveIntegerField(default=None, null=True)
+    ipd_procedure = models.TextField(default=None, null=True)
+    ipd_procedure_id = models.PositiveIntegerField(default=None, null=True)
     locality_location = models.PointField(geography=True, srid=4326, blank=True, null=True)
     sublocality_location = models.PointField(geography=True, srid=4326, blank=True, null=True)
     location = models.PointField(geography=True, srid=4326, blank=True, null=True)
+    bookable_doctors_count = JSONField(null=True)
 
     def __str__(self):
         return self.url
