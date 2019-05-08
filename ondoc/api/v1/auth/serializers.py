@@ -190,10 +190,17 @@ class UserProfileSerializer(serializers.ModelSerializer):
         if isinstance(obj, dict):
             return False
 
-        insured_member_obj = InsuredMembers.objects.filter(profile=obj).order_by('-id').first()
+        # insured_member_obj = InsuredMembers.objects.filter(profile=obj).order_by('-id').first()
+        insured_member_obj = None
+        if obj.insurance.all():
+            insured_member_obj = obj.insurance.all()[0]
+            for object in obj.insurance.all():
+                if object.id > insured_member_obj.id:
+                    insured_member_obj = object
         if not insured_member_obj:
             return False
-        user_insurance_obj = UserInsurance.objects.filter(id=insured_member_obj.user_insurance_id).last()
+        # user_insurance_obj = UserInsurance.objects.filter(id=insured_member_obj.user_insurance_id).last()
+        user_insurance_obj = insured_member_obj.user_insurance
         if user_insurance_obj and user_insurance_obj.is_profile_valid():
             return True
         else:
@@ -202,10 +209,17 @@ class UserProfileSerializer(serializers.ModelSerializer):
     def get_insurance_status(self, obj):
         if isinstance(obj, dict):
             return False
-        insured_member_obj = InsuredMembers.objects.filter(profile=obj).order_by('-id').first()
+        # insured_member_obj = InsuredMembers.objects.filter(profile=obj).order_by('-id').first()
+        insured_member_obj = None
+        if obj.insurance.all():
+            insured_member_obj = obj.insurance.all()[0]
+            for object in obj.insurance.all():
+                if object.id > insured_member_obj.id:
+                    insured_member_obj = object
         if not insured_member_obj:
             return 0
-        user_insurance_obj = UserInsurance.objects.filter(id=insured_member_obj.user_insurance_id).last()
+        # user_insurance_obj = UserInsurance.objects.filter(id=insured_member_obj.user_insurance_id).last()
+        user_insurance_obj = insured_member_obj.user_insurance
         if user_insurance_obj and user_insurance_obj.is_profile_valid():
             return user_insurance_obj.status
         else:
