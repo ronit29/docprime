@@ -1363,29 +1363,29 @@ class LabList(viewsets.ReadOnlyModelViewSet):
             if lab_visit and not home_visit:
                 filtering_query.append('  is_home_collection_enabled = False and home_collection_possible = False ')
 
-        if ids and availability:
-            start_day = Date.today().weekday()
-            avail_days = max(map(int, availability))
-            days = list()
-            if avail_days == serializers.SearchLabListSerializer.TODAY:
-                days.append(start_day)
-            elif avail_days == serializers.SearchLabListSerializer.TOMORROW:
-                days.append(start_day)
-                days.append(0 if start_day == 6 else start_day + 1)
-            elif avail_days == serializers.SearchLabListSerializer.NEXT_3_DAYS:
-                for day in range(4):
-                    days.append(0 if start_day == 6 else start_day + 1)
-
-            counter = 1
-            if len(days) > 0:
-                lab_days_str = 'lt.day IN ('
-                for day in days:
-                    if not counter == 1:
-                        lab_days_str += ','
-                    lab_days_str = lab_days_str + '%(' + 'lab_day' + str(counter) + ')s'
-                    filtering_params['lab_day' + str(counter)] = day
-                    counter += 1
-                filtering_query.append(lab_days_str + ')')
+        # if ids and availability:
+        #     start_day = Date.today().weekday()
+        #     avail_days = max(map(int, availability))
+        #     days = list()
+        #     if avail_days == serializers.SearchLabListSerializer.TODAY:
+        #         days.append(start_day)
+        #     elif avail_days == serializers.SearchLabListSerializer.TOMORROW:
+        #         days.append(start_day)
+        #         days.append(0 if start_day == 6 else start_day + 1)
+        #     elif avail_days == serializers.SearchLabListSerializer.NEXT_3_DAYS:
+        #         for day in range(4):
+        #             days.append(0 if start_day == 6 else start_day + 1)
+        #
+        #     counter = 1
+        #     if len(days) > 0:
+        #         lab_days_str = 'lbt.day IN ('
+        #         for day in days:
+        #             if not counter == 1:
+        #                 lab_days_str += ','
+        #             lab_days_str = lab_days_str + '%(' + 'lab_day' + str(counter) + ')s'
+        #             filtering_params['lab_day' + str(counter)] = day
+        #             counter += 1
+        #         filtering_query.append(lab_days_str + ')')
 
         filter_query_string = ""
         if len(filtering_query) > 0:
@@ -1449,12 +1449,12 @@ class LabList(viewsets.ReadOnlyModelViewSet):
                         sum(case when custom_deal_price is null then computed_deal_price else custom_deal_price end)as price,
                         max(ST_Distance(location,St_setsrid(St_point((%(longitude)s), (%(latitude)s)), 4326))) as distance,
                         max(order_priority) as max_order_priority from lab lb inner join available_lab_test avlt on
-                        lb.lab_pricing_group_id = avlt.lab_pricing_group_id  inner join lab_timing lt on lb.id=lt.lab_id
+                        lb.lab_pricing_group_id = avlt.lab_pricing_group_id  
                         and lb.is_test_lab = False and lb.is_live = True and lb.lab_pricing_group_id is not null 
                         and St_dwithin( St_setsrid(St_point((%(longitude)s), (%(latitude)s)), 4326),lb.location, (%(max_distance)s)) 
                         and St_dwithin(St_setsrid(St_point((%(longitude)s), (%(latitude)s)), 4326), lb.location,  (%(min_distance)s)) = false 
                         and avlt.enabled = True 
-                        inner join lab_test lbt on lbt.id = avlt.test_id and lbt.enable_for_retail=True 
+                        inner join lab_test lt on lt.id = avlt.test_id and lt.enable_for_retail=True 
                          where 1=1 {filter_query_string}
 
                         group by lb.id having count(*)=(%(length)s))a
