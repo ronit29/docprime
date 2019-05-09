@@ -1331,16 +1331,13 @@ class DoctorAppointmentRetrieveSerializer(OpdAppointmentSerializer):
     doctor = AppointmentRetrieveDoctorSerializer()
     mask_data = serializers.SerializerMethodField()
     mrp = serializers.ReadOnlyField(source='fees')
-    is_docprime = serializers.SerializerMethodField()
+    is_docprime = serializers.ReadOnlyField(default=True)
 
     def get_mask_data(self, obj):
         mask_number = obj.mask_number.first()
         if mask_number:
             return mask_number.build_data()
         return None
-
-    def get_is_docprime(self, obj):
-        return True if isinstance(obj, OpdAppointment) else False
 
     class Meta:
         model = OpdAppointment
