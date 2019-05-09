@@ -2015,13 +2015,15 @@ class IpdProcedureLeadSerializer(serializers.ModelSerializer):
     hospital = serializers.PrimaryKeyRelatedField(queryset=Hospital.objects.filter(is_live=True), required=False)
     name = serializers.CharField(max_length=100)
     phone_number = serializers.IntegerField(min_value=1000000000, max_value=9999999999)
-    email = serializers.EmailField(max_length=256)
+    email = serializers.EmailField(max_length=256, required=False)
     gender = serializers.ChoiceField(choices=UserProfile.GENDER_CHOICES)
     age = serializers.IntegerField(min_value=1, max_value=120, required=False, default=None)
     dob = serializers.DateField(required=False, default=None)
     lat = serializers.FloatField(required=False, allow_null=True)
     long = serializers.FloatField(required=False, allow_null=True)
     city = serializers.CharField(required=False, allow_null=True, allow_blank=True)
+    source = serializers.CharField(required=False, default='docprimeweb')
+    specialty = serializers.CharField(required=False, default=None)
 
     class Meta:
         model = IpdProcedureLead
