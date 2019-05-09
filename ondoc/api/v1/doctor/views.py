@@ -1439,8 +1439,9 @@ class DoctorListViewSet(viewsets.GenericViewSet):
         if validated_data.get('avg_ratings'):
             ratings = min([float(rating) for rating in validated_data.get('avg_ratings')])
             response = [data for data in response if
-                        (data.get('average_rating') and data.get('average_rating') > ratings) or (data.get('google_rating') and
-                        data.get('google_rating').get('avg_rating') > ratings)]
+                        (data.get('average_rating') and data.get('average_rating') > ratings) or (
+                                    data.get('google_rating') and
+                                    data.get('google_rating').get('avg_rating') and data.get('google_rating').get('avg_rating') > ratings)]
 
         entity_ids = [doctor_data['id'] for doctor_data in response]
 

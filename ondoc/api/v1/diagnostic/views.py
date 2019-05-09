@@ -315,7 +315,8 @@ class LabList(viewsets.ReadOnlyModelViewSet):
         if home_visit and not lab_visit:
             filter_query += ' and is_home_collection_enabled = True and home_collection_possible = True '
         if lab_visit and not home_visit:
-            filter_query += ' and is_home_collection_enabled = False and home_collection_possible = False '
+            filter_query += " and network_id IS DISTINCT FROM 1 "
+
         if avg_ratings:
             filter_query += " and (case when rating_data is not null and (rating_data->> 'avg_rating') is not null and (rating_data ->> 'rating_count') is not null and (rating_data ->> 'rating_count')::int >5 then (rating_data->> 'avg_rating')::float > (%(avg_ratings)s) end) "
             params['avg_ratings'] = max(avg_ratings)
@@ -1388,7 +1389,7 @@ class LabList(viewsets.ReadOnlyModelViewSet):
         if ids:
             if home_visit and not lab_visit:
                 filtering_query.append(' is_home_collection_enabled = True and home_collection_possible = True ')
-            if lab_visit:
+            if lab_visit and not home_visit:
                 filtering_query.append("lb.network_id IS DISTINCT FROM 1 ")
         ## We are excluding THYROCARE_NETWORK_ID here which is 1
 
@@ -1510,7 +1511,8 @@ class LabList(viewsets.ReadOnlyModelViewSet):
                     queryset_order_by = ' price + pickup_charges asc, distance asc'
                     # queryset_order_by = ' order_priority desc, price + pickup_charges asc, distance asc'
             elif order_by == 'distance':
-                queryset_order_by = ' order_priority desc, distance asc'
+                queryset_order_by = ' distance asc'
+                # queryset_order_by = ' order_priority desc, distance asc'
             elif order_by == 'name':
                 queryset_order_by = ' order_priority desc, name asc'
             else:
