@@ -1562,14 +1562,14 @@ class DoctorListViewSet(viewsets.GenericViewSet):
             # if validated_data.get('extras') and validated_data.get('extras').get('specialization'):
             #     specializations = validated_data.get('extras').get('specialization')
 
-            if validated_data.get('sitemap_identifier') == 'SPECIALIZATION_CITY':
-                title, description, ratings_title = self.get_spec_city_title_desc(specialization_id, city, specialization)
-
             if validated_data.get('sitemap_identifier') == 'IPD_PROCEDURE_DOCTOR_CITY':
                 title = '{ipd_procedure_name} Doctors in {city} | Best {ipd_procedure_name} Specialists'.format(
                     ipd_procedure_name=validated_data.get('ipd_procedure'), city=city)
                 description = '{ipd_procedure_name} Doctors in {city} : Check {ipd_procedure_name} doctors in {city}. View address, reviews, cost estimate and more at Docprime.'.format(
                     ipd_procedure_name=validated_data.get('ipd_procedure'), city=city)
+
+            if validated_data.get('sitemap_identifier') == 'SPECIALIZATION_CITY':
+                title, description, ratings_title = self.get_spec_city_title_desc(specialization_id, city, specialization)
 
             elif validated_data.get('sitemap_identifier') == 'SPECIALIZATION_LOCALITY_CITY':
                 title = specialization
@@ -1582,7 +1582,7 @@ class DoctorListViewSet(viewsets.GenericViewSet):
                     description += ' and get upto 50% off. View Address, fees and more for doctors '
                     description += 'in ' + city + '.'
 
-            else:
+            elif validated_data.get('sitemap_identifier') in ('DOCTORS_CITY', 'DOCTORS_LOCALITY_CITY'):
                 title = 'Doctors'
                 description = 'Doctors'
                 if locality:
