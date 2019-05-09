@@ -440,10 +440,10 @@ class UserProfileViewSet(mixins.CreateModelMixin, mixins.ListModelMixin,
         insured_member_profile = None
         insured_member_status = None
         if insured_member_obj:
-            # insured_member_profile = insured_member_obj.profile
+            insured_member_profile = insured_member_obj.profile
             insured_member_status = insured_member_obj.user_insurance.status
         # if obj and hasattr(obj, 'id') and obj.id and insured_member_profile:
-        if obj and hasattr(obj, 'id') and obj.id and not (insured_member_status == UserInsurance.CANCELLED or
+        if obj and hasattr(obj, 'id') and obj.id and insured_member_profile and not (insured_member_status == UserInsurance.CANCELLED or
                                                               insured_member_status == UserInsurance.EXPIRED):
 
             whatsapp_optin = data.get('whatsapp_optin')
