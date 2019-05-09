@@ -802,14 +802,6 @@ class PartnersAppInvoice(viewsets.GenericViewSet):
             model_serializer = serializers.GeneralInvoiceItemsModelSerializer(items, many=True)
         return Response({"invoice_items": model_serializer.data}, status.HTTP_200_OK)
 
-    # @staticmethod
-    # def bulk_delete_selected_invoice_items(selected_invoice_item, invoice_obj):
-    #     invoice_items = list()
-    #     for item in selected_invoice_item:
-    #         invoice_items.append(item["invoice_item"])
-    #     doc_models.SelectedInvoiceItems.filter(invoice)
-    #     return
-
     @staticmethod
     def bulk_create_selected_invoice_items(selected_invoice_item, invoice):
         obj_list = list()

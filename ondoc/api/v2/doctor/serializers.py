@@ -211,7 +211,7 @@ class ConsentIsDocprimeSerializer(serializers.Serializer):
 
 class BulkCreateDoctorSerializer(serializers.Serializer):
     name = serializers.CharField(max_length=200)
-    online_consultation_fees = serializers.DecimalField(required=False, max_digits=10, decimal_places=2, min_value=0, allow_null=True)
+    online_consultation_fees = serializers.IntegerField(required=False, min_value=0, allow_null=True)
     license = serializers.CharField(max_length=200, allow_blank=True, required=False)
     phone_number = serializers.IntegerField(required=False, min_value=5000000000, max_value=9999999999, allow_null=True)
     is_appointment = serializers.BooleanField(default=False)
@@ -422,7 +422,7 @@ class SelectedInvoiceItemsModelSerializer(serializers.ModelSerializer):
 
 class PartnersAppInvoiceSerialier(serializers.Serializer):
     appointment_id = serializers.PrimaryKeyRelatedField(queryset=doc_models.OfflineOPDAppointments.objects.all())
-    consultation_fees = serializers.DecimalField(max_digits=10, decimal_places=2)
+    consultation_fees = serializers.IntegerField(min_value=0)
     selected_invoice_items = serializers.ListField(child=SelectedInvoiceItemsSerializer(many=False), required=False,
                                                    allow_empty=True)
     payment_status = serializers.ChoiceField(choices=doc_models.PartnersAppInvoice.PAYMENT_STATUS)
