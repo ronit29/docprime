@@ -1,9 +1,12 @@
+from django.contrib.contenttypes.fields import GenericRelation
+from django.contrib.contenttypes.models import ContentType
 from django.core.validators import FileExtensionValidator
 from django.db import models
 from django.utils import timezone
 from ondoc.authentication import models as auth_model
 from ondoc.authentication.models import TimeStampedModel, Document
-from ondoc.common.models import MatrixMappedCity, MatrixMappedState
+from ondoc.bookinganalytics.models import DP_CorporateDeals
+from ondoc.common.models import MatrixMappedCity, MatrixMappedState, SyncBookingAnalytics
 
 
 class CorporateBooking(auth_model.TimeStampedModel):
@@ -31,19 +34,110 @@ class CorporateDeal(auth_model.TimeStampedModel):
     deal_end_date = models.DateTimeField()
     payment_date = models.DateTimeField()
     gross_amount = models.IntegerField(default=None)
-    YES = 1
-    NO = 2
-    tds_choices = ((YES, 'Yes'), (NO, 'No'),)
-    tds_deducted = models.IntegerField(choices=tds_choices, default=NO)
+    tds_choices = (('YES', 'Yes'), ('NO', 'No'),)
+    tds_deducted = models.CharField(max_length=50, choices=tds_choices, default='NO')
     expected_provider_fee = models.IntegerField(default=None)
     employee_count = models.IntegerField(default=None)
     service_description = models.TextField(default='N/A')
     receipt_no = models.CharField(max_length=1000, default='')
+    is_active = models.BooleanField(default=False)
     receipt_image = models.FileField(default=None, upload_to='corporate/receipt', validators=[
         FileExtensionValidator(allowed_extensions=['pdf', 'jfif', 'jpg', 'jpeg', 'png'])])
+    synced_analytics = GenericRelation(SyncBookingAnalytics, related_name="corporate_deal_analytics")
+
 
     def __str__(self):
         return "{}".format(self.id)
+
+
+    def sync_with_booking_analytics(self):
+        obj = DP_CorporateDeals.objects.filter(CorporateDealId=self.id).first()
+        if not obj:
+            obj = DP_CorporateDeals()
+            obj.CorporateDealId = self.id
+            obj.CorporateName = self.corporate_id.corporate_name
+            obj.DealStartDate = self.deal_start_date
+            obj.ReceiptNumber = self.receipt_no
+            obj.CreatedDate = self.created_at
+            obj.ExpectedProviderFee = self.expected_provider_fee
+            obj.GrossAmount = self.gross_amount
+            obj.NumberOfEmployees = self.employee_count
+            obj.TDSDeducted = self.tds_deducted
+            obj.PaymentDate = self.payment_date
+        obj.IsActive = self.is_active
+        obj.DealEndDate = self.deal_end_date
+        obj.UpdatedDate = self.updated_at
+        obj.save()
+
+        try:
+            SyncBookingAnalytics.objects.update_or_create(object_id=self.id,
+                                                          content_type=ContentType.objects.get_for_model(CorporateDeal),
+                                                          defaults={"synced_at": self.updated_at, "last_updated_at": self.updated_at})
+        except Exception as e:
+            pass
+
+        return obj
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+        promo_cost = self.deal_price - self.effective_price if self.deal_price and self.effective_price else 0
+        department = None
+        if self.doctor:
+            if self.doctor.doctorpracticespecializations.first():
+                if self.doctor.doctorpracticespecializations.first().specialization.department.first():
+                    department = self.doctor.doctorpracticespecializations.first().specialization.department.first().id
+
+        wallet, cashback = self.get_completion_breakup()
+
+        obj = DP_OpdConsultsAndTests.objects.filter(Appointment_Id=self.id, TypeId=1).first()
+        if not obj:
+            obj = DP_OpdConsultsAndTests()
+            obj.Appointment_Id = self.id
+            obj.CityId = self.get_city()
+            obj.StateId = self.get_state()
+            obj.SpecialityId = department
+            obj.TypeId = 1
+            obj.ProviderId = self.hospital.id
+            obj.PaymentType = self.payment_type if self.payment_type else None
+            obj.Payout = self.fees
+            obj.CashbackUsed = cashback
+            obj.BookingDate = self.created_at
+        obj.PromoCost = max(0, promo_cost)
+        obj.GMValue = self.deal_price
+        obj.StatusId = self.status
+        obj.save()
+
+        try:
+            SyncBookingAnalytics.objects.update_or_create(object_id=self.id,
+                                                          content_type=ContentType.objects.get_for_model(OpdAppointment),
+                                                          defaults={"synced_at": self.updated_at, "last_updated_at": self.updated_at})
+        except Exception as e:
+            pass
+
+        return obj
 
     class Meta:
         db_table = "corporate_deal"
