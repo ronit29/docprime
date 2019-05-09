@@ -1437,10 +1437,10 @@ class DoctorListViewSet(viewsets.GenericViewSet):
                                                                 hosp_locality_entity_dict=hosp_locality_entity_dict)
 
         if validated_data.get('avg_ratings'):
-            ratings = max(validated_data.get('avg_ratings'))
+            ratings = min([float(rating) for rating in validated_data.get('avg_ratings')])
             response = [data for data in response if
-                        data['average_rating'] and data['average_rating'] > float(ratings) or data['google_rating'] and
-                        data['google_rating'] > float(ratings)]
+                        (data.get('average_rating') and data.get('average_rating') > ratings) or (data.get('google_rating') and
+                        data.get('google_rating').get('avg_rating') > ratings)]
 
         entity_ids = [doctor_data['id'] for doctor_data in response]
 

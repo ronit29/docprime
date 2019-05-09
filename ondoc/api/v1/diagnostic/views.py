@@ -1,8 +1,6 @@
 import operator
 from copy import deepcopy
 from itertools import groupby
-from pyodbc import Date
-
 from ondoc.api.v1.diagnostic.serializers import CustomLabTestPackageSerializer
 from ondoc.api.v1.doctor.serializers import CommaSepratedToListField
 from ondoc.authentication.backends import JWTAuthentication
@@ -1300,7 +1298,7 @@ class LabList(viewsets.ReadOnlyModelViewSet):
         filtering_params = {}
         #params = {}
         if not min_distance:
-            min_distance = 0
+            min_distance=0
 
         filtering_params['min_distance'] = min_distance
         filtering_params['max_distance'] = max_distance
@@ -1355,7 +1353,7 @@ class LabList(viewsets.ReadOnlyModelViewSet):
 
         if avg_ratings:
             filtering_query.append("(case when rating_data is not null then(rating_data->> 'avg_rating')::float > (%(avg_ratings)s) end)")
-            filtering_params['avg_ratings'] = max(avg_ratings)
+            filtering_params['avg_ratings'] = min(avg_ratings)
 
         if ids:
             if home_visit and not lab_visit:
@@ -1449,7 +1447,7 @@ class LabList(viewsets.ReadOnlyModelViewSet):
                         sum(case when custom_deal_price is null then computed_deal_price else custom_deal_price end)as price,
                         max(ST_Distance(location,St_setsrid(St_point((%(longitude)s), (%(latitude)s)), 4326))) as distance,
                         max(order_priority) as max_order_priority from lab lb inner join available_lab_test avlt on
-                        lb.lab_pricing_group_id = avlt.lab_pricing_group_id  
+                        lb.lab_pricing_group_id = avlt.lab_pricing_group_id 
                         and lb.is_test_lab = False and lb.is_live = True and lb.lab_pricing_group_id is not null 
                         and St_dwithin( St_setsrid(St_point((%(longitude)s), (%(latitude)s)), 4326),lb.location, (%(max_distance)s)) 
                         and St_dwithin(St_setsrid(St_point((%(longitude)s), (%(latitude)s)), 4326), lb.location,  (%(min_distance)s)) = false 
