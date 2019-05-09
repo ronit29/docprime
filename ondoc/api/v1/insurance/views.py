@@ -166,6 +166,8 @@ class InsuranceOrderViewSet(viewsets.GenericViewSet):
             user = User.objects.filter(phone_number=phone_number, user_type=User.CONSUMER).first()
             if not user:
                 user = request.user
+        else:
+            user = request.user
 
         if not user.is_anonymous:
             user_insurance_lead = InsuranceLead.objects.filter(user=user).order_by('id').last()
