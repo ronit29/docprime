@@ -90,7 +90,7 @@ class ListInsuranceViewSet(viewsets.GenericViewSet):
             user = request.user
             if not user.is_anonymous:
                 user_insurance = UserInsurance.get_user_insurance(request.user)
-                if user_insurance and user_insurance.is_profile_valid():
+                if user_insurance and user_insurance.is_profile_valid() and not request.query_params.get('is_endorsement'):
                     return Response(data={'certificate': True}, status=status.HTTP_200_OK)
 
             insurer_data = self.get_queryset()
@@ -506,3 +506,21 @@ class InsuranceCancelViewSet(viewsets.GenericViewSet):
         res['cancel_master'] = cancel_master
 
         return Response(data=res, status=status.HTTP_200_OK)
+
+
+class InsuranceEndorsementViewSet(viewsets.GenericViewSet):
+    authentication_classes = (JWTAuthentication,)
+    permission_classes = (IsAuthenticated,)
+
+    def get_endorsement_data(self, request):
+        user = request.user
+        user_insurance = user.active_insurance
+        res = {}
+        if not user_insurance:
+            res['error'] = "Insurance not found for the user"
+            return Response(data=res, status=status.HTTP_400_BAD_REQUEST)
+        if not user_insurance.status == UserInsurance.ACTIVE:
+            res['error'] = "Active Insurance not found for the user"
+            return Response(data=res, status=status.HTTP_400_BAD_REQUEST)
+        # return Response(data=res, status=status.HTTP_200_OK)
+

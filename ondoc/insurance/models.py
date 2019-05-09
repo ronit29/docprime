@@ -484,6 +484,9 @@ class UserInsurance(auth_model.TimeStampedModel):
 
         return None
 
+    def get_members(self):
+        return InsuredMembers.objects.filter(user_insurance=self).all()
+
     @classmethod
     def get_user_insurance(cls, user):
         return UserInsurance.objects.filter(user=user).order_by('-created_at').first()
