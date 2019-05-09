@@ -66,8 +66,7 @@ class DoctorLoginSerializer(serializers.Serializer):
             lab_admin_not_exists = provider_signup_lead_not_exists = False
             if not DoctorNumber.objects.filter(phone_number=attrs['phone_number']).exists():
                 doctor_not_exists = True
-            admin = GenericAdmin.objects.filter(phone_number=attrs['phone_number'], is_disabled=False)
-            if not admin.exists():
+            if not GenericAdmin.objects.filter(phone_number=attrs['phone_number'], is_disabled=False).exists():
                 admin_not_exists = True
             if not GenericLabAdmin.objects.filter(phone_number=attrs['phone_number'], is_disabled=False).exists():
                 lab_admin_not_exists = True
@@ -76,11 +75,11 @@ class DoctorLoginSerializer(serializers.Serializer):
             if doctor_not_exists and admin_not_exists and lab_admin_not_exists and provider_signup_lead_not_exists:
                 raise serializers.ValidationError('No Doctor or Admin with given phone number found')
 
-            agent_hospitals = admin.filter(Q(hospital__isnull=False, hospital__is_live=True), Q(hospital__source_type=Hospital.AGENT) | Q(hospital__source_type=None))
-            provider_hospitals = admin.filter(hospital__isnull=False, hospital__source_type=Hospital.PROVIDER)
-            if not agent_hospitals.exists():
-                if not provider_hospitals.exists():
-                    raise serializers.ValidationError("Live hospital for admin not found")
+        agent_hospitals = GenericAdmin.objects.filter(Q(phone_number=attrs['phone_number'], is_disabled=False, hospital__is_live=True), Q(Q(hospital__source_type=Hospital.AGENT) | Q(hospital__source_type=None)))
+        provider_hospitals = GenericAdmin.objects.filter(phone_number=attrs['phone_number'], is_disabled=False, hospital__source_type=Hospital.PROVIDER)
+        if not agent_hospitals.exists():
+            if not provider_hospitals.exists():
+                raise serializers.ValidationError("Live hospital for admin not found")
 
         return attrs
 
@@ -192,12 +191,7 @@ class UserProfileSerializer(serializers.ModelSerializer):
             return False
 
         # insured_member_obj = InsuredMembers.objects.filter(profile=obj).order_by('-id').first()
-        insured_member_obj = None
-        if obj.insurance.all():
-            insured_member_obj = obj.insurance.all()[0]
-            for object in obj.insurance.all():
-                if object.id > insured_member_obj.id:
-                    insured_member_obj = object
+        insured_member_obj = sorted(obj.insurance.all(), key=lambda object: object.id, reverse=True)[0] if obj.insurance.all() else None
         if not insured_member_obj:
             return False
         # user_insurance_obj = UserInsurance.objects.filter(id=insured_member_obj.user_insurance_id).last()
@@ -211,12 +205,7 @@ class UserProfileSerializer(serializers.ModelSerializer):
         if isinstance(obj, dict):
             return False
         # insured_member_obj = InsuredMembers.objects.filter(profile=obj).order_by('-id').first()
-        insured_member_obj = None
-        if obj.insurance.all():
-            insured_member_obj = obj.insurance.all()[0]
-            for object in obj.insurance.all():
-                if object.id > insured_member_obj.id:
-                    insured_member_obj = object
+        insured_member_obj = sorted(obj.insurance.all(), key=lambda object: object.id, reverse=True)[0] if obj.insurance.all() else None
         if not insured_member_obj:
             return 0
         # user_insurance_obj = UserInsurance.objects.filter(id=insured_member_obj.user_insurance_id).last()

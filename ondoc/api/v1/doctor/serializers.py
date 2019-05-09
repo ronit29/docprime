@@ -1331,16 +1331,13 @@ class DoctorAppointmentRetrieveSerializer(OpdAppointmentSerializer):
     doctor = AppointmentRetrieveDoctorSerializer()
     mask_data = serializers.SerializerMethodField()
     mrp = serializers.ReadOnlyField(source='fees')
-    is_docprime = serializers.SerializerMethodField()
+    is_docprime = serializers.ReadOnlyField(default=True)
 
     def get_mask_data(self, obj):
         mask_number = obj.mask_number.first()
         if mask_number:
             return mask_number.build_data()
         return None
-
-    def get_is_docprime(self, obj):
-        return True if isinstance(obj, OpdAppointment) else False
 
     class Meta:
         model = OpdAppointment
@@ -1538,7 +1535,7 @@ class AdminUpdateBodySerializer(AdminCreateBodySerializer):
     remove_list = serializers.ListField()
     old_phone_number = serializers.IntegerField(min_value=5000000000, max_value=9999999999, required=False)
     license = serializers.CharField(max_length=200, required=False)
-    online_consultation_fees = serializers.DecimalField(max_digits=10, decimal_places=2, min_value=0, required=False)
+    online_consultation_fees = serializers.IntegerField(min_value=0, required=False)
 
     def validate(self, attrs):
         if attrs['type'] == User.STAFF and 'name' not in attrs:
