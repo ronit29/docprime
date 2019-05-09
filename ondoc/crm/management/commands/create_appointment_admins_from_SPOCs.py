@@ -28,6 +28,8 @@ class Command(BaseCommand):
                                                                                                     'hospital_spocs')
         admins_to_be_created = list()
         for spoc in spocs_without_admins:
+            if len(spoc['name']) > 100:
+                continue
             admins_to_be_created.append(
                 GenericAdmin(name=spoc['name'], phone_number=str(spoc['number']), hospital_id=spoc['hospital_spocs'],
                              permission_type=GenericAdmin.APPOINTMENT, auto_created_from_SPOCs=True))
