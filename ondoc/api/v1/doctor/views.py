@@ -1548,7 +1548,7 @@ class DoctorListViewSet(viewsets.GenericViewSet):
                     description += ' and get upto 50% off. View Address, fees and more for doctors '
                     description += 'in ' + city + '.'
 
-            else:
+            elif validated_data.get('sitemap_identifier') in ('DOCTORS_CITY', 'DOCTORS_LOCALITY_CITY'):
                 title = 'Doctors'
                 description = 'Doctors'
                 if locality:

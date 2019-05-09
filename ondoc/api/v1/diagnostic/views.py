@@ -1388,8 +1388,6 @@ class LabList(viewsets.ReadOnlyModelViewSet):
         if ids:
             if home_visit and not lab_visit:
                 filtering_query.append(' is_home_collection_enabled = True and home_collection_possible = True ')
-            if lab_visit and not home_visit:
-                filtering_query.append(' center_visit_enabled = True ')
 
         filter_query_string = ""
         if len(filtering_query) > 0:
