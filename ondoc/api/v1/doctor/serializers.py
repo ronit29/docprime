@@ -2007,6 +2007,8 @@ class IpdProcedureLeadSerializer(serializers.ModelSerializer):
     lat = serializers.FloatField(required=False, allow_null=True)
     long = serializers.FloatField(required=False, allow_null=True)
     city = serializers.CharField(required=False, allow_null=True, allow_blank=True)
+    source = serializers.CharField(required=False, default='docprimeweb')
+    specialty = serializers.CharField(required=False, default=None)
 
     class Meta:
         model = IpdProcedureLead
