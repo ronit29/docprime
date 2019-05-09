@@ -701,7 +701,7 @@ class UserInsuranceForm(forms.ModelForm):
         # if int(status) == UserInsurance.ONHOLD:
         #     if not onhold_reason:
         #         raise forms.ValidationError("In Case of ONHOLD status, Onhold reason is mandatory")
-        if case_type=="NO" and int(status) == UserInsurance.CANCEL_INITIATE or int(status) == UserInsurance.CANCELLED:
+        if case_type=="NO" and (int(status) == UserInsurance.CANCEL_INITIATE or int(status) == UserInsurance.CANCELLED):
             if not cancel_reason:
                 raise forms.ValidationError('For Cancel Initiation, Cancel reason is mandatory')
             insured_opd_completed_app_count = OpdAppointment.get_insured_completed_appointment(self.instance)
@@ -712,7 +712,7 @@ class UserInsuranceForm(forms.ModelForm):
             if insured_opd_completed_app_count > 0:
                 raise forms.ValidationError('OPD appointment with insurance have been completed, '
                                             'Cancellation could not proceed')
-        if case_type == "YES" and int(status) == UserInsurance.CANCEL_INITIATE or int(status) == UserInsurance.CANCELLED:
+        if case_type == "YES" and (int(status) == UserInsurance.CANCEL_INITIATE or int(status) == UserInsurance.CANCELLED):
             if not cancel_reason:
                 raise forms.ValidationError('For Cancel Initiation, Cancel reason is mandatory')
         if int(status) == UserInsurance.CANCELLED and not self.instance.status == UserInsurance.CANCEL_INITIATE:
