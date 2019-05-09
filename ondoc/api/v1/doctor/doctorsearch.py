@@ -80,6 +80,7 @@ class DoctorSearchHelper:
                 sp_str+')'
             )
 
+        counter = 1
         if self.query_params.get("sits_at"):
             sits_at_str = 'hospital_type IN('
             for hosp_type in sits_at_hosp_types:

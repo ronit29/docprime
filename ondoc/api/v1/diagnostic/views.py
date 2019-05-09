@@ -1388,6 +1388,9 @@ class LabList(viewsets.ReadOnlyModelViewSet):
         if ids:
             if home_visit and not lab_visit:
                 filtering_query.append(' is_home_collection_enabled = True and home_collection_possible = True ')
+            if lab_visit:
+                filtering_query.append("lb.network_id IS DISTINCT FROM 1 ")
+        ## We are excluding THYROCARE_NETWORK_ID here which is 1
 
         filter_query_string = ""
         if len(filtering_query) > 0:
