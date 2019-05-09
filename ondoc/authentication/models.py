@@ -791,11 +791,11 @@ class GenericLabAdmin(TimeStampedModel, CreatedByModel):
 
     @classmethod
     def update_user_lab_admin(cls, phone_number):
-        user = User.objects.filter(phone_number=phone_number, user_type=User.DOCTOR)
-        if user.exists():
+        user = User.objects.filter(phone_number=phone_number, user_type=User.DOCTOR).first()
+        if user:
             admin = GenericLabAdmin.objects.filter(phone_number=phone_number, user__isnull=True)
             if admin.exists():
-                admin.update(user=user.first())
+                admin.update(user=user)
 
     @classmethod
     def get_user_admin_obj(cls, user):
