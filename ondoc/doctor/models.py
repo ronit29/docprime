@@ -2189,6 +2189,10 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
 
         if old_instance and old_instance.status != self.ACCEPTED and self.status == self.ACCEPTED:
             try:
+                notification_tasks.appointment_reminder_sms_provider.apply_async(
+                    (self.id, str(math.floor(self.updated_at.timestamp()))),
+                    eta=self.time_slot_start - datetime.timedelta(
+                        minutes=int(settings.PROVIDER_SMS_APPOINTMENT_REMINDER_TIME)), )
                 notification_tasks.opd_send_otp_before_appointment.apply_async(
                     (self.id, str(math.floor(self.time_slot_start.timestamp()))),
                     eta=self.time_slot_start - datetime.timedelta(
@@ -3123,6 +3127,7 @@ class OfflineOPDAppointments(auth_model.TimeStampedModel):
                                   null=True)
     status = models.PositiveSmallIntegerField(default=CREATED, choices=STATUS_CHOICES)
     time_slot_start = models.DateTimeField(blank=True, null=True)
+    fees = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
     error = models.BooleanField(default=False)
     error_message = models.CharField(max_length=256, blank=True, null=True)
 
@@ -3200,6 +3205,22 @@ class OfflineOPDAppointments(auth_model.TimeStampedModel):
                     OfflineOPDAppointments.appointment_add_sms(sms_obj)
                 elif sms_obj.get('action_reschedule') and sms_obj['action_reschedule']:
                     OfflineOPDAppointments.appointment_reschedule_sms(sms_obj)
+
+    def get_prescriptions(self, request):
+
+        files=[]
+        resp = dict()
+        for pres in self.offline_prescription.all():
+            resp = {
+                'updated_at': pres.updated_at,
+                'details': pres.prescription_details
+            }
+            if pres.name and pres.name.url:
+                files.append(request.build_absolute_uri(pres.name.url))
+        resp['files']= files
+
+        return resp
+
 
 
 class SearchScore(auth_model.TimeStampedModel):
@@ -3342,3 +3363,163 @@ class HospitalTiming(auth_model.TimeStampedModel):
 
     class Meta:
         db_table = "hospital_timing"
+
+
+class PartnersAppInvoice(auth_model.TimeStampedModel):
+    DECIMAL_PLACES = 2
+    INVOICE_SERIAL_ID_START = 300000
+    ONLINE = 1
+    CASH = 2
+    PAYMENT_CHOICES = ((ONLINE, 'Online'), (CASH, 'Cash'))
+    PAID = 1
+    PENDING = 2
+    PAYMENT_STATUS = ((PAID, 'Paid'), (PENDING, 'Pending'))
+    INVOICE_STORAGE_FOLDER = 'partners/invoice'
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    invoice_serial_id = models.CharField(max_length=100)
+    appointment = models.ForeignKey(OfflineOPDAppointments, on_delete=models.CASCADE, related_name='partners_app_invoice')
+    consultation_fees = models.PositiveSmallIntegerField()
+    selected_invoice_items = JSONField()
+    payment_status = models.IntegerField(choices=PAYMENT_STATUS)
+    payment_type = models.IntegerField(choices=PAYMENT_CHOICES, null=True, blank=True)
+    due_date = models.DateField(null=True, blank=True)
+    invoice_title = models.CharField(max_length=300, null=True, blank=True)
+    sub_total_amount = models.DecimalField(max_digits=10, decimal_places=DECIMAL_PLACES)
+    tax_amount = models.DecimalField(max_digits=10, decimal_places=DECIMAL_PLACES, blank=True, null=True)
+    tax_percentage = models.DecimalField(max_digits=5, decimal_places=DECIMAL_PLACES, blank=True, null=True,
+                                         validators=[MinValueValidator(0), MaxValueValidator(100)])
+    discount_amount = models.DecimalField(max_digits=10, decimal_places=DECIMAL_PLACES, blank=True, null=True)
+    discount_percentage = models.DecimalField(max_digits=5, decimal_places=DECIMAL_PLACES, blank=True, null=True,
+                                              validators=[MinValueValidator(0), MaxValueValidator(100)])
+    total_amount = models.DecimalField(max_digits=10, decimal_places=DECIMAL_PLACES)
+    is_invoice_generated = models.BooleanField(default=False)
+    file = models.FileField(upload_to=INVOICE_STORAGE_FOLDER, blank=False, null=False)
+    invoice_url = models.URLField(null=True, blank=True)
+    encoded_url = models.URLField(null=True, blank=True, max_length=300)
+    is_valid = models.BooleanField(default=True)
+    is_edited = models.BooleanField(default=False)
+    edited_by = models.ForeignKey(auth_model.User, on_delete=models.SET_NULL, null=True, blank=True, related_name='patners_app_invoices')
+
+    def __str__(self):
+        return str(self.appointment)
+
+    def get_context(self, selected_invoice_items):
+        context = dict()
+        context["patient_name"] = self.appointment.user.name
+        patient_mobile_queryset = self.appointment.user.patient_mobiles.all()
+        if patient_mobile_queryset.exists():
+            patient_mobile = patient_mobile_queryset.filter(is_default=True).first() if patient_mobile_queryset.filter(
+                is_default=True).exists() else patient_mobile_queryset.first()
+        else:
+            patient_mobile = None
+        context["patient_phone_number"] = patient_mobile
+        context["invoice_serial_id"] = self.invoice_serial_id
+        context["updated_at"] = self.updated_at if self.updated_at else datetime.datetime.now()
+        context["payment_status"] = "Paid" if self.payment_status == self.PAID else "Pending"
+        if self.payment_status == self.PAID:
+            context["payment_status"] = "Paid"
+            context["payment_type"] = "Online" if self.payment_type == self.ONLINE else "Cash"
+        elif self.payment_status == self.PENDING:
+            context["payment_status"] = "Pending"
+            context["due_date"] = self.due_date
+        context["doctor_name"] = self.appointment.doctor.name
+        context["hospital_name"] = self.appointment.hospital.name
+        context["hospital_address"] = self.appointment.hospital.get_hos_address()
+        doctor_number = self.appointment.doctor.doctor_number.first()
+        if doctor_number:
+            context["doctor_phone_number"] = doctor_number.phone_number
+        context["invoice_title"] = self.invoice_title
+        context["consultation_fees"] = self.consultation_fees
+        context["invoice_items"] = self.get_invoice_items(selected_invoice_items)
+        context["sub_total_amount"] = str(self.sub_total_amount)
+        context["tax_percentage"] = self.tax_percentage.normalize() if self.tax_percentage else None
+        context["tax_amount"] = str(self.tax_amount) if self.tax_amount else "-"
+        context["discount_percentage"] = self.discount_percentage.normalize() if self.discount_percentage else None
+        context["discount_amount"] = str(self.discount_amount) if self.discount_amount else "-"
+        context["total_amount"] = str(self.total_amount)
+        return context
+
+    def get_invoice_items(self, selected_invoice_items):
+        invoice_items = list()
+        # selected_invoice_items = self.selected_invoice_items
+        for item in selected_invoice_items:
+            if item['invoice_item'].tax_percentage:
+                tax = str(item['invoice_item'].tax_amount) + ' (' + str(item['invoice_item'].tax_percentage.normalize()) + '%)'
+            else:
+                tax = str(item['invoice_item'].tax_amount)
+            if item['invoice_item'].discount_percentage:
+                discount = str(item['invoice_item'].discount_amount) + ' (' + str(item['invoice_item'].discount_percentage.normalize()) + '%)'
+            else:
+                discount = str(item['invoice_item'].discount_amount)
+            invoice_items.append({"name": item['invoice_item'].item,
+                                  "base_price": str(item['invoice_item'].base_price),
+                                  "quantity": item['quantity'],
+                                  "tax": tax,
+                                  "discount": discount,
+                                  "amount": str(item['calculated_price'])
+                                  })
+        return invoice_items
+
+    @classmethod
+    def last_serial(cls, appointment):
+        obj = cls.objects.filter(appointment__doctor=appointment.doctor,
+                                 appointment__hospital=appointment.hospital).order_by('-created_at').first()
+        if obj:
+            serial = int(obj.invoice_serial_id[-9:-3])
+            return serial
+        else:
+            return cls.INVOICE_SERIAL_ID_START
+
+    class Meta:
+        db_table = "partners_app_invoice"
+
+
+# class GeneralInvoiceItems(auth_model.TimeStampedModel, UniqueNameModel, SearchKey):
+#     item = models.CharField(max_length=200)
+#
+#     def __str__(self):
+#         return self.item
+#
+#     class Meta:
+#         db_table = "general_invoice_items"
+
+
+class GeneralInvoiceItems(auth_model.TimeStampedModel):
+    DECIMAL_PLACES = 2
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    item = models.CharField(max_length=200)
+    base_price = models.DecimalField(max_digits=10, decimal_places=DECIMAL_PLACES)
+    description = models.CharField(max_length=500, null=True, blank=True)
+    tax_amount = models.DecimalField(max_digits=10, decimal_places=DECIMAL_PLACES, blank=True, null=True)
+    tax_percentage = models.DecimalField(max_digits=5, decimal_places=DECIMAL_PLACES, blank=True, null=True,
+                                         validators=[MinValueValidator(0), MaxValueValidator(100)])
+    discount_amount = models.DecimalField(max_digits=10, decimal_places=DECIMAL_PLACES, blank=True, null=True)
+    discount_percentage = models.DecimalField(max_digits=5, decimal_places=DECIMAL_PLACES, blank=True, null=True,
+                                              validators=[MinValueValidator(0), MaxValueValidator(100)])
+    user = models.ForeignKey(auth_model.User, on_delete=models.SET_NULL, related_name='invoice_items', null=True)
+    hospitals = models.ManyToManyField(Hospital, related_name='invoice_items')
+
+    def __str__(self):
+        return self.item
+
+    def get_computed_price(self):
+        tax_amount = self.tax_amount if self.tax_amount else 0
+        discount_amount = self.discount_amount if self.discount_amount else 0
+        return (self.base_price + tax_amount - discount_amount)
+
+    class Meta:
+        db_table = "general_invoice_items"
+
+
+class SelectedInvoiceItems(auth_model.TimeStampedModel):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    invoice = models.ForeignKey(PartnersAppInvoice, on_delete=models.CASCADE, related_name='selected_items')
+    invoice_item = models.ForeignKey(GeneralInvoiceItems, on_delete=models.CASCADE, related_name='selected')
+    quantity = models.PositiveIntegerField(validators=[MinValueValidator(1)])
+    calculated_price = models.DecimalField(max_digits=10, decimal_places=2)
+
+    def __str__(self):
+        return self.invoice_item + " (" + self.invoice + ")"
+
+    class Meta:
+        db_table = "selected_invoice_items"
