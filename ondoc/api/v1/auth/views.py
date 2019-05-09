@@ -1502,8 +1502,6 @@ class HospitalDoctorAppointmentPermissionViewSet(GenericViewSet):
         doc_hosp_queryset = (DoctorClinic.objects
                              .select_related('doctor', 'hospital')
                              .prefetch_related('doctor__manageable_doctors', 'hospital__manageable_hospitals')
-                             # .filter(Q(doctor__is_live=True, hospital__is_live=True) |
-                             #         Q(doctor__source_type=Doctor.PROVIDER, hospital__source_type=Hospital.PROVIDER))
                              .filter(Q(Q(doctor__is_live=True) | Q(doctor__source_type=Doctor.PROVIDER)),
                                      Q(Q(hospital__is_live=True) | Q(hospital__source_type=Hospital.PROVIDER)))
                              .annotate(doctor_gender=F('doctor__gender'),
