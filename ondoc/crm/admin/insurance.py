@@ -891,11 +891,17 @@ class InsuranceLeadResource(resources.ModelResource):
         user_profile = UserProfile.objects.filter(user=user, is_default_user=True).first()
         if user_profile:
             return str(user_profile.name)
+        elif obj.extras.get('lead_data'):
+            return obj.extras.get('lead_data').get('name', '')
         else:
             return ""
 
     def dehydrate_phone_number(self, obj):
-        return str(obj.user.phone_number)
+        user = obj.user
+        if user:
+            return str(obj.user.phone_number)
+        else:
+            return str(obj.phone_number)
 
     def dehydrate_status(self, obj):
         user_insurance = UserInsurance.objects.filter(user=obj.user).order_by('-id').first()
@@ -919,6 +925,8 @@ class InsuranceLeadAdmin(ImportExportModelAdmin, admin.ModelAdmin):
         user_profile = UserProfile.objects.filter(user=user, is_default_user=True).first()
         if user_profile:
             return str(user_profile.name)
+        elif obj.extras.get('lead_data'):
+            return obj.extras.get('lead_data').get('name', '')
         else:
             return ""
 
@@ -926,8 +934,12 @@ class InsuranceLeadAdmin(ImportExportModelAdmin, admin.ModelAdmin):
         extras = obj.extras
         return extras.get('source', '')
 
-    def phone_number(self, obj):
-        return str(obj.user.phone_number)
+    def lead_phone_number(self, obj):
+        user = obj.user
+        if user:
+            return str(obj.user.phone_number)
+        else:
+            return str(obj.phone_number)
 
     def status(self, obj):
         user_insurance = UserInsurance.objects.filter(user=obj.user).order_by('-id').first()
@@ -936,7 +948,7 @@ class InsuranceLeadAdmin(ImportExportModelAdmin, admin.ModelAdmin):
         else:
             return "New"
 
-    list_display = ('id', 'name',  'phone_number', 'status', 'matrix_lead_id', 'source', 'created_at', 'updated_at')
+    list_display = ('id', 'name',  'lead_phone_number', 'status', 'matrix_lead_id', 'source', 'created_at', 'updated_at')
 
     def get_export_queryset(self, request):
         super().get_export_queryset(request)
