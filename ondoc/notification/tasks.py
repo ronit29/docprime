@@ -856,6 +856,11 @@ def push_insurance_banner_lead_to_matrix(self, data):
         if not banner_obj:
             raise Exception("Banner object could not found against id - " + str(id))
 
+        if banner_obj.user:
+            phone_number = banner_obj.user.phone_number
+        else:
+            phone_number = banner_obj.phone_number
+
         extras = banner_obj.extras
         plan_id = extras.get('plan_id', None)
         plan = None
@@ -866,8 +871,8 @@ def push_insurance_banner_lead_to_matrix(self, data):
             'LeadID': banner_obj.matrix_lead_id if banner_obj.matrix_lead_id else 0,
             'LeadSource': 'InsuranceOPD',
             'Name': 'none',
-            'BookedBy': banner_obj.user.phone_number,
-            'PrimaryNo': banner_obj.user.phone_number,
+            'BookedBy': phone_number,
+            'PrimaryNo': phone_number,
             'PaymentStatus': 0,
             'UtmCampaign': extras.get('utm_campaign', ''),
             'UTMMedium': extras.get('utm_medium', ''),

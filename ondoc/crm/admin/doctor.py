@@ -2038,11 +2038,20 @@ class SpecializationFieldAdmin(ImportExportMixin, VersionAdmin):
     resource_class = SpecializationFieldResource
 
 
+class PracticeSpecializationForm(forms.ModelForm):
+    def clean(self):
+        if self.data.get('specializationdepartmentmapping_set-TOTAL_FORMS') and int(
+                self.data.get('specializationdepartmentmapping_set-TOTAL_FORMS')) <= 0:
+            raise forms.ValidationError("Atleast one entry of Department is required.")
+        return super().clean()
+
+
 class PracticeSpecializationDepartmentMappingInline(admin.TabularInline):
     model = SpecializationDepartmentMapping
     extra = 0
     can_delete = True
     show_change_link = False
+
 
 
 class PracticeSpecializationAdmin(AutoComplete, ImportExportMixin, VersionAdmin):
@@ -2052,6 +2061,7 @@ class PracticeSpecializationAdmin(AutoComplete, ImportExportMixin, VersionAdmin)
     inlines = [PracticeSpecializationDepartmentMappingInline, ]
     resource_class = PracticeSpecializationSynonymResource
     search_fields = ['name', ]
+    form = PracticeSpecializationForm
 
 
 class GoogleDetailingResource(resources.ModelResource):
