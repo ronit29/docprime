@@ -696,8 +696,7 @@ def update_onboarding_qcstatus_to_matrix(self, data):
             if obj.data_status == QCModel.SUBMITTED_FOR_QC:
                 history_obj = obj.history.filter(status=QCModel.REOPENED).order_by('-created_at').first()
                 if history_obj:
-                    qc_user = history_obj.user.staffprofile.employee_id if hasattr(history_obj.user,
-                                                                                         'staffprofile') and history_obj.user.staffprofile.employee_id else ''
+                    qc_user = history_obj.user if hasattr(history_obj.user, 'staffprofile') and history_obj.user.staffprofile.employee_id else ''
                     if qc_user and qc_user.is_member_of(constants['QC_GROUP_NAME']):
                         assigned_user = qc_user
 
