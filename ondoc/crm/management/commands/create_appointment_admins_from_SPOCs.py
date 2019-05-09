@@ -15,7 +15,7 @@ class Command(BaseCommand):
 
     def handle(self, *args, **options):
 
-        all_spocs = SPOCDetails.objects.all()
+        all_spocs = SPOCDetails.objects
         all_spocs_hospitals = all_spocs.filter(content_type=ContentType.objects.get_for_model(Hospital))
         spocs_with_admins = SPOCDetails.objects.prefetch_related('content_object', 'content_object__manageable_hospitals').annotate(
             chr_number=Cast('number', CharField())).filter(content_type=ContentType.objects.get_for_model(Hospital),
