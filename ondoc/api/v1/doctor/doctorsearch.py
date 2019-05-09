@@ -47,6 +47,7 @@ class DoctorSearchHelper:
         procedure_ids = self.query_params.get("procedure_ids", [])# NEW_LOGIC
         ipd_procedure_ids = self.query_params.get("ipd_procedure_ids", [])
         procedure_category_ids = self.query_params.get("procedure_category_ids", [])  # NEW_LOGIC
+        sits_at_hosp_types = self.query_params.get("sits_at", [])
 
         if self.query_params.get('hospital_id') is not None:
             filtering_params.append(
@@ -80,12 +81,22 @@ class DoctorSearchHelper:
             )
 
         if self.query_params.get("sits_at"):
-            filtering_params.append(
-                "hospital_type IN(%(sits_at)s)"
-            )
-            params['sits_at'] = ", ".join(
-                [str(hospital_type_mapping.get(sits_at)) for sits_at in self.query_params.get("sits_at")])
+            sits_at_str = 'hospital_type IN('
+            for hosp_type in sits_at_hosp_types:
 
+                if not counter == 1:
+                    sits_at_str += ','
+                sits_at_str = sits_at_str + '%(' + 'sits_at' + str(counter) + ')s'
+                params['sits_at' + str(counter)] = hospital_type_mapping.get(hosp_type)
+                counter += 1
+
+            filtering_params.append(
+                sits_at_str + ')'
+            )
+            # filtering_params.append(
+            #     "hospital_type IN (%(sits_at)s)"
+            # )
+            # params['sits_at'] =  ", ".join([str(hospital_type_mapping.get(sits_at)) for sits_at in self.query_params.get("sits_at")])
 
         if procedure_category_ids and not procedure_ids:  # NEW_LOGIC
             preferred_procedure_ids = list(
