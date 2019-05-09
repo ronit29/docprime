@@ -160,8 +160,14 @@ class DoctorSearchHelper:
                 days.append(start_day)
                 days.append(0 if start_day == 6 else start_day + 1)
             elif avail_days == serializers.DoctorListSerializer.NEXT_3_DAYS:
-                for day in range(4):
-                    days.append(0 if start_day == 6 else start_day + 1)
+                days.append(start_day)
+                for day in range(3):
+                    if start_day == 6:
+                        days.append(0)
+                        start_day = 0
+                    else:
+                        start_day += 1
+                        days.append(start_day)
 
             counter = 1
             if len(days) > 0:

@@ -1,6 +1,8 @@
 import operator
 from copy import deepcopy
 from itertools import groupby
+from pyodbc import Date
+
 from ondoc.api.v1.diagnostic.serializers import CustomLabTestPackageSerializer
 from ondoc.api.v1.doctor.serializers import CommaSepratedToListField
 from ondoc.authentication.backends import JWTAuthentication
@@ -1191,8 +1193,36 @@ class LabList(viewsets.ReadOnlyModelViewSet):
         #paginated_queryset = paginate_queryset(queryset_result, request)
         result = self.form_lab_search_whole_data(queryset_result, parameters.get("ids"), insurance_data_dict=insurance_data_dict)
 
-
         if result:
+            if parameters.get('availability'):
+                availability = parameters.get('availability')
+                start_day = Date.today().weekday()
+                avail_days = max(map(int, availability))
+                days = list()
+                if avail_days == serializers.SearchLabListSerializer.TODAY:
+                    days.append(start_day)
+                elif avail_days == serializers.SearchLabListSerializer.TOMORROW:
+                    days.append(start_day)
+                    days.append(0 if start_day == 6 else start_day + 1)
+                elif avail_days == serializers.SearchLabListSerializer.NEXT_3_DAYS:
+                    days.append(start_day)
+                    for day in range(3):
+                        if start_day == 6:
+                            days.append(0)
+                            start_day = 0
+                        else:
+                            start_day += 1
+                            days.append(start_day)
+
+                avl_result = list()
+                for data in result:
+                    if data['next_lab_timing_data'] and list(data['next_lab_timing_data'].keys()):
+                        for i in list(data.get('next_lab_timing_data').keys()):
+                            if i in days:
+                                avl_result.append(data)
+                                break
+                result = avl_result
+
             from ondoc.coupon.models import Coupon
             search_coupon = Coupon.get_search_coupon(request.user)
 
@@ -1360,30 +1390,6 @@ class LabList(viewsets.ReadOnlyModelViewSet):
                 filtering_query.append('  is_home_collection_enabled = True and home_collection_possible = True ')
             if lab_visit and not home_visit:
                 filtering_query.append('  is_home_collection_enabled = False and home_collection_possible = False ')
-
-        # if ids and availability:
-        #     start_day = Date.today().weekday()
-        #     avail_days = max(map(int, availability))
-        #     days = list()
-        #     if avail_days == serializers.SearchLabListSerializer.TODAY:
-        #         days.append(start_day)
-        #     elif avail_days == serializers.SearchLabListSerializer.TOMORROW:
-        #         days.append(start_day)
-        #         days.append(0 if start_day == 6 else start_day + 1)
-        #     elif avail_days == serializers.SearchLabListSerializer.NEXT_3_DAYS:
-        #         for day in range(4):
-        #             days.append(0 if start_day == 6 else start_day + 1)
-        #
-        #     counter = 1
-        #     if len(days) > 0:
-        #         lab_days_str = 'lbt.day IN ('
-        #         for day in days:
-        #             if not counter == 1:
-        #                 lab_days_str += ','
-        #             lab_days_str = lab_days_str + '%(' + 'lab_day' + str(counter) + ')s'
-        #             filtering_params['lab_day' + str(counter)] = day
-        #             counter += 1
-        #         filtering_query.append(lab_days_str + ')')
 
         filter_query_string = ""
         if len(filtering_query) > 0:
