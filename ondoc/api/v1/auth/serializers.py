@@ -65,8 +65,7 @@ class DoctorLoginSerializer(serializers.Serializer):
             lab_admin_not_exists = provider_signup_lead_not_exists = False
             if not DoctorNumber.objects.filter(phone_number=attrs['phone_number']).exists():
                 doctor_not_exists = True
-            admin = GenericAdmin.objects.filter(phone_number=attrs['phone_number'], is_disabled=False)
-            if not admin.exists():
+            if not GenericAdmin.objects.filter(phone_number=attrs['phone_number'], is_disabled=False).exists():
                 admin_not_exists = True
             if not GenericLabAdmin.objects.filter(phone_number=attrs['phone_number'], is_disabled=False).exists():
                 lab_admin_not_exists = True
@@ -75,11 +74,11 @@ class DoctorLoginSerializer(serializers.Serializer):
             if doctor_not_exists and admin_not_exists and lab_admin_not_exists and provider_signup_lead_not_exists:
                 raise serializers.ValidationError('No Doctor or Admin with given phone number found')
 
-            agent_hospitals = admin.filter(Q(hospital__isnull=False, hospital__is_live=True), Q(hospital__source_type=Hospital.AGENT) | Q(hospital__source_type=None))
-            provider_hospitals = admin.filter(hospital__isnull=False, hospital__source_type=Hospital.PROVIDER)
-            if not agent_hospitals.exists():
-                if not provider_hospitals.exists():
-                    raise serializers.ValidationError("Live hospital for admin not found")
+        agent_hospitals = GenericAdmin.objects.filter(Q(phone_number=attrs['phone_number'], is_disabled=False, hospital__is_live=True), Q(Q(hospital__source_type=Hospital.AGENT) | Q(hospital__source_type=None)))
+        provider_hospitals = GenericAdmin.objects.filter(phone_number=attrs['phone_number'], is_disabled=False, hospital__source_type=Hospital.PROVIDER)
+        if not agent_hospitals.exists():
+            if not provider_hospitals.exists():
+                raise serializers.ValidationError("Live hospital for admin not found")
 
         return attrs
 
