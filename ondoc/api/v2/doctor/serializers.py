@@ -383,7 +383,6 @@ class GeneralInvoiceItemsModelSerializer(serializers.ModelSerializer):
 
 
 class SelectedInvoiceItemsSerializer(serializers.Serializer):
-    # invoice_id = serializers.PrimaryKeyRelatedField(queryset=doc_models.PartnersAppInvoice.objects.all())
     invoice_item = serializers.PrimaryKeyRelatedField(queryset=doc_models.GeneralInvoiceItems.objects.all())
     quantity = serializers.IntegerField(min_value=1)
     calculated_price = serializers.DecimalField(max_digits=10, decimal_places=2)
@@ -407,7 +406,6 @@ class SelectedInvoiceItemsSerializer(serializers.Serializer):
 
 
 class SelectedInvoiceItemsJSONSerializer(serializers.Serializer):
-    # invoice_id = serializers.PrimaryKeyRelatedField(queryset=doc_models.PartnersAppInvoice.objects.all())
     invoice_item = GeneralInvoiceItemsModelSerializer(many=False)
     quantity = serializers.IntegerField(min_value=1)
     calculated_price = serializers.DecimalField(max_digits=10, decimal_places=2)

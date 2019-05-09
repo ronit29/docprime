@@ -3395,12 +3395,6 @@ class PartnersAppInvoice(auth_model.TimeStampedModel):
     def __str__(self):
         return str(self.appointment)
 
-    # def get_invoice_id(self):
-    #     last_serial = self.get_last_serial(self.appointment)
-    #     doctor = self.appointment.doctor
-    #     hospital = self.appointment.hospital
-    #     return 'INV-'+hospital.id+'-'+doctor.id+str(last_serial+1)
-
     def get_context(self, selected_invoice_items):
         context = dict()
         context["patient_name"] = self.appointment.user.name
