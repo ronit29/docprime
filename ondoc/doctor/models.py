@@ -2205,6 +2205,10 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
                     (self.id, str(math.floor(self.time_slot_start.timestamp())), True),
                     eta=self.time_slot_start + datetime.timedelta(
                         minutes=settings.TIME_AFTER_APPOINTMENT_TO_SEND_SECOND_CONFIRMATION), )
+                notification_tasks.opd_send_after_appointment_confirmation.apply_async(
+                    (self.id, str(math.floor(self.time_slot_start.timestamp())), True),
+                    eta=self.time_slot_start + datetime.timedelta(
+                        minutes=settings.TIME_AFTER_APPOINTMENT_TO_SEND_THIRD_CONFIRMATION), )
                 # notification_tasks.opd_send_otp_before_appointment(self.id, self.time_slot_start)
             except Exception as e:
                 logger.error(str(e))
