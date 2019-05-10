@@ -29,7 +29,7 @@ from ondoc.doctor.models import DoctorMobile, Doctor, HospitalNetwork, Hospital,
                                 DoctorClinicTiming, ProviderSignupLead
 from ondoc.authentication.models import (OtpVerifications, NotificationEndpoint, Notification, UserProfile,
                                          Address, AppointmentTransaction, GenericAdmin, UserSecretKey, GenericLabAdmin,
-                                         AgentToken, DoctorNumber)
+                                         AgentToken, DoctorNumber, LastLoginTimestamp)
 from ondoc.notification.models import SmsNotification, EmailNotification
 from ondoc.account.models import PgTransaction, ConsumerAccount, ConsumerTransaction, Order, ConsumerRefund, OrderLog, \
     UserReferrals, UserReferred, PgLogs
@@ -236,6 +236,9 @@ class UserViewset(GenericViewSet):
         token_object = JWTAuthentication.generate_token(user)
         expire_otp(data['phone_number'])
 
+        if data.get("source"):
+            LastLoginTimestamp.objects.create(user=user, source=data.get("source"))
+
         response = {
             "login": 1,
             "token": token_object['token'],
@@ -438,9 +441,13 @@ class UserProfileViewSet(mixins.CreateModelMixin, mixins.ListModelMixin,
 
         insured_member_obj = InsuredMembers.objects.filter(profile__id=obj.id).last()
         insured_member_profile = None
+        insured_member_status = None
         if insured_member_obj:
             insured_member_profile = insured_member_obj.profile
-        if obj and hasattr(obj, 'id') and obj.id and insured_member_profile:
+            insured_member_status = insured_member_obj.user_insurance.status
+        # if obj and hasattr(obj, 'id') and obj.id and insured_member_profile:
+        if obj and hasattr(obj, 'id') and obj.id and insured_member_profile and not (insured_member_status == UserInsurance.CANCELLED or
+                                                              insured_member_status == UserInsurance.EXPIRED):
 
             whatsapp_optin = data.get('whatsapp_optin')
             whatsapp_is_declined = data.get('whatsapp_is_declined')
@@ -1499,14 +1506,16 @@ class HospitalDoctorAppointmentPermissionViewSet(GenericViewSet):
         doc_hosp_queryset = (DoctorClinic.objects
                              .select_related('doctor', 'hospital')
                              .prefetch_related('doctor__manageable_doctors', 'hospital__manageable_hospitals')
-                             .filter(Q(doctor__is_live=True, hospital__is_live=True) |
-                                     Q(doctor__source_type=Doctor.PROVIDER, hospital__source_type=Hospital.PROVIDER))
+                             .filter(Q(Q(doctor__is_live=True) | Q(doctor__source_type=Doctor.PROVIDER)),
+                                     Q(Q(hospital__is_live=True) | Q(hospital__source_type=Hospital.PROVIDER)))
                              .annotate(doctor_gender=F('doctor__gender'),
                                        hospital_building=F('hospital__building'),
                                        hospital_name=F('hospital__name'),
                                        doctor_name=F('doctor__name'),
                                        doctor_source_type=F('doctor__source_type'),
                                        doctor_is_live=F('doctor__is_live'),
+                                       license=F('doctor__license'),
+                                       is_license_verified=F('doctor__is_license_verified'),
                                        hospital_source_type=F('hospital__source_type'),
                                        hospital_is_live=F('hospital__is_live'),
                                        online_consultation_fees=F('doctor__online_consultation_fees')
@@ -1540,8 +1549,9 @@ class HospitalDoctorAppointmentPermissionViewSet(GenericViewSet):
                                               hospital__manageable_hospitals__entity_type=GenericAdminEntity.HOSPITAL)
                                     ))
                              .values('hospital', 'doctor', 'hospital_name', 'doctor_name', 'doctor_gender',
-                                     'doctor_source_type', 'hospital_source_type', 'online_consultation_fees',
-                                     'doctor_is_live', 'hospital_is_live').distinct('hospital', 'doctor')
+                                     'doctor_source_type', 'doctor_is_live', 'license',
+                                     'is_license_verified', 'hospital_source_type', 'online_consultation_fees',
+                                     'hospital_is_live').distinct('hospital', 'doctor')
                              )
 
         # all_docs = [doc_hosp_queryset
@@ -2127,6 +2137,7 @@ class TokenFromUrlKey(viewsets.GenericViewSet):
             if obj:
                 obj.is_consumed = True
                 obj.save()
+                LastLoginTimestamp.objects.create(user=obj.user, source="d_sms")
                 return Response({'status': 1, 'token': obj.token})
             else:
-                return Response({'status': 0, 'token': None, 'message': 'key not found'})
+                return Response({'status': 0, 'token': None, 'message': 'key not found'}, status=status.HTTP_404_NOT_FOUND)

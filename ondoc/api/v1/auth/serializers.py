@@ -2,7 +2,7 @@ from rest_framework import serializers
 from ondoc.authentication.models import (OtpVerifications, User, UserProfile, Notification, NotificationEndpoint,
                                          DoctorNumber, Address, GenericAdmin, UserSecretKey,
                                          UserPermission, Address, GenericAdmin, GenericLabAdmin)
-from ondoc.doctor.models import DoctorMobile, ProviderSignupLead
+from ondoc.doctor.models import DoctorMobile, ProviderSignupLead, Hospital
 from ondoc.common.models import AppointmentHistory
 from ondoc.doctor.models import DoctorMobile
 from ondoc.insurance.models import InsuredMembers, UserInsurance
@@ -19,6 +19,7 @@ from django.contrib.auth import get_user_model
 from django.contrib.staticfiles.templatetags.staticfiles import static
 import jwt
 from django.conf import settings
+from django.db.models import Q
 from ondoc.authentication.backends import JWTAuthentication
 from ondoc.common import models as common_models
 
@@ -51,6 +52,7 @@ class OTPVerificationSerializer(serializers.Serializer):
 class DoctorLoginSerializer(serializers.Serializer):
     phone_number = serializers.IntegerField(min_value=5000000000,max_value=9999999999)
     otp = serializers.IntegerField(min_value=100000,max_value=999999)
+    source = serializers.CharField(max_length=100, required=False)
 
     def validate(self, attrs):
         if attrs['phone_number'] == 9582557400:
@@ -72,6 +74,12 @@ class DoctorLoginSerializer(serializers.Serializer):
                 provider_signup_lead_not_exists = True
             if doctor_not_exists and admin_not_exists and lab_admin_not_exists and provider_signup_lead_not_exists:
                 raise serializers.ValidationError('No Doctor or Admin with given phone number found')
+
+        agent_hospitals = GenericAdmin.objects.filter(Q(phone_number=attrs['phone_number'], is_disabled=False, hospital__is_live=True), Q(Q(hospital__source_type=Hospital.AGENT) | Q(hospital__source_type=None)))
+        provider_hospitals = GenericAdmin.objects.filter(phone_number=attrs['phone_number'], is_disabled=False, hospital__source_type=Hospital.PROVIDER)
+        if not agent_hospitals.exists():
+            if not provider_hospitals.exists():
+                raise serializers.ValidationError("Live hospital for admin not found")
 
         return attrs
 
@@ -182,10 +190,12 @@ class UserProfileSerializer(serializers.ModelSerializer):
         if isinstance(obj, dict):
             return False
 
-        insured_member_obj = InsuredMembers.objects.filter(profile=obj).order_by('-id').first()
+        # insured_member_obj = InsuredMembers.objects.filter(profile=obj).order_by('-id').first()
+        insured_member_obj = sorted(obj.insurance.all(), key=lambda object: object.id, reverse=True)[0] if obj.insurance.all() else None
         if not insured_member_obj:
             return False
-        user_insurance_obj = UserInsurance.objects.filter(id=insured_member_obj.user_insurance_id).last()
+        # user_insurance_obj = UserInsurance.objects.filter(id=insured_member_obj.user_insurance_id).last()
+        user_insurance_obj = insured_member_obj.user_insurance
         if user_insurance_obj and user_insurance_obj.is_profile_valid():
             return True
         else:
@@ -194,10 +204,12 @@ class UserProfileSerializer(serializers.ModelSerializer):
     def get_insurance_status(self, obj):
         if isinstance(obj, dict):
             return False
-        insured_member_obj = InsuredMembers.objects.filter(profile=obj).order_by('-id').first()
+        # insured_member_obj = InsuredMembers.objects.filter(profile=obj).order_by('-id').first()
+        insured_member_obj = sorted(obj.insurance.all(), key=lambda object: object.id, reverse=True)[0] if obj.insurance.all() else None
         if not insured_member_obj:
             return 0
-        user_insurance_obj = UserInsurance.objects.filter(id=insured_member_obj.user_insurance_id).last()
+        # user_insurance_obj = UserInsurance.objects.filter(id=insured_member_obj.user_insurance_id).last()
+        user_insurance_obj = insured_member_obj.user_insurance
         if user_insurance_obj and user_insurance_obj.is_profile_valid():
             return user_insurance_obj.status
         else:
