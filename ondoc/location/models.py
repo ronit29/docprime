@@ -291,14 +291,14 @@ class EntityAddress(TimeStampedModel):
             return False
 
         use_in_url = True
-        if not type.startswith('LOCALITY') and not type.startswith('SUBLOCALITY'):
+        if not type or (not type.startswith('LOCALITY') and not type.startswith('SUBLOCALITY')):
             use_in_url = False
 
-        if type.startswith('LOCALITY') and parent_entity.use_in_url:
+        if not type or (type.startswith('LOCALITY') and parent_entity.use_in_url):
             use_in_url = False
 
-        if type.startswith('SUBLOCALITY') and (not parent_entity or not parent_entity.use_in_url\
-            or not parent_entity.type or not parent_entity.type.startswith('LOCALITY')):
+        if not type or (type.startswith('SUBLOCALITY') and (not parent_entity or not parent_entity.use_in_url\
+            or not parent_entity.type or not parent_entity.type.startswith('LOCALITY'))):
             use_in_url = False
 
         if name in ('[no name]', 'Unnamed Road'):
