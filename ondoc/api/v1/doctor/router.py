@@ -67,4 +67,5 @@ urlpatterns = [
     path('hospital/<int:pk>', HospitalViewSet.as_view({'get': 'retrive'}), name='hospital_detail'),
     path('hospital_by_url', HospitalViewSet.as_view({'get': 'retrieve_by_url'}), name='hospital_detail_by_url'),
     path('ipd_procedure/create_lead', IpdProcedureViewSet.as_view({'post': 'create_lead'}), name='ipd_procedure_lead'),
+    path('licence/update', DoctorProfileView.as_view({'post': 'licence_update'}), name='licence_update'),
 ]
