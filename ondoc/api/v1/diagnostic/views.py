@@ -1195,34 +1195,6 @@ class LabList(viewsets.ReadOnlyModelViewSet):
         result = self.form_lab_search_whole_data(queryset_result, parameters.get("ids"), insurance_data_dict=insurance_data_dict)
 
         if result:
-            if parameters.get('availability'):
-                availability = parameters.get('availability')
-                start_day = Date.today().weekday()
-                avail_days = max(map(int, availability))
-                days = list()
-                if avail_days == serializers.SearchLabListSerializer.TODAY:
-                    days.append(start_day)
-                elif avail_days == serializers.SearchLabListSerializer.TOMORROW:
-                    days.append(start_day)
-                    days.append(0 if start_day == 6 else start_day + 1)
-                elif avail_days == serializers.SearchLabListSerializer.NEXT_3_DAYS:
-                    days.append(start_day)
-                    for day in range(3):
-                        if start_day == 6:
-                            days.append(0)
-                            start_day = 0
-                        else:
-                            start_day += 1
-                            days.append(start_day)
-
-                avl_result = list()
-                for data in result:
-                    if data['next_lab_timing_data'] and list(data['next_lab_timing_data'].keys()):
-                        for i in list(data.get('next_lab_timing_data').keys()):
-                            if i in days:
-                                avl_result.append(data)
-                                break
-                result = avl_result
 
             from ondoc.coupon.models import Coupon
             search_coupon = Coupon.get_search_coupon(request.user)
@@ -1322,6 +1294,7 @@ class LabList(viewsets.ReadOnlyModelViewSet):
         avg_ratings = parameters.get('avg_ratings', None)
         home_visit = parameters.get('home_visit', False)
         lab_visit = parameters.get('lab_visit', False)
+        availability = parameters.get('availability')
 
         #filtering_params = []
         #filtering_params_query1 = []
@@ -1370,6 +1343,41 @@ class LabList(viewsets.ReadOnlyModelViewSet):
         #     params['length']=0
 
         group_filter=[]
+        lab_timing_join = ""
+
+        if availability:
+            start_day = Date.today().weekday()
+            avail_days = max(map(int, availability))
+            days = list()
+            if avail_days == serializers.SearchLabListSerializer.TODAY:
+                days.append(start_day)
+            elif avail_days == serializers.SearchLabListSerializer.TOMORROW:
+                days.append(start_day)
+                days.append(0 if start_day == 6 else start_day + 1)
+            elif avail_days == serializers.SearchLabListSerializer.NEXT_3_DAYS:
+                days.append(start_day)
+                for day in range(3):
+                    if start_day == 6:
+                        days.append(0)
+                        start_day = 0
+                    else:
+                        start_day += 1
+                        days.append(start_day)
+
+            lab_timing_join = " inner join lab_timing lbt on lbt.lab_id = lb.id "
+
+            counter = 1
+            if len(days) > 0:
+                lab_days_str = 'lbt.day IN ('
+                for day in days:
+                    if not counter == 1:
+                        lab_days_str += ','
+                    lab_days_str = lab_days_str + '%(' + 'lab_day' + str(counter) + ')s'
+                    filtering_params['lab_day' + str(counter)] = day
+                    counter += 1
+                filtering_query.append(
+                    lab_days_str + ')'
+                )
 
         if min_price:
             group_filter.append("price>=(%(min_price)s)")
@@ -1454,7 +1462,7 @@ class LabList(viewsets.ReadOnlyModelViewSet):
                         end as pickup_charges,
                         sum(case when custom_deal_price is null then computed_deal_price else custom_deal_price end)as price,
                         max(ST_Distance(location,St_setsrid(St_point((%(longitude)s), (%(latitude)s)), 4326))) as distance,
-                        max(order_priority) as max_order_priority from lab lb inner join available_lab_test avlt on
+                        max(order_priority) as max_order_priority from lab lb {lab_timing_join} inner join available_lab_test avlt on
                         lb.lab_pricing_group_id = avlt.lab_pricing_group_id 
                         and lb.is_test_lab = False and lb.is_live = True and lb.lab_pricing_group_id is not null 
                         and St_dwithin( St_setsrid(St_point((%(longitude)s), (%(latitude)s)), 4326),lb.location, (%(max_distance)s)) 
@@ -1468,7 +1476,7 @@ class LabList(viewsets.ReadOnlyModelViewSet):
                         )r
                         where new_network_rank<=(%(page_end)s) and new_network_rank>(%(page_start)s) order by new_network_rank, rank
                          '''.format(filter_query_string=filter_query_string, 
-                            group_filter_query_string=group_filter_query_string, order=order_by)
+                            group_filter_query_string=group_filter_query_string, order=order_by, lab_timing_join=lab_timing_join)
 
             lab_search_result = RawSql(query, filtering_params).fetch_all()
         else:
@@ -1488,14 +1496,14 @@ class LabList(viewsets.ReadOnlyModelViewSet):
                     select *,
                     max(ST_Distance(location,St_setsrid(St_point((%(longitude)s), (%(latitude)s)), 4326))) as distance,
                     max(order_priority) as max_order_priority
-                    from lab lb where is_test_lab = False and is_live = True and lab_pricing_group_id is not null 
+                    from lab lb { lab_timing_join } where is_test_lab = False and is_live = True and lab_pricing_group_id is not null 
                     and St_dwithin( St_setsrid(St_point((%(longitude)s), (%(latitude)s)), 4326),location, (%(max_distance)s)) 
                     and St_dwithin(St_setsrid(St_point((%(longitude)s), (%(latitude)s)), 4326), location, (%(min_distance)s)) = false
                     {filter_query_string}
                     group by id)a)y )x where rank<=5)z  order by {order} )r where 
                     new_network_rank<=(%(page_end)s) and new_network_rank>(%(page_start)s) order by new_network_rank, 
                     rank'''.format(
-                    filter_query_string=filter_query_string, order=order_by)
+                    filter_query_string=filter_query_string, order=order_by, lab_timing_join=lab_timing_join)
 
             lab_search_result = RawSql(query1, filtering_params).fetch_all()
 
