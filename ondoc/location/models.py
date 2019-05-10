@@ -1180,7 +1180,7 @@ class EntityUrls(TimeStampedModel):
 
         # Mark all existing urls as is_valid=False.
 
-        update_query = '''update entity_urls set is_valid=false where sitemap_identifier in ('LAB_LOCALITY_CITY', 'LAB_CITY');'''
+        # update_query = '''update entity_urls set is_valid=false where sitemap_identifier in ('LAB_LOCALITY_CITY', 'LAB_CITY');'''
 
         query =  '''insert into entity_urls(extras, sitemap_identifier, url, count, entity_type, url_type, is_valid, created_at, 
                        updated_at, sequence, sublocality_latitude, sublocality_longitude, locality_latitude, locality_longitude, locality_id, sublocality_id,
@@ -1245,7 +1245,7 @@ class EntityUrls(TimeStampedModel):
 
                        'Lab' as entity_type,
                        'SEARCHURL' as url_type,
-                       True as is_valid,
+                       False as is_valid,
                        NOW() as created_at,
                        NOW() as updated_at,
                        %d as sequence,
@@ -1291,6 +1291,11 @@ class EntityUrls(TimeStampedModel):
 
         update_null_location = '''update entity_urls set location = locality_location where location is null and  url_type='SEARCHURL' and entity_type='Lab' '''
 
+        update_current_urls_query = '''update entity_urls set is_valid=true where sitemap_identifier 
+                                             in ('LAB_PAGE') and sequence=%d''' % sequence
+
+        update_previous_urls_query = '''update entity_urls set is_valid=true where sitemap_identifier 
+                                             in ('LAB_PAGE') and sequence<%d''' % sequence
 
         # query ='''insert into entity_urls(extras, sitemap_identifier, url, count, entity_type, url_type, is_valid, created_at, updated_at, sequence)
         #     select x.extras as extras, x.sitemap_identifier as sitemap_identifier, x.url as url,
@@ -1347,12 +1352,14 @@ class EntityUrls(TimeStampedModel):
         from django.db import connection
         with connection.cursor() as cursor:
             try:
-                cursor.execute(update_query)
+
                 cursor.execute(query)
                 cursor.execute(update_locality_lat_long)
                 cursor.execute(update_sublocality_lat_long)
                 cursor.execute(update_location)
                 cursor.execute(update_null_location)
+                cursor.execute(update_current_urls_query)
+                cursor.execute(update_previous_urls_query)
 
             except Exception as e:
                 print(str(e))
