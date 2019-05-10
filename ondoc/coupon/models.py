@@ -466,6 +466,7 @@ class CouponRecommender():
         coupons = self.all_applicable_coupons
         user = self.user
         user_cart_counts = self.user_cart_counts
+        search_type = self.type
         deal_price = filters.get('deal_price')
         tests = filters.get('tests')
         lab = filters.get('lab')
@@ -478,110 +479,111 @@ class CouponRecommender():
         if deal_price:
             coupons = list(filter(lambda x: x.min_order_amount == None or x.min_order_amount <= deal_price, coupons))
 
-        if tests:
-            tests_ids = []
-            test_categories_ids = []
-            categories_check = False
-            for test in tests:
-                test_categories = []
-                test_id = getattr(test, 'id') if hasattr(test, 'id') else test.get('id')
-                if test_id:
-                    tests_ids.append(test_id)
+        if search_type == 'doctor' or search_type == 'lab':
+            if tests:
+                tests_ids = []
+                test_categories_ids = []
+                categories_check = False
+                for test in tests:
+                    test_categories = []
+                    test_id = getattr(test, 'id') if hasattr(test, 'id') else test.get('id')
+                    if test_id:
+                        tests_ids.append(test_id)
 
-                if hasattr(test, 'categories'):
-                    categories = getattr(test, 'categories').all()
-                    test_categories = list(map(lambda x: x.id, categories))
-                    categories_check = True
-                if test_categories:
-                    test_categories_ids = test_categories_ids + test_categories
-                else:
-                    if not categories_check and test.get('categories'):
-                        test_categories_ids.append(test.get('categories'))
+                    if hasattr(test, 'categories'):
+                        categories = getattr(test, 'categories').all()
+                        test_categories = list(map(lambda x: x.id, categories))
+                        categories_check = True
+                    if test_categories:
+                        test_categories_ids = test_categories_ids + test_categories
+                    else:
+                        if not categories_check and test.get('categories'):
+                            test_categories_ids.append(test.get('categories'))
 
-            tests_ids = set(tests_ids)
-            test_categories_ids = set(test_categories_ids)
+                tests_ids = set(tests_ids)
+                test_categories_ids = set(test_categories_ids)
 
-            # check test in coupon
-            for coupon in coupons:
-                keep_coupon = False
-                if len(coupon.test.all()) == 0:
-                    keep_coupon = True
-                else:
-                    if tests_ids:
-                        coupon_test_ids = list(map(lambda x: x.id, coupon.test.all()))
-                        for coupon_test_id in coupon_test_ids:
-                            if coupon_test_id in tests_ids:
-                                keep_coupon = True
-                                break
+                # check test in coupon
+                for coupon in coupons:
+                    keep_coupon = False
+                    if len(coupon.test.all()) == 0:
+                        keep_coupon = True
+                    else:
+                        if tests_ids:
+                            coupon_test_ids = list(map(lambda x: x.id, coupon.test.all()))
+                            for coupon_test_id in coupon_test_ids:
+                                if coupon_test_id in tests_ids:
+                                    keep_coupon = True
+                                    break
 
-                if not keep_coupon:
-                    coupons.remove(coupon)
+                    if not keep_coupon:
+                        coupons.remove(coupon)
 
-            # check test categories in coupon
-            for coupon in coupons:
-                keep_coupon = False
-                if len(coupon.test_categories.all()) == 0:
-                    keep_coupon = True
-                else:
-                    if test_categories_ids:
-                        coupon_test_categories_ids = list(map(lambda x: x.id, coupon.test_categories.all()))
-                        for coupon_test_categories_id in coupon_test_categories_ids:
-                            if coupon_test_categories_id in test_categories_ids:
-                                keep_coupon = True
-                                break
+                # check test categories in coupon
+                for coupon in coupons:
+                    keep_coupon = False
+                    if len(coupon.test_categories.all()) == 0:
+                        keep_coupon = True
+                    else:
+                        if test_categories_ids:
+                            coupon_test_categories_ids = list(map(lambda x: x.id, coupon.test_categories.all()))
+                            for coupon_test_categories_id in coupon_test_categories_ids:
+                                if coupon_test_categories_id in test_categories_ids:
+                                    keep_coupon = True
+                                    break
 
-                if not keep_coupon:
-                    coupons.remove(coupon)
-        else:
-            coupons = list(filter(lambda x: len(x.test.all()) == 0, coupons))
-            coupons = list(filter(lambda x: len(x.test_categories.all()) == 0, coupons))
+                    if not keep_coupon:
+                        coupons.remove(coupon)
+            else:
+                coupons = list(filter(lambda x: len(x.test.all()) == 0, coupons))
+                coupons = list(filter(lambda x: len(x.test_categories.all()) == 0, coupons))
 
-        if lab and lab.get('city'):
-            coupons = list(filter(lambda x: x.cities == None or lab.get('city') in x.cities, coupons))
-        else:
-            coupons = list(filter(lambda x: x.cities == None, coupons))
+            if lab and lab.get('city'):
+                coupons = list(filter(lambda x: x.cities == None or lab.get('city') in x.cities, coupons))
+            else:
+                coupons = list(filter(lambda x: x.cities == None, coupons))
 
-        if hospital:
-            hospital_id = getattr(hospital, 'id') if hasattr(hospital, 'id') else hospital.get('id')
-            hospital_city = getattr(hospital, 'city') if hasattr(hospital, 'city') else hospital.get('city')
-            coupons = list(
-                filter(lambda x: len(x.hospitals.all()) == 0 or hospital_id in list(map(lambda y: y.id, x.hospitals.all())), coupons))
-            coupons = list(filter(lambda x: x.cities == None or hospital_city in x.cities, coupons))
-        else:
-            coupons = list(filter(lambda x: len(x.hospitals.all()) == 0, coupons))
-            coupons = list(filter(lambda x: x.cities == None, coupons))
+            if hospital:
+                hospital_id = getattr(hospital, 'id') if hasattr(hospital, 'id') else hospital.get('id')
+                hospital_city = getattr(hospital, 'city') if hasattr(hospital, 'city') else hospital.get('city')
+                coupons = list(
+                    filter(lambda x: len(x.hospitals.all()) == 0 or hospital_id in list(map(lambda y: y.id, x.hospitals.all())), coupons))
+                coupons = list(filter(lambda x: x.cities == None or hospital_city in x.cities, coupons))
+            else:
+                coupons = list(filter(lambda x: len(x.hospitals.all()) == 0, coupons))
+                coupons = list(filter(lambda x: x.cities == None, coupons))
 
-        if doctor_id:
-            coupons = list(filter(lambda x: len(x.doctors.all()) == 0 or doctor_id in list(map(lambda y: y.id, x.doctors.all())), coupons))
-            for coupon in coupons:
-                keep_coupon = False
-                if len(coupon.specializations.all()) == 0:
-                    keep_coupon = True
-                else:
-                    if doctor_specializations_ids:
-                        coupon_specializations_ids = list(map(lambda x: x.id, coupon.specializations.all()))
-                        for coupon_specializations_id in coupon_specializations_ids:
-                            if coupon_specializations_id in doctor_specializations_ids:
-                                keep_coupon = True
-                                break
+            if doctor_id:
+                coupons = list(filter(lambda x: len(x.doctors.all()) == 0 or doctor_id in list(map(lambda y: y.id, x.doctors.all())), coupons))
+                for coupon in coupons:
+                    keep_coupon = False
+                    if len(coupon.specializations.all()) == 0:
+                        keep_coupon = True
+                    else:
+                        if doctor_specializations_ids:
+                            coupon_specializations_ids = list(map(lambda x: x.id, coupon.specializations.all()))
+                            for coupon_specializations_id in coupon_specializations_ids:
+                                if coupon_specializations_id in doctor_specializations_ids:
+                                    keep_coupon = True
+                                    break
 
-                if not keep_coupon:
-                    coupons.remove(coupon)
-        else:
-            coupons = list(filter(lambda x: len(x.doctors.all()) == 0, coupons))
-            coupons = list(filter(lambda x: len(x.specializations.all()) == 0, coupons))
+                    if not keep_coupon:
+                        coupons.remove(coupon)
+            else:
+                coupons = list(filter(lambda x: len(x.doctors.all()) == 0, coupons))
+                coupons = list(filter(lambda x: len(x.specializations.all()) == 0, coupons))
 
 
-        if procedures_ids:
-            pass
-            # add filters here
-            # coupons = coupons.filter(Q(procedures__isnull=True) | Q(procedures__in=procedures))
-            # procedure_categories = set(procedures.values_list('categories', flat=True))
-            # coupons = coupons.filter(
-            #     Q(procedure_categories__isnull=True) | Q(procedure_categories__in=procedure_categories))
-        else:
-            coupons = list(filter(lambda x: len(x.procedures.all()) == 0, coupons))
-            coupons = list(filter(lambda x: len(x.procedure_categories.all()) == 0, coupons))
+            if procedures_ids:
+                pass
+                # add filters here
+                # coupons = coupons.filter(Q(procedures__isnull=True) | Q(procedures__in=procedures))
+                # procedure_categories = set(procedures.values_list('categories', flat=True))
+                # coupons = coupons.filter(
+                #     Q(procedure_categories__isnull=True) | Q(procedure_categories__in=procedure_categories))
+            else:
+                coupons = list(filter(lambda x: len(x.procedures.all()) == 0, coupons))
+                coupons = list(filter(lambda x: len(x.procedure_categories.all()) == 0, coupons))
 
         for coupon in coupons:
             coupon_properties = self.coupon_properties[coupon.code] = dict()
