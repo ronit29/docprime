@@ -4,7 +4,7 @@ from django.conf import settings
 from django.forms import model_to_dict
 
 from ondoc.api.v1.insurance.serializers import InsuredMemberIdSerializer, InsuranceDiseaseIdSerializer, \
-    MemberListSerializer, MemberSerializer
+    MemberListSerializer, MemberSerializer, UserInsuranceModelSerializer
 from ondoc.api.v1.utils import insurance_transform
 from django.core.serializers import serialize
 from rest_framework import viewsets
@@ -94,7 +94,7 @@ class ListInsuranceViewSet(viewsets.GenericViewSet):
             user = request.user
             if not user.is_anonymous:
                 user_insurance = UserInsurance.get_user_insurance(request.user)
-                if user_insurance and user_insurance.is_profile_valid() and not request.query_params.get('is_endorsement'):
+                if user_insurance and user_insurance.is_profile_valid() and not self.strtobool(request.query_params.get("is_endorsement")):
                     return Response(data={'certificate': True}, status=status.HTTP_200_OK)
 
             insurer_data = self.get_queryset()
@@ -107,6 +107,13 @@ class ListInsuranceViewSet(viewsets.GenericViewSet):
         else:
             return Response(status=status.HTTP_404_NOT_FOUND)
         return Response(resp)
+
+    def strtobool(self, val):
+        if val == 'true':
+            return True
+        else:
+            return False
+
 
 
 class InsuredMemberViewSet(viewsets.GenericViewSet):
@@ -527,8 +534,15 @@ class InsuranceEndorsementViewSet(viewsets.GenericViewSet):
             res['error'] = "Active Insurance not found for the user"
             return Response(data=res, status=status.HTTP_400_BAD_REQUEST)
         members = user_insurance.get_members()
+        user_insurance_queryset = UserInsurance.objects.filter(id=user_insurance.id)
+        if not members:
+            res['error'] = "No members found for the user insurance"
+            return Response(data=res, status=status.HTTP_400_BAD_REQUEST)
+        user_insurance_serializer = UserInsuranceModelSerializer(user_insurance_queryset, context={'request': request})
+        insurance_data = user_insurance_serializer.data
+        res['insurance'] = insurance_data
         member_serializer = MemberSerializer(members, context={'request': request}, many=True)
         members_data = member_serializer.data
-        res['members'] = members_data
+        res['insurance']['members'] = members_data
         return Response(data=res, status=status.HTTP_200_OK)
 
