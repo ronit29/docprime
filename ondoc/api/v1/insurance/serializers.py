@@ -73,6 +73,8 @@ class MemberListSerializer(serializers.Serializer):
     district = serializers.CharField(max_length=100)
     state = serializers.CharField(max_length=100)
     state_code = serializers.CharField(max_length=10)
+    city_code = serializers.IntegerField()
+    district_code = serializers.IntegerField()
 
     def validate(self, attrs):
         request = self.context.get("request")
@@ -124,6 +126,8 @@ class MemberSerializer(serializers.ModelSerializer):
     district = serializers.ReadOnlyField()
     state = serializers.ReadOnlyField()
     state_code = serializers.ReadOnlyField()
+    city_code = serializers.ReadOnlyField()
+    district_code = serializers.ReadOnlyField()
 
     class Meta:
         model = InsuredMembers

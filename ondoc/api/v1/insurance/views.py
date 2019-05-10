@@ -607,3 +607,10 @@ class InsuranceEndorsementViewSet(viewsets.GenericViewSet):
         serializer.is_valid(raise_exception=True)
         valid_data = serializer.validated_data
 
+    def upload(self, request, *args, **kwargs):
+        instance = self.get_object()
+        serializer = serializers.UploadMemberDocumentSerializer(instance, data=request.data, context={'request':request})
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+        return Response(serializer.data)
+

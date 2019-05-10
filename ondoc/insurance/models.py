@@ -1291,6 +1291,8 @@ class InsuredMembers(auth_model.TimeStampedModel):
     state = models.CharField(max_length=100, null=False)
     state_code = models.CharField(max_length=10, null=True)
     user_insurance = models.ForeignKey(UserInsurance, related_name="members", on_delete=models.DO_NOTHING, null=False)
+    city_code = models.IntegerField(null=True, default=None)
+    district_code = models.IntegerField(null=True, default=None)
 
     class Meta:
         db_table = "insured_members"
