@@ -2345,7 +2345,7 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin,
         return integrator_history.accepted_through
 
     def get_matrix_data(self, order, product_id, sub_product_id):
-        policy_details = self.get_matrix_policy_data()
+        # policy_details = self.get_matrix_policy_data()
         appointment_details = self.get_matrix_appointment_data(order)
 
         request_data = {
@@ -2359,8 +2359,7 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin,
             'CityId': 0,
             'ProductId': product_id,
             'SubProductId': sub_product_id,
-            'AppointmentDetails': appointment_details,
-            'PolicyDetails': policy_details
+            'AppointmentDetails': appointment_details
         }
         return request_data
 
@@ -2425,7 +2424,7 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin,
             payment_URN = merchant_payout.utr_no
             amount = merchant_payout.payable_amount
 
-        user_insurance = self.user.active_insurance
+        user_insurance = self.insurance
         mobile_list = self.get_matrix_spoc_data()
 
         appointment_details = {
@@ -2483,13 +2482,14 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin,
             if number:
                 number = int(number)
 
-            contact_type = dict(contact_person.CONTACT_TYPE_CHOICES)[contact_person.contact_type]
-            contact_name = contact_person.name
-            mobile_list.append({'MobileNo': number,
-                                'Name': contact_name,
-                                'DesignationID': contact_person.contact_type,
-                                'AutoIVREnable': str(auto_ivr_enabled).lower(),
-                                'Type': 3})
+            if number:
+                contact_type = dict(contact_person.CONTACT_TYPE_CHOICES)[contact_person.contact_type]
+                contact_name = contact_person.name
+                mobile_list.append({'MobileNo': number,
+                                    'Name': contact_name,
+                                    'DesignationID': contact_person.contact_type,
+                                    'AutoIVREnable': str(auto_ivr_enabled).lower(),
+                                    'Type': 3})
 
         # Lab mobile number
         mobile_list.append({'MobileNo': self.lab.primary_mobile, 'Name': self.lab.name, 'Type': 3})

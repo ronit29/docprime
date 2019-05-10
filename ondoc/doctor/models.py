@@ -2634,7 +2634,7 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
             logger.error("Could not save triggered event - " + str(e))
 
     def get_matrix_data(self, order, product_id, sub_product_id):
-        policy_details = self.get_matrix_policy_data()
+        # policy_details = self.get_matrix_policy_data()
         appointment_details = self.get_matrix_appointment_data(order)
 
         request_data = {
@@ -2648,8 +2648,7 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
             'CityId': 0,
             'ProductId': product_id,
             'SubProductId': sub_product_id,
-            'AppointmentDetails': appointment_details,
-            'PolicyDetails': policy_details
+            'AppointmentDetails': appointment_details
         }
         return request_data
 
@@ -2705,7 +2704,7 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
             payment_URN = merchant_payout.utr_no
             amount = merchant_payout.payable_amount
 
-        user_insurance = self.user.active_insurance
+        user_insurance = self.insurance
         mobile_list = self.get_matrix_spoc_data()
 
         appointment_details = {
@@ -2769,12 +2768,13 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
                 number = int(number)
 
             # spoc_type = dict(spoc_obj.CONTACT_TYPE_CHOICES)[spoc_obj.contact_type]
-            spoc_name = spoc_obj.name
-            mobile_list.append({'MobileNo': number,
-                                'Name': spoc_name,
-                                'DesignationID': spoc_obj.contact_type,
-                                'AutoIVREnable': str(auto_ivr_enabled).lower(),
-                                'Type': 2})
+            if number:
+                spoc_name = spoc_obj.name
+                mobile_list.append({'MobileNo': number,
+                                    'Name': spoc_name,
+                                    'DesignationID': spoc_obj.contact_type,
+                                    'AutoIVREnable': str(auto_ivr_enabled).lower(),
+                                    'Type': 2})
 
         # Doctor mobile numbers
         doctor_mobiles = [doctor_mobile.number for doctor_mobile in self.doctor.mobiles.all()]
