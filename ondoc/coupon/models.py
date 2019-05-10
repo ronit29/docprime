@@ -1,4 +1,6 @@
 from django.db import models
+from django.db.models import F, ExpressionWrapper, DateTimeField
+
 from ondoc.authentication import models as auth_model
 from ondoc.common.models import PaymentOptions
 from django.core.validators import MaxValueValidator, MinValueValidator
@@ -16,11 +18,12 @@ class Coupon(auth_model.TimeStampedModel):
     DOCTOR = 1
     LAB = 2
     ALL = 3
+    SUBSCRIPTION_PLAN = 4
 
     DISCOUNT = 1
     CASHBACK = 2
 
-    TYPE_CHOICES = (("", "Select"), (DOCTOR, "Doctor"), (LAB, "Lab"), (ALL, "All"),)
+    TYPE_CHOICES = (("", "Select"), (DOCTOR, "Doctor"), (LAB, "Lab"), (ALL, "All"), (SUBSCRIPTION_PLAN, "SUBSCRIPTION_PLAN"),)
     COUPON_TYPE_CHOICES = ((DISCOUNT, "Discount"), (CASHBACK, "Cashback"),)
 
     code = models.CharField(max_length=50)
@@ -59,6 +62,8 @@ class Coupon(auth_model.TimeStampedModel):
     new_user_constraint = models.BooleanField(default=False)
     coupon_type = models.IntegerField(choices=COUPON_TYPE_CHOICES, default=DISCOUNT)
     payment_option = models.ForeignKey(PaymentOptions, on_delete=models.SET_NULL, blank=True, null=True)
+    random_coupon_count = models.PositiveIntegerField(null=True, blank=True)
+    plan = models.ManyToManyField("subscription_plan.Plan", blank=True, null=True)
 
     def save(self, *args, **kwargs):
         if not self.id:
@@ -92,6 +97,7 @@ class Coupon(auth_model.TimeStampedModel):
         from ondoc.doctor.models import OpdAppointment
         from ondoc.diagnostic.models import LabAppointment
         from ondoc.cart.models import Cart
+        from ondoc.subscription_plan.models import UserPlanMapping
 
         if not user.is_authenticated:
             return 0
@@ -114,8 +120,61 @@ class Coupon(auth_model.TimeStampedModel):
                                                                LabAppointment.ACCEPTED,
                                                                LabAppointment.COMPLETED],
                                                    coupon=self).count()
+        if str(self.type) == str(self.SUBSCRIPTION_PLAN) or str(self.type) == str(self.ALL):
+            count += UserPlanMapping.objects.filter(user=user,
+                                                   status__in=[UserPlanMapping.BOOKED],
+                                                   coupon=self).count()
 
         count += Cart.objects.filter(user=user, deleted_at__isnull=True, data__coupon_code__contains=self.code).exclude(id=cart_item).count()
+        return count
+
+    def random_coupon_used_count(self, user, code, cart_item=None):
+        from ondoc.doctor.models import OpdAppointment
+        from ondoc.diagnostic.models import LabAppointment
+        from ondoc.cart.models import Cart
+        from ondoc.subscription_plan.models import UserPlanMapping
+
+        if user and not user.is_authenticated:
+            return 0
+
+        count = 0
+        if str(self.type) == str(self.DOCTOR) or str(self.type) == str(self.ALL):
+            qs = OpdAppointment.objects.filter(status__in=[OpdAppointment.CREATED, OpdAppointment.BOOKED,
+                                                               OpdAppointment.RESCHEDULED_DOCTOR,
+                                                               OpdAppointment.RESCHEDULED_PATIENT,
+                                                               OpdAppointment.ACCEPTED,
+                                                               OpdAppointment.COMPLETED],
+                                                   coupon=self,
+                                                   coupon_data__random_coupons__random_coupon_list__contains=[code])
+            if user:
+                qs = qs.filter(user=user)
+            count += qs.count()
+
+
+        if str(self.type) == str(self.LAB) or str(self.type) == str(self.ALL):
+            qs = LabAppointment.objects.filter(status__in=[LabAppointment.CREATED, LabAppointment.BOOKED,
+                                                           LabAppointment.RESCHEDULED_LAB,
+                                                           LabAppointment.RESCHEDULED_PATIENT,
+                                                           LabAppointment.ACCEPTED,
+                                                           LabAppointment.COMPLETED],
+                                               coupon=self,
+                                               coupon_data__random_coupons__random_coupon_list__contains=[code])
+            if user:
+                qs = qs.filter(user=user)
+            count += qs.count()
+        if str(self.type) == str(self.SUBSCRIPTION_PLAN) or str(self.type) == str(self.ALL):
+            qs = UserPlanMapping.objects.filter(status__in=[UserPlanMapping.BOOKED],
+                                                coupon=self,
+                                                coupon_data__random_coupons__random_coupon_list__contains=[code])
+            if user:
+                qs = qs.filter(user=user)
+            count += qs.count()
+
+        qs = Cart.objects.filter(deleted_at__isnull=True, data__coupon_code__contains=code).exclude(id=cart_item)
+        if user:
+            qs = qs.filter(user=user)
+        count += qs.count()
+
         return count
 
     def total_used_coupon_count(self):
@@ -143,6 +202,7 @@ class Coupon(auth_model.TimeStampedModel):
     def get_total_deduction(cls, data, deal_price):
         from ondoc.doctor.models import OpdAppointment
         coupon_list = []
+        random_coupon_list = []
         discount_coupon_list = []
         cashback_coupon_list = []
 
@@ -150,7 +210,8 @@ class Coupon(auth_model.TimeStampedModel):
         coupon_cashback = 0
 
         if data.get("coupon_code"):
-            coupon_obj = cls.objects.filter(code__in=set(data.get("coupon_code")))
+            coupon_obj = RandomGeneratedCoupon.get_coupons(set(data.get("coupon_code")))
+            # coupon_obj = cls.objects.filter(code__in=set(data.get("coupon_code")))
             obj = OpdAppointment()
 
             remaining_deal_price = deal_price
@@ -178,6 +239,9 @@ class Coupon(auth_model.TimeStampedModel):
                     coupon_discount += curr_discount
                     remaining_deal_price -= curr_discount
                     coupon_list.append(coupon.id)
+                    if hasattr(coupon, 'is_random') and coupon.is_random:
+                        random_coupon_list.append(coupon.random_coupon_code)
+
 
             for coupon in cashback_coupon_list:
                 if remaining_deal_price > 0:
@@ -197,8 +261,10 @@ class Coupon(auth_model.TimeStampedModel):
                     coupon_cashback += curr_cashback
                     remaining_deal_price -= curr_cashback
                     coupon_list.append(coupon.id)
+                    if hasattr(coupon, 'is_random') and coupon.is_random:
+                        random_coupon_list.append(coupon.random_coupon_code)
 
-        return coupon_discount, coupon_cashback, coupon_list
+        return coupon_discount, coupon_cashback, coupon_list, random_coupon_list
 
     def __str__(self):
         return self.code
@@ -239,10 +305,42 @@ class RandomGeneratedCoupon(auth_model.TimeStampedModel):
 
     random_coupon = models.CharField(max_length=50)
     coupon = models.ForeignKey(Coupon, on_delete=models.CASCADE, related_name="random_generated_coupon")
-    user = models.ForeignKey(auth_model.User, on_delete=models.CASCADE)
-    sent_at = models.DateTimeField(default=None, null=True, blank=True)
-    consumed_at = models.DateTimeField(default=None, null=True, blank=True)
-    validity = models.PositiveIntegerField(default=None)
+    user = models.ForeignKey(auth_model.User, on_delete=models.CASCADE, null=True)
+    sent_at = models.DateTimeField(null=True, blank=True)
+    consumed_at = models.DateTimeField(null=True, blank=True)
+    validity = models.PositiveIntegerField(null=True, blank=True)
+
+    @classmethod
+    def get_coupons(cls, coupon_codes):
+        coupon_obj = None
+
+        expression = F('sent_at') + datetime.timedelta(days=1) * F('validity')
+        annotate_expression = ExpressionWrapper(expression, DateTimeField())
+        random_coupons = cls.objects.annotate(last_date=annotate_expression)\
+                                                                .filter(random_coupon__in=coupon_codes,
+                                                                         sent_at__isnull=False,
+                                                                         consumed_at__isnull=True,
+                                                                         last_date__gte=datetime.datetime.now()
+                                                                ).all()
+
+        if random_coupons:
+            c_list = ','.join(["'" + str(c) + "'" for c in coupon_codes])
+            coupon_obj = Coupon.objects\
+                .prefetch_related('random_generated_coupon')\
+                .annotate(is_random=models.Value(True, models.BooleanField()),
+                          random_count=models.Value(1, models.IntegerField()))\
+                .filter(id__in=random_coupons.values_list('coupon', flat=True)) \
+                .extra(select={'random_coupon_code': 'SELECT random_coupon FROM random_generated_coupon where coupon_id = coupon.id AND random_coupon IN ('+c_list+')'})
+
+        if not coupon_obj:
+            coupon_obj = Coupon.objects \
+                .prefetch_related('random_generated_coupon')\
+                .annotate(is_random=models.Value(False, models.BooleanField()),
+                          random_count=models.Value(0, models.IntegerField()),
+                          random_coupon_code=models.Value("", models.CharField()))\
+                .filter(code__in=coupon_codes)
+
+        return coupon_obj
 
     def __str__(self):
         return self.random_coupon
