@@ -2,7 +2,7 @@ from django.contrib.admin import TabularInline
 # from django.contrib.auth import admin
 from django.contrib import admin
 
-from ondoc.corporate_booking.models import CorporateBooking, CorporateDeal, CorporateDocument
+from ondoc.corporate_booking.models import CorporateDeal, CorporateDocument, Corporates
 
 
 class CorporateDocumentInline(TabularInline):
@@ -13,8 +13,8 @@ class CorporateDocumentInline(TabularInline):
     verbose_name_plural = 'Corporate Documents'
 
 
-class CorporateBookingAdmin(admin.ModelAdmin):
-    model = CorporateBooking
+class CorporatesAdmin(admin.ModelAdmin):
+    model = Corporates
     list_display = ['corporate_name']
     inlines = [CorporateDocumentInline]
 
