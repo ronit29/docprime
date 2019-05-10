@@ -610,7 +610,7 @@ class DoctorProfileUserViewSet(viewsets.GenericViewSet):
 
         procedures = response_data.pop('procedures')
         availability = []
-        coupon_recommender = CouponRecommender(self.request.user, profile, 'doctor', product_id, coupon_code)
+        coupon_recommender = CouponRecommender(self.request.user, profile, 'doctor', product_id, coupon_code, None)
         filters = dict()
         for key, group in groupby(sorted_by_enable_booking, lambda x: x['hospital_id']):
             hospital_groups = list(group)

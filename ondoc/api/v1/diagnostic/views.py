@@ -92,7 +92,7 @@ class SearchPageViewSet(viewsets.ReadOnlyModelViewSet):
                                                                                                           recommended_lab_tests__searchable=True,
                                                                                                           recommended_lab_tests__enable_for_retail=True).order_by('-priority').distinct()[:count]
         test_serializer = diagnostic_serializer.CommonTestSerializer(test_queryset, many=True, context={'request': request})
-        coupon_recommender = CouponRecommender(request.user, profile, 'lab', product_id, coupon_code)
+        coupon_recommender = CouponRecommender(request.user, profile, 'lab', product_id, coupon_code, None)
         package_serializer = diagnostic_serializer.CommonPackageSerializer(package_queryset, many=True, context={'request': request, 'coupon_recommender':coupon_recommender})
         lab_serializer = diagnostic_serializer.PromotedLabsSerializer(lab_queryset, many=True)
         condition_serializer = diagnostic_serializer.CommonConditionsSerializer(conditions_queryset, many=True)
@@ -394,7 +394,7 @@ class LabList(viewsets.ReadOnlyModelViewSet):
                 is_selected = True
             category_result.append({'name': name, 'id': category_id, 'is_selected': is_selected})
 
-        coupon_recommender = CouponRecommender(request.user, profile, 'lab', product_id, coupon_code)
+        coupon_recommender = CouponRecommender(request.user, profile, 'lab', product_id, coupon_code, None)
         filters = dict()
 
         result = serializer.data
@@ -683,7 +683,7 @@ class LabList(viewsets.ReadOnlyModelViewSet):
                 is_selected = True
             category_result.append({'name': name, 'id': category_id, 'is_selected': is_selected})
 
-        coupon_recommender = CouponRecommender(request.user, profile, 'lab', product_id, coupon_code)
+        coupon_recommender = CouponRecommender(request.user, profile, 'lab', product_id, coupon_code, None)
         filters = dict()
 
         result = serializer.data
@@ -1211,7 +1211,7 @@ class LabList(viewsets.ReadOnlyModelViewSet):
             product_id = parameters.get('product_id', None)
             coupon_code = parameters.get('coupon_code', None)
             profile = parameters.get('profile_id', None)
-            coupon_recommender = CouponRecommender(request.user, profile, 'lab', product_id, coupon_code)
+            coupon_recommender = CouponRecommender(request.user, profile, 'lab', product_id, coupon_code, None)
             filters = dict()
 
             from ondoc.coupon.models import Coupon
@@ -3197,7 +3197,7 @@ class CompareLabPackagesViewSet(viewsets.ReadOnlyModelViewSet):
                 package_detail['category_parameter_count'] = category_parameter_result
                 lab_packages_all_details[data.id] = package_detail
 
-        coupon_recommender = CouponRecommender(request.user, profile, 'lab', product_id, coupon_code)
+        coupon_recommender = CouponRecommender(request.user, profile, 'lab', product_id, coupon_code, None)
         final_result = []
         for pack_lab in validated_data.get('package_lab_ids', []):
             temp_data = {}

@@ -57,7 +57,7 @@ class ScreenViewSet(viewsets.GenericViewSet):
         test_serializer = CommonTestSerializer(test_queryset, many=True, context={'request': request})
 
         package_queryset = CommonPackage.get_packages(grid_size-1)
-        coupon_recommender = CouponRecommender(request.user, profile, 'lab', product_id, coupon_code)
+        coupon_recommender = CouponRecommender(request.user, profile, 'lab', product_id, coupon_code, None)
         package_serializer = CommonPackageSerializer(package_queryset, many=True, context={'request': request, 'coupon_recommender': coupon_recommender})
 
         # upcoming_appointment_viewset = AppointmentViewSet()

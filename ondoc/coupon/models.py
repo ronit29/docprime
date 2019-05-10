@@ -353,7 +353,7 @@ class RandomGeneratedCoupon(auth_model.TimeStampedModel):
 
 class CouponRecommender():
 
-    def __init__(self, user, profile, type, product_id, coupon_code):
+    def __init__(self, user, profile, type, product_id, coupon_code, cart_item_id):
         self.user = user
         self.type = type
         self.profile = profile
@@ -362,6 +362,7 @@ class CouponRecommender():
         self.user_cart_counts = dict()
         self.coupon_properties = dict()
         self.payment_option_filter = None
+        self.cart_item_id = cart_item_id
 
     @cached_property
     def all_applicable_coupons(self):
@@ -376,6 +377,7 @@ class CouponRecommender():
         coupon_code = self.coupon_code
         user_cart_counts = self.user_cart_counts
         types = [Coupon.ALL]
+        cart_item_id = self.cart_item_id if self.cart_item_id else None
 
         if not user.is_authenticated:
             user = None
@@ -442,7 +444,7 @@ class CouponRecommender():
 
             cart_items = None
             self.payment_option_filter = Cart.get_pg_if_pgcoupon(user, cart_items)
-            user_cart_purchase_items = user.cart_item.filter(deleted_at__isnull=True)
+            user_cart_purchase_items = user.cart_item.filter(deleted_at__isnull=True).exclude(id=cart_item_id)
 
             for item in user_cart_purchase_items:
                 if item.data and item.data.get('coupon_code'):

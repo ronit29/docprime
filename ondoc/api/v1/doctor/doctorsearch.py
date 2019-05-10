@@ -432,7 +432,7 @@ class DoctorSearchHelper:
         product_id = query_params.get("product_id", None)
         coupon_code = query_params.get("coupon_code", None)
 
-        coupon_recommender = CouponRecommender(request.user, profile, 'doctor', product_id, coupon_code)
+        coupon_recommender = CouponRecommender(request.user, profile, 'doctor', product_id, coupon_code, None)
         filters = dict()
 
         for doctor in doctor_data:

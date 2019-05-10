@@ -342,7 +342,7 @@ class ApplicableCouponsViewSet(viewsets.GenericViewSet):
         deal_price = input_data.get("deal_price")
         coupon_code = input_data.get("coupon_code")
         profile = input_data.get("profile_id", None)
-        # cart_item_id = input_data.get('cart_item').id if input_data.get('cart_item') else None
+        cart_item_id = input_data.get('cart_item').id if input_data.get('cart_item') else None
         show_all = input_data.get('show_all', False)
 
         coupon_type = 'both'
@@ -355,7 +355,7 @@ class ApplicableCouponsViewSet(viewsets.GenericViewSet):
         if deal_price==0:
             deal_price=None
 
-        coupon_recommender = CouponRecommender(request.user, profile, coupon_type, product_id, coupon_code)
+        coupon_recommender = CouponRecommender(request.user, profile, coupon_type, product_id, coupon_code, cart_item_id)
         filters = dict()
 
         if lab:
