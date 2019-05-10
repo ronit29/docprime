@@ -28,7 +28,7 @@ class Corporates(auth_model.TimeStampedModel):
 
 
 class CorporateDeal(auth_model.TimeStampedModel):
-    corporate_id = models.ForeignKey(Corporates, on_delete=models.CASCADE, verbose_name='Corporate Name')
+    corporate = models.ForeignKey(Corporates, on_delete=models.CASCADE, verbose_name='Corporate Name')
     deal_start_date = models.DateTimeField()
     deal_end_date = models.DateTimeField()
     payment_date = models.DateTimeField()
@@ -40,8 +40,8 @@ class CorporateDeal(auth_model.TimeStampedModel):
     service_description = models.TextField(default='N/A')
     receipt_no = models.CharField(max_length=1000, default='')
     is_active = models.BooleanField(default=False)
-    receipt_image = models.FileField(default=None, upload_to='corporate/receipt', validators=[
-        FileExtensionValidator(allowed_extensions=['pdf', 'jfif', 'jpg', 'jpeg', 'png'])])
+    receipt_image = models.FileField(default=None, upload_to='corporate/receipt',
+                                     validators=[FileExtensionValidator(allowed_extensions=['pdf', 'jfif', 'jpg', 'jpeg', 'png'])])
     synced_analytics = GenericRelation(SyncBookingAnalytics, related_name="corporate_deal_analytics")
 
 
@@ -54,20 +54,8 @@ class CorporateDeal(auth_model.TimeStampedModel):
         if not obj:
             obj = DP_CorporateDeals()
             obj.CorporateDealId = self.id
-            obj.CorporateName = self.corporate_id.corporate_name
-            obj.DealStartDate = self.deal_start_date
-            obj.ReceiptNumber = self.receipt_no
-            obj.CreatedDate = self.created_at
-            obj.ExpectedProviderFee = self.expected_provider_fee
-            obj.GrossAmount = self.gross_amount
-            obj.NumberOfEmployees = self.employee_count
-            obj.TDSDeducted = self.tds_deducted
-            obj.PaymentDate = self.payment_date
-            obj.IsActive = self.is_active
-            obj.DealEndDate = self.deal_end_date
-            obj.UpdatedDate = self.updated_at
-            obj.save()
-        obj.CorporateName = self.corporate_id.corporate_name
+
+        obj.CorporateName = self.corporate.corporate_name
         obj.DealStartDate = self.deal_start_date
         obj.ReceiptNumber = self.receipt_no
         obj.CreatedDate = self.created_at
@@ -79,6 +67,8 @@ class CorporateDeal(auth_model.TimeStampedModel):
         obj.IsActive = self.is_active
         obj.DealEndDate = self.deal_end_date
         obj.UpdatedDate = self.updated_at
+        obj.save()
+
 
         try:
             SyncBookingAnalytics.objects.update_or_create(object_id=self.id,
