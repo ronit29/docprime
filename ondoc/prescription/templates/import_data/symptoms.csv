@@ -1,0 +1,719 @@
+name,source,source_type
+Abdominal Tenderness,CHAT ,1
+Acne,CHAT ,1
+Aggressiveness,CHAT ,1
+Aimless Movement,CHAT ,1
+Anemia,CHAT ,1
+Anxiety,CHAT ,1
+Anxious Mood,CHAT ,1
+Arm Pain,CHAT ,1
+Aversion To Food Or Drink,CHAT ,1
+Backache,CHAT ,1
+Bee Sting,CHAT ,1
+Big Toe Pain,CHAT ,1
+Blackhead,CHAT ,1
+Blanching Of Skin,CHAT ,1
+Bleeds Easily,CHAT ,1
+Blocked Nose,CHAT ,1
+Blood-Tinged Sputum,CHAT ,1
+Boils,CHAT ,1
+Bone Pain,CHAT ,1
+Bone Tenderness,CHAT ,1
+Bowed Legs,CHAT ,1
+Breast Nodule,CHAT ,1
+Breast Tenderness,CHAT ,1
+Breathlessness,CHAT ,1
+Bruising Around The Eyes,CHAT ,1
+Burning Sensation during urination,CHAT ,1
+Calf Pain,CHAT ,1
+Cataract,CHAT ,1
+Catatonic State,CHAT ,1
+Change In The Way Food Tastes,CHAT ,1
+Changes In Skin,CHAT ,1
+Choking,CHAT ,1
+Chronic Pain,CHAT ,1
+Claw Hand,CHAT ,1
+Cleft Palate And Lip,CHAT ,1
+Clubfoot,CHAT ,1
+Clumsy,CHAT ,1
+Cold,CHAT ,1
+Cold Sweat,CHAT ,1
+Color Vision Deficiency,CHAT ,1
+Comatose,CHAT ,1
+Conjunctivitis,CHAT ,1
+Contusion,CHAT ,1
+Convulsions,CHAT ,1
+Corneal Abrasion,CHAT ,1
+Corns,CHAT ,1
+Coughing,CHAT ,1
+Cysts,CHAT ,1
+Decreased Alertness,CHAT ,1
+Dehydration,CHAT ,1
+Delusions,CHAT ,1
+Dementia,CHAT ,1
+Depression,CHAT ,1
+Dermatitis,CHAT ,1
+Developmental Delay,CHAT ,1
+Diarrhoea,CHAT ,1
+Difficulty Concentrating,CHAT ,1
+Difficulty Sleeping,CHAT ,1
+Difficulty Swallowing,CHAT ,1
+Disorders Of Communication,CHAT ,1
+Dizzy When Standing Up,CHAT ,1
+Drooling,CHAT ,1
+Drowsiness,CHAT ,1
+Drug Abuse,CHAT ,1
+Dry Hair,CHAT ,1
+Dry Mouth,CHAT ,1
+Dry Skin,CHAT ,1
+Dryness Of Eye,CHAT ,1
+Ear Infection,CHAT ,1
+Episodes Of Overeating,CHAT ,1
+Erection Too Short-Lived,CHAT ,1
+Euphoric Mood,CHAT ,1
+Eye Infection,CHAT ,1
+Eyelid Drooping,CHAT ,1
+Eyelid Spasm,CHAT ,1
+Failure To Thrive,CHAT ,1
+Feeling Bloated,CHAT ,1
+Feeling Full After Eating A Small Amount,CHAT ,1
+Feeling Irritable,CHAT ,1
+Feeling Sad,CHAT ,1
+Feels Hot To Touch,CHAT ,1
+Feet Clawing,CHAT ,1
+Fertility Problem,CHAT ,1
+Fidgety,CHAT ,1
+Finger Clubbing,CHAT ,1
+Finger Numbness,CHAT ,1
+Fingernail Cyanosis,CHAT ,1
+Flat Foot,CHAT ,1
+Fluid In Peritoneal Cavity,CHAT ,1
+Flushed Complexion,CHAT ,1
+Foot Pain,CHAT ,1
+Foul Smelling Stool,CHAT ,1
+Fractures,CHAT ,1
+Frequent Sneezing,CHAT ,1
+Furuncle,CHAT ,1
+Gait Abnormality,CHAT ,1
+Gap Between Cranial Sutures,CHAT ,1
+Generalised Muscle Pain,CHAT ,1
+Gingival Hemorrhage,CHAT ,1
+Goiter,CHAT ,1
+Grand Mal Seizure,CHAT ,1
+Grey Skin,CHAT ,1
+Growth Retardation,CHAT ,1
+Guilt Feelings,CHAT ,1
+Hair Loss,CHAT ,1
+Hand Pain,CHAT ,1
+Heart Flutter,CHAT ,1
+Urine with blood,CHAT ,1
+Vomiting with blood,CHAT ,1
+Hemorrhage- Gastrointestinal,CHAT ,1
+High Blood Pressure,CHAT ,1
+High-Pitched Moan,CHAT ,1
+Hip Pain,CHAT ,1
+Hip Stiffness,CHAT ,1
+Hot Flushes,CHAT ,1
+Enlargement Of Male Breast,CHAT ,1
+Increased Hunger,CHAT ,1
+Increased Skin Pigmentation,CHAT ,1
+Increased Tendency To Bruise,CHAT ,1
+Indigestion,CHAT ,1
+Infertility,CHAT ,1
+Inguinal Mass,CHAT ,1
+Inguinal Pain,CHAT ,1
+Insomnia,CHAT ,1
+Involuntary Movements,CHAT ,1
+Irregular Heart Rhythms,CHAT ,1
+Irregular Sleep-Wake Pattern,CHAT ,1
+Irritable Mood,CHAT ,1
+Itching,CHAT ,1
+Itchy Ear,CHAT ,1
+Itchy Eyes,CHAT ,1
+Itchy Foot,CHAT ,1
+Joint Pain,CHAT ,1
+Joints Warm,CHAT ,1
+Deformity Of Spine,CHAT ,1
+Labored Respiration,CHAT ,1
+Lack Of Appetite,CHAT ,1
+Lack Of Energy,CHAT ,1
+Lassitude,CHAT ,1
+Lazy Eye,CHAT ,1
+Leg Ulcers,CHAT ,1
+Lightheadedness,CHAT ,1
+Limb Deformity- Congenital,CHAT ,1
+Limb Numbness,CHAT ,1
+Limited Range Of Motion,CHAT ,1
+Lip Chapping,CHAT ,1
+Lip Cyanosis,CHAT ,1
+Lip Pain,CHAT ,1
+Liver Enlarged,CHAT ,1
+Loss Of Hair,CHAT ,1
+Loss Of Muscle Function,CHAT ,1
+Loss Of Perception Of Sensory Stimuli,CHAT ,1
+Loss Of Vision In One Half Of The Visual Field,CHAT ,1
+Low Birth Weights,CHAT ,1
+Low Blood Pressure,CHAT ,1
+Lumbar Back Pain,CHAT ,1
+Lump In Eyelid,CHAT ,1
+Lump In Stomach Area,CHAT ,1
+Memory Loss,CHAT ,1
+Menstrual Irregularity,CHAT ,1
+Menstruation Excessive,CHAT ,1
+Milk Intolerance,CHAT ,1
+Misty Vision,CHAT ,1
+Mouth Sores,CHAT ,1
+Mouth Ulcers,CHAT ,1
+Muddled,CHAT ,1
+Multiple Skin Tags,CHAT ,1
+Muscle Contracture,CHAT ,1
+Muscle Cramps,CHAT ,1
+Muscle Wasting,CHAT ,1
+Nail Problems,CHAT ,1
+Nappy Rash,CHAT ,1
+Nasal Drainage,CHAT ,1
+Nasal Flaring,CHAT ,1
+Nasal Irritation,CHAT ,1
+Neck Mass,CHAT ,1
+Nervousness,CHAT ,1
+Nightmares,CHAT ,1
+Nipple Itchy,CHAT ,1
+Nosebleed,CHAT ,1
+Not Feeling Well,CHAT ,1
+Not Having A Period,CHAT ,1
+Not Hungry,CHAT ,1
+Numb Hands,CHAT ,1
+Numbness,CHAT ,1
+Numbness Of Foot,CHAT ,1
+Numbness Of Limbs,CHAT ,1
+Numbness/Tingling In Hands/Feet,CHAT ,1
+Ocular Pain,CHAT ,1
+Olfactory Impairment,CHAT ,1
+Orientation Poor,CHAT ,1
+Pain Around The Eye,CHAT ,1
+Pain In Breast,CHAT ,1
+Pain In Fingers,CHAT ,1
+Pain In More Than One Joint,CHAT ,1
+Pain In Neck,CHAT ,1
+Pain In The Area Around The Anus,CHAT ,1
+Pain In The Lower Jaw,CHAT ,1
+Pain With Intercourse,CHAT ,1
+Painful Ankle,CHAT ,1
+Painful Elbow,CHAT ,1
+Painful Gums,CHAT ,1
+Painful Hips,CHAT ,1
+Painful Leg,CHAT ,1
+Painful Periods,CHAT ,1
+Painful Respiration,CHAT ,1
+Painful Swallowing,CHAT ,1
+Painful Urination,CHAT ,1
+Pale Stools,CHAT ,1
+Panic Attacks,CHAT ,1
+Papule,CHAT ,1
+Passing Gas,CHAT ,1
+Penile Pain,CHAT ,1
+Personality Change,CHAT ,1
+Pigmented Skin Lesion,CHAT ,1
+Poor Balance,CHAT ,1
+Poor Feeding Of Newborn,CHAT ,1
+Poor Memory,CHAT ,1
+Poor Muscle Tone,CHAT ,1
+Poor Night Vision,CHAT ,1
+Posture Abnormal,CHAT ,1
+Preterm Labor,CHAT ,1
+Problem Behavior,CHAT ,1
+Problems With Sexual Interest Or Activity,CHAT ,1
+Problems With Urination,CHAT ,1
+Prominent Frontal Ridges,CHAT ,1
+Protruding Eyes,CHAT ,1
+Puncture Wound,CHAT ,1
+Pustule,CHAT ,1
+Queasy In The Mornings,CHAT ,1
+Raised Skin Bump,CHAT ,1
+Range Of Joint Movement Increased,CHAT ,1
+Rapid Shallow Breathing,CHAT ,1
+Rash On Genitals,CHAT ,1
+Rashes,CHAT ,1
+Rectal Hemorrhage,CHAT ,1
+Rectal Itching,CHAT ,1
+Red Eyes,CHAT ,1
+Respiratory Obstruction,CHAT ,1
+Rigor,CHAT ,1
+Rough Voice,CHAT ,1
+Runny Nose,CHAT ,1
+Scalp Itchy,CHAT ,1
+Scoliosis Deformity Of Spine,CHAT ,1
+Fissured tongue,CHAT ,1
+Self Rejection,CHAT ,1
+Semen Bloody,CHAT ,1
+Sensation Of Feeling Heart Beat,CHAT ,1
+Sensitive To Cold,CHAT ,1
+Sensitive To Criticism,CHAT ,1
+Sensitive To Heat,CHAT ,1
+Separation Anxiety,CHAT ,1
+Severe Blood Loss,CHAT ,1
+Severe Headache,CHAT ,1
+Sexual Impotence,CHAT ,1
+Shin Splints,CHAT ,1
+Shock,CHAT ,1
+Short Of Breath Lying Down,CHAT ,1
+Short Stature,CHAT ,1
+Shortness Of Breath On Exertion,CHAT ,1
+Shyness,CHAT ,1
+Sick To Stomach,CHAT ,1
+Side Ache,CHAT ,1
+Sinusitis,CHAT ,1
+Skin Abscess,CHAT ,1
+Skin Discolored,CHAT ,1
+Skin Exfoliation,CHAT ,1
+Skin Lesion,CHAT ,1
+Skin Nodule,CHAT ,1
+Skin Pruritus,CHAT ,1
+Skin Rash,CHAT ,1
+Skin Redness,CHAT ,1
+Skull Fractures,CHAT ,1
+Sleep Paralysis,CHAT ,1
+Sleeplessness,CHAT ,1
+Slow Movements,CHAT ,1
+Slow Pulse,CHAT ,1
+Small Jaw,CHAT ,1
+Small Red Dots On Skin,CHAT ,1
+Smelly Breath,CHAT ,1
+Sob,CHAT ,1
+Soft Spot - Bulging,CHAT ,1
+Sore Knees,CHAT ,1
+Sore Mouth,CHAT ,1
+Sore Rib,CHAT ,1
+Sore Throat,CHAT ,1
+Sour Stomach,CHAT ,1
+Speech Articulation Problems,CHAT ,1
+Speech Impairment,CHAT ,1
+Speech Problem,CHAT ,1
+Spine Deformed,CHAT ,1
+Splenomegaly,CHAT ,1
+Spotting,CHAT ,1
+Stertor,CHAT ,1
+Sticky Skin,CHAT ,1
+Stiff Muscles,CHAT ,1
+Stinging Sensation In Eye,CHAT ,1
+Stomach Bloat,CHAT ,1
+Stools Floating,CHAT ,1
+Stopped Breathing,CHAT ,1
+Stretchy Skin,CHAT ,1
+Stridor,CHAT ,1
+Strong Pulse,CHAT ,1
+Stuffy- Congested Nose,CHAT ,1
+Stye,CHAT ,1
+Sun Sensitivity,CHAT ,1
+Sunken Fontanelle,CHAT ,1
+Swallowing Disorder,CHAT ,1
+Swayback,CHAT ,1
+Sweating At Night,CHAT ,1
+Swelling,CHAT ,1
+Swelling Due To Excess Fluid,CHAT ,1
+Swollen Ankle,CHAT ,1
+Swollen Breast,CHAT ,1
+Swollen Face,CHAT ,1
+Swollen Gums,CHAT ,1
+Swollen Joints,CHAT ,1
+Swollen Lymph Nodes,CHAT ,1
+Swollen Scrotum,CHAT ,1
+Swollen Stomach,CHAT ,1
+Tarry Stools,CHAT ,1
+Teeth Grinding,CHAT ,1
+Telling Untruths,CHAT ,1
+Temper Tantrums,CHAT ,1
+Tense Stomach,CHAT ,1
+Testicular Pain,CHAT ,1
+Testicular Swelling,CHAT ,1
+Things Taste Different,CHAT ,1
+Threatening Suicide,CHAT ,1
+Throat Irritation,CHAT ,1
+Throat Soreness,CHAT ,1
+Thyroid Nodules,CHAT ,1
+Toe Numbness,CHAT ,1
+Toe Pain,CHAT ,1
+Tongue Swelling,CHAT ,1
+Tooth Decay,CHAT ,1
+Tooth Deformity,CHAT ,1
+Trouble Sleeping,CHAT ,1
+Trouble Speaking,CHAT ,1
+Truancy,CHAT ,1
+Tumescence,CHAT ,1
+Tummy Ache,CHAT ,1
+Twitching,CHAT ,1
+Unable To Concentrate,CHAT ,1
+Unable To Control Bowel Movements,CHAT ,1
+Unable To Control Emotions,CHAT ,1
+Unable To Have A Bowel Movement,CHAT ,1
+Unable To Keep Still,CHAT ,1
+Unable To See,CHAT ,1
+Unable To Smell,CHAT ,1
+Unconscious,CHAT ,1
+Uncontrolled Eye Movements,CHAT ,1
+Underbite,CHAT ,1
+Unequal Pupils,CHAT ,1
+Unilateral Hearing Loss,CHAT ,1
+Unintentional Weight Gain,CHAT ,1
+Unpredictable- Repetitive Movements,CHAT ,1
+Unsteady Gait,CHAT ,1
+Urethral Pain,CHAT ,1
+Urge Incontinence,CHAT ,1
+Urinary Hesitation,CHAT ,1
+Urinary Stress Incontinence,CHAT ,1
+Urinary Urgency,CHAT ,1
+Urine Color Abnormal,CHAT ,1
+Urine Looks Dark,CHAT ,1
+Urine Smell Abnormal,CHAT ,1
+Vaginal Bleeding Between Periods,CHAT ,1
+Vaginal Discharge,CHAT ,1
+Vaginal Dryness,CHAT ,1
+Vaginal Infections,CHAT ,1
+Vaginal Itching,CHAT ,1
+Vaginal Pain,CHAT ,1
+Visual Disturbance,CHAT ,1
+Vitreous Floaters,CHAT ,1
+Vomiting Blood,CHAT ,1
+Vomiting Coffee-Ground Like Material,CHAT ,1
+Vomiting Up Bowel Contents,CHAT ,1
+Wandering- Nocturnal,CHAT ,1
+Wasp Sting,CHAT ,1
+Watery Eyes,CHAT ,1
+Watery Stool,CHAT ,1
+Weak Bladder,CHAT ,1
+Weak Muscles,CHAT ,1
+Weak Pulse,CHAT ,1
+Weary,CHAT ,1
+Webbed Toes,CHAT ,1
+Webbing Of Fingers,CHAT ,1
+Weight Increase,CHAT ,1
+Wetting The Bed,CHAT ,1
+Wheezing,CHAT ,1
+Whiteheads,CHAT ,1
+Wooziness,CHAT ,1
+Wrist Pain,CHAT ,1
+Yawns Too Much,CHAT ,1
+Yellow Eyes,CHAT ,1
+White patches on skin,CHAT ,1
+Aging-Premature,MESH,2
+Asthenia,MESH,2
+Fever,MESH,2
+Fever of Unknown Origin,MESH,2
+Sweating Sickness,MESH,2
+Hypothermia,MESH,2
+Body Weight,MESH,2
+Birth Weight,MESH,2
+Fetal Macrosomia,MESH,2
+Body Weight Changes,MESH,2
+Weight Gain,MESH,2
+Weight Loss,MESH,2
+Emaciation,MESH,2
+Cachexia,MESH,2
+Fetal Weight,MESH,2
+Overweight,MESH,2
+Obesity,MESH,2
+Obesity-Morbid,MESH,2
+Thinness,MESH,2
+Cardiac Output-High,MESH,2
+Cardiac Output-Low,MESH,2
+Chills,MESH,2
+Cyanosis,MESH,2
+Infantile Apparent Life-Threatening Event,MESH,2
+Edema,MESH,2
+Edema-Cardiac,MESH,2
+Hydrops Fetalis,MESH,2
+Eye Manifestations,MESH,2
+Eye Hemorrhage,MESH,2
+Eye Pain,MESH,2
+Susac Syndrome,MESH,2
+Fatigue,MESH,2
+Mental Fatigue,MESH,2
+Feminization,MESH,2
+Fetal Distress,MESH,2
+Flushing,MESH,2
+Heart Murmurs,MESH,2
+Systolic Murmurs,MESH,2
+Hot Flashes,MESH,2
+Hypergammaglobulinemia,MESH,2
+Intermittent Claudication,MESH,2
+Mobility Limitation,MESH,2
+Motion Sickness,MESH,2
+Space Motion Sickness,MESH,2
+Neurologic Manifestations,MESH,2
+Cerebrospinal Fluid Otorrhea,MESH,2
+Cerebrospinal Fluid Rhinorrhea,MESH,2
+Decerebrate State,MESH,2
+Dyskinesias,MESH,2
+Ataxia,MESH,2
+Cerebellar Ataxia,MESH,2
+Gait Ataxia,MESH,2
+Athetosis,MESH,2
+Catalepsy,MESH,2
+Chorea,MESH,2
+Dystonia,MESH,2
+Torticollis,MESH,2
+Hyperkinesis,MESH,2
+Hypokinesia,MESH,2
+Myoclonus,MESH,2
+Psychomotor Agitation,MESH,2
+Akathisia-Drug-Induced,MESH,2
+Synkinesis,MESH,2
+Tics,MESH,2
+Tremor,MESH,2
+Gait Disorders-Neurologic,MESH,2
+Gait Apraxia,MESH,2
+Meningism,MESH,2
+Neurobehavioral Manifestations,MESH,2
+Apraxias,MESH,2
+Alien Hand Syndrome,MESH,2
+Catatonia,MESH,2
+Communication Disorders,MESH,2
+Language Disorders,MESH,2
+Agraphia,MESH,2
+Anomia,MESH,2
+Dyslexia,MESH,2
+Dyslexia-Acquired,MESH,2
+Alexia-Pure,MESH,2
+Language Development Disorders,MESH,2
+Speech Disorders,MESH,2
+Aphasia,MESH,2
+Aphasia-Broca,MESH,2
+Aphasia-Conduction,MESH,2
+Aphasia-Primary Progressive,MESH,2
+Primary Progressive Nonfluent Aphasia,MESH,2
+Aphasia-Wernicke,MESH,2
+Articulation Disorders,MESH,2
+Dysarthria,MESH,2
+Echolalia,MESH,2
+Mutism,MESH,2
+Stuttering,MESH,2
+Learning Disorders,MESH,2
+Confusion,MESH,2
+Delirium,MESH,2
+Consciousness Disorders,MESH,2
+Unconsciousness,MESH,2
+Coma,MESH,2
+Persistent Vegetative State,MESH,2
+Stupor,MESH,2
+Syncope,MESH,2
+Syncope-Vasovagal,MESH,2
+Lethargy,MESH,2
+Memory Disorders,MESH,2
+Amnesia,MESH,2
+Amnesia-Anterograde,MESH,2
+Amnesia-Retrograde,MESH,2
+Amnesia-Transient Global,MESH,2
+Korsakoff Syndrome,MESH,2
+Mental Retardation,MESH,2
+Perceptual Disorders,MESH,2
+Agnosia,MESH,2
+Gerstmann Syndrome,MESH,2
+Prosopagnosia,MESH,2
+Auditory Perceptual Disorders,MESH,2
+Hallucinations,MESH,2
+Illusions,MESH,2
+Phantom Limb,MESH,2
+Psychomotor Disorders,MESH,2
+Apraxia-Ideomotor,MESH,2
+Fasciculation,MESH,2
+Muscle Cramp,MESH,2
+Muscle Hypertonia,MESH,2
+Muscle Rigidity,MESH,2
+Muscle Spasticity,MESH,2
+Muscle Hypotonia,MESH,2
+Muscle Weakness,MESH,2
+Muscular Atrophy,MESH,2
+Sarcopenia,MESH,2
+Myokymia,MESH,2
+Myotonia,MESH,2
+Spasm,MESH,2
+Hemifacial Spasm,MESH,2
+Trismus,MESH,2
+Tetany,MESH,2
+Orthostatic Intolerance,MESH,2
+Pain,MESH,2
+Back Pain,MESH,2
+Low Back Pain,MESH,2
+Facial Pain,MESH,2
+Headache,MESH,2
+Slit Ventricle Syndrome,MESH,2
+Labor Pain,MESH,2
+Metatarsalgia,MESH,2
+Neck Pain,MESH,2
+Neuralgia,MESH,2
+Neuralgia-Postherpetic,MESH,2
+Piriformis Muscle Syndrome,MESH,2
+Sciatica,MESH,2
+Pain-Intractable,MESH,2
+Pain-Referred,MESH,2
+Paralysis,MESH,2
+Facial Paralysis,MESH,2
+Gastroparesis,MESH,2
+Hemiplegia,MESH,2
+Ophthalmoplegia,MESH,2
+Ophthalmoplegia-Chronic Progressive External,MESH,2
+Supranuclear Palsy-Progressive,MESH,2
+Paraplegia,MESH,2
+Brown-Sequard Syndrome,MESH,2
+Pseudobulbar Palsy,MESH,2
+Quadriplegia,MESH,2
+Respiratory Paralysis,MESH,2
+Vocal Cord Paralysis,MESH,2
+Paresis,MESH,2
+Paraparesis,MESH,2
+Paraparesis-Spastic,MESH,2
+Psychophysiologic Disorders,MESH,2
+Pupil Disorders,MESH,2
+Anisocoria,MESH,2
+Miosis,MESH,2
+Horner Syndrome,MESH,2
+Tonic Pupil,MESH,2
+Reflex-Abnormal,MESH,2
+Reflex-Babinski,MESH,2
+Seizures,MESH,2
+Sensation Disorders,MESH,2
+Dizziness,MESH,2
+Hearing Disorders,MESH,2
+Hearing Loss,MESH,2
+Deafness,MESH,2
+Deaf-Blind Disorders,MESH,2
+Hearing Loss-Bilateral,MESH,2
+Hearing Loss-Conductive,MESH,2
+Hearing Loss-Functional,MESH,2
+Hearing Loss-High-Frequency,MESH,2
+Hearing Loss-Mixed Conductive-Sensorineural,MESH,2
+Hearing Loss-Sensorineural,MESH,2
+Hearing Loss-Central,MESH,2
+Hearing Loss-Noise-Induced,MESH,2
+Presbycusis,MESH,2
+Usher Syndromes,MESH,2
+Hearing Loss-Sudden,MESH,2
+Hearing Loss-Unilateral,MESH,2
+Hyperacusis,MESH,2
+Tinnitus,MESH,2
+Olfaction Disorders,MESH,2
+Somatosensory Disorders,MESH,2
+Hyperalgesia,MESH,2
+Hyperesthesia,MESH,2
+Hypesthesia,MESH,2
+Paresthesia,MESH,2
+Taste Disorders,MESH,2
+Ageusia,MESH,2
+Dysgeusia,MESH,2
+Vision Disorders,MESH,2
+Amblyopia,MESH,2
+Blindness,MESH,2
+Amaurosis Fugax,MESH,2
+Blindness-Cortical,MESH,2
+Color Vision Defects,MESH,2
+Diplopia,MESH,2
+Hemianopsia,MESH,2
+Photophobia,MESH,2
+Scotoma,MESH,2
+Vision-Low,MESH,2
+Sleep Disorders,MESH,2
+Sleep Deprivation,MESH,2
+Urinary Bladder-Neurogenic,MESH,2
+Vertigo,MESH,2
+Voice Disorders,MESH,2
+Aphonia,MESH,2
+Dysphonia,MESH,2
+Hoarseness,MESH,2
+Oral Manifestations,MESH,2
+Oral Hemorrhage,MESH,2
+Abdominal Pain,MESH,2
+Abdomen-Acute,MESH,2
+Colic,MESH,2
+Renal Colic,MESH,2
+Arthralgia,MESH,2
+Shoulder Pain,MESH,2
+Chest Pain,MESH,2
+Angina Pectoris,MESH,2
+Acute Coronary Syndrome,MESH,2
+Angina-Unstable,MESH,2
+Angina Pectoris-Variant,MESH,2
+Earache,MESH,2
+Toothache,MESH,2
+Flank Pain,MESH,2
+Glossalgia,MESH,2
+Pain-Postoperative,MESH,2
+Pelvic Pain,MESH,2
+Dysmenorrhea,MESH,2
+Pseudophakia,MESH,2
+Reticulocytosis,MESH,2
+Aerophagy,MESH,2
+Anorexia,MESH,2
+Constipation,MESH,2
+Coprophagia,MESH,2
+Diarrhea,MESH,2
+Diarrhea-Infantile,MESH,2
+Dyspepsia,MESH,2
+Encopresis,MESH,2
+Eructation,MESH,2
+Flatulence,MESH,2
+Gagging,MESH,2
+Halitosis,MESH,2
+Heartburn,MESH,2
+Hiccup,MESH,2
+Hyperphagia,MESH,2
+Bulimia,MESH,2
+Nausea,MESH,2
+Postoperative Nausea and Vomiting,MESH,2
+Vomiting,MESH,2
+Hematemesis,MESH,2
+Morning Sickness,MESH,2
+Hyperemesis Gravidarum,MESH,2
+Vomiting-Anticipatory,MESH,2
+Anoxia,MESH,2
+Fetal Hypoxia,MESH,2
+Apnea,MESH,2
+Cheyne-Stokes Respiration,MESH,2
+Cough,MESH,2
+Dyspnea,MESH,2
+Dyspnea-Paroxysmal,MESH,2
+Hemoptysis,MESH,2
+Hypercapnia,MESH,2
+Hyperoxia,MESH,2
+Hyperventilation,MESH,2
+Hypocapnia,MESH,2
+Hypoventilation,MESH,2
+Mouth Breathing,MESH,2
+Respiratory Aspiration,MESH,2
+Respiratory Sounds,MESH,2
+Snoring,MESH,2
+Sneezing,MESH,2
+Skin Manifestations,MESH,2
+Cafe-au-Lait Spots,MESH,2
+Ecchymosis,MESH,2
+Jaundice,MESH,2
+Jaundice-Obstructive,MESH,2
+Livedo Reticularis,MESH,2
+Necrolytic Migratory Erythema,MESH,2
+Pallor,MESH,2
+Pruritus,MESH,2
+Tinea Pedis,MESH,2
+Purpura,MESH,2
+Purpura Fulminans,MESH,2
+Purpura-Hyperglobulinemic,MESH,2
+Purpura-Schoenlein-Henoch,MESH,2
+Purpura-Thrombocytopenic,MESH,2
+Purpura-Thrombocytopenic-Idiopathic,MESH,2
+Purpura-Thrombotic Thrombocytopenic,MESH,2
+Waterhouse-Friderichsen Syndrome,MESH,2
+Striae Distensae,MESH,2
+Dysuria,MESH,2
+Hypercalciuria,MESH,2
+Nocturia,MESH,2
+Oliguria,MESH,2
+Polyuria,MESH,2
+Prostatism,MESH,2
+Proteinuria,MESH,2
+Albuminuria,MESH,2
+Hemoglobinuria,MESH,2
+Urinary Bladder-Overactive,MESH,2
+Urinary Incontinence,MESH,2
+Urinary Incontinence-Stress,MESH,2
+Urinary Incontinence-Urge,MESH,2
+Urinoma,MESH,2
+Virilism,MESH,2
+Hirsutism,MESH,2

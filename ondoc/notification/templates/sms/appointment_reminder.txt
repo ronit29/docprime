@@ -1,0 +1,20 @@
+Gentle Reminder: You have an appointment for
+{{patient_name|capfirst}}
+Dr. {{doctor_name|capfirst}} at {{instance.hospital.name|capfirst}} on {{instance.time_slot_start|date:"D jS F Y"}} at {{instance.time_slot_start|date:"h:i A"}}
+{% if instance.payment_type == 2 %}
+Please enter the OTP obtained from the patient post consultation in the link provided below to successfully complete the appointment.
+Please collect the amount ₹xyz from the patient post-consultation.
+{% else %}
+Please enter the OTP obtained from the patient post consultation to successfully complete the appointment.
+{% endif %}
+Link: {{provider_login_url}}
+
+The booking details are as below :
+Booking ID : {{instance.id}}
+Patient Name : {{patient_name|capfirst}}
+Patient Contact No: {{mask_number}}
+Doctor Name : Dr. {{doctor_name|capfirst}}
+Appointment Date and Time : {{instance.time_slot_start|date:"D jS F Y"}} || {{instance.time_slot_start|date:"h:i A"}}
+
+Thanks
+Team docprime

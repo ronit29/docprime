@@ -84,7 +84,8 @@ import time
 from ondoc.api.v1.ratings.serializers import GoogleRatingsGraphSerializer
 logger = logging.getLogger(__name__)
 import random
-
+from ondoc.prescription import models as pres_models
+from ondoc.api.v1.prescription import serializers as pres_serializers
 
 class CreateAppointmentPermission(permissions.BasePermission):
     message = 'creating appointment is not allowed.'
@@ -568,6 +569,28 @@ class DoctorProfileView(viewsets.GenericViewSet):
             resp_data['is_provider_signup_lead'] = False
 
         return Response(resp_data)
+
+    def licence_update(self, request):
+        serializer = serializers.DoctorLicenceBodySerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        valid_data = serializer.validated_data
+        doctor = Doctor.objects.filter(Q(id=valid_data['doctor_id'].id,
+                                       doctor_clinics__hospital__manageable_hospitals__user=request.user,
+                                       doctor_clinics__hospital__manageable_hospitals__is_disabled=False),
+                                       (Q(doctor_clinics__hospital__manageable_hospitals__permission_type=auth_models.GenericAdmin.APPOINTMENT)
+                                        |
+                                        Q(doctor_clinics__hospital__manageable_hospitals__super_user_permission=True))
+                                       ).first()
+        if not doctor:
+            return Response({'error': 1}, status=status.HTTP_403_FORBIDDEN)
+
+        try:
+            doctor.license = valid_data['licence']
+            doctor.save()
+        except Exception as e :
+            logger.error(str(e))
+            return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        return Response({'status':1})
 
 
 class DoctorProfileUserViewSet(viewsets.GenericViewSet):
@@ -1130,30 +1153,47 @@ class PrescriptionFileViewset(OndocViewSet):
         serializer = serializers.PrescriptionSerializer(data=request.data, context={"request": request})
         serializer.is_valid(raise_exception=True)
         validated_data = serializer.validated_data
-        #resp_data = list()
-        if not self.prescription_permission(request.user, validated_data.get('appointment')):
-            return Response({'msg': "You don't have permissions to manage this appointment"},
-                            status=status.HTTP_403_FORBIDDEN)
+        app = validated_data['appointment_obj']
 
-        if models.Prescription.objects.filter(appointment=validated_data.get('appointment')).exists():
-            prescription = models.Prescription.objects.filter(appointment=validated_data.get('appointment')).first()
+        #resp_data = list()
+        if validated_data.get('type') == serializers.PrescriptionSerializer.OFFLINE:
+            pres_models.OfflinePrescription.objects.create(
+                name=validated_data.get('name'),
+                prescription_details=validated_data.get('prescription_details'),
+                appointment=validated_data.get('appointment_obj')
+            )
+            resp_data = {'id': app.id,
+                         'doctor': serializers.AppointmentRetrieveDoctorSerializer(app.doctor).data,
+                         'time_slot_start': app.time_slot_start,
+                         'hospital': serializers.HospitalModelSerializer(app.hospital).data,
+                         'profile': OfflinePatientSerializer(app.user).data,
+                         'prescriptions': app.get_prescriptions(request)
+                         }
+
         else:
-            prescription = models.Prescription.objects.create(appointment=validated_data.get('appointment'),
-                                                                  prescription_details=validated_data.get(
-                                                                      'prescription_details'))
-        prescription_file_data = {
-            "prescription": prescription.id,
-            "name": validated_data.get('name')
-        }
-        prescription_file_serializer = serializers.PrescriptionFileSerializer(data=prescription_file_data,
-                                                                                  context={"request": request})
-        prescription_file_serializer.is_valid(raise_exception=True)
-        prescription_file_serializer.save()
-        # resp_data = prescription_file_serializer.data
-        resp_data = serializers.DoctorAppointmentRetrieveSerializer(validated_data.get('appointment'),
-                                                                         context={'request': request}).data
-        if validated_data.get('appointment'):
-            resp_data['prescriptions'] = validated_data.get('appointment').get_prescriptions(request)
+            if not self.prescription_permission(request.user, app):
+                return Response({'msg': "You don't have permissions to manage this appointment"}, status=status.HTTP_403_FORBIDDEN)
+
+            prescription_obj = models.Prescription.objects.filter(appointment=app).first()
+            if prescription_obj:
+                prescription = prescription_obj
+            else:
+                prescription = models.Prescription.objects.create(appointment=validated_data.get('appointment_obj'),
+                                                                      prescription_details=validated_data.get(
+                                                                          'prescription_details'))
+            prescription_file_data = {
+                "prescription": prescription.id,
+                "name": validated_data.get('name')
+            }
+            prescription_file_serializer = serializers.PrescriptionFileSerializer(data=prescription_file_data,
+                                                                                      context={"request": request})
+            prescription_file_serializer.is_valid(raise_exception=True)
+            prescription_file_serializer.save()
+            # resp_data = prescription_file_serializer.data
+            resp_data = serializers.DoctorAppointmentRetrieveSerializer(validated_data.get('appointment_obj'),
+                                                                             context={'request': request}).data
+            if validated_data.get('appointment_obj'):
+                resp_data['prescriptions'] = validated_data.get('appointment_obj').get_prescriptions(request)
 
         return Response(resp_data)
 
@@ -1541,14 +1581,14 @@ class DoctorListViewSet(viewsets.GenericViewSet):
             # if validated_data.get('extras') and validated_data.get('extras').get('specialization'):
             #     specializations = validated_data.get('extras').get('specialization')
 
-            if validated_data.get('sitemap_identifier') == 'SPECIALIZATION_CITY':
-                title, description, ratings_title = self.get_spec_city_title_desc(specialization_id, city, specialization)
-
             if validated_data.get('sitemap_identifier') == 'IPD_PROCEDURE_DOCTOR_CITY':
                 title = '{ipd_procedure_name} Doctors in {city} | Best {ipd_procedure_name} Specialists'.format(
                     ipd_procedure_name=validated_data.get('ipd_procedure'), city=city)
                 description = '{ipd_procedure_name} Doctors in {city} : Check {ipd_procedure_name} doctors in {city}. View address, reviews, cost estimate and more at Docprime.'.format(
                     ipd_procedure_name=validated_data.get('ipd_procedure'), city=city)
+
+            if validated_data.get('sitemap_identifier') == 'SPECIALIZATION_CITY':
+                title, description, ratings_title = self.get_spec_city_title_desc(specialization_id, city, specialization)
 
             elif validated_data.get('sitemap_identifier') == 'SPECIALIZATION_LOCALITY_CITY':
                 title = specialization
@@ -1561,7 +1601,7 @@ class DoctorListViewSet(viewsets.GenericViewSet):
                     description += ' and get upto 50% off. View Address, fees and more for doctors '
                     description += 'in ' + city + '.'
 
-            else:
+            elif validated_data.get('sitemap_identifier') in ('DOCTORS_CITY', 'DOCTORS_LOCALITY_CITY'):
                 title = 'Doctors'
                 description = 'Doctors'
                 if locality:
@@ -2457,14 +2497,15 @@ class CreateAdminViewSet(viewsets.GenericViewSet):
         serializer = serializers.EntityListQuerySerializer(data=request.query_params)
         serializer.is_valid(raise_exception=True)
         valid_data = serializer.validated_data
-        queryset = auth_models.GenericAdmin.objects.select_related('doctor', 'hospital').prefetch_related('doctor__doctor_clinic')
+        queryset = auth_models.GenericAdmin.objects.select_related('doctor', 'hospital').prefetch_related('doctor__doctor_clinics')
         if valid_data.get('entity_type') == GenericAdminEntity.DOCTOR:
             query = queryset.exclude(user=request.user).filter(doctor_id=valid_data.get('id'),
                                     entity_type=GenericAdminEntity.DOCTOR
                                     ) \
-                            .annotate(hospital_ids=F('hospital__id'), hospital_ids_count=Count('hospital__hospital_doctors__doctor'))\
+                            .annotate(hospital_ids=F('hospital__id'), hospital_ids_count=Count('hospital__hospital_doctors__doctor'),
+                                      license=F('doctor__license'), online_consultation_fees=F('doctor__online_consultation_fees'))\
                             .values('id', 'phone_number', 'name', 'is_disabled', 'permission_type', 'super_user_permission', 'hospital_ids',
-                                    'hospital_ids_count', 'updated_at')
+                                    'hospital_ids_count', 'updated_at', 'license', 'online_consultation_fees')
             for x in query:
                 if temp.get(x['phone_number']):
                     if x['hospital_ids'] not in temp[x['phone_number']]['hospital_ids']:
@@ -2493,7 +2534,8 @@ class CreateAdminViewSet(viewsets.GenericViewSet):
                     'assigned': 'CASE WHEN  ((SELECT COUNT(*) FROM doctor_number WHERE doctor_id = doctor.id) = 0) THEN 0 ELSE 1  END',
                     'phone_number': 'SELECT phone_number FROM doctor_number WHERE doctor_id = doctor.id',
                     'enabled': 'SELECT enabled FROM doctor_clinic WHERE doctor_id = doctor.id AND hospital_id='+str(hos_obj.id)})\
-                    .values('name', 'id', 'assigned', 'phone_number', 'enabled', 'is_live', 'source_type')
+                    .values('name', 'id', 'assigned', 'phone_number', 'enabled', 'is_live', 'source_type', 'license',
+                            'online_consultation_fees')
 
             for x in response:
                 if temp.get(x['phone_number']):
@@ -2508,6 +2550,8 @@ class CreateAdminViewSet(viewsets.GenericViewSet):
                             x['name'] = doc.get('name')
                             x['id'] = doc.get('id')
                             x['assigned'] = doc.get('assigned')
+                            x['license'] = doc.get('license')
+                            x['online_consultation_fees'] = doc.get('online_consultation_fees')
                             break
                     if not x.get('is_doctor'):
                         x['is_doctor'] = False
@@ -2623,6 +2667,14 @@ class CreateAdminViewSet(viewsets.GenericViewSet):
                 if dn.first():
                     try:
                         dn.update(phone_number=valid_data.get('phone_number'))
+                        doctor = valid_data.get('doc_profile')
+                        if valid_data.get('license'):
+                            if doctor.license:
+                                return Response({"error": "License for given doctor already exists"}, status=status.HTTP_400_BAD_REQUEST)
+                            doctor.license = valid_data.get('license')
+                        if valid_data.get("online_consultation_fees"):
+                            doctor.online_consultation_fees = valid_data.get("online_consultation_fees")
+                        doctor.save()
                     except Exception as e:
                         logger.error("Error Updating Entity Hospital " + str(e))
                         return Response({'error': 'something went wrong!'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
@@ -2725,6 +2777,9 @@ class OfflineCustomerViewSet(viewsets.GenericViewSet):
         ret_obj['status'] = appnt.status
         # ret_obj['mrp'] = appnt.mrp
         # ret_obj['payment_type'] = appnt.payment_type
+        ret_obj['fees'] = appnt.fees
+        #RAJIV YADAV
+        ret_obj['mrp'] = appnt.fees
         ret_obj['hospital'] = HospitalModelSerializer(appnt.hospital).data
         ret_obj['doctor'] = AppointmentRetrieveDoctorSerializer(appnt.doctor).data
         ret_obj['is_docprime'] = False
@@ -2966,6 +3021,7 @@ class OfflineCustomerViewSet(viewsets.GenericViewSet):
                                                                      booked_by=request.user,
                                                                      user=patient,
                                                                      status=models.OfflineOPDAppointments.ACCEPTED,
+                                                                     fees=data.get('fees'),
                                                                      error=data.get('error') if data.get('error') else False,
                                                                      error_message=data.get('error_message') if data.get('error_message') else None
                                                                               )
@@ -3162,6 +3218,7 @@ class OfflineCustomerViewSet(viewsets.GenericViewSet):
                             action_complete = True
                         appnt.doctor = data.get('doctor')
                         appnt.hospital = data.get('hospital')
+                        appnt.fees = data.get('fees')
                         appnt.error = data.get('error', False)
                         appnt.error_message = data.get('error_message')
                         if data.get("time_slot_start"):
@@ -3317,11 +3374,12 @@ class OfflineCustomerViewSet(viewsets.GenericViewSet):
         valid_data = serializer.validated_data
         online_queryset = get_opd_pem_queryset(request.user, models.OpdAppointment)\
             .select_related('profile', 'merchant_payout')\
-            .prefetch_related('prescriptions', 'prescriptions__prescription_file', 'mask_number').distinct('id', 'time_slot_start')
+            .prefetch_related('prescriptions', 'prescriptions__prescription_file', 'mask_number',
+                              'profile__insurance', 'profile__insurance__user_insurance', 'eprescription').distinct('id', 'time_slot_start')
 
         offline_queryset = get_opd_pem_queryset(request.user, models.OfflineOPDAppointments)\
             .select_related('user')\
-            .prefetch_related('user__patient_mobiles').distinct('id')
+            .prefetch_related('user__patient_mobiles', 'eprescription', 'offline_prescription', 'partners_app_invoice').distinct('id')
         start_date = valid_data.get('start_date')
         end_date = valid_data.get('end_date')
         updated_at = valid_data.get('updated_at')
@@ -3333,10 +3391,10 @@ class OfflineCustomerViewSet(viewsets.GenericViewSet):
             offline_queryset = offline_queryset.filter(time_slot_start__date__range=(start_date, end_date))\
                 .order_by('time_slot_start')
         if updated_at:
-            admin_queryset = auth_models.GenericAdmin.objects.filter(user=request.user, updated_at__gte=updated_at)
-            if not admin_queryset.exists():
-                online_queryset = online_queryset.filter(updated_at__gte=updated_at)
-                offline_queryset = offline_queryset.filter(updated_at__gte=updated_at)
+            # admin_queryset = auth_models.GenericAdmin.objects.filter(user=request.user, updated_at__gte=updated_at)
+            # if not admin_queryset.exists():
+            online_queryset = online_queryset.filter(updated_at__gte=updated_at)
+            offline_queryset = offline_queryset.filter(updated_at__gte=updated_at)
 
         if appointment_id:
             offline_id= True
@@ -3352,6 +3410,7 @@ class OfflineCustomerViewSet(viewsets.GenericViewSet):
                 online_queryset = None
         if online_queryset and offline_queryset:
             final_data = sorted(chain(online_queryset, offline_queryset), key=lambda car: car.time_slot_start, reverse=False)
+
         if not final_data:
             final_data = online_queryset if online_queryset else offline_queryset
         final_result = []
@@ -3368,7 +3427,13 @@ class OfflineCustomerViewSet(viewsets.GenericViewSet):
             mask_data = None
             mrp = None
             payment_type = None
+            invoice_data = invoice = None
             if instance == OFFLINE:
+                for inv in app.partners_app_invoice.all():
+                    if inv.is_valid:
+                        invoice = inv
+                        break
+                invoice_data = v2_serializers.PartnersAppInvoiceModelSerialier(invoice).data if invoice else None
                 patient_profile = OfflinePatientSerializer(app.user).data
                 is_docprime = False
                 patient_name = app.user.name if hasattr(app.user, 'name') else None
@@ -3381,6 +3446,8 @@ class OfflineCustomerViewSet(viewsets.GenericViewSet):
                 patient_profile['patient_numbers'] = phone_number
                 error_flag = app.error if app.error else False
                 error_message = app.error_message if app.error_message else ''
+                prescription = app.get_prescriptions(request)
+
             else:
                 is_docprime = True
                 effective_price = app.effective_price
@@ -3444,6 +3511,8 @@ class OfflineCustomerViewSet(viewsets.GenericViewSet):
             ret_obj['error_message'] = error_message
             ret_obj['type'] = 'doctor'
             ret_obj['prescriptions'] = prescription
+            ret_obj['e_prescriptions'] = pres_serializers.PrescriptionPDFModelSerializer(app.eprescription, many=True, context={"request": request}).data
+            ret_obj['invoice'] = invoice_data
             final_result.append(ret_obj)
         return Response(final_result)
 
