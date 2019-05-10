@@ -169,29 +169,44 @@ class InsuredMemberViewSet(viewsets.GenericViewSet):
 
 class InsuranceOrderViewSet(viewsets.GenericViewSet):
     authentication_classes = (JWTAuthentication,)
-    permission_classes = (IsAuthenticated,)
+    # permission_classes = (IsAuthenticated,)
 
     def create_banner_lead(self, request):
-        user = request.user
-        user_insurance_lead = InsuranceLead.objects.filter(user=user).order_by('id').last()
-        user_insurance = user.purchased_insurance.filter().order_by('id').last()
+        phone_number = request.data.get('phone_number', None)
+        if phone_number:
+            user = User.objects.filter(phone_number=phone_number, user_type=User.CONSUMER).first()
+            if not user:
+                user = request.user
+        else:
+            user = request.user
 
-        if user.active_insurance:
+        if not user.is_anonymous:
+            user_insurance_lead = InsuranceLead.objects.filter(user=user).order_by('id').last()
+            user_insurance = user.purchased_insurance.filter().order_by('id').last()
+
+            if user.active_insurance:
+                return Response({'success': True})
+
+            if not user_insurance_lead:
+                user_insurance_lead = InsuranceLead(user=user)
+            elif user_insurance_lead and user_insurance and not user_insurance.is_valid():
+                active_insurance_lead = InsuranceLead.objects.filter(created_at__gte=user_insurance.expiry_date, user=user).order_by('created_at').last()
+                if not active_insurance_lead:
+                    user_insurance_lead = InsuranceLead(user=user)
+                else:
+                    user_insurance_lead = active_insurance_lead
+
+            user_insurance_lead.extras = request.data
+            user_insurance_lead.save()
+
+            return Response({'success': True})
+        else:
+            lead = InsuranceLead.create_lead_by_phone_number(request)
+            if not lead:
+                return Response({'success': False})
+
             return Response({'success': True})
 
-        if not user_insurance_lead:
-            user_insurance_lead = InsuranceLead(user=user)
-        elif user_insurance_lead and user_insurance and not user_insurance.is_valid():
-            active_insurance_lead = InsuranceLead.objects.filter(created_at__gte=user_insurance.expiry_date, user=user).order_by('created_at').last()
-            if not active_insurance_lead:
-                user_insurance_lead = InsuranceLead(user=user)
-            else:
-                user_insurance_lead = active_insurance_lead
-
-        user_insurance_lead.extras = request.data
-        user_insurance_lead.save()
-
-        return Response({'success': True})
 
     @transaction.atomic
     def create_order(self, request):
