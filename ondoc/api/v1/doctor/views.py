@@ -1482,6 +1482,7 @@ class DoctorListViewSet(viewsets.GenericViewSet):
                         (data.get('average_rating') and data.get('average_rating') > ratings) or (
                                     data.get('google_rating') and
                                     data.get('google_rating').get('avg_rating') and data.get('google_rating').get('avg_rating') > ratings)]
+            result_count = len(response)
 
         entity_ids = [doctor_data['id'] for doctor_data in response]
 

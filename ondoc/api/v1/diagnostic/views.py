@@ -315,7 +315,7 @@ class LabList(viewsets.ReadOnlyModelViewSet):
         if home_visit and not lab_visit:
             filter_query += ' and is_home_collection_enabled = True and home_collection_possible = True '
         if lab_visit and not home_visit:
-            filter_query += " and network_id IS DISTINCT FROM 1 "
+            filter_query += " and lab.network_id IS DISTINCT FROM 43 "
 
         if avg_ratings:
             filter_query += " and (case when rating_data is not null and (rating_data->> 'avg_rating') is not null and (rating_data ->> 'rating_count') is not null and (rating_data ->> 'rating_count')::int >5 then (rating_data->> 'avg_rating')::float > (%(avg_ratings)s) end) "
@@ -1398,7 +1398,7 @@ class LabList(viewsets.ReadOnlyModelViewSet):
             if home_visit and not lab_visit:
                 filtering_query.append(' is_home_collection_enabled = True and home_collection_possible = True ')
             if lab_visit and not home_visit:
-                filtering_query.append("lb.network_id IS DISTINCT FROM 1 ")
+                filtering_query.append("lb.network_id IS DISTINCT FROM 43 ")
         ## We are excluding THYROCARE_NETWORK_ID here which is 1
 
         filter_query_string = ""
