@@ -1,6 +1,10 @@
-from django.conf import settings
+import json
 
-from ondoc.api.v1.insurance.serializers import InsuredMemberIdSerializer, InsuranceDiseaseIdSerializer
+from django.conf import settings
+from django.forms import model_to_dict
+
+from ondoc.api.v1.insurance.serializers import InsuredMemberIdSerializer, InsuranceDiseaseIdSerializer, \
+    MemberListSerializer, MemberSerializer
 from ondoc.api.v1.utils import insurance_transform
 from django.core.serializers import serialize
 from rest_framework import viewsets
@@ -522,5 +526,9 @@ class InsuranceEndorsementViewSet(viewsets.GenericViewSet):
         if not user_insurance.status == UserInsurance.ACTIVE:
             res['error'] = "Active Insurance not found for the user"
             return Response(data=res, status=status.HTTP_400_BAD_REQUEST)
-        # return Response(data=res, status=status.HTTP_200_OK)
+        members = user_insurance.get_members()
+        member_serializer = MemberSerializer(members, context={'request': request}, many=True)
+        members_data = member_serializer.data
+        res['members'] = members_data
+        return Response(data=res, status=status.HTTP_200_OK)
 

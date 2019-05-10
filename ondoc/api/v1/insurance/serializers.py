@@ -107,6 +107,30 @@ class InsuredMemberSerializer(serializers.Serializer):
     # insurance_plan = serializers.PrimaryKeyRelatedField(queryset=InsurancePlans.objects.all())
 
 
+class MemberSerializer(serializers.ModelSerializer):
+
+    title = serializers.ReadOnlyField()
+    first_name = serializers.ReadOnlyField()
+    middle_name = serializers.ReadOnlyField()
+    last_name = serializers.ReadOnlyField()
+    dob = serializers.ReadOnlyField()
+    email = serializers.ReadOnlyField()
+    relation = serializers.ReadOnlyField()
+    address = serializers.ReadOnlyField()
+    pincode = serializers.ReadOnlyField()
+    profile = serializers.PrimaryKeyRelatedField(queryset=UserProfile.objects.all(), allow_null=True)
+    gender = serializers.ReadOnlyField()
+    town = serializers.ReadOnlyField()
+    district = serializers.ReadOnlyField()
+    state = serializers.ReadOnlyField()
+    state_code = serializers.ReadOnlyField()
+
+    class Meta:
+        model = InsuredMembers
+        fields = '__all__'
+        # fields = ('id', 'name', 'min_float', 'logo', 'website', 'phone_number', 'email', 'plans', 'insurer_document')
+
+
 class InsuredMemberIdSerializer(serializers.Serializer):
     id = serializers.PrimaryKeyRelatedField(queryset=InsuredMembers.objects.all())
 
