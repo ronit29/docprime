@@ -1515,6 +1515,8 @@ class LabList(viewsets.ReadOnlyModelViewSet):
                 # queryset_order_by = ' order_priority desc, distance asc'
             elif order_by == 'name':
                 queryset_order_by = ' order_priority desc, name asc'
+            elif order_by == 'rating':
+                queryset_order_by = " (rating_data ->> 'avg_rating') desc NULLS LAST  "
             else:
                 queryset_order_by = ' order_priority desc, distance asc'
         else:
