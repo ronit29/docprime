@@ -348,6 +348,9 @@ class RandomGeneratedCoupon(auth_model.TimeStampedModel):
     class Meta:
         db_table = "random_generated_coupon"
 
+
+
+
 class CouponRecommender():
 
     def __init__(self, user, profile, type, product_id, coupon_code):
@@ -409,7 +412,7 @@ class CouponRecommender():
                                     .filter(type__in=types)
 
         if coupon_code:
-            all_coupons = all_coupons.filter(code__iexact=coupon_code)
+            all_coupons = RandomGeneratedCoupon.get_coupons([coupon_code])
         else:
             all_coupons = all_coupons.filter(is_visible=True)
 
@@ -627,6 +630,20 @@ class CouponRecommender():
 
             if remove_coupon:
                 coupons = list(filter(lambda x: x.id != coupon.id, coupons))
+
+            # TODO add cart_item_id
+            cart_item_id = None
+            is_random_generated = False
+            random_coupon_code = None
+            if hasattr(coupon, 'is_random') and coupon.is_random:
+                is_random_generated = True
+                random_coupon_code = coupon.random_coupon_code
+                random_count = coupon.random_coupon_used_count(user, coupon.random_coupon_code, cart_item_id)
+                if random_count > 0:
+                    coupon_properties['valid'] = False
+
+            coupon_properties['is_random_generated'] = is_random_generated
+            coupon_properties['random_coupon_code'] = random_coupon_code
 
 
         applicable_coupons = list(set(coupons))
