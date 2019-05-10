@@ -1437,13 +1437,13 @@ class LabList(viewsets.ReadOnlyModelViewSet):
             query = ''' select * from (select id,network_id, name ,price, count, mrp, pickup_charges, distance, order_priority, new_network_rank, rank,
             max(new_network_rank) over(partition by 1) result_count
             from ( 
-            select id,network_id, name ,price, count, mrp, pickup_charges, distance, order_priority, 
+            select id, rating_data, network_id, name ,price, count, mrp, pickup_charges, distance, order_priority, 
                         dense_rank() over(order by network_rank) as new_network_rank, rank from
                         (
-                        select id,network_id, rank() over(partition by coalesce(network_id,random()) order by order_rank) as rank,
+                        select id, rating_data, network_id, rank() over(partition by coalesce(network_id,random()) order by order_rank) as rank,
                          min (order_rank) OVER (PARTITION BY coalesce(network_id,random())) network_rank,
                          name ,price, count, mrp, pickup_charges, distance, order_priority from
-                        (select id,network_id,  
+                        (select id, rating_data, network_id,  
                         name ,price, test_count as count, total_mrp as mrp,pickup_charges, distance, 
                         ROW_NUMBER () OVER (ORDER BY {order} ) order_rank,
                         max_order_priority as order_priority
@@ -1464,7 +1464,7 @@ class LabList(viewsets.ReadOnlyModelViewSet):
                          where 1=1 {filter_query_string}
 
                         group by lb.id having count(*)=(%(length)s))a
-                        {group_filter_query_string})y )x where rank<=5 )z 
+                        {group_filter_query_string})y )x where rank<=5 )z order by {order}
                         )r
                         where new_network_rank<=(%(page_end)s) and new_network_rank>(%(page_start)s) order by new_network_rank, rank
                          '''.format(filter_query_string=filter_query_string, 
@@ -1472,15 +1472,15 @@ class LabList(viewsets.ReadOnlyModelViewSet):
 
             lab_search_result = RawSql(query, filtering_params).fetch_all()
         else:
-            query1 = '''select * from (select id,network_id, name , distance, order_priority, new_network_rank, rank,
+            query1 = '''select * from (select id, network_id, name , distance, order_priority, new_network_rank, rank,
                     max(new_network_rank) over(partition by 1) result_count from 
-                    (select id,network_id, name , distance, order_priority, 
+                    (select id, rating_data, network_id, name , distance, order_priority, 
                     dense_rank() over(order by network_rank) as new_network_rank, rank from
                     (
-                    select id,network_id,rank() over(partition by coalesce(network_id,random()) order by order_rank) as rank,
+                    select id, rating_data, network_id,rank() over(partition by coalesce(network_id,random()) order by order_rank) as rank,
                      min (order_rank) OVER (PARTITION BY coalesce(network_id,random())) network_rank,
                      name , distance, order_priority from
-                    (select id,network_id,  
+                    (select id, rating_data, network_id,  
                     name , distance, 
                     ROW_NUMBER () OVER (ORDER BY {order} ) order_rank,
                     max_order_priority as order_priority
@@ -1492,7 +1492,7 @@ class LabList(viewsets.ReadOnlyModelViewSet):
                     and St_dwithin( St_setsrid(St_point((%(longitude)s), (%(latitude)s)), 4326),location, (%(max_distance)s)) 
                     and St_dwithin(St_setsrid(St_point((%(longitude)s), (%(latitude)s)), 4326), location, (%(min_distance)s)) = false
                     {filter_query_string}
-                    group by id)a)y )x where rank<=5)z )r where 
+                    group by id)a)y )x where rank<=5)z  order by {order} )r where 
                     new_network_rank<=(%(page_end)s) and new_network_rank>(%(page_start)s) order by new_network_rank, 
                     rank'''.format(
                     filter_query_string=filter_query_string, order=order_by)
