@@ -20,5 +20,11 @@ urlpatterns = [
     path('provider-signup/add/doctor', views.ProviderSignupDataViewset.as_view({'post': 'create_doctor'}), name='create-doctor'),
     path('provider-signup/add/staffs', views.ProviderSignupDataViewset.as_view({'post': 'create_staffs'}), name='create-staffs'),
     path('provider/update/hospital/consent', views.ProviderSignupDataViewset.as_view({'post': 'update_hospital_consent'}), name='update-hospital-consent'),
+    path('invoice/item', views.PartnersAppInvoice.as_view({'post': 'add_or_edit_general_invoice_item'}), name='add-or-edit-general-invoice-item'),
+    path('invoice/list/items', views.PartnersAppInvoice.as_view({'get': 'list_invoice_items'}), name='list-invoice-items'),
+    path('invoice/create', views.PartnersAppInvoice.as_view({'post': 'create'}), name='create-invoice'),
+    path('invoice/update', views.PartnersAppInvoice.as_view({'post': 'update'}), name='update-invoice'),
+    path('invoice/<str:encoded_filename>', views.PartnersAppInvoicePDF.as_view({'get': 'download_pdf'}), name='invoice-pdf'),
 ]
+
 

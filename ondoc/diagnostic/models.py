@@ -268,6 +268,25 @@ class Lab(TimeStampedModel, CreatedByModel, QCModel, SearchKey, WelcomeCallingDo
     def is_enabled_for_insurance(self):
         return self.is_insurance_enabled
 
+    @classmethod
+    def update_insured_labs(cls):
+
+        delete_query = RawSql(''' delete from insurance_covered_entity where type='lab' ''', []).execute()
+
+        query = '''
+                    insert into insurance_covered_entity(entity_id,name ,location, type, search_key, data,created_at,updated_at)
+                    select lab_id as entity_id, lab_name as name, location ,'lab' as type,search_key,
+                    json_build_object('id', lab_id, 'type','lab','name', lab_name, 'city', city,'url', url), now(), now() from
+                    (select distinct lb.id lab_id, lb.name lab_name, lb.city, eu.url,
+                    lb.location, lb.search_key
+                    from lab lb inner join available_lab_test avlt on
+                    lb.lab_pricing_group_id = avlt.lab_pricing_group_id  and avlt.enabled = True and avlt.mrp<=1500
+                    and lb.is_test_lab = False and lb.is_live = True and lb.lab_pricing_group_id is not null 
+                    inner join lab_test lt on lt.id = avlt.test_id and lt.enable_for_retail=True 
+                    inner join entity_urls eu on eu.entity_id = lb.id and sitemap_identifier = 'LAB_PAGE' and eu.is_valid=true
+                    )x '''
+        update_insured_labs = RawSql(query, []).execute()
+
     def open_for_communications(self):
         if (self.network and self.network.open_for_communication) or (not self.network and self.open_for_communication):
             return True

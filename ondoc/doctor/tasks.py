@@ -70,3 +70,11 @@ def update_all_hospitals_seo_urls():
 def update_all_ipd_seo_urls():
     from ondoc.procedure.models import IpdProcedure
     IpdProcedure.update_ipd_seo_urls()
+
+@task
+def update_insured_labs_and_doctors():
+    from ondoc.doctor.models import Doctor
+    from ondoc.diagnostic.models import Lab
+    Doctor.update_insured_doctors()
+    Lab.update_insured_labs()
+
