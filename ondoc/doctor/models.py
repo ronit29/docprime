@@ -1844,7 +1844,7 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
     def get_corporate_deal_id(self):
         coupon = self.coupon.first()
         if coupon and coupon.corporate_deal:
-            return coupon.corporate_deal
+            return coupon.corporate_deal.id
 
         return None
 
