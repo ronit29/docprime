@@ -99,7 +99,6 @@ class DoctorURL():
                     ST_DWithin(ea.centroid::geography,h.location::geography,15000)) OR 
                     (ea.type = 'SUBLOCALITY' and ST_DWithin(ea.centroid::geography,h.location::geography,5000))) and h.is_live=true
                     and ea.type IN ('SUBLOCALITY' , 'LOCALITY') and ea.use_in_url=true 
-                    and lower(ea.alternative_value) = lower(h.city_search_key)
                     inner join doctor_clinic dc on dc.hospital_id = h.id 
                     and dc.enabled=true inner join doctor d on dc.doctor_id= d.id and d.is_live=true
                     inner join doctor_practice_specialization dps on dps.doctor_id = d.id 
@@ -128,7 +127,7 @@ class DoctorURL():
                     from entity_address ea inner join hospital h on ((ea.type = 'LOCALITY' and 
                     ST_DWithin(ea.centroid::geography,h.location::geography,15000)) OR 
                     (ea.type = 'SUBLOCALITY' and ST_DWithin(ea.centroid::geography,h.location::geography,5000))) and h.is_live=true
-                    and ea.type IN ('SUBLOCALITY' , 'LOCALITY') and ea.use_in_url=true and lower(ea.alternative_value) = lower(h.city_search_key)
+                    and ea.type IN ('SUBLOCALITY' , 'LOCALITY') and ea.use_in_url=true 
                     inner join doctor_clinic dc on dc.hospital_id = h.id 
                     and dc.enabled=true inner join doctor d on dc.doctor_id= d.id and d.is_live=true
                     where ea.id>=%d and ea.id<%d
