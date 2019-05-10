@@ -287,12 +287,20 @@ class EntityAddress(TimeStampedModel):
         if not cls.is_english(name):
             return False
 
+        if not parent_entity:
+            return False
+
         if parent_entity and parent_entity.use_in_url and not cls.is_english(parent_entity.alternative_value):
             return False
 
         use_in_url = True
         if not type or (not type.startswith('LOCALITY') and not type.startswith('SUBLOCALITY')):
             use_in_url = False
+
+        # if type and type.startswith('LOCALITY') and not parent_entity:
+        #     print(type+' '+name)
+
+
 
         if not type or (type.startswith('LOCALITY') and parent_entity.use_in_url):
             use_in_url = False
