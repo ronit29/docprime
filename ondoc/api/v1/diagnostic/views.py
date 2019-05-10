@@ -302,6 +302,8 @@ class LabList(viewsets.ReadOnlyModelViewSet):
             sort_query = ' order by price %s ' %sort_order
         elif sort_on == 'distance':
             sort_query = ' order by distance asc '
+        elif sort_on == 'rating':
+            sort_query = " order by (rating_data->> 'avg_rating') NULLS LAST "
 
         filter_query = ''
         params['min_distance'] = str(min_distance)
@@ -318,7 +320,7 @@ class LabList(viewsets.ReadOnlyModelViewSet):
             filter_query += " and lab.network_id IS DISTINCT FROM 43 "
 
         if avg_ratings:
-            filter_query += " and (case when rating_data is not null and (rating_data->> 'avg_rating') is not null and (rating_data ->> 'rating_count') is not null and (rating_data ->> 'rating_count')::int >5 then (rating_data->> 'avg_rating')::float > (%(avg_ratings)s) end) "
+            filter_query += " and (case when (rating_data is not null and (rating_data->> 'avg_rating') is not null) or ( (rating_data ->> 'rating_count') is not null and (rating_data ->> 'rating_count')::int >5) then (rating_data->> 'avg_rating')::float > (%(avg_ratings)s) end) "
             params['avg_ratings'] = max(avg_ratings)
 
         if valid_package_ids is not None:
@@ -1391,7 +1393,7 @@ class LabList(viewsets.ReadOnlyModelViewSet):
             filtering_params['insurance_threshold_amount'] = insurance_threshold_amount
 
         if avg_ratings:
-            filtering_query.append(" case when rating_data is not null and (rating_data ->> 'avg_rating') is not  null and (rating_data ->> 'rating_count') is not null and (rating_data ->> 'rating_count')::int >5 then (rating_data->> 'avg_rating')::float >= (%(avg_ratings)s) end ")
+            filtering_query.append(" (case when (rating_data is not null and (rating_data ->> 'avg_rating') is not  null) or ( (rating_data ->> 'rating_count') is not null and (rating_data ->> 'rating_count')::int >5) then (rating_data->> 'avg_rating')::float >= (%(avg_ratings)s) end) ")
             filtering_params['avg_ratings'] = min(avg_ratings)
 
         if ids:
@@ -1471,7 +1473,7 @@ class LabList(viewsets.ReadOnlyModelViewSet):
                         inner join lab_test lt on lt.id = avlt.test_id and lt.enable_for_retail=True 
                          where 1=1 {filter_query_string}
 
-                        group by lb.id having count(*)=(%(length)s))a
+                        group by lb.id having count(distinct lt.id)=(%(length)s))a
                         {group_filter_query_string})y )x where rank<=5 )z order by {order}
                         )r
                         where new_network_rank<=(%(page_end)s) and new_network_rank>(%(page_start)s) order by new_network_rank, rank
@@ -1493,14 +1495,14 @@ class LabList(viewsets.ReadOnlyModelViewSet):
                     ROW_NUMBER () OVER (ORDER BY {order} ) order_rank,
                     max_order_priority as order_priority
                     from (
-                    select *,
+                    select lb.*,
                     max(ST_Distance(location,St_setsrid(St_point((%(longitude)s), (%(latitude)s)), 4326))) as distance,
                     max(order_priority) as max_order_priority
-                    from lab lb { lab_timing_join } where is_test_lab = False and is_live = True and lab_pricing_group_id is not null 
+                    from lab lb  {lab_timing_join} where is_test_lab = False and is_live = True and lab_pricing_group_id is not null 
                     and St_dwithin( St_setsrid(St_point((%(longitude)s), (%(latitude)s)), 4326),location, (%(max_distance)s)) 
                     and St_dwithin(St_setsrid(St_point((%(longitude)s), (%(latitude)s)), 4326), location, (%(min_distance)s)) = false
-                    {filter_query_string}
-                    group by id)a)y )x where rank<=5)z  order by {order} )r where 
+                     {filter_query_string}
+                    group by lb.id)a)y )x where rank<=5)z  order by {order} )r where 
                     new_network_rank<=(%(page_end)s) and new_network_rank>(%(page_start)s) order by new_network_rank, 
                     rank'''.format(
                     filter_query_string=filter_query_string, order=order_by, lab_timing_join=lab_timing_join)
