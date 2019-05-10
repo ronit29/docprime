@@ -1206,7 +1206,7 @@ class EntityUrls(TimeStampedModel):
                               'sublocality_longitude', x.sublocality_longitude, 'locality_latitude', x.locality_latitude, 'locality_longitude', 
                               x.locality_longitude))
                         
-                       end as extras, x.sitemap_identifier as sitemap_identifier, x.url as url, 
+                       end as extras, x.sitemap_identifier as sitemap_identifier, lower(x.url) as url, 
                        x.count as count, x.entity_type as entity_type, x.url_type as url_type , x.is_valid, 
                        x.created_at as created_at, x.updated_at as updated_at, x.sequence as sequence,
                        x.sublocality_latitude as sublocality_latitude, x.sublocality_longitude as sublocality_longitude, x.locality_latitude as locality_latitude,
