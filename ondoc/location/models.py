@@ -1299,9 +1299,9 @@ class EntityUrls(TimeStampedModel):
 
         update_null_location = '''update entity_urls set location = locality_location where location is null and  url_type='SEARCHURL' and entity_type='Lab' '''
 
-        update_current_urls_query = '''update entity_urls set is_valid=true where sitemap_identifier = 'LAB_PAGE' and sequence = %d''' % sequence
+        update_current_urls_query = '''update entity_urls set is_valid=true where url_type='SEARCHURL' and entity_type='Lab' and sequence = %d''' % sequence
 
-        update_previous_urls_query = '''update entity_urls set is_valid=false where sitemap_identifier = 'LAB_PAGE' and sequence < %d''' % sequence
+        update_previous_urls_query = '''update entity_urls set is_valid=false where url_type='SEARCHURL' and entity_type='Lab' and sequence < %d''' % sequence
 
         # query ='''insert into entity_urls(extras, sitemap_identifier, url, count, entity_type, url_type, is_valid, created_at, updated_at, sequence)
         #     select x.extras as extras, x.sitemap_identifier as sitemap_identifier, x.url as url,
