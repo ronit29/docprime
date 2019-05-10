@@ -1422,6 +1422,9 @@ class InsurerPolicyNumber(auth_model.TimeStampedModel):
 
 
 class InsuranceDummyData(auth_model.TimeStampedModel):
+    BOOKING = 1
+    ENDORSEMENT = 2
+    type_choices = [(BOOKING, "Booking"), (ENDORSEMENT, "Endorsement")]
     user = models.ForeignKey(User, related_name='user_insurance_dummy_data', on_delete=models.DO_NOTHING)
     data = JSONField(null=True, blank=True)
 

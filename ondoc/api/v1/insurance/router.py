@@ -19,4 +19,8 @@ urlpatterns = [
     path('cancel-master', InsuranceCancelViewSet.as_view({'get': 'cancel_master'}), name='insurance-cancel-master'),
     path('network/search', InsuranceNetworkViewSet.as_view({'get': 'list'}), name='insurance-network'),
     path('endorsement', InsuranceEndorsementViewSet.as_view({'get':'get_endorsement_data'}), name='insurance-endorsement'),
+    path('push_endorsement_data', InsuranceDummyDataViewSet.as_view({'post': 'push_endorsement_data'}), name='push-endorsement-data'),
+    path('show_endorsement_data', InsuranceDummyDataViewSet.as_view({'get': 'show_endorsement_data'}), name='show-endorsement-data'),
+    path('endorsement/create', InsuranceEndorsementViewSet.as_view({'post': 'create'}), name='create-endorsement'),
 ]
+

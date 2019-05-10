@@ -459,7 +459,7 @@ class InsuranceDummyDataViewSet(viewsets.GenericViewSet):
         try:
             user = request.user
             data = request.data
-            InsuranceDummyData.objects.create(user=user, data=data)
+            InsuranceDummyData.objects.create(user=user, data=data, type=InsuranceDummyData.BOOKING)
             return Response(data="save successfully!!", status=status.HTTP_200_OK )
         except Exception as e:
             logger.log(str(e))
@@ -471,11 +471,38 @@ class InsuranceDummyDataViewSet(viewsets.GenericViewSet):
         if not user:
             res['error'] = "user not found"
             return Response(error=res, status=status.HTTP_200_OK)
-        dummy_data = InsuranceDummyData.objects.filter(user=user).order_by('-id').first()
+        dummy_data = InsuranceDummyData.objects.filter(user=user, type=InsuranceDummyData.BOOKING).order_by('-id').first()
         if not dummy_data:
             res['error'] = "data not found"
             return Response(error=res, status=status.HTTP_200_OK)
         member_data = dummy_data.data
+        if not member_data:
+            res['error'] = "data not found"
+            return Response(error=res, status=status.HTTP_200_OK)
+        res['data'] = member_data
+        return Response(data=res, status=status.HTTP_200_OK)
+
+    def push_endorsement_data(self, request):
+        try:
+            user = request.user
+            data = request.data
+            InsuranceDummyData.objects.create(user=user, data=data, type=InsuranceDummyData.ENDORSEMENT)
+            return Response(data="save successfully!!", status=status.HTTP_200_OK )
+        except Exception as e:
+            logger.log(str(e))
+            return Response(data="could not save data", status=status.HTTP_200_OK)
+
+    def show_endorsement_data(self, request):
+        user = request.user
+        res = {}
+        if not user:
+            res['error'] = "user not found"
+            return Response(error=res, status=status.HTTP_200_OK)
+        rendorsement_data = InsuranceDummyData.objects.filter(user=user, type=InsuranceDummyData.ENDORSEMENT).order_by('-id').first()
+        if not rendorsement_data:
+            res['error'] = "data not found"
+            return Response(error=res, status=status.HTTP_200_OK)
+        member_data = rendorsement_data.data
         if not member_data:
             res['error'] = "data not found"
             return Response(error=res, status=status.HTTP_200_OK)
@@ -557,4 +584,13 @@ class InsuranceEndorsementViewSet(viewsets.GenericViewSet):
         members_data = member_serializer.data
         res['members'] = members_data
         return Response(data=res, status=status.HTTP_200_OK)
+
+    def create(self, request):
+        user = request.user
+        serializer = serializers.InsuredMemberSerializer(data=request.data, context={'request': request})
+        if not serializer.is_valid() and serializer.errors:
+            logger.error(str(serializer.errors))
+
+        serializer.is_valid(raise_exception=True)
+        valid_data = serializer.validated_data
 
