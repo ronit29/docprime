@@ -90,5 +90,5 @@ def setup_periodic_tasks(sender, **kwargs):
     doctor_search_score_creation_time = crontab(hour=21, minute=30)
     sender.add_periodic_task(doctor_search_score_creation_time, update_search_score.s(), name='Update Doctor search score')
     sender.add_periodic_task(crontab(hour=23, minute=00), update_insured_labs_and_doctors.s(), name="Update insured labs and doctors")
-    sender.add_periodic_task(crontab(hour=23, minute=30), update_seo_urls.s(),
+    #sender.add_periodic_task(crontab(hour=23, minute=30), update_seo_urls.s(),
                              name="Update Seo Urls")
