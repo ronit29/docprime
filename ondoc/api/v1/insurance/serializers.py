@@ -175,18 +175,6 @@ class UserInsuranceSerializer(serializers.Serializer):
     order = serializers.PrimaryKeyRelatedField(queryset=account_models.Order.objects.all())
 
 
-class UserInsuranceModelSerializer(serializers.ModelSerializer):
-    insurance_plan = serializers.ReadOnlyField()
-    user = serializers.ReadOnlyField()
-    premium_amount = serializers.ReadOnlyField()
-    purchase_date = serializers.ReadOnlyField()
-    expiry_date = serializers.ReadOnlyField()
-    status = serializers.ReadOnlyField()
-
-    class Meta:
-        model = UserInsurance
-        fields = ('id', 'insurance_plan', 'user', 'premium_amount', 'purchase_date', 'expiry_date', 'status')
-
 class InsuranceValidationSerializer(serializers.Serializer):
     lab = serializers.PrimaryKeyRelatedField(queryset=Lab.objects.all(), allow_null=True)
     doctor = serializers.PrimaryKeyRelatedField(queryset=Doctor.objects.all(), allow_null=True)
