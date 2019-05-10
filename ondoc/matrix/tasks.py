@@ -565,6 +565,7 @@ def create_or_update_lead_on_matrix(self, data):
     from ondoc.doctor.models import Hospital
     from ondoc.doctor.models import HospitalNetwork
     from ondoc.doctor.models import ProviderSignupLead
+    from ondoc.procedure.models import IpdProcedureLead
     try:
         obj_id = data.get('obj_id', None)
         obj_type = data.get('obj_type', None)
@@ -572,14 +573,23 @@ def create_or_update_lead_on_matrix(self, data):
             logger.error("CELERY ERROR: Incorrect values provided.")
             raise ValueError()
         product_id = matrix_product_ids.get('opd_products', 1)
-        sub_product_id = matrix_subproduct_ids.get(obj_type.lower(), 4) if obj_type != ProviderSignupLead.__name__ else matrix_subproduct_ids.get(Doctor.__name__.lower(), 4)
+        if obj_type == IpdProcedureLead.__name__:
+            product_id = matrix_product_ids.get('ipd_procedure', 9)
+        sub_product_id = matrix_subproduct_ids.get(obj_type.lower(), 4)
+        if obj_type == ProviderSignupLead.__name__:
+            sub_product_id = matrix_subproduct_ids.get(Doctor.__name__.lower(), 4)
+        if obj_type == IpdProcedureLead.__name__:
+            sub_product_id = matrix_subproduct_ids.get('idp_subproduct_id', 0)
         ct = ContentType.objects.get(model=obj_type.lower())
         model_used = ct.model_class()
         content_type = ContentType.objects.get_for_model(model_used)
-        if obj_type != ProviderSignupLead.__name__:
-            exit_point_url = settings.ADMIN_BASE_URL + reverse('admin:{}_{}_change'.format(content_type.app_label, content_type.model), kwargs={"object_id": obj_id})
-        else:
+        if obj_type == ProviderSignupLead.__name__:
             exit_point_url = settings.ADMIN_BASE_URL + reverse('admin:doctor_doctor_add')
+        elif obj_type == IpdProcedureLead.__name__:
+            exit_point_url = ''
+        else:
+            exit_point_url = settings.ADMIN_BASE_URL + reverse(
+                'admin:{}_{}_change'.format(content_type.app_label, content_type.model), kwargs={"object_id": obj_id})
         obj = model_used.objects.filter(id=obj_id).first()
         if not obj:
             raise Exception("{} could not found against id - {}".format(obj_type, obj_id))
@@ -588,6 +598,7 @@ def create_or_update_lead_on_matrix(self, data):
         email = ''
         gender = 0
         name = obj.name if hasattr(obj, 'name') and obj.name else ''
+        lead_source = None
         if obj_type == Doctor.__name__:
             lead_source = 'referral'
             if obj.gender and obj.gender == 'm':
@@ -620,9 +631,16 @@ def create_or_update_lead_on_matrix(self, data):
                 name = obj.name + ' (Doctor)'
             elif obj.type == ProviderSignupLead.HOSPITAL_ADMIN:
                 name = obj.name + ' (Hospital Admin)'
+        elif obj_type == IpdProcedureLead.__name__:
+            lead_source = obj.source
+            mobile = obj.phone_number
+            email = obj.email if obj.email else ''
+            name = obj.name
         mobile = int(mobile)
         # if not mobile:
         #     return
+        if not lead_source:
+            return
         request_data = {
             'LeadSource': lead_source,
             'LeadID': obj.matrix_lead_id if hasattr(obj, 'matrix_lead_id') and obj.matrix_lead_id else 0,
@@ -696,10 +714,9 @@ def update_onboarding_qcstatus_to_matrix(self, data):
             if obj.data_status == QCModel.SUBMITTED_FOR_QC:
                 history_obj = obj.history.filter(status=QCModel.REOPENED).order_by('-created_at').first()
                 if history_obj:
-                    qc_user = history_obj.user.staffprofile.employee_id if hasattr(history_obj.user,
-                                                                                         'staffprofile') and history_obj.user.staffprofile.employee_id else ''
+                    qc_user = history_obj.user if hasattr(history_obj.user, 'staffprofile') and history_obj.user.staffprofile.employee_id else ''
                     if qc_user and qc_user.is_member_of(constants['QC_GROUP_NAME']):
-                        assigned_user = qc_user
+                        assigned_user = qc_user.staffprofile.employee_id
 
             else:
                 history_obj = obj.history.filter(status=QCModel.SUBMITTED_FOR_QC).order_by('-created_at').first()

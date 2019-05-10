@@ -2,6 +2,8 @@ from django.contrib.gis.db import models
 from django.contrib.contenttypes.fields import GenericForeignKey
 from django.contrib.contenttypes.models import ContentType
 import logging
+
+# from ondoc.diagnostic import models as diagnostic_models
 from .service import get_meta_by_latlong
 import logging
 import json
@@ -32,6 +34,30 @@ logger = logging.getLogger(__name__)
 def split_and_append(initial_str, spliter, appender):
     value_chunks = initial_str.split(spliter)
     return appender.join(value_chunks)
+
+
+class CompareSEOUrls(TimeStampedModel):
+    url = models.SlugField(blank=False, null=True, max_length=2000, db_index=True, unique=True)
+    title = models.CharField(blank=True, null=True, max_length=2000)
+
+    class Meta:
+        db_table = 'compare_seo_urls'
+
+    def save(self, *args, **kwargs):
+        self.url = self.url.lower()
+        if not self.url.endswith('hpcp'):
+            self.url = self.url + '-hpcp'
+
+        super(CompareSEOUrls, self).save(*args, **kwargs)
+
+
+class CompareLabPackagesSeoUrls(TimeStampedModel):
+    url = models.ForeignKey(CompareSEOUrls, related_name="compare_url", on_delete=models.CASCADE)
+    lab = models.ForeignKey('diagnostic.Lab', related_name="compare_lab", on_delete=models.CASCADE)
+    package = models.ForeignKey('diagnostic.LabTest', related_name="compare_package", on_delete=models.CASCADE)
+
+    class Meta:
+        db_table = "compare_lab_packages_seo_urls"
 
 
 class TempURL(TimeStampedModel):

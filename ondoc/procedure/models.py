@@ -93,6 +93,9 @@ class IpdProcedureLead(auth_model.TimeStampedModel):
     lat = models.FloatField(null=True, default=None)
     long = models.FloatField(null=True, default=None)
     city = models.CharField(null=True, default=None, blank=True, max_length=150)
+    source = models.CharField(max_length=256, blank=False, null=True, default=None)
+    specialty = models.CharField(max_length=256, blank=False, null=True, default=None)
+    matrix_lead_id = models.BigIntegerField(blank=True, null=True, unique=True)
 
     class Meta:
         db_table = "ipd_procedure_lead"

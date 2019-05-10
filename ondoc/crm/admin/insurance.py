@@ -589,6 +589,7 @@ class UserInsuranceResource(resources.ModelResource):
     amount = fields.Field()
     receipt_number = fields.Field()
     coi = fields.Field()
+    status = fields.Field()
     matrix_lead = fields.Field()
 
     def export(self, queryset=None, *args, **kwargs):
@@ -610,7 +611,7 @@ class UserInsuranceResource(resources.ModelResource):
         fields = ()
         export_order = ('id', 'insurance_plan', 'user_name', 'phone_number', 'purchase_date', 'expiry_date',
                         'policy_number', 'amount', 'receipt_number',
-                        'coi', 'matrix_lead')
+                        'coi', 'status', 'matrix_lead')
 
     def dehydrate_id(self, insurance):
         return str(insurance.id)
@@ -646,6 +647,18 @@ class UserInsuranceResource(resources.ModelResource):
 
     def dehydrate_coi(self, insurance):
         return insurance.coi.url if insurance.coi is not None and insurance.coi.name else ''
+
+    def dehydrate_status(self, insurance):
+        if insurance.status == 1:
+            return "ACTIVE"
+        elif insurance.status == 2:
+            return "CANCELLED"
+        elif insurance.status == 3:
+            return "EXPIRED"
+        elif insurance.status == 4:
+            return "ONHOLD"
+        elif insurance.status == 5:
+            return "CANCEL_INITIATE"
 
     def dehydrate_matrix_lead(self, insurance):
         return str(insurance.matrix_lead_id)
@@ -688,7 +701,7 @@ class UserInsuranceForm(forms.ModelForm):
         # if int(status) == UserInsurance.ONHOLD:
         #     if not onhold_reason:
         #         raise forms.ValidationError("In Case of ONHOLD status, Onhold reason is mandatory")
-        if case_type=="NO" and int(status) == UserInsurance.CANCEL_INITIATE or int(status) == UserInsurance.CANCELLED:
+        if case_type=="NO" and (int(status) == UserInsurance.CANCEL_INITIATE or int(status) == UserInsurance.CANCELLED):
             if not cancel_reason:
                 raise forms.ValidationError('For Cancel Initiation, Cancel reason is mandatory')
             insured_opd_completed_app_count = OpdAppointment.get_insured_completed_appointment(self.instance)
@@ -699,7 +712,7 @@ class UserInsuranceForm(forms.ModelForm):
             if insured_opd_completed_app_count > 0:
                 raise forms.ValidationError('OPD appointment with insurance have been completed, '
                                             'Cancellation could not proceed')
-        if case_type == "YES" and int(status) == UserInsurance.CANCEL_INITIATE or int(status) == UserInsurance.CANCELLED:
+        if case_type == "YES" and (int(status) == UserInsurance.CANCEL_INITIATE or int(status) == UserInsurance.CANCELLED):
             if not cancel_reason:
                 raise forms.ValidationError('For Cancel Initiation, Cancel reason is mandatory')
         if int(status) == UserInsurance.CANCELLED and not self.instance.status == UserInsurance.CANCEL_INITIATE:
@@ -717,6 +730,7 @@ class UserInsuranceAdmin(ImportExportMixin, admin.ModelAdmin):
     formats = (base_formats.XLS,)
     model = UserInsurance
     date_hierarchy = 'created_at'
+    list_filter = ['status']
 
     def user_policy_number(self, obj):
         return str(obj.policy_number)
@@ -730,7 +744,7 @@ class UserInsuranceAdmin(ImportExportMixin, admin.ModelAdmin):
     #     cities = InsuranceCity.objects.all().values_list('name', flat=True)
     #     return cities
 
-    list_display = ['id', 'insurance_plan', 'user_name', 'user', 'policy_number', 'purchase_date','merchant_payout']
+    list_display = ['id', 'insurance_plan', 'user_name', 'user', 'policy_number', 'purchase_date', 'status']
     fields = ['insurance_plan', 'user', 'purchase_date', 'expiry_date', 'policy_number', 'premium_amount',
               'merchant_payout', 'status', 'cancel_reason', 'cancel_after_utilize_insurance', 'cancel_case_type']
     readonly_fields = ('insurance_plan', 'user', 'purchase_date', 'expiry_date', 'policy_number', 'premium_amount', 'merchant_payout')
@@ -891,11 +905,17 @@ class InsuranceLeadResource(resources.ModelResource):
         user_profile = UserProfile.objects.filter(user=user, is_default_user=True).first()
         if user_profile:
             return str(user_profile.name)
+        elif obj.extras.get('lead_data'):
+            return obj.extras.get('lead_data').get('name', '')
         else:
             return ""
 
     def dehydrate_phone_number(self, obj):
-        return str(obj.user.phone_number)
+        user = obj.user
+        if user:
+            return str(obj.user.phone_number)
+        else:
+            return str(obj.phone_number)
 
     def dehydrate_status(self, obj):
         user_insurance = UserInsurance.objects.filter(user=obj.user).order_by('-id').first()
@@ -919,6 +939,8 @@ class InsuranceLeadAdmin(ImportExportModelAdmin, admin.ModelAdmin):
         user_profile = UserProfile.objects.filter(user=user, is_default_user=True).first()
         if user_profile:
             return str(user_profile.name)
+        elif obj.extras.get('lead_data'):
+            return obj.extras.get('lead_data').get('name', '')
         else:
             return ""
 
@@ -926,8 +948,12 @@ class InsuranceLeadAdmin(ImportExportModelAdmin, admin.ModelAdmin):
         extras = obj.extras
         return extras.get('source', '')
 
-    def phone_number(self, obj):
-        return str(obj.user.phone_number)
+    def lead_phone_number(self, obj):
+        user = obj.user
+        if user:
+            return str(obj.user.phone_number)
+        else:
+            return str(obj.phone_number)
 
     def status(self, obj):
         user_insurance = UserInsurance.objects.filter(user=obj.user).order_by('-id').first()
@@ -936,7 +962,7 @@ class InsuranceLeadAdmin(ImportExportModelAdmin, admin.ModelAdmin):
         else:
             return "New"
 
-    list_display = ('id', 'name',  'phone_number', 'status', 'matrix_lead_id', 'source', 'created_at', 'updated_at')
+    list_display = ('id', 'name',  'lead_phone_number', 'status', 'matrix_lead_id', 'source', 'created_at', 'updated_at')
 
     def get_export_queryset(self, request):
         super().get_export_queryset(request)
