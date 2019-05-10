@@ -1267,7 +1267,7 @@ class EntityUrls(TimeStampedModel):
                        end as url
                        from
                        (select * from 
-                       (select ea.id location_id,ea.alternative_value location_name, ea.type,ea.parent_id,
+                       (select ea.id location_id,lower(ea.alternative_value) location_name, ea.type,ea.parent_id,
                        st_x(centroid::geometry) as longitude, st_y(centroid::geometry) as latitude
                        ,count(*) count from entity_address ea
                        inner join lab l on l.is_live=true 
