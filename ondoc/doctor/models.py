@@ -676,6 +676,14 @@ class Doctor(auth_model.TimeStampedModel, auth_model.QCModel, SearchKey, auth_mo
     def __str__(self):
         return '{} ({})'.format(self.name, self.id)
 
+    @classmethod
+    def update_doctors_seo_urls(cls):
+        from ondoc.location.management.commands import doctor_search_urls_new
+
+        # update search and profile urls
+        doctor_search_urls_new.doctor_urls()
+
+
     # @property
     @cached_property
     def is_enabled_for_insurance(self):

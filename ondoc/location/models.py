@@ -287,18 +287,26 @@ class EntityAddress(TimeStampedModel):
         if not cls.is_english(name):
             return False
 
+        if not parent_entity:
+            return False
+
         if parent_entity and parent_entity.use_in_url and not cls.is_english(parent_entity.alternative_value):
             return False
 
         use_in_url = True
-        if not type.startswith('LOCALITY') and not type.startswith('SUBLOCALITY'):
+        if not type or (not type.startswith('LOCALITY') and not type.startswith('SUBLOCALITY')):
             use_in_url = False
 
-        if type.startswith('LOCALITY') and parent_entity.use_in_url:
+        # if type and type.startswith('LOCALITY') and not parent_entity:
+        #     print(type+' '+name)
+
+
+
+        if not type or (type.startswith('LOCALITY') and parent_entity.use_in_url):
             use_in_url = False
 
-        if type.startswith('SUBLOCALITY') and (not parent_entity or not parent_entity.use_in_url\
-            or not parent_entity.type or not parent_entity.type.startswith('LOCALITY')):
+        if not type or (type.startswith('SUBLOCALITY') and (not parent_entity or not parent_entity.use_in_url\
+            or not parent_entity.type or not parent_entity.type.startswith('LOCALITY'))):
             use_in_url = False
 
         if name in ('[no name]', 'Unnamed Road'):
@@ -1180,7 +1188,7 @@ class EntityUrls(TimeStampedModel):
 
         # Mark all existing urls as is_valid=False.
 
-        update_query = '''update entity_urls set is_valid=false where sitemap_identifier in ('LAB_LOCALITY_CITY', 'LAB_CITY');'''
+        # update_query = '''update entity_urls set is_valid=false where sitemap_identifier in ('LAB_LOCALITY_CITY', 'LAB_CITY');'''
 
         query =  '''insert into entity_urls(extras, sitemap_identifier, url, count, entity_type, url_type, is_valid, created_at, 
                        updated_at, sequence, sublocality_latitude, sublocality_longitude, locality_latitude, locality_longitude, locality_id, sublocality_id,
@@ -1245,7 +1253,7 @@ class EntityUrls(TimeStampedModel):
 
                        'Lab' as entity_type,
                        'SEARCHURL' as url_type,
-                       True as is_valid,
+                       False as is_valid,
                        NOW() as created_at,
                        NOW() as updated_at,
                        %d as sequence,
@@ -1264,15 +1272,36 @@ class EntityUrls(TimeStampedModel):
                        ,count(*) count from entity_address ea
                        inner join lab l on l.is_live=true 
                        and (
-                       (type_blueprint='LOCALITY' and ST_DWithin(ea.centroid,l.location,15000)) or
-                       (type_blueprint='SUBLOCALITY' and ST_DWithin(ea.centroid,l.location,5000))
+                       (type='LOCALITY' and ST_DWithin(ea.centroid,l.location,15000)) or
+                       (type='SUBLOCALITY' and ST_DWithin(ea.centroid,l.location,5000))
                        )
-                       where type_blueprint in ('LOCALITY','SUBLOCALITY')
+                       where type in ('LOCALITY','SUBLOCALITY')
                        group by ea.id)x where count>=3)y
                        left join entity_address ea on y.parent_id=ea.id 
                        ) as data 
                        ) x where rnum=1 and x.url ~* 'y*?(^[A-Za-z0-9-]+$)' 
                        ''' % (sequence)
+
+        update_locality_lat_long = '''UPDATE entity_urls 
+                        SET locality_latitude = st_y(centroid::geometry), locality_longitude = st_x(centroid::geometry),
+                        locality_value = ea.alternative_value, locality_location = centroid
+                        FROM entity_address ea
+                        WHERE locality_id = ea.id  and url_type='SEARCHURL' and entity_type='Lab' '''
+
+        update_sublocality_lat_long = '''UPDATE entity_urls 
+                        SET sublocality_latitude = st_y(centroid::geometry), sublocality_longitude = st_x(centroid::geometry),
+                        sublocality_value = ea.alternative_value, sublocality_location = centroid
+                        FROM entity_address ea
+                        WHERE sublocality_id = ea.id  and url_type='SEARCHURL' and entity_type='Lab'
+                        '''
+
+        update_location = '''update entity_urls set location = sublocality_location where sublocality_location is not null and  url_type='SEARCHURL' and entity_type='Lab' '''
+
+        update_null_location = '''update entity_urls set location = locality_location where location is null and  url_type='SEARCHURL' and entity_type='Lab' '''
+
+        update_current_urls_query = '''update entity_urls set is_valid=true where sitemap_identifier = 'LAB_PAGE' and sequence = %d''' % sequence
+
+        update_previous_urls_query = '''update entity_urls set is_valid=false where sitemap_identifier = 'LAB_PAGE' and sequence < %d''' % sequence
 
         # query ='''insert into entity_urls(extras, sitemap_identifier, url, count, entity_type, url_type, is_valid, created_at, updated_at, sequence)
         #     select x.extras as extras, x.sitemap_identifier as sitemap_identifier, x.url as url,
@@ -1329,8 +1358,14 @@ class EntityUrls(TimeStampedModel):
         from django.db import connection
         with connection.cursor() as cursor:
             try:
-                cursor.execute(update_query)
+
                 cursor.execute(query)
+                cursor.execute(update_locality_lat_long)
+                cursor.execute(update_sublocality_lat_long)
+                cursor.execute(update_location)
+                cursor.execute(update_null_location)
+                cursor.execute(update_current_urls_query)
+                cursor.execute(update_previous_urls_query)
 
             except Exception as e:
                 print(str(e))
@@ -1690,7 +1725,7 @@ class LabPageUrl(object):
             EntityUrls.objects.filter(entity_id=self.lab.id, sitemap_identifier=EntityUrls.SitemapIdentifier.LAB_PAGE, url=url).delete()
             EntityUrls.objects.create(**data)
 
-    def create_lab_page_urls(lab, sequence):
+    def create_lab_page_urls(lab, sequence, cache):
         sequence = sequence
         locality_value = None
         locality_id = None
@@ -1769,24 +1804,20 @@ class LabPageUrl(object):
 
                     new_url = url
 
-                    dup_url = EntityUrls.objects.filter(url=new_url+'-lpp',
-                                                        sitemap_identifier=EntityUrls.SitemapIdentifier.LAB_PAGE
-                                                        ).filter(~Q(entity_id=lab.id)).first()
-                    if dup_url:
+                    is_duplicate = cache.is_duplicate(new_url + '-lpp', lab.id)
+
+                    if is_duplicate:
                         new_url = new_url + '-' + str(lab.id)
+
                     new_url = new_url + '-lpp'
 
-                    EntityUrls.objects.filter(entity_id=lab.id,
-                                              sitemap_identifier=EntityUrls.SitemapIdentifier.LAB_PAGE,
-                                              is_valid=True).filter(
-                        ~Q(url=new_url)).update(is_valid=False)
-
-                    EntityUrls.objects.filter(entity_id=lab.id,
-                                              sitemap_identifier=EntityUrls.SitemapIdentifier.LAB_PAGE,
-                                              url=new_url).delete()
                     data['url'] = new_url
-                    EntityUrls.objects.create(**data)
-                    return ("success: " + str(lab.id))
+                    new_entity = EntityUrls(**data)
+
+                    cache.add(new_entity)
+
+                    return new_entity
+
 
 
 class DoctorPageURL(object):
@@ -1908,6 +1939,7 @@ class DoctorPageURL(object):
 
         sequence = seq[0]['inc']
 
+        from ondoc.location.services.doctor_urls import PageUrlCache
         cache = PageUrlCache(EntityUrls.SitemapIdentifier.DOCTOR_PAGE)
         #to_disable = []
         to_delete = []
@@ -2085,8 +2117,8 @@ class DoctorPageURL(object):
             # EntityUrls.objects.filter(entity_id=doctor.id,
             #                           sitemap_identifier=EntityUrls.SitemapIdentifier.DOCTOR_PAGE).filter(
             #     ~Q(url=new_url)).update(is_valid=False)
-
-            to_delete.extend(cache.get_deletions(new_url, doctor.id))
+            #
+            # to_delete.extend(cache.get_deletions(new_url, doctor.id))
             # EntityUrls.objects.filter(entity_id=doctor.id, sitemap_identifier=EntityUrls.SitemapIdentifier.DOCTOR_PAGE,
             #                           url=new_url).delete()
 
