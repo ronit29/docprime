@@ -1424,9 +1424,10 @@ class InsurerPolicyNumber(auth_model.TimeStampedModel):
 class InsuranceDummyData(auth_model.TimeStampedModel):
     BOOKING = 1
     ENDORSEMENT = 2
-    type_choices = [(BOOKING, "Booking"), (ENDORSEMENT, "Endorsement")]
+    TYPE_CHOICES = [(BOOKING, "Booking"), (ENDORSEMENT, "Endorsement")]
     user = models.ForeignKey(User, related_name='user_insurance_dummy_data', on_delete=models.DO_NOTHING)
     data = JSONField(null=True, blank=True)
+    type = models.PositiveIntegerField(choices=TYPE_CHOICES, default=BOOKING)
 
     class Meta:
         db_table = 'insurance_dummy_data'
@@ -1468,3 +1469,47 @@ class InsuranceCoveredEntity(auth_model.TimeStampedModel):
 
     class Meta:
         db_table = 'insurance_covered_entity'
+
+
+class EndorsementRequest(auth_model.TimeStampedModel):
+    MALE = 'm'
+    FEMALE = 'f'
+    OTHER = 'o'
+    GENDER_CHOICES = [(MALE, 'Male'), (FEMALE, 'Female'), (OTHER, 'Other')]
+    SELF = 'self'
+    SPOUSE = 'spouse'
+    SON = 'son'
+    DAUGHTER = 'daughter'
+    RELATION_CHOICES = [(SPOUSE, 'Spouse'), (SON, 'Son'), (DAUGHTER, 'Daughter'), (SELF, 'Self')]
+    ADULT = "adult"
+    CHILD = "child"
+    MEMBER_TYPE_CHOICES = [(ADULT, 'adult'), (CHILD, 'child')]
+    MR = 'mr.'
+    MISS = 'miss'
+    MRS = 'mrs.'
+    MAST = 'mast.'
+    PENDING = 1
+    APPROVED = 2
+    REJECT = 3
+    STATUS_CHOICES = [(PENDING, "Pending"), (APPROVED, "Approved"), (REJECT, "Reject")]
+    TITLE_TYPE_CHOICES = [(MR, 'mr.'), (MRS, 'mrs.'), (MISS, 'miss'), (MAST, 'mast.')]
+    member = models.ForeignKey(InsuredMembers, related_name='related_endorse_request', on_delete=models.DO_NOTHING)
+    insurance = models.ForeignKey(UserInsurance, related_name='endorse_members', on_delete=models.DO_NOTHING)
+    first_name = models.CharField(max_length=50, null=False)
+    last_name = models.CharField(max_length=50, null=True)
+    dob = models.DateField(blank=False, null=False)
+    email = models.EmailField(max_length=100, null=True)
+    relation = models.CharField(max_length=50, choices=RELATION_CHOICES, default=None)
+    pincode = models.PositiveIntegerField(default=None)
+    address = models.TextField(default=None)
+    gender = models.CharField(max_length=50, choices=GENDER_CHOICES, default=None)
+    phone_number = models.BigIntegerField(blank=True, null=True,
+                                          validators=[MaxValueValidator(9999999999), MinValueValidator(1000000000)])
+    profile = models.ForeignKey(auth_model.UserProfile, related_name="endorsement_insurance", on_delete=models.SET_NULL, null=True)
+    title = models.CharField(max_length=20, choices=TITLE_TYPE_CHOICES, default=None)
+    middle_name = models.CharField(max_length=50, null=True)
+    town = models.CharField(max_length=100, null=False)
+    district = models.CharField(max_length=100, null=False)
+    state = models.CharField(max_length=100, null=False)
+    state_code = models.CharField(max_length=10, null=True)
+    status = models.PositiveIntegerField(choices=STATUS_CHOICES, default=PENDING)

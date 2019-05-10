@@ -20,7 +20,7 @@ from ondoc.account import models as account_models
 from ondoc.doctor import models as doctor_models
 from ondoc.insurance.models import (Insurer, InsuredMembers, InsuranceThreshold, InsurancePlans, UserInsurance, InsuranceLead,
                                     InsuranceTransaction, InsuranceDisease, InsuranceDiseaseResponse, StateGSTCode,
-                                    InsuranceDummyData, InsuranceCancelMaster)
+                                    InsuranceDummyData, InsuranceCancelMaster, InsuranceCity, InsuranceDistrict)
 from ondoc.authentication.models import UserProfile
 from ondoc.authentication.backends import JWTAuthentication
 from ondoc.api.v1.utils import RawSql
@@ -462,7 +462,7 @@ class InsuranceDummyDataViewSet(viewsets.GenericViewSet):
             InsuranceDummyData.objects.create(user=user, data=data, type=InsuranceDummyData.BOOKING)
             return Response(data="save successfully!!", status=status.HTTP_200_OK )
         except Exception as e:
-            logger.log(str(e))
+            logger.error(str(e))
             return Response(data="could not save data", status=status.HTTP_200_OK)
 
     def show_dummy_data(self, request):
@@ -489,7 +489,7 @@ class InsuranceDummyDataViewSet(viewsets.GenericViewSet):
             InsuranceDummyData.objects.create(user=user, data=data, type=InsuranceDummyData.ENDORSEMENT)
             return Response(data="save successfully!!", status=status.HTTP_200_OK )
         except Exception as e:
-            logger.log(str(e))
+            logger.error(str(e))
             return Response(data="could not save data", status=status.HTTP_200_OK)
 
     def show_endorsement_data(self, request):
@@ -582,6 +582,19 @@ class InsuranceEndorsementViewSet(viewsets.GenericViewSet):
         res['insurance_plan'] = user_insurance.insurance_plan.id
         member_serializer = MemberSerializer(members, context={'request': request}, many=True)
         members_data = member_serializer.data
+        for member in members_data:
+            city_name = member.get('town', None)
+            district_name = member.get('district', None)
+            city_code = None
+            city_obj = InsuranceCity.objects.filter(city_name=city_name).first()
+            if city_obj:
+                city_code = city_obj.city_code
+            district_code = None
+            district_obj = InsuranceDistrict.objects.filter(district_name=district_name).first()
+            if district_obj:
+                district_code = district_obj.district_code
+            member['city_code'] = city_code
+            member['district_code'] = district_code
         res['members'] = members_data
         return Response(data=res, status=status.HTTP_200_OK)
 
