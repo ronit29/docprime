@@ -3036,6 +3036,8 @@ class OfflineCustomerViewSet(viewsets.GenericViewSet):
         if data.get('share_with_hospital') and not hospital:
             logger.error('PROVIDER_REQUEST - Hospital Not Given when Shared with Hospital Set'+ str(data))
         hosp = hospital if data.get('share_with_hospital') and hospital else None
+        if hosp and hosp.provider_encrypt:
+            encrypt_number = data.get('encrypt_number')
         patient = models.OfflinePatients.objects.create(name=data.get('name'),
                                                         id=data.get('id'),
                                                         sms_notification=data.get('sms_notification', False),
@@ -3057,7 +3059,7 @@ class OfflineCustomerViewSet(viewsets.GenericViewSet):
                                                         )
         default_num = None
         sms_number = None
-        if data.get('phone_number'):
+        if data.get('phone_number') and not encrypt_number:
             for num in data.get('phone_number'):
                 models.PatientMobile.objects.create(patient=patient,
                                                     phone_number=num.get('phone_number'),
@@ -3071,12 +3073,21 @@ class OfflineCustomerViewSet(viewsets.GenericViewSet):
                               'name': patient.name,
                               'welcome_message': data.get('welcome_message'),
                               'display_welcome_message': data.get('display_welcome_message', False)}
+        if encrypt_number:
+            for num in encrypt_number:
+                models.PatientMobile.objects.create(patient=patient,
+                                                    encrypted_number=num.get('phone_number'),
+                                                    is_default=num.get('is_default', False)
+                                                    )
+                sms_number = None
         return {"sms_list": sms_number, "patient": patient}
 
     def update_patient(self, request, data, hospital, doctor):
         if data.get('share_with_hospital') and not hospital:
             logger.error('PROVIDER_REQUEST - Hospital Not Given when Shared with Hospital Set'+ str(data))
         hosp = hospital if data.get('share_with_hospital') and hospital else None
+        if hosp and hosp.provider_encrypt:
+            encrypt_number = data.get('encrypt_number')
         patient = models.OfflinePatients.objects.filter(id=data.get('id')).first()
         if patient:
             if data.get('gender'):
@@ -3103,10 +3114,10 @@ class OfflineCustomerViewSet(viewsets.GenericViewSet):
             default_num = None
             sms_number = None
 
-            if data.get('phone_number'):
-                del_queryset = models.PatientMobile.objects.filter(patient=patient)
-                if del_queryset.exists():
-                    del_queryset.delete()
+            del_queryset = models.PatientMobile.objects.filter(patient=patient)
+
+            if data.get('phone_number') and not encrypt_number:
+                del_queryset.delete()
                 for num in data.get('phone_number'):
                     models.PatientMobile.objects.create(patient=patient,
                                                         phone_number=num.get('phone_number'),
@@ -3119,6 +3130,14 @@ class OfflineCustomerViewSet(viewsets.GenericViewSet):
                                   'name': patient.name}
                     sms_number['welcome_message'] = data.get('welcome_message')
                     sms_number['display_welcome_message'] = False
+            if encrypt_number:
+                del_queryset.delete()
+                for num in encrypt_number:
+                    models.PatientMobile.objects.create(patient=patient,
+                                                        encrypted_number=num.get('phone_number'),
+                                                        is_default=num.get('is_default', False)
+                                                        )
+                    sms_number = None
             return {"sms_list": sms_number, "patient": patient}
 
     def update_offline_appointments(self, request):

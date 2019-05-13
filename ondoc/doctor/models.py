@@ -239,6 +239,8 @@ class Hospital(auth_model.TimeStampedModel, auth_model.CreatedByModel, auth_mode
     is_location_verified = models.BooleanField(verbose_name='Location Verified', default=False)
     auto_ivr_enabled = models.BooleanField(default=True)
     priority_score = models.IntegerField(default=0, null=False, blank=False)
+    provider_encrypt = models.NullBooleanField(null=True, blank=True)
+    provider_encrypted_by = models.ForeignKey(auth_model.User, null=True, blank=True, on_delete=models.SET_NULL, related_name='encrypted_hospitals')
 
     def __str__(self):
         return self.name
@@ -3102,6 +3104,7 @@ class PatientMobile(auth_model.TimeStampedModel):
     phone_number = models.BigIntegerField(blank=True, null=True,
                                           validators=[MaxValueValidator(9999999999), MinValueValidator(6000000000)])
     is_default = models.BooleanField(verbose_name='Default Number?', default=False)
+    encrypted_number = models.CharField(max_length=64, null=True, blank=True)
 
     def __str__(self):
         return '{}'.format(self.phone_number)

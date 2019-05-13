@@ -523,7 +523,22 @@ class ProviderSignupDataViewset(viewsets.GenericViewSet):
             return Response({"status":1, "message":"consent updated"})
         except Exception as e:
             logger.error('Error updating consent: ' + str(e))
-            return Response({"status": 0, "message": "Error updating consent - " + str(e)}, status.HTTP_400_BAD_REQUEST)
+            return Response({"status": 0, "message": "Error updating consent - " + str(e)}, status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+    def encrypt_consent(self, request):
+        serializer = serializers.ConsentIsEncryptSerializer(data=request.data, context={'request': request})
+        serializer.is_valid(raise_exception=True)
+        valid_data = serializer.validated_data
+        user = request.user
+        hospital = valid_data.get("hosp")
+        try:
+            hospital.provider_encrypt = True
+            hospital.provider_encrypted_by = user
+            hospital.save()
+            return Response({"status": 1, "message": "consent updated"})
+        except Exception as e:
+            logger.error('Error updating consent: ' + str(e))
+            return Response({"status": 0, "message": "Error updating consent - " + str(e)}, status.HTTP_500_INTERNAL_SERVER_ERROR)
 
     def bulk_create_doctors(self, doctor_details):
         doc_obj_list = list()

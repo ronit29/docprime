@@ -209,6 +209,19 @@ class ConsentIsDocprimeSerializer(serializers.Serializer):
         return attrs
 
 
+class ConsentIsEncryptSerializer(serializers.Serializer):
+    is_encrypted = serializers.BooleanField()
+    hospital_id = serializers.IntegerField()
+
+    def validate(self, attrs):
+        if attrs and attrs['hospital_id']:
+            queryset = doc_models.Hospital.objects.filter(id=attrs['hospital_id']).first()
+            if not queryset:
+                raise serializers.ValidationError('Hospital Not Found!')
+            attrs['hosp'] = queryset
+            return attrs
+
+
 class BulkCreateDoctorSerializer(serializers.Serializer):
     name = serializers.CharField(max_length=200)
     online_consultation_fees = serializers.IntegerField(required=False, min_value=0, allow_null=True)
