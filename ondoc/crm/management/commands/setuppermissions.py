@@ -42,7 +42,8 @@ from ondoc.diagnostic.models import (Lab, LabTiming, LabImage, GenericLabAdmin,
 from ondoc.insurance.models import (Insurer, InsurancePlans, InsuranceThreshold, InsuranceCity, StateGSTCode,
                                     InsuranceDistrict, InsuranceTransaction, InsuranceDeal, InsuranceDisease,
                                     UserInsurance, InsurancePlanContent, InsuredMembers, InsurerAccount, InsuranceLead,
-                                    InsuranceDiseaseResponse, InsurerPolicyNumber, InsuranceCancelMaster)
+                                    InsuranceDiseaseResponse, InsurerPolicyNumber, InsuranceCancelMaster,
+                                    EndorsementRequest)
 
 from ondoc.procedure.models import Procedure, ProcedureCategory, CommonProcedureCategory, DoctorClinicProcedure, \
     ProcedureCategoryMapping, ProcedureToCategoryMapping, CommonProcedure, IpdProcedure, IpdProcedureFeatureMapping, \
@@ -890,7 +891,8 @@ class Command(BaseCommand):
                                                            StateGSTCode, InsuranceDistrict, InsuranceThreshold,
                                                            UserInsurance, InsuranceDeal, InsuranceLead,
                                                            InsuranceTransaction, InsuranceDiseaseResponse,
-                                                           InsuredMembers, InsurerPolicyNumber, InsuranceCancelMaster)
+                                                           InsuredMembers, InsurerPolicyNumber, InsuranceCancelMaster,
+                                                           EndorsementRequest)
 
         for cl, ct in content_types.items():
             permissions = Permission.objects.filter(
@@ -918,7 +920,8 @@ class Command(BaseCommand):
                                                            StateGSTCode, InsuranceDistrict, InsuranceThreshold,
                                                            UserInsurance, InsuranceDeal, InsuranceLead,
                                                            InsuranceTransaction, InsuranceDiseaseResponse,
-                                                           InsuredMembers, InsurerPolicyNumber, InsuranceCancelMaster)
+                                                           InsuredMembers, InsurerPolicyNumber, InsuranceCancelMaster,
+                                                           EndorsementRequest)
 
         for cl, ct in content_types.items():
             permissions = Permission.objects.filter(

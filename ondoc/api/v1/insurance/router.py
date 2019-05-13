@@ -22,6 +22,6 @@ urlpatterns = [
     path('push_endorsement_data', InsuranceDummyDataViewSet.as_view({'post': 'push_endorsement_data'}), name='push-endorsement-data'),
     path('show_endorsement_data', InsuranceDummyDataViewSet.as_view({'get': 'show_endorsement_data'}), name='show-endorsement-data'),
     path('endorsement/create', InsuranceEndorsementViewSet.as_view({'post': 'create'}), name='create-endorsement'),
-    path('insurance/member/<int:pk>/upload', InsuranceEndorsementViewSet.as_view({'post': 'upload'}), name='Insuredmember-document-upload'),
+    path('member/<int:pk>/upload', InsuranceEndorsementViewSet.as_view({'post': 'upload'}), name='Insuredmember-document-upload'),
 ]
 

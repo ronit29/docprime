@@ -566,14 +566,6 @@ class InsuranceEndorsementViewSet(viewsets.GenericViewSet):
     authentication_classes = (JWTAuthentication,)
     permission_classes = (IsAuthenticated,)
 
-    def get_queryset(self):
-        request = self.request
-        member = request.query_params.get('member', None)
-        if not member:
-            return None
-        queryset = InsuredMembers.objects.filter(id=self.id)
-        return queryset
-
     def get_endorsement_data(self, request):
         user = request.user
         user_insurance = user.active_insurance
@@ -639,8 +631,15 @@ class InsuranceEndorsementViewSet(viewsets.GenericViewSet):
                 return Response(data=res, status=status.HTTP_200_OK)
 
     def upload(self, request, *args, **kwargs):
-        instance = self.get_object()
-        serializer = serializers.UploadMemberDocumentSerializer(instance, data=request.data, context={'request':request})
+        data = dict()
+        member = request.query_params.get('member')
+        type = request.query_params.get('type')
+        data['member'] = member
+        if type == "front":
+            data['document_first_image'] = request.data['document_first_image']
+        elif type == "back":
+            data['document_second_image'] = request.data['document_second_image']
+        serializer = serializers.UploadMemberDocumentSerializer(data=data, context={'request':request})
         serializer.is_valid(raise_exception=True)
         serializer.save()
         return Response(serializer.data)

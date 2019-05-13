@@ -2,12 +2,11 @@ from rest_framework import serializers
 from collections import defaultdict
 from rest_framework.fields import NullBooleanField
 from rest_framework.renderers import JSONRenderer
-
 from ondoc.diagnostic.models import Lab
 from ondoc.doctor.models import Doctor
 from ondoc.insurance.models import (Insurer, InsurancePlans, InsuranceThreshold, InsurerAccount, InsuredMembers,
                                     InsuranceTransaction, UserInsurance, InsuranceDisease, InsurancePlanContent,
-                                    StateGSTCode, InsuranceCity, InsuranceDistrict)
+                                    StateGSTCode, InsuranceCity, InsuranceDistrict, InsuredMemberDocument)
 from ondoc.authentication.models import (User, UserProfile)
 from ondoc.account import models as account_models
 from ondoc.account.models import (Order)
@@ -221,7 +220,9 @@ class StateGSTCodeSerializer(serializers.ModelSerializer):
 
 
 class UploadMemberDocumentSerializer(serializers.ModelSerializer):
+    document_first_image = serializers.ImageField(max_length=None, use_url=True, allow_empty_file=True, required=False)
+    document_second_image = serializers.ImageField(max_length=None, use_url=True, allow_empty_file=True, required=False)
 
     class Meta:
-        model = UserProfile
-        fields = ("member", 'document_first_image', 'document_second_image')
+        model = InsuredMemberDocument
+        fields = ('document_first_image', 'document_second_image', 'member')
