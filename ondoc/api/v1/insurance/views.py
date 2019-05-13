@@ -56,9 +56,13 @@ class InsuranceNetworkViewSet(viewsets.GenericViewSet):
         " rnk from (select mt.*, st_distance(location,st_setsrid(st_point((%(longitude)s),(%(latitude)s)), 4326))/1000 "\
         " distance from  insurance_covered_entity mt where type=%(type)s and search_key like (%(starts_with)s) and "\
         " st_dwithin(location,st_setsrid(st_point((%(longitude)s),(%(latitude)s)), 4326),15000) "\
-        " )x )y where rnk=1 order by name"
+        " )x )y where rnk=1 order by distance"
 
         results = RawSql(query_string, params).fetch_all()
+
+        distance_count_query = "select count(distinct entity_id) from insurance_covered_entity where type= %(type)s "\
+        " and st_dwithin(location,st_setsrid(st_point((%(longitude)s),(%(latitude)s)), 4326),15000)"
+        distance_count = RawSql(distance_count_query, {'type':type,'latitude':latitude,'longitude':longitude}).fetch_all()[0].get('count')
 
         total_count_query= "select count(distinct entity_id) from insurance_covered_entity where type= %(type)s"
         total_count = RawSql(total_count_query, {'type':type}).fetch_all()[0].get('count')
@@ -72,6 +76,7 @@ class InsuranceNetworkViewSet(viewsets.GenericViewSet):
         resp["starts_with"] = starts_with
         resp["count"] = len(data_list)
         resp["total_count"] = total_count
+        resp["distance_count"] = distance_count
         resp["results"] = data_list
 
         return Response(resp)
