@@ -999,3 +999,7 @@ class InsuranceLeadForm(forms.ModelForm):
 
 class InsuranceCancelMasterAdmin(admin.ModelAdmin):
     list_display = ['insurer', 'min_days', 'max_days', 'refund_percentage']
+
+
+class EndorsementRequestAdmin(admin.ModelAdmin):
+    list_display = ['member']

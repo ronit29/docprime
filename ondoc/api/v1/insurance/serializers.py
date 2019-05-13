@@ -56,7 +56,6 @@ class InsurerSerializer(serializers.ModelSerializer):
 
 
 class MemberListSerializer(serializers.Serializer):
-
     title = serializers.ChoiceField(choices=InsuredMembers.TITLE_TYPE_CHOICES)
     first_name = serializers.CharField(max_length=50)
     middle_name = serializers.CharField(max_length=50, allow_blank=True, allow_null=True)
@@ -76,6 +75,7 @@ class MemberListSerializer(serializers.Serializer):
     city_code = serializers.IntegerField(allow_null=True)
     district_code = serializers.IntegerField(allow_null=True)
     is_change = serializers.BooleanField(required=False)
+    id = serializers.IntegerField(required=False)
 
     def validate(self, attrs):
         request = self.context.get("request")

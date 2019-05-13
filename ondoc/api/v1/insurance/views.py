@@ -20,7 +20,8 @@ from ondoc.account import models as account_models
 from ondoc.doctor import models as doctor_models
 from ondoc.insurance.models import (Insurer, InsuredMembers, InsuranceThreshold, InsurancePlans, UserInsurance, InsuranceLead,
                                     InsuranceTransaction, InsuranceDisease, InsuranceDiseaseResponse, StateGSTCode,
-                                    InsuranceDummyData, InsuranceCancelMaster, InsuranceCity, InsuranceDistrict)
+                                    InsuranceDummyData, InsuranceCancelMaster, InsuranceCity, InsuranceDistrict,
+                                    EndorsementRequest)
 from ondoc.authentication.models import UserProfile
 from ondoc.authentication.backends import JWTAuthentication
 from ondoc.api.v1.utils import RawSql
@@ -565,6 +566,14 @@ class InsuranceEndorsementViewSet(viewsets.GenericViewSet):
     authentication_classes = (JWTAuthentication,)
     permission_classes = (IsAuthenticated,)
 
+    def get_queryset(self):
+        request = self.request
+        member = request.query_params.get('member', None)
+        if not member:
+            return None
+        queryset = InsuredMembers.objects.filter(id=self.id)
+        return queryset
+
     def get_endorsement_data(self, request):
         user = request.user
         user_insurance = user.active_insurance
@@ -595,6 +604,10 @@ class InsuranceEndorsementViewSet(viewsets.GenericViewSet):
     def create(self, request):
         user = request.user
         res = {}
+        if not user.active_insurance:
+            res['error'] = "Active insurance not found for User"
+            return Response(data=res, status=status.HTTP_400_BAD_REQUEST)
+
         serializer = serializers.EndorseMemberSerializer(data=request.data, context={'request': request})
         if not serializer.is_valid() and serializer.errors:
             logger.error(str(serializer.errors))
@@ -602,12 +615,28 @@ class InsuranceEndorsementViewSet(viewsets.GenericViewSet):
         serializer.is_valid(raise_exception=True)
         # return Response(data=res, status=status.HTTP_200_OK)
         valid_data = serializer.validated_data
-        for member in valid_data:
-            if member.get('is_change'):
-                if not member.is_document_available():
-                    res['error'] = "Document not found for member {}".format(member.get('first_name'))
+        for member in valid_data.get('members'):
+            insured_member_obj = InsuredMembers.objects.filter(id=member.get('id')).first()
+            if not insured_member_obj:
+                res['error'] = "Insured Member details not found for member"
+                return Response(data=res, status=status.HTTP_400_BAD_REQUEST)
+            insurance_obj = insured_member_obj.user_insurance
+            if not insurance_obj:
+                res['error'] = "User Insurance not found for member {}".format(member.get('first_name'))
+                return Response(data=res, status=status.HTTP_400_BAD_REQUEST)
+            if member.get('is_change', None):
+                document = insured_member_obj.is_document_available()
+                if not document:
+                    res['error'] = "Document required for member {}".format(member.get('first_name'))
                     return Response(data=res, status=status.HTTP_400_BAD_REQUEST)
-                member.save()
+                del member['is_change']
+                del member['member_type']
+                member['insurance_id'] = insurance_obj.id
+                member['member_id'] = insured_member_obj.id
+                EndorsementRequest.objects.create(**member)
+                res['success'] = 'Request for endorsement have been consider,' \
+                                 'will update once insurer verified the details'
+                return Response(data=res, status=status.HTTP_200_OK)
 
     def upload(self, request, *args, **kwargs):
         instance = self.get_object()
