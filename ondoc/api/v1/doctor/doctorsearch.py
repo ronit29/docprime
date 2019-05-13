@@ -163,27 +163,29 @@ class DoctorSearchHelper:
 
         if self.query_params.get('availability'):
             availability = self.query_params.get('availability')
-            start_day = Date.today().weekday()
+            today = Date.today().weekday()
+            currentDT = datetime.now()
+            today_time = currentDT.strftime("%H.%M")
             avail_days = max(map(int, availability))
             days = list()
             if avail_days == serializers.DoctorListSerializer.TODAY:
-                days.append(start_day)
+                 today = today
             elif avail_days == serializers.DoctorListSerializer.TOMORROW:
-                days.append(start_day)
-                days.append(0 if start_day == 6 else start_day + 1)
+                # next day
+                days.append(0 if today == 6 else today + 1)
             elif avail_days == serializers.DoctorListSerializer.NEXT_3_DAYS:
-                days.append(start_day)
+                # next 3 days
                 for day in range(3):
-                    if start_day == 6:
+                    if today == 6:
                         days.append(0)
-                        start_day = 0
+                        today = 0
                     else:
-                        start_day += 1
-                        days.append(start_day)
+                        today += 1
+                        days.append(today)
 
             counter = 1
             if len(days) > 0:
-                dct_days_str = 'dct.day IN ('
+                dct_days_str = 'dct.day IN (case when dct.day = (%(today)s) and dct."end"<= (%(today_time)s):: numeric then dct.day end , '
                 for day in days:
                     if not counter == 1:
                         dct_days_str += ','
@@ -193,6 +195,8 @@ class DoctorSearchHelper:
                 filtering_params.append(
                     dct_days_str + ')'
                 )
+                params['today'] = Date.today().weekday()
+                params['today_time'] = today_time
 
         if self.query_params.get("doctor_name"):
             name = self.query_params.get("doctor_name").lower().strip()

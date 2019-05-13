@@ -1296,7 +1296,6 @@ class LabList(viewsets.ReadOnlyModelViewSet):
         avg_ratings = parameters.get('avg_ratings', None)
         home_visit = parameters.get('home_visit', False)
         lab_visit = parameters.get('lab_visit', False)
-        availability = parameters.get('availability')
 
         #filtering_params = []
         #filtering_params_query1 = []
@@ -1344,33 +1343,36 @@ class LabList(viewsets.ReadOnlyModelViewSet):
         # else:
         #     params['length']=0
 
-        group_filter=[]
+        group_filter = []
         lab_timing_join = ""
 
         if availability:
-            start_day = Date.today().weekday()
+            today = Date.today().weekday()
+            currentDT = datetime.datetime.now()
+            today_time = currentDT.strftime("%H.%M")
+
             avail_days = max(map(int, availability))
             days = list()
             if avail_days == serializers.SearchLabListSerializer.TODAY:
-                days.append(start_day)
+                today = today
             elif avail_days == serializers.SearchLabListSerializer.TOMORROW:
-                days.append(start_day)
-                days.append(0 if start_day == 6 else start_day + 1)
+                # next 1 day
+                days.append(0 if today == 6 else today + 1)
             elif avail_days == serializers.SearchLabListSerializer.NEXT_3_DAYS:
-                days.append(start_day)
+                # next 3 days
                 for day in range(3):
-                    if start_day == 6:
+                    if today == 6:
                         days.append(0)
-                        start_day = 0
+                        today = 0
                     else:
-                        start_day += 1
-                        days.append(start_day)
+                        today += 1
+                        days.append(today)
 
             lab_timing_join = " inner join lab_timing lbt on lbt.lab_id = lb.id "
 
             counter = 1
             if len(days) > 0:
-                lab_days_str = 'lbt.day IN ('
+                lab_days_str = ' lbt.day IN (case when lbt.day = (%(today)s) and lbt."end"<= (%(today_time)s):: numeric then lbt.day end , '
                 for day in days:
                     if not counter == 1:
                         lab_days_str += ','
@@ -1380,6 +1382,9 @@ class LabList(viewsets.ReadOnlyModelViewSet):
                 filtering_query.append(
                     lab_days_str + ')'
                 )
+
+                filtering_params['today'] = Date.today().weekday()
+                filtering_params['today_time'] = today_time
 
         if min_price:
             group_filter.append("price>=(%(min_price)s)")
