@@ -1350,9 +1350,10 @@ class LabList(viewsets.ReadOnlyModelViewSet):
         lab_timing_join = ""
 
         if availability:
+            from pytz import timezone
             aval_query = ""
             today = Date.today().weekday()
-            currentDT = datetime.datetime.now()
+            currentDT = datetime.datetime.now(timezone('Asia/Kolkata'))
             today_time = currentDT.strftime("%H.%M")
             avail_days = max(map(int, availability))
 
