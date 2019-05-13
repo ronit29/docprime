@@ -24,6 +24,7 @@ from ondoc.location.models import EntityAddress
 from collections import OrderedDict
 from ondoc.insurance.models import UserInsurance
 from collections import defaultdict
+from ondoc.api.v1.doctor.serializers import DoctorListSerializer
 
 
 class DoctorSearchHelper:
@@ -162,42 +163,33 @@ class DoctorSearchHelper:
             params['current_hour'] = str(current_hour)
 
         if self.query_params.get('availability'):
+            aval_query = ""
             availability = self.query_params.get('availability')
             today = Date.today().weekday()
             currentDT = datetime.now()
             today_time = currentDT.strftime("%H.%M")
             avail_days = max(map(int, availability))
-            days = list()
-            if avail_days == serializers.DoctorListSerializer.TODAY:
-                 days.append(today)
-            elif avail_days == serializers.DoctorListSerializer.TOMORROW:
-                days.append(today)
-                days.append(0 if today == 6 else today + 1)
-            elif avail_days == serializers.DoctorListSerializer.NEXT_3_DAYS:
-                days.append(today)
-                for day in range(3):
+            if avail_days in (DoctorListSerializer.TODAY, DoctorListSerializer.TOMORROW, DoctorListSerializer.NEXT_3_DAYS):
+                aval_query += ' (dct.day = (%(today)s) and  dct."end"<= (%(today_time)s)) '
+                params['today'] = today
+                params['today_time'] = today_time
+
+            if avail_days == DoctorListSerializer.TOMORROW:
+                aval_query += ' or dct.day = (%(tomorrow)s) '
+                params['tomorrow'] = (0 if today == 6 else today + 1)
+            elif avail_days == DoctorListSerializer.NEXT_3_DAYS:
+                for day in range(1, 4):
                     if today == 6:
-                        days.append(0)
                         today = 0
+                        aval_query += ' or dct.day =' + '%(' + 'next_day' + str(day) + ')s'
+                        params['next_day' + str(day)] = today
+
                     else:
                         today += 1
-                        days.append(today)
+                        aval_query += ' or dct.day =' +  '%(' + 'next_day' + str(day) + ')s'
+                        params['next_day' + str(day)] = today
 
-            counter = 1
-            if len(days) > 0:
-                dct_days_str = 'dct.day IN ( '
-                for day in days:
-                    if not counter == 1:
-                        dct_days_str += ','
-                    dct_days_str = dct_days_str + '%(' + 'dct_day' + str(counter) + ')s'
-                    params['dct_day' + str(counter)] = day
-                    counter += 1
-                filtering_params.append(
-                    dct_days_str + ')'
-                )
-                filtering_params.append(' (case when dct.day = (%(today)s) then dct."end"<= (%(today_time)s) end ) ')
-                params['today'] = Date.today().weekday()
-                params['today_time'] = today_time
+            filtering_params.append(aval_query)
 
         if self.query_params.get("doctor_name"):
             name = self.query_params.get("doctor_name").lower().strip()
