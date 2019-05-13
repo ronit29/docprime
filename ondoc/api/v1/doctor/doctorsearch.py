@@ -169,12 +169,12 @@ class DoctorSearchHelper:
             avail_days = max(map(int, availability))
             days = list()
             if avail_days == serializers.DoctorListSerializer.TODAY:
-                 today = today
+                 days.append(today)
             elif avail_days == serializers.DoctorListSerializer.TOMORROW:
-                # next day
+                days.append(today)
                 days.append(0 if today == 6 else today + 1)
             elif avail_days == serializers.DoctorListSerializer.NEXT_3_DAYS:
-                # next 3 days
+                days.append(today)
                 for day in range(3):
                     if today == 6:
                         days.append(0)
@@ -185,7 +185,7 @@ class DoctorSearchHelper:
 
             counter = 1
             if len(days) > 0:
-                dct_days_str = 'dct.day IN (case when dct.day = (%(today)s) and dct."end"<= (%(today_time)s):: numeric then dct.day end , '
+                dct_days_str = 'dct.day IN ( '
                 for day in days:
                     if not counter == 1:
                         dct_days_str += ','
@@ -195,6 +195,7 @@ class DoctorSearchHelper:
                 filtering_params.append(
                     dct_days_str + ')'
                 )
+                filtering_params.append(' (case when dct.day = (%(today)s) then dct."end"<= (%(today_time)s) end ) ')
                 params['today'] = Date.today().weekday()
                 params['today_time'] = today_time
 

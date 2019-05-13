@@ -1353,16 +1353,15 @@ class LabList(viewsets.ReadOnlyModelViewSet):
             today = Date.today().weekday()
             currentDT = datetime.datetime.now()
             today_time = currentDT.strftime("%H.%M")
-
             avail_days = max(map(int, availability))
             days = list()
             if avail_days == serializers.SearchLabListSerializer.TODAY:
-                today = today
+                days.append(today)
             elif avail_days == serializers.SearchLabListSerializer.TOMORROW:
-                # next 1 day
+                days.append(today)
                 days.append(0 if today == 6 else today + 1)
             elif avail_days == serializers.SearchLabListSerializer.NEXT_3_DAYS:
-                # next 3 days
+                days.append(today)
                 for day in range(3):
                     if today == 6:
                         days.append(0)
@@ -1375,7 +1374,7 @@ class LabList(viewsets.ReadOnlyModelViewSet):
 
             counter = 1
             if len(days) > 0:
-                lab_days_str = ' lbt.day IN (case when lbt.day = (%(today)s) and lbt."end"<= (%(today_time)s):: numeric then lbt.day end , '
+                lab_days_str = ' lbt.day IN ( '
                 for day in days:
                     if not counter == 1:
                         lab_days_str += ','
@@ -1385,7 +1384,7 @@ class LabList(viewsets.ReadOnlyModelViewSet):
                 filtering_query.append(
                     lab_days_str + ')'
                 )
-
+                filtering_query.append(' (case when lbt.day = (%(today)s) then lbt."end"<= (%(today_time)s) end ) ')
                 filtering_params['today'] = Date.today().weekday()
                 filtering_params['today_time'] = today_time
 
