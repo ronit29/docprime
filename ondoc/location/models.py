@@ -1206,7 +1206,7 @@ class EntityUrls(TimeStampedModel):
                               'sublocality_longitude', x.sublocality_longitude, 'locality_latitude', x.locality_latitude, 'locality_longitude', 
                               x.locality_longitude))
                         
-                       end as extras, x.sitemap_identifier as sitemap_identifier, x.url as url, 
+                       end as extras, x.sitemap_identifier as sitemap_identifier, lower(x.url) as url, 
                        x.count as count, x.entity_type as entity_type, x.url_type as url_type , x.is_valid, 
                        x.created_at as created_at, x.updated_at as updated_at, x.sequence as sequence,
                        x.sublocality_latitude as sublocality_latitude, x.sublocality_longitude as sublocality_longitude, x.locality_latitude as locality_latitude,
@@ -1267,7 +1267,7 @@ class EntityUrls(TimeStampedModel):
                        end as url
                        from
                        (select * from 
-                       (select ea.id location_id,ea.alternative_value location_name, ea.type,ea.parent_id,
+                       (select ea.id location_id,lower(ea.alternative_value) location_name, ea.type,ea.parent_id,
                        st_x(centroid::geometry) as longitude, st_y(centroid::geometry) as latitude
                        ,count(*) count from entity_address ea
                        inner join lab l on l.is_live=true 
@@ -1299,9 +1299,14 @@ class EntityUrls(TimeStampedModel):
 
         update_null_location = '''update entity_urls set location = locality_location where location is null and  url_type='SEARCHURL' and entity_type='Lab' '''
 
-        update_current_urls_query = '''update entity_urls set is_valid=true where sitemap_identifier = 'LAB_PAGE' and sequence = %d''' % sequence
+        update_current_urls_query = '''update entity_urls set is_valid=true where url_type='SEARCHURL' and entity_type='Lab' and sequence = %d''' % sequence
 
-        update_previous_urls_query = '''update entity_urls set is_valid=false where sitemap_identifier = 'LAB_PAGE' and sequence < %d''' % sequence
+        update_previous_urls_query = '''update entity_urls set is_valid=false where url_type='SEARCHURL' and entity_type='Lab' and sequence < %d''' % sequence
+
+        cleanup = '''delete from entity_urls where id in (select id from 
+                   (select eu.*, row_number() over(partition by url order by is_valid desc, sequence desc) rownum from entity_urls eu  
+                   )x where rownum>1 
+                   ) '''
 
         # query ='''insert into entity_urls(extras, sitemap_identifier, url, count, entity_type, url_type, is_valid, created_at, updated_at, sequence)
         #     select x.extras as extras, x.sitemap_identifier as sitemap_identifier, x.url as url,
@@ -1366,6 +1371,7 @@ class EntityUrls(TimeStampedModel):
                 cursor.execute(update_null_location)
                 cursor.execute(update_current_urls_query)
                 cursor.execute(update_previous_urls_query)
+                cursor.execute(cleanup)
 
             except Exception as e:
                 print(str(e))

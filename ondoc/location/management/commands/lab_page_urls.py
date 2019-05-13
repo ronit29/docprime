@@ -11,7 +11,7 @@ def map_lab_location_urls():
     query = '''select nextval('entity_url_version_seq') as inc'''
     seq = RawSql(query,[]).fetch_all()
     sequence = seq[0]['inc']
-    cache = PageUrlCache(EntityUrls.SitemapIdentifier.DOCTOR_PAGE)
+    cache = PageUrlCache(EntityUrls.SitemapIdentifier.LAB_PAGE)
 
     to_create = []
 
