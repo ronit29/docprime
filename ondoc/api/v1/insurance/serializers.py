@@ -75,6 +75,7 @@ class MemberListSerializer(serializers.Serializer):
     state_code = serializers.CharField(max_length=10)
     city_code = serializers.IntegerField(allow_null=True)
     district_code = serializers.IntegerField(allow_null=True)
+    is_change = serializers.BooleanField(required=False)
 
     def validate(self, attrs):
         request = self.context.get("request")
@@ -105,8 +106,21 @@ class InsuredMemberSerializer(serializers.Serializer):
 
         return attrs
 
-    # insurer = serializers.PrimaryKeyRelatedField(queryset=Insurer.objects.all())
-    # insurance_plan = serializers.PrimaryKeyRelatedField(queryset=InsurancePlans.objects.all())
+
+class EndorseMemberSerializer(serializers.Serializer):
+    members = serializers.ListSerializer(child=MemberListSerializer())
+
+    def validate(self, attrs):
+        # check if there is name duplicacy or not.
+        member_list = attrs.get('members', [])
+        name_set = set(
+            map(lambda member: "%s-%s-%s" % (member['first_name'], member['middle_name'], member['last_name']),
+                member_list))
+
+        if len(name_set) != len(member_list):
+            raise serializers.ValidationError({'name': 'Multiple members cannot have same name'})
+
+        return attrs
 
 
 class MemberSerializer(serializers.ModelSerializer):
@@ -206,3 +220,8 @@ class StateGSTCodeSerializer(serializers.ModelSerializer):
         fields = ('id', 'gst_code', 'state_name', 'cities', 'district')
 
 
+class UploadMemberDocumentSerializer(serializers.ModelSerializer):
+
+    class Meta:
+        model = UserProfile
+        fields = ("member", 'document_first_image', 'document_second_image')

@@ -244,6 +244,16 @@ class InsuranceCity(auth_model.TimeStampedModel):
     def __str__(self):
         return "{} ({})".format(self.city_code, self.city_name)
 
+    @classmethod
+    def get_city_code_with_name(cls, name):
+        if not name:
+            return None
+        city_obj = cls.objects.filter(city_name=name).first()
+        if not city_obj:
+            return None
+        city_code = city_obj.city_code
+        return city_code
+
     class Meta:
         db_table = "insurance_city"
 
@@ -257,6 +267,16 @@ class InsuranceDistrict(auth_model.TimeStampedModel):
 
     def __str__(self):
         return "{} ({})".format(self.district_code, self.district_name)
+
+    @classmethod
+    def get_district_code_with_name(cls, name):
+        if not name:
+            return None
+        district_obj = InsuranceDistrict.objects.filter(district_name=name).first()
+        if not district_obj:
+            return None
+        district_code = district_obj.district_code
+        return district_code
 
     class Meta:
         db_table = "insurance_district"
@@ -1329,8 +1349,18 @@ class InsuredMembers(auth_model.TimeStampedModel):
                                                                         district=member.get('district'),
                                                                         state=member.get('state'),
                                                                         state_code = member.get('state_code'),
-                                                                        user_insurance=user_insurance
+                                                                        user_insurance=user_insurance,
+                                                                        city_code=member.get('city_code'),
+                                                                        district_code=member.get('district_code')
                                                                         )
+
+    def is_document_available(self):
+        document_obj = InsuredMemberDocument.objects.filter(member=self, document_first_image__isnull=False,
+                                                            document_second_image__isnull=False).first()
+        if document_obj:
+            return True
+        else:
+            return False
 
 
 class Insurance(auth_model.TimeStampedModel):
@@ -1515,3 +1545,17 @@ class EndorsementRequest(auth_model.TimeStampedModel):
     state = models.CharField(max_length=100, null=False)
     state_code = models.CharField(max_length=10, null=True)
     status = models.PositiveIntegerField(choices=STATUS_CHOICES, default=PENDING)
+    city_code = models.PositiveIntegerField(null=True, default=None)
+    district_code = models.PositiveIntegerField(null=True, default=None)
+
+    class Meta:
+        db_table = 'insurance_endorsement'
+
+
+class InsuredMemberDocument(auth_model.TimeStampedModel):
+    member = models.ForeignKey(InsuredMembers, related_name='related_document', on_delete=models.DO_NOTHING)
+    document_first_image = models.ImageField(upload_to='users/images', height_field=None, width_field=None)
+    document_second_image = models.ImageField(upload_to='users/images', height_field=None, width_field=None)
+
+    class Meta:
+        db_table = 'insured_member_document'
