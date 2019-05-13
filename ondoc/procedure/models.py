@@ -9,17 +9,25 @@ from collections import deque, OrderedDict
 
 class IpdProcedure(auth_model.TimeStampedModel, SearchKey, auth_model.SoftDelete):
     name = models.CharField(max_length=500, unique=True)
+    synonyms = models.CharField(max_length=4000, null=True, blank=True)
     about = models.TextField(blank=True, verbose_name="Short description")
     details = models.TextField(blank=True)
     is_enabled = models.BooleanField(default=False)
     features = models.ManyToManyField(Feature, through='IpdProcedureFeatureMapping',
                                       through_fields=('ipd_procedure', 'feature'), related_name='of_ipd_procedures')
+    show_about = models.BooleanField(default=False)
 
     def __str__(self):
         return '{}'.format(self.name)
 
     class Meta:
         db_table = "ipd_procedure"
+
+    @classmethod
+    def update_ipd_seo_urls(cls):
+        from ondoc.location.services.doctor_urls import IpdProcedureSeo
+        ipd_procedure = IpdProcedureSeo()
+        ipd_procedure.create()
 
 
 class IpdProcedureFeatureMapping(models.Model):
@@ -81,6 +89,13 @@ class IpdProcedureLead(auth_model.TimeStampedModel):
     email = models.CharField(max_length=256, blank=False, null=True, default=None)
     gender = models.CharField(max_length=2, default=None, blank=True, null=True, choices=UserProfile.GENDER_CHOICES)
     age = models.PositiveIntegerField(blank=True, null=True)
+    dob = models.DateTimeField(blank=True, null=True)
+    lat = models.FloatField(null=True, default=None)
+    long = models.FloatField(null=True, default=None)
+    city = models.CharField(null=True, default=None, blank=True, max_length=150)
+    source = models.CharField(max_length=256, blank=False, null=True, default=None)
+    specialty = models.CharField(max_length=256, blank=False, null=True, default=None)
+    matrix_lead_id = models.BigIntegerField(blank=True, null=True, unique=True)
 
     class Meta:
         db_table = "ipd_procedure_lead"
@@ -415,3 +430,35 @@ def get_procedure_categories_with_procedures(selected_procedures, other_procedur
         final_result.append(value)
 
     return final_result
+
+
+class IpdProcedureSynonym(auth_model.TimeStampedModel):
+    name = models.CharField(max_length=1000, default='')
+
+    def __str__(self):
+        return self.name
+
+    class Meta:
+        db_table = "ipd_procedure_synonym"
+
+
+class IpdProcedureSynonymMapping(auth_model.TimeStampedModel):
+    ipd_procedure_synonym = models.ForeignKey(IpdProcedureSynonym, on_delete=models.CASCADE)
+    ipd_procedure = models.ForeignKey(IpdProcedure, on_delete=models.CASCADE)
+    order = models.IntegerField(null=True, blank=True)
+
+    def __str__(self):
+        return str(self.id)
+
+    class Meta:
+        db_table = "procedure_synonym_mapping"
+
+
+class SimilarIpdProcedureMapping(auth_model.TimeStampedModel):
+    ipd_procedure = models.ForeignKey(IpdProcedure, on_delete=models.CASCADE, related_name='similar_ipds')
+    similar_ipd_procedure = models.ForeignKey(IpdProcedure, on_delete=models.CASCADE, related_name='similar_ipds_2')
+    order = models.IntegerField(null=True, blank=True)
+
+    class Meta:
+        db_table = "similar_ipd_procedure_mapping"
+        unique_together = (('ipd_procedure', 'similar_ipd_procedure'),)

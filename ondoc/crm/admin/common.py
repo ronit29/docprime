@@ -11,7 +11,8 @@ from django.conf import settings
 from django.utils.dateparse import parse_datetime
 from ondoc.authentication.models import Merchant, AssociatedMerchant, QCModel
 from ondoc.account.models import MerchantPayout
-from ondoc.common.models import Cities, MatrixCityMapping, PaymentOptions, Remark, MatrixMappedCity, MatrixMappedState, GlobalNonBookable
+from ondoc.common.models import Cities, MatrixCityMapping, PaymentOptions, Remark, MatrixMappedCity, MatrixMappedState, \
+    GlobalNonBookable, UserConfig
 from import_export import resources, fields
 from import_export.admin import ImportMixin, base_formats, ImportExportMixin, ImportExportModelAdmin, ExportMixin
 from reversion.admin import VersionAdmin
@@ -21,8 +22,9 @@ from django.utils.safestring import mark_safe
 from django.contrib.contenttypes.models import ContentType
 from import_export.admin import ImportExportMixin
 
-from ondoc.diagnostic.models import Lab, LabAppointment
+from ondoc.diagnostic.models import Lab, LabAppointment, LabPricingGroup
 from ondoc.doctor.models import Hospital, Doctor, OpdAppointment, HospitalNetwork
+from ondoc.insurance.models import UserInsurance
 from django.db.models import Q
 from django import forms
 
@@ -101,8 +103,39 @@ class QCPemAdmin(admin.ModelAdmin):
         abstract = True
 
 
-class FormCleanMixin(forms.ModelForm):
+class RefundableAppointmentForm(forms.ModelForm):
+    refund_payment = forms.BooleanField(required=False)
+    refund_reason = forms.CharField(widget=forms.Textarea,required=False)
+
     def clean(self):
+        super().clean()
+        cleaned_data = self.cleaned_data
+        refund_payment = cleaned_data.get('refund_payment')
+        refund_reason = cleaned_data.get('refund_reason')
+        if refund_payment:
+            if not refund_reason:
+                raise forms.ValidationError("Refund reason is compulsory")
+            if self.instance and not self.instance.status == self.instance.COMPLETED:
+                raise forms.ValidationError("Refund can be processed after Completion")
+        # TODO : No refund should already be in process
+        return cleaned_data
+
+
+class FormCleanMixin(forms.ModelForm):
+
+    def pin_code_qc_submit(self):
+        if '_submit_for_qc' in self.data:
+            # if hasattr(self.instance, 'pin_code') and self.instance.pin_code is not None:
+            if hasattr(self.instance, 'pin_code'):
+                if not self.cleaned_data.get('pin_code'):
+                    raise forms.ValidationError("Cannot submit for QC without pincode ")
+            # else:
+            #     raise forms.ValidationError(
+            #             "Cannot submit for QC without pincode ")
+
+    def clean(self):
+        self.pin_code_qc_submit()
+
         if (not self.request.user.is_superuser and not self.request.user.groups.filter(name=constants['SUPER_QC_GROUP']).exists()):
             # and (not '_reopen' in self.data and not self.request.user.groups.filter(name__in=[constants['QC_GROUP_NAME'], constants['WELCOME_CALLING_TEAM']]).exists()):
             if isinstance(self.instance, Hospital) or isinstance(self.instance, HospitalNetwork):
@@ -119,7 +152,7 @@ class FormCleanMixin(forms.ModelForm):
                 if self.instance.data_status == QCModel.SUBMITTED_FOR_QC:
                     raise forms.ValidationError("Cannot update Data submitted for QC approval")
                 if not self.request.user.groups.filter(name=constants['DOCTOR_SALES_GROUP']).exists():
-                    if self.instance.data_status in [QCModel.IN_PROGRESS, QCModel.REOPENED] and self.instance.created_by and self.instance.created_by.groups.filter(name=constants['DOCTOR_NETWORK_GROUP_NAME']).exists() and self.instance.created_by != self.request.user:
+                    if self.instance.data_status in [QCModel.IN_PROGRESS] and self.instance.created_by and self.instance.created_by.groups.filter(name=constants['DOCTOR_NETWORK_GROUP_NAME']).exists() and self.instance.created_by != self.request.user:
                         raise forms.ValidationError("Cannot modify Data added by other users")
             if '_submit_for_qc' in self.data:
                 self.validate_qc()
@@ -392,9 +425,10 @@ class MerchantPayoutForm(forms.ModelForm):
             if not billed_to:
                 raise forms.ValidationError("Billing entity not defined.")
 
-            associated_merchant = billed_to.merchant.first()
-            if not associated_merchant.verified:
-                raise forms.ValidationError("Associated Merchant not verified.")
+            if not self.instance.booking_type == self.instance.InsurancePremium:
+                associated_merchant = billed_to.merchant.first()
+                if not associated_merchant.verified:
+                    raise forms.ValidationError("Associated Merchant not verified.")
 
         if not self.instance.status == self.instance.PENDING:
             raise forms.ValidationError("This payout is already under process")
@@ -415,11 +449,11 @@ class MerchantPayoutAdmin(ExportMixin, VersionAdmin):
     resource_class = MerchantPayoutResource
     form = MerchantPayoutForm
     model = MerchantPayout
-    fields = ['id', 'payment_mode','charged_amount', 'updated_at', 'created_at', 'payable_amount', 'status', 'payout_time', 'paid_to',
+    fields = ['id','booking_type', 'payment_mode','charged_amount', 'updated_at', 'created_at', 'payable_amount', 'status', 'payout_time', 'paid_to',
               'appointment_id', 'get_billed_to', 'get_merchant', 'process_payout', 'type', 'utr_no', 'amount_paid','api_response','pg_status','status_api_response']
-    list_display = ('id', 'status', 'payable_amount', 'appointment_id', 'doc_lab_name')
+    list_display = ('id', 'status', 'payable_amount', 'appointment_id', 'doc_lab_name','booking_type')
     search_fields = ['name']
-    list_filter = ['status']
+    list_filter = ['status','booking_type']
 
     def get_queryset(self, request):
         return super().get_queryset(request).filter(payable_amount__gt=0).order_by('-id').prefetch_related('lab_appointment__lab',
@@ -427,14 +461,14 @@ class MerchantPayoutAdmin(ExportMixin, VersionAdmin):
 
     def get_search_results(self, request, queryset, search_term):
         queryset, use_distinct = super().get_search_results(request, queryset, None)
-
-        queryset = queryset.filter(Q(opd_appointment__doctor__name__icontains=search_term) |
-         Q(lab_appointment__lab__name__icontains=search_term))
+        if search_term:
+            queryset = queryset.filter(Q(opd_appointment__doctor__name__icontains=search_term) |
+             Q(lab_appointment__lab__name__icontains=search_term))
 
         return queryset, use_distinct
 
     def get_readonly_fields(self, request, obj=None):
-        base = ['appointment_id', 'get_billed_to', 'get_merchant']
+        base = ['appointment_id', 'get_billed_to', 'get_merchant','booking_type']
         editable_fields = ['payout_approved']
         if obj and obj.status == MerchantPayout.PENDING:
             editable_fields += ['type', 'amount_paid','payment_mode']
@@ -456,6 +490,10 @@ class MerchantPayoutAdmin(ExportMixin, VersionAdmin):
         elif isinstance(appt, LabAppointment):
             if appt.lab:
                 return appt.lab.name
+        elif isinstance(appt, UserInsurance):
+            if appt.insurance_plan.insurer:
+                return appt.insurance_plan.insurer.name
+
         return ''
 
     def appointment_id(self, instance):
@@ -582,8 +620,23 @@ class MatrixMappedCityResource(resources.ModelResource):
         fields = ('id', 'name', 'state_id')
 
 
+class MatrixMappedCityAdminForm(forms.ModelForm):
+    def clean(self):
+        super().clean()
+        if any(self.errors):
+            return
+        cleaned_data = self.cleaned_data
+        state = cleaned_data.get('state', None)
+        city_name = cleaned_data.get('name', '')
+        if not state:
+            raise forms.ValidationError("State is required.")
+        if state and city_name:
+            if MatrixMappedCity.objects.filter(name__iexact=city_name.strip(), state=state).exists():
+                raise forms.ValidationError("City-State combination already exists.")
+
 
 class MatrixMappedCityAdmin(ImportMixin, admin.ModelAdmin):
+    form = MatrixMappedCityAdminForm
     formats = (base_formats.XLS, base_formats.XLSX,)
     list_display = ('name', 'state')
     readonly_fields = ('name', 'state', )
@@ -594,6 +647,7 @@ class MatrixMappedCityAdmin(ImportMixin, admin.ModelAdmin):
         if not request.user.is_superuser and not request.user.groups.filter(name=constants['SUPER_QC_GROUP']).exists():
             return super().get_readonly_fields(request, obj)
         return ()
+
 
 class MatrixStateAutocomplete(autocomplete.Select2QuerySetView):
 
@@ -619,3 +673,25 @@ class MatrixCityAutocomplete(autocomplete.Select2QuerySetView):
 
         return queryset
 
+
+class ContactUsAdmin(admin.ModelAdmin):
+    list_display = ('name', 'mobile', 'email', 'from_app')
+    fields = ('name', 'mobile', 'email', 'message', 'from_app')
+    readonly_fields = ('name', 'mobile', 'email', 'message', 'from_app')
+    list_filter = ("from_app",)
+
+
+class UserConfigAdmin(admin.ModelAdmin):
+    model = UserConfig
+    list_display = ('key',)
+
+
+class LabPricingAutocomplete(autocomplete.Select2QuerySetView):
+
+    def get_queryset(self):
+        queryset = LabPricingGroup.objects.all()
+
+        if self.q:
+            queryset = queryset.filter(group_name__istartswith=self.q)
+
+        return queryset

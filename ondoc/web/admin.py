@@ -18,22 +18,33 @@ class CareerAdmin(admin.ModelAdmin):
     readonly_fields = ['name', 'mobile', 'email', 'profile_type', 'resume', 'created_at']
     fields = ['name','mobile', 'email', 'profile_type', 'resume', 'created_at']
 
+
 class OnlineLeadAdmin(admin.ModelAdmin):
     list_display = ('name', 'member_type', 'city', 'city_name', 'created_at')
 
     readonly_fields = ['name', 'city', 'city_name', 'mobile', 'email', 'member_type', 'created_at']
     fields = ['name', 'city', 'city_name', 'mobile', 'email', 'member_type', 'created_at']
 
+
 class UploadImageAdmin(admin.ModelAdmin):
     date_hierarchy = 'created_at'
+    list_display = ('id', 'name',)
+    fields = ('name', 'image', 'url')
+    readonly_fields = ('url',)
 
-    list_display = ('name', 'url', 'created_at')
-    #
+    def get_queryset(self, request):
+        qs = super().get_queryset(request)
+        self.request = request
+        return qs
+
     def url(self, instance):
-        url = None
         if instance and instance.id:
-            url = instance.image.path
-        return mark_safe('''<a href="%s" target='_blank'>%s</a>'''%(url, url))
+            url = self.request.build_absolute_uri(instance.image.url) if instance.image else None
+
+            #url = instance.image.path if instance.image else None
+            if url:
+                return mark_safe('''<a href="%s" target='_blank'>%s</a>''' % (url, url))
+        return None
     url.short_description = "Url"
 
 admin.site.register(OnlineLead, OnlineLeadAdmin)

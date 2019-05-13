@@ -6,8 +6,7 @@ Share this code with the lab at the time of your appointment.
 Booking ID : {{instance.id}}
 Patient Name : {{patient_name|capfirst}}
 Lab Name : {{lab_name|capfirst}}
-Lab Address : {{instance.lab.get_lab_address}}
+{% if instance.is_home_pickup %}Home Pick up Address : {{instance.get_pickup_address}}{% else %}Lab Address : {{instance.lab.get_lab_address}}{% endif %}
 Appointment Date and Time : {{instance.time_slot_start|date:"D jS F Y"}} || {{instance.time_slot_start|date:"h:i A"}}
-Helpline Toll Free Number : 1800-123-9419
 
 Thanks for choosing docprime.com

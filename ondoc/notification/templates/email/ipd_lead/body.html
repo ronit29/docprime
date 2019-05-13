@@ -1,6 +1,11 @@
-IPD Procedure : {{instance.ipd_procedure.name}}
+{% if instance.ipd_procedure %}IPD Procedure : {{instance.ipd_procedure.name}}{% endif %}
+{% if instance.hospital %}Hospital : {{instance.hospital.name}}{% endif %}
 Name : {{instance.name}}
 Phone Number : {{instance.phone_number}}
 Email : {{instance.email}}
 Gender : {{instance.gender}}
 Age : {{instance.age}}
+DOB : {{instance.dob}}
+Latitude : {{instance.lat}}
+Longitude : {{instance.long}}
+City : {{instance.city}}

@@ -2,8 +2,10 @@ from rest_framework import serializers
 from ondoc.authentication.models import (OtpVerifications, User, UserProfile, Notification, NotificationEndpoint,
                                          DoctorNumber, Address, GenericAdmin, UserSecretKey,
                                          UserPermission, Address, GenericAdmin, GenericLabAdmin)
-from ondoc.doctor.models import DoctorMobile, ProviderSignupLead
+from ondoc.doctor.models import DoctorMobile, ProviderSignupLead, Hospital
 from ondoc.common.models import AppointmentHistory
+from ondoc.doctor.models import DoctorMobile
+from ondoc.insurance.models import InsuredMembers, UserInsurance
 from ondoc.diagnostic.models import AvailableLabTest
 from ondoc.account.models import ConsumerAccount, Order, ConsumerTransaction
 import datetime, calendar
@@ -17,6 +19,7 @@ from django.contrib.auth import get_user_model
 from django.contrib.staticfiles.templatetags.staticfiles import static
 import jwt
 from django.conf import settings
+from django.db.models import Q
 from ondoc.authentication.backends import JWTAuthentication
 from ondoc.common import models as common_models
 
@@ -49,6 +52,7 @@ class OTPVerificationSerializer(serializers.Serializer):
 class DoctorLoginSerializer(serializers.Serializer):
     phone_number = serializers.IntegerField(min_value=5000000000,max_value=9999999999)
     otp = serializers.IntegerField(min_value=100000,max_value=999999)
+    source = serializers.CharField(max_length=100, required=False)
 
     def validate(self, attrs):
         if attrs['phone_number'] == 9582557400:
@@ -70,6 +74,12 @@ class DoctorLoginSerializer(serializers.Serializer):
                 provider_signup_lead_not_exists = True
             if doctor_not_exists and admin_not_exists and lab_admin_not_exists and provider_signup_lead_not_exists:
                 raise serializers.ValidationError('No Doctor or Admin with given phone number found')
+
+        agent_hospitals = GenericAdmin.objects.filter(Q(phone_number=attrs['phone_number'], is_disabled=False, hospital__is_live=True), Q(Q(hospital__source_type=Hospital.AGENT) | Q(hospital__source_type=None)))
+        provider_hospitals = GenericAdmin.objects.filter(phone_number=attrs['phone_number'], is_disabled=False, hospital__source_type=Hospital.PROVIDER)
+        if not agent_hospitals.exists():
+            if not provider_hospitals.exists():
+                raise serializers.ValidationError("Live hospital for admin not found")
 
         return attrs
 
@@ -163,14 +173,47 @@ class UserProfileSerializer(serializers.ModelSerializer):
     gender = serializers.ChoiceField(choices=GENDER_CHOICES)
     email = serializers.EmailField(required=False, allow_null=True, allow_blank=True)
     profile_image = serializers.SerializerMethodField()
+    is_insured = serializers.SerializerMethodField()
+    insurance_status = serializers.SerializerMethodField()
     dob = serializers.DateField(allow_null=True, required=False)
     whatsapp_optin = serializers.NullBooleanField(required=False)
     whatsapp_is_declined = serializers.BooleanField(required=False)
+    is_default_user = serializers.BooleanField(required=False)
 
     class Meta:
         model = UserProfile
-        fields = ("id", "name", "email", "gender", "phone_number", "is_otp_verified", "is_default_user",
-                  "profile_image", "age", "user", "dob", "updated_at", "whatsapp_optin", "whatsapp_is_declined")
+        fields = ("id", "name", "email", "gender", "phone_number", "is_otp_verified", "is_default_user", "profile_image"
+                  , "age", "user", "dob", "is_insured", "updated_at", "whatsapp_optin", "whatsapp_is_declined",
+                  "insurance_status")
+
+    def get_is_insured(self, obj):
+        if isinstance(obj, dict):
+            return False
+
+        # insured_member_obj = InsuredMembers.objects.filter(profile=obj).order_by('-id').first()
+        insured_member_obj = sorted(obj.insurance.all(), key=lambda object: object.id, reverse=True)[0] if obj.insurance.all() else None
+        if not insured_member_obj:
+            return False
+        # user_insurance_obj = UserInsurance.objects.filter(id=insured_member_obj.user_insurance_id).last()
+        user_insurance_obj = insured_member_obj.user_insurance
+        if user_insurance_obj and user_insurance_obj.is_profile_valid():
+            return True
+        else:
+            return False
+
+    def get_insurance_status(self, obj):
+        if isinstance(obj, dict):
+            return False
+        # insured_member_obj = InsuredMembers.objects.filter(profile=obj).order_by('-id').first()
+        insured_member_obj = sorted(obj.insurance.all(), key=lambda object: object.id, reverse=True)[0] if obj.insurance.all() else None
+        if not insured_member_obj:
+            return 0
+        # user_insurance_obj = UserInsurance.objects.filter(id=insured_member_obj.user_insurance_id).last()
+        user_insurance_obj = insured_member_obj.user_insurance
+        if user_insurance_obj and user_insurance_obj.is_profile_valid():
+            return user_insurance_obj.status
+        else:
+            return 0
 
     def get_age(self, obj):
         from datetime import date
@@ -221,8 +264,8 @@ class UserPermissionSerializer(serializers.ModelSerializer):
 class AddressSerializer(serializers.ModelSerializer):
     locality_location_lat = serializers.ReadOnlyField(source='locality_location.y')
     locality_location_long = serializers.ReadOnlyField(source='locality_location.x')
-    landmark_location_lat = serializers.ReadOnlyField(source='landmark_location.y')
-    landmark_location_long = serializers.ReadOnlyField(source='landmark_location.x')
+    landmark_location_lat = serializers.ReadOnlyField(source='landmark_location.y', required=False, allow_null=True, default=None)
+    landmark_location_long = serializers.ReadOnlyField(source='landmark_location.x', required=False, allow_null=True, default=None)
 
     class Meta:
         model = Address
@@ -485,6 +528,7 @@ class ContactUsSerializer(serializers.Serializer):
     mobile = serializers.IntegerField(min_value=1000000000, max_value=9999999999)
     email = serializers.EmailField()
     message = serializers.CharField(max_length=2000)
+    from_app = serializers.BooleanField(default=False)
 
     class Meta:
         model = ContactUs
@@ -503,6 +547,11 @@ class UserLeadSerializer(serializers.ModelSerializer):
         fields = ('name', 'phone_number', 'gender', 'message')
 
 
+class TokenFromUrlKeySerializer(serializers.Serializer):
+    auth_token = serializers.CharField(max_length=100, required=False)
+    key = serializers.CharField(max_length=30, required=False)
 
-
-
+    def validate(self, attrs):
+        if not (attrs.get('auth_token') or attrs.get('key')):
+            raise serializers.ValidationError('neither auth_token nor key found')
+        return attrs

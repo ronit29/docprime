@@ -5,7 +5,12 @@ from django.contrib.contenttypes.models import ContentType
 from ondoc.authentication.models import TimeStampedModel
 from ondoc.common.helper import Choices
 from django.contrib.postgres.fields import JSONField
+from django.db import transaction
+from ondoc.matrix.tasks import push_appointment_to_matrix
+from ondoc.diagnostic.models import TestParameter
+import logging
 
+logger = logging.getLogger(__name__)
 # Create your models here.
 
 
@@ -118,11 +123,27 @@ class IntegratorResponse(TimeStampedModel):
 
         print("Order Summary for Thyrocare Complete")
 
+    def save(self, *args, **kwargs):
+        super().save(*args, **kwargs)
+        push_to_matrix = True
+        transaction.on_commit(lambda: self.app_commit_tasks(push_to_matrix))
+
+    def app_commit_tasks(self, push_to_matrix):
+        if push_to_matrix:
+            # Push the appointment data to the matrix
+            try:
+                push_appointment_to_matrix.apply_async(
+                    ({'type': 'LAB_APPOINTMENT', 'appointment_id': self.object_id, 'product_id': 5,
+                      'sub_product_id': 2},), countdown=5)
+            except Exception as e:
+                logger.error(str(e))
+
 
 class IntegratorReport(TimeStampedModel):
     integrator_response = models.ForeignKey(IntegratorResponse, on_delete=models.CASCADE, null=False)
     pdf_url = models.TextField(null=True, blank=True)
     xml_url = models.TextField(null=True, blank=True)
+    json_data = JSONField(null=True, default={})
 
     class Meta:
         db_table = 'integrator_report'
@@ -186,5 +207,34 @@ class IntegratorTestMapping(TimeStampedModel):
     test_type = models.CharField(max_length=30, null=True, blank=True)
     is_active = models.BooleanField(default=False)
 
+    @classmethod
+    def get_if_third_party_integration(cls, network_id=None):
+        if network_id:
+            mapping = cls.objects.filter(object_id=network_id, is_active=True).first()
+        else:
+            return None
+
+        # Return if no test exist over here and it depicts that it is not a part of integrations.
+        if not mapping:
+            return None
+
+        # Part of the integrations.
+        if mapping.content_type == ContentType.objects.get(model='labnetwork'):
+            return {
+                'class_name': mapping.integrator_class_name,
+                'service_type': mapping.service_type
+            }
+
     class Meta:
         db_table = 'integrator_test_mapping'
+
+
+class IntegratorTestParameterMapping(TimeStampedModel):
+    integrator_class_name = models.CharField(max_length=40, null=False, blank=False)
+    integrator_test_name = models.CharField(max_length=60, null=True, blank=True)
+    test_parameter_chat = models.ForeignKey('diagnostic.TestParameterChat', on_delete=models.CASCADE, null=True)
+    response_data = JSONField(blank=True, null=True)
+    test_parameter = models.ForeignKey(TestParameter, related_name='integrator_mapped_parameters', on_delete=models.CASCADE, null=True)
+
+    class Meta:
+        db_table = 'integrator_test_parameter_mapping'

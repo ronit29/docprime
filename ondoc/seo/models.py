@@ -8,6 +8,7 @@ from ondoc.diagnostic.models import LabNetwork
 
 # Create your models here.
 from ondoc.location.models import EntityUrls
+from bs4 import BeautifulSoup
 
 
 class Sitemap(TimeStampedModel):
@@ -25,7 +26,7 @@ class Robot(TimeStampedModel):
 
 
 class SitemapManger(TimeStampedModel):
-    file = models.FileField(upload_to='seo', validators=[FileExtensionValidator(allowed_extensions=['xml'])])
+    file = models.FileField(upload_to='seo', validators=[FileExtensionValidator(allowed_extensions=['xml, gzip'])])
     count = models.PositiveIntegerField(default=0, null=True)
     valid = models.BooleanField(default=True)
 
@@ -63,17 +64,38 @@ class NewDynamic(TimeStampedModel):
     is_enabled = models.BooleanField(default=False)
     meta_title = models.CharField(max_length=5000, default='', blank=True)
     meta_description = models.CharField(max_length=5000, default='', blank=True)
+
     class Meta:
         db_table = "dynamic_url_content"
 
     def save(self, force_insert=False, force_update=False, using=None, update_fields=None):
-        if not self.id:
-            if not strip_tags(self.top_content).strip("&nbsp;").strip():
-                if self.url.url_type == EntityUrls.UrlType.SEARCHURL and PracticeSpecializationContent.objects.filter(
-                        specialization_id=self.url.specialization_id):
-                    self.top_content = PracticeSpecializationContent.objects.filter(
-                        specialization_id=self.url.specialization_id).first().content
+        if self.is_html_empty(self.top_content):
+            self.top_content = ''
+        if self.is_html_empty(self.bottom_content):
+            self.bottom_content = ''
+        self.top_content = self.top_content.strip("&nbsp;").strip()
+        entity_to_be_used = None
+        if (not self.id or not self.top_content) and self.url and self.url.url_type == EntityUrls.UrlType.SEARCHURL:
+            entity_to_be_used = self.url
+        if (not self.id or not self.top_content) and self.url_value:
+            entity_to_be_used = EntityUrls.objects.filter(url_type=EntityUrls.UrlType.SEARCHURL, url=self.url_value,
+                                                          is_valid=True).first()
+
+        if entity_to_be_used:
+            ps_content = PracticeSpecializationContent.objects.filter(
+                specialization_id=entity_to_be_used.specialization_id).first()
+            if ps_content:
+                self.top_content = ps_content.content
+
         if self.url:
             self.url_value = self.url.url
+
         super().save(force_insert, force_update, using, update_fields)
 
+    def is_html_empty(self, html):
+        from bs4 import BeautifulSoup
+        soup = BeautifulSoup(html, 'html.parser')
+        text = soup.get_text().strip()
+        if not text:
+            return True
+        return False
