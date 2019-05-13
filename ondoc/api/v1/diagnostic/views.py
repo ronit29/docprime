@@ -320,7 +320,10 @@ class LabList(viewsets.ReadOnlyModelViewSet):
             filter_query += " and lab.network_id IS DISTINCT FROM 43 "
 
         if avg_ratings:
-            filter_query += " and (case when (rating_data is not null and (rating_data->> 'avg_rating') is not null) or ( (rating_data ->> 'rating_count') is not null and (rating_data ->> 'rating_count')::int >5) then (rating_data->> 'avg_rating')::float > (%(avg_ratings)s) end) "
+            filter_query += " and (case when (rating_data is not null and (rating_data ->> 'avg_rating')::float >= 4 ) or " \
+                            "( (rating_data ->> 'avg_rating')::float >= (%(avg_ratings)s) and (rating_data ->> 'rating_count') is not null and " \
+                            "(rating_data ->> 'rating_count')::int >5) then (rating_data ->> 'avg_rating')::float >= (%(avg_ratings)s) end)"
+            #filter_query += " and (case when (rating_data is not null and (rating_data->> 'avg_rating') is not null) or ( (rating_data ->> 'rating_count') is not null and (rating_data ->> 'rating_count')::int >5) then (rating_data->> 'avg_rating')::float > (%(avg_ratings)s) end) "
             params['avg_ratings'] = max(avg_ratings)
 
         if valid_package_ids is not None:
@@ -1398,7 +1401,10 @@ class LabList(viewsets.ReadOnlyModelViewSet):
             filtering_params['insurance_threshold_amount'] = insurance_threshold_amount
 
         if avg_ratings:
-            filtering_query.append(" (case when (rating_data is not null and (rating_data ->> 'avg_rating') is not  null) or ( (rating_data ->> 'rating_count') is not null and (rating_data ->> 'rating_count')::int >5) then (rating_data->> 'avg_rating')::float >= (%(avg_ratings)s) end) ")
+            filtering_query.append(" (case when (rating_data is not null and (rating_data ->> 'avg_rating')::float >= 4 ) or " \
+                            "( (rating_data ->> 'avg_rating')::float >= (%(avg_ratings)s) and (rating_data ->> 'rating_count') is not null and " \
+                            "(rating_data ->> 'rating_count')::int >5) then (rating_data ->> 'avg_rating')::float >= (%(avg_ratings)s) end) " )
+            #filtering_query.append(" (case when (rating_data is not null and (rating_data ->> 'avg_rating'::float >= (%(avg_ratings)s)) is not  null) or ( (rating_data ->> 'rating_count') is not null and (rating_data ->> 'rating_count')::int >5) then (rating_data->> 'avg_rating') end) ")
             filtering_params['avg_ratings'] = min(avg_ratings)
 
         if ids:
