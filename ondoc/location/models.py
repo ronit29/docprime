@@ -1303,6 +1303,11 @@ class EntityUrls(TimeStampedModel):
 
         update_previous_urls_query = '''update entity_urls set is_valid=false where url_type='SEARCHURL' and entity_type='Lab' and sequence < %d''' % sequence
 
+        cleanup = '''delete from entity_urls where id in (select id from 
+                   (select eu.*, row_number() over(partition by url order by is_valid desc, sequence desc) rownum from entity_urls eu  
+                   )x where rownum>1 
+                   ) '''
+
         # query ='''insert into entity_urls(extras, sitemap_identifier, url, count, entity_type, url_type, is_valid, created_at, updated_at, sequence)
         #     select x.extras as extras, x.sitemap_identifier as sitemap_identifier, x.url as url,
         #     x.count as count, x.entity_type as entity_type, x.url_type as url_type , x.is_valid, x.created_at as created_at, x.updated_at as updated_at, x.sequence as sequence
@@ -1366,6 +1371,7 @@ class EntityUrls(TimeStampedModel):
                 cursor.execute(update_null_location)
                 cursor.execute(update_current_urls_query)
                 cursor.execute(update_previous_urls_query)
+                cursor.execute(cleanup)
 
             except Exception as e:
                 print(str(e))
