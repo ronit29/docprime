@@ -1156,6 +1156,7 @@ class LabList(viewsets.ReadOnlyModelViewSet):
         page = int(request.query_params.get('page', 1))
 
         parameters['insurance_threshold_amount'] = insurance_data_dict['insurance_threshold_amount']
+        parameters['is_user_insured'] = insurance_data_dict['is_user_insured']
         queryset_result = self.get_lab_search_list(parameters, page)
         count = 0
         if len(queryset_result)>0:
@@ -1429,6 +1430,8 @@ class LabList(viewsets.ReadOnlyModelViewSet):
         return lab_search_result
 
     def apply_search_sort(self, parameters):
+        if parameters.get('is_user_insured'):
+            return ' network_id = 43, distance asc '
         order_by = parameters.get("sort_on")
         if order_by is not None:
             if order_by == "fees" and parameters.get('ids'):

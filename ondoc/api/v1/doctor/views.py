@@ -1443,7 +1443,7 @@ class DoctorListViewSet(viewsets.GenericViewSet):
         doctor_search_helper = DoctorSearchHelper(validated_data)
         if not validated_data.get("search_id"):
             filtering_params = doctor_search_helper.get_filtering_params()
-            order_by_field, rank_by = doctor_search_helper.get_ordering_params()
+            order_by_field, rank_by = doctor_search_helper.get_ordering_params(insurance_data_dict)
             query_string = doctor_search_helper.prepare_raw_query(filtering_params,
                                                                   order_by_field, rank_by)
             doctor_search_result = RawSql(query_string.get('query'),

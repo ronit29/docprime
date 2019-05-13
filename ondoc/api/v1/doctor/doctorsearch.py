@@ -205,7 +205,7 @@ class DoctorSearchHelper:
             self.count_of_procedure = len(procedure_ids)
         return result
 
-    def get_ordering_params(self):
+    def get_ordering_params(self, insurance_data_dict):
         # order_by_field = 'is_gold desc, distance, dc.priority desc'
         # rank_by = "rank_distance=1"
         if self.query_params and self.query_params.get('doctor_name'):
@@ -216,6 +216,9 @@ class DoctorSearchHelper:
             return ' enabled_for_online_booking DESC, distance, priority desc ', ' rnk=1 '
 
         bucket_size=2000
+
+        if insurance_data_dict and insurance_data_dict['is_user_insured']:
+            return " floor(distance/{bucket_size}) ASC, fees ASC ".format(bucket_size=str(bucket_size)), "rnk=1"
 
         if self.count_of_procedure:
             order_by_field = ' distance, total_price '
@@ -352,7 +355,7 @@ class DoctorSearchHelper:
             query_string = "SELECT x.doctor_id, x.hospital_id, doctor_clinic_id, doctor_clinic_timing_id " \
                            "FROM (select {rank_part}, " \
                            "St_distance(St_setsrid(St_point((%(longitude)s), (%(latitude)s)), 4326), h.location) distance, " \
-                           "d.id as doctor_id, " \
+                           "d.id as doctor_id, dct.fees as fees, " \
                            "dc.id as doctor_clinic_id,  d.search_key, " \
                            "dct.id as doctor_clinic_timing_id,practicing_since, " \
                            "d.enabled_for_online_booking and dc.enabled_for_online_booking and h.enabled_for_online_booking as enabled_for_online_booking, " \
