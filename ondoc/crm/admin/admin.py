@@ -2,7 +2,7 @@
 from django.contrib.gis import admin
 from ondoc.common.models import PaymentOptions, UserConfig, Feature, Service, MatrixMappedState, MatrixMappedCity, \
     GlobalNonBookable, QRCode
-from ondoc.crm.admin.banner import BannerAdmin, SliderLocationAdmin
+from ondoc.crm.admin.banner import BannerAdmin, SliderLocationAdmin, RecommenderAdmin, EmailBannerAdmin
 from ondoc.crm.admin.location import ComparePackagesSEOUrlsAdmin
 from ondoc.crm.admin.procedure import ProcedureCategoryAdmin, ProcedureAdmin, IpdProcedureAdmin, FeatureAdmin, \
     ServiceAdmin, HealthInsuranceProviderAdmin, IpdProcedureCategoryAdmin, IpdProcedureDetailAdmin, \
@@ -82,7 +82,7 @@ from ondoc.seo.models import SeoSpecialization
 from ondoc.seo.models import SeoLabNetwork
 from ondoc.elastic.models import DemoElastic
 from .elastic import DemoElasticAdmin
-from ondoc.banner.models import Banner, SliderLocation
+from ondoc.banner.models import Banner, SliderLocation, EmailBanner, Recommender
 from .integrations import IntegratorMapping, IntegratorMappingAdmin
 from .integrations import IntegratorProfileMapping, IntegratorProfileMappingAdmin
 from .integrations import IntegratorReport, IntegratorReportAdmin
@@ -233,3 +233,6 @@ admin.site.register(AppRatings, AppRatingsAdmin)
 admin.site.register(AppCompliments, AppComplimentsAdmin)
 admin.site.register(ContactUs, ContactUsAdmin)
 admin.site.register(CompareSEOUrls, ComparePackagesSEOUrlsAdmin)
+
+admin.site.register(EmailBanner, EmailBannerAdmin)
+admin.site.register(Recommender, RecommenderAdmin)

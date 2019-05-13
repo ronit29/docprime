@@ -13,6 +13,11 @@ from django.http import QueryDict
 from django.utils import timezone
 from django.db.models import Q
 
+from ondoc.doctor.models import OpdAppointment
+from ondoc.notification.models import NotificationAction
+from django.contrib.postgres.fields import ArrayField
+from multiselectfield import MultiSelectField
+
 
 class SliderLocation(models.Model):
     name = models.CharField(max_length=1000, null=True, default='Home_Page')
@@ -22,6 +27,72 @@ class SliderLocation(models.Model):
 
     class Meta:
         db_table = 'slider_location'
+
+
+class RecommenderThrough(auth_model.TimeStampedModel):
+    content_type = models.ForeignKey(ContentType, on_delete=models.CASCADE, null=True, blank=True)
+    object_id = models.PositiveIntegerField(null=True, blank=True)
+    content_object = GenericForeignKey()
+
+    recommender = models.ForeignKey('banner.Recommender', related_name="through_data", on_delete=models.CASCADE)
+
+
+class Recommender(auth_model.TimeStampedModel):
+
+    payment_type = MultiSelectField(choices=OpdAppointment.PAY_CHOICES, null=True, blank=True)
+    notification_type = MultiSelectField(choices=NotificationAction.NOTIFICATION_TYPE_CHOICES, null=True, blank=True)
+    item_min_price = models.DecimalField(max_digits=10, decimal_places=2, blank=True, null=True)
+    item_max_price = models.DecimalField(max_digits=10, decimal_places=2, blank=True, null=True)
+
+    def __str__(self):
+        return str(self.id)
+
+    class Meta:
+        db_table = 'recommender'
+
+
+class EmailBanner(auth_model.TimeStampedModel):
+
+    key = models.CharField(max_length=500, unique=True)
+    data = JSONField(blank=True, null=True)
+    properties = GenericRelation('banner.RecommenderThrough', related_name="email_banners")
+
+    @classmethod
+    def get_banner(cls, appointment=None, notification_type=None):
+
+        qs = RecommenderThrough.objects.select_related('recommender')\
+                                       .filter(content_type_id=ContentType.objects.get_for_model(cls))
+
+        if appointment and appointment.payment_type:
+            qs = qs.filter(recommender__payment_type__contains=appointment.payment_type)
+
+        if notification_type:
+            qs = qs.filter(recommender__notification_type__contains=notification_type)
+
+        if appointment and appointment.deal_price:
+            deal_price = appointment.deal_price
+            qs = qs.filter(Q(recommender__item_min_price__isnull=True) | Q(recommender__item_min_price__lte=deal_price))
+            qs = qs.filter(Q(recommender__item_max_price__isnull=True) | Q(recommender__item_max_price__gte=deal_price))
+
+        banner = None
+        through_row = qs.first()
+        if through_row:
+            banner = through_row.content_object
+            banner = banner.data['html_code']
+
+        return banner
+
+
+    # def save(self, force_insert=False, force_update=False, using=None,
+    #          update_fields=None):
+    #     app = OpdAppointment.objects.first()
+    #     EmailBanner.get_banner(app, 1)
+
+    def __str__(self):
+        return self.key
+
+    class Meta:
+        db_table = 'email_banner'
 
 
 class Banner(auth_model.TimeStampedModel):
