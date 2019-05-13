@@ -11,7 +11,7 @@ from dateutil.relativedelta import relativedelta
 
 class NodeJsSmsBackend(object):
 
-    def send(self, message, phone_no, retry_send=False):
+    def send(self, message, phone_no, retry_send=False, otp=None):
         from requests.utils import quote
         payload = {
             "type": "sms",
@@ -22,6 +22,24 @@ class NodeJsSmsBackend(object):
             }
         }
         publish_message(json.dumps(payload))
+
+        if otp and phone_no:
+            whatsapp_message = {"media": {},
+                                "message": "",
+                                "template": {
+                                    "name": "docprime_otp_verification",
+                                    "params": [otp]
+                                },
+                                "message_type": "HSM",
+                                "phone_number": phone_no
+                                }
+
+            whatsapp_payload = {
+                "data": whatsapp_message,
+                "type": "social_message"
+            }
+
+            publish_message(json.dumps(whatsapp_payload))
 
 
 class BaseSmsBackend(NodeJsSmsBackend):
@@ -51,7 +69,8 @@ class SmsBackend(BaseSmsBackend):
 
     def send_otp(self, message, phone_no, retry_send=False):
 
-        message = create_otp(phone_no, message)
+        data = create_otp(phone_no, message)
+        message = data['message']
         return self.send(message, phone_no, retry_send)
 
 class ConsoleSmsBackend(BaseSmsBackend):
@@ -63,7 +82,8 @@ class ConsoleSmsBackend(BaseSmsBackend):
 
     def send_otp(self, message, phone_no, retry_send=False):
 
-        message = create_otp(phone_no, message)
+        data = create_otp(phone_no, message)
+        message = data['message']
         self.print(message)
         return True
 
@@ -78,7 +98,8 @@ class WhitelistedSmsBackend(BaseSmsBackend):
 
     def send_otp(self, message, phone_no, retry_send=False):
 
-        message = create_otp(phone_no, message)
+        data = create_otp(phone_no, message)
+        message = data['message']
         if self.is_number_whitelisted(phone_no):
             return self.send(message, phone_no, retry_send)
         else:
