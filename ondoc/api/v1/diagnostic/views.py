@@ -3,7 +3,7 @@ from copy import deepcopy
 from itertools import groupby
 from pyodbc import Date
 
-from ondoc.api.v1.diagnostic.serializers import CustomLabTestPackageSerializer
+from ondoc.api.v1.diagnostic.serializers import CustomLabTestPackageSerializer, SearchLabListSerializer
 from ondoc.api.v1.doctor.serializers import CommaSepratedToListField
 from ondoc.authentication.backends import JWTAuthentication
 from ondoc.api.v1.diagnostic import serializers as diagnostic_serializer
@@ -1350,43 +1350,36 @@ class LabList(viewsets.ReadOnlyModelViewSet):
         lab_timing_join = ""
 
         if availability:
+            aval_query = ""
             today = Date.today().weekday()
             currentDT = datetime.datetime.now()
             today_time = currentDT.strftime("%H.%M")
             avail_days = max(map(int, availability))
-            days = list()
-            if avail_days == serializers.SearchLabListSerializer.TODAY:
-                days.append(today)
-            elif avail_days == serializers.SearchLabListSerializer.TOMORROW:
-                days.append(today)
-                days.append(0 if today == 6 else today + 1)
-            elif avail_days == serializers.SearchLabListSerializer.NEXT_3_DAYS:
-                days.append(today)
-                for day in range(3):
+
+            if avail_days in (SearchLabListSerializer.TODAY, SearchLabListSerializer.TOMORROW, SearchLabListSerializer.NEXT_3_DAYS):
+                aval_query += ' (lbt.day = (%(today)s) and  lbt."end"<= (%(today_time)s)) '
+                filtering_params['today'] = today
+                filtering_params['today_time'] = today_time
+
+            if avail_days == serializers.SearchLabListSerializer.TOMORROW:
+                aval_query += ' or lbt.day = (%(tomorrow)s) '
+                filtering_params['tomorrow'] = (0 if today == 6 else today + 1)
+
+            if avail_days == serializers.SearchLabListSerializer.NEXT_3_DAYS:
+                for day in range(1, 4):
                     if today == 6:
-                        days.append(0)
                         today = 0
+                        aval_query += ' or lbt.day =' + '%(' + 'next_day' + str(day) + ')s'
+                        filtering_params['next_day' + str(day)] = today
+
                     else:
                         today += 1
-                        days.append(today)
+                        aval_query += ' or lbt.day =' + '%(' + 'next_day' + str(day) + ')s'
+                        filtering_params['next_day' + str(day)] = today
 
             lab_timing_join = " inner join lab_timing lbt on lbt.lab_id = lb.id "
 
-            counter = 1
-            if len(days) > 0:
-                lab_days_str = ' lbt.day IN ( '
-                for day in days:
-                    if not counter == 1:
-                        lab_days_str += ','
-                    lab_days_str = lab_days_str + '%(' + 'lab_day' + str(counter) + ')s'
-                    filtering_params['lab_day' + str(counter)] = day
-                    counter += 1
-                filtering_query.append(
-                    lab_days_str + ')'
-                )
-                filtering_query.append(' (case when lbt.day = (%(today)s) then lbt."end"<= (%(today_time)s) end ) ')
-                filtering_params['today'] = Date.today().weekday()
-                filtering_params['today_time'] = today_time
+        filtering_query.append(aval_query)
 
         if min_price:
             group_filter.append("price>=(%(min_price)s)")
