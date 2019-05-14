@@ -644,24 +644,16 @@ class InsuranceEndorsementViewSet(viewsets.GenericViewSet):
                     res['error'] = "Document required for member {}".format(member.get('first_name'))
                     return Response(data=res, status=status.HTTP_400_BAD_REQUEST)
 
-                if not member.get('front_image_id') and not member.get('back_image_id'):
-                    res['error'] = "Document Ids missing for member!!"
-                    return Response(data=res, status=status.HTTP_400_BAD_REQUEST)
-
-                document_ids = [member.get('front_image_id'), member.get('back_image_id')]
-                document_serializer = serializers.InsuredMemberDocumentIdsSerializer(data=document_ids, many=True)
-                document_serializer.is_valid(raise_exception=True)
-
-                del member['is_change']
-                del member['member_type']
                 member['insurance_id'] = insurance_obj.id
                 member['member_id'] = insured_member_obj.id
+                document_ids = [member.get('front_image_id').id, member.get('back_image_id').id]
 
-                EndorsementRequest.objects.create(**member)
-                for document in document_ids:
-                    member_document_obj = InsuredMemberDocument.objects.filter(id=document).first()
-                    member_document_obj.is_enabled = True
-                    member_document_obj.save()
+                end_obj = EndorsementRequest.create(member)
+                member_documents = InsuredMemberDocument.objects.filter(id__in=document_ids)
+                for document in member_documents:
+                    document.is_enabled = True
+                    document.endorsement_request = end_obj
+                    document.save()
 
                 res['success'] = 'Request for endorsement have been consider,' \
                                  'will update once insurer verified the details'
@@ -669,18 +661,13 @@ class InsuranceEndorsementViewSet(viewsets.GenericViewSet):
 
     def upload(self, request, *args, **kwargs):
         data = dict()
+        document_data = {}
         member = request.query_params.get('member')
-        # type = request.query_params.get('type')
         data['member'] = member
-        data['document_image'] = request.data
-        # if type == "front":
-        #     data['document_first_image'] = request.data['document_first_image']
-        # elif type == "back":
-        #     data['document_second_image'] = request.data['document_second_image']
+        data['document_image'] = request.data['document_image']
         serializer = serializers.UploadMemberDocumentSerializer(data=data, context={'request':request})
         serializer.is_valid(raise_exception=True)
         doc_obj = serializer.save()
-        document_data = {}
         document_data['id'] = doc_obj.id
         document_data['data'] = serializer.data
         return Response(document_data)

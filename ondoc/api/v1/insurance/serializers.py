@@ -75,6 +75,10 @@ class MemberListSerializer(serializers.Serializer):
     district_code = serializers.IntegerField(allow_null=True)
     is_change = serializers.BooleanField(required=False)
     id = serializers.IntegerField(required=False)
+    front_image_id = serializers.PrimaryKeyRelatedField(queryset=InsuredMemberDocument.objects.all(),
+                                                        required=False)
+    back_image_id = serializers.PrimaryKeyRelatedField(queryset=InsuredMemberDocument.objects.all(),
+                                                        required=False)
 
     def validate(self, attrs):
         request = self.context.get("request")
@@ -220,9 +224,7 @@ class StateGSTCodeSerializer(serializers.ModelSerializer):
 
 
 class UploadMemberDocumentSerializer(serializers.ModelSerializer):
-    document_image = serializers.ImageField(max_length=None, use_url=True, allow_empty_file=True, required=False)
-    # document_second_image = serializers.ImageField(max_length=None, use_url=True, allow_empty_file=True, required=False)
-
+    # document_image = serializers.ImageField(max_length=None, use_url=True)
     class Meta:
         model = InsuredMemberDocument
         fields = ('document_image', 'member')

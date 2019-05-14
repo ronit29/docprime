@@ -1355,8 +1355,7 @@ class InsuredMembers(auth_model.TimeStampedModel):
                                                                         )
 
     def is_document_available(self):
-        document_obj = InsuredMemberDocument.objects.filter(member=self, document_first_image__isnull=False,
-                                                            document_second_image__isnull=False).first()
+        document_obj = InsuredMemberDocument.objects.filter(member=self, document_image__isnull=False).first()
         if document_obj:
             return True
         else:
@@ -1555,6 +1554,15 @@ class EndorsementRequest(auth_model.TimeStampedModel):
             return True
         else:
             return False
+
+    @classmethod
+    def create(cls, endorsed_member):
+        del endorsed_member['is_change']
+        del endorsed_member['member_type']
+        del endorsed_member['front_image_id']
+        del endorsed_member['back_image_id']
+        end_obj = EndorsementRequest.objects.create(**endorsed_member)
+        return end_obj
 
     class Meta:
         db_table = 'insurance_endorsement'
