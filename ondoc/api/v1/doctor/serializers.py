@@ -1861,14 +1861,17 @@ class HospitalDetailIpdProcedureSerializer(TopHospitalForIpdProcedureSerializer)
                                                                      )
 
     def get_specialization_doctors(self, obj):
+        validated_data = self.context.get('validated_data')
+        specialization_ids = validated_data.get('specialization_ids')
+        if not specialization_ids:
+            return None
         from ondoc.api.v1.doctor.views import DoctorListViewSet
         request = self.context.get('request')
-        validated_data = self.context.get('validated_data')
         spec_doctors_list_viewset = DoctorListViewSet()
         return spec_doctors_list_viewset.list(request,
                                         parameters={'hospital_id': str(obj.id), 'longitude': validated_data.get('long'),
                                                     'latitude': validated_data.get('lat'), 'sort_on': 'experience',
-                                                    'restrict_result_count': 3, 'specialization_ids' : validated_data.get('specialization_ids')}).data
+                                                    'restrict_result_count': 3, 'specialization_ids' : specialization_ids}).data
     def get_about(self, obj):
         if obj.network:
             return obj.network.about

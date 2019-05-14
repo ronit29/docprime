@@ -1385,7 +1385,6 @@ class DoctorListViewSet(viewsets.GenericViewSet):
         parameters = request.query_params
         if kwargs.get("parameters"):
             parameters = kwargs.get("parameters")
-
         restrict_result_count = parameters.get('restrict_result_count', None)
         serializer = serializers.DoctorListSerializer(data=parameters, context={"request": request})
         serializer.is_valid(raise_exception=True)
@@ -3811,15 +3810,13 @@ class HospitalViewSet(viewsets.GenericViewSet):
                 else:
                     return Response(status=status.HTTP_404_NOT_FOUND)
 
-            specialization_ids = request.GET.get('specialization_ids')
-
             # entity_id = entity.entity_id
-            response = self.retrive(request, entity.entity_id, entity, specialization_ids)
+            response = self.retrive(request, entity.entity_id, entity)
             return response
         else:
             return Response(status=status.HTTP_404_NOT_FOUND)
 
-    def retrive(self, request, pk, entity=None, specialization_ids=None):
+    def retrive(self, request, pk, entity=None):
         serializer = serializers.HospitalDetailRequestSerializer(data=request.query_params)
         serializer.is_valid(raise_exception=True)
         validated_data = serializer.validated_data
@@ -3849,7 +3846,7 @@ class HospitalViewSet(viewsets.GenericViewSet):
 
         hosp_serializer = serializers.HospitalDetailIpdProcedureSerializer(hospital_obj, context={'request': request,
                                                                                     'validated_data': validated_data,
-                                                                                    "entity": entity, 'specialization_ids': specialization_ids}).data
+                                                                                    "entity": entity}).data
         response = hosp_serializer
         if entity:
             response['url'] = entity.url
@@ -3979,7 +3976,6 @@ class IpdProcedureViewSet(viewsets.GenericViewSet):
                                                                       'sort_on': 'experience',
                                                                       'city': city,
                                                                       'restrict_result_count': 3})
-
         doctor_result_data = doctor_result.data
         ipd_procedure_serializer = serializers.IpdProcedureDetailSerializer(ipd_procedure, context={'request': request,
                                                                                                     'similar_ipds_entity_dict': similar_ipds_entity_dict,
