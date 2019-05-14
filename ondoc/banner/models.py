@@ -108,10 +108,10 @@ class EmailBanner(auth_model.TimeStampedModel):
         return html
 
 
-    def save(self, force_insert=False, force_update=False, using=None,
-             update_fields=None):
-        app = OpdAppointment.objects.first()
-        EmailBanner.get_banner(app, 1)
+    # def save(self, force_insert=False, force_update=False, using=None,
+    #          update_fields=None):
+    #     app = OpdAppointment.objects.first()
+    #     EmailBanner.get_banner(app, 1)
 
     def __str__(self):
         return self.key
