@@ -387,7 +387,7 @@ class ApplicableCouponsViewSet(viewsets.GenericViewSet):
                                        "invalidating_message": coupon_property.get('invalidating_message', ''),
                                        "coupon_type": coupon.type,
                                        "coupon_id": coupon.id,
-                                       "code": coupon_property.get('random_coupon_code', coupon.code),
+                                       "code": coupon_property.get('random_coupon_code', False) or coupon.code,
                                        "desc": coupon.description,
                                        "coupon_count": coupon.count,
                                        "used_count": coupon_property.get('used_count', 0),
