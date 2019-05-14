@@ -663,6 +663,9 @@ class InsuranceEndorsementViewSet(viewsets.GenericViewSet):
             data['document_second_image'] = request.data['document_second_image']
         serializer = serializers.UploadMemberDocumentSerializer(data=data, context={'request':request})
         serializer.is_valid(raise_exception=True)
-        serializer.save()
-        return Response(serializer.data)
+        doc_obj = serializer.save()
+        document_data ={}
+        document_data['id'] = doc_obj.id
+        document_data['data'] = serializer.data
+        return Response(document_data)
 
