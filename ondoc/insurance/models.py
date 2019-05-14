@@ -901,7 +901,6 @@ class UserInsurance(auth_model.TimeStampedModel):
             # member['profile'] = member['profile'].id if member.get('profile') else None
         insurance_data['insured_members'] = members
 
-
         user_insurance_obj = UserInsurance.objects.create(insurance_plan=insurance_data['insurance_plan'],
                                                             user=insurance_data['user'],
                                                             insured_members=json.dumps(insurance_data['insured_members']),
@@ -910,6 +909,7 @@ class UserInsurance(auth_model.TimeStampedModel):
                                                             premium_amount=insurance_data['premium_amount'],
                                                             order=insurance_data['order'],
                                                             policy_number=generate_insurance_insurer_policy_number(insurer_id))
+
         insured_members = InsuredMembers.create_insured_members(user_insurance_obj)
         return user_insurance_obj
 
@@ -1309,10 +1309,10 @@ class InsuredMembers(auth_model.TimeStampedModel):
     town = models.CharField(max_length=100, null=False)
     district = models.CharField(max_length=100, null=False)
     state = models.CharField(max_length=100, null=False)
-    state_code = models.CharField(max_length=10, null=True)
+    state_code = models.CharField(max_length=10, default='')
     user_insurance = models.ForeignKey(UserInsurance, related_name="members", on_delete=models.DO_NOTHING, null=False)
-    city_code = models.IntegerField(null=True, default=None)
-    district_code = models.IntegerField(null=True, default=None)
+    city_code = models.CharField(max_length=10, blank=True, null=True, default='')
+    district_code = models.CharField(max_length=10, blank=True, null=True, default='')
 
     class Meta:
         db_table = "insured_members"
@@ -1360,6 +1360,10 @@ class InsuredMembers(auth_model.TimeStampedModel):
             return True
         else:
             return False
+
+    def update_member(self, endorsed_data):
+        self.first_name = endorsed_data.first_name
+        self.save()
 
 
 class Insurance(auth_model.TimeStampedModel):
@@ -1542,10 +1546,10 @@ class EndorsementRequest(auth_model.TimeStampedModel):
     town = models.CharField(max_length=100, null=False)
     district = models.CharField(max_length=100, null=False)
     state = models.CharField(max_length=100, null=False)
-    state_code = models.CharField(max_length=10, null=True)
+    state_code = models.CharField(max_length=10, default='')
     status = models.PositiveIntegerField(choices=STATUS_CHOICES, default=PENDING)
-    city_code = models.PositiveIntegerField(null=True, default=None)
-    district_code = models.PositiveIntegerField(null=True, default=None)
+    city_code = models.CharField(max_length=10, default='')
+    district_code = models.CharField(max_length=10, default='')
 
     @classmethod
     def is_endorsement_exist(cls, member_obj):
@@ -1563,6 +1567,17 @@ class EndorsementRequest(auth_model.TimeStampedModel):
         del endorsed_member['back_image_id']
         end_obj = EndorsementRequest.objects.create(**endorsed_member)
         return end_obj
+
+    def process_endorsement(self):
+        member = self.member
+        profile = member.profile
+        profile.gender = self.gender
+        profile.name = self.first_name + " " + self.middle_name + " " + self.last_name
+        profile.dob = self.dob
+        profile.email = self.email
+        profile.save()
+        member.update_member(self.instance)
+
 
     class Meta:
         db_table = 'insurance_endorsement'

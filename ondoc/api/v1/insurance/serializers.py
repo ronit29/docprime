@@ -71,8 +71,8 @@ class MemberListSerializer(serializers.Serializer):
     district = serializers.CharField(max_length=100)
     state = serializers.CharField(max_length=100)
     state_code = serializers.CharField(max_length=10)
-    city_code = serializers.IntegerField(allow_null=True)
-    district_code = serializers.IntegerField(allow_null=True)
+    city_code = serializers.CharField(allow_null=True, allow_blank=True, required=False)
+    district_code = serializers.CharField(allow_null=True, allow_blank=True, required=False)
     is_change = serializers.BooleanField(required=False)
     id = serializers.IntegerField(required=False)
     front_image_id = serializers.PrimaryKeyRelatedField(queryset=InsuredMemberDocument.objects.all(),
@@ -143,8 +143,8 @@ class MemberSerializer(serializers.ModelSerializer):
     district = serializers.ReadOnlyField()
     state = serializers.ReadOnlyField()
     state_code = serializers.ReadOnlyField()
-    city_code = serializers.ReadOnlyField(allow_null=True)
-    district_code = serializers.ReadOnlyField(allow_null=True)
+    city_code = serializers.ReadOnlyField(allow_null=True, required=False)
+    district_code = serializers.ReadOnlyField(allow_null=True, required=False)
 
     class Meta:
         model = InsuredMembers
