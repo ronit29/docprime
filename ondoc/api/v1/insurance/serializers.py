@@ -220,12 +220,12 @@ class StateGSTCodeSerializer(serializers.ModelSerializer):
 
 
 class UploadMemberDocumentSerializer(serializers.ModelSerializer):
-    document_first_image = serializers.ImageField(max_length=None, use_url=True, allow_empty_file=True, required=False)
-    document_second_image = serializers.ImageField(max_length=None, use_url=True, allow_empty_file=True, required=False)
+    document_image = serializers.ImageField(max_length=None, use_url=True, allow_empty_file=True, required=False)
+    # document_second_image = serializers.ImageField(max_length=None, use_url=True, allow_empty_file=True, required=False)
 
     class Meta:
         model = InsuredMemberDocument
-        fields = ('document_first_image', 'document_second_image', 'member')
+        fields = ('document_image', 'member')
 
 
 class InsuredMemberDocumentIdsSerializer(serializers.Serializer):

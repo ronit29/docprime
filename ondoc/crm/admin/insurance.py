@@ -1003,3 +1003,11 @@ class InsuranceCancelMasterAdmin(admin.ModelAdmin):
 
 class EndorsementRequestAdmin(admin.ModelAdmin):
     list_display = ['member']
+    readonly_fields = ['first_name', 'last_name', 'dob', 'email', 'address', 'pincode', 'gender', 'phone_number',
+                       'relation', 'profile']
+
+    def has_add_permission(self, request, obj=None):
+        return False
+
+    def has_delete_permission(self, request, obj=None):
+        return False

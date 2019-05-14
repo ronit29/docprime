@@ -1562,9 +1562,10 @@ class EndorsementRequest(auth_model.TimeStampedModel):
 
 class InsuredMemberDocument(auth_model.TimeStampedModel):
     member = models.ForeignKey(InsuredMembers, related_name='related_document', on_delete=models.DO_NOTHING)
-    document_first_image = models.ImageField(upload_to='users/images', height_field=None, width_field=None, blank=True, null=True)
-    document_second_image = models.ImageField(upload_to='users/images', height_field=None, width_field=None, blank=True, null=True)
+    document_image = models.ImageField(upload_to='users/images', height_field=None, width_field=None, blank=True, null=True)
+    # document_second_image = models.ImageField(upload_to='users/images', height_field=None, width_field=None, blank=True, null=True)
     is_enabled = models.BooleanField(default=False)
+    endorsement_request = models.ForeignKey(EndorsementRequest, related_name='member_documents', null=True, on_delete=models.DO_NOTHING)
 
     class Meta:
         db_table = 'insured_member_document'
