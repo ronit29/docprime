@@ -3086,6 +3086,7 @@ class OfflineCustomerViewSet(viewsets.GenericViewSet):
         if data.get('share_with_hospital') and not hospital:
             logger.error('PROVIDER_REQUEST - Hospital Not Given when Shared with Hospital Set'+ str(data))
         hosp = hospital if data.get('share_with_hospital') and hospital else None
+        encrypt_number = None
         if hosp and hosp.provider_encrypt:
             encrypt_number = data.get('encrypt_number')
         patient = models.OfflinePatients.objects.filter(id=data.get('id')).first()
