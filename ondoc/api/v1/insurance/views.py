@@ -21,7 +21,7 @@ from ondoc.doctor import models as doctor_models
 from ondoc.insurance.models import (Insurer, InsuredMembers, InsuranceThreshold, InsurancePlans, UserInsurance, InsuranceLead,
                                     InsuranceTransaction, InsuranceDisease, InsuranceDiseaseResponse, StateGSTCode,
                                     InsuranceDummyData, InsuranceCancelMaster, InsuranceCity, InsuranceDistrict,
-                                    EndorsementRequest)
+                                    EndorsementRequest, InsuredMemberDocument)
 from ondoc.authentication.models import UserProfile
 from ondoc.authentication.backends import JWTAuthentication
 from ondoc.api.v1.utils import RawSql
@@ -598,6 +598,7 @@ class InsuranceEndorsementViewSet(viewsets.GenericViewSet):
         res['members'] = members_data
         return Response(data=res, status=status.HTTP_200_OK)
 
+    @transaction.atomic()
     def create(self, request):
         user = request.user
         res = {}
@@ -628,7 +629,7 @@ class InsuranceEndorsementViewSet(viewsets.GenericViewSet):
             endorsement_request = EndorsementRequest.is_endorsement_exist(insured_member_obj)
             if endorsement_request:
                 res['error'] = "Endorsement request already in process for member {}!!".format(member.get('first_name'))
-                return Response(data=res, status=status.HTTP_400_BAD_REQUEST)
+                return Response(data=res, status=status.HTTP_200_OK)
 
             insurance_obj = insured_member_obj.user_insurance
             if not insurance_obj:
@@ -643,11 +644,25 @@ class InsuranceEndorsementViewSet(viewsets.GenericViewSet):
                     res['error'] = "Document required for member {}".format(member.get('first_name'))
                     return Response(data=res, status=status.HTTP_400_BAD_REQUEST)
 
+                if not member.get('front_image_id') and not member.get('back_image_id'):
+                    res['error'] = "Document Ids missing for member!!"
+                    return Response(data=res, status=status.HTTP_400_BAD_REQUEST)
+
+                document_ids = [member.get('front_image_id'), member.get('back_image_id')]
+                document_serializer = serializers.InsuredMemberDocumentIdsSerializer(data=document_ids, many=True)
+                document_serializer.is_valid(raise_exception=True)
+
                 del member['is_change']
                 del member['member_type']
                 member['insurance_id'] = insurance_obj.id
                 member['member_id'] = insured_member_obj.id
+
                 EndorsementRequest.objects.create(**member)
+                for document in document_ids:
+                    member_document_obj = InsuredMemberDocument.objects.filter(id=document).first()
+                    member_document_obj.is_enabled = True
+                    member_document_obj.save()
+
                 res['success'] = 'Request for endorsement have been consider,' \
                                  'will update once insurer verified the details'
                 return Response(data=res, status=status.HTTP_200_OK)
@@ -655,16 +670,17 @@ class InsuranceEndorsementViewSet(viewsets.GenericViewSet):
     def upload(self, request, *args, **kwargs):
         data = dict()
         member = request.query_params.get('member')
-        type = request.query_params.get('type')
+        # type = request.query_params.get('type')
         data['member'] = member
-        if type == "front":
-            data['document_first_image'] = request.data['document_first_image']
-        elif type == "back":
-            data['document_second_image'] = request.data['document_second_image']
+        data['document_image'] = request.data
+        # if type == "front":
+        #     data['document_first_image'] = request.data['document_first_image']
+        # elif type == "back":
+        #     data['document_second_image'] = request.data['document_second_image']
         serializer = serializers.UploadMemberDocumentSerializer(data=data, context={'request':request})
         serializer.is_valid(raise_exception=True)
         doc_obj = serializer.save()
-        document_data ={}
+        document_data = {}
         document_data['id'] = doc_obj.id
         document_data['data'] = serializer.data
         return Response(document_data)

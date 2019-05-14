@@ -226,3 +226,7 @@ class UploadMemberDocumentSerializer(serializers.ModelSerializer):
     class Meta:
         model = InsuredMemberDocument
         fields = ('document_first_image', 'document_second_image', 'member')
+
+
+class InsuredMemberDocumentIdsSerializer(serializers.Serializer):
+    id = serializers.PrimaryKeyRelatedField(queryset=UserInsurance.objects.all())
