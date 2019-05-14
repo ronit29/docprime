@@ -1660,7 +1660,8 @@ class LabList(viewsets.ReadOnlyModelViewSet):
             test__searchable=True)
 
         total_test_count = queryset.count() if queryset else 0
-        queryset = queryset.filter(test__in=test_ids)
+        if test_ids:
+            queryset = queryset.filter(test__in=test_ids)
 
         test_serializer = diagnostic_serializer.AvailableLabTestPackageSerializer(queryset, many=True,
                                                                            context={"lab": lab_obj, "request": request, "package_free_or_not_dict": package_free_or_not_dict})
