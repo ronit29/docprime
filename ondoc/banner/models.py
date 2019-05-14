@@ -1,6 +1,7 @@
 from django.contrib.gis.db import models
 from django.contrib.gis.geos import Point
 from django.contrib.postgres.fields import JSONField
+from django.utils.safestring import mark_safe
 
 from ondoc.authentication import models as auth_model
 from django.conf import settings
@@ -56,6 +57,9 @@ class EmailBanner(auth_model.TimeStampedModel):
     key = models.CharField(max_length=500, unique=True)
     data = JSONField(blank=True, null=True)
     properties = GenericRelation('banner.RecommenderThrough', related_name="email_banners")
+    enable_login = models.BooleanField(default=False)
+    banner_image = models.FileField(upload_to="banner/email_banner", null=True, blank=True)
+    banner_url = models.CharField(max_length=1000, blank=True, null=True)
 
     @classmethod
     def get_banner(cls, appointment=None, notification_type=None):
@@ -78,15 +82,36 @@ class EmailBanner(auth_model.TimeStampedModel):
         through_row = qs.first()
         if through_row:
             banner = through_row.content_object
-            banner = banner.data['html_code']
+            banner = banner.build_banner_html(appointment.user)
 
         return banner
 
+    def build_banner_html(self, user=None):
+        from ondoc.authentication.models import AgentToken
 
-    # def save(self, force_insert=False, force_update=False, using=None,
-    #          update_fields=None):
-    #     app = OpdAppointment.objects.first()
-    #     EmailBanner.get_banner(app, 1)
+        href = self.banner_url
+        src = ""
+
+        if self.banner_image and self.banner_image.url:
+            src = self.banner_image.url
+
+        if self.enable_login and user and href:
+            token = AgentToken.objects.create_token(user)
+            href += "&access_token=" + str(token.token)
+
+        if not href or not src:
+            return None
+
+        html = ''''<tr><td><table cellpadding="0" cellspacing="0" style="width: 100%; padding: 10px 15px;"><tbody><tr><td style="width: 0%; text-align: center;"><a href="{}" target="_blank"><img src="{}"></a></td></tr></tbody></table></td></tr>'''.format(href, src)
+        html = mark_safe(html)
+
+        return html
+
+
+    def save(self, force_insert=False, force_update=False, using=None,
+             update_fields=None):
+        app = OpdAppointment.objects.first()
+        EmailBanner.get_banner(app, 1)
 
     def __str__(self):
         return self.key
