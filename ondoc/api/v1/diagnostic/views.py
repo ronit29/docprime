@@ -1350,15 +1350,14 @@ class LabList(viewsets.ReadOnlyModelViewSet):
         lab_timing_join = ""
 
         if availability:
-            from pytz import timezone
-            aval_query = ""
             today = Date.today().weekday()
-            currentDT = datetime.datetime.now(timezone('Asia/Kolkata'))
+            aval_query = ""
+            currentDT = timezone.now()
             today_time = currentDT.strftime("%H.%M")
             avail_days = max(map(int, availability))
 
             if avail_days in (SearchLabListSerializer.TODAY, SearchLabListSerializer.TOMORROW, SearchLabListSerializer.NEXT_3_DAYS):
-                aval_query += ' (lbt.day = (%(today)s) and  lbt."end"<= (%(today_time)s)) '
+                aval_query += ' (lbt.day = (%(today)s) and  (%(today_time)s)<= lbt."end" ) '
                 filtering_params['today'] = today
                 filtering_params['today_time'] = today_time
 
@@ -1380,7 +1379,7 @@ class LabList(viewsets.ReadOnlyModelViewSet):
 
             lab_timing_join = " inner join lab_timing lbt on lbt.lab_id = lb.id "
 
-        filtering_query.append(aval_query)
+            filtering_query.append(aval_query)
 
         if min_price:
             group_filter.append("price>=(%(min_price)s)")

@@ -2,8 +2,7 @@ import operator
 from pyodbc import Date
 
 from django.contrib.gis.geos import Point
-from django.db.models import F
-from pytz import timezone
+from django.utils import timezone
 
 from ondoc.api.v1.doctor.serializers import DoctorProfileUserViewSerializer
 from ondoc.api.v1.procedure.serializers import DoctorClinicProcedureSerializer
@@ -167,11 +166,11 @@ class DoctorSearchHelper:
             aval_query = ""
             availability = self.query_params.get('availability')
             today = Date.today().weekday()
-            currentDT = datetime.now(timezone('Asia/Kolkata'))
+            currentDT = timezone.now()
             today_time = currentDT.strftime("%H.%M")
             avail_days = max(map(int, availability))
             if avail_days in (DoctorListSerializer.TODAY, DoctorListSerializer.TOMORROW, DoctorListSerializer.NEXT_3_DAYS):
-                aval_query += ' (dct.day = (%(today)s) and  dct."end"<= (%(today_time)s)) '
+                aval_query += ' (dct.day = (%(today)s) and  (%(today_time)s) <= dct."end" ) '
                 params['today'] = today
                 params['today_time'] = today_time
 
