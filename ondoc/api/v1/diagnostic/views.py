@@ -1351,7 +1351,7 @@ class LabList(viewsets.ReadOnlyModelViewSet):
 
         if availability:
             today = Date.today().weekday()
-            aval_query = ""
+            aval_query = "( "
             currentDT = timezone.now()
             today_time = currentDT.strftime("%H.%M")
             avail_days = max(map(int, availability))
@@ -1379,7 +1379,7 @@ class LabList(viewsets.ReadOnlyModelViewSet):
 
             lab_timing_join = " inner join lab_timing lbt on lbt.lab_id = lb.id "
 
-            filtering_query.append(aval_query)
+            filtering_query.append(aval_query + ')')
 
         if min_price:
             group_filter.append("price>=(%(min_price)s)")

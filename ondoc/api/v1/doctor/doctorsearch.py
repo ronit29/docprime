@@ -163,7 +163,7 @@ class DoctorSearchHelper:
             params['current_hour'] = str(current_hour)
 
         if self.query_params.get('availability'):
-            aval_query = ""
+            aval_query = "( "
             availability = self.query_params.get('availability')
             today = Date.today().weekday()
             currentDT = timezone.now()
@@ -189,7 +189,7 @@ class DoctorSearchHelper:
                         aval_query += ' or dct.day =' +  '%(' + 'next_day' + str(day) + ')s'
                         params['next_day' + str(day)] = today
 
-            filtering_params.append(aval_query)
+            filtering_params.append(aval_query + ')')
 
         if self.query_params.get("doctor_name"):
             name = self.query_params.get("doctor_name").lower().strip()
