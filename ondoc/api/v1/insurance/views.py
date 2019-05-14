@@ -600,27 +600,44 @@ class InsuranceEndorsementViewSet(viewsets.GenericViewSet):
             res['error'] = "Active insurance not found for User"
             return Response(data=res, status=status.HTTP_400_BAD_REQUEST)
 
-        serializer = serializers.EndorseMemberSerializer(data=request.data, context={'request': request})
+        # appointment should not be completed in insurance mode for endorsement!!
+        opd_completed_appointments = OpdAppointment.get_insured_completed_appointment(user.active_insurance)
+        lab_completed_appointments = LabAppointment.get_insured_completed_appointment(user.active_insurance)
+        if opd_completed_appointments > 0 or lab_completed_appointments > 0:
+            res['error'] = "One of the OPD or LAB Appointment have been completed, could not process endorsement!!"
+            return Response(data=res, status=status.HTTP_400_BAD_REQUEST)
+
+        serializer = serializers.InsuredMemberSerializer(data=request.data, context={'request': request})
         if not serializer.is_valid() and serializer.errors:
             logger.error(str(serializer.errors))
-
         serializer.is_valid(raise_exception=True)
-        # return Response(data=res, status=status.HTTP_200_OK)
         valid_data = serializer.validated_data
+
         for member in valid_data.get('members'):
             insured_member_obj = InsuredMembers.objects.filter(id=member.get('id')).first()
             if not insured_member_obj:
                 res['error'] = "Insured Member details not found for member"
                 return Response(data=res, status=status.HTTP_400_BAD_REQUEST)
+
+            # endorsement could not process if already process and in Pending Status!!
+            endorsement_request = EndorsementRequest.is_endorsement_exist(insured_member_obj)
+            if endorsement_request:
+                res['error'] = "Endorsement request already in process for member {}!!".format(member.get('first_name'))
+                return Response(data=res, status=status.HTTP_400_BAD_REQUEST)
+
             insurance_obj = insured_member_obj.user_insurance
             if not insurance_obj:
                 res['error'] = "User Insurance not found for member {}".format(member.get('first_name'))
                 return Response(data=res, status=status.HTTP_400_BAD_REQUEST)
+
+            # endorsement only create when some changes in member details pushed with flag!!
             if member.get('is_change', None):
+                # if document uploaded then only creates endorsement
                 document = insured_member_obj.is_document_available()
                 if not document:
                     res['error'] = "Document required for member {}".format(member.get('first_name'))
                     return Response(data=res, status=status.HTTP_400_BAD_REQUEST)
+
                 del member['is_change']
                 del member['member_type']
                 member['insurance_id'] = insurance_obj.id

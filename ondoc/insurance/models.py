@@ -1548,6 +1548,14 @@ class EndorsementRequest(auth_model.TimeStampedModel):
     city_code = models.PositiveIntegerField(null=True, default=None)
     district_code = models.PositiveIntegerField(null=True, default=None)
 
+    @classmethod
+    def is_endorsement_exist(cls, member_obj):
+        endorsement_request = cls.objects.filter(member=member_obj, status=EndorsementRequest.PENDING).first()
+        if endorsement_request:
+            return True
+        else:
+            return False
+
     class Meta:
         db_table = 'insurance_endorsement'
 
