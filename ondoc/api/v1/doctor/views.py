@@ -1385,8 +1385,7 @@ class DoctorListViewSet(viewsets.GenericViewSet):
         parameters = request.query_params
         if kwargs.get("parameters"):
             parameters = kwargs.get("parameters")
-            if parameters.get('specialization_ids')==None:
-                parameters['specialization_ids'] = ''
+
         restrict_result_count = parameters.get('restrict_result_count', None)
         serializer = serializers.DoctorListSerializer(data=parameters, context={"request": request})
         serializer.is_valid(raise_exception=True)

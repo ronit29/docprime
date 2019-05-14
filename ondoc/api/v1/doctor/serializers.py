@@ -2057,7 +2057,7 @@ class IpdProcedureLeadSerializer(serializers.ModelSerializer):
 class HospitalDetailRequestSerializer(serializers.Serializer):
     long = serializers.FloatField(default=77.071848)
     lat = serializers.FloatField(default=28.450367)
-    specialization_ids = serializers.CharField(required=False, max_length=500)
+    specialization_ids = serializers.CharField(required=False, max_length=500, default='')
 
 
 class IpdDetailsRequestDetailRequestSerializer(serializers.Serializer):
