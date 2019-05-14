@@ -408,15 +408,16 @@ class CouponRecommender():
                                                                   .exclude(status__in=[LabAppointment.CANCELLED]),
                                                                            to_attr='user_lab_booked')
 
-        all_coupons = Coupon.objects.prefetch_related('user_specific_coupon', 'test', 'test_categories', 'hospitals',
-                                                      'doctors', 'specializations', 'procedures',
-                                                      'lab', 'test', total_opd_booked, user_opd_booked, total_lab_booked, user_lab_booked)\
-                                    .filter(type__in=types)
+        all_coupons = Coupon.objects.filter(type__in=types)
 
         if coupon_code:
             all_coupons = RandomGeneratedCoupon.get_coupons([coupon_code])
         else:
             all_coupons = all_coupons.filter(is_visible=True)
+
+        all_coupons = all_coupons.prefetch_related('user_specific_coupon', 'test', 'test_categories', 'hospitals',
+                                                  'doctors', 'specializations', 'procedures',
+                                                  'lab', 'test', total_opd_booked, user_opd_booked, total_lab_booked, user_lab_booked)
 
         if user and user.is_authenticated:
             all_coupons = all_coupons.filter(Q(is_user_specific=False) \
