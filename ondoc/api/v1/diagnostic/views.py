@@ -1376,11 +1376,13 @@ class LabList(viewsets.ReadOnlyModelViewSet):
                         ROW_NUMBER () OVER (ORDER BY {order} ) order_rank,
                         max_order_priority as order_priority
                         from (
-                        select lb.*, sum(mrp) total_mrp, count(*) as test_count,
+                        select max(lt.test_type) as test_type, lb.*, sum(mrp) total_mrp, count(*) as test_count,
                         case when bool_and(home_collection_possible)=True and is_home_collection_enabled=True 
                         then max(home_pickup_charges) else 0
                         end as pickup_charges,
                         sum(case when custom_deal_price is null then computed_deal_price else custom_deal_price end)as price,
+                        max(case when custom_agreed_price is null then computed_agreed_price else
+                        custom_agreed_price end) as agreed_price,
                         max(ST_Distance(location,St_setsrid(St_point((%(longitude)s), (%(latitude)s)), 4326))) as distance,
                         max(order_priority) as max_order_priority from lab lb inner join available_lab_test avlt on
                         lb.lab_pricing_group_id = avlt.lab_pricing_group_id 
@@ -1413,7 +1415,7 @@ class LabList(viewsets.ReadOnlyModelViewSet):
                     ROW_NUMBER () OVER (ORDER BY {order} ) order_rank,
                     max_order_priority as order_priority
                     from (
-                    select *,
+                    select  *,
                     max(ST_Distance(location,St_setsrid(St_point((%(longitude)s), (%(latitude)s)), 4326))) as distance,
                     max(order_priority) as max_order_priority
                     from lab lb where is_test_lab = False and is_live = True and lab_pricing_group_id is not null 
@@ -1431,7 +1433,7 @@ class LabList(viewsets.ReadOnlyModelViewSet):
 
     def apply_search_sort(self, parameters):
         if parameters.get('is_user_insured'):
-            return ' case when test_type = 1 then distance asc when test_type=2 then case when network_id=43 then -1 else network_id end , distance asc end '
+            return ' case when (test_type in (2,3)) then ((case when network_id=43 then -1 end) , agreed_price ) end, case when (test_type=1) then distance  end '
         order_by = parameters.get("sort_on")
         if order_by is not None:
             if order_by == "fees" and parameters.get('ids'):
