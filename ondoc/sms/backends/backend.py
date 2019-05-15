@@ -7,57 +7,29 @@ from ondoc.notification.rabbitmq_client import publish_message
 # from ondoc.notification.sqs_client import publish_message
 from django.utils import timezone
 from dateutil.relativedelta import relativedelta
-from ondoc.notification.models import WhtsappNotification, NotificationAction
 
 
 class NodeJsSmsBackend(object):
 
-    def send(self, message, phone_no, retry_send=False, otp=None, via_sms=True, via_whatsapp=False):
+    def send(self, message, phone_no, retry_send=False):
         from requests.utils import quote
-
-        if via_sms:
-            payload = {
-                "type": "sms",
-                "data": {
-                    "phone_number": phone_no,
-                    "content": quote(message),
-                    "retry": retry_send
-                }
+        payload = {
+            "type": "sms",
+            "data": {
+                "phone_number": phone_no,
+                "content": quote(message),
+                "retry": retry_send
             }
-            publish_message(json.dumps(payload))
-
-        if otp and phone_no and via_whatsapp:
-            whatsapp_message = {"media": {},
-                                "message": "",
-                                "template": {
-                                    "name": "docprime_otp_verification",
-                                    "params": [otp]
-                                },
-                                "message_type": "HSM",
-                                "phone_number": phone_no
-                                }
-
-            whatsapp_noti = WhtsappNotification.objects.create(
-                phone_number=phone_no,
-                notification_type=NotificationAction.LOGIN_OTP,
-                template_name='docprime_otp_verification',
-                payload=whatsapp_message
-            )
-
-            whatsapp_payload = {
-                "data": whatsapp_noti.payload,
-                "type": "social_message"
-            }
-
-            publish_message(json.dumps(whatsapp_payload))
+        }
+        publish_message(json.dumps(payload))
 
 
 class BaseSmsBackend(NodeJsSmsBackend):
 
-    def send(self, message, phone_no, retry_send=False, otp=None, via_sms=True, via_whatsapp=False):
+    def send(self, message, phone_no, retry_send=False):
         from requests.utils import quote
         if settings.SEND_THROUGH_NODEJS_ENABLED:
-            super().send(message, phone_no, retry_send, otp, via_sms, via_whatsapp)
+            super().send(message, phone_no, retry_send)
             return True
         payload = {'sender': 'DOCPRM', 'route': '4','authkey':settings.SMS_AUTH_KEY}
         payload['message'] = quote(message)
@@ -79,12 +51,8 @@ class SmsBackend(BaseSmsBackend):
 
     def send_otp(self, message, phone_no, retry_send=False, **kwargs):
         call_source = kwargs.get('call_source')
-        via_sms = kwargs.get('via_sms', True)
-        via_whatsapp = kwargs.get('via_whatsapp', False)
-        data = create_otp(phone_no, message, call_source=call_source)
-        message = data['message']
-        otp = data['otp']
-        return self.send(message, phone_no, retry_send, otp, via_sms, via_whatsapp)
+        message = create_otp(phone_no, message, call_source=call_source)
+        return self.send(message, phone_no, retry_send)
 
 class ConsoleSmsBackend(BaseSmsBackend):
 
@@ -96,9 +64,7 @@ class ConsoleSmsBackend(BaseSmsBackend):
     def send_otp(self, message, phone_no, retry_send=False, **kwargs):
 
         call_source = kwargs.get('call_source')
-        data = create_otp(phone_no, message, call_source=call_source)
-        message = data['message']
-        otp = data['otp']
+        message = create_otp(phone_no, message, call_source=call_source)
         self.print(message)
         return True
 
@@ -113,14 +79,10 @@ class WhitelistedSmsBackend(BaseSmsBackend):
 
     def send_otp(self, message, phone_no, retry_send=False, **kwargs):
 
-        via_sms = kwargs.get('via_sms', True)
-        via_whatsapp = kwargs.get('via_whatsapp', False)
         call_source = kwargs.get('call_source')
-        data = create_otp(phone_no, message, call_source=call_source)
-        message = data['message']
-        otp = data['otp']
+        message = create_otp(phone_no, message, call_source=call_source)
         if self.is_number_whitelisted(phone_no):
-            return self.send(message, phone_no, retry_send, otp, via_sms, via_whatsapp)
+            return self.send(message, phone_no, retry_send)
         else:
             return self.print(message)
 
@@ -132,6 +94,7 @@ class WhitelistedSmsBackend(BaseSmsBackend):
 
 def create_otp(phone_no, message, **kwargs):
     call_source = kwargs.get('call_source')
+    return_otp = kwargs.get('return_otp', False)
     otpEntry = (OtpVerifications.objects.filter(phone_number=phone_no, is_expired=False,
                                                 created_at__gte=timezone.now() - relativedelta(
                                                     minutes=OtpVerifications.OTP_EXPIRY_TIME)).first())
@@ -142,8 +105,9 @@ def create_otp(phone_no, message, **kwargs):
         otp = randint(100000,999999)
         otpEntry = OtpVerifications(phone_number=phone_no, code=otp, country_code="+91", otp_request_source=call_source)
         otpEntry.save()
+
+    if return_otp:
+        return otp
+
     message = message.format(str(otp))
-    data = {}
-    data['message'] = message
-    data['otp'] = otp
-    return data
+    return message
