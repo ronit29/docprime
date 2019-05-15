@@ -1259,7 +1259,7 @@ class SearchedItemsViewSet(viewsets.GenericViewSet):
         count = int(count)
         if count <= 0:
             count = 10
-        medical_conditions = models.CommonMedicalCondition.objects.select_related('condition').all().order_by(
+        medical_conditions = models.CommonMedicalCondition.objects.select_related('condition').prefetch_related('condition__specialization').all().order_by(
             "-priority")[:count]
         conditions_serializer = serializers.MedicalConditionSerializer(medical_conditions, many=True,
                                                                        context={'request': request})
