@@ -14,7 +14,6 @@ from ondoc.banner.models import Banner
 
 class BannerListViewSet(viewsets.GenericViewSet):
     authentication_classes = (JWTAuthentication,)
-    permission_classes = (IsAuthenticated,)
 
     def get_queryset(self):
         return None
