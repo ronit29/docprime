@@ -205,7 +205,7 @@ class DoctorSearchHelper:
             self.count_of_procedure = len(procedure_ids)
         return result
 
-    def get_ordering_params(self, insurance_data_dict):
+    def get_ordering_params(self):
         # order_by_field = 'is_gold desc, distance, dc.priority desc'
         # rank_by = "rank_distance=1"
         if self.query_params and self.query_params.get('doctor_name'):
@@ -217,7 +217,7 @@ class DoctorSearchHelper:
 
         bucket_size=2000
 
-        if insurance_data_dict and insurance_data_dict['is_user_insured']:
+        if self.query_params.get('is_user_insured'):
             return " floor(distance/{bucket_size}) ASC, fees ASC ".format(bucket_size=str(bucket_size)), "rnk=1"
 
         if self.count_of_procedure:

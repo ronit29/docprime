@@ -1439,11 +1439,12 @@ class DoctorListViewSet(viewsets.GenericViewSet):
                     insurance_data_dict['is_user_insured'] = True
 
         validated_data['insurance_threshold_amount'] = insurance_data_dict['insurance_threshold_amount']
+        validated_data['is_user_insured'] = insurance_data_dict['is_user_insured']
 
         doctor_search_helper = DoctorSearchHelper(validated_data)
         if not validated_data.get("search_id"):
             filtering_params = doctor_search_helper.get_filtering_params()
-            order_by_field, rank_by = doctor_search_helper.get_ordering_params(insurance_data_dict)
+            order_by_field, rank_by = doctor_search_helper.get_ordering_params()
             query_string = doctor_search_helper.prepare_raw_query(filtering_params,
                                                                   order_by_field, rank_by)
             doctor_search_result = RawSql(query_string.get('query'),

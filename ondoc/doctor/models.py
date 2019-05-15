@@ -1028,9 +1028,9 @@ class Doctor(auth_model.TimeStampedModel, auth_model.QCModel, SearchKey, auth_mo
         if len(dps) == 0:
             return False
 
-        for  d in dps:
+        for d in dps:
             if not d.specialization.is_insurance_enabled:
-                return false
+                return False
 
         # doctor_specializations = DoctorPracticeSpecialization.objects.filter(doctor=self).values_list('specialization_id', flat=True)
         # if not doctor_specializations:
