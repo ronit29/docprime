@@ -653,7 +653,7 @@ class InsuranceEndorsementViewSet(viewsets.GenericViewSet):
 
                 member['insurance_id'] = insurance_obj.id
                 member['member_id'] = insured_member_obj.id
-                document_ids = [member.get('front_image_id').id, member.get('back_image_id').id]
+                document_ids = member.get('image_ids')
 
                 end_obj = EndorsementRequest.create(member)
                 member_documents = InsuredMemberDocument.objects.filter(id__in=document_ids)

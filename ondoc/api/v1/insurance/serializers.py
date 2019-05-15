@@ -54,6 +54,10 @@ class InsurerSerializer(serializers.ModelSerializer):
         fields = ('id', 'name', 'min_float', 'logo', 'website', 'phone_number', 'email', 'plans', 'insurer_document')
 
 
+class InsuredMemberDocumentIdsSerializer(serializers.Serializer):
+    id = serializers.PrimaryKeyRelatedField(queryset=InsuredMemberDocument.objects.all())
+
+
 class MemberListSerializer(serializers.Serializer):
     title = serializers.ChoiceField(choices=InsuredMembers.TITLE_TYPE_CHOICES)
     first_name = serializers.CharField(max_length=50)
@@ -75,10 +79,12 @@ class MemberListSerializer(serializers.Serializer):
     district_code = serializers.CharField(allow_null=True, allow_blank=True, required=False)
     is_change = serializers.BooleanField(required=False)
     id = serializers.IntegerField(required=False)
-    front_image_id = serializers.PrimaryKeyRelatedField(queryset=InsuredMemberDocument.objects.all(),
-                                                        required=False)
-    back_image_id = serializers.PrimaryKeyRelatedField(queryset=InsuredMemberDocument.objects.all(),
-                                                        required=False)
+    images_ids = serializers.ListSerializer(child=InsuredMemberDocumentIdsSerializer(), required=False)
+    # image_ids = serializers.PrimaryKeyRelatedField(queryset=InsuredMemberDocument.objects.all(), required=False)
+    # front_image_id = serializers.PrimaryKeyRelatedField(queryset=InsuredMemberDocument.objects.all(),
+    #                                                     required=False)
+    # back_image_id = serializers.PrimaryKeyRelatedField(queryset=InsuredMemberDocument.objects.all(),
+    #                                                     required=False)
 
     def validate(self, attrs):
         request = self.context.get("request")
@@ -229,6 +235,3 @@ class UploadMemberDocumentSerializer(serializers.ModelSerializer):
         model = InsuredMemberDocument
         fields = ('document_image', 'member')
 
-
-class InsuredMemberDocumentIdsSerializer(serializers.Serializer):
-    id = serializers.PrimaryKeyRelatedField(queryset=UserInsurance.objects.all())

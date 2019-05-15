@@ -1565,6 +1565,7 @@ class EndorsementRequest(auth_model.TimeStampedModel):
     status = models.PositiveIntegerField(choices=STATUS_CHOICES, default=PENDING)
     city_code = models.CharField(max_length=10, default='')
     district_code = models.CharField(max_length=10, default='')
+    member_type = models.CharField(max_length=20, choices=MEMBER_TYPE_CHOICES, default=ADULT)
 
     @classmethod
     def is_endorsement_exist(cls, member_obj):
@@ -1577,9 +1578,7 @@ class EndorsementRequest(auth_model.TimeStampedModel):
     @classmethod
     def create(cls, endorsed_member):
         del endorsed_member['is_change']
-        del endorsed_member['member_type']
-        del endorsed_member['front_image_id']
-        del endorsed_member['back_image_id']
+        del endorsed_member['image_ids']
         end_obj = EndorsementRequest.objects.create(**endorsed_member)
         return end_obj
 
@@ -1600,8 +1599,9 @@ class EndorsementRequest(auth_model.TimeStampedModel):
 
 class InsuredMemberDocument(auth_model.TimeStampedModel):
     member = models.ForeignKey(InsuredMembers, related_name='related_document', on_delete=models.DO_NOTHING)
-    document_image = models.ImageField(upload_to='users/images', height_field=None, width_field=None, blank=True, null=True)
-    # document_second_image = models.ImageField(upload_to='users/images', height_field=None, width_field=None, blank=True, null=True)
+    # document_image = models.ImageField(upload_to='users/images', height_field=None, width_field=None, blank=True, null=True)
+    document_image = models.FileField(upload_to='users/images', blank=False, null=False, validators=[
+        FileExtensionValidator(allowed_extensions=['pdf', 'jpg', 'jpeg', 'png'])])
     is_enabled = models.BooleanField(default=False)
     endorsement_request = models.ForeignKey(EndorsementRequest, related_name='member_documents', null=True, on_delete=models.DO_NOTHING)
 
