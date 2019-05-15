@@ -17,7 +17,7 @@ def send_otp(message, phone_no, retry_send=False, **kwargs):
     # return True
     call_source = kwargs.get('call_source')
     if str(phone_no) not in settings.OTP_BYPASS_NUMBERS and kwargs.get('via_sms', True):
-        return get_connection().send_otp(message, phone_no, retry_send=retry_send, call_source=call_source)
+        get_connection().send_otp(message, phone_no, retry_send=retry_send, call_source=call_source)
 
     if kwargs.get('via_whatsapp', False):
         WhtsappNotification.send_login_otp(phone_no, call_source)
