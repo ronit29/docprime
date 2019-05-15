@@ -1024,15 +1024,23 @@ class Doctor(auth_model.TimeStampedModel, auth_model.QCModel, SearchKey, auth_mo
         return sticker
 
     def is_doctor_specialization_insured(self):
-        doctor_specializations = DoctorPracticeSpecialization.objects.filter(doctor=self).values_list('specialization_id', flat=True)
-        if not doctor_specializations:
+        dps = self.doctorpracticespecializations.all()
+        if len(dps) == 0:
             return False
-        for specialization in doctor_specializations:
-            practice_specialization = PracticeSpecialization.objects.filter(id=specialization).first()
-            if not practice_specialization:
-                return False
-            if not practice_specialization.is_insurance_enabled:
-                return False
+
+        for  d in dps:
+            if not d.specialization.is_insurance_enabled:
+                return false
+
+        # doctor_specializations = DoctorPracticeSpecialization.objects.filter(doctor=self).values_list('specialization_id', flat=True)
+        # if not doctor_specializations:
+        #     return False
+        # for specialization in doctor_specializations:
+        #     practice_specialization = PracticeSpecialization.objects.filter(id=specialization).first()
+        #     if not practice_specialization:
+        #         return False
+        #     if not practice_specialization.is_insurance_enabled:
+        #         return False
         return True
 
     class Meta:
