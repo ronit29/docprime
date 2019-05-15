@@ -1327,6 +1327,25 @@ class InsuredMembers(auth_model.TimeStampedModel):
         proposer_name = " ".join(proposer_name.split())
         return proposer_name
 
+    def update_member(self, endorsed_data):
+        self.first_name = endorsed_data.first_name
+        self.middle_name = endorsed_data.middle_name
+        self.last_name = endorsed_data.last_name
+        self.title = endorsed_data.title
+        self.dob = endorsed_data.dob
+        self.email = endorsed_data.email
+        self.relation = endorsed_data.relation
+        self.address = endorsed_data.address
+        self.state = endorsed_data.state
+        self.state_code = endorsed_data.state_code
+        self.gender = endorsed_data.gender
+        self.phone_number = endorsed_data.phone_number
+        self.town = endorsed_data.town
+        self.district = endorsed_data.district
+        self.city_code = endorsed_data.city_code
+        self.district_code = endorsed_data.district_code
+        self.save()
+
     @classmethod
     def create_insured_members(cls, user_insurance):
         import json
@@ -1360,10 +1379,6 @@ class InsuredMembers(auth_model.TimeStampedModel):
             return True
         else:
             return False
-
-    def update_member(self, endorsed_data):
-        self.first_name = endorsed_data.first_name
-        self.save()
 
 
 class Insurance(auth_model.TimeStampedModel):
@@ -1569,15 +1584,11 @@ class EndorsementRequest(auth_model.TimeStampedModel):
         return end_obj
 
     def process_endorsement(self):
-        kwargs = model_to_dict(self.member, exclude=['id'])
-        InsuredMemberHistory.objects.create(**kwargs)
-        # profile = member.profile
-        # profile.gender = self.gender
-        # profile.name = self.first_name + " " + self.middle_name + " " + self.last_name
-        # profile.dob = self.dob
-        # profile.email = self.email
-        # profile.save()
-        # member.update_member()
+        insured_member = self.member
+        InsuredMemberHistory.create_member(insured_member)
+        insured_member.update_member(self)
+        profile = self.profile
+        profile.update_endorsement_profile(self)
 
     def reject_endorsement(self):
         pass
@@ -1618,6 +1629,7 @@ class InsuredMemberHistory(auth_model.TimeStampedModel):
     TITLE_TYPE_CHOICES = [(MR, 'mr.'), (MRS, 'mrs.'), (MISS, 'miss'), (MAST, 'mast.')]
     # insurer = models.ForeignKey(Insurer, on_delete=models.DO_NOTHING)
     # insurance_plan = models.ForeignKey(InsurancePlans, on_delete=models.DO_NOTHING)
+    member = models.ForeignKey(InsuredMembers, related_name='member_history', on_delete=models.DO_NOTHING, null=True)
     first_name = models.CharField(max_length=50, null=False)
     last_name = models.CharField(max_length=50, null=True)
     dob = models.DateField(blank=False, null=False)
@@ -1638,6 +1650,16 @@ class InsuredMemberHistory(auth_model.TimeStampedModel):
     user_insurance = models.ForeignKey(UserInsurance, related_name="history_members", on_delete=models.DO_NOTHING, null=False)
     city_code = models.CharField(max_length=10, blank=True, null=True, default='')
     district_code = models.CharField(max_length=10, blank=True, null=True, default='')
+
+    @classmethod
+    def create_member(cls, member):
+        cls.objects.create(member=member, first_name=member.first_name, middle_name=member.middle_name,
+                           last_name=member.last_name, dob=member.dob, email=member.email, relation=member.relation,
+                           pincode=member.pincode, address=member.address, gender=member.gender,
+                           phone_number=member.phone_number, profile=member.profile, title=member.title,
+                           town=member.town, district=member.district, state=member.state, state_code=member.state_code,
+                           user_insurance=member.user_insurance, city_code=member.city_code,
+                           district_code=member.district_code)
 
     class Meta:
         db_table = "insured_member_history"

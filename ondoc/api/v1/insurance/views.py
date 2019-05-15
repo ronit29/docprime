@@ -645,7 +645,7 @@ class InsuranceEndorsementViewSet(viewsets.GenericViewSet):
 
             # endorsement only create when some changes in member details pushed with flag!!
             if member.get('is_change', None):
-                # if document uploaded then only creates endorsement
+                # document uploaded then only creates endorsement
                 document = insured_member_obj.is_document_available()
                 if not document:
                     res['error'] = "Document required for member {}".format(member.get('first_name'))

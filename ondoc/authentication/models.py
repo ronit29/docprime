@@ -536,6 +536,14 @@ class UserProfile(TimeStampedModel):
                                                       new_image_io.tell(), None)
         super().save(*args, **kwargs)
 
+    def update_endorsement_profile(self, endorsed_data):
+        self.name = endorsed_data.first_name + " " + endorsed_data.middle_name + " " + endorsed_data.last_name
+        self.email = endorsed_data.email
+        self.gender = endorsed_data.gender
+        self.phone_number = endorsed_data.phone_number
+        self.dob = endorsed_data.dob
+        self.save()
+
     class Meta:
         db_table = "user_profile"
 
