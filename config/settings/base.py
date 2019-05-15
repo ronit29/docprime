@@ -146,7 +146,8 @@ THIRD_PARTY_APPS = (
     'threadedcomments',
     'django_comments',
     'safedelete',
-    'qrcode',		
+    'qrcode',
+    'Crypto'
 )
 
 LOCAL_APPS = (
