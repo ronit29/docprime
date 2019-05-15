@@ -1301,6 +1301,7 @@ class DoctorLabAppointmentRetrieveSerializer(LabAppointmentModelSerializer):
 class AppointmentCompleteBodySerializer(serializers.Serializer):
     lab_appointment = serializers.PrimaryKeyRelatedField(queryset=LabAppointment.objects.all())
     otp = serializers.IntegerField(max_value=9999)
+    source = serializers.CharField(required=False, allow_blank=False)
 
     def validate(self, attrs):
         appointment = attrs.get('lab_appointment')

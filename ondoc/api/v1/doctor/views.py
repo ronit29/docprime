@@ -194,6 +194,8 @@ class DoctorAppointmentsViewSet(OndocViewSet):
         serializer = serializers.OTPFieldSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         validated_data = serializer.validated_data
+        if validated_data.get('source'):
+            source = validated_data.get('source')
         opd_appointment = models.OpdAppointment.objects.select_for_update().filter(pk=validated_data.get('id')).first()
 
         if not opd_appointment:
@@ -288,12 +290,14 @@ class DoctorAppointmentsViewSet(OndocViewSet):
         opd_appointment = models.OpdAppointment.objects.filter(id=pk).first()
         if not opd_appointment:
             return Response({'error': 'Appointment Not Found'}, status=status.HTTP_404_NOT_FOUND)
-        opd_appointment._source = source if source in [x[0] for x in AppointmentHistory.SOURCE_CHOICES] else ''
-        opd_appointment._responsible_user = responsible_user
         serializer = serializers.UpdateStatusSerializer(data=request.data,
                                             context={'request': request, 'opd_appointment': opd_appointment})
         serializer.is_valid(raise_exception=True)
         validated_data = serializer.validated_data
+        if validated_data.get('source'):
+            source = validated_data.get('source')
+        opd_appointment._source = source if source in [x[0] for x in AppointmentHistory.SOURCE_CHOICES] else ''
+        opd_appointment._responsible_user = responsible_user
         allowed = opd_appointment.allowed_action(request.user.user_type, request)
         appt_status = validated_data['status']
         if appt_status not in allowed:
@@ -2128,7 +2132,7 @@ class DoctorAppointmentNoAuthViewSet(viewsets.GenericViewSet):
         opd_appointment = models.OpdAppointment.objects.select_for_update().filter(pk=validated_data.get('opd_appointment')).first()
         if not opd_appointment:
             return Response({"message": "Invalid appointment id"}, status.HTTP_404_NOT_FOUND)
-        source = request.query_params.get('source', '')
+        source = validated_data.get('source') if validated_data.get('source') else request.query_params.get('source', '')
         responsible_user = request.user if request.user.is_authenticated else None
         opd_appointment._source = source if source in [x[0] for x in AppointmentHistory.SOURCE_CHOICES] else ''
         opd_appointment._responsible_user = responsible_user

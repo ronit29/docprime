@@ -393,6 +393,7 @@ class SetAppointmentSerializer(serializers.Serializer):
 class OTPFieldSerializer(serializers.Serializer):
     id = serializers.IntegerField()
     otp = serializers.IntegerField(max_value=9999)
+    source = serializers.CharField(required=False, allow_blank=True)
 
 
 class OTPConfirmationSerializer(serializers.Serializer):
@@ -415,6 +416,7 @@ class UpdateStatusSerializer(serializers.Serializer):
     cancellation_reason = serializers.PrimaryKeyRelatedField(
         queryset=CancellationReason.objects.filter(visible_on_front_end=True), required=False)
     cancellation_comment = serializers.CharField(required=False, allow_blank=True)
+    source = serializers.CharField(required=False, allow_blank=True)
 
 
 class DoctorImageSerializer(serializers.ModelSerializer):
@@ -1404,6 +1406,7 @@ class OpdAppointmentCompleteTempSerializer(serializers.Serializer):
 
     opd_appointment = serializers.IntegerField()
     otp = serializers.IntegerField(max_value=9999)
+    source = serializers.CharField(required=False, allow_blank=True)
 
     def validate(self, attrs):
         appointment_id = attrs.get('opd_appointment')
