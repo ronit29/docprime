@@ -10,12 +10,15 @@ def send_sms(message, phone_no):
     return get_connection().send_message(message, phone_no)
 
 
-def send_otp(message, phone_no, retry_send=False):
+def send_otp(message, phone_no, retry_send=False, **kwargs):
 
     # print(message)
     # return True
+    via_sms = kwargs.get('via_sms', True)
+    via_whatsapp = kwargs.get('via_whatsapp', False)
+    call_source = kwargs.get('call_source')
     if str(phone_no) not in settings.OTP_BYPASS_NUMBERS:
-        return get_connection().send_otp(message, phone_no, retry_send=retry_send)
+        return get_connection().send_otp(message, phone_no, retry_send=retry_send, via_sms=via_sms, via_whatsapp=via_whatsapp, call_source=call_source)
 
 
 def get_connection():

@@ -96,6 +96,9 @@ class LoginOTP(GenericViewSet):
         data = serializer.validated_data
         phone_number = data['phone_number']
         req_type = request.query_params.get('type')
+        via_sms = data.get('via_sms', True)
+        via_whatsapp = data.get('via_whatsapp', False)
+        call_source = data.get('request_source')
         retry_send = request.query_params.get('retry', False)
         otp_message = OtpVerifications.get_otp_message(request.META.get('HTTP_PLATFORM'), req_type, version=request.META.get('HTTP_APP_VERSION'))
         if req_type == 'doctor':
@@ -119,7 +122,7 @@ class LoginOTP(GenericViewSet):
             #     send_otp("OTP for DocPrime login is {}", phone_number)
 
         else:
-            send_otp(otp_message, phone_number, retry_send)
+            send_otp(otp_message, phone_number, retry_send, via_sms=via_sms, via_whatsapp=via_whatsapp, call_source=call_source)
             if User.objects.filter(phone_number=phone_number, user_type=User.CONSUMER).exists():
                 response['exists'] = 1
 
