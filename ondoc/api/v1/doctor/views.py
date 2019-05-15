@@ -86,6 +86,7 @@ logger = logging.getLogger(__name__)
 import random
 from ondoc.prescription import models as pres_models
 from ondoc.api.v1.prescription import serializers as pres_serializers
+from django.template.defaultfilters import slugify
 
 class CreateAppointmentPermission(permissions.BasePermission):
     message = 'creating appointment is not allowed.'
@@ -1265,12 +1266,16 @@ class SearchedItemsViewSet(viewsets.GenericViewSet):
                                                                        context={'request': request})
 
         common_specializations = models.CommonSpecialization.get_specializations(count)
+        common_spec_urls = list()
+
         if city:
+            for data in common_specializations:
+                if data.specialization and data.specialization.name:
+                    common_spec_urls.append(slugify(data.specialization.name + '-in-' + city + '-sptcit'))
+
             entity_urls = EntityUrls.objects.filter(sitemap_identifier='SPECIALIZATION_CITY',
-                                                    locality_value__iexact=city,
-                                                    is_valid=True,
-                                                    specialization_id__in=common_specializations.values_list(
-                                                        'specialization_id', flat=True))
+                                                    is_valid=True, url__in=common_spec_urls)
+
             for data in entity_urls:
                 spec_urls[data.specialization_id] = data.url
 
@@ -1295,8 +1300,7 @@ class SearchedItemsViewSet(viewsets.GenericViewSet):
         ipd_entity_dict = {}
         if city:
             ipd_entity_qs = EntityUrls.objects.filter(ipd_procedure_id__in=common_ipd_procedure_ids,
-                                                      url_type=EntityUrls.UrlType.PAGEURL,
-                                                      entity_type='IpdProcedure',
+                                                      sitemap_identifier='IPD_PROCEDURE_CITY',
                                                       is_valid=True,
                                                       locality_value__iexact=city).annotate(
                 ipd_id=F('ipd_procedure_id')).values('ipd_id', 'url')
