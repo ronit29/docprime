@@ -1432,7 +1432,7 @@ class LabList(viewsets.ReadOnlyModelViewSet):
         return lab_search_result
 
     def apply_search_sort(self, parameters):
-        if parameters.get('ids') and  parameters.get('is_user_insured'):
+        if parameters.get('ids') and  parameters.get('is_user_insured') and not parameters.get('sort_on'):
             return ' case when (test_type in (2,3)) then ((case when network_id=43 then -1 end) , agreed_price ) end, case when (test_type=1) then distance  end '
         order_by = parameters.get("sort_on")
         if order_by is not None:
