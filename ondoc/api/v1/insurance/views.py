@@ -388,6 +388,13 @@ class InsuranceProfileViewSet(viewsets.GenericViewSet):
                 else:
                     resp['is_cancel_allowed'] = True
                     resp['is_endorsement_allowed'] = True
+                members = user_insurance.members
+                is_endorsement_exist = False
+                for member in members:
+                    if EndorsementRequest.is_endorsement_exist(member):
+                        is_endorsement_exist = True
+                        break
+                resp['is_endorsement_exist'] = is_endorsement_exist
             else:
                 return Response({"message": "User is not valid"},
                                 status.HTTP_404_NOT_FOUND)
