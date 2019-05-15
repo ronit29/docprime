@@ -80,59 +80,100 @@ class Banner(auth_model.TimeStampedModel):
 
 
     @staticmethod
-    def get_all_banners(request):
+    def get_all_banners(request, latitude=None, longitude=None):
 
-        queryset = Banner.objects.filter(enable=True).filter(Q(start_date__lte=timezone.now()) | Q(start_date__isnull=True)).filter(Q(end_date__gte=timezone.now()) | Q(end_date__isnull=True)).order_by('-priority')[:100]
+        queryset = Banner.objects.prefetch_related('banner_location','location').filter(enable=True).filter(Q(start_date__lte=timezone.now()) | Q(start_date__isnull=True)).filter(Q(end_date__gte=timezone.now()) | Q(end_date__isnull=True)).order_by('-priority')[:100]
         #queryset = Banner.objects.filter(enable=True)
         slider_locate = dict(Banner.slider_location)
         final_result = []
         for data in queryset:
-            resp = dict()
-            resp['title'] = data.title
-            resp['id'] = data.id
-            # resp['slider_location'] = slider_locate[data.slider_locate]
-            resp['slider_location'] = data.location.name if data.location and data.location.name else None
-            resp['latitude'] = data.latitude
-            resp['longitude'] = data.longitude
-            resp['radius'] = data.radius
-            resp['start_date'] = data.start_date
-            resp['end_date'] = data.end_date
-            resp['priority'] = data.priority
-            resp['url_params_included'] = data.url_params_included
-            resp['url_params_excluded'] = data.url_params_excluded
-            resp['show_in_app'] = data.show_in_app
-            resp['app_params'] = data.app_params
-            resp['app_screen'] = data.app_screen
-            resp['event_name'] = data.event_name
-            resp['url'] = None
-            resp['url_details'] = None
-            if data.url:
-                path = urlparse(data.url).path
-                params = urlparse(data.url).params + '?'
-                query = urlparse(data.url).query
-                netloc = urlparse(data.url).netloc
-                if re.match(r'.*?docprime.com/?', netloc):
-                    if path:
-                        resp['url'] = path + params + query
-                    else:
-                        resp['url'] = '/'
+            locations = data.banner_location.all()
+            append_banner=True
+            if locations:
+                if not latitude or not longitude:
+                    append_banner=False
                 else:
-                    resp['url'] = data.url
-            if data.url:
-                data.url = re.sub('.*?\?', '', data.url)
-                qd = QueryDict(data.url, mutable=True)
+                    append_banner=False
+                    for loc in locations:
+                        pnt1 = Point(float(longitude), float(latitude))
+                        pnt2 = Point(float(loc.longitude), float(loc.latitude))
+                        if pnt1.distance(pnt2)*100 <= loc.radius:
+                            append_banner=True
+                            break
 
-                for key in qd.keys():
-                    if qd[key] and qd[key]=='true':
-                        qd[key] = True
-                    elif qd[key] and qd[key]=='false':
-                        qd[key] = False
 
-                resp['url_details'] = qd
-            resp['image'] = request.build_absolute_uri(data.image.url)
+            # if latitude and longitude
+            # if locations and latitude and longitude:
+            #     append_banner=False
+            #     for loc in locations:
+            #         pnt1 = Point(float(longitude), float(latitude))
+            #         pnt2 = Point(float(loc.longitude), float(loc.latitude))
+            #         pnt1.distance(pnt2)*100 <= loc.radius:
+            #             append_banner=True
+            #             break
 
-            final_result.append(resp)
+
+            if append_banner:
+                resp = dict()
+                resp['title'] = data.title
+                resp['id'] = data.id
+                # resp['slider_location'] = slider_locate[data.slider_locate]
+                resp['slider_location'] = data.location.name if data.location and data.location.name else None
+                # resp['latitude'] = data.latitude
+                # resp['longitude'] = data.longitude
+                # resp['radius'] = data.radius
+                resp['start_date'] = data.start_date
+                resp['end_date'] = data.end_date
+                resp['priority'] = data.priority
+                resp['url_params_included'] = data.url_params_included
+                resp['url_params_excluded'] = data.url_params_excluded
+                resp['show_in_app'] = data.show_in_app
+                resp['app_params'] = data.app_params
+                resp['app_screen'] = data.app_screen
+                resp['event_name'] = data.event_name
+                resp['url'] = None
+                resp['url_details'] = None
+                if data.url:
+                    path = urlparse(data.url).path
+                    params = urlparse(data.url).params + '?'
+                    query = urlparse(data.url).query
+                    netloc = urlparse(data.url).netloc
+                    if re.match(r'.*?docprime.com/?', netloc):
+                        if path:
+                            resp['url'] = path + params + query
+                        else:
+                            resp['url'] = '/'
+                    else:
+                        resp['url'] = data.url
+                if data.url:
+                    data.url = re.sub('.*?\?', '', data.url)
+                    qd = QueryDict(data.url, mutable=True)
+
+                    for key in qd.keys():
+                        if qd[key] and qd[key]=='true':
+                            qd[key] = True
+                        elif qd[key] and qd[key]=='false':
+                            qd[key] = False
+
+                    resp['url_details'] = qd
+                resp['image'] = request.build_absolute_uri(data.image.url)
+
+                final_result.append(resp)
+
         return final_result
 
     class Meta:
         db_table = 'banner'
+
+
+class BannerLocation(models.Model):
+    banner = models.ForeignKey(Banner, on_delete=models.CASCADE, null=False, blank=False, related_name='banner_location')
+    latitude = models.FloatField(null=False, blank=False)
+    longitude = models.FloatField(null=False, blank=False)
+    radius = models.PositiveIntegerField(null=False, blank=False)
+
+    def __str__(self):
+        return str(self.id)
+
+    class Meta:
+        db_table = 'banner_location'
