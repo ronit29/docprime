@@ -655,9 +655,9 @@ class InsuranceEndorsementViewSet(viewsets.GenericViewSet):
                     document.endorsement_request = end_obj
                     document.save()
 
-                res['success'] = 'Request for endorsement have been consider,' \
-                                 'will update once insurer verified the details'
-                return Response(data=res, status=status.HTTP_200_OK)
+        res['success'] = 'Request for endorsement have been consider,' \
+                         'will update once insurer verified the details'
+        return Response(data=res, status=status.HTTP_200_OK)
 
     def upload(self, request, *args, **kwargs):
         data = dict()
