@@ -218,7 +218,7 @@ class DoctorSearchHelper:
         bucket_size=2000
 
         if self.query_params.get('is_user_insured'):
-            return " floor(distance/{bucket_size}) ASC, fees ASC ".format(bucket_size=str(bucket_size)), "rnk=1"
+            return " enabled_for_online_booking DESC , floor(distance/{bucket_size}) ASC, fees ASC ".format(bucket_size=str(bucket_size)), "rnk=1"
 
         if self.count_of_procedure:
             order_by_field = ' distance, total_price '
