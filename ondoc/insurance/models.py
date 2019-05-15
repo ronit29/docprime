@@ -1569,14 +1569,18 @@ class EndorsementRequest(auth_model.TimeStampedModel):
         return end_obj
 
     def process_endorsement(self):
-        member = self.member
-        profile = member.profile
-        profile.gender = self.gender
-        profile.name = self.first_name + " " + self.middle_name + " " + self.last_name
-        profile.dob = self.dob
-        profile.email = self.email
-        profile.save()
-        member.update_member(self.instance)
+        kwargs = model_to_dict(self.member, exclude=['id'])
+        InsuredMemberHistory.objects.create(**kwargs)
+        # profile = member.profile
+        # profile.gender = self.gender
+        # profile.name = self.first_name + " " + self.middle_name + " " + self.last_name
+        # profile.dob = self.dob
+        # profile.email = self.email
+        # profile.save()
+        # member.update_member()
+
+    def reject_endorsement(self):
+        pass
 
 
     class Meta:
@@ -1592,3 +1596,48 @@ class InsuredMemberDocument(auth_model.TimeStampedModel):
 
     class Meta:
         db_table = 'insured_member_document'
+
+
+class InsuredMemberHistory(auth_model.TimeStampedModel):
+    MALE = 'm'
+    FEMALE = 'f'
+    OTHER = 'o'
+    GENDER_CHOICES = [(MALE, 'Male'), (FEMALE, 'Female'), (OTHER, 'Other')]
+    SELF = 'self'
+    SPOUSE = 'spouse'
+    SON = 'son'
+    DAUGHTER = 'daughter'
+    RELATION_CHOICES = [(SPOUSE, 'Spouse'), (SON, 'Son'), (DAUGHTER, 'Daughter'), (SELF, 'Self')]
+    ADULT = "adult"
+    CHILD = "child"
+    MEMBER_TYPE_CHOICES = [(ADULT, 'adult'), (CHILD, 'child')]
+    MR = 'mr.'
+    MISS = 'miss'
+    MRS = 'mrs.'
+    MAST = 'mast.'
+    TITLE_TYPE_CHOICES = [(MR, 'mr.'), (MRS, 'mrs.'), (MISS, 'miss'), (MAST, 'mast.')]
+    # insurer = models.ForeignKey(Insurer, on_delete=models.DO_NOTHING)
+    # insurance_plan = models.ForeignKey(InsurancePlans, on_delete=models.DO_NOTHING)
+    first_name = models.CharField(max_length=50, null=False)
+    last_name = models.CharField(max_length=50, null=True)
+    dob = models.DateField(blank=False, null=False)
+    email = models.EmailField(max_length=100, null=True)
+    relation = models.CharField(max_length=50, choices=RELATION_CHOICES, default=None)
+    pincode = models.PositiveIntegerField(default=None)
+    address = models.TextField(default=None)
+    gender = models.CharField(max_length=50, choices=GENDER_CHOICES, default=None)
+    phone_number = models.BigIntegerField(blank=True, null=True,
+                                          validators=[MaxValueValidator(9999999999), MinValueValidator(1000000000)])
+    profile = models.ForeignKey(auth_model.UserProfile, related_name="history_insurance", on_delete=models.SET_NULL, null=True)
+    title = models.CharField(max_length=20, choices=TITLE_TYPE_CHOICES, default=None)
+    middle_name = models.CharField(max_length=50, null=True)
+    town = models.CharField(max_length=100, null=False)
+    district = models.CharField(max_length=100, null=False)
+    state = models.CharField(max_length=100, null=False)
+    state_code = models.CharField(max_length=10, default='')
+    user_insurance = models.ForeignKey(UserInsurance, related_name="history_members", on_delete=models.DO_NOTHING, null=False)
+    city_code = models.CharField(max_length=10, blank=True, null=True, default='')
+    district_code = models.CharField(max_length=10, blank=True, null=True, default='')
+
+    class Meta:
+        db_table = "insured_member_history"
