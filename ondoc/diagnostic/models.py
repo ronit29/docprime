@@ -1556,9 +1556,11 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin,
     coupon_data = JSONField(blank=True, null=True)
 
     def get_corporate_deal_id(self):
-        if self.coupon.all():
-            if self.coupon.first().corporate_deal:
-                return self.coupon.first().corporate_deal
+        coupon = self.coupon.first()
+        if coupon and coupon.corporate_deal:
+            return coupon.corporate_deal.id
+
+        return None
 
     def get_city(self):
         if self.lab and self.lab.matrix_city:
@@ -1595,6 +1597,7 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin,
             obj.PaymentType = self.payment_type if self.payment_type else None
             obj.Payout = self.agreed_price
             obj.BookingDate = self.created_at
+        obj.CorporateDealId = self.get_corporate_deal_id()
         obj.PromoCost = max(0, promo_cost)
         obj.GMValue = self.deal_price
         obj.Category = category
