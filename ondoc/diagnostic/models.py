@@ -263,6 +263,17 @@ class Lab(TimeStampedModel, CreatedByModel, QCModel, SearchKey, WelcomeCallingDo
     class Meta:
         db_table = "lab"
 
+    @classmethod
+    def update_labs_seo_urls(cls):
+        from ondoc.location.management.commands import lab_page_urls, map_lab_search_urls
+
+        # create lab page urls
+        lab_page_urls.map_lab_location_urls()
+
+        # create lab search urls
+        map_lab_search_urls.map_lab_search_urls()
+
+
     @cached_property
     def is_enabled_for_insurance(self):
         return self.is_insurance_enabled
@@ -1751,9 +1762,7 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin,
                             if old_instance.status != self.CANCELLED and self.status == self.CANCELLED:
                                 push_lab_appointment_to_integrator.apply_async(({'appointment_id': self.id},), countdown=5)
                         else:
-                            push_lab_appointment_to_integrator.apply_async(({'appointment_id': self.id},),
-                                                                           link=get_integrator_order_status.s(
-                                                                               appointment_id=self.id),countdown=5)
+                            push_lab_appointment_to_integrator.apply_async(({'appointment_id': self.id},), countdown=5)
                 except Exception as e:
                     logger.error(str(e))
 
