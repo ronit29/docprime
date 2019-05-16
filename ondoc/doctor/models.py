@@ -672,6 +672,7 @@ class Doctor(auth_model.TimeStampedModel, auth_model.QCModel, SearchKey, auth_mo
     rating_data = JSONField(blank=True, null=True)
     qr_code = GenericRelation(QRCode, related_name="qrcode")
     priority_score = models.IntegerField(default=0, null=False, blank=False)
+    search_distance = models.FloatField(default=15000)
 
     def __str__(self):
         return '{} ({})'.format(self.name, self.id)

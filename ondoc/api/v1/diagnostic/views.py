@@ -1419,7 +1419,9 @@ class LabList(viewsets.ReadOnlyModelViewSet):
                     max(ST_Distance(location,St_setsrid(St_point((%(longitude)s), (%(latitude)s)), 4326))) as distance,
                     max(order_priority) as max_order_priority
                     from lab lb where is_test_lab = False and is_live = True and lab_pricing_group_id is not null 
-                    and St_dwithin( St_setsrid(St_point((%(longitude)s), (%(latitude)s)), 4326),location, (%(max_distance)s)) 
+                    and case when (%(max_distance)s) >= 0  then 
+                    St_dwithin( St_setsrid(St_point((%(longitude)s), (%(latitude)s)), 4326),lb.location, (%(max_distance)s))
+                    else St_dwithin( St_setsrid(St_point((%(longitude)s), (%(latitude)s)), 4326),lb.location, search_distance ) end
                     and St_dwithin(St_setsrid(St_point((%(longitude)s), (%(latitude)s)), 4326), location, (%(min_distance)s)) = false
                     {filter_query_string}
                     group by id)a)y )x where rank<=5)z )r where 
