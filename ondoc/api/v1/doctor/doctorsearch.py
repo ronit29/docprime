@@ -50,6 +50,7 @@ class DoctorSearchHelper:
         procedure_category_ids = self.query_params.get("procedure_category_ids", [])  # NEW_LOGIC
         sits_at_hosp_types = self.query_params.get("sits_at", [])
 
+
         if self.query_params.get('hospital_id') is not None:
             filtering_params.append(
                 "h.id=(%(hospital_id)s)")
@@ -144,11 +145,13 @@ class DoctorSearchHelper:
                 # "deal_price>={}".format(str(self.query_params.get("min_fees")))
                 "deal_price>=(%(min_fees)s)")
             params['min_fees'] = str(self.query_params.get("min_fees"))
+
         if len(procedure_ids) == 0 and self.query_params.get("max_fees") is not None:
             filtering_params.append(
                 # "deal_price<={}".format(str(self.query_params.get("max_fees"))))
                 "deal_price<=(%(max_fees)s)")
             params['max_fees'] = str(self.query_params.get("max_fees"))
+
         if self.query_params.get("is_female"):
             filtering_params.append(
                 "gender='f'"
@@ -161,6 +164,16 @@ class DoctorSearchHelper:
                 'dl.id is NULL and dct.day=(%(current_time)s) and dct.end>=(%(current_hour)s)')
             params['current_time'] = str(current_time.weekday())
             params['current_hour'] = str(current_hour)
+
+        if self.query_params.get('avg_ratings'):
+
+            filtering_params.append(" ((case when (d.rating_data is not null and (d.rating_data ->> 'avg_rating')::float > 4 ) or " \
+                            "( (d.rating_data ->> 'avg_rating')::float >= (%(avg_ratings)s) and (d.rating_data ->> 'rating_count') is not null and " \
+                            "(d.rating_data ->> 'rating_count')::int >5) then (d.rating_data ->> 'avg_rating')::float >= (%(avg_ratings)s) end) "
+                            " or  (case when h.google_avg_rating is not null and (h.google_avg_rating)::float >= (%(avg_ratings)s) then "
+                            "(h.google_avg_rating)::float >= (%(avg_ratings)s) end ))")
+
+            params['avg_ratings'] = min(self.query_params.get('avg_ratings'))
 
         if self.query_params.get('availability'):
             aval_query = "( "
