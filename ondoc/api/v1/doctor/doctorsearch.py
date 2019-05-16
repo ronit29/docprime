@@ -319,7 +319,7 @@ class DoctorSearchHelper:
                            "INNER JOIN doctor_clinic_procedure dcp ON dc.id = dcp.doctor_clinic_id " \
                            "WHERE {filtering_params} AND " \
                            "case when (%(max_distance)s) >= 0  then St_dwithin( St_setsrid(St_point((%(longitude)s), (%(latitude)s)), 4326), h.location, (%(max_distance)s))" \
-                           " else St_dwithin( St_setsrid(St_point((%(longitude)s), (%(latitude)s)), 4326), h.location, search_distance ) end AND " \
+                           " else St_dwithin( St_setsrid(St_point((%(longitude)s), (%(latitude)s)), 4326), h.location, h.search_distance ) end AND " \
                            "St_dwithin(St_setsrid(St_point((%(longitude)s), (%(latitude)s)), 4326 ), h.location, (%(min_distance)s)) = false " \
                            " ) " \
                            "AS tempTable WHERE count_per_clinic={count_of_procedure}) AS tempTable2) " \
@@ -369,7 +369,7 @@ class DoctorSearchHelper:
                            "{sp_cond} " \
                            "WHERE {filtering_params} " \
                            "and case when (%(max_distance)s) >= 0  then St_dwithin( St_setsrid(St_point((%(longitude)s), (%(latitude)s)), 4326), h.location, (%(max_distance)s))" \
-                           " else St_dwithin( St_setsrid(St_point((%(longitude)s), (%(latitude)s)), 4326), h.location, search_distance ) end" \
+                           " else St_dwithin( St_setsrid(St_point((%(longitude)s), (%(latitude)s)), 4326), h.location, h.search_distance ) end" \
                            "{min_dist_cond}" \
                            " )x " \
                            "where {rank_by} ORDER BY {order_by_field}".format(rank_part=rank_part, sp_cond=sp_cond, \

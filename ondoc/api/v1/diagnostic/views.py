@@ -1387,7 +1387,7 @@ class LabList(viewsets.ReadOnlyModelViewSet):
                         and lb.is_test_lab = False and lb.is_live = True and lb.lab_pricing_group_id is not null 
                         and case when (%(max_distance)s) >= 0  then 
                         St_dwithin( St_setsrid(St_point((%(longitude)s), (%(latitude)s)), 4326),lb.location, (%(max_distance)s))
-                        else St_dwithin( St_setsrid(St_point((%(longitude)s), (%(latitude)s)), 4326),lb.location, search_distance ) end
+                        else St_dwithin( St_setsrid(St_point((%(longitude)s), (%(latitude)s)), 4326),lb.location, lb.search_distance ) end
                         and St_dwithin(St_setsrid(St_point((%(longitude)s), (%(latitude)s)), 4326), lb.location,  (%(min_distance)s)) = false 
                         and avlt.enabled = True 
                         inner join lab_test lt on lt.id = avlt.test_id and lt.enable_for_retail=True 
@@ -1421,7 +1421,7 @@ class LabList(viewsets.ReadOnlyModelViewSet):
                     from lab lb where is_test_lab = False and is_live = True and lab_pricing_group_id is not null 
                     and case when (%(max_distance)s) >= 0  then 
                     St_dwithin( St_setsrid(St_point((%(longitude)s), (%(latitude)s)), 4326),lb.location, (%(max_distance)s))
-                    else St_dwithin( St_setsrid(St_point((%(longitude)s), (%(latitude)s)), 4326),lb.location, search_distance ) end
+                    else St_dwithin( St_setsrid(St_point((%(longitude)s), (%(latitude)s)), 4326),lb.location, lb.search_distance ) end
                     and St_dwithin(St_setsrid(St_point((%(longitude)s), (%(latitude)s)), 4326), location, (%(min_distance)s)) = false
                     {filter_query_string}
                     group by id)a)y )x where rank<=5)z )r where 

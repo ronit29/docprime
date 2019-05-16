@@ -239,6 +239,7 @@ class Hospital(auth_model.TimeStampedModel, auth_model.CreatedByModel, auth_mode
     is_location_verified = models.BooleanField(verbose_name='Location Verified', default=False)
     auto_ivr_enabled = models.BooleanField(default=True)
     priority_score = models.IntegerField(default=0, null=False, blank=False)
+    search_distance = models.FloatField(default=15000)
 
     def __str__(self):
         return self.name
@@ -672,7 +673,6 @@ class Doctor(auth_model.TimeStampedModel, auth_model.QCModel, SearchKey, auth_mo
     rating_data = JSONField(blank=True, null=True)
     qr_code = GenericRelation(QRCode, related_name="qrcode")
     priority_score = models.IntegerField(default=0, null=False, blank=False)
-    search_distance = models.FloatField(default=15000)
 
     def __str__(self):
         return '{} ({})'.format(self.name, self.id)
