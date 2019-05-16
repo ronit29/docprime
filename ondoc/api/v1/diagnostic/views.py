@@ -1356,13 +1356,13 @@ class LabList(viewsets.ReadOnlyModelViewSet):
             today_time = currentDT.strftime("%H.%M")
             avail_days = max(map(int, availability))
 
-            if avail_days in (SearchLabListSerializer.TODAY, SearchLabListSerializer.TOMORROW, SearchLabListSerializer.NEXT_3_DAYS):
+            if avail_days in (SearchLabListSerializer.TODAY, SearchLabListSerializer.NEXT_3_DAYS):
                 aval_query += ' (lbt.day = (%(today)s) and  (%(today_time)s)<= lbt."end" ) '
                 filtering_params['today'] = today
                 filtering_params['today_time'] = today_time
 
             if avail_days == serializers.SearchLabListSerializer.TOMORROW:
-                aval_query += ' or lbt.day = (%(tomorrow)s) '
+                aval_query += ' lbt.day = (%(tomorrow)s) '
                 filtering_params['tomorrow'] = (0 if today == 6 else today + 1)
 
             if avail_days == serializers.SearchLabListSerializer.NEXT_3_DAYS:
