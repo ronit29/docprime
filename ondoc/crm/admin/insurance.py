@@ -562,7 +562,7 @@ class UserInsuranceLabResource(resources.ModelResource):
         return ""
 
     def dehydrate_booking_date(self, appointment):
-        return str(appointment.created_at.date())
+        return str(appointment.created_at)
 
     def dehydrate_status(self, appointment):
         if appointment.status == 1:
