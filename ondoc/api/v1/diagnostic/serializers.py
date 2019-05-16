@@ -539,49 +539,57 @@ class CommonPackageSerializer(serializers.ModelSerializer):
     lab = LabModelSerializer()
     discounted_price = serializers.SerializerMethodField()
 
+    def __init__(self, instance=None, data=None, **kwargs):
+        super().__init__(instance, data, **kwargs)
+        queryset = AvailableLabTest.objects.all()
+        filters = Q()  # Create an empty Q object to start with
+
+        for ins in instance:
+            q = Q(lab_pricing_group_id=ins.lab.lab_pricing_group_id,test_id = ins.package_id)
+            filters |= q
+        queryset = queryset.filter(filters)
+        for ins in instance:
+            ins._selected_test = None
+            for x in queryset:
+                if ins.lab.lab_pricing_group_id == x.lab_pricing_group_id and ins.package_id == x.test_id:
+                    ins._selected_test = x
+                    break
+
     def get_icon(self, obj):
         request = self.context.get('request')
         return request.build_absolute_uri(obj.icon.url) if obj.icon else None
 
     def get_agreed_price(self, obj):
-        agreed_price = None
-        if obj.package.availablelabs:
-            available_test = obj.package.availablelabs.filter(lab_pricing_group__labs__id=obj.lab_id).first()
-            if available_test:
-                agreed_price = available_test.get_deal_price()
-        return agreed_price
+        if obj._selected_test:
+            return obj._selected_test.get_deal_price()
+        return None
 
     def get_mrp(self, obj):
-        mrp = None
-        if obj.package.availablelabs:
-            available_test = obj.package.availablelabs.filter(lab_pricing_group__labs__id=obj.lab_id).first()
-            if available_test:
-                mrp = available_test.mrp
-        return mrp
+        if obj._selected_test:
+            return obj._selected_test.mrp
+        return None
 
     def get_discounted_price(self, obj):
         discounted_price = None
         coupon_recommender = self.context.get('coupon_recommender')
         filters = dict()
 
-        if obj.package.availablelabs:
-            available_test = obj.package.availablelabs.filter(lab_pricing_group__labs__id=obj.lab_id).first()
-            if available_test:
-                deal_price = available_test.get_deal_price()
-                if coupon_recommender:
-                    filters['deal_price'] = deal_price
-                    filters['tests'] = [available_test.test]
+        if obj._selected_test:
+            deal_price = obj._selected_test.get_deal_price()
+            if coupon_recommender:
+                filters['deal_price'] = deal_price
+                filters['tests'] = [obj._selected_test.test]
 
-                    package_result_lab = getattr(obj, 'lab') if hasattr(obj, 'lab') else None
-                    if package_result_lab and isinstance(package_result_lab, Lab):
-                        filters['lab'] = dict()
-                        lab_obj = filters['lab']
-                        lab_obj['id'] = package_result_lab.id
-                        lab_obj['network_id'] = package_result_lab.network_id
-                        lab_obj['city'] = package_result_lab.city
-                search_coupon = coupon_recommender.best_coupon(**filters) if coupon_recommender else None
+                package_result_lab = getattr(obj, 'lab') if hasattr(obj, 'lab') else None
+                if package_result_lab and isinstance(package_result_lab, Lab):
+                    filters['lab'] = dict()
+                    lab_obj = filters['lab']
+                    lab_obj['id'] = package_result_lab.id
+                    lab_obj['network_id'] = package_result_lab.network_id
+                    lab_obj['city'] = package_result_lab.city
+            search_coupon = coupon_recommender.best_coupon(**filters) if coupon_recommender else None
 
-                discounted_price = deal_price if not search_coupon else search_coupon.get_search_coupon_discounted_price(deal_price)
+            discounted_price = deal_price if not search_coupon else search_coupon.get_search_coupon_discounted_price(deal_price)
 
         return discounted_price
 

@@ -2420,7 +2420,7 @@ class CommonPackage(TimeStampedModel):
 
     @classmethod
     def get_packages(cls, count):
-        packages = cls.objects.prefetch_related('package').filter(package__enable_for_retail=True, package__searchable=True).order_by('-priority')[:count]
+        packages = cls.objects.prefetch_related('package', 'lab_documents').filter(package__enable_for_retail=True, package__searchable=True).order_by('-priority')[:count]
         return packages
 
 class CommonDiagnosticCondition(TimeStampedModel):

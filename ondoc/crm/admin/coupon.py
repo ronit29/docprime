@@ -295,6 +295,7 @@ class CouponAdmin(admin.ModelAdmin):
 
     autocomplete_fields = ['payment_option']
     search_fields = ['code']
+    readonly_fields = ['total_used_count', ]
     form = CouponForm
 
     def save_model(self, request, obj, form, change):
