@@ -17,7 +17,7 @@ import random, string
 from django.contrib.contenttypes.fields import GenericForeignKey, GenericRelation
 from django.contrib.contenttypes.models import ContentType
 from django.utils.functional import cached_property
-from datetime import date, timedelta, datetime
+from datetime import date, datetime
 from safedelete import SOFT_DELETE
 from safedelete.models import SafeDeleteModel
 import reversion

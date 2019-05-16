@@ -105,22 +105,10 @@ class UserSpecificCouponSerializer(CouponListSerializer):
                 raise serializers.ValidationError("Invalid product id for doctor")
 
         coupons_data, random_coupons = None, None
-        if RandomGeneratedCoupon.objects.filter(random_coupon__in=codes).exists():
-            expression = F('sent_at') + datetime.timedelta(days=1) * F('validity')
-            annotate_expression = ExpressionWrapper(expression, DateTimeField())
-            random_coupons = RandomGeneratedCoupon.objects.annotate(last_date=annotate_expression
-                                                   ).filter(random_coupon__in=codes,
-                                                            sent_at__isnull=False,
-                                                            consumed_at__isnull=True,
-                                                            last_date__gte=datetime.datetime.now()
-                                                            ).all()
-            if random_coupons:
-                coupons_data = Coupon.objects.filter(id__in=random_coupons.values_list('coupon', flat=True))
-        if coupons_data:
-            coupons_data = Coupon.objects.filter(code__in=codes) | coupons_data
-        elif Coupon.objects.filter(code__in=codes).exists():
-            coupons_data = Coupon.objects.filter(code__in=codes)
-        else:
+
+        coupons_data = RandomGeneratedCoupon.get_coupons(codes)
+
+        if not coupons_data:
             raise serializers.ValidationError("Unknown Coupon Code")
         attrs["coupons_data"] = coupons_data
 
