@@ -1060,7 +1060,7 @@ class EndorsementRequestAdmin(admin.ModelAdmin):
         if request.user.is_member_of(constants['SUPER_INSURANCE_GROUP']) or request.user.is_member_of(constants['INSURANCE_GROUP']):
             if obj.status == EndorsementRequest.APPROVED:
                 obj.process_endorsement()
-                super().save_model()
+                super().save_model(request, obj, form, change)
             elif obj.status == EndorsementRequest.REJECT:
                 obj.reject_endorsement()
 
