@@ -414,7 +414,7 @@ class CouponRecommender():
 
         all_coupons = all_coupons.prefetch_related('user_specific_coupon', 'test', 'test_categories', 'hospitals',
                                                   'doctors', 'specializations', 'procedures',
-                                                  'lab', 'test', user_opd_booked, user_lab_booked)
+                                                  'lab', 'test','procedure_categories', user_opd_booked, user_lab_booked)
 
         if user and user.is_authenticated:
             all_coupons = all_coupons.filter(Q(is_user_specific=False) \
@@ -586,7 +586,7 @@ class CouponRecommender():
         for coupon in coupons:
             coupon_properties = self.coupon_properties[coupon.code] = dict()
             remove_coupon = False
-            if coupon.total_count and coupon.total_used_count >= coupon.total_count:
+            if coupon.total_count and coupon.total_used_count and coupon.total_used_count >= coupon.total_count:
                 remove_coupon = True
 
             used_coupon_count = 0
