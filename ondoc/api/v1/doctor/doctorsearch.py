@@ -264,10 +264,13 @@ class DoctorSearchHelper:
         if not self.query_params.get('max_distance') == None and self.query_params.get('max_distance')*1000 == 0:
             max_distance = self.query_params.get('max_distance')
         else:
+            # max_distance = str(
+            #     self.query_params.get('max_distance') * 1000 if self.query_params.get(
+            #         'max_distance') and self.query_params.get(
+            #         'max_distance') * 1000 < int(DoctorSearchHelper.MAX_DISTANCE) else DoctorSearchHelper.MAX_DISTANCE)
             max_distance = str(
-                self.query_params.get('max_distance') * 1000 if self.query_params.get(
-                    'max_distance') and self.query_params.get(
-                    'max_distance') * 1000 < int(DoctorSearchHelper.MAX_DISTANCE) else DoctorSearchHelper.MAX_DISTANCE)
+                     self.query_params.get('max_distance') * 1000 if self.query_params.get(
+                        'max_distance') and self.query_params.get( 'max_distance') * 1000 else -1)
         min_distance = self.query_params.get('min_distance')*1000 if self.query_params.get('min_distance') else 0
 
         if self.query_params and self.query_params.get('sitemap_identifier') and self.query_params.get('max_distance')==None:
