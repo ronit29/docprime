@@ -273,7 +273,7 @@ class DoctorSearchHelper:
                     rank_by = "rnk=1"
                 elif self.query_params.get('sort_on') == 'fees':
                     if self.query_params.get('sort_order') and self.query_params.get('sort_order') == 'desc':
-                        order_by_field = " deal_price DESC, distance ASC, priority desc "
+                        order_by_field = " total_price DESC, distance ASC "
                     else:
                         order_by_field = " total_price ASC, distance ASC "
                     rank_by = "rnk=1"
