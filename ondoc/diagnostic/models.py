@@ -1556,9 +1556,11 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin,
     coupon_data = JSONField(blank=True, null=True)
 
     def get_corporate_deal_id(self):
-        if self.coupon.all():
-            if self.coupon.first().corporate_deal:
-                return self.coupon.first().corporate_deal
+        coupon = self.coupon.first()
+        if coupon and coupon.corporate_deal:
+            return coupon.corporate_deal.id
+
+        return None
 
     def get_city(self):
         if self.lab and self.lab.matrix_city:
@@ -1595,6 +1597,7 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin,
             obj.PaymentType = self.payment_type if self.payment_type else None
             obj.Payout = self.agreed_price
             obj.BookingDate = self.created_at
+        obj.CorporateDealId = self.get_corporate_deal_id()
         obj.PromoCost = max(0, promo_cost)
         obj.GMValue = self.deal_price
         obj.Category = category
@@ -1792,6 +1795,12 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin,
                 notification_models.EmailNotification.ops_notification_alert(self, email_list=settings.OPS_EMAIL_ID,
                                                                              product=account_model.Order.LAB_PRODUCT_ID,
                                                                              alert_type=notification_models.EmailNotification.OPS_APPOINTMENT_NOTIFICATION)
+            except Exception as e:
+                logger.error(str(e))
+
+        if not old_instance or self.status == self.CANCELLED:
+            try:
+                notification_tasks.update_coupon_used_count.apply_async()
             except Exception as e:
                 logger.error(str(e))
 
