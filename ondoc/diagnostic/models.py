@@ -1762,9 +1762,7 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin,
                             if old_instance.status != self.CANCELLED and self.status == self.CANCELLED:
                                 push_lab_appointment_to_integrator.apply_async(({'appointment_id': self.id},), countdown=5)
                         else:
-                            push_lab_appointment_to_integrator.apply_async(({'appointment_id': self.id},),
-                                                                           link=get_integrator_order_status.s(
-                                                                               appointment_id=self.id),countdown=5)
+                            push_lab_appointment_to_integrator.apply_async(({'appointment_id': self.id},), countdown=5)
                 except Exception as e:
                     logger.error(str(e))
 

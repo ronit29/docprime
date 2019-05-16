@@ -83,7 +83,7 @@ from ondoc.seo.models import SeoSpecialization
 from ondoc.seo.models import SeoLabNetwork
 from ondoc.elastic.models import DemoElastic
 from .elastic import DemoElasticAdmin
-from ondoc.banner.models import Banner, SliderLocation
+from ondoc.banner.models import Banner, SliderLocation, BannerLocation
 from .integrations import IntegratorMapping, IntegratorMappingAdmin
 from .integrations import IntegratorProfileMapping, IntegratorProfileMappingAdmin
 from .integrations import IntegratorReport, IntegratorReportAdmin
@@ -235,3 +235,4 @@ admin.site.register(AppRatings, AppRatingsAdmin)
 admin.site.register(AppCompliments, AppComplimentsAdmin)
 admin.site.register(ContactUs, ContactUsAdmin)
 admin.site.register(CompareSEOUrls, ComparePackagesSEOUrlsAdmin)
+admin.site.register(BannerLocation)
