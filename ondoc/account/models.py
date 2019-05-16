@@ -79,6 +79,49 @@ class Order(TimeStampedModel):
     def __str__(self):
         return "{}".format(self.id)
 
+    def get_insurance_data_for_pg(self):
+        from ondoc.insurance.models import UserInsurance
+
+        data = {}
+        user_insurance = None
+        if self.product_id == Order.INSURANCE_PRODUCT_ID:
+            user_insurance = UserInsurance.objects.filter(order=self).first()
+            if user_insurance:
+                data['merchCode'] = str(user_insurance.insurance_plan.insurer.insurer_merchant_code)
+        elif (self.product_id in (self.DOCTOR_PRODUCT_ID,self.LAB_PRODUCT_ID)):
+            if not self.is_parent() and self.booked_using_insurance():
+            # if self.is_parent():
+            #     raise Exception('cannot get insurance for parent order')
+                appt = self.getAppointment()
+                if appt and appt.insurance:
+                    user_insurance = appt.insurance
+                    transactions = user_insurance.order.getTransactions()
+                    if not transactions:
+                        raise Exception('No transactions found for appointment insurance.')
+                    insurance_order_transaction = transactions[0]
+                    data['refOrderId'] = str(insurance_order_transaction.order_id)
+                    data['refOrderNo'] = str(insurance_order_transaction.order_no)
+                    data['merchCode'] = str(user_insurance.insurance_plan.insurer.insurer_merchant_code)
+
+        return data
+
+    def dummy_transaction_allowed(self):
+        if (not self.is_parent() and not self.booked_using_insurance()) or self.getTransactions():
+            return False
+
+        return True
+
+    def booked_using_insurance(self):
+        if self.is_parent():
+            raise Exception('Not implemented for parent orders')
+        appt = self.getAppointment()
+        if appt and appt.insurance_id:
+            return True
+        return False
+
+    def is_parent(self):
+        return self.parent_id is None
+
     @classmethod
     def disable_pending_orders(cls, appointment_details, product_id, action):
         if product_id == Order.DOCTOR_PRODUCT_ID:
@@ -213,11 +256,19 @@ class Order(TimeStampedModel):
                                                     account=insurer.float.all().first(),
                                                     transaction_type=InsuranceTransaction.DEBIT, amount=amount)
         elif self.action == Order.SUBSCRIPTION_PLAN_BUY:
-            amount = Decimal(appointment_data.get('extra_details').get('deal_price', float('inf')))
+            amount = Decimal(appointment_data.get('extra_details').get('payable_amount', float('inf')))
             if consumer_account.balance >= amount:
                 new_appointment_data = appointment_data
+                coupon = appointment_data.pop('coupon', [])
+                coupon_data = {
+                    "random_coupons": new_appointment_data.pop("coupon_data", [])
+                }
                 appointment_obj = UserPlanMapping(**new_appointment_data)
+                appointment_obj.coupon_data = coupon_data
                 appointment_obj.save()
+
+                if coupon:
+                    appointment_obj.coupon.add(*coupon)
                 order_dict = {
                     "reference_id": appointment_obj.id,
                     "payment_status": Order.PAYMENT_ACCEPTED
@@ -359,6 +410,9 @@ class Order(TimeStampedModel):
         return None
 
     def get_total_price(self):
+        if not self.is_parent() and self.booked_using_insurance():
+            return 0
+
         if self.parent:
             raise Exception("Cannot calculate price on a child order")
 
@@ -366,7 +420,10 @@ class Order(TimeStampedModel):
 
     def getTransactions(self):
         # if trying to get txn on a child order, recurse for its parent instead
-        if self.parent:
+
+        # for insurance dummy transaction should be created on child order
+        # for other bookings it should be created on parent order
+        if not self.is_parent() and not self.booked_using_insurance():
             return self.parent.getTransactions()
 
         all_txn = None
@@ -1535,32 +1592,32 @@ class MerchantPayout(TimeStampedModel):
                 return all_txn[0].order_no
 
     def update_status_from_pg(self):
+        with transaction.atomic():
+            if self.pg_status=='SETTLEMENT_COMPLETED' or self.utr_no or self.type ==self.MANUAL:
+                return
 
-        if self.pg_status=='SETTLEMENT_COMPLETED' or self.utr_no or self.type ==self.MANUAL:
-            return
+            url = settings.SETTLEMENT_DETAILS_API
+            order_no = self.get_pg_order_no()
 
-        url = settings.SETTLEMENT_DETAILS_API
-        order_no = self.get_pg_order_no()
+            if order_no:
+                req_data = {"orderNo":order_no}
+                req_data["hash"] = self.create_checksum(req_data)
 
-        if order_no:
-            req_data = {"orderNo":order_no}
-            req_data["hash"] = self.create_checksum(req_data)
+                headers = {"auth": settings.SETTLEMENT_AUTH,
+                           "Content-Type": "application/json"}
 
-            headers = {"auth": settings.SETTLEMENT_AUTH,
-                       "Content-Type": "application/json"}
-
-            response = requests.post(url, data=json.dumps(req_data), headers=headers)
-            if response.status_code == status.HTTP_200_OK:
-                resp_data = response.json()
-                self.status_api_response = resp_data
-                if resp_data.get('ok') == 1 and len(resp_data.get('settleDetails'))>0:
-                    details = resp_data.get('settleDetails')
-                    for d in details:
-                        if d.get('refNo') == str(self.payout_ref_id):
-                            self.utr_no = d.get('utrNo','')
-                            self.pg_status = d.get('txStatus','')
-                            break
-                self.save()
+                response = requests.post(url, data=json.dumps(req_data), headers=headers)
+                if response.status_code == status.HTTP_200_OK:
+                    resp_data = response.json()
+                    self.status_api_response = resp_data
+                    if resp_data.get('ok') == 1 and len(resp_data.get('settleDetails'))>0:
+                        details = resp_data.get('settleDetails')
+                        for d in details:
+                            if d.get('refNo') == str(self.payout_ref_id):
+                                self.utr_no = d.get('utrNo','')
+                                self.pg_status = d.get('txStatus','')
+                                break
+                    self.save()
 
     def create_checksum(self, data):
 

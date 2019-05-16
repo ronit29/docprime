@@ -1507,9 +1507,9 @@ class DoctorOpdAppointmentForm(RefundableAppointmentForm):
 
 class DoctorOpdAppointmentAdmin(admin.ModelAdmin):
     form = DoctorOpdAppointmentForm
-    search_fields = ['id']
+    search_fields = ['id', 'profile__name', 'profile__phone_number', 'doctor__name', 'hospital__name']
     list_display = ('booking_id', 'get_doctor', 'get_profile', 'status', 'time_slot_start', 'effective_price', 'created_at', 'updated_at')
-    list_filter = ('status', )
+    list_filter = ('status', 'payment_type')
     date_hierarchy = 'created_at'
 
     def get_queryset(self, request):
@@ -2012,11 +2012,20 @@ class SpecializationFieldAdmin(ImportExportMixin, VersionAdmin):
     resource_class = SpecializationFieldResource
 
 
+class PracticeSpecializationForm(forms.ModelForm):
+    def clean(self):
+        if self.data.get('specializationdepartmentmapping_set-TOTAL_FORMS') and int(
+                self.data.get('specializationdepartmentmapping_set-TOTAL_FORMS')) <= 0:
+            raise forms.ValidationError("Atleast one entry of Department is required.")
+        return super().clean()
+
+
 class PracticeSpecializationDepartmentMappingInline(admin.TabularInline):
     model = SpecializationDepartmentMapping
     extra = 0
     can_delete = True
     show_change_link = False
+
 
 
 class PracticeSpecializationAdmin(AutoComplete, ImportExportMixin, VersionAdmin):
@@ -2026,6 +2035,7 @@ class PracticeSpecializationAdmin(AutoComplete, ImportExportMixin, VersionAdmin)
     inlines = [PracticeSpecializationDepartmentMappingInline, ]
     resource_class = PracticeSpecializationSynonymResource
     search_fields = ['name', ]
+    form = PracticeSpecializationForm
 
 
 class GoogleDetailingResource(resources.ModelResource):

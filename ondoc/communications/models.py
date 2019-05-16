@@ -275,6 +275,8 @@ class SMSNotification:
             body_template = "sms/appointment_cancelled_patient.txt"
         elif notification_type == NotificationAction.PRESCRIPTION_UPLOADED:
             body_template = "sms/prescription_uploaded.txt"
+        elif notification_type == NotificationAction.APPOINTMENT_REMINDER_PROVIDER_SMS:
+            body_template = "sms/appointment_reminder.txt"
 
         elif notification_type == NotificationAction.LAB_APPOINTMENT_ACCEPTED or \
                 notification_type == NotificationAction.LAB_OTP_BEFORE_APPOINTMENT:
@@ -297,6 +299,8 @@ class SMSNotification:
             body_template = "sms/lab/lab_report_uploaded.txt"
         elif notification_type == NotificationAction.INSURANCE_CONFIRMED:
             body_template = "sms/insurance/insurance_confirmed.txt"
+        elif notification_type == NotificationAction.INSURANCE_CANCEL_INITIATE:
+            body_template = "sms/insurance/insurance_cancellation.txt"
         elif notification_type == NotificationAction.LAB_REPORT_SEND_VIA_CRM:
             body_template = "sms/lab/lab_report_send_crm.txt"
             lab_reports = []
@@ -380,24 +384,28 @@ class SMSNotification:
             else:
                 unique_key_found = True
         expiration_time = datetime.fromtimestamp(payload.get('exp'))
-        ClickLoginToken.objects.create(user=user, token=token, expiration_time=expiration_time, url_key=url_key)
+        # ClickLoginToken.objects.create(user=user, token=token, expiration_time=expiration_time, url_key=url_key)
+        click_login_token_obj = ClickLoginToken(user=user, token=token, expiration_time=expiration_time, url_key=url_key)
         provider_login_url = settings.PROVIDER_APP_DOMAIN + "/sms/login?key=" + url_key + \
                                         "&url=/sms-redirect/" + appointment_type + "/appointment/" + str(appointment.id)
         context['provider_login_url'] = generate_short_url(provider_login_url)
-        return context
+        return context, click_login_token_obj
 
     def send(self, receivers):
         context = self.context
         if not context:
             return
+        click_login_token_objects = list()
         for receiver in receivers:
             template = self.get_template(receiver.get('user'))
             if receiver.get('user') and receiver.get('user').user_type == User.DOCTOR:
-                context = self.save_token_to_context(context, receiver['user'])
+                context, click_login_token_obj = self.save_token_to_context(context, receiver['user'])
+                click_login_token_objects.append(click_login_token_obj)
             elif context.get('provider_login_url'):
                 context.pop('provider_login_url')
             if template:
                 self.trigger(receiver, template, context)
+        ClickLoginToken.objects.bulk_create(click_login_token_objects)
 
 
 class WHTSAPPNotification:
@@ -896,6 +904,28 @@ class EMAILNotification:
         elif notification_type == NotificationAction.IPD_PROCEDURE_MAIL:
             body_template = "email/ipd_lead/body.html"
             subject_template = "email/ipd_lead/subject.txt"
+        elif notification_type == NotificationAction.INSURANCE_CANCEL_INITIATE:
+            body_template = "email/insurance_cancelled/body.html"
+            subject_template = "email/insurance_cancelled/subject.txt"
+        elif notification_type == NotificationAction.PRICING_ALERT_EMAIL:
+            body_template = "email/lab/lab_pricing_change/body.html"
+            subject_template = "email/lab/lab_pricing_change/subject.txt"
+        elif notification_type == NotificationAction.LAB_LOGO_CHANGE_MAIL:
+            instance = context.get("instance", None)
+            if instance:
+                logo = context.get("instance").name
+                if not logo:
+                    logger.error("No logo found for logo change mail")
+                    return '', ''
+                context.update({"logo": logo})
+                context.update({"coi_url": logo.url})
+                context.update(
+                    {"attachments": [
+                        {"filename": util_file_name(logo.url),
+                         "path": util_absolute_url(logo.url)}]})
+
+                body_template = "email/lab_document_logo/body.html"
+                subject_template = "email/lab_document_logo/subject.txt"
 
         return subject_template, body_template
 
@@ -910,7 +940,6 @@ class EMAILNotification:
         notification_type = self.notification_type
         context = copy.deepcopy(context)
         instance = context.get('instance', None)
-
         receiver_user = receiver.get('user')
 
         # Hospital and labs which has the flag open to communication, send notificaiton to them only.
@@ -1121,6 +1150,9 @@ class OpdNotification(Notification):
 
             whtsapp_notification = WHTSAPPNotification(notification_type, context)
             whtsapp_notification.send(all_receivers.get('sms_receivers', []))
+        elif notification_type== NotificationAction.APPOINTMENT_REMINDER_PROVIDER_SMS:
+            sms_notification = SMSNotification(notification_type, context)
+            sms_notification.send(all_receivers.get('sms_receivers', []))
 
         else:
             email_notification = EMAILNotification(notification_type, context)
@@ -1161,6 +1193,9 @@ class OpdNotification(Notification):
             doctor_spocs_app_recievers = GenericAdmin.get_appointment_admins(instance)
             # receivers.extend(doctor_spocs)
             receivers.append(instance.user)
+        elif notification_type in [NotificationAction.APPOINTMENT_REMINDER_PROVIDER_SMS]:
+            spocs_to_be_communicated = doctor_spocs
+            doctor_spocs_app_recievers = GenericAdmin.get_appointment_admins(instance)
         receivers = list(set(receivers))
         user_and_phone_number = []
         user_and_email = []
@@ -1447,7 +1482,7 @@ class InsuranceNotification(Notification):
         notification_type = self.notification_type
         all_receivers = self.get_receivers()
 
-        if notification_type == NotificationAction.INSURANCE_CONFIRMED:
+        if notification_type in [NotificationAction.INSURANCE_CONFIRMED, NotificationAction.INSURANCE_CANCEL_INITIATE]:
             email_notification = EMAILNotification(notification_type, context)
             email_notification.send(all_receivers.get('email_receivers', []))
 

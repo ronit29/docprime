@@ -17,7 +17,7 @@ import random, string
 from django.contrib.contenttypes.fields import GenericForeignKey, GenericRelation
 from django.contrib.contenttypes.models import ContentType
 from django.utils.functional import cached_property
-from datetime import date, timedelta, datetime
+from datetime import date, datetime
 from safedelete import SOFT_DELETE
 from safedelete.models import SafeDeleteModel
 import reversion
@@ -37,6 +37,53 @@ class Image(models.Model):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.__original_name = self.name
+
+    def use_image_name(self):
+        return False
+
+    def auto_generate_thumbnails(self):
+        return False
+
+    def crop_existing_image(self, width, height):
+        if not hasattr(self, 'name'):
+            return
+        if not self.name:
+            return
+        if not hasattr(self, 'get_image_name'):
+            return
+        # from django.core.files.storage import get_storage_class
+        # default_storage_class = get_storage_class()
+        # storage_instance = default_storage_class()
+
+        path = "{}".format(self.get_image_name())
+        # if storage_instance.exists(path):
+        #     return
+        if self.name.closed:
+            self.name.open()
+        with Img.open(self.name) as img:
+            img = img.copy()
+            img.thumbnail(tuple([width, height]), Img.LANCZOS)
+            if img.mode != 'RGB':
+                img = img.convert('RGB')
+            new_image_io = BytesIO()
+            img.save(new_image_io, format='JPEG')
+            in_memory_file = InMemoryUploadedFile(new_image_io, None, path + ".jpg", 'image/jpeg', new_image_io.tell(),
+                                                  None)
+            self.cropped_image = in_memory_file
+            self.save()
+
+    def create_thumbnail(self):
+        if not hasattr(self, 'cropped_image'):
+            return
+        if not (hasattr(self, 'auto_generate_thumbnails') and self.auto_generate_thumbnails()):
+            return
+        if self.cropped_image:
+            return
+        from ondoc.doctor.models import DoctorImage
+        size = DoctorImage.image_sizes[0]
+        width = size[0]
+        height = size[1]
+        self.crop_existing_image(width, height)
 
     def get_thumbnail_path(self, path, prefix):
         first, last = path.rsplit('/', 1)
@@ -60,8 +107,8 @@ class Image(models.Model):
             size = img.size
             #new_size = ()
 
-            if max(size)>max_allowed:
-                size = tuple(math.floor(ti/(max(size)/max_allowed)) for ti in size)
+            if max(size) > max_allowed:
+                size = tuple(math.floor(ti / (max(size) / max_allowed)) for ti in size)
 
             img = img.resize(size, Img.ANTIALIAS)
 
@@ -69,7 +116,9 @@ class Image(models.Model):
                 img = img.convert('RGB')
 
             md5_hash = hashlib.md5(img.tobytes()).hexdigest()
-            #if img.multiple_chunks():
+            if hasattr(self, 'use_image_name') and self.use_image_name() and hasattr(self, 'get_image_name'):
+                md5_hash = self.get_image_name()
+            # if img.multiple_chunks():
             #    for chunk in img.chunks():
             #       hash.update(chunk)
             # else:    
@@ -77,15 +126,12 @@ class Image(models.Model):
 
             new_image_io = BytesIO()
             img.save(new_image_io, format='JPEG')
-
-
-            #im = img.save(md5_hash+'.jpg')
+            # im = img.save(md5_hash+'.jpg')
             self.name = InMemoryUploadedFile(new_image_io, None, md5_hash+".jpg", 'image/jpeg',
                                   new_image_io.tell(), None)
 
             # self.name = InMemoryUploadedFile(output, 'ImageField', md5_hash+".jpg", 'image/jpeg',
             #                                     output.len, None)
-
             # self.name = img
             # img.thumbnail((self.image.width/1.5,self.image.height/1.5), Img.ANTIALIAS)
             # output = StringIO.StringIO()
@@ -99,6 +145,9 @@ class Image(models.Model):
         abstract = True
 
 class Document(models.Model):
+
+    def use_image_name(self):
+        return False
 
     def get_thumbnail_path(self, path, prefix):
         first, last = path.rsplit('/', 1)
@@ -136,6 +185,8 @@ class Document(models.Model):
                     img = img.convert('RGB')
 
                 md5_hash = hashlib.md5(img.tobytes()).hexdigest()
+                if hasattr(self, 'use_image_name') and self.use_image_name() and hasattr(self, 'get_image_name'):
+                    md5_hash = self.get_image_name()
                 #if img.multiple_chunks():
                 #    for chunk in img.chunks():
                 #       hash.update(chunk)
@@ -158,7 +209,6 @@ class Document(models.Model):
                 name, extension = os.path.splitext(self.name.name)
                 filename = hash+extension
                 self.name.file.seek(0,2)
-
                 self.name = InMemoryUploadedFile(self.name.file, None, filename, None,
                     self.name.file.tell(), None)
 
@@ -741,11 +791,11 @@ class GenericLabAdmin(TimeStampedModel, CreatedByModel):
 
     @classmethod
     def update_user_lab_admin(cls, phone_number):
-        user = User.objects.filter(phone_number=phone_number, user_type=User.DOCTOR)
-        if user.exists():
+        user = User.objects.filter(phone_number=phone_number, user_type=User.DOCTOR).first()
+        if user:
             admin = GenericLabAdmin.objects.filter(phone_number=phone_number, user__isnull=True)
             if admin.exists():
-                admin.update(user=user.first())
+                admin.update(user=user)
 
     @classmethod
     def get_user_admin_obj(cls, user):
@@ -1705,3 +1755,16 @@ class RefundMixin(object):
         return not ConsumerTransaction.valid_appointment_for_cancellation(self.id, product_id)
         # return ConsumerRefund.objects.filter(consumer_transaction__reference_id=self.id,
         #                               consumer_transaction__product_id=product_id).first()
+
+
+class LastLoginTimestamp(TimeStampedModel):
+
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name="last_login_timestamp")
+    last_login = models.DateTimeField(auto_now=True)
+    source = models.CharField(max_length=100)
+
+    def __str__(self):
+        return self.user
+
+    class Meta:
+        db_table = "last_login_timestamp"

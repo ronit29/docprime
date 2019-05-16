@@ -1,4 +1,6 @@
 from urllib.parse import urlparse
+
+from django.core.files.uploadedfile import TemporaryUploadedFile, UploadedFile
 from rest_framework.views import exception_handler
 from rest_framework import permissions
 from collections import defaultdict
@@ -31,10 +33,35 @@ import hashlib
 from ondoc.authentication import models as auth_models
 import logging
 from datetime import timedelta
+import os
+import tempfile
 
 logger = logging.getLogger(__name__)
 
 User = get_user_model()
+
+
+class CustomTemporaryUploadedFile(UploadedFile):
+    """
+    A file uploaded to a temporary location (i.e. stream-to-disk).
+    """
+    def __init__(self, name, content_type, size, charset, prefix, suffix, content_type_extra=None):
+        _, ext = os.path.splitext(name)
+        file = tempfile.NamedTemporaryFile(suffix=suffix, prefix=prefix, dir=settings.FILE_UPLOAD_TEMP_DIR)
+        super().__init__(file, name, content_type, size, charset, content_type_extra)
+
+    def temporary_file_path(self):
+        """Return the full path of this file."""
+        return self.file.name
+
+    def close(self):
+        try:
+            return self.file.close()
+        except FileNotFoundError:
+            # The file was moved or deleted before the tempfile could unlink
+            # it. Still sets self.file.close_called and calls
+            # self.file.file.close() before the exception.
+            pass
 
 
 def flatten_dict(d):
@@ -558,7 +585,8 @@ def doctor_query_parameters(entity, req_params):
         params_dict["longitude"] = entity.sublocality_longitude
     elif entity.locality_longitude:
         params_dict["longitude"] = entity.locality_longitude
-
+    if entity.ipd_procedure_id:
+        params_dict["ipd_procedure_ids"] = str(entity.ipd_procedure_id)
 
     # if entity_params.get("location_json"):
     #     if entity_params["location_json"].get("sublocality_latitude"):
@@ -607,6 +635,7 @@ class CouponsMixin(object):
         from ondoc.coupon.models import Coupon
         from ondoc.doctor.models import OpdAppointment
         from ondoc.diagnostic.models import LabAppointment
+        from ondoc.subscription_plan.models import UserPlanMapping
 
         user = kwargs.get("user")
         coupon_obj = kwargs.get("coupon_obj")
@@ -620,6 +649,8 @@ class CouponsMixin(object):
             if isinstance(self, OpdAppointment) and coupon_obj.type not in [Coupon.DOCTOR, Coupon.ALL]:
                 return {"is_valid": False, "used_count": None}
             elif isinstance(self, LabAppointment) and coupon_obj.type not in [Coupon.LAB, Coupon.ALL]:
+                return {"is_valid": False, "used_count": None}
+            elif isinstance(self, UserPlanMapping) and coupon_obj.type not in [Coupon.SUBSCRIPTION_PLAN, Coupon.ALL]:
                 return {"is_valid": False, "used_count": None}
 
             diff_days = (timezone.now() - (coupon_obj.start_date or coupon_obj.created_at)).days
@@ -676,6 +707,14 @@ class CouponsMixin(object):
                 if user_specefic and count >= user_specefic.count:
                     return {"is_valid": False, "used_count": count}
 
+            # if coupon is random coupon
+            if hasattr(coupon_obj, 'is_random') and coupon_obj.is_random:
+                random_count = coupon_obj.random_coupon_used_count(None, coupon_obj.random_coupon_code, cart_item)
+                if random_count > 0:
+                    return {"is_valid": False, "used_count": random_count}
+                else:
+                    return {"is_valid": True, "used_count": random_count}
+
             if (coupon_obj.count is None or count < coupon_obj.count) and (coupon_obj.total_count is None or total_used_count < coupon_obj.total_count):
                 return {"is_valid": True, "used_count": count}
             else:
@@ -686,6 +725,8 @@ class CouponsMixin(object):
     def validate_product_coupon(self, **kwargs):
         from ondoc.diagnostic.models import Lab
         from ondoc.account.models import Order
+        from ondoc.coupon.models import Coupon
+
         import re
 
         coupon_obj = kwargs.get("coupon_obj")
@@ -703,6 +744,14 @@ class CouponsMixin(object):
         doctor = kwargs.get("doctor")
         hospital = kwargs.get("hospital")
         procedures = kwargs.get("procedures", [])
+        plan = kwargs.get("plan")
+
+        if plan:
+            if coupon_obj.type in [Coupon.ALL, Coupon.SUBSCRIPTION_PLAN] \
+                and coupon_obj.plan.filter(id=plan.id).exists():
+                    return True
+            return False
+
 
         if coupon_obj.lab and coupon_obj.lab != lab:
             return False
@@ -1493,3 +1542,21 @@ def update_physical_agreement_timestamp(obj):
         obj.physical_agreement_signed_at = time_to_be_set
         if isinstance(obj, HospitalNetwork):
             update_physical_agreement_value(obj, obj.physical_agreement_signed, time_to_be_set)
+
+
+def ipd_query_parameters(entity, req_params):
+    params_dict = copy.deepcopy(req_params)
+    params_dict["max_distance"] = None
+    if entity.sublocality_latitude:
+        params_dict["lat"] = entity.sublocality_latitude
+        params_dict["max_distance"] = 5  # In KMs
+    elif entity.locality_latitude:
+        params_dict["lat"] = entity.locality_latitude
+        params_dict["max_distance"] = 15  # In KMs
+    if entity.sublocality_longitude:
+        params_dict["long"] = entity.sublocality_longitude
+    elif entity.locality_longitude:
+        params_dict["long"] = entity.locality_longitude
+    if entity.locality_value:
+        params_dict['city'] = entity.locality_value
+    return params_dict

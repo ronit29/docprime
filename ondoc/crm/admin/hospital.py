@@ -26,9 +26,12 @@ from django.http import HttpResponseRedirect
 import logging
 logger = logging.getLogger(__name__)
 
+
 class HospitalImageInline(admin.TabularInline):
     model = HospitalImage
     # template = 'imageinline.html'
+    # exclude = ['cropped_image']
+    readonly_fields = ['cropped_image']
     extra = 0
     can_delete = True
     show_change_link = False
@@ -423,7 +426,7 @@ class HospitalAdmin(admin.GeoModelAdmin, VersionAdmin, ActionAdmin, QCPemAdmin):
     map_width = 200
     map_template = 'admin/gis/gmap.html'
     extra_js = ['js/admin/GoogleMap.js',
-                'https://maps.googleapis.com/maps/api/js?key=AIzaSyCFtb27PooaG0yujuykgvPtxi6tvS04Ek0&callback=initGoogleMap']
+                'https://maps.googleapis.com/maps/api/js?key=AIzaSyBqDAVDFBQzI5JMgaXcqJq431QPpJtNiZE&callback=initGoogleMap']
 
     # def get_inline_instances(self, request, obj=None):
     #     res = super().get_inline_instances(request, obj)

@@ -1,0 +1,9 @@
+Hi {{proposer_name}}
+
+The request for the cancellation of OPD group Out Patient Insurance Policy ID {{policy_number}} has been received
+Our team will get it touch with you within 24 hours
+In case of any further query you can contact us at :
+Email : customercare@docprime.com
+
+Thanks
+Team Docprime
