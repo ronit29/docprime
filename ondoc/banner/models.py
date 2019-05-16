@@ -84,7 +84,7 @@ class Banner(auth_model.TimeStampedModel):
 
 
     @staticmethod
-    def get_all_banners(request, latitude=None, longitude=None):
+    def get_all_banners(request, latitude=None, longitude=None, from_app=False):
 
         queryset = Banner.objects.prefetch_related('banner_location','location').filter(enable=True).filter(Q(start_date__lte=timezone.now()) | Q(start_date__isnull=True)).filter(Q(end_date__gte=timezone.now()) | Q(end_date__isnull=True)).order_by('-priority')[:100]
         #queryset = Banner.objects.filter(enable=True)
@@ -100,14 +100,27 @@ class Banner(auth_model.TimeStampedModel):
             if locations:
                 if not latitude or not longitude:
                     append_banner=False
-                else:
-                    append_banner=False
+
+                elif latitude and longitude and from_app == True:
+                    append_banner = False
                     for loc in locations:
                         pnt1 = Point(float(longitude), float(latitude))
                         pnt2 = Point(float(loc.longitude), float(loc.latitude))
                         if pnt1.distance(pnt2)*100 <= loc.radius:
                             append_banner = True
                             break
+
+                elif latitude and longitude and from_app == False:
+                    append_banner = False
+                    for loc in locations:
+                        pnt1 = Point(float(longitude), float(latitude))
+                        pnt2 = Point(float(loc.longitude), float(loc.latitude))
+                        if pnt1.distance(pnt2)*100 <= loc.radius:
+                            append_banner = True
+                            break
+
+                elif not latitude or not longitude and from_app == True:
+                    append_banner = True
 
             if append_banner and data.show_to_users and data.show_to_users!='all':
                 if data.show_to_users == 'logged_in' and not user.is_authenticated:
