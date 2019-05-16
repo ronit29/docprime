@@ -417,7 +417,7 @@ class CouponRecommender():
 
         all_coupons = all_coupons.prefetch_related('user_specific_coupon', 'test', 'test_categories', 'hospitals',
                                                   'doctors', 'specializations', 'procedures',
-                                                  'lab', 'test', total_opd_booked, user_opd_booked, total_lab_booked, user_lab_booked)
+                                                  'lab', 'test','procedure_categories', total_opd_booked, user_opd_booked, total_lab_booked, user_lab_booked)
 
         if user and user.is_authenticated:
             all_coupons = all_coupons.filter(Q(is_user_specific=False) \
