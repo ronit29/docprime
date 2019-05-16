@@ -1027,6 +1027,10 @@ class InsuredMemberDocumentInline(admin.TabularInline):
     readonly_fields = ("member_name", 'document_image', )
 
 
+class InsuredMemberDocumentAdmin(admin.ModelAdmin):
+    list_display = ['member', 'document_image']
+
+
 class EndorsementRequestAdmin(admin.ModelAdmin):
 
     def member_name(self, obj):
@@ -1056,8 +1060,22 @@ class EndorsementRequestAdmin(admin.ModelAdmin):
         if request.user.is_member_of(constants['SUPER_INSURANCE_GROUP']) or request.user.is_member_of(constants['INSURANCE_GROUP']):
             if obj.status == EndorsementRequest.APPROVED:
                 obj.process_endorsement()
+                super().save_model()
             elif obj.status == EndorsementRequest.REJECT:
                 obj.reject_endorsement()
+
+
+class InsuredMemberHistoryAdmin(admin.ModelAdmin):
+    list_display = ['first_name', 'last_name', 'dob', 'email', 'address', 'pincode', 'gender', 'phone_number']
+    readonly_fields = ['first_name', 'last_name', 'dob', 'email', 'address', 'pincode', 'gender', 'phone_number', 'relation', 'profile']
+
+    def has_add_permission(self, request, obj=None):
+        return False
+
+    def has_delete_permission(self, request, obj=None):
+        return False
+
+
 
 
 

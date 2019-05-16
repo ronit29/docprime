@@ -536,7 +536,7 @@ class UserProfile(TimeStampedModel):
                                                       new_image_io.tell(), None)
         super().save(*args, **kwargs)
 
-    def update_endorsement_profile(self, endorsed_data):
+    def update_profile_post_endorsement(self, endorsed_data):
         self.name = endorsed_data.first_name + " " + endorsed_data.middle_name + " " + endorsed_data.last_name
         self.email = endorsed_data.email
         self.gender = endorsed_data.gender
