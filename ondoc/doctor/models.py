@@ -1959,6 +1959,12 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
 
         return allowed
 
+    def get_corporate_deal_id(self):
+        coupon = self.coupon.first()
+        if coupon and coupon.corporate_deal:
+            return coupon.corporate_deal.id
+
+        return None
 
     def get_city(self):
         if self.hospital and self.hospital.matrix_city:
@@ -1996,6 +2002,7 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
             obj.Payout = self.fees
             obj.CashbackUsed = cashback
             obj.BookingDate = self.created_at
+        obj.CorporateDealId = self.get_corporate_deal_id()
         obj.PromoCost = max(0, promo_cost)
         obj.GMValue = self.deal_price
         obj.StatusId = self.status

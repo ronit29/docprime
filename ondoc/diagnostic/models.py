@@ -1554,7 +1554,12 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin,
     history = GenericRelation(AppointmentHistory)
     refund_details = GenericRelation(RefundDetails, related_query_name="lab_appointment_detail")
     coupon_data = JSONField(blank=True, null=True)
-    
+
+    def get_corporate_deal_id(self):
+        if self.coupon.all():
+            if self.coupon.first().corporate_deal:
+                return self.coupon.first().corporate_deal
+
     def get_city(self):
         if self.lab and self.lab.matrix_city:
             return self.lab.matrix_city.id
