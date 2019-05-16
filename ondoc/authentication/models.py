@@ -539,8 +539,16 @@ class UserProfile(TimeStampedModel):
     def update_profile_post_endorsement(self, endorsed_data):
         self.name = endorsed_data.first_name + " " + endorsed_data.middle_name + " " + endorsed_data.last_name
         self.email = endorsed_data.email
-        self.gender = endorsed_data.gender
-        self.phone_number = endorsed_data.phone_number
+        if endorsed_data.gender == 'f':
+            self.gender = UserProfile.FEMALE
+        elif endorsed_data.gender == 'm':
+            self.gender = UserProfile.MALE
+        else:
+            self.gender = UserProfile.OTHER
+        if endorsed_data.phone_number:
+            self.phone_number = endorsed_data.phone_number
+        else:
+            self.phone_number = self.user.phone_number
         self.dob = endorsed_data.dob
         self.save()
 

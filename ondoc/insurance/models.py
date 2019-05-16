@@ -1586,7 +1586,7 @@ class EndorsementRequest(auth_model.TimeStampedModel):
         insured_member = self.member
         InsuredMemberHistory.create_member(insured_member)
         insured_member.update_member(self)
-        profile = self.profile
+        profile = self.member.profile
         profile.update_profile_post_endorsement(self)
 
     def reject_endorsement(self):
