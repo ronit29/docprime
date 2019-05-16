@@ -1074,7 +1074,7 @@ class EndorsementRequestAdmin(admin.ModelAdmin):
                 super().save_model(request, obj, form, change)
             elif obj.status == EndorsementRequest.REJECT:
                 obj.reject_endorsement()
-            if obj.mail_coi_to_customer and self.status == EndorsementRequest.APPROVED:
+            if obj.mail_coi_to_customer and obj.status == EndorsementRequest.APPROVED:
                 obj.process_coi()
 
 
