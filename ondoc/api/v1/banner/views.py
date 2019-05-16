@@ -5,11 +5,15 @@ from django.contrib.gis.geos import Point
 from django.http import QueryDict
 from django.utils import timezone
 from rest_framework import viewsets, status, serializers
+from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
+
+from ondoc.authentication.backends import JWTAuthentication
 from ondoc.banner.models import Banner
 
 
 class BannerListViewSet(viewsets.GenericViewSet):
+    authentication_classes = (JWTAuthentication,)
 
     def get_queryset(self):
         return None
