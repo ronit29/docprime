@@ -37,7 +37,7 @@ class CorporateDeal(auth_model.TimeStampedModel):
     tds_deducted = models.CharField(max_length=50, choices=tds_choices, default='NO', verbose_name='TDS deducted')
     expected_provider_fee = models.IntegerField(default=None)
     employee_count = models.IntegerField(default=None)
-    service_description = models.TextField(default='')
+    service_description = models.TextField(null=True, blank=True)
     receipt_no = models.CharField(max_length=1000, default='')
     is_active = models.BooleanField(default=False)
     receipt_image = models.FileField(default=None, upload_to='corporate/receipt',
