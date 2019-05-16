@@ -1657,7 +1657,11 @@ class LabList(viewsets.ReadOnlyModelViewSet):
             lab_pricing_group__labs__is_live=True,
             enabled=True,
             test__enable_for_retail=True,
-            test__in=test_ids)
+            test__searchable=True)
+
+        total_test_count = queryset.count() if queryset else 0
+        #if test_ids:
+        queryset = queryset.filter(test__in=test_ids)
 
         test_serializer = diagnostic_serializer.AvailableLabTestPackageSerializer(queryset, many=True,
                                                                            context={"lab": lab_obj, "request": request, "package_free_or_not_dict": package_free_or_not_dict})
@@ -1710,6 +1714,7 @@ class LabList(viewsets.ReadOnlyModelViewSet):
         temp_data['tests'] = test_serializer.data
         temp_data['lab_tests'] = lab_test_serializer.data
         temp_data['lab_timing'], temp_data["lab_timing_data"] = lab_timing, lab_timing_data
+        temp_data['total_test_count'] = total_test_count
 
         # temp_data['url'] = entity.first()['url'] if len(entity) == 1 else None
 

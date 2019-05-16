@@ -61,15 +61,23 @@ def send_lab_notifications_refactored(appointment_id):
 def send_ipd_procedure_lead_mail(obj_id):
     from ondoc.communications.models import EMAILNotification
     from ondoc.procedure.models import IpdProcedureLead
+    from ondoc.matrix.tasks import create_or_update_lead_on_matrix
     instance = IpdProcedureLead.objects.filter(id=obj_id).first()
     if not instance:
         return
     try:
-        emails = settings.IPD_PROCEDURE_CONTACT_DETAILS
-        user_and_email = [{'user': None, 'email': email} for email in emails]
-        email_notification = EMAILNotification(notification_type=NotificationAction.IPD_PROCEDURE_MAIL,
-                                               context={'instance': instance})
-        email_notification.send(user_and_email)
+        if not instance.source or instance.source != 'docprimechat':
+            emails = settings.IPD_PROCEDURE_CONTACT_DETAILS
+            user_and_email = [{'user': None, 'email': email} for email in emails]
+            email_notification = EMAILNotification(notification_type=NotificationAction.IPD_PROCEDURE_MAIL,
+                                                   context={'instance': instance})
+            email_notification.send(user_and_email)
+        else:
+            create_or_update_lead_on_matrix.apply_async(
+                ({'obj_type': instance.__class__.__name__, 'obj_id': instance.id}
+                 ,), countdown=5)
+
+
     except Exception as e:
         logger.error(str(e))
 
@@ -683,6 +691,27 @@ def opd_send_otp_before_appointment(appointment_id, previous_appointment_date_ti
         opd_notification.send()
     except Exception as e:
         logger.error(str(e))
+
+@task()
+def appointment_reminder_sms_provider(appointment_id, appointment_updated_at):
+    from ondoc.doctor.models import OpdAppointment
+    from ondoc.communications.models import OpdNotification
+    try:
+        instance = OpdAppointment.objects.filter(id=appointment_id).first()
+        if not instance or \
+                not instance.user or \
+                str(math.floor(instance.updated_at.timestamp())) != appointment_updated_at \
+                or instance.status != OpdAppointment.ACCEPTED:
+            # logger.error(
+            #     'instance : {}, time : {}, str: {}'.format(str(model_to_dict(instance)),
+            #                                                previous_appointment_date_time,
+            #                                                str(math.floor(instance.time_slot_start.timestamp()))))
+            return
+        opd_notification = OpdNotification(instance, NotificationAction.APPOINTMENT_REMINDER_PROVIDER_SMS)
+        opd_notification.send()
+    except Exception as e:
+        logger.error(str(e))
+
 
 @task()
 def opd_send_after_appointment_confirmation(appointment_id, previous_appointment_date_time, second=False):
