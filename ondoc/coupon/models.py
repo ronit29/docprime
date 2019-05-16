@@ -11,6 +11,9 @@ import sys
 import datetime
 from django.utils.crypto import get_random_string
 import logging
+
+from ondoc.corporate_booking.models import CorporateDeal
+
 logger = logging.getLogger(__name__)
 
 
@@ -64,6 +67,7 @@ class Coupon(auth_model.TimeStampedModel):
     payment_option = models.ForeignKey(PaymentOptions, on_delete=models.SET_NULL, blank=True, null=True)
     random_coupon_count = models.PositiveIntegerField(null=True, blank=True)
     plan = models.ManyToManyField("subscription_plan.Plan", blank=True, null=True)
+    corporate_deal = models.ForeignKey(CorporateDeal, on_delete=models.SET_NULL, null=True, blank=True)
 
     def save(self, *args, **kwargs):
         if not self.id:
