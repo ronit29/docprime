@@ -1308,7 +1308,7 @@ class LabList(viewsets.ReadOnlyModelViewSet):
         min_distance = parameters.get('min_distance')
         # max_distance = parameters.get('max_distance')*1000 if parameters.get('max_distance') else DEFAULT_DISTANCE
         max_distance = parameters.get('max_distance') * 1000 if parameters.get('max_distance') else -1
-        max_distance = min(max_distance, MAX_SEARCHABLE_DISTANCE)
+        # max_distance = min(max_distance, MAX_SEARCHABLE_DISTANCE)
         long = parameters.get('long', default_long)
         lat = parameters.get('lat', default_lat)
         ids = parameters.get('ids', [])
