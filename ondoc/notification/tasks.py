@@ -27,6 +27,7 @@ from django.utils.safestring import mark_safe
 from ondoc.notification.models import NotificationAction
 import random
 import string
+from ondoc.api.v1.utils import RawSql
 
 
 logger = logging.getLogger(__name__)
@@ -985,3 +986,16 @@ def generate_random_coupons(total_count, coupon_id):
 
     except Exception as e:
         logger.error(str(e))
+
+
+@task
+def update_coupon_used_count():
+    RawSql('''  update coupon set total_used_count= usage_count from
+                (select coupon_id, sum(usage_count) usage_count from
+                (select oac.coupon_id, count(*) usage_count from opd_appointment oa inner join opd_appointment_coupon oac on oa.id = oac.opdappointment_id
+                 where oa.status in (2,3,4,5,7) group by oac.coupon_id
+                union
+                select oac.coupon_id, count(*) usage_count from lab_appointment oa inner join lab_appointment_coupon oac on oa.id = oac.labappointment_id
+                 where oa.status in (2,3,4,5,7) group by oac.coupon_id
+                ) x group by coupon_id
+                ) y where coupon.id = y.coupon_id ''', []).execute()
