@@ -1496,16 +1496,13 @@ class HospitalDoctorAppointmentPermissionViewSet(GenericViewSet):
     authentication_classes = (JWTAuthentication, )
     permission_classes = (IsAuthenticated, IsDoctor,)
 
-    # building = models.CharField(max_length=1000, blank=True)
-    # sublocality = models.CharField(max_length=100, blank=True)
-    # locality = models.CharField(max_length=100, blank=True)
-    # city = models.CharField(max_length=100)
-    # state = models.CharField(max_length=100, blank=True)
-    # country = models.CharField(max_length=100)
-
     @transaction.non_atomic_requests
     def list(self, request):
         user = request.user
+        manageable_hosp_list = GenericAdmin.objects.filter(Q(is_disabled=False, user=user), (Q(permission_type=GenericAdmin.APPOINTMENT)
+                                                                                              |
+                                                                                            Q(super_user_permission=True)))\
+                                                    .values_list('hospital', flat=True)
         doc_hosp_queryset = (DoctorClinic.objects
                              .select_related('doctor', 'hospital')
                              .prefetch_related('doctor__manageable_doctors', 'hospital__manageable_hospitals')
@@ -1523,43 +1520,12 @@ class HospitalDoctorAppointmentPermissionViewSet(GenericViewSet):
                                        hospital_is_live=F('hospital__is_live'),
                                        online_consultation_fees=F('doctor__online_consultation_fees')
                                        )
-                             .filter(
-                                    Q(
-                                        Q(doctor__manageable_doctors__user=user,
-                                          doctor__manageable_doctors__hospital=F('hospital'),
-                                          doctor__manageable_doctors__is_disabled=False,
-                                          doctor__manageable_doctors__permission_type__in=[GenericAdmin.APPOINTMENT, GenericAdmin.ALL],
-                                          doctor__manageable_doctors__write_permission=True) |
-                                        Q(doctor__manageable_doctors__user=user,
-                                          doctor__manageable_doctors__hospital__isnull=True,
-                                          doctor__manageable_doctors__is_disabled=False,
-                                          doctor__manageable_doctors__permission_type__in=[GenericAdmin.APPOINTMENT, GenericAdmin.ALL],
-                                          doctor__manageable_doctors__write_permission=True) |
-                                        Q(hospital__manageable_hospitals__doctor__isnull=True,
-                                          hospital__manageable_hospitals__user=user,
-                                          hospital__manageable_hospitals__is_disabled=False,
-                                          hospital__manageable_hospitals__permission_type__in=[GenericAdmin.APPOINTMENT, GenericAdmin.ALL],
-                                          hospital__manageable_hospitals__write_permission=True)
-                                    )|
-                                        Q(
-                                            Q(doctor__manageable_doctors__user=user,
-                                             doctor__manageable_doctors__super_user_permission=True,
-                                             doctor__manageable_doctors__is_disabled=False,
-                                             doctor__manageable_doctors__entity_type=GenericAdminEntity.DOCTOR,)|
-                                            Q(hospital__manageable_hospitals__user=user,
-                                              hospital__manageable_hospitals__super_user_permission=True,
-                                              hospital__manageable_hospitals__is_disabled=False,
-                                              hospital__manageable_hospitals__entity_type=GenericAdminEntity.HOSPITAL)
-                                    ))
+                             .filter(hospital_id__in=list(manageable_hosp_list))
                              .values('hospital', 'doctor', 'hospital_name', 'doctor_name', 'doctor_gender',
                                      'doctor_source_type', 'doctor_is_live', 'license',
-                                     'is_license_verified', 'hospital_source_type', 'online_consultation_fees',
-                                     'hospital_is_live').distinct('hospital', 'doctor')
+                                     'is_license_verified', 'hospital_source_type', 'hospital_is_live',
+                                     'online_consultation_fees').distinct('hospital', 'doctor')
                              )
-
-        # all_docs = [doc_hosp_queryset
-        # all_hospitals = doc_hosp_queryset
-
 
         return Response(doc_hosp_queryset)
 
