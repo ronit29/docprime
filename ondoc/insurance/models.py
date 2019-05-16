@@ -160,8 +160,11 @@ class InsuranceDoctorSpecializations(object):
 
         result = False
         specialization = None
-        doctor_specialization_ids = DoctorPracticeSpecialization.objects.filter(doctor_id=doctor).values_list('specialization_id', flat=True)
-        doctor_specialization_ids_set = set(doctor_specialization_ids)
+
+        doctor_specialization_ids_set = set([x.specialization_id for x in doctor.doctorpracticespecializations.all()])
+        
+        # doctor_specialization_ids = DoctorPracticeSpecialization.objects.prefetch_.filter(doctor_id=doctor).values_list('specialization_id', flat=True)
+        # doctor_specialization_ids_set = set(doctor_specialization_ids)
         for specialiization_id in doctor_specialization_ids_set:
             if specialiization_id in all_gynecologist_list:
                 # self.doctor_specialization = InsuranceDoctorSpecializations.SpecializationMapping.GYNOCOLOGIST
