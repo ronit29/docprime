@@ -256,6 +256,7 @@ class Lab(TimeStampedModel, CreatedByModel, QCModel, SearchKey, WelcomeCallingDo
     rating_data = JSONField(blank=True, null=True)
     is_location_verified = models.BooleanField(verbose_name='Location Verified', default=False)
     auto_ivr_enabled = models.BooleanField(default=True)
+    search_distance = models.FloatField(default=20000)
 
     def __str__(self):
         return self.name

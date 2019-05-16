@@ -1240,7 +1240,7 @@ class LabList(viewsets.ReadOnlyModelViewSet):
     def get_lab_search_list(self, parameters, page):
         # distance in meters
 
-        DEFAULT_DISTANCE = 20000
+        # DEFAULT_DISTANCE = 20000
         MAX_SEARCHABLE_DISTANCE = 50000
 
         if not page or page<1:
@@ -1249,7 +1249,8 @@ class LabList(viewsets.ReadOnlyModelViewSet):
         default_long = 77.071848
         default_lat = 28.450367
         min_distance = parameters.get('min_distance')
-        max_distance = parameters.get('max_distance')*1000 if parameters.get('max_distance') else DEFAULT_DISTANCE
+        # max_distance = parameters.get('max_distance')*1000 if parameters.get('max_distance') else DEFAULT_DISTANCE
+        max_distance = parameters.get('max_distance') * 1000 if parameters.get('max_distance') else -1
         max_distance = min(max_distance, MAX_SEARCHABLE_DISTANCE)
         long = parameters.get('long', default_long)
         lat = parameters.get('lat', default_lat)
@@ -1384,7 +1385,9 @@ class LabList(viewsets.ReadOnlyModelViewSet):
                         max(order_priority) as max_order_priority from lab lb inner join available_lab_test avlt on
                         lb.lab_pricing_group_id = avlt.lab_pricing_group_id 
                         and lb.is_test_lab = False and lb.is_live = True and lb.lab_pricing_group_id is not null 
-                        and St_dwithin( St_setsrid(St_point((%(longitude)s), (%(latitude)s)), 4326),lb.location, (%(max_distance)s)) 
+                        and case when (%(max_distance)s) >= 0  then 
+                        St_dwithin( St_setsrid(St_point((%(longitude)s), (%(latitude)s)), 4326),lb.location, (%(max_distance)s))
+                        else St_dwithin( St_setsrid(St_point((%(longitude)s), (%(latitude)s)), 4326),lb.location, search_distance ) end
                         and St_dwithin(St_setsrid(St_point((%(longitude)s), (%(latitude)s)), 4326), lb.location,  (%(min_distance)s)) = false 
                         and avlt.enabled = True 
                         inner join lab_test lt on lt.id = avlt.test_id and lt.enable_for_retail=True 
