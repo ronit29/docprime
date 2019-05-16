@@ -1566,6 +1566,8 @@ class EndorsementRequest(auth_model.TimeStampedModel):
     city_code = models.CharField(max_length=10, default='')
     district_code = models.CharField(max_length=10, default='')
     member_type = models.CharField(max_length=20, choices=MEMBER_TYPE_CHOICES, default=ADULT)
+    mail_coi_to_customer = models.BooleanField(default=False)
+    reject_reason = models.CharField(max_length=150, blank=True, null=True)
 
     @classmethod
     def is_endorsement_exist(cls, member_obj):
@@ -1588,6 +1590,11 @@ class EndorsementRequest(auth_model.TimeStampedModel):
         insured_member.update_member(self)
         profile = self.member.profile
         profile.update_profile_post_endorsement(self)
+
+    def process_coi(self):
+        user_insurance = self.user_insurance
+        # TODO - EMAIL - COI - Template Pending
+        # user_insurance.generate_pdf()
 
     def reject_endorsement(self):
         pass

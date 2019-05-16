@@ -1003,9 +1003,20 @@ class EndorsementRequestForm(forms.ModelForm):
     status_choices = [(EndorsementRequest.PENDING, "Pending"), (EndorsementRequest.APPROVED, 'Approved'),
                       (EndorsementRequest.REJECT, "Reject")]
     status = forms.ChoiceField(choices=status_choices, required=True)
+    # coi_choices = [("YES", "Yes"), ("NO", "No")]
+    mail_coi_to_customer = forms.BooleanField(initial=False)
+    reject_reason = forms.CharField(max_length=150, required=False)
 
     def clean(self):
         super().clean()
+        data = self.cleaned_data
+        status = data.get('status')
+        coi_status = data.get('mail_coi_to_customer')
+        reject_reason = data.get('reject_reason')
+        if status == EndorsementRequest.PENDING and coi_status:
+            raise forms.ValidationError('Without Approved COI can not be send to customer')
+        if status == EndorsementRequest.REJECT and not reject_reason:
+            raise forms.ValidationError('For Rejection, reject reason is mandatory')
 
     class Meta:
         fields = '__all__'
@@ -1063,6 +1074,8 @@ class EndorsementRequestAdmin(admin.ModelAdmin):
                 super().save_model(request, obj, form, change)
             elif obj.status == EndorsementRequest.REJECT:
                 obj.reject_endorsement()
+            if obj.mail_coi_to_customer and self.status == EndorsementRequest.APPROVED:
+                obj.process_coi()
 
 
 class InsuredMemberHistoryAdmin(admin.ModelAdmin):
