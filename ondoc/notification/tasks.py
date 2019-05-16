@@ -969,7 +969,7 @@ def generate_random_coupons(total_count, coupon_id):
             batch_data = []
             while curr_count < 10000 and total_count:
                 rc = RandomGeneratedCoupon()
-                rc.random_coupon = ''.join(random.choice(string.ascii_uppercase + string.digits + string.ascii_lowercase) for _ in range(8))
+                rc.random_coupon = ''.join(random.choice(string.ascii_uppercase + string.digits) for _ in range(12))
                 rc.coupon = coupon_obj
                 rc.validity = 90
                 rc.sent_at = datetime.datetime.utcnow()
