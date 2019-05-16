@@ -621,12 +621,11 @@ class InsuranceEndorsementViewSet(viewsets.GenericViewSet):
             res['error'] = "One of the OPD or LAB Appointment have been completed, could not process endorsement!!"
             return Response(data=res, status=status.HTTP_400_BAD_REQUEST)
 
-        serializer = serializers.InsuredMemberSerializer(data=request.data, context={'request': request})
+        serializer = serializers.EndorseMemberSerializer(data=request.data, context={'request': request})
         if not serializer.is_valid() and serializer.errors:
             logger.error(str(serializer.errors))
         serializer.is_valid(raise_exception=True)
         valid_data = serializer.validated_data
-
         for member in valid_data.get('members'):
             insured_member_obj = InsuredMembers.objects.filter(id=member.get('id')).first()
             if not insured_member_obj:
@@ -646,7 +645,6 @@ class InsuranceEndorsementViewSet(viewsets.GenericViewSet):
 
             # endorsement only create when some changes in member details pushed with flag!!
             if member.get('is_change', None):
-                # document uploaded then only creates endorsement
                 document = insured_member_obj.is_document_available()
                 if not document:
                     res['error'] = "Document required for member {}".format(member.get('first_name'))
@@ -654,7 +652,14 @@ class InsuranceEndorsementViewSet(viewsets.GenericViewSet):
 
                 member['insurance_id'] = insurance_obj.id
                 member['member_id'] = insured_member_obj.id
-                document_ids = member.get('image_ids')
+                document_ids = []
+                document_objs = member.get('image_ids')
+                if not document_objs:
+                    res['error'] = "Document Image Ids not found for member {}".format(member.get('first_name'))
+                    return Response(data=res, status=status.HTTP_400_BAD_REQUEST)
+                for document in document_objs:
+                    document_id = document.get('document_image').id
+                    document_ids.append(document_id)
 
                 end_obj = EndorsementRequest.create(member)
                 member_documents = InsuredMemberDocument.objects.filter(id__in=document_ids)
