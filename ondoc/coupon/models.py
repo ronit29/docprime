@@ -64,6 +64,7 @@ class Coupon(auth_model.TimeStampedModel):
     payment_option = models.ForeignKey(PaymentOptions, on_delete=models.SET_NULL, blank=True, null=True)
     random_coupon_count = models.PositiveIntegerField(null=True, blank=True)
     plan = models.ManyToManyField("subscription_plan.Plan", blank=True, null=True)
+    total_used_count = models.PositiveIntegerField(null=True, blank=True, default=0)
 
     def save(self, *args, **kwargs):
         if not self.id:
@@ -390,18 +391,10 @@ class CouponRecommender():
             types.append(Coupon.DOCTOR)
             types.append(Coupon.LAB)
 
-        total_opd_booked = Prefetch('opd_appointment_coupon',
-                                    queryset=OpdAppointment.objects.exclude(status__in=[OpdAppointment.CANCELLED]),
-                                                                            to_attr='total_opd_booked')
-
         user_opd_booked = Prefetch('opd_appointment_coupon',
                                    queryset=OpdAppointment.objects.filter(user=user)
                                                                   .exclude(status__in=[OpdAppointment.CANCELLED]),
                                                                            to_attr='user_opd_booked')
-
-        total_lab_booked = Prefetch('lab_appointment_coupon',
-                                    queryset=LabAppointment.objects.exclude(status__in=[LabAppointment.CANCELLED]),
-                                                                            to_attr='total_lab_booked')
 
         user_lab_booked = Prefetch('lab_appointment_coupon',
                                    queryset=LabAppointment.objects.filter(user=user)
@@ -417,7 +410,7 @@ class CouponRecommender():
 
         all_coupons = all_coupons.prefetch_related('user_specific_coupon', 'test', 'test_categories', 'hospitals',
                                                   'doctors', 'specializations', 'procedures',
-                                                  'lab', 'test', total_opd_booked, user_opd_booked, total_lab_booked, user_lab_booked)
+                                                  'lab', 'test', user_opd_booked, user_lab_booked)
 
         if user and user.is_authenticated:
             all_coupons = all_coupons.filter(Q(is_user_specific=False) \
@@ -589,8 +582,7 @@ class CouponRecommender():
         for coupon in coupons:
             coupon_properties = self.coupon_properties[coupon.code] = dict()
             remove_coupon = False
-            if coupon.total_count and (len(coupon.total_opd_booked) \
-                    + len(coupon.total_lab_booked)) >= coupon.total_count:
+            if coupon.total_count and coupon.total_used_count >= coupon.total_count:
                 remove_coupon = True
 
             used_coupon_count = 0
