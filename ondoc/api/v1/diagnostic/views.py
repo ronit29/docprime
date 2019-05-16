@@ -1198,6 +1198,7 @@ class LabList(viewsets.ReadOnlyModelViewSet):
         page = int(request.query_params.get('page', 1))
 
         parameters['insurance_threshold_amount'] = insurance_data_dict['insurance_threshold_amount']
+        parameters['is_user_insured'] = insurance_data_dict['is_user_insured']
         queryset_result = self.get_lab_search_list(parameters, page)
         count = 0
         if len(queryset_result)>0:
@@ -1432,11 +1433,13 @@ class LabList(viewsets.ReadOnlyModelViewSet):
                         ROW_NUMBER () OVER (ORDER BY {order} ) order_rank,
                         max_order_priority as order_priority
                         from (
-                        select lb.*, sum(mrp) total_mrp, count(*) as test_count,
+                        select max(lt.test_type) as test_type, lb.*, sum(mrp) total_mrp, count(*) as test_count,
                         case when bool_and(home_collection_possible)=True and is_home_collection_enabled=True 
                         then max(home_pickup_charges) else 0
                         end as pickup_charges,
                         sum(case when custom_deal_price is null then computed_deal_price else custom_deal_price end)as price,
+                        max(case when custom_agreed_price is null then computed_agreed_price else
+                        custom_agreed_price end) as agreed_price,
                         max(ST_Distance(location,St_setsrid(St_point((%(longitude)s), (%(latitude)s)), 4326))) as distance,
                         max(order_priority) as max_order_priority from lab lb inner join available_lab_test avlt on
                         lb.lab_pricing_group_id = avlt.lab_pricing_group_id 
@@ -1486,6 +1489,8 @@ class LabList(viewsets.ReadOnlyModelViewSet):
         return lab_search_result
 
     def apply_search_sort(self, parameters):
+        if parameters.get('ids') and  parameters.get('is_user_insured') and not parameters.get('sort_on'):
+            return ' case when (test_type in (2,3)) then ((case when network_id=43 then -1 end) , agreed_price ) end, case when (test_type=1) then distance  end '
         order_by = parameters.get("sort_on")
         if order_by is not None:
             if order_by == "fees" and parameters.get('ids'):
