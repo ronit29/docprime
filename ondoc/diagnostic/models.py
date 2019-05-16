@@ -263,9 +263,39 @@ class Lab(TimeStampedModel, CreatedByModel, QCModel, SearchKey, WelcomeCallingDo
     class Meta:
         db_table = "lab"
 
+    @classmethod
+    def update_labs_seo_urls(cls):
+        from ondoc.location.management.commands import lab_page_urls, map_lab_search_urls
+
+        # create lab page urls
+        lab_page_urls.map_lab_location_urls()
+
+        # create lab search urls
+        map_lab_search_urls.map_lab_search_urls()
+
+
     @cached_property
     def is_enabled_for_insurance(self):
         return self.is_insurance_enabled
+
+    @classmethod
+    def update_insured_labs(cls):
+
+        delete_query = RawSql(''' delete from insurance_covered_entity where type='lab' ''', []).execute()
+
+        query = '''
+                    insert into insurance_covered_entity(entity_id,name ,location, type, search_key, data,created_at,updated_at)
+                    select lab_id as entity_id, lab_name as name, location ,'lab' as type,search_key,
+                    json_build_object('id', lab_id, 'type','lab','name', lab_name, 'city', city,'url', url), now(), now() from
+                    (select distinct lb.id lab_id, lb.name lab_name, lb.city, eu.url,
+                    lb.location, lb.search_key
+                    from lab lb inner join available_lab_test avlt on
+                    lb.lab_pricing_group_id = avlt.lab_pricing_group_id  and avlt.enabled = True and avlt.mrp<=1500
+                    and lb.is_test_lab = False and lb.is_live = True and lb.lab_pricing_group_id is not null 
+                    inner join lab_test lt on lt.id = avlt.test_id and lt.enable_for_retail=True 
+                    inner join entity_urls eu on eu.entity_id = lb.id and sitemap_identifier = 'LAB_PAGE' and eu.is_valid=true
+                    )x '''
+        update_insured_labs = RawSql(query, []).execute()
 
     def open_for_communications(self):
         if (self.network and self.network.open_for_communication) or (not self.network and self.open_for_communication):
@@ -1523,8 +1553,15 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin,
     auto_ivr_data = JSONField(default=list(), null=True)
     history = GenericRelation(AppointmentHistory)
     refund_details = GenericRelation(RefundDetails, related_query_name="lab_appointment_detail")
+    coupon_data = JSONField(blank=True, null=True)
 
-    
+    def get_corporate_deal_id(self):
+        coupon = self.coupon.first()
+        if coupon and coupon.corporate_deal:
+            return coupon.corporate_deal.id
+
+        return None
+
     def get_city(self):
         if self.lab and self.lab.matrix_city:
             return self.lab.matrix_city.id
@@ -1560,6 +1597,7 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin,
             obj.PaymentType = self.payment_type if self.payment_type else None
             obj.Payout = self.agreed_price
             obj.BookingDate = self.created_at
+        obj.CorporateDealId = self.get_corporate_deal_id()
         obj.PromoCost = max(0, promo_cost)
         obj.GMValue = self.deal_price
         obj.Category = category
@@ -1732,9 +1770,7 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin,
                             if old_instance.status != self.CANCELLED and self.status == self.CANCELLED:
                                 push_lab_appointment_to_integrator.apply_async(({'appointment_id': self.id},), countdown=5)
                         else:
-                            push_lab_appointment_to_integrator.apply_async(({'appointment_id': self.id},),
-                                                                           link=get_integrator_order_status.s(
-                                                                               appointment_id=self.id),countdown=5)
+                            push_lab_appointment_to_integrator.apply_async(({'appointment_id': self.id},), countdown=5)
                 except Exception as e:
                     logger.error(str(e))
 
@@ -1759,6 +1795,12 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin,
                 notification_models.EmailNotification.ops_notification_alert(self, email_list=settings.OPS_EMAIL_ID,
                                                                              product=account_model.Order.LAB_PRODUCT_ID,
                                                                              alert_type=notification_models.EmailNotification.OPS_APPOINTMENT_NOTIFICATION)
+            except Exception as e:
+                logger.error(str(e))
+
+        if not old_instance or self.status == self.CANCELLED:
+            try:
+                notification_tasks.update_coupon_used_count.apply_async()
             except Exception as e:
                 logger.error(str(e))
 
@@ -1929,6 +1971,9 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin,
         appointment_data["user_plan_used"] = appointment_data.pop("user_plan", None)
         lab_ids = appointment_data.pop("lab_test")
         coupon_list = appointment_data.pop("coupon", None)
+        coupon_data = {
+            "random_coupons": appointment_data.pop("coupon_data", [])
+        }
         extra_details = deepcopy(appointment_data.pop("extra_details", None))
         app_obj = cls.objects.create(**appointment_data)
         test_mappings = []
@@ -1946,6 +1991,7 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin,
         app_obj.lab_test.add(*lab_ids)
         if coupon_list:
             app_obj.coupon.add(*coupon_list)
+        app_obj.coupon_data = coupon_data
         return app_obj
 
     def action_rescheduled_lab(self):
@@ -2166,7 +2212,7 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin,
                 effective_price += data["lab"].home_pickup_charges
                 home_pickup_charges = data["lab"].home_pickup_charges
 
-        coupon_discount, coupon_cashback, coupon_list = Coupon.get_total_deduction(data, effective_price)
+        coupon_discount, coupon_cashback, coupon_list, random_coupon_list = Coupon.get_total_deduction(data, effective_price)
 
         if data.get("payment_type") in [OpdAppointment.PREPAID]:
             if coupon_discount >= effective_price:
@@ -2176,11 +2222,11 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin,
 
         if data.get("payment_type") in [OpdAppointment.COD, OpdAppointment.PLAN]:
             effective_price = 0
-            coupon_discount, coupon_cashback, coupon_list = 0, 0, []
+            coupon_discount, coupon_cashback, coupon_list, random_coupon_list = 0, 0, [], []
 
         if data.get("payment_type") in [OpdAppointment.INSURANCE]:
             effective_price = effective_price
-            coupon_discount, coupon_cashback, coupon_list = 0, 0, []
+            coupon_discount, coupon_cashback, coupon_list, random_coupon_list = 0, 0, [], []
 
         return {
             "deal_price" : total_deal_price,
@@ -2190,7 +2236,8 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin,
             "coupon_discount" : coupon_discount,
             "coupon_cashback" : coupon_cashback,
             "coupon_list" : coupon_list,
-            "home_pickup_charges" : home_pickup_charges
+            "home_pickup_charges" : home_pickup_charges,
+            "coupon_data" : { "random_coupon_list" : random_coupon_list }
         }
 
     @classmethod
@@ -2257,7 +2304,8 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin,
             "discount": int(price_data.get("coupon_discount")),
             "cashback": int(price_data.get("coupon_cashback")),
             "is_appointment_insured": is_appointment_insured,
-            "insurance": insurance_id
+            "insurance": insurance_id,
+            "coupon_data": price_data.get("coupon_data")
         }
 
         if data.get('included_in_user_plan', False):

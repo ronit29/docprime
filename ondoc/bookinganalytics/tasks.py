@@ -18,6 +18,8 @@ def sync_booking_data():
     from ondoc.doctor.models import OpdAppointment
     from ondoc.diagnostic.models import LabAppointment
     from ondoc.common.models import SyncBookingAnalytics
+    from ondoc.corporate_booking.models import CorporateDeal
+
 
     try:
         cities = MatrixMappedCity.objects.filter(synced_analytics__isnull=True)
@@ -39,6 +41,11 @@ def sync_booking_data():
         for app in lab_apps:
             app.sync_with_booking_analytics()
             print('lab-id : {} has been synced'.format(app.id))
+
+        corp_deals = CorporateDeal.objects.filter(synced_analytics__isnull=True)
+        for deal in corp_deals:
+            deal.sync_with_booking_analytics()
+            print('deal-id : {} has been synced'.format(deal.id))
 
         to_be_updated = SyncBookingAnalytics.objects.exclude(synced_at=F('last_updated_at'))
         for obj in to_be_updated:

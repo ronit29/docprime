@@ -1,8 +1,10 @@
-
 from django.contrib.gis import admin
 from ondoc.common.models import PaymentOptions, UserConfig, Feature, Service, MatrixMappedState, MatrixMappedCity, \
     GlobalNonBookable, QRCode
+from ondoc.corporate_booking.models import Corporates, CorporateDeal, CorporateDocument
 from ondoc.crm.admin.banner import BannerAdmin, SliderLocationAdmin
+from ondoc.crm.admin.location import ComparePackagesSEOUrlsAdmin
+from ondoc.crm.admin.corporate_booking import CorporateDealAdmin, CorporatesAdmin
 from ondoc.crm.admin.procedure import ProcedureCategoryAdmin, ProcedureAdmin, IpdProcedureAdmin, FeatureAdmin, \
     ServiceAdmin, HealthInsuranceProviderAdmin, IpdProcedureCategoryAdmin, IpdProcedureDetailAdmin, \
     IpdProcedureDetailTypeAdmin, IpdProcedureSynonymAdmin, IpdProcedureSynonymMappingAdmin
@@ -24,7 +26,7 @@ from ondoc.coupon.models import Coupon, UserSpecificCoupon, RandomGeneratedCoupo
 from ondoc.lead.models import HospitalLead, DoctorLead, SearchLead
 from ondoc.account.models import ConsumerAccount, MerchantPayout, Order
 from ondoc.location.admin import EntityUrlsAdmin
-from ondoc.location.models import EntityUrls
+from ondoc.location.models import EntityUrls, CompareSEOUrls
 from ondoc.notification import models as notifcation_model
 from ondoc.procedure.models import Procedure, ProcedureCategory, CommonProcedureCategory, CommonProcedure, IpdProcedure, \
     IpdProcedureCategory, CommonIpdProcedure, IpdProcedureDetail, IpdProcedureDetailType, IpdProcedureSynonym, \
@@ -81,7 +83,7 @@ from ondoc.seo.models import SeoSpecialization
 from ondoc.seo.models import SeoLabNetwork
 from ondoc.elastic.models import DemoElastic
 from .elastic import DemoElasticAdmin
-from ondoc.banner.models import Banner, SliderLocation
+from ondoc.banner.models import Banner, SliderLocation, BannerLocation
 from .integrations import IntegratorMapping, IntegratorMappingAdmin
 from .integrations import IntegratorProfileMapping, IntegratorProfileMappingAdmin
 from .integrations import IntegratorReport, IntegratorReportAdmin
@@ -188,7 +190,7 @@ admin.site.register(SitemapManger, SitemapManagerAdmin)
 admin.site.register(GoogleDetailing, GoogleDetailingAdmin)
 admin.site.register(Coupon, CouponAdmin)
 admin.site.register(UserSpecificCoupon, UserSpecificCouponAdmin)
-# admin.site.register(RandomGeneratedCoupon, RandomGeneratedCouponAdmin)
+admin.site.register(RandomGeneratedCoupon, RandomGeneratedCouponAdmin)
 admin.site.register(VisitReason, VisitReasonAdmin)
 admin.site.register(CancellationReason)
 admin.site.register(SeoSpecialization, SeoSpecializationAdmin)
@@ -231,3 +233,7 @@ admin.site.register(TestParameterChat, TestParameterChatAdmin)
 admin.site.register(AppRatings, AppRatingsAdmin)
 admin.site.register(AppCompliments, AppComplimentsAdmin)
 admin.site.register(ContactUs, ContactUsAdmin)
+admin.site.register(Corporates, CorporatesAdmin)
+admin.site.register(CorporateDeal, CorporateDealAdmin)
+admin.site.register(CompareSEOUrls, ComparePackagesSEOUrlsAdmin)
+admin.site.register(BannerLocation)

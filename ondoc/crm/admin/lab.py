@@ -1173,7 +1173,7 @@ class LabAppointmentAdmin(nested_admin.NestedModelAdmin):
                     history_obj = IntegratorHistory.objects.filter(content_type=lab_appointment_content_type,
                                                                    object_id=obj.id).order_by('id').last()
                     if history_obj:
-                        history_obj.status = IntegratorHistory.PUSHED_AND_ACCEPTED
+                        # history_obj.status = IntegratorHistory.PUSHED_AND_ACCEPTED
                         history_obj.accepted_through = "CRM"
                         history_obj.save()
 

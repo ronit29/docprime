@@ -80,6 +80,7 @@ class NotificationAction:
 
     LAB_LOGO_CHANGE_MAIL = 70
     PRICING_ALERT_EMAIL = 72
+    APPOINTMENT_REMINDER_PROVIDER_SMS = 77
 
     NOTIFICATION_TYPE_CHOICES = (
         (APPOINTMENT_ACCEPTED, "Appointment Accepted"),
@@ -108,7 +109,8 @@ class NotificationAction:
         (REFUND_COMPLETED, 'Refund Completed'),
         (IPD_PROCEDURE_MAIL, 'IPD Procedure Mail'),
         (PRICING_ALERT_EMAIL, 'Pricing Change Mail'),
-        (LAB_LOGO_CHANGE_MAIL, 'Lab Logo Change Mail')
+        (LAB_LOGO_CHANGE_MAIL, 'Lab Logo Change Mail'),
+        (APPOINTMENT_REMINDER_PROVIDER_SMS, 'Appointment Reminder Provider SMS')
     )
 
     OPD_APPOINTMENT = "opd_appointment"

@@ -15,11 +15,13 @@ Link(s):
 {% endfor %}
 {% endif %}
 
+
 {% if is_thyrocare_report %}
-If you wish to get your reports reviewed by our in-house doctors, Please click on https://docprime.com/mobileviewchat?utm_source=Thyrocare&booking_id={{instance.id}})
+If you wish to get your reports reviewed by our in-house doctors, Please click on https://docprime.com/mobileviewchat?utm_source=Thyrocare&booking_id={{instance.id}}
 {% else %}
-If you wish to get your reports reviewed by our in-house doctors, please send an email to customercare@docprime.com or call us at 1800-123-9419.
+If you wish to get your reports reviewed by our in-house doctors, please send an email to customercare@docprime.com .
 {% endif %}
+
 
 Pending reports, if any, will be shared once received from the lab.
 Thank you for choosing docprime.com

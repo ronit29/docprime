@@ -17,7 +17,7 @@ import random, string
 from django.contrib.contenttypes.fields import GenericForeignKey, GenericRelation
 from django.contrib.contenttypes.models import ContentType
 from django.utils.functional import cached_property
-from datetime import date, timedelta, datetime
+from datetime import date, datetime
 from safedelete import SOFT_DELETE
 from safedelete.models import SafeDeleteModel
 import reversion
@@ -791,11 +791,11 @@ class GenericLabAdmin(TimeStampedModel, CreatedByModel):
 
     @classmethod
     def update_user_lab_admin(cls, phone_number):
-        user = User.objects.filter(phone_number=phone_number, user_type=User.DOCTOR)
-        if user.exists():
+        user = User.objects.filter(phone_number=phone_number, user_type=User.DOCTOR).first()
+        if user:
             admin = GenericLabAdmin.objects.filter(phone_number=phone_number, user__isnull=True)
             if admin.exists():
-                admin.update(user=user.first())
+                admin.update(user=user)
 
     @classmethod
     def get_user_admin_obj(cls, user):
@@ -1755,3 +1755,16 @@ class RefundMixin(object):
         return not ConsumerTransaction.valid_appointment_for_cancellation(self.id, product_id)
         # return ConsumerRefund.objects.filter(consumer_transaction__reference_id=self.id,
         #                               consumer_transaction__product_id=product_id).first()
+
+
+class LastLoginTimestamp(TimeStampedModel):
+
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name="last_login_timestamp")
+    last_login = models.DateTimeField(auto_now=True)
+    source = models.CharField(max_length=100)
+
+    def __str__(self):
+        return self.user
+
+    class Meta:
+        db_table = "last_login_timestamp"

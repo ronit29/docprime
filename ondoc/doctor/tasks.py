@@ -61,12 +61,34 @@ def update_search_score():
     obj = DoctorSearchScore()
     obj.create_search_score()
 
-@task
-def update_all_hospitals_seo_urls():
-    from ondoc.doctor.models import Hospital
-    Hospital.update_hospital_seo_urls()
+
 
 @task
 def update_all_ipd_seo_urls():
     from ondoc.procedure.models import IpdProcedure
+    IpdProcedure.update_ipd_seo_urls()
+
+@task
+def update_insured_labs_and_doctors():
+    from ondoc.doctor.models import Doctor
+    from ondoc.diagnostic.models import Lab
+    Doctor.update_insured_doctors()
+    Lab.update_insured_labs()
+
+@task
+def update_seo_urls():
+    from ondoc.doctor.models import Doctor, Hospital
+    from ondoc.diagnostic.models import Lab
+    from ondoc.procedure.models import IpdProcedure
+
+    # update doctor seo urls
+    Doctor.update_doctors_seo_urls()
+
+    # update hospital seo urls
+    Hospital.update_hospital_seo_urls()
+
+    # update lab seo urls()
+    Lab.update_labs_seo_urls()
+
+    # update ipd_procedure urls
     IpdProcedure.update_ipd_seo_urls()
