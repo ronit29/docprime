@@ -1599,7 +1599,7 @@ class EndorsementRequest(auth_model.TimeStampedModel):
         profile.update_profile_post_endorsement(self)
 
     def process_coi(self):
-        user_insurance = self.user_insurance
+        user_insurance = self.insurance
         if not user_insurance:
             logger.error('User Insurance not found for the endorsment request with id %d' % self.id)
             return
