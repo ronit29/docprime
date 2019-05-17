@@ -23,6 +23,8 @@ class BannerListViewSet(viewsets.GenericViewSet):
         lat = parameters.get('lat', None)
         long = parameters.get('long', None)
         from_app = parameters.get('from_app', False)
+        if from_app:
+            from_app=True
         banners = Banner.get_all_banners(request, lat, long, from_app)
         return Response(banners)
         # res = []

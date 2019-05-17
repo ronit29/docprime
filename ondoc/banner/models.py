@@ -100,27 +100,16 @@ class Banner(auth_model.TimeStampedModel):
             if locations:
                 if not latitude or not longitude:
                     append_banner=False
-
-                elif latitude and longitude and from_app == True:
-                    append_banner = False
+                else:
+                    append_banner=False
                     for loc in locations:
                         pnt1 = Point(float(longitude), float(latitude))
                         pnt2 = Point(float(loc.longitude), float(loc.latitude))
                         if pnt1.distance(pnt2)*100 <= loc.radius:
                             append_banner = True
                             break
-
-                elif latitude and longitude and from_app == False:
-                    append_banner = False
-                    for loc in locations:
-                        pnt1 = Point(float(longitude), float(latitude))
-                        pnt2 = Point(float(loc.longitude), float(loc.latitude))
-                        if pnt1.distance(pnt2)*100 <= loc.radius:
-                            append_banner = True
-                            break
-
-                elif not latitude or not longitude and from_app == True:
-                    append_banner = True
+                if from_app == True and append_banner == False and not latitude and not longitude:
+                    append_banner=True
 
             if append_banner and data.show_to_users and data.show_to_users!='all':
                 if data.show_to_users == 'logged_in' and not user.is_authenticated:
