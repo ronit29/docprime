@@ -1382,7 +1382,7 @@ class InsuranceLead(auth_model.TimeStampedModel):
         long = self.extras.get('longitude', None)
 
         city_name = InsuranceEligibleCities.check_eligibility(lat, long)
-        if city_name is not None:
+        if not lat or not long or city_name:
             push_insurance_banner_lead_to_matrix.apply_async(({'id': self.id}, ))
 
     @classmethod
