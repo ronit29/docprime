@@ -1798,6 +1798,12 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin,
             except Exception as e:
                 logger.error(str(e))
 
+        if not old_instance or self.status == self.CANCELLED:
+            try:
+                notification_tasks.update_coupon_used_count.apply_async()
+            except Exception as e:
+                logger.error(str(e))
+
         if self.status == self.COMPLETED and not self.is_rated:
             try:
                 notification_tasks.send_opd_rating_message.apply_async(
@@ -2414,7 +2420,7 @@ class CommonPackage(TimeStampedModel):
 
     @classmethod
     def get_packages(cls, count):
-        packages = cls.objects.prefetch_related('package').filter(package__enable_for_retail=True, package__searchable=True).order_by('-priority')[:count]
+        packages = cls.objects.prefetch_related('package', 'lab__lab_documents').filter(package__enable_for_retail=True, package__searchable=True).order_by('-priority')[:count]
         return packages
 
 class CommonDiagnosticCondition(TimeStampedModel):
