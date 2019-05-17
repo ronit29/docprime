@@ -30,6 +30,7 @@ from num2words import num2words
 from hardcopy import bytestring_to_pdf
 import math
 import reversion
+import numbers
 from ondoc.account.models import Order, Merchant, MerchantPayout
 from decimal import  *
 logger = logging.getLogger(__name__)
@@ -157,6 +158,9 @@ class InsuranceDoctorSpecializations(object):
         from ondoc.doctor.models import DoctorPracticeSpecialization, OpdAppointment
         all_gynecologist_list = set(json.loads(settings.GYNECOLOGIST_SPECIALIZATION_IDS))
         all_oncologist_list = set(json.loads(settings.ONCOLOGIST_SPECIALIZATION_IDS))
+
+        if isinstance(doctor, numbers.Number):
+            doctor = Doctor.objects.filter(id=doctor).first()
 
         result = False
         specialization = None
