@@ -8,7 +8,7 @@ from django.core import serializers as core_serializer
 import math
 
 from ondoc.api.v1.utils import payment_details
-from ondoc.diagnostic.models import LabAppointment
+from ondoc.diagnostic.models import LabAppointment, Lab
 from ondoc.doctor.models import OpdAppointment
 from . import serializers
 from rest_framework.response import Response
@@ -22,7 +22,7 @@ from ondoc.authentication.backends import JWTAuthentication
 from ondoc.api.v1.utils import RawSql
 from rest_framework.permissions import IsAuthenticated
 from rest_framework import status, permissions
-from django.db.models import F
+from django.db.models import F, Window
 import datetime
 from django.db import transaction
 from ondoc.authentication.models import User
@@ -32,12 +32,14 @@ import logging
 logger = logging.getLogger(__name__)
 from dateutil.relativedelta import relativedelta
 
+
 class InsuranceNetworkViewSet(viewsets.GenericViewSet):
 
     def get_queryset(self):
         return None
 
     def list(self, request):
+
 
         type = request.query_params.get('type')
         if type not in ('doctor','lab'):
@@ -51,7 +53,25 @@ class InsuranceNetworkViewSet(viewsets.GenericViewSet):
             return Response({'count':0,'total_count':0, 'results':[]})
 
         if not starts_with:
-            pass
+            params = dict()
+            params['latitude'] = latitude
+            params['longitude'] = longitude
+            result = list()
+
+            labs_query = '''select l.* from lab_network ln inner join lab l on l.network_id = ln.id
+            where ln.id in (43, 18, 65, 22) and St_dwithin( St_setsrid(St_point((%(longitude)s), (%(latitude)s)), 4326),l.location, 15000) 
+            order by ST_Distance(location, St_setsrid(St_point((%(longitude)s), (%(latitude)s)), 4326)) '''
+            labs = RawSql(labs_query, params).fetch_all()
+            temp_dict = set()
+            for lab in labs:
+                if len(temp_dict) == 4:
+                    break
+                if not lab.get('network_id') in temp_dict:
+                    result.append(lab)
+                    temp_dict.add(lab.get('network_id'))
+
+            return Response({'resp':result})
+
         else:
             starts_with = starts_with.lower()
 
