@@ -8,7 +8,7 @@ from ondoc.crm.constants import constants
 from ondoc.doctor.models import OpdAppointment, DoctorPracticeSpecialization, PracticeSpecialization, Hospital
 from ondoc.diagnostic.models import LabAppointment, LabTest, Lab
 from ondoc.insurance.models import InsurancePlanContent, InsurancePlans, InsuredMembers, UserInsurance, StateGSTCode, \
-    InsuranceCity, InsuranceDistrict, InsuranceDeal, InsurerPolicyNumber, InsuranceLead
+    InsuranceCity, InsuranceDistrict, InsuranceDeal, InsurerPolicyNumber, InsuranceLead, InsuranceEligibleCities
 from import_export.admin import ImportExportMixin, ImportExportModelAdmin, base_formats
 import nested_admin
 from import_export import fields, resources
@@ -1007,3 +1007,7 @@ class InsuranceLeadForm(forms.ModelForm):
 
 class InsuranceCancelMasterAdmin(admin.ModelAdmin):
     list_display = ['insurer', 'min_days', 'max_days', 'refund_percentage']
+
+
+class InsuranceEligibleCitiesAdmin(admin.ModelAdmin):
+    model = InsuranceEligibleCities
