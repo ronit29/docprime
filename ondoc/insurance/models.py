@@ -1593,8 +1593,23 @@ class EndorsementRequest(auth_model.TimeStampedModel):
 
     def process_coi(self):
         user_insurance = self.user_insurance
-        # TODO - EMAIL - COI - Template Pending
-        # user_insurance.generate_pdf()
+        if not user_insurance:
+            logger.error('User Insurance not found for the endorsment request with id %d' % self.id)
+            return
+        endorsment_members = user_insurance.endorse_members.all()
+        total_endorsment_members = endorsment_members.count()
+        endorsed_members_count = user_insurance.endorse_members.filter(~Q(status=EndorsementRequest.PENDING),
+                                                                       mail_coi_to_customer=True).count()
+
+        if total_endorsment_members == endorsed_members_count:
+            try:
+                user_insurance.generate_pdf()
+            except Exception as e:
+                logger.error('Insurance coi pdf cannot be generated. %s' % str(e))
+
+
+            send_insurance_notifications.apply_async(({'user_id': user_insurance.user.id, 'is_endorsment_notification': True}, ))
+
 
     def reject_endorsement(self):
         pass

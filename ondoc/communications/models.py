@@ -299,6 +299,8 @@ class SMSNotification:
             body_template = "sms/lab/lab_report_uploaded.txt"
         elif notification_type == NotificationAction.INSURANCE_CONFIRMED:
             body_template = "sms/insurance/insurance_confirmed.txt"
+        elif notification_type == NotificationAction.INSURANCE_ENDORSMENT_APPROVED:
+            body_template = "sms/insurance/insurance_endorsment_approved.txt"
         elif notification_type == NotificationAction.INSURANCE_CANCEL_INITIATE:
             body_template = "sms/insurance/insurance_cancellation.txt"
         elif notification_type == NotificationAction.LAB_REPORT_SEND_VIA_CRM:
@@ -894,6 +896,22 @@ class EMAILNotification:
             body_template = "email/insurance_confirmed/body.html"
             subject_template = "email/insurance_confirmed/subject.txt"
 
+        elif notification_type == NotificationAction.INSURANCE_ENDORSMENT_APPROVED:
+
+            coi = context.get("instance").coi
+            if not coi:
+                logger.error("Got error while creating pdf after endorsment for opd invoice")
+                return '', ''
+            context.update({"coi": coi})
+            context.update({"coi_url": coi.url})
+            context.update(
+                {"attachments": [
+                    {"filename": util_file_name(coi.url),
+                     "path": util_absolute_url(coi.url)}]})
+
+            body_template = "email/insurance_endorsment_approved/body.html"
+            subject_template = "email/insurance_endorsment_approved/subject.txt"
+
         elif notification_type == NotificationAction.LAB_REPORT_SEND_VIA_CRM:
             attachments = []
             for report_link in context.get('reports', []):
@@ -1482,7 +1500,8 @@ class InsuranceNotification(Notification):
         notification_type = self.notification_type
         all_receivers = self.get_receivers()
 
-        if notification_type in [NotificationAction.INSURANCE_CONFIRMED, NotificationAction.INSURANCE_CANCEL_INITIATE]:
+        if notification_type in [NotificationAction.INSURANCE_CONFIRMED, NotificationAction.INSURANCE_CANCEL_INITIATE,
+                                 NotificationAction.INSURANCE_ENDORSMENT_APPROVED]:
             email_notification = EMAILNotification(notification_type, context)
             email_notification.send(all_receivers.get('email_receivers', []))
 

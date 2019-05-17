@@ -580,6 +580,8 @@ def send_insurance_notifications(self, data):
             raise Exception("Invalid user id passed for insurance email notification. Userid %s" % str(user_id))
 
         insurance_status = int(data.get('status', 0))
+        is_endorsment_notification = data.get('is_endorsment_notification', False)
+
         # Cancellation
         if insurance_status and insurance_status == UserInsurance.CANCEL_INITIATE:
             user_insurance = UserInsurance.get_user_insurance(user)
@@ -604,7 +606,11 @@ def send_insurance_notifications(self, data):
                     print(countdown_time)
                     self.retry([data], countdown=countdown_time)
 
-            insurance_notification = InsuranceNotification(user_insurance, NotificationAction.INSURANCE_CONFIRMED)
+            if is_endorsment_notification:
+                insurance_notification = InsuranceNotification(user_insurance, NotificationAction.INSURANCE_ENDORSMENT_APPROVED)
+            else:
+                insurance_notification = InsuranceNotification(user_insurance, NotificationAction.INSURANCE_CONFIRMED)
+
             insurance_notification.send()
     except Exception as e:
         logger.error(str(e))

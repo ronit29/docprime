@@ -61,6 +61,7 @@ class NotificationAction:
     LAB_INVOICE = 11
 
     INSURANCE_CONFIRMED=15
+    INSURANCE_ENDORSMENT_APPROVED=82
     INSURANCE_CANCEL_INITIATE = 73
     INSURANCE_CANCELLATION=74
     INSURANCE_FLOAT_LIMIT=75
@@ -104,6 +105,7 @@ class NotificationAction:
         (DOCTOR_INVOICE, "Doctor Invoice"),
         (LAB_INVOICE, "Lab Invoice"),
         (INSURANCE_CONFIRMED, "Insurance Confirmed"),
+        (INSURANCE_ENDORSMENT_APPROVED, "Insurance endorsment completed."),
         (CASHBACK_CREDITED, "Cashback Credited"),
         (REFUND_BREAKUP, 'Refund break up'),
         (REFUND_COMPLETED, 'Refund Completed'),
