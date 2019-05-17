@@ -30,6 +30,7 @@ from num2words import num2words
 from hardcopy import bytestring_to_pdf
 import math
 import reversion
+import numbers
 from ondoc.account.models import Order, Merchant, MerchantPayout
 from decimal import  *
 logger = logging.getLogger(__name__)
@@ -154,14 +155,20 @@ class InsuranceDoctorSpecializations(object):
 
     @classmethod
     def get_doctor_insurance_specializations(cls, doctor):
-        from ondoc.doctor.models import DoctorPracticeSpecialization, OpdAppointment
+        from ondoc.doctor.models import Doctor, DoctorPracticeSpecialization, OpdAppointment
         all_gynecologist_list = set(json.loads(settings.GYNECOLOGIST_SPECIALIZATION_IDS))
         all_oncologist_list = set(json.loads(settings.ONCOLOGIST_SPECIALIZATION_IDS))
 
+        if isinstance(doctor, numbers.Number):
+            doctor = Doctor.objects.filter(id=doctor).first()
+
         result = False
         specialization = None
-        doctor_specialization_ids = DoctorPracticeSpecialization.objects.filter(doctor_id=doctor).values_list('specialization_id', flat=True)
-        doctor_specialization_ids_set = set(doctor_specialization_ids)
+
+        doctor_specialization_ids_set = set([x.specialization_id for x in doctor.doctorpracticespecializations.all()])
+        
+        # doctor_specialization_ids = DoctorPracticeSpecialization.objects.prefetch_.filter(doctor_id=doctor).values_list('specialization_id', flat=True)
+        # doctor_specialization_ids_set = set(doctor_specialization_ids)
         for specialiization_id in doctor_specialization_ids_set:
             if specialiization_id in all_gynecologist_list:
                 # self.doctor_specialization = InsuranceDoctorSpecializations.SpecializationMapping.GYNOCOLOGIST

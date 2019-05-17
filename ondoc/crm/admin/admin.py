@@ -1,9 +1,10 @@
-
 from django.contrib.gis import admin
 from ondoc.common.models import PaymentOptions, UserConfig, Feature, Service, MatrixMappedState, MatrixMappedCity, \
     GlobalNonBookable, QRCode
+from ondoc.corporate_booking.models import Corporates, CorporateDeal, CorporateDocument
 from ondoc.crm.admin.banner import BannerAdmin, SliderLocationAdmin
 from ondoc.crm.admin.location import ComparePackagesSEOUrlsAdmin
+from ondoc.crm.admin.corporate_booking import CorporateDealAdmin, CorporatesAdmin
 from ondoc.crm.admin.procedure import ProcedureCategoryAdmin, ProcedureAdmin, IpdProcedureAdmin, FeatureAdmin, \
     ServiceAdmin, HealthInsuranceProviderAdmin, IpdProcedureCategoryAdmin, IpdProcedureDetailAdmin, \
     IpdProcedureDetailTypeAdmin, IpdProcedureSynonymAdmin, IpdProcedureSynonymMappingAdmin
@@ -195,7 +196,7 @@ admin.site.register(SitemapManger, SitemapManagerAdmin)
 admin.site.register(GoogleDetailing, GoogleDetailingAdmin)
 admin.site.register(Coupon, CouponAdmin)
 admin.site.register(UserSpecificCoupon, UserSpecificCouponAdmin)
-# admin.site.register(RandomGeneratedCoupon, RandomGeneratedCouponAdmin)
+admin.site.register(RandomGeneratedCoupon, RandomGeneratedCouponAdmin)
 admin.site.register(VisitReason, VisitReasonAdmin)
 admin.site.register(CancellationReason)
 admin.site.register(SeoSpecialization, SeoSpecializationAdmin)
@@ -238,5 +239,7 @@ admin.site.register(TestParameterChat, TestParameterChatAdmin)
 admin.site.register(AppRatings, AppRatingsAdmin)
 admin.site.register(AppCompliments, AppComplimentsAdmin)
 admin.site.register(ContactUs, ContactUsAdmin)
+admin.site.register(Corporates, CorporatesAdmin)
+admin.site.register(CorporateDeal, CorporateDealAdmin)
 admin.site.register(CompareSEOUrls, ComparePackagesSEOUrlsAdmin)
 admin.site.register(BannerLocation)

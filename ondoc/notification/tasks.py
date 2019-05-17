@@ -25,6 +25,10 @@ import requests
 from rest_framework import status
 from django.utils.safestring import mark_safe
 from ondoc.notification.models import NotificationAction
+import random
+import string
+from ondoc.api.v1.utils import RawSql
+
 
 logger = logging.getLogger(__name__)
 
@@ -957,3 +961,47 @@ def push_insurance_banner_lead_to_matrix(self, data):
 
     except Exception as e:
         logger.error("Error in Celery. Failed pushing insurance banner lead to the matrix- " + str(e))
+
+
+@task
+def generate_random_coupons(total_count, coupon_id):
+    from ondoc.coupon.models import RandomGeneratedCoupon, Coupon
+    try:
+        coupon_obj = Coupon.objects.filter(id=coupon_id).first()
+        if not coupon_obj:
+            return
+
+        while total_count:
+            curr_count = 0
+            batch_data = []
+            while curr_count < 10000 and total_count:
+                rc = RandomGeneratedCoupon()
+                rc.random_coupon = ''.join(random.choice(string.ascii_uppercase + string.digits) for _ in range(12))
+                rc.coupon = coupon_obj
+                rc.validity = 90
+                rc.sent_at = datetime.datetime.utcnow()
+
+                batch_data.append(rc)
+                curr_count += 1
+                total_count -= 1
+
+            if batch_data:
+                RandomGeneratedCoupon.objects.bulk_create(batch_data)
+            else:
+                return
+
+    except Exception as e:
+        logger.error(str(e))
+
+
+@task
+def update_coupon_used_count():
+    RawSql('''  update coupon set total_used_count= usage_count from
+                (select coupon_id, sum(usage_count) usage_count from
+                (select oac.coupon_id, count(*) usage_count from opd_appointment oa inner join opd_appointment_coupon oac on oa.id = oac.opdappointment_id
+                 where oa.status in (2,3,4,5,7) group by oac.coupon_id
+                union
+                select oac.coupon_id, count(*) usage_count from lab_appointment oa inner join lab_appointment_coupon oac on oa.id = oac.labappointment_id
+                 where oa.status in (2,3,4,5,7) group by oac.coupon_id
+                ) x group by coupon_id
+                ) y where coupon.id = y.coupon_id ''', []).execute()
