@@ -45,41 +45,53 @@ class InsuranceNetworkViewSet(viewsets.GenericViewSet):
         latitude = request.query_params.get('latitude')
         longitude = request.query_params.get('longitude')
         starts_with = request.query_params.get('starts_with')
-        if not type or not latitude or not longitude or not starts_with:
+        search = request.query_params.get('search')
+        if (not type or not latitude or not longitude) or \
+                (not starts_with and type == 'doctor'):
             return Response({'count':0,'total_count':0, 'results':[]})
 
-        starts_with = starts_with.lower()
+        if not starts_with:
+            pass
+        else:
+            starts_with = starts_with.lower()
 
-        params = {'type':type,'latitude':latitude,'longitude':longitude,'starts_with':starts_with+'%'}
+            params = {'type':type,'latitude':latitude,'longitude':longitude,'starts_with':starts_with+'%'}
 
-        query_string = "select * from (select x.*, rank() over(partition by entity_id order by distance) "\
-        " rnk from (select mt.*, st_distance(location,st_setsrid(st_point((%(longitude)s),(%(latitude)s)), 4326))/1000 "\
-        " distance from  insurance_covered_entity mt where type=%(type)s and search_key like (%(starts_with)s) and "\
-        " st_dwithin(location,st_setsrid(st_point((%(longitude)s),(%(latitude)s)), 4326),15000) "\
-        " )x )y where rnk=1 order by distance"
+            query_string = "select * from (select x.*, rank() over(partition by entity_id order by distance) "\
+            " rnk from (select mt.*, st_distance(location,st_setsrid(st_point((%(longitude)s),(%(latitude)s)), 4326))/1000 "\
+            " distance from  insurance_covered_entity mt where type=%(type)s and "
 
-        results = RawSql(query_string, params).fetch_all()
+            if type =='doctor' and search == 'specialization':
+                query_string += " (specialization_search_key like (%(starts_with)s) or specialization_search_key like concat('%,',(%(starts_with)s))) "
+            else:
+                query_string += ' search_key like (%(starts_with)s) '
 
-        distance_count_query = "select count(distinct entity_id) from insurance_covered_entity where type= %(type)s "\
-        " and st_dwithin(location,st_setsrid(st_point((%(longitude)s),(%(latitude)s)), 4326),15000)"
-        distance_count = RawSql(distance_count_query, {'type':type,'latitude':latitude,'longitude':longitude}).fetch_all()[0].get('count')
+            query_string += " and "\
+            " st_dwithin(location,st_setsrid(st_point((%(longitude)s),(%(latitude)s)), 4326),15000) "\
+            " )x )y where rnk=1 order by distance"
 
-        total_count_query= "select count(distinct entity_id) from insurance_covered_entity where type= %(type)s"
-        total_count = RawSql(total_count_query, {'type':type}).fetch_all()[0].get('count')
+            results = RawSql(query_string, params).fetch_all()
 
-        data_list = []
-        for r in results:
-            data_list.append({'name':r.get('name'), 'distance':math.ceil(r.get('distance')), 'id':r.get('entity_id'),\
-            'type':r.get('type'), 'city':r.get('data',{}).get('city'),'url':r.get('data',{}).get('url')})
+            distance_count_query = "select count(distinct entity_id) from insurance_covered_entity where type= %(type)s "\
+            " and st_dwithin(location,st_setsrid(st_point((%(longitude)s),(%(latitude)s)), 4326),15000)"
+            distance_count = RawSql(distance_count_query, {'type':type,'latitude':latitude,'longitude':longitude}).fetch_all()[0].get('count')
 
-        resp = dict()
-        resp["starts_with"] = starts_with
-        resp["count"] = len(data_list)
-        resp["total_count"] = total_count
-        resp["distance_count"] = distance_count
-        resp["results"] = data_list
+            total_count_query= "select count(distinct entity_id) from insurance_covered_entity where type= %(type)s"
+            total_count = RawSql(total_count_query, {'type':type}).fetch_all()[0].get('count')
 
-        return Response(resp)
+            data_list = []
+            for r in results:
+                data_list.append({'name':r.get('name'), 'distance':math.ceil(r.get('distance')), 'id':r.get('entity_id'),\
+                'type':r.get('type'), 'city':r.get('data',{}).get('city'),'url':r.get('data',{}).get('url')})
+
+            resp = dict()
+            resp["starts_with"] = starts_with
+            resp["count"] = len(data_list)
+            resp["total_count"] = total_count
+            resp["distance_count"] = distance_count
+            resp["results"] = data_list
+
+            return Response(resp)
 
 
 class ListInsuranceViewSet(viewsets.GenericViewSet):

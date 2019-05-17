@@ -1459,6 +1459,7 @@ class InsuranceCoveredEntity(auth_model.TimeStampedModel):
     type = models.CharField(max_length=50)
     search_key = models.CharField(max_length=1000, null=True, blank=True)
     data = JSONField(null=True, blank=True)
+    specialization_search_key = models.CharField(max_length=1000, null=True, blank=True)
 
     class Meta:
         db_table = 'insurance_covered_entity'
