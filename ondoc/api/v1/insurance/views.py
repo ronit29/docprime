@@ -59,15 +59,14 @@ class InsuranceNetworkViewSet(viewsets.GenericViewSet):
 
             query_string = "select * from (select x.*, rank() over(partition by entity_id order by distance) "\
             " rnk from (select mt.*, st_distance(location,st_setsrid(st_point((%(longitude)s),(%(latitude)s)), 4326))/1000 "\
-            " distance from  insurance_covered_entity mt where type=%(type)s and "
+            " distance from  insurance_covered_entity mt where type=(%(type)s) and "
 
             if type =='doctor' and search == 'specialization':
-                query_string += " (specialization_search_key like (%(starts_with)s) or specialization_search_key like concat('%,',(%(starts_with)s))) "
+                query_string += " ((specialization_search_key like (%(starts_with)s)) or (specialization_search_key like concat('%,',(%(starts_with)s))) )"
             else:
-                query_string += ' search_key like (%(starts_with)s) '
+                query_string += ' search_key like %(starts_with)s '
 
-            query_string += " and "\
-            " st_dwithin(location,st_setsrid(st_point((%(longitude)s),(%(latitude)s)), 4326),15000) "\
+            query_string += " and st_dwithin(location,st_setsrid(st_point((%(longitude)s),(%(latitude)s)), 4326),15000) "\
             " )x )y where rnk=1 order by distance"
 
             results = RawSql(query_string, params).fetch_all()
