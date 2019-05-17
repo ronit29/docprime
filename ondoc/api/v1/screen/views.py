@@ -5,6 +5,7 @@ from rest_framework.response import Response
 from ondoc.api.v1.auth.views import AppointmentViewSet
 from ondoc.authentication.backends import JWTAuthentication
 from ondoc.common.utils import get_all_upcoming_appointments
+from ondoc.coupon.models import CouponRecommender
 from ondoc.doctor.models import CommonSpecialization
 from ondoc.diagnostic.models import CommonTest
 from ondoc.diagnostic.models import CommonPackage
@@ -35,6 +36,9 @@ class ScreenViewSet(viewsets.GenericViewSet):
 
         params = request.query_params
         from_app = params.get("from_app", False)
+        coupon_code = params.get('coupon_code')
+        profile = params.get('profile_id')
+        product_id = params.get('product_id')
         app_version = params.get("app_version", "1.0")
         if UserConfig.objects.filter(key="app_update").exists():
             app_update = UserConfig.objects.filter(key="app_update").values_list('data', flat=True).first()
@@ -53,7 +57,8 @@ class ScreenViewSet(viewsets.GenericViewSet):
         test_serializer = CommonTestSerializer(test_queryset, many=True, context={'request': request})
 
         package_queryset = CommonPackage.get_packages(grid_size-1)
-        package_serializer = CommonPackageSerializer(package_queryset, many=True, context={'request': request})
+        coupon_recommender = CouponRecommender(request.user, profile, 'lab', product_id, coupon_code, None)
+        package_serializer = CommonPackageSerializer(package_queryset, many=True, context={'request': request, 'coupon_recommender': coupon_recommender})
 
         # upcoming_appointment_viewset = AppointmentViewSet()
         # upcoming_appointment_result = upcoming_appointment_viewset.upcoming_appointments(request).data

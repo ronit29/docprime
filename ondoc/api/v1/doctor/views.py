@@ -23,7 +23,7 @@ from ondoc.doctor.models import DoctorClinic, OpdAppointment, DoctorAssociation,
     HealthInsuranceProvider, ProviderSignupLead, HospitalImage
 from ondoc.notification.models import EmailNotification
 from django.utils.safestring import mark_safe
-from ondoc.coupon.models import Coupon
+from ondoc.coupon.models import Coupon, CouponRecommender
 from ondoc.api.v1.diagnostic import serializers as diagnostic_serializer
 from ondoc.account import models as account_models
 from ondoc.location.models import EntityUrls, EntityAddress, DefaultRating
@@ -596,7 +596,7 @@ class DoctorProfileView(viewsets.GenericViewSet):
 
 class DoctorProfileUserViewSet(viewsets.GenericViewSet):
 
-    def prepare_response(self, response_data, selected_hospital):
+    def prepare_response(self, response_data, selected_hospital, profile=None, product_id=None, coupon_code=None):
         import operator 
         # hospitals = sorted(response_data.get('hospitals'), key=itemgetter("hospital_id"))
         # [d['value'] for d in l if 'value' in d]
@@ -611,6 +611,8 @@ class DoctorProfileUserViewSet(viewsets.GenericViewSet):
 
         procedures = response_data.pop('procedures')
         availability = []
+        coupon_recommender = CouponRecommender(self.request.user, profile, 'doctor', product_id, coupon_code, None)
+        filters = dict()
         for key, group in groupby(sorted_by_enable_booking, lambda x: x['hospital_id']):
             hospital_groups = list(group)
             hospital_groups = sorted(hospital_groups, key=itemgetter("discounted_fees"))
@@ -625,6 +627,20 @@ class DoctorProfileUserViewSet(viewsets.GenericViewSet):
             hospital.pop("count", None)
             hospital.pop("discounted_fees", None)
             hospital['procedure_categories'] = procedures.get(key) if procedures else []
+
+            filters['deal_price'] = hospital['deal_price']
+            filters['doctor_id'] = response_data.get('id')
+            filters['doctor_specializations_ids'] = response_data.get('doctor_specializations_ids', [])
+            filters['hospital'] = dict()
+            hospital_obj = filters['hospital']
+            hospital_obj['id'] = hospital.get('hospital_id')
+            hospital_obj['city'] = hospital.get('hospital_city')
+
+            search_coupon = coupon_recommender.best_coupon(**filters)
+
+            hospital['discounted_price'] = hospital['deal_price'] if not search_coupon else search_coupon.get_search_coupon_discounted_price(
+            hospital['deal_price'])
+
             if key == selected_hospital:
                 availability.insert(0, hospital)
             else:
@@ -793,6 +809,9 @@ class DoctorProfileUserViewSet(viewsets.GenericViewSet):
         category_ids = validated_data.get('procedure_category_ids', None)
         procedure_ids = validated_data.get('procedure_ids', None)
         selected_hospital = validated_data.get('hospital_id', None)
+        profile_id = request.query_params.get('profile_id', None)
+        product_id = request.query_params.get('product_id', None)
+        coupon_code = request.query_params.get('coupon_code', None)
         doctor = (models.Doctor.objects
                   .prefetch_related('languages__language',
                                     'doctor_clinics__hospital',
@@ -849,7 +868,7 @@ class DoctorProfileUserViewSet(viewsets.GenericViewSet):
                                                                          ,  "spec_url_dict":spec_url_dict
                                                                               })
 
-        response_data = self.prepare_response(serializer.data, selected_hospital)
+        response_data = self.prepare_response(serializer.data, selected_hospital, profile_id, product_id, coupon_code)
 
         hospital = None
         response_data['about_web'] = None
@@ -1443,6 +1462,7 @@ class DoctorListViewSet(viewsets.GenericViewSet):
                     insurance_data_dict['is_user_insured'] = True
 
         validated_data['insurance_threshold_amount'] = insurance_data_dict['insurance_threshold_amount']
+        validated_data['is_user_insured'] = insurance_data_dict['is_user_insured']
 
         doctor_search_helper = DoctorSearchHelper(validated_data)
         if not validated_data.get("search_id"):
