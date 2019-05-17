@@ -988,13 +988,13 @@ class Doctor(auth_model.TimeStampedModel, auth_model.QCModel, SearchKey, auth_mo
         output = ImageOps.fit(doctor_image, mask.size, centering=(1, 1))
         output.putalpha(mask)
         # output.save('output.png')
-        canvas = Image.new('RGB', (992, 1620))
+        canvas = Image.new('RGB', (892, 1620))
         canvas.paste(template, (0,0))
         # doctor_image = doctor_image.resize((200, 200), Image.ANTIALIAS)
-        canvas.paste(doctor_image, (390, 300), doctor_image)
+        canvas.paste(doctor_image, (315, 300), doctor_image)
         #canvas.save('overlap.png')
         qrcode_image = qrcode_image.resize((530, 530), Image.ANTIALIAS)
-        canvas.paste(qrcode_image, (215, 830))
+        canvas.paste(qrcode_image, (165, 760))
 
         blank_image = Image.new('RGBA', (1000, 1000), 'white') # this new image is created to write text and paste on canvas
         img_draw = ImageDraw.Draw(canvas)
@@ -1004,7 +1004,7 @@ class Doctor(auth_model.TimeStampedModel, auth_model.QCModel, SearchKey, auth_mo
 
         w, h = img_draw.textsize(self.name, font=font)
 
-        img_draw.text(((992-w)/2,530), self.name, fill="black", font=font)
+        img_draw.text(((892-w)/2,530), self.name, fill="black", font=font)
         #img_draw.text((350,530), self.name, fill="black", font=font)
         #im.save("hello.png", "PNG")
 
@@ -1029,7 +1029,7 @@ class Doctor(auth_model.TimeStampedModel, auth_model.QCModel, SearchKey, auth_mo
         if len(dps) == 0:
             return False
 
-        for  d in dps:
+        for d in dps:
             if not d.specialization.is_insurance_enabled:
                 return False
 
@@ -2209,6 +2209,12 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
             notification_models.EmailNotification.ops_notification_alert(self, email_list=settings.OPS_EMAIL_ID,
                                                                          product=Order.DOCTOR_PRODUCT_ID,
                                                                          alert_type=notification_models.EmailNotification.OPS_APPOINTMENT_NOTIFICATION)
+        if not old_instance or self.status == self.CANCELLED:
+            try:
+                notification_tasks.update_coupon_used_count.apply_async()
+            except Exception as e:
+                logger.error(str(e))
+
         # if self.status == self.COMPLETED and not self.is_rated:
         #     try:
         #         notification_tasks.send_opd_rating_message.apply_async(
