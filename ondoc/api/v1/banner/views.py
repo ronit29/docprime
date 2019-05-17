@@ -22,7 +22,10 @@ class BannerListViewSet(viewsets.GenericViewSet):
         parameters = request.query_params
         lat = parameters.get('lat', None)
         long = parameters.get('long', None)
-        banners = Banner.get_all_banners(request, lat, long)
+        from_app = parameters.get('from_app', False)
+        if from_app:
+            from_app=True
+        banners = Banner.get_all_banners(request, lat, long, from_app)
         return Response(banners)
         # res = []
         # for banner_obj in banners:
