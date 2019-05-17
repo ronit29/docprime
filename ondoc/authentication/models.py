@@ -547,6 +547,8 @@ class OtpVerifications(TimeStampedModel):
     country_code = models.CharField(max_length=10)
     is_expired = models.BooleanField(default=False)
     otp_request_source = models.CharField(null=True, default=None, max_length=200)
+    via_whatsapp = models.NullBooleanField(null=True, default=None)
+    via_sms = models.NullBooleanField(null=True, default=None)
 
     def __str__(self):
         return self.phone_number

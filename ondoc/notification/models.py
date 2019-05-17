@@ -982,10 +982,12 @@ class WhtsappNotification(TimeStampedModel):
     extras = JSONField(null=False, blank=False, default={})
 
     @classmethod
-    def send_login_otp(cls, phone_number, request_source):
+    def send_login_otp(cls, phone_number, request_source, **kwargs):
 
         from ondoc.sms.backends.backend import create_otp
-        otp = create_otp(phone_number, "{}", call_source=request_source, return_otp=True)
+        via_sms = kwargs.get('via_sms')
+        via_whatsapp = kwargs.get('via_whatsapp')
+        otp = create_otp(phone_number, "{}", call_source=request_source, return_otp=True, via_sms=via_sms, via_whatsapp=via_whatsapp)
 
         whatsapp_message = {"media": {},
                             "message": "",
