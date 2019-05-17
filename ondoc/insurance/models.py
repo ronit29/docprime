@@ -1158,7 +1158,7 @@ class UserInsurance(auth_model.TimeStampedModel):
         from ondoc.tracking.models import TrackingEvent
         try:
             with transaction.atomic():
-                event_data = TrackingEvent.build_event_data(self.user, TrackingEvent.InsurancePurchased, appointmentId=self.id)
+                event_data = TrackingEvent.build_event_data(self.user, TrackingEvent.InsurancePurchased, appointmentId=self.id, visitor_info=visitor_info)
                 if event_data and visitor_info:
                     TrackingEvent.save_event(event_name=event_data.get('event'), data=event_data, visit_id=visitor_info.get('visit_id'),
                                              user=self.user, triggered_at=datetime.datetime.utcnow())
