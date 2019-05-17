@@ -1,6 +1,7 @@
 from django.conf import settings
 
-from ondoc.api.v1.insurance.serializers import InsuredMemberIdSerializer, InsuranceDiseaseIdSerializer
+from ondoc.api.v1.insurance.serializers import InsuredMemberIdSerializer, InsuranceDiseaseIdSerializer, \
+    InsuranceCityEligibilitySerializer
 from ondoc.api.v1.utils import insurance_transform
 from django.core.serializers import serialize
 from rest_framework import viewsets
@@ -14,9 +15,10 @@ from . import serializers
 from rest_framework.response import Response
 from ondoc.account import models as account_models
 from ondoc.doctor import models as doctor_models
-from ondoc.insurance.models import (Insurer, InsuredMembers, InsuranceThreshold, InsurancePlans, UserInsurance, InsuranceLead,
+from ondoc.insurance.models import (Insurer, InsuredMembers, InsuranceThreshold, InsurancePlans, UserInsurance,
+                                    InsuranceLead,
                                     InsuranceTransaction, InsuranceDisease, InsuranceDiseaseResponse, StateGSTCode,
-                                    InsuranceDummyData, InsuranceCancelMaster)
+                                    InsuranceDummyData, InsuranceCancelMaster, InsuranceEligibleCities)
 from ondoc.authentication.models import UserProfile
 from ondoc.authentication.backends import JWTAuthentication
 from ondoc.api.v1.utils import RawSql
@@ -88,6 +90,21 @@ class ListInsuranceViewSet(viewsets.GenericViewSet):
 
     def get_queryset(self):
         return Insurer.objects.filter(is_live=True)
+
+    def check_is_insurance_available(self, request):
+        data = {
+            'latitude': request.query_params.get('latitude'),
+            'longitude': request.query_params.get('longitude')
+        }
+        serializer = InsuranceCityEligibilitySerializer(data=data)
+        serializer.is_valid(raise_exception=True)
+        data = serializer.validated_data
+
+        city_name = InsuranceEligibleCities.check_eligibility(data.get('latitude'), data.get('longitude'))
+        if not city_name:
+            return Response({'available': False})
+
+        return Response({'available': True})
 
     def list(self, request):
         if settings.IS_INSURANCE_ACTIVE:
