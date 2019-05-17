@@ -62,11 +62,13 @@ class InsuranceNetworkViewSet(viewsets.GenericViewSet):
             " distance from  insurance_covered_entity mt where type=(%(type)s) and "
 
             if type =='doctor' and search == 'specialization':
-                query_string += " ((specialization_search_key like (%(starts_with)s)) or (specialization_search_key like concat('%,',(%(starts_with)s))) )"
+                params['comma_separated_starts_with'] = '%,' + starts_with
+                query_string += " ((specialization_search_key like (%(starts_with)s)) or (specialization_search_key like (%(comma_separated_starts_with)s) )) and "
+                # query_string += " ((specialization_search_key like (%(starts_with)s)) or (specialization_search_key like concat('%,',(%(starts_with)s))) ) and "
             else:
-                query_string += ' search_key like %(starts_with)s '
+                query_string += ' search_key like %(starts_with)s and '
 
-            query_string += " and st_dwithin(location,st_setsrid(st_point((%(longitude)s),(%(latitude)s)), 4326),15000) "\
+            query_string += " st_dwithin(location,st_setsrid(st_point((%(longitude)s),(%(latitude)s)), 4326),15000) "\
             " )x )y where rnk=1 order by distance"
 
             results = RawSql(query_string, params).fetch_all()
