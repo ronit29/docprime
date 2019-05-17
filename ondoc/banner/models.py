@@ -84,7 +84,7 @@ class Banner(auth_model.TimeStampedModel):
 
 
     @staticmethod
-    def get_all_banners(request, latitude=None, longitude=None):
+    def get_all_banners(request, latitude=None, longitude=None, from_app=False):
 
         queryset = Banner.objects.prefetch_related('banner_location','location').filter(enable=True).filter(Q(start_date__lte=timezone.now()) | Q(start_date__isnull=True)).filter(Q(end_date__gte=timezone.now()) | Q(end_date__isnull=True)).order_by('-priority')[:100]
         #queryset = Banner.objects.filter(enable=True)
@@ -108,6 +108,8 @@ class Banner(auth_model.TimeStampedModel):
                         if pnt1.distance(pnt2)*100 <= loc.radius:
                             append_banner = True
                             break
+                if from_app == True and append_banner == False and not latitude and not longitude:
+                    append_banner=True
 
             if append_banner and data.show_to_users and data.show_to_users!='all':
                 if data.show_to_users == 'logged_in' and not user.is_authenticated:
