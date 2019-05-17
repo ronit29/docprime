@@ -80,7 +80,7 @@ class InsuranceNetworkViewSet(viewsets.GenericViewSet):
             resp["distance_count"] = len(result)
             resp["results"] = result
 
-            return Response({'resp':result})
+            return Response(resp)
 
         else:
             starts_with = starts_with.lower()
