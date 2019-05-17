@@ -155,7 +155,7 @@ class InsuranceDoctorSpecializations(object):
 
     @classmethod
     def get_doctor_insurance_specializations(cls, doctor):
-        from ondoc.doctor.models import DoctorPracticeSpecialization, OpdAppointment
+        from ondoc.doctor.models import Doctor, DoctorPracticeSpecialization, OpdAppointment
         all_gynecologist_list = set(json.loads(settings.GYNECOLOGIST_SPECIALIZATION_IDS))
         all_oncologist_list = set(json.loads(settings.ONCOLOGIST_SPECIALIZATION_IDS))
 
