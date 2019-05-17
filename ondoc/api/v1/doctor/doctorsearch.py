@@ -190,6 +190,7 @@ class DoctorSearchHelper:
 
             if avail_days == DoctorListSerializer.TOMORROW:
                 aval_query += ' dct.day = (%(tomorrow)s) '
+                today += 1
                 params['tomorrow'] = (0 if today == 6 else today + 1)
             elif avail_days == DoctorListSerializer.NEXT_3_DAYS:
                 for day in range(1, 4):

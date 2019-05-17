@@ -258,8 +258,8 @@ class Hospital(auth_model.TimeStampedModel, auth_model.CreatedByModel, auth_mode
 
     @classmethod
     def update_hosp_google_avg_rating(cls):
-        update_hosp_google_ratings = RawSql('''update hospital set google_avg_rating = (select (reviews->>'user_avg_rating')::float from (select hpd.reviews, h.id as hospital_id from hospital_place_details hpd inner join 
-                    hospital h on h.id = hpd.hospital_id)x where hospital.id = x.hospital_id )''', [] ).execute()
+        update_hosp_google_ratings = RawSql('''update hospital h set google_avg_rating = (select (reviews->>'user_avg_rating')::float from hospital_place_details 
+                                         where hospital_id=h.id limit 1)''', [] ).execute()
 
     @classmethod
     def get_hosp_and_locality_dict(cls, temp_hospital_ids, required_identifier):
