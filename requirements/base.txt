@@ -51,3 +51,4 @@ gevent
 beautifulsoup4==4.7.1
 pandas
 pyminizip
+pycrypto

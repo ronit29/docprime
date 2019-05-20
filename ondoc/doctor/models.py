@@ -3065,6 +3065,7 @@ class OfflinePatients(auth_model.TimeStampedModel):
                          (OTHERS, "Others")]
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     name = models.CharField(max_length=32)
+    encrypted_name = models.CharField(max_length=128, null=True, blank=True)
     sms_notification = models.BooleanField(default=False)
     gender = models.CharField(max_length=2, default=None, blank=True, null=True, choices=GENDER_CHOICES)
     dob = models.DateField(blank=True, null=True)

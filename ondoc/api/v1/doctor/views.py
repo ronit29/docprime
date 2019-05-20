@@ -2881,6 +2881,7 @@ class OfflineCustomerViewSet(viewsets.GenericViewSet):
             patient_dict = {}
             patient_dict['id'] = data.id
             patient_dict['name'] = data.name if data.name else None
+            patient_dict['encrypted_name'] = data.encrypted_name if data.encrypted_name else None
             patient_dict['gender'] = data.gender if data.gender else None
             patient_dict['doctor'] = data.doctor.id if data.doctor else None
             patient_dict['hospital'] = data.hospital.id if data.hospital else None
@@ -3039,6 +3040,7 @@ class OfflineCustomerViewSet(viewsets.GenericViewSet):
         if hosp and hosp.provider_encrypt:
             encrypt_number = data.get('encrypt_number')
         patient = models.OfflinePatients.objects.create(name=data.get('name'),
+                                                        encrypted_name = data.get('encrypted_name', None),
                                                         id=data.get('id'),
                                                         sms_notification=data.get('sms_notification', False),
                                                         gender=data.get('gender'),
@@ -3086,9 +3088,10 @@ class OfflineCustomerViewSet(viewsets.GenericViewSet):
         if data.get('share_with_hospital') and not hospital:
             logger.error('PROVIDER_REQUEST - Hospital Not Given when Shared with Hospital Set'+ str(data))
         hosp = hospital if data.get('share_with_hospital') and hospital else None
-        encrypt_number = None
+        encrypt_number = encrypted_name = None
         if hosp and hosp.provider_encrypt:
             encrypt_number = data.get('encrypt_number')
+            encrypted_name = data.get('encrypted_name')
         patient = models.OfflinePatients.objects.filter(id=data.get('id')).first()
         if patient:
             if data.get('gender'):
@@ -3111,6 +3114,8 @@ class OfflineCustomerViewSet(viewsets.GenericViewSet):
                 patient.hospital = hosp
             if doctor:
                 patient.doctor = doctor
+            if encrypted_name:
+                patient.encrypted_name = encrypted_name
             patient.save()
             default_num = None
             sms_number = None

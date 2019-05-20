@@ -1607,7 +1607,8 @@ class DoctorDetailsRequestSerializer(serializers.Serializer):
 
 
 class OfflinePatientBodySerializer(serializers.Serializer):
-    name = serializers.CharField(max_length=24)
+    name = serializers.CharField(max_length=24, required=False, allow_blank=True)
+    encrypted_name = serializers.CharField(max_length=128, required=False, allow_blank=True)
     sms_notification = serializers.BooleanField(required=False)
     share_with_hospital = serializers.BooleanField(required=False)
     gender = serializers.ChoiceField(choices=OfflinePatients.GENDER_CHOICES, required=False, allow_null=True)
@@ -1669,7 +1670,7 @@ class OfflineAppointmentFilterSerializer(serializers.Serializer):
 class OfflinePatientSerializer(serializers.ModelSerializer):
     class Meta:
         model = OfflinePatients
-        fields = ('id', 'name', 'dob', 'calculated_dob', 'gender', 'age','referred_by', 'display_welcome_message',
+        fields = ('id', 'name', 'encrypted_name', 'dob', 'calculated_dob', 'gender', 'age','referred_by', 'display_welcome_message',
                   'share_with_hospital', 'sms_notification', 'medical_history', 'updated_at')
 
 
