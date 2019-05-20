@@ -40,6 +40,8 @@ class ScreenViewSet(viewsets.GenericViewSet):
         profile = params.get('profile_id')
         product_id = params.get('product_id')
         app_version = params.get("app_version", "1.0")
+        latitude = params.get('latitude', None)
+        longitude = params.get('longitude', None)
         if UserConfig.objects.filter(key="app_update").exists():
             app_update = UserConfig.objects.filter(key="app_update").values_list('data', flat=True).first()
             if app_update:
@@ -96,7 +98,7 @@ class ScreenViewSet(viewsets.GenericViewSet):
             }
         ]
 
-        banner_list = Banner.get_all_banners(request)
+        banner_list = Banner.get_all_banners(request, latitude, longitude, from_app)
         banner_list_homepage = list()
         for banner in banner_list:
             if banner.get('slider_location') == 'home_page':
