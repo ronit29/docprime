@@ -1,6 +1,6 @@
 from rest_framework import serializers
 
-from ondoc.common.models import GlobalNonBookable
+from ondoc.common.models import GlobalNonBookable, DeviceDetails
 from ondoc.lead.models import SearchLead
 
 
@@ -45,3 +45,10 @@ class GlobalNonBookableSerializer(serializers.ModelSerializer):
     class Meta:
         model = GlobalNonBookable
         exclude = ('booking_type', 'created_at', 'updated_at', 'deleted_at')
+
+
+class DeviceDetailsSerializer(serializers.ModelSerializer):
+
+    class Meta:
+        model = DeviceDetails
+        exclude = ('created_at', 'updated_at', 'id')
