@@ -320,10 +320,10 @@ MAP_WIDGETS = {
         ("GooglePlaceAutocompleteOptions", {'componentRestrictions': {'country': 'in'}}),
         ("markerFitZoom", 12),
     ),
-    "GOOGLE_MAP_API_KEY": "AIzaSyDJ06gynqhKmoEQc9tLf60_irFdrXwq_p4"
+    "GOOGLE_MAP_API_KEY": "AIzaSyBqDAVDFBQzI5JMgaXcqJq431QPpJtNiZE"
 }
 
-GOOGLE_MAPS_API_KEY = 'AIzaSyDJ06gynqhKmoEQc9tLf60_irFdrXwq_p4'
+GOOGLE_MAPS_API_KEY = 'AIzaSyBqDAVDFBQzI5JMgaXcqJq431QPpJtNiZE'
 
 
 CRISPY_TEMPLATE_PACK = 'bootstrap3'

@@ -81,6 +81,7 @@ class NotificationAction:
     LAB_LOGO_CHANGE_MAIL = 70
     PRICING_ALERT_EMAIL = 72
     APPOINTMENT_REMINDER_PROVIDER_SMS = 77
+    LOGIN_OTP = 80
 
     NOTIFICATION_TYPE_CHOICES = (
         (APPOINTMENT_ACCEPTED, "Appointment Accepted"),
@@ -110,7 +111,8 @@ class NotificationAction:
         (IPD_PROCEDURE_MAIL, 'IPD Procedure Mail'),
         (PRICING_ALERT_EMAIL, 'Pricing Change Mail'),
         (LAB_LOGO_CHANGE_MAIL, 'Lab Logo Change Mail'),
-        (APPOINTMENT_REMINDER_PROVIDER_SMS, 'Appointment Reminder Provider SMS')
+        (APPOINTMENT_REMINDER_PROVIDER_SMS, 'Appointment Reminder Provider SMS'),
+        (LOGIN_OTP, 'Login OTP')
     )
 
     OPD_APPOINTMENT = "opd_appointment"
@@ -977,6 +979,41 @@ class WhtsappNotification(TimeStampedModel):
     template_name = models.CharField(max_length=100, null=False, blank=False)
     notification_type = models.PositiveIntegerField(choices=NotificationAction.NOTIFICATION_TYPE_CHOICES)
     payload = JSONField(null=False, blank=False, default={})
+    extras = JSONField(null=False, blank=False, default={})
+
+    @classmethod
+    def send_login_otp(cls, phone_number, request_source, **kwargs):
+
+        from ondoc.sms.backends.backend import create_otp
+        via_sms = kwargs.get('via_sms')
+        via_whatsapp = kwargs.get('via_whatsapp')
+        otp = create_otp(phone_number, "{}", call_source=request_source, return_otp=True, via_sms=via_sms, via_whatsapp=via_whatsapp)
+
+        whatsapp_message = {"media": {},
+                            "message": "",
+                            "template": {
+                                "name": "docprime_otp_verification",
+                                "params": [otp]
+                            },
+                            "message_type": "HSM",
+                            "phone_number": phone_number
+                            }
+
+        extra = {'call_source': request_source}
+        whatsapp_noti = WhtsappNotification.objects.create(
+            phone_number=phone_number,
+            notification_type=NotificationAction.LOGIN_OTP,
+            template_name='docprime_otp_verification',
+            payload=whatsapp_message,
+            extras=extra
+        )
+
+        whatsapp_payload = {
+                "data": whatsapp_noti.payload,
+                "type": "social_message"
+            }
+
+        publish_message(json.dumps(whatsapp_payload))
 
     class Meta:
         db_table = "whtsapp_notification"

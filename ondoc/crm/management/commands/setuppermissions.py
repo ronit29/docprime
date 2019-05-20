@@ -3,9 +3,9 @@ from django.contrib.auth.models import Group, Permission
 from django.contrib.contenttypes.models import ContentType
 from django.db.models import Q
 
-from ondoc.banner.models import Banner, SliderLocation
+from ondoc.banner.models import Banner, SliderLocation, BannerLocation
 from ondoc.common.models import PaymentOptions, UserConfig, Feature, Service, Remark, MatrixMappedCity, MatrixMappedState
-from ondoc.coupon.models import Coupon, UserSpecificCoupon
+from ondoc.coupon.models import Coupon, UserSpecificCoupon, RandomGeneratedCoupon
 from ondoc.crm.admin import UserPlanMappingAdmin
 from ondoc.crm.constants import constants
 from ondoc.doctor.models import (Doctor, Hospital, DoctorClinicTiming, DoctorClinic,
@@ -382,7 +382,17 @@ class Command(BaseCommand):
 
             group.permissions.add(*permissions)
 
-        content_types = ContentType.objects.get_for_models(Banner)
+        content_types = ContentType.objects.get_for_models(RandomGeneratedCoupon)
+
+        for cl, ct in content_types.items():
+            permissions = Permission.objects.filter(
+                Q(content_type=ct),
+                Q(codename='change_' + ct.model))
+
+            group.permissions.add(*permissions)
+
+
+        content_types = ContentType.objects.get_for_models(Banner, BannerLocation, SliderLocation)
         for cl, ct in content_types.items():
             permissions = Permission.objects.filter(
                 Q(content_type=ct),

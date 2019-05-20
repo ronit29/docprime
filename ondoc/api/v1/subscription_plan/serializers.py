@@ -68,14 +68,38 @@ class UserSubscriptionResponseSerializer(serializers.Serializer):
 
 class UserSubscriptionBuyRequestSerializer(serializers.Serializer):
     plan = serializers.PrimaryKeyRelatedField(queryset=Plan.objects.filter(enabled=True))
+    coupon_code = serializers.ListField(child=serializers.CharField(), required=False, default=[])
 
-    def validate(self, attrs):
+    def validate(self, data):
+        from ondoc.coupon.models import RandomGeneratedCoupon
+        from ondoc.doctor.models import OpdAppointment
+        from ondoc.account.models import Order
         request = self.context.get('request')
         if not request:
             raise serializers.ValidationError('Invalid request.')
+
+        if data.get("coupon_code"):
+            coupon_codes = data.get("coupon_code", [])
+            coupon_obj = RandomGeneratedCoupon.get_coupons(coupon_codes)
+
+            if coupon_obj:
+                for coupon in coupon_obj:
+                    obj = UserPlanMapping()
+                    if obj.validate_user_coupon(user=request.user, coupon_obj=coupon).get("is_valid"):
+                        if not obj.validate_product_coupon(coupon_obj=coupon,
+                                                           plan=data.get('plan'),
+                                                           product_id=Order.SUBSCRIPTION_PLAN_PRODUCT_ID):
+                            raise serializers.ValidationError('Invalid coupon code - ' + str(coupon))
+                    else:
+                        raise serializers.ValidationError('Invalid coupon code - ' + str(coupon))
+                data["coupon_obj"] = list(coupon_obj)
+            else:
+                raise serializers.ValidationError('Invalid coupon code.')
+
         if UserPlanMapping.objects.filter(user=request.user, is_active=True, expire_at__gte=timezone.now()).exists():
             raise serializers.ValidationError('User already has a subscription plan.')
-        return attrs
+
+        return data
 
 
 class UserSubscriptionRetrieveRequestSerializer(serializers.Serializer):

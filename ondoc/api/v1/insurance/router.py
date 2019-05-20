@@ -5,6 +5,7 @@ from .views import (ListInsuranceViewSet, InsuredMemberViewSet, InsuranceProfile
 
 urlpatterns = [
     path('list', ListInsuranceViewSet.as_view({'get': 'list'}), name='insurance-list'),
+    path('availability', ListInsuranceViewSet.as_view({'get': 'check_is_insurance_available'}), name='insurance-city-availability'),
     # path('summary', InsuredMemberViewSet.as_view({'post': 'summary'}), name='insurance-summary'),
     path('create', InsuranceOrderViewSet.as_view({'post': 'create_order'}), name='insured-members'),
     path('lead/create', InsuranceOrderViewSet.as_view({'post': 'create_banner_lead'}), name='banner-lead-create'),

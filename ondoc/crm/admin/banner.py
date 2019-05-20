@@ -1,5 +1,7 @@
 from django.contrib import admin
-from ondoc.banner.models import Banner, SliderLocation, Recommender, EmailBanner, RecommenderThrough
+from django.contrib.admin import TabularInline
+
+from ondoc.banner.models import Banner, SliderLocation, BannerLocation, Recommender, EmailBanner, RecommenderThrough
 from django import forms
 from django.contrib.contenttypes.admin import GenericTabularInline
 
@@ -62,11 +64,19 @@ class BannerForm(forms.ModelForm):
                 raise forms.ValidationError('Cannot input duplicate values in field url_params -> {}'.format(resp))
 
 
+class BannerLocationInline(admin.TabularInline):
+
+    model = BannerLocation
+    extra = 0
+    can_delete = True
+    show_change_link = False
+
 
 class BannerAdmin(admin.ModelAdmin):
 
     model = Banner
     form = BannerForm
+    inlines = [BannerLocationInline]
     list_display = ['title', 'priority', 'location', 'start_date', 'end_date', 'enable']
     readonly_fields = ['event_name']
     list_filter = ['enable']

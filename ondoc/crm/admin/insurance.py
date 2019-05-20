@@ -8,7 +8,7 @@ from ondoc.crm.constants import constants
 from ondoc.doctor.models import OpdAppointment, DoctorPracticeSpecialization, PracticeSpecialization, Hospital
 from ondoc.diagnostic.models import LabAppointment, LabTest, Lab
 from ondoc.insurance.models import InsurancePlanContent, InsurancePlans, InsuredMembers, UserInsurance, StateGSTCode, \
-    InsuranceCity, InsuranceDistrict, InsuranceDeal, InsurerPolicyNumber, InsuranceLead
+    InsuranceCity, InsuranceDistrict, InsuranceDeal, InsurerPolicyNumber, InsuranceLead, InsuranceEligibleCities
 from import_export.admin import ImportExportMixin, ImportExportModelAdmin, base_formats
 import nested_admin
 from import_export import fields, resources
@@ -591,6 +591,7 @@ class UserInsuranceResource(resources.ModelResource):
     coi = fields.Field()
     status = fields.Field()
     matrix_lead = fields.Field()
+    pg_order_no = fields.Field()
 
     def export(self, queryset=None, *args, **kwargs):
         queryset = self.get_queryset(**kwargs)
@@ -663,6 +664,13 @@ class UserInsuranceResource(resources.ModelResource):
     def dehydrate_matrix_lead(self, insurance):
         return str(insurance.matrix_lead_id)
 
+    def dehydrate_pg_order_no(self, insurance):
+        from ondoc.account.models import Order
+        order = Order.objects.filter(reference_id=insurance.id).first()
+        transaction = order.getTransactions()
+        if not transaction:
+            return ""
+        return str(transaction.first().order_no)
 
 class CustomDateInput(forms.DateInput):
     input_type = 'date'
@@ -999,3 +1007,7 @@ class InsuranceLeadForm(forms.ModelForm):
 
 class InsuranceCancelMasterAdmin(admin.ModelAdmin):
     list_display = ['insurer', 'min_days', 'max_days', 'refund_percentage']
+
+
+class InsuranceEligibleCitiesAdmin(admin.ModelAdmin):
+    model = InsuranceEligibleCities
