@@ -1411,7 +1411,7 @@ class LabList(viewsets.ReadOnlyModelViewSet):
             today = Date.today().weekday()
             aval_query = "( "
             currentDT = timezone.now()
-            today_time = currentDT.strftime("%H.%M")
+            today_time = aware_time_zone(currentDT).strftime("%H.%M")
             avail_days = list(map(int, availability))
 
             if SearchLabListSerializer.TODAY in avail_days:

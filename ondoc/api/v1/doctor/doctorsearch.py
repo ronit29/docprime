@@ -9,7 +9,7 @@ from ondoc.api.v1.procedure.serializers import DoctorClinicProcedureSerializer
 from ondoc.api.v1.ratings.serializers import GoogleRatingsGraphSerializer
 from ondoc.coupon.models import CouponRecommender
 from ondoc.doctor import models
-from ondoc.api.v1.utils import clinic_convert_timings
+from ondoc.api.v1.utils import clinic_convert_timings, aware_time_zone
 from ondoc.api.v1.doctor import serializers
 from ondoc.authentication.models import QCModel
 from ondoc.doctor.models import Doctor, PracticeSpecialization
@@ -181,7 +181,7 @@ class DoctorSearchHelper:
             availability = self.query_params.get('availability')
             today = Date.today().weekday()
             currentDT = timezone.now()
-            today_time = currentDT.strftime("%H.%M")
+            today_time = aware_time_zone(currentDT).strftime("%H.%M")
             avail_days =list(map(int, availability))
             if DoctorListSerializer.TODAY in avail_days:
                 aval_query += ' (dct.day = (%(today)s) and  (%(today_time)s) <= dct."end" ) '
