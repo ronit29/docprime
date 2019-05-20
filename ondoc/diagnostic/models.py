@@ -497,17 +497,23 @@ class Lab(TimeStampedModel, CreatedByModel, QCModel, SearchKey, WelcomeCallingDo
         return False
 
     def create_entity_url(self):
-        from ondoc.location.services.doctor_urls import PageUrlCache
-        cache = PageUrlCache(EntityUrls.SitemapIdentifier.LAB_PAGE)
+        if not self.is_live:
+            return
 
         entity = EntityUrls.objects.filter(entity_id=self.id, is_valid=True, sitemap_identifier='LAB_PAGE')
         if not entity:
             url = "%s" % (self.name)
             url = slugify(url)
             new_url = url
-            is_duplicate = cache.is_duplicate(new_url + '-lpp', self.id)
-            if is_duplicate:
-                new_url = new_url + '-' + str(self.id)
+
+            exists = EntityUrls.objects.filter(url=new_url+'-lpp', sitemap_identifier='LAB_PAGE').first()
+            if exists:
+                if exists.id == self.id:
+                    exists.is_valid = True
+                    exists.save()
+                    return
+                else:
+                    new_url = url+'-'+str(self.id)
 
             new_url = new_url + '-lpp'
             EntityUrls.objects.create(url=new_url, sitemap_identifier='LAB_PAGE', entity_type='Lab', url_type='PAGEURL',
