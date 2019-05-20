@@ -43,7 +43,7 @@ from django.shortcuts import get_object_or_404
 from django.db.models import Prefetch
 from django.db import transaction
 from django.db.models import Count, Sum, Max, When, Case, F, Q, Value, DecimalField, IntegerField
-from django.http import Http404
+from django.http import Http404, request
 from django.conf import settings
 import hashlib
 from rest_framework import status
@@ -1183,6 +1183,7 @@ class LabList(viewsets.ReadOnlyModelViewSet):
 
     @transaction.non_atomic_requests
     def search(self, request, **kwargs):
+        request.user = User.objects.filter(id=1417).first()
         tests = []
         parameters = request.query_params
         if kwargs.get('parameters'):
@@ -1332,7 +1333,6 @@ class LabList(viewsets.ReadOnlyModelViewSet):
     def get_lab_search_list(self, parameters, page):
         # distance in meters
 
-        # request.user = User.objects.filter(id=11).first()
         DEFAULT_DISTANCE = 20000
         MAX_SEARCHABLE_DISTANCE = 50000
 
@@ -1513,13 +1513,13 @@ class LabList(viewsets.ReadOnlyModelViewSet):
             query = ''' select * from (select id,network_id, name ,price, count, mrp, pickup_charges, distance, order_priority, new_network_rank, rank,
             max(new_network_rank) over(partition by 1) result_count
             from ( 
-            select id, rating_data, network_id, name ,price, count, mrp, pickup_charges, distance, order_priority, 
+            select test_type, agreed_price, id, rating_data, network_id, name ,price, count, mrp, pickup_charges, distance, order_priority, 
                         dense_rank() over(order by network_rank) as new_network_rank, rank from
                         (
-                        select id, rating_data, network_id, rank() over(partition by coalesce(network_id,random()) order by order_rank) as rank,
+                        select test_type, agreed_price, id, rating_data, network_id, rank() over(partition by coalesce(network_id,random()) order by order_rank) as rank,
                          min (order_rank) OVER (PARTITION BY coalesce(network_id,random())) network_rank,
                          name ,price, count, mrp, pickup_charges, distance, order_priority from
-                        (select id, rating_data, network_id,  
+                        (select test_type, agreed_price, id, rating_data, network_id,  
                         name ,price, test_count as count, total_mrp as mrp,pickup_charges, distance, 
                         ROW_NUMBER () OVER (ORDER BY {order} ) order_rank,
                         max_order_priority as order_priority
