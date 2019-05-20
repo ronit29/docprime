@@ -1,1 +1,6 @@
-Endorsment successfull
+Your endorsement request for policy ID: {{policy_number}} has been approved
+PFA the updated COI for your reference
+
+{{coi_url}}
+Thanks
+Team Docprime

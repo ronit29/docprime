@@ -584,8 +584,6 @@ def send_insurance_notifications(self, data):
             raise Exception("Invalid user id passed for insurance email notification. Userid %s" % str(user_id))
 
         insurance_status = int(data.get('status', 0))
-        is_endorsment_notification = data.get('is_endorsment_notification', False)
-
         # Cancellation
         if insurance_status and insurance_status == UserInsurance.CANCEL_INITIATE:
             user_insurance = UserInsurance.get_user_insurance(user)
@@ -610,14 +608,54 @@ def send_insurance_notifications(self, data):
                     print(countdown_time)
                     self.retry([data], countdown=countdown_time)
 
-            if is_endorsment_notification:
-                insurance_notification = InsuranceNotification(user_insurance, NotificationAction.INSURANCE_ENDORSMENT_APPROVED)
-            else:
-                insurance_notification = InsuranceNotification(user_insurance, NotificationAction.INSURANCE_CONFIRMED)
-
+            insurance_notification = InsuranceNotification(user_insurance, NotificationAction.INSURANCE_CONFIRMED)
             insurance_notification.send()
     except Exception as e:
         logger.error(str(e))
+
+
+@task(bind=True, max_retries=3)
+def send_insurance_endorsment_notifications(self, data):
+    from ondoc.authentication import models as auth_model
+    from ondoc.communications.models import InsuranceNotification
+    from ondoc.insurance.models import UserInsurance, EndorsementRequest
+    try:
+        user_id = int(data.get('user_id', 0))
+        user = auth_model.User.objects.filter(id=user_id).last()
+        if not user:
+            raise Exception("Invalid user id passed for insurance email notification. Userid %s" % str(user_id))
+
+        user_insurance = user.active_insurance
+        if not user_insurance:
+            raise Exception("Invalid or None user insurance found for email notification. User id %s" % str(user_id))
+
+        endorsment_status = data.get('endorsment_status', 0)
+        notification = None
+
+        if endorsment_status == EndorsementRequest.PENDING:
+            notification = NotificationAction.INSURANCE_ENDORSMENT_PENDING
+        elif endorsment_status == EndorsementRequest.REJECT:
+            notification = NotificationAction.INSURANCE_ENDORSMENT_REJECTED
+        elif endorsment_status == EndorsementRequest.APPROVED:
+            notification = NotificationAction.INSURANCE_ENDORSMENT_APPROVED
+
+            if not user_insurance.coi:
+                try:
+                    user_insurance.generate_pdf()
+                except Exception as e:
+                    logger.error('Insurance coi pdf cannot be generated. %s' % str(e))
+
+                    countdown_time = (2 ** self.request.retries) * 60 * 10
+                    print(countdown_time)
+                    self.retry([data], countdown=countdown_time)
+
+        if notification and user_insurance:
+            insurance_notification = InsuranceNotification(user_insurance, notification)
+            insurance_notification.send()
+
+    except Exception as e:
+        logger.error(str(e))
+
 
 @task(bind=True, max_retries=3)
 def send_insurance_float_limit_notifications(self, data):

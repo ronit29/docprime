@@ -2,7 +2,7 @@ import datetime
 from django.core.validators import FileExtensionValidator
 
 from ondoc.notification.models import EmailNotification
-from ondoc.notification.tasks import send_insurance_notifications, send_insurance_float_limit_notifications
+from ondoc.notification.tasks import send_insurance_notifications, send_insurance_float_limit_notifications, send_insurance_endorsment_notifications
 from ondoc.insurance.tasks import push_insurance_buy_to_matrix
 from ondoc.notification.tasks import push_insurance_banner_lead_to_matrix
 import json
@@ -1585,6 +1585,12 @@ class EndorsementRequest(auth_model.TimeStampedModel):
             return False
 
     @classmethod
+    def process_endorsment_notifications(cls, status, user):
+        user_id = user.id
+        send_insurance_endorsment_notifications.apply_async(({'user_id': user_id, 'endorsment_status': status}, ))
+
+
+    @classmethod
     def create(cls, endorsed_member):
         del endorsed_member['is_change']
         del endorsed_member['image_ids']
@@ -1614,13 +1620,19 @@ class EndorsementRequest(auth_model.TimeStampedModel):
             except Exception as e:
                 logger.error('Insurance coi pdf cannot be generated. %s' % str(e))
 
-
-            send_insurance_notifications.apply_async(({'user_id': user_insurance.user.id, 'is_endorsment_notification': True}, ))
-
+            EndorsementRequest.process_endorsment_notifications(EndorsementRequest.APPROVED, user_insurance.user)
 
     def reject_endorsement(self):
-        pass
+        user_insurance = self.insurance
+        if not user_insurance:
+            logger.error('User Insurance not found for the endorsment request with id %d' % self.id)
+            return
+        endorsment_members = user_insurance.endorse_members.all()
+        total_endorsment_members = endorsment_members.count()
+        endorment_rejected_members_count = user_insurance.endorse_members.filter(status=EndorsementRequest.REJECT).count()
 
+        if total_endorsment_members == endorment_rejected_members_count:
+            EndorsementRequest.process_endorsment_notifications(EndorsementRequest.REJECT, user_insurance.user)
 
     class Meta:
         db_table = 'insurance_endorsement'

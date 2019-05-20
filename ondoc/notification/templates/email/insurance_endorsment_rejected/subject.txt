@@ -1,0 +1,1 @@
+{{insurer_name}} Insurance Policy Endorsement Request Rejected | Policy Number: {{policy_number}}

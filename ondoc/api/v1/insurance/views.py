@@ -668,6 +668,9 @@ class InsuranceEndorsementViewSet(viewsets.GenericViewSet):
                     document.endorsement_request = end_obj
                     document.save()
 
+        user_insurance = user.active_insurance
+        EndorsementRequest.process_endorsment_notifications(EndorsementRequest.PENDING, user_insurance.user)
+
         res['success'] = 'Request for endorsement have been consider,' \
                          'will update once insurer verified the details'
         return Response(data=res, status=status.HTTP_200_OK)

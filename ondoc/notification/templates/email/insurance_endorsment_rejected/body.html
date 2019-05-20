@@ -107,8 +107,8 @@
                                     <tr>
                                       <td width="45%" style="font-size: 12px;  padding-bottom: 15px; color: #757575; padding-top: 15px; vertical-align: top;">Covered Member:</td>
                                       <td style="font-weight: 500; color: #000; padding-top: 15px; font-size: 12px;">
-                                        {% for member in endorsement_list %}
-                                          {{member.relation}} - <b>{{member.name}}</b> - <b>{{member.status}}</b><br>
+                                        {% for member in insured_members %}
+                                          {{member.relation}} - <b>{{member.name}}</b><br>
                                           {% endfor %}
                                       </td>
                                     </tr>

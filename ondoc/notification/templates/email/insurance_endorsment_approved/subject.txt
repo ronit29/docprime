@@ -1,1 +1,1 @@
-{{insurer_name}} Insurance Policy Booked | Policy Number: {{policy_number}}
+{{insurer_name}} Insurance Policy Endorsement Request Approved | Policy Number: {{policy_number}}

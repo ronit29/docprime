@@ -1,0 +1,5 @@
+Your endorsement request for policy ID: {{policy_number}} has been received
+You will receive an email and SMS once the request is processed
+
+Thanks
+Team Docprime
