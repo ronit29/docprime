@@ -980,7 +980,7 @@ class DeviceDetailsSave(viewsets.GenericViewSet):
 
     def save(self, request):
         serializer = serializers.DeviceDetailsSerializer(data=request.data)
-        serializer.is_valid()
+        serializer.is_valid(raise_exception=True)
         validated_data = serializer.validated_data
         device_details_queryset = DeviceDetails.objects.filter(d_token=validated_data.get('d_token'))
         device_details = device_details_queryset.first()
