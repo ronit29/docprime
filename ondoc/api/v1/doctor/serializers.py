@@ -1178,7 +1178,7 @@ class DoctorProfileUserViewSerializer(DoctorProfileSerializer):
         data = DoctorClinicTiming.objects.filter(doctor_clinic__doctor=obj,
                                                  doctor_clinic__enabled=True,
                                                  doctor_clinic__hospital__is_live=True).select_related(
-            "doctor_clinic__doctor", "doctor_clinic__hospital").prefetch_related("doctor_clinic__hospital__spoc_details","doctor_clinic__doctor__mobiles")
+            "doctor_clinic__doctor", "doctor_clinic__hospital").prefetch_related("doctor_clinic__hospital__spoc_details","doctor_clinic__doctor__mobiles","doctor_clinic__doctor__doctorpracticespecializations","doctor_clinic__doctor__doctorpracticespecializations__specialization")
         if obj:
             doctor_specialization = InsuranceDoctorSpecializations.get_doctor_insurance_specializations(obj)
             if doctor_specialization:
@@ -2016,10 +2016,10 @@ class IpdProcedureLeadSerializer(serializers.ModelSerializer):
     ipd_procedure = serializers.PrimaryKeyRelatedField(queryset=IpdProcedure.objects.filter(is_enabled=True),
                                                        required=False, allow_null=True)
     hospital = serializers.PrimaryKeyRelatedField(queryset=Hospital.objects.filter(is_live=True), required=False)
-    name = serializers.CharField(max_length=100)
-    phone_number = serializers.IntegerField(min_value=1000000000, max_value=9999999999)
+    name = serializers.CharField(max_length=100, required=False, allow_null=True)
+    phone_number = serializers.IntegerField(min_value=1000000000, max_value=9999999999, required=False)
     email = serializers.EmailField(max_length=256, required=False)
-    gender = serializers.ChoiceField(choices=UserProfile.GENDER_CHOICES)
+    gender = serializers.ChoiceField(choices=UserProfile.GENDER_CHOICES, required=False)
     age = serializers.IntegerField(min_value=1, max_value=120, required=False, default=None)
     dob = serializers.DateField(required=False, default=None)
     lat = serializers.FloatField(required=False, allow_null=True)
@@ -2037,8 +2037,8 @@ class IpdProcedureLeadSerializer(serializers.ModelSerializer):
         hospital = attrs.get('hospital')
         age = attrs.get('age')
         dob = attrs.get('dob')
-        if all([age, dob]):
-            raise serializers.ValidationError('Only one of age or DOB is required.')
+        # if all([age, dob]):
+        #     raise serializers.ValidationError('Only one of age or DOB is required.')
         if not any([age, dob]):
             raise serializers.ValidationError('Either age or DOB is required.')
         if ipd_procedure and hospital:
