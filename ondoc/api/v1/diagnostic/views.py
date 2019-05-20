@@ -1413,26 +1413,28 @@ class LabList(viewsets.ReadOnlyModelViewSet):
             today_time = currentDT.strftime("%H.%M")
             avail_days = max(map(int, availability))
 
-            if avail_days in (SearchLabListSerializer.TODAY):
+            if avail_days == SearchLabListSerializer.TODAY:
                 aval_query += ' (lbt.day = (%(today)s) and  (%(today_time)s)<= lbt."end" ) '
                 filtering_params['today'] = today
                 filtering_params['today_time'] = today_time
 
-            if avail_days == serializers.SearchLabListSerializer.TOMORROW:
+            if avail_days == SearchLabListSerializer.TOMORROW:
                 today += 1
                 aval_query += ' lbt.day = (%(tomorrow)s) '
                 filtering_params['tomorrow'] = (0 if today == 6 else today + 1)
 
-            if avail_days == serializers.SearchLabListSerializer.NEXT_3_DAYS:
+            if avail_days == SearchLabListSerializer.NEXT_3_DAYS:
                 for day in range(1, 4):
+                    if not aval_query == "( ":
+                        aval_query += ' or '
                     if today == 6:
                         today = 0
-                        aval_query += ' or lbt.day =' + '%(' + 'next_day' + str(day) + ')s'
+                        aval_query += ' lbt.day =' + '%(' + 'next_day' + str(day) + ')s'
                         filtering_params['next_day' + str(day)] = today
 
                     else:
                         today += 1
-                        aval_query += ' or lbt.day =' + '%(' + 'next_day' + str(day) + ')s'
+                        aval_query += ' lbt.day =' + '%(' + 'next_day' + str(day) + ')s'
                         filtering_params['next_day' + str(day)] = today
 
             lab_timing_join = " inner join lab_timing lbt on lbt.lab_id = lb.id "
