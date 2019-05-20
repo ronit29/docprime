@@ -36,6 +36,10 @@ class ScreenViewSet(viewsets.GenericViewSet):
 
         params = request.query_params
         from_app = params.get("from_app", False)
+        if from_app == 'True' or from_app == 'true':
+            from_app=True
+        else:
+            from_app=False
         coupon_code = params.get('coupon_code')
         profile = params.get('profile_id')
         product_id = params.get('product_id')
