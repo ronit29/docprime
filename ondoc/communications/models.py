@@ -1484,7 +1484,7 @@ class InsuranceNotification(Notification):
             'insurer_name': instance.insurance_plan.insurer.name
         }
 
-        if self.notification_type == EndorsementRequest.APPROVED:
+        if self.notification_type == NotificationAction.INSURANCE_ENDORSMENT_APPROVED:
             endorsement_list = list()
             endorsed_members = instance.endorse_members.filter(~Q(status=EndorsementRequest.PENDING))
             for mem in endorsed_members:
