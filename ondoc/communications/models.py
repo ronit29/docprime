@@ -303,9 +303,9 @@ class SMSNotification:
         elif notification_type == NotificationAction.INSURANCE_ENDORSMENT_APPROVED:
             body_template = "sms/insurance/insurance_endorsment_approved.txt"
         elif notification_type == NotificationAction.INSURANCE_ENDORSMENT_PENDING:
-            body_template = "sms/insurance/insurance_endorsment_approved.txt"
+            body_template = "sms/insurance/insurance_endorsment_pending.txt"
         elif notification_type == NotificationAction.INSURANCE_ENDORSMENT_REJECTED:
-            body_template = "sms/insurance/insurance_endorsment_approved.txt"
+            body_template = "sms/insurance/insurance_endorsment_rejected.txt"
         elif notification_type == NotificationAction.INSURANCE_CANCEL_INITIATE:
             body_template = "sms/insurance/insurance_cancellation.txt"
         elif notification_type == NotificationAction.LAB_REPORT_SEND_VIA_CRM:
@@ -1491,7 +1491,7 @@ class InsuranceNotification(Notification):
                 mem_data = {
                     'name': mem.member.get_full_name(),
                     'relation': mem.member.relation,
-                    'status': EndorsementRequest.STATUS_CHOICES[mem.status][1]
+                    'status': EndorsementRequest.STATUS_CHOICES[mem.status-1][1]
                 }
 
                 endorsement_list.append(mem_data)
