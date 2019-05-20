@@ -275,6 +275,8 @@ class SMSNotification:
             body_template = "sms/appointment_cancelled_patient.txt"
         elif notification_type == NotificationAction.PRESCRIPTION_UPLOADED:
             body_template = "sms/prescription_uploaded.txt"
+        elif notification_type == NotificationAction.APPOINTMENT_REMINDER_PROVIDER_SMS:
+            body_template = "sms/appointment_reminder.txt"
 
         elif notification_type == NotificationAction.LAB_APPOINTMENT_ACCEPTED or \
                 notification_type == NotificationAction.LAB_OTP_BEFORE_APPOINTMENT:
@@ -382,24 +384,28 @@ class SMSNotification:
             else:
                 unique_key_found = True
         expiration_time = datetime.fromtimestamp(payload.get('exp'))
-        ClickLoginToken.objects.create(user=user, token=token, expiration_time=expiration_time, url_key=url_key)
+        # ClickLoginToken.objects.create(user=user, token=token, expiration_time=expiration_time, url_key=url_key)
+        click_login_token_obj = ClickLoginToken(user=user, token=token, expiration_time=expiration_time, url_key=url_key)
         provider_login_url = settings.PROVIDER_APP_DOMAIN + "/sms/login?key=" + url_key + \
                                         "&url=/sms-redirect/" + appointment_type + "/appointment/" + str(appointment.id)
         context['provider_login_url'] = generate_short_url(provider_login_url)
-        return context
+        return context, click_login_token_obj
 
     def send(self, receivers):
         context = self.context
         if not context:
             return
+        click_login_token_objects = list()
         for receiver in receivers:
             template = self.get_template(receiver.get('user'))
             if receiver.get('user') and receiver.get('user').user_type == User.DOCTOR:
-                context = self.save_token_to_context(context, receiver['user'])
+                context, click_login_token_obj = self.save_token_to_context(context, receiver['user'])
+                click_login_token_objects.append(click_login_token_obj)
             elif context.get('provider_login_url'):
                 context.pop('provider_login_url')
             if template:
                 self.trigger(receiver, template, context)
+        ClickLoginToken.objects.bulk_create(click_login_token_objects)
 
 
 class WHTSAPPNotification:
@@ -717,7 +723,8 @@ class WHTSAPPNotification:
                 phone_number=phone_number,
                 notification_type=notification_type,
                 template_name=template,
-                payload=kwargs.get('payload', {})
+                payload=kwargs.get('payload', {}),
+                extras={}
             )
             message = {
                 "data": whtsapp_noti.payload,
@@ -731,7 +738,8 @@ class WHTSAPPNotification:
                 phone_number=phone_number,
                 notification_type=notification_type,
                 template_name=template,
-                payload=kwargs.get('payload', {})
+                payload=kwargs.get('payload', {}),
+                extras={}
             )
             message = {
                 "data": whtsapp_noti.payload,
@@ -1144,6 +1152,9 @@ class OpdNotification(Notification):
 
             whtsapp_notification = WHTSAPPNotification(notification_type, context)
             whtsapp_notification.send(all_receivers.get('sms_receivers', []))
+        elif notification_type== NotificationAction.APPOINTMENT_REMINDER_PROVIDER_SMS:
+            sms_notification = SMSNotification(notification_type, context)
+            sms_notification.send(all_receivers.get('sms_receivers', []))
 
         else:
             email_notification = EMAILNotification(notification_type, context)
@@ -1184,6 +1195,9 @@ class OpdNotification(Notification):
             doctor_spocs_app_recievers = GenericAdmin.get_appointment_admins(instance)
             # receivers.extend(doctor_spocs)
             receivers.append(instance.user)
+        elif notification_type in [NotificationAction.APPOINTMENT_REMINDER_PROVIDER_SMS]:
+            spocs_to_be_communicated = doctor_spocs
+            doctor_spocs_app_recievers = GenericAdmin.get_appointment_admins(instance)
         receivers = list(set(receivers))
         user_and_phone_number = []
         user_and_email = []

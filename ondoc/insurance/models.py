@@ -1,4 +1,5 @@
 import datetime
+from django.contrib.gis.geos import Point
 from django.core.validators import FileExtensionValidator
 
 from ondoc.notification.models import EmailNotification
@@ -8,6 +9,8 @@ from ondoc.notification.tasks import push_insurance_banner_lead_to_matrix
 import json
 
 from django.db import models, transaction
+from django.contrib.gis.db.models import PointField
+
 from django.db.models import Q
 import logging
 from ondoc.authentication import models as auth_model
@@ -28,6 +31,7 @@ from num2words import num2words
 from hardcopy import bytestring_to_pdf
 import math
 import reversion
+import numbers
 from ondoc.account.models import Order, Merchant, MerchantPayout
 from decimal import  *
 logger = logging.getLogger(__name__)
@@ -152,14 +156,20 @@ class InsuranceDoctorSpecializations(object):
 
     @classmethod
     def get_doctor_insurance_specializations(cls, doctor):
-        from ondoc.doctor.models import DoctorPracticeSpecialization, OpdAppointment
+        from ondoc.doctor.models import Doctor, DoctorPracticeSpecialization, OpdAppointment
         all_gynecologist_list = set(json.loads(settings.GYNECOLOGIST_SPECIALIZATION_IDS))
         all_oncologist_list = set(json.loads(settings.ONCOLOGIST_SPECIALIZATION_IDS))
 
+        if isinstance(doctor, numbers.Number):
+            doctor = Doctor.objects.filter(id=doctor).first()
+
         result = False
         specialization = None
-        doctor_specialization_ids = DoctorPracticeSpecialization.objects.filter(doctor_id=doctor).values_list('specialization_id', flat=True)
-        doctor_specialization_ids_set = set(doctor_specialization_ids)
+
+        doctor_specialization_ids_set = set([x.specialization_id for x in doctor.doctorpracticespecializations.all()])
+        
+        # doctor_specialization_ids = DoctorPracticeSpecialization.objects.prefetch_.filter(doctor_id=doctor).values_list('specialization_id', flat=True)
+        # doctor_specialization_ids_set = set(doctor_specialization_ids)
         for specialiization_id in doctor_specialization_ids_set:
             if specialiization_id in all_gynecologist_list:
                 # self.doctor_specialization = InsuranceDoctorSpecializations.SpecializationMapping.GYNOCOLOGIST
@@ -414,8 +424,12 @@ class UserInsurance(auth_model.TimeStampedModel):
     ONHOLD = 4
     CANCEL_INITIATE = 5
 
+    REFUND = 1
+    NO_REFUND = 2
+
     STATUS_CHOICES = [(ACTIVE, "Active"), (CANCELLED, "Cancelled"), (EXPIRED, "Expired"), (ONHOLD, "Onhold"),
                       (CANCEL_INITIATE, 'Cancel Initiate')]
+    CANCEL_CASE_CHOICES = [(REFUND, "Refund"), (NO_REFUND, "Non-Refund")]
 
     id = models.BigAutoField(primary_key=True)
     insurance_plan = models.ForeignKey(InsurancePlans, related_name='active_users', on_delete=models.DO_NOTHING)
@@ -433,7 +447,8 @@ class UserInsurance(auth_model.TimeStampedModel):
     matrix_lead_id = models.IntegerField(null=True)
     status = models.PositiveIntegerField(choices=STATUS_CHOICES, default=ACTIVE)
     merchant_payout = models.ForeignKey(MerchantPayout, related_name="user_insurance", on_delete=models.DO_NOTHING, null=True)
-    onhold_reason = models.CharField(max_length=200, blank=True, null=True, default=None)
+    cancel_reason = models.CharField(max_length=200, blank=True, null=True, default=None)
+    cancel_case_type = models.PositiveIntegerField(choices=CANCEL_CASE_CHOICES, default=REFUND)
 
     def __str__(self):
         return str(self.user)
@@ -1171,20 +1186,21 @@ class UserInsurance(auth_model.TimeStampedModel):
             appointment.save()
         self.status = UserInsurance.CANCEL_INITIATE
         self.save()
-        transaction.on_commit(lambda: self.after_commit_task())
+
+        send_cancellation_notification = True if self.user and hasattr(self, '_responsible_user') and self._responsible_user == self.user else None
+
+        transaction.on_commit(lambda: self.after_commit_task(send_cancellation_notification))
         res['success'] = "Cancellation request received, refund will be credited in your account in 10-15 working days"
         return res
 
-    def after_commit_task(self):
+    def after_commit_task(self, send_cancellation_notification):
         if self.status == UserInsurance.CANCEL_INITIATE:
             try:
                 # notification_tasks.send_insurance_cancellation.apply_async(self.id)
-                # send_insurance_notifications.apply_async(({'user_id': self.user.id, 'status': UserInsurance.CANCEL_INITIATE}, ), countdown=1)
-                pass
+                if send_cancellation_notification:
+                    send_insurance_notifications.apply_async(({'user_id': self.user.id, 'status': UserInsurance.CANCEL_INITIATE}, ))
             except Exception as e:
                 logger.error(str(e))
-
-
 
 
 class InsuranceTransaction(auth_model.TimeStampedModel):
@@ -1336,6 +1352,7 @@ class InsuranceDisease(auth_model.TimeStampedModel):
     disease = models.CharField(max_length=100)
     enabled = models.BooleanField()
     is_live = models.BooleanField()
+    is_female_related = models.BooleanField(default=False)
 
     class Meta:
         db_table = "insurance_disease"
@@ -1353,14 +1370,20 @@ class InsuranceDiseaseResponse(auth_model.TimeStampedModel):
 class InsuranceLead(auth_model.TimeStampedModel):
     matrix_lead_id = models.IntegerField(null=True)
     extras = JSONField(default={})
-    user = models.ForeignKey(User, on_delete=models.CASCADE)
+    user = models.ForeignKey(User, on_delete=models.CASCADE, null=True, blank=True)
+    phone_number = models.BigIntegerField(blank=True, null=True, validators=[MaxValueValidator(9999999999), MinValueValidator(1000000000)])
 
     def save(self, *args, **kwargs):
         super().save(*args, **kwargs)
         transaction.on_commit(lambda: self.after_commit())
 
     def after_commit(self):
-        push_insurance_banner_lead_to_matrix.apply_async(({'id': self.id}, ))
+        lat = self.extras.get('latitude', None)
+        long = self.extras.get('longitude', None)
+
+        city_name = InsuranceEligibleCities.check_eligibility(lat, long)
+        if not lat or not long or city_name:
+            push_insurance_banner_lead_to_matrix.apply_async(({'id': self.id}, ))
 
     @classmethod
     def get_latest_lead_id(cls, user):
@@ -1369,6 +1392,20 @@ class InsuranceLead(auth_model.TimeStampedModel):
             return insurance_lead.matrix_lead_id
 
         return None
+
+    @classmethod
+    def create_lead_by_phone_number(cls, request):
+        phone_number = request.data.get('phone_number', None)
+        if not phone_number:
+            return None
+
+        user_insurance_lead = InsuranceLead.objects.filter(phone_number=phone_number).order_by('id').last()
+        if not user_insurance_lead:
+            user_insurance_lead = InsuranceLead(phone_number=phone_number)
+
+        user_insurance_lead.extras = request.data
+        user_insurance_lead.save()
+        return True
 
     class Meta:
         db_table = 'insurance_leads'
@@ -1417,6 +1454,7 @@ class InsuranceMIS(auth_model.TimeStampedModel):
         USER_INSURANCE_DOCTOR_RESOURCE = "USER_INSURANCE_DOCTOR_RESOURCE"
         USER_INSURANCE_LAB_RESOURCE = "USER_INSURANCE_LAB_RESOURCE"
         USER_INSURANCE_RESOURCE = "USER_INSURANCE_RESOURCE"
+        INSURED_MEMBERS_RESOURCE = "INSURED_MEMBERS_RESOURCE"
         ALL_MIS_ZIP = "ALL_MIS_ZIP"
 
     attachment_type = models.CharField(max_length=100, null=False, blank=False, choices=AttachmentType.as_choices())
@@ -1424,3 +1462,49 @@ class InsuranceMIS(auth_model.TimeStampedModel):
 
     class Meta:
         db_table = 'insurance_mis'
+
+
+class InsuranceCoveredEntity(auth_model.TimeStampedModel):
+
+    entity_id = models.PositiveIntegerField()
+    name = models.CharField(max_length=1000)
+    location = PointField(geography=True, srid=4326, blank=True, null=True)
+    type = models.CharField(max_length=50)
+    search_key = models.CharField(max_length=1000, null=True, blank=True)
+    data = JSONField(null=True, blank=True)
+    specialization_search_key = models.CharField(max_length=1000, null=True, blank=True)
+
+    class Meta:
+        db_table = 'insurance_covered_entity'
+
+
+class InsuranceEligibleCities(auth_model.TimeStampedModel):
+
+    Radius = 15
+
+    name = models.CharField(max_length=100, blank=False, null=False)
+    latitude = models.DecimalField(null=False, max_digits=11, decimal_places=8)
+    longitude = models.DecimalField(null=False, max_digits=11, decimal_places=8)
+
+    @classmethod
+    def check_eligibility(cls, latitude, longitude):
+        if not latitude or not longitude:
+            return None
+
+        providing_cities = cls.objects.all()
+
+        pnt1 = Point(float(longitude), float(latitude))
+
+        for insurance_city in providing_cities:
+            try:
+                pnt2 = Point(float(insurance_city.longitude), float(insurance_city.latitude))
+                distance = pnt1.distance(pnt2) * 100
+                if distance <= cls.Radius:
+                    return insurance_city.name
+            except Exception as e:
+                pass
+
+        return None
+
+    class Meta:
+        db_table = "insurance_eligible_cities"

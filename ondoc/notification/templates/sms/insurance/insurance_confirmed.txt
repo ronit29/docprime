@@ -11,6 +11,6 @@ Coverage:{%if total_member_covered > 1%} {{total_member_covered}} Members {% els
 Policy Issue Date: {{purchase_date}}
 Policy Expiry Date: {{expiry_date}}
 Policy Status:  Active
-For any query please call on our toll free number: 1800-123-9419
+For any query please contact us at customercare@docprime.com
 
 Thanks for choosing Docprime.com
