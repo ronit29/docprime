@@ -183,7 +183,7 @@ class DoctorSearchHelper:
             currentDT = timezone.now()
             today_time = currentDT.strftime("%H.%M")
             avail_days = max(map(int, availability))
-            if avail_days in (DoctorListSerializer.TODAY, DoctorListSerializer.NEXT_3_DAYS):
+            if avail_days in (DoctorListSerializer.TODAY):
                 aval_query += ' (dct.day = (%(today)s) and  (%(today_time)s) <= dct."end" ) '
                 params['today'] = today
                 params['today_time'] = today_time

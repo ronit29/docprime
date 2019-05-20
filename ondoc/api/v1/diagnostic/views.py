@@ -1413,7 +1413,7 @@ class LabList(viewsets.ReadOnlyModelViewSet):
             today_time = currentDT.strftime("%H.%M")
             avail_days = max(map(int, availability))
 
-            if avail_days in (SearchLabListSerializer.TODAY, SearchLabListSerializer.NEXT_3_DAYS):
+            if avail_days in (SearchLabListSerializer.TODAY):
                 aval_query += ' (lbt.day = (%(today)s) and  (%(today_time)s)<= lbt."end" ) '
                 filtering_params['today'] = today
                 filtering_params['today_time'] = today_time
