@@ -1,8 +1,9 @@
 from django.contrib import admin
 from django.contrib.admin import TabularInline
 
-from ondoc.banner.models import Banner, SliderLocation, BannerLocation
+from ondoc.banner.models import Banner, SliderLocation, BannerLocation, Recommender, EmailBanner, RecommenderThrough
 from django import forms
+from django.contrib.contenttypes.admin import GenericTabularInline
 
 
 class BannerForm(forms.ModelForm):
@@ -85,3 +86,28 @@ class SliderLocationAdmin(admin.ModelAdmin):
 
     model = SliderLocation
     list_display = ['name']
+
+
+class RecommenderAdmin(admin.ModelAdmin):
+
+    model = Recommender
+
+    def get_form(self, request, obj=None, **kwargs):
+        form = super().get_form(request, obj=obj, **kwargs)
+        return form
+
+
+class RecommenderInline(GenericTabularInline):
+    can_delete = True
+    extra = 0
+    # form = SPOCDetailsForm
+    model = RecommenderThrough
+    show_change_link = False
+    fields = ['recommender']
+
+class EmailBannerAdmin(admin.ModelAdmin):
+
+    model = EmailBanner
+    inlines = (RecommenderInline, )
+
+
