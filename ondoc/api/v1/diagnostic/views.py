@@ -1332,7 +1332,7 @@ class LabList(viewsets.ReadOnlyModelViewSet):
     def get_lab_search_list(self, parameters, page):
         # distance in meters
 
-        request.user = User.objects.filter(id=11).first()
+        # request.user = User.objects.filter(id=11).first()
         DEFAULT_DISTANCE = 20000
         MAX_SEARCHABLE_DISTANCE = 50000
 
@@ -1412,19 +1412,21 @@ class LabList(viewsets.ReadOnlyModelViewSet):
             aval_query = "( "
             currentDT = timezone.now()
             today_time = currentDT.strftime("%H.%M")
-            avail_days = max(map(int, availability))
+            avail_days = list(map(int, availability))
 
-            if avail_days == SearchLabListSerializer.TODAY:
+            if SearchLabListSerializer.TODAY in avail_days:
                 aval_query += ' (lbt.day = (%(today)s) and  (%(today_time)s)<= lbt."end" ) '
                 filtering_params['today'] = today
                 filtering_params['today_time'] = today_time
 
-            if avail_days == SearchLabListSerializer.TOMORROW:
+            if SearchLabListSerializer.TOMORROW in avail_days and not SearchLabListSerializer.NEXT_3_DAYS in avail_days:
+                if len(avail_days) > 1:
+                    aval_query += ' or '
                 today += 1
                 aval_query += ' lbt.day = (%(tomorrow)s) '
                 filtering_params['tomorrow'] = (0 if today == 6 else today + 1)
 
-            if avail_days == SearchLabListSerializer.NEXT_3_DAYS:
+            if SearchLabListSerializer.NEXT_3_DAYS in avail_days:
                 for day in range(1, 4):
                     if not aval_query == "( ":
                         aval_query += ' or '

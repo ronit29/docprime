@@ -182,17 +182,20 @@ class DoctorSearchHelper:
             today = Date.today().weekday()
             currentDT = timezone.now()
             today_time = currentDT.strftime("%H.%M")
-            avail_days = max(map(int, availability))
-            if avail_days == DoctorListSerializer.TODAY:
+            avail_days =list(map(int, availability))
+            if DoctorListSerializer.TODAY in avail_days:
                 aval_query += ' (dct.day = (%(today)s) and  (%(today_time)s) <= dct."end" ) '
                 params['today'] = today
                 params['today_time'] = today_time
 
-            if avail_days == DoctorListSerializer.TOMORROW:
+            if DoctorListSerializer.TOMORROW in avail_days and not DoctorListSerializer.NEXT_3_DAYS in avail_days:
+                if len(avail_days) > 1:
+                    aval_query += ' or '
                 aval_query += ' dct.day = (%(tomorrow)s) '
                 today += 1
                 params['tomorrow'] = (0 if today == 6 else today + 1)
-            elif avail_days == DoctorListSerializer.NEXT_3_DAYS:
+
+            if DoctorListSerializer.NEXT_3_DAYS in avail_days:
                 for day in range(1, 4):
                     if not aval_query == "( ":
                         aval_query += ' or '
