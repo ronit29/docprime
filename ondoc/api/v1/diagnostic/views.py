@@ -1419,6 +1419,7 @@ class LabList(viewsets.ReadOnlyModelViewSet):
                 filtering_params['today_time'] = today_time
 
             if avail_days == serializers.SearchLabListSerializer.TOMORROW:
+                today += 1
                 aval_query += ' lbt.day = (%(tomorrow)s) '
                 filtering_params['tomorrow'] = (0 if today == 6 else today + 1)
 
