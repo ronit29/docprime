@@ -863,8 +863,10 @@ class Doctor(auth_model.TimeStampedModel, auth_model.QCModel, SearchKey, auth_mo
         return False
 
     def create_entity_url(self):
-        from ondoc.location.services.doctor_urls import PageUrlCache
-        cache = PageUrlCache(EntityUrls.SitemapIdentifier.DOCTOR_PAGE)
+        #from ondoc.location.services.doctor_urls import PageUrlCache
+        #cache = PageUrlCache(EntityUrls.SitemapIdentifier.DOCTOR_PAGE)
+        if not self.is_live:
+            return
 
         entity = EntityUrls.objects.filter(entity_id=self.id, is_valid=True, sitemap_identifier='DOCTOR_PAGE')
         if not entity:
@@ -880,13 +882,25 @@ class Doctor(auth_model.TimeStampedModel, auth_model.QCModel, SearchKey, auth_mo
                 url = "dr-%s" % (self.name)
             url = slugify(url)
             new_url = url
-            is_duplicate = cache.is_duplicate(new_url + '-dpp', self.id)
-            if is_duplicate:
-                new_url = new_url + '-' + str(self.id)
-
-            new_url = new_url + '-dpp'
-            EntityUrls.objects.create(url=new_url, sitemap_identifier='DOCTOR_PAGE', entity_type='Doctor', url_type='PAGEURL',
+            exists = EntityUrls.objects.filter(url=new_url+'-dpp', sitemap_identifier='DOCTOR_PAGE').first()
+            if exists:
+                if exists.id = self.id:
+                    exists.is_valid=True
+                    exists.save()
+                    return
+                else:
+                    new_url = url+'-'+str(self.id)
+            
+            EntityUrls.objects.create(url=new_url+'-dpp', sitemap_identifier='DOCTOR_PAGE', entity_type='Doctor', url_type='PAGEURL',
                                   is_valid=True, sequence=0, entity_id=self.id)
+    
+            #is_duplicate = cache.is_duplicate(new_url + '-dpp', self.id)
+            # if is_duplicate:
+            #     new_url = new_url + '-' + str(self.id)
+
+            # new_url = new_url + '-dpp'
+            # EntityUrls.objects.create(url=new_url, sitemap_identifier='DOCTOR_PAGE', entity_type='Doctor', url_type='PAGEURL',
+            #                       is_valid=True, sequence=0, entity_id=self.id)
 
 
     def save(self, *args, **kwargs):
