@@ -1332,6 +1332,7 @@ class LabList(viewsets.ReadOnlyModelViewSet):
     def get_lab_search_list(self, parameters, page):
         # distance in meters
 
+        request.user = User.objects.filter(id=11).first()
         DEFAULT_DISTANCE = 20000
         MAX_SEARCHABLE_DISTANCE = 50000
 
