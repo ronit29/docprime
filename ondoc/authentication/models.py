@@ -17,7 +17,7 @@ import random, string
 from django.contrib.contenttypes.fields import GenericForeignKey, GenericRelation
 from django.contrib.contenttypes.models import ContentType
 from django.utils.functional import cached_property
-from datetime import date, timedelta, datetime
+from datetime import date, datetime
 from safedelete import SOFT_DELETE
 from safedelete.models import SafeDeleteModel
 import reversion
@@ -546,6 +546,9 @@ class OtpVerifications(TimeStampedModel):
     code = models.CharField(max_length=10)
     country_code = models.CharField(max_length=10)
     is_expired = models.BooleanField(default=False)
+    otp_request_source = models.CharField(null=True, max_length=200, blank=True)
+    via_whatsapp = models.NullBooleanField(null=True)
+    via_sms = models.NullBooleanField(null=True)
 
     def __str__(self):
         return self.phone_number
