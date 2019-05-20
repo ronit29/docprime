@@ -496,6 +496,23 @@ class Lab(TimeStampedModel, CreatedByModel, QCModel, SearchKey, WelcomeCallingDo
             return True
         return False
 
+    def create_entity_url(self):
+        from ondoc.location.services.doctor_urls import PageUrlCache
+        cache = PageUrlCache(EntityUrls.SitemapIdentifier.LAB_PAGE)
+
+        entity = EntityUrls.objects.filter(entity_id=self.id, is_valid=True, sitemap_identifier='LAB_PAGE')
+        if not entity:
+            url = "%s" % (self.name)
+            url = slugify(url)
+            new_url = url
+            is_duplicate = cache.is_duplicate(new_url + '-lpp', self.id)
+            if is_duplicate:
+                new_url = new_url + '-' + str(self.id)
+
+            new_url = new_url + '-lpp'
+            EntityUrls.objects.create(url=new_url, sitemap_identifier='LAB_PAGE', entity_type='Lab', url_type='PAGEURL',
+                                  is_valid=True, sequence=0, entity_id=self.id)
+
     def save(self, *args, **kwargs):
         self.clean()
 
@@ -548,7 +565,7 @@ class Lab(TimeStampedModel, CreatedByModel, QCModel, SearchKey, WelcomeCallingDo
                 AvailableLabTest.objects.\
                     filter(lab=id, test__test_type=LabTest.RADIOLOGY).\
                     update(computed_deal_price=DealPriceCalculate(F('mrp'), F('computed_agreed_price'), rad_deal_price_prcnt))
-
+        self.create_entity_url()
         # transaction.on_commit(lambda: self.app_commit_tasks(push_to_matrix))
     #
     # def app_commit_tasks(self, push_to_matrix):
