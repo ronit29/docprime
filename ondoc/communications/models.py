@@ -723,7 +723,8 @@ class WHTSAPPNotification:
                 phone_number=phone_number,
                 notification_type=notification_type,
                 template_name=template,
-                payload=kwargs.get('payload', {})
+                payload=kwargs.get('payload', {}),
+                extras={}
             )
             message = {
                 "data": whtsapp_noti.payload,
@@ -737,7 +738,8 @@ class WHTSAPPNotification:
                 phone_number=phone_number,
                 notification_type=notification_type,
                 template_name=template,
-                payload=kwargs.get('payload', {})
+                payload=kwargs.get('payload', {}),
+                extras={}
             )
             message = {
                 "data": whtsapp_noti.payload,
