@@ -1,1 +1,1 @@
-{{insurer_name}} Insurance Policy Endorsement Request Received | Policy Number: {{policy_number}}
+{{insurer_name}} Endorsement Request Received | Policy Number: {{policy_number}}

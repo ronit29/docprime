@@ -1084,8 +1084,9 @@ class EndorsementRequestAdmin(admin.ModelAdmin):
                 obj.process_endorsement()
             elif obj.status == EndorsementRequest.REJECT:
                 obj.reject_endorsement()
-            if obj.mail_coi_to_customer and obj.status == EndorsementRequest.APPROVED:
+            if obj.mail_coi_to_customer:
                 obj.process_coi()
+
 
 
 class InsuredMemberHistoryAdmin(admin.ModelAdmin):

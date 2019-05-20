@@ -1486,8 +1486,12 @@ class InsuranceNotification(Notification):
 
         if self.notification_type == NotificationAction.INSURANCE_ENDORSMENT_APPROVED:
             endorsement_list = list()
+            rejected = 0
             endorsed_members = instance.endorse_members.filter(~Q(status=EndorsementRequest.PENDING))
             for mem in endorsed_members:
+                if mem.status == 3:
+                    rejected = rejected + 1
+
                 mem_data = {
                     'name': mem.member.get_full_name(),
                     'relation': mem.member.relation,
@@ -1497,6 +1501,8 @@ class InsuranceNotification(Notification):
                 endorsement_list.append(mem_data)
 
             context['endorsement_list'] = endorsement_list
+            context['few_rejected'] = True if rejected > 0 else False
+
 
         return context
 
