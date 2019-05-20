@@ -40,8 +40,8 @@ class ScreenViewSet(viewsets.GenericViewSet):
         profile = params.get('profile_id')
         product_id = params.get('product_id')
         app_version = params.get("app_version", "1.0")
-        lat = params.get('latitude', None)
-        long = params.get('longitude', None)
+        lat = params.get('lat', None)
+        long = params.get('long', None)
         if UserConfig.objects.filter(key="app_update").exists():
             app_update = UserConfig.objects.filter(key="app_update").values_list('data', flat=True).first()
             if app_update:
