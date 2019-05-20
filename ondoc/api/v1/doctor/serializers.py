@@ -2053,8 +2053,8 @@ class IpdProcedureLeadSerializer(serializers.ModelSerializer):
         hospital = attrs.get('hospital')
         age = attrs.get('age')
         dob = attrs.get('dob')
-        if all([age, dob]):
-            raise serializers.ValidationError('Only one of age or DOB is required.')
+        # if all([age, dob]):
+        #     raise serializers.ValidationError('Only one of age or DOB is required.')
         if not any([age, dob]):
             raise serializers.ValidationError('Either age or DOB is required.')
         if ipd_procedure and hospital:

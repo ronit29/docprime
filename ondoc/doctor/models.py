@@ -701,24 +701,31 @@ class Doctor(auth_model.TimeStampedModel, auth_model.QCModel, SearchKey, auth_mo
 
         delete_query = RawSql(''' delete from insurance_covered_entity where type='doctor' ''', []).execute()
 
-        query = '''  insert into insurance_covered_entity(entity_id,name ,location, type, search_key, data,created_at,updated_at) 
-        select doctor_id as entity_id, doctor_name as name, location ,'doctor' as type,search_key,
-        json_build_object('id',doctor_id, 'type','doctor','name', doctor_name,'city', city,'url', url,'hospital_name',hospital_name), now(), now() from
-        (select distinct d.id doctor_id, h.id hospital_id, d.name doctor_name, h.city, eu.url, h.name hospital_name,
-        h.location, d.search_key
-        from doctor d 
-        inner join entity_urls eu on eu.entity_id = d.id and sitemap_identifier = 'DOCTOR_PAGE' and eu.is_valid=true
-        inner join doctor_practice_specialization dps on dps.doctor_id = d.id 
-        inner join practice_specialization ps on ps.id = dps.specialization_id and ps.is_insurance_enabled=true
-        inner join doctor_clinic dc on d.id = dc.doctor_id 
-        inner join doctor_clinic_timing dct on dct.doctor_clinic_id = dc.id and dct.mrp<=1500
-        inner join hospital h on h.id = dc.hospital_id 
-        where d.is_live=true and  d.enabled_for_online_booking=true 
-        and  d.is_test_doctor=false and d.is_internal=false and d.is_insurance_enabled=true
-        and dc.enabled=true and dc.enabled_for_online_booking=true
-        and h.enabled_for_online_booking=true and h.enabled_for_prepaid=true and h.is_live=true
-        and h.location is not null
-        )x '''
+        query =   '''insert into insurance_covered_entity(entity_id,name ,location, type, search_key, data,specialization_search_key, created_at,updated_at)
+                 
+                 select doc_id as entity_id, doctor_name as name, location ,'doctor' as type,search_key,
+                        json_build_object('id',doc_id, 'type','doctor','name', doctor_name,'city', city,'url', url,'hospital_name',hospital_name, 'specializations', specializations),specialization_search_key,  now(), now() from(
+                select doc_id ,doctor_name, h.location, doc_search_key as search_key, h.city, h.name as hospital_name , url, specialization_search_key, specializations from 
+                (select d.id doc_id, d.name doctor_name,d.search_key as doc_search_key, max(eu.url) as url,
+                string_agg(distinct lower(ps.name), ',') specialization_search_key,
+                array_agg(distinct ps.name) specializations
+                from doctor d 
+                 inner join entity_urls eu on eu.entity_id = d.id and sitemap_identifier = 'DOCTOR_PAGE' and eu.is_valid=true
+                 inner join doctor_practice_specialization dps on dps.doctor_id = d.id 
+                 inner join practice_specialization ps on ps.id = dps.specialization_id and ps.is_insurance_enabled=true
+                 inner join doctor_clinic dc on d.id = dc.doctor_id 
+                 inner join doctor_clinic_timing dct on dct.doctor_clinic_id = dc.id and dct.mrp<=1500
+                 inner join hospital h on h.id = dc.hospital_id
+                 where d.is_live=true and  d.enabled_for_online_booking=true and
+                 dc.enabled=true and dc.enabled_for_online_booking=true
+                 and h.enabled_for_online_booking=true and h.enabled_for_prepaid=true and h.is_live=true
+                        and h.location is not null
+                  and  d.is_test_doctor=false and d.is_internal=false and d.is_insurance_enabled=true
+                group by d.id
+                )x inner join doctor_clinic dc on dc.doctor_id=doc_id inner join hospital h on h.id=dc.hospital_id
+                 and dc.enabled=true and dc.enabled_for_online_booking=true
+                        and h.enabled_for_online_booking=true and h.enabled_for_prepaid=true and h.is_live=true
+                        and h.location is not null) y '''
 
         update_insured_doctors = RawSql(query, []).execute()
 
