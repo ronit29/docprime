@@ -17,7 +17,7 @@ Link(s):
 
 
 {% if is_thyrocare_report %}
-If you wish to get your reports reviewed by our in-house doctors, Please click on https://docprime.com/mobileviewchat?utm_source=Thyrocare&booking_id={{instance.id}}
+If you wish to get your reports reviewed by our in-house doctors, Please click on {{chat_url}}
 {% else %}
 If you wish to get your reports reviewed by our in-house doctors, please send an email to customercare@docprime.com .
 {% endif %}

@@ -1274,8 +1274,11 @@ class LabNotification(Notification):
             mask_number = mask_number_instance.mask_number
 
         is_thyrocare_report = False
+        chat_url = ""
         if instance and instance.lab and instance.lab.network and instance.lab.network.id == settings.THYROCARE_NETWORK_ID:
             is_thyrocare_report = True
+            chat_url = "https://docprime.com/mobileviewchat?utm_source=Thyrocare&booking_id=%s" % instance.id
+            chat_url = generate_short_url(chat_url)
 
         context = {
             "lab_name": lab_name,
@@ -1296,7 +1299,8 @@ class LabNotification(Notification):
             "type": "lab",
             "mask_number": mask_number,
             "email_banners": email_banners_html if email_banners_html is not None else "",
-            "is_thyrocare_report": is_thyrocare_report
+            "is_thyrocare_report": is_thyrocare_report,
+            "chat_url": chat_url
         }
         return context
 
