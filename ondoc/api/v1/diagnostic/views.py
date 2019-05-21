@@ -1318,6 +1318,7 @@ class LabList(viewsets.ReadOnlyModelViewSet):
         network_id = parameters.get("network_id")
         is_insurance = parameters.get('is_insurance')
         insurance_threshold_amount = parameters.get('insurance_threshold_amount')
+        is_user_insured = parameters.get('is_user_insured')
 
         #filtering_params = []
         #filtering_params_query1 = []
@@ -1377,8 +1378,9 @@ class LabList(viewsets.ReadOnlyModelViewSet):
         if is_insurance and ids:
             filtering_query.append("mrp<=(%(insurance_threshold_amount)s)")
             filtering_params['insurance_threshold_amount'] = insurance_threshold_amount
+            group_filter.append(" not(pickup_charges>0 and network_id=43) ")
 
-        filter_query_string = ""    
+        filter_query_string = ""
         if len(filtering_query)>0:
             filter_query_string = " and "+" and ".join(filtering_query)
         

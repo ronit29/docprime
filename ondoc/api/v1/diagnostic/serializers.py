@@ -83,6 +83,13 @@ class LabModelSerializer(serializers.ModelSerializer):
     center_visit_enabled = serializers.SerializerMethodField()
     display_rating_widget = serializers.SerializerMethodField()
     is_thyrocare = serializers.SerializerMethodField()
+    is_home_collection_enabled = serializers.SerializerMethodField()
+
+    def get_is_home_collection_enabled(self, obj):
+        if obj and obj.network and settings.THYROCARE_NETWORK_ID:
+            if obj.network.id == settings.THYROCARE_NETWORK_ID and obj.home_pickup_charges>0:
+                return False
+        return True
 
     def get_is_thyrocare(self, obj):
         if obj and obj.network and settings.THYROCARE_NETWORK_ID:
