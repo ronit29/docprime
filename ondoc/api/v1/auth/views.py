@@ -620,7 +620,7 @@ class UserAppointmentsViewSet(OndocViewSet):
         if appointment_type == 'lab':
             # lab_appointment = get_object_or_404(LabAppointment, pk=pk)
             lab_appointment = LabAppointment.objects.select_for_update().filter(pk=pk).first()
-            lab_appointment._source = source if source in [x[0] for x in AppointmentHistory.SOURCE_CHOICES] else ''
+            lab_appointment._source = source
             lab_appointment._responsible_user = responsible_user
             resp = dict()
             if not lab_appointment:
@@ -642,7 +642,7 @@ class UserAppointmentsViewSet(OndocViewSet):
         elif appointment_type == 'doctor':
             # opd_appointment = get_object_or_404(OpdAppointment, pk=pk)
             opd_appointment = OpdAppointment.objects.select_for_update().filter(pk=pk).first()
-            opd_appointment._source = source if source in [x[0] for x in AppointmentHistory.SOURCE_CHOICES] else ''
+            opd_appointment._source = source
             opd_appointment._responsible_user = responsible_user
             resp = dict()
             if not opd_appointment:

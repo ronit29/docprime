@@ -2676,7 +2676,6 @@ class DoctorLabAppointmentsNoAuthViewSet(viewsets.GenericViewSet):
         lab_appointment = validated_data.get('lab_appointment')
 
         lab_appointment = LabAppointment.objects.select_for_update().get(id=lab_appointment.id)
-        source = request.query_params.get('source', '')
         source = validated_data.get('source') if validated_data.get('source') else request.query_params.get('source', '')
         responsible_user = request.user if request.user.is_authenticated else None
         lab_appointment._source = source if source in [x[0] for x in AppointmentHistory.SOURCE_CHOICES] else ''
