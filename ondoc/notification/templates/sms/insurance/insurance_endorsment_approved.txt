@@ -1,4 +1,9 @@
-Your endorsement request for policy ID: {{policy_number}} has been approved.
+Your endorsement request for policy ID: {{policy_number}} has been processed.
+
+{% for mem in endorsement_list %}
+{{mem.name}} : {{mem.status}}
+{% endfor %}
+
 PFA the updated COI for your reference
 
 {{coi_url}}

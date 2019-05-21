@@ -1503,7 +1503,7 @@ class InsuranceNotification(Notification):
                     rejected = rejected + 1
 
                 mem_data = {
-                    'name': mem.member.get_full_name(),
+                    'name': mem.member.get_full_name().title(),
                     'relation': mem.member.relation,
                     'status': EndorsementRequest.STATUS_CHOICES[mem.status-1][1]
                 }
