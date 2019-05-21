@@ -1,4 +1,5 @@
 import datetime
+from django.contrib.gis.geos import Point
 from django.core.validators import FileExtensionValidator
 
 from ondoc.notification.models import EmailNotification
@@ -1158,7 +1159,7 @@ class UserInsurance(auth_model.TimeStampedModel):
         from ondoc.tracking.models import TrackingEvent
         try:
             with transaction.atomic():
-                event_data = TrackingEvent.build_event_data(self.user, TrackingEvent.InsurancePurchased, appointmentId=self.id)
+                event_data = TrackingEvent.build_event_data(self.user, TrackingEvent.InsurancePurchased, appointmentId=self.id, visitor_info=visitor_info)
                 if event_data and visitor_info:
                     TrackingEvent.save_event(event_name=event_data.get('event'), data=event_data, visit_id=visitor_info.get('visit_id'),
                                              user=self.user, triggered_at=datetime.datetime.utcnow())
@@ -1377,7 +1378,12 @@ class InsuranceLead(auth_model.TimeStampedModel):
         transaction.on_commit(lambda: self.after_commit())
 
     def after_commit(self):
-        push_insurance_banner_lead_to_matrix.apply_async(({'id': self.id}, ))
+        lat = self.extras.get('latitude', None)
+        long = self.extras.get('longitude', None)
+
+        city_name = InsuranceEligibleCities.check_eligibility(lat, long)
+        if not lat or not long or city_name:
+            push_insurance_banner_lead_to_matrix.apply_async(({'id': self.id}, ))
 
     @classmethod
     def get_latest_lead_id(cls, user):
@@ -1466,6 +1472,39 @@ class InsuranceCoveredEntity(auth_model.TimeStampedModel):
     type = models.CharField(max_length=50)
     search_key = models.CharField(max_length=1000, null=True, blank=True)
     data = JSONField(null=True, blank=True)
+    specialization_search_key = models.CharField(max_length=1000, null=True, blank=True)
 
     class Meta:
         db_table = 'insurance_covered_entity'
+
+
+class InsuranceEligibleCities(auth_model.TimeStampedModel):
+
+    Radius = 15
+
+    name = models.CharField(max_length=100, blank=False, null=False)
+    latitude = models.DecimalField(null=False, max_digits=11, decimal_places=8)
+    longitude = models.DecimalField(null=False, max_digits=11, decimal_places=8)
+
+    @classmethod
+    def check_eligibility(cls, latitude, longitude):
+        if not latitude or not longitude:
+            return None
+
+        providing_cities = cls.objects.all()
+
+        pnt1 = Point(float(longitude), float(latitude))
+
+        for insurance_city in providing_cities:
+            try:
+                pnt2 = Point(float(insurance_city.longitude), float(insurance_city.latitude))
+                distance = pnt1.distance(pnt2) * 100
+                if distance <= cls.Radius:
+                    return insurance_city.name
+            except Exception as e:
+                pass
+
+        return None
+
+    class Meta:
+        db_table = "insurance_eligible_cities"

@@ -321,7 +321,7 @@ class LabList(viewsets.ReadOnlyModelViewSet):
         package_search_query = package_search_query.format(filter_query=filter_query, sort_query=sort_query, offset=offset, limit=page_size)
         all_packages = list(LabTest.objects.raw(package_search_query, params))
         from django.db.models import prefetch_related_objects
-        prefetch_related_objects(all_packages, 'test', 'test__recommended_categories', 'test__parameter', 'categories')
+        prefetch_related_objects(all_packages, 'test','test__categories', 'test__recommended_categories', 'test__parameter', 'categories')
         lab_ids = [package.lab for package in all_packages]
         entity_url_qs = EntityUrls.objects.filter(entity_id__in=lab_ids, is_valid=True, url__isnull=False,
                                                   sitemap_identifier=EntityUrls.SitemapIdentifier.LAB_PAGE).values(

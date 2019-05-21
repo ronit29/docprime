@@ -71,7 +71,7 @@ class DoctorSearchScore:
             result.append(self.get_doctors_score(doctor_in_hosp_count, doctor))
             result.append(self.get_doctor_ratings(doctor))
             result.append(self.get_doctor_ratings_count(doctor))
-            result.append(self.get_final_score(result))
+            result.append(self.get_final_score(result, doctor))
 
             score_obj_list.append(doctor_models.SearchScore(doctor=doctor, popularity_score=result[0]['popularity_score'],
                                                             years_of_experience_score=result[1]['experience_score'],
@@ -129,32 +129,17 @@ class DoctorSearchScore:
 
     def get_popularity_score(self, doctor):
         pop_score = self.popularity_data.get(doctor.id)
-        priority_score = 0
-        if pop_score:
-            if doctor.priority_score:
-                priority_score += doctor.priority_score
-            if doctor.hospitals.all() and priority_score == 0:
-                for hosp in doctor.hospitals.all():
-                    if hosp.priority_score > priority_score:
-                        priority_score = hosp.priority_score
 
-            if priority_score == 0:
-                network_hospitals = doctor.hospitals.all().filter(network__isnull=False)
-                if network_hospitals:
-                    for data in network_hospitals:
-                        if data.network and data.network.priority_score > priority_score:
-                            priority_score = data.network.priority_score
+        if not pop_score:
+            pop_score = 0
 
-            pop_score += priority_score
-            # popularity_list = self.scoring_data.get('popularity_score')
-            # for score in popularity_list:
-            #     if pop_score == 10:
-            #         return {'popularity_score': 10}
-            #
-            #     elif pop_score >= score.get('min') and pop_score < score.get('max'):
-            return {'popularity_score': pop_score}
-        else:
-            return {'popularity_score': 0}
+        # popularity_list = self.scoring_data.get('popularity_score')
+        # for score in popularity_list:
+        #     if pop_score == 10:
+        #         return {'popularity_score': 10}
+        #
+        #     elif pop_score >= score.get('min') and pop_score < score.get('max'):
+        return {'popularity_score': pop_score}
 
     def get_practice_score(self, doctor):
         score = 0
@@ -186,15 +171,31 @@ class DoctorSearchScore:
             elif doctors_count >= score.get('min') and doctors_count < score.get('max'):
                 return {'doctors_in_clinic_score': score.get('score')}
 
-    def get_final_score(self, result):
+    def get_final_score(self, result, doctor):
         if result:
             final_score = 0
-
+            priority_score = 0
             final_score_list = self.scoring_data.get('weightage')[0]
             final_score = float(result[0]['popularity_score']) * final_score_list['popularity_score'] + result[1][
                 'experience_score'] * final_score_list['years_of_experience'] + result[2]['doctors_in_clinic_score'] * \
                           final_score_list['doctors_in_clinic'] + result[3]['avg_ratings_score'] * final_score_list[
                               'average_ratings'] + result[4]['ratings_count'] * final_score_list['ratings_count']
+
+            if doctor.priority_score:
+                priority_score += doctor.priority_score
+            if doctor.hospitals.all() and priority_score == 0:
+                for hosp in doctor.hospitals.all():
+                    if hosp.priority_score > priority_score:
+                        priority_score = hosp.priority_score
+
+            if priority_score == 0:
+                network_hospitals = doctor.hospitals.all().filter(network__isnull=False)
+                if network_hospitals:
+                    for data in network_hospitals:
+                        if data.network and data.network.priority_score > priority_score:
+                            priority_score = data.network.priority_score
+
+            final_score += priority_score
 
             return {'final_score': final_score}
 
