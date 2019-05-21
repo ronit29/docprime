@@ -182,26 +182,6 @@ class Coupon(auth_model.TimeStampedModel):
 
         return count
 
-    def total_used_coupon_count(self):
-        from ondoc.doctor.models import OpdAppointment
-        from ondoc.diagnostic.models import LabAppointment
-
-        count = 0
-        if str(self.type) == str(self.DOCTOR) or str(self.type) == str(self.ALL):
-            count += OpdAppointment.objects.filter(status__in=[OpdAppointment.CREATED, OpdAppointment.BOOKED,
-                                                               OpdAppointment.RESCHEDULED_DOCTOR,
-                                                               OpdAppointment.RESCHEDULED_PATIENT,
-                                                               OpdAppointment.ACCEPTED,
-                                                               OpdAppointment.COMPLETED],
-                                                   coupon=self).count()
-        if str(self.type) == str(self.LAB) or str(self.type) == str(self.ALL):
-            count += LabAppointment.objects.filter(status__in=[LabAppointment.CREATED, LabAppointment.BOOKED,
-                                                               LabAppointment.RESCHEDULED_LAB,
-                                                               LabAppointment.RESCHEDULED_PATIENT,
-                                                               LabAppointment.ACCEPTED,
-                                                               LabAppointment.COMPLETED],
-                                                   coupon=self).count()
-        return count
 
     @classmethod
     def get_total_deduction(cls, data, deal_price):

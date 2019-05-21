@@ -700,7 +700,7 @@ class CouponsMixin(object):
                     return {"is_valid": False, "used_count": 0}
 
             count = coupon_obj.used_coupon_count(user, cart_item)
-            total_used_count = coupon_obj.total_used_coupon_count()
+            total_used_count = coupon_obj.total_used_count
 
             if coupon_obj.is_user_specific and user:
                 user_specefic = UserSpecificCoupon.objects.filter(user=user, coupon=coupon_obj).first()
@@ -868,6 +868,23 @@ class CouponsMixin(object):
 
         return {"total_price": total_price}
 
+    def get_applicable_tests_with_total_price_v2(self, **kwargs):
+        from ondoc.diagnostic.models import AvailableLabTest
+
+        lab = kwargs.get("lab")
+        test_ids = kwargs.get("test_ids")
+
+        queryset = AvailableLabTest.objects.filter(lab_pricing_group__labs=lab, test__in=test_ids)
+
+        total_price = 0
+        for test in queryset:
+            if test.custom_deal_price is not None:
+                total_price += test.custom_deal_price
+            else:
+                total_price += test.computed_deal_price
+
+        return {"total_price": total_price}
+
     def get_applicable_procedures_with_total_price(self, **kwargs):
         from ondoc.procedure.models import DoctorClinicProcedure
 
@@ -879,6 +896,21 @@ class CouponsMixin(object):
         queryset = DoctorClinicProcedure.objects.filter(doctor_clinic__doctor=doctor, doctor_clinic__hospital=hospital, procedure__in=procedures)
         if coupon_obj.procedures.exists():
             queryset = queryset.filter(procedure__in=coupon_obj.procedures.all())
+
+        total_price = 0
+        for procedure in queryset:
+            total_price += procedure.deal_price
+
+        return {"total_price": total_price}
+
+    def get_applicable_procedures_with_total_price_v2(self, **kwargs):
+        from ondoc.procedure.models import DoctorClinicProcedure
+
+        doctor = kwargs.get("doctor")
+        hospital = kwargs.get("hospital")
+        procedures = kwargs.get("procedures")
+
+        queryset = DoctorClinicProcedure.objects.filter(doctor_clinic__doctor=doctor, doctor_clinic__hospital=hospital, procedure__in=procedures)
 
         total_price = 0
         for procedure in queryset:
