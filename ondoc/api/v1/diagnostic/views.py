@@ -1378,7 +1378,7 @@ class LabList(viewsets.ReadOnlyModelViewSet):
         if is_insurance and ids:
             filtering_query.append("mrp<=(%(insurance_threshold_amount)s)")
             filtering_params['insurance_threshold_amount'] = insurance_threshold_amount
-            group_filter.append(" not(pickup_charges>0 and network_id=43) ")
+            group_filter.append(" (not network_id =43 or network_id is null) and not (pickup_charges>0::float ) ")
 
         filter_query_string = ""
         if len(filtering_query)>0:
