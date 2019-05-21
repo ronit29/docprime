@@ -42,6 +42,9 @@ class UrlsModel(models.Model):
     class Meta:
         abstract = True
 
+    @classmethod
+    def update_profile_urls(self):
+        update_doctor_page_urls = RawSql('''''', []).execute()
 
 class CompareSEOUrls(TimeStampedModel):
     url = models.SlugField(blank=False, null=True, max_length=2000, db_index=True, unique=True)

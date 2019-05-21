@@ -502,7 +502,7 @@ class Lab(TimeStampedModel, CreatedByModel, QCModel, SearchKey, WelcomeCallingDo
 
         entity = EntityUrls.objects.filter(entity_id=self.id, is_valid=True, sitemap_identifier='LAB_PAGE')
         if not entity:
-            url = "%s" % (self.name)
+            url = self.name
             url = slugify(url)
             new_url = url
 
