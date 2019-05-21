@@ -1704,7 +1704,7 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin,
         report_file_links = set()
         for report in reports:
             report_file_links = report_file_links.union(
-                set([report_file.name.url for report_file in report.files.all() if report_file.name.url.split('.')[1].lower() != 'xml']))
+                set([report_file.name.url for report_file in report.files.all() if report_file.name.url.rsplit('.',1)[1].lower() != 'xml']))
         report_file_links = [util_absolute_url(report_file_link) for report_file_link in report_file_links]
         return list(report_file_links)
 
