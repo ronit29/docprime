@@ -30,6 +30,7 @@ from ondoc.bookinganalytics.models import DP_OpdConsultsAndTests
 from ondoc.location import models as location_models
 from ondoc.account.models import Order, ConsumerAccount, ConsumerTransaction, PgTransaction, ConsumerRefund, \
     MerchantPayout, UserReferred, MoneyPool, Invoice
+from ondoc.location.models import EntityUrls
 from ondoc.notification.models import NotificationAction, EmailNotification
 from ondoc.payout.models import Outstanding
 from ondoc.coupon.models import Coupon
@@ -694,24 +695,31 @@ class Doctor(auth_model.TimeStampedModel, auth_model.QCModel, SearchKey, auth_mo
 
         delete_query = RawSql(''' delete from insurance_covered_entity where type='doctor' ''', []).execute()
 
-        query = '''  insert into insurance_covered_entity(entity_id,name ,location, type, search_key, data,created_at,updated_at) 
-        select doctor_id as entity_id, doctor_name as name, location ,'doctor' as type,search_key,
-        json_build_object('id',doctor_id, 'type','doctor','name', doctor_name,'city', city,'url', url,'hospital_name',hospital_name), now(), now() from
-        (select distinct d.id doctor_id, h.id hospital_id, d.name doctor_name, h.city, eu.url, h.name hospital_name,
-        h.location, d.search_key
-        from doctor d 
-        inner join entity_urls eu on eu.entity_id = d.id and sitemap_identifier = 'DOCTOR_PAGE' and eu.is_valid=true
-        inner join doctor_practice_specialization dps on dps.doctor_id = d.id 
-        inner join practice_specialization ps on ps.id = dps.specialization_id and ps.is_insurance_enabled=true
-        inner join doctor_clinic dc on d.id = dc.doctor_id 
-        inner join doctor_clinic_timing dct on dct.doctor_clinic_id = dc.id and dct.mrp<=1500
-        inner join hospital h on h.id = dc.hospital_id 
-        where d.is_live=true and  d.enabled_for_online_booking=true 
-        and  d.is_test_doctor=false and d.is_internal=false and d.is_insurance_enabled=true
-        and dc.enabled=true and dc.enabled_for_online_booking=true
-        and h.enabled_for_online_booking=true and h.enabled_for_prepaid=true and h.is_live=true
-        and h.location is not null
-        )x '''
+        query =   '''insert into insurance_covered_entity(entity_id,name ,location, type, search_key, data,specialization_search_key, created_at,updated_at)
+                 
+                 select doc_id as entity_id, doctor_name as name, location ,'doctor' as type,search_key,
+                        json_build_object('id',doc_id, 'type','doctor','name', doctor_name,'city', city,'url', url,'hospital_name',hospital_name, 'specializations', specializations),specialization_search_key,  now(), now() from(
+                select doc_id ,doctor_name, h.location, doc_search_key as search_key, h.city, h.name as hospital_name , url, specialization_search_key, specializations from 
+                (select d.id doc_id, d.name doctor_name,d.search_key as doc_search_key, max(eu.url) as url,
+                string_agg(distinct lower(ps.name), ',') specialization_search_key,
+                array_agg(distinct ps.name) specializations
+                from doctor d 
+                 inner join entity_urls eu on eu.entity_id = d.id and sitemap_identifier = 'DOCTOR_PAGE' and eu.is_valid=true
+                 inner join doctor_practice_specialization dps on dps.doctor_id = d.id 
+                 inner join practice_specialization ps on ps.id = dps.specialization_id and ps.is_insurance_enabled=true
+                 inner join doctor_clinic dc on d.id = dc.doctor_id 
+                 inner join doctor_clinic_timing dct on dct.doctor_clinic_id = dc.id and dct.mrp<=1500
+                 inner join hospital h on h.id = dc.hospital_id
+                 where d.is_live=true and  d.enabled_for_online_booking=true and
+                 dc.enabled=true and dc.enabled_for_online_booking=true
+                 and h.enabled_for_online_booking=true and h.enabled_for_prepaid=true and h.is_live=true
+                        and h.location is not null
+                  and  d.is_test_doctor=false and d.is_internal=false and d.is_insurance_enabled=true
+                group by d.id
+                )x inner join doctor_clinic dc on dc.doctor_id=doc_id inner join hospital h on h.id=dc.hospital_id
+                 and dc.enabled=true and dc.enabled_for_online_booking=true
+                        and h.enabled_for_online_booking=true and h.enabled_for_prepaid=true and h.is_live=true
+                        and h.location is not null) y '''
 
         update_insured_doctors = RawSql(query, []).execute()
 
@@ -853,7 +861,38 @@ class Doctor(auth_model.TimeStampedModel, auth_model.QCModel, SearchKey, auth_mo
                                  (self.rating_data.get('avg_rating') and self.rating_data['avg_rating'] > 4)):
             return True
         return False
-    
+
+    def create_entity_url(self):
+        if not self.is_live:
+            return
+
+        entity = EntityUrls.objects.filter(entity_id=self.id, is_valid=True, sitemap_identifier='DOCTOR_PAGE')
+        if not entity:
+            doctor = Doctor.objects.prefetch_related('doctorpracticespecializations', 'doctorpracticespecializations__specialization').filter(id=self.id)[0]
+            practice_specializations = doctor.doctorpracticespecializations.all()
+            specializations = set()
+            for sp in practice_specializations:
+                specializations.add(sp.specialization.name)
+
+            if specializations:
+                url = "dr-%s-%s" % (self.name, "-".join(specializations))
+            else:
+                url = "dr-%s" % (self.name)
+            url = slugify(url)
+            new_url = url
+            exists = EntityUrls.objects.filter(url=new_url+'-dpp', sitemap_identifier='DOCTOR_PAGE').first()
+            if exists:
+                if exists.id == self.id:
+                    exists.is_valid=True
+                    exists.save()
+                    return
+                else:
+                    new_url = url+'-'+str(self.id)
+            
+            EntityUrls.objects.create(url=new_url+'-dpp', sitemap_identifier='DOCTOR_PAGE', entity_type='Doctor', url_type='PAGEURL',
+                                  is_valid=True, sequence=0, entity_id=self.id)
+
+
     def save(self, *args, **kwargs):
         self.update_time_stamps()
         self.update_live_status()
@@ -870,6 +909,7 @@ class Doctor(auth_model.TimeStampedModel, auth_model.QCModel, SearchKey, auth_mo
             push_to_matrix = True
 
         super(Doctor, self).save(*args, **kwargs)
+        self.create_entity_url()
 
         transaction.on_commit(lambda: self.app_commit_tasks(push_to_matrix=push_to_matrix,
                                                             update_status_in_matrix=update_status_in_matrix))
@@ -987,13 +1027,13 @@ class Doctor(auth_model.TimeStampedModel, auth_model.QCModel, SearchKey, auth_mo
         output = ImageOps.fit(doctor_image, mask.size, centering=(1, 1))
         output.putalpha(mask)
         # output.save('output.png')
-        canvas = Image.new('RGB', (992, 1620))
+        canvas = Image.new('RGB', (892, 1620))
         canvas.paste(template, (0,0))
         # doctor_image = doctor_image.resize((200, 200), Image.ANTIALIAS)
-        canvas.paste(doctor_image, (390, 300), doctor_image)
+        canvas.paste(doctor_image, (315, 300), doctor_image)
         #canvas.save('overlap.png')
         qrcode_image = qrcode_image.resize((530, 530), Image.ANTIALIAS)
-        canvas.paste(qrcode_image, (215, 830))
+        canvas.paste(qrcode_image, (165, 760))
 
         blank_image = Image.new('RGBA', (1000, 1000), 'white') # this new image is created to write text and paste on canvas
         img_draw = ImageDraw.Draw(canvas)
@@ -1003,7 +1043,7 @@ class Doctor(auth_model.TimeStampedModel, auth_model.QCModel, SearchKey, auth_mo
 
         w, h = img_draw.textsize(self.name, font=font)
 
-        img_draw.text(((992-w)/2,530), self.name, fill="black", font=font)
+        img_draw.text(((892-w)/2,530), self.name, fill="black", font=font)
         #img_draw.text((350,530), self.name, fill="black", font=font)
         #im.save("hello.png", "PNG")
 
@@ -1028,7 +1068,7 @@ class Doctor(auth_model.TimeStampedModel, auth_model.QCModel, SearchKey, auth_mo
         if len(dps) == 0:
             return False
 
-        for  d in dps:
+        for d in dps:
             if not d.specialization.is_insurance_enabled:
                 return False
 
@@ -1929,6 +1969,7 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
     auto_ivr_data = JSONField(default=list(), null=True)
     synced_analytics = GenericRelation(SyncBookingAnalytics, related_name="opd_booking_analytics")
     refund_details = GenericRelation(RefundDetails, related_query_name="opd_appointment_detail")
+    coupon_data = JSONField(blank=True, null=True)
 
     def __str__(self):
         return self.profile.name + " (" + self.doctor.name + ")"
@@ -1958,6 +1999,12 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
 
         return allowed
 
+    def get_corporate_deal_id(self):
+        coupon = self.coupon.first()
+        if coupon and coupon.corporate_deal:
+            return coupon.corporate_deal.id
+
+        return None
 
     def get_city(self):
         if self.hospital and self.hospital.matrix_city:
@@ -1995,6 +2042,7 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
             obj.Payout = self.fees
             obj.CashbackUsed = cashback
             obj.BookingDate = self.created_at
+        obj.CorporateDealId = self.get_corporate_deal_id()
         obj.PromoCost = max(0, promo_cost)
         obj.GMValue = self.deal_price
         obj.StatusId = self.status
@@ -2053,6 +2101,9 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
         # if appointment_data["insurance_id"] :
         #     appointment_data["insurance"] = insurance_model.UserInsurance.objects.get(id=appointment_data["insurance_id"].id)
         coupon_list = appointment_data.pop("coupon", None)
+        coupon_data = {
+            "random_coupons": appointment_data.pop("coupon_data", [])
+        }
         procedure_details = appointment_data.pop('extra_details', [])
         app_obj = cls.objects.create(**appointment_data)
         if procedure_details:
@@ -2064,6 +2115,7 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
             OpdAppointmentProcedureMapping.objects.bulk_create(procedure_to_be_added)
         if coupon_list:
             app_obj.coupon.add(*coupon_list)
+        app_obj.coupon_data = coupon_data
         return app_obj
 
     @transaction.atomic
@@ -2196,6 +2248,12 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
             notification_models.EmailNotification.ops_notification_alert(self, email_list=settings.OPS_EMAIL_ID,
                                                                          product=Order.DOCTOR_PRODUCT_ID,
                                                                          alert_type=notification_models.EmailNotification.OPS_APPOINTMENT_NOTIFICATION)
+        if not old_instance or self.status == self.CANCELLED:
+            try:
+                notification_tasks.update_coupon_used_count.apply_async()
+            except Exception as e:
+                logger.error(str(e))
+
         # if self.status == self.COMPLETED and not self.is_rated:
         #     try:
         #         notification_tasks.send_opd_rating_message.apply_async(
@@ -2477,9 +2535,9 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
         if not procedures:
             if data.get("payment_type") == cls.INSURANCE:
                 effective_price = doctor_clinic_timing.deal_price
-                coupon_discount, coupon_cashback, coupon_list = 0, 0, []
+                coupon_discount, coupon_cashback, coupon_list, random_coupon_list = 0, 0, [], []
             elif data.get("payment_type") in [cls.PREPAID]:
-                coupon_discount, coupon_cashback, coupon_list = Coupon.get_total_deduction(data,
+                coupon_discount, coupon_cashback, coupon_list, random_coupon_list = Coupon.get_total_deduction(data,
                                                                                            doctor_clinic_timing.deal_price)
                 if coupon_discount >= doctor_clinic_timing.deal_price:
                     effective_price = 0
@@ -2495,7 +2553,7 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
             if data.get("payment_type") == cls.INSURANCE:
                 effective_price = total_deal_price
             elif data.get("payment_type") in [cls.PREPAID]:
-                coupon_discount, coupon_cashback, coupon_list = Coupon.get_total_deduction(data, total_deal_price)
+                coupon_discount, coupon_cashback, coupon_list, random_coupon_list = Coupon.get_total_deduction(data, total_deal_price)
                 if coupon_discount >= total_deal_price:
                     effective_price = 0
                 else:
@@ -2507,7 +2565,7 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
 
         if data.get("payment_type") == cls.COD:
             effective_price = 0
-            coupon_discount, coupon_cashback, coupon_list = 0, 0, []
+            coupon_discount, coupon_cashback, coupon_list, random_coupon_list = 0, 0, [], []
 
         return {
             "deal_price": deal_price,
@@ -2520,7 +2578,8 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
             "consultation" : {
                 "deal_price": doctor_clinic_timing.deal_price,
                 "mrp": doctor_clinic_timing.mrp
-            }
+            },
+            "coupon_data" : { "random_coupon_list" : random_coupon_list }
         }
 
     @classmethod
@@ -2585,7 +2644,8 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
             "discount": int(price_data.get("coupon_discount")),
             "cashback": int(price_data.get("coupon_cashback")),
             "is_appointment_insured": is_appointment_insured,
-            "insurance": insurance_id
+            "insurance": insurance_id,
+            "coupon_data": price_data.get("coupon_data")
         }
 
     @staticmethod
@@ -2637,7 +2697,7 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
         from ondoc.tracking.mongo_models import TrackingEvent as MongoTrackingEvent
         try:
             with transaction.atomic():
-                event_data = TrackingEvent.build_event_data(self.user, TrackingEvent.DoctorAppointmentBooked, appointmentId=self.id)
+                event_data = TrackingEvent.build_event_data(self.user, TrackingEvent.DoctorAppointmentBooked, appointmentId=self.id, visitor_info=visitor_info)
                 if event_data and visitor_info:
                     TrackingEvent.save_event(event_name=event_data.get('event'), data=event_data, visit_id=visitor_info.get('visit_id'),
                                              user=self.user, triggered_at=datetime.datetime.utcnow())
