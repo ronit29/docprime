@@ -30,7 +30,7 @@ from ondoc.bookinganalytics.models import DP_OpdConsultsAndTests
 from ondoc.location import models as location_models
 from ondoc.account.models import Order, ConsumerAccount, ConsumerTransaction, PgTransaction, ConsumerRefund, \
     MerchantPayout, UserReferred, MoneyPool, Invoice
-from ondoc.location.models import EntityUrls
+from ondoc.location.models import EntityUrls, UrlsModel
 from ondoc.notification.models import NotificationAction, EmailNotification
 from ondoc.payout.models import Outstanding
 from ondoc.coupon.models import Coupon
@@ -90,7 +90,6 @@ class Migration(migrations.Migration):
     operations = [
         CreateExtension('postgis')
     ]
-
 
 class UniqueNameModel(models.Model):
 
@@ -579,7 +578,7 @@ class College(auth_model.TimeStampedModel):
         db_table = "college"
 
 
-class Doctor(auth_model.TimeStampedModel, auth_model.QCModel, SearchKey, auth_model.SoftDelete):
+class Doctor(auth_model.TimeStampedModel, auth_model.QCModel, SearchKey, auth_model.SoftDelete, UrlsModel):
     SOURCE_PRACTO = "pr"
     SOURCE_CRM = 'crm'
 
@@ -891,7 +890,9 @@ class Doctor(auth_model.TimeStampedModel, auth_model.QCModel, SearchKey, auth_mo
             
             EntityUrls.objects.create(url=new_url+'-dpp', sitemap_identifier='DOCTOR_PAGE', entity_type='Doctor', url_type='PAGEURL',
                                   is_valid=True, sequence=0, entity_id=self.id)
-
+            self.url = new_url + '-dpp'
+            self.save()
+        return
 
     def save(self, *args, **kwargs):
         self.update_time_stamps()

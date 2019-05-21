@@ -36,6 +36,13 @@ def split_and_append(initial_str, spliter, appender):
     return appender.join(value_chunks)
 
 
+class UrlsModel(models.Model):
+    url = models.CharField(blank=False, null=True, max_length=2000, db_index=True, editable=False)
+
+    class Meta:
+        abstract = True
+
+
 class CompareSEOUrls(TimeStampedModel):
     url = models.SlugField(blank=False, null=True, max_length=2000, db_index=True, unique=True)
     title = models.CharField(blank=True, null=True, max_length=2000)
