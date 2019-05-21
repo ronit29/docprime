@@ -216,7 +216,10 @@ class DoctorSearchHelper:
                                              or self.query_params.get('sort_on')=='distance'):
             return ' enabled_for_online_booking DESC, distance, priority desc ', ' rnk=1 '
 
-        bucket_size=2000
+        bucket_size=8000
+
+        if self.query_params.get('is_user_insured') and not self.query_params.get('sort_on'):
+            return " enabled_for_online_booking DESC , floor(distance/{bucket_size}) ASC, fees ASC ".format(bucket_size=str(bucket_size)), "rnk=1"
 
         if self.count_of_procedure:
             order_by_field = ' distance, total_price '
@@ -273,7 +276,7 @@ class DoctorSearchHelper:
         if self.query_params and self.query_params.get('sitemap_identifier') and self.query_params.get('max_distance')==None:
             sitemap_identifier = self.query_params.get('sitemap_identifier')
             if sitemap_identifier in ('SPECIALIZATION_LOCALITY_CITY', 'DOCTORS_LOCALITY_CITY'):
-                max_distance = 3000
+                max_distance = 5000
             if sitemap_identifier in ('SPECIALIZATION_CITY', 'DOCTORS_CITY'):
                 max_distance = 15000
 
@@ -353,7 +356,7 @@ class DoctorSearchHelper:
             query_string = "SELECT x.doctor_id, x.hospital_id, doctor_clinic_id, doctor_clinic_timing_id " \
                            "FROM (select {rank_part}, " \
                            "St_distance(St_setsrid(St_point((%(longitude)s), (%(latitude)s)), 4326), h.location) distance, " \
-                           "d.id as doctor_id, " \
+                           "d.id as doctor_id, dct.fees as fees, " \
                            "dc.id as doctor_clinic_id,  d.search_key, " \
                            "dct.id as doctor_clinic_timing_id,practicing_since, " \
                            "d.enabled_for_online_booking and dc.enabled_for_online_booking and h.enabled_for_online_booking as enabled_for_online_booking, " \

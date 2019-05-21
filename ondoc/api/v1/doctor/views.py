@@ -1462,6 +1462,7 @@ class DoctorListViewSet(viewsets.GenericViewSet):
                     insurance_data_dict['is_user_insured'] = True
 
         validated_data['insurance_threshold_amount'] = insurance_data_dict['insurance_threshold_amount']
+        validated_data['is_user_insured'] = insurance_data_dict['is_user_insured']
 
         doctor_search_helper = DoctorSearchHelper(validated_data)
         if not validated_data.get("search_id"):

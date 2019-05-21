@@ -143,7 +143,7 @@ class EventCreateViewSet(GenericViewSet):
                             ex_visitor = track_models.TrackingVisitor(id=visitor_id)
                             ex_visitor.save()
                     except IntegrityError as e:
-                        pass
+                        ex_visitor = track_models.TrackingVisitor.objects.filter(id=visitor_id).first()
 
                 if settings.MONGO_STORE:
                     mongo_visitor = track_mongo_models.TrackingVisitor.objects.filter(id=visitor_id).first()
@@ -163,7 +163,7 @@ class EventCreateViewSet(GenericViewSet):
                             ex_visit = track_models.TrackingVisit(id=visit_id, visitor_id=visitor_id, ip_address=client_ip)
                             ex_visit.save()
                     except IntegrityError as e:
-                        pass
+                        ex_visit = track_models.TrackingVisit.objects.filter(id=visit_id).first()
 
                 if settings.MONGO_STORE:
                     mongo_visit = track_mongo_models.TrackingVisit.objects.filter(id=visit_id).first()

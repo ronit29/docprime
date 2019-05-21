@@ -36,10 +36,16 @@ class ScreenViewSet(viewsets.GenericViewSet):
 
         params = request.query_params
         from_app = params.get("from_app", False)
+        if from_app == 'True' or from_app == 'true':
+            from_app=True
+        else:
+            from_app=False
         coupon_code = params.get('coupon_code')
         profile = params.get('profile_id')
         product_id = params.get('product_id')
         app_version = params.get("app_version", "1.0")
+        lat = params.get('lat', None)
+        long = params.get('long', None)
         if UserConfig.objects.filter(key="app_update").exists():
             app_update = UserConfig.objects.filter(key="app_update").values_list('data', flat=True).first()
             if app_update:
@@ -96,7 +102,7 @@ class ScreenViewSet(viewsets.GenericViewSet):
             }
         ]
 
-        banner_list = Banner.get_all_banners(request)
+        banner_list = Banner.get_all_banners(request, lat, long, from_app)
         banner_list_homepage = list()
         for banner in banner_list:
             if banner.get('slider_location') == 'home_page':

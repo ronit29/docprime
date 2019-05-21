@@ -178,3 +178,8 @@ class StateGSTCodeSerializer(serializers.ModelSerializer):
         fields = ('id', 'gst_code', 'state_name', 'cities', 'district')
 
 
+class InsuranceCityEligibilitySerializer(serializers.Serializer):
+    latitude = serializers.DecimalField(allow_null=False, max_digits=11, decimal_places=8)
+    longitude = serializers.DecimalField(allow_null=False, max_digits=11, decimal_places=8)
+
+
