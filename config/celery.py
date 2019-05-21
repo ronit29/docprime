@@ -15,7 +15,6 @@ from ondoc.account.tasks import update_ben_status_from_pg,update_merchant_payout
 from ondoc.insurance.tasks import push_mis
 # from ondoc.doctor.services.update_search_score import DoctorSearchScore
 from ondoc.bookinganalytics.tasks import sync_booking_data
-from ondoc.location.tasks import update_profile_urls
 
 env = environ.Env()
 
@@ -91,6 +90,4 @@ def setup_periodic_tasks(sender, **kwargs):
     doctor_search_score_creation_time = crontab(hour=21, minute=30)
     sender.add_periodic_task(doctor_search_score_creation_time, update_search_score.s(), name='Update Doctor search score')
     sender.add_periodic_task(crontab(hour=23, minute=00), update_insured_labs_and_doctors.s(), name="Update insured labs and doctors")
-    sender.add_periodic_task(crontab(hour=23, minute=30), update_profile_urls.s(),
-                             name="Update Labs, Doctors and Hospitals Profile Urls")
     #sender.add_periodic_task(crontab(hour=23, minute=30), update_seo_urls.s(), name="Update Seo Urls")
