@@ -15,7 +15,7 @@ from ondoc.bookinganalytics.models import DP_OpdConsultsAndTests
 from ondoc.doctor.models import Hospital, SearchKey, CancellationReason, Doctor
 from ondoc.crm.constants import constants
 from ondoc.coupon.models import Coupon
-from ondoc.location.models import EntityUrls
+from ondoc.location.models import EntityUrls, UrlsModel
 from ondoc.notification import models as notification_models
 from ondoc.notification import tasks as notification_tasks
 from ondoc.notification.labnotificationaction import LabNotificationAction
@@ -153,7 +153,7 @@ class HomePickupCharges(models.Model):
     content_object = GenericForeignKey()
 
 
-class Lab(TimeStampedModel, CreatedByModel, QCModel, SearchKey, WelcomeCallingDone):
+class Lab(TimeStampedModel, CreatedByModel, QCModel, SearchKey, WelcomeCallingDone, UrlsModel):
     NOT_ONBOARDED = 1
     REQUEST_SENT = 2
     ONBOARDED = 3
@@ -502,7 +502,7 @@ class Lab(TimeStampedModel, CreatedByModel, QCModel, SearchKey, WelcomeCallingDo
 
         entity = EntityUrls.objects.filter(entity_id=self.id, is_valid=True, sitemap_identifier='LAB_PAGE')
         if not entity:
-            url = "%s" % (self.name)
+            url = self.name
             url = slugify(url)
             new_url = url
 
@@ -511,6 +511,7 @@ class Lab(TimeStampedModel, CreatedByModel, QCModel, SearchKey, WelcomeCallingDo
                 if exists.id == self.id:
                     exists.is_valid = True
                     exists.save()
+                    new_url = new_url + '-lpp'
                     return
                 else:
                     new_url = url+'-'+str(self.id)
@@ -518,6 +519,7 @@ class Lab(TimeStampedModel, CreatedByModel, QCModel, SearchKey, WelcomeCallingDo
             new_url = new_url + '-lpp'
             EntityUrls.objects.create(url=new_url, sitemap_identifier='LAB_PAGE', entity_type='Lab', url_type='PAGEURL',
                                   is_valid=True, sequence=0, entity_id=self.id)
+            self.url = new_url
 
     def save(self, *args, **kwargs):
         self.clean()
@@ -538,6 +540,7 @@ class Lab(TimeStampedModel, CreatedByModel, QCModel, SearchKey, WelcomeCallingDo
                 # Push to matrix
                 push_to_matrix = True
 
+        self.create_entity_url()
         super(Lab, self).save(*args, **kwargs)
 
         if edit_instance is not None:
@@ -571,7 +574,7 @@ class Lab(TimeStampedModel, CreatedByModel, QCModel, SearchKey, WelcomeCallingDo
                 AvailableLabTest.objects.\
                     filter(lab=id, test__test_type=LabTest.RADIOLOGY).\
                     update(computed_deal_price=DealPriceCalculate(F('mrp'), F('computed_agreed_price'), rad_deal_price_prcnt))
-        self.create_entity_url()
+
         # transaction.on_commit(lambda: self.app_commit_tasks(push_to_matrix))
     #
     # def app_commit_tasks(self, push_to_matrix):

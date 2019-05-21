@@ -238,7 +238,7 @@ class LabCityFooter(Footer):
         result = []
         query = '''select * from
                         (
-                        select url, lb.name title,
+                        select eu.url, lb.name title,
                         row_number() over (partition by ln.id order by st_distance(eu.location, %s)asc ) as row_number 
                         from entity_urls eu inner join lab lb on eu.entity_id = lb.id and eu.sitemap_identifier = 'LAB_PAGE' 
                         and ST_DWithin(eu.location, %s, 20000) and lower(eu.locality_value) = lower(%s)
