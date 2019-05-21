@@ -1619,6 +1619,10 @@ class EndorsementRequest(auth_model.TimeStampedModel):
             return
         endorsment_members = user_insurance.endorse_members.all()
         total_endorsment_members = endorsment_members.count()
+        endorment_rejected_members_count = user_insurance.endorse_members.filter(status=EndorsementRequest.REJECT).count()
+        if total_endorsment_members == endorment_rejected_members_count:
+            return
+
         endorsed_members_count = user_insurance.endorse_members.filter(~Q(status=EndorsementRequest.PENDING),
                                                                        mail_coi_to_customer=True).count()
 
