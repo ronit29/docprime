@@ -511,6 +511,7 @@ class Lab(TimeStampedModel, CreatedByModel, QCModel, SearchKey, WelcomeCallingDo
                 if exists.id == self.id:
                     exists.is_valid = True
                     exists.save()
+                    new_url = new_url + '-lpp'
                     return
                 else:
                     new_url = url+'-'+str(self.id)
@@ -519,8 +520,6 @@ class Lab(TimeStampedModel, CreatedByModel, QCModel, SearchKey, WelcomeCallingDo
             EntityUrls.objects.create(url=new_url, sitemap_identifier='LAB_PAGE', entity_type='Lab', url_type='PAGEURL',
                                   is_valid=True, sequence=0, entity_id=self.id)
             self.url = new_url
-            self.save()
-            return
 
     def save(self, *args, **kwargs):
         self.clean()
@@ -541,6 +540,7 @@ class Lab(TimeStampedModel, CreatedByModel, QCModel, SearchKey, WelcomeCallingDo
                 # Push to matrix
                 push_to_matrix = True
 
+        self.create_entity_url()
         super(Lab, self).save(*args, **kwargs)
 
         if edit_instance is not None:
@@ -574,7 +574,7 @@ class Lab(TimeStampedModel, CreatedByModel, QCModel, SearchKey, WelcomeCallingDo
                 AvailableLabTest.objects.\
                     filter(lab=id, test__test_type=LabTest.RADIOLOGY).\
                     update(computed_deal_price=DealPriceCalculate(F('mrp'), F('computed_agreed_price'), rad_deal_price_prcnt))
-        self.create_entity_url()
+
         # transaction.on_commit(lambda: self.app_commit_tasks(push_to_matrix))
     #
     # def app_commit_tasks(self, push_to_matrix):

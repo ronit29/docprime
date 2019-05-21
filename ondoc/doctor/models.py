@@ -418,6 +418,7 @@ class Hospital(auth_model.TimeStampedModel, auth_model.CreatedByModel, auth_mode
                 if exists.id == self.id:
                     exists.is_valid = True
                     exists.save()
+                    self.url = new_url+'-hpp'
                     return
                 else:
                     new_url = url + '-' + str(self.id)
@@ -426,8 +427,6 @@ class Hospital(auth_model.TimeStampedModel, auth_model.CreatedByModel, auth_mode
             EntityUrls.objects.create(url=new_url, sitemap_identifier='HOSPITAL_PAGE', entity_type='Hospital', url_type='PAGEURL',
                                       is_valid=True, sequence=0, entity_id=self.id)
             self.url = new_url
-            self.save()
-            return
 
     def save(self, *args, **kwargs):
         self.update_time_stamps()
@@ -445,6 +444,8 @@ class Hospital(auth_model.TimeStampedModel, auth_model.CreatedByModel, auth_mode
                 update_status_in_matrix = True
         if not self.matrix_lead_id and (self.is_listed_on_docprime is None or self.is_listed_on_docprime is True):
             push_to_matrix = True
+
+        self.create_entity_url()
         super(Hospital, self).save(*args, **kwargs)
         if self.is_appointment_manager:
             auth_model.GenericAdmin.objects.filter(hospital=self, entity_type=auth_model.GenericAdmin.DOCTOR, permission_type=auth_model.GenericAdmin.APPOINTMENT)\
@@ -454,7 +455,6 @@ class Hospital(auth_model.TimeStampedModel, auth_model.CreatedByModel, auth_mode
                 .update(is_disabled=False)
         # if build_url and self.location and self.is_live:
         #     ea = location_models.EntityLocationRelationship.create(latitude=self.location.y, longitude=self.location.x, content_object=self)
-        self.create_entity_url()
         transaction.on_commit(lambda: self.app_commit_tasks(push_to_matrix=push_to_matrix,
                                                             update_status_in_matrix=update_status_in_matrix))
 
@@ -911,6 +911,7 @@ class Doctor(auth_model.TimeStampedModel, auth_model.QCModel, SearchKey, auth_mo
                 if exists.id == self.id:
                     exists.is_valid=True
                     exists.save()
+                    self.url = new_url + '-dpp'
                     return
                 else:
                     new_url = url+'-'+str(self.id)
@@ -918,8 +919,6 @@ class Doctor(auth_model.TimeStampedModel, auth_model.QCModel, SearchKey, auth_mo
             EntityUrls.objects.create(url=new_url+'-dpp', sitemap_identifier='DOCTOR_PAGE', entity_type='Doctor', url_type='PAGEURL',
                                   is_valid=True, sequence=0, entity_id=self.id)
             self.url = new_url + '-dpp'
-            self.save()
-        return
 
     def save(self, *args, **kwargs):
         self.update_time_stamps()
@@ -936,8 +935,8 @@ class Doctor(auth_model.TimeStampedModel, auth_model.QCModel, SearchKey, auth_mo
         else:
             push_to_matrix = True
 
-        super(Doctor, self).save(*args, **kwargs)
         self.create_entity_url()
+        super(Doctor, self).save(*args, **kwargs)
 
         transaction.on_commit(lambda: self.app_commit_tasks(push_to_matrix=push_to_matrix,
                                                             update_status_in_matrix=update_status_in_matrix))
