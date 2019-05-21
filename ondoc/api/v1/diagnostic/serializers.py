@@ -546,8 +546,9 @@ class CommonPackageSerializer(serializers.ModelSerializer):
         filters = Q()  # Create an empty Q object to start with
 
         for ins in instance:
-            q = Q(lab_pricing_group_id=ins.lab.lab_pricing_group_id,test_id = ins.package_id)
-            filters |= q
+            if ins.lab:
+                q = Q(lab_pricing_group_id=ins.lab.lab_pricing_group_id,test_id = ins.package_id)
+                filters |= q
         queryset = queryset.filter(filters)
         for ins in instance:
             ins._selected_test = None
