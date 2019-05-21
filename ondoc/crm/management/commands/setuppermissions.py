@@ -3,7 +3,7 @@ from django.contrib.auth.models import Group, Permission
 from django.contrib.contenttypes.models import ContentType
 from django.db.models import Q
 
-from ondoc.banner.models import Banner, SliderLocation, BannerLocation
+from ondoc.banner.models import Banner, SliderLocation, BannerLocation, EmailBanner, RecommenderThrough, Recommender
 from ondoc.common.models import PaymentOptions, UserConfig, Feature, Service, Remark, MatrixMappedCity, MatrixMappedState
 from ondoc.coupon.models import Coupon, UserSpecificCoupon, RandomGeneratedCoupon
 from ondoc.crm.admin import UserPlanMappingAdmin
@@ -549,7 +549,8 @@ class Command(BaseCommand):
                                                            DoctorClinic, DoctorClinicIpdProcedure,
                                                            HealthInsuranceProviderHospitalMapping, IpdProcedureCategoryMapping, CommonIpdProcedure,
                                                            HospitalHelpline, IpdProcedure, HospitalTiming,
-                                                           IpdProcedureDetailType, IpdProcedureDetail, IpdProcedureSynonym, IpdProcedureSynonymMapping)
+                                                           IpdProcedureDetailType, IpdProcedureDetail, IpdProcedureSynonym, IpdProcedureSynonymMapping,
+                                                           EmailBanner, RecommenderThrough, Recommender)
         for cl, ct in content_types.items():
             permissions = Permission.objects.filter(
                 Q(content_type=ct),

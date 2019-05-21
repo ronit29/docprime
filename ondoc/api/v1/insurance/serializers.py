@@ -267,3 +267,8 @@ class StateGSTCodeSerializer(serializers.ModelSerializer):
 
     # id = serializers.PrimaryKeyRelatedField(queryset=InsuredMemberDocument.objects.all())
 
+class InsuranceCityEligibilitySerializer(serializers.Serializer):
+    latitude = serializers.DecimalField(allow_null=False, max_digits=11, decimal_places=8)
+    longitude = serializers.DecimalField(allow_null=False, max_digits=11, decimal_places=8)
+
+

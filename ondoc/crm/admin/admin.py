@@ -2,7 +2,7 @@ from django.contrib.gis import admin
 from ondoc.common.models import PaymentOptions, UserConfig, Feature, Service, MatrixMappedState, MatrixMappedCity, \
     GlobalNonBookable, QRCode
 from ondoc.corporate_booking.models import Corporates, CorporateDeal, CorporateDocument
-from ondoc.crm.admin.banner import BannerAdmin, SliderLocationAdmin
+from ondoc.crm.admin.banner import BannerAdmin, SliderLocationAdmin, RecommenderAdmin, EmailBannerAdmin
 from ondoc.crm.admin.location import ComparePackagesSEOUrlsAdmin
 from ondoc.crm.admin.corporate_booking import CorporateDealAdmin, CorporatesAdmin
 from ondoc.crm.admin.procedure import ProcedureCategoryAdmin, ProcedureAdmin, IpdProcedureAdmin, FeatureAdmin, \
@@ -68,11 +68,12 @@ from .geoip import AdwordLocationCriteriaAdmin
 from ondoc.insurance.models import Insurer, InsurerAccount, InsurancePlans, InsuranceThreshold, UserInsurance, \
     InsuredMembers, InsuranceTransaction, InsurancePlanContent, InsuranceDisease, StateGSTCode, InsuranceCity, \
     InsuranceDistrict, InsuranceDeal, InsurerPolicyNumber, InsuranceLead, InsuranceCancelMaster, EndorsementRequest, InsuredMemberDocument, \
-    InsuredMemberHistory
+    InsuredMemberHistory, InsuranceEligibleCities
 from ondoc.crm.admin.insurance import InsurerAdmin, InsurancePlansAdmin, InsuranceThresholdAdmin, InsurerFloatAdmin, \
     UserInsuranceAdmin, InsuredMembersAdmin, InsuranceDiseaseAdmin, StateGSTCodeAdmin, InsuranceCityAdmin, \
     InsuranceDistrictAdmin, InsuranceDealAdmin, InsurerPolicyNumberAdmin, InsuranceLeadAdmin, InsuranceCancelMasterAdmin, \
-    EndorsementRequestAdmin, InsuredMemberDocumentAdmin, InsuredMemberHistoryAdmin
+    EndorsementRequestAdmin, InsuredMemberDocumentAdmin, InsuredMemberHistoryAdmin, InsuranceEligibleCitiesAdmin
+
 from ondoc.insurance import models as insurance_model
 from ondoc.ratings_review.models import RatingsReview, ReviewCompliments, AppRatings, AppCompliments
 from ondoc.crm.admin.ratings import RatingsReviewAdmin, ReviewComplimentsAdmin, AppRatingsAdmin, AppComplimentsAdmin
@@ -85,7 +86,7 @@ from ondoc.seo.models import SeoSpecialization
 from ondoc.seo.models import SeoLabNetwork
 from ondoc.elastic.models import DemoElastic
 from .elastic import DemoElasticAdmin
-from ondoc.banner.models import Banner, SliderLocation, BannerLocation
+from ondoc.banner.models import Banner, SliderLocation, BannerLocation, EmailBanner, Recommender
 from .integrations import IntegratorMapping, IntegratorMappingAdmin
 from .integrations import IntegratorProfileMapping, IntegratorProfileMappingAdmin
 from .integrations import IntegratorReport, IntegratorReportAdmin
@@ -182,7 +183,7 @@ admin.site.register(InsuranceCancelMaster, InsuranceCancelMasterAdmin)
 admin.site.register(EndorsementRequest, EndorsementRequestAdmin)
 admin.site.register(InsuredMemberDocument, InsuredMemberDocumentAdmin)
 admin.site.register(InsuredMemberHistory, InsuredMemberHistoryAdmin)
-
+admin.site.register(InsuranceEligibleCities, InsuranceEligibleCitiesAdmin)
 # admin.site.register(InsuranceReport, InsuranceReportAdmin)
 # admin.site.register(InsurancePlanContent, InsurancePlanContentAdmin)
 
@@ -243,3 +244,5 @@ admin.site.register(Corporates, CorporatesAdmin)
 admin.site.register(CorporateDeal, CorporateDealAdmin)
 admin.site.register(CompareSEOUrls, ComparePackagesSEOUrlsAdmin)
 admin.site.register(BannerLocation)
+admin.site.register(EmailBanner, EmailBannerAdmin)
+admin.site.register(Recommender, RecommenderAdmin)

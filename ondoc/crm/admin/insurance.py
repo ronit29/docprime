@@ -9,7 +9,7 @@ from ondoc.doctor.models import OpdAppointment, DoctorPracticeSpecialization, Pr
 from ondoc.diagnostic.models import LabAppointment, LabTest, Lab
 from ondoc.insurance.models import InsurancePlanContent, InsurancePlans, InsuredMembers, UserInsurance, StateGSTCode, \
     InsuranceCity, InsuranceDistrict, InsuranceDeal, InsurerPolicyNumber, InsuranceLead, EndorsementRequest, \
-    InsuredMemberDocument
+    InsuredMemberDocument, InsuranceEligibleCities
 from import_export.admin import ImportExportMixin, ImportExportModelAdmin, base_formats
 import nested_admin
 from import_export import fields, resources
@@ -1100,9 +1100,5 @@ class InsuredMemberHistoryAdmin(admin.ModelAdmin):
         return False
 
 
-
-
-
-
-
-
+class InsuranceEligibleCitiesAdmin(admin.ModelAdmin):
+    model = InsuranceEligibleCities
