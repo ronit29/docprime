@@ -609,13 +609,15 @@ class UserAppointmentsViewSet(OndocViewSet):
         responsible_user = None
         if query_input_serializer.validated_data.get('source', None):
             source = query_input_serializer.validated_data.get('source')
+            if validated_data.get('source', None):
+                source = request.data.get('source')
         if request.user and hasattr(request.user, 'user_type'):
             responsible_user = request.user
-            # if not source:
-            #     if request.user.user_type == User.DOCTOR:
-            #         source = AppointmentHistory.DOC_APP
-            #     elif request.user.user_type == User.CONSUMER:
-            #         source = AppointmentHistory.CONSUMER_APP
+            if not source:
+                if request.user.user_type == User.DOCTOR:
+                    source = AppointmentHistory.DOC_APP
+                elif request.user.user_type == User.CONSUMER:
+                    source = AppointmentHistory.CONSUMER_APP
         appointment_type = query_input_serializer.validated_data.get('type')
         if appointment_type == 'lab':
             # lab_appointment = get_object_or_404(LabAppointment, pk=pk)
