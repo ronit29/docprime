@@ -1351,6 +1351,7 @@ class InsuredMembers(auth_model.TimeStampedModel):
         self.district = endorsed_data.district
         self.city_code = endorsed_data.city_code
         self.district_code = endorsed_data.district_code
+        self.pincode = endorsed_data.pincode
         self.save()
 
     @classmethod
