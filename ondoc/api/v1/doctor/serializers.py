@@ -1139,9 +1139,10 @@ class DoctorProfileUserViewSerializer(DoctorProfileSerializer):
         breadcrums = None
         if self.context.get('entity'):
             entity = self.context.get('entity')
-            breadcrums = entity.additional_info.get('breadcrums')
-            if breadcrums:
-                return breadcrums
+            if entity and entity.additional_info:
+                breadcrums = entity.additional_info.get('breadcrums')
+                if breadcrums:
+                    return breadcrums
         return breadcrums
 
     def get_procedures(self, obj):

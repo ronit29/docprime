@@ -198,9 +198,10 @@ class LabModelSerializer(serializers.ModelSerializer):
         if self.context.get('entity'):
             entity = self.context.get('entity')
         # if entity.exists():
-            breadcrums = entity.additional_info.get('breadcrums')
-            if breadcrums:
-                return breadcrums
+            if entity and entity.additional_info:
+                breadcrums = entity.additional_info.get('breadcrums')
+                if breadcrums:
+                    return breadcrums
         return breadcrums
 
     def get_lab_thumbnail(self, obj):
@@ -541,17 +542,22 @@ class CommonPackageSerializer(serializers.ModelSerializer):
 
     def __init__(self, instance=None, data=None, **kwargs):
         super().__init__(instance, data, **kwargs)
-        queryset = AvailableLabTest.objects.all()
+        queryset = AvailableLabTest.objects
         filters = Q()  # Create an empty Q object to start with
 
         for ins in instance:
-            q = Q(lab_pricing_group_id=ins.lab.lab_pricing_group_id,test_id = ins.package_id)
-            filters |= q
-        queryset = queryset.filter(filters)
+            if ins.lab and ins.lab.lab_pricing_group_id and ins.package_id:
+                q = Q(lab_pricing_group_id=ins.lab.lab_pricing_group_id,test_id = ins.package_id)
+                filters |= q
+
+        if filters:
+            queryset = queryset.filter(filters)
+        else:
+            queryset = queryset.none()
         for ins in instance:
             ins._selected_test = None
             for x in queryset:
-                if ins.lab.lab_pricing_group_id == x.lab_pricing_group_id and ins.package_id == x.test_id:
+                if ins.lab and ins.lab.lab_pricing_group_id == x.lab_pricing_group_id and ins.package_id == x.test_id:
                     ins._selected_test = x
                     break
 

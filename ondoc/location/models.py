@@ -36,6 +36,26 @@ def split_and_append(initial_str, spliter, appender):
     return appender.join(value_chunks)
 
 
+class UrlsModel(models.Model):
+    url = models.CharField(blank=False, null=True, max_length=2000, db_index=True, editable=False)
+
+    class Meta:
+        abstract = True
+
+    @classmethod
+    def update_profile_urls(cls):
+        update_doctor_page_urls = RawSql(
+            ''' update doctor d set url = (select url from entity_urls eu where eu.entity_id=d.id and eu.is_valid=true and sitemap_identifier='DOCTOR_PAGE' ) ''',
+            []).execute()
+
+        update_lab_page_urls = RawSql(
+            ''' update lab lb set url = (select url from entity_urls eu where eu.entity_id=lb.id and eu.is_valid=true and sitemap_identifier='LAB_PAGE' ) ''',
+            []).execute()
+
+        update_hosp_page_urls = RawSql(
+            ''' update hospital h set url = (select url from entity_urls eu where eu.entity_id=h.id and eu.is_valid=true and sitemap_identifier='HOSPITAL_PAGE' ) ''',
+            []).execute()
+
 class CompareSEOUrls(TimeStampedModel):
     url = models.SlugField(blank=False, null=True, max_length=2000, db_index=True, unique=True)
     title = models.CharField(blank=True, null=True, max_length=2000)
