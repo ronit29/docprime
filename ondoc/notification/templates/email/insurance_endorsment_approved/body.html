@@ -38,7 +38,7 @@
         <td style="padding:0 10px 10px"></td>
       </tr> -->
       <tr>
-        <td align="center" style="font-size:18px; color:#000; font-weight: 700;">Endorsement Request Processed.</td>
+        <td align="center" style="font-size:16px; color:#000; font-weight: 700;">Endorsement Request Processed.</td>
       </tr>
       <!--
       <tr>
@@ -110,7 +110,7 @@
 
                             The details are mentioned below:<br>
                             {% for member in endorsement_list %}
-                            <b>{{member.name}}</b> - <b>{{member.status}}</b><br>
+                            {{member.name}} - {{member.status}}<br>
                             {% endfor %}
 
                             PFA the updated COI for your reference
