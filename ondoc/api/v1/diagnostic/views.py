@@ -750,9 +750,6 @@ class LabList(viewsets.ReadOnlyModelViewSet):
         max_distance = max_distance*1000 if max_distance is not None else 10000
         min_distance = min_distance*1000 if min_distance is not None else 0
 
-        if request.user.active_insurance:
-            return None
-
         package_free_or_not_dict = get_package_free_or_not_dict(request)
 
         main_queryset = LabTest.objects.prefetch_related('test', 'test__recommended_categories',
@@ -1787,8 +1784,11 @@ class LabList(viewsets.ReadOnlyModelViewSet):
 
         #disable home pickup for insured customers if lab charges home collection
         if request.user and request.user.is_authenticated and temp_data.get('lab') and temp_data.get('lab').get('home_pickup_charges',0)>0:
+            if temp_data.get('lab').get('network_id') and temp_data.get('lab').get('network_id') == 43:
+                temp_data.get('lab')['is_home_collection_enabled'] = False
+
             active_insurance = request.user.active_insurance
-            if active_insurance:
+            if temp_data.get('lab')['is_home_collection_enabled'] and active_insurance:
                 if not temp_data.get('tests',[]):
                     temp_data.get('lab')['is_home_collection_enabled'] = False
                 else:
