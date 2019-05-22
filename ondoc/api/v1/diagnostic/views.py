@@ -750,6 +750,9 @@ class LabList(viewsets.ReadOnlyModelViewSet):
         max_distance = max_distance*1000 if max_distance is not None else 10000
         min_distance = min_distance*1000 if min_distance is not None else 0
 
+        if request.user.active_insurance:
+            return None
+
         package_free_or_not_dict = get_package_free_or_not_dict(request)
 
         main_queryset = LabTest.objects.prefetch_related('test', 'test__recommended_categories',
