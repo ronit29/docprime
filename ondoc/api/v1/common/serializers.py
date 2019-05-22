@@ -51,4 +51,4 @@ class DeviceDetailsSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = DeviceDetails
-        exclude = ('created_at', 'updated_at', 'id')
+        exclude = ('created_at', 'updated_at', 'id', 'user')

@@ -982,13 +982,14 @@ class DeviceDetailsSave(viewsets.GenericViewSet):
         serializer = serializers.DeviceDetailsSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         validated_data = serializer.validated_data
-        device_details_queryset = DeviceDetails.objects.filter(d_token=validated_data.get('d_token'))
+        user = request.user if request.user and request.user.is_authenticated else None
+        device_details_queryset = DeviceDetails.objects.filter(device_id=validated_data.get('device_id'))
         device_details = device_details_queryset.first()
         try:
             if device_details:
-                device_details_queryset.update(**validated_data)
+                device_details_queryset.update(**validated_data, user=user)
             else:
-                DeviceDetails.objects.create(**validated_data)
+                DeviceDetails.objects.create(**validated_data, user=user)
         except Exception as e:
             return Response("Error adding device details - " + str(e), status=status.HTTP_500_INTERNAL_SERVER_ERROR)
         return Response({"status": 1, "message": "device details added"}, status=status.HTTP_200_OK)

@@ -435,27 +435,27 @@ class RefundDetails(TimeStampedModel):
 
 
 class DeviceDetails(TimeStampedModel):
-    app_version = models.CharField(max_length=20)
-    os = models.PositiveSmallIntegerField()
-    os_version = models.CharField(max_length=20)
-    make = models.CharField(max_length=100)
-    model = models.CharField(max_length=100)
-    installed_date = models.DateTimeField()
-    firebase_reg_id = models.CharField(max_length=200)
-    user = models.ForeignKey(User, null=True, on_delete=models.SET_NULL, related_name="device_details")
-    app_name = models.CharField(max_length=200)
-    ping_status = models.CharField(max_length=50)
-    last_ping_time = models.DateTimeField()
-    last_usage = models.DateTimeField()
+    device_id = models.CharField(max_length=200)
+    app_version = models.CharField(max_length=20, null=True, blank=True)
+    os = models.PositiveSmallIntegerField(null=True, blank=True)
+    os_version = models.CharField(max_length=20, null=True, blank=True)
+    make = models.CharField(max_length=100, null=True, blank=True)
+    model = models.CharField(max_length=100, null=True, blank=True)
+    # installed_date = models.DateTimeField()   # created_at is the installed_date for given d_token
+    firebase_reg_id = models.CharField(max_length=200, null=True, blank=True)
+    user = models.ForeignKey(User, null=True, blank=True, on_delete=models.SET_NULL, related_name="device_details")
+    app_name = models.CharField(max_length=200, null=True, blank=True)
+    ping_status = models.CharField(max_length=50, null=True, blank=True)
+    last_ping_time = models.DateTimeField(null=True, blank=True)
+    # last_usage = models.DateTimeField()   # updated_at is the last_usage
     dnd = models.BooleanField(default=False)
-    d_token = models.CharField(max_length=200)
-    res = models.CharField(max_length=100)
-    adv_id = models.CharField(max_length=100)
-    apps_flyer_id = models.CharField(max_length=100)
+    res = models.CharField(max_length=100, null=True, blank=True)
+    adv_id = models.CharField(max_length=100, null=True, blank=True)
+    apps_flyer_id = models.CharField(max_length=100, null=True, blank=True)
     data = JSONField()
 
     def __str__(self):
-        return self.make + " (" + self.model +")"
+        return self.device_id
 
     class Meta:
         db_table = "device_details"
