@@ -1790,9 +1790,12 @@ class LabList(viewsets.ReadOnlyModelViewSet):
                     temp_data.get('lab')['is_home_collection_enabled'] = False
                 else:
                     for x in temp_data.get('tests',[]):
-                        if float(x.get('mrp',0))<active_insurance.lab_amount_limit.insurance_threshold:
-                            temp_data.get('lab')['is_home_collection_enabled'] = False
-                            break
+                        active_insurer = active_insurance.insurance_plan.threshold.all()
+                        if  active_insurer and active_insurer.first() and active_insurer.first().lab_amount_limit:
+                            lab_amount_limit = active_insurance.insurance_plan.threshold.all().first().lab_amount_limit
+                            if float(x.get('mrp',0))< lab_amount_limit:
+                                temp_data.get('lab')['is_home_collection_enabled'] = False
+                                break
 
 
         # temp_data['url'] = entity.first()['url'] if len(entity) == 1 else None
