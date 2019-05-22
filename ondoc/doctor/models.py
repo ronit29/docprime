@@ -2747,6 +2747,11 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
                                           insurance=insurance_obj)
         return appointments
 
+    @classmethod
+    def get_all_insurance_appointment(cls, insurance_obj):
+        appointments = cls.objects.filter(~Q(status=cls.CANCELLED), user=insurance_obj.user, insurance=insurance_obj)
+        return appointments
+
 
 class OpdAppointmentProcedureMapping(models.Model):
     opd_appointment = models.ForeignKey(OpdAppointment, on_delete=models.CASCADE, related_name='procedure_mappings')

@@ -1,4 +1,7 @@
 from django.db import models
+from ondoc.authentication.models import User
+from django.contrib.contenttypes.fields import GenericForeignKey, GenericRelation
+from django.contrib.contenttypes.models import ContentType
 from ondoc.authentication import models as auth_models
 from ondoc.doctor import models as doc_models
 from django.contrib.postgres.fields import JSONField, ArrayField
@@ -229,3 +232,19 @@ class OfflinePrescription(auth_models.TimeStampedModel, auth_models.Document):
 
     class Meta:
         db_table = 'offline_prescription'
+
+
+class AppointmentPrescription(auth_models.TimeStampedModel):
+
+    content_type = models.ForeignKey(ContentType, on_delete=models.DO_NOTHING)
+    object_id = models.PositiveIntegerField()
+    content_object = GenericForeignKey()
+    user = models.ForeignKey(User, null=True, default=None, on_delete=models.CASCADE)
+    prescription_file = models.FileField(null=False, upload_to='user_prescriptions', validators=[FileExtensionValidator(allowed_extensions=['pdf', 'jpg', 'jpeg', 'png'])])
+
+    @classmethod
+    def prescription_exist_for_user_date(cls, user, date):
+        return cls.objects.filter(created_at__date=date, user=user).exists()
+
+    class Meta:
+        db_table = 'appointment_prescription'

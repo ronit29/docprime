@@ -352,6 +352,7 @@ class InsurancePlans(auth_model.TimeStampedModel, LiveMixin):
     is_live = models.BooleanField(default=False)
     total_allowed_members = models.PositiveSmallIntegerField(default=0)
     is_selected = models.BooleanField(default=False)
+    plan_usages = JSONField(default={}, null=True)
 
     @property
     def get_active_threshold(self):
@@ -651,7 +652,7 @@ class UserInsurance(auth_model.TimeStampedModel):
             'premium_in_words': ('%s rupees ' % num2words(self.premium_amount)).title() + "only",
             'proposer_name': proposer_name.title(),
             'proposer_address': '%s, %s, %s, %s, %d' % (proposer.address, proposer.town, proposer.district, proposer.state, proposer.pincode),
-            'proposer_mobile': proposer.phone_number,
+            'proposer_mobile': self.user.phone_number,
             'proposer_email': proposer.email,
             'intermediary_name': self.insurance_plan.insurer.intermediary_name,
             'intermediary_code': self.insurance_plan.insurer.intermediary_code,
@@ -1224,6 +1225,19 @@ class UserInsurance(auth_model.TimeStampedModel):
                     send_insurance_notifications.apply_async(({'user_id': self.user.id, 'status': UserInsurance.CANCEL_INITIATE}, ))
             except Exception as e:
                 logger.error(str(e))
+
+    def validate_limit_usages(self):
+        response = dict()
+        plan_usages = self.insurance_plan.plan_usages
+        ytd_count = plan_usages.get('ytd_count', None)
+        ytd_amount = plan_usages.get('ytd_count', None)
+        daily_count = plan_usages.get('ytd_count', None)
+        daily_amount = plan_usages.get('ytd_count', None)
+
+        if not ytd_amount or not ytd_count or not daily_amount or not daily_count:
+            response['prescription_needed'] = False
+            response['created_state'] = False
+
 
 
 class InsuranceTransaction(auth_model.TimeStampedModel):
