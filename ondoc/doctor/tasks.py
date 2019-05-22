@@ -92,3 +92,8 @@ def update_seo_urls():
 
     # update ipd_procedure urls
     IpdProcedure.update_ipd_seo_urls()
+
+    # update labs, doctors and hospitals profile urls
+    from ondoc.location.models import UrlsModel
+    UrlsModel.update_profile_urls()
+    return True

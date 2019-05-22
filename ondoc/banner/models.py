@@ -216,7 +216,7 @@ class Banner(auth_model.TimeStampedModel):
             if append_banner and data.insurance_check and data.insurance_check!='all':
                 if data.insurance_check == 'insured' and not active_insurance:
                     append_banner = False
-                if data.insurance_check == 'not_insured' and active_insurance:
+                if data.insurance_check == 'non_insured' and active_insurance:
                     append_banner = False
 
             if append_banner:
