@@ -2,7 +2,7 @@ from ondoc.tracking import models as track_models
 from ondoc.tracking import mongo_models as track_mongo_models
 import logging
 
-from ondoc.tracking.models import TrackingSaveLogs
+
 
 logger = logging.getLogger(__name__)
 from rest_framework.response import Response
@@ -28,7 +28,7 @@ class EventCreateViewSet(GenericViewSet):
 
     @transaction.non_atomic_requests
     def create(self, request):
-
+        from ondoc.tracking.models import TrackingSaveLogs
         try:
             with transaction.atomic():
                 TrackingSaveLogs.objects.create(data=request.data)
