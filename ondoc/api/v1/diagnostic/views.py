@@ -1537,6 +1537,8 @@ class LabList(viewsets.ReadOnlyModelViewSet):
         lab = dict()
 
         for obj in labs:
+            if  insurance_data_dict and insurance_data_dict['is_user_insured'] and obj.get('home_pickup_charges', 0) > 0:
+                obj['is_home_collection_enabled'] = False
             temp_var[obj.id] = obj
             tests[obj.id] = list()
             if test_ids and obj.selected_group and obj.selected_group.selected_tests:
@@ -1782,11 +1784,8 @@ class LabList(viewsets.ReadOnlyModelViewSet):
 
         #disable home pickup for insured customers if lab charges home collection
         if request.user and request.user.is_authenticated and temp_data.get('lab') and temp_data.get('lab').get('home_pickup_charges',0)>0:
-            if temp_data.get('lab').get('network_id') and temp_data.get('lab').get('network_id') == 43:
-                temp_data.get('lab')['is_home_collection_enabled'] = False
-
             active_insurance = request.user.active_insurance
-            if temp_data.get('lab')['is_home_collection_enabled'] and active_insurance:
+            if active_insurance:
                 if not temp_data.get('tests',[]):
                     temp_data.get('lab')['is_home_collection_enabled'] = False
                 else:
