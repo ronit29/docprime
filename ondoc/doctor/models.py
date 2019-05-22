@@ -724,9 +724,9 @@ class Doctor(auth_model.TimeStampedModel, auth_model.QCModel, SearchKey, auth_mo
         query =   '''insert into insurance_covered_entity(entity_id,name ,location, type, search_key, data,specialization_search_key, created_at,updated_at)
                  
                  select doc_id as entity_id, doctor_name as name, location ,'doctor' as type,search_key,
-                        json_build_object('id',doc_id, 'type','doctor','name', doctor_name,'city', city,'url', url,'hospital_name',hospital_name, 'specializations', specializations),specialization_search_key,  now(), now() from(
-                select doc_id ,doctor_name, h.location, doc_search_key as search_key, h.city, h.name as hospital_name , url, specialization_search_key, specializations from 
-                (select d.id doc_id, d.name doctor_name,d.search_key as doc_search_key, max(eu.url) as url,
+                        json_build_object('id',doc_id, 'type','doctor','name', doctor_name,'city', city,'url', entity_url,'hospital_name',hospital_name, 'specializations', specializations),specialization_search_key,  now(), now() from(
+                select doc_id ,doctor_name, h.location, doc_search_key as search_key, h.city, h.name as hospital_name , entity_url , specialization_search_key, specializations from 
+                (select d.id doc_id, d.name doctor_name,d.search_key as doc_search_key, max(eu.url) as entity_url,
                 string_agg(distinct lower(ps.name), ',') specialization_search_key,
                 array_agg(distinct ps.name) specializations
                 from doctor d 
