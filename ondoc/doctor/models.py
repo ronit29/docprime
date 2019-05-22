@@ -30,6 +30,7 @@ from ondoc.bookinganalytics.models import DP_OpdConsultsAndTests
 from ondoc.location import models as location_models
 from ondoc.account.models import Order, ConsumerAccount, ConsumerTransaction, PgTransaction, ConsumerRefund, \
     MerchantPayout, UserReferred, MoneyPool, Invoice
+from ondoc.location.models import EntityUrls, UrlsModel
 from ondoc.notification.models import NotificationAction, EmailNotification
 from ondoc.payout.models import Outstanding
 from ondoc.coupon.models import Coupon
@@ -90,7 +91,6 @@ class Migration(migrations.Migration):
         CreateExtension('postgis')
     ]
 
-
 class UniqueNameModel(models.Model):
 
     def validate_unique(self, *args, **kwargs):
@@ -143,7 +143,7 @@ class MedicalService(auth_model.TimeStampedModel, UniqueNameModel):
         db_table = "medical_service"
 
 
-class Hospital(auth_model.TimeStampedModel, auth_model.CreatedByModel, auth_model.QCModel, SearchKey, auth_model.SoftDelete, auth_model.WelcomeCallingDone):
+class Hospital(auth_model.TimeStampedModel, auth_model.CreatedByModel, auth_model.QCModel, SearchKey, auth_model.SoftDelete, auth_model.WelcomeCallingDone, UrlsModel):
     PRIVATE = 1
     CLINIC = 2
     HOSPITAL = 3
@@ -405,6 +405,31 @@ class Hospital(auth_model.TimeStampedModel, auth_model.CreatedByModel, auth_mode
         elif self.enabled and self.disabled_at:
             self.disabled_at = None
 
+    def create_entity_url(self):
+        if not self.is_live:
+            return
+
+        entity = EntityUrls.objects.filter(entity_id=self.id, is_valid=True, sitemap_identifier='HOSPITAL_PAGE')
+        if not entity:
+            url = self.name
+            url = slugify(url)
+            new_url = url
+
+            exists = EntityUrls.objects.filter(url=new_url + '-hpp', sitemap_identifier='HOSPITAL_PAGE').first()
+            if exists:
+                if exists.id == self.id:
+                    exists.is_valid = True
+                    exists.save()
+                    self.url = new_url+'-hpp'
+                    return
+                else:
+                    new_url = url + '-' + str(self.id)
+
+            new_url = new_url + '-hpp'
+            EntityUrls.objects.create(url=new_url, sitemap_identifier='HOSPITAL_PAGE', entity_type='Hospital', url_type='PAGEURL',
+                                      is_valid=True, sequence=0, entity_id=self.id)
+            self.url = new_url
+
     def save(self, *args, **kwargs):
         self.update_time_stamps()
         self.update_live_status()
@@ -421,6 +446,8 @@ class Hospital(auth_model.TimeStampedModel, auth_model.CreatedByModel, auth_mode
                 update_status_in_matrix = True
         if not self.matrix_lead_id and (self.is_listed_on_docprime is None or self.is_listed_on_docprime is True):
             push_to_matrix = True
+
+        self.create_entity_url()
         super(Hospital, self).save(*args, **kwargs)
         if self.is_appointment_manager:
             auth_model.GenericAdmin.objects.filter(hospital=self, entity_type=auth_model.GenericAdmin.DOCTOR, permission_type=auth_model.GenericAdmin.APPOINTMENT)\
@@ -580,7 +607,7 @@ class College(auth_model.TimeStampedModel):
         db_table = "college"
 
 
-class Doctor(auth_model.TimeStampedModel, auth_model.QCModel, SearchKey, auth_model.SoftDelete):
+class Doctor(auth_model.TimeStampedModel, auth_model.QCModel, SearchKey, auth_model.SoftDelete, UrlsModel):
     SOURCE_PRACTO = "pr"
     SOURCE_CRM = 'crm'
 
@@ -862,7 +889,39 @@ class Doctor(auth_model.TimeStampedModel, auth_model.QCModel, SearchKey, auth_mo
                                  (self.rating_data.get('avg_rating') and self.rating_data['avg_rating'] > 4)):
             return True
         return False
-    
+
+    def create_entity_url(self):
+        if not self.is_live:
+            return
+
+        entity = EntityUrls.objects.filter(entity_id=self.id, is_valid=True, sitemap_identifier='DOCTOR_PAGE')
+        if not entity:
+            doctor = Doctor.objects.prefetch_related('doctorpracticespecializations', 'doctorpracticespecializations__specialization').filter(id=self.id)[0]
+            practice_specializations = doctor.doctorpracticespecializations.all()
+            specializations = set()
+            for sp in practice_specializations:
+                specializations.add(sp.specialization.name)
+
+            if specializations:
+                url = "dr-%s-%s" % (self.name, "-".join(specializations))
+            else:
+                url = "dr-%s" % (self.name)
+            url = slugify(url)
+            new_url = url
+            exists = EntityUrls.objects.filter(url=new_url+'-dpp', sitemap_identifier='DOCTOR_PAGE').first()
+            if exists:
+                if exists.id == self.id:
+                    exists.is_valid=True
+                    exists.save()
+                    self.url = new_url + '-dpp'
+                    return
+                else:
+                    new_url = url+'-'+str(self.id)
+            
+            EntityUrls.objects.create(url=new_url+'-dpp', sitemap_identifier='DOCTOR_PAGE', entity_type='Doctor', url_type='PAGEURL',
+                                  is_valid=True, sequence=0, entity_id=self.id)
+            self.url = new_url + '-dpp'
+
     def save(self, *args, **kwargs):
         self.update_time_stamps()
         self.update_live_status()
@@ -878,6 +937,7 @@ class Doctor(auth_model.TimeStampedModel, auth_model.QCModel, SearchKey, auth_mo
         else:
             push_to_matrix = True
 
+        self.create_entity_url()
         super(Doctor, self).save(*args, **kwargs)
 
         transaction.on_commit(lambda: self.app_commit_tasks(push_to_matrix=push_to_matrix,

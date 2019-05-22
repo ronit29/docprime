@@ -121,3 +121,11 @@ class MigrateTracker(auth_models.TimeStampedModel):
 
     class Meta:
         db_table = 'migrate_tracker'
+
+
+class TrackingSaveLogs(auth_models.TimeStampedModel):
+
+    data = JSONField(null=True)
+
+    class Meta:
+        db_table = 'tracking_logs'
