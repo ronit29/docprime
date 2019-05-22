@@ -2415,6 +2415,17 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin,
                                           insurance=insurance_obj)
         return appointments
 
+    @classmethod
+    def get_all_insurance_appointment(cls, insurance_obj, date=None):
+        if not date:
+            appointments = cls.objects.filter(~Q(status=cls.CANCELLED), user=insurance_obj.user, insurance=insurance_obj)
+        else:
+            appointments = cls.objects.filter(~Q(status=cls.CANCELLED), user=insurance_obj.user, insurance=insurance_obj, time_slot_start__date=date)
+
+        count = appointments.count()
+        data = appointments.aggregate(sum_amount=Sum('mrp'))
+        return {'count': count, 'sum': data.get('sum_amount', 0)}
+
     class Meta:
         db_table = "lab_appointment"
 

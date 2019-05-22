@@ -1226,6 +1226,25 @@ class UserInsurance(auth_model.TimeStampedModel):
             except Exception as e:
                 logger.error(str(e))
 
+    def get_insurance_appointment_stats(self):
+        from ondoc.doctor.models import OpdAppointment
+        from ondoc.diagnostic.models import LabAppointment
+
+        total_opd_stats = OpdAppointment.get_all_insurance_appointment(self)
+        today_opd_stats = OpdAppointment.get_all_insurance_appointment(self, timezone.now().date())
+
+        total_lab_stats = LabAppointment.get_all_insurance_appointment(self)
+        today_lab_stats = LabAppointment.get_all_insurance_appointment(self, timezone.now().date())
+
+        data = {
+            'ytd_count': total_opd_stats['count'] + total_lab_stats['count'],
+            'ytd_amount': total_opd_stats['sum'] + total_lab_stats['sum'],
+            'daily_count': today_opd_stats['count'] + today_lab_stats['count'],
+            'daily_amount': today_opd_stats['sum'] + today_lab_stats['sum']
+        }
+
+        return data
+
     def validate_limit_usages(self):
         response = dict()
         plan_usages = self.insurance_plan.plan_usages
@@ -1237,6 +1256,8 @@ class UserInsurance(auth_model.TimeStampedModel):
         if not ytd_amount or not ytd_count or not daily_amount or not daily_count:
             response['prescription_needed'] = False
             response['created_state'] = False
+
+
 
 
 
