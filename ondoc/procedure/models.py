@@ -1,3 +1,4 @@
+from django.contrib.postgres.fields import JSONField
 from django.core.validators import MaxValueValidator, MinValueValidator
 from django.db import models, transaction
 from ondoc.authentication import models as auth_model
@@ -103,6 +104,8 @@ class IpdProcedureLead(auth_model.TimeStampedModel):
     INSURANCE = 2
     GOVERNMENT_PANEL = 3
 
+
+
     STATUS_CHOICES = [(None, "--Select--"), (NEW, 'NEW'), (COST_REQUESTED, 'COST_REQUESTED'),
                       (COST_SHARED, 'COST_SHARED'), (OPD, 'OPD'),
                       (NOT_INTERESTED, 'NOT_INTERESTED'), (COMPLETED, 'COMPLETED')]
@@ -123,7 +126,8 @@ class IpdProcedureLead(auth_model.TimeStampedModel):
     lat = models.FloatField(null=True, default=None, blank=True)
     long = models.FloatField(null=True, default=None, blank=True)
     city = models.CharField(null=True, default=None, blank=True, max_length=150)
-    source = models.CharField(max_length=256, blank=True, null=True, default=None)
+    source = models.CharField(max_length=256, blank=True, null=True, default=None,
+                              choices=AppointmentHistory.SOURCE_CHOICES)
     specialty = models.CharField(max_length=256, blank=True, null=True, default=None)
     matrix_lead_id = models.BigIntegerField(blank=True, null=True, unique=True)
     alternate_number = models.BigIntegerField(blank=True, null=True,
@@ -135,9 +139,10 @@ class IpdProcedureLead(auth_model.TimeStampedModel):
     insurer = models.ForeignKey(HealthInsuranceProvider, on_delete=models.DO_NOTHING, null=True, blank=True)
     tpa = models.ForeignKey(ThirdPartyAdministrator, on_delete=models.DO_NOTHING, null=True, blank=True)
     num_of_chats = models.PositiveIntegerField(null=True, blank=True)
+    comments = models.TextField(null=True, blank=True)
+    data = JSONField(blank=True, null=True)
 
     # ADMIN :Is_OpDInsured, Specialization List, appointment list
-    # Model : ,, Payment Amount ,, Number of Chats
     # DEFAULTS??
 
     class Meta:

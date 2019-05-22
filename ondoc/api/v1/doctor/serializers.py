@@ -2027,6 +2027,9 @@ class IpdProcedureLeadSerializer(serializers.ModelSerializer):
     city = serializers.CharField(required=False, allow_null=True, allow_blank=True)
     source = serializers.CharField(required=False, default='docprimeweb')
     specialty = serializers.CharField(required=False, default=None)
+    num_of_chats = serializers.IntegerField(min_value=0, required=False, default=None)
+    comments = serializers.CharField(required=False, default=None)
+    data = serializers.JSONField(required=False, default=None)
 
     class Meta:
         model = IpdProcedureLead

@@ -322,6 +322,24 @@ class IpdProcedureLeadAdmin(VersionAdmin):
     search_fields = ['phone_number']
     list_display = ['id', 'phone_number', 'name', 'matrix_lead_id']
     autocomplete_fields = ['hospital', 'insurer', 'tpa']
-    exclude = ['user', 'dob', 'lat', 'long', 'source', '']
-    readonly_fields = ['phone_number', 'id', 'matrix_lead_id', 'ipd_procedure', 'hospital', 'age']
+    exclude = ['user', 'dob', 'lat', 'long']
+    readonly_fields = ['phone_number', 'id', 'matrix_lead_id', 'ipd_procedure', 'hospital', 'source', 'age', 'specialty'
+                       # 'insurance_details', 'opd_appointments', 'lab_appointments'
+                       ]
 
+    fieldsets = (
+        (None, {
+            'fields': (
+                'id', 'name', 'gender', 'phone_number', 'alternate_number', 'age', 'city', 'email')
+        }),
+        ('Lead Info', {
+            # 'classes': ('collapse',),
+            'fields': ('matrix_lead_id', 'ipd_procedure',
+                       'hospital', 'hospital_reference_id', 'source', 'status', 'payment_type', 'payment_amount',
+                       'insurer', 'tpa', 'num_of_chats'),
+        }),
+        # ('History', {
+        #     # 'classes': ('collapse',),
+        #     'fields': ('insurance_details', 'opd_appointments', 'lab_appointments'),
+        # }),
+    )
