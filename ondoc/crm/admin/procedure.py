@@ -2,16 +2,19 @@ from django.conf import settings
 from django.contrib import messages, admin
 from django.contrib.admin import TabularInline
 from django.contrib.contenttypes.models import ContentType
+from django.db import transaction
 from django.http import HttpResponseRedirect
 from django.urls import reverse
 from django.utils.safestring import mark_safe
+from import_export import resources, fields, widgets
+from import_export.admin import ImportExportMixin
 from reversion.admin import VersionAdmin
 
-from ondoc.common.models import Feature, Service
+from ondoc.common.models import Feature, Service, AppointmentHistory
 from ondoc.crm.admin.doctor import AutoComplete
 from ondoc.procedure.models import Procedure, ProcedureCategory, ProcedureCategoryMapping, ProcedureToCategoryMapping, \
     IpdProcedure, IpdProcedureFeatureMapping, IpdProcedureCategoryMapping, IpdProcedureCategory, IpdProcedureDetail, \
-    IpdProcedureSynonym, IpdProcedureSynonymMapping, SimilarIpdProcedureMapping
+    IpdProcedureSynonym, IpdProcedureSynonymMapping, SimilarIpdProcedureMapping, IpdProcedurePracticeSpecialization
 from django import forms
 
 
@@ -166,6 +169,15 @@ class IpdCategoryInline(AutoComplete, TabularInline):
     verbose_name_plural = "IPD Procedure Categories"
 
 
+class IpdProcedurePracticeSpecializationInline(AutoComplete, TabularInline):
+    model = IpdProcedurePracticeSpecialization
+    extra = 0
+    can_delete = True
+    autocomplete_fields = ['practice_specialization']
+    verbose_name = "Associated Specialization"
+    verbose_name_plural = "Associated Specializations"
+
+
 class IpdProcedureAdminForm(forms.ModelForm):
     about = forms.CharField(widget=forms.Textarea, required=False)
     details = forms.CharField(widget=forms.Textarea, required=False)
@@ -181,8 +193,8 @@ class IpdProcedureAdmin(VersionAdmin):
     model = IpdProcedure
     search_fields = ['search_key']
     exclude = ['search_key']
-    inlines = [IpdCategoryInline, FeatureInline, DetailInline, IpdProcedureSynonymMappingInline,
-               SimilarIpdProcedureMappingInline]
+    inlines = [IpdCategoryInline, IpdProcedurePracticeSpecializationInline, FeatureInline, DetailInline,
+               IpdProcedureSynonymMappingInline, SimilarIpdProcedureMappingInline]
 
     def delete_view(self, request, object_id, extra_context=None):
         obj = self.model.objects.filter(id=object_id).first()
@@ -272,7 +284,6 @@ class ProcedureCategoryAdmin(VersionAdmin):
     form = ProcedureCategoryForm
 
 
-
 class IpdProcedureSynonymAdmin(admin.ModelAdmin):
     model = IpdProcedureSynonym
     list_display = ['name']
@@ -292,3 +303,52 @@ class IpdProcedureSynonymMappingAdmin(admin.ModelAdmin):
         return obj.ipd_procedure.name
     get_ipd_procedure_name.admin_order_field  = 'ipd_procedure'  #Allows column order sorting
     get_ipd_procedure_name.short_description = 'Ipd Procedure'
+
+
+class IpdProcedurePracticeSpecializationResource(resources.ModelResource):
+    class Meta:
+        model = IpdProcedurePracticeSpecialization
+        fields = ('id', 'ipd_procedure', 'practice_specialization')
+
+
+class IpdProcedurePracticeSpecializationAdmin(ImportExportMixin, VersionAdmin):
+    search_fields = ['ipd_procedure__name']
+    resource_class = IpdProcedurePracticeSpecializationResource
+    list_display = ['ipd_procedure', 'practice_specialization']
+    autocomplete_fields = ['ipd_procedure', 'practice_specialization']
+    # change_list_template = 'superuser_import_export.html'
+
+
+class IpdProcedureLeadAdmin(VersionAdmin):
+    search_fields = ['phone_number']
+    list_display = ['id', 'phone_number', 'name', 'matrix_lead_id']
+    autocomplete_fields = ['hospital', 'insurer', 'tpa']
+    exclude = ['user', 'dob', 'lat', 'long']
+    readonly_fields = ['phone_number', 'id', 'matrix_lead_id', 'ipd_procedure', 'hospital', 'source', 'age', 'specialty'
+                       # 'insurance_details', 'opd_appointments', 'lab_appointments'
+                       ]
+
+    fieldsets = (
+        (None, {
+            'fields': (
+                'id', 'name', 'gender', 'phone_number', 'alternate_number', 'age', 'city', 'email')
+        }),
+        ('Lead Info', {
+            # 'classes': ('collapse',),
+            'fields': ('matrix_lead_id', 'ipd_procedure',
+                       'hospital', 'hospital_reference_id', 'source', 'status', 'payment_type', 'payment_amount',
+                       'insurer', 'tpa', 'num_of_chats'),
+        }),
+        # ('History', {
+        #     # 'classes': ('collapse',),
+        #     'fields': ('insurance_details', 'opd_appointments', 'lab_appointments'),
+        # }),
+    )
+
+    @transaction.atomic
+    def save_model(self, request, obj, form, change):
+        responsible_user = request.user
+        obj._responsible_user = responsible_user if responsible_user and not responsible_user.is_anonymous else None
+        if obj and obj.id:
+            obj._source = AppointmentHistory.CRM
+        super().save_model(request, obj, form, change)
