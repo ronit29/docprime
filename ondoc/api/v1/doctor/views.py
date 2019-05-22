@@ -3144,6 +3144,11 @@ class OfflineCustomerViewSet(viewsets.GenericViewSet):
                 patient.doctor = doctor
             if encrypted_name:
                 patient.encrypted_name = encrypted_name
+                patient.name = None
+            if not encrypted_name:
+                patient.encrypted_name = None
+                if data.get('name'):
+                    patient.name = data.get('name')
             patient.save()
             default_num = None
             sms_number = None
