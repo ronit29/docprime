@@ -25,6 +25,10 @@ import requests
 from rest_framework import status
 from django.utils.safestring import mark_safe
 from ondoc.notification.models import NotificationAction
+import random
+import string
+from ondoc.api.v1.utils import RawSql
+
 
 logger = logging.getLogger(__name__)
 
@@ -58,18 +62,28 @@ def send_lab_notifications_refactored(appointment_id):
 
 
 @task
-def send_ipd_procedure_lead_mail(obj_id):
+def send_ipd_procedure_lead_mail(data):
+    obj_id = data.get('obj_id')
+    send_email = data.get('send_email')
     from ondoc.communications.models import EMAILNotification
     from ondoc.procedure.models import IpdProcedureLead
+    from ondoc.matrix.tasks import create_or_update_lead_on_matrix
     instance = IpdProcedureLead.objects.filter(id=obj_id).first()
     if not instance:
         return
+    if instance.matrix_lead_id:
+        return
     try:
-        emails = settings.IPD_PROCEDURE_CONTACT_DETAILS
-        user_and_email = [{'user': None, 'email': email} for email in emails]
-        email_notification = EMAILNotification(notification_type=NotificationAction.IPD_PROCEDURE_MAIL,
-                                               context={'instance': instance})
-        email_notification.send(user_and_email)
+        if send_email:
+            emails = settings.IPD_PROCEDURE_CONTACT_DETAILS
+            user_and_email = [{'user': None, 'email': email} for email in emails]
+            email_notification = EMAILNotification(notification_type=NotificationAction.IPD_PROCEDURE_MAIL,
+                                                   context={'instance': instance})
+            email_notification.send(user_and_email)
+
+        create_or_update_lead_on_matrix.apply_async(
+            ({'obj_type': instance.__class__.__name__, 'obj_id': instance.id},), countdown=5)
+
     except Exception as e:
         logger.error(str(e))
 
@@ -685,6 +699,27 @@ def opd_send_otp_before_appointment(appointment_id, previous_appointment_date_ti
         logger.error(str(e))
 
 @task()
+def appointment_reminder_sms_provider(appointment_id, appointment_updated_at):
+    from ondoc.doctor.models import OpdAppointment
+    from ondoc.communications.models import OpdNotification
+    try:
+        instance = OpdAppointment.objects.filter(id=appointment_id).first()
+        if not instance or \
+                not instance.user or \
+                str(math.floor(instance.updated_at.timestamp())) != appointment_updated_at \
+                or instance.status != OpdAppointment.ACCEPTED:
+            # logger.error(
+            #     'instance : {}, time : {}, str: {}'.format(str(model_to_dict(instance)),
+            #                                                previous_appointment_date_time,
+            #                                                str(math.floor(instance.time_slot_start.timestamp()))))
+            return
+        opd_notification = OpdNotification(instance, NotificationAction.APPOINTMENT_REMINDER_PROVIDER_SMS)
+        opd_notification.send()
+    except Exception as e:
+        logger.error(str(e))
+
+
+@task()
 def opd_send_after_appointment_confirmation(appointment_id, previous_appointment_date_time, second=False):
     from ondoc.doctor.models import OpdAppointment
     from ondoc.communications.models import OpdNotification
@@ -856,6 +891,11 @@ def push_insurance_banner_lead_to_matrix(self, data):
         if not banner_obj:
             raise Exception("Banner object could not found against id - " + str(id))
 
+        if banner_obj.user:
+            phone_number = banner_obj.user.phone_number
+        else:
+            phone_number = banner_obj.phone_number
+
         extras = banner_obj.extras
         plan_id = extras.get('plan_id', None)
         plan = None
@@ -866,15 +906,15 @@ def push_insurance_banner_lead_to_matrix(self, data):
             'LeadID': banner_obj.matrix_lead_id if banner_obj.matrix_lead_id else 0,
             'LeadSource': 'InsuranceOPD',
             'Name': 'none',
-            'BookedBy': banner_obj.user.phone_number,
-            'PrimaryNo': banner_obj.user.phone_number,
+            'BookedBy': phone_number,
+            'PrimaryNo': phone_number,
             'PaymentStatus': 0,
             'UtmCampaign': extras.get('utm_campaign', ''),
             'UTMMedium': extras.get('utm_medium', ''),
             'UtmSource': extras.get('utm_source', ''),
             'UtmTerm': extras.get('utm_term', ''),
-            'ProductId': 5,
-            'SubProductId': 3,
+            'ProductId': 8,
+            'SubProductId': 0,
             'PolicyDetails': {
                 "ProposalNo": None,
                 "BookingId": None,
@@ -917,3 +957,47 @@ def push_insurance_banner_lead_to_matrix(self, data):
 
     except Exception as e:
         logger.error("Error in Celery. Failed pushing insurance banner lead to the matrix- " + str(e))
+
+
+@task
+def generate_random_coupons(total_count, coupon_id):
+    from ondoc.coupon.models import RandomGeneratedCoupon, Coupon
+    try:
+        coupon_obj = Coupon.objects.filter(id=coupon_id).first()
+        if not coupon_obj:
+            return
+
+        while total_count:
+            curr_count = 0
+            batch_data = []
+            while curr_count < 10000 and total_count:
+                rc = RandomGeneratedCoupon()
+                rc.random_coupon = ''.join(random.choice(string.ascii_uppercase + string.digits) for _ in range(12))
+                rc.coupon = coupon_obj
+                rc.validity = 90
+                rc.sent_at = datetime.datetime.utcnow()
+
+                batch_data.append(rc)
+                curr_count += 1
+                total_count -= 1
+
+            if batch_data:
+                RandomGeneratedCoupon.objects.bulk_create(batch_data)
+            else:
+                return
+
+    except Exception as e:
+        logger.error(str(e))
+
+
+@task
+def update_coupon_used_count():
+    RawSql('''  update coupon set total_used_count= usage_count from
+                (select coupon_id, sum(usage_count) usage_count from
+                (select oac.coupon_id, count(*) usage_count from opd_appointment oa inner join opd_appointment_coupon oac on oa.id = oac.opdappointment_id
+                 where oa.status in (2,3,4,5,7) group by oac.coupon_id
+                union
+                select oac.coupon_id, count(*) usage_count from lab_appointment oa inner join lab_appointment_coupon oac on oa.id = oac.labappointment_id
+                 where oa.status in (2,3,4,5,7) group by oac.coupon_id
+                ) x group by coupon_id
+                ) y where coupon.id = y.coupon_id ''', []).execute()

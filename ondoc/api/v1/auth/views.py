@@ -29,7 +29,7 @@ from ondoc.doctor.models import DoctorMobile, Doctor, HospitalNetwork, Hospital,
                                 DoctorClinicTiming, ProviderSignupLead
 from ondoc.authentication.models import (OtpVerifications, NotificationEndpoint, Notification, UserProfile,
                                          Address, AppointmentTransaction, GenericAdmin, UserSecretKey, GenericLabAdmin,
-                                         AgentToken, DoctorNumber)
+                                         AgentToken, DoctorNumber, LastLoginTimestamp)
 from ondoc.notification.models import SmsNotification, EmailNotification
 from ondoc.account.models import PgTransaction, ConsumerAccount, ConsumerTransaction, Order, ConsumerRefund, OrderLog, \
     UserReferrals, UserReferred, PgLogs
@@ -96,6 +96,9 @@ class LoginOTP(GenericViewSet):
         data = serializer.validated_data
         phone_number = data['phone_number']
         req_type = request.query_params.get('type')
+        via_sms = data.get('via_sms', True)
+        via_whatsapp = data.get('via_whatsapp', False)
+        call_source = data.get('request_source')
         retry_send = request.query_params.get('retry', False)
         otp_message = OtpVerifications.get_otp_message(request.META.get('HTTP_PLATFORM'), req_type, version=request.META.get('HTTP_APP_VERSION'))
         if req_type == 'doctor':
@@ -119,7 +122,7 @@ class LoginOTP(GenericViewSet):
             #     send_otp("OTP for DocPrime login is {}", phone_number)
 
         else:
-            send_otp(otp_message, phone_number, retry_send)
+            send_otp(otp_message, phone_number, retry_send, via_sms=via_sms, via_whatsapp=via_whatsapp, call_source=call_source)
             if User.objects.filter(phone_number=phone_number, user_type=User.CONSUMER).exists():
                 response['exists'] = 1
 
@@ -235,6 +238,9 @@ class UserViewset(GenericViewSet):
 
         token_object = JWTAuthentication.generate_token(user)
         expire_otp(data['phone_number'])
+
+        if data.get("source"):
+            LastLoginTimestamp.objects.create(user=user, source=data.get("source"))
 
         response = {
             "login": 1,
@@ -438,9 +444,13 @@ class UserProfileViewSet(mixins.CreateModelMixin, mixins.ListModelMixin,
 
         insured_member_obj = InsuredMembers.objects.filter(profile__id=obj.id).last()
         insured_member_profile = None
+        insured_member_status = None
         if insured_member_obj:
             insured_member_profile = insured_member_obj.profile
-        if obj and hasattr(obj, 'id') and obj.id and insured_member_profile:
+            insured_member_status = insured_member_obj.user_insurance.status
+        # if obj and hasattr(obj, 'id') and obj.id and insured_member_profile:
+        if obj and hasattr(obj, 'id') and obj.id and insured_member_profile and not (insured_member_status == UserInsurance.CANCELLED or
+                                                              insured_member_status == UserInsurance.EXPIRED):
 
             whatsapp_optin = data.get('whatsapp_optin')
             whatsapp_is_declined = data.get('whatsapp_is_declined')
@@ -597,6 +607,8 @@ class UserAppointmentsViewSet(OndocViewSet):
         query_input_serializer.is_valid(raise_exception=True)
         source = ''
         responsible_user = None
+        if validated_data.get('source', None):
+            source = validated_data.get('source')
         if query_input_serializer.validated_data.get('source', None):
             source = query_input_serializer.validated_data.get('source')
         if request.user and hasattr(request.user, 'user_type'):
@@ -1486,67 +1498,36 @@ class HospitalDoctorAppointmentPermissionViewSet(GenericViewSet):
     authentication_classes = (JWTAuthentication, )
     permission_classes = (IsAuthenticated, IsDoctor,)
 
-    # building = models.CharField(max_length=1000, blank=True)
-    # sublocality = models.CharField(max_length=100, blank=True)
-    # locality = models.CharField(max_length=100, blank=True)
-    # city = models.CharField(max_length=100)
-    # state = models.CharField(max_length=100, blank=True)
-    # country = models.CharField(max_length=100)
-
     @transaction.non_atomic_requests
     def list(self, request):
         user = request.user
+        manageable_hosp_list = GenericAdmin.objects.filter(Q(is_disabled=False, user=user), (Q(permission_type=GenericAdmin.APPOINTMENT)
+                                                                                              |
+                                                                                            Q(super_user_permission=True)))\
+                                                    .values_list('hospital', flat=True)
         doc_hosp_queryset = (DoctorClinic.objects
                              .select_related('doctor', 'hospital')
                              .prefetch_related('doctor__manageable_doctors', 'hospital__manageable_hospitals')
-                             .filter(Q(doctor__is_live=True, hospital__is_live=True) |
-                                     Q(doctor__source_type=Doctor.PROVIDER, hospital__source_type=Hospital.PROVIDER))
+                             .filter(Q(Q(doctor__is_live=True) | Q(doctor__source_type=Doctor.PROVIDER)),
+                                     Q(Q(hospital__is_live=True) | Q(hospital__source_type=Hospital.PROVIDER)))
                              .annotate(doctor_gender=F('doctor__gender'),
                                        hospital_building=F('hospital__building'),
                                        hospital_name=F('hospital__name'),
                                        doctor_name=F('doctor__name'),
                                        doctor_source_type=F('doctor__source_type'),
                                        doctor_is_live=F('doctor__is_live'),
+                                       license=F('doctor__license'),
+                                       is_license_verified=F('doctor__is_license_verified'),
                                        hospital_source_type=F('hospital__source_type'),
                                        hospital_is_live=F('hospital__is_live'),
                                        online_consultation_fees=F('doctor__online_consultation_fees')
                                        )
-                             .filter(
-                                    Q(
-                                        Q(doctor__manageable_doctors__user=user,
-                                          doctor__manageable_doctors__hospital=F('hospital'),
-                                          doctor__manageable_doctors__is_disabled=False,
-                                          doctor__manageable_doctors__permission_type__in=[GenericAdmin.APPOINTMENT, GenericAdmin.ALL],
-                                          doctor__manageable_doctors__write_permission=True) |
-                                        Q(doctor__manageable_doctors__user=user,
-                                          doctor__manageable_doctors__hospital__isnull=True,
-                                          doctor__manageable_doctors__is_disabled=False,
-                                          doctor__manageable_doctors__permission_type__in=[GenericAdmin.APPOINTMENT, GenericAdmin.ALL],
-                                          doctor__manageable_doctors__write_permission=True) |
-                                        Q(hospital__manageable_hospitals__doctor__isnull=True,
-                                          hospital__manageable_hospitals__user=user,
-                                          hospital__manageable_hospitals__is_disabled=False,
-                                          hospital__manageable_hospitals__permission_type__in=[GenericAdmin.APPOINTMENT, GenericAdmin.ALL],
-                                          hospital__manageable_hospitals__write_permission=True)
-                                    )|
-                                        Q(
-                                            Q(doctor__manageable_doctors__user=user,
-                                             doctor__manageable_doctors__super_user_permission=True,
-                                             doctor__manageable_doctors__is_disabled=False,
-                                             doctor__manageable_doctors__entity_type=GenericAdminEntity.DOCTOR,)|
-                                            Q(hospital__manageable_hospitals__user=user,
-                                              hospital__manageable_hospitals__super_user_permission=True,
-                                              hospital__manageable_hospitals__is_disabled=False,
-                                              hospital__manageable_hospitals__entity_type=GenericAdminEntity.HOSPITAL)
-                                    ))
+                             .filter(hospital_id__in=list(manageable_hosp_list))
                              .values('hospital', 'doctor', 'hospital_name', 'doctor_name', 'doctor_gender',
-                                     'doctor_source_type', 'hospital_source_type', 'online_consultation_fees',
-                                     'doctor_is_live', 'hospital_is_live').distinct('hospital', 'doctor')
+                                     'doctor_source_type', 'doctor_is_live', 'license',
+                                     'is_license_verified', 'hospital_source_type', 'hospital_is_live',
+                                     'online_consultation_fees').distinct('hospital', 'doctor')
                              )
-
-        # all_docs = [doc_hosp_queryset
-        # all_hospitals = doc_hosp_queryset
-
 
         return Response(doc_hosp_queryset)
 
@@ -2127,6 +2108,7 @@ class TokenFromUrlKey(viewsets.GenericViewSet):
             if obj:
                 obj.is_consumed = True
                 obj.save()
+                LastLoginTimestamp.objects.create(user=obj.user, source="d_sms")
                 return Response({'status': 1, 'token': obj.token})
             else:
-                return Response({'status': 0, 'token': None, 'message': 'key not found'})
+                return Response({'status': 0, 'token': None, 'message': 'key not found'}, status=status.HTTP_404_NOT_FOUND)

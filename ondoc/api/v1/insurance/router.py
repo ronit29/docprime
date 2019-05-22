@@ -1,10 +1,11 @@
 from django.urls import path
 from .views import (ListInsuranceViewSet, InsuredMemberViewSet, InsuranceProfileViewSet, InsuranceOrderViewSet,
-                    InsuranceValidationViewSet, InsuranceDummyDataViewSet, InsuranceCancelViewSet)
+                    InsuranceValidationViewSet, InsuranceDummyDataViewSet, InsuranceCancelViewSet, InsuranceNetworkViewSet)
 
 
 urlpatterns = [
     path('list', ListInsuranceViewSet.as_view({'get': 'list'}), name='insurance-list'),
+    path('availability', ListInsuranceViewSet.as_view({'get': 'check_is_insurance_available'}), name='insurance-city-availability'),
     # path('summary', InsuredMemberViewSet.as_view({'post': 'summary'}), name='insurance-summary'),
     path('create', InsuranceOrderViewSet.as_view({'post': 'create_order'}), name='insured-members'),
     path('lead/create', InsuranceOrderViewSet.as_view({'post': 'create_banner_lead'}), name='banner-lead-create'),
@@ -15,5 +16,6 @@ urlpatterns = [
     path('show_insurance_data', InsuranceDummyDataViewSet.as_view({'get': 'show_dummy_data'}), name='show-dummy-data'),
     path('check_insurance', InsuranceValidationViewSet.as_view({'post': 'validation'}), name='insurance-validation'),
     path('cancel', InsuranceCancelViewSet.as_view({'get': 'insurance_cancel'}), name='insurance-cancel'),
-    path('cancel-master', InsuranceCancelViewSet.as_view({'get': 'cancel_master'}), name='insurance-cancel-master')
+    path('cancel-master', InsuranceCancelViewSet.as_view({'get': 'cancel_master'}), name='insurance-cancel-master'),
+    path('network/search', InsuranceNetworkViewSet.as_view({'get': 'list'}), name='insurance-network')
 ]

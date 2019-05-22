@@ -1,26 +1,30 @@
 from django.conf import settings
 
-from ondoc.api.v1.insurance.serializers import InsuredMemberIdSerializer, InsuranceDiseaseIdSerializer
+from ondoc.api.v1.insurance.serializers import InsuredMemberIdSerializer, InsuranceDiseaseIdSerializer, \
+    InsuranceCityEligibilitySerializer
 from ondoc.api.v1.utils import insurance_transform
 from django.core.serializers import serialize
 from rest_framework import viewsets
 from django.core import serializers as core_serializer
+import math
 
 from ondoc.api.v1.utils import payment_details
-from ondoc.diagnostic.models import LabAppointment
+from ondoc.diagnostic.models import LabAppointment, Lab
 from ondoc.doctor.models import OpdAppointment
 from . import serializers
 from rest_framework.response import Response
 from ondoc.account import models as account_models
 from ondoc.doctor import models as doctor_models
-from ondoc.insurance.models import (Insurer, InsuredMembers, InsuranceThreshold, InsurancePlans, UserInsurance, InsuranceLead,
+from ondoc.insurance.models import (Insurer, InsuredMembers, InsuranceThreshold, InsurancePlans, UserInsurance,
+                                    InsuranceLead,
                                     InsuranceTransaction, InsuranceDisease, InsuranceDiseaseResponse, StateGSTCode,
-                                    InsuranceDummyData, InsuranceCancelMaster)
+                                    InsuranceDummyData, InsuranceCancelMaster, InsuranceEligibleCities)
 from ondoc.authentication.models import UserProfile
 from ondoc.authentication.backends import JWTAuthentication
+from ondoc.api.v1.utils import RawSql
 from rest_framework.permissions import IsAuthenticated
 from rest_framework import status, permissions
-from django.db.models import F
+from django.db.models import F, Window
 import datetime
 from django.db import transaction
 from ondoc.authentication.models import User
@@ -30,12 +34,122 @@ import logging
 logger = logging.getLogger(__name__)
 from dateutil.relativedelta import relativedelta
 
+
+class InsuranceNetworkViewSet(viewsets.GenericViewSet):
+
+    def get_queryset(self):
+        return None
+
+    def list(self, request):
+
+
+        type = request.query_params.get('type')
+        if type not in ('doctor','lab'):
+            type = None
+        latitude = request.query_params.get('latitude')
+        longitude = request.query_params.get('longitude')
+        starts_with = request.query_params.get('starts_with')
+        search = request.query_params.get('search')
+        if (not type or not latitude or not longitude) or \
+                (not starts_with and type == 'doctor'):
+            return Response({'count':0,'total_count':0, 'results':[]})
+
+        if not starts_with:
+            params = dict()
+            params['latitude'] = latitude
+            params['longitude'] = longitude
+            result = list()
+
+            labs_query = '''select l.network_id,l.name, 'lab' as type,eu.url,l.city,l.id from lab_network ln inner join lab l on l.network_id = ln.id
+            inner join entity_urls eu on l.id = eu.entity_id and eu.sitemap_identifier='LAB_PAGE' and eu.is_valid=true
+            where l.is_live=true and l.is_test_lab=false and ln.id in (43, 18, 65, 22) and St_dwithin( St_setsrid(St_point((%(longitude)s), (%(latitude)s)), 4326),l.location, 15000) 
+            order by ST_Distance(l.location, St_setsrid(St_point((%(longitude)s), (%(latitude)s)), 4326)) '''
+            labs = RawSql(labs_query, params).fetch_all()
+            temp_dict = set()
+            for lab in labs:
+                if len(temp_dict) == 4:
+                    break
+                if not lab.get('network_id') in temp_dict:
+                    result.append(lab)
+                    temp_dict.add(lab.get('network_id'))
+
+            total_count_query= "select count(distinct entity_id) from insurance_covered_entity where type= %(type)s"
+            total_count = RawSql(total_count_query, {'type':type}).fetch_all()[0].get('count')
+
+            resp = dict()
+            resp["starts_with"] = None
+            resp["count"] = len(result)
+            resp["total_count"] = total_count
+            resp["distance_count"] = len(result)
+            resp["results"] = result
+
+            return Response(resp)
+
+        else:
+            starts_with = starts_with.lower()
+
+            params = {'type':type,'latitude':latitude,'longitude':longitude,'starts_with':starts_with+'%'}
+
+            query_string = "select * from (select x.*, rank() over(partition by entity_id order by distance) "\
+            " rnk from (select mt.*, st_distance(location,st_setsrid(st_point((%(longitude)s),(%(latitude)s)), 4326))/1000 "\
+            " distance from  insurance_covered_entity mt where type=(%(type)s) and "
+
+            if type =='doctor' and search == 'specialization':
+                params['comma_separated_starts_with'] = '%,' + starts_with+'%'
+                query_string += " ((specialization_search_key like (%(starts_with)s)) or (specialization_search_key like (%(comma_separated_starts_with)s) )) and "
+                # query_string += " ((specialization_search_key like (%(starts_with)s)) or (specialization_search_key like concat('%,',(%(starts_with)s))) ) and "
+            else:
+                query_string += ' search_key like %(starts_with)s and '
+
+            query_string += " st_dwithin(location,st_setsrid(st_point((%(longitude)s),(%(latitude)s)), 4326),15000) "\
+            " )x )y where rnk=1 order by distance"
+
+            results = RawSql(query_string, params).fetch_all()
+
+            distance_count_query = "select count(distinct entity_id) from insurance_covered_entity where type= %(type)s "\
+            " and st_dwithin(location,st_setsrid(st_point((%(longitude)s),(%(latitude)s)), 4326),15000)"
+            distance_count = RawSql(distance_count_query, {'type':type,'latitude':latitude,'longitude':longitude}).fetch_all()[0].get('count')
+
+            total_count_query= "select count(distinct entity_id) from insurance_covered_entity where type= %(type)s"
+            total_count = RawSql(total_count_query, {'type':type}).fetch_all()[0].get('count')
+
+            data_list = []
+            for r in results:
+                data_list.append({'name':r.get('name'), 'distance':math.ceil(r.get('distance')), 'id':r.get('entity_id'),\
+                'type':r.get('type'), 'city':r.get('data',{}).get('city'),'url':r.get('data',{}).get('url'),\
+                'specializations':r.get('data',{}).get('specializations')})
+
+            resp = dict()
+            resp["starts_with"] = starts_with
+            resp["count"] = len(data_list)
+            resp["total_count"] = total_count
+            resp["distance_count"] = distance_count
+            resp["results"] = data_list
+
+            return Response(resp)
+
+
 class ListInsuranceViewSet(viewsets.GenericViewSet):
     # authentication_classes = (JWTAuthentication,)
     # permission_classes = (IsAuthenticated,)
 
     def get_queryset(self):
         return Insurer.objects.filter(is_live=True)
+
+    def check_is_insurance_available(self, request):
+        data = {
+            'latitude': request.query_params.get('latitude'),
+            'longitude': request.query_params.get('longitude')
+        }
+        serializer = InsuranceCityEligibilitySerializer(data=data)
+        serializer.is_valid(raise_exception=True)
+        data = serializer.validated_data
+
+        city_name = InsuranceEligibleCities.check_eligibility(data.get('latitude'), data.get('longitude'))
+        if not city_name:
+            return Response({'available': False})
+
+        return Response({'available': True})
 
     def list(self, request):
         if settings.IS_INSURANCE_ACTIVE:
@@ -76,9 +190,10 @@ class InsuredMemberViewSet(viewsets.GenericViewSet):
             result['insurer_logo'] = request.build_absolute_uri(user_insurance.insurance_plan.insurer.logo.url) \
                 if user_insurance.insurance_plan.insurer.logo is not None and \
                    user_insurance.insurance_plan.insurer.logo.name else None
-            member_list = user_insurance.members.all().order_by('id').values('id', 'first_name', 'last_name', 'relation')
+            member_list = user_insurance.members.all().order_by('id').values('id', 'first_name', 'last_name', 'relation'
+                                                                             , 'gender')
             result['members'] = member_list
-            disease = InsuranceDisease.objects.filter(is_live=True).values('id', 'disease')
+            disease = InsuranceDisease.objects.filter(is_live=True).values('id', 'disease', 'is_female_related')
             result['disease'] = disease
         else:
             return Response(status=status.HTTP_404_NOT_FOUND)
@@ -110,29 +225,44 @@ class InsuredMemberViewSet(viewsets.GenericViewSet):
 
 class InsuranceOrderViewSet(viewsets.GenericViewSet):
     authentication_classes = (JWTAuthentication,)
-    permission_classes = (IsAuthenticated,)
+    # permission_classes = (IsAuthenticated,)
 
     def create_banner_lead(self, request):
-        user = request.user
-        user_insurance_lead = InsuranceLead.objects.filter(user=user).order_by('id').last()
-        user_insurance = user.purchased_insurance.filter().order_by('id').last()
+        phone_number = request.data.get('phone_number', None)
+        if phone_number:
+            user = User.objects.filter(phone_number=phone_number, user_type=User.CONSUMER).first()
+            if not user:
+                user = request.user
+        else:
+            user = request.user
 
-        if user.active_insurance:
+        if not user.is_anonymous:
+            user_insurance_lead = InsuranceLead.objects.filter(user=user).order_by('id').last()
+            user_insurance = user.purchased_insurance.filter().order_by('id').last()
+
+            if user.active_insurance:
+                return Response({'success': True})
+
+            if not user_insurance_lead:
+                user_insurance_lead = InsuranceLead(user=user)
+            elif user_insurance_lead and user_insurance and not user_insurance.is_valid():
+                active_insurance_lead = InsuranceLead.objects.filter(created_at__gte=user_insurance.expiry_date, user=user).order_by('created_at').last()
+                if not active_insurance_lead:
+                    user_insurance_lead = InsuranceLead(user=user)
+                else:
+                    user_insurance_lead = active_insurance_lead
+
+            user_insurance_lead.extras = request.data
+            user_insurance_lead.save()
+
+            return Response({'success': True})
+        else:
+            lead = InsuranceLead.create_lead_by_phone_number(request)
+            if not lead:
+                return Response({'success': False})
+
             return Response({'success': True})
 
-        if not user_insurance_lead:
-            user_insurance_lead = InsuranceLead(user=user)
-        elif user_insurance_lead and user_insurance and not user_insurance.is_valid():
-            active_insurance_lead = InsuranceLead.objects.filter(created_at__gte=user_insurance.expiry_date, user=user).order_by('created_at').last()
-            if not active_insurance_lead:
-                user_insurance_lead = InsuranceLead(user=user)
-            else:
-                user_insurance_lead = active_insurance_lead
-
-        user_insurance_lead.extras = request.data
-        user_insurance_lead.save()
-
-        return Response({'success': True})
 
     @transaction.atomic
     def create_order(self, request):
@@ -424,6 +554,10 @@ class InsuranceCancelViewSet(viewsets.GenericViewSet):
         if not user.active_insurance:
             res['error'] = "Insurance is not active"
             return Response(data=res, status=status.HTTP_400_BAD_REQUEST)
+
+        responsible_user = request.user
+        user_insurance._responsible_user = responsible_user if responsible_user and not responsible_user.is_anonymous else None
+
         opd_appointment_count = OpdAppointment.get_insured_completed_appointment(user_insurance)
         lab_appointment_count = LabAppointment.get_insured_completed_appointment(user_insurance)
         if opd_appointment_count > 0 or lab_appointment_count > 0:
