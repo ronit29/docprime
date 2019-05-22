@@ -1537,8 +1537,8 @@ class LabList(viewsets.ReadOnlyModelViewSet):
         lab = dict()
 
         for obj in labs:
-            if  insurance_data_dict and insurance_data_dict['is_user_insured'] and obj.get('home_pickup_charges', 0) > 0:
-                obj['is_home_collection_enabled'] = False
+            if  insurance_data_dict and insurance_data_dict['is_user_insured'] and obj.home_pickup_charges > 0:
+                obj.is_home_collection_enabled = False
             temp_var[obj.id] = obj
             tests[obj.id] = list()
             if test_ids and obj.selected_group and obj.selected_group.selected_tests:
