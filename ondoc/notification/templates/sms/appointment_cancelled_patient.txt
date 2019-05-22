@@ -9,7 +9,9 @@ Booking ID : {{instance.id}}
 Patient Name : {{patient_name|capfirst}}
 Doctor Name : {{doctor_name|capfirst}}
 
+{% if instance.payment_type !=3 %}
 Refund if applicable will be credited within 5-7 working days.
+{% endif %}
 
 In case of any queries please contact us at customercare@docprime.com .
 
