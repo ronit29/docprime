@@ -62,12 +62,14 @@ def send_lab_notifications_refactored(appointment_id):
 
 
 @task
-def send_ipd_procedure_lead_mail(obj_id, send_email=False):
+def send_ipd_procedure_lead_mail(data):
+    obj_id = data.get('obj_id')
+    send_email = data.get('send_email')
     from ondoc.communications.models import EMAILNotification
     from ondoc.procedure.models import IpdProcedureLead
     from ondoc.matrix.tasks import create_or_update_lead_on_matrix
     instance = IpdProcedureLead.objects.filter(id=obj_id).first()
-    if not instance:
+    if not instance or not instance.matrix_lead_id:
         return
     try:
         if send_email:
@@ -76,9 +78,8 @@ def send_ipd_procedure_lead_mail(obj_id, send_email=False):
             email_notification = EMAILNotification(notification_type=NotificationAction.IPD_PROCEDURE_MAIL,
                                                    context={'instance': instance})
             email_notification.send(user_and_email)
-        if not instance.matrix_lead_id:
-            create_or_update_lead_on_matrix.apply_async(
-                ({'obj_type': instance.__class__.__name__, 'obj_id': instance.id},), countdown=5)
+        create_or_update_lead_on_matrix.apply_async(
+            ({'obj_type': instance.__class__.__name__, 'obj_id': instance.id},), countdown=5)
 
     except Exception as e:
         logger.error(str(e))

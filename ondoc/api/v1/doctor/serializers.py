@@ -2037,7 +2037,6 @@ class IpdProcedureLeadSerializer(serializers.ModelSerializer):
     num_of_chats = serializers.IntegerField(min_value=0, required=False, default=None)
     comments = serializers.CharField(required=False, default=None)
     data = serializers.JSONField(required=False, default=None)
-    status = serializers.IntegerField(default=IpdProcedureLead.NEW)
 
     class Meta:
         model = IpdProcedureLead
