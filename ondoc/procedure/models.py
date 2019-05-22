@@ -162,10 +162,10 @@ class IpdProcedureLead(auth_model.TimeStampedModel):
             AppointmentHistory.create(content_object=self)
         super().save(*args, **kwargs)
         transaction.on_commit(lambda: self.app_commit_tasks(send_lead_email=send_lead_email))
-
-    def app_commit_tasks(self, send_lead_email):
-        from ondoc.notification.tasks import send_ipd_procedure_lead_mail
-        send_ipd_procedure_lead_mail.apply_async(self.id, send_lead_email)
+    #
+    # def app_commit_tasks(self, send_lead_email):
+    #     from ondoc.notification.tasks import send_ipd_procedure_lead_mail
+    #     send_ipd_procedure_lead_mail.apply_async(self.id, send_lead_email)
 
 
 class IpdProcedureDetailType(auth_model.TimeStampedModel):
