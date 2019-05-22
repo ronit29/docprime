@@ -4,7 +4,7 @@ from ondoc.crm.admin.common import MatrixStateAutocomplete, MatrixCityAutocomple
 from .views import (CitiesViewSet, ServicesViewSet, SmsServiceViewSet, UpdateXlsViewSet, UploadDoctorViewSet,
                     UploadQualificationViewSet, UploadExperienceViewSet, UploadAwardViewSet, UploadHospitalViewSet,
                     UploadMembershipViewSet, SearchLeadViewSet, GetPaymentOptionsViewSet, GetSearchUrlViewSet,
-                    GetKeyDataViewSet, AllUrlsViewset)
+                    GetKeyDataViewSet, AllUrlsViewset, DeviceDetailsSave)
 
 urlpatterns = [
     path('cities/list', CitiesViewSet.as_view({'get': 'list'}), name='cities-list'),
@@ -28,4 +28,5 @@ urlpatterns = [
     path('get_search_url', GetSearchUrlViewSet.as_view({'get':'search_url'}), name='get-search-url'),
     path('get_key_data', GetKeyDataViewSet.as_view({'get':'list'}), name='get-key-data'),
     path('entity-compare-autocomplete', AllUrlsViewset.as_view({'get':'list'}), name='entity-compare-autocomplete'),
+    path('device-details/save', DeviceDetailsSave.as_view({'post': 'save'}), name='device-details'),
 ]

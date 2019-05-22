@@ -1501,10 +1501,7 @@ class HospitalDoctorAppointmentPermissionViewSet(GenericViewSet):
     @transaction.non_atomic_requests
     def list(self, request):
         user = request.user
-        manageable_hosp_list = GenericAdmin.objects.filter(Q(is_disabled=False, user=user), (Q(permission_type=GenericAdmin.APPOINTMENT)
-                                                                                              |
-                                                                                            Q(super_user_permission=True)))\
-                                                    .values_list('hospital', flat=True)
+        manageable_hosp_list = GenericAdmin.get_manageable_hospitals(user)
         doc_hosp_queryset = (DoctorClinic.objects
                              .select_related('doctor', 'hospital')
                              .prefetch_related('doctor__manageable_doctors', 'hospital__manageable_hospitals')
@@ -1522,7 +1519,7 @@ class HospitalDoctorAppointmentPermissionViewSet(GenericViewSet):
                                        hospital_is_live=F('hospital__is_live'),
                                        online_consultation_fees=F('doctor__online_consultation_fees')
                                        )
-                             .filter(hospital_id__in=list(manageable_hosp_list))
+                             .filter(hospital_id__in=manageable_hosp_list)
                              .values('hospital', 'doctor', 'hospital_name', 'doctor_name', 'doctor_gender',
                                      'doctor_source_type', 'doctor_is_live', 'license',
                                      'is_license_verified', 'hospital_source_type', 'hospital_is_live',

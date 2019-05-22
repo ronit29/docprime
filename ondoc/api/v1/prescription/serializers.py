@@ -252,8 +252,12 @@ class OPDAppointmentModelSerializer(serializers.ModelSerializer):
 
 
 class PrescriptionPDFModelSerializer(serializers.ModelSerializer):
-    offline_opd_appointment = OfflineOPDAppointmentModelSerializer()
-    opd_appointment = OPDAppointmentModelSerializer()
+    # offline_opd_appointment = OfflineOPDAppointmentModelSerializer()
+    # opd_appointment = OPDAppointmentModelSerializer()
+    offline_opd_appointment = serializers.SerializerMethodField()
+
+    def get_offline_opd_appointment(self, obj):
+        return str(obj.id)
 
     class Meta:
         model = prescription_models.PresccriptionPdf

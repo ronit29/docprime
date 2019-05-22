@@ -3303,35 +3303,9 @@ class OfflineCustomerViewSet(viewsets.GenericViewSet):
         serializer.is_valid(raise_exception=True)
         validated_data = serializer.validated_data
 
-        dc_queryset = models.DoctorClinic.objects.filter(Q(
-                                                   Q(doctor__manageable_doctors__user=user,
-                                                     doctor__manageable_doctors__entity_type=GenericAdminEntity.DOCTOR,
-                                                     doctor__manageable_doctors__is_disabled=False,
-                                                     doctor__manageable_doctors__hospital__isnull=True)
-                                                   |
-                                                   Q(doctor__manageable_doctors__user=user,
-                                                     doctor__manageable_doctors__entity_type=GenericAdminEntity.DOCTOR,
-                                                     doctor__manageable_doctors__is_disabled=False,
-                                                     doctor__manageable_doctors__hospital__isnull=False,
-                                                     doctor__manageable_doctors__hospital=F('hospital'))
-                                                   |
-                                                   Q(hospital__manageable_hospitals__user=user,
-                                                     hospital__manageable_hospitals__is_disabled=False,
-                                                     hospital__manageable_hospitals__entity_type=GenericAdminEntity.HOSPITAL)
-                                                   )
-                                                  |
-                                                  Q(
-                                                      Q(doctor__manageable_doctors__user=user,
-                                                        doctor__manageable_doctors__super_user_permission=True,
-                                                        doctor__manageable_doctors__is_disabled=False,
-                                                        doctor__manageable_doctors__entity_type=GenericAdminEntity.DOCTOR)
-                                                      |
-                                                      Q(hospital__manageable_hospitals__user=user,
-                                                        hospital__manageable_hospitals__is_disabled=False,
-                                                        hospital__manageable_hospitals__entity_type=GenericAdminEntity.HOSPITAL,
-                                                        hospital__manageable_hospitals__super_user_permission=True)
-                                                   )
-                                                  ).distinct().values('id', 'doctor', 'hospital')
+        manageable_hosp_list = auth_models.GenericAdmin.get_manageable_hospitals(user)
+
+        dc_queryset = models.DoctorClinic.objects.filter(hospital_id__in=manageable_hosp_list).distinct().values('id', 'doctor', 'hospital')
         if dc_queryset:
             dc_list = [(dc['id'], dc['doctor']) for dc in dc_queryset]
             dc_id_list, dc_doc_list = zip(*dc_list)

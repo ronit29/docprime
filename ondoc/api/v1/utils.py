@@ -1302,38 +1302,17 @@ def get_opd_pem_queryset(user, model):
     #                              super_user_permission=false AND is_disabled=false AND permission_type=1) > 0) THEN 1  ELSE 0 END'''
     # billing_query = '''CASE WHEN ((SELECT COUNT(id) FROM generic_admin WHERE user_id=%s AND hospital_id=hospital.id AND
     #                                super_user_permission=false AND is_disabled=false AND permission_type=2) > 0) THEN 1  ELSE 0 END'''
+
+    manageable_hosp_list = auth_models.GenericAdmin.objects.filter(is_disabled=False, user=user) \
+                                                           .values_list('hospital', flat=True)
     queryset = model.objects \
         .select_related('doctor', 'hospital', 'user') \
         .prefetch_related('doctor__manageable_doctors', 'hospital__manageable_hospitals', 'doctor__images',
                           'doctor__qualifications', 'doctor__qualifications__qualification',
                           'doctor__qualifications__specialization', 'doctor__qualifications__college',
                           'doctor__doctorpracticespecializations', 'doctor__doctorpracticespecializations__specialization') \
-        .filter(
-        Q(
-            Q(doctor__manageable_doctors__user=user,
-              doctor__manageable_doctors__hospital=F('hospital'),
-              doctor__manageable_doctors__is_disabled=False,) |
-            Q(doctor__manageable_doctors__user=user,
-              doctor__manageable_doctors__hospital__isnull=True,
-              doctor__manageable_doctors__is_disabled=False,
-             )
-             |
-            Q(hospital__manageable_hospitals__doctor__isnull=True,
-              hospital__manageable_hospitals__user=user,
-              hospital__manageable_hospitals__is_disabled=False,
-              )
-        ) |
-        Q(
-            Q(doctor__manageable_doctors__user=user,
-              doctor__manageable_doctors__super_user_permission=True,
-              doctor__manageable_doctors__is_disabled=False,
-              doctor__manageable_doctors__entity_type=GenericAdminEntity.DOCTOR, ) |
-            Q(hospital__manageable_hospitals__user=user,
-              hospital__manageable_hospitals__super_user_permission=True,
-              hospital__manageable_hospitals__is_disabled=False,
-              hospital__manageable_hospitals__entity_type=GenericAdminEntity.HOSPITAL)
-        ))\
-    .annotate(pem_type=Case(When(Q(hospital__manageable_hospitals__user=user) &
+        .filter(hospital_id__in=list(manageable_hosp_list))\
+        .annotate(pem_type=Case(When(Q(hospital__manageable_hospitals__user=user) &
                                    Q(hospital__manageable_hospitals__super_user_permission=True) &
                                    Q(hospital__manageable_hospitals__is_disabled=False), then=Value(3)),
                               When(Q(hospital__manageable_hospitals__user=user) &

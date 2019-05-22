@@ -432,3 +432,30 @@ class RefundDetails(TimeStampedModel):
             if not refund_initiated_by:
                 raise Exception("Must have a responsible user.")
             cls .objects.create(refund_reason=refund_reason, refund_initiated_by=refund_initiated_by, content_object=appointment)
+
+
+class DeviceDetails(TimeStampedModel):
+    app_version = models.CharField(max_length=20)
+    os = models.PositiveSmallIntegerField()
+    os_version = models.CharField(max_length=20)
+    make = models.CharField(max_length=100)
+    model = models.CharField(max_length=100)
+    installed_date = models.DateTimeField()
+    firebase_reg_id = models.CharField(max_length=200)
+    user = models.ForeignKey(User, null=True, on_delete=models.SET_NULL, related_name="device_details")
+    app_name = models.CharField(max_length=200)
+    ping_status = models.CharField(max_length=50)
+    last_ping_time = models.DateTimeField()
+    last_usage = models.DateTimeField()
+    dnd = models.BooleanField(default=False)
+    d_token = models.CharField(max_length=200)
+    res = models.CharField(max_length=100)
+    adv_id = models.CharField(max_length=100)
+    apps_flyer_id = models.CharField(max_length=100)
+    data = JSONField()
+
+    def __str__(self):
+        return self.make + " (" + self.model +")"
+
+    class Meta:
+        db_table = "device_details"
