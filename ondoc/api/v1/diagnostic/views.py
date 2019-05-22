@@ -1417,7 +1417,7 @@ class LabList(viewsets.ReadOnlyModelViewSet):
         #     price_result['string'] = " and ".join(price)
         # else:
         #     price_result['string'] = 'where price>=0'
-
+        # if lab.home_collection_charges=0 or centre_visit_enabled
         order_by = self.apply_search_sort(parameters)
 
         if ids:
@@ -1774,12 +1774,26 @@ class LabList(viewsets.ReadOnlyModelViewSet):
         # if entity.exists():
         #     lab_serializable_data['url'] = entity.first()['url'] if len(entity) == 1 else None
         temp_data = dict()
+
         temp_data['lab'] = lab_serializable_data
         temp_data['distance_related_charges'] = distance_related_charges
         temp_data['tests'] = test_serializer.data
         temp_data['lab_tests'] = lab_test_serializer.data
         temp_data['lab_timing'], temp_data["lab_timing_data"] = lab_timing, lab_timing_data
         temp_data['total_test_count'] = total_test_count
+
+        #disable home pickup for insured customers if lab charges home collection
+        if request.user and request.user.is_authenticated and temp_data.get('lab') and temp_data.get('lab').get('home_pickup_charges',0)>0:
+            active_insurance = request.user.active_insurance
+            if active_insurance:
+                if not temp_data.get('tests',[]):
+                    temp_data.get('lab')['is_home_collection_enabled'] = False
+                else:
+                    for x in temp_data.get('tests',[]):
+                        if float(x.get('mrp',0))<active_insurance.lab_amount_limit.insurance_threshold:
+                            temp_data.get('lab')['is_home_collection_enabled'] = False
+                            break
+
 
         # temp_data['url'] = entity.first()['url'] if len(entity) == 1 else None
 
