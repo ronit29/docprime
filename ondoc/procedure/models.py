@@ -104,6 +104,13 @@ class IpdProcedureLead(auth_model.TimeStampedModel):
     INSURANCE = 2
     GOVERNMENT_PANEL = 3
 
+    DOCPRIMECHAT = 'docprimechat'
+    CRM = 'crm'
+    DOCPRIMEWEB = "docprimeweb"
+
+    SOURCE_CHOICES = [(DOCPRIMECHAT, 'DocPrime Chat'),
+                      (CRM, 'CRM'),
+                      (DOCPRIMEWEB, "DocPrime Web")]
 
 
     STATUS_CHOICES = [(None, "--Select--"), (NEW, 'NEW'), (COST_REQUESTED, 'COST_REQUESTED'),
@@ -127,13 +134,13 @@ class IpdProcedureLead(auth_model.TimeStampedModel):
     long = models.FloatField(null=True, default=None, blank=True)
     city = models.CharField(null=True, default=None, blank=True, max_length=150)
     source = models.CharField(max_length=256, blank=True, null=True, default=None,
-                              choices=AppointmentHistory.SOURCE_CHOICES)
+                              choices=SOURCE_CHOICES)
     specialty = models.CharField(max_length=256, blank=True, null=True, default=None)
     matrix_lead_id = models.BigIntegerField(blank=True, null=True, unique=True)
     alternate_number = models.BigIntegerField(blank=True, null=True,
                                               validators=[MaxValueValidator(9999999999), MinValueValidator(1000000000)])
-    status = models.PositiveIntegerField(default=None, choices=STATUS_CHOICES, null=True, blank=True)  # DEFAULTS
-    payment_type = models.IntegerField(default=None, choices=PAYMENT_TYPE_CHOICES, null=True, blank=True)  # DEFAULTS
+    status = models.PositiveIntegerField(default=NEW, choices=STATUS_CHOICES, null=True, blank=True)
+    payment_type = models.IntegerField(default=CASH, choices=PAYMENT_TYPE_CHOICES, null=True, blank=True)
     payment_amount = models.DecimalField(max_digits=15, decimal_places=2, null=True, blank=True)
     hospital_reference_id = models.CharField(max_length=500, null=True, blank=True)
     insurer = models.ForeignKey(HealthInsuranceProvider, on_delete=models.DO_NOTHING, null=True, blank=True)

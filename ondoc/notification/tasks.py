@@ -69,7 +69,9 @@ def send_ipd_procedure_lead_mail(data):
     from ondoc.procedure.models import IpdProcedureLead
     from ondoc.matrix.tasks import create_or_update_lead_on_matrix
     instance = IpdProcedureLead.objects.filter(id=obj_id).first()
-    if not instance or not instance.matrix_lead_id:
+    if not instance:
+        return
+    if instance.matrix_lead_id:
         return
     try:
         if send_email:
@@ -78,6 +80,7 @@ def send_ipd_procedure_lead_mail(data):
             email_notification = EMAILNotification(notification_type=NotificationAction.IPD_PROCEDURE_MAIL,
                                                    context={'instance': instance})
             email_notification.send(user_and_email)
+
         create_or_update_lead_on_matrix.apply_async(
             ({'obj_type': instance.__class__.__name__, 'obj_id': instance.id},), countdown=5)
 

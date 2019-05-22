@@ -2,6 +2,7 @@ from django.conf import settings
 from django.contrib import messages, admin
 from django.contrib.admin import TabularInline
 from django.contrib.contenttypes.models import ContentType
+from django.db import transaction
 from django.http import HttpResponseRedirect
 from django.urls import reverse
 from django.utils.safestring import mark_safe
@@ -9,7 +10,7 @@ from import_export import resources, fields, widgets
 from import_export.admin import ImportExportMixin
 from reversion.admin import VersionAdmin
 
-from ondoc.common.models import Feature, Service
+from ondoc.common.models import Feature, Service, AppointmentHistory
 from ondoc.crm.admin.doctor import AutoComplete
 from ondoc.procedure.models import Procedure, ProcedureCategory, ProcedureCategoryMapping, ProcedureToCategoryMapping, \
     IpdProcedure, IpdProcedureFeatureMapping, IpdProcedureCategoryMapping, IpdProcedureCategory, IpdProcedureDetail, \
@@ -343,3 +344,11 @@ class IpdProcedureLeadAdmin(VersionAdmin):
         #     'fields': ('insurance_details', 'opd_appointments', 'lab_appointments'),
         # }),
     )
+
+    @transaction.atomic
+    def save_model(self, request, obj, form, change):
+        responsible_user = request.user
+        obj._responsible_user = responsible_user if responsible_user and not responsible_user.is_anonymous else None
+        if obj and obj.id:
+            obj._source = AppointmentHistory.CRM
+        super().save_model(request, obj, form, change)

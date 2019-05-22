@@ -2032,7 +2032,8 @@ class IpdProcedureLeadSerializer(serializers.ModelSerializer):
     lat = serializers.FloatField(required=False, allow_null=True)
     long = serializers.FloatField(required=False, allow_null=True)
     city = serializers.CharField(required=False, allow_null=True, allow_blank=True)
-    source = serializers.CharField(required=False, default='docprimeweb')
+    source = serializers.ChoiceField(required=False, default=IpdProcedureLead.DOCPRIMEWEB,
+                                     choices=IpdProcedureLead.SOURCE_CHOICES)
     specialty = serializers.CharField(required=False, default=None)
     num_of_chats = serializers.IntegerField(min_value=0, required=False, default=None)
     comments = serializers.CharField(required=False, default=None)
