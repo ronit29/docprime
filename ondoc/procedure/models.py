@@ -156,23 +156,33 @@ class IpdProcedureLead(auth_model.TimeStampedModel):
         db_table = "ipd_procedure_lead"
 
     def save(self, *args, **kwargs):
+        if self.phone_number and not self.user:
+            self.user = User.objects.filter(phone_number=self.phone_number).first()
         send_lead_email = False
+        update_status_in_matrix = False
+        push_to_history = False
         if not self.id:
             send_lead_email = True
-        push_to_history = False
-        if self.id and self.status != self.__class__.objects.get(pk=self.id).status:
             push_to_history = True
-        elif self.id is None:
-            push_to_history = True
+        else:
+            database_obj = self.__class__.objects.filter(id=self.id).first()
+            if database_obj and self.status != database_obj.status:
+                update_status_in_matrix = True
+                push_to_history = True
         super().save(*args, **kwargs)
         if push_to_history:
             AppointmentHistory.create(content_object=self)
         super().save(*args, **kwargs)
-        transaction.on_commit(lambda: self.app_commit_tasks(send_lead_email=send_lead_email))
+        transaction.on_commit(lambda: self.app_commit_tasks(send_lead_email=send_lead_email,
+                                                            update_status_in_matrix=update_status_in_matrix))
 
-    def app_commit_tasks(self, send_lead_email):
+    def app_commit_tasks(self, send_lead_email, update_status_in_matrix=False):
         from ondoc.notification.tasks import send_ipd_procedure_lead_mail
+        from ondoc.matrix.tasks import update_onboarding_qcstatus_to_matrix
         send_ipd_procedure_lead_mail({'obj_id': self.id, 'send_email': send_lead_email})
+        if update_status_in_matrix:
+            update_onboarding_qcstatus_to_matrix.apply_async(({'obj_type': self.__class__.__name__, 'obj_id': self.id}
+                                                              ,), countdown=5)
 
 
 class IpdProcedureDetailType(auth_model.TimeStampedModel):
