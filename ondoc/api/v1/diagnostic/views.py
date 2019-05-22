@@ -1784,15 +1784,14 @@ class LabList(viewsets.ReadOnlyModelViewSet):
 
         #disable home pickup for insured customers if lab charges home collection
         if request.user and request.user.is_authenticated and temp_data.get('lab'):
-            if temp_data.get('lab').get('home_pickup_charges', 0) > 0:
-                temp_data.get('lab')['is_home_collection_enabled'] = False
-                if temp_data.get('tests'):
-                    temp_data.get('tests')[0]['is_home_collection_enabled'] = False
-                return Response(temp_data)
             active_insurance = request.user.active_insurance
             if active_insurance:
                 if not temp_data.get('tests',[]):
                     temp_data.get('lab')['is_home_collection_enabled'] = False
+                elif temp_data.get('lab').get('home_pickup_charges', 0) > 0:
+                    temp_data.get('lab')['is_home_collection_enabled'] = False
+                    temp_data.get('tests')[0]['is_home_collection_enabled'] = False
+                    return Response(temp_data)
                 else:
                     for x in temp_data.get('tests', []):
                         threshold = active_insurance.insurance_plan.threshold.all()
