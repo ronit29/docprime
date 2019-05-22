@@ -1,10 +1,13 @@
+from django.contrib.postgres.fields import JSONField
 from django.core.validators import MaxValueValidator, MinValueValidator
 from django.db import models, transaction
 from ondoc.authentication import models as auth_model
 from ondoc.authentication.models import User, UserProfile
-from ondoc.common.models import Feature
-from ondoc.doctor.models import DoctorClinic, SearchKey, Hospital
+from ondoc.common.models import Feature, AppointmentHistory
+from ondoc.doctor.models import DoctorClinic, SearchKey, Hospital, PracticeSpecialization, HealthInsuranceProvider
 from collections import deque, OrderedDict
+
+from ondoc.insurance.models import ThirdPartyAdministrator
 
 
 class IpdProcedure(auth_model.TimeStampedModel, SearchKey, auth_model.SoftDelete):
@@ -28,6 +31,15 @@ class IpdProcedure(auth_model.TimeStampedModel, SearchKey, auth_model.SoftDelete
         from ondoc.location.services.doctor_urls import IpdProcedureSeo
         ipd_procedure = IpdProcedureSeo()
         ipd_procedure.create()
+
+
+class IpdProcedurePracticeSpecialization(auth_model.TimeStampedModel):
+    ipd_procedure = models.ForeignKey(IpdProcedure, on_delete=models.CASCADE)
+    practice_specialization = models.ForeignKey(PracticeSpecialization, on_delete=models.CASCADE)
+
+    class Meta:
+        db_table = "ipd_procedure_practice_specialization"
+        unique_together = (('ipd_procedure', 'practice_specialization'),)
 
 
 class IpdProcedureFeatureMapping(models.Model):
@@ -80,22 +92,65 @@ class IpdProcedureCategoryMapping(models.Model):
 
 
 class IpdProcedureLead(auth_model.TimeStampedModel):
+
+    NEW = 1
+    COST_REQUESTED = 2
+    COST_SHARED = 3
+    OPD = 4
+    NOT_INTERESTED = 5
+    COMPLETED = 6
+
+    CASH = 1
+    INSURANCE = 2
+    GOVERNMENT_PANEL = 3
+
+    DOCPRIMECHAT = 'docprimechat'
+    CRM = 'crm'
+    DOCPRIMEWEB = "docprimeweb"
+
+    SOURCE_CHOICES = [(DOCPRIMECHAT, 'DocPrime Chat'),
+                      (CRM, 'CRM'),
+                      (DOCPRIMEWEB, "DocPrime Web")]
+
+
+    STATUS_CHOICES = [(None, "--Select--"), (NEW, 'NEW'), (COST_REQUESTED, 'COST_REQUESTED'),
+                      (COST_SHARED, 'COST_SHARED'), (OPD, 'OPD'),
+                      (NOT_INTERESTED, 'NOT_INTERESTED'), (COMPLETED, 'COMPLETED')]
+
+    PAYMENT_TYPE_CHOICES = [(None, "--Select--"), (CASH, 'CASH'), (INSURANCE, 'INSURANCE'),
+                            (GOVERNMENT_PANEL, 'GOVERNMENT_PANEL')]
+
     ipd_procedure = models.ForeignKey(IpdProcedure, on_delete=models.SET_NULL, null=True, blank=True)
     hospital = models.ForeignKey(Hospital, on_delete=models.SET_NULL, null=True, blank=True)
     user = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True)
     name = models.CharField(max_length=100, blank=False, null=True, default=None)
     phone_number = models.BigIntegerField(blank=True, null=True,
                                           validators=[MaxValueValidator(9999999999), MinValueValidator(1000000000)])
-    email = models.CharField(max_length=256, blank=False, null=True, default=None)
+    email = models.CharField(max_length=256, blank=True, null=True, default=None)
     gender = models.CharField(max_length=2, default=None, blank=True, null=True, choices=UserProfile.GENDER_CHOICES)
     age = models.PositiveIntegerField(blank=True, null=True)
     dob = models.DateTimeField(blank=True, null=True)
-    lat = models.FloatField(null=True, default=None)
-    long = models.FloatField(null=True, default=None)
+    lat = models.FloatField(null=True, default=None, blank=True)
+    long = models.FloatField(null=True, default=None, blank=True)
     city = models.CharField(null=True, default=None, blank=True, max_length=150)
-    source = models.CharField(max_length=256, blank=False, null=True, default=None)
-    specialty = models.CharField(max_length=256, blank=False, null=True, default=None)
+    source = models.CharField(max_length=256, blank=True, null=True, default=None,
+                              choices=SOURCE_CHOICES)
+    specialty = models.CharField(max_length=256, blank=True, null=True, default=None)
     matrix_lead_id = models.BigIntegerField(blank=True, null=True, unique=True)
+    alternate_number = models.BigIntegerField(blank=True, null=True,
+                                              validators=[MaxValueValidator(9999999999), MinValueValidator(1000000000)])
+    status = models.PositiveIntegerField(default=NEW, choices=STATUS_CHOICES, null=True, blank=True)
+    payment_type = models.IntegerField(default=CASH, choices=PAYMENT_TYPE_CHOICES, null=True, blank=True)
+    payment_amount = models.DecimalField(max_digits=15, decimal_places=2, null=True, blank=True)
+    hospital_reference_id = models.CharField(max_length=500, null=True, blank=True)
+    insurer = models.ForeignKey(HealthInsuranceProvider, on_delete=models.DO_NOTHING, null=True, blank=True)
+    tpa = models.ForeignKey(ThirdPartyAdministrator, on_delete=models.DO_NOTHING, null=True, blank=True)
+    num_of_chats = models.PositiveIntegerField(null=True, blank=True)
+    comments = models.TextField(null=True, blank=True)
+    data = JSONField(blank=True, null=True)
+
+    # ADMIN :Is_OpDInsured, Specialization List, appointment list
+    # DEFAULTS??
 
     class Meta:
         db_table = "ipd_procedure_lead"
@@ -104,12 +159,20 @@ class IpdProcedureLead(auth_model.TimeStampedModel):
         send_lead_email = False
         if not self.id:
             send_lead_email = True
+        push_to_history = False
+        if self.id and self.status != self.__class__.objects.get(pk=self.id).status:
+            push_to_history = True
+        elif self.id is None:
+            push_to_history = True
+        super().save(*args, **kwargs)
+        if push_to_history:
+            AppointmentHistory.create(content_object=self)
         super().save(*args, **kwargs)
         transaction.on_commit(lambda: self.app_commit_tasks(send_lead_email=send_lead_email))
 
     def app_commit_tasks(self, send_lead_email):
         from ondoc.notification.tasks import send_ipd_procedure_lead_mail
-        send_ipd_procedure_lead_mail(self.id)
+        send_ipd_procedure_lead_mail({'obj_id': self.id, 'send_email': send_lead_email})
 
 
 class IpdProcedureDetailType(auth_model.TimeStampedModel):

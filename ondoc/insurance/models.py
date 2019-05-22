@@ -1748,3 +1748,10 @@ class InsuranceEligibleCities(auth_model.TimeStampedModel):
 
     class Meta:
         db_table = "insurance_eligible_cities"
+
+
+class ThirdPartyAdministrator(auth_model.TimeStampedModel):
+    name = models.CharField(max_length=500, unique=True)
+
+    class Meta:
+        db_table = "third_party_administrator"
