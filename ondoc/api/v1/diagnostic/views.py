@@ -1783,18 +1783,23 @@ class LabList(viewsets.ReadOnlyModelViewSet):
         temp_data['total_test_count'] = total_test_count
 
         #disable home pickup for insured customers if lab charges home collection
-        if request.user and request.user.is_authenticated and temp_data.get('lab') and temp_data.get('lab').get('home_pickup_charges',0)>0:
+        if request.user and request.user.is_authenticated and temp_data.get('lab'):
+            if temp_data.get('lab').get('home_pickup_charges', 0) > 0:
+                temp_data.get('lab')['is_home_collection_enabled'] = False
+                if temp_data.get('tests'):
+                    temp_data.get('tests')[0]['is_home_collection_enabled'] = False
+                return Response(temp_data)
             active_insurance = request.user.active_insurance
             if active_insurance:
                 if not temp_data.get('tests',[]):
                     temp_data.get('lab')['is_home_collection_enabled'] = False
                 else:
-                    for x in temp_data.get('tests',[]):
-                        active_insurer = active_insurance.insurance_plan.threshold.all()
-                        if  active_insurer and active_insurer.first() and active_insurer.first().lab_amount_limit:
-                            lab_amount_limit = active_insurance.insurance_plan.threshold.all().first().lab_amount_limit
-                            if float(x.get('mrp',0))< lab_amount_limit:
-                                temp_data.get('test')['is_home_collection_enabled'] = False
+                    for x in temp_data.get('tests', []):
+                        threshold = active_insurance.insurance_plan.threshold.all()
+                        if threshold and threshold.first() and threshold.first().lab_amount_limit:
+                            lab_amount_limit = threshold.first().lab_amount_limit
+                            if float(x.get('mrp', 0)) <= lab_amount_limit:
+                                x['is_home_collection_enabled'] = False
                                 temp_data.get('lab')['is_home_collection_enabled'] = False
                                 break
 
