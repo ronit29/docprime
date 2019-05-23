@@ -2685,7 +2685,10 @@ class DoctorLabAppointmentsNoAuthViewSet(viewsets.GenericViewSet):
             # lab_appointment_serializer = diagnostic_serializer.LabAppointmentRetrieveSerializer(lab_appointment,
             #                                                                                         context={
             #                                                                                             'request': request})
-            resp = {'success':'LabAppointment Updated Successfully!'}
+            resp = {'success':'LabAppointment Updated Successfully!',
+                    'mrp': lab_appointment.price,
+                    'payment_status': lab_appointment.payment_status,
+                    'payment_type': lab_appointment.payment_type}
         return Response(resp)
 
 
