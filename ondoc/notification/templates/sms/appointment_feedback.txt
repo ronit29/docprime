@@ -1,8 +1,8 @@
 Dear {{patient_name|capfirst}},
 
-We would like to know your valuable feedback for your recently completed appointment with with Dr. {{doctor_name|capfirst}}.
+We would like to know your valuable feedback for your recent appointment with Dr.{{doctor_name|capfirst}}.
 
-Please rate your experience to help us improve our services.
+Please rate your experience to help us serve you better.
 
 {{opd_appointment_feedback_url}}
 

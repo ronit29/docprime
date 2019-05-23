@@ -1,6 +1,5 @@
-We have received an appointment request for {{patient_name|capfirst}} with Dr. {{doctor_name|capfirst}}.
+We have received an appointment request. Below are the details:
 
-The booking details are as below :
 Booking ID : {{instance.id}}
 Patient Name : {{patient_name|capfirst}}
 Doctor Name : Dr. {{doctor_name|capfirst}}
@@ -9,12 +8,13 @@ Amount To Be Paid :Rs {{cod_amount}}
 {% else %}
 Amount Paid : Rs {{instance.effective_price}}
 {% endif %}
-Clinic : {{instance.hospital.name|capfirst}}
-Clinic Address : {{instance.hospital.get_hos_address}}
+{{clinic_or_hospital}} : {{instance.hospital.name|capfirst}}
+{{clinic_or_hospital}} Address : {{instance.hospital.get_hos_address}}
 Appointment Date and Time : {{instance.time_slot_start|date:"D jS F Y"}} || {{instance.time_slot_start|date:"h:i A"}}
+Customer Care Number : 1800-123-9419
 {% if instance.payment_type == 2 %}
 Please pay Rs {{cod_amount}} at the center at the time of appointment.
 {% endif %}
-You will receive a confirmation email and sms once the booking is confirmed by the doctor.
+You will receive a confirmation email and message once the appointment is confirmed.
 
 Thanks for choosing docprime.com

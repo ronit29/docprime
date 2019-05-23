@@ -1,12 +1,8 @@
-The appointment for {{patient_name|capfirst}} with {{lab_name|capfirst}} on {{instance.time_slot_start|date:"D jS F Y"}} at {{instance.time_slot_start|date:"h:i A"}} has been confirmed.
+Your appointment with {{lab_name|capfirst}} is confirmed for {{instance.time_slot_start|date:"D jS F Y"}} at {{instance.time_slot_start|date:"h:i A"}}. Please share unique confirmation code and booking id at the time of the appointment.
 
-The booking details are as below :
 Unique Confirmation Code : {{instance.otp}}
-Share this code with the lab at the time of your appointment.
 Booking ID : {{instance.id}}
 Patient Name : {{patient_name|capfirst}}
-Lab Name : {{lab_name|capfirst}}
 {% if instance.is_home_pickup %}Home Pick up Address : {{instance.get_pickup_address}}{% else %}Lab Address : {{instance.lab.get_lab_address}}{% endif %}
-Appointment Date and Time : {{instance.time_slot_start|date:"D jS F Y"}} || {{instance.time_slot_start|date:"h:i A"}}
 
-Thanks for choosing docprime.com
+PS: This is a cashless appointment. Therefore, you are not required to pay for the service booked through us. For any queries, please reach out to us on 1800-123-9419

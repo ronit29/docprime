@@ -1,20 +1,12 @@
-The appointment request for {{patient_name|capfirst}} with Dr. {{doctor_name|capfirst}} has been confirmed.
+Your appointment with Dr.{{doctor_name|capfirst}} is confirmed for {{instance.time_slot_start|date:"D jS F Y"}} at {{instance.time_slot_start|date:"h:i A"}}. Please share unique confirmation code and booking id at the time of appointment.
+
 Unique Confirmation Code : {{instance.otp}}
-Please share this code with doctor at the time of appointment.
-The booking details are as below :
 Booking ID : {{instance.id}}
 Patient Name : {{patient_name|capfirst}}
-Doctor Name : Dr. {{doctor_name|capfirst}}
-{% if instance.payment_type == 2 %}
-Amount To Be Paid :Rs {{cod_amount}}
-{% else %}
-Amount Paid : Rs {{instance.effective_price}}
-{% endif %}
-Clinic : {{instance.hospital.name|capfirst}}
-Clinic Address : {{instance.hospital.get_hos_address}}
-Appointment Date and Time : {{instance.time_slot_start|date:"D jS F Y"}} || {{instance.time_slot_start|date:"h:i A"}}
-{% if instance.payment_type == 2 %}
-Please pay Rs {{cod_amount}} at the center at the time of appointment.
-{% endif %}
+{{clinic_or_hospital}} : {{instance.hospital.name|capfirst}}
+{{clinic_or_hospital}} Address : {{instance.hospital.get_hos_address}}
+PS: This is a cashless appointment. Therefore, you are not required to pay for the service booked through us. For any queries, please reach out to us on 1800-123-9419
 
-Thanks for choosing docprime.com
+
+Thanks,
+Team Docprime.com

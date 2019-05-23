@@ -1,10 +1,8 @@
-We have received a reschedule request for the appointment of {{patient_name|capfirst}} with {{lab_name|capfirst}}.
+We have received a reschedule request for your appointment with {{lab_name|capfirst}}. Below are detals:
 Booking ID : {{instance.id}}
-Requested Date and Time : {{instance.time_slot_start|date:"D jS F Y"}} || {{instance.time_slot_start|date:"h:i A"}}
 Patient Name : {{patient_name|capfirst}}
-Lab Name : {{lab_name|capfirst}}
+Requested Date and Time : {{instance.time_slot_start|date:"D jS F Y"}} || {{instance.time_slot_start|date:"h:i A"}}
 
-We will send you an email and sms once the request is processed.
-Our associate might try to get in touch with you for the same.
+You will receive a confirmation email and message once the appointment is confirmed.
 
-Thanks for choosing docprime.com
+Thanks for choosing Docprime.com

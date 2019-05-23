@@ -1105,6 +1105,9 @@ class OpdNotification(Notification):
 
         # Implmented According to DOCNEW-360
         # auth_token = AgentToken.objects.create_token(user=self.appointment.user)
+        clinic_or_hospital = "Clinic"
+        if self.appointment.hospital.assoc_doctors.filter(enabled=True).count() > 10:
+            clinic_or_hospital = "Hospital"
         token_object = JWTAuthentication.generate_token(self.appointment.user)
         booking_url = settings.BASE_URL + '/sms/booking?token={}'.format(token_object['token'].decode("utf-8"))
         opd_appointment_complete_url = booking_url + "&callbackurl=opd/appointment/{}?complete=true".format(self.appointment.id)
@@ -1115,6 +1118,7 @@ class OpdNotification(Notification):
             "patient_name": patient_name,
             "id": self.appointment.id,
             "instance": self.appointment,
+            "clinic_or_hospital": clinic_or_hospital,
             "procedures": procedures,
             "coupon_discount": str(self.appointment.discount) if self.appointment.discount else None,
             "url": "/opd/appointment/{}".format(self.appointment.id),

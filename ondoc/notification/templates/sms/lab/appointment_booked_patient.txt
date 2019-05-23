@@ -1,11 +1,11 @@
-We have received an appointment request for {{patient_name|capfirst}} with {{lab_name|capfirst}} on {{instance.time_slot_start|date:"D jS F Y"}} at {{instance.time_slot_start|date:"h:i A"}}
+We have received an appointment request. Below are the details:
 
-The booking details are as below :
+
 Booking ID : {{instance.id}}
 Patient Name : {{patient_name|capfirst}}
 Lab Name : {{lab_name|capfirst}}
 {% if instance.is_home_pickup %}Home Pick up Address : {{instance.get_pickup_address}}{% else %}Lab Address : {{instance.lab.get_lab_address}}{% endif %}
 Appointment Date and Time : {{instance.time_slot_start|date:"D jS F Y"}} || {{instance.time_slot_start|date:"h:i A"}}
-You will receive a confirmation email and sms once the booking is confirmed by the lab.
+You will receive a confirmation email and sms once the appointment is confirmed.
 
 Thanks for choosing docprime.com
