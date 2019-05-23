@@ -197,6 +197,43 @@ class DoctorBillingViewSet(viewsets.GenericViewSet):
         return Response(entities)
 
 
+class HospitalProviderDataViewSet(viewsets.GenericViewSet):
+
+    authentication_classes = (JWTAuthentication,)
+    permission_classes = (IsAuthenticated, v1_utils.IsDoctor)
+
+    def get_queryset(self):
+        return None
+
+    def list(self, request):
+        queryset = auth_models.GenericAdmin.objects.filter(is_disabled=False, user=request.user)\
+                                                   .select_related('hospital')
+        all_data = {}
+        for admin in queryset.all():
+            if admin.hospital and (admin.hospital.id not in all_data):
+                hosp_id = admin.hospital.id
+                admin_data = {"name": admin.hospital.name,
+                              "id": hosp_id,
+                              'pem_type': admin.permission_type
+                             }
+                if admin.super_user_permission:
+                    admin_data['pem_type'] = auth_models.GenericAdmin.ALL
+                if admin.hospital.provider_encrypt:
+                    admin_data['is_encrypted'] = admin.hospital.provider_encrypt
+                    admin_data["encrypted_by"] = admin.hospital.provider_encrypted_by.phone_number
+                all_data[hosp_id] = admin_data
+            elif admin.hospital and (hosp_id in all_data):
+                if not all_data[hosp_id]['pem_type'] == auth_models.GenericAdmin.ALL:
+                    if admin.super_user_permission:
+                        all_data[hosp_id]['pem_type'] == auth_models.GenericAdmin.ALL
+                    elif admin.permission_type != all_data[hosp_id]['pem_type']:
+                        all_data[hosp_id]['pem_type'] == auth_models.GenericAdmin.ALL
+        resp = all_data.values() if all_data else []
+        return Response(resp)
+
+
+
+
 class DoctorProfileView(viewsets.GenericViewSet):
 
     authentication_classes = (JWTAuthentication, )

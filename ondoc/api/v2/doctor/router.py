@@ -3,6 +3,7 @@ from . import views
 
 urlpatterns = [
     path('billing_entities', views.DoctorBillingViewSet.as_view({'get': 'list'}), name='billing_entities'),
+    path('hosp_data', views.HospitalProviderDataViewSet.as_view({'get': 'list'}), name='hosp_data'),
     path('profile', views.DoctorProfileView.as_view({'get': 'retrieve'}), name='doctor-profile'),
     path('block-calender', views.DoctorBlockCalendarViewSet.as_view({'get': 'list'}), name='block-calender'),
     path('block-calender/create', views.DoctorBlockCalendarViewSet.as_view({'post': 'create'}), name='block-calender-create'),
