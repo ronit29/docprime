@@ -1998,7 +1998,14 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin,
 
         if insurance and insurance.is_valid():
             booking_date = appointment_data.get('time_slot_start').date()
-            mrp = appointment_data.get('mrp')
+            mrp = Decimal(0)
+
+            for extras in appointment_data.get('extra_details',[]):
+                agreed_price = extras.get('custom_agreed_price') if extras.get('custom_agreed_price') != 'None' else extras.get('computed_agreed_price', 0)
+                if agreed_price == 'None':
+                    agreed_price = 0
+                mrp = mrp + Decimal(agreed_price)
+
             insurance_limit_usage_data = insurance.validate_limit_usages(mrp, booking_date)
             if insurance_limit_usage_data.get('created_state'):
                 appointment_status = OpdAppointment.CREATED
