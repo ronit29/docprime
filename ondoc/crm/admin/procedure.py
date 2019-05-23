@@ -14,7 +14,8 @@ from ondoc.common.models import Feature, Service, AppointmentHistory
 from ondoc.crm.admin.doctor import AutoComplete
 from ondoc.procedure.models import Procedure, ProcedureCategory, ProcedureCategoryMapping, ProcedureToCategoryMapping, \
     IpdProcedure, IpdProcedureFeatureMapping, IpdProcedureCategoryMapping, IpdProcedureCategory, IpdProcedureDetail, \
-    IpdProcedureSynonym, IpdProcedureSynonymMapping, SimilarIpdProcedureMapping, IpdProcedurePracticeSpecialization
+    IpdProcedureSynonym, IpdProcedureSynonymMapping, SimilarIpdProcedureMapping, IpdProcedurePracticeSpecialization, \
+    IpdProcedureLead
 from django import forms
 
 
@@ -319,8 +320,24 @@ class IpdProcedurePracticeSpecializationAdmin(ImportExportMixin, VersionAdmin):
     # change_list_template = 'superuser_import_export.html'
 
 
+class IpdProcedureLeadAdminForm(forms.ModelForm):
+    def clean(self):
+        super().clean()
+        if any(self.errors):
+            return
+        cleaned_data = self.cleaned_data
+        curr_status = cleaned_data.get('status')
+        planned_date = cleaned_data.get('planned_date')
+        if curr_status and curr_status in [IpdProcedureLead.PLANNED]:
+            if not planned_date:
+                raise forms.ValidationError("Planned Date is mandatory for {} status.".format(
+                    dict(IpdProcedureLead.STATUS_CHOICES)[curr_status]))
+
+
 class IpdProcedureLeadAdmin(VersionAdmin):
-    search_fields = ['phone_number']
+    form = IpdProcedureLeadAdminForm
+    list_filter = ['created_at', 'ipd_procedure']
+    search_fields = ['phone_number', 'matrix_lead_id']
     list_display = ['id', 'phone_number', 'name', 'matrix_lead_id']
     autocomplete_fields = ['hospital', 'insurer', 'tpa']
     exclude = ['user', 'lat', 'long']
@@ -335,7 +352,7 @@ class IpdProcedureLeadAdmin(VersionAdmin):
         ('Lead Info', {
             # 'classes': ('collapse',),
             'fields': ('matrix_lead_id', 'comments', 'data', 'ipd_procedure', 'related_speciality',
-                       'hospital', 'hospital_reference_id', 'source', 'status', 'payment_type', 'payment_amount',
+                       'hospital', 'hospital_reference_id', 'source', 'status', 'planned_date', 'payment_type', 'payment_amount',
                        'insurer', 'tpa', 'num_of_chats'),
         }),
         ('History', {

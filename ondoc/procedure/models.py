@@ -117,8 +117,8 @@ class IpdProcedureLead(auth_model.TimeStampedModel):
                       (DOCPRIMEWEB, "DocPrime Web")]
 
     STATUS_CHOICES = [(None, "--Select--"), (NEW, 'NEW'), (COST_REQUESTED, 'COST_REQUESTED'),
-                      (COST_SHARED, 'COST_SHARED'), (OPD, 'OPD'), (VALID, 'valid'), (CONTACTED, 'contacted'),
-                      (PLANNED, 'planned'), (NOT_INTERESTED, 'NOT_INTERESTED'), (COMPLETED, 'COMPLETED')]
+                      (COST_SHARED, 'COST_SHARED'), (OPD, 'OPD'), (VALID, 'VALID'), (CONTACTED, 'CONTACTED'),
+                      (PLANNED, 'PLANNED'), (NOT_INTERESTED, 'NOT_INTERESTED'), (COMPLETED, 'COMPLETED')]
 
     PAYMENT_TYPE_CHOICES = [(None, "--Select--"), (CASH, 'CASH'), (INSURANCE, 'INSURANCE'),
                             (GOVERNMENT_PANEL, 'GOVERNMENT_PANEL')]
