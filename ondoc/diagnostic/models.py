@@ -2438,7 +2438,7 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin,
                                               insurance=insurance_obj, time_slot_start__date=date)
 
         count = appointments.count()
-        data = appointments.aggregate(sum_amount=Sum('price'))
+        data = appointments.aggregate(sum_amount=Sum('agreed_price'))
         sum = data.get('sum_amount', 0)
         sum = sum if sum else 0
         return {'count': count, 'sum': sum}

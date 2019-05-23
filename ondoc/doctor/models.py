@@ -2777,7 +2777,7 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
                                               insurance=insurance_obj, time_slot_start__date=date)
 
         count = appointments.count()
-        data = appointments.aggregate(sum_amount=Sum('mrp'))
+        data = appointments.aggregate(sum_amount=Sum('fees'))
         sum = data.get('sum_amount', 0)
         sum = sum if sum else 0
         return {'count': count, 'sum': sum}

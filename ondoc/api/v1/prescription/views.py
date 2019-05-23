@@ -14,6 +14,7 @@ from ondoc.prescription import models as prescription_models
 from ondoc.diagnostic import models as diagnostic_models
 from ondoc.api.v1 import utils
 from django.utils import timezone
+from decimal import Decimal
 import logging, random
 logger = logging.getLogger(__name__)
 from datetime import datetime
@@ -145,8 +146,16 @@ class AppointmentPrescriptionViewSet(viewsets.GenericViewSet):
         serializer = AppointmentPrescriptionSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         valid_data = serializer.validated_data
-        mrp = valid_data.get('mrp')
-        start_date = valid_data.get('start_date')
+
+        lab = valid_data.get('lab')
+        lab_pricing_group = lab.lab_pricing_group
+        available_lab_test_qs = lab_pricing_group.available_lab_tests.all().filter(test__in=valid_data.get('lab_test'))
+        mrp = Decimal(0)
+        for available_lab_test in available_lab_test_qs:
+            agreed_price = available_lab_test.custom_agreed_price if available_lab_test.custom_agreed_price else available_lab_test.computed_agreed_price
+            mrp = mrp + agreed_price
+
+        start_date = valid_data.get('start_date').date()
 
         resp = insurance.validate_limit_usages(mrp, start_date)
 
