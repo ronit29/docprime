@@ -26,6 +26,7 @@ import logging
 import json
 
 from ondoc.insurance.models import UserInsurance, InsuranceThreshold
+from ondoc.prescription.models import AppointmentPrescription
 from ondoc.ratings_review.models import RatingsReview
 from django.db.models import Avg
 from django.db.models import Q
@@ -714,6 +715,10 @@ class PlanTransactionModelSerializer(serializers.Serializer):
     coupon_data = serializers.JSONField(required=False)
 
 
+class PrescriptionDocumentSerializer(serializers.Serializer):
+    prescription_file = serializers.PrimaryKeyRelatedField(queryset=AppointmentPrescription.objects.all())
+
+
 class LabAppTransactionModelSerializer(serializers.Serializer):
     id = serializers.IntegerField(required=False)
     lab = serializers.PrimaryKeyRelatedField(queryset=Lab.objects.filter(is_live=True))
@@ -739,6 +744,8 @@ class LabAppTransactionModelSerializer(serializers.Serializer):
     extra_details = serializers.JSONField(required=False)
     user_plan = serializers.PrimaryKeyRelatedField(queryset=UserPlanMapping.objects.all(), allow_null=True)
     coupon_data = serializers.JSONField(required=False)
+    prescription_ids = serializers.ListSerializer(child=PrescriptionDocumentSerializer(), required=False)
+
 
 class LabAppRescheduleModelSerializer(serializers.ModelSerializer):
     class Meta:
@@ -812,6 +819,7 @@ class LabAppointmentCreateSerializer(serializers.Serializer):
     user_plan = serializers.PrimaryKeyRelatedField(queryset=UserPlanMapping.objects.all(), required=False, allow_null=True, default=None)
     included_in_user_plan = serializers.BooleanField(required=False, default=False)
     app_version = serializers.CharField(required=False, allow_null=True, allow_blank=True)
+    prescription_ids = serializers.ListSerializer(child=PrescriptionDocumentSerializer(), required=False)
 
     def validate(self, data):
         MAX_APPOINTMENTS_ALLOWED = 10

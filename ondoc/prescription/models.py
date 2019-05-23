@@ -246,5 +246,9 @@ class AppointmentPrescription(auth_models.TimeStampedModel):
     def prescription_exist_for_user_date(cls, user, date):
         return cls.objects.filter(created_at__date=date, user=user).exists()
 
+    @classmethod
+    def update_with_appointment(cls, app_obj, ids):
+        cls.objects.filter(id__in=ids).update(content_object=app_obj)
+
     class Meta:
         db_table = 'appointment_prescription'
