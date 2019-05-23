@@ -139,6 +139,9 @@ class AppointmentPrescriptionViewSet(viewsets.GenericViewSet):
     def ask_prescription(self, request):
         user = request.user
         insurance = user.active_insurance
+        if not insurance:
+            return Response(status=status.HTTP_400_BAD_REQUEST)
+
         serializer = AppointmentPrescriptionSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         valid_data = serializer.validated_data
