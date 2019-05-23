@@ -11,9 +11,9 @@ class Migration(migrations.Migration):
     ]
 
     operations = [
-        migrations.AddField(
-            model_name='insurerpolicynumber',
-            name='insurer',
-            field=models.ForeignKey(null=True, on_delete=django.db.models.deletion.DO_NOTHING, related_name='policy_number_history', to='insurance.Insurer'),
-        ),
+        # migrations.AddField(
+        #     model_name='insurerpolicynumber',
+        #     name='insurer',
+        #     field=models.ForeignKey(null=True, on_delete=django.db.models.deletion.DO_NOTHING, related_name='policy_number_history', to='insurance.Insurer'),
+        # ),
     ]
