@@ -900,3 +900,8 @@ def push_non_bookable_doctor_lead_to_matrix(self, nb_doc_lead_id):
             obj.save()
     except Exception as e:
         logger.error("Error while pushing the non bookable doctor lead to matrix. ", str(e))
+
+
+# @task(bind=True, max_retries=2)
+# def create_ipd_lead_from_opd_appointment(self, data):
+#     obj = OpdAppointment.objects.fliter(id)

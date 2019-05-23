@@ -99,6 +99,10 @@ class IpdProcedureLead(auth_model.TimeStampedModel):
     OPD = 4
     NOT_INTERESTED = 5
     COMPLETED = 6
+    VALID = 7
+    CONTACTED = 8
+    PLANNED = 9
+
 
     CASH = 1
     INSURANCE = 2
@@ -112,10 +116,9 @@ class IpdProcedureLead(auth_model.TimeStampedModel):
                       (CRM, 'CRM'),
                       (DOCPRIMEWEB, "DocPrime Web")]
 
-
     STATUS_CHOICES = [(None, "--Select--"), (NEW, 'NEW'), (COST_REQUESTED, 'COST_REQUESTED'),
-                      (COST_SHARED, 'COST_SHARED'), (OPD, 'OPD'),
-                      (NOT_INTERESTED, 'NOT_INTERESTED'), (COMPLETED, 'COMPLETED')]
+                      (COST_SHARED, 'COST_SHARED'), (OPD, 'OPD'), (VALID, 'valid'), (CONTACTED, 'contacted'),
+                      (PLANNED, 'planned'), (NOT_INTERESTED, 'NOT_INTERESTED'), (COMPLETED, 'COMPLETED')]
 
     PAYMENT_TYPE_CHOICES = [(None, "--Select--"), (CASH, 'CASH'), (INSURANCE, 'INSURANCE'),
                             (GOVERNMENT_PANEL, 'GOVERNMENT_PANEL')]
@@ -148,6 +151,7 @@ class IpdProcedureLead(auth_model.TimeStampedModel):
     num_of_chats = models.PositiveIntegerField(null=True, blank=True)
     comments = models.TextField(null=True, blank=True)
     data = JSONField(blank=True, null=True)
+    planned_date = models.DateField(null=True, blank=True)
 
     # ADMIN :Is_OpDInsured, Specialization List, appointment list
     # DEFAULTS??
