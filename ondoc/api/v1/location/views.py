@@ -95,7 +95,7 @@ class LabProfileFooter(Footer):
            return self.get_urls(query,[self.locality, self.centroid.ewkt, self.centroid.ewkt])
 
     def labs_in_nearby_localities(self):
-        query = '''select url, concat('Labs in ', sublocality_value,' ', locality_value) title from entity_urls where 
+        query = '''select eu.url, concat('Labs in ', sublocality_value,' ', locality_value) title from entity_urls eu where 
                     sitemap_identifier = 'LAB_LOCALITY_CITY'and is_valid = True and locality_value = %s and ST_DWithin(sublocality_location, %s, 20000) 
                     order by count desc limit 10'''
 
@@ -124,7 +124,7 @@ class LabProfileFooter(Footer):
 
         query = '''select a.url, a.title from
                       (
-                select url, lb.name title,
+                select eu.url, lb.name title,
                 row_number() over (partition by ln.id order by st_distance(eu.location, %s) ASC) as row_number 
                 from entity_urls eu inner join lab lb on eu.entity_id = lb.id and eu.sitemap_identifier = 'LAB_PAGE' and 
                 eu.is_valid = True  and lower(eu.locality_value) = lower(%s) and
@@ -182,7 +182,7 @@ class LabLocalityCityFooter(Footer):
 
         query = '''select * from
                         (                                                                       
-                        select url, lb.name title,
+                        select eu.url, lb.name title,
                         row_number() over (partition by ln.id order by st_distance(eu.location, %s)asc ) as row_number 
                         from entity_urls eu inner join lab lb on eu.entity_id = lb.id and eu.sitemap_identifier = 'LAB_PAGE' and 
                         ST_DWithin(eu.location, %s, 20000) and lower(eu.sublocality_value) = lower(%s)  
@@ -228,7 +228,7 @@ class LabCityFooter(Footer):
             return response
 
     def labs_in_top_cities(self):
-            query = '''select url, concat('Labs in ', eu.locality_value) title from entity_urls eu inner join
+            query = '''select eu.url, concat('Labs in ', eu.locality_value) title from entity_urls eu inner join
                         seo_cities sc on lower(eu.locality_value) = lower(sc.city) 
                         and  eu.sitemap_identifier = 'LAB_CITY' and eu.is_valid = True order by rank limit 10'''
 
@@ -238,7 +238,7 @@ class LabCityFooter(Footer):
         result = []
         query = '''select * from
                         (
-                        select url, lb.name title,
+                        select eu.url, lb.name title,
                         row_number() over (partition by ln.id order by st_distance(eu.location, %s)asc ) as row_number 
                         from entity_urls eu inner join lab lb on eu.entity_id = lb.id and eu.sitemap_identifier = 'LAB_PAGE' 
                         and ST_DWithin(eu.location, %s, 20000) and lower(eu.locality_value) = lower(%s)
@@ -303,7 +303,7 @@ class SpecialityCityFooter(Footer):
 
     def specialist_in_city(self):
 
-        query = ''' select url, concat(eu.specialization,' in ',eu.locality_value) title 
+        query = ''' select eu.url, concat(eu.specialization,' in ',eu.locality_value) title 
                     from seo_specialization ss inner join entity_urls eu on ss.specialization_id = eu.specialization_id 
                     and lower(eu.locality_value) = lower(%s) and eu.sitemap_identifier='SPECIALIZATION_CITY' 
                     and eu.is_valid=True and eu.specialization_id!=%s order by count desc limit 10'''
@@ -366,7 +366,7 @@ class SpecialityLocalityFooter(Footer):
 
     def specialist_in_locality(self):
 
-        query = ''' select url, concat(eu.specialization,' in ', eu.sublocality_value, ' ',  eu.locality_value) title from seo_specialization ss 
+        query = ''' select eu.url, concat(eu.specialization,' in ', eu.sublocality_value, ' ',  eu.locality_value) title from seo_specialization ss 
                     inner join entity_urls eu on ss.specialization_id = eu.specialization_id 
                     and eu.sublocality_id=%s and eu.sitemap_identifier='SPECIALIZATION_LOCALITY_CITY' 
                     and eu.is_valid=True and eu.specialization_id!=%s order by count desc limit 10'''
@@ -456,7 +456,7 @@ class DoctorProfileFooter(Footer):
 
     def specialist_in_locality(self):
 
-        query = ''' select url, concat(eu.specialization,' in ', eu.sublocality_value, ' ',  eu.locality_value) title from seo_specialization ss 
+        query = ''' select eu.url, concat(eu.specialization,' in ', eu.sublocality_value, ' ',  eu.locality_value) title from seo_specialization ss 
                        inner join entity_urls eu on ss.specialization_id = eu.specialization_id 
                        and eu.sublocality_id=%s and eu.sitemap_identifier='SPECIALIZATION_LOCALITY_CITY' 
                        and eu.is_valid=True order by count desc limit 10'''
@@ -515,7 +515,7 @@ class DoctorCityFooter(Footer):
 
     def specialist_in_city(self):
 
-        query = ''' select url, concat(eu.specialization,' in ',eu.locality_value) title from seo_specialization ss inner join entity_urls eu on ss.specialization_id = eu.specialization_id 
+        query = ''' select eu.url, concat(eu.specialization,' in ',eu.locality_value) title from seo_specialization ss inner join entity_urls eu on ss.specialization_id = eu.specialization_id 
                     and lower(eu.locality_value) = lower(%s) and eu.sitemap_identifier='SPECIALIZATION_CITY'  
                     and eu.is_valid=True order by count desc limit 10'''
 
@@ -563,7 +563,7 @@ class DoctorLocalityCityFooter(Footer):
 
     def doctors_in_locality(self):
 
-        query = ''' select url, concat(eu.specialization,' in ', eu.sublocality_value, ' ',  eu.locality_value) title from seo_specialization ss 
+        query = ''' select eu.url, concat(eu.specialization,' in ', eu.sublocality_value, ' ',  eu.locality_value) title from seo_specialization ss 
                            inner join entity_urls eu on ss.specialization_id = eu.specialization_id 
                            and eu.sublocality_id=%s and eu.sitemap_identifier='SPECIALIZATION_LOCALITY_CITY' 
                            and eu.is_valid=True and eu.locality_value iLIKE %s order by count desc limit 10'''

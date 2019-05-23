@@ -11,6 +11,7 @@ from django.db.models import F, Q
 # from hardcopy import bytestring_to_pdf
 
 from ondoc.api.v1.utils import util_absolute_url, util_file_name, generate_short_url
+from ondoc.banner.models import EmailBanner
 from ondoc.doctor.models import OpdAppointment
 from ondoc.diagnostic.models import LabAppointment
 from ondoc.common.models import UserConfig
@@ -577,22 +578,22 @@ class WHTSAPPNotification:
             data.append(pickup_address)
             data.append(datetime.strftime(aware_time_zone(self.context.get('instance').time_slot_start), '%d-%m-%Y %H:%M'))
 
-        elif notification_type == NotificationAction.LAB_APPOINTMENT_BOOKED and user and user.user_type == User.CONSUMER:
-            body_template = "appointment_booked_patient"
-
-            data.append(self.context.get('patient_name'))
-            data.append(self.context.get('lab_name'))
-            data.append(datetime.strftime(aware_time_zone(self.context.get('instance').time_slot_start), '%d-%m-%Y'))
-            data.append(datetime.strftime(aware_time_zone(self.context.get('instance').time_slot_start), '%H:%M'))
-            data.append(self.context.get('instance').id)
-            data.append(self.context.get('patient_name'))
-            data.append(self.context.get('lab_name'))
-            pickup_address = 'NA'
-            if self.context.get('pickup_address'):
-                pickup_address = self.context.get('pickup_address')
-
-            data.append(pickup_address)
-            data.append(datetime.strftime(aware_time_zone(self.context.get('instance').time_slot_start), '%d-%m-%Y %H:%M'))
+        # elif notification_type == NotificationAction.LAB_APPOINTMENT_BOOKED and user and user.user_type == User.CONSUMER:
+        #     body_template = "appointment_booked_patient"
+        #
+        #     data.append(self.context.get('patient_name'))
+        #     data.append(self.context.get('lab_name'))
+        #     data.append(datetime.strftime(aware_time_zone(self.context.get('instance').time_slot_start), '%d-%m-%Y'))
+        #     data.append(datetime.strftime(aware_time_zone(self.context.get('instance').time_slot_start), '%H:%M'))
+        #     data.append(self.context.get('instance').id)
+        #     data.append(self.context.get('patient_name'))
+        #     data.append(self.context.get('lab_name'))
+        #     pickup_address = 'NA'
+        #     if self.context.get('pickup_address'):
+        #         pickup_address = self.context.get('pickup_address')
+        #
+        #     data.append(pickup_address)
+        #     data.append(datetime.strftime(aware_time_zone(self.context.get('instance').time_slot_start), '%d-%m-%Y %H:%M'))
 
         elif notification_type == NotificationAction.LAB_APPOINTMENT_BOOKED and (not user or user.user_type == User.DOCTOR):
             body_template = "appointment_booked_lab"
@@ -1097,8 +1098,11 @@ class OpdNotification(Notification):
         mask_number=''
         if mask_number_instance:
             mask_number = mask_number_instance.mask_number
-        email_banners_html = UserConfig.objects.filter(key__iexact="email_banners") \
-                    .annotate(html_code=KeyTransform('html_code', 'data')).values_list('html_code', flat=True).first()
+
+        email_banners_html = EmailBanner.get_banner(self.appointment, self.notification_type)
+        # email_banners_html = UserConfig.objects.filter(key__iexact="email_banners") \
+        #             .annotate(html_code=KeyTransform('html_code', 'data')).values_list('html_code', flat=True).first()
+
         # Implmented According to DOCNEW-360
         # auth_token = AgentToken.objects.create_token(user=self.appointment.user)
         token_object = JWTAuthentication.generate_token(self.appointment.user)
@@ -1262,8 +1266,12 @@ class LabNotification(Notification):
         time_slot_start = self.appointment.time_slot_start.astimezone(est)
         tests = self.appointment.get_tests_and_prices()
         report_file_links = instance.get_report_urls()
-        email_banners_html = UserConfig.objects.filter(key__iexact="email_banners") \
-                    .annotate(html_code=KeyTransform('html_code', 'data')).values_list('html_code', flat=True).first()
+
+        email_banners_html = EmailBanner.get_banner(instance, self.notification_type)
+        # email_banners_html = UserConfig.objects.filter(key__iexact="email_banners") \
+        #             .annotate(html_code=KeyTransform('html_code', 'data')).values_list('html_code', flat=True).first()
+
+
         for test in tests:
             test['mrp'] = str(test['mrp'])
             test['deal_price'] = str(test['deal_price'])
