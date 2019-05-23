@@ -1317,8 +1317,12 @@ class LabAppointmentRetrieveSerializer(LabAppointmentModelSerializer):
 
     class Meta:
         model = LabAppointment
-        fields = ('id', 'type', 'lab_name', 'status', 'deal_price', 'effective_price', 'time_slot_start', 'time_slot_end','is_rated', 'rating_declined',
-                   'is_home_pickup', 'lab_thumbnail', 'lab_image', 'profile', 'allowed_action', 'lab_test', 'lab', 'otp', 'address', 'type', 'reports', 'invoices', 'cancellation_reason', 'mask_data', 'payment_type', 'price')
+        fields = ('id', 'type', 'lab_name', 'status', 'deal_price', 'effective_price',
+                  'time_slot_start', 'time_slot_end', 'is_rated', 'rating_declined', 'is_home_pickup', 'lab_thumbnail',
+                  'lab_image', 'profile', 'allowed_action', 'lab_test', 'lab', 'otp', 'address', 'type', 'reports',
+                  'report_files', 'invoices', 'prescription', 'cancellation_reason', 'mask_data', 'payment_type',
+                  'price')
+
 
 
 class DoctorLabAppointmentRetrieveSerializer(LabAppointmentModelSerializer):
