@@ -1785,22 +1785,38 @@ class LabList(viewsets.ReadOnlyModelViewSet):
         #disable home pickup for insured customers if lab charges home collection
         if request.user and request.user.is_authenticated and temp_data.get('lab'):
             active_insurance = request.user.active_insurance
-            if active_insurance:
-                if not temp_data.get('tests',[]):
-                    temp_data.get('lab')['is_home_collection_enabled'] = False
-                elif temp_data.get('lab').get('home_pickup_charges', 0) > 0:
-                    temp_data.get('lab')['is_home_collection_enabled'] = False
-                    temp_data.get('tests')[0]['is_home_collection_enabled'] = False
-                    return Response(temp_data)
-                else:
+            threshold = active_insurance.insurance_plan.threshold.first()
+            if active_insurance and threshold:
+                turn_off_home_collection = False                
+                if temp_data.get('lab').get('home_pickup_charges', 0) > 0:
+                    if not temp_data.get('tests',[]):
+                        turn_off_home_collection = True
                     for x in temp_data.get('tests', []):
-                        threshold = active_insurance.insurance_plan.threshold.all()
-                        if threshold and threshold.first() and threshold.first().lab_amount_limit:
-                            lab_amount_limit = threshold.first().lab_amount_limit
-                            if float(x.get('mrp', 0)) <= lab_amount_limit:
-                                x['is_home_collection_enabled'] = False
-                                temp_data.get('lab')['is_home_collection_enabled'] = False
-                                break
+                        if float(x.get('mrp', 0)) <= threshold.lab_amount_limit:
+                            turn_off_home_collection = True
+                    if turn_off_home_collection:
+                        temp_data.get('lab')['is_home_collection_enabled'] = False
+                        for x in temp_data.get('tests', []):
+                            x['is_home_collection_enabled'] = False
+                                
+                #         temp_data.get('lab')['is_home_collection_enabled'] = False
+
+
+                # if not temp_data.get('tests',[]):
+                #     temp_data.get('lab')['is_home_collection_enabled'] = False
+                # elif temp_data.get('lab').get('home_pickup_charges', 0) > 0:
+                #     temp_data.get('lab')['is_home_collection_enabled'] = False
+                #     temp_data.get('tests')[0]['is_home_collection_enabled'] = False
+                #     return Response(temp_data)
+                # else:
+                #     for x in temp_data.get('tests', []):
+                #         threshold = active_insurance.insurance_plan.threshold.all()
+                #         if threshold and threshold.first() and threshold.first().lab_amount_limit:
+                #             lab_amount_limit = threshold.first().lab_amount_limit
+                #             if float(x.get('mrp', 0)) <= lab_amount_limit:
+                #                 x['is_home_collection_enabled'] = False
+                #                 temp_data.get('lab')['is_home_collection_enabled'] = False
+                #                 break
 
 
         # temp_data['url'] = entity.first()['url'] if len(entity) == 1 else None
