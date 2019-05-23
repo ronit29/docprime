@@ -236,8 +236,8 @@ class OfflinePrescription(auth_models.TimeStampedModel, auth_models.Document):
 
 class AppointmentPrescription(auth_models.TimeStampedModel):
 
-    content_type = models.ForeignKey(ContentType, on_delete=models.DO_NOTHING)
-    object_id = models.PositiveIntegerField()
+    content_type = models.ForeignKey(ContentType, on_delete=models.DO_NOTHING, null=True)
+    object_id = models.PositiveIntegerField(null=True)
     content_object = GenericForeignKey()
     user = models.ForeignKey(User, null=True, default=None, on_delete=models.CASCADE)
     prescription_file = models.FileField(null=False, upload_to='user_prescriptions', validators=[FileExtensionValidator(allowed_extensions=['pdf', 'jpg', 'jpeg', 'png'])])

@@ -34,6 +34,7 @@ import reversion
 import numbers
 from ondoc.account.models import Order, Merchant, MerchantPayout
 from decimal import  *
+
 logger = logging.getLogger(__name__)
 from django.utils.functional import cached_property
 from ondoc.notification import tasks as notification_tasks
@@ -1226,39 +1227,55 @@ class UserInsurance(auth_model.TimeStampedModel):
             except Exception as e:
                 logger.error(str(e))
 
-    def get_insurance_appointment_stats(self):
+    def get_insurance_appointment_stats(self, booking_date):
         from ondoc.doctor.models import OpdAppointment
         from ondoc.diagnostic.models import LabAppointment
 
         total_opd_stats = OpdAppointment.get_all_insurance_appointment(self)
-        today_opd_stats = OpdAppointment.get_all_insurance_appointment(self, timezone.now().date())
+        today_opd_stats = OpdAppointment.get_all_insurance_appointment(self, booking_date)
 
         total_lab_stats = LabAppointment.get_all_insurance_appointment(self)
-        today_lab_stats = LabAppointment.get_all_insurance_appointment(self, timezone.now().date())
+        today_lab_stats = LabAppointment.get_all_insurance_appointment(self, booking_date)
 
         data = {
-            'ytd_count': total_opd_stats['count'] + total_lab_stats['count'],
-            'ytd_amount': total_opd_stats['sum'] + total_lab_stats['sum'],
-            'daily_count': today_opd_stats['count'] + today_lab_stats['count'],
-            'daily_amount': today_opd_stats['sum'] + today_lab_stats['sum']
+            'used_ytd_count': total_opd_stats['count'] + total_lab_stats['count'],
+            'used_ytd_amount': total_opd_stats['sum'] + total_lab_stats['sum'],
+            'used_daily_count': today_opd_stats['count'] + today_lab_stats['count'],
+            'used_daily_amount': today_opd_stats['sum'] + today_lab_stats['sum']
         }
 
         return data
 
-    def validate_limit_usages(self):
-        response = dict()
+    def validate_limit_usages(self, mrp, booking_date):
+        from ondoc.prescription.models import AppointmentPrescription
+        appointment_mrp = mrp
+        response = {
+            'prescription_needed': False,
+            'created_state': False
+        }
         plan_usages = self.insurance_plan.plan_usages
         ytd_count = plan_usages.get('ytd_count', None)
-        ytd_amount = plan_usages.get('ytd_count', None)
-        daily_count = plan_usages.get('ytd_count', None)
-        daily_amount = plan_usages.get('ytd_count', None)
+        ytd_amount = plan_usages.get('ytd_amount', None)
+        daily_count = plan_usages.get('daily_count', None)
+        daily_amount = plan_usages.get('daily_amount', None)
 
         if not ytd_amount or not ytd_count or not daily_amount or not daily_count:
-            response['prescription_needed'] = False
-            response['created_state'] = False
+            return response
 
+        insurance_appointment_stats = self.get_insurance_appointment_stats(booking_date)
 
+        if insurance_appointment_stats['used_ytd_amount'] + appointment_mrp >= ytd_amount or\
+                insurance_appointment_stats['used_ytd_count'] + 1 >= ytd_count or\
+                insurance_appointment_stats['used_daily_amount'] + appointment_mrp >= daily_amount or\
+                insurance_appointment_stats['used_daily_count'] + 1 >= daily_count:
 
+            response['prescription_needed'] = True
+            response['created_state'] = True
+
+            if AppointmentPrescription.prescription_exist_for_user_date(self.user, timezone.now().date()):
+                response['prescription_needed'] = False
+
+        return response
 
 
 class InsuranceTransaction(auth_model.TimeStampedModel):

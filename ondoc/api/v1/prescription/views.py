@@ -3,6 +3,8 @@ from django.db import transaction
 from django.db.models import Q
 from rest_framework.response import Response
 from rest_framework import viewsets, mixins, status
+
+from ondoc.api.v1.prescription.serializers import AppointmentPrescriptionSerializer
 from ondoc.authentication.backends import JWTAuthentication
 from rest_framework.permissions import IsAuthenticated
 from ondoc.api.v1.utils import IsConsumer, IsNotAgent, IsDoctor
@@ -129,5 +131,39 @@ class PrescriptionComponentsViewSet(viewsets.GenericViewSet):
         return Response(resp)
 
 
+class AppointmentPrescriptionViewSet(viewsets.GenericViewSet):
+
+    authentication_classes = (JWTAuthentication,)
+    permission_classes = (IsAuthenticated, )
+
+    def ask_prescription(self, request):
+        user = request.user
+        insurance = user.active_insurance
+        serializer = AppointmentPrescriptionSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        valid_data = serializer.validated_data
+        mrp = valid_data.get('mrp')
+        start_date = valid_data.get('start_date')
+
+        resp = insurance.validate_limit_usages(mrp, start_date)
+
+        return Response(resp)
+
+    def upload_prescription(self, request, *args, **kwargs):
+        user = request.user
+        insurance = user.active_insurance
+        if not insurance:
+            return Response(status=status.HTTP_400_BAD_REQUEST)
+
+        data = dict()
+        document_data = {}
+        data['user'] = user
+        data['prescription_file'] = request.data['prescription_file']
+        serializer = serializers.AppointmentPrescriptionUploadSerializer(data=data, context={'request':request})
+        serializer.is_valid(raise_exception=True)
+        prescription_obj = serializer.save()
+        document_data['id'] = prescription_obj.id
+        document_data['data'] = serializer.data
+        return Response(document_data)
 
 

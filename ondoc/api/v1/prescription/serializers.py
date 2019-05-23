@@ -4,7 +4,9 @@ from rest_framework import serializers
 
 from ondoc.diagnostic import models as diag_models
 from ondoc.doctor import models as doc_models
+from ondoc.insurance.models import InsuredMemberDocument
 from ondoc.prescription import models as prescription_models
+from ondoc.prescription.models import AppointmentPrescription
 
 
 class PrescriptionModelComponents():
@@ -302,3 +304,15 @@ class PrescriptionLabTestSerializer(serializers.ModelSerializer):
     class Meta:
         model = diag_models.LabTest
         fields = ('id', 'name', 'created_at', 'updated_at', 'moderated', 'hospitals', 'source_type', 'instructions')
+
+
+class AppointmentPrescriptionSerializer(serializers.Serializer):
+    mrp = serializers.DecimalField(max_digits=10, decimal_places=2)
+    start_date = serializers.DateField(format="%Y-%m-%d", required=True)
+
+
+class AppointmentPrescriptionUploadSerializer(serializers.ModelSerializer):
+    # prescription_file = serializers.FileField(max_length=None, use_url=True)
+    class Meta:
+        model = AppointmentPrescription
+        fields = ('prescription_file', 'user')

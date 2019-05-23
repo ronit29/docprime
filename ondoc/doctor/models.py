@@ -2758,7 +2758,9 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
 
         count = appointments.count()
         data = appointments.aggregate(sum_amount=Sum('mrp'))
-        return {'count': count, 'sum': data.get('sum_amount', 0)}
+        sum = data.get('sum_amount', 0)
+        sum = sum if sum else 0
+        return {'count': count, 'sum': sum}
 
 
 class OpdAppointmentProcedureMapping(models.Model):
