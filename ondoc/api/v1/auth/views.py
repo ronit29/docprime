@@ -550,7 +550,7 @@ class UserAppointmentsViewSet(OndocViewSet):
 
     def get_queryset(self):
         user = self.request.user
-        return OpdAppointment.objects.filter(user=user).filter(~Q(status=OpdAppointment.CREATED))
+        return OpdAppointment.objects.filter(user=user)
 
     @transaction.non_atomic_requests
     def list(self, request):
@@ -587,11 +587,11 @@ class UserAppointmentsViewSet(OndocViewSet):
         input_serializer.is_valid(raise_exception=True)
         appointment_type = input_serializer.validated_data.get('type')
         if appointment_type == 'lab':
-            queryset = LabAppointment.objects.filter(pk=pk, user=user).filter(~Q(status=LabAppointment.CREATED))
+            queryset = LabAppointment.objects.filter(pk=pk, user=user)
             serializer = LabAppointmentRetrieveSerializer(queryset, many=True, context={"request": request})
             return Response(serializer.data)
         elif appointment_type == 'doctor':
-            queryset = OpdAppointment.objects.filter(pk=pk, user=user).filter(~Q(status=OpdAppointment.CREATED))
+            queryset = OpdAppointment.objects.filter(pk=pk, user=user)
             # serializer = AppointmentRetrieveSerializer(queryset, many=True, context={"request": request})
             serializer = NewAppointmentRetrieveSerializer(queryset, many=True, context={"request": request})
             return Response(serializer.data)
@@ -621,7 +621,7 @@ class UserAppointmentsViewSet(OndocViewSet):
         appointment_type = query_input_serializer.validated_data.get('type')
         if appointment_type == 'lab':
             # lab_appointment = get_object_or_404(LabAppointment, pk=pk)
-            lab_appointment = LabAppointment.objects.select_for_update().filter(pk=pk).filter(~Q(status=LabAppointment.CREATED)).first()
+            lab_appointment = LabAppointment.objects.select_for_update().filter(pk=pk).first()
             lab_appointment._source = source
             lab_appointment._responsible_user = responsible_user
             resp = dict()
@@ -643,7 +643,7 @@ class UserAppointmentsViewSet(OndocViewSet):
                 return Response(updated_lab_appointment)
         elif appointment_type == 'doctor':
             # opd_appointment = get_object_or_404(OpdAppointment, pk=pk)
-            opd_appointment = OpdAppointment.objects.select_for_update().filter(pk=pk).filter(~Q(status=OpdAppointment.CREATED)).first()
+            opd_appointment = OpdAppointment.objects.select_for_update().filter(pk=pk).first()
             opd_appointment._source = source
             opd_appointment._responsible_user = responsible_user
             resp = dict()
@@ -971,7 +971,7 @@ class UserAppointmentsViewSet(OndocViewSet):
     def lab_appointment_list(self, request, params):
         user = request.user
         queryset = LabAppointment.objects.select_related('lab', 'profile', 'user')\
-                                        .prefetch_related('lab__lab_image', 'lab__lab_documents', 'reports').filter(user=user).filter(~Q(status=LabAppointment.CREATED))
+                                        .prefetch_related('lab__lab_image', 'lab__lab_documents', 'reports').filter(user=user)
         if queryset and params.get('profile_id'):
             queryset = queryset.filter(profile=params['profile_id'])
         range = params.get('range')
@@ -986,7 +986,7 @@ class UserAppointmentsViewSet(OndocViewSet):
 
     def doctor_appointment_list(self, request, params):
         user = request.user
-        queryset = OpdAppointment.objects.select_related('profile', 'doctor', 'hospital', 'user').prefetch_related('doctor__images').filter(user=user).filter(~Q(status=OpdAppointment.CREATED))
+        queryset = OpdAppointment.objects.select_related('profile', 'doctor', 'hospital', 'user').prefetch_related('doctor__images').filter(user=user)
 
         if not queryset:
             return Response([])
