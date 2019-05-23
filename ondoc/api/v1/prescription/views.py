@@ -157,7 +157,7 @@ class AppointmentPrescriptionViewSet(viewsets.GenericViewSet):
 
         data = dict()
         document_data = {}
-        data['user'] = user
+        data['user'] = user.id
         data['prescription_file'] = request.data['prescription_file']
         serializer = serializers.AppointmentPrescriptionUploadSerializer(data=data, context={'request':request})
         serializer.is_valid(raise_exception=True)
