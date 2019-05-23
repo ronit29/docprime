@@ -2094,7 +2094,7 @@ class DoctorAvailabilityTimingViewSet(viewsets.ViewSet):
 
         if request.user and request.user.is_authenticated and request.user.active_insurance:
             active_appointments = dc_obj.hospital.\
-                get_active_opd_appointments(request.user,request.user.active_insurance)
+                get_active_opd_appointments(request.user, request.user.active_insurance)
             for apt in active_appointments:
                 del timeslots.get('time_slots',{})[str(apt.time_slot_start.date())]
 
@@ -2176,7 +2176,7 @@ class DoctorAppointmentNoAuthViewSet(viewsets.GenericViewSet):
         validated_data = serializer.validated_data
         # opd_appointment = get_object_or_404(models.OpdAppointment, pk=validated_data.get('opd_appointment'))
         opd_appointment = models.OpdAppointment.objects.select_for_update().filter(pk=validated_data.get('opd_appointment')).first()
-        if not opd_appointment or opd_appointment.status==models.OpdAppointment.CREATED)):
+        if not opd_appointment or opd_appointment.status==models.OpdAppointment.CREATED:
             return Response({"message": "Invalid appointment id"}, status.HTTP_404_NOT_FOUND)
         source = validated_data.get('source') if validated_data.get('source') else request.query_params.get('source', '')
         responsible_user = request.user if request.user.is_authenticated else None
