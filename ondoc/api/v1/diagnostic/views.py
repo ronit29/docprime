@@ -2069,6 +2069,7 @@ class LabAppointmentView(mixins.CreateModelMixin,
         request = self.request
         if request.user.user_type == User.DOCTOR:
             return models.LabAppointment.objects.filter(
+                ~Q(status=models.LabAppointment.CREATED),
                 Q(lab__manageable_lab_admins__user=request.user,
                   lab__manageable_lab_admins__is_disabled=False) |
                 Q(lab__network__manageable_lab_network_admins__user=request.user,
@@ -2284,6 +2285,9 @@ class LabAppointmentView(mixins.CreateModelMixin,
 
     def update(self, request, pk=None):
         lab_appointment = get_object_or_404(LabAppointment, pk=pk)
+        if lab_appointment and lab_appointment.status == LabAppointment.CREATED:
+            return Response(status=status.HTTP_404_NOT_FOUND)
+
         # lab_appointment = self.get_queryset().filter(pk=pk).first()
         # if not lab_appointment:
         #     return Response()
@@ -2648,6 +2652,8 @@ class DoctorLabAppointmentsViewSet(viewsets.GenericViewSet):
         serializer.is_valid(raise_exception=True)
         validated_data = serializer.validated_data
         lab_appointment = validated_data.get('lab_appointment')
+        if lab_appointment.status == LabAppointment.CREATED:
+            return Response(status=status.HTTP_404_NOT_FOUND)
 
         lab_appointment = LabAppointment.objects.select_for_update().get(id=lab_appointment.id)
 
@@ -2678,6 +2684,9 @@ class DoctorLabAppointmentsNoAuthViewSet(viewsets.GenericViewSet):
         serializer.is_valid(raise_exception=True)
         validated_data = serializer.validated_data
         lab_appointment = validated_data.get('lab_appointment')
+
+        if lab_appointment.status == LabAppointment.CREATED:
+            return Response(status=status.HTTP_404_NOT_FOUND)
 
         lab_appointment = LabAppointment.objects.select_for_update().get(id=lab_appointment.id)
         source = validated_data.get('source') if validated_data.get('source') else request.query_params.get('source', '')
