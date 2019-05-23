@@ -279,7 +279,7 @@ class AvailableLabTestPackageSerializer(serializers.ModelSerializer):
         agreed_price = self.get_agreed_price(obj)
         if logged_in_user.is_authenticated and not logged_in_user.is_anonymous and agreed_price:
             user_insurance = request.user.active_insurance
-            data = user_insurance.validate_limit_usages(agreed_price)
+            data = user_insurance.validate_limit_usages(agreed_price) if user_insurance else None
 
         if not data:
             return False
