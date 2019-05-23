@@ -2004,6 +2004,7 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
     auto_ivr_data = JSONField(default=list(), null=True)
     synced_analytics = GenericRelation(SyncBookingAnalytics, related_name="opd_booking_analytics")
     refund_details = GenericRelation(RefundDetails, related_query_name="opd_appointment_detail")
+    appointment_prescriptions = GenericRelation("prescription.AppointmentPrescription", related_query_name="appointment_prescriptions")
     coupon_data = JSONField(blank=True, null=True)
     status_change_comments = models.CharField(max_length=5000, null=True, blank=True)
 
