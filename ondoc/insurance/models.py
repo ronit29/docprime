@@ -1278,7 +1278,7 @@ class UserInsurance(auth_model.TimeStampedModel):
             response['prescription_needed'] = True
             response['created_state'] = True
 
-            if AppointmentPrescription.prescription_exist_for_user_date(self.user, timezone.now().date()):
+            if AppointmentPrescription.prescription_exist_for_user_current_date(self.user, timezone.now().date()):
                 response['prescription_needed'] = False
 
         return response
