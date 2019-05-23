@@ -97,3 +97,8 @@ def update_seo_urls():
     from ondoc.location.models import UrlsModel
     UrlsModel.update_profile_urls()
     return True
+
+@task
+def update_hosp_google_avg_rating():
+    from ondoc.doctor.models import Hospital
+    Hospital.update_hosp_google_avg_rating()
