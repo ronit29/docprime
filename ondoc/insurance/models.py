@@ -57,13 +57,16 @@ def generate_insurance_policy_number():
 def generate_insurance_insurer_policy_number(insurance_plan):
     if not insurance_plan:
         raise Exception('Could not generate policy number according to the insurer.')
-    # plan = InsurancePlans.objects.filter(id=insurance_plan.id).first()
-    policy_number_data = InsurerPolicyNumber.objects.filter(insurance_plan=insurance_plan).order_by('-id').first()
-    if not policy_number_data:
+    master_policy_number = None
+    plan_policy_number_obj = InsurerPolicyNumber.objects.filter(insurance_plan=insurance_plan).order_by('-id').first()
+    if plan_policy_number_obj:
+        master_policy_number = plan_policy_number_obj.insurer_policy_number
+    else:
+        insurer_policy_number_obj = InsurerPolicyNumber.objects.filter(insurer=insurance_plan.insurer).order_by(
+            '-id').first()
+        master_policy_number = insurer_policy_number_obj.insurer_policy_number
+    if not master_policy_number:
         raise Exception('Master Policy number is missing.')
-    master_policy_number = policy_number_data.insurer_policy_number
-    # master_policy_number = insurer.policy_number_history.policy_number.order_by('-created_at').first()
-    # master_policy_number = insurer.master_policy_number
     query = '''select nextval('userinsurance_policy_num_seq') as inc'''
     seq = RawSql(query, []).fetch_all()
     sequence = None
@@ -75,7 +78,6 @@ def generate_insurance_insurer_policy_number(insurance_plan):
         return str(master_policy_number + '%.8d' % sequence)
     else:
         raise ValueError('Sequence Produced is not valid.')
-
 
 
 def generate_insurance_reciept_number():
@@ -1536,7 +1538,7 @@ class InsuranceDeal(auth_model.TimeStampedModel):
 
 
 class InsurerPolicyNumber(auth_model.TimeStampedModel):
-    # insurer = models.ForeignKey(Insurer, related_name='policy_number_history', on_delete=models.DO_NOTHING)
+    insurer = models.ForeignKey(Insurer, related_name='policy_number_history', on_delete=models.DO_NOTHING, null=True)
     insurer_policy_number = models.CharField(max_length=50)
     insurance_plan = models.ForeignKey(InsurancePlans, related_name='plan_policy_number', on_delete=models.DO_NOTHING, null=True)
 
