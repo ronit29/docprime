@@ -332,6 +332,7 @@ class LabList(viewsets.ReadOnlyModelViewSet):
             entity_url_dict[item.get('lab_id')].append(item.get('url'))
         lab_data = Lab.objects.prefetch_related('lab_documents', 'lab_timings', 'network',
                                                 'home_collection_charges').in_bulk(lab_ids)
+
         category_data = {}
         test_package_queryset = []
         cache = {}
@@ -398,6 +399,16 @@ class LabList(viewsets.ReadOnlyModelViewSet):
         filters = dict()
 
         result = serializer.data
+
+        # disable home pickup for insured customers if lab charges home collection
+        if request.user and request.user.is_authenticated and result:
+            active_insurance = request.user.active_insurance
+            threshold = active_insurance.insurance_plan.threshold.first()
+            if active_insurance and threshold:
+                for data in result:
+                    if data.get('lab') and ((data.get('lab').get('home_pickup_charges', 0) > 0) or (float(data.get('mrp', 0)) <= threshold.lab_amount_limit)):
+                        data.get('lab')['is_home_collection_enabled'] = False
+
         if result:
             from ondoc.coupon.models import Coupon
             # search_coupon = Coupon.get_search_coupon(request.user)
