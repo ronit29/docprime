@@ -2145,9 +2145,9 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
         appointment_status = OpdAppointment.BOOKED
 
         if insurance and insurance.is_valid():
-            booking_date =appointment_data.get('time_slot_start').date()
-            mrp =appointment_data.get('mrp')
-            insurance_limit_usage_data = insurance.validate_limit_usages(mrp, booking_date)
+            booking_date = appointment_data.get('time_slot_start').date()
+            mrp = appointment_data.get('mrp')
+            insurance_limit_usage_data = insurance.validate_limit_usages(mrp)
             if insurance_limit_usage_data.get('created_state'):
                 appointment_status = OpdAppointment.CREATED
 
@@ -2785,12 +2785,10 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
 
     @classmethod
     def get_all_insurance_appointment(cls, insurance_obj, date=None):
-        if not date:
-            appointments = cls.objects.filter(~Q(status=cls.CANCELLED), user=insurance_obj.user,
-                                              insurance=insurance_obj)
-        else:
-            appointments = cls.objects.filter(~Q(status=cls.CANCELLED), user=insurance_obj.user,
-                                              insurance=insurance_obj, time_slot_start__date=date)
+        appointments = cls.objects.filter(~Q(status=cls.CANCELLED), user=insurance_obj.user, insurance=insurance_obj)
+
+        if date:
+            appointments = appointments.filter(created_at__date=date)
 
         count = appointments.count()
         data = appointments.aggregate(sum_amount=Sum('fees'))

@@ -1233,15 +1233,15 @@ class UserInsurance(auth_model.TimeStampedModel):
             except Exception as e:
                 logger.error(str(e))
 
-    def get_insurance_appointment_stats(self, booking_date):
+    def get_insurance_appointment_stats(self):
         from ondoc.doctor.models import OpdAppointment
         from ondoc.diagnostic.models import LabAppointment
 
         total_opd_stats = OpdAppointment.get_all_insurance_appointment(self)
-        today_opd_stats = OpdAppointment.get_all_insurance_appointment(self, booking_date)
+        today_opd_stats = OpdAppointment.get_all_insurance_appointment(self, timezone.now().date())
 
         total_lab_stats = LabAppointment.get_all_insurance_appointment(self)
-        today_lab_stats = LabAppointment.get_all_insurance_appointment(self, booking_date)
+        today_lab_stats = LabAppointment.get_all_insurance_appointment(self, timezone.now().date())
 
         data = {
             'used_ytd_count': total_opd_stats['count'] + total_lab_stats['count'],
@@ -1252,9 +1252,8 @@ class UserInsurance(auth_model.TimeStampedModel):
 
         return data
 
-    def validate_limit_usages(self, mrp, booking_date):
+    def validate_limit_usages(self, appointment_mrp):
         from ondoc.prescription.models import AppointmentPrescription
-        appointment_mrp = mrp
         response = {
             'prescription_needed': False,
             'created_state': False
@@ -1265,21 +1264,19 @@ class UserInsurance(auth_model.TimeStampedModel):
         daily_count = plan_usages.get('daily_count', None)
         daily_amount = plan_usages.get('daily_amount', None)
 
-        if not ytd_amount or not ytd_count or not daily_amount or not daily_count:
-            return response
+        insurance_appointment_stats = self.get_insurance_appointment_stats()
 
-        insurance_appointment_stats = self.get_insurance_appointment_stats(booking_date)
-
-        if insurance_appointment_stats['used_ytd_amount'] + appointment_mrp > ytd_amount or\
-                insurance_appointment_stats['used_ytd_count'] + 1 > ytd_count or\
-                insurance_appointment_stats['used_daily_amount'] + appointment_mrp > daily_amount or\
-                insurance_appointment_stats['used_daily_count'] + 1 > daily_count:
-
+        if ytd_count and insurance_appointment_stats['used_ytd_count'] + 1 > ytd_count:
             response['prescription_needed'] = True
-            response['created_state'] = True
+        elif ytd_amount and insurance_appointment_stats['used_ytd_amount'] + appointment_mrp > ytd_amount:
+            response['prescription_needed'] = True
+        elif daily_amount and insurance_appointment_stats['used_daily_amount'] + appointment_mrp > daily_amount:
+            response['prescription_needed'] = True
+        elif daily_count and insurance_appointment_stats['used_daily_count'] + 1 > daily_count:
+            response['prescription_needed'] = True
 
-            if AppointmentPrescription.prescription_exist_for_user_current_date(self.user, timezone.now().date()):
-                response['prescription_needed'] = False
+        if AppointmentPrescription.prescription_exist_for_user_current_date(self.user, timezone.now().date()):
+            response['prescription_needed'] = False
 
         return response
 

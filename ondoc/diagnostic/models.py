@@ -2006,7 +2006,7 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin,
                     agreed_price = 0
                 mrp = mrp + Decimal(agreed_price)
 
-            insurance_limit_usage_data = insurance.validate_limit_usages(mrp, booking_date)
+            insurance_limit_usage_data = insurance.validate_limit_usages(mrp)
             if insurance_limit_usage_data.get('created_state'):
                 appointment_status = OpdAppointment.CREATED
 
@@ -2021,10 +2021,10 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin,
             "random_coupons": appointment_data.pop("coupon_data", [])
         }
         extra_details = deepcopy(appointment_data.pop("extra_details", None))
-        prescription_objects = deepcopy(appointment_data.pop("prescription_ids", []))
+        prescription_objects = deepcopy(appointment_data.pop("prescription_list", []))
         prescription_id_list = []
         for prescription in prescription_objects:
-            prescription_id_list.append(prescription.get('prescription_file').id)
+            prescription_id_list.append(prescription.get('prescription').id)
 
         app_obj = cls.objects.create(**appointment_data)
         AppointmentPrescription.update_with_appointment(app_obj, prescription_id_list)
@@ -2358,7 +2358,7 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin,
             "is_appointment_insured": is_appointment_insured,
             "insurance": insurance_id,
             "coupon_data": price_data.get("coupon_data"),
-            "prescription_ids": data.get('prescription_ids')
+            "prescription_list": data.get('prescription_list')
         }
 
         if data.get('included_in_user_plan', False):
@@ -2444,12 +2444,10 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin,
 
     @classmethod
     def get_all_insurance_appointment(cls, insurance_obj, date=None):
-        if not date:
-            appointments = cls.objects.filter(~Q(status=cls.CANCELLED), user=insurance_obj.user,
-                                              insurance=insurance_obj)
-        else:
-            appointments = cls.objects.filter(~Q(status=cls.CANCELLED), user=insurance_obj.user,
-                                              insurance=insurance_obj, time_slot_start__date=date)
+        appointments = cls.objects.filter(~Q(status=cls.CANCELLED), user=insurance_obj.user, insurance=insurance_obj)
+
+        if date:
+            appointments = appointments.filter(created_at__date=date)
 
         count = appointments.count()
         data = appointments.aggregate(sum_amount=Sum('agreed_price'))

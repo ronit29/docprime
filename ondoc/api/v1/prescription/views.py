@@ -157,7 +157,7 @@ class AppointmentPrescriptionViewSet(viewsets.GenericViewSet):
 
         start_date = valid_data.get('start_date').date()
 
-        resp = insurance.validate_limit_usages(mrp, start_date)
+        resp = insurance.validate_limit_usages(mrp)
 
         return Response(resp)
 
@@ -165,7 +165,7 @@ class AppointmentPrescriptionViewSet(viewsets.GenericViewSet):
         user = request.user
         insurance = user.active_insurance
         if not insurance:
-            return Response(status=status.HTTP_400_BAD_REQUEST)
+            return Response(status=status.HTTP_400_BAD_REQUEST, data={'error': 'User do not have active insurance.'})
 
         data = dict()
         document_data = {}
