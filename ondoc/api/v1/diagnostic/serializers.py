@@ -734,7 +734,7 @@ class PlanTransactionModelSerializer(serializers.Serializer):
 
 
 class PrescriptionDocumentSerializer(serializers.Serializer):
-    prescription_file = serializers.PrimaryKeyRelatedField(queryset=AppointmentPrescription.objects.all())
+    prescription = serializers.PrimaryKeyRelatedField(queryset=AppointmentPrescription.objects.all())
 
 
 class LabAppTransactionModelSerializer(serializers.Serializer):
