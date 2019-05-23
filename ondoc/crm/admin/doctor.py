@@ -1636,6 +1636,10 @@ class DoctorOpdAppointmentAdmin(admin.ModelAdmin):
             read_only += ('status',)
         if request.user.groups.filter(name=constants['APPOINTMENT_OTP_TEAM']).exists() or request.user.is_superuser:
             read_only = read_only + ('otp',)
+
+        if obj.status is not OpdAppointment.CREATED:
+            read_only = read_only + ('status_change_comments',)
+
         return read_only
         # else:
         #     return ('invoice_urls')

@@ -791,6 +791,9 @@ class LabAppointmentForm(RefundableAppointmentForm):
             raise forms.ValidationError(
                 "Reason/Comment for cancellation can only be entered on cancelled appointment")
 
+        if cleaned_data.get('status') is LabAppointment.CREATED and cleaned_data.get('status_change_comments'):
+            raise forms.ValidationError("Comment for status change can only be entered when changing status from created to other.")
+
         if cleaned_data.get('status') is LabAppointment.CANCELLED and not cleaned_data.get('cancellation_reason'):
             raise forms.ValidationError("Reason for Cancelled appointment should be set.")
 
@@ -798,6 +801,10 @@ class LabAppointmentForm(RefundableAppointmentForm):
                 'cancellation_reason', None) and cleaned_data.get('cancellation_reason').is_comment_needed and not cleaned_data.get('cancellation_comments'):
             raise forms.ValidationError(
                 "Cancellation comments must be mentioned for selected cancellation reason.")
+
+        if cleaned_data.get('status') and cleaned_data.get('status') != LabAppointment.CREATED and self.instance and self.instance.status == LabAppointment.CREATED and not cleaned_data.get('status_change_comments'):
+            raise forms.ValidationError(
+                "Status change comments must be mentioned when changing status from created to other.")
 
         if not lab.lab_pricing_group:
             raise forms.ValidationError("Lab is not in any lab pricing group.")
@@ -959,7 +966,7 @@ class LabAppointmentAdmin(nested_admin.NestedModelAdmin):
                     'get_pickup_address', 'get_lab_address', 'outstanding', 'status', 'cancel_type',
                     'cancellation_reason', 'cancellation_comments', 'start_date', 'start_time',
                     'send_email_sms_report', 'invoice_urls', 'reports_uploaded', 'email_notification_timestamp', 'payment_type',
-                     'payout_info', 'refund_initiated')
+                     'payout_info', 'refund_initiated', 'status_change_comments')
         if request.user.groups.filter(name=constants['APPOINTMENT_OTP_TEAM']).exists() or request.user.is_superuser:
             all_fields = all_fields + ('otp',)
 
@@ -989,6 +996,9 @@ class LabAppointmentAdmin(nested_admin.NestedModelAdmin):
             read_only.extend(['status'])
         if request.user.groups.filter(name=constants['APPOINTMENT_OTP_TEAM']).exists() or request.user.is_superuser:
             read_only = read_only + ['otp']
+
+        if obj.status is not LabAppointment.CREATED:
+            read_only = read_only + ('status_change_comments',)
         return read_only
 
     def refund_initiated(self, obj):
