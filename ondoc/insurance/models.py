@@ -922,12 +922,18 @@ class UserInsurance(auth_model.TimeStampedModel):
         return user_insurance_obj
 
     def validate_insurance(self, appointment_data):
+        from ondoc.doctor.models import OpdAppointment
+
         response_dict = {
             'is_insured': False,
             'insurance_id': None,
             'insurance_message': "",
             'doctor_specialization_dict': dict()
         }
+
+        # skip insurance check for COD appointments
+        if appointment_data.get('payment_type') == OpdAppointment.COD:
+            return response_dict
 
         profile = appointment_data.get('profile', None)
         user = profile.user

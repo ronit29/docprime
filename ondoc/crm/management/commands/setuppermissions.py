@@ -42,13 +42,14 @@ from ondoc.insurance.models import (Insurer, InsurancePlans, InsuranceThreshold,
                                     InsuranceDistrict, InsuranceTransaction, InsuranceDeal, InsuranceDisease,
                                     UserInsurance, InsurancePlanContent, InsuredMembers, InsurerAccount, InsuranceLead,
                                     InsuranceDiseaseResponse, InsurerPolicyNumber, InsuranceCancelMaster,
-                                    EndorsementRequest, InsuredMemberDocument, InsuredMemberHistory)
+                                    EndorsementRequest, InsuredMemberDocument, InsuredMemberHistory,
+                                    ThirdPartyAdministrator)
 
 from ondoc.procedure.models import Procedure, ProcedureCategory, CommonProcedureCategory, DoctorClinicProcedure, \
     ProcedureCategoryMapping, ProcedureToCategoryMapping, CommonProcedure, IpdProcedure, IpdProcedureFeatureMapping, \
     DoctorClinicIpdProcedure, IpdProcedureCategoryMapping, IpdProcedureCategory, CommonIpdProcedure, \
     IpdProcedureDetailType, IpdProcedureDetail, IpdProcedureSynonym, IpdProcedureSynonymMapping, \
-    IpdProcedurePracticeSpecialization
+    IpdProcedurePracticeSpecialization, IpdProcedureLead
 from ondoc.reports import models as report_models
 
 from ondoc.diagnostic.models import LabPricing
@@ -683,6 +684,16 @@ class Command(BaseCommand):
 
         group, created = Group.objects.get_or_create(name=constants['APPOINTMENT_REFUND_TEAM'])
         #group.permissions.clear()
+
+        group, created = Group.objects.get_or_create(name=constants['IPD_TEAM'])
+        group.permissions.clear()
+
+        content_types = ContentType.objects.get_for_models(Doctor, Hospital, IpdProcedure, HealthInsuranceProvider,
+                                                           ThirdPartyAdministrator, IpdProcedureLead)
+        for cl, ct in content_types.items():
+            permissions = Permission.objects.filter(
+                Q(content_type=ct), Q(codename='change_' + ct.model))
+            group.permissions.add(*permissions)
 
         self.stdout.write('Successfully created groups and permissions')
 
