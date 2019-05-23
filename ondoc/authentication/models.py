@@ -338,6 +338,14 @@ class User(AbstractBaseUser, PermissionsMixin):
         active_insurance = self.purchased_insurance.filter().order_by('id').last()
         return active_insurance if active_insurance and active_insurance.is_valid() else None
 
+    @cached_property
+    def recent_opd_appointment(self):
+        return self.appointments.filter(created_at__gt=timezone.now() - timezone.timedelta(days=90)).order_by('-id')
+
+    @cached_property
+    def recent_lab_appointment(self):
+        return self.lab_appointments.filter(created_at__gt=timezone.now() - timezone.timedelta(days=90)).order_by('-id')
+
     def get_phone_number_for_communication(self):
         from ondoc.communications.models import unique_phone_numbers
         receivers = []

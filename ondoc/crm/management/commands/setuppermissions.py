@@ -689,7 +689,7 @@ class Command(BaseCommand):
         group.permissions.clear()
 
         content_types = ContentType.objects.get_for_models(Doctor, Hospital, IpdProcedure, HealthInsuranceProvider,
-                                                           ThirdPartyAdministrator, IpdProcedureLead)
+                                                           ThirdPartyAdministrator, IpdProcedureLead, UserInsurance)
         for cl, ct in content_types.items():
             permissions = Permission.objects.filter(
                 Q(content_type=ct), Q(codename='change_' + ct.model))
