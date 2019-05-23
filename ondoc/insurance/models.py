@@ -54,11 +54,11 @@ def generate_insurance_policy_number():
         raise ValueError('Sequence Produced is not valid.')
 
 
-def generate_insurance_insurer_policy_number(insurance_plan_id):
-    if not insurance_plan_id:
+def generate_insurance_insurer_policy_number(insurance_plan):
+    if not insurance_plan:
         raise Exception('Could not generate policy number according to the insurer.')
-    plan = InsurancePlans.objects.filter(id=insurance_plan_id).first()
-    policy_number_data = InsurerPolicyNumber.objects.filter(insurance_plan=plan).order_by('-id').first()
+    # plan = InsurancePlans.objects.filter(id=insurance_plan.id).first()
+    policy_number_data = InsurerPolicyNumber.objects.filter(insurance_plan=insurance_plan).order_by('-id').first()
     if not policy_number_data:
         raise Exception('Master Policy number is missing.')
     master_policy_number = policy_number_data.insurer_policy_number
