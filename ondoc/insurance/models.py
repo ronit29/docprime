@@ -1270,10 +1270,10 @@ class UserInsurance(auth_model.TimeStampedModel):
 
         insurance_appointment_stats = self.get_insurance_appointment_stats(booking_date)
 
-        if insurance_appointment_stats['used_ytd_amount'] + appointment_mrp >= ytd_amount or\
-                insurance_appointment_stats['used_ytd_count'] + 1 >= ytd_count or\
-                insurance_appointment_stats['used_daily_amount'] + appointment_mrp >= daily_amount or\
-                insurance_appointment_stats['used_daily_count'] + 1 >= daily_count:
+        if insurance_appointment_stats['used_ytd_amount'] + appointment_mrp > ytd_amount or\
+                insurance_appointment_stats['used_ytd_count'] + 1 > ytd_count or\
+                insurance_appointment_stats['used_daily_amount'] + appointment_mrp > daily_amount or\
+                insurance_appointment_stats['used_daily_count'] + 1 > daily_count:
 
             response['prescription_needed'] = True
             response['created_state'] = True
