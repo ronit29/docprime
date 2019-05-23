@@ -408,6 +408,7 @@ class LabList(viewsets.ReadOnlyModelViewSet):
                 for data in result:
                     if data.get('lab') and ((data.get('lab').get('home_pickup_charges', 0) > 0) or (float(data.get('mrp', 0)) <= threshold.lab_amount_limit)):
                         data.get('lab')['is_home_collection_enabled'] = False
+                        data['pickup_available'] = 0
 
         if result:
             from ondoc.coupon.models import Coupon
