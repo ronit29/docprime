@@ -62,7 +62,8 @@ from django.contrib.contenttypes.fields import GenericRelation
 from django.contrib.contenttypes.fields import GenericForeignKey
 from django.contrib.contenttypes.models import ContentType
 from ondoc.matrix.tasks import push_appointment_to_matrix, push_onboarding_qcstatus_to_matrix, \
-    update_onboarding_qcstatus_to_matrix, create_or_update_lead_on_matrix, push_signup_lead_to_matrix
+    update_onboarding_qcstatus_to_matrix, create_or_update_lead_on_matrix, push_signup_lead_to_matrix, \
+    create_ipd_lead_from_opd_appointment
 # from ondoc.procedure.models import Procedure
 from ondoc.ratings_review import models as ratings_models
 from django.utils import timezone
@@ -472,6 +473,14 @@ class Hospital(auth_model.TimeStampedModel, auth_model.CreatedByModel, auth_mode
         result.extend(list(self.spoc_details.filter(contact_type__in=[SPOCDetails.SPOC, SPOCDetails.MANAGER])))
         if not result:
             result.extend(list(self.spoc_details.filter(contact_type=SPOCDetails.OWNER)))
+        return result
+
+    def has_ipd_doctors(self):
+        result = False
+        for doctor_clinic in self.hospital_doctors.filter(enabled=True):
+            if doctor_clinic.ipd_procedure_clinic_mappings.filter(enabled=True).exists():
+                result = True
+                break
         return result
 
 
@@ -2275,6 +2284,13 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
         return False
 
     def after_commit_tasks(self, old_instance, push_to_matrix):
+        if old_instance is None:
+            try:
+                create_ipd_lead_from_opd_appointment.apply_async(({'obj_id': self.id},),)
+                                                                 # eta=timezone.now() + timezone.timedelta(hours=1))
+
+            except Exception as e:
+                logger.error(str(e))
         if push_to_matrix:
         # Push the appointment data to the matrix .
             try:
@@ -2355,7 +2371,6 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
             raise Exception('Cancelled or Completed appointment cannot be saved')
         # if not self.is_doctor_available():
         #     raise RestFrameworkValidationError("Doctor is on leave.")
-
         # push_to_matrix = kwargs.get('push_again_to_matrix', True)
         # if 'push_again_to_matrix' in kwargs.keys():
         #     kwargs.pop('push_again_to_matrix')
@@ -2782,6 +2797,22 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
         sum = data.get('sum_amount', 0)
         sum = sum if sum else 0
         return {'count': count, 'sum': sum}
+
+    def convert_ipd_lead_data(self):
+        result = {}
+        result['hospital'] = self.hospital
+        result['user'] = self.user
+        result['payment_amount'] = self.deal_price  # To be confirmed
+        if self.user:
+            result['name'] = self.user.full_name
+            result['phone_number'] = self.user.phone_number
+            result['email'] = self.user.email
+            default_user_profile = self.user.get_default_profile()
+            if default_user_profile:
+                result['gender'] = default_user_profile.gender
+                result['dob'] = default_user_profile.dob
+        result['data'] = {'opd_appointment_id': self.id}
+        return result
 
 
 class OpdAppointmentProcedureMapping(models.Model):

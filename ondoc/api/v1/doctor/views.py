@@ -2159,7 +2159,10 @@ class DoctorAppointmentNoAuthViewSet(viewsets.GenericViewSet):
         if opd_appointment:
             opd_appointment.action_completed()
 
-            resp = {'success': 'Appointment Completed Successfully!'}
+            resp = {'success': 'Appointment Completed Successfully!',
+                    'mrp': opd_appointment.mrp,
+                    'payment_type': opd_appointment.payment_type,
+                    'payment_status': opd_appointment.payment_status}
         return Response(resp)
 
 

@@ -9,8 +9,8 @@ from ondoc.crm.constants import constants
 from ondoc.doctor.models import OpdAppointment, DoctorPracticeSpecialization, PracticeSpecialization, Hospital
 from ondoc.diagnostic.models import LabAppointment, LabTest, Lab
 from ondoc.insurance.models import InsurancePlanContent, InsurancePlans, InsuredMembers, UserInsurance, StateGSTCode, \
-    InsuranceCity, InsuranceDistrict, InsuranceDeal, InsurerPolicyNumber, InsuranceLead, EndorsementRequest, \
-    InsuredMemberDocument, InsuranceEligibleCities, ThirdPartyAdministrator
+     ThirdPartyAdministrator, InsuranceEligibleCities, InsuranceCity, InsuranceDistrict, InsuranceDeal, \
+    InsurerPolicyNumber, InsuranceLead, EndorsementRequest, InsuredMemberDocument, InsuranceEligibleCities
 from import_export.admin import ImportExportMixin, ImportExportModelAdmin, base_formats
 import nested_admin
 from import_export import fields, resources

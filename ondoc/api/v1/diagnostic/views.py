@@ -336,6 +336,7 @@ class LabList(viewsets.ReadOnlyModelViewSet):
             entity_url_dict[item.get('lab_id')].append(item.get('url'))
         lab_data = Lab.objects.prefetch_related('lab_documents', 'lab_timings', 'network',
                                                 'home_collection_charges').in_bulk(lab_ids)
+
         category_data = {}
         test_package_queryset = []
         cache = {}
@@ -402,6 +403,18 @@ class LabList(viewsets.ReadOnlyModelViewSet):
         filters = dict()
 
         result = serializer.data
+
+        # disable home pickup for insured customers if lab charges home collection
+        if request.user and request.user.is_authenticated and result:
+            active_insurance = request.user.active_insurance
+            threshold = active_insurance.insurance_plan.threshold.first()
+            if active_insurance and threshold:
+                for data in result:
+                    if data.get('lab') and data.get('lab').get('home_pickup_charges', 0) > 0:
+                        if float(data.get('mrp', 0)) <= threshold.lab_amount_limit:
+                            data.get('lab')['is_home_collection_enabled'] = False
+                            data['pickup_available'] = 0
+
         if result:
             from ondoc.coupon.models import Coupon
             # search_coupon = Coupon.get_search_coupon(request.user)
@@ -1541,6 +1554,8 @@ class LabList(viewsets.ReadOnlyModelViewSet):
         lab = dict()
 
         for obj in labs:
+            if  insurance_data_dict and insurance_data_dict['is_user_insured'] and obj.home_pickup_charges > 0:
+                obj.is_home_collection_enabled = False
             temp_var[obj.id] = obj
             tests[obj.id] = list()
             if test_ids and obj.selected_group and obj.selected_group.selected_tests:
@@ -1776,12 +1791,50 @@ class LabList(viewsets.ReadOnlyModelViewSet):
         # if entity.exists():
         #     lab_serializable_data['url'] = entity.first()['url'] if len(entity) == 1 else None
         temp_data = dict()
+
         temp_data['lab'] = lab_serializable_data
         temp_data['distance_related_charges'] = distance_related_charges
         temp_data['tests'] = test_serializer.data
         temp_data['lab_tests'] = lab_test_serializer.data
         temp_data['lab_timing'], temp_data["lab_timing_data"] = lab_timing, lab_timing_data
         temp_data['total_test_count'] = total_test_count
+
+        #disable home pickup for insured customers if lab charges home collection
+        if request.user and request.user.is_authenticated and temp_data.get('lab'):
+            active_insurance = request.user.active_insurance
+            threshold = active_insurance.insurance_plan.threshold.first()
+            if active_insurance and threshold:
+                turn_off_home_collection = False                
+                if temp_data.get('lab').get('home_pickup_charges', 0) > 0:
+                    if not temp_data.get('tests',[]):
+                        turn_off_home_collection = True
+                    for x in temp_data.get('tests', []):
+                        if float(x.get('mrp', 0)) <= threshold.lab_amount_limit:
+                            turn_off_home_collection = True
+                    if turn_off_home_collection:
+                        temp_data.get('lab')['is_home_collection_enabled'] = False
+                        for x in temp_data.get('tests', []):
+                            x['is_home_collection_enabled'] = False
+                                
+                #         temp_data.get('lab')['is_home_collection_enabled'] = False
+
+
+                # if not temp_data.get('tests',[]):
+                #     temp_data.get('lab')['is_home_collection_enabled'] = False
+                # elif temp_data.get('lab').get('home_pickup_charges', 0) > 0:
+                #     temp_data.get('lab')['is_home_collection_enabled'] = False
+                #     temp_data.get('tests')[0]['is_home_collection_enabled'] = False
+                #     return Response(temp_data)
+                # else:
+                #     for x in temp_data.get('tests', []):
+                #         threshold = active_insurance.insurance_plan.threshold.all()
+                #         if threshold and threshold.first() and threshold.first().lab_amount_limit:
+                #             lab_amount_limit = threshold.first().lab_amount_limit
+                #             if float(x.get('mrp', 0)) <= lab_amount_limit:
+                #                 x['is_home_collection_enabled'] = False
+                #                 temp_data.get('lab')['is_home_collection_enabled'] = False
+                #                 break
+
 
         # temp_data['url'] = entity.first()['url'] if len(entity) == 1 else None
 
@@ -2698,7 +2751,10 @@ class DoctorLabAppointmentsNoAuthViewSet(viewsets.GenericViewSet):
             # lab_appointment_serializer = diagnostic_serializer.LabAppointmentRetrieveSerializer(lab_appointment,
             #                                                                                         context={
             #                                                                                             'request': request})
-            resp = {'success':'LabAppointment Updated Successfully!'}
+            resp = {'success':'LabAppointment Updated Successfully!',
+                    'mrp': lab_appointment.price,
+                    'payment_status': lab_appointment.payment_status,
+                    'payment_type': lab_appointment.payment_type}
         return Response(resp)
 
 
