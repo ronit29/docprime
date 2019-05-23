@@ -4015,9 +4015,13 @@ class IpdProcedureViewSet(viewsets.GenericViewSet):
              'breadcrumb': breadcrumb})
 
     def create_lead(self, request):
+        from ondoc.procedure.models import IpdProcedureLead
         serializer = serializers.IpdProcedureLeadSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-        obj_created = serializer.save()
+        validated_data = serializer.validated_data
+        validated_data['status'] = IpdProcedureLead.NEW
+        obj_created = IpdProcedureLead(**validated_data)
+        obj_created.save()
         return Response(serializers.IpdProcedureLeadSerializer(obj_created).data)
 
     def list_by_alphabet(self, request):

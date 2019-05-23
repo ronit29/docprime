@@ -649,11 +649,11 @@ class LabAppointmentModelSerializer(serializers.ModelSerializer):
 
     def get_lab_thumbnail(self, obj):
         request = self.context.get("request")
-        return request.build_absolute_uri(obj.lab.get_thumbnail()) if obj.lab.get_thumbnail() else None
+        return request.build_absolute_uri(obj.lab.get_thumbnail()) if obj.lab and obj.lab.get_thumbnail() else None
 
     def get_patient_thumbnail(self, obj):
         request = self.context.get("request")
-        return request.build_absolute_uri(obj.profile.get_thumbnail()) if obj.profile.get_thumbnail() else None
+        return request.build_absolute_uri(obj.profile.get_thumbnail()) if obj.profile and obj.profile.get_thumbnail() else None
 
     def get_patient_name(self, obj):
         if obj.profile_detail:

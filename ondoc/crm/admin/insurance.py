@@ -10,7 +10,7 @@ from ondoc.doctor.models import OpdAppointment, DoctorPracticeSpecialization, Pr
 from ondoc.diagnostic.models import LabAppointment, LabTest, Lab
 from ondoc.insurance.models import InsurancePlanContent, InsurancePlans, InsuredMembers, UserInsurance, StateGSTCode, \
     InsuranceCity, InsuranceDistrict, InsuranceDeal, InsurerPolicyNumber, InsuranceLead, EndorsementRequest, \
-    InsuredMemberDocument, InsuranceEligibleCities
+    InsuredMemberDocument, InsuranceEligibleCities, ThirdPartyAdministrator
 from import_export.admin import ImportExportMixin, ImportExportModelAdmin, base_formats
 import nested_admin
 from import_export import fields, resources
@@ -1117,3 +1117,15 @@ class InsuredMemberHistoryAdmin(admin.ModelAdmin):
 
 class InsuranceEligibleCitiesAdmin(admin.ModelAdmin):
     model = InsuranceEligibleCities
+
+
+class ThirdPartyAdministratorResource(resources.ModelResource):
+    class Meta:
+        model = ThirdPartyAdministrator
+        fields = ['id', 'name']
+
+
+class ThirdPartyAdministratorAdmin(ImportExportMixin, admin.ModelAdmin):
+    resource_class = ThirdPartyAdministratorResource
+    search_fields = ['name']
+    list_display = ['id', 'name']
