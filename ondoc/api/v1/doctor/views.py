@@ -2082,7 +2082,7 @@ class DoctorAvailabilityTimingViewSet(viewsets.ViewSet):
                                                             hospital_id=validated_data.get(
                                                                 'hospital_id')).first()
         if dc_obj:
-            timeslots = dc_obj.get_timings()
+            timeslots = dc_obj.get_timings(request.user)
         else:
             res_data = OrderedDict()
             for i in range(30):

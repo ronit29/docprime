@@ -209,6 +209,10 @@ class LabList(viewsets.ReadOnlyModelViewSet):
         max_distance = max_distance*1000 if max_distance is not None else 10000
         min_distance = min_distance*1000 if min_distance is not None else 0
 
+        if request.user and request.user.active_insurance and request.user.active_insurance.insurance_plan:
+            if not request.user.active_insurance.insurance_plan.plan_usages.get('package_enabled'):
+                return Response({"result": [], "result_count": 0})
+
         package_free_or_not_dict = get_package_free_or_not_dict(request)
         page_size = 30
         if not request.query_params.get('page') or int(request.query_params.get('page')) < 1:

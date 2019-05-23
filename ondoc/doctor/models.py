@@ -1221,7 +1221,7 @@ class DoctorClinic(auth_model.TimeStampedModel, auth_model.WelcomeCallingDone):
     # def __str__(self):
     #     return '{}-{}'.format(self.doctor, self.hospital)
 
-    def get_timings(self):
+    def get_timings(self, user):
         from ondoc.api.v2.doctor import serializers as v2_serializers
         from ondoc.api.v1.common import serializers as common_serializers
         clinic_timings= self.availability.order_by("start")
@@ -1242,6 +1242,14 @@ class DoctorClinic(auth_model.TimeStampedModel, auth_model.WelcomeCallingDone):
         date = datetime.datetime.today().strftime('%Y-%m-%d')
         booking_details = {"type": "doctor"}
         slots = obj.get_timing_slots(date, total_leaves, booking_details)
+        temp_slots = slots.copy()
+        active_appointments = None
+        if user.active_insurance:
+            active_appointments = OpdAppointment.get_insured_active_appointment(user.active_insurance)
+            for appointment in active_appointments:
+                for slot in temp_slots:
+                    if str(appointment.time_slot_start.date()) == slot and clinic_timings.first().doctor_clinic.hospital_id == appointment.hospital_id:
+                        del slots[slot]
         upcoming_slots = obj.get_upcoming_slots(time_slots=slots)
         res_data = {"time_slots": slots, "upcoming_slots": upcoming_slots}
         return res_data
