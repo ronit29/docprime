@@ -42,6 +42,7 @@ from ondoc.insurance.models import (Insurer, InsurancePlans, InsuranceThreshold,
                                     InsuranceDistrict, InsuranceTransaction, InsuranceDeal, InsuranceDisease,
                                     UserInsurance, InsurancePlanContent, InsuredMembers, InsurerAccount, InsuranceLead,
                                     InsuranceDiseaseResponse, InsurerPolicyNumber, InsuranceCancelMaster,
+                                    EndorsementRequest, InsuredMemberDocument, InsuredMemberHistory,
                                     ThirdPartyAdministrator)
 
 from ondoc.procedure.models import Procedure, ProcedureCategory, CommonProcedureCategory, DoctorClinicProcedure, \
@@ -688,7 +689,7 @@ class Command(BaseCommand):
         group.permissions.clear()
 
         content_types = ContentType.objects.get_for_models(Doctor, Hospital, IpdProcedure, HealthInsuranceProvider,
-                                                           ThirdPartyAdministrator, IpdProcedureLead)
+                                                           ThirdPartyAdministrator, IpdProcedureLead, UserInsurance)
         for cl, ct in content_types.items():
             permissions = Permission.objects.filter(
                 Q(content_type=ct), Q(codename='change_' + ct.model))
@@ -913,7 +914,8 @@ class Command(BaseCommand):
                                                            StateGSTCode, InsuranceDistrict, InsuranceThreshold,
                                                            UserInsurance, InsuranceDeal, InsuranceLead,
                                                            InsuranceTransaction, InsuranceDiseaseResponse,
-                                                           InsuredMembers, InsurerPolicyNumber, InsuranceCancelMaster)
+                                                           InsuredMembers, InsurerPolicyNumber, InsuranceCancelMaster,
+                                                           EndorsementRequest)
 
         for cl, ct in content_types.items():
             permissions = Permission.objects.filter(
@@ -941,7 +943,8 @@ class Command(BaseCommand):
                                                            StateGSTCode, InsuranceDistrict, InsuranceThreshold,
                                                            UserInsurance, InsuranceDeal, InsuranceLead,
                                                            InsuranceTransaction, InsuranceDiseaseResponse,
-                                                           InsuredMembers, InsurerPolicyNumber, InsuranceCancelMaster)
+                                                           InsuredMembers, InsurerPolicyNumber, InsuranceCancelMaster,
+                                                           EndorsementRequest, InsuredMemberDocument, InsuredMemberHistory)
 
         for cl, ct in content_types.items():
             permissions = Permission.objects.filter(

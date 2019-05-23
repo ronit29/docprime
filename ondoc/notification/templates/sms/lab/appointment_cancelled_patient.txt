@@ -12,7 +12,10 @@ Date and Time : {{instance.time_slot_start|date:"D jS F Y"}} || {{instance.time_
 {% if instance.effective_price > 0 %}
 Refund Amount : {{instance.effective_price}}
 
+{% if instance.payment_type !=3 %}
 Refund if applicable will be credited within 5-7 working days.
+{% endif %}
+
 {% endif %}
 
 In case of any queries please contact us at customercare@docprime.com .
