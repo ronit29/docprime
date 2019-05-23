@@ -188,6 +188,10 @@ class IpdProcedureLead(auth_model.TimeStampedModel):
             update_onboarding_qcstatus_to_matrix.apply_async(({'obj_type': self.__class__.__name__, 'obj_id': self.id}
                                                               ,), countdown=5)
 
+    @staticmethod
+    def is_valid_hospital_for_lead(hospital):
+        return hospital.has_ipd_doctors()
+
 
 class IpdProcedureDetailType(auth_model.TimeStampedModel):
     name = models.CharField(max_length=1000)

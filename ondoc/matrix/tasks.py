@@ -902,6 +902,22 @@ def push_non_bookable_doctor_lead_to_matrix(self, nb_doc_lead_id):
         logger.error("Error while pushing the non bookable doctor lead to matrix. ", str(e))
 
 
-# @task(bind=True, max_retries=2)
-# def create_ipd_lead_from_opd_appointment(self, data):
-#     obj = OpdAppointment.objects.fliter(id)
+@task(bind=True, max_retries=2)
+def create_ipd_lead_from_opd_appointment(self, data):
+    from ondoc.doctor.models import OpdAppointment
+    from ondoc.procedure.models import IpdProcedureLead
+    obj_id = data.get('obj_id')
+    if not obj_id:
+        logger.error("[CELERY ERROR: Incorrect values provided.]")
+        raise ValueError()
+    obj = OpdAppointment.objects.filter(id=obj_id).first()
+    if not obj:
+        return
+    is_valid = IpdProcedureLead.is_valid_hospital_for_lead(obj.hospital)
+    if not is_valid:
+        return
+    data = obj.convert_ipd_lead_data()
+    data['status'] = IpdProcedureLead.NEW
+    data['source'] = IpdProcedureLead.CRM
+    obj_created = IpdProcedureLead(**data)
+    obj_created.save()
