@@ -868,8 +868,8 @@ class InsuranceDistrictAdmin(ImportExportModelAdmin):
 
 class InsurerPolicyNumberAdmin(admin.ModelAdmin):
     model = InsurerPolicyNumber
-    fields = ('insurance_plan', 'insurer_policy_number')
-    list_display = ('insurance_plan', 'insurer_policy_number', 'created_at')
+    fields = ('insurer', 'insurance_plan', 'insurer_policy_number')
+    list_display = ('insurer', 'insurance_plan', 'insurer_policy_number', 'created_at')
     # form = InsurerPolicyNumberForm
     # search_fields = ['insurer']
     # autocomplete_fields = ['insurer', 'insurance_plan']

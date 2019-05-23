@@ -209,8 +209,8 @@ class LabList(viewsets.ReadOnlyModelViewSet):
         max_distance = max_distance*1000 if max_distance is not None else 10000
         min_distance = min_distance*1000 if min_distance is not None else 0
 
-        if request.user and request.user.active_insurance and request.user.active_insurance.insurance_plan:
-            if not request.user.active_insurance.insurance_plan.plan_usages.get('package_enabled'):
+        if request.user and request.user.active_insurance and request.user.active_insurance.insurance_plan and request.user.active_insurance.insurance_plan.plan_usages:
+            if request.user.active_insurance.insurance_plan.plan_usages.get('package_disabled'):
                 return Response({"result": [], "result_count": 0})
 
         package_free_or_not_dict = get_package_free_or_not_dict(request)
@@ -2338,9 +2338,6 @@ class LabAppointmentView(mixins.CreateModelMixin,
 
     def update(self, request, pk=None):
         lab_appointment = get_object_or_404(LabAppointment, pk=pk)
-        if lab_appointment and lab_appointment.status == LabAppointment.CREATED:
-            return Response(status=status.HTTP_404_NOT_FOUND)
-
         # lab_appointment = self.get_queryset().filter(pk=pk).first()
         # if not lab_appointment:
         #     return Response()
