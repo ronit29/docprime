@@ -24,7 +24,7 @@ from import_export.admin import ImportExportMixin
 
 from ondoc.diagnostic.models import Lab, LabAppointment, LabPricingGroup
 from ondoc.doctor.models import Hospital, Doctor, OpdAppointment, HospitalNetwork
-from ondoc.insurance.models import UserInsurance, InsurancePlans, Insurer
+from ondoc.insurance.models import UserInsurance
 from django.db.models import Q
 from django import forms
 
