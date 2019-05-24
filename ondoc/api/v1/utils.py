@@ -352,11 +352,12 @@ def labappointment_transform(app_data):
     app_data["user"] = app_data["user"].id
     app_data["profile"] = app_data["profile"].id
     app_data["home_pickup_charges"] = str(app_data.get("home_pickup_charges",0))
-    prescription_objects = app_data["prescription_list"]
-    prescription_id_list = []
-    for prescription_data in prescription_objects:
-        prescription_id_list.append({'prescription': prescription_data.get('prescription').id})
-    app_data["prescription_list"] = prescription_id_list
+    prescription_objects = app_data.get("prescription_list", [])
+    if prescription_objects:
+        prescription_id_list = []
+        for prescription_data in prescription_objects:
+            prescription_id_list.append({'prescription': prescription_data.get('prescription').id})
+        app_data["prescription_list"] = prescription_id_list
 
 
     if app_data.get("coupon"):

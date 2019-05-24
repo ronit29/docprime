@@ -2002,7 +2002,6 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin,
         appointment_status = OpdAppointment.BOOKED
 
         if insurance and insurance.is_valid():
-            booking_date = appointment_data.get('time_slot_start').date()
             mrp = Decimal(0)
 
             for extras in appointment_data.get('extra_details',[]):
@@ -2363,7 +2362,7 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin,
             "is_appointment_insured": is_appointment_insured,
             "insurance": insurance_id,
             "coupon_data": price_data.get("coupon_data"),
-            "prescription_list": data.get('prescription_list')
+            "prescription_list": data.get('prescription_list', [])
         }
 
         if data.get('included_in_user_plan', False):

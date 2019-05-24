@@ -1269,16 +1269,16 @@ class UserInsurance(auth_model.TimeStampedModel):
         insurance_appointment_stats = self.get_insurance_appointment_stats()
 
         if ytd_count and insurance_appointment_stats['used_ytd_count'] + 1 > ytd_count:
-            response['prescription_needed'] = True
+            response['created_state'] = True
         elif ytd_amount and insurance_appointment_stats['used_ytd_amount'] + appointment_mrp > ytd_amount:
-            response['prescription_needed'] = True
+            response['created_state'] = True
         elif daily_amount and insurance_appointment_stats['used_daily_amount'] + appointment_mrp > daily_amount:
-            response['prescription_needed'] = True
+            response['created_state'] = True
         elif daily_count and insurance_appointment_stats['used_daily_count'] + 1 > daily_count:
-            response['prescription_needed'] = True
+            response['created_state'] = True
 
-        if AppointmentPrescription.prescription_exist_for_user_current_date(self.user, timezone.now().date()):
-            response['prescription_needed'] = False
+        if response['created_state'] and not AppointmentPrescription.prescription_exist_for_user_current_date(self.user, timezone.now().date()):
+            response['prescription_needed'] = True
 
         return response
 
