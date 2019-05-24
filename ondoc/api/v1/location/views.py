@@ -291,7 +291,7 @@ class SpecialityCityFooter(Footer):
 
     def specialist_in_popular_localities(self):
         if self.location:
-            query = '''select eu.url, concat(eu.specialization,' in ',eu.sublocality_value ,' ',eu.locality_value) title from entity_urls eu where
+            query = '''select eu.url, concat(eu.specialization,' in ',eu.sublocality_value ,', ',eu.locality_value) title from entity_urls eu where
                 specialization_id = %s and sitemap_identifier ='SPECIALIZATION_LOCALITY_CITY'  
                 and ST_DWithin(sublocality_location, %s, 10000) and is_valid=True 
                 and lower(locality_value) = lower(%s)
@@ -354,7 +354,7 @@ class SpecialityLocalityFooter(Footer):
 
     def specialist_in_popular_localities(self):
         if self.centroid:
-            query = '''select eu.url, concat(eu.specialization,' in ',eu.sublocality_value, ' ',eu.locality_value ) title from entity_urls eu where
+            query = '''select eu.url, concat(eu.specialization,' in ',eu.sublocality_value, ', ',eu.locality_value ) title from entity_urls eu where
                 specialization_id = %s and sitemap_identifier ='SPECIALIZATION_LOCALITY_CITY'  
                 and ST_DWithin(sublocality_location, %s, 10000) and is_valid=True 
                 and lower(locality_value) = lower(%s) and sublocality_id != %s
@@ -366,7 +366,7 @@ class SpecialityLocalityFooter(Footer):
 
     def specialist_in_locality(self):
 
-        query = ''' select eu.url, concat(eu.specialization,' in ', eu.sublocality_value, ' ',  eu.locality_value) title from seo_specialization ss 
+        query = ''' select eu.url, concat(eu.specialization,' in ', eu.sublocality_value, ', ',  eu.locality_value) title from seo_specialization ss 
                     inner join entity_urls eu on ss.specialization_id = eu.specialization_id 
                     and eu.sublocality_id=%s and eu.sitemap_identifier='SPECIALIZATION_LOCALITY_CITY' 
                     and eu.is_valid=True and eu.specialization_id!=%s order by count desc limit 10'''
@@ -456,7 +456,7 @@ class DoctorProfileFooter(Footer):
 
     def specialist_in_locality(self):
 
-        query = ''' select eu.url, concat(eu.specialization,' in ', eu.sublocality_value, ' ',  eu.locality_value) title from seo_specialization ss 
+        query = ''' select eu.url, concat(eu.specialization,' in ', eu.sublocality_value, ', ',  eu.locality_value) title from seo_specialization ss 
                        inner join entity_urls eu on ss.specialization_id = eu.specialization_id 
                        and eu.sublocality_id=%s and eu.sitemap_identifier='SPECIALIZATION_LOCALITY_CITY' 
                        and eu.is_valid=True order by count desc limit 10'''
@@ -472,7 +472,7 @@ class DoctorProfileFooter(Footer):
     #     return self.get_urls(query, [self.locality])
 
     def specialist_in_popular_localities(self):
-        query = '''select eu.url, concat(eu.specialization,' in ',eu.sublocality_value,' ',eu.locality_value) title from entity_urls eu where
+        query = '''select eu.url, concat(eu.specialization,' in ',eu.sublocality_value,', ',eu.locality_value) title from entity_urls eu where
                 specialization_id = %s and sitemap_identifier ='SPECIALIZATION_LOCALITY_CITY'  
                 and ST_DWithin(sublocality_location, %s, 10000) and is_valid=True                 
                 order by count desc limit 10'''
@@ -506,7 +506,7 @@ class DoctorCityFooter(Footer):
         return response
 
     def doctor_in_top_localities(self):
-        query = '''select eu.url, concat('Doctors',' in ',eu.sublocality_value,' ',eu.locality_value) title from entity_urls eu where
+        query = '''select eu.url, concat('Doctors',' in ',eu.sublocality_value,', ',eu.locality_value) title from entity_urls eu where
                 sitemap_identifier ='DOCTORS_LOCALITY_CITY'  
                 and ST_DWithin(sublocality_location, %s,10000) and is_valid=True
                 and lower(locality_value) = lower(%s)
@@ -563,7 +563,7 @@ class DoctorLocalityCityFooter(Footer):
 
     def doctors_in_locality(self):
 
-        query = ''' select eu.url, concat(eu.specialization,' in ', eu.sublocality_value, ' ',  eu.locality_value) title from seo_specialization ss 
+        query = ''' select eu.url, concat(eu.specialization,' in ', eu.sublocality_value, ', ',  eu.locality_value) title from seo_specialization ss 
                            inner join entity_urls eu on ss.specialization_id = eu.specialization_id 
                            and eu.sublocality_id=%s and eu.sitemap_identifier='SPECIALIZATION_LOCALITY_CITY' 
                            and eu.is_valid=True and eu.locality_value iLIKE %s order by count desc limit 10'''
