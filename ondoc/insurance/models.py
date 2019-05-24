@@ -3,7 +3,7 @@ from django.contrib.gis.geos import Point
 from django.core.validators import FileExtensionValidator
 
 from ondoc.notification.models import EmailNotification
-from ondoc.notification.tasks import send_insurance_notifications, send_insurance_float_limit_notifications
+from ondoc.notification.tasks import send_insurance_notifications, send_insurance_float_limit_notifications, send_insurance_endorsment_notifications
 from ondoc.insurance.tasks import push_insurance_buy_to_matrix
 from ondoc.notification.tasks import push_insurance_banner_lead_to_matrix
 import json
@@ -252,6 +252,16 @@ class InsuranceCity(auth_model.TimeStampedModel):
     def __str__(self):
         return "{} ({})".format(self.city_code, self.city_name)
 
+    @classmethod
+    def get_city_code_with_name(cls, name):
+        if not name:
+            return None
+        city_obj = cls.objects.filter(city_name=name).first()
+        if not city_obj:
+            return None
+        city_code = city_obj.city_code
+        return city_code
+
     class Meta:
         db_table = "insurance_city"
 
@@ -265,6 +275,16 @@ class InsuranceDistrict(auth_model.TimeStampedModel):
 
     def __str__(self):
         return "{} ({})".format(self.district_code, self.district_name)
+
+    @classmethod
+    def get_district_code_with_name(cls, name):
+        if not name:
+            return None
+        district_obj = InsuranceDistrict.objects.filter(district_name=name).first()
+        if not district_obj:
+            return None
+        district_code = district_obj.district_code
+        return district_code
 
     class Meta:
         db_table = "insurance_district"
@@ -491,6 +511,9 @@ class UserInsurance(auth_model.TimeStampedModel):
             return proposers[0]
 
         return None
+
+    def get_members(self):
+        return InsuredMembers.objects.filter(user_insurance=self).all()
 
     @classmethod
     def get_user_insurance(cls, user):
@@ -886,7 +909,6 @@ class UserInsurance(auth_model.TimeStampedModel):
             # member['profile'] = member['profile'].id if member.get('profile') else None
         insurance_data['insured_members'] = members
 
-
         user_insurance_obj = UserInsurance.objects.create(insurance_plan=insurance_data['insurance_plan'],
                                                             user=insurance_data['user'],
                                                             insured_members=json.dumps(insurance_data['insured_members']),
@@ -895,16 +917,23 @@ class UserInsurance(auth_model.TimeStampedModel):
                                                             premium_amount=insurance_data['premium_amount'],
                                                             order=insurance_data['order'],
                                                             policy_number=generate_insurance_insurer_policy_number(insurer_id))
+
         insured_members = InsuredMembers.create_insured_members(user_insurance_obj)
         return user_insurance_obj
 
     def validate_insurance(self, appointment_data):
+        from ondoc.doctor.models import OpdAppointment
+
         response_dict = {
             'is_insured': False,
             'insurance_id': None,
             'insurance_message': "",
             'doctor_specialization_dict': dict()
         }
+
+        # skip insurance check for COD appointments
+        if appointment_data.get('payment_type') == OpdAppointment.COD:
+            return response_dict
 
         profile = appointment_data.get('profile', None)
         user = profile.user
@@ -1294,8 +1323,10 @@ class InsuredMembers(auth_model.TimeStampedModel):
     town = models.CharField(max_length=100, null=False)
     district = models.CharField(max_length=100, null=False)
     state = models.CharField(max_length=100, null=False)
-    state_code = models.CharField(max_length=10, null=True)
+    state_code = models.CharField(max_length=10, default='')
     user_insurance = models.ForeignKey(UserInsurance, related_name="members", on_delete=models.DO_NOTHING, null=False)
+    city_code = models.CharField(max_length=10, blank=True, null=True, default='')
+    district_code = models.CharField(max_length=10, blank=True, null=True, default='')
 
     class Meta:
         db_table = "insured_members"
@@ -1309,6 +1340,26 @@ class InsuredMembers(auth_model.TimeStampedModel):
         proposer_name = '%s %s %s %s' % (self.title, proposer_fname, proposer_mname, proposer_lname)
         proposer_name = " ".join(proposer_name.split())
         return proposer_name
+
+    def update_member(self, endorsed_data):
+        self.first_name = endorsed_data.first_name
+        self.middle_name = endorsed_data.middle_name
+        self.last_name = endorsed_data.last_name
+        self.title = endorsed_data.title
+        self.dob = endorsed_data.dob
+        self.email = endorsed_data.email
+        self.relation = endorsed_data.relation
+        self.address = endorsed_data.address
+        self.state = endorsed_data.state
+        self.state_code = endorsed_data.state_code
+        self.gender = endorsed_data.gender
+        self.phone_number = endorsed_data.phone_number
+        self.town = endorsed_data.town
+        self.district = endorsed_data.district
+        self.city_code = endorsed_data.city_code
+        self.district_code = endorsed_data.district_code
+        self.pincode = endorsed_data.pincode
+        self.save()
 
     @classmethod
     def create_insured_members(cls, user_insurance):
@@ -1332,8 +1383,17 @@ class InsuredMembers(auth_model.TimeStampedModel):
                                                                         district=member.get('district'),
                                                                         state=member.get('state'),
                                                                         state_code = member.get('state_code'),
-                                                                        user_insurance=user_insurance
+                                                                        user_insurance=user_insurance,
+                                                                        city_code=member.get('city_code'),
+                                                                        district_code=member.get('district_code')
                                                                         )
+
+    def is_document_available(self):
+        document_obj = InsuredMemberDocument.objects.filter(member=self, document_image__isnull=False).first()
+        if document_obj:
+            return True
+        else:
+            return False
 
 
 class Insurance(auth_model.TimeStampedModel):
@@ -1432,8 +1492,12 @@ class InsurerPolicyNumber(auth_model.TimeStampedModel):
 
 
 class InsuranceDummyData(auth_model.TimeStampedModel):
+    BOOKING = 1
+    ENDORSEMENT = 2
+    TYPE_CHOICES = [(BOOKING, "Booking"), (ENDORSEMENT, "Endorsement")]
     user = models.ForeignKey(User, related_name='user_insurance_dummy_data', on_delete=models.DO_NOTHING)
     data = JSONField(null=True, blank=True)
+    type = models.PositiveIntegerField(choices=TYPE_CHOICES, default=BOOKING)
 
     class Meta:
         db_table = 'insurance_dummy_data'
@@ -1476,6 +1540,188 @@ class InsuranceCoveredEntity(auth_model.TimeStampedModel):
 
     class Meta:
         db_table = 'insurance_covered_entity'
+
+
+class EndorsementRequest(auth_model.TimeStampedModel):
+    MALE = 'm'
+    FEMALE = 'f'
+    OTHER = 'o'
+    GENDER_CHOICES = [(MALE, 'Male'), (FEMALE, 'Female'), (OTHER, 'Other')]
+    SELF = 'self'
+    SPOUSE = 'spouse'
+    SON = 'son'
+    DAUGHTER = 'daughter'
+    RELATION_CHOICES = [(SPOUSE, 'Spouse'), (SON, 'Son'), (DAUGHTER, 'Daughter'), (SELF, 'Self')]
+    ADULT = "adult"
+    CHILD = "child"
+    MEMBER_TYPE_CHOICES = [(ADULT, 'adult'), (CHILD, 'child')]
+    MR = 'mr.'
+    MISS = 'miss'
+    MRS = 'mrs.'
+    MAST = 'mast.'
+    PENDING = 1
+    APPROVED = 2
+    REJECT = 3
+    STATUS_CHOICES = [(PENDING, "Pending"), (APPROVED, "Approved"), (REJECT, "Reject")]
+    TITLE_TYPE_CHOICES = [(MR, 'mr.'), (MRS, 'mrs.'), (MISS, 'miss'), (MAST, 'mast.')]
+    member = models.ForeignKey(InsuredMembers, related_name='related_endorse_request', on_delete=models.DO_NOTHING)
+    insurance = models.ForeignKey(UserInsurance, related_name='endorse_members', on_delete=models.DO_NOTHING)
+    first_name = models.CharField(max_length=50, null=False)
+    last_name = models.CharField(max_length=50, null=True)
+    dob = models.DateField(blank=False, null=False)
+    email = models.EmailField(max_length=100, null=True)
+    relation = models.CharField(max_length=50, choices=RELATION_CHOICES, default=None)
+    pincode = models.PositiveIntegerField(default=None)
+    address = models.TextField(default=None)
+    gender = models.CharField(max_length=50, choices=GENDER_CHOICES, default=None)
+    phone_number = models.BigIntegerField(blank=True, null=True,
+                                          validators=[MaxValueValidator(9999999999), MinValueValidator(1000000000)])
+    profile = models.ForeignKey(auth_model.UserProfile, related_name="endorsement_insurance", on_delete=models.SET_NULL, null=True)
+    title = models.CharField(max_length=20, choices=TITLE_TYPE_CHOICES, default=None)
+    middle_name = models.CharField(max_length=50, null=True)
+    town = models.CharField(max_length=100, null=False)
+    district = models.CharField(max_length=100, null=False)
+    state = models.CharField(max_length=100, null=False)
+    state_code = models.CharField(max_length=10, default='')
+    status = models.PositiveIntegerField(choices=STATUS_CHOICES, default=PENDING)
+    city_code = models.CharField(max_length=10, default='')
+    district_code = models.CharField(max_length=10, default='')
+    member_type = models.CharField(max_length=20, choices=MEMBER_TYPE_CHOICES, default=ADULT)
+    mail_coi_to_customer = models.BooleanField(default=False)
+    reject_reason = models.CharField(max_length=150, blank=True, null=True)
+
+    @classmethod
+    def is_endorsement_exist(cls, member_obj):
+        endorsement_request = cls.objects.filter(member=member_obj, status=EndorsementRequest.PENDING).first()
+        if endorsement_request:
+            return True
+        else:
+            return False
+
+    @classmethod
+    def process_endorsment_notifications(cls, status, user):
+        user_id = user.id
+        send_insurance_endorsment_notifications.apply_async(({'user_id': user_id, 'endorsment_status': status}, ))
+
+
+    @classmethod
+    def create(cls, endorsed_member):
+        del endorsed_member['is_change']
+        del endorsed_member['image_ids']
+        end_obj = EndorsementRequest.objects.create(**endorsed_member)
+        return end_obj
+
+    def process_endorsement(self):
+        insured_member = self.member
+        InsuredMemberHistory.create_member(insured_member)
+        insured_member.update_member(self)
+        profile = self.member.profile
+        profile.update_profile_post_endorsement(self)
+
+    def process_coi(self):
+        user_insurance = self.insurance
+        if not user_insurance:
+            logger.error('User Insurance not found for the endorsment request with id %d' % self.id)
+            return
+        endorsment_members = user_insurance.endorse_members.all()
+        total_endorsment_members = endorsment_members.count()
+        endorment_rejected_members_count = user_insurance.endorse_members.filter(status=EndorsementRequest.REJECT).count()
+        if total_endorsment_members == endorment_rejected_members_count:
+            return
+
+        endorsed_members_count = user_insurance.endorse_members.filter(~Q(status=EndorsementRequest.PENDING),
+                                                                       mail_coi_to_customer=True).count()
+
+        if total_endorsment_members == endorsed_members_count:
+            try:
+                user_insurance.generate_pdf()
+            except Exception as e:
+                logger.error('Insurance coi pdf cannot be generated. %s' % str(e))
+
+            EndorsementRequest.process_endorsment_notifications(EndorsementRequest.APPROVED, user_insurance.user)
+
+    def reject_endorsement(self):
+        user_insurance = self.insurance
+        if not user_insurance:
+            logger.error('User Insurance not found for the endorsment request with id %d' % self.id)
+            return
+        endorsment_members = user_insurance.endorse_members.all()
+        total_endorsment_members = endorsment_members.count()
+        endorment_rejected_members_count = user_insurance.endorse_members.filter(status=EndorsementRequest.REJECT).count()
+
+        if total_endorsment_members == endorment_rejected_members_count:
+            EndorsementRequest.process_endorsment_notifications(EndorsementRequest.REJECT, user_insurance.user)
+
+    class Meta:
+        db_table = 'insurance_endorsement'
+
+
+class InsuredMemberDocument(auth_model.TimeStampedModel):
+    member = models.ForeignKey(InsuredMembers, related_name='related_document', on_delete=models.DO_NOTHING)
+    # document_image = models.ImageField(upload_to='users/images', height_field=None, width_field=None, blank=True, null=True)
+    document_image = models.FileField(upload_to='users/images', blank=False, null=False, validators=[
+        FileExtensionValidator(allowed_extensions=['pdf', 'jpg', 'jpeg', 'png'])])
+    is_enabled = models.BooleanField(default=False)
+    endorsement_request = models.ForeignKey(EndorsementRequest, related_name='member_documents', null=True, on_delete=models.DO_NOTHING)
+
+    class Meta:
+        db_table = 'insured_member_document'
+
+
+class InsuredMemberHistory(auth_model.TimeStampedModel):
+    MALE = 'm'
+    FEMALE = 'f'
+    OTHER = 'o'
+    GENDER_CHOICES = [(MALE, 'Male'), (FEMALE, 'Female'), (OTHER, 'Other')]
+    SELF = 'self'
+    SPOUSE = 'spouse'
+    SON = 'son'
+    DAUGHTER = 'daughter'
+    RELATION_CHOICES = [(SPOUSE, 'Spouse'), (SON, 'Son'), (DAUGHTER, 'Daughter'), (SELF, 'Self')]
+    ADULT = "adult"
+    CHILD = "child"
+    MEMBER_TYPE_CHOICES = [(ADULT, 'adult'), (CHILD, 'child')]
+    MR = 'mr.'
+    MISS = 'miss'
+    MRS = 'mrs.'
+    MAST = 'mast.'
+    TITLE_TYPE_CHOICES = [(MR, 'mr.'), (MRS, 'mrs.'), (MISS, 'miss'), (MAST, 'mast.')]
+    # insurer = models.ForeignKey(Insurer, on_delete=models.DO_NOTHING)
+    # insurance_plan = models.ForeignKey(InsurancePlans, on_delete=models.DO_NOTHING)
+    member = models.ForeignKey(InsuredMembers, related_name='member_history', on_delete=models.DO_NOTHING, null=True)
+    first_name = models.CharField(max_length=50, null=False)
+    last_name = models.CharField(max_length=50, null=True)
+    dob = models.DateField(blank=False, null=False)
+    email = models.EmailField(max_length=100, null=True)
+    relation = models.CharField(max_length=50, choices=RELATION_CHOICES, default=None)
+    pincode = models.PositiveIntegerField(default=None)
+    address = models.TextField(default=None)
+    gender = models.CharField(max_length=50, choices=GENDER_CHOICES, default=None)
+    phone_number = models.BigIntegerField(blank=True, null=True,
+                                          validators=[MaxValueValidator(9999999999), MinValueValidator(1000000000)])
+    profile = models.ForeignKey(auth_model.UserProfile, related_name="history_insurance", on_delete=models.SET_NULL, null=True)
+    title = models.CharField(max_length=20, choices=TITLE_TYPE_CHOICES, default=None)
+    middle_name = models.CharField(max_length=50, null=True)
+    town = models.CharField(max_length=100, null=False)
+    district = models.CharField(max_length=100, null=False)
+    state = models.CharField(max_length=100, null=False)
+    state_code = models.CharField(max_length=10, default='')
+    user_insurance = models.ForeignKey(UserInsurance, related_name="history_members", on_delete=models.DO_NOTHING, null=False)
+    city_code = models.CharField(max_length=10, blank=True, null=True, default='')
+    district_code = models.CharField(max_length=10, blank=True, null=True, default='')
+
+    @classmethod
+    def create_member(cls, member):
+        cls.objects.create(member=member, first_name=member.first_name, middle_name=member.middle_name,
+                           last_name=member.last_name, dob=member.dob, email=member.email, relation=member.relation,
+                           pincode=member.pincode, address=member.address, gender=member.gender,
+                           phone_number=member.phone_number, profile=member.profile, title=member.title,
+                           town=member.town, district=member.district, state=member.state, state_code=member.state_code,
+                           user_insurance=member.user_insurance, city_code=member.city_code,
+                           district_code=member.district_code)
+
+    class Meta:
+        db_table = "insured_member_history"
 
 
 class InsuranceEligibleCities(auth_model.TimeStampedModel):
