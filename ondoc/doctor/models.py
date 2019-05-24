@@ -62,7 +62,8 @@ from django.contrib.contenttypes.fields import GenericRelation
 from django.contrib.contenttypes.fields import GenericForeignKey
 from django.contrib.contenttypes.models import ContentType
 from ondoc.matrix.tasks import push_appointment_to_matrix, push_onboarding_qcstatus_to_matrix, \
-    update_onboarding_qcstatus_to_matrix, create_or_update_lead_on_matrix, push_signup_lead_to_matrix
+    update_onboarding_qcstatus_to_matrix, create_or_update_lead_on_matrix, push_signup_lead_to_matrix, \
+    create_ipd_lead_from_opd_appointment
 # from ondoc.procedure.models import Procedure
 from ondoc.ratings_review import models as ratings_models
 from django.utils import timezone
@@ -258,6 +259,18 @@ class Hospital(auth_model.TimeStampedModel, auth_model.CreatedByModel, auth_mode
     #         self.city_search_key = search_city
     #         return self.city
     #     return None
+
+    def get_active_opd_appointments(self, user=None, user_insurance=None):
+
+        appointments = OpdAppointment.objects.filter(hospital_id=self.id)\
+                           .exclude(status__in=[OpdAppointment.COMPLETED, OpdAppointment.CANCELLED])
+        if user and user.is_authenticated:
+            appointments = appointments.filter(user=user)
+        if user_insurance:
+            appointments = appointments.filter(insurance=user_insurance)
+
+        return appointments
+
     @classmethod
     def get_hosp_and_locality_dict(cls, temp_hospital_ids, required_identifier):
         if not temp_hospital_ids:
@@ -476,6 +489,14 @@ class Hospital(auth_model.TimeStampedModel, auth_model.CreatedByModel, auth_mode
         result.extend(list(self.spoc_details.filter(contact_type__in=[SPOCDetails.SPOC, SPOCDetails.MANAGER])))
         if not result:
             result.extend(list(self.spoc_details.filter(contact_type=SPOCDetails.OWNER)))
+        return result
+
+    def has_ipd_doctors(self):
+        result = False
+        for doctor_clinic in self.hospital_doctors.filter(enabled=True):
+            if doctor_clinic.ipd_procedure_clinic_mappings.filter(enabled=True).exists():
+                result = True
+                break
         return result
 
 
@@ -728,9 +749,9 @@ class Doctor(auth_model.TimeStampedModel, auth_model.QCModel, SearchKey, auth_mo
         query =   '''insert into insurance_covered_entity(entity_id,name ,location, type, search_key, data,specialization_search_key, created_at,updated_at)
                  
                  select doc_id as entity_id, doctor_name as name, location ,'doctor' as type,search_key,
-                        json_build_object('id',doc_id, 'type','doctor','name', doctor_name,'city', city,'url', url,'hospital_name',hospital_name, 'specializations', specializations),specialization_search_key,  now(), now() from(
-                select doc_id ,doctor_name, h.location, doc_search_key as search_key, h.city, h.name as hospital_name , url, specialization_search_key, specializations from 
-                (select d.id doc_id, d.name doctor_name,d.search_key as doc_search_key, max(eu.url) as url,
+                        json_build_object('id',doc_id, 'type','doctor','name', doctor_name,'city', city,'url', entity_url,'hospital_name',hospital_name, 'specializations', specializations),specialization_search_key,  now(), now() from(
+                select doc_id ,doctor_name, h.location, doc_search_key as search_key, h.city, h.name as hospital_name , entity_url , specialization_search_key, specializations from 
+                (select d.id doc_id, d.name doctor_name,d.search_key as doc_search_key, max(eu.url) as entity_url,
                 string_agg(distinct lower(ps.name), ',') specialization_search_key,
                 array_agg(distinct ps.name) specializations
                 from doctor d 
@@ -2000,13 +2021,20 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
     auto_ivr_data = JSONField(default=list(), null=True)
     synced_analytics = GenericRelation(SyncBookingAnalytics, related_name="opd_booking_analytics")
     refund_details = GenericRelation(RefundDetails, related_query_name="opd_appointment_detail")
+    appointment_prescriptions = GenericRelation("prescription.AppointmentPrescription", related_query_name="appointment_prescriptions")
     coupon_data = JSONField(blank=True, null=True)
+    status_change_comments = models.CharField(max_length=5000, null=True, blank=True)
 
     def __str__(self):
         return self.profile.name + " (" + self.doctor.name + ")"
 
     def allowed_action(self, user_type, request):
         allowed = []
+        if self.status == self.CREATED:
+            if user_type == auth_model.User.CONSUMER:
+                return [self.CANCELLED]
+            return []
+
         current_datetime = timezone.now()
         today = datetime.date.today()
         if user_type == auth_model.User.DOCTOR and self.time_slot_start.date() >= today:
@@ -2125,9 +2153,19 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
 
     @classmethod
     def create_appointment(cls, appointment_data):
+
+        insurance = appointment_data.get('insurance')
+        appointment_status = OpdAppointment.BOOKED
+
+        if insurance and insurance.is_valid():
+            mrp = appointment_data.get('fees')
+            insurance_limit_usage_data = insurance.validate_limit_usages(mrp)
+            if insurance_limit_usage_data.get('created_state'):
+                appointment_status = OpdAppointment.CREATED
+
         otp = random.randint(1000, 9999)
         appointment_data["payment_status"] = OpdAppointment.PAYMENT_ACCEPTED
-        appointment_data["status"] = OpdAppointment.BOOKED
+        appointment_data["status"] = appointment_status
         appointment_data["otp"] = otp
         # if appointment_data["insurance_id"] :
         #     appointment_data["insurance"] = insurance_model.UserInsurance.objects.get(id=appointment_data["insurance_id"].id)
@@ -2258,6 +2296,13 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
         return False
 
     def after_commit_tasks(self, old_instance, push_to_matrix):
+        if old_instance is None:
+            try:
+                create_ipd_lead_from_opd_appointment.apply_async(({'obj_id': self.id},),)
+                                                                 # eta=timezone.now() + timezone.timedelta(hours=1))
+
+            except Exception as e:
+                logger.error(str(e))
         if push_to_matrix:
         # Push the appointment data to the matrix .
             try:
@@ -2338,7 +2383,6 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
             raise Exception('Cancelled or Completed appointment cannot be saved')
         # if not self.is_doctor_available():
         #     raise RestFrameworkValidationError("Doctor is on leave.")
-
         # push_to_matrix = kwargs.get('push_again_to_matrix', True)
         # if 'push_again_to_matrix' in kwargs.keys():
         #     kwargs.pop('push_again_to_matrix')
@@ -2750,6 +2794,34 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
         appointments = cls.objects.filter(~Q(status=cls.COMPLETED), ~Q(status=cls.CANCELLED), user=insurance_obj.user,
                                           insurance=insurance_obj)
         return appointments
+
+    @classmethod
+    def get_insurance_usage(cls, insurance_obj, date=None):
+        appointments = cls.objects.filter(user=insurance_obj.user, insurance=insurance_obj).exclude(status=cls.CANCELLED)
+        if date:
+            appointments = appointments.filter(created_at__date=date)
+
+        count = appointments.count()
+        data = appointments.aggregate(sum_amount=Sum('fees'))
+        sum = data.get('sum_amount', 0)
+        sum = sum if sum else 0
+        return {'count': count, 'sum': sum}
+
+    def convert_ipd_lead_data(self):
+        result = {}
+        result['hospital'] = self.hospital
+        result['user'] = self.user
+        result['payment_amount'] = self.deal_price  # To be confirmed
+        if self.user:
+            result['name'] = self.user.full_name
+            result['phone_number'] = self.user.phone_number
+            result['email'] = self.user.email
+            default_user_profile = self.user.get_default_profile()
+            if default_user_profile:
+                result['gender'] = default_user_profile.gender
+                result['dob'] = default_user_profile.dob
+        result['data'] = {'opd_appointment_id': self.id}
+        return result
 
 
 class OpdAppointmentProcedureMapping(models.Model):

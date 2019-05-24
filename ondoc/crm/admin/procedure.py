@@ -2,16 +2,20 @@ from django.conf import settings
 from django.contrib import messages, admin
 from django.contrib.admin import TabularInline
 from django.contrib.contenttypes.models import ContentType
+from django.db import transaction
 from django.http import HttpResponseRedirect
 from django.urls import reverse
 from django.utils.safestring import mark_safe
+from import_export import resources, fields, widgets
+from import_export.admin import ImportExportMixin
 from reversion.admin import VersionAdmin
 
-from ondoc.common.models import Feature, Service
+from ondoc.common.models import Feature, Service, AppointmentHistory
 from ondoc.crm.admin.doctor import AutoComplete
 from ondoc.procedure.models import Procedure, ProcedureCategory, ProcedureCategoryMapping, ProcedureToCategoryMapping, \
     IpdProcedure, IpdProcedureFeatureMapping, IpdProcedureCategoryMapping, IpdProcedureCategory, IpdProcedureDetail, \
-    IpdProcedureSynonym, IpdProcedureSynonymMapping, SimilarIpdProcedureMapping
+    IpdProcedureSynonym, IpdProcedureSynonymMapping, SimilarIpdProcedureMapping, IpdProcedurePracticeSpecialization, \
+    IpdProcedureLead
 from django import forms
 
 
@@ -166,6 +170,15 @@ class IpdCategoryInline(AutoComplete, TabularInline):
     verbose_name_plural = "IPD Procedure Categories"
 
 
+class IpdProcedurePracticeSpecializationInline(AutoComplete, TabularInline):
+    model = IpdProcedurePracticeSpecialization
+    extra = 0
+    can_delete = True
+    autocomplete_fields = ['practice_specialization']
+    verbose_name = "Associated Specialization"
+    verbose_name_plural = "Associated Specializations"
+
+
 class IpdProcedureAdminForm(forms.ModelForm):
     about = forms.CharField(widget=forms.Textarea, required=False)
     details = forms.CharField(widget=forms.Textarea, required=False)
@@ -181,8 +194,8 @@ class IpdProcedureAdmin(VersionAdmin):
     model = IpdProcedure
     search_fields = ['search_key']
     exclude = ['search_key']
-    inlines = [IpdCategoryInline, FeatureInline, DetailInline, IpdProcedureSynonymMappingInline,
-               SimilarIpdProcedureMappingInline]
+    inlines = [IpdCategoryInline, IpdProcedurePracticeSpecializationInline, FeatureInline, DetailInline,
+               IpdProcedureSynonymMappingInline, SimilarIpdProcedureMappingInline]
 
     def delete_view(self, request, object_id, extra_context=None):
         obj = self.model.objects.filter(id=object_id).first()
@@ -272,7 +285,6 @@ class ProcedureCategoryAdmin(VersionAdmin):
     form = ProcedureCategoryForm
 
 
-
 class IpdProcedureSynonymAdmin(admin.ModelAdmin):
     model = IpdProcedureSynonym
     list_display = ['name']
@@ -292,3 +304,126 @@ class IpdProcedureSynonymMappingAdmin(admin.ModelAdmin):
         return obj.ipd_procedure.name
     get_ipd_procedure_name.admin_order_field  = 'ipd_procedure'  #Allows column order sorting
     get_ipd_procedure_name.short_description = 'Ipd Procedure'
+
+
+class IpdProcedurePracticeSpecializationResource(resources.ModelResource):
+    class Meta:
+        model = IpdProcedurePracticeSpecialization
+        fields = ('id', 'ipd_procedure', 'practice_specialization')
+
+
+class IpdProcedurePracticeSpecializationAdmin(ImportExportMixin, VersionAdmin):
+    search_fields = ['ipd_procedure__name']
+    resource_class = IpdProcedurePracticeSpecializationResource
+    list_display = ['ipd_procedure', 'practice_specialization']
+    autocomplete_fields = ['ipd_procedure', 'practice_specialization']
+    # change_list_template = 'superuser_import_export.html'
+
+
+class IpdProcedureLeadAdminForm(forms.ModelForm):
+    def clean(self):
+        super().clean()
+        if any(self.errors):
+            return
+        cleaned_data = self.cleaned_data
+        curr_status = cleaned_data.get('status')
+        planned_date = cleaned_data.get('planned_date')
+        if curr_status and curr_status in [IpdProcedureLead.PLANNED]:
+            if not planned_date:
+                raise forms.ValidationError("Planned Date is mandatory for {} status.".format(
+                    dict(IpdProcedureLead.STATUS_CHOICES)[curr_status]))
+
+
+class IpdProcedureLeadAdmin(VersionAdmin):
+    form = IpdProcedureLeadAdminForm
+    list_filter = ['created_at', 'ipd_procedure']
+    search_fields = ['phone_number', 'matrix_lead_id']
+    list_display = ['id', 'phone_number', 'name', 'matrix_lead_id']
+    autocomplete_fields = ['hospital', 'insurer', 'tpa']
+    exclude = ['user', 'lat', 'long']
+    readonly_fields = ['phone_number', 'id', 'matrix_lead_id', 'comments', 'data', 'ipd_procedure', 'source', 'current_age',
+                       'related_speciality', 'is_insured', 'insurance_details', 'opd_appointments', 'lab_appointments']
+
+
+
+
+    fieldsets = (
+        (None, {
+            'fields': (
+                'id', 'name', 'gender', 'phone_number', 'is_insured', 'alternate_number', 'dob', 'current_age', 'city', 'email')
+        }),
+        ('Lead Info', {
+            # 'classes': ('collapse',),
+            'fields': ('matrix_lead_id', 'comments', 'data', 'ipd_procedure', 'related_speciality',
+                       'hospital', 'hospital_reference_id', 'source', 'referer_doctor', 'status', 'planned_date',
+                       'payment_type', 'payment_amount', 'insurer', 'tpa', 'num_of_chats', 'remarks'),
+        }),
+        ('History', {
+            # 'classes': ('collapse',),
+            'fields': ('insurance_details', 'opd_appointments', 'lab_appointments'),
+        }),
+    )
+
+    @transaction.atomic
+    def save_model(self, request, obj, form, change):
+        responsible_user = request.user
+        obj._responsible_user = responsible_user if responsible_user and not responsible_user.is_anonymous else None
+        if obj and obj.id:
+            obj._source = AppointmentHistory.CRM
+        super().save_model(request, obj, form, change)
+
+    def related_speciality(self, obj):
+        result = []
+        if obj and obj.id and obj.ipd_procedure:
+            result = IpdProcedurePracticeSpecialization.objects.filter(ipd_procedure=obj.ipd_procedure).values_list(
+                'practice_specialization__name', flat=True)
+        return ', '.join(result)
+
+    def is_insured(self, obj):
+        result = False
+        if obj and obj.user:
+            return bool(obj.user.active_insurance)
+        return result
+
+    def insurance_details(self, obj):
+        result = None
+        if obj and obj.user:
+            t_obj = obj.user.active_insurance
+            if t_obj:
+                exit_point_url = settings.ADMIN_BASE_URL + reverse(
+                    'admin:{}_{}_change'.format(t_obj.__class__._meta.app_label, t_obj.__class__._meta.model_name),
+                    kwargs={"object_id": t_obj.id})
+                result = mark_safe('<a href="{}">Active Insurance</a>'.format(exit_point_url))
+        return result
+
+    def opd_appointments(self, obj):
+        result = []
+        if obj and obj.user:
+            qs = obj.user.recent_opd_appointment
+            for t_obj in qs:
+                exit_point_url = reverse(
+                    'admin:{}_{}_change'.format(t_obj.__class__._meta.app_label, t_obj.__class__._meta.model_name),
+                    kwargs={"object_id": t_obj.id})
+                result.append(mark_safe('<a href="{}" target="_blank">{}</a>'.format(exit_point_url, t_obj.id)))
+        return mark_safe(', '.join(result))
+
+    def lab_appointments(self, obj):
+        result = []
+        if obj and obj.user:
+            qs = obj.user.recent_lab_appointment
+            for t_obj in qs:
+                exit_point_url = reverse(
+                    'admin:{}_{}_change'.format(t_obj.__class__._meta.app_label, t_obj.__class__._meta.model_name),
+                    kwargs={"object_id": t_obj.id})
+                result.append(mark_safe('<a href="{}" target="_blank">{}</a>'.format(exit_point_url, t_obj.id)))
+        return mark_safe(', '.join(result))
+
+    def current_age(self, obj):
+        from django.utils import timezone
+        from math import ceil
+        result = None
+        if obj and obj.dob:
+            result = str(ceil(((timezone.now() - obj.dob).days / (365.25))))
+        if not result and obj.age:
+            result = str(obj.age)
+        return result

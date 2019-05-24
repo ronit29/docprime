@@ -29,4 +29,6 @@ urlpatterns = [
     path('get_key_data', GetKeyDataViewSet.as_view({'get':'list'}), name='get-key-data'),
     path('entity-compare-autocomplete', AllUrlsViewset.as_view({'get':'list'}), name='entity-compare-autocomplete'),
     path('device-details/save', DeviceDetailsSave.as_view({'post': 'save'}), name='device-details'),
+    # url(r'^insurer-autocomplete/$', InsurerAutocomplete.as_view(), name='insurer-autocomplete'),
+    # url(r'^insurance-plan-autocomplete/$', InsurancePlanAutocomplete.as_view(), name='insurance-plan-autocomplete'),
 ]

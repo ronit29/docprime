@@ -352,6 +352,14 @@ def labappointment_transform(app_data):
     app_data["user"] = app_data["user"].id
     app_data["profile"] = app_data["profile"].id
     app_data["home_pickup_charges"] = str(app_data.get("home_pickup_charges",0))
+    prescription_objects = app_data.get("prescription_list", [])
+    if prescription_objects:
+        prescription_id_list = []
+        for prescription_data in prescription_objects:
+            prescription_id_list.append({'prescription': prescription_data.get('prescription').id})
+        app_data["prescription_list"] = prescription_id_list
+
+
     if app_data.get("coupon"):
         app_data["coupon"] = list(app_data["coupon"])
     if app_data.get("user_plan"):
@@ -1313,21 +1321,21 @@ def get_opd_pem_queryset(user, model):
                           'doctor__doctorpracticespecializations', 'doctor__doctorpracticespecializations__specialization') \
         .filter(hospital_id__in=list(manageable_hosp_list))\
         .annotate(pem_type=Case(When(Q(hospital__manageable_hospitals__user=user) &
-                                   Q(hospital__manageable_hospitals__super_user_permission=True) &
-                                   Q(hospital__manageable_hospitals__is_disabled=False), then=Value(3)),
-                              When(Q(hospital__manageable_hospitals__user=user) &
-                                   Q(hospital__manageable_hospitals__super_user_permission=False) &
-                                   Q(hospital__manageable_hospitals__permission_type=auth_models.GenericAdmin.BILLINNG) &
-                                   ~Q(hospital__manageable_hospitals__permission_type=auth_models.GenericAdmin.APPOINTMENT) &
-                                   Q(hospital__manageable_hospitals__is_disabled=False), then=Value(2)),
-                              When(Q(hospital__manageable_hospitals__user=user) &
-                                   Q(hospital__manageable_hospitals__super_user_permission=False) &
-                                   Q(hospital__manageable_hospitals__permission_type=auth_models.GenericAdmin.BILLINNG) &
-                                   Q(hospital__manageable_hospitals__permission_type=auth_models.GenericAdmin.APPOINTMENT) &
-                                   Q(hospital__manageable_hospitals__is_disabled=False), then=Value(3)),
-                              default=Value(1),
-                              output_field=IntegerField()
-                              )
+                               Q(hospital__manageable_hospitals__super_user_permission=True) &
+                               Q(hospital__manageable_hospitals__is_disabled=False), then=Value(3)),
+                          When(Q(hospital__manageable_hospitals__user=user) &
+                               Q(hospital__manageable_hospitals__super_user_permission=False) &
+                               Q(hospital__manageable_hospitals__permission_type=auth_models.GenericAdmin.BILLINNG) &
+                               ~Q(hospital__manageable_hospitals__permission_type=auth_models.GenericAdmin.APPOINTMENT) &
+                               Q(hospital__manageable_hospitals__is_disabled=False), then=Value(2)),
+                          When(Q(hospital__manageable_hospitals__user=user) &
+                               Q(hospital__manageable_hospitals__super_user_permission=False) &
+                               Q(hospital__manageable_hospitals__permission_type=auth_models.GenericAdmin.BILLINNG) &
+                               Q(hospital__manageable_hospitals__permission_type=auth_models.GenericAdmin.APPOINTMENT) &
+                               Q(hospital__manageable_hospitals__is_disabled=False), then=Value(3)),
+                          default=Value(1),
+                          output_field=IntegerField()
+                          )
               )
     # .extra(select={'super_user': super_user_query, 'appointment_pem': appoint_query, 'billing_pem': billing_query}, params=(user_id, user_id, user_id))
     return queryset

@@ -585,8 +585,6 @@ def create_or_update_lead_on_matrix(self, data):
         content_type = ContentType.objects.get_for_model(model_used)
         if obj_type == ProviderSignupLead.__name__:
             exit_point_url = settings.ADMIN_BASE_URL + reverse('admin:doctor_doctor_add')
-        elif obj_type == IpdProcedureLead.__name__:
-            exit_point_url = ''
         else:
             exit_point_url = settings.ADMIN_BASE_URL + reverse(
                 'admin:{}_{}_change'.format(content_type.app_label, content_type.model), kwargs={"object_id": obj_id})
@@ -687,6 +685,7 @@ def create_or_update_lead_on_matrix(self, data):
 
 @task(bind=True, max_retries=3)
 def update_onboarding_qcstatus_to_matrix(self, data):
+    from ondoc.procedure.models import IpdProcedureLead
     try:
         obj_id = data.get('obj_id', None)
         obj_type = data.get('obj_type', None)
@@ -703,14 +702,15 @@ def update_onboarding_qcstatus_to_matrix(self, data):
 
         comment = ''
         from ondoc.common.models import Remark
-        remark_obj = obj.remark.order_by('-created_at').first()
-        if remark_obj:
-            comment = remark_obj.content
+        if hasattr(obj, 'remark'):
+            remark_obj = obj.remark.order_by('-created_at').first()
+            if remark_obj:
+                comment = remark_obj.content
 
         assigned_user = ''
         if data.get('assigned_matrix_user', None):
             assigned_user = data.get('assigned_user')
-        else:
+        elif hasattr(obj, 'data_status'):
             if obj.data_status == QCModel.SUBMITTED_FOR_QC:
                 history_obj = obj.history.filter(status=QCModel.REOPENED).order_by('-created_at').first()
                 if history_obj:
@@ -727,12 +727,17 @@ def update_onboarding_qcstatus_to_matrix(self, data):
         obj_matrix_lead_id = obj.matrix_lead_id if hasattr(obj, 'matrix_lead_id') and obj.matrix_lead_id else 0
         if not obj_matrix_lead_id:
             return
+
+        if obj_type == IpdProcedureLead.__name__:
+            new_status = obj.status
+        else:
+            new_status = obj.data_status
         request_data = {
             "LeadID": obj_matrix_lead_id,
             "Comment": comment,
             "NewJourneyURL": exit_point_url,
             "AssignedUser": assigned_user,
-            "CRMStatusId": obj.data_status
+            "CRMStatusId": new_status
         }
 
         url = settings.MATRIX_STATUS_UPDATE_API_URL
@@ -895,3 +900,24 @@ def push_non_bookable_doctor_lead_to_matrix(self, nb_doc_lead_id):
             obj.save()
     except Exception as e:
         logger.error("Error while pushing the non bookable doctor lead to matrix. ", str(e))
+
+
+@task(bind=True, max_retries=2)
+def create_ipd_lead_from_opd_appointment(self, data):
+    from ondoc.doctor.models import OpdAppointment
+    from ondoc.procedure.models import IpdProcedureLead
+    obj_id = data.get('obj_id')
+    if not obj_id:
+        logger.error("[CELERY ERROR: Incorrect values provided.]")
+        raise ValueError()
+    obj = OpdAppointment.objects.filter(id=obj_id).first()
+    if not obj:
+        return
+    is_valid = IpdProcedureLead.is_valid_hospital_for_lead(obj.hospital)
+    if not is_valid:
+        return
+    data = obj.convert_ipd_lead_data()
+    data['status'] = IpdProcedureLead.NEW
+    data['source'] = IpdProcedureLead.CRM
+    obj_created = IpdProcedureLead(**data)
+    obj_created.save()
