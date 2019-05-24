@@ -347,6 +347,7 @@ class InsurerAccount(auth_model.TimeStampedModel):
 class InsurancePlans(auth_model.TimeStampedModel, LiveMixin):
     insurer = models.ForeignKey(Insurer,related_name="plans", on_delete=models.CASCADE)
     name = models.CharField(max_length=100)
+    internal_name = models.CharField(max_length=200, null=True)
     amount = models.PositiveIntegerField(default=0)
     policy_tenure = models.PositiveIntegerField(default=1)
     adult_count = models.SmallIntegerField(default=0)
@@ -365,7 +366,9 @@ class InsurancePlans(auth_model.TimeStampedModel, LiveMixin):
         return "%d adult, %d childs" % (self.adult_count, self.child_count)
 
     def __str__(self):
-        return self.name
+        if self.internal_name:            
+            return self.name+'('+self.internal_name+')'
+        return self.name    
 
     class Meta:
         db_table = "insurance_plans"
