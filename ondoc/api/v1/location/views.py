@@ -632,7 +632,7 @@ class DoctorsCitySearchViewSet(viewsets.GenericViewSet):
             elif entity.sitemap_identifier == EntityUrls.SitemapIdentifier.DOCTOR_PAGE:
                 footer = DoctorProfileFooter(entity)
             elif entity.sitemap_identifier == EntityUrls.SitemapIdentifier.DOCTORS_CITY:
-                if page and int(page) == 1:
+                if int(page) == 1:
                     footer = DoctorCityFooter(entity)
             elif entity.sitemap_identifier == EntityUrls.SitemapIdentifier.LAB_CITY:
                 footer = LabCityFooter(entity)
@@ -641,7 +641,7 @@ class DoctorsCitySearchViewSet(viewsets.GenericViewSet):
             elif entity.sitemap_identifier == EntityUrls.SitemapIdentifier.LAB_PAGE:
                 footer = LabProfileFooter(entity)
             elif entity.sitemap_identifier == EntityUrls.SitemapIdentifier.DOCTORS_LOCALITY_CITY:
-                if page and int(page) == 1:
+                if int(page) == 1:
                     footer = DoctorLocalityCityFooter(entity)
 
             if footer:
