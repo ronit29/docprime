@@ -1776,7 +1776,10 @@ class LastLoginTimestamp(TimeStampedModel):
 class PaymentMixin(object):
 
     def capture_payment(self):
-        pass
+        from ondoc.notification import tasks as notification_tasks
+        notification_tasks.send_capture_payment_request.apply_async(
+            self.PRODUCT_ID, self.id, eta=datetime.datetime.now(), )
 
     def release_payment(self):
-        pass
+        notification_tasks.send_release_payment_request.apply_async(
+            self.PRODUCT_ID, self.id, eta=datetime.datetime.now(), )

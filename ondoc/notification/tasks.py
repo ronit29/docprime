@@ -1002,7 +1002,7 @@ def update_coupon_used_count():
 
 
 @task(bind=True, max_retries=5)
-def send_capture_release_payment_request(self, product_id, appointment_id):
+def send_capture_payment_request(self, product_id, appointment_id):
     from ondoc.doctor.models import OpdAppointment
     from ondoc.diagnostic.models import LabAppointment
     from ondoc.account.models import Order, PgTransaction
@@ -1053,10 +1053,43 @@ def send_capture_release_payment_request(self, product_id, appointment_id):
                     else:
                         raise Exception("Retry on invalid Http response status - " + str(response.content))
 
+    except Exception as e:
+        logger.error("Error in payment capture with data - " + json.dumps(req_data) + " with exception - " + str(e))
+        self.retry([product_id, appointment_id], countdown=300)
+
+@task(bind=True, max_retries=5)
+def send_release_payment_request(self, product_id, appointment_id):
+    from ondoc.doctor.models import OpdAppointment
+    from ondoc.diagnostic.models import LabAppointment
+    from ondoc.account.models import Order, PgTransaction
+    req_data = dict()
+    if product_id == Order.DOCTOR_PRODUCT_ID:
+        obj = OpdAppointment
+    if product_id == Order.LAB_PRODUCT_ID:
+        obj = LabAppointment
+    try:
+        order = Order.objects.filter(product_id=product_id, reference_id=appointment_id).first()
+
+        appointment = order.getAppointment()
+        if not appointment:
+            raise Exception("No Appointment found.")
+
+        if order and not order.is_parent():
+            order = order.parent
+
+        txn_obj = PgTransaction.objects.filter(order=order).first()
+
+        req_data = {
+            "orderNo": txn_obj.order_no,
+            "orderId": order.id,
+            "hash": pg_seamless_hash(order, txn_obj.order_no)
+        }
+
         if appointment.status == obj.CANCELLED:
             if txn_obj and txn_obj.is_preauth:
                 if txn_obj.status_type == 'TXN_AUTHORIZE':
-                    if datetime.datetime.now() < txn_obj.transaction_date + datetime.timedelta(hours=int(settings.PAYMENT_AUTO_CAPTURE_DURATION)):
+                    if datetime.datetime.now() < txn_obj.transaction_date + datetime.timedelta(
+                            hours=int(settings.PAYMENT_AUTO_CAPTURE_DURATION)):
                         url = settings.PG_RELEASE_PAYMENT_URL
                         token = settings.PG_SEAMLESS_RELEASE_AUTH_TOKEN
                         headers = {
@@ -1075,11 +1108,8 @@ def send_capture_release_payment_request(self, product_id, appointment_id):
                                     req_data) + " with error message - " + resp_data.get('statusMsg', ''))
                         else:
                             raise Exception("Retry on invalid Http response status - " + str(response.content))
-                    else:
-                        # todo - refund in this case
-                        pass
 
     except Exception as e:
-        logger.error("Error in payment with data - " + json.dumps(req_data) + " with exception - " + str(e))
+        logger.error("Error in payment release with data - " + json.dumps(req_data) + " with exception - " + str(e))
         self.retry([product_id, appointment_id], countdown=300)
 
