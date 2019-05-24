@@ -69,6 +69,7 @@ from django.db.models.functions import RowNumber
 from django.db.models import Avg
 from django.db.models.expressions import RawSQL
 from ondoc.doctor.v1.serializers import ArticleAuthorSerializer
+from decimal import Decimal
 User = get_user_model()
 
 
@@ -1795,9 +1796,23 @@ class LabList(viewsets.ReadOnlyModelViewSet):
         #     lab_serializable_data['url'] = entity.first()['url'] if len(entity) == 1 else None
         temp_data = dict()
 
+        test_serializer_data = test_serializer.data
+        is_prescription_needed = False
+        if request.user and request.user.is_authenticated and not request.user.is_anonymous:
+            insurance = request.user.active_insurance
+            if insurance and test_serializer_data:
+                agreed_price = Decimal(0)
+                for single_test_serializer_data in test_serializer_data:
+                    agreed_price = agreed_price + Decimal(single_test_serializer_data.get('agreed_price', 0))
+
+                limit_data = insurance.validate_limit_usages(agreed_price)
+                is_prescription_needed = limit_data.get('prescription_needed')
+
+        lab_serializable_data['is_prescription_needed'] = is_prescription_needed
+
         temp_data['lab'] = lab_serializable_data
         temp_data['distance_related_charges'] = distance_related_charges
-        temp_data['tests'] = test_serializer.data
+        temp_data['tests'] = test_serializer_data
         temp_data['lab_tests'] = lab_test_serializer.data
         temp_data['lab_timing'], temp_data["lab_timing_data"] = lab_timing, lab_timing_data
         temp_data['total_test_count'] = total_test_count

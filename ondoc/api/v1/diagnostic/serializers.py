@@ -256,7 +256,7 @@ class AvailableLabTestPackageSerializer(serializers.ModelSerializer):
     hide_price = serializers.ReadOnlyField(source='test.hide_price')
     included_in_user_plan = serializers.SerializerMethodField()
     is_price_zero = serializers.SerializerMethodField()
-    is_prescription_needed = serializers.SerializerMethodField()
+    # is_prescription_needed = serializers.SerializerMethodField()
 
     def get_is_price_zero(self, obj):
         agreed_price = obj.computed_agreed_price if obj.custom_agreed_price is None else obj.custom_agreed_price
@@ -269,20 +269,20 @@ class AvailableLabTestPackageSerializer(serializers.ModelSerializer):
         package_free_or_not_dict = self.context.get('package_free_or_not_dict', {})
         return package_free_or_not_dict.get(obj.test.id, False)
 
-    def get_is_prescription_needed(self, obj):
-        request = self.context.get("request")
-        if not request:
-            return False
-
-        data = None
-        logged_in_user = request.user
-        agreed_price = self.get_agreed_price(obj)
-        if logged_in_user.is_authenticated and not logged_in_user.is_anonymous and agreed_price:
-            user_insurance = request.user.active_insurance
-            data = user_insurance.validate_limit_usages(agreed_price) if user_insurance else None
-
-        if not data:
-            return False
+    # def get_is_prescription_needed(self, obj):
+    #     request = self.context.get("request")
+    #     if not request:
+    #         return False
+    #
+    #     data = None
+    #     logged_in_user = request.user
+    #     agreed_price = self.get_agreed_price(obj)
+    #     if logged_in_user.is_authenticated and not logged_in_user.is_anonymous and agreed_price:
+    #         user_insurance = request.user.active_insurance
+    #         data = user_insurance.validate_limit_usages(agreed_price) if user_insurance else None
+    #
+    #     if not data:
+    #         return False
 
         return data.get('prescription_needed', False)
 
@@ -376,7 +376,7 @@ class AvailableLabTestPackageSerializer(serializers.ModelSerializer):
         model = AvailableLabTest
         fields = ('test_id', 'mrp', 'test', 'agreed_price', 'deal_price', 'enabled', 'is_home_collection_enabled',
                   'package', 'parameters', 'is_package', 'number_of_tests', 'why', 'pre_test_info', 'expected_tat',
-                  'hide_price', 'included_in_user_plan', 'insurance', 'is_price_zero', 'is_prescription_needed')
+                  'hide_price', 'included_in_user_plan', 'insurance', 'is_price_zero')
 
 class AvailableLabTestSerializer(serializers.ModelSerializer):
     test = LabTestSerializer()
