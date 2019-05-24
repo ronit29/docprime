@@ -991,5 +991,6 @@ class DeviceDetailsSave(viewsets.GenericViewSet):
             else:
                 DeviceDetails.objects.create(**validated_data, user=user)
         except Exception as e:
+            logger.error("Something went wrong while saving device details - " + str(e))
             return Response("Error adding device details - " + str(e), status=status.HTTP_500_INTERNAL_SERVER_ERROR)
         return Response({"status": 1, "message": "device details added"}, status=status.HTTP_200_OK)
