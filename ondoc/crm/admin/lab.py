@@ -998,7 +998,7 @@ class LabAppointmentAdmin(nested_admin.NestedModelAdmin):
             read_only = read_only + ['otp']
 
         if obj.status is not LabAppointment.CREATED:
-            read_only = read_only + ('status_change_comments',)
+            read_only = read_only + ['status_change_comments']
         return read_only
 
     def refund_initiated(self, obj):
