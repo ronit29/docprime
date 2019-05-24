@@ -8,7 +8,8 @@ from ondoc.crm.constants import constants
 from ondoc.doctor.models import OpdAppointment, DoctorPracticeSpecialization, PracticeSpecialization, Hospital
 from ondoc.diagnostic.models import LabAppointment, LabTest, Lab
 from ondoc.insurance.models import InsurancePlanContent, InsurancePlans, InsuredMembers, UserInsurance, StateGSTCode, \
-    InsuranceCity, InsuranceDistrict, InsuranceDeal, InsurerPolicyNumber, InsuranceLead, InsuranceEligibleCities
+     ThirdPartyAdministrator, InsuranceEligibleCities, InsuranceCity, InsuranceDistrict, InsuranceDeal, \
+    InsurerPolicyNumber, InsuranceLead, EndorsementRequest, InsuredMemberDocument, InsuranceEligibleCities
 from import_export.admin import ImportExportMixin, ImportExportModelAdmin, base_formats
 import nested_admin
 from import_export import fields, resources
@@ -561,7 +562,7 @@ class UserInsuranceLabResource(resources.ModelResource):
         return ""
 
     def dehydrate_booking_date(self, appointment):
-        return str(appointment.created_at.date())
+        return str(appointment.created_at)
 
     def dehydrate_status(self, appointment):
         if appointment.status == 1:
@@ -747,10 +748,6 @@ class UserInsuranceAdmin(ImportExportMixin, admin.ModelAdmin):
         from ondoc.authentication.models import UserProfile
         user_profile = UserProfile.objects.filter(user=obj.user).first()
         return str(user_profile.name)
-
-    # def city_name(self, obj):
-    #     cities = InsuranceCity.objects.all().values_list('name', flat=True)
-    #     return cities
 
     list_display = ['id', 'insurance_plan', 'user_name', 'user', 'policy_number', 'purchase_date', 'status']
     fields = ['insurance_plan', 'user', 'purchase_date', 'expiry_date', 'policy_number', 'premium_amount',
@@ -1009,5 +1006,111 @@ class InsuranceCancelMasterAdmin(admin.ModelAdmin):
     list_display = ['insurer', 'min_days', 'max_days', 'refund_percentage']
 
 
+class EndorsementRequestForm(forms.ModelForm):
+
+    status_choices = [(EndorsementRequest.PENDING, "Pending"), (EndorsementRequest.APPROVED, 'Approved'),
+                      (EndorsementRequest.REJECT, "Reject")]
+    status = forms.ChoiceField(choices=status_choices, required=True)
+    # coi_choices = [("YES", "Yes"), ("NO", "No")]
+    mail_coi_to_customer = forms.BooleanField(initial=False)
+    reject_reason = forms.CharField(max_length=150, required=False)
+
+    def clean(self):
+        super().clean()
+        data = self.cleaned_data
+        status = data.get('status')
+        coi_status = data.get('mail_coi_to_customer')
+        reject_reason = data.get('reject_reason')
+        if status == EndorsementRequest.PENDING and coi_status:
+            raise forms.ValidationError('Without Approved COI can not be send to customer')
+        if status == EndorsementRequest.REJECT and not reject_reason:
+            raise forms.ValidationError('For Rejection, reject reason is mandatory')
+
+    class Meta:
+        fields = '__all__'
+
+
+class InsuredMemberDocumentInline(admin.TabularInline):
+    model = InsuredMemberDocument
+
+    def member_name(self, obj):
+        first_name = obj.member.first_name
+        last_name = obj.member.last_name
+        return first_name + " " + last_name
+
+    fields = ('member_name', 'document_image',)
+    extra = 0
+    can_delete = False
+    show_change_link = False
+    can_add = False
+    readonly_fields = ("member_name", 'document_image', )
+
+
+class InsuredMemberDocumentAdmin(admin.ModelAdmin):
+    list_display = ['member', 'document_image']
+
+
+class EndorsementRequestAdmin(admin.ModelAdmin):
+
+    def member_name(self, obj):
+        first_name = obj.member.first_name
+        last_name = obj.member.last_name
+        return first_name + " " + last_name
+
+    def insurance_id(self, obj):
+        return obj.insurance.id
+
+    list_display = ['member_name', 'insurance_id']
+    readonly_fields = ['first_name', 'last_name', 'dob', 'email', 'address', 'pincode', 'gender', 'phone_number',
+                       'relation', 'profile', 'town', 'district', 'state', 'state_code', 'city_code', 'district_code',
+                       'middle_name']
+    inlines = [InsuredMemberDocumentInline]
+
+    def has_add_permission(self, request, obj=None):
+        return False
+
+    def has_delete_permission(self, request, obj=None):
+        return False
+
+    @transaction.atomic()
+    def save_model(self, request, obj, form, change):
+        user = request.user
+        obj._user = user if user and not user.is_anonymous else None
+
+        if request.user.is_member_of(constants['SUPER_INSURANCE_GROUP']) or request.user.is_member_of(constants['INSURANCE_GROUP']):
+            super().save_model(request, obj, form, change)
+
+            if obj.status == EndorsementRequest.APPROVED:
+                obj.process_endorsement()
+            elif obj.status == EndorsementRequest.REJECT:
+                obj.reject_endorsement()
+            if obj.mail_coi_to_customer:
+                obj.process_coi()
+
+
+
+class InsuredMemberHistoryAdmin(admin.ModelAdmin):
+    list_display = ['first_name', 'last_name', 'dob', 'email', 'address', 'pincode', 'gender', 'phone_number']
+    readonly_fields = ['first_name', 'last_name', 'dob', 'email', 'address', 'pincode', 'gender', 'phone_number', 'relation', 'profile']
+
+    def has_add_permission(self, request, obj=None):
+        return False
+
+    def has_delete_permission(self, request, obj=None):
+        return False
+
+
 class InsuranceEligibleCitiesAdmin(admin.ModelAdmin):
     model = InsuranceEligibleCities
+
+
+class ThirdPartyAdministratorResource(resources.ModelResource):
+    class Meta:
+        model = ThirdPartyAdministrator
+        fields = ['id', 'name']
+
+
+class ThirdPartyAdministratorAdmin(ImportExportMixin, admin.ModelAdmin):
+    resource_class = ThirdPartyAdministratorResource
+    search_fields = ['name']
+    list_display = ['id', 'name']

@@ -6,7 +6,6 @@ from django.db.models import Q
 from ondoc.banner.models import Banner, SliderLocation, BannerLocation, EmailBanner, RecommenderThrough, Recommender
 from ondoc.common.models import PaymentOptions, UserConfig, Feature, Service, Remark, MatrixMappedCity, MatrixMappedState
 from ondoc.coupon.models import Coupon, UserSpecificCoupon, RandomGeneratedCoupon
-from ondoc.crm.admin import UserPlanMappingAdmin
 from ondoc.crm.constants import constants
 from ondoc.doctor.models import (Doctor, Hospital, DoctorClinicTiming, DoctorClinic,
                                  DoctorQualification, Qualification, Specialization, DoctorLanguage,
@@ -42,12 +41,15 @@ from ondoc.diagnostic.models import (Lab, LabTiming, LabImage, GenericLabAdmin,
 from ondoc.insurance.models import (Insurer, InsurancePlans, InsuranceThreshold, InsuranceCity, StateGSTCode,
                                     InsuranceDistrict, InsuranceTransaction, InsuranceDeal, InsuranceDisease,
                                     UserInsurance, InsurancePlanContent, InsuredMembers, InsurerAccount, InsuranceLead,
-                                    InsuranceDiseaseResponse, InsurerPolicyNumber, InsuranceCancelMaster)
+                                    InsuranceDiseaseResponse, InsurerPolicyNumber, InsuranceCancelMaster,
+                                    EndorsementRequest, InsuredMemberDocument, InsuredMemberHistory,
+                                    ThirdPartyAdministrator)
 
 from ondoc.procedure.models import Procedure, ProcedureCategory, CommonProcedureCategory, DoctorClinicProcedure, \
     ProcedureCategoryMapping, ProcedureToCategoryMapping, CommonProcedure, IpdProcedure, IpdProcedureFeatureMapping, \
     DoctorClinicIpdProcedure, IpdProcedureCategoryMapping, IpdProcedureCategory, CommonIpdProcedure, \
-    IpdProcedureDetailType, IpdProcedureDetail, IpdProcedureSynonym, IpdProcedureSynonymMapping
+    IpdProcedureDetailType, IpdProcedureDetail, IpdProcedureSynonym, IpdProcedureSynonymMapping, \
+    IpdProcedurePracticeSpecialization, IpdProcedureLead
 from ondoc.reports import models as report_models
 
 from ondoc.diagnostic.models import LabPricing
@@ -549,7 +551,8 @@ class Command(BaseCommand):
                                                            HealthInsuranceProviderHospitalMapping, IpdProcedureCategoryMapping, CommonIpdProcedure,
                                                            HospitalHelpline, IpdProcedure, HospitalTiming,
                                                            IpdProcedureDetailType, IpdProcedureDetail, IpdProcedureSynonym, IpdProcedureSynonymMapping,
-                                                           EmailBanner, RecommenderThrough, Recommender)
+                                                           EmailBanner, RecommenderThrough, Recommender,
+                                                           IpdProcedurePracticeSpecialization)
         for cl, ct in content_types.items():
             permissions = Permission.objects.filter(
                 Q(content_type=ct),
@@ -681,6 +684,16 @@ class Command(BaseCommand):
 
         group, created = Group.objects.get_or_create(name=constants['APPOINTMENT_REFUND_TEAM'])
         #group.permissions.clear()
+
+        group, created = Group.objects.get_or_create(name=constants['IPD_TEAM'])
+        group.permissions.clear()
+
+        content_types = ContentType.objects.get_for_models(Doctor, Hospital, IpdProcedure, HealthInsuranceProvider,
+                                                           ThirdPartyAdministrator, IpdProcedureLead, UserInsurance)
+        for cl, ct in content_types.items():
+            permissions = Permission.objects.filter(
+                Q(content_type=ct), Q(codename='change_' + ct.model))
+            group.permissions.add(*permissions)
 
         self.stdout.write('Successfully created groups and permissions')
 
@@ -901,7 +914,8 @@ class Command(BaseCommand):
                                                            StateGSTCode, InsuranceDistrict, InsuranceThreshold,
                                                            UserInsurance, InsuranceDeal, InsuranceLead,
                                                            InsuranceTransaction, InsuranceDiseaseResponse,
-                                                           InsuredMembers, InsurerPolicyNumber, InsuranceCancelMaster)
+                                                           InsuredMembers, InsurerPolicyNumber, InsuranceCancelMaster,
+                                                           EndorsementRequest)
 
         for cl, ct in content_types.items():
             permissions = Permission.objects.filter(
@@ -929,7 +943,8 @@ class Command(BaseCommand):
                                                            StateGSTCode, InsuranceDistrict, InsuranceThreshold,
                                                            UserInsurance, InsuranceDeal, InsuranceLead,
                                                            InsuranceTransaction, InsuranceDiseaseResponse,
-                                                           InsuredMembers, InsurerPolicyNumber, InsuranceCancelMaster)
+                                                           InsuredMembers, InsurerPolicyNumber, InsuranceCancelMaster,
+                                                           EndorsementRequest, InsuredMemberDocument, InsuredMemberHistory)
 
         for cl, ct in content_types.items():
             permissions = Permission.objects.filter(
