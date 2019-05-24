@@ -152,6 +152,8 @@ class IpdProcedureLead(auth_model.TimeStampedModel):
     comments = models.TextField(null=True, blank=True)
     data = JSONField(blank=True, null=True)
     planned_date = models.DateField(null=True, blank=True)
+    referer_doctor = models.CharField(max_length=500, null=True, blank=True)
+    remarks = models.TextField(null=True, blank=True)
 
     # ADMIN :Is_OpDInsured, Specialization List, appointment list
     # DEFAULTS??
