@@ -504,6 +504,14 @@ class HospitalPlaceDetails(auth_model.TimeStampedModel):
         super().save(*args, **kwargs)
 
     @classmethod
+    def update_hosp_place_with_google_api_details(cls):
+        query = RawSql(''' insert into hospital_place_details(place_id, hospital_id, place_details,reviews, created_at,updated_at)
+                select (json_array_elements(clinic_place_search::json ->'candidates')->>'place_id') as place_id, hospital_id , clinic_detail::json as place_details,
+                json_build_object('user_ratings_total',clinic_detail::json->'result'->'user_ratings_total', 'user_avg_rating',
+                clinic_detail::json->'result'->'rating', 'user_reviews', clinic_detail::json->'result'->'reviews' ) as reviews, now(), now() 
+                from google_api_details where hospital_id is not null ''', []).execute()
+
+    @classmethod
     def update_place_details(cls):
         hosp_place_id = HospitalPlaceDetails.objects.all()
         for data in hosp_place_id:
