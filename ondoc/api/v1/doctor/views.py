@@ -2096,7 +2096,7 @@ class DoctorAvailabilityTimingViewSet(viewsets.ViewSet):
             active_appointments = dc_obj.hospital.\
                 get_active_opd_appointments(request.user, request.user.active_insurance)
             for apt in active_appointments:
-                del timeslots.get('time_slots',{})[str(apt.time_slot_start.date())]
+                timeslots.get('time_slots', {}).pop(str(apt.time_slot_start.date()), None)
 
         # queryset = models.DoctorClinicTiming.objects.filter(doctor_clinic__doctor=validated_data.get('doctor_id'),
         #                                                     doctor_clinic__hospital=validated_data.get(
