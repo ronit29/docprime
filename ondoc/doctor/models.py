@@ -2154,7 +2154,7 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
         appointment_status = OpdAppointment.BOOKED
 
         if insurance and insurance.is_valid():
-            mrp = appointment_data.get('mrp')
+            mrp = appointment_data.get('fees')
             insurance_limit_usage_data = insurance.validate_limit_usages(mrp)
             if insurance_limit_usage_data.get('created_state'):
                 appointment_status = OpdAppointment.CREATED
