@@ -63,7 +63,7 @@ from ondoc.authentication.models import BillingAccount, SPOCDetails, GenericAdmi
 from ondoc.account.models import MerchantPayout
 from ondoc.seo.models import Sitemap, NewDynamic
 from ondoc.elastic.models import DemoElastic
-from ondoc.location.models import EntityUrls, CompareLabPackagesSeoUrls, CompareSEOUrls
+from ondoc.location.models import EntityUrls, CompareLabPackagesSeoUrls, CompareSEOUrls, CityLatLong
 
 #from fluent_comments.admin import CommentModel
 from threadedcomments.models import ThreadedComment
@@ -551,7 +551,7 @@ class Command(BaseCommand):
                                                            HospitalHelpline, IpdProcedure, HospitalTiming,
                                                            IpdProcedureDetailType, IpdProcedureDetail, IpdProcedureSynonym, IpdProcedureSynonymMapping,
                                                            EmailBanner, RecommenderThrough, Recommender,
-                                                           IpdProcedurePracticeSpecialization)
+                                                           IpdProcedurePracticeSpecialization, CityLatLong)
         for cl, ct in content_types.items():
             permissions = Permission.objects.filter(
                 Q(content_type=ct),
