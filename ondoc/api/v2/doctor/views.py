@@ -34,7 +34,6 @@ User = get_user_model()
 logger = logging.getLogger(__name__)
 
 
-
 class DoctorBillingViewSet(viewsets.GenericViewSet):
     
     authentication_classes = (JWTAuthentication,)
@@ -230,8 +229,6 @@ class HospitalProviderDataViewSet(viewsets.GenericViewSet):
                         all_data[hosp_id]['pem_type'] == auth_models.GenericAdmin.ALL
         resp = all_data.values() if all_data else []
         return Response(resp)
-
-
 
 
 class DoctorProfileView(viewsets.GenericViewSet):
@@ -571,6 +568,8 @@ class ProviderSignupDataViewset(viewsets.GenericViewSet):
         try:
             hospital.provider_encrypt = True
             hospital.provider_encrypted_by = user
+            hospital.encryption_hint = valid_data.get('encryption_hint')
+            hospital.encrypted_hospital_id = valid_data.get('encrypted_hospital_id')
             hospital.save()
             return Response({"status": 1, "message": "consent updated"})
         except Exception as e:
@@ -990,3 +989,5 @@ class PartnersAppInvoicePDF(viewsets.GenericViewSet):
         response = HttpResponse(invoice.file, content_type='application/pdf')
         response['Content-Disposition'] = 'attachment; filename=%s' % filename
         return response
+
+

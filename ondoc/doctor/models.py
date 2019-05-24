@@ -241,6 +241,8 @@ class Hospital(auth_model.TimeStampedModel, auth_model.CreatedByModel, auth_mode
     priority_score = models.IntegerField(default=0, null=False, blank=False)
     provider_encrypt = models.NullBooleanField(null=True, blank=True)
     provider_encrypted_by = models.ForeignKey(auth_model.User, null=True, blank=True, on_delete=models.SET_NULL, related_name='encrypted_hospitals')
+    encryption_hint = models.CharField(max_length=128, null=True, blank=True)
+    encrypted_hospital_id = models.CharField(max_length=128, null=True, blank=True)
 
     def __str__(self):
         return self.name
