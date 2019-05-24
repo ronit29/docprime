@@ -10,7 +10,8 @@ from ondoc.doctor.models import OpdAppointment, DoctorPracticeSpecialization, Pr
 from ondoc.diagnostic.models import LabAppointment, LabTest, Lab
 from ondoc.insurance.models import InsurancePlanContent, InsurancePlans, InsuredMembers, UserInsurance, StateGSTCode, \
      ThirdPartyAdministrator, InsuranceEligibleCities, InsuranceCity, InsuranceDistrict, InsuranceDeal, \
-    InsurerPolicyNumber, InsuranceLead, EndorsementRequest, InsuredMemberDocument, InsuranceEligibleCities
+    InsurerPolicyNumber, InsuranceLead, EndorsementRequest, InsuredMemberDocument, InsuranceEligibleCities,\
+    InsuranceThreshold
 from import_export.admin import ImportExportMixin, ImportExportModelAdmin, base_formats
 import nested_admin
 from import_export import fields, resources
@@ -66,10 +67,16 @@ class InsurancePlanAdminForm(forms.ModelForm):
         return is_selected
 
 
+class InsuranceThresholdInline(admin.TabularInline):
+    model = InsuranceThreshold
+    #fields = ('__all__',)
+    extra = 0
+
+
 class InsurancePlansAdmin(admin.ModelAdmin):
 
-    list_display = ['insurer', 'name', 'amount', 'is_selected']
-    inlines = [InsurancePlanContentInline, InsurerPolicyNumberInline]
+    list_display = ['insurer', 'name','internal_name', 'amount', 'is_selected','get_policy_prefix']
+    inlines = [InsurancePlanContentInline, InsurerPolicyNumberInline,InsuranceThresholdInline]
     search_fields = ['name']
     form = InsurancePlanAdminForm
 

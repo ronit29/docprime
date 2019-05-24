@@ -362,6 +362,18 @@ class InsurancePlans(auth_model.TimeStampedModel, LiveMixin):
     def get_active_threshold(self):
         return self.threshold.filter(is_live=True)
 
+    def get_policy_prefix(self):
+        insurer_policy_number = None
+        if self.plan_policy_number.first():
+            insurer_policy_number = self.plan_policy_number.first().insurer_policy_number
+        else :
+            insurer_policy_number_obj = InsurerPolicyNumber.objects.filter(insurer=self.insurer, insurance_plan__isnull=True).order_by(
+                '-id').first()
+            if insurer_policy_number_obj:
+                insurer_policy_number = insurer_policy_number_obj.insurer_policy_number
+
+        return insurer_policy_number
+
     def get_people_covered(self):
         return "%d adult, %d childs" % (self.adult_count, self.child_count)
 
