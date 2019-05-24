@@ -37,7 +37,7 @@ from decimal import  *
 logger = logging.getLogger(__name__)
 from django.utils.functional import cached_property
 from ondoc.notification import tasks as notification_tasks
-
+from dateutil.relativedelta import relativedelta
 
 
 def generate_insurance_policy_number():
@@ -401,12 +401,16 @@ class InsuranceThreshold(auth_model.TimeStampedModel, LiveMixin):
         message = {}
         is_dob_valid = False
         # Calculate day difference between dob and current date
-        # current_date = datetime.datetime.now().date()
+
         current_date = timezone.now().date()
+        # days_diff = current_date - member['dob']
+        # days_diff = days_diff.days
+        # years_diff = days_diff / 365
+        # years_diff = math.ceil(years_diff)
+
+        years_diff = relativedelta(current_date, member['dob']).years
         days_diff = current_date - member['dob']
         days_diff = days_diff.days
-        years_diff = days_diff / 365
-        years_diff = math.ceil(years_diff)
         adult_max_age = self.max_age
         adult_min_age = self.min_age
         child_min_age = self.child_min_age
