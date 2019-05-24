@@ -2027,7 +2027,7 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
     def allowed_action(self, user_type, request):
         allowed = []
         if self.status == self.CREATED:
-            if user_type == User.CONSUMER:
+            if user_type == auth_model.User.CONSUMER:
                 return [self.CANCELLED]
             return []
 
@@ -2154,8 +2154,7 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
         appointment_status = OpdAppointment.BOOKED
 
         if insurance and insurance.is_valid():
-            booking_date = appointment_data.get('time_slot_start').date()
-            mrp = appointment_data.get('mrp')
+            mrp = appointment_data.get('fees')
             insurance_limit_usage_data = insurance.validate_limit_usages(mrp)
             if insurance_limit_usage_data.get('created_state'):
                 appointment_status = OpdAppointment.CREATED

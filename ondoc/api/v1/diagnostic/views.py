@@ -407,7 +407,10 @@ class LabList(viewsets.ReadOnlyModelViewSet):
         # disable home pickup for insured customers if lab charges home collection
         if request.user and request.user.is_authenticated and result:
             active_insurance = request.user.active_insurance
-            threshold = active_insurance.insurance_plan.threshold.first()
+            threshold = None
+            if active_insurance and active_insurance.insurance_plan:
+                threshold = active_insurance.insurance_plan.threshold.first()
+
             if active_insurance and threshold:
                 for data in result:
                     if data.get('lab') and data.get('lab').get('home_pickup_charges', 0) > 0:
@@ -1802,7 +1805,10 @@ class LabList(viewsets.ReadOnlyModelViewSet):
         #disable home pickup for insured customers if lab charges home collection
         if request.user and request.user.is_authenticated and temp_data.get('lab'):
             active_insurance = request.user.active_insurance
-            threshold = active_insurance.insurance_plan.threshold.first() if active_insurance else None
+            threshold = None
+            if active_insurance and active_insurance.insurance_plan:
+                threshold = active_insurance.insurance_plan.threshold.first()
+
             if active_insurance and threshold:
                 turn_off_home_collection = False                
                 if temp_data.get('lab').get('home_pickup_charges', 0) > 0:
