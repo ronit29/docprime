@@ -42,6 +42,12 @@ class InsurancePlanContentInline(admin.TabularInline):
     # readonly_fields = ("first_name", 'last_name', 'relation', 'dob', 'gender', )
 
 
+class InsurerPolicyNumberInline(admin.TabularInline):
+    model = InsurerPolicyNumber
+    fields = ('insurer', 'insurer_policy_number')
+    extra = 0
+
+
 class InsurancePlanAdminForm(forms.ModelForm):
 
     is_selected = forms.BooleanField(required=False)
@@ -63,7 +69,7 @@ class InsurancePlanAdminForm(forms.ModelForm):
 class InsurancePlansAdmin(admin.ModelAdmin):
 
     list_display = ['insurer', 'name', 'amount', 'is_selected']
-    inlines = [InsurancePlanContentInline]
+    inlines = [InsurancePlanContentInline, InsurerPolicyNumberInline]
     search_fields = ['name']
     form = InsurancePlanAdminForm
 

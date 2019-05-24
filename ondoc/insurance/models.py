@@ -1243,8 +1243,8 @@ class UserInsurance(auth_model.TimeStampedModel):
         from ondoc.doctor.models import OpdAppointment
         from ondoc.diagnostic.models import LabAppointment
 
-        total_opd_stats = OpdAppointment.get_insurance_usage(self)
-        today_opd_stats = OpdAppointment.get_insurance_usage(self, timezone.now().date())
+        total_opd_stats = {'count': 0, 'sum': 0} #OpdAppointment.get_insurance_usage(self)
+        today_opd_stats = {'count': 0, 'sum': 0} #OpdAppointment.get_insurance_usage(self, timezone.now().date())
 
         total_lab_stats = LabAppointment.get_insurance_usage(self)
         today_lab_stats = LabAppointment.get_insurance_usage(self, timezone.now().date())
