@@ -2792,7 +2792,7 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
         return appointments
 
     @classmethod
-    def get_all_insurance_appointment(cls, insurance_obj, date=None):
+    def get_insurance_usage(cls, insurance_obj, date=None):
         appointments = cls.objects.filter(user=insurance_obj.user, insurance=insurance_obj).exclude(status=cls.CANCELLED)
         if date:
             appointments = appointments.filter(created_at__date=date)

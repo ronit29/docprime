@@ -2098,16 +2098,6 @@ class DoctorAvailabilityTimingViewSet(viewsets.ViewSet):
             for apt in active_appointments:
                 del timeslots.get('time_slots',{})[str(apt.time_slot_start.date())]
 
-
-        # active_appointments = None
-        # if request.user and request.user.is_authenticated and request.user.active_insurance:
-        #     active_appointments = OpdAppointment.get_insured_active_appointment(request.user.active_insurance)
-        #     for appointment in active_appointments:
-        #         for slot in temp_slots:
-        #             if str(appointment.time_slot_start.date()) == slot and clinic_timings.first().doctor_clinic.hospital_id == appointment.hospital_id:
-        #                 del slots[slot]
-
-
         # queryset = models.DoctorClinicTiming.objects.filter(doctor_clinic__doctor=validated_data.get('doctor_id'),
         #                                                     doctor_clinic__hospital=validated_data.get(
         #                                                         'hospital_id')).order_by("start")

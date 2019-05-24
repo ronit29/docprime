@@ -283,8 +283,8 @@ class AvailableLabTestPackageSerializer(serializers.ModelSerializer):
     #
     #     if not data:
     #         return False
-
-        return data.get('prescription_needed', False)
+    #
+    #   return data.get('prescription_needed', False)
 
     def get_insurance(self, obj):
         request = self.context.get("request")

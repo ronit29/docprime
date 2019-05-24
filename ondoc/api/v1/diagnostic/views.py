@@ -1798,7 +1798,7 @@ class LabList(viewsets.ReadOnlyModelViewSet):
 
         test_serializer_data = test_serializer.data
         is_prescription_needed = False
-        if request.user and request.user.is_authenticated and not request.user.is_anonymous:
+        if request.user and request.user.is_authenticated:
             insurance = request.user.active_insurance
             if insurance and test_serializer_data:
                 agreed_price = Decimal(0)

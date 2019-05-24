@@ -14,6 +14,6 @@ class Migration(migrations.Migration):
         migrations.AddField(
             model_name='insuranceplans',
             name='plan_usages',
-            field=django.contrib.postgres.fields.jsonb.JSONField(default={}, null=True),
+            field=django.contrib.postgres.fields.jsonb.JSONField(default=dict, null=True),
         ),
     ]

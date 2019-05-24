@@ -355,7 +355,7 @@ class InsurancePlans(auth_model.TimeStampedModel, LiveMixin):
     is_live = models.BooleanField(default=False)
     total_allowed_members = models.PositiveSmallIntegerField(default=0)
     is_selected = models.BooleanField(default=False)
-    plan_usages = JSONField(default={}, null=True)
+    plan_usages = JSONField(default=dict, null=True)
 
     @property
     def get_active_threshold(self):
@@ -1239,11 +1239,11 @@ class UserInsurance(auth_model.TimeStampedModel):
         from ondoc.doctor.models import OpdAppointment
         from ondoc.diagnostic.models import LabAppointment
 
-        total_opd_stats = OpdAppointment.get_all_insurance_appointment(self)
-        today_opd_stats = OpdAppointment.get_all_insurance_appointment(self, timezone.now().date())
+        total_opd_stats = OpdAppointment.get_insurance_usage(self)
+        today_opd_stats = OpdAppointment.get_insurance_usage(self, timezone.now().date())
 
-        total_lab_stats = LabAppointment.get_all_insurance_appointment(self)
-        today_lab_stats = LabAppointment.get_all_insurance_appointment(self, timezone.now().date())
+        total_lab_stats = LabAppointment.get_insurance_usage(self)
+        today_lab_stats = LabAppointment.get_insurance_usage(self, timezone.now().date())
 
         data = {
             'used_ytd_count': total_opd_stats['count'] + total_lab_stats['count'],
