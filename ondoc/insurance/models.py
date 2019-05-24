@@ -62,7 +62,7 @@ def generate_insurance_insurer_policy_number(insurance_plan):
     if plan_policy_number_obj:
         master_policy_number = plan_policy_number_obj.insurer_policy_number
     else:
-        insurer_policy_number_obj = InsurerPolicyNumber.objects.filter(insurer=insurance_plan.insurer).order_by(
+        insurer_policy_number_obj = InsurerPolicyNumber.objects.filter(insurer=insurance_plan.insurer, insurance_plan__isnull=True).order_by(
             '-id').first()
         master_policy_number = insurer_policy_number_obj.insurer_policy_number
     if not master_policy_number:
