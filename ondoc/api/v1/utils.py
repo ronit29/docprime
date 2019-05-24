@@ -405,6 +405,8 @@ def payment_details(request, order):
     base_url = "https://{}".format(request.get_host())
     surl = base_url + '/api/v1/user/transaction/save'
     furl = base_url + '/api/v1/user/transaction/save'
+    # surl = 'https://honest-lionfish-80.localtunnel.me/api/v1/user/transaction/save'
+    # furl = 'https://honest-lionfish-80.localtunnel.me/api/v1/user/transaction/save'
     profile = user.get_default_profile()
     profile_name = ""
     if profile:
@@ -435,6 +437,7 @@ def payment_details(request, order):
         'orderId': order.id,
         'name': profile_name,
         'txAmount': str(order.amount),
+        'holdPayment': 0,
     }
 
     if insurer_code:
@@ -456,6 +459,31 @@ def payment_details(request, order):
 
     return pgdata, payment_required
 
+
+def pg_seamless_hash(order, order_no):
+    from ondoc.account.models import PgTransaction
+    secret_key, client_key = get_pg_secret_client_key(order)
+    orderData = {
+        "orderId": order.id,
+        "orderNo": order_no
+    }
+    pg_hash = PgTransaction.create_pg_hash(orderData, secret_key, client_key)
+    return pg_hash
+
+def get_pg_secret_client_key(order):
+    from ondoc.account.models import Order
+    secret_key = client_key = ""
+    if order.product_id == Order.DOCTOR_PRODUCT_ID or order.product_id == Order.SUBSCRIPTION_PLAN_PRODUCT_ID:
+        secret_key = settings.PG_SECRET_KEY_P1
+        client_key = settings.PG_CLIENT_KEY_P1
+    elif order.product_id == Order.LAB_PRODUCT_ID:
+        secret_key = settings.PG_SECRET_KEY_P2
+        client_key = settings.PG_CLIENT_KEY_P2
+    elif order.product_id == Order.INSURANCE_PRODUCT_ID:
+        secret_key = settings.PG_SECRET_KEY_P3
+        client_key = settings.PG_CLIENT_KEY_P3
+
+    return [secret_key, client_key]
 
 def get_location(lat, long):
     pnt = None

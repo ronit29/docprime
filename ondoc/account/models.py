@@ -780,7 +780,7 @@ class PgTransaction(TimeStampedModel):
     status_code = models.IntegerField()
     pg_name = models.CharField(max_length=100, null=True, blank=True)
     status_type = models.CharField(max_length=50)
-    transaction_id = models.CharField(max_length=100, unique=True)
+    transaction_id = models.CharField(max_length=100, unique=True, blank=True)
     pb_gateway_name = models.CharField(max_length=100, null=True, blank=True)
 
     @transaction.atomic
@@ -891,6 +891,9 @@ class PgTransaction(TimeStampedModel):
 
         encrypted_message_digest = encrypted_message_object.hexdigest()
         return encrypted_message_digest
+
+    def is_preauth(self):
+        self.payment_mode == 'PPI' and self.pg_name == 'paytm'
 
     class Meta:
         db_table = "pg_transaction"

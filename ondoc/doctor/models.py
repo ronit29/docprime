@@ -25,7 +25,7 @@ from datetime import timedelta
 from dateutil import tz
 from django.utils import timezone
 from ondoc.authentication import models as auth_model
-from ondoc.authentication.models import SPOCDetails, RefundMixin
+from ondoc.authentication.models import SPOCDetails, RefundMixin, PaymentMixin
 from ondoc.bookinganalytics.models import DP_OpdConsultsAndTests
 from ondoc.location import models as location_models
 from ondoc.account.models import Order, ConsumerAccount, ConsumerTransaction, PgTransaction, ConsumerRefund, \
@@ -1890,7 +1890,7 @@ class OpdAppointmentInvoiceMixin(object):
 
 
 @reversion.register()
-class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentInvoiceMixin, RefundMixin, CompletedBreakupMixin):
+class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentInvoiceMixin, RefundMixin, CompletedBreakupMixin, PaymentMixin):
     PRODUCT_ID = Order.DOCTOR_PRODUCT_ID
     CREATED = 1
     BOOKED = 2
@@ -2187,6 +2187,12 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
                 self.outstanding = out_obj
         self.save()
 
+        try:
+            notification_tasks.send_capture_release_payment_request.apply_async(
+                Order.DOCTOR_PRODUCT_ID, self.id, eta=datetime.datetime.now(), )
+        except Exception as e:
+            logger.error(str(e))
+
     def get_billable_admin_level(self):
         if self.hospital.network and self.hospital.network.is_billing_enabled:
             return self.hospital.network, payout_model.Outstanding.HOSPITAL_NETWORK_LEVEL
@@ -2297,6 +2303,17 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
         #         }, ), countdown=countdown)
         # except Exception as e:
         #     logger.error("Error in auto cancel flow - " + str(e))
+
+        if not old_instance:
+            try:
+                # notification_tasks.send_capture_release_payment_request.apply_async(
+                #     (Order.DOCTOR_PRODUCT_ID, self.id), eta=timezone.localtime() + datetime.timedelta(
+                #         hours=int(settings.PAYMENT_AUTO_CAPTURE_DURATION)), )
+                notification_tasks.send_capture_release_payment_request.apply_async(
+                    (Order.DOCTOR_PRODUCT_ID, self.id), eta=timezone.localtime() + datetime.timedelta(hours=0.04), )
+            except Exception as e:
+                logger.error(str(e))
+
         print('all ops tasks completed')
 
     def save(self, *args, **kwargs):

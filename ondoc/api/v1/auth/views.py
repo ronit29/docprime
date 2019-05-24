@@ -1317,7 +1317,7 @@ class TransactionViewSet(viewsets.GenericViewSet):
         data['status_code'] = response.get('statusCode')
         data['pg_name'] = response.get('pgGatewayName')
         data['status_type'] = response.get('txStatus')
-        data['transaction_id'] = response.get('pgTxId')
+        data['transaction_id'] = response.get('pgTxId') if not response.get('pgTxId') == 'null' else None
         data['pb_gateway_name'] = response.get('pbGatewayName')
 
         return data

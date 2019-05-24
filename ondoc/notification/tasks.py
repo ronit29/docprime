@@ -14,7 +14,7 @@ from django.forms import model_to_dict
 from django.utils import timezone
 from openpyxl import load_workbook
 
-from ondoc.api.v1.utils import aware_time_zone, util_absolute_url
+from ondoc.api.v1.utils import aware_time_zone, util_absolute_url, pg_seamless_hash
 from ondoc.common.models import AppointmentMaskNumber
 from ondoc.notification.labnotificationaction import LabNotificationAction
 from ondoc.notification import models as notification_models
@@ -999,3 +999,87 @@ def update_coupon_used_count():
                  where oa.status in (2,3,4,5,7) group by oac.coupon_id
                 ) x group by coupon_id
                 ) y where coupon.id = y.coupon_id ''', []).execute()
+
+
+@task(bind=True, max_retries=5)
+def send_capture_release_payment_request(self, product_id, appointment_id):
+    from ondoc.doctor.models import OpdAppointment
+    from ondoc.diagnostic.models import LabAppointment
+    from ondoc.account.models import Order, PgTransaction
+    req_data = dict()
+    if product_id == Order.DOCTOR_PRODUCT_ID:
+        obj = OpdAppointment
+    if product_id == Order.LAB_PRODUCT_ID:
+        obj = LabAppointment
+    try:
+        order = Order.objects.filter(product_id=product_id, reference_id=appointment_id).first()
+
+        appointment = order.getAppointment()
+        if not appointment:
+            raise Exception("No Appointment found.")
+
+        if order and not order.is_parent():
+            order = order.parent
+
+        txn_obj = PgTransaction.objects.filter(order=order).first()
+
+        req_data = {
+            "orderNo": txn_obj.order_no,
+            "orderId": order.id,
+            "hash": pg_seamless_hash(order, txn_obj.order_no)
+        }
+
+        # check if appointment is not cancelled
+        if not appointment.status == obj.CANCELLED:
+            # check if txn is preauth
+            if txn_obj and txn_obj.is_preauth:
+                # check if txn already succeed/captured
+                if txn_obj.status_type == 'TXN_AUTHORIZE':
+                    url = settings.PG_CAPTURE_PAYMENT_URL
+                    token = settings.PG_SEAMLESS_CAPTURE_AUTH_TOKEN
+                    headers = {
+                        "auth": token,
+                        "Content-Type": "application/json"
+                    }
+
+                    response = requests.post(url, data=req_data, headers=headers)
+                    if response.status_code == status.HTTP_200_OK:
+                        resp_data = response.json()
+                        if resp_data.get("ok") is not None and resp_data.get("ok") == 1:
+                            txn_obj.status_type = 'TXN_SUCCESS'
+                            txn_obj.save()
+                        else:
+                            logger.error("Error in capture the payment with data - " + json.dumps(req_data) + " with error message - " + resp_data.get('statusMsg', ''))
+                    else:
+                        raise Exception("Retry on invalid Http response status - " + str(response.content))
+
+        if appointment.status == obj.CANCELLED:
+            if txn_obj and txn_obj.is_preauth:
+                if txn_obj.status_type == 'TXN_AUTHORIZE':
+                    if datetime.datetime.now() < txn_obj.transaction_date + datetime.timedelta(hours=int(settings.PAYMENT_AUTO_CAPTURE_DURATION)):
+                        url = settings.PG_RELEASE_PAYMENT_URL
+                        token = settings.PG_SEAMLESS_RELEASE_AUTH_TOKEN
+                        headers = {
+                            "auth": token,
+                            "Content-Type": "application/json"
+                        }
+
+                        response = requests.post(url, data=req_data, headers=headers)
+                        if response.status_code == status.HTTP_200_OK:
+                            resp_data = response.json()
+                            if resp_data.get("ok") is not None and resp_data.get("ok") == 1:
+                                txn_obj.status_type = 'TXN_RELEASED'
+                                txn_obj.save()
+                            else:
+                                logger.error("Error in releasing the payment with data - " + json.dumps(
+                                    req_data) + " with error message - " + resp_data.get('statusMsg', ''))
+                        else:
+                            raise Exception("Retry on invalid Http response status - " + str(response.content))
+                    else:
+                        # todo - refund in this case
+                        pass
+
+    except Exception as e:
+        logger.error("Error in payment with data - " + json.dumps(req_data) + " with exception - " + str(e))
+        self.retry([product_id, appointment_id], countdown=300)
+

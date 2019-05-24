@@ -1771,3 +1771,12 @@ class LastLoginTimestamp(TimeStampedModel):
 
     class Meta:
         db_table = "last_login_timestamp"
+
+
+class PaymentMixin(object):
+
+    def capture_payment(self):
+        pass
+
+    def release_payment(self):
+        pass
