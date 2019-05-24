@@ -307,10 +307,10 @@ class PrescriptionLabTestSerializer(serializers.ModelSerializer):
         fields = ('id', 'name', 'created_at', 'updated_at', 'moderated', 'hospitals', 'source_type', 'instructions')
 
 
-class AppointmentPrescriptionSerializer(serializers.Serializer):
-    lab_test = serializers.ListField(child=serializers.IntegerField(), required=True)
-    lab = serializers.PrimaryKeyRelatedField(queryset=Lab.objects.all(), required=True)
-    start_date = serializers.DateTimeField(required=True)
+# class AppointmentPrescriptionSerializer(serializers.Serializer):
+#     lab_test = serializers.ListField(child=serializers.IntegerField(), required=True)
+#     lab = serializers.PrimaryKeyRelatedField(queryset=Lab.objects.all(), required=True)
+#     start_date = serializers.DateTimeField(required=True)
 
 
 class AppointmentPrescriptionUploadSerializer(serializers.ModelSerializer):
