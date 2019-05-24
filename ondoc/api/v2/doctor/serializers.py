@@ -213,7 +213,7 @@ class ConsentIsEncryptSerializer(serializers.Serializer):
     is_encrypted = serializers.BooleanField()
     hospital_id = serializers.IntegerField()
     encrypted_hospital_id = serializers.CharField()
-    encryption_hint = serializers.CharField(required=False, allow_blank=True)
+    hint = serializers.CharField(required=False, allow_blank=True)
 
     def validate(self, attrs):
         if attrs and attrs['hospital_id']:

@@ -220,6 +220,8 @@ class HospitalProviderDataViewSet(viewsets.GenericViewSet):
                 if admin.hospital.provider_encrypt:
                     admin_data['is_encrypted'] = admin.hospital.provider_encrypt
                     admin_data["encrypted_by"] = admin.hospital.provider_encrypted_by.phone_number
+                    admin_data["encrypted_hospital_id"] = admin.hospital.encrypted_hospital_id
+                    admin_data["encryption_hint"] = admin.hospital.encryption_hint
                 all_data[hosp_id] = admin_data
             elif admin.hospital and (hosp_id in all_data):
                 if not all_data[hosp_id]['pem_type'] == auth_models.GenericAdmin.ALL:
@@ -568,7 +570,7 @@ class ProviderSignupDataViewset(viewsets.GenericViewSet):
         try:
             hospital.provider_encrypt = True
             hospital.provider_encrypted_by = user
-            hospital.encryption_hint = valid_data.get('encryption_hint')
+            hospital.encryption_hint = valid_data.get('hint')
             hospital.encrypted_hospital_id = valid_data.get('encrypted_hospital_id')
             hospital.save()
             return Response({"status": 1, "message": "consent updated"})
