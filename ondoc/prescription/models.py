@@ -244,7 +244,7 @@ class AppointmentPrescription(auth_models.TimeStampedModel):
 
     @classmethod
     def prescription_exist_for_user_current_date(cls, user, date):
-        return cls.objects.filter(created_at__date=date, user=user).exists()
+        return cls.objects.filter(created_at__date=date, user=user, object_id__isnull=False).exists()
 
     @classmethod
     def update_with_appointment(cls, app_obj, ids):
