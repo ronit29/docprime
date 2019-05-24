@@ -198,7 +198,7 @@ class DoctorAppointmentsViewSet(OndocViewSet):
             source = validated_data.get('source')
         opd_appointment = models.OpdAppointment.objects.select_for_update().filter(pk=validated_data.get('id')).first()
 
-        if not opd_appointment:
+        if not opd_appointment or opd_appointment.status==opd_appointment.CREATED:
             return Response({"message": "Invalid appointment id"}, status.HTTP_404_NOT_FOUND)
         opd_appointment._source = source if source in [x[0] for x in AppointmentHistory.SOURCE_CHOICES] else ''
         opd_appointment._responsible_user = responsible_user
@@ -2091,9 +2091,25 @@ class DoctorAvailabilityTimingViewSet(viewsets.ViewSet):
                 res_data[readable_date] = list()
 
             timeslots = {"time_slots": res_data, "upcoming_slots": []}
+
+        if request.user and request.user.is_authenticated and request.user.active_insurance:
+            active_appointments = dc_obj.hospital.\
+                get_active_opd_appointments(request.user, request.user.active_insurance)
+            for apt in active_appointments:
+                del timeslots.get('time_slots',{})[str(apt.time_slot_start.date())]
+
         # queryset = models.DoctorClinicTiming.objects.filter(doctor_clinic__doctor=validated_data.get('doctor_id'),
         #                                                     doctor_clinic__hospital=validated_data.get(
         #                                                         'hospital_id')).order_by("start")
+        # temp_slots = slots.copy()
+        # active_appointments = None
+        # if user.active_insurance:
+        #     active_appointments = OpdAppointment.get_insured_active_appointment(user.active_insurance)
+        #     for appointment in active_appointments:
+        #         for slot in temp_slots:
+        #             if str(appointment.time_slot_start.date()) == slot and clinic_timings.first().doctor_clinic.hospital_id == appointment.hospital_id:
+        #                 del slots[slot]
+
         doctor_queryset = (models.Doctor
                            .objects.prefetch_related("qualifications__qualification",
                                                      "qualifications__specialization")
@@ -2150,7 +2166,7 @@ class DoctorAppointmentNoAuthViewSet(viewsets.GenericViewSet):
         validated_data = serializer.validated_data
         # opd_appointment = get_object_or_404(models.OpdAppointment, pk=validated_data.get('opd_appointment'))
         opd_appointment = models.OpdAppointment.objects.select_for_update().filter(pk=validated_data.get('opd_appointment')).first()
-        if not opd_appointment:
+        if not opd_appointment or opd_appointment.status==models.OpdAppointment.CREATED:
             return Response({"message": "Invalid appointment id"}, status.HTTP_404_NOT_FOUND)
         source = validated_data.get('source') if validated_data.get('source') else request.query_params.get('source', '')
         responsible_user = request.user if request.user.is_authenticated else None

@@ -42,8 +42,7 @@ from ondoc.insurance.models import (Insurer, InsurancePlans, InsuranceThreshold,
                                     InsuranceDistrict, InsuranceTransaction, InsuranceDeal, InsuranceDisease,
                                     UserInsurance, InsurancePlanContent, InsuredMembers, InsurerAccount, InsuranceLead,
                                     InsuranceDiseaseResponse, InsurerPolicyNumber, InsuranceCancelMaster,
-                                    EndorsementRequest, InsuredMemberDocument, InsuredMemberHistory,
-                                    ThirdPartyAdministrator)
+                                    EndorsementRequest, InsuredMemberDocument, InsuredMemberHistory, ThirdPartyAdministrator)
 
 from ondoc.procedure.models import Procedure, ProcedureCategory, CommonProcedureCategory, DoctorClinicProcedure, \
     ProcedureCategoryMapping, ProcedureToCategoryMapping, CommonProcedure, IpdProcedure, IpdProcedureFeatureMapping, \

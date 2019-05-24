@@ -3,6 +3,7 @@ from django import forms
 from django.db.models import Count, Q
 from django.db.models import F
 from rest_framework import serializers
+from dal import autocomplete
 from ondoc.api.v1.insurance.serializers import InsuranceTransactionSerializer
 from ondoc.crm.constants import constants
 from ondoc.doctor.models import OpdAppointment, DoctorPracticeSpecialization, PracticeSpecialization, Hospital
@@ -23,6 +24,7 @@ class InsurerAdmin(admin.ModelAdmin):
 
     list_display = ['name', 'enabled', 'is_live']
     list_filter = ['name']
+    search_fields = ['name']
 
 
 class InsurerFloatAdmin(admin.ModelAdmin):
@@ -62,6 +64,7 @@ class InsurancePlansAdmin(admin.ModelAdmin):
 
     list_display = ['insurer', 'name', 'amount', 'is_selected']
     inlines = [InsurancePlanContentInline]
+    search_fields = ['name']
     form = InsurancePlanAdminForm
 
 
@@ -854,10 +857,22 @@ class InsuranceDistrictAdmin(ImportExportModelAdmin):
     list_display = ('id', 'district_code', 'district_name', 'state')
 
 
+# class InsurerPolicyNumberForm(forms.ModelForm):
+#
+#     class Meta:
+#         widgets = {
+#             'insurer': autocomplete.ModelSelect2(url='insurer-autocomplete'),
+#             'insurance_plan': autocomplete.ModelSelect2(url='insurance-plan-autocomplete', forward=['insurer'])
+#         }
+
+
 class InsurerPolicyNumberAdmin(admin.ModelAdmin):
     model = InsurerPolicyNumber
-    fields = ('insurer', 'insurer_policy_number')
-    list_display = ('insurer', 'insurer_policy_number', 'created_at')
+    fields = ('insurer', 'insurance_plan', 'insurer_policy_number')
+    list_display = ('insurer', 'insurance_plan', 'insurer_policy_number', 'created_at')
+    # form = InsurerPolicyNumberForm
+    # search_fields = ['insurer']
+    # autocomplete_fields = ['insurer', 'insurance_plan']
 
 
 class InsuranceDealAdmin(admin.ModelAdmin):

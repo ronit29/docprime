@@ -34,6 +34,7 @@ import reversion
 import numbers
 from ondoc.account.models import Order, Merchant, MerchantPayout
 from decimal import  *
+
 logger = logging.getLogger(__name__)
 from django.utils.functional import cached_property
 from ondoc.notification import tasks as notification_tasks
@@ -53,16 +54,19 @@ def generate_insurance_policy_number():
         raise ValueError('Sequence Produced is not valid.')
 
 
-def generate_insurance_insurer_policy_number(insurer_id):
-    if not insurer_id:
+def generate_insurance_insurer_policy_number(insurance_plan):
+    if not insurance_plan:
         raise Exception('Could not generate policy number according to the insurer.')
-    insurer = Insurer.objects.filter(id=insurer_id).first()
-    policy_number_data = InsurerPolicyNumber.objects.filter(insurer=insurer).order_by('-id').first()
-    if not policy_number_data:
+    master_policy_number = None
+    plan_policy_number_obj = InsurerPolicyNumber.objects.filter(insurance_plan=insurance_plan).order_by('-id').first()
+    if plan_policy_number_obj:
+        master_policy_number = plan_policy_number_obj.insurer_policy_number
+    else:
+        insurer_policy_number_obj = InsurerPolicyNumber.objects.filter(insurer=insurance_plan.insurer, insurance_plan__isnull=True).order_by(
+            '-id').first()
+        master_policy_number = insurer_policy_number_obj.insurer_policy_number
+    if not master_policy_number:
         raise Exception('Master Policy number is missing.')
-    master_policy_number = policy_number_data.insurer_policy_number
-    # master_policy_number = insurer.policy_number_history.policy_number.order_by('-created_at').first()
-    # master_policy_number = insurer.master_policy_number
     query = '''select nextval('userinsurance_policy_num_seq') as inc'''
     seq = RawSql(query, []).fetch_all()
     sequence = None
@@ -74,7 +78,6 @@ def generate_insurance_insurer_policy_number(insurer_id):
         return str(master_policy_number + '%.8d' % sequence)
     else:
         raise ValueError('Sequence Produced is not valid.')
-
 
 
 def generate_insurance_reciept_number():
@@ -352,6 +355,7 @@ class InsurancePlans(auth_model.TimeStampedModel, LiveMixin):
     is_live = models.BooleanField(default=False)
     total_allowed_members = models.PositiveSmallIntegerField(default=0)
     is_selected = models.BooleanField(default=False)
+    plan_usages = JSONField(default=dict, null=True)
 
     @property
     def get_active_threshold(self):
@@ -655,7 +659,7 @@ class UserInsurance(auth_model.TimeStampedModel):
             'premium_in_words': ('%s rupees ' % num2words(self.premium_amount)).title() + "only",
             'proposer_name': proposer_name.title(),
             'proposer_address': '%s, %s, %s, %s, %d' % (proposer.address, proposer.town, proposer.district, proposer.state, proposer.pincode),
-            'proposer_mobile': proposer.phone_number,
+            'proposer_mobile': self.user.phone_number,
             'proposer_email': proposer.email,
             'intermediary_name': self.insurance_plan.insurer.intermediary_name,
             'intermediary_code': self.insurance_plan.insurer.intermediary_code,
@@ -920,7 +924,7 @@ class UserInsurance(auth_model.TimeStampedModel):
                                                             expiry_date=insurance_data['expiry_date'],
                                                             premium_amount=insurance_data['premium_amount'],
                                                             order=insurance_data['order'],
-                                                            policy_number=generate_insurance_insurer_policy_number(insurer_id))
+                                                            policy_number=generate_insurance_insurer_policy_number(insurance_data['insurance_plan']))
 
         insured_members = InsuredMembers.create_insured_members(user_insurance_obj)
         return user_insurance_obj
@@ -1235,6 +1239,53 @@ class UserInsurance(auth_model.TimeStampedModel):
             except Exception as e:
                 logger.error(str(e))
 
+    def get_insurance_appointment_stats(self):
+        from ondoc.doctor.models import OpdAppointment
+        from ondoc.diagnostic.models import LabAppointment
+
+        total_opd_stats = OpdAppointment.get_insurance_usage(self)
+        today_opd_stats = OpdAppointment.get_insurance_usage(self, timezone.now().date())
+
+        total_lab_stats = LabAppointment.get_insurance_usage(self)
+        today_lab_stats = LabAppointment.get_insurance_usage(self, timezone.now().date())
+
+        data = {
+            'used_ytd_count': total_opd_stats['count'] + total_lab_stats['count'],
+            'used_ytd_amount': total_opd_stats['sum'] + total_lab_stats['sum'],
+            'used_daily_count': today_opd_stats['count'] + today_lab_stats['count'],
+            'used_daily_amount': today_opd_stats['sum'] + today_lab_stats['sum']
+        }
+
+        return data
+
+    def validate_limit_usages(self, appointment_mrp):
+        from ondoc.prescription.models import AppointmentPrescription
+        response = {
+            'prescription_needed': False,
+            'created_state': False
+        }
+        plan_usages = self.insurance_plan.plan_usages
+        ytd_count = plan_usages.get('ytd_count', None)
+        ytd_amount = plan_usages.get('ytd_amount', None)
+        daily_count = plan_usages.get('daily_count', None)
+        daily_amount = plan_usages.get('daily_amount', None)
+
+        insurance_appointment_stats = self.get_insurance_appointment_stats()
+
+        if ytd_count and insurance_appointment_stats['used_ytd_count'] + 1 > ytd_count:
+            response['created_state'] = True
+        elif ytd_amount and insurance_appointment_stats['used_ytd_amount'] + appointment_mrp > ytd_amount:
+            response['created_state'] = True
+        elif daily_amount and insurance_appointment_stats['used_daily_amount'] + appointment_mrp > daily_amount:
+            response['created_state'] = True
+        elif daily_count and insurance_appointment_stats['used_daily_count'] + 1 > daily_count:
+            response['created_state'] = True
+
+        if response['created_state'] and not AppointmentPrescription.prescription_exist_for_user_current_date(self.user, timezone.now().date()):
+            response['prescription_needed'] = True
+
+        return response
+
 
 class InsuranceTransaction(auth_model.TimeStampedModel):
     CREDIT = 1
@@ -1488,8 +1539,9 @@ class InsuranceDeal(auth_model.TimeStampedModel):
 
 
 class InsurerPolicyNumber(auth_model.TimeStampedModel):
-    insurer = models.ForeignKey(Insurer, related_name='policy_number_history', on_delete=models.DO_NOTHING)
+    insurer = models.ForeignKey(Insurer, related_name='policy_number_history', on_delete=models.DO_NOTHING, null=True, blank=True)
     insurer_policy_number = models.CharField(max_length=50)
+    insurance_plan = models.ForeignKey(InsurancePlans, related_name='plan_policy_number', on_delete=models.DO_NOTHING, null=True, blank=True)
 
     class Meta:
         db_table = 'insurer_policy_numbers'
