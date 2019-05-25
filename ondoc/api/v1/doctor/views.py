@@ -2081,8 +2081,17 @@ class DoctorAvailabilityTimingViewSet(viewsets.ViewSet):
         dc_obj = models.DoctorClinic.objects.filter(doctor_id=validated_data.get('doctor_id'),
                                                             hospital_id=validated_data.get(
                                                                 'hospital_id')).first()
+        blocks = []
+        if request.user and request.user.is_authenticated and \
+                not hasattr(request, 'agent') and request.user.active_insurance:
+            active_appointments = dc_obj.hospital.\
+                get_active_opd_appointments(request.user, request.user.active_insurance)
+            for apt in active_appointments:
+                blocks.append(str(apt.time_slot_start.date()))
+
+
         if dc_obj:
-            timeslots = dc_obj.get_timings()
+            timeslots = dc_obj.get_timings(blocks)
         else:
             res_data = OrderedDict()
             for i in range(30):
@@ -2092,11 +2101,11 @@ class DoctorAvailabilityTimingViewSet(viewsets.ViewSet):
 
             timeslots = {"time_slots": res_data, "upcoming_slots": []}
 
-        if request.user and request.user.is_authenticated and request.user.active_insurance:
-            active_appointments = dc_obj.hospital.\
-                get_active_opd_appointments(request.user, request.user.active_insurance)
-            for apt in active_appointments:
-                timeslots.get('time_slots', {}).pop(str(apt.time_slot_start.date()), None)
+        # if request.user and request.user.is_authenticated and request.user.active_insurance:
+        #     active_appointments = dc_obj.hospital.\
+        #         get_active_opd_appointments(request.user, request.user.active_insurance)
+        #     for apt in active_appointments:
+        #         timeslots.get('time_slots', {}).pop(str(apt.time_slot_start.date()), None)
 
         # queryset = models.DoctorClinicTiming.objects.filter(doctor_clinic__doctor=validated_data.get('doctor_id'),
         #                                                     doctor_clinic__hospital=validated_data.get(
