@@ -1,6 +1,7 @@
 from django.db import models
 from django.contrib.postgres.fields import JSONField
 from django.forms import model_to_dict
+from django.utils.functional import cached_property
 
 from ondoc.authentication.models import TimeStampedModel, User, UserProfile, Merchant
 from ondoc.account.tasks import refund_curl_task
@@ -147,8 +148,25 @@ class Order(TimeStampedModel):
                 action=action,
             ).update(is_viewable=False)
 
+    def upgrade_to_prepaid(self):
+        from ondoc.doctor.models import OpdAppointment
+        if self.product_id != self.DOCTOR_PRODUCT_ID:
+            return False
+        if not self.reference_id:
+            return False
+        opd_obj = OpdAppointment.objects.filter(id=self.reference_id).first()
+        if not opd_obj:
+            return False
+        if opd_obj.payment_type != OpdAppointment.COD:
+            return False
+        self.payment_type = OpdAppointment.COD
+        self.action_data['appointment_id'] = self.reference_id
+        self.action_data['payment_type'] = OpdAppointment.PREPAID
+        self.action_data['effective_price'] = self.action_data['deal_price']  # TODO : SHASHANK_SINGH set to correct price
+        return True
+
     @transaction.atomic
-    def process_order(self):
+    def process_order(self, upgrade_to):
         from ondoc.doctor.models import OpdAppointment
         from ondoc.diagnostic.models import LabAppointment
         from ondoc.api.v1.doctor.serializers import OpdAppTransactionModelSerializer
@@ -160,7 +178,10 @@ class Order(TimeStampedModel):
 
         # skip if order already processed
         if self.reference_id:
-            raise Exception("Order already processed - " + str(self.id))
+            if self.upgrade_to_prepaid():
+                pass
+            else:
+                raise Exception("Order already processed - " + str(self.id))
 
         # Initial validations for appointment data
         appointment_data = self.action_data
@@ -593,7 +614,6 @@ class Order(TimeStampedModel):
         from ondoc.insurance.models import UserInsurance
         from ondoc.subscription_plan.models import UserPlanMapping
         from ondoc.insurance.models import InsuranceDoctorSpecializations
-
         orders_to_process = []
         if self.orders.exists():
             orders_to_process = self.orders.all()
