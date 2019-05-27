@@ -1273,7 +1273,7 @@ class UserInsurance(auth_model.TimeStampedModel):
 
         return data
 
-    def validate_limit_usages(self, appointment_mrp):
+    def validate_limit_usages(self, tests_amount):
         from ondoc.prescription.models import AppointmentPrescription
         response = {
             'prescription_needed': False,
@@ -1289,9 +1289,9 @@ class UserInsurance(auth_model.TimeStampedModel):
 
         if ytd_count and insurance_appointment_stats['used_ytd_count'] + 1 > ytd_count:
             response['created_state'] = True
-        elif ytd_amount and insurance_appointment_stats['used_ytd_amount'] + appointment_mrp > ytd_amount:
+        elif ytd_amount and insurance_appointment_stats['used_ytd_amount'] + tests_amount > ytd_amount:
             response['created_state'] = True
-        elif daily_amount and insurance_appointment_stats['used_daily_amount'] + appointment_mrp > daily_amount:
+        elif daily_amount and insurance_appointment_stats['used_daily_amount'] + tests_amount > daily_amount:
             response['created_state'] = True
         elif daily_count and insurance_appointment_stats['used_daily_count'] + 1 > daily_count:
             response['created_state'] = True
