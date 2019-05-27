@@ -3084,10 +3084,11 @@ class OfflineCustomerViewSet(viewsets.GenericViewSet):
         if data.get('share_with_hospital') and not hospital:
             logger.error('PROVIDER_REQUEST - Hospital Not Given when Shared with Hospital Set'+ str(data))
         hosp = hospital if data.get('share_with_hospital') and hospital else None
+        encrypt_number = None
         if hosp and hosp.provider_encrypt:
             encrypt_number = data.get('encrypt_number')
         patient = models.OfflinePatients.objects.create(name=data.get('name'),
-                                                        encrypted_name = data.get('encrypted_name', None),
+                                                        encrypted_name=data.get('encrypted_name', None),
                                                         id=data.get('id'),
                                                         sms_notification=data.get('sms_notification', False),
                                                         gender=data.get('gender'),
@@ -3472,9 +3473,14 @@ class OfflineCustomerViewSet(viewsets.GenericViewSet):
                 patient_profile['phone_number'] = None
                 if hasattr(app.user, 'patient_mobiles'):
                     for mob in app.user.patient_mobiles.all():
-                        phone_number.append({"phone_number": mob.phone_number, "is_default": mob.is_default})
-                        if mob.is_default:
-                            patient_profile['phone_number'] = mob.phone_number
+                        if not mob.encrypted_number:
+                            phone_number.append({"phone_number": mob.phone_number, "is_default": mob.is_default})
+                            if mob.is_default:
+                                patient_profile['phone_number'] = mob.phone_number
+                        else:
+                            phone_number.append({"phone_number": mob.encrypted_number, "is_default": mob.is_default})
+                            if mob.is_default:
+                                patient_profile['phone_number'] = mob.encrypted_number
                 patient_profile['patient_numbers'] = phone_number
                 error_flag = app.error if app.error else False
                 error_message = app.error_message if app.error_message else ''

@@ -20,7 +20,7 @@ from django.contrib.contenttypes.models import ContentType
 from ondoc.procedure.models import Procedure
 from django.contrib.auth import get_user_model
 from django.conf import settings
-import datetime, logging, re, random, jwt, os
+import datetime, logging, re, random, jwt, os, hashlib
 import json
 from django.utils import timezone
 
@@ -567,16 +567,24 @@ class ProviderSignupDataViewset(viewsets.GenericViewSet):
         valid_data = serializer.validated_data
         user = request.user
         hospital = valid_data.get("hosp")
-        try:
+        if valid_data.get('decrypt'):
+            hospital.provider_encrypt = False
+            hospital.provider_encrypted_by = None
+            hospital.encryption_hint = None
+            hospital.encrypted_hospital_id = None
+            self.decrypt_and_save_provider_data(hospital.id, valid_data['encryption_key'])
+        else:
             hospital.provider_encrypt = True
             hospital.provider_encrypted_by = user
             hospital.encryption_hint = valid_data.get('hint')
             hospital.encrypted_hospital_id = valid_data.get('encrypted_hospital_id')
+        try:
             hospital.save()
             return Response({"status": 1, "message": "consent updated"})
         except Exception as e:
             logger.error('Error updating consent: ' + str(e))
-            return Response({"status": 0, "message": "Error updating consent - " + str(e)}, status.HTTP_500_INTERNAL_SERVER_ERROR)
+            return Response({"status": 0, "message": "Error "
+                                                     "doctor consent - " + str(e)}, status.HTTP_500_INTERNAL_SERVER_ERROR)
 
     def bulk_create_doctors(self, doctor_details):
         doc_obj_list = list()
@@ -808,6 +816,24 @@ class ProviderSignupDataViewset(viewsets.GenericViewSet):
         except Exception as e:
             logger.error('Error updating hospital consent ' + str(e))
             return Response({"status": 0, "message": "Error updating hospital consent - " + str(e)}, status.HTTP_400_BAD_REQUEST)
+
+    def decrypt_and_save_provider_data(self, hospital_id, key):
+        passphrase = hashlib.md5(key.encode())
+        passphrase = passphrase[:16]
+        patient_queryset = doc_models.OfflinePatients.objects.prefetch_related('patient_mobiles').filter(hospital_id=hospital_id)
+        for patient in patient_queryset:
+            if patient.encrypted_name:
+                name = v1_utils.AES_encryption.decrypt(patient.encrypted_name, passphrase)
+                patient.name = name
+                patient.encrypted_name = None
+                patient.save()
+            for mobile in patient.patient_mobiles.all():
+                if mobile.encrypted_number:
+                    number = v1_utils.AES_encryption.decrypt(mobile.encrypted_number, passphrase)
+                    mobile.phone_number = number
+                    mobile.encrypted_number = None
+                    mobile.save()
+
 
 
 class PartnersAppInvoice(viewsets.GenericViewSet):

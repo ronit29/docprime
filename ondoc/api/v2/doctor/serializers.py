@@ -210,10 +210,12 @@ class ConsentIsDocprimeSerializer(serializers.Serializer):
 
 
 class ConsentIsEncryptSerializer(serializers.Serializer):
-    is_encrypted = serializers.BooleanField()
+    is_encrypted = serializers.BooleanField(required=False)
     hospital_id = serializers.IntegerField()
     encrypted_hospital_id = serializers.CharField()
     hint = serializers.CharField(required=False, allow_blank=True)
+    encryption_key = serializers.CharField(required=False, allow_blank=True)
+    decrypt = serializers.BooleanField(required=False)
 
     def validate(self, attrs):
         if attrs and attrs['hospital_id']:
@@ -222,6 +224,8 @@ class ConsentIsEncryptSerializer(serializers.Serializer):
                 raise serializers.ValidationError('Hospital Not Found!')
             attrs['hosp'] = queryset
             return attrs
+        if attrs and attrs.get('decrypt') and not attrs['encryption_key']:
+            raise serializers.ValidationError('Encryption Key Not Found!')
 
 
 class BulkCreateDoctorSerializer(serializers.Serializer):

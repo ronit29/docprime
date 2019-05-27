@@ -36,6 +36,10 @@ from datetime import timedelta
 import os
 import tempfile
 
+import base64, hashlib
+from Crypto import Random
+from Crypto.Cipher import AES
+
 logger = logging.getLogger(__name__)
 
 User = get_user_model()
@@ -1547,3 +1551,35 @@ def ipd_query_parameters(entity, req_params):
     if entity.locality_value:
         params_dict['city'] = entity.locality_value
     return params_dict
+
+
+class AES_encryption:
+
+    BLOCK_SIZE = 16
+
+    @staticmethod
+    def pad(data):
+        length = AES_encryption.BLOCK_SIZE - (len(data) % AES_encryption.BLOCK_SIZE)
+        return data + chr(length) * length
+
+    @staticmethod
+    def unpad(data):
+        return data[:-ord(data[-1])]
+
+    @staticmethod
+    def encrypt(message, passphrase):
+        IV = Random.new().read(AES_encryption.BLOCK_SIZE)
+        aes = AES.new(passphrase, AES.MODE_CBC, IV)
+        return base64.b64encode(IV + aes.encrypt(AES_encryption.pad(message)))
+
+    @staticmethod
+    def decrypt(encrypted, passphrase):
+        encrypted = base64.b64decode(encrypted)
+        IV = encrypted[:AES_encryption.BLOCK_SIZE]
+        aes = AES.new(passphrase, AES.MODE_CBC, IV)
+        return aes.decrypt(encrypted[AES_encryption.BLOCK_SIZE:]).decode("utf-8")
+
+
+
+
+
