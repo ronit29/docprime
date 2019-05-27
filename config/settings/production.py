@@ -4,7 +4,10 @@ import logging
 
 SECRET_KEY = env('DJANGO_SECRET_KEY')
 
-ALLOWED_HOSTS = env.list('DJANGO_ALLOWED_HOSTS', default=['panaceatechno.com', 'test.docprime.com', 'docprime.com','admin.docprime.com'])
+# ALLOWED_HOSTS = env.list('DJANGO_ALLOWED_HOSTS', default=['panaceatechno.com', 'test.docprime.com', 'docprime.com','admin.docprime.com'])
+ALLOWED_HOSTS = ['panaceatechno.com', 'test.docprime.com', 'docprime.com','admin.docprime.com']
+ALLOWED_HOSTS += ['10.20.{}.{}'.format(i,j) for i in range(256) for j in range(256)]
+
 DATABASES['default']['ATOMIC_REQUESTS'] = True  # noqa F405
 DATABASES['default']['CONN_MAX_AGE'] = env.int('CONN_MAX_AGE', default=60)  # noqa F405
 DEBUG = False
