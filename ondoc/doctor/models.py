@@ -267,6 +267,16 @@ class Hospital(auth_model.TimeStampedModel, auth_model.CreatedByModel, auth_mode
 
         return appointments
 
+    def is_appointment_exist_for_date(self, insurance, appointment_date):
+        active_appointments = self.get_active_opd_appointments(None, insurance)
+        if not active_appointments:
+            return False
+        for appointment in active_appointments:
+            if appointment.time_slot_start == appointment_date.date():
+                return True
+        return False
+
+
     @classmethod
     def get_hosp_and_locality_dict(cls, temp_hospital_ids, required_identifier):
         if not temp_hospital_ids:
@@ -2160,10 +2170,9 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
         if insurance and insurance.is_valid():
             hospital = appointment_data.get('hospital')
             if hospital:
-               appointments = hospital.get_active_opd_appointments(None, insurance)
-               for appointment in appointments:
-                   if appointment.time_slot_start.date() == appointment_data.get('time_slot_start').date():
-                       raise Exception('Appointment for selected hospital have been already booked for give date')
+               is_appointment_exist = hospital.is_appointment_exist_for_date(insurance, appointment_data.get('time_slot_start'))
+               if is_appointment_exist:
+                   raise Exception('Appointment for selected hospital have been already booked for give date')
         #     mrp = appointment_data.get('fees')
         #     insurance_limit_usage_data = insurance.validate_limit_usages(mrp)
         #     if insurance_limit_usage_data.get('created_state'):
