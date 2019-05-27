@@ -1797,14 +1797,11 @@ class PaymentMixin(object):
 
             if txn_obj and txn_obj.is_preauth():
                 if request.data.get("refund"):
-                    child_non_cancelled_orders_count = len(order_parent.non_cancelled_appointments())
-                    if child_non_cancelled_orders_count > 1:
-                        if txn_obj.status_type == 'TXN_AUTHORIZE':
-                            self.capture_payment()
+                    if order_parent.orders.count() > 1:
+                        self.capture_payment()
                     else:
-                        if txn_obj.status_type == 'TXN_AUTHORIZE':
-                            self.release_payment()
-                            initiate_refund = 0
+                        self.release_payment()
+                        initiate_refund = 0
                 else:
                     raise Exception('Preauth booked appointment can not be rebooked.')
 

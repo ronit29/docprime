@@ -1032,29 +1032,27 @@ def send_capture_payment_request(self, product_id, appointment_id):
         # check if appointment is not cancelled
         if not appointment.status == obj.CANCELLED:
             # check if txn is preauth
-            if txn_obj and txn_obj.is_preauth:
-                # check if txn already succeed/captured
-                if txn_obj.status_type == 'TXN_AUTHORIZE':
-                    url = settings.PG_CAPTURE_PAYMENT_URL
-                    token = settings.PG_SEAMLESS_CAPTURE_AUTH_TOKEN
-                    headers = {
-                        "auth": token,
-                        "Content-Type": "application/json"
-                    }
+            if txn_obj and txn_obj.is_preauth():
+                url = settings.PG_CAPTURE_PAYMENT_URL
+                token = settings.PG_SEAMLESS_CAPTURE_AUTH_TOKEN
+                headers = {
+                    "auth": token,
+                    "Content-Type": "application/json"
+                }
 
-                    response = requests.post(url, data=req_data, headers=headers)
-                    if response.status_code == status.HTTP_200_OK:
-                        resp_data = response.json()
-                        if resp_data.get("ok") is not None and resp_data.get("ok") == 1:
-                            txn_obj.status_type = resp_data.get('txStatus')
-                            txn_obj.payment_mode = resp_data.get("paymentMode")
-                            txn_obj.bank_name = resp_data.get('bankName')
-                            txn_obj.transaction_id = resp_data.get('bankTxId')
-                            txn_obj.save()
-                        else:
-                            logger.error("Error in capture the payment with data - " + json.dumps(req_data) + " with error message - " + resp_data.get('statusMsg', ''))
+                response = requests.post(url, data=req_data, headers=headers)
+                if response.status_code == status.HTTP_200_OK:
+                    resp_data = response.json()
+                    if resp_data.get("ok") is not None and resp_data.get("ok") == 1:
+                        txn_obj.status_type = resp_data.get('txStatus')
+                        txn_obj.payment_mode = resp_data.get("paymentMode")
+                        txn_obj.bank_name = resp_data.get('bankName')
+                        txn_obj.transaction_id = resp_data.get('bankTxId')
+                        txn_obj.save()
                     else:
-                        raise Exception("Retry on invalid Http response status - " + str(response.content))
+                        logger.error("Error in capture the payment with data - " + json.dumps(req_data) + " with error message - " + resp_data.get('statusMsg', ''))
+                else:
+                    raise Exception("Retry on invalid Http response status - " + str(response.content))
 
     except Exception as e:
         logger.error("Error in payment capture with data - " + json.dumps(req_data) + " with exception - " + str(e))
@@ -1089,28 +1087,27 @@ def send_release_payment_request(self, product_id, appointment_id):
         }
 
         if appointment.status == obj.CANCELLED:
-            if txn_obj and txn_obj.is_preauth:
-                if txn_obj.status_type == 'TXN_AUTHORIZE':
-                    if datetime.datetime.now() < txn_obj.transaction_date + datetime.timedelta(
-                            hours=int(settings.PAYMENT_AUTO_CAPTURE_DURATION)):
-                        url = settings.PG_RELEASE_PAYMENT_URL
-                        token = settings.PG_SEAMLESS_RELEASE_AUTH_TOKEN
-                        headers = {
-                            "auth": token,
-                            "Content-Type": "application/json"
-                        }
+            if txn_obj and txn_obj.is_preauth():
+                if datetime.datetime.now() < txn_obj.transaction_date + datetime.timedelta(
+                        hours=int(settings.PAYMENT_AUTO_CAPTURE_DURATION)):
+                    url = settings.PG_RELEASE_PAYMENT_URL
+                    token = settings.PG_SEAMLESS_RELEASE_AUTH_TOKEN
+                    headers = {
+                        "auth": token,
+                        "Content-Type": "application/json"
+                    }
 
-                        response = requests.post(url, data=req_data, headers=headers)
-                        if response.status_code == status.HTTP_200_OK:
-                            resp_data = response.json()
-                            if resp_data.get("ok") is not None and resp_data.get("ok") == 1:
-                                txn_obj.status_type = 'TXN_RELEASE'
-                                txn_obj.save()
-                            else:
-                                logger.error("Error in releasing the payment with data - " + json.dumps(
-                                    req_data) + " with error message - " + resp_data.get('statusMsg', ''))
+                    response = requests.post(url, data=req_data, headers=headers)
+                    if response.status_code == status.HTTP_200_OK:
+                        resp_data = response.json()
+                        if resp_data.get("ok") is not None and resp_data.get("ok") == 1:
+                            txn_obj.status_type = 'TXN_RELEASE'
+                            txn_obj.save()
                         else:
-                            raise Exception("Retry on invalid Http response status - " + str(response.content))
+                            logger.error("Error in releasing the payment with data - " + json.dumps(
+                                req_data) + " with error message - " + resp_data.get('statusMsg', ''))
+                    else:
+                        raise Exception("Retry on invalid Http response status - " + str(response.content))
 
     except Exception as e:
         logger.error("Error in payment release with data - " + json.dumps(req_data) + " with exception - " + str(e))
