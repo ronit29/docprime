@@ -432,7 +432,7 @@ class DoctorProfileFooter(Footer):
         if self.centroid and self.specialization and self.specialization_id:
             specialist_in_nearby_localities = self.specialist_in_popular_localities()
             if specialist_in_nearby_localities:
-                response['menu'].append({'sub_heading': '%s in nearby localities' % (self.specialization),
+                response['menu'].append({'sub_heading': '%s in nearby localities' % (self.specialization + 's'),
                                              'url_list': specialist_in_nearby_localities})
 
         if self.sublocality_id and self.sublocality and self.locality:
@@ -654,11 +654,11 @@ class DoctorsCitySearchViewSet(viewsets.GenericViewSet):
                                                     locality_value=entity.locality_value, sitemap_identifier='SPECIALIZATION_CITY').first()
 
         if spec_city_entity and spec_city_entity.specialization and spec_city_entity.locality_value:
-            title[1] = spec_city_entity.specialization + ' in ' + spec_city_entity.locality_value
-            title[2] = 'Best ' + spec_city_entity.specialization + ' in ' + spec_city_entity.locality_value
-            title[3] = 'Top ' + spec_city_entity.specialization + ' in ' + spec_city_entity.locality_value
-            title[4] = spec_city_entity.specialization + ' near me'
-            title[5] = 'Find ' + spec_city_entity.specialization + ' near you'
+            title[1] = spec_city_entity.specialization + 's in ' + spec_city_entity.locality_value
+            title[2] = 'Best ' + spec_city_entity.specialization + 's in ' + spec_city_entity.locality_value
+            title[3] = 'Top ' + spec_city_entity.specialization + 's in ' + spec_city_entity.locality_value
+            title[4] = spec_city_entity.specialization + 's near me'
+            title[5] = 'Find ' + spec_city_entity.specialization + 's near you'
             title_url = {'title': title[int(page)], 'url': spec_city_entity.url}
             if response and response.get('menu'):
                 response.get('menu').insert(0, {'sub_heading': spec_city_entity.specialization+'s' + ' in ' + spec_city_entity.locality_value, 'url_list': [title_url]})
