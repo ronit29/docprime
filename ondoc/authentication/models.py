@@ -1726,7 +1726,7 @@ class PhysicalAgreementSigned(models.Model):
 class RefundMixin(object):
 
     @transaction.atomic
-    def action_refund(self, refund_flag=1):
+    def action_refund(self, refund_flag=1, initiate_refund=1):
         from ondoc.doctor.models import OpdAppointment
         from ondoc.account.models import ConsumerAccount
         from ondoc.common.models import RefundDetails
@@ -1744,7 +1744,7 @@ class RefundMixin(object):
             consumer_account.credit_cancellation(self, product_id, wallet_refund, cashback_refund)
             if refund_flag:
                 ctx_obj = consumer_account.debit_refund()
-                ConsumerRefund.initiate_refund(self.user, ctx_obj)
+                ConsumerRefund.initiate_refund(self.user, ctx_obj) if initiate_refund else None
 
     def can_agent_refund(self, user):
         from ondoc.crm.constants import constants
@@ -1778,8 +1778,34 @@ class PaymentMixin(object):
     def capture_payment(self):
         from ondoc.notification import tasks as notification_tasks
         notification_tasks.send_capture_payment_request.apply_async(
-            self.PRODUCT_ID, self.id, eta=datetime.datetime.now(), )
+            (self.PRODUCT_ID, self.id), eta=timezone.localtime(), )
 
     def release_payment(self):
+        from ondoc.notification import tasks as notification_tasks
         notification_tasks.send_release_payment_request.apply_async(
-            self.PRODUCT_ID, self.id, eta=datetime.datetime.now(), )
+            (self.PRODUCT_ID, self.id), eta=timezone.localtime(), )
+
+    def preauth_process(self, request):
+        from ondoc.account.models import Order
+        from ondoc.account.models import PgTransaction
+        initiate_refund = 1
+        order = Order.objects.filter(product_id=self.PRODUCT_ID,
+                                         reference_id=self.id).first()
+        if order:
+            order_parent = order.parent
+            txn_obj = PgTransaction.objects.filter(order=order_parent).first() if order_parent else None
+
+            if txn_obj and txn_obj.is_preauth():
+                if request.data.get("refund"):
+                    child_non_cancelled_orders_count = len(order_parent.non_cancelled_appointments())
+                    if child_non_cancelled_orders_count > 1:
+                        if txn_obj.status_type == 'TXN_AUTHORIZE':
+                            self.capture_payment()
+                    else:
+                        if txn_obj.status_type == 'TXN_AUTHORIZE':
+                            self.release_payment()
+                            initiate_refund = 0
+                else:
+                    raise Exception('Preauth booked appointment can not be rebooked.')
+
+        return initiate_refund

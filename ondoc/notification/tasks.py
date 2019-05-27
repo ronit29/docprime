@@ -1046,7 +1046,10 @@ def send_capture_payment_request(self, product_id, appointment_id):
                     if response.status_code == status.HTTP_200_OK:
                         resp_data = response.json()
                         if resp_data.get("ok") is not None and resp_data.get("ok") == 1:
-                            txn_obj.status_type = 'TXN_SUCCESS'
+                            txn_obj.status_type = resp_data.get('txStatus')
+                            txn_obj.payment_mode = resp_data.get("paymentMode")
+                            txn_obj.bank_name = resp_data.get('bankName')
+                            txn_obj.transaction_id = resp_data.get('bankTxId')
                             txn_obj.save()
                         else:
                             logger.error("Error in capture the payment with data - " + json.dumps(req_data) + " with error message - " + resp_data.get('statusMsg', ''))
@@ -1101,7 +1104,7 @@ def send_release_payment_request(self, product_id, appointment_id):
                         if response.status_code == status.HTTP_200_OK:
                             resp_data = response.json()
                             if resp_data.get("ok") is not None and resp_data.get("ok") == 1:
-                                txn_obj.status_type = 'TXN_RELEASED'
+                                txn_obj.status_type = 'TXN_RELEASE'
                                 txn_obj.save()
                             else:
                                 logger.error("Error in releasing the payment with data - " + json.dumps(

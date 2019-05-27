@@ -122,6 +122,24 @@ class Order(TimeStampedModel):
     def is_parent(self):
         return self.parent_id is None
 
+    def non_cancelled_appointments(self):
+        from ondoc.doctor.models import OpdAppointment
+        from ondoc.diagnostic.models import LabAppointment
+        parent_order = self
+        non_cancelled_appointments_orders = list()
+        if not self.is_parent():
+            parent_order = self.parent
+
+        for order in parent_order.orders.all():
+            if order.product_id == Order.DOCTOR_PRODUCT_ID:
+                opd_appointment = OpdAppointment.objects.filter(pk=order.reference_id).first()
+                non_cancelled_appointments_orders.append(order) if not opd_appointment.status == OpdAppointment.CANCELLED else None
+            if order.product_id == Order.LAB_PRODUCT_ID:
+                lab_appointment = LabAppointment.objects.filter(pk=order.reference_id).first()
+                non_cancelled_appointments_orders.append(order) if not lab_appointment.status == LabAppointment.CANCELLED else None
+
+        return non_cancelled_appointments_orders
+
     @classmethod
     def disable_pending_orders(cls, appointment_details, product_id, action):
         if product_id == Order.DOCTOR_PRODUCT_ID:
@@ -893,7 +911,8 @@ class PgTransaction(TimeStampedModel):
         return encrypted_message_digest
 
     def is_preauth(self):
-        self.payment_mode == 'PPI' and self.pg_name == 'paytm'
+        # todo - add more conditions here
+        return self.status_type == 'TXN_AUTHORIZE'# and self.pg_name == 'paytm'
 
     class Meta:
         db_table = "pg_transaction"

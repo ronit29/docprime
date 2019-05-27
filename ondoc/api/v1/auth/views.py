@@ -669,7 +669,8 @@ class UserAppointmentsViewSet(OndocViewSet):
                 lab_appointment.cancellation_type = LabAppointment.PATIENT_CANCELLED
                 lab_appointment.cancellation_reason = validated_data.get('cancellation_reason', None)
                 lab_appointment.cancellation_comments = validated_data.get('cancellation_comment', '')
-                lab_appointment.action_cancelled(request.data.get('refund', 1))
+                initiate_refund = lab_appointment.preauth_process(request)
+                lab_appointment.action_cancelled(request.data.get('refund', 1), initiate_refund)
                 resp = LabAppointmentRetrieveSerializer(lab_appointment, context={"request": request}).data
             elif validated_data.get('status') == LabAppointment.RESCHEDULED_PATIENT:
                 if validated_data.get("start_date") and validated_data.get('start_time'):
@@ -753,29 +754,8 @@ class UserAppointmentsViewSet(OndocViewSet):
                 opd_appointment.cancellation_type = OpdAppointment.PATIENT_CANCELLED
                 opd_appointment.cancellation_reason = validated_data.get('cancellation_reason', None)
                 opd_appointment.cancellation_comments = validated_data.get('cancellation_comment', '')
-
-                # if refund requested, then check preauth and mulitple appointment
-                child_order_count = 1
-                process_cancel = True
-                if request.data.get("refund"):
-                    opd_order = Order.objects.filter(product_id=Order.DOCTOR_PRODUCT_ID, reference_id=opd_appointment.id).first()
-                    if opd_order:
-                        opd_order_parent = opd_order.parent
-                        txn_obj = PgTransaction.objects.filter(order=opd_order_parent).first() if opd_order_parent else None;
-
-                        if txn_obj and txn_obj.is_preauth:
-                            child_order_count = opd_order_parent.orders.count()
-
-                            if child_order_count > 1:
-                                process_cancel = False
-                                self.capture_payment()
-                            else:
-                                if datetime.datetime.now() < txn_obj.transaction_date + datetime.timedelta(hours=int(settings.PAYMENT_AUTO_CAPTURE_DURATION)):
-                                    process_cancel = False
-                                    self.release_payment()
-
-                if process_cancel:
-                    opd_appointment.action_cancelled(request.data.get("refund", 1))
+                initiate_refund = opd_appointment.preauth_process(request)
+                opd_appointment.action_cancelled(request.data.get("refund", 1), initiate_refund)
                 logger.warning(
                     "Ending for id - " + str(opd_appointment.id) + " timezone - " + str(timezone.now()))
                 resp = AppointmentRetrieveSerializer(opd_appointment, context={"request": request}).data
@@ -1038,6 +1018,7 @@ class UserAppointmentsViewSet(OndocViewSet):
         queryset = paginate_queryset(queryset, request, 100)
         serializer = OpdAppointmentSerializer(queryset, many=True,context={"request": request})
         return serializer
+
 
 
 class AddressViewsSet(viewsets.ModelViewSet):
