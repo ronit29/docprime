@@ -3,6 +3,7 @@ import json
 from django.contrib.contenttypes.fields import GenericForeignKey
 from django.contrib.contenttypes.models import ContentType
 from django.core.files.uploadedfile import SimpleUploadedFile
+from django.core.validators import FileExtensionValidator
 from django.db import models
 from django.contrib.postgres.fields import JSONField, ArrayField
 from django.forms.models import model_to_dict
@@ -10,15 +11,25 @@ from ondoc.authentication.models import TimeStampedModel
 from ondoc.authentication.models import NotificationEndpoint
 from ondoc.authentication.models import UserProfile
 from ondoc.account import models as account_model
-from ondoc.api.v1.utils import readable_status_choices
+from ondoc.api.v1.utils import readable_status_choices, generate_short_url
 from ondoc.notification.rabbitmq_client import publish_message
 from django.contrib.auth import get_user_model
 from django.template.loader import render_to_string
 from django.utils import timezone
 from weasyprint import HTML
 from django.conf import settings
+from num2words import num2words
+import datetime
+from datetime import timedelta
 import pytz
 import logging
+import string
+import random
+from django.core.files.storage import default_storage
+from django.core.files.base import ContentFile
+from django.core.files.uploadedfile import SimpleUploadedFile, InMemoryUploadedFile
+from django.core.files import File
+from hardcopy import bytestring_to_pdf
 from django.contrib.postgres.fields import ArrayField
 
 import copy
@@ -49,6 +60,14 @@ class NotificationAction:
     DOCTOR_INVOICE = 10
     LAB_INVOICE = 11
 
+    INSURANCE_CONFIRMED=15
+    INSURANCE_ENDORSMENT_APPROVED=82
+    INSURANCE_ENDORSMENT_REJECTED=83
+    INSURANCE_ENDORSMENT_PENDING=84
+    INSURANCE_CANCEL_INITIATE = 73
+    INSURANCE_CANCELLATION=74
+    INSURANCE_FLOAT_LIMIT=75
+    INSURANCE_MIS=76
     OPD_OTP_BEFORE_APPOINTMENT = 30
     LAB_OTP_BEFORE_APPOINTMENT = 31
     OPD_CONFIRMATION_CHECK_AFTER_APPOINTMENT = 32
@@ -59,6 +78,13 @@ class NotificationAction:
     REFUND_COMPLETED = 42
 
     CASHBACK_CREDITED = 55
+
+    IPD_PROCEDURE_MAIL = 60
+
+    LAB_LOGO_CHANGE_MAIL = 70
+    PRICING_ALERT_EMAIL = 72
+    APPOINTMENT_REMINDER_PROVIDER_SMS = 77
+    LOGIN_OTP = 80
 
     NOTIFICATION_TYPE_CHOICES = (
         (APPOINTMENT_ACCEPTED, "Appointment Accepted"),
@@ -81,10 +107,18 @@ class NotificationAction:
         (RECEIPT, "Receipt"),
         (DOCTOR_INVOICE, "Doctor Invoice"),
         (LAB_INVOICE, "Lab Invoice"),
+        (INSURANCE_CONFIRMED, "Insurance Confirmed"),
+        (INSURANCE_ENDORSMENT_APPROVED, "Insurance endorsment completed."),
+        (INSURANCE_ENDORSMENT_REJECTED, "Insurance endorsment rejected."),
+        (INSURANCE_ENDORSMENT_PENDING, "Insurance endorsment received."),
         (CASHBACK_CREDITED, "Cashback Credited"),
-
         (REFUND_BREAKUP, 'Refund break up'),
-        (REFUND_COMPLETED, 'Refund Completed')
+        (REFUND_COMPLETED, 'Refund Completed'),
+        (IPD_PROCEDURE_MAIL, 'IPD Procedure Mail'),
+        (PRICING_ALERT_EMAIL, 'Pricing Change Mail'),
+        (LAB_LOGO_CHANGE_MAIL, 'Lab Logo Change Mail'),
+        (APPOINTMENT_REMINDER_PROVIDER_SMS, 'Appointment Reminder Provider SMS'),
+        (LOGIN_OTP, 'Login OTP')
     )
 
     OPD_APPOINTMENT = "opd_appointment"
@@ -99,7 +133,8 @@ class NotificationAction:
     def trigger(cls, instance, user, notification_type):
         from ondoc.doctor.models import OpdAppointment
         est = pytz.timezone(settings.TIME_ZONE)
-        time_slot_start = instance.time_slot_start.astimezone(est)
+        if notification_type != cls.INSURANCE_CONFIRMED:
+            time_slot_start = instance.time_slot_start.astimezone(est)
         context = {}
         if notification_type == NotificationAction.APPOINTMENT_ACCEPTED:
             patient_name = instance.profile.name if instance.profile.name else ""
@@ -298,6 +333,55 @@ class NotificationAction:
                 "image_url": ""
             }
             NotificationAction.trigger_all(user=user, notification_type=notification_type, context=context)
+        elif notification_type == NotificationAction.INSURANCE_CONFIRMED:
+            insured_members = instance.members.all()
+            proposer = list(filter(lambda member: member.relation.lower() == 'self', insured_members))
+            proposer = proposer[0]
+
+            # proposer_fname = proposer.first_name if proposer.first_name else ""
+            # proposer_mname = proposer.middle_name if proposer.middle_name else ""
+            # proposer_lname = proposer.last_name if proposer.last_name else ""
+            #
+            # proposer_name = '%s %s %s %s' % (proposer.title, proposer_fname, proposer_mname, proposer_lname)
+            proposer_name = proposer.get_full_name()
+
+            member_list = list()
+            count = 1
+            for member in insured_members:
+                # fname = member.first_name if member.first_name else ""
+                # mname = member.middle_name if member.middle_name else ""
+                # lname = member.last_name if member.last_name else ""
+                #
+                # name = '%s %s %s' % (fname, mname, lname)
+                name = member.get_full_name()
+                data = {
+                    'name': name.title(),
+                    'member_number': count,
+                    'dob': member.dob.strftime('%d-%m-%Y'),
+                    'relation': member.relation,
+                    'id': member.id,
+                    'gender': member.gender.title(),
+                    'age': int((datetime.datetime.now().date() - member.dob).days/365),
+                }
+                member_list.append(data)
+                count = count + 1
+
+            context = {
+                'purchase_data': str(instance.purchase_date.date().strftime('%d-%m-%Y')),
+                'expiry_date': str(instance.expiry_date.date().strftime('%d-%m-%Y')),
+                'premium': instance.premium_amount,
+                'proposer_name': proposer_name.title(),
+                'current_date': datetime.datetime.now().date().strftime('%d-%m-%Y'),
+                'policy_number': instance.policy_number,
+                'total_member_covered': len(member_list),
+                'plan': instance.insurance_plan.name,
+                'insured_members': member_list,
+                'insurer_logo': instance.insurance_plan.insurer.logo.url,
+                'coi_url': instance.coi.url,
+                'insurer_name': instance.insurance_plan.insurer.name
+            }
+            EmailNotification.send_notification(user=user, notification_type=notification_type,
+                                                context=context, email=proposer.email)
 
 
     @classmethod
@@ -394,6 +478,30 @@ class EmailNotificationOpdMixin:
             context.update({"invoice_url": invoice.file.url})
             html_body = render_to_string("email/doctor_invoice/body.html", context=context)
             email_subject = render_to_string("email/doctor_invoice/subject.txt", context=context)
+
+        elif notification_type == NotificationAction.INSURANCE_CONFIRMED:
+            # html_body = render_to_string("email/insurance_confirmed/pdfbody.html", context=context)
+            # instance = context.get('instance')
+            # filename = "COI_{}.pdf".format(str(timezone.now().timestamp()))
+            # try:
+            #     from django.core.files.uploadedfile import TemporaryUploadedFile
+            #     extra_args = {
+            #         'virtual-time-budget': 6000
+            #     }
+            #     file = TemporaryUploadedFile(filename, 'byte', 1000, 'utf-8')
+            #     f = open(file.temporary_file_path())
+            #     bytestring_to_pdf(html_body.encode(), f, **extra_args)
+            #     f.seek(0)
+            #     f.flush()
+            #     f.content_type = 'application/pdf'
+            #
+            #     instance.coi = InMemoryUploadedFile(file, None, filename, 'application/pdf', file.tell(), None)
+            #     instance.save()
+            # except Exception as e:
+            #     logger.error("Got error while creating pdf for opd invoice {}".format(e))
+            html_body = render_to_string("email/insurance_confirmed/body.html", context=context)
+            email_subject = render_to_string("email/insurance_confirmed/subject.txt", context=context)
+
         return html_body, email_subject
 
 
@@ -451,7 +559,7 @@ class EmailNotification(TimeStampedModel, EmailNotificationOpdMixin, EmailNotifi
     user = models.ForeignKey(User, on_delete=models.CASCADE, null=True, blank=True)
     content = models.TextField()
     email_subject = models.TextField(blank=True, null=True)
-    email = models.EmailField()
+    email = models.EmailField(null=True)
     viewed_at = models.DateTimeField(blank=True, null=True)
     read_at = models.DateTimeField(blank=True, null=True)
     notification_type = models.PositiveIntegerField(choices=NotificationAction.NOTIFICATION_TYPE_CHOICES)
@@ -459,7 +567,8 @@ class EmailNotification(TimeStampedModel, EmailNotificationOpdMixin, EmailNotifi
     bcc = ArrayField(models.EmailField(), default=[], blank=[])
     attachments = JSONField(default=[], blank=[])
     content_type = models.ForeignKey(ContentType, on_delete=models.CASCADE, null=True)
-    object_id = models.PositiveIntegerField(null=True)
+    # object_id = models.PositiveIntegerField(null=True)
+    object_id = models.BigIntegerField(null=True)
     content_object = GenericForeignKey()
 
     class Meta:
@@ -618,7 +727,8 @@ class EmailNotification(TimeStampedModel, EmailNotificationOpdMixin, EmailNotifi
     @classmethod
     def send_booking_url(cls, token, email):
         booking_url = "{}/agent/booking?token={}".format(settings.CONSUMER_APP_DOMAIN, token)
-        html_body = "Your booking url is - {} . Please pay to confirm".format(booking_url)
+        short_url = generate_short_url(booking_url)
+        html_body = "Your booking url is - {} . Please pay to confirm".format(short_url)
         email_subject = "Booking Url"
         if email:
             email_noti = {
@@ -633,6 +743,65 @@ class EmailNotification(TimeStampedModel, EmailNotificationOpdMixin, EmailNotifi
             message = json.dumps(message)
             publish_message(message)
         return booking_url
+
+    @classmethod
+    def send_insurance_booking_url(cls, token, email):
+        booking_url = "{}/agent/booking?token={}".format(settings.CONSUMER_APP_DOMAIN, token)
+        booking_url = booking_url + "&callbackurl=insurance/insurance-user-details-review"
+        short_url = generate_short_url(booking_url)
+        html_body = "Your Insurance purchase url is - {} . Please pay to confirm".format(short_url)
+        email_subject = "Insurance Purchase Url"
+        if email:
+            email_noti = {
+                "email": email,
+                "content": html_body,
+                "email_subject": email_subject
+            }
+            message = {
+                "data": email_noti,
+                "type": "email"
+            }
+            message = json.dumps(message)
+            publish_message(message)
+        return booking_url
+
+    @classmethod
+    def send_insurance_float_alert_email(cls, email, html_body):
+        email_subject = 'ALERT!!! Insurance Float amount is on the limit.'
+        if email:
+            email_obj = cls.objects.create(email=email, notification_type=NotificationAction.INSURANCE_FLOAT_LIMIT,
+                                                          content=html_body,email_subject=email_subject, cc=[], bcc=[])
+            email_obj.save()
+
+            email_noti = {
+                "email": email,
+                "content": html_body,
+                "email_subject": email_subject
+            }
+            message = {
+                "data": email_noti,
+                "type": "email"
+            }
+            message = json.dumps(message)
+            publish_message(message)
+
+    @classmethod
+    def send_insurance_mis(cls, attachment):
+        email_subject = 'Insurance MIS'
+        html_body = 'Insurance MIS. Please find the attached MIS.'
+        emails = settings.INSURANCE_MIS_EMAILS
+        to_email = emails[0]
+        cc_emails = emails[1:]
+        email_obj = cls.objects.create(attachments=attachment, email=to_email, notification_type=NotificationAction.INSURANCE_FLOAT_LIMIT,
+                                       content=html_body, email_subject=email_subject, cc=cc_emails, bcc=[])
+        email_obj.save()
+
+        message = {
+            "data": model_to_dict(email_obj),
+            "type": "email"
+        }
+        message = json.dumps(message)
+        publish_message(message)
 
 
 class SmsNotificationOpdMixin:
@@ -744,7 +913,8 @@ class SmsNotification(TimeStampedModel, SmsNotificationOpdMixin, SmsNotification
     @classmethod
     def send_booking_url(cls, token, phone_number):
         booking_url = "{}/agent/booking?token={}".format(settings.CONSUMER_APP_DOMAIN, token)
-        html_body = "Your booking url is - {} . Please pay to confirm".format(booking_url)
+        short_url = generate_short_url(booking_url)
+        html_body = "Your booking url is - {} . Please pay to confirm".format(short_url)
         if phone_number:
             sms_noti = {
                 "phone_number": phone_number,
@@ -752,6 +922,25 @@ class SmsNotification(TimeStampedModel, SmsNotificationOpdMixin, SmsNotification
             }
             message = {
                 "data": sms_noti,
+                "type": "sms"
+            }
+            message = json.dumps(message)
+            publish_message(message)
+        return booking_url
+
+    @classmethod
+    def send_insurance_booking_url(cls, token, phone_number):
+        booking_url = "{}/agent/booking?token={}".format(settings.CONSUMER_APP_DOMAIN, token)
+        booking_url = booking_url + "&callbackurl=insurance/insurance-user-details-review"
+        short_url = generate_short_url(booking_url)
+        html_body = "Your Insurance purchase url is - {} . Please pay to confirm".format(short_url)
+        if phone_number:
+            sms_notification = {
+                "phone_number": phone_number,
+                "content": html_body,
+            }
+            message = {
+                "data": sms_notification,
                 "type": "sms"
             }
             message = json.dumps(message)
@@ -786,6 +975,57 @@ class SmsNotification(TimeStampedModel, SmsNotificationOpdMixin, SmsNotification
             }
             message = json.dumps(message)
             publish_message(message)
+
+
+class WhtsappNotification(TimeStampedModel):
+    user = models.ForeignKey(User, on_delete=models.CASCADE, blank=True, null=True)
+    phone_number = models.BigIntegerField()
+    viewed_at = models.DateTimeField(blank=True, null=True, default=None)
+    read_at = models.DateTimeField(blank=True, null=True, default=None)
+    template_name = models.CharField(max_length=100, null=False, blank=False)
+    notification_type = models.PositiveIntegerField(choices=NotificationAction.NOTIFICATION_TYPE_CHOICES)
+    payload = JSONField(null=False, blank=False, default={})
+    extras = JSONField(null=False, blank=False, default={})
+
+    @classmethod
+    def send_login_otp(cls, phone_number, request_source, **kwargs):
+
+        from ondoc.sms.backends.backend import create_otp
+        via_sms = kwargs.get('via_sms')
+        via_whatsapp = kwargs.get('via_whatsapp')
+        otp = create_otp(phone_number, "{}", call_source=request_source, return_otp=True, via_sms=via_sms, via_whatsapp=via_whatsapp)
+
+        whatsapp_message = {"media": {},
+                            "message": "",
+                            "template": {
+                                "name": "docprime_otp_verification",
+                                "params": [otp]
+                            },
+                            "message_type": "HSM",
+                            "phone_number": phone_number
+                            }
+
+        extra = {'call_source': request_source}
+        whatsapp_noti = WhtsappNotification.objects.create(
+            phone_number=phone_number,
+            notification_type=NotificationAction.LOGIN_OTP,
+            template_name='docprime_otp_verification',
+            payload=whatsapp_message,
+            extras=extra
+        )
+
+        whatsapp_payload = {
+                "data": whatsapp_noti.payload,
+                "type": "social_message"
+            }
+
+        publish_message(json.dumps(whatsapp_payload))
+
+    class Meta:
+        db_table = "whtsapp_notification"
+
+    def __str__(self):
+        return '{} -> {} ({})'.format(self.notification_type, self.phone_number, self.user)
 
 
 class AppNotification(TimeStampedModel):

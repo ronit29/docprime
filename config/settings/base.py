@@ -14,6 +14,7 @@ import environ
 import datetime
 import json
 import os
+from mongoengine import *
 
 # Build paths inside the project like this: os.path.join(BASE_DIR, ...)
 #BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -70,11 +71,45 @@ FILE_UPLOAD_PERMISSIONS = 0o664
 
 
 DATABASES = {
-    'default': env.db('DATABASE_URL'),
+    'default': env.db('DATABASE_URL')
 }
+
 DATABASES['default']['ENGINE'] = 'django.contrib.gis.db.backends.postgis'
 
+try:
+    if env('MSSQL_HOST') and env('MSSQL_USERNAME') and env('MSSQL_PASSWORD'):
+        DATABASES['sql_server'] = {
+             'ENGINE': 'sql_server.pyodbc',
+             'HOST': env('MSSQL_HOST'),
+             'USER': env('MSSQL_USERNAME'),
+             'PASSWORD': env('MSSQL_PASSWORD'),
+             'NAME': env('MSSQL_DB'),
+             'OPTIONS': {
+                  'driver' : 'ODBC Driver 17 for SQL Server'
+            }
+        }
+except Exception as e:
+    print(str(e))
 
+
+
+try:
+    MONGO_STORE = False
+    if env('MONGO_DB_NAME') and env('MONGO_DB_HOST') and env('MONGO_DB_PORT'):
+        mongo_port = int(env('MONGO_DB_PORT'))
+        if env('MONGO_DB_USERNAME', None) and env('MONGO_DB_PASSWORD', None):
+            connect(env('MONGO_DB_NAME'), host=env('MONGO_DB_HOST'), port=mongo_port, username=env('MONGO_DB_USERNAME'),
+                                            password=env('MONGO_DB_PASSWORD'), authentication_source='admin')
+        else:
+            connect(env('MONGO_DB_NAME'), host=env('MONGO_DB_HOST'), port=mongo_port)
+        MONGO_STORE = env.bool('MONGO_STORE', default=False)
+except Exception as e:
+    print(e)
+    print('Failed to connect to mongo')
+    MONGO_STORE = False
+
+
+DATABASE_ROUTERS = ['config.settings.db_router.DatabaseRouter']
 
 # Application definition
 
@@ -110,7 +145,9 @@ THIRD_PARTY_APPS = (
     'fluent_comments',
     'threadedcomments',
     'django_comments',
-    'ddtrace.contrib.django',
+    'safedelete',
+    'qrcode',
+    'multiselectfield'
 )
 
 LOCAL_APPS = (
@@ -141,9 +178,13 @@ LOCAL_APPS = (
     'ondoc.banner',
     'ondoc.cart',
     'ondoc.ckedit',
+    'ondoc.integrations',
     'ondoc.screen',
     'ondoc.comments',
-    'ondoc.integrations'
+    'ondoc.subscription_plan',
+    'ondoc.bookinganalytics',
+    'ondoc.prescription',
+    'ondoc.corporate_booking',
 )
 
 INSTALLED_APPS = DJANGO_APPS + THIRD_PARTY_APPS + LOCAL_APPS
@@ -279,10 +320,10 @@ MAP_WIDGETS = {
         ("GooglePlaceAutocompleteOptions", {'componentRestrictions': {'country': 'in'}}),
         ("markerFitZoom", 12),
     ),
-    "GOOGLE_MAP_API_KEY": "AIzaSyAfoicJaTk8xQOoAOQn9vtHJzgTeZDJRtA"
+    "GOOGLE_MAP_API_KEY": "AIzaSyBqDAVDFBQzI5JMgaXcqJq431QPpJtNiZE"
 }
 
-GOOGLE_MAPS_API_KEY = 'AIzaSyAfoicJaTk8xQOoAOQn9vtHJzgTeZDJRtA'
+GOOGLE_MAPS_API_KEY = 'AIzaSyBqDAVDFBQzI5JMgaXcqJq431QPpJtNiZE'
 
 
 CRISPY_TEMPLATE_PACK = 'bootstrap3'
@@ -301,8 +342,9 @@ CONSUMER_APP_DOMAIN = env('CONSUMER_APP_DOMAIN')
 PROVIDER_APP_DOMAIN = env('PROVIDER_APP_DOMAIN')
 
 API_BASE_URL = env('API_BASE_URL')
-REVERSE_GEOCODING_API_KEY= env('REVERSE_GEOCODING_API_KEY')
-MATRIX_API_URL= env('MATRIX_API_URL')
+REVERSE_GEOCODING_API_KEY = env('REVERSE_GEOCODING_API_KEY')
+MATRIX_API_URL = env('MATRIX_API_URL')
+MATRIX_STATUS_UPDATE_API_URL = env('MATRIX_STATUS_UPDATE_API_URL')
 MATRIX_API_TOKEN = env('MATRIX_API_TOKEN')
 MATRIX_AUTH_TOKEN = env('MATRIX_USER_TOKEN')
 CHAT_API_URL = env('CHAT_API_URL')
@@ -322,10 +364,13 @@ PG_SETTLEMENT_URL = env('PG_SETTLEMENT_URL')
 PG_PAYMENT_ACKNOWLEDGE_URL = env('PG_PAYMENT_ACKNOWLEDGE_URL')
 PAYOUTS_ENABLED = env('PAYOUTS_ENABLED')
 PG_REFUND_STATUS_POLL_TIME = 60  # In min
+PG_PAYOUT_CLIENT_KEY = env('PG_PAYOUT_CLIENT_KEY')
+PG_PAYOUT_SECRET_KEY = env('PG_PAYOUT_SECRET_KEY')
 REFUND_INACTIVE_TIME = 24  # In hours
 AUTO_CANCEL_OPD_DELAY = 3000  # In min
 AUTO_CANCEL_LAB_DELAY = 30  # In min
 OPS_EMAIL_ID = env.list('OPS_EMAIL_ID')
+IPD_PROCEDURE_CONTACT_DETAILS = env.list('IPD_PROCEDURE_CONTACT_DETAILS')
 ORDER_FAILURE_EMAIL_ID = env.list('ORDER_FAILURE_EMAIL_ID')
 AUTO_REFUND = env.bool('AUTO_REFUND')
 HARD_CODED_OTP = '357237'
@@ -337,8 +382,13 @@ OTP_BYPASS_NUMBERS = env.list('OTP_BYPASS_NUMBERS')
 TIME_BEFORE_APPOINTMENT_TO_SEND_OTP = env.int('TIME_BEFORE_APPOINTMENT_TO_SEND_OTP', default=60)  # in minutes
 TIME_AFTER_APPOINTMENT_TO_SEND_CONFIRMATION = env.int('TIME_AFTER_APPOINTMENT_TO_SEND_CONFIRMATION', default=120)
 TIME_AFTER_APPOINTMENT_TO_SEND_SECOND_CONFIRMATION = env.int('TIME_AFTER_APPOINTMENT_TO_SEND_SECOND_CONFIRMATION', default=1440)
+TIME_AFTER_APPOINTMENT_TO_SEND_THIRD_CONFIRMATION = env.int('TIME_AFTER_APPOINTMENT_TO_SEND_THIRD_CONFIRMATION', default=2880)
 # MONGO_URL = env.list('MONGO_URL')
 #GOOGLE_MAP_API_KEY = env('GOOGLE_MAP_API_KEY')
+PG_SECRET_KEY_P3 = env('PG_SECRET_KEY_P3')
+PG_CLIENT_KEY_P3 = env('PG_CLIENT_KEY_P3')
+GYNECOLOGIST_SPECIALIZATION_IDS = env('GYNECOLOGIST_SPECIALIZATION_IDS')
+ONCOLOGIST_SPECIALIZATION_IDS = env('ONCOLOGIST_SPECIALIZATION_IDS')
 MATRIX_NUMBER_MASKING = env('MATRIX_NUMBER_MASKING')
 UPDATE_DOCTOR_SEARCH_SCORE_TIME = 24  # In hours
 SYNC_ELASTIC = 24
@@ -346,6 +396,22 @@ THYROCARE_USERNAME=env('THYROCARE_USERNAME')
 THYROCARE_PASSWORD=env('THYROCARE_PASSWORD')
 THYROCARE_API_KEY=env('THYROCARE_API_KEY')
 THYROCARE_BASE_URL=env('THYROCARE_BASE_URL')
+THYROCARE_REF_CODE=env('THYROCARE_REF_CODE')
+SAFE_DELETE_INTERPRET_UNDELETED_OBJECTS_AS_CREATED=env('SAFE_DELETE_INTERPRET_UNDELETED_OBJECTS_AS_CREATED')
+NO_OF_WEEKS_FOR_TIME_SLOTS=env('NO_OF_WEEKS_FOR_TIME_SLOTS')
+THYROCARE_INTEGRATION_ENABLED= env.bool('THYROCARE_INTEGRATION_ENABLED')
+ORDER_SUMMARY_CRON_TIME = env('ORDER_SUMMARY_CRON_TIME')
+THYROCARE_REPORT_CRON_TIME = env('THYROCARE_REPORT_CRON_TIME')
+
+NODAL_BENEFICIARY_API=env('NODAL_BENEFICIARY_API')
+NODAL_BENEFICIARY_TOKEN=env('NODAL_BENEFICIARY_TOKEN')
+BENE_STATUS_API=env('BENE_STATUS_API')
+BENE_STATUS_TOKEN=env('BENE_STATUS_TOKEN')
+
+SETTLEMENT_DETAILS_API=env('SETTLEMENT_DETAILS_API', default=None)
+SETTLEMENT_AUTH=env('SETTLEMENT_AUTH', default=None)
+THYROCARE_NAME_PARAM_REQUIRED_TESTS = env('THYROCARE_NAME_PARAM_REQUIRED_TESTS', default='')
+IS_INSURANCE_ACTIVE = env.bool('IS_INSURANCE_ACTIVE')
 
 ANYMAIL = {
     "MAILGUN_API_KEY": env('MAILGUN_API_KEY', default=None),
@@ -380,11 +446,22 @@ CONN_MAX_AGE=600
 
 AWS_ACCESS_KEY_ID = env('AWS_ACCESS_KEY_ID', default='')
 AWS_SECRET_ACCESS_KEY = env('AWS_SECRET_ACCESS_KEY', default='')
-PROVIDER_EMAIL = env('PROVIDER_EMAIL', default='')
 
+PROVIDER_EMAIL = env('PROVIDER_EMAIL', default='')
+INSURANCE_GYNECOLOGIST_LIMIT = 5
+INSURANCE_ONCOLOGIST_LIMIT = 5
 
 #comments Settings
 COMMENTS_APP = 'fluent_comments'
 SITE_ID = 1
 FLUENT_COMMENTS_REPLACE_ADMIN = False
-
+CONSUMER_ANDROID_MESSAGE_HASH = env('CONSUMER_ANDROID_MESSAGE_HASH', default='')
+PROVIDER_ANDROID_MESSAGE_HASH = env('PROVIDER_ANDROID_MESSAGE_HASH', default='')
+PARTNERS_INVOICE_ENCODE_KEY = env('PARTNERS_INVOICE_ENCODE_KEY', default='')
+MATRIX_DOC_AUTH_TOKEN = env('MATRIX_DOC_AUTH_TOKEN')
+INSURANCE_FLOAT_LIMIT_ALERT_EMAIL=env.list('INSURANCE_FLOAT_LIMIT_ALERT_EMAIL')
+INSURANCE_MIS_EMAILS=env.list('INSURANCE_MIS_EMAILS')
+INSURANCE_MIS_PASSWORD=env('INSURANCE_MIS_PASSWORD')
+DEAL_AGREED_PRICE_CHANGE_EMAILS = env.list('DEAL_AGREED_PRICE_CHANGE_EMAILS')
+LOGO_CHANGE_EMAIL_RECIPIENTS=env.list('LOGO_CHANGE_EMAIL_RECIPIENTS')
+PROVIDER_SMS_APPOINTMENT_REMINDER_TIME=env('PROVIDER_SMS_APPOINTMENT_REMINDER_TIME', default=5) # in minutes

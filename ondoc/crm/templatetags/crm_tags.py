@@ -3,6 +3,7 @@ from django import template
 
 from ondoc.crm.constants import constants
 from django.contrib.auth.models import Group
+from ondoc.authentication.models import QCModel
 
 register = template.Library()
 
@@ -33,16 +34,21 @@ def show_actions(context, original):
 
     # check if member of QC Team
     if request.user.is_member_of(constants['QC_GROUP_NAME']):
-        if data_status == 1:
-            actions['_submit_for_qc'] = available_actions['_submit_for_qc']
-        elif data_status == 2:
+        # if data_status == QCModel.IN_PROGRESS:
+        #     actions['_submit_for_qc'] = available_actions['_submit_for_qc']
+        # elif data_status == QCModel.SUBMITTED_FOR_QC:
+        if data_status == QCModel.SUBMITTED_FOR_QC:
             actions['_qc_approve'] = available_actions['_qc_approve']
             actions['_mark_in_progress'] = available_actions['_mark_in_progress']
 
     # if field team member
     if request.user.is_member_of(constants['DOCTOR_NETWORK_GROUP_NAME']):
-        if data_status == 1:
+        if data_status == QCModel.IN_PROGRESS or data_status == QCModel.REOPENED:
             actions['_submit_for_qc'] = available_actions['_submit_for_qc']
+
+    if request.user.is_member_of(constants['WELCOME_CALLING_TEAM']):
+        if data_status == QCModel.QC_APPROVED:
+            actions['_mark_in_progress'] = available_actions['_mark_in_progress']
 
     return {'choices': actions}
 

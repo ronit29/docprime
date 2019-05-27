@@ -5,6 +5,7 @@ from ondoc.authentication import models as auth_models
 from django.utils.safestring import mark_safe
 from . import serializers
 from ondoc.api.v1 import utils as v1_utils
+from ondoc.sms.api import send_otp
 from django.shortcuts import get_object_or_404
 from rest_framework import viewsets
 from rest_framework.response import Response
@@ -13,14 +14,25 @@ from rest_framework.permissions import IsAuthenticated
 from ondoc.authentication.backends import JWTAuthentication
 from django.db import transaction
 from django.db.models import Q, Value, Case, When, F
+from django.http import HttpResponse
+from django.template.loader import render_to_string
+from django.contrib.contenttypes.models import ContentType
 from ondoc.procedure.models import Procedure
 from django.contrib.auth import get_user_model
 from django.conf import settings
-import datetime, logging, re, random
+import datetime, logging, re, random, jwt, os
+import json
 from django.utils import timezone
+
+from ondoc.diagnostic.models import LabAppointment
+from ondoc.doctor.models import OpdAppointment
+from ondoc.api.v1.doctor import serializers as doctor_serializers
+from ondoc.api.v1.diagnostic import serializers as diagnostic_serializers
+
 
 User = get_user_model()
 logger = logging.getLogger(__name__)
+
 
 
 class DoctorBillingViewSet(viewsets.GenericViewSet):
@@ -73,8 +85,10 @@ class DoctorBillingViewSet(viewsets.GenericViewSet):
                                                    .prefetch_related('hospital__hospital_doctors', 'hospital__hospital_doctors__doctor',
                                                                      'hospital__merchant', 'hospital__merchant__merchant',
                                                                      'doctor__merchant', 'doctor__merchant__merchant',
-                                                                     'doctor__doctor_clinics', 'doctor__doctor_clinics__hospital')\
-                                                   .filter(user=user, is_disabled=False)
+                                                                     'doctor__doctor_clinics', 'doctor__doctor_clinics__hospital') \
+                            .filter(Q(user=user, is_disabled=False),
+                                    (Q(entity_type=v1_utils.GenericAdminEntity.HOSPITAL, hospital__is_live=True) |
+                                     Q(entity_type=v1_utils.GenericAdminEntity.DOCTOR, doctor__is_live=True)))
         entities = {}
         for admin in queryset.all():
             if admin.entity_type == v1_utils.GenericAdminEntity.HOSPITAL:
@@ -443,3 +457,484 @@ class DoctorDataViewset(viewsets.GenericViewSet):
         qs = doc_models.Specialization.objects.all()
         serializer = serializers.SpecializationSerializer(qs, many=True)
         return Response(serializer.data)
+
+
+class ProviderSignupOtpViewset(viewsets.GenericViewSet):
+
+    def otp_generate(self, request, *args, **kwargs):
+        from ondoc.authentication.models import OtpVerifications
+        serializer = serializers.GenerateOtpSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        valid_data = serializer.validated_data
+        phone_number = valid_data.get('phone_number')
+        retry_send = request.query_params.get('retry', False)
+        otp_message = OtpVerifications.get_otp_message(request.META.get('HTTP_PLATFORM'), None, True, version=request.META.get('HTTP_APP_VERSION'))
+        send_otp(otp_message, phone_number, retry_send)
+        response = {'otp_generated': True}
+        return Response(response)
+
+    def otp_verification(self, request, *args, **kwargs):
+        serializer = serializers.OtpVerificationSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        valid_data = serializer.validated_data
+        phone_number = valid_data.get('phone_number')
+        user = User.objects.filter(phone_number=phone_number, user_type=User.DOCTOR).first()
+
+        if not user:
+            user = User.objects.create(phone_number=phone_number, is_phone_number_verified=True, user_type=User.DOCTOR)
+
+        token_object = JWTAuthentication.generate_token(user)
+        auth_models.OtpVerifications.objects.filter(phone_number=phone_number).update(is_expired=True)
+
+        response = {
+            "login": 1,
+            "token": token_object['token'],
+            "expiration_time": token_object['payload']['exp']
+        }
+        return Response(response)
+
+
+class ProviderSignupDataViewset(viewsets.GenericViewSet):
+    authentication_classes = (JWTAuthentication,)
+    permission_classes = (IsAuthenticated, DoctorPermission,)
+
+    def create(self, request, *args, **kwargs):
+        serializer = serializers.ProviderSignupLeadDataSerializer(data=request.data, context={'request':request})
+        serializer.is_valid(raise_exception=True)
+        valid_data = serializer.validated_data
+        valid_data['user'] = request.user
+        try:
+            doc_models.ProviderSignupLead.objects.create(**valid_data)
+            return Response({"status": 1, "message": "signup lead data added"})
+        except Exception as e:
+            logger.error('Error creating signup lead: ' + str(e))
+            return Response({"status": 0, "message": "Error creating signup lead: " + str(e)}, status.HTTP_400_BAD_REQUEST)
+
+    def consent_is_docprime(self, request, *args, **kwargs):
+        serializer = serializers.ConsentIsDocprimeSerializer(data=request.data, context={'request':request})
+        serializer.is_valid(raise_exception=True)
+        valid_data = serializer.validated_data
+        user = request.user
+        is_docprime = valid_data.get("is_docprime")
+        try:
+            provider_object = doc_models.ProviderSignupLead.objects.filter(user=user).first()
+            provider_object.is_docprime = is_docprime
+            provider_object.save()
+            return Response({"status":1, "message":"consent updated"})
+        except Exception as e:
+            logger.error('Error updating consent: ' + str(e))
+            return Response({"status": 0, "message": "Error updating consent - " + str(e)}, status.HTTP_400_BAD_REQUEST)
+
+    def bulk_create_doctors(self, doctor_details):
+        doc_obj_list = list()
+        for doctor in doctor_details:
+            name = doctor.get('name')
+            online_consultation_fees = doctor.get('online_consultation_fees')
+            license = doctor.get('license', '')
+            doc_obj_list.append(doc_models.Doctor(name=name, online_consultation_fees=online_consultation_fees,
+                                                  enabled=False, source_type=doc_models.Hospital.PROVIDER,
+                                                  license=license if license else ''))
+        created_doctors = doc_models.Doctor.objects.bulk_create(doc_obj_list)
+        return created_doctors
+
+    def bulk_create_doctor_clinics(self, hospital, doctors):
+        doctor_clinic_obj_list = list()
+        for doctor in doctors:
+            doctor_clinic_obj_list.append(doc_models.DoctorClinic(doctor=doctor, hospital=hospital,
+                                                                  enabled=False))
+        created_doctor_clinics = doc_models.DoctorClinic.objects.bulk_create(doctor_clinic_obj_list)
+        return created_doctor_clinics
+
+    def bulk_create_doctor_mobiles(self, doctors, doctor_details):
+        doctor_mobile_obj_list = list()
+        doctor_details_by_name = dict((d['name'], dict(d, index=index)) for (index, d) in enumerate(doctor_details))
+        for doctor in doctors:
+            phone_number = doctor_details_by_name.get(doctor.name).get('phone_number') if doctor_details_by_name.get(
+                doctor.name) else None
+            if phone_number:
+                doctor_mobile_obj_list.append(doc_models.DoctorMobile(doctor=doctor, is_primary=True,
+                                                                  number=phone_number))
+        created_doctor_mobiles = doc_models.DoctorMobile.objects.bulk_create(doctor_mobile_obj_list)
+        return created_doctor_mobiles
+
+    def bulk_create_doctor_phone_number(self, hospital, doctors, doctor_details):
+        doctor_number_obj_list = list()
+        doctor_details_by_name = dict((d['name'], dict(d, index=index)) for (index, d) in enumerate(doctor_details))
+        for doctor in doctors:
+            phone_number = doctor_details_by_name.get(doctor.name).get('phone_number') if doctor_details_by_name.get(
+                doctor.name) else None
+            if phone_number:
+                doctor_number_obj_list.append(auth_models.DoctorNumber(doctor=doctor, hospital=hospital,
+                                                                       phone_number=phone_number))
+        created_doctor_numbers = auth_models.DoctorNumber.objects.bulk_create(doctor_number_obj_list)
+        return created_doctor_numbers
+
+    def bulk_create_doctor_generic_admins(self, hospital, doctors, doctor_details):
+        generic_admin_obj_list = list()
+        doctor_details_by_name = dict((d['name'], dict(d, index=index)) for (index, d) in enumerate(doctor_details))
+        for doctor in doctors:
+            details = doctor_details_by_name.get(doctor.name)
+            if details.get('phone_number'):
+                phone_number = details.get('phone_number')
+                if details.get('is_superuser'):
+                    generic_admin_obj_list.append(auth_models.GenericAdmin(name=doctor.name,
+                                                                           doctor=doctor, hospital=hospital,
+                                                                           phone_number=phone_number,
+                                                                           source_type=auth_models.GenericAdmin.APP,
+                                                                           entity_type=auth_models.GenericAdmin.HOSPITAL,
+                                                                           super_user_permission=True))
+                    continue
+                if details.get('is_appointment'):
+                    generic_admin_obj_list.append(auth_models.GenericAdmin(name=doctor.name,
+                                                                           doctor=doctor, hospital=hospital,
+                                                                           phone_number=phone_number,
+                                                                           source_type=auth_models.GenericAdmin.APP,
+                                                                           entity_type=auth_models.GenericAdmin.HOSPITAL,
+                                                                           permission_type=auth_models.GenericAdmin.APPOINTMENT,
+                                                                           write_permission=True))
+                if details.get('is_billing'):
+                    generic_admin_obj_list.append(auth_models.GenericAdmin(name=doctor.name,
+                                                                           doctor=doctor, hospital=hospital,
+                                                                           phone_number=phone_number,
+                                                                           source_type=auth_models.GenericAdmin.APP,
+                                                                           entity_type=auth_models.GenericAdmin.HOSPITAL,
+                                                                           permission_type=auth_models.GenericAdmin.BILLINNG,
+                                                                           write_permission=True))
+        created_doctor_generic_admins = auth_models.GenericAdmin.objects.bulk_create(generic_admin_obj_list)
+        return created_doctor_generic_admins
+
+    def bulk_create_hospital_generic_admins(self, hospital, hospital_generic_admin_details):
+        generic_admin_obj_list = list()
+        for generic_admin in hospital_generic_admin_details:
+            if generic_admin.get('is_superuser'):
+                generic_admin_obj_list.append(
+                    auth_models.GenericAdmin(name=generic_admin.get('name'), hospital=hospital,
+                                             phone_number=generic_admin.get('phone_number'),
+                                             source_type=auth_models.GenericAdmin.APP,
+                                             entity_type=auth_models.GenericAdmin.HOSPITAL,
+                                             super_user_permission=True))
+                continue
+            if generic_admin.get('is_appointment'):
+                generic_admin_obj_list.append(
+                    auth_models.GenericAdmin(name=generic_admin.get('name'), hospital=hospital,
+                                             phone_number=generic_admin.get('phone_number'),
+                                             source_type=auth_models.GenericAdmin.APP,
+                                             entity_type=auth_models.GenericAdmin.HOSPITAL,
+                                             permission_type=auth_models.GenericAdmin.APPOINTMENT,
+                                             write_permission=True))
+            if generic_admin.get('is_billing'):
+                generic_admin_obj_list.append(
+                    auth_models.GenericAdmin(name=generic_admin.get('name'), hospital=hospital,
+                                             phone_number=generic_admin.get('phone_number'),
+                                             source_type=auth_models.GenericAdmin.APP,
+                                             entity_type=auth_models.GenericAdmin.HOSPITAL,
+                                             permission_type=auth_models.GenericAdmin.BILLINNG,
+                                             write_permission=True))
+        generic_admin_objects = auth_models.GenericAdmin.objects.bulk_create(generic_admin_obj_list)
+        generic_admin_model_serializer = serializers.GenericAdminModelSerializer(generic_admin_objects,
+                                                                                 many=True)
+        return generic_admin_model_serializer.data
+
+    def doctor_creation_flow(self, hospital, doctor_details):
+        created_doctors = self.bulk_create_doctors(doctor_details)
+        created_doctor_clinics = self.bulk_create_doctor_clinics(hospital, created_doctors)
+        created_doctor_mobiles = self.bulk_create_doctor_mobiles(created_doctors, doctor_details)
+        created_doctor_numbers = self.bulk_create_doctor_phone_number(hospital, created_doctors, doctor_details)
+        created_doctor_generic_admins = self.bulk_create_doctor_generic_admins(hospital, created_doctors,
+                                                                               doctor_details)
+        doctor_model_serializer = serializers.DoctorModelSerializer(created_doctors, many=True)
+        # doctor_clinic_model_serializer = serializers.DoctorClinicModelSerializer(created_doctor_clinics,
+        #                                                                          many=True)
+        # doctor_mobile_model_serializer = serializers.DoctorMobileModelSerializer(created_doctor_mobiles,
+        #                                                                          many=True)
+        doctor_generic_admin_model_serializer = serializers.GenericAdminModelSerializer(created_doctor_generic_admins,
+                                                                                        many=True)
+        doctors_data = doctor_model_serializer.data
+        # doctor_clinics_data = doctor_clinic_model_serializer.data
+        # doctors_mobile_data = doctor_mobile_model_serializer.data
+        doctors_generic_admin_data = doctor_generic_admin_model_serializer.data
+        return doctors_data, doctors_generic_admin_data
+
+    def create_hospital(self, request, *args, **kwargs):
+        serializer = serializers.CreateHospitalSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        valid_data = serializer.validated_data
+        valid_data['enabled'] = False
+        valid_data['enabled_for_online_booking'] = False
+        valid_data['is_mask_number_required'] = False
+        valid_data['source_type'] = doc_models.Hospital.PROVIDER
+
+        hosp_essential_dict = dict()
+        hosp_essential_dict['name'] = valid_data.get('name')
+        if valid_data.get('city'):
+            hosp_essential_dict['city'] = valid_data.get('city')
+        if valid_data.get('state'):
+            hosp_essential_dict['state'] = valid_data.get('state')
+        if valid_data.get('country'):
+            hosp_essential_dict['country'] = valid_data.get('country')
+        hosp_essential_dict['is_listed_on_docprime'] = valid_data.get('is_listed_on_docprime')
+
+        contact_number = valid_data.get('contact_number')
+        doctor_details = valid_data.get('doctors')
+        hospital_generic_admin_details = valid_data.get('staffs')
+        doctors_data = None
+        doctors_generic_admin_data = None
+        hospital_generic_admins_data = None
+        try:
+            hospital = doc_models.Hospital.objects.create(**hosp_essential_dict,
+                                                          is_billing_enabled=True,
+                                                          is_appointment_manager=True,
+                                                          source_type=doc_models.Hospital.PROVIDER)
+            hospital_model_serializer = serializers.HospitalModelSerializer(hospital, many=False)
+            auth_models.GenericAdmin.objects.create(user=request.user, phone_number=request.user.phone_number,
+                                                    hospital=hospital, super_user_permission=True,
+                                                    entity_type=auth_models.GenericAdmin.HOSPITAL)
+            auth_models.SPOCDetails.objects.create(name=valid_data.get('name'), number=request.user.phone_number,
+                                                   email=valid_data.get('email'), content_object=hospital,
+                                                   contact_type=auth_models.SPOCDetails.SPOC)
+            if contact_number:
+                auth_models.SPOCDetails.objects.create(name=valid_data.get('name'), number=contact_number,
+                                                       contact_type=auth_models.SPOCDetails.OTHER,
+                                                       content_object=hospital)
+            if doctor_details:
+                doctors_data, doctors_generic_admin_data = self.doctor_creation_flow(hospital, doctor_details)
+
+            if hospital_generic_admin_details:
+                hospital_generic_admins_data = self.bulk_create_hospital_generic_admins(hospital, hospital_generic_admin_details)
+
+            return Response({"status": 1,
+                             "hospital": hospital_model_serializer.data,
+                             "doctors": doctors_data if doctors_data else None,
+                             "doctors_generic_admins": doctors_generic_admin_data if doctors_generic_admin_data else None,
+                             "hospital_generic_admins": hospital_generic_admins_data if hospital_generic_admins_data else None})
+        except Exception as e:
+            logger.error('Error creating Hospital: ' + str(e))
+            return Response({"status": 0, "message": "Error creating Hospital - " + str(e)}, status.HTTP_400_BAD_REQUEST)
+
+    def create_doctor(self, request, *args, **kwargs):
+        serializer = serializers.CreateDoctorSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        valid_data = serializer.validated_data
+        hospital = valid_data.get('hospital_id')
+        doctor_details = valid_data.get("doctors", [])
+        try:
+            doctors_data, doctors_generic_admin_data = self.doctor_creation_flow(hospital, doctor_details)
+            return Response({"status": 1,
+                             "doctors": doctors_data if doctors_data else None,
+                             "doctors_generic_admins": doctors_generic_admin_data if doctors_generic_admin_data else None
+                            })
+        except Exception as e:
+            logger.error('Error adding Doctors ' + str(e))
+            return Response({"status": 0, "message": "Error adding Doctors - " + str(e)}, status.HTTP_400_BAD_REQUEST)
+
+    def create_staffs(self, request, *args, **kwargs):
+        serializer = serializers.CreateGenericAdminSerializer(data=request.data, context={'request': request})
+        serializer.is_valid(raise_exception=True)
+        valid_data = serializer.validated_data
+        hospital = valid_data.get('hospital_id')
+        hospital_generic_admin_details = valid_data.get("staffs", [])
+        try:
+            hospital_generic_admins_data = self.bulk_create_hospital_generic_admins(hospital,
+                                                                                      hospital_generic_admin_details)
+            return Response({"status": 1, "staffs": hospital_generic_admins_data})
+        except Exception as e:
+            logger.error('Error adding Staffs ' + str(e))
+            return Response({"status": 0, "message": "Error adding Staffs - " + str(e)}, status.HTTP_400_BAD_REQUEST)
+
+    def update_hospital_consent(self, request, *args, **kwargs):
+        serializer = serializers.UpdateHospitalConsent(data=request.data, context={'request': request})
+        serializer.is_valid(raise_exception=True)
+        valid_data = serializer.validated_data
+        try:
+            hospital = valid_data.get('hospital_id')
+            if hospital.is_listed_on_docprime:
+                return Response({"status": 1, "message": "already consent present for given hospital"}, status.HTTP_200_OK)
+            hospital.is_listed_on_docprime = valid_data.get('is_listed_on_docprime')
+            hospital.save()
+            return Response({"status": 1, "message": "successfully updated"}, status.HTTP_200_OK)
+        except Exception as e:
+            logger.error('Error updating hospital consent ' + str(e))
+            return Response({"status": 0, "message": "Error updating hospital consent - " + str(e)}, status.HTTP_400_BAD_REQUEST)
+
+
+class PartnersAppInvoice(viewsets.GenericViewSet):
+    authentication_classes = (JWTAuthentication,)
+    permission_classes = (IsAuthenticated, DoctorPermission,)
+
+    CREATE = 1
+    UPDATE = 2
+
+    def add_or_edit_general_invoice_item(self, request):
+        try:
+            serializer = serializers.GeneralInvoiceItemsSerializer(data=request.data, context={"request": request})
+            serializer.is_valid(raise_exception=True)
+            valid_data = serializer.validated_data
+            hospital_ids = valid_data.pop('hospital_ids')
+            hospitals = valid_data.pop('hospitals')
+            general_invoice_item = valid_data.pop('general_invoice_item') if valid_data.get('general_invoice_item') else None
+            if not general_invoice_item:
+                invoice_item_obj = doc_models.GeneralInvoiceItems.objects.create(**valid_data)
+                invoice_item_obj.hospitals.add(*hospitals)
+            else:
+                invoice_items = doc_models.GeneralInvoiceItems.objects.filter(id=general_invoice_item.id)
+                invoice_items.update(**valid_data)
+                invoice_item_obj = invoice_items.first()
+                invoice_item_obj.hospitals.set(hospitals, clear=True)
+            model_serializer = serializers.GeneralInvoiceItemsModelSerializer(invoice_item_obj, many=False)
+            return Response({"status": 1, "message": "Invoice Item added successfully",
+                             "invoice_item": model_serializer.data}, status.HTTP_200_OK)
+        except Exception as e:
+            return Response({"status":0 , "message": "Error adding Invoice Item with exception -" + str(e)},
+                            status.HTTP_400_BAD_REQUEST)
+
+    def list_invoice_items(self, request):
+        serializer = serializers.ListInvoiceItemsSerializer(data=request.query_params, context={'request':request})
+        serializer.is_valid(raise_exception=True)
+        data = serializer.validated_data
+        hospital = data.get('hospital_id')
+        if hospital:
+            items = doc_models.GeneralInvoiceItems.objects.filter(hospitals=hospital)
+            model_serializer = serializers.GeneralInvoiceItemsModelSerializer(items, many=True)
+        else:
+            admin = auth_models.GenericAdmin.objects.filter(user=request.user)
+            hospital_ids = admin.values_list('hospital', flat=True).distinct()
+            items = doc_models.GeneralInvoiceItems.objects.filter(hospitals__in=hospital_ids)
+            model_serializer = serializers.GeneralInvoiceItemsModelSerializer(items, many=True)
+        return Response({"invoice_items": model_serializer.data}, status.HTTP_200_OK)
+
+    @staticmethod
+    def bulk_create_selected_invoice_items(selected_invoice_item, invoice):
+        obj_list = list()
+        for item in selected_invoice_item:
+            obj_list.append(doc_models.SelectedInvoiceItems(invoice=invoice,
+                                                            invoice_item=item['invoice_item'],
+                                                            quantity=item['quantity'],
+                                                            calculated_price=item['calculated_price']))
+        created_objects = doc_models.SelectedInvoiceItems.objects.bulk_create(obj_list)
+        return created_objects
+
+    def create_or_update_invoice(self, invoice_data, version, id=None):
+        invoice = selected_invoice_items_created = e = None
+
+        task = invoice_data.pop('task')
+        generate_invoice = invoice_data.pop("generate_invoice")
+
+        appointment = invoice_data.get('appointment')
+        selected_invoice_items = invoice_data.get('selected_invoice_items')
+        invoice_data['selected_invoice_items'] = serializers.SelectedInvoiceItemsJSONSerializer(
+            selected_invoice_items, many=True).data
+        if task == self.CREATE:
+            invoice_obj = doc_models.PartnersAppInvoice(**invoice_data)
+            last_serial = doc_models.PartnersAppInvoice.last_serial(appointment)
+            serial = last_serial + 1 if version == '01' else last_serial
+            invoice_obj.invoice_serial_id = 'INV-' + str(appointment.hospital.id) + '-' + \
+                                            str(appointment.doctor.id) + '-' + str(serial) + '-' + version
+        else:
+            if not id:
+                raise Exception("invoice_id is required")
+            invoice_queryset = doc_models.PartnersAppInvoice.objects.filter(id=id)
+            invoice_queryset.update(**invoice_data)
+            invoice_obj = invoice_queryset.first()
+
+        if generate_invoice:
+            invoice_obj.is_invoice_generated = True
+            context = invoice_obj.get_context(selected_invoice_items)
+            content = render_to_string("partners_app_invoice/partners_app_invoice.html", context=context)
+            filename = (appointment.user.name + ' ' + invoice_obj.invoice_serial_id + '.pdf').replace(' ', '_')
+            file = v1_utils.html_to_pdf(content, filename)
+
+            invoice_obj.file = file
+            file_path = os.path.join(settings.MEDIA_ROOT, invoice_obj.INVOICE_STORAGE_FOLDER, filename)
+            if os.path.exists(file_path):
+                os.remove(file_path)
+            invoice_obj.invoice_url = "{}{}{}".format(settings.BASE_URL, "/api/v2/doctor/invoice/", filename)
+            encoded_filename = jwt.encode({"filename":filename}, settings.PARTNERS_INVOICE_ENCODE_KEY).decode('utf-8')
+            encoded_url = "{}{}{}".format(settings.BASE_URL, "/api/v2/doctor/invoice/", encoded_filename)
+            invoice_obj.encoded_url = v1_utils.generate_short_url(encoded_url)
+        try:
+            invoice_obj.save()
+            invoice = serializers.PartnersAppInvoiceModelSerialier(invoice_obj)
+
+            if selected_invoice_items:
+                if task == self.UPDATE:
+                    doc_models.SelectedInvoiceItems.objects.filter(invoice=invoice_obj.id).delete()
+                selected_invoice_items_objects = self.bulk_create_selected_invoice_items(selected_invoice_items,
+                                                                                         invoice_obj)
+                model_serializer = serializers.SelectedInvoiceItemsModelSerializer(selected_invoice_items_objects,
+                                                                                   many=True)
+            selected_invoice_items_created = model_serializer.data if selected_invoice_items else []
+            return invoice, selected_invoice_items_created, e
+        except Exception as e:
+            logger.error(str(e))
+            return invoice, selected_invoice_items_created, str(e)
+
+    def create(self, request):
+
+        serializer = serializers.PartnersAppInvoiceSerialier(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        invoice_data = serializer.validated_data
+
+        appointment = invoice_data.get("appointment")
+        if doc_models.PartnersAppInvoice.objects.filter(appointment=appointment, is_valid=True).exists():
+            logger.error('Invoice for this appointment already exists, please try updating it')
+            return Response(
+                {"status": 0, "message": "Invoice for this appointment already exists, please try updating it"},
+                 status.HTTP_400_BAD_REQUEST)
+        try:
+            invoice_data['task'] = self.CREATE
+            invoice, selected_invoice_items_created, exception = self.create_or_update_invoice(invoice_data, version='01')
+            if not exception:
+                return Response({"status": 1, "invoice": invoice.data,
+                                 "selected_invoice_items_created": selected_invoice_items_created}, status.HTTP_200_OK)
+            logger.error(str(exception))
+            return Response({"status": 0, "message": "Error creating invoice - " + str(exception)}, status.HTTP_400_BAD_REQUEST)
+        except Exception as e:
+            logger.error(str(e))
+            return Response({"status": 0, "message": "Error creating invoice - " + str(e)}, status.HTTP_400_BAD_REQUEST)
+
+    def update(self, request):
+        try:
+            serializer = serializers.UpdatePartnersAppInvoiceSerializer(data=request.data, context={"request": request})
+            serializer.is_valid(raise_exception=True)
+            invoice = serializer.validated_data['invoice_id']
+            data = serializer.validated_data['data']
+            if not invoice.is_invoice_generated:
+                invoice.is_edited = True
+                invoice.edited_by = request.user
+                invoice.save()
+                version = invoice.invoice_serial_id[-2:]
+                data['task'] = self.UPDATE
+                invoice_data, selected_invoice_items_created, exception = self.create_or_update_invoice(data, version, invoice.id)
+
+            else:
+                invoice.is_valid = False
+                invoice.save()
+                version = str(int(invoice.invoice_serial_id[-2:]) + 1).zfill(2)
+                data['task'] = self.CREATE
+                invoice_data, selected_invoice_items_created, exception = self.create_or_update_invoice(data, version)
+            if not exception:
+                return Response({"status": 1, "invoice": invoice_data.data,
+                                 "selected_invoice_items_created": selected_invoice_items_created}, status.HTTP_200_OK)
+            logger.error(str(exception))
+            return Response({"status": 0, "message": "Error creating invoice - " + str(exception)},
+                            status.HTTP_400_BAD_REQUEST)
+        except Exception as e:
+            logger.error(str(e))
+            return Response({"status": 0, "message": "Error updating invoice - " + str(e)}, status.HTTP_400_BAD_REQUEST)
+
+
+class PartnersAppInvoicePDF(viewsets.GenericViewSet):
+
+    def download_pdf(self, request, encoded_filename=None):
+        if not encoded_filename:
+            return Response({"status": 0, "message": "encoded filename is required"},
+                            status=status.HTTP_400_BAD_REQUEST)
+        encoded_filename = jwt.decode(encoded_filename, settings.PARTNERS_INVOICE_ENCODE_KEY)
+        filename = encoded_filename.get('filename')
+        invoice_serial_id = filename[filename.find('INV-'):].replace('.pdf', '')
+        invoice = doc_models.PartnersAppInvoice.objects.filter(invoice_serial_id=invoice_serial_id).order_by('-updated_at').first()
+        if not invoice:
+            return Response({"status": 0, "message": "File not found"}, status=status.HTTP_404_NOT_FOUND)
+        response = HttpResponse(invoice.file, content_type='application/pdf')
+        response['Content-Disposition'] = 'attachment; filename=%s' % filename
+        return response

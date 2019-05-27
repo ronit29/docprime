@@ -8,7 +8,7 @@ from ondoc.api.v1.common.serializers import SearchLeadSerializer
 from django.utils.dateparse import parse_datetime
 from weasyprint import HTML
 from django.http import HttpResponse
-from ondoc.api.v1.utils import html_to_pdf
+from ondoc.api.v1.utils import html_to_pdf, generate_short_url
 from ondoc.diagnostic.models import Lab
 from ondoc.doctor.models import (Doctor, DoctorPracticeSpecialization, PracticeSpecialization, DoctorMobile, Qualification,
                                  Specialization, College, DoctorQualification, DoctorExperience, DoctorAward,
@@ -22,7 +22,7 @@ from ondoc.notification.rabbitmq_client import publish_message
 # from ondoc.notification.sqs_client import publish_message
 from django.template.loader import render_to_string
 from . import serializers
-from ondoc.common.models import Cities, PaymentOptions
+from ondoc.common.models import Cities, PaymentOptions, UserConfig
 from ondoc.common.utils import send_email, send_sms
 from ondoc.authentication.backends import JWTAuthentication
 from django.core.files.uploadedfile import SimpleUploadedFile, TemporaryUploadedFile, InMemoryUploadedFile
@@ -884,12 +884,10 @@ class SearchLeadViewSet(viewsets.GenericViewSet):
 
 
 class GetPaymentOptionsViewSet(viewsets.GenericViewSet):
-
     def get_queryset(self):
         return None
 
     def return_queryset(self, request):
-        
         params = request.query_params
         from_app = params.get("from_app", False)
         if from_app:
@@ -903,3 +901,76 @@ class GetPaymentOptionsViewSet(viewsets.GenericViewSet):
         options = PaymentOptions.build_payment_option(queryset)
 
         return Response(options)
+
+
+class GetSearchUrlViewSet(viewsets.GenericViewSet):
+
+    def search_url(self, request):
+        params = request.query_params
+        specialization_ids = params.get("specialization", '')
+        from_app = params.get("from_app", False)
+        test_ids = params.get("test", '')
+        lat = params.get("lat", 28.4485)  # if no lat long then default to gurgaon
+        long = params.get("long", 77.0759)
+
+        if from_app == False:
+
+            opd_search_url = "%s/opd/searchresults?specializations=%s" \
+                             "&lat=%s&long=%s" \
+                             % (settings.BASE_URL, specialization_ids, lat, long)
+            tiny_opd_search_url = generate_short_url(opd_search_url)
+
+            lab_search_url = "%s/lab/searchresults?test_ids=%s" \
+                             "&lat=%s&long=%s" \
+                             % (settings.BASE_URL, test_ids, lat, long)
+            tiny_lab_search_url = generate_short_url(lab_search_url)
+
+            return Response({"opd_search_url": tiny_opd_search_url, "lab_search_url": tiny_lab_search_url})
+
+        else:
+
+            opd_search_url = "docprm://docprime.com/opd/searchresults?specializations=%s" \
+                             "&lat=%s&long=%s" \
+                             % (specialization_ids, lat, long)
+
+            lab_search_url = "docprm://docprime.com/lab/searchresults?test_ids=%s" \
+                             "&lat=%s&long=%s" \
+                             % (test_ids, lat, long)
+
+            return Response({"opd_search_url": opd_search_url, "lab_search_url": lab_search_url})
+
+
+
+class GetKeyDataViewSet(viewsets.GenericViewSet):
+
+    def list(self, request):
+
+        parameters = request.query_params
+        key = parameters.get('key')
+        if not key:
+            return Response(status=status.HTTP_400_BAD_REQUEST)
+        queryset = UserConfig.objects.filter(key__iexact=key)
+        if not queryset:
+            return Response(status=status.HTTP_404_NOT_FOUND)
+        resp = []
+        for info in queryset:
+            data_key = info.key
+            data_key = data_key.lower()
+            data = info.data
+            resp.append({'data': data, 'key': data_key})
+        return Response(resp)
+
+
+class AllUrlsViewset(viewsets.GenericViewSet):
+
+    def list(self, request):
+        parameters = request.query_params
+        key = parameters.get('query')
+        if not key:
+            return Response(status=status.HTTP_400_BAD_REQUEST)
+        from ondoc.location.models import EntityUrls
+        from ondoc.location.models import CompareSEOUrls
+        e_urls = list(EntityUrls.objects.filter(url__icontains=key, is_valid=True).values_list('url', flat=True))[:5]
+        c_urls = list(CompareSEOUrls.objects.filter(url__icontains=key).values_list('url', flat=True))[:5]
+        result = e_urls + c_urls
+        return Response(dict(enumerate(result)))

@@ -1,4 +1,6 @@
 from urllib.parse import urlparse
+
+from django.core.files.uploadedfile import TemporaryUploadedFile, UploadedFile
 from rest_framework.views import exception_handler
 from rest_framework import permissions
 from collections import defaultdict
@@ -8,7 +10,6 @@ from django.db import connection, transaction
 from django.db.models import F, Func, Q, Count, Sum, Case, When, Value, IntegerField
 from django.utils import timezone
 import math
-import datetime
 import pytz
 import calendar
 from django.contrib.auth import get_user_model
@@ -31,9 +32,36 @@ from django.utils.dateparse import parse_datetime
 import hashlib
 from ondoc.authentication import models as auth_models
 import logging
+from datetime import timedelta
+import os
+import tempfile
+
 logger = logging.getLogger(__name__)
 
 User = get_user_model()
+
+
+class CustomTemporaryUploadedFile(UploadedFile):
+    """
+    A file uploaded to a temporary location (i.e. stream-to-disk).
+    """
+    def __init__(self, name, content_type, size, charset, prefix, suffix, content_type_extra=None):
+        _, ext = os.path.splitext(name)
+        file = tempfile.NamedTemporaryFile(suffix=suffix, prefix=prefix, dir=settings.FILE_UPLOAD_TEMP_DIR)
+        super().__init__(file, name, content_type, size, charset, content_type_extra)
+
+    def temporary_file_path(self):
+        """Return the full path of this file."""
+        return self.file.name
+
+    def close(self):
+        try:
+            return self.file.close()
+        except FileNotFoundError:
+            # The file was moved or deleted before the tempfile could unlink
+            # it. Still sets self.file.close_called and calls
+            # self.file.file.close() before the exception.
+            pass
 
 
 def flatten_dict(d):
@@ -103,10 +131,11 @@ def convert_timings(timings, is_day_human_readable=True):
     TIMESLOT_MAPPING = {value[0]: value[1] for value in DoctorClinicTiming.TIME_CHOICES}
     temp = defaultdict(list)
     for timing in timings:
-        temp[(timing.get('start'), timing.get('end'))].append(DAY_MAPPING.get(timing.get('day')))
+        temp[(float(timing.get('start')), float(timing.get('end')))].append(DAY_MAPPING.get(timing.get('day')))
     for key, value in temp.items():
         temp[key] = sorted(value, key=itemgetter(0))
     final_dict = defaultdict(list)
+    keys_list = list(TIMESLOT_MAPPING.keys())
     for key, value in temp.items():
         grouped_consecutive_days = group_consecutive_numbers(map(lambda x: x[0], value))
         response_keys = []
@@ -116,8 +145,17 @@ def convert_timings(timings, is_day_human_readable=True):
             else:
                 response_keys.append("{}-{}".format(DAY_MAPPING_REVERSE.get(days[0]),
                                                     DAY_MAPPING_REVERSE.get(days[1])))
-        final_dict[",".join(response_keys)].append("{} to {}".format(TIMESLOT_MAPPING.get(key[0]),
-                                                                     TIMESLOT_MAPPING.get(key[1])))
+        start_time = TIMESLOT_MAPPING.get(key[0])
+        end_time = TIMESLOT_MAPPING.get(key[1])
+        if not start_time and key[0] < keys_list[0]:
+            start_time = TIMESLOT_MAPPING.get(keys_list[0])
+        if not end_time and key[1] > keys_list[-1]:
+            end_time = TIMESLOT_MAPPING.get(keys_list[-1])
+        if not key[0] > key[1]:
+            if start_time and end_time:
+                final_dict[",".join(response_keys)].append("{} to {}".format(start_time, end_time))
+            else:
+                final_dict[",".join(response_keys)].append("")
     return final_dict
 
 
@@ -249,6 +287,42 @@ class IsMatrixUser(permissions.BasePermission):
         return False
 
 
+def insurance_transform(app_data):
+    """A serializer helper to serialize Insurance data"""
+    # app_data['insurance']['insurance_transaction']['transaction_date'] = str(app_data['insurance']['insurance_transaction']['transaction_date'])
+    # app_data['insurance']['profile_detail']['dob'] = str(app_data['insurance']['profile_detail']['dob'])
+    # insured_members = app_data['insurance']['insurance_transaction']['insured_members']
+    # for member in insured_members:
+    #     member['dob'] = str(member['dob'])
+    #     # member['member_profile']['dob'] = str(member['member_profile']['dob'])
+    # return app_data
+    app_data['user_insurance']['purchase_date'] = str(
+        app_data['user_insurance']['purchase_date'])
+    app_data['user_insurance']['expiry_date'] = str(
+        app_data['user_insurance']['expiry_date'])
+    app_data['profile_detail']['dob'] = str(app_data['profile_detail']['dob'])
+    insured_members = app_data['user_insurance']['insured_members']
+    for member in insured_members:
+        member['dob'] = str(member['dob'])
+        # member['member_profile']['dob'] = str(member['member_profile']['dob'])
+    return app_data
+
+
+def insurance_reverse_transform(insurance_data):
+    insurance_data['user_insurance']['purchase_date'] = \
+        datetime.datetime.strptime(insurance_data['user_insurance']['purchase_date'], "%Y-%m-%d %H:%M:%S.%f")
+    insurance_data['user_insurance']['expiry_date'] = \
+        datetime.datetime.strptime(insurance_data['user_insurance']['expiry_date'],
+                                   "%Y-%m-%d %H:%M:%S.%f")
+    insurance_data['profile_detail']['dob'] = \
+        datetime.datetime.strptime(insurance_data['profile_detail']['dob'],
+                                   "%Y-%m-%d")
+    insured_members = insurance_data['user_insurance']['insured_members']
+    for member in insured_members:
+        member['dob'] = datetime.datetime.strptime(member['dob'], "%Y-%m-%d").date()
+    return insurance_data
+
+
 def opdappointment_transform(app_data):
     """A serializer helper to serialize OpdAppointment data"""
     app_data["deal_price"] = str(app_data["deal_price"])
@@ -278,8 +352,18 @@ def labappointment_transform(app_data):
     app_data["user"] = app_data["user"].id
     app_data["profile"] = app_data["profile"].id
     app_data["home_pickup_charges"] = str(app_data.get("home_pickup_charges",0))
+    prescription_objects = app_data.get("prescription_list", [])
+    if prescription_objects:
+        prescription_id_list = []
+        for prescription_data in prescription_objects:
+            prescription_id_list.append({'prescription': prescription_data.get('prescription').id})
+        app_data["prescription_list"] = prescription_id_list
+
+
     if app_data.get("coupon"):
         app_data["coupon"] = list(app_data["coupon"])
+    if app_data.get("user_plan"):
+        app_data["user_plan"] = app_data["user_plan"].id
     return app_data
 
 
@@ -318,6 +402,7 @@ def is_valid_testing_lab_data(user, lab):
 
 def payment_details(request, order):
     from ondoc.authentication.models import UserProfile
+    from ondoc.insurance.models import InsurancePlans
     from ondoc.account.models import PgTransaction, Order
     payment_required = True
     user = request.user
@@ -332,11 +417,26 @@ def payment_details(request, order):
     profile_name = ""
     if profile:
         profile_name = profile.name
+    if not profile and order.product_id == 3:
+        if order.action_data.get('profile_detail'):
+            profile_name = order.action_data.get('profile_detail').get('name', "")
+
+    insurer_code = None
+    if order.product_id == Order.INSURANCE_PRODUCT_ID:
+        insurance_plan_id = order.action_data.get('insurance_plan')
+        insurance_plan = InsurancePlans.objects.filter(id=insurance_plan_id).first()
+        if not insurance_plan:
+            raise Exception('Invalid pg transaction as insurer plan is not found.')
+        insurer = insurance_plan.insurer
+        insurer_code = insurer.insurer_merchant_code
+
+    temp_product_id = order.product_id
+
     pgdata = {
         'custId': user.id,
         'mobile': user.phone_number,
         'email': uemail,
-        'productId': order.product_id,
+        'productId': temp_product_id,
         'surl': surl,
         'furl': furl,
         'referenceId': "",
@@ -344,13 +444,21 @@ def payment_details(request, order):
         'name': profile_name,
         'txAmount': str(order.amount),
     }
+
+    if insurer_code:
+        pgdata['insurerCode'] = insurer_code
+
     secret_key = client_key = ""
-    if order.product_id == Order.DOCTOR_PRODUCT_ID:
+    # TODO : SHASHANK_SINGH for plan FINAL ??
+    if order.product_id == Order.DOCTOR_PRODUCT_ID or order.product_id == Order.SUBSCRIPTION_PLAN_PRODUCT_ID:
         secret_key = settings.PG_SECRET_KEY_P1
         client_key = settings.PG_CLIENT_KEY_P1
     elif order.product_id == Order.LAB_PRODUCT_ID:
         secret_key = settings.PG_SECRET_KEY_P2
         client_key = settings.PG_CLIENT_KEY_P2
+    elif order.product_id == Order.INSURANCE_PRODUCT_ID:
+        secret_key = settings.PG_SECRET_KEY_P3
+        client_key = settings.PG_CLIENT_KEY_P3
 
     pgdata['hash'] = PgTransaction.create_pg_hash(pgdata, secret_key, client_key)
 
@@ -399,6 +507,30 @@ def resolve_address(address_obj):
         if address_string:
             address_string += ", "
         address_string += str(address_dict["land_mark"])
+    if address_dict.get("locality"):
+        if address_string:
+            address_string += ", "
+        address_string += str(address_dict["locality"])
+    if address_dict.get("pincode"):
+        if address_string:
+            address_string += ", "
+        address_string += str(address_dict["pincode"])
+
+    return address_string
+
+
+def thyrocare_resolve_address(address_obj):
+    address_string = ""
+    address_dict = dict()
+    if not isinstance(address_obj, dict):
+        address_dict = vars(address_dict)
+    else:
+        address_dict = address_obj
+
+    if address_dict.get("address"):
+        if address_string:
+            address_string += ", "
+        address_string += str(address_dict["address"])
     if address_dict.get("locality"):
         if address_string:
             address_string += ", "
@@ -461,7 +593,8 @@ def doctor_query_parameters(entity, req_params):
         params_dict["longitude"] = entity.sublocality_longitude
     elif entity.locality_longitude:
         params_dict["longitude"] = entity.locality_longitude
-
+    if entity.ipd_procedure_id:
+        params_dict["ipd_procedure_ids"] = str(entity.ipd_procedure_id)
 
     # if entity_params.get("location_json"):
     #     if entity_params["location_json"].get("sublocality_latitude"):
@@ -510,6 +643,7 @@ class CouponsMixin(object):
         from ondoc.coupon.models import Coupon
         from ondoc.doctor.models import OpdAppointment
         from ondoc.diagnostic.models import LabAppointment
+        from ondoc.subscription_plan.models import UserPlanMapping
 
         user = kwargs.get("user")
         coupon_obj = kwargs.get("coupon_obj")
@@ -523,6 +657,8 @@ class CouponsMixin(object):
             if isinstance(self, OpdAppointment) and coupon_obj.type not in [Coupon.DOCTOR, Coupon.ALL]:
                 return {"is_valid": False, "used_count": None}
             elif isinstance(self, LabAppointment) and coupon_obj.type not in [Coupon.LAB, Coupon.ALL]:
+                return {"is_valid": False, "used_count": None}
+            elif isinstance(self, UserPlanMapping) and coupon_obj.type not in [Coupon.SUBSCRIPTION_PLAN, Coupon.ALL]:
                 return {"is_valid": False, "used_count": None}
 
             diff_days = (timezone.now() - (coupon_obj.start_date or coupon_obj.created_at)).days
@@ -579,6 +715,14 @@ class CouponsMixin(object):
                 if user_specefic and count >= user_specefic.count:
                     return {"is_valid": False, "used_count": count}
 
+            # if coupon is random coupon
+            if hasattr(coupon_obj, 'is_random') and coupon_obj.is_random:
+                random_count = coupon_obj.random_coupon_used_count(None, coupon_obj.random_coupon_code, cart_item)
+                if random_count > 0:
+                    return {"is_valid": False, "used_count": random_count}
+                else:
+                    return {"is_valid": True, "used_count": random_count}
+
             if (coupon_obj.count is None or count < coupon_obj.count) and (coupon_obj.total_count is None or total_used_count < coupon_obj.total_count):
                 return {"is_valid": True, "used_count": count}
             else:
@@ -589,6 +733,8 @@ class CouponsMixin(object):
     def validate_product_coupon(self, **kwargs):
         from ondoc.diagnostic.models import Lab
         from ondoc.account.models import Order
+        from ondoc.coupon.models import Coupon
+
         import re
 
         coupon_obj = kwargs.get("coupon_obj")
@@ -606,6 +752,14 @@ class CouponsMixin(object):
         doctor = kwargs.get("doctor")
         hospital = kwargs.get("hospital")
         procedures = kwargs.get("procedures", [])
+        plan = kwargs.get("plan")
+
+        if plan:
+            if coupon_obj.type in [Coupon.ALL, Coupon.SUBSCRIPTION_PLAN] \
+                and coupon_obj.plan.filter(id=plan.id).exists():
+                    return True
+            return False
+
 
         if coupon_obj.lab and coupon_obj.lab != lab:
             return False
@@ -755,7 +909,7 @@ class TimeSlotExtraction(object):
     MORNING = "AM"
     # AFTERNOON = "Afternoon"
     EVENING = "PM"
-    TIME_SPAN = 15  # In minutes
+    TIME_SPAN = 30  # In minutes
     timing = dict()
     price_available = dict()
 
@@ -822,6 +976,99 @@ class TimeSlotExtraction(object):
 
         return whole_timing_data
 
+    def get_timing_slots(self, date, leaves, booking_details, is_thyrocare=False):
+        date = datetime.datetime.strptime(date, '%Y-%m-%d')
+        day = date.weekday()
+        booking_type = booking_details.get('type')
+        if booking_type == 'integration':
+            total_leave_list = []
+        elif booking_type == "doctor":
+            total_leave_list = self.get_doctor_leave_list(leaves)
+        else:
+            total_leave_list = self.get_lab_leave_list(leaves)
+        whole_timing_data = OrderedDict()
+        booking_details['total_leave_list'] = total_leave_list
+
+        j = 0
+        if is_thyrocare:
+            self.get_slots(date, day, j, whole_timing_data, booking_details, is_thyrocare)
+        else:
+            for k in range(int(settings.NO_OF_WEEKS_FOR_TIME_SLOTS)):
+                for i in range(7):
+                    if k == 0:
+                        if i >= day:
+                            self.get_slots(date, i, j, whole_timing_data, booking_details, is_thyrocare)
+                            j = j + 1
+                    else:
+                        self.get_slots(date, i, j, whole_timing_data, booking_details, is_thyrocare)
+                        j = j + 1
+        return whole_timing_data
+
+    def get_slots(self, date, i, j, whole_timing_data, booking_details, is_thyrocare):
+        converted_date = (date + datetime.timedelta(days=j))
+        readable_date = converted_date.strftime("%Y-%m-%d")
+        booking_details['date'] = converted_date
+        total_leave_list = booking_details.get('total_leave_list')
+        if converted_date in total_leave_list:
+            whole_timing_data[readable_date] = list()
+        else:
+            whole_timing_data[readable_date] = list()
+            pa = self.price_available[i]
+
+            if self.timing[i].get('timing'):
+                am_timings = self.format_data_new(self.timing[i]['timing'][self.MORNING], self.MORNING, pa, booking_details, is_thyrocare)
+                pm_timings = self.format_data_new(self.timing[i]['timing'][self.EVENING], self.EVENING, pa, booking_details, is_thyrocare)
+                if len(am_timings.get('timing')) == 0 and len(pm_timings.get('timing')) == 0:
+                    # whole_timing_data[readable_date].append({})
+                    pass
+                else:
+                    whole_timing_data[readable_date].append(am_timings)
+                    whole_timing_data[readable_date].append(pm_timings)
+
+    def get_doctor_leave_list(self, leaves):
+        total_leaves = list()
+        doctor_leaves = leaves.get('doctor')
+        global_leaves = leaves.get('global')
+        for dl in doctor_leaves:
+            start_date = dl.get('start_date')
+            end_date = dl.get('end_date')
+            if start_date == end_date:
+                total_leaves.append(datetime.datetime.strptime(start_date, '%Y-%m-%d'))
+            else:
+                delta = datetime.datetime.strptime(end_date, '%Y-%m-%d') - datetime.datetime.strptime(start_date, '%Y-%m-%d')
+                total_leaves.append(datetime.datetime.strptime(start_date, '%Y-%m-%d'))
+                for i in range(delta.days + 1):
+                    total_leaves.append(datetime.datetime.strptime(start_date, '%Y-%m-%d') + datetime.timedelta(i))
+        for gl in global_leaves:
+            start_date = gl.get('start_date')
+            end_date = gl.get('end_date')
+            if start_date == end_date:
+                total_leaves.append(datetime.datetime.strptime(start_date, '%Y-%m-%d'))
+            else:
+                delta = datetime.datetime.strptime(end_date, '%Y-%m-%d') - datetime.datetime.strptime(start_date, '%Y-%m-%d')
+                for i in range(delta.days + 1):
+                    total_leaves.append(datetime.datetime.strptime(start_date, '%Y-%m-%d') + datetime.timedelta(i))
+        doc_leave_set = set(total_leaves)
+        final_leaves = list(doc_leave_set)
+        return final_leaves
+
+    def get_lab_leave_list(self, leaves):
+        total_leaves = list()
+        for gl in leaves:
+            start_date = gl.get('start_date')
+            end_date = gl.get('end_date')
+            if start_date == end_date:
+                total_leaves.append(datetime.datetime.strptime(start_date, '%Y-%m-%d'))
+            else:
+                delta = datetime.datetime.strptime(end_date, '%Y-%m-%d') - datetime.datetime.strptime(start_date,
+                                                                                                      '%Y-%m-%d')
+                total_leaves.append(datetime.datetime.strptime(start_date, '%Y-%m-%d'))
+                for i in range(delta.days + 1):
+                    total_leaves.append(datetime.datetime.strptime(start_date, '%Y-%m-%d') + datetime.timedelta(i))
+        lab_leave_set = set(total_leaves)
+        final_leaves = list(lab_leave_set)
+        return final_leaves
+
     def format_data(self, data, day_time, pa):
         data_list = list()
         for k, v in data.items():
@@ -832,6 +1079,101 @@ class TimeSlotExtraction(object):
             else:
                 data_list.append({"value": k, "text": v, "price": pa[k]["price"],
                                   "is_available": pa[k]["is_available"], "on_call": pa[k].get("on_call", False)})
+        format_data = dict()
+        format_data['type'] = 'AM' if day_time == self.MORNING else 'PM'
+        format_data['title'] = day_time
+        format_data['timing'] = data_list
+        return format_data
+
+    def format_data_new(self, data, day_time, pa, booking_details, is_thyrocare):
+        current_date_time = datetime.datetime.now()
+        booking_date = booking_details.get('date')
+        lab_tomorrow_time = 0.0
+        lab_minimum_time = None
+        doc_minimum_time = None
+        doctor_maximum_timing = 20.0
+        if booking_details.get('type') == "doctor":
+            if current_date_time.date() == booking_date.date():
+                doc_booking_minimum_time = current_date_time + datetime.timedelta(hours=1)
+                doc_booking_hours = doc_booking_minimum_time.strftime('%H:%M')
+                hours, minutes = doc_booking_hours.split(':')
+                mins = int(hours) * 60 + int(minutes)
+                doc_minimum_time = mins / 60
+        else:
+            if is_thyrocare:
+                pass
+            else:
+                is_home_pickup = booking_details.get('is_home_pickup')
+                if is_home_pickup:
+                    if current_date_time.weekday() == 6:
+                        lab_minimum_time = 24.0
+                    if current_date_time.hour < 13:
+                        lab_booking_minimum_time = current_date_time + datetime.timedelta(hours=4)
+                        lab_booking_hours = lab_booking_minimum_time.strftime('%H:%M')
+                        hours, minutes = lab_booking_hours.split(':')
+                        mins = int(hours) * 60 + int(minutes)
+                        lab_minimum_time = mins / 60
+                    elif current_date_time.hour >= 13 and current_date_time.hour < 17:
+                        lab_minimum_time = 24.0
+                    if current_date_time.hour >= 17:
+                        lab_minimum_time = 24.0
+                        lab_tomorrow_time = 12.0
+                else:
+                    lab_booking_minimum_time = current_date_time + datetime.timedelta(hours=2)
+                    lab_booking_hours = lab_booking_minimum_time.strftime('%H:%M')
+                    hours, minutes = lab_booking_hours.split(':')
+                    mins = int(hours) * 60 + int(minutes)
+                    lab_minimum_time = mins / 60
+
+
+        data_list = list()
+        for k, v in data.items():
+            if 'mrp' in pa[k].keys() and 'deal_price' in pa[k].keys():
+                if current_date_time.date() == booking_date.date():
+                    if pa[k].get('on_call') == False:
+                        if k >= float(doc_minimum_time) and k <= doctor_maximum_timing:
+                            data_list.append({"value": k, "text": v, "price": pa[k]["price"], "is_price_zero": True if pa[k]["price"] is not None and pa[k]["price"] == 0 else False,
+                                              "mrp": pa[k]['mrp'], 'deal_price': pa[k]['deal_price'],
+                                              "is_available": pa[k]["is_available"], "on_call": pa[k].get("on_call", False)})
+                        else:
+                            pass
+                    else:
+                        pass
+                else:
+                    if k <= doctor_maximum_timing:
+                        data_list.append({"value": k, "text": v, "price": pa[k]["price"], "is_price_zero": True if pa[k]["price"] is not None and pa[k]["price"] == 0 else False,
+                                          "mrp": pa[k]['mrp'], 'deal_price': pa[k]['deal_price'],
+                                          "is_available": pa[k]["is_available"],
+                                          "on_call": pa[k].get("on_call", False)})
+                    else:
+                        pass
+            else:
+                next_date = current_date_time + datetime.timedelta(days=1)
+                if current_date_time.date() == booking_date.date():
+                    if k >= float(lab_minimum_time):
+                        data_list.append({"value": k, "text": v, "price": pa[k]["price"], "is_price_zero": True if pa[k]["price"] is not None and pa[k]["price"] == 0 else False,
+                                          "is_available": pa[k]["is_available"],
+                                          "on_call": pa[k].get("on_call", False)})
+                    else:
+                        pass
+                elif next_date.date() == booking_date.date():
+                    if lab_tomorrow_time:
+                        if k >= float(lab_tomorrow_time):
+                            data_list.append({"value": k, "text": v, "price": pa[k]["price"], "is_price_zero": True if pa[k]["price"] is not None and pa[k]["price"] == 0 else False,
+                                              "is_available": pa[k]["is_available"],
+                                              "on_call": pa[k].get("on_call", False)})
+                        else:
+                            pass
+                    else:
+                        data_list.append({"value": k, "text": v, "price": pa[k]["price"], "is_price_zero": True if pa[k]["price"] is not None and pa[k]["price"] == 0 else False,
+                                          "is_available": pa[k]["is_available"],
+                                          "on_call": pa[k].get("on_call", False)})
+
+                else:
+                    data_list.append({"value": k, "text": v, "price": pa[k]["price"], "is_price_zero": True if pa[k]["price"] is not None and pa[k]["price"] == 0 else False,
+                                      "is_available": pa[k]["is_available"],
+                                      "on_call": pa[k].get("on_call", False)})
+
         format_data = dict()
         format_data['type'] = 'AM' if day_time == self.MORNING else 'PM'
         format_data['title'] = day_time
@@ -882,6 +1224,62 @@ class TimeSlotExtraction(object):
 
         return today_min, tomorrow_min, today_max
 
+    def get_upcoming_slots(self, time_slots):
+        no_of_slots = 3
+        next_day_slot = 0
+        upcoming = OrderedDict()
+        for key, value in time_slots.items():
+            if not value or (not value[0]['timing'] and not value[1]['timing']):
+                pass
+            else:
+                upcoming[key] = list()
+                if len(value[0]['timing']) >= no_of_slots:
+                    if next_day_slot > 0:
+                        range_upto = next_day_slot
+                    else:
+                        range_upto = no_of_slots
+
+                    for i in range(range_upto):
+                        upcoming[str(key)].append(value[0]['timing'][i])
+
+                    next_day_slot = no_of_slots - (len(value[0]['timing']) + next_day_slot)
+
+                elif len(value[0]['timing']) < no_of_slots:
+                    if next_day_slot > 0:
+                        if next_day_slot >= len(value[0]['timing']):
+                            range_upto = len(value[0]['timing'])
+                        else:
+                            range_upto = next_day_slot
+
+                        for i in range(range_upto):
+                            upcoming[str(key)].append(value[0]['timing'][i])
+
+                        remaining = next_day_slot - len(value[0]['timing'])
+                        if remaining >= len(value[1]['timing']):
+                            range_upto = len(value[1]['timing'])
+                        else:
+                            range_upto = remaining
+
+                        for i in range(range_upto):
+                            upcoming[str(key)].append(value[1]['timing'][i])
+                    else:
+                        for i in range(len(value[0]['timing'])):
+                            upcoming[str(key)].append(value[0]['timing'][i])
+
+                        remaining = no_of_slots - len(value[0]['timing'])
+                        if remaining >= len(value[1]['timing']):
+                            range_upto = len(value[1]['timing'])
+                        else:
+                            range_upto = remaining
+
+                        for i in range(range_upto):
+                            upcoming[str(key)].append(value[1]['timing'][i])
+                    next_day_slot = no_of_slots - (len(value[0]['timing']) + len(value[1]['timing']) + next_day_slot)
+
+                if next_day_slot > 0:
+                    pass
+                else:
+                    return upcoming
 
 def consumers_balance_refund():
     from ondoc.account.models import ConsumerAccount, ConsumerRefund
@@ -912,6 +1310,7 @@ def get_opd_pem_queryset(user, model):
     #                              super_user_permission=false AND is_disabled=false AND permission_type=1) > 0) THEN 1  ELSE 0 END'''
     # billing_query = '''CASE WHEN ((SELECT COUNT(id) FROM generic_admin WHERE user_id=%s AND hospital_id=hospital.id AND
     #                                super_user_permission=false AND is_disabled=false AND permission_type=2) > 0) THEN 1  ELSE 0 END'''
+    from ondoc.doctor.models import OpdAppointment
     queryset = model.objects \
         .select_related('doctor', 'hospital', 'user') \
         .prefetch_related('doctor__manageable_doctors', 'hospital__manageable_hospitals', 'doctor__images',
@@ -919,6 +1318,7 @@ def get_opd_pem_queryset(user, model):
                           'doctor__qualifications__specialization', 'doctor__qualifications__college',
                           'doctor__doctorpracticespecializations', 'doctor__doctorpracticespecializations__specialization') \
         .filter(
+        ~Q(status=OpdAppointment.CREATED),
         Q(
             Q(doctor__manageable_doctors__user=user,
               doctor__manageable_doctors__hospital=F('hospital'),
@@ -1034,9 +1434,11 @@ def create_payout_checksum(all_txn, product_id):
     #     secret_key = settings.PG_SECRET_KEY_P2
     #     client_key = settings.PG_CLIENT_KEY_P2
 
-    secret_key = settings.PG_SECRET_KEY_P2
-    client_key = settings.PG_CLIENT_KEY_P2
+    # secret_key = settings.PG_SECRET_KEY_P2
+    # client_key = settings.PG_CLIENT_KEY_P2
 
+    secret_key = settings.PG_PAYOUT_SECRET_KEY
+    client_key = settings.PG_PAYOUT_CLIENT_KEY
 
     all_txn = sorted(all_txn, key=lambda x : x["idx"])
     checksum = ""
@@ -1101,3 +1503,70 @@ def datetime_to_formated_string(instance, time_format='%Y-%m-%d %H:%M:%S', to_zo
     formated_date = datetime.datetime.strftime(instance, time_format)
     return formated_date
 
+def payout_checksum(request_payload):
+
+    secretkey = settings.PG_SECRET_KEY_P2
+    accesskey = settings.PG_CLIENT_KEY_P2
+
+    checksum = ""
+
+    curr = ''
+
+    keylist = sorted(request_payload)
+    for k in keylist:
+        if request_payload[k] is not None:
+            curr = curr + k + '=' + str(request_payload[k]) + ';'
+
+    checksum += curr
+
+    checksum = accesskey + "|" + checksum + "|" + secretkey
+    checksum_hash = hashlib.sha256(str(checksum).encode())
+    checksum_hash = checksum_hash.hexdigest()
+    return checksum_hash
+
+def get_package_free_or_not_dict(request):
+    from ondoc.subscription_plan.models import UserPlanMapping
+    package_free_or_not_dict = defaultdict(bool)
+    if request.user and request.user.is_authenticated:
+        free_test_in_user_plan = UserPlanMapping.get_free_tests(request)
+        for temp_user_plan_package in free_test_in_user_plan:
+            package_free_or_not_dict[temp_user_plan_package] = True
+    return package_free_or_not_dict
+
+
+def update_physical_agreement_value(obj, value, time):
+    obj.assoc_hospitals.all().update(physical_agreement_signed=value, physical_agreement_signed_at=time)
+
+
+def update_physical_agreement_timestamp(obj):
+    from ondoc.doctor.models import HospitalNetwork
+    to_be_updated = False
+    time_to_be_set = None
+    if obj.physical_agreement_signed and not obj.physical_agreement_signed_at:
+        time_to_be_set = timezone.now()
+        to_be_updated = True
+    elif not obj.physical_agreement_signed and obj.physical_agreement_signed_at:
+        time_to_be_set = None
+        to_be_updated = True
+    if to_be_updated:
+        obj.physical_agreement_signed_at = time_to_be_set
+        if isinstance(obj, HospitalNetwork):
+            update_physical_agreement_value(obj, obj.physical_agreement_signed, time_to_be_set)
+
+
+def ipd_query_parameters(entity, req_params):
+    params_dict = copy.deepcopy(req_params)
+    params_dict["max_distance"] = None
+    if entity.sublocality_latitude:
+        params_dict["lat"] = entity.sublocality_latitude
+        params_dict["max_distance"] = 5  # In KMs
+    elif entity.locality_latitude:
+        params_dict["lat"] = entity.locality_latitude
+        params_dict["max_distance"] = 15  # In KMs
+    if entity.sublocality_longitude:
+        params_dict["long"] = entity.sublocality_longitude
+    elif entity.locality_longitude:
+        params_dict["long"] = entity.locality_longitude
+    if entity.locality_value:
+        params_dict['city'] = entity.locality_value
+    return params_dict

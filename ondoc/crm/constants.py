@@ -24,5 +24,27 @@ constants = {
     'MERCHANT_TEAM': 'merchant_team',
     'COMMENT_TEAM': 'comment_team',
     'PRODUCT_TEAM': 'product_team',
-    'INTEGRATION_MANAGEMENT_TEAM': 'integration_management_team'
+    'INTEGRATION_MANAGEMENT_TEAM': 'integration_management_team',
+    'WELCOME_CALLING_TEAM': 'welcome_calling_team',
+    'DOC_AVAILABILITY_TEAM_GROUP': 'doctor_availability_team',
+    'APPOINTMENT_OTP_TEAM': 'appointment_otp_team',
+    'INSURANCE_GROUP': 'insurance_group',
+    'APPOINTMENT_REFUND_TEAM' : 'appointment_refund_team',
+    'SUPER_INSURANCE_GROUP' : 'super_insurance_group',
+    'IPD_TEAM': 'ipd_team'
+}
+matrix_product_ids = {
+    'opd_products': 1,
+    'lab_products': 4,
+    'consumer': 5,
+    'ipd_procedure': 9
+}
+matrix_subproduct_ids = {
+    "chat": 1,
+    "appointment": 2,
+    "insurance": 3,
+    "other_services": 4,
+    "doctor": 8,
+    "hospital": 7,
+    "hospitalnetwork": 6
 }

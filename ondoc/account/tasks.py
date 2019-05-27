@@ -132,46 +132,96 @@ def dump_to_elastic():
                     if dump_response.status_code != status.HTTP_200_OK or not dump_response.ok:
                         raise Exception('Dump unsuccessfull')
 
-        # Delete the index or empty the index for new use.
-        deleteResponse = requests.delete(elastic_url + '/' + destination)
-        if deleteResponse.status_code != status.HTTP_200_OK or not deleteResponse.ok:
-            if deleteResponse.status_code == status.HTTP_404_NOT_FOUND and deleteResponse.json().get('error', {}).get('type', "") == "index_not_found_exception".lower():
-                pass
-            else:
-                raise Exception('Could not delete the destination index.')
-
-        # create the destination index for dumping the data.
-        createDestinationIndex = requests.put(elastic_url + '/' + destination, headers=headers, data=json.dumps(secondary_index_mapping_data))
-        if createDestinationIndex.status_code != status.HTTP_200_OK or not createDestinationIndex.ok:
-            raise Exception('Could not create the destination index. ', destination)
-
-        data = {"source": {"index": primary_index}, "dest": {"index": destination}}
-        response = requests.post(elastic_url + '/_reindex', headers={'Content-Type': 'application/json'}, data=json.dumps(data))
-        if response.status_code != status.HTTP_200_OK or not response.ok:
-            raise Exception('Could not switch the ')
-
-        aliasData = {
-            "actions": [
-                {
-                    "remove": {
-                        "indices": [original],
-                        "alias": elastic_alias
-                    }
-                },
-                {
-                    "add": {"indices": [destination], "alias": elastic_alias}
-                }
-            ]
+        call_data = {
+            'primary_index': primary_index,
+            'secondary_index_mapping_data' : secondary_index_mapping_data,
+            'elastic_alias': elastic_alias,
+            'url': elastic_url,
+            'original': original,
+            'destination': destination,
+            'timestamp': int(datetime.datetime.now().timestamp()),
+            'id': obj.id
         }
 
-        response = requests.post(elastic_url + '/_aliases', headers={'Content-Type': 'application/json'}, data=json.dumps(aliasData))
-        if response.status_code != status.HTTP_200_OK or not response.ok:
-            raise Exception('Could not switch the latest index to the live aliases. ', aliasData)
+        logger.error(json.dumps(call_data))
 
-        print("Sync to elastic successfull.")
+        obj.post_task_data = call_data
+        obj.save()
+
+        # elastic_alias_switch.apply_async((call_data,), countdown=3600)
+
+        logger.error("Sync elastic job 1 completed")
+        return
 
     except Exception as e:
         logger.error("Error in syncing process of elastic - " + str(e))
+
+@task()
+def elastic_alias_switch():
+    from ondoc.elastic import models as elastic_models
+
+    obj = elastic_models.DemoElastic.objects.all().order_by('id').last()
+    if not obj:
+        raise Exception('Could not elastic object.')
+
+    data = obj.post_task_data
+    if data.get('timestamp', 0) + (2 * 3600) < int(datetime.datetime.now().timestamp()):
+        raise Exception('Object found is not desired object or last object.')
+
+    headers = {
+        'Content-Type': 'application/json',
+    }
+
+    elastic_url = data.get('url')
+    destination = data.get('destination')
+    original = data.get('original')
+    elastic_alias = data.get('elastic_alias')
+    secondary_index_mapping_data = data.get('secondary_index_mapping_data')
+    primary_index = data.get('primary_index')
+    if not elastic_url or not destination or not original or not elastic_alias or not secondary_index_mapping_data or not primary_index:
+        raise Exception('Invalid data found. Cannot sync to elastic.')
+
+    # Delete the index or empty the index for new use.
+    deleteResponse = requests.delete(elastic_url + '/' + destination)
+    if deleteResponse.status_code != status.HTTP_200_OK or not deleteResponse.ok:
+        if deleteResponse.status_code == status.HTTP_404_NOT_FOUND and deleteResponse.json().get('error', {}).get('type', "") == "index_not_found_exception".lower():
+            pass
+        else:
+            raise Exception('Could not delete the destination index.')
+
+    # create the destination index for dumping the data.
+    createDestinationIndex = requests.put(elastic_url + '/' + destination, headers=headers, data=json.dumps(secondary_index_mapping_data))
+    if createDestinationIndex.status_code != status.HTTP_200_OK or not createDestinationIndex.ok:
+        raise Exception('Could not create the destination index. ', destination)
+
+    data = {"source": {"index": primary_index}, "dest": {"index": destination}}
+    response = requests.post(elastic_url + '/_reindex', headers={'Content-Type': 'application/json'}, data=json.dumps(data))
+    if response.status_code != status.HTTP_200_OK or not response.ok:
+        raise Exception('Could not switch the ')
+
+    alias_data = {
+        "actions": [
+            {
+                "remove": {
+                    "indices": [original],
+                    "alias": elastic_alias
+                }
+            },
+            {
+                "add": {"indices": [destination], "alias": elastic_alias}
+            }
+        ]
+    }
+
+    response = requests.post(elastic_url + '/_aliases', headers={'Content-Type': 'application/json'}, data=json.dumps(alias_data))
+    if response.status_code != status.HTTP_200_OK or not response.ok:
+        logger.error('Could not switch the latest index to the live aliases. ', alias_data)
+        logger.error("Sync to elastic failed.")
+    else:
+        logger.error("Sync to elastic successfull.")
+        obj.save()
+    return
+
 
 @task()
 def consumer_refund_update():
@@ -181,6 +231,20 @@ def consumer_refund_update():
     ConsumerRefund.request_pending_refunds()
     ConsumerRefund.update_refund_status()
 
+@task()
+def update_ben_status_from_pg():
+    from ondoc.authentication.models import Merchant
+    Merchant.update_status_from_pg()
+    return True
+
+@task()
+def update_merchant_payout_pg_status():
+    from ondoc.account.models import MerchantPayout
+    payouts = MerchantPayout.objects.all().order_by('-id')
+    for p in payouts:
+        p.refresh_from_db()
+        p.update_status_from_pg()
+    return True
 
 @task(bind=True)
 def refund_status_update(self):
@@ -264,6 +328,7 @@ def refund_curl_task(self, req_data):
 @task(bind=True, max_retries=5)
 def set_order_dummy_transaction(self, order_id, user_id):
     from ondoc.account.models import Order, DummyTransactions
+    from ondoc.insurance.models import UserInsurance
     from ondoc.account.models import User
     try:
         if not settings.PAYOUTS_ENABLED:
@@ -288,6 +353,23 @@ def set_order_dummy_transaction(self, order_id, user_id):
             }
             url = settings.PG_DUMMY_TRANSACTION_URL
 
+            insurer_code = None
+            insurance_order_id = None
+            insurance_order_number = None
+            if order_row.product_id == Order.INSURANCE_PRODUCT_ID:
+                insurer_code = appointment.insurance_plan.insurer.insurer_merchant_code
+
+            user_insurance = UserInsurance.get_user_insurance(user)
+            if order_row.product_id in [Order.DOCTOR_PRODUCT_ID, Order.LAB_PRODUCT_ID] and user_insurance:
+                insurance_order = user_insurance.order
+
+                insurance_order_transactions = insurance_order.getTransactions()
+                if not insurance_order_transactions:
+                    raise Exception('No transactions found for appointment insurance.')
+                insurance_order_transaction = insurance_order_transactions[0]
+                insurance_order_id = insurance_order_transaction.order_id
+                insurance_order_number = insurance_order_transaction.order_no
+
             req_data = {
                 "customerId": user_id,
                 "mobile": user.phone_number,
@@ -303,6 +385,13 @@ def set_order_dummy_transaction(self, order_id, user_id):
                 "buCallbackSuccessUrl": "",
                 "buCallbackFailureUrl": ""
             }
+
+            if insurance_order_id and insurance_order_number:
+                req_data['refOrderNo'] = insurance_order_number
+                req_data['refOrderId'] = insurance_order_id
+
+            if insurer_code:
+                req_data['insurerCode'] = insurer_code
 
             response = requests.post(url, data=json.dumps(req_data), headers=headers)
             if response.status_code == status.HTTP_200_OK:
@@ -431,3 +520,14 @@ def process_payout(payout_id):
 
     except Exception as e:
         logger.error("Error in processing payout - with exception - " + str(e))
+
+
+@task()
+def integrator_order_summary():
+    from ondoc.integrations.models import IntegratorResponse
+    IntegratorResponse.get_order_summary()
+
+@task()
+def get_thyrocare_reports():
+    from ondoc.integrations.Integrators import Thyrocare
+    Thyrocare.get_generated_report()

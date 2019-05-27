@@ -1,7 +1,8 @@
 from django.urls import path
 from .views import (LabTestList, LabList, LabAppointmentView, SearchPageViewSet, LabTimingListView,
                     AvailableTestViewSet, LabReportFileViewset, DoctorLabAppointmentsViewSet,
-                    DoctorLabAppointmentsNoAuthViewSet, TestDetailsViewset, LabTestCategoryListViewSet)
+                    DoctorLabAppointmentsNoAuthViewSet, TestDetailsViewset, LabTestCategoryListViewSet,
+                    CompareLabPackagesViewSet, DigitalReports)
 
 # from rest_framework.routers import DefaultRouter
 #
@@ -17,6 +18,7 @@ urlpatterns = [
     path('test', LabTestList.as_view({'get': 'list'}), name='test-list'),
     path('package', LabTestList.as_view({'get': 'autocomplete_packages'}), name='package-autocomplete'),
     path('packagelist', LabList.as_view({'get': 'list_packages'}), name='package-list'),
+    path('package_list', LabList.as_view({'get': 'package_list'}), name='package-list'),
     # path('test/<int:id>/', LabTestList.as_view({'get': 'retrieve'}), name='test-detail'),
     path('lablist', LabList.as_view({'get': 'list'}), name='lab-list'),
     path('labnetworksearch', LabList.as_view({'get': 'search'}), name='lab-network-search'),
@@ -39,6 +41,8 @@ urlpatterns = [
     #      name='payment-retry'),
     path('labtiming', LabTimingListView.as_view({'get': 'list'}),
          name='lab-timing'),
+    path('labtiming_new', LabTimingListView.as_view({'get': 'list_new'}),
+         name='lab-timing-new'),
     path('labtest/<int:lab_id>', AvailableTestViewSet.as_view({'get': 'retrieve'}),
          name='lab-available-test'),
     path('lab-report-file', LabReportFileViewset.as_view({'get': 'list'}), name='lab-upload-list'),
@@ -49,5 +53,10 @@ urlpatterns = [
          name='appointment-complete'),
     path('test/details', TestDetailsViewset.as_view({'get': 'retrieve'}), name='test-details'),
     path('test/details_by_url', TestDetailsViewset.as_view({'get': 'retrieve_test_by_url'}), name='test-details-by-url'),
+    path('test/list_by_alphabet', TestDetailsViewset.as_view({'get':'list_by_alphabet'}), name='list-test-by-alphabet'),
     path('test/category', LabTestCategoryListViewSet.as_view({'get': 'list'}), name='test-category'),
+    path('compare_lab_packages', CompareLabPackagesViewSet.as_view({'post': 'retrieve'}), name='lab_packages_comparison'),
+    path('compare_lab_packages_by_url', CompareLabPackagesViewSet.as_view({'post': 'retrieve_by_url'}), name='lab_packages_comparison_by_url'),
+    # path('digital/report/<int:booking_id>', DigitalReports.as_view({'get': 'retrieve'}), name='digital_report'),
+
 ]

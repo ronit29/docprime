@@ -9,6 +9,7 @@ import datetime
 class TrackingVisitor(auth_models.TimeStampedModel):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     device_info = JSONField(null=True, blank=True)
+    client_category = models.CharField(max_length=100, blank=True, null=True)
 
     def __str__(self):
         return '{}'.format(self.id)
@@ -47,14 +48,15 @@ class TrackingVisit(auth_models.TimeStampedModel):
 class TrackingEvent(auth_models.TimeStampedModel):
     DoctorAppointmentBooked = 'DoctorAppointmentBooked'
     LabAppointmentBooked = 'LabAppointmentBooked'
-
+    InsurancePurchased = 'InsurancePurchased'
     ACTION_EVENTS = {
         DoctorAppointmentBooked : 'doctor-appointment-booked',
         LabAppointmentBooked : 'lab-appointment-booked',
+        InsurancePurchased: 'insurance-purchased'
     }
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    name = models.CharField(max_length=50, null=True, blank=True)
+    name = models.CharField(max_length=250, null=True, blank=True)
     data = JSONField(blank=True, null=True)
     visit = models.ForeignKey(TrackingVisit, on_delete=models.CASCADE)
     user = models.ForeignKey(settings.AUTH_USER_MODEL,  on_delete=models.SET_NULL, default=None,
@@ -79,8 +81,14 @@ class TrackingEvent(auth_models.TimeStampedModel):
         if action not in cls.ACTION_EVENTS:
             return None
 
+        Category = 'ConsumerApp'
+        if kwargs.get("visitor_info"):
+            visitor_info = kwargs.get("visitor_info")
+            if visitor_info and visitor_info.get("from_app", False):
+                Category = 'DocprimeApp'
+
         event_data = {
-            'Category': 'ConsumerApp', 'Action': action, 'CustomerID': user.id,
+            'Category': Category, 'Action': action, 'CustomerID': user.id,
             'leadid': kwargs.get("appointmentId", None), 'event': cls.ACTION_EVENTS[action]
         }
 
@@ -105,3 +113,19 @@ class ServerHitMonitor(auth_models.TimeStampedModel):
 
     class Meta:
         db_table = 'server_hit_monitor'
+
+
+class MigrateTracker(auth_models.TimeStampedModel):
+
+    start_time = models.DateTimeField(null=True)
+
+    class Meta:
+        db_table = 'migrate_tracker'
+
+
+class TrackingSaveLogs(auth_models.TimeStampedModel):
+
+    data = JSONField(null=True)
+
+    class Meta:
+        db_table = 'tracking_logs'

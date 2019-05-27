@@ -1,3 +1,4 @@
+from collections import OrderedDict
 from copy import deepcopy
 
 from django.contrib.gis.db import models
@@ -9,10 +10,12 @@ from django.template.loader import render_to_string
 from ondoc.account.models import MerchantPayout, ConsumerAccount, Order, UserReferred, MoneyPool, Invoice
 from ondoc.authentication.models import (TimeStampedModel, CreatedByModel, Image, Document, QCModel, UserProfile, User,
                                          UserPermission, GenericAdmin, LabUserPermission, GenericLabAdmin,
-                                         BillingAccount, SPOCDetails)
-from ondoc.doctor.models import Hospital, SearchKey, CancellationReason
+                                         BillingAccount, SPOCDetails, RefundMixin, WelcomeCallingDone)
+from ondoc.bookinganalytics.models import DP_OpdConsultsAndTests
+from ondoc.doctor.models import Hospital, SearchKey, CancellationReason, Doctor
+from ondoc.crm.constants import constants
 from ondoc.coupon.models import Coupon
-from ondoc.location.models import EntityUrls
+from ondoc.location.models import EntityUrls, UrlsModel
 from ondoc.notification import models as notification_models
 from ondoc.notification import tasks as notification_tasks
 from ondoc.notification.labnotificationaction import LabNotificationAction
@@ -26,7 +29,7 @@ from django.db.models import F, Sum, When, Case, Q, Avg
 from django.db import transaction
 from django.contrib.postgres.fields import JSONField
 from ondoc.doctor.models import OpdAppointment
-from ondoc.notification.models import EmailNotification
+from ondoc.notification.models import EmailNotification, NotificationAction
 from ondoc.payout.models import Outstanding
 from ondoc.authentication import models as auth_model
 from django.core.files.uploadedfile import InMemoryUploadedFile, TemporaryUploadedFile
@@ -48,13 +51,19 @@ from django.contrib.contenttypes.fields import GenericRelation
 from django.contrib.contenttypes.fields import GenericForeignKey
 from django.contrib.contenttypes.models import ContentType
 from ondoc.matrix.tasks import push_appointment_to_matrix, push_onboarding_qcstatus_to_matrix
+from ondoc.integrations.task import push_lab_appointment_to_integrator, get_integrator_order_status
 from ondoc.location import models as location_models
 from ondoc.ratings_review import models as ratings_models
-from decimal import Decimal
-from ondoc.common.models import AppointmentHistory, AppointmentMaskNumber
+from ondoc.api.v1.common import serializers as common_serializers
+from ondoc.common.models import AppointmentHistory, AppointmentMaskNumber, Remark, GlobalNonBookable, \
+    SyncBookingAnalytics, CompletedBreakupMixin, RefundDetails, MatrixMappedState, \
+    MatrixMappedCity
 import reversion
 from decimal import Decimal
 from django.utils.text import slugify
+from django.utils.functional import cached_property
+#from ondoc.api.v1.diagnostic import serializers as diagnostic_serializers
+from ondoc.common.helper import Choices
 
 logger = logging.getLogger(__name__)
 
@@ -144,12 +153,25 @@ class HomePickupCharges(models.Model):
     content_object = GenericForeignKey()
 
 
-class Lab(TimeStampedModel, CreatedByModel, QCModel, SearchKey):
+class Lab(TimeStampedModel, CreatedByModel, QCModel, SearchKey, WelcomeCallingDone, UrlsModel):
     NOT_ONBOARDED = 1
     REQUEST_SENT = 2
     ONBOARDED = 3
     ONBOARDING_STATUS = [(NOT_ONBOARDED, "Not Onboarded"), (REQUEST_SENT, "Onboarding Request Sent"),
                          (ONBOARDED, "Onboarded")]
+    INCORRECT_CONTACT_DETAILS = 1
+    MOU_AGREEMENT_NEEDED = 2
+    LAB_NOT_INTERESTED = 3
+    CHARGES_ISSUES = 4
+    DUPLICATE = 5
+    OTHERS = 9
+    PHONE_RINGING_BUT_COULD_NOT_CONNECT = 10
+    DISABLED_REASONS_CHOICES = (
+        ("", "Select"), (INCORRECT_CONTACT_DETAILS, "Incorrect contact details"),
+        (MOU_AGREEMENT_NEEDED, "MoU agreement needed"), (LAB_NOT_INTERESTED, "Lab not interested for tie-up"),
+        (CHARGES_ISSUES, "Issue in discount % / charges"),
+        (PHONE_RINGING_BUT_COULD_NOT_CONNECT, "Phone ringing but could not connect"),
+        (DUPLICATE, "Duplicate"), (OTHERS, "Others (please specify)"))
     name = models.CharField(max_length=200)
     about = models.CharField(max_length=1000, blank=True)
     license = models.CharField(max_length=200, blank=True)
@@ -178,6 +200,10 @@ class Lab(TimeStampedModel, CreatedByModel, QCModel, SearchKey):
     locality = models.CharField(max_length=100, blank=True)
     city = models.CharField(max_length=100, blank=True)
     state = models.CharField(max_length=100, blank=True)
+    matrix_state = models.ForeignKey(MatrixMappedState, null=True, blank=False, on_delete=models.DO_NOTHING,
+                                     related_name='labs_in_state', verbose_name='State')
+    matrix_city = models.ForeignKey(MatrixMappedCity, null=True, blank=False, on_delete=models.DO_NOTHING,
+                                    related_name='labs_in_city', verbose_name='City')
     country = models.CharField(max_length=100, blank=True)
     pin_code = models.PositiveIntegerField(blank=True, null=True)
     agreed_rate_list = models.FileField(upload_to='lab/docs', max_length=200, null=True, blank=True,
@@ -212,18 +238,96 @@ class Lab(TimeStampedModel, CreatedByModel, QCModel, SearchKey):
     entity = GenericRelation(location_models.EntityLocationRelationship)
     rating = GenericRelation(ratings_models.RatingsReview, related_query_name='lab_ratings')
     enabled = models.BooleanField(verbose_name='Is Enabled', default=True, blank=True)
+    disabled_at = models.DateTimeField(null=True, blank=True)
+    disabled_after = models.PositiveIntegerField(null=True, blank=True, choices=Hospital.DISABLED_AFTER_CHOICES)
+    disable_reason = models.PositiveIntegerField(null=True, blank=True, choices=DISABLED_REASONS_CHOICES)
+    disable_comments = models.CharField(max_length=500, blank=True)
+    disabled_by = models.ForeignKey(settings.AUTH_USER_MODEL, related_name="disabled_lab", null=True,
+                                    editable=False,
+                                    on_delete=models.SET_NULL)
     booking_closing_hours_from_dayend = models.DecimalField(max_digits=10, decimal_places=2, default=0, validators=[MinValueValidator(Decimal('0.00'))])
     order_priority = models.PositiveIntegerField(blank=True, null=True, default=0)
     merchant = GenericRelation(auth_model.AssociatedMerchant)
     merchant_payout = GenericRelation(account_model.MerchantPayout)
     avg_rating = models.DecimalField(max_digits=5, decimal_places=2, null=True, editable=False)
     lab_priority = models.PositiveIntegerField(blank=False, null=False, default=1)
+    open_for_communication = models.BooleanField(default=True)
+    remark = GenericRelation(Remark)
+    rating_data = JSONField(blank=True, null=True)
+    is_location_verified = models.BooleanField(verbose_name='Location Verified', default=False)
+    auto_ivr_enabled = models.BooleanField(default=True)
 
     def __str__(self):
         return self.name
 
     class Meta:
         db_table = "lab"
+
+    @classmethod
+    def update_labs_seo_urls(cls):
+        from ondoc.location.management.commands import lab_page_urls, map_lab_search_urls
+
+        # create lab page urls
+        lab_page_urls.map_lab_location_urls()
+
+        # create lab search urls
+        map_lab_search_urls.map_lab_search_urls()
+
+
+    @cached_property
+    def is_enabled_for_insurance(self):
+        return self.is_insurance_enabled
+
+    @classmethod
+    def update_insured_labs(cls):
+
+        delete_query = RawSql(''' delete from insurance_covered_entity where type='lab' ''', []).execute()
+
+        query = '''
+                    insert into insurance_covered_entity(entity_id,name ,location, type, search_key, data,created_at,updated_at)
+                    select lab_id as entity_id, lab_name as name, location ,'lab' as type,search_key,
+                    json_build_object('id', lab_id, 'type','lab','name', lab_name, 'city', city,'url', url), now(), now() from
+                    (select distinct lb.id lab_id, lb.name lab_name, lb.city, eu.url,
+                    lb.location, lb.search_key
+                    from lab lb inner join available_lab_test avlt on
+                    lb.lab_pricing_group_id = avlt.lab_pricing_group_id  and avlt.enabled = True and avlt.mrp<=1500
+                    and lb.is_test_lab = False and lb.is_live = True and lb.lab_pricing_group_id is not null 
+                    inner join lab_test lt on lt.id = avlt.test_id and lt.enable_for_retail=True 
+                    inner join entity_urls eu on eu.entity_id = lb.id and sitemap_identifier = 'LAB_PAGE' and eu.is_valid=true
+                    )x '''
+        update_insured_labs = RawSql(query, []).execute()
+
+    def open_for_communications(self):
+        if (self.network and self.network.open_for_communication) or (not self.network and self.open_for_communication):
+            return True
+
+        return False
+
+    def is_auto_ivr_enabled(self):
+        if (self.network and self.network.auto_ivr_enabled) or (not self.network and self.auto_ivr_enabled):
+            return True
+
+        return False
+
+    @classmethod
+    def get_insurance_details(cls, user):
+
+        resp = {
+            'is_insurance_covered': False,
+            'insurance_threshold_amount': None,
+            'is_user_insured': False
+        }
+
+        if user.is_authenticated and not user.is_anonymous:
+            user_insurance = user.active_insurance
+            if user_insurance:
+                insurance_threshold = user_insurance.insurance_threshold
+                if insurance_threshold:
+                    resp['insurance_threshold_amount'] = 0 if insurance_threshold.lab_amount_limit is None else \
+                        insurance_threshold.lab_amount_limit
+                    resp['is_user_insured'] = True
+
+        return resp
 
     def convert_min(self, min):
         min_str = str(min)
@@ -386,6 +490,37 @@ class Lab(TimeStampedModel, CreatedByModel, QCModel, SearchKey):
         if self.is_live and (self.onboarding_status != self.ONBOARDED or self.data_status != self.QC_APPROVED or self.enabled == False):
             self.is_live = False
 
+    def display_rating_on_list(self):
+        if self.rating_data and ((self.rating_data.get('rating_count') and self.rating_data['rating_count'] > 5) or \
+                                 (self.rating_data.get('avg_rating') and self.rating_data['avg_rating'] > 4)):
+            return True
+        return False
+
+    def create_entity_url(self):
+        if not self.is_live:
+            return
+
+        entity = EntityUrls.objects.filter(entity_id=self.id, is_valid=True, sitemap_identifier='LAB_PAGE')
+        if not entity:
+            url = self.name
+            url = slugify(url)
+            new_url = url
+
+            exists = EntityUrls.objects.filter(url=new_url+'-lpp', sitemap_identifier='LAB_PAGE').first()
+            if exists:
+                if exists.id == self.id:
+                    exists.is_valid = True
+                    exists.save()
+                    new_url = new_url + '-lpp'
+                    return
+                else:
+                    new_url = url+'-'+str(self.id)
+
+            new_url = new_url + '-lpp'
+            EntityUrls.objects.create(url=new_url, sitemap_identifier='LAB_PAGE', entity_type='Lab', url_type='PAGEURL',
+                                  is_valid=True, sequence=0, entity_id=self.id)
+            self.url = new_url
+
     def save(self, *args, **kwargs):
         self.clean()
 
@@ -405,6 +540,7 @@ class Lab(TimeStampedModel, CreatedByModel, QCModel, SearchKey):
                 # Push to matrix
                 push_to_matrix = True
 
+        self.create_entity_url()
         super(Lab, self).save(*args, **kwargs)
 
         if edit_instance is not None:
@@ -459,8 +595,111 @@ class Lab(TimeStampedModel, CreatedByModel, QCModel, SearchKey):
         content_type = ContentType.objects.get_for_model(Lab)
         if content_type:
             cid = content_type.id
-            query = '''UPDATE lab l set avg_rating = (select avg(ratings) from ratings_review where content_type_id={} and object_id=l.id) '''.format(cid)
+            query = '''update lab l set rating_data = 
+                        (select rating_data from
+                        (select max(l.id) lab_id,max(l.network_id) network_id,
+                        json_build_object('avg_rating', round(avg(ratings),1),'rating_count' ,count(ratings)) rating_data
+                        from ratings_review rr
+                        inner join lab l on rr.object_id = l.id 
+                        and rr.content_type_id={}
+                        where rr.is_live='true'
+                        group by case when l.network_id is null then l.id else l.network_id end
+                        )x where case when l.network_id is null then l.id=x.lab_id else l.network_id=x.network_id end
+                        )
+                     '''.format(cid)
             cursor.execute(query)
+
+    def get_timing(self, is_home_pickup):
+        from ondoc.api.v1.common import serializers as common_serializers
+        date = datetime.datetime.today().strftime('%Y-%m-%d')
+        lab_timing_queryset = self.lab_timings.filter(for_home_pickup=is_home_pickup)
+        lab_slots = []
+        if not lab_timing_queryset or (is_home_pickup and not lab_timing_queryset[0].lab.is_home_collection_enabled):
+            res_data = OrderedDict()
+            for i in range(30):
+                converted_date = (datetime.datetime.now() + datetime.timedelta(days=i))
+                readable_date = converted_date.strftime("%Y-%m-%d")
+                res_data[readable_date] = list()
+
+            res_data = {"time_slots": res_data, "upcoming_slots": [], "is_thyrocare": False}
+            return res_data
+        else:
+            global_leave_serializer = common_serializers.GlobalNonBookableSerializer(
+                GlobalNonBookable.objects.filter(deleted_at__isnull=True, booking_type=GlobalNonBookable.LAB), many=True)
+            total_leaves = dict()
+            total_leaves['global'] = global_leave_serializer.data
+
+        obj = TimeSlotExtraction()
+
+        if not is_home_pickup and lab_timing_queryset[0].lab.always_open:
+            for day in range(0, 7):
+                obj.form_time_slots(day, 0.0, 23.75, None, True)
+
+        else:
+            for data in lab_timing_queryset:
+                obj.form_time_slots(data.day, data.start, data.end, None, True)
+
+        global_leave_serializer = common_serializers.GlobalNonBookableSerializer(
+            GlobalNonBookable.objects.filter(deleted_at__isnull=True,
+                                             booking_type=GlobalNonBookable.LAB), many=True)
+
+        booking_details = {"type": "lab", "is_home_pickup": is_home_pickup}
+        resp_list = obj.get_timing_slots(date, global_leave_serializer.data, booking_details)
+        is_thyrocare = False
+        lab_id = self.id
+        if lab_id and settings.THYROCARE_NETWORK_ID:
+            if Lab.objects.filter(id=lab_id, network_id=settings.THYROCARE_NETWORK_ID).exists():
+                is_thyrocare = True
+
+        # today_min, tomorrow_min, today_max = obj.initial_start_times(is_thyrocare=is_thyrocare,
+        #                                                              is_home_pickup=is_home_pickup,
+        #                                                              time_slots=resp_list)
+        # res_data = {
+        #     "time_slots": resp_list,
+        #     "today_min": today_min,
+        #     "tomorrow_min": tomorrow_min,
+        #     "today_max": today_max
+        # }
+
+        upcoming_slots = obj.get_upcoming_slots(time_slots=resp_list)
+        res_data = {"time_slots": resp_list, "upcoming_slots": upcoming_slots, "is_thyrocare": False}
+        return res_data
+
+    def get_available_slots(self, is_home_pickup, pincode, date):
+        from ondoc.integrations.models import IntegratorTestMapping
+        from ondoc.integrations import service
+
+        integration_dict = None
+        lab = Lab.objects.filter(id=self.id).first()
+        if lab:
+            if lab.network and lab.network.id:
+                integration_dict = IntegratorTestMapping.get_if_third_party_integration(network_id=lab.network.id)
+
+                if lab.network.id == settings.THYROCARE_NETWORK_ID and settings.THYROCARE_INTEGRATION_ENABLED:
+                    pass
+                else:
+                    integration_dict = None
+
+        if not integration_dict:
+            available_slots = lab.get_timing(is_home_pickup)
+        else:
+            class_name = integration_dict['class_name']
+            integrator_obj = service.create_integrator_obj(class_name)
+            available_slots = integrator_obj.get_appointment_slots(pincode, date,
+                                                                   is_home_pickup=is_home_pickup)
+
+        return available_slots
+
+    def is_integrated(self):
+        from ondoc.integrations.models import IntegratorTestMapping
+
+        integration_dict = None
+        if self.network and self.network.id:
+            integration_dict = IntegratorTestMapping.get_if_third_party_integration(network_id=self.network.id)
+        if not integration_dict:
+            return False
+        else:
+            return True
 
 
 class LabCertification(TimeStampedModel):
@@ -528,15 +767,75 @@ class LabImage(TimeStampedModel, Image):
 
 class LabBookingClosingManager(models.Manager):
 
-    def lab_booking_slots(self, *args, **kwargs):
+    # def lab_booking_slots_new(self, *args, **kwargs):
+    #
+    #     is_home_pickup = kwargs.get("for_home_pickup", False)
+    #
+    #     if is_home_pickup:
+    #         kwargs["lab__is_home_collection_enabled"] = is_home_pickup
+    #     lab_timing_queryset = LabTiming.timing_manager.filter(**kwargs)
+    #
+    #     if not lab_timing_queryset or (is_home_pickup and not lab_timing_queryset[0].lab.is_home_collection_enabled):
+    #         return {
+    #             "time_slots": [],
+    #             "today_min": None,
+    #             "tomorrow_min": None,
+    #             "today_max": None
+    #         }
+    #
+    #     else:
+    #         obj = TimeSlotExtraction()
+    #         threshold = lab_timing_queryset[0].lab.booking_closing_hours_from_dayend
+    #
+    #         if not is_home_pickup and lab_timing_queryset[0].lab.always_open:
+    #             for day in range(0, 7):
+    #                 obj.form_time_slots(day, 0.0, 23.75, None, True)
+    #
+    #         else:
+    #             for data in lab_timing_queryset:
+    #                 obj.form_time_slots(data.day, data.start, data.end, None, True)
+    #             # daywise_data_array = sorted(lab_timing_queryset, key=lambda k: [k.day, k.start], reverse=True)
+    #             # day, end = daywise_data_array[0].day, daywise_data_array[0].end
+    #             # end = end - threshold
+    #             # for data in daywise_data_array:
+    #             #     if data.day != day:
+    #             #         day = data.day
+    #             #         end = data.end - threshold
+    #             #     if not end <= data.start <= data.end:
+    #             #         if data.start <= end <= data.end:
+    #             #             data.end = end
+    #             #         obj.form_time_slots(data.day, data.start, data.end, None, True)
+    #         global_leave_serializer = common_serializers.GlobalNonBookableSerializer(
+    #                             GlobalNonBookable.objects.filter(deleted_at__isnull=True,
+    #                                                              booking_type=GlobalNonBookable.DOCTOR), many=True)
+    #         date = datetime.datetime.today().strftime('%Y-%m-%d')
+    #         # resp_list = obj.get_timing_list()
+    #         resp_list = obj.get_timing_slots(date, global_leave_serializer.data, "lab")
+    #         is_thyrocare = False
+    #         lab_id = kwargs.get("lab__id", None)
+    #         if lab_id and settings.THYROCARE_NETWORK_ID:
+    #             if Lab.objects.filter(id=lab_id, network_id=settings.THYROCARE_NETWORK_ID).exists():
+    #                 is_thyrocare = True
+    #
+    #         today_min, tomorrow_min, today_max = obj.initial_start_times(is_thyrocare=is_thyrocare, is_home_pickup=is_home_pickup, time_slots=resp_list)
+    #         res_data = {
+    #             "time_slots": resp_list,
+    #             "today_min": today_min,
+    #             "tomorrow_min": tomorrow_min,
+    #             "today_max": today_max
+    #         }
+    #
+    #         return res_data
 
+    def lab_booking_slots(self, *args, **kwargs):
         is_home_pickup = kwargs.get("for_home_pickup", False)
 
         if is_home_pickup:
             kwargs["lab__is_home_collection_enabled"] = is_home_pickup
         lab_timing_queryset = LabTiming.timing_manager.filter(**kwargs)
 
-        if not lab_timing_queryset or (is_home_pickup and not lab_timing_queryset[0].lab.is_home_collection_enabled):
+        if not lab_timing_queryset or (
+                is_home_pickup and not lab_timing_queryset[0].lab.is_home_collection_enabled):
             return {
                 "time_slots": [],
                 "today_min": None,
@@ -574,7 +873,9 @@ class LabBookingClosingManager(models.Manager):
                 if Lab.objects.filter(id=lab_id, network_id=settings.THYROCARE_NETWORK_ID).exists():
                     is_thyrocare = True
 
-            today_min, tomorrow_min, today_max = obj.initial_start_times(is_thyrocare=is_thyrocare, is_home_pickup=is_home_pickup, time_slots=resp_list)
+            today_min, tomorrow_min, today_max = obj.initial_start_times(is_thyrocare=is_thyrocare,
+                                                                         is_home_pickup=is_home_pickup,
+                                                                         time_slots=resp_list)
             res_data = {
                 "time_slots": resp_list,
                 "today_min": today_min,
@@ -633,6 +934,10 @@ class LabNetwork(TimeStampedModel, CreatedByModel, QCModel):
     locality = models.CharField(max_length=100, blank=True)
     city = models.CharField(max_length=100)
     state = models.CharField(max_length=100)
+    matrix_state = models.ForeignKey(MatrixMappedState, null=True, blank=False, on_delete=models.DO_NOTHING,
+                                     related_name='lab_networks_in_state', verbose_name='State')
+    matrix_city = models.ForeignKey(MatrixMappedCity, null=True, blank=False, on_delete=models.DO_NOTHING,
+                                    related_name='lab_networks_in_city', verbose_name='City')
     country = models.CharField(max_length=100)
     pin_code = models.PositiveIntegerField(blank=True, null=True)
     is_billing_enabled = models.BooleanField(verbose_name='Enabled for Billing', default=False)
@@ -645,6 +950,9 @@ class LabNetwork(TimeStampedModel, CreatedByModel, QCModel):
     merchant = GenericRelation(auth_model.AssociatedMerchant)
     merchant_payout = GenericRelation(account_model.MerchantPayout)
     is_mask_number_required = models.BooleanField(default=True)
+    open_for_communication = models.BooleanField(default=True)
+    remark = GenericRelation(Remark)
+    auto_ivr_enabled = models.BooleanField(default=True)
 
     def all_associated_labs(self):
         if self.id:
@@ -764,6 +1072,7 @@ class LabTestSubType(TimeStampedModel):
 
 class TestParameter(TimeStampedModel):
     name = models.CharField(max_length=200, unique=True)
+    details = models.CharField(max_length=10000, null=True, blank=True)
     # lab_test = models.ForeignKey('LabTest', on_delete=models.DO_NOTHING, null=True, blank=True)
 
     class Meta:
@@ -909,6 +1218,11 @@ class LabTest(TimeStampedModel, SearchKey):
                                         through_fields=('lab_test', 'parent_category'),
                                         related_name='recommended_lab_tests')
     reference_code = models.CharField(max_length=150, blank=True, default='')
+
+    author = models.ForeignKey(Doctor, null=True, blank=True, related_name='published_tests',
+                               on_delete=models.SET_NULL)
+    is_cancellable = models.BooleanField(default=True)
+
     # test_sub_type = models.ManyToManyField(
     #     LabTestSubType,
     #     through='LabTestSubTypeMapping',
@@ -1033,8 +1347,13 @@ class AvailableLabTest(TimeStampedModel):
     enabled = models.BooleanField(default=False)
     lab_pricing_group = models.ForeignKey(LabPricingGroup, blank=True, null=True, on_delete=models.SET_NULL,
                                           related_name='available_lab_tests')
+    supplier_name = models.CharField(null=True, blank=True, max_length=40, default=None)
+    supplier_price = models.DecimalField(default=None, max_digits=10, decimal_places=2, null=True, blank=True)
+    desired_docprime_price = models.DecimalField(default=None, max_digits=10, decimal_places=2, null=True, blank=True)
     rating = GenericRelation(ratings_models.RatingsReview)
 
+    def get_deal_price(self):
+        return self.custom_deal_price if self.custom_deal_price else self.computed_deal_price
 
     def update_deal_price(self):
         # will update only this available lab test prices and will be called on save
@@ -1044,13 +1363,27 @@ class AvailableLabTest(TimeStampedModel):
         #         is not null then custom_agreed_price
         #         else computed_agreed_price end), mrp) where id = %s '''
 
-        query = '''update available_lab_test set computed_deal_price = 
-                   least(greatest(floor(least((case when custom_agreed_price is not null 
-                   then custom_agreed_price else computed_agreed_price end)*1.5, mrp*.8)/5)*5, case when custom_agreed_price
-                   is not null then custom_agreed_price else computed_agreed_price end), mrp)
-                   where enabled=true and id=%s ''' 
+        query = '''update available_lab_test set computed_deal_price = (select deal_price from 
+                    (select *,  least(greatest(floor(price /5)*5, agreed_price), mrp ) as deal_price from 
+                    (select id, mrp, agreed_price,
+                    case 
+                    when agreed_price <=0 then mrp*.4 
+                    when mrp<=2000 then
+                        case when (least(agreed_price*1.5, .8*mrp) - agreed_price) >100 then least(agreed_price*1.5, .8*mrp) 
+                        else least(agreed_price+100, mrp) end
+                    else 
+                        case when (least(agreed_price*1.5, agreed_price+.5*(mrp-agreed_price)) - agreed_price )>100
+                        then least(agreed_price*1.5, agreed_price+.5*(mrp-agreed_price))
+                        else
+                        least(agreed_price+100, mrp) end 	
+                    end price
+                    from 
+                    (select case when custom_agreed_price is null then computed_agreed_price else
+                     custom_agreed_price end as agreed_price,
+                    mrp, id from available_lab_test  where id=%s )x)y where y.id = available_lab_test.id )z) 
+                    where available_lab_test.enabled=true and id=%s '''
 
-        update_available_lab_test_deal_price = RawSql(query, [self.pk]).execute()
+        update_available_lab_test_deal_price = RawSql(query, [self.pk, self.pk]).execute()
         # deal_price = RawSql(query, [self.pk]).fetch_all()
         # if deal_price:
         #    self.computed_deal_price = deepcopy(deal_price[0].get('computed_deal_price'))
@@ -1058,11 +1391,23 @@ class AvailableLabTest(TimeStampedModel):
     @classmethod
     def update_all_deal_price(cls):
         # will update all lab prices
-        query = '''update available_lab_test set computed_deal_price = 
-                least(greatest(floor(least((case when custom_agreed_price is not null 
-                then custom_agreed_price else computed_agreed_price end)*1.5, mrp*.8)/5)*5, case when custom_agreed_price
-                is not null then custom_agreed_price else computed_agreed_price end), mrp)
-                where enabled=true'''
+        query = '''update available_lab_test set computed_deal_price = (select deal_price from 
+                (select *,  least(greatest(floor(price /5)*5, agreed_price), mrp ) as deal_price from 
+                (select id, mrp, agreed_price,
+                case 
+                when agreed_price <=0 then mrp*.4 
+                when mrp<=2000 then
+                    case when (least(agreed_price*1.5, .8*mrp) - agreed_price) >100 then least(agreed_price*1.5, .8*mrp) 
+                    else least(agreed_price+100, mrp) end
+                else 
+                    case when (least(agreed_price*1.5, agreed_price+.5*(mrp-agreed_price)) - agreed_price )>100
+                    then least(agreed_price*1.5, agreed_price+.5*(mrp-agreed_price))
+                    else
+                    least(agreed_price+100, mrp) end 	
+                end price
+                from 
+                (select case when custom_agreed_price is null then computed_agreed_price else custom_agreed_price end as agreed_price,
+                mrp, id from available_lab_test)x)y where y.id = available_lab_test.id )z) where available_lab_test.enabled=true'''
 
         update_all_available_lab_test_deal_price = RawSql(query, []).execute()
 
@@ -1078,8 +1423,22 @@ class AvailableLabTest(TimeStampedModel):
             # self.computed_deal_price = self.get_computed_deal_price()
             self.computed_deal_price = self.computed_agreed_price
         super(AvailableLabTest, self).save(*args, **kwargs)
+
+        transaction.on_commit(lambda: self.app_commit_tasks())
+
+    def app_commit_tasks(self):
         self.update_deal_price()
 
+    def send_pricing_alert_email(self, responsible_user):
+        from ondoc.communications.models import EMAILNotification
+        try:
+            emails = settings.DEAL_AGREED_PRICE_CHANGE_EMAILS
+            user_and_email = [{'user': None, 'email': email} for email in emails]
+            email_notification = EMAILNotification(notification_type=NotificationAction.PRICING_ALERT_EMAIL,
+                                                   context={'instance': self, 'responsible_user': responsible_user})
+            email_notification.send(user_and_email)
+        except Exception as e:
+            logger.error(str(e))
 
     def get_computed_deal_price(self):
         if self.test.test_type == LabTest.RADIOLOGY:
@@ -1153,7 +1512,9 @@ class LabAppointmentInvoiceMixin(object):
 
 
 @reversion.register()
-class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin):
+class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin, RefundMixin, CompletedBreakupMixin):
+    from ondoc.integrations.models import IntegratorResponse
+    PRODUCT_ID = Order.LAB_PRODUCT_ID
     CREATED = 1
     BOOKED = 2
     RESCHEDULED_LAB = 3
@@ -1191,7 +1552,7 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin)
     payment_status = models.PositiveIntegerField(choices=OpdAppointment.PAYMENT_STATUS_CHOICES,
                                                  default=OpdAppointment.PAYMENT_PENDING)
     payment_type = models.PositiveSmallIntegerField(choices=OpdAppointment.PAY_CHOICES, default=OpdAppointment.PREPAID)
-    insurance = models.ForeignKey(insurance_model.Insurance, blank=True, null=True, default=None,
+    insurance = models.ForeignKey(insurance_model.UserInsurance, blank=True, null=True, default=None,
                                   on_delete=models.DO_NOTHING)
     is_home_pickup = models.BooleanField(default=False)
     address = JSONField(blank=True, null=True)
@@ -1208,22 +1569,108 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin)
     merchant_payout = models.ForeignKey(MerchantPayout, related_name="lab_appointment", on_delete=models.SET_NULL, null=True)
     price_data = JSONField(blank=True, null=True)
     tests = models.ManyToManyField(LabTest, through='LabAppointmentTestMapping', through_fields=('appointment', 'test'))
-    money_pool = models.ForeignKey(MoneyPool, on_delete=models.SET_NULL, null=True)
+    money_pool = models.ForeignKey(MoneyPool, on_delete=models.SET_NULL, null=True, related_name='lab_apps')
     mask_number = GenericRelation(AppointmentMaskNumber)
     email_notification = GenericRelation(EmailNotification, related_name="lab_notification")
+    user_plan_used = models.ForeignKey('subscription_plan.UserPlanMapping', null=True, on_delete=models.DO_NOTHING,
+                                       related_name='appointment_using')
+    synced_analytics = GenericRelation(SyncBookingAnalytics, related_name="lab_booking_analytics")
+    integrator_response = GenericRelation(IntegratorResponse)
+    auto_ivr_data = JSONField(default=list(), null=True)
+    history = GenericRelation(AppointmentHistory)
+    refund_details = GenericRelation(RefundDetails, related_query_name="lab_appointment_detail")
+    coupon_data = JSONField(blank=True, null=True)
+    status_change_comments = models.CharField(max_length=5000, null=True, blank=True)
+    appointment_prescriptions = GenericRelation("prescription.AppointmentPrescription", related_query_name="appointment_prescriptions")
+
+
+    def get_all_uploaded_prescriptions(self, date=None):
+        from ondoc.prescription.models import AppointmentPrescription
+        qs = LabAppointment.objects.filter(user=self.user).values_list('id', flat=True)
+        prescriptions = AppointmentPrescription.objects.filter(content_type=ContentType.objects.get_for_model(self), object_id__in=qs)
+        return prescriptions
+
+    def get_corporate_deal_id(self):
+        coupon = self.coupon.first()
+        if coupon and coupon.corporate_deal:
+            return coupon.corporate_deal.id
+
+        return None
+
+    def get_city(self):
+        if self.lab and self.lab.matrix_city:
+            return self.lab.matrix_city.id
+        else:
+            return None
+
+    def get_state(self):
+        if self.lab and self.lab.matrix_state:
+            return self.lab.matrix_state.id
+        else:
+            return None
+
+    def sync_with_booking_analytics(self):
+
+        category = None
+        for t in self.tests.all():
+            if t.is_package == True:
+                category = 1
+                break
+            else:
+                category = 0
+
+        promo_cost = self.deal_price - self.effective_price if self.deal_price and self.effective_price else 0
+
+        obj = DP_OpdConsultsAndTests.objects.filter(Appointment_Id=self.id, TypeId=2).first()
+        if not obj:
+            obj = DP_OpdConsultsAndTests()
+            obj.Appointment_Id = self.id
+            obj.CityId = self.get_city()
+            obj.StateId = self.get_state()
+            obj.ProviderId = self.lab.id
+            obj.TypeId = 2
+            obj.PaymentType = self.payment_type if self.payment_type else None
+            obj.Payout = self.agreed_price
+            obj.BookingDate = self.created_at
+        obj.CorporateDealId = self.get_corporate_deal_id()
+        obj.PromoCost = max(0, promo_cost)
+        obj.GMValue = self.deal_price
+        obj.Category = category
+        obj.StatusId = self.status
+        obj.save()
+
+        try:
+            SyncBookingAnalytics.objects.update_or_create(object_id=self.id,
+                                                          content_type=ContentType.objects.get_for_model(LabAppointment),
+                                                          defaults={"synced_at": self.updated_at, "last_updated_at": self.updated_at})
+        except Exception as e:
+            pass
+
+        return obj
+
 
     def get_tests_and_prices(self):
         test_price = []
-        for test in self.test_mappings.all():
-            test_price.append({'name': test.test.name, 'mrp': test.mrp, 'deal_price': (
-                test.custom_deal_price if test.custom_deal_price else test.computed_deal_price),
-                               'discount': test.mrp - (
-                                   test.custom_deal_price if test.custom_deal_price else test.computed_deal_price)})
+        if self.payment_type == OpdAppointment.INSURANCE:
+            for test in self.test_mappings.all():
+                test_price.append({'name': test.test.name, 'mrp': test.mrp, 'deal_price': "0.00",
+                                   'discount': test.mrp})
 
-        if self.is_home_pickup:
-            test_price.append(
-                {'name': 'Home Pick Up Charges', 'mrp': self.home_pickup_charges, 'deal_price': self.home_pickup_charges,
-                 'discount': '0.00'})
+            if self.is_home_pickup:
+                test_price.append(
+                    {'name': 'Home Pick Up Charges', 'mrp': self.home_pickup_charges, 'deal_price': "0.00",
+                     'discount': self.home_pickup_charges})
+        else:
+            for test in self.test_mappings.all():
+                test_price.append({'name': test.test.name, 'mrp': test.mrp, 'deal_price': (
+                    test.custom_deal_price if test.custom_deal_price else test.computed_deal_price),
+                                   'discount': test.mrp - (
+                                       test.custom_deal_price if test.custom_deal_price else test.computed_deal_price)})
+
+            if self.is_home_pickup:
+                test_price.append(
+                    {'name': 'Home Pick Up Charges', 'mrp': self.home_pickup_charges, 'deal_price': self.home_pickup_charges,
+                     'discount': '0.00'})
 
         return test_price
 
@@ -1242,6 +1689,18 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin)
     def get_cancellation_reason(self):
         return CancellationReason.objects.filter(Q(type=Order.LAB_PRODUCT_ID) | Q(type__isnull=True),
                                                  visible_on_front_end=True)
+    # @staticmethod
+    # def get_upcoming_appointment_serialized(user_id):
+    #     response_appointment = LabAppointment.get_upcoming_appointment(user_id)
+    #     appointment = diagnostic_serializers.LabAppointmentUpcoming(response_appointment, many=True)
+    #     return appointment.data
+
+    @classmethod
+    def get_upcoming_appointment(cls, user_id):
+        current_time = timezone.now()
+        appointments = LabAppointment.objects.filter(time_slot_start__gte=current_time, user_id=user_id).exclude(
+            status__in=[LabAppointment.CANCELLED, LabAppointment.COMPLETED]).prefetch_related('tests', 'lab', 'profile')
+        return appointments
 
     def get_serialized_cancellation_reason(self):
         res = []
@@ -1249,13 +1708,12 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin)
             res.append({'id': cr.id, 'name': cr.name, 'is_comment_needed': cr.is_comment_needed})
         return res
 
-
     def get_report_urls(self):
         reports = self.reports.all()
         report_file_links = set()
         for report in reports:
             report_file_links = report_file_links.union(
-                set([report_file.name.url for report_file in report.files.all()]))
+                set([report_file.name.url for report_file in report.files.all() if report_file.name.url.rsplit('.',1)[1].lower() != 'xml']))
         report_file_links = [util_absolute_url(report_file_link) for report_file_link in report_file_links]
         return list(report_file_links)
 
@@ -1264,10 +1722,17 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin)
 
     def allowed_action(self, user_type, request):
         allowed = []
+        if self.status == self.CREATED:
+            if user_type == User.CONSUMER:
+                return [self.CANCELLED]
+            return []
+
         current_datetime = timezone.now()
         if user_type == User.CONSUMER and current_datetime <= self.time_slot_start:
             if self.status in (self.BOOKED, self.ACCEPTED, self.RESCHEDULED_LAB, self.RESCHEDULED_PATIENT):
-                allowed = [self.RESCHEDULED_PATIENT, self.CANCELLED]
+                allowed = [self.RESCHEDULED_PATIENT]
+                if all([x.is_cancellable for x in self.tests.all()]):
+                    allowed += [self.CANCELLED]
         if user_type == User.DOCTOR and self.time_slot_start.date() >= current_datetime.date():
             perm_queryset = auth_model.GenericLabAdmin.objects.filter(is_disabled=False, user=request.user)
             if perm_queryset.first():
@@ -1304,7 +1769,25 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin)
             return [admin.user for admin in self.lab.manageable_lab_admins.filter(is_disabled=False)
                     if admin.user]
 
-    def app_commit_tasks(self, old_instance, push_to_matrix):
+    def created_by_native(self):
+        from packaging.version import parse
+        child_order = Order.objects.filter(reference_id=self.id).first()
+        parent_order = None
+        from_app = False
+
+        if child_order:
+            parent_order = child_order.parent
+
+        if parent_order and parent_order.visitor_info:
+            from_app = parent_order.visitor_info.get('from_app', False)
+            app_version = parent_order.visitor_info.get('app_version', None)
+
+        if from_app and app_version and parse(app_version) < parse('1.2'):
+            return True
+        else:
+            return False
+
+    def app_commit_tasks(self, old_instance, push_to_matrix, push_to_integrator):
         if push_to_matrix:
             # Push the appointment data to the matrix
             try:
@@ -1313,6 +1796,23 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin)
                       'sub_product_id': 2},), countdown=5)
             except Exception as e:
                 logger.error(str(e))
+
+        is_thyrocare_enabled = False
+        if not self.created_by_native():
+            if push_to_integrator:
+                if self.lab.network and self.lab.network.id == settings.THYROCARE_NETWORK_ID:
+                    if settings.THYROCARE_INTEGRATION_ENABLED:
+                        is_thyrocare_enabled = True
+
+                try:
+                    if is_thyrocare_enabled:
+                        if old_instance:
+                            if old_instance.status != self.CANCELLED and self.status == self.CANCELLED:
+                                push_lab_appointment_to_integrator.apply_async(({'appointment_id': self.id},), countdown=5)
+                        else:
+                            push_lab_appointment_to_integrator.apply_async(({'appointment_id': self.id},), countdown=5)
+                except Exception as e:
+                    logger.error(str(e))
 
         # if push_for_mask_number:
         #     try:
@@ -1335,6 +1835,12 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin)
                 notification_models.EmailNotification.ops_notification_alert(self, email_list=settings.OPS_EMAIL_ID,
                                                                              product=account_model.Order.LAB_PRODUCT_ID,
                                                                              alert_type=notification_models.EmailNotification.OPS_APPOINTMENT_NOTIFICATION)
+            except Exception as e:
+                logger.error(str(e))
+
+        if not old_instance or self.status == self.CANCELLED:
+            try:
+                notification_tasks.update_coupon_used_count.apply_async()
             except Exception as e:
                 logger.error(str(e))
 
@@ -1454,7 +1960,12 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin)
         if push_to_history:
             AppointmentHistory.create(content_object=self)
 
-        transaction.on_commit(lambda: self.app_commit_tasks(database_instance, push_to_matrix))
+        # Push the appointment to the integrator.
+        push_to_integrator = kwargs.get('push_to_integrator', True)
+        if 'push_to_integrator' in kwargs.keys():
+            kwargs.pop('push_to_integrator')
+
+        transaction.on_commit(lambda: self.app_commit_tasks(database_instance, push_to_matrix, push_to_integrator))
 
     def save_merchant_payout(self):
         if self.payment_type in [OpdAppointment.COD]:
@@ -1466,6 +1977,7 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin)
         payout_data = {
             "charged_amount" : self.effective_price,
             "payable_amount" : payout_amount,
+            "booking_type": Order.LAB_PRODUCT_ID
         }
 
         merchant_payout = MerchantPayout.objects.create(**payout_data)
@@ -1492,14 +2004,41 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin)
 
     @classmethod
     def create_appointment(cls, appointment_data):
+        from ondoc.prescription.models import AppointmentPrescription
+        insurance = appointment_data.get('insurance')
+        appointment_status = OpdAppointment.BOOKED
+
+        if insurance and insurance.is_valid():
+            mrp = Decimal(0)
+
+            for extras in appointment_data.get('extra_details',[]):
+                agreed_price = extras.get('custom_agreed_price') if extras.get('custom_agreed_price') != 'None' else extras.get('computed_agreed_price', 0)
+                if agreed_price == 'None':
+                    agreed_price = 0
+                mrp = mrp + Decimal(agreed_price)
+
+            insurance_limit_usage_data = insurance.validate_limit_usages(mrp)
+            if insurance_limit_usage_data.get('created_state'):
+                appointment_status = OpdAppointment.CREATED
+
         otp = random.randint(1000, 9999)
         appointment_data["payment_status"] = OpdAppointment.PAYMENT_ACCEPTED
-        appointment_data["status"] = OpdAppointment.BOOKED
+        appointment_data["status"] = appointment_status
         appointment_data["otp"] = otp
+        appointment_data["user_plan_used"] = appointment_data.pop("user_plan", None)
         lab_ids = appointment_data.pop("lab_test")
         coupon_list = appointment_data.pop("coupon", None)
+        coupon_data = {
+            "random_coupons": appointment_data.pop("coupon_data", [])
+        }
         extra_details = deepcopy(appointment_data.pop("extra_details", None))
+        prescription_objects = deepcopy(appointment_data.pop("prescription_list", []))
+        prescription_id_list = []
+        for prescription in prescription_objects:
+            prescription_id_list.append(prescription.get('prescription').id)
+
         app_obj = cls.objects.create(**appointment_data)
+        AppointmentPrescription.update_with_appointment(app_obj, prescription_id_list)
         test_mappings = []
         for test in extra_details:
             test.pop('name', None)
@@ -1515,6 +2054,7 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin)
         app_obj.lab_test.add(*lab_ids)
         if coupon_list:
             app_obj.coupon.add(*coupon_list)
+        app_obj.coupon_data = coupon_data
         return app_obj
 
     def action_rescheduled_lab(self):
@@ -1536,30 +2076,32 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin)
         self.status = self.ACCEPTED
         self.save()
 
+    def update_ivr_status(self, status):
+        if status == self.status:
+            return True, ""
+
+        if self.status in [LabAppointment.COMPLETED, LabAppointment.CANCELLED]:
+            return False, 'Appointment cannot be accepted as current status is %s' % str(self.status)
+
+        if status == LabAppointment.ACCEPTED:
+            # Constraints: Check if appointment can be accepted or not.
+            if self.time_slot_start < timezone.now():
+                return False, 'Appointment cannot be accepted as time slot has been expired'
+
+            self.action_accepted()
+
+        elif status == LabAppointment.COMPLETED:
+            self.action_completed()
+
+        return True, ""
+
     @transaction.atomic
     def action_cancelled(self, refund_flag=1):
-
-        # Taking Lock first
-        consumer_account = None
-        if self.payment_type == OpdAppointment.PREPAID:
-            temp_list = account_model.ConsumerAccount.objects.get_or_create(user=self.user)
-            consumer_account = account_model.ConsumerAccount.objects.select_for_update().get(user=self.user)
-
         old_instance = LabAppointment.objects.get(pk=self.id)
         if old_instance.status != self.CANCELLED:
             self.status = self.CANCELLED
             self.save()
-            product_id = account_model.Order.LAB_PRODUCT_ID
-
-            if self.payment_type == OpdAppointment.PREPAID and account_model.ConsumerTransaction.valid_appointment_for_cancellation(
-                    self.id, product_id):
-
-                wallet_refund, cashback_refund = self.get_cancellation_breakup()
-
-                consumer_account.credit_cancellation(self, account_model.Order.LAB_PRODUCT_ID, wallet_refund, cashback_refund)
-                if refund_flag:
-                    ctx_obj = consumer_account.debit_refund()
-                    account_model.ConsumerRefund.initiate_refund(self.user, ctx_obj)
+            self.action_refund(refund_flag)
 
     def get_cancellation_breakup(self):
         wallet_refund = cashback_refund = 0
@@ -1733,7 +2275,7 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin)
                 effective_price += data["lab"].home_pickup_charges
                 home_pickup_charges = data["lab"].home_pickup_charges
 
-        coupon_discount, coupon_cashback, coupon_list = Coupon.get_total_deduction(data, effective_price)
+        coupon_discount, coupon_cashback, coupon_list, random_coupon_list = Coupon.get_total_deduction(data, effective_price)
 
         if data.get("payment_type") in [OpdAppointment.PREPAID]:
             if coupon_discount >= effective_price:
@@ -1741,9 +2283,13 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin)
             else:
                 effective_price = effective_price - coupon_discount
 
-        if data.get("payment_type") in [OpdAppointment.COD]:
+        if data.get("payment_type") in [OpdAppointment.COD, OpdAppointment.PLAN]:
             effective_price = 0
-            coupon_discount, coupon_cashback, coupon_list = 0, 0, []
+            coupon_discount, coupon_cashback, coupon_list, random_coupon_list = 0, 0, [], []
+
+        if data.get("payment_type") in [OpdAppointment.INSURANCE]:
+            effective_price = effective_price
+            coupon_discount, coupon_cashback, coupon_list, random_coupon_list = 0, 0, [], []
 
         return {
             "deal_price" : total_deal_price,
@@ -1753,12 +2299,14 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin)
             "coupon_discount" : coupon_discount,
             "coupon_cashback" : coupon_cashback,
             "coupon_list" : coupon_list,
-            "home_pickup_charges" : home_pickup_charges
+            "home_pickup_charges" : home_pickup_charges,
+            "coupon_data" : { "random_coupon_list" : random_coupon_list }
         }
 
     @classmethod
     def create_fulfillment_data(cls, user, data, price_data):
         from ondoc.api.v1.auth.serializers import AddressSerializer
+        from ondoc.insurance.models import UserInsurance
 
         lab_test_queryset = AvailableLabTest.objects.filter(lab_pricing_group__labs=data["lab"], test__in=data['test_ids'])
         test_ids_list = list()
@@ -1781,6 +2329,23 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin)
             "gender": data["profile"].gender,
             "dob": str(data["profile"].dob),
         }
+        payment_type = data.get("payment_type")
+        effective_price = price_data.get("effective_price")
+        cart_data = data.get('cart_item').data
+        # is_appointment_insured = cart_data.get('is_appointment_insured', None)
+        # insurance_id = cart_data.get('insurance_id', None)
+
+        is_appointment_insured = False
+        insurance_id = None
+        user_insurance = UserInsurance.objects.filter(user=user).order_by('-id').first()
+        if user_insurance and user_insurance.is_valid():
+            is_appointment_insured, insurance_id, insurance_message = user_insurance.validate_lab_insurance(data, user_insurance)
+
+        if is_appointment_insured and cart_data.get('is_appointment_insured', None):
+            payment_type = OpdAppointment.INSURANCE
+            effective_price = 0.0
+        else:
+            insurance_id = None
 
         fulfillment_data = {
             "lab": data["lab"],
@@ -1789,19 +2354,28 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin)
             "price": price_data.get("mrp"),
             "agreed_price": price_data.get("fees"),
             "deal_price": price_data.get("deal_price"),
-            "effective_price": price_data.get("effective_price"),
+            "effective_price": effective_price,
             "home_pickup_charges": price_data.get("home_pickup_charges"),
             "time_slot_start": start_dt,
             "is_home_pickup": data["is_home_pickup"],
             "profile_detail": profile_detail,
             "status": LabAppointment.BOOKED,
-            "payment_type": data["payment_type"],
+            "payment_type": payment_type,
             "lab_test": test_ids_list,
             "extra_details": extra_details,
             "coupon": price_data.get("coupon_list"),
             "discount": int(price_data.get("coupon_discount")),
-            "cashback": int(price_data.get("coupon_cashback"))
+            "cashback": int(price_data.get("coupon_cashback")),
+            "is_appointment_insured": is_appointment_insured,
+            "insurance": insurance_id,
+            "coupon_data": price_data.get("coupon_data"),
+            "prescription_list": data.get('prescription_list', [])
         }
+
+        if data.get('included_in_user_plan', False):
+            fulfillment_data.update({'user_plan': data.get('user_plan', None)})
+        else:
+            fulfillment_data.update({'user_plan': None})
 
         if data.get("is_home_pickup") is True:
             address = Address.objects.filter(pk=data.get("address").id).first()
@@ -1814,17 +2388,82 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin)
 
     def trigger_created_event(self, visitor_info):
         from ondoc.tracking.models import TrackingEvent
+        from ondoc.tracking.mongo_models import TrackingEvent as MongoTrackingEvent
         try:
             with transaction.atomic():
-                event_data = TrackingEvent.build_event_data(self.user, TrackingEvent.LabAppointmentBooked, appointmentId=self.id)
+                event_data = TrackingEvent.build_event_data(self.user, TrackingEvent.LabAppointmentBooked, appointmentId=self.id, visitor_info=visitor_info)
                 if event_data and visitor_info:
                     TrackingEvent.save_event(event_name=event_data.get('event'), data=event_data, visit_id=visitor_info.get('visit_id'),
                                              user=self.user, triggered_at=datetime.datetime.utcnow())
+
+                    if settings.MONGO_STORE:
+                        MongoTrackingEvent.save_event(event_name=event_data.get('event'), data=event_data,
+                                                 visit_id=visitor_info.get('visit_id'),
+                                                 visitor_id=visitor_info.get('visitor_id'),
+                                                 user=self.user, triggered_at=datetime.datetime.utcnow())
+
         except Exception as e:
             logger.error("Could not save triggered event - " + str(e))
 
+    def integrator_order_status(self):
+        from ondoc.integrations.models import IntegratorHistory
+
+        lab_appointment_content_type = ContentType.objects.get_for_model(self)
+        integrator_history = IntegratorHistory.objects.filter(object_id=self.id,
+                                                              content_type=lab_appointment_content_type).order_by('id').last()
+        if not integrator_history:
+            return 'Not a part of Integration'
+
+        return IntegratorHistory.STATUS_CHOICES[integrator_history.status - 1][1]
+
+    def thyrocare_booking_no(self):
+        from ondoc.integrations.models import IntegratorResponse
+
+        lab_appointment_content_type = ContentType.objects.get_for_model(self)
+        integrator_response = IntegratorResponse.objects.filter(object_id=self.id,
+                                                                content_type=lab_appointment_content_type).order_by('id').last()
+        if not integrator_response:
+            return 'Not Found'
+
+        return [integrator_response.lead_id, integrator_response.integrator_order_id]
+
+
+    def accepted_through(self):
+        from ondoc.integrations.models import IntegratorHistory
+
+        lab_appointment_content_type = ContentType.objects.get_for_model(self)
+        integrator_history = IntegratorHistory.objects.filter(object_id=self.id,
+                                                              content_type=lab_appointment_content_type).order_by('id').last()
+        if not integrator_history:
+            return 'Not Found'
+
+        return integrator_history.accepted_through
+
     def __str__(self):
         return "{}, {}".format(self.profile.name if self.profile else "", self.lab.name)
+
+    @classmethod
+    def get_insured_completed_appointment(cls, insurance_obj):
+        count = cls.objects.filter(user=insurance_obj.user, insurance=insurance_obj, status=cls.COMPLETED).count()
+        return count
+
+    @classmethod
+    def get_insured_active_appointment(cls, insurance_obj):
+        appointments = cls.objects.filter(~Q(status=cls.COMPLETED), ~Q(status=cls.CANCELLED), user=insurance_obj.user,
+                                          insurance=insurance_obj)
+        return appointments
+
+    @classmethod
+    def get_insurance_usage(cls, insurance_obj, date=None):
+        appointments = cls.objects.filter(user=insurance_obj.user, insurance=insurance_obj).exclude(status=cls.CANCELLED)
+        if date:
+            appointments = appointments.filter(created_at__date=date)
+
+        count = appointments.count()
+        data = appointments.aggregate(sum_amount=Sum('agreed_price'))
+        sum = data.get('sum_amount', 0)
+        sum = sum if sum else 0
+        return {'count': count, 'sum': sum}
 
     class Meta:
         db_table = "lab_appointment"
@@ -1838,17 +2477,27 @@ class CommonTest(TimeStampedModel):
     def __str__(self):
         return "{}-{}".format(self.test.name, self.id)
 
+    @classmethod
+    def get_tests(cls, count):
+        tests = cls.objects.select_related('test').filter(test__enable_for_retail=True, test__searchable=True).order_by('-priority')[:count]
+        return tests
 
 class CommonPackage(TimeStampedModel):
     package = models.ForeignKey(LabTest, on_delete=models.CASCADE, related_name='commonpackage')
     icon = models.ImageField(upload_to='diagnostic/common_package_icons', null=True)
     priority = models.PositiveIntegerField(default=0)
+    lab = models.ForeignKey(Lab, on_delete=models.CASCADE, related_name='packagelab', null=True)
+
     def __str__(self):
         return "{}-{}".format(self.package.name, self.id)
 
     class Meta:
         db_table = 'common_package'
 
+    @classmethod
+    def get_packages(cls, count):
+        packages = cls.objects.prefetch_related('package', 'lab__lab_documents').filter(package__enable_for_retail=True, package__searchable=True).order_by('-priority')[:count]
+        return packages
 
 class CommonDiagnosticCondition(TimeStampedModel):
     name = models.CharField(max_length=200)
@@ -2006,10 +2655,26 @@ class LabDocument(TimeStampedModel, Document):
             self.resize_image(width, height)
 
     def save(self, *args, **kwargs):
+        database_instance = LabDocument.objects.filter(pk=self.id).first()
         super().save(*args, **kwargs)
         if self.document_type == LabDocument.LOGO:
             self.create_all_images()
 
+            if database_instance and database_instance.name == self.name:
+                pass
+            else:
+                self.send_change_logo_email()
+
+    def send_change_logo_email(self):
+        from ondoc.communications.models import EMAILNotification
+        try:
+            emails = settings.LOGO_CHANGE_EMAIL_RECIPIENTS
+            user_and_email = [{'user': None, 'email': email} for email in emails]
+            email_notification = EMAILNotification(notification_type=NotificationAction.LAB_LOGO_CHANGE_MAIL,
+                                                   context={'instance': self})
+            email_notification.send(user_and_email)
+        except Exception as e:
+            logger.error(str(e))
 
     # def __str__(self):
         # return self.name
@@ -2088,7 +2753,7 @@ class LabReport(auth_model.TimeStampedModel):
 class LabReportFile(auth_model.TimeStampedModel, auth_model.Document):
     report = models.ForeignKey(LabReport, related_name='files', on_delete=models.SET_NULL, null=True, blank=True)
     name = models.FileField(upload_to='lab_reports/', blank=False, null=False, validators=[
-        FileExtensionValidator(allowed_extensions=['pdf', 'jfif', 'jpg', 'jpeg', 'png'])])
+        FileExtensionValidator(allowed_extensions=['pdf', 'jfif', 'jpg', 'jpeg', 'png', 'xml'])])
 
     def __str__(self):
 
@@ -2165,3 +2830,47 @@ class LabTestGroupMapping(TimeStampedModel):
 
     class Meta:
         db_table = "lab_test_group_mapping"
+
+
+class TestParameterChat(TimeStampedModel):
+    test = models.ForeignKey(LabTest, on_delete=models.CASCADE, null=True)
+    age_from = models.PositiveIntegerField()
+    age_to = models.PositiveIntegerField()
+    gender = models.CharField(max_length=30, null=True, blank=True)
+    min_range = models.DecimalField(blank=True, null=True, max_digits=10,decimal_places=2)
+    max_range = models.DecimalField(blank=True, null=True, max_digits=10,decimal_places=2)
+    test_name = models.CharField(blank=False, null=False, max_length=60)
+
+    def __str__(self):
+        return self.test_name
+
+    class Meta:
+        db_table = 'test_parameter_chat'
+
+
+class LabTestThresholds(TimeStampedModel):
+    class Colour(Choices):
+        RED = 'RED'
+        GREEN = 'GREEN'
+        ORANGE = 'ORANGE'
+
+    MALE = 'm'
+    FEMALE = 'f'
+    OTHER = 'o'
+    NULL = ''
+    GENDER_CHOICES = [(MALE,"Male"), (FEMALE,"Female"), (OTHER,"Other"), (NULL, "Null")]
+
+    lab_test = models.ForeignKey(LabTest, on_delete=models.CASCADE, related_name='tests_parameter_thresholds')
+    test_parameter = models.ForeignKey(TestParameter, on_delete=models.CASCADE, related_name='parameter_thresholds', blank=False, null=True)
+    color = models.CharField(max_length=50, null=True, default=None, blank=False, choices=Colour.as_choices())
+    details = models.TextField(blank=True, null=True)
+    what_to_do = models.TextField(blank=True, null=True)
+    min_value = models.FloatField(null=True, default=0)
+    max_value = models.FloatField(null=True, default=0)
+    min_age = models.PositiveIntegerField(null=True, default=0)
+    max_age = models.PositiveIntegerField(null=True, default=0)
+    gender = models.CharField(choices=GENDER_CHOICES, max_length=50, default=None, null=True, blank=True)
+
+
+    class Meta:
+        db_table = 'lab_test_thresholds'

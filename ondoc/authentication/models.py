@@ -1,5 +1,5 @@
 from django.conf import settings
-from django.db import models
+from django.db import models, transaction
 from django.contrib.gis.db import models as geo_models
 from django.db.models import Q, Prefetch
 from django.contrib.staticfiles.templatetags.staticfiles import static
@@ -14,10 +14,19 @@ import math
 import os
 import hashlib
 import random, string
-from django.contrib.contenttypes.fields import GenericForeignKey
+from django.contrib.contenttypes.fields import GenericForeignKey, GenericRelation
 from django.contrib.contenttypes.models import ContentType
 from django.utils.functional import cached_property
-from datetime import date, timedelta, datetime
+from datetime import date, datetime
+from safedelete import SOFT_DELETE
+from safedelete.models import SafeDeleteModel
+import reversion
+
+import requests
+import json
+from rest_framework import status
+from collections import OrderedDict
+from django.utils.text import slugify
 
 
 class Image(models.Model):
@@ -28,6 +37,53 @@ class Image(models.Model):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.__original_name = self.name
+
+    def use_image_name(self):
+        return False
+
+    def auto_generate_thumbnails(self):
+        return False
+
+    def crop_existing_image(self, width, height):
+        if not hasattr(self, 'name'):
+            return
+        if not self.name:
+            return
+        if not hasattr(self, 'get_image_name'):
+            return
+        # from django.core.files.storage import get_storage_class
+        # default_storage_class = get_storage_class()
+        # storage_instance = default_storage_class()
+
+        path = "{}".format(self.get_image_name())
+        # if storage_instance.exists(path):
+        #     return
+        if self.name.closed:
+            self.name.open()
+        with Img.open(self.name) as img:
+            img = img.copy()
+            img.thumbnail(tuple([width, height]), Img.LANCZOS)
+            if img.mode != 'RGB':
+                img = img.convert('RGB')
+            new_image_io = BytesIO()
+            img.save(new_image_io, format='JPEG')
+            in_memory_file = InMemoryUploadedFile(new_image_io, None, path + ".jpg", 'image/jpeg', new_image_io.tell(),
+                                                  None)
+            self.cropped_image = in_memory_file
+            self.save()
+
+    def create_thumbnail(self):
+        if not hasattr(self, 'cropped_image'):
+            return
+        if not (hasattr(self, 'auto_generate_thumbnails') and self.auto_generate_thumbnails()):
+            return
+        if self.cropped_image:
+            return
+        from ondoc.doctor.models import DoctorImage
+        size = DoctorImage.image_sizes[0]
+        width = size[0]
+        height = size[1]
+        self.crop_existing_image(width, height)
 
     def get_thumbnail_path(self, path, prefix):
         first, last = path.rsplit('/', 1)
@@ -51,8 +107,8 @@ class Image(models.Model):
             size = img.size
             #new_size = ()
 
-            if max(size)>max_allowed:
-                size = tuple(math.floor(ti/(max(size)/max_allowed)) for ti in size)
+            if max(size) > max_allowed:
+                size = tuple(math.floor(ti / (max(size) / max_allowed)) for ti in size)
 
             img = img.resize(size, Img.ANTIALIAS)
 
@@ -60,7 +116,9 @@ class Image(models.Model):
                 img = img.convert('RGB')
 
             md5_hash = hashlib.md5(img.tobytes()).hexdigest()
-            #if img.multiple_chunks():
+            if hasattr(self, 'use_image_name') and self.use_image_name() and hasattr(self, 'get_image_name'):
+                md5_hash = self.get_image_name()
+            # if img.multiple_chunks():
             #    for chunk in img.chunks():
             #       hash.update(chunk)
             # else:    
@@ -68,15 +126,12 @@ class Image(models.Model):
 
             new_image_io = BytesIO()
             img.save(new_image_io, format='JPEG')
-
-
-            #im = img.save(md5_hash+'.jpg')
+            # im = img.save(md5_hash+'.jpg')
             self.name = InMemoryUploadedFile(new_image_io, None, md5_hash+".jpg", 'image/jpeg',
                                   new_image_io.tell(), None)
 
             # self.name = InMemoryUploadedFile(output, 'ImageField', md5_hash+".jpg", 'image/jpeg',
             #                                     output.len, None)
-
             # self.name = img
             # img.thumbnail((self.image.width/1.5,self.image.height/1.5), Img.ANTIALIAS)
             # output = StringIO.StringIO()
@@ -90,6 +145,9 @@ class Image(models.Model):
         abstract = True
 
 class Document(models.Model):
+
+    def use_image_name(self):
+        return False
 
     def get_thumbnail_path(self, path, prefix):
         first, last = path.rsplit('/', 1)
@@ -127,6 +185,8 @@ class Document(models.Model):
                     img = img.convert('RGB')
 
                 md5_hash = hashlib.md5(img.tobytes()).hexdigest()
+                if hasattr(self, 'use_image_name') and self.use_image_name() and hasattr(self, 'get_image_name'):
+                    md5_hash = self.get_image_name()
                 #if img.multiple_chunks():
                 #    for chunk in img.chunks():
                 #       hash.update(chunk)
@@ -149,7 +209,6 @@ class Document(models.Model):
                 name, extension = os.path.splitext(self.name.name)
                 filename = hash+extension
                 self.name.file.seek(0,2)
-
                 self.name = InMemoryUploadedFile(self.name.file, None, filename, None,
                     self.name.file.tell(), None)
 
@@ -179,11 +238,23 @@ class QCModel(models.Model):
     IN_PROGRESS = 1
     SUBMITTED_FOR_QC = 2
     QC_APPROVED = 3
-    DATA_STATUS_CHOICES = [(IN_PROGRESS, "In Progress"), (SUBMITTED_FOR_QC, "Submitted For QC Check"), (QC_APPROVED, "QC approved")]
+    REOPENED = 4
+    DATA_STATUS_CHOICES = [(IN_PROGRESS, "In Progress"), (SUBMITTED_FOR_QC, "Submitted For QC Check"), (QC_APPROVED, "QC approved"), (REOPENED, "Reopened")]
     data_status = models.PositiveSmallIntegerField(default=1, editable=False, choices=DATA_STATUS_CHOICES)
     qc_approved_at = models.DateTimeField(null=True, blank=True)
+    history = GenericRelation('authentication.StatusHistory')
+
     class Meta:
         abstract = True
+
+    def save(self, *args, **kwargs):
+        if self.pk is not None:
+            orig = self.__class__.objects.get(pk=self.pk)
+            if orig.data_status != self.data_status:
+                StatusHistory.create(content_object=self)
+
+        super().save(*args, **kwargs)
+
 
 class CustomUserManager(BaseUserManager):
     """Define a model manager for User model with no username field."""
@@ -240,6 +311,7 @@ class User(AbstractBaseUser, PermissionsMixin):
 
     is_staff = models.BooleanField(verbose_name= 'Staff Status', default=False, help_text= 'Designates whether the user can log into this admin site.')
     date_joined = models.DateTimeField(auto_now_add=True)
+    auto_created = models.BooleanField(default=False)
 
     def __hash__(self):
         return self.id
@@ -259,6 +331,20 @@ class User(AbstractBaseUser, PermissionsMixin):
         # if self.user_type==1 and hasattr(self, 'staffprofile'):
         #     return self.staffprofile.name
         # return str(self.phone_number)
+
+    # @property
+    @cached_property
+    def active_insurance(self):
+        active_insurance = self.purchased_insurance.filter().order_by('id').last()
+        return active_insurance if active_insurance and active_insurance.is_valid() else None
+
+    @cached_property
+    def recent_opd_appointment(self):
+        return self.appointments.filter(created_at__gt=timezone.now() - timezone.timedelta(days=90)).order_by('-id')
+
+    @cached_property
+    def recent_lab_appointment(self):
+        return self.lab_appointments.filter(created_at__gt=timezone.now() - timezone.timedelta(days=90)).order_by('-id')
 
     def get_phone_number_for_communication(self):
         from ondoc.communications.models import unique_phone_numbers
@@ -394,6 +480,7 @@ class CreatedByModel(models.Model):
         abstract = True
 
 
+@reversion.register()
 class UserProfile(TimeStampedModel):
     MALE = 'm'
     FEMALE = 'f'
@@ -409,6 +496,8 @@ class UserProfile(TimeStampedModel):
     dob = models.DateField(blank=True, null=True)
     
     profile_image = models.ImageField(upload_to='users/images', height_field=None, width_field=None, blank=True, null=True)
+    whatsapp_optin = models.NullBooleanField(default=None) # optin check of the whatsapp
+    whatsapp_is_declined = models.BooleanField(default=False) # flag to whether show whatsapp pop up or not.
 
     def __str__(self):
         return "{}-{}".format(self.name, self.id)
@@ -455,6 +544,22 @@ class UserProfile(TimeStampedModel):
                                                       new_image_io.tell(), None)
         super().save(*args, **kwargs)
 
+    def update_profile_post_endorsement(self, endorsed_data):
+        self.name = endorsed_data.first_name + " " + endorsed_data.middle_name + " " + endorsed_data.last_name
+        self.email = endorsed_data.email
+        if endorsed_data.gender == 'f':
+            self.gender = UserProfile.FEMALE
+        elif endorsed_data.gender == 'm':
+            self.gender = UserProfile.MALE
+        else:
+            self.gender = UserProfile.OTHER
+        if endorsed_data.phone_number:
+            self.phone_number = endorsed_data.phone_number
+        else:
+            self.phone_number = self.user.phone_number
+        self.dob = endorsed_data.dob
+        self.save()
+
     class Meta:
         db_table = "user_profile"
 
@@ -465,12 +570,26 @@ class OtpVerifications(TimeStampedModel):
     code = models.CharField(max_length=10)
     country_code = models.CharField(max_length=10)
     is_expired = models.BooleanField(default=False)
+    otp_request_source = models.CharField(null=True, max_length=200, blank=True)
+    via_whatsapp = models.NullBooleanField(null=True)
+    via_sms = models.NullBooleanField(null=True)
 
     def __str__(self):
         return self.phone_number
 
     class Meta:
         db_table = "otp_verification"
+
+    @staticmethod
+    def get_otp_message(platform, user_type, is_doc=False, version=None):
+        from packaging.version import parse
+        result = "OTP for login is {}.\nDon't share this code with others."
+        if platform == "android" and version:
+            if (user_type == 'doctor' or is_doc) and parse(version) > parse("2.100.4"):
+                result = "<#>\n" + result + "\n" + settings.PROVIDER_ANDROID_MESSAGE_HASH
+            elif parse(version) > parse("1.1"):
+                result = "<#>\n" + result + "\n" + settings.CONSUMER_ANDROID_MESSAGE_HASH
+        return result
 
 
 class NotificationEndpoint(TimeStampedModel):
@@ -699,11 +818,11 @@ class GenericLabAdmin(TimeStampedModel, CreatedByModel):
 
     @classmethod
     def update_user_lab_admin(cls, phone_number):
-        user = User.objects.filter(phone_number=phone_number, user_type=User.DOCTOR)
-        if user.exists():
+        user = User.objects.filter(phone_number=phone_number, user_type=User.DOCTOR).first()
+        if user:
             admin = GenericLabAdmin.objects.filter(phone_number=phone_number, user__isnull=True)
             if admin.exists():
-                admin.update(user=user.first())
+                admin.update(user=user)
 
     @classmethod
     def get_user_admin_obj(cls, user):
@@ -796,9 +915,10 @@ class GenericAdmin(TimeStampedModel, CreatedByModel):
     super_user_permission = models.BooleanField(default=False)
     read_permission = models.BooleanField(default=False)
     write_permission = models.BooleanField(default=False)
-    name = models.CharField(max_length=24, blank=True, null=True)
+    name = models.CharField(max_length=100, blank=True, null=True)
     source_type = models.PositiveSmallIntegerField(choices=source_choices, default=CRM)
     entity_type = models.PositiveSmallIntegerField(choices=entity_choices, default=OTHER)
+    auto_created_from_SPOCs = models.BooleanField(default=False)
 
 
     class Meta:
@@ -1384,8 +1504,22 @@ class DoctorNumber(TimeStampedModel):
 
 
 class Merchant(TimeStampedModel):
+
+    STATE_ABBREVIATIONS = ('Andhra Pradesh','AP'),('Arunachal Pradesh','AR'),('Assam','AS'),('Bihar','BR'),('Chhattisgarh','CG'),('Goa','GA'),('Gujarat','GJ'),('Haryana','HR'),('Himachal Pradesh','HP'),('Jammu and Kashmir','JK'),('Jharkhand','JH'),('Karnataka','KA'),('Kerala','KL'),('Madhya Pradesh','MP'),('Maharashtra','MH'),('Manipur','MN'),('Meghalaya','ML'),('Mizoram','MZ'),('Nagaland','NL'),('Orissa','OR'),('Punjab','PB'),('Rajasthan','RJ'),('Sikkim','SK'),('Tamil Nadu','TN'),('Tripura','TR'),('Uttarakhand','UK'),('Uttar Pradesh','UP'),('West Bengal','WB'),('Tamil Nadu','TN'),('Tripura','TR'),('Andaman and Nicobar Islands','AN'),('Chandigarh','CH'),('Dadra and Nagar Haveli','DH'),('Daman and Diu','DD'),('Delhi','DL'),('Lakshadweep','LD'),('Pondicherry','PY')
+
     SAVINGS = 1
     CURRENT = 2
+
+    #pg merchant creation codes
+    NOT_INITIATED = 0
+    INITIATED = 1
+    INPROCESS = 2
+    COMPLETE = 3
+    FAILURE = 4
+    CREATION_STATUS_CHOICES = ((NOT_INITIATED, 'Not Initiated'),
+        (INITIATED,'Initiated'),(INPROCESS, 'In Progress'),
+         (COMPLETE, 'Complete'), (FAILURE, 'Failure')
+        )
 
     beneficiary_name = models.CharField(max_length=128, null=True)
     account_number = models.CharField(max_length=50, null=True, default=None, blank=True)
@@ -1412,7 +1546,8 @@ class Merchant(TimeStampedModel):
     country = models.CharField(max_length=200, null=False, blank= True)
     email = models.CharField(max_length=200, null=False, blank= True)
     mobile = models.CharField(max_length=200, null=False, blank= True)
-
+    pg_status = models.PositiveIntegerField(choices=CREATION_STATUS_CHOICES, default=NOT_INITIATED, editable=False)
+    api_response = JSONField(blank=True, null=True, editable=False)
 
     class Meta:
         db_table = 'merchant'
@@ -1420,6 +1555,118 @@ class Merchant(TimeStampedModel):
     def __str__(self):
         return self.beneficiary_name+"("+self.account_number+")-("+str(self.id)+")"
 
+    def save(self, *args, **kwargs):
+        if self.verified_by_finance and (self.pg_status == self.NOT_INITIATED or self.pg_status == self.FAILURE):
+            pass
+            #self.create_in_pg()
+
+        super().save(*args, **kwargs)
+
+    def create_in_pg(self, *args, **kwargs):
+        resp_data = None
+        request_payload = dict()
+        request_payload["Bene_Code"] = str(self.id)
+        request_payload["Bene Name"] = self.beneficiary_name
+        request_payload["Bene Add 1"] = self.merchant_add_1
+        request_payload["Bene Add 2"] = self.merchant_add_2
+        request_payload["Bene Add 3"] = self.merchant_add_3
+        request_payload["Bene Add 4"] = self.merchant_add_4
+        request_payload["Bene Add 5"] = None
+        request_payload["Bene_City"] = self.city
+        request_payload["Bene_Pin"] = self.pin
+        request_payload["State"] = self.state
+
+        abbr = Merchant.get_abbreviation(self.state)
+        if abbr:
+            request_payload["State"] = abbr
+        else:
+            request_payload["State"] = self.state
+
+        #request_payload["Country"] = self.country
+        request_payload["Country"] = 'in'
+        request_payload["Bene_Email"] = 'payment@docprime.com'
+        request_payload["Bene_Mobile"] = self.mobile
+        request_payload["Bene_Tel"] = None
+        request_payload["Bene_Fax"] = None
+        request_payload["IFSC"] = self.ifsc_code
+        request_payload["Bene_A/c No"] = self.account_number
+        request_payload["Bene Bank"] = None
+        request_payload["PaymentType"] = None
+        request_payload["isBulk"] = "0"
+
+        #from ondoc.api.v1.utils import payout_checksum
+        checksum_response = Merchant.generate_checksum(request_payload)
+        request_payload["hash"] = checksum_response
+        url = settings.NODAL_BENEFICIARY_API
+
+        nodal_beneficiary_api_token = settings.NODAL_BENEFICIARY_TOKEN
+
+        response = requests.post(url, data=json.dumps(request_payload), headers={'auth': nodal_beneficiary_api_token,
+                                                                              'Content-Type': 'application/json'})
+
+        if response.status_code == status.HTTP_200_OK:
+            resp_data = response.json()
+            self.api_response = resp_data
+            if resp_data.get('StatusCode') and resp_data.get('StatusCode') in [1,2,3,4]:
+                self.pg_status = resp_data.get('StatusCode')
+
+    @classmethod
+    def get_abbreviation(cls, state_name):
+        state_slug = slugify(state_name)
+        for state,abbr in cls.STATE_ABBREVIATIONS:
+            if state_slug == slugify(state):
+                return abbr
+
+        return None
+
+    @classmethod
+    def get_states_list(cls):        
+        states = [x[0] for x in cls.STATE_ABBREVIATIONS]
+        return states
+
+    @classmethod
+    def get_states_string(cls):
+        return ", ".join(cls.get_states_list())
+
+    @classmethod
+    def generate_checksum(cls, request_payload):
+
+        secretkey = settings.PG_SECRET_KEY_P1
+        accesskey = settings.PG_CLIENT_KEY_P1
+
+        checksum = ""
+
+        curr = ''
+
+        keylist = sorted(request_payload)
+        for k in keylist:
+            if request_payload[k] is not None:
+                curr = curr + k + '=' + str(request_payload[k]) + ';'
+
+        checksum += curr
+
+        checksum = accesskey + "|" + checksum + "|" + secretkey
+        checksum_hash = hashlib.sha256(str(checksum).encode())
+        checksum_hash = checksum_hash.hexdigest()
+        return checksum_hash
+
+
+    @classmethod
+    def update_status_from_pg(cls):
+        merchant = Merchant.objects.filter(pg_status__in=[cls.NOT_INITIATED, cls.INITIATED, cls.INPROCESS, cls.FAILURE])
+        for data in merchant:
+            resp_data = None
+            request_payload = {"beneCode": str(data.pk)}
+            url = settings.BENE_STATUS_API
+            bene_status_token = settings.BENE_STATUS_TOKEN
+            response = requests.post(url, data=json.dumps(request_payload), headers={'auth': bene_status_token,
+                                                                                     'Content-Type': 'application/json'})
+            if response.status_code == status.HTTP_200_OK:
+                resp_data = response.json()
+                data.api_response = resp_data
+                if resp_data.get('statusCode') and resp_data.get('statusCode') in [cls.INITIATED, cls.INPROCESS]:
+                    data.pg_status = resp_data.get('statusCode')
+                    data.save()
 
 class AssociatedMerchant(TimeStampedModel):
 
@@ -1432,3 +1679,119 @@ class AssociatedMerchant(TimeStampedModel):
     class Meta:
         db_table = 'associated_merchant'
 
+
+class SoftDelete(SafeDeleteModel):
+    _safedelete_policy = SOFT_DELETE
+
+    class Meta:
+        abstract = True
+
+
+class StatusHistory(TimeStampedModel):
+    content_type = models.ForeignKey(ContentType, on_delete=models.DO_NOTHING)
+    object_id = models.PositiveIntegerField()
+    content_object = GenericForeignKey()
+    status = models.PositiveSmallIntegerField(null=False)
+    user = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True)
+
+    @classmethod
+    def create(cls, *args, **kwargs):
+        obj = kwargs.get('content_object')
+        if not obj:
+            raise Exception('Function accept content_object in **kwargs')
+
+        content_type = ContentType.objects.get_for_model(obj)
+        cls(content_type=content_type, object_id=obj.id, status=obj.data_status, user=obj.status_changed_by).save()
+
+    class Meta:
+        db_table = 'status_history'
+
+
+class WelcomeCallingDone(models.Model):
+    welcome_calling_done = models.BooleanField(default=False)
+    welcome_calling_done_at = models.DateTimeField(null=True, blank=True)
+
+    def save(self, *args, **kwargs):
+        if self.welcome_calling_done and not self.welcome_calling_done_at:
+            self.welcome_calling_done_at = timezone.now()
+        elif not self.welcome_calling_done and self.welcome_calling_done_at:
+            self.welcome_calling_done_at = None
+        super().save(*args, **kwargs)
+
+    class Meta:
+        abstract = True
+
+
+class ClickLoginToken(TimeStampedModel):
+    URL_KEY_LENGTH = 30
+    token = models.CharField(max_length=300)
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
+    expiration_time = models.DateTimeField(null=True)
+    is_consumed = models.BooleanField(default=False)
+    url_key = models.CharField(max_length=URL_KEY_LENGTH)
+
+    class Meta:
+        db_table = 'click_login_token'
+
+
+class PhysicalAgreementSigned(models.Model):
+    physical_agreement_signed = models.BooleanField(default=False)
+    physical_agreement_signed_at = models.DateTimeField(null=True, blank=True)
+
+    def save(self, *args, **kwargs):
+        from ondoc.api.v1.utils import update_physical_agreement_timestamp
+        update_physical_agreement_timestamp(self)
+        super().save(*args, **kwargs)
+
+    class Meta:
+        abstract = True
+
+
+class RefundMixin(object):
+
+    @transaction.atomic
+    def action_refund(self, refund_flag=1):
+        from ondoc.doctor.models import OpdAppointment
+        from ondoc.account.models import ConsumerAccount
+        from ondoc.common.models import RefundDetails
+        from ondoc.account.models import ConsumerTransaction
+        from ondoc.account.models import ConsumerRefund
+        # Taking Lock first
+        consumer_account = None
+        product_id = self.PRODUCT_ID
+        if self.payment_type == OpdAppointment.PREPAID:
+            temp_list = ConsumerAccount.objects.get_or_create(user=self.user)
+            consumer_account = ConsumerAccount.objects.select_for_update().get(user=self.user)
+        if self.payment_type == OpdAppointment.PREPAID and ConsumerTransaction.valid_appointment_for_cancellation(self.id, product_id):
+            RefundDetails.log_refund(self)
+            wallet_refund, cashback_refund = self.get_cancellation_breakup()
+            consumer_account.credit_cancellation(self, product_id, wallet_refund, cashback_refund)
+            if refund_flag:
+                ctx_obj = consumer_account.debit_refund()
+                ConsumerRefund.initiate_refund(self.user, ctx_obj)
+
+    def can_agent_refund(self, user):
+        from ondoc.crm.constants import constants
+        if self.status == self.COMPLETED and (user.groups.filter(name=constants['APPOINTMENT_REFUND_TEAM']).exists() or user.is_superuser) and not self.has_app_consumer_trans():
+            return True
+        return False
+
+    def has_app_consumer_trans(self):
+        from ondoc.account.models import ConsumerTransaction
+        product_id = self.PRODUCT_ID
+        return not ConsumerTransaction.valid_appointment_for_cancellation(self.id, product_id)
+        # return ConsumerRefund.objects.filter(consumer_transaction__reference_id=self.id,
+        #                               consumer_transaction__product_id=product_id).first()
+
+
+class LastLoginTimestamp(TimeStampedModel):
+
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name="last_login_timestamp")
+    last_login = models.DateTimeField(auto_now=True)
+    source = models.CharField(max_length=100)
+
+    def __str__(self):
+        return self.user
+
+    class Meta:
+        db_table = "last_login_timestamp"

@@ -2,6 +2,7 @@ from __future__ import absolute_import, unicode_literals
 
 import copy
 import datetime
+from datetime import timedelta
 import json
 import math
 import traceback
@@ -24,6 +25,10 @@ import requests
 from rest_framework import status
 from django.utils.safestring import mark_safe
 from ondoc.notification.models import NotificationAction
+import random
+import string
+from ondoc.api.v1.utils import RawSql
+
 
 logger = logging.getLogger(__name__)
 
@@ -54,6 +59,34 @@ def send_lab_notifications_refactored(appointment_id):
         lab_notification.send()
     except Exception as e:
         logger.error(str(e))
+
+
+@task
+def send_ipd_procedure_lead_mail(data):
+    obj_id = data.get('obj_id')
+    send_email = data.get('send_email')
+    from ondoc.communications.models import EMAILNotification
+    from ondoc.procedure.models import IpdProcedureLead
+    from ondoc.matrix.tasks import create_or_update_lead_on_matrix
+    instance = IpdProcedureLead.objects.filter(id=obj_id).first()
+    if not instance:
+        return
+    if instance.matrix_lead_id:
+        return
+    try:
+        if send_email:
+            emails = settings.IPD_PROCEDURE_CONTACT_DETAILS
+            user_and_email = [{'user': None, 'email': email} for email in emails]
+            email_notification = EMAILNotification(notification_type=NotificationAction.IPD_PROCEDURE_MAIL,
+                                                   context={'instance': instance})
+            email_notification.send(user_and_email)
+
+        create_or_update_lead_on_matrix.apply_async(
+            ({'obj_type': instance.__class__.__name__, 'obj_id': instance.id},), countdown=5)
+
+    except Exception as e:
+        logger.error(str(e))
+
 
 
 @task
@@ -239,79 +272,80 @@ def send_opd_rating_message(appointment_id, type):
 @task(bind=True, max_retries=5)
 def set_order_dummy_transaction(self, order_id, user_id):
     from ondoc.account.models import Order, DummyTransactions
+    from ondoc.insurance.models import UserInsurance
+    from ondoc.doctor.models import OpdAppointment
+    from ondoc.diagnostic.models import LabAppointment
     from ondoc.account.models import User
+    req_data = dict()
     try:
         order_row = Order.objects.filter(id=order_id).first()
         user = User.objects.filter(id=user_id).first()
 
-        if order_row and order_row.parent:
+        if not order_row or not user:
+            raise Exception('order and user are required')
+        if order_row.getTransactions():
+            return
+        if not order_row.dummy_transaction_allowed():
             raise Exception("Cannot create dummy payout for a child order.")
 
-        if order_row and user:
-            if order_row.getTransactions():
-                #print("dummy Transaction already set")
-                return
+        appointment = order_row.getAppointment()
+        if not appointment:
+            raise Exception("No Appointment/UserPlanMapping found.")
 
-            appointment = order_row.getAppointment()
-            if not appointment:
-                raise Exception("No Appointment found.")
+        total_price = order_row.get_total_price()
 
-            total_price = order_row.get_total_price()
+        token = settings.PG_DUMMY_TRANSACTION_TOKEN
+        headers = {
+            "auth": token,
+            "Content-Type": "application/json"
+        }
+        url = settings.PG_DUMMY_TRANSACTION_URL
+        insurance_data = order_row.get_insurance_data_for_pg()
 
-            token = settings.PG_DUMMY_TRANSACTION_TOKEN
-            headers = {
-                "auth": token,
-                "Content-Type": "application/json"
-            }
-            url = settings.PG_DUMMY_TRANSACTION_URL
+        name  = ''
+        if isinstance(appointment, OpdAppointment) or isinstance(appointment, LabAppointment):
+            name = appointment.profile.name
 
-            req_data = {
-                "customerId": user_id,
-                "mobile": user.phone_number,
-                "email": user.email or "dummyemail@docprime.com",
-                "productId": order_row.product_id,
-                "orderId": order_id,
-                "name": appointment.profile.name,
-                "txAmount": 0,
-                "couponCode": "",
-                "couponAmt": str(total_price),
-                "paymentMode": "DC",
-                "AppointmentId": appointment.id,
-                "buCallbackSuccessUrl": "",
-                "buCallbackFailureUrl": ""
-            }
+        if isinstance(appointment, UserInsurance):
+            name = appointment.user.full_name
 
-            response = requests.post(url, data=json.dumps(req_data), headers=headers)
-            if response.status_code == status.HTTP_200_OK:
-                resp_data = response.json()
-                #logger.error(resp_data)
-                if resp_data.get("ok") is not None and resp_data.get("ok") == 1:
-                    tx_data = {}
-                    tx_data['user'] = user
-                    tx_data['product_id'] = order_row.product_id
-                    tx_data['order_no'] = resp_data.get('orderNo')
-                    tx_data['order_id'] = order_row.id
-                    tx_data['reference_id'] = appointment.id
-                    tx_data['type'] = DummyTransactions.CREDIT
-                    tx_data['amount'] = total_price
-                    tx_data['payment_mode'] = "DC"
+        req_data = {
+            "customerId": user_id,
+            "mobile": user.phone_number,
+            "email": user.email or "dummyemail@docprime.com",
+            "productId": order_row.product_id,
+            "orderId": order_id,
+            "name": name,
+            "txAmount": 0,
+            "couponCode": "",
+            "couponAmt": str(total_price),
+            "paymentMode": "DC",
+            "AppointmentId": appointment.id,
+            "buCallbackSuccessUrl": "",
+            "buCallbackFailureUrl": ""
+        }
 
-                    # tx_data['transaction_id'] = resp_data.get('orderNo')
-                    # tx_data['response_code'] = response.get('responseCode')
-                    # tx_data['bank_id'] = response.get('bankTxId')
-                    # transaction_time = parse(response.get("txDate"))
-                    # tx_data['transaction_date'] = transaction_time
-                    # tx_data['bank_name'] = response.get('bankName')
-                    # tx_data['currency'] = response.get('currency')
-                    # tx_data['status_code'] = response.get('statusCode')
-                    # tx_data['pg_name'] = response.get('pgGatewayName')
-                    # tx_data['status_type'] = response.get('txStatus')
-                    # tx_data['pb_gateway_name'] = response.get('pbGatewayName')
+        req_data.update(insurance_data)
 
-                    DummyTransactions.objects.create(**tx_data)
-                    #print("SAVED DUMMY TRANSACTION")
-            else:
-                raise Exception("Retry on invalid Http response status - " + str(response.content))
+        response = requests.post(url, data=json.dumps(req_data), headers=headers)
+        if response.status_code == status.HTTP_200_OK:
+            resp_data = response.json()
+            #logger.error(resp_data)
+            if resp_data.get("ok") is not None and resp_data.get("ok") == 1:
+                tx_data = {}
+                tx_data['user'] = user
+                tx_data['product_id'] = order_row.product_id
+                tx_data['order_no'] = resp_data.get('orderNo')
+                tx_data['order_id'] = order_row.id
+                tx_data['reference_id'] = appointment.id
+                tx_data['type'] = DummyTransactions.CREDIT
+                tx_data['amount'] = total_price
+                tx_data['payment_mode'] = "DC"
+
+                DummyTransactions.objects.create(**tx_data)
+                #print("SAVED DUMMY TRANSACTION")
+        else:
+            raise Exception("Retry on invalid Http response status - " + str(response.content))
 
     except Exception as e:
         logger.error("Error in Setting Dummy Transaction of user with data - " + json.dumps(req_data) + " with exception - " + str(e))
@@ -447,29 +481,37 @@ def process_payout(payout_id):
             raise Exception("No payout specified")
 
         payout_data = MerchantPayout.objects.filter(id=payout_id).first()
-        if not payout_data or payout_data.status == payout_data.PAID:
+        if not payout_data:
+            raise Exception("Payout not found")
+        if payout_data.status == payout_data.PAID:
             raise Exception("Payment already done for this payout")
 
 
         default_payment_mode = payout_data.get_default_payment_mode()
-
         appointment = payout_data.get_appointment()
+        if not appointment :
+            raise Exception("Insufficient Data " + str(payout_data))
+
+        if not payout_data.booking_type == payout_data.InsurancePremium:
+            if appointment.payment_type in [OpdAppointment.COD]:
+                raise Exception("Cannot process payout for COD appointments")
+
+        
         billed_to = payout_data.get_billed_to()
         merchant = payout_data.get_merchant()
         order_data = None
 
-        if not appointment or not billed_to or not merchant:
+        if not billed_to or not merchant:
             raise Exception("Insufficient Data " + str(payout_data))
-
-        if appointment.payment_type in [OpdAppointment.COD]:
-            raise Exception("Cannot process payout for COD appointments")
 
         if not merchant.verified_by_finance or not merchant.enabled:
             raise Exception("Merchant is not verified or is not enabled. " + str(payout_data))
 
-        associated_merchant = billed_to.merchant.first()
-        if not associated_merchant.verified:
-            raise Exception("Associated Merchant not verified. " + str(payout_data))
+        if not payout_data.booking_type == payout_data.InsurancePremium:
+            associated_merchant = billed_to.merchant.first()
+            if not associated_merchant.verified:
+                raise Exception("Associated Merchant not verified. " + str(payout_data))
+
 
         # assuming 1 to 1 relation between Order and Appointment
         order_data = Order.objects.filter(reference_id=appointment.id).order_by('-id').first()
@@ -512,11 +554,13 @@ def process_payout(payout_id):
         payout_status = None
         if len(req_data2.get('payload'))>0:
             payout_status = request_payout(req_data2, order_data)
+            payout_data.request_data = req_data2
 
         if not payout_status or not payout_status.get('status'):
             payout_status = request_payout(req_data, order_data)
+            payout_data.request_data = req_data
 
-        if payout_status:
+        if payout_status:            
             payout_data.api_response = payout_status.get("response")
             if payout_status.get("status"):
                 payout_data.payout_time = datetime.datetime.now()
@@ -526,9 +570,127 @@ def process_payout(payout_id):
 
             payout_data.save()
 
-
     except Exception as e:
         logger.error("Error in processing payout - with exception - " + str(e))
+
+
+@task(bind=True, max_retries=3)
+def send_insurance_notifications(self, data):
+    from ondoc.authentication import models as auth_model
+    from ondoc.communications.models import InsuranceNotification
+    from ondoc.insurance.models import UserInsurance
+    try:
+        user_id = int(data.get('user_id', 0))
+        user = auth_model.User.objects.filter(id=user_id).last()
+        if not user:
+            raise Exception("Invalid user id passed for insurance email notification. Userid %s" % str(user_id))
+
+        insurance_status = int(data.get('status', 0))
+        # Cancellation
+        if insurance_status and insurance_status == UserInsurance.CANCEL_INITIATE:
+            user_insurance = UserInsurance.get_user_insurance(user)
+            if not user_insurance:
+                raise Exception("Invalid or None user insurance found for email notification. User id %s" % str(user_id))
+
+            insurance_notification = InsuranceNotification(user_insurance, NotificationAction.INSURANCE_CANCEL_INITIATE)
+            insurance_notification.send()
+
+        else:
+            user_insurance = user.active_insurance
+            if not user_insurance:
+                raise Exception("Invalid or None user insurance found for email notification. User id %s" % str(user_id))
+
+            if not user_insurance.coi:
+                try:
+                    user_insurance.generate_pdf()
+                except Exception as e:
+                    logger.error('Insurance coi pdf cannot be generated. %s' % str(e))
+
+                    countdown_time = (2 ** self.request.retries) * 60 * 10
+                    print(countdown_time)
+                    self.retry([data], countdown=countdown_time)
+
+            insurance_notification = InsuranceNotification(user_insurance, NotificationAction.INSURANCE_CONFIRMED)
+            insurance_notification.send()
+    except Exception as e:
+        logger.error(str(e))
+
+
+@task(bind=True, max_retries=3)
+def send_insurance_endorsment_notifications(self, data):
+    from ondoc.authentication import models as auth_model
+    from ondoc.communications.models import InsuranceNotification
+    from ondoc.insurance.models import UserInsurance, EndorsementRequest
+    try:
+        user_id = int(data.get('user_id', 0))
+        user = auth_model.User.objects.filter(id=user_id).last()
+        if not user:
+            raise Exception("Invalid user id passed for insurance email notification. Userid %s" % str(user_id))
+
+        user_insurance = user.active_insurance
+        if not user_insurance:
+            raise Exception("Invalid or None user insurance found for email notification. User id %s" % str(user_id))
+
+        endorsment_status = data.get('endorsment_status', 0)
+        notification = None
+
+        if endorsment_status == EndorsementRequest.PENDING:
+            notification = NotificationAction.INSURANCE_ENDORSMENT_PENDING
+        elif endorsment_status == EndorsementRequest.REJECT:
+            notification = NotificationAction.INSURANCE_ENDORSMENT_REJECTED
+        elif endorsment_status == EndorsementRequest.APPROVED:
+            notification = NotificationAction.INSURANCE_ENDORSMENT_APPROVED
+
+            if not user_insurance.coi:
+                try:
+                    user_insurance.generate_pdf()
+                except Exception as e:
+                    logger.error('Insurance coi pdf cannot be generated. %s' % str(e))
+
+                    countdown_time = (2 ** self.request.retries) * 60 * 10
+                    print(countdown_time)
+                    self.retry([data], countdown=countdown_time)
+
+        if notification and user_insurance:
+            insurance_notification = InsuranceNotification(user_insurance, notification)
+            insurance_notification.send()
+
+    except Exception as e:
+        logger.error(str(e))
+
+
+@task(bind=True, max_retries=3)
+def send_insurance_float_limit_notifications(self, data):
+    from ondoc.notification.models import EmailNotification
+    from ondoc.insurance.models import Insurer
+    try:
+        insurer_id = int(data.get('insurer_id', 0))
+        insurer = Insurer.objects.filter(id=insurer_id).first()
+        if not insurer:
+            raise Exception('Insurer not found against the id %d' % insurer_id)
+
+        insurer_account = insurer.float.filter().first()
+        if not insurer_account:
+            raise Exception('Insurer Account not found against the insurer id %d' % insurer_id)
+
+        emails = settings.INSURANCE_FLOAT_LIMIT_ALERT_EMAIL
+        html_body = "Insurer {insurer} current float amount is being getting exhausted and reached {limit}."\
+            .format(insurer=insurer.name, limit=insurer_account.current_float)
+
+        date = timezone.now() - timedelta(days=1)
+        is_already_sent = EmailNotification.objects.filter(created_at__gte=date,
+                                             notification_type=NotificationAction.INSURANCE_FLOAT_LIMIT).exists()
+
+        if not is_already_sent:
+            for email in emails:
+                EmailNotification.send_insurance_float_alert_email(email, html_body)
+
+    except Exception as e:
+        logger.error(str(e))
+        countdown_time = (2 ** self.request.retries) * 60 * 10
+        print(countdown_time)
+        self.retry([data], countdown=countdown_time)
+
 
 def request_payout(req_data, order_data):
     from ondoc.api.v1.utils import create_payout_checksum
@@ -559,6 +721,7 @@ def request_payout(req_data, order_data):
     logger.error("payout failed for request data - " + str(req_data))
     return {"status" : 0, "response" : resp_data}
 
+
 @task()
 def opd_send_otp_before_appointment(appointment_id, previous_appointment_date_time):
     from ondoc.doctor.models import OpdAppointment
@@ -578,6 +741,27 @@ def opd_send_otp_before_appointment(appointment_id, previous_appointment_date_ti
         opd_notification.send()
     except Exception as e:
         logger.error(str(e))
+
+@task()
+def appointment_reminder_sms_provider(appointment_id, appointment_updated_at):
+    from ondoc.doctor.models import OpdAppointment
+    from ondoc.communications.models import OpdNotification
+    try:
+        instance = OpdAppointment.objects.filter(id=appointment_id).first()
+        if not instance or \
+                not instance.user or \
+                str(math.floor(instance.updated_at.timestamp())) != appointment_updated_at \
+                or instance.status != OpdAppointment.ACCEPTED:
+            # logger.error(
+            #     'instance : {}, time : {}, str: {}'.format(str(model_to_dict(instance)),
+            #                                                previous_appointment_date_time,
+            #                                                str(math.floor(instance.time_slot_start.timestamp()))))
+            return
+        opd_notification = OpdNotification(instance, NotificationAction.APPOINTMENT_REMINDER_PROVIDER_SMS)
+        opd_notification.send()
+    except Exception as e:
+        logger.error(str(e))
+
 
 @task()
 def opd_send_after_appointment_confirmation(appointment_id, previous_appointment_date_time, second=False):
@@ -732,3 +916,132 @@ def refund_breakup_sms_task(obj_id):
         sms_notification.send(receivers)
     except Exception as e:
         logger.error(str(e))
+
+
+@task(bind=True, max_retries=2)
+def push_insurance_banner_lead_to_matrix(self, data):
+    from ondoc.insurance.models import InsuranceLead, InsurancePlans
+    try:
+        if not data:
+            raise Exception('Data not received for banner lead.')
+
+        id = data.get('id', None)
+        if not id:
+            logger.error("[CELERY ERROR: Incorrect values provided.]")
+            raise ValueError()
+
+        banner_obj = InsuranceLead.objects.filter(id=id).first()
+
+        if not banner_obj:
+            raise Exception("Banner object could not found against id - " + str(id))
+
+        if banner_obj.user:
+            phone_number = banner_obj.user.phone_number
+        else:
+            phone_number = banner_obj.phone_number
+
+        extras = banner_obj.extras
+        plan_id = extras.get('plan_id', None)
+        plan = None
+        if plan_id and type(plan_id).__name__ == 'int':
+            plan = InsurancePlans.objects.filter(id=plan_id).first()
+
+        request_data = {
+            'LeadID': banner_obj.matrix_lead_id if banner_obj.matrix_lead_id else 0,
+            'LeadSource': 'InsuranceOPD',
+            'Name': 'none',
+            'BookedBy': phone_number,
+            'PrimaryNo': phone_number,
+            'PaymentStatus': 0,
+            'UtmCampaign': extras.get('utm_campaign', ''),
+            'UTMMedium': extras.get('utm_medium', ''),
+            'UtmSource': extras.get('utm_source', ''),
+            'UtmTerm': extras.get('utm_term', ''),
+            'ProductId': 8,
+            'SubProductId': 0,
+            'PolicyDetails': {
+                "ProposalNo": None,
+                "BookingId": None,
+                'PolicyPaymentSTATUS': 0,
+                "ProposerName": None,
+                "PolicyId": None,
+                "InsurancePlanPurchased": plan.name if plan else None,
+                "PurchaseDate": None,
+                "ExpirationDate": None,
+                "COILink": None,
+                "PeopleCovered": 0
+            }
+        }
+
+        url = settings.MATRIX_API_URL
+        matrix_api_token = settings.MATRIX_API_TOKEN
+        response = requests.post(url, data=json.dumps(request_data), headers={'Authorization': matrix_api_token,
+                                                                              'Content-Type': 'application/json'})
+
+        if response.status_code != status.HTTP_200_OK or not response.ok:
+            logger.error(json.dumps(request_data))
+            logger.info("[ERROR] Insurance banner lead could not be published to the matrix system")
+            logger.info("[ERROR] %s", response.reason)
+
+            countdown_time = (2 ** self.request.retries) * 60 * 10
+            logging.error("Lead sync with the Matrix System failed with response - " + str(response.content))
+            print(countdown_time)
+            self.retry([data], countdown=countdown_time)
+        else:
+            resp_data = response.json()
+            if not resp_data:
+                raise Exception('Data received from matrix is null or empty.')
+
+            if not resp_data.get('Id', None):
+                logger.error(json.dumps(request_data))
+                raise Exception("[ERROR] Id not recieved from the matrix while pushing insurance banner lead to matrix.")
+
+            insurance_banner_qs = InsuranceLead.objects.filter(id=id)
+            insurance_banner_qs.update(matrix_lead_id=resp_data.get('Id'))
+
+    except Exception as e:
+        logger.error("Error in Celery. Failed pushing insurance banner lead to the matrix- " + str(e))
+
+
+@task
+def generate_random_coupons(total_count, coupon_id):
+    from ondoc.coupon.models import RandomGeneratedCoupon, Coupon
+    try:
+        coupon_obj = Coupon.objects.filter(id=coupon_id).first()
+        if not coupon_obj:
+            return
+
+        while total_count:
+            curr_count = 0
+            batch_data = []
+            while curr_count < 10000 and total_count:
+                rc = RandomGeneratedCoupon()
+                rc.random_coupon = ''.join(random.choice(string.ascii_uppercase + string.digits) for _ in range(12))
+                rc.coupon = coupon_obj
+                rc.validity = 90
+                rc.sent_at = datetime.datetime.utcnow()
+
+                batch_data.append(rc)
+                curr_count += 1
+                total_count -= 1
+
+            if batch_data:
+                RandomGeneratedCoupon.objects.bulk_create(batch_data)
+            else:
+                return
+
+    except Exception as e:
+        logger.error(str(e))
+
+
+@task
+def update_coupon_used_count():
+    RawSql('''  update coupon set total_used_count= usage_count from
+                (select coupon_id, sum(usage_count) usage_count from
+                (select oac.coupon_id, count(*) usage_count from opd_appointment oa inner join opd_appointment_coupon oac on oa.id = oac.opdappointment_id
+                 where oa.status in (2,3,4,5,7) group by oac.coupon_id
+                union
+                select oac.coupon_id, count(*) usage_count from lab_appointment oa inner join lab_appointment_coupon oac on oa.id = oac.labappointment_id
+                 where oa.status in (2,3,4,5,7) group by oac.coupon_id
+                ) x group by coupon_id
+                ) y where coupon.id = y.coupon_id ''', []).execute()

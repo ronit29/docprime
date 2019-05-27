@@ -19,6 +19,8 @@ class DemoElastic(TimeStampedModel):
 
     active = models.BooleanField(default=False)
 
+    post_task_data = JSONField(default={})
+
     def save(self, *args, **kwargs):
         super(DemoElastic, self).save(*args, **kwargs)
 

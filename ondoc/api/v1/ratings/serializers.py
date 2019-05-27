@@ -18,19 +18,29 @@ class GetComplementSerializer(serializers.ModelSerializer):
 class RatingCreateBodySerializer(serializers.Serializer):
     rating = serializers.IntegerField(max_value=5)
     review = serializers.CharField(max_length=5000, allow_blank=True)
-    appointment_id = serializers.IntegerField()
-    appointment_type = serializers.ChoiceField(choices=RatingsReview.APPOINTMENT_TYPE_CHOICES)
+    appointment_id = serializers.IntegerField(required=False, allow_null=True)
+    appointment_type = serializers.ChoiceField(choices=RatingsReview.APPOINTMENT_TYPE_CHOICES)      #treat appointment_type as entity_type
     # compliment = ListReviewComplimentSerializer(source='request.data')
     compliment = serializers.ListField(child=serializers.PrimaryKeyRelatedField(queryset=ReviewCompliments.objects.all()), allow_empty=True)
+    entity_id = serializers.IntegerField(required=False, allow_null=True)
+    related_entity_id = serializers.IntegerField(required=False, allow_null=True)
 
     def validate(self, attrs):
+        if not (attrs.get('appointment_id') or attrs.get('entity_id')):
+            raise serializers.ValidationError("either one of appointment id or entity id is required")
         if (attrs.get('appointment_id') and attrs.get('appointment_type')):
-            if attrs.get('appointment_type') == RatingsReview.OPD:
-                app = doc_models.OpdAppointment.objects.filter(id=attrs.get('appointment_id')).first()
-            else:
-                app = lab_models.LabAppointment.objects.filter(id=attrs.get('appointment_id')).first()
-            if app and app.is_rated:
+            query = RatingsReview.objects.filter(appointment_id=attrs['appointment_id'], appointment_type=attrs['appointment_type'])
+            # if attrs.get('appointment_type') == RatingsReview.OPD:
+            #     app = doc_models.OpdAppointment.objects.filter(id=attrs.get('appointment_id')).first()
+            # else:
+            #     app = lab_models.LabAppointment.objects.filter(id=attrs.get('appointment_id')).first()
+            if query.exists():
                 raise serializers.ValidationError("Appointment Already Rated.")
+        if attrs.get('appointment_type') == RatingsReview.OPD and attrs.get('entity_id'):
+            if not attrs.get('related_entity_id'):
+                raise serializers.ValidationError("related_entity_id(Hospital) is missing for given entity_id(Doctor)")
+            elif not doc_models.Hospital.objects.filter(id=attrs.get('related_entity_id')).exists():
+                raise serializers.ValidationError("object for related_entity_id(Hospital) is not found")
         return attrs
 
 
@@ -48,6 +58,8 @@ class RatingListBodySerializerdata(serializers.Serializer):
             raise serializers.ValidationError('Doctor Not Found')
         elif attrs.get('content_type') == RatingsReview.LAB and not lab_models.Lab.objects.filter(id=attrs.get('object_id')).exists():
             raise serializers.ValidationError('Lab Not Found')
+        elif attrs.get('content_type') == RatingsReview.HOSPITAL and not doc_models.Hospital.objects.filter(id=attrs.get('object_id')).exists():
+            raise serializers.ValidationError('Hospital Not Found')
         return attrs
 
 
@@ -120,23 +132,63 @@ class RatingsGraphSerializer(serializers.Serializer):
         return avg
 
 
+class GoogleRatingsGraphSerializer(serializers.Serializer):
+    rating_count = serializers.SerializerMethodField()
+    review_count = serializers.SerializerMethodField()
+    avg_rating = serializers.SerializerMethodField()
+    star_count = serializers.SerializerMethodField()
+    top_compliments = serializers.SerializerMethodField()
+
+    def get_top_compliments(self, obj):
+        return None
+
+    def get_rating_count(self, obj):
+        count = obj.get('user_ratings_total') if obj.get('user_ratings_total') else None
+        return count
+
+    def get_review_count(self, obj):
+        empty_review_count = 0
+        if obj.get('user_reviews'):
+            for data in obj.get('user_reviews'):
+                if data.get('text') == '' or data.get('text') == None:
+                    empty_review_count += 1
+            count = len(obj.get('user_reviews')) - empty_review_count
+            return count
+        return None
+
+    def get_star_count(self, obj):
+        return None
+
+    def get_avg_rating(self, obj):
+        avg = obj.get('user_avg_rating') if obj.get('user_avg_rating') else None
+        if avg:
+            avg = round(avg, 1)
+        return avg
+
+
 class RatingsModelSerializer(serializers.ModelSerializer):
     compliment = serializers.SerializerMethodField()
     date = serializers.SerializerMethodField()
     user_name = serializers.SerializerMethodField()
+    is_verified = serializers.SerializerMethodField()
 
     def get_user_name(self, obj):
-        name = app = None
+        name = app = profile = None
         app_obj = self.context.get('app')
         if app_obj:
             for ap in app_obj:
                 if obj.appointment_id == ap.id:
                     app = ap
                     break
-            if app:
-                profile = app.profile
-                if profile:
-                    name = profile.name
+        if app:
+            profile = app.profile
+        else:
+            for pro in obj.user.profiles.all():
+                if pro.is_default_user:
+                    profile = pro
+                    break
+        if profile:
+            name = profile.name
         return name
 
     def get_date(self, obj):
@@ -154,9 +206,12 @@ class RatingsModelSerializer(serializers.ModelSerializer):
             compliments_string = (', ').join(c_list)
         return compliments_string
 
+    def get_is_verified(self, obj):
+        return True if obj.appointment_id else False
+
     class Meta:
         model = RatingsReview
-        fields = ('id', 'user', 'ratings', 'review', 'is_live', 'date', 'compliment', 'user_name')
+        fields = ('id', 'user', 'ratings', 'review', 'is_live', 'date', 'compliment', 'user_name', 'is_verified', 'appointment_id', 'object_id', 'related_entity_id')
 
 
 class RatingUpdateBodySerializer(serializers.Serializer):
