@@ -294,7 +294,10 @@ class LabList(viewsets.ReadOnlyModelViewSet):
                                 left JOIN "lab_test_category" ltc on ltrc.parent_category_id = ltc.id 
                                 WHERE "lab_test"."enable_for_retail" = true AND "lab_test"."is_package" = true 
                                 AND "lab_test"."searchable" = true AND "available_lab_test"."enabled" = true 
-                                AND "lab"."enabled" = true AND "lab"."is_live" = true '''
+                                AND "lab"."enabled" = true AND "lab"."is_live" = true and ltc.id is not null AND 
+                                ST_DWithin("lab"."location", St_setsrid(St_point((%(longitude)s), (%(latitude)s)), 4326), %(max_distance)s)
+                                and not ST_DWithin("lab"."location", St_setsrid(St_point((%(longitude)s), (%(latitude)s)), 4326), %(min_distance)s) '''
+
         # package_count_query = ' SELECT count(distinct available_lab_test)' \
         #                       ' FROM "lab_test" inner JOIN "available_lab_test" ON ("lab_test"."id" = "available_lab_test"."test_id")' \
         #                       ' inner JOIN "lab_pricing_group" ON ("available_lab_test"."lab_pricing_group_id" = "lab_pricing_group"."id")' \
